@@ -1,0 +1,16 @@
+.task
+bin
+frontend/dist
+frontend/node_modules
+build/linux/appimage/build
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+# Mobile generated (per-machine; overlays hold absolute paths)
+build/ios/xcode/
+build/android/overlay.json
+build/android/gen/
+build/android/.gradle/
+build/android/build/
+build/android/app/build/
+build/android/app/src/main/jniLibs/
+.idea/
+.codex/
