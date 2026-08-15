@@ -6,15 +6,23 @@ import {
   TriangleAlertIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useTranslation } from "react-i18next"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
+  const { t } = useTranslation("common")
 
   return (
     <Sonner
+      {...props}
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      containerAriaLabel={t("notifications")}
+      toastOptions={{
+        closeButtonAriaLabel: t("closeNotification"),
+        ...toastOptions,
+      }}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
@@ -30,7 +38,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--border-radius": "var(--radius)",
         } as React.CSSProperties
       }
-      {...props}
     />
   )
 }

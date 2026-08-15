@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react"
+import type { TFunction } from "i18next"
+import { useEffect, useMemo, useState } from "react"
 import { SearchIcon, SendIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,88 +35,89 @@ type Conversation = {
   }[]
 }
 
-const conversations: Conversation[] = [
+function createConversations(t: TFunction<"inbox">): Conversation[] {
+  return [
   {
     id: "lin-xiao",
-    name: "林晓",
-    initials: "林",
-    channel: "网站聊天",
-    preview: "退款大概多久到账？",
-    time: "刚刚",
-    status: "在线",
+    name: t("conversations.linXiao.name"),
+    initials: t("conversations.linXiao.initials"),
+    channel: t("channels.webChat"),
+    preview: t("conversations.linXiao.preview"),
+    time: t("conversations.linXiao.time"),
+    status: t("conversations.linXiao.status"),
     unread: 2,
     online: true,
     messages: [
       {
         id: "lin-1",
         author: "visitor",
-        text: "你好，我昨天提交了退款申请。",
+        text: t("conversations.linXiao.messages.lin1"),
         time: "10:41",
       },
       {
         id: "lin-2",
         author: "agent",
-        text: "你好，退款申请已经审核通过，款项正在原路退回。",
+        text: t("conversations.linXiao.messages.lin2"),
         time: "10:42",
       },
       {
         id: "lin-3",
         author: "visitor",
-        text: "退款大概多久到账？",
+        text: t("conversations.linXiao.messages.lin3"),
         time: "10:43",
       },
     ],
   },
   {
     id: "chen-yu",
-    name: "陈语",
-    initials: "陈",
-    channel: "应用内消息",
-    preview: "已经收到，谢谢你们。",
-    time: "8 分钟前",
-    status: "8 分钟前活跃",
+    name: t("conversations.chenYu.name"),
+    initials: t("conversations.chenYu.initials"),
+    channel: t("channels.inApp"),
+    preview: t("conversations.chenYu.preview"),
+    time: t("conversations.chenYu.time"),
+    status: t("conversations.chenYu.status"),
     messages: [
       {
         id: "chen-1",
         author: "visitor",
-        text: "请问发票已经开好了吗？",
+        text: t("conversations.chenYu.messages.chen1"),
         time: "10:28",
       },
       {
         id: "chen-2",
         author: "agent",
-        text: "已经发送到你的账户邮箱，请注意查收。",
+        text: t("conversations.chenYu.messages.chen2"),
         time: "10:31",
       },
       {
         id: "chen-3",
         author: "visitor",
-        text: "已经收到，谢谢你们。",
+        text: t("conversations.chenYu.messages.chen3"),
         time: "10:34",
       },
     ],
   },
   {
     id: "zhou-ran",
-    name: "周然",
-    initials: "周",
-    channel: "网站聊天",
-    preview: "登录页面一直提示网络错误。",
-    time: "25 分钟前",
-    status: "在线",
+    name: t("conversations.zhouRan.name"),
+    initials: t("conversations.zhouRan.initials"),
+    channel: t("channels.webChat"),
+    preview: t("conversations.zhouRan.preview"),
+    time: t("conversations.zhouRan.time"),
+    status: t("conversations.zhouRan.status"),
     unread: 1,
     online: true,
     messages: [
       {
         id: "zhou-1",
         author: "visitor",
-        text: "登录页面一直提示网络错误。",
+        text: t("conversations.zhouRan.messages.zhou1"),
         time: "10:12",
       },
       {
         id: "zhou-2",
         author: "agent",
-        text: "收到，我先帮你确认一下当前的服务状态。",
+        text: t("conversations.zhouRan.messages.zhou2"),
         time: "10:13",
       },
     ],
@@ -123,35 +126,42 @@ const conversations: Conversation[] = [
     id: "alex",
     name: "Alex Morgan",
     initials: "AM",
-    channel: "应用内消息",
-    preview: "想了解一下团队版的价格。",
-    time: "1 小时前",
-    status: "1 小时前活跃",
+    channel: t("channels.inApp"),
+    preview: t("conversations.alex.preview"),
+    time: t("conversations.alex.time"),
+    status: t("conversations.alex.status"),
     messages: [
       {
         id: "alex-1",
         author: "visitor",
-        text: "你好，想了解一下团队版的价格。",
+        text: t("conversations.alex.messages.alex1"),
         time: "09:35",
       },
       {
         id: "alex-2",
         author: "agent",
-        text: "你好，团队版会根据席位数量计费，后续我可以为你介绍详细方案。",
+        text: t("conversations.alex.messages.alex2"),
         time: "09:38",
       },
     ],
   },
-]
+  ]
+}
 
 function ConversationAvatar({ conversation }: { conversation: Conversation }) {
+  const { t } = useTranslation("inbox")
+
   return (
     <div className="relative shrink-0">
       <div className="flex size-9 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
         {conversation.initials}
       </div>
       {conversation.online ? (
-        <span className="absolute right-0 bottom-0 size-2.5 rounded-full border-2 border-background bg-primary" />
+        <span
+          role="img"
+          aria-label={t("onlineIndicator")}
+          className="absolute right-0 bottom-0 size-2.5 rounded-full border-2 border-background bg-primary"
+        />
       ) : null}
     </div>
   )
@@ -164,6 +174,8 @@ function ConversationThread({
   conversation: Conversation
   mobile?: boolean
 }) {
+  const { t } = useTranslation("inbox")
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header
@@ -185,12 +197,17 @@ function ConversationThread({
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 md:p-6">
           <div className="flex items-center gap-3 py-1 text-xs text-muted-foreground">
             <Separator className="flex-1" />
-            今天
+            {t("today")}
             <Separator className="flex-1" />
           </div>
           {conversation.messages.map((message) => (
             <div
               key={message.id}
+              aria-label={t(
+                message.author === "agent"
+                  ? "messageFromAgent"
+                  : "messageFromVisitor"
+              )}
               className={cn(
                 "flex",
                 message.author === "agent" ? "justify-end" : "justify-start"
@@ -223,14 +240,16 @@ function ConversationThread({
 
       <div className="shrink-0 border-t bg-background p-3 md:p-4">
         <div className="rounded-2xl border bg-muted/20 p-3">
-          <p className="min-h-8 text-sm text-muted-foreground">输入回复…</p>
+          <p className="min-h-8 text-sm text-muted-foreground">
+            {t("replyPlaceholder")}
+          </p>
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-muted-foreground">
-              回复功能将在后续接入
+              {t("replyComingSoon")}
             </span>
             <Button size="sm" disabled>
               <SendIcon />
-              发送
+              {t("send")}
             </Button>
           </div>
         </div>
@@ -240,7 +259,9 @@ function ConversationThread({
 }
 
 export function InboxPage() {
+  const { t } = useTranslation("inbox")
   const isMobile = useIsMobile()
+  const conversations = useMemo(() => createConversations(t), [t])
   const [selectedId, setSelectedId] = useState(conversations[0].id)
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
   const selectedConversation =
@@ -266,15 +287,21 @@ export function InboxPage() {
       <section className="flex min-h-0 w-full shrink-0 flex-col border-r md:w-80 lg:w-[22rem]">
         <div className="flex h-14 shrink-0 items-center px-4">
           <div>
-            <h2 className="text-sm font-medium">客户会话</h2>
-            <p className="text-xs text-muted-foreground">4 个进行中</p>
+            <h2 className="text-sm font-medium">{t("title")}</h2>
+            <p className="text-xs text-muted-foreground">
+              {t("ongoing", { count: conversations.length })}
+            </p>
           </div>
         </div>
         <Separator />
         <div className="shrink-0 p-3">
           <div className="relative">
             <SearchIcon className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
-            <Input aria-label="搜索会话" placeholder="搜索会话" className="pl-8" />
+            <Input
+              aria-label={t("search")}
+              placeholder={t("search")}
+              className="pl-8"
+            />
           </div>
         </div>
         <ScrollArea className="min-h-0 flex-1">
@@ -284,6 +311,11 @@ export function InboxPage() {
                 key={conversation.id}
                 type="button"
                 aria-pressed={selectedId === conversation.id}
+                aria-label={
+                  conversation.unread
+                    ? `${conversation.name}, ${t("unread", { count: conversation.unread })}`
+                    : conversation.name
+                }
                 className={cn(
                   "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-muted/60",
                   selectedId === conversation.id && "bg-muted"
@@ -324,8 +356,10 @@ export function InboxPage() {
       <Sheet open={isMobileDetailOpen} onOpenChange={setIsMobileDetailOpen}>
         <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
           <SheetHeader className="sr-only">
-            <SheetTitle>与 {selectedConversation.name} 的会话</SheetTitle>
-            <SheetDescription>客服会话详情</SheetDescription>
+            <SheetTitle>
+              {t("conversationTitle", { name: selectedConversation.name })}
+            </SheetTitle>
+            <SheetDescription>{t("detailDescription")}</SheetDescription>
           </SheetHeader>
           <ConversationThread conversation={selectedConversation} mobile />
         </SheetContent>

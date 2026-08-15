@@ -1,0 +1,109 @@
+const enUS = {
+  common: {
+    notifications: "Notifications",
+    closeNotification: "Close notification",
+    actions: {
+      close: "Close",
+    },
+    sidebar: {
+      title: "Sidebar",
+      description: "Displays the mobile sidebar.",
+      toggle: "Toggle sidebar",
+    },
+  },
+  auth: {
+    title: "Log in to Cervi",
+    description: "Enter any account and password to open the workspace",
+    accountLabel: "Account",
+    accountPlaceholder: "Enter any account",
+    passwordLabel: "Password",
+    forgotPassword: "Forgot your password?",
+    submit: "Log in",
+    googleLogin: "Continue with Google",
+    noAccount: "Don’t have an account?",
+    signUp: "Sign up",
+    success: "Logged in successfully",
+  },
+  workspace: {
+    brandSubtitle: "Workspace",
+    navigationGroup: "Menu",
+    inbox: "inbox",
+    menu: "Menu {{number}}",
+    logout: "Log out",
+    placeholderDescription:
+      "The workspace foundation is ready. Business content will be added later.",
+  },
+  inbox: {
+    title: "Customer conversations",
+    ongoing: "{{count}} ongoing",
+    ongoing_one: "{{count}} ongoing",
+    ongoing_other: "{{count}} ongoing",
+    search: "Search conversations",
+    today: "Today",
+    replyPlaceholder: "Type a reply…",
+    replyComingSoon: "Reply functionality will be added later",
+    send: "Send",
+    conversationTitle: "Conversation with {{name}}",
+    detailDescription: "Customer conversation details",
+    onlineIndicator: "Online",
+    unread: "{{count}} unread messages",
+    unread_one: "{{count}} unread message",
+    unread_other: "{{count}} unread messages",
+    messageFromVisitor: "Message from customer",
+    messageFromAgent: "Message from agent",
+    channels: {
+      webChat: "Website chat",
+      inApp: "In-app message",
+    },
+    conversations: {
+      linXiao: {
+        name: "Lin Xiao",
+        initials: "LX",
+        preview: "How long will the refund take?",
+        time: "Just now",
+        status: "Online",
+        messages: {
+          lin1: "Hi, I submitted a refund request yesterday.",
+          lin2: "Hi, your request has been approved and the payment is being returned to the original method.",
+          lin3: "How long will the refund take?",
+        },
+      },
+      chenYu: {
+        name: "Chen Yu",
+        initials: "CY",
+        preview: "I received it. Thank you.",
+        time: "8 minutes ago",
+        status: "Active 8 minutes ago",
+        messages: {
+          chen1: "Has my invoice been issued?",
+          chen2: "It has been sent to your account email. Please check your inbox.",
+          chen3: "I received it. Thank you.",
+        },
+      },
+      zhouRan: {
+        name: "Zhou Ran",
+        initials: "ZR",
+        preview: "The login page keeps showing a network error.",
+        time: "25 minutes ago",
+        status: "Online",
+        messages: {
+          zhou1: "The login page keeps showing a network error.",
+          zhou2: "Got it. I’ll check the current service status for you.",
+        },
+      },
+      alex: {
+        name: "Alex Morgan",
+        initials: "AM",
+        preview: "I’d like to learn about Team plan pricing.",
+        time: "1 hour ago",
+        status: "Active 1 hour ago",
+        messages: {
+          alex1: "Hi, I’d like to learn about Team plan pricing.",
+          alex2: "Hi, the Team plan is priced by seat. I can walk you through the details later.",
+        },
+      },
+    },
+  },
+} as const
+
+export default enUS

@@ -1,0 +1,108 @@
+const zhCN = {
+  common: {
+    notifications: "通知",
+    closeNotification: "关闭通知",
+    actions: {
+      close: "关闭",
+    },
+    sidebar: {
+      title: "侧栏",
+      description: "显示移动端侧栏。",
+      toggle: "切换侧栏",
+    },
+  },
+  auth: {
+    title: "登录 Cervi",
+    description: "输入任意账号和密码即可进入工作台",
+    accountLabel: "账号",
+    accountPlaceholder: "请输入任意账号",
+    passwordLabel: "密码",
+    forgotPassword: "忘记密码？",
+    submit: "登录",
+    googleLogin: "使用 Google 登录",
+    noAccount: "还没有账号？",
+    signUp: "注册",
+    success: "登录成功",
+  },
+  workspace: {
+    brandSubtitle: "工作台",
+    navigationGroup: "菜单",
+    inbox: "inbox",
+    menu: "菜单 {{number}}",
+    logout: "退出登录",
+    placeholderDescription: "工作台基础架构已经就绪，业务内容将在后续步骤中补充。",
+  },
+  inbox: {
+    title: "客户会话",
+    ongoing: "{{count}} 个进行中",
+    ongoing_one: "{{count}} 个进行中",
+    ongoing_other: "{{count}} 个进行中",
+    search: "搜索会话",
+    today: "今天",
+    replyPlaceholder: "输入回复…",
+    replyComingSoon: "回复功能将在后续接入",
+    send: "发送",
+    conversationTitle: "与 {{name}} 的会话",
+    detailDescription: "客服会话详情",
+    onlineIndicator: "在线",
+    unread: "{{count}} 条未读消息",
+    unread_one: "{{count}} 条未读消息",
+    unread_other: "{{count}} 条未读消息",
+    messageFromVisitor: "客户消息",
+    messageFromAgent: "客服消息",
+    channels: {
+      webChat: "网站聊天",
+      inApp: "应用内消息",
+    },
+    conversations: {
+      linXiao: {
+        name: "林晓",
+        initials: "林",
+        preview: "退款大概多久到账？",
+        time: "刚刚",
+        status: "在线",
+        messages: {
+          lin1: "你好，我昨天提交了退款申请。",
+          lin2: "你好，退款申请已经审核通过，款项正在原路退回。",
+          lin3: "退款大概多久到账？",
+        },
+      },
+      chenYu: {
+        name: "陈语",
+        initials: "陈",
+        preview: "已经收到，谢谢你们。",
+        time: "8 分钟前",
+        status: "8 分钟前活跃",
+        messages: {
+          chen1: "请问发票已经开好了吗？",
+          chen2: "已经发送到你的账户邮箱，请注意查收。",
+          chen3: "已经收到，谢谢你们。",
+        },
+      },
+      zhouRan: {
+        name: "周然",
+        initials: "周",
+        preview: "登录页面一直提示网络错误。",
+        time: "25 分钟前",
+        status: "在线",
+        messages: {
+          zhou1: "登录页面一直提示网络错误。",
+          zhou2: "收到，我先帮你确认一下当前的服务状态。",
+        },
+      },
+      alex: {
+        name: "Alex Morgan",
+        initials: "AM",
+        preview: "想了解一下团队版的价格。",
+        time: "1 小时前",
+        status: "1 小时前活跃",
+        messages: {
+          alex1: "你好，想了解一下团队版的价格。",
+          alex2: "你好，团队版会根据席位数量计费，后续我可以为你介绍详细方案。",
+        },
+      },
+    },
+  },
+} as const
+
+export default zhCN

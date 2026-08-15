@@ -1,4 +1,5 @@
 import type { FormEvent } from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
@@ -25,9 +26,11 @@ export function LoginForm({
 }: React.ComponentProps<"div"> & {
   onLogin: () => void
 }) {
+  const { t } = useTranslation("auth")
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    toast.success("登录成功")
+    toast.success(t("success"))
     onLogin()
   }
 
@@ -35,30 +38,32 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>登录 Cervi</CardTitle>
-          <CardDescription>输入任意账号和密码即可进入工作台</CardDescription>
+          <CardTitle>{t("title")}</CardTitle>
+          <CardDescription>{t("description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="account">账号</FieldLabel>
+                <FieldLabel htmlFor="account">{t("accountLabel")}</FieldLabel>
                 <Input
                   id="account"
-                  placeholder="请输入任意账号"
+                  placeholder={t("accountPlaceholder")}
                   autoComplete="username"
                   required
                 />
               </Field>
               <Field>
                 <div className="flex items-center">
-                  <FieldLabel htmlFor="password">密码</FieldLabel>
+                  <FieldLabel htmlFor="password">
+                    {t("passwordLabel")}
+                  </FieldLabel>
                   <a
                     href="#"
                     className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
                     onClick={(event) => event.preventDefault()}
                   >
-                    忘记密码？
+                    {t("forgotPassword")}
                   </a>
                 </div>
                 <Input
@@ -69,14 +74,14 @@ export function LoginForm({
                 />
               </Field>
               <Field>
-                <Button type="submit">登录</Button>
+                <Button type="submit">{t("submit")}</Button>
                 <Button variant="outline" type="button">
-                  使用 Google 登录
+                  {t("googleLogin")}
                 </Button>
                 <FieldDescription className="text-center">
-                  还没有账号？{" "}
+                  {t("noAccount")} {" "}
                   <a href="#" onClick={(event) => event.preventDefault()}>
-                    注册
+                    {t("signUp")}
                   </a>
                 </FieldDescription>
               </Field>

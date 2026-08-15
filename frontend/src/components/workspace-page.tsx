@@ -1,9 +1,11 @@
+import type { TFunction } from "i18next"
 import {
   CircleIcon,
   InboxIcon,
   LogOutIcon,
   PanelsTopLeftIcon,
 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate, useParams } from "react-router"
 
 import { InboxPage } from "@/components/inbox/inbox-page"
@@ -26,13 +28,22 @@ import {
 } from "@/components/ui/sidebar"
 
 const menuItems = [
-  { id: "inbox", label: "inbox", icon: InboxIcon },
+  { id: "inbox", kind: "inbox" as const, icon: InboxIcon },
   ...Array.from({ length: 5 }, (_, index) => ({
     id: `menu-${index + 1}`,
-    label: `菜单 ${index + 1}`,
+    kind: "placeholder" as const,
+    number: index + 1,
     icon: CircleIcon,
   })),
 ]
+
+type MenuItem = (typeof menuItems)[number]
+
+function getMenuLabel(item: MenuItem, t: TFunction<"workspace">) {
+  return item.kind === "inbox"
+    ? t("inbox")
+    : t("menu", { number: item.number })
+}
 
 function WorkspaceSidebar({
   activeMenuId,
@@ -42,6 +53,7 @@ function WorkspaceSidebar({
   onLogout: () => void
 }) {
   const navigate = useNavigate()
+  const { t } = useTranslation("workspace")
   const { isMobile, setOpenMobile } = useSidebar()
 
   function selectMenu(menuId: string) {
@@ -63,7 +75,7 @@ function WorkspaceSidebar({
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Cervi</span>
-                <span className="truncate text-xs">工作台</span>
+                <span className="truncate text-xs">{t("brandSubtitle")}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -71,18 +83,18 @@ function WorkspaceSidebar({
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>菜单</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("navigationGroup")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     isActive={activeMenuId === item.id}
-                    tooltip={item.label}
+                    tooltip={getMenuLabel(item, t)}
                     onClick={() => selectMenu(item.id)}
                   >
                     <item.icon />
-                    <span>{item.label}</span>
+                    <span>{getMenuLabel(item, t)}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -93,9 +105,9 @@ function WorkspaceSidebar({
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="退出登录" onClick={onLogout}>
+            <SidebarMenuButton tooltip={t("logout")} onClick={onLogout}>
               <LogOutIcon />
-              <span>退出登录</span>
+              <span>{t("logout")}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -105,6 +117,7 @@ function WorkspaceSidebar({
 }
 
 export function WorkspacePage({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation("workspace")
   const { menuId } = useParams()
   const activeMenu = menuItems.find((item) => item.id === menuId)
 
@@ -119,7 +132,9 @@ export function WorkspacePage({ onLogout }: { onLogout: () => void }) {
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
-          <h1 className="text-sm font-medium">{activeMenu.label}</h1>
+          <h1 className="text-sm font-medium">
+            {getMenuLabel(activeMenu, t)}
+          </h1>
         </header>
         {activeMenu.id === "inbox" ? (
           <InboxPage />
@@ -131,10 +146,10 @@ export function WorkspacePage({ onLogout }: { onLogout: () => void }) {
                   <PanelsTopLeftIcon className="size-5 text-muted-foreground" />
                 </div>
                 <h2 className="text-lg font-semibold tracking-tight">
-                  {activeMenu.label}
+                  {getMenuLabel(activeMenu, t)}
                 </h2>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  工作台基础架构已经就绪，业务内容将在后续步骤中补充。
+                  {t("placeholderDescription")}
                 </p>
               </div>
             </section>
