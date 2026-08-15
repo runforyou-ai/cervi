@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: cervi
+      POSTGRES_USER: cervi
+      POSTGRES_PASSWORD: cervi_local_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - cervi-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cervi -d cervi"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: build/docker/Dockerfile.server
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://cervi:cervi_local_dev@postgres:5432/cervi?sslmode=disable
+      WAILS_SERVER_HOST: 0.0.0.0
+      WAILS_SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+
+volumes:
+  cervi-postgres-data:

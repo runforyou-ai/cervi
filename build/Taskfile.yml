@@ -272,6 +272,8 @@ tasks:
           DEV: "true"
     cmds:
       - '"./{{.BIN_DIR}}/{{.APP_NAME}}-server{{exeExt}}"'
+    env:
+      DATABASE_URL: '{{.DATABASE_URL | default "postgres://cervi:cervi_local_dev@localhost:5432/cervi?sslmode=disable"}}'
 
   build:docker:
     summary: Builds a Docker image for server mode deployment

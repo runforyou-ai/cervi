@@ -54,6 +54,28 @@ tasks:
     cmds:
       - task: common:run:server
 
+  db:up:
+    summary: Starts the local PostgreSQL database
+    cmds:
+      - docker compose up -d --wait postgres
+
+  db:down:
+    summary: Stops the local PostgreSQL database
+    cmds:
+      - docker compose down
+
+  db:logs:
+    summary: Follows local PostgreSQL logs
+    cmds:
+      - docker compose logs -f postgres
+
+  db:migration:create:
+    summary: Creates a new sequential Goose SQL migration (NAME=... is required)
+    requires:
+      vars: [NAME]
+    cmds:
+      - go run github.com/pressly/goose/v3/cmd/goose@v3.27.3 -dir internal/storage/postgres/migrations -s create "{{.NAME}}" sql
+
   build:docker:
     summary: Builds a Docker image for server mode deployment
     cmds:

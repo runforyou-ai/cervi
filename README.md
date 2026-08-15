@@ -1,59 +1,86 @@
-# Welcome to Your New Wails3 Project!
+# Cervi
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+Cervi is a Wails 3 application targeting server, desktop, and mobile runtimes.
+The server build uses PostgreSQL through Bun and applies embedded Goose
+migrations during startup. Desktop and mobile storage will be added separately.
 
-## Getting Started
+## Local server development
 
-1. Navigate to your project directory in the terminal.
+Requirements: Go, Wails 3, Node.js/npm, Docker, and Docker Compose.
 
-2. To run your application in development mode, use the following command:
+Start PostgreSQL:
 
-   ```
-   wails3 dev
-   ```
+```sh
+wails3 task db:up
+```
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+Build and run the Wails server. The local task supplies the development
+`DATABASE_URL` used by `docker-compose.yml` unless it is overridden:
 
-3. To build your application for production, use:
+```sh
+wails3 task run:server
+```
 
-   ```
-   wails3 build
-   ```
+The application is available at <http://localhost:8080>. Server mode is built
+with Wails' `server` build tag and does not create a native window.
 
-   This will create a production-ready executable in the `build` directory.
+To override the database or pool settings:
 
-## Exploring Wails3 Features
+```sh
+DATABASE_URL='postgres://user:password@host:5432/database?sslmode=require' \
+POSTGRES_MAX_OPEN_CONNS=25 \
+wails3 task run:server
+```
 
-Now that you have your project set up, it's time to explore the features that Wails3 offers:
+Supported PostgreSQL environment variables:
 
-1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
+| Variable | Default |
+| --- | --- |
+| `DATABASE_URL` | Required in server builds |
+| `POSTGRES_MAX_OPEN_CONNS` | `25` |
+| `POSTGRES_MAX_IDLE_CONNS` | `5` |
+| `POSTGRES_CONN_MAX_LIFETIME` | `30m` |
+| `POSTGRES_CONN_MAX_IDLE_TIME` | `5m` |
+| `POSTGRES_STARTUP_TIMEOUT` | `1m` |
 
-2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
+The process fails fast if PostgreSQL cannot be reached or a migration fails.
+Migration SQL is embedded in the binary from
+`internal/storage/postgres/migrations`.
 
-   ```
-   go run .
-   ```
+Create the next sequential Goose migration with:
 
-   Note: Some examples may be under development during the alpha phase.
+```sh
+wails3 task db:migration:create NAME=create_users
+```
 
-3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3.wails.io/) for in-depth guides and API references.
+Stop the local database without deleting its named volume:
 
-4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
+```sh
+wails3 task db:down
+```
 
-## Project Structure
+## Containers
 
-Take a moment to familiarize yourself with your project structure:
+Run PostgreSQL only (the default):
 
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
+```sh
+docker compose up -d --wait postgres
+```
 
-## Next Steps
+Or build and run the complete server stack:
 
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
+```sh
+docker compose --profile app up --build
+```
 
-Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+The credentials in `docker-compose.yml` are for local development only. A
+deployed server must receive `DATABASE_URL` from its secret/configuration
+system.
+
+## Desktop development
+
+Desktop startup remains unchanged and does not require PostgreSQL:
+
+```sh
+wails3 dev
+```
