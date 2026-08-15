@@ -3,7 +3,7 @@ import {Events, WML} from "@wailsio/runtime";
 import {GreetService} from "../bindings/github.com/runforyou-ai/cervi";
 
 // Show the actual Wails version this project was generated against.
-const wailsVersion = "v3.0.0-beta.6";
+const wailsVersion = "v3.0.0-beta.8";
 
 function App() {
   const [name, setName] = useState<string>('');
