@@ -11,13 +11,13 @@ import {
 
 function resolveBrowserLanguage(): SupportedLanguage {
   const browserLanguage = navigator.languages[0] ?? navigator.language
-  const normalizedLanguage = browserLanguage.toLowerCase()
+  const browserLocale = new Intl.Locale(browserLanguage).maximize()
 
-  if (normalizedLanguage.startsWith("zh")) {
+  if (browserLocale.language === "zh" && browserLocale.script === "Hans") {
     return "zh-CN"
   }
 
-  if (normalizedLanguage.startsWith("en")) {
+  if (browserLocale.language === "en") {
     return "en-US"
   }
 
