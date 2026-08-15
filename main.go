@@ -37,7 +37,6 @@ func main() {
 }
 
 func run() error {
-	// 初始化当前构建目标的存储。
 	appStorage, err := storage.Open(context.Background())
 	if err != nil {
 		return fmt.Errorf("initialize storage: %w", err)

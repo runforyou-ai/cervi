@@ -6,6 +6,7 @@ package mobile
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	sqliteinfra "github.com/runforyou-ai/cervi/internal/storage/internal/sqlite"
 	"github.com/uptrace/bun"
@@ -22,6 +23,8 @@ func Open(ctx context.Context, databasePath string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize mobile SQLite: %w", err)
 	}
+	slog.Info("移动端 SQLite 连接成功")
+
 	if err := migrate(ctx, db.DB); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate mobile SQLite: %w", err)
