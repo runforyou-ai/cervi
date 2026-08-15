@@ -50,6 +50,14 @@ const zhCN = {
     unread_other: "{{count}} 条未读消息",
     messageFromVisitor: "客户消息",
     messageFromAgent: "客服消息",
+    customerPanel: {
+      title: "客户信息",
+      show: "显示客户信息",
+      hide: "隐藏客户信息",
+      channel: "渠道",
+      notes: "备注",
+      notesPlaceholder: "客户备注将在后续接入。",
+    },
     channels: {
       webChat: "网站聊天",
       inApp: "应用内消息",

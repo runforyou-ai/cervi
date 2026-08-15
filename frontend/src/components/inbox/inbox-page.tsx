@@ -1,6 +1,11 @@
 import type { TFunction } from "i18next"
 import { useEffect, useMemo, useState } from "react"
-import { SearchIcon, SendIcon } from "lucide-react"
+import {
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
+  SearchIcon,
+  SendIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
@@ -124,8 +129,8 @@ function createConversations(t: TFunction<"inbox">): Conversation[] {
   },
   {
     id: "alex",
-    name: "Alex Morgan",
-    initials: "AM",
+    name: t("conversations.alex.name"),
+    initials: t("conversations.alex.initials"),
     channel: t("channels.inApp"),
     preview: t("conversations.alex.preview"),
     time: t("conversations.alex.time"),
@@ -170,9 +175,13 @@ function ConversationAvatar({ conversation }: { conversation: Conversation }) {
 function ConversationThread({
   conversation,
   mobile = false,
+  customerPanelOpen,
+  onCustomerPanelToggle,
 }: {
   conversation: Conversation
   mobile?: boolean
+  customerPanelOpen?: boolean
+  onCustomerPanelToggle?: () => void
 }) {
   const { t } = useTranslation("inbox")
 
@@ -191,6 +200,31 @@ function ConversationThread({
             {conversation.channel} · {conversation.status}
           </p>
         </div>
+        {onCustomerPanelToggle ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto"
+            aria-label={
+              customerPanelOpen
+                ? t("customerPanel.hide")
+                : t("customerPanel.show")
+            }
+            aria-pressed={customerPanelOpen}
+            title={
+              customerPanelOpen
+                ? t("customerPanel.hide")
+                : t("customerPanel.show")
+            }
+            onClick={onCustomerPanelToggle}
+          >
+            {customerPanelOpen ? (
+              <PanelRightCloseIcon />
+            ) : (
+              <PanelRightOpenIcon />
+            )}
+          </Button>
+        ) : null}
       </header>
 
       <ScrollArea className="min-h-0 flex-1 bg-muted/20">
@@ -258,12 +292,59 @@ function ConversationThread({
   )
 }
 
+function CustomerPanel({ conversation }: { conversation: Conversation }) {
+  const { t } = useTranslation("inbox")
+
+  return (
+    <aside className="hidden min-h-0 w-[320px] shrink-0 flex-col border-l bg-background md:flex">
+      <header className="flex h-14 shrink-0 items-center border-b px-4">
+        <h2 className="text-sm font-medium">{t("customerPanel.title")}</h2>
+      </header>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="space-y-6 p-4">
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
+              {conversation.initials}
+            </div>
+            <div>
+              <p className="text-sm font-medium">{conversation.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {conversation.status}
+              </p>
+            </div>
+          </div>
+          <Separator />
+          <dl className="space-y-4 text-sm">
+            <div className="space-y-1">
+              <dt className="text-xs text-muted-foreground">
+                {t("customerPanel.channel")}
+              </dt>
+              <dd>{conversation.channel}</dd>
+            </div>
+            <div className="space-y-1">
+              <dt className="text-xs text-muted-foreground">
+                {t("customerPanel.notes")}
+              </dt>
+              <dd className="text-muted-foreground">
+                {t("customerPanel.notesPlaceholder")}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </ScrollArea>
+    </aside>
+  )
+}
+
 export function InboxPage() {
   const { t } = useTranslation("inbox")
   const isMobile = useIsMobile()
   const conversations = useMemo(() => createConversations(t), [t])
   const [selectedId, setSelectedId] = useState(conversations[0].id)
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
+  const [isCustomerPanelOpen, setIsCustomerPanelOpen] = useState(
+    () => window.innerWidth >= 1440
+  )
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedId) ??
     conversations[0]
@@ -283,8 +364,8 @@ export function InboxPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden bg-background">
-      <section className="flex min-h-0 w-full shrink-0 flex-col border-r md:w-80 lg:w-[22rem]">
+    <div className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden bg-background">
+      <section className="flex min-h-0 w-full shrink-0 flex-col border-r md:w-[320px]">
         <div className="flex h-14 shrink-0 items-center px-4">
           <div>
             <h2 className="text-sm font-medium">{t("title")}</h2>
@@ -349,9 +430,19 @@ export function InboxPage() {
         </ScrollArea>
       </section>
 
-      <section className="hidden min-w-0 flex-1 md:block">
-        <ConversationThread conversation={selectedConversation} />
+      <section className="hidden min-w-[560px] flex-1 md:block">
+        <ConversationThread
+          conversation={selectedConversation}
+          customerPanelOpen={isCustomerPanelOpen}
+          onCustomerPanelToggle={() =>
+            setIsCustomerPanelOpen((isOpen) => !isOpen)
+          }
+        />
       </section>
+
+      {isCustomerPanelOpen ? (
+        <CustomerPanel conversation={selectedConversation} />
+      ) : null}
 
       <Sheet open={isMobileDetailOpen} onOpenChange={setIsMobileDetailOpen}>
         <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">

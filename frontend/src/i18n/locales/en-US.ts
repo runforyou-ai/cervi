@@ -51,6 +51,14 @@ const enUS = {
     unread_other: "{{count}} unread messages",
     messageFromVisitor: "Message from customer",
     messageFromAgent: "Message from agent",
+    customerPanel: {
+      title: "Customer details",
+      show: "Show customer details",
+      hide: "Hide customer details",
+      channel: "Channel",
+      notes: "Notes",
+      notesPlaceholder: "Customer notes will be added later.",
+    },
     channels: {
       webChat: "Website chat",
       inApp: "In-app message",

@@ -1,5 +1,4 @@
 import i18n from "i18next"
-import LanguageDetector from "i18next-browser-languagedetector"
 import { initReactI18next } from "react-i18next"
 
 import {
@@ -10,25 +9,38 @@ import {
   type SupportedLanguage,
 } from "@/i18n/resources"
 
-const languagePreferenceKey = "cervi.language"
+function resolveBrowserLanguage(): SupportedLanguage {
+  const browserLanguage = navigator.languages[0] ?? navigator.language
+  const normalizedLanguage = browserLanguage.toLowerCase()
 
-function normalizeLanguage(language: string): SupportedLanguage {
-  return language.toLowerCase().startsWith("zh") ? "zh-CN" : "en-US"
+  if (normalizedLanguage.startsWith("zh")) {
+    return "zh-CN"
+  }
+
+  if (normalizedLanguage.startsWith("en")) {
+    return "en-US"
+  }
+
+  console.warn("[i18n] 浏览器语言暂未支持，使用默认语言", {
+    browserLanguage,
+    fallbackLanguage,
+  })
+  return fallbackLanguage
 }
 
 function syncDocumentLanguage(language: string) {
-  const normalizedLanguage = normalizeLanguage(language)
-  document.documentElement.lang = normalizedLanguage
-  document.documentElement.dir = i18n.dir(normalizedLanguage)
+  document.documentElement.lang = language
+  document.documentElement.dir = i18n.dir(language)
 }
 
 i18n.on("languageChanged", syncDocumentLanguage)
 
-export const i18nReady = i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
+export async function initializeI18n() {
+  const language = resolveBrowserLanguage()
+
+  await i18n.use(initReactI18next).init({
     resources,
+    lng: language,
     defaultNS: defaultNamespace,
     fallbackLng: fallbackLanguage,
     supportedLngs: supportedLanguages,
@@ -36,38 +48,25 @@ export const i18nReady = i18n
     interpolation: {
       escapeValue: false,
     },
-    detection: {
-      order: ["localStorage", "navigator"],
-      lookupLocalStorage: languagePreferenceKey,
-      caches: [],
-      convertDetectedLanguage: normalizeLanguage,
-    },
     react: {
       useSuspense: false,
     },
   })
-  .then(() => {
-    syncDocumentLanguage(i18n.resolvedLanguage ?? fallbackLanguage)
-    return i18n
+
+  console.info("[i18n] 初始化完成", {
+    language: i18n.resolvedLanguage ?? language,
   })
 
-export function changeLanguage(language: SupportedLanguage) {
-  try {
-    localStorage.setItem(languagePreferenceKey, language)
-  } catch {
-    // Language switching still works when storage is unavailable.
-  }
-  return i18n.changeLanguage(language)
+  return i18n
+}
+
+export async function changeLanguage(language: SupportedLanguage) {
+  await i18n.changeLanguage(language)
+  console.info("[i18n] 语言已切换", { language })
 }
 
 export function followBrowserLanguage() {
-  try {
-    localStorage.removeItem(languagePreferenceKey)
-  } catch {
-    // Falling back to the browser language does not require storage.
-  }
-  const browserLanguage = navigator.languages[0] ?? navigator.language
-  return i18n.changeLanguage(normalizeLanguage(browserLanguage))
+  return changeLanguage(resolveBrowserLanguage())
 }
 
 export { i18n }
