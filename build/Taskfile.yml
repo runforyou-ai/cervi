@@ -11,8 +11,12 @@ tasks:
 
   install:frontend:deps:
     summary: Install frontend dependencies
-    dir: frontend
     run: once
+    cmds:
+      - task: install:frontend:deps:{{.PACKAGE_MANAGER}}
+
+  install:frontend:deps:npm:
+    dir: frontend
     sources:
       - package.json
       - package-lock.json
@@ -24,8 +28,48 @@ tasks:
     cmds:
       - npm install
 
+  install:frontend:deps:bun:
+    dir: frontend
+    sources:
+      - package.json
+      - bun.lock
+      - bun.lockb
+    generates:
+      - node_modules
+    preconditions:
+      - sh: bun --version
+        msg: "bun not found"
+    cmds:
+      - bun install
+
+  install:frontend:deps:pnpm:
+    dir: frontend
+    sources:
+      - package.json
+      - pnpm-lock.yaml
+    generates:
+      - node_modules
+    preconditions:
+      - sh: pnpm --version
+        msg: "pnpm not found"
+    cmds:
+      - pnpm install
+
+  install:frontend:deps:yarn:
+    dir: frontend
+    sources:
+      - package.json
+      - yarn.lock
+    status:
+      - test -d node_modules || test -f .pnp.cjs
+    preconditions:
+      - sh: yarn --version
+        msg: "yarn not found"
+    cmds:
+      - yarn install
+
   build:frontend:
-    label: build:frontend (DEV={{.DEV}})
+    label: build:frontend (DEV={{.DEV}} RUNNER={{.PACKAGE_MANAGER}})
     summary: Build the frontend project
     # 多架构构建共享绑定目录；只运行一次可避免生成器与打包器并发读写。
     run: once
@@ -44,9 +88,48 @@ tasks:
           OBFUSCATED:
             ref: .OBFUSCATED
     cmds:
-      - npm run {{if eq .DEV "true"}}build:dev{{else}}build{{end}} -q
+      - task: frontend:run
+        vars:
+          SCRIPT: '{{if eq .DEV "true"}}build:dev{{else}}build{{end}}'
     env:
       PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
+
+  frontend:run:
+    summary: Run a frontend script with selected runner
+    cmds:
+      - task: frontend:run:{{.PACKAGE_MANAGER}}
+        vars:
+          SCRIPT: "{{.SCRIPT}}"
+    vars:
+      SCRIPT: "{{.SCRIPT}}"
+
+  frontend:run:npm:
+    dir: frontend
+    cmds:
+      - npm run {{.SCRIPT}} -q
+    vars:
+      SCRIPT: "{{.SCRIPT}}"
+
+  frontend:run:yarn:
+    dir: frontend
+    cmds:
+      - yarn {{.SCRIPT}}
+    vars:
+      SCRIPT: "{{.SCRIPT}}"
+
+  frontend:run:pnpm:
+    dir: frontend
+    cmds:
+      - pnpm run {{.SCRIPT}}
+    vars:
+      SCRIPT: "{{.SCRIPT}}"
+
+  frontend:run:bun:
+    dir: frontend
+    cmds:
+      - bun run {{.SCRIPT}}
+    vars:
+      SCRIPT: "{{.SCRIPT}}"
 
   generate:bindings:
     summary: Generates bindings for the frontend
@@ -81,11 +164,30 @@ tasks:
 
   dev:frontend:
     summary: Runs the frontend in development mode
-    dir: frontend
     deps:
       - task: install:frontend:deps
     cmds:
+      - task: frontend:dev:{{.PACKAGE_MANAGER}}
+
+  frontend:dev:npm:
+    dir: frontend
+    cmds:
       - npm run dev -- --port {{.VITE_PORT}} --strictPort
+
+  frontend:dev:yarn:
+    dir: frontend
+    cmds:
+      - yarn dev --port {{.VITE_PORT}} --strictPort
+
+  frontend:dev:pnpm:
+    dir: frontend
+    cmds:
+      - pnpm dev --port {{.VITE_PORT}} --strictPort
+
+  frontend:dev:bun:
+    dir: frontend
+    cmds:
+      - bun run dev --port {{.VITE_PORT}} --strictPort
 
   update:build-assets:
     summary: Updates the build assets
