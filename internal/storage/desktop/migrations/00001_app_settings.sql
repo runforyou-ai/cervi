@@ -6,4 +6,4 @@ CREATE TABLE app_settings (
 );
 
 -- +goose Down
-DROP TABLE IF EXISTS app_settings;
+DROP TABLE app_settings;
