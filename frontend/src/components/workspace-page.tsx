@@ -54,13 +54,13 @@ function WorkspaceSidebar({
 }) {
   const navigate = useNavigate()
   const { t } = useTranslation("workspace")
-  const { isMobile, setOpenMobile } = useSidebar()
+  const { isNarrowViewport, setOpenNarrowViewport } = useSidebar()
 
   function selectMenu(menuId: string) {
     navigate(`/workspace/${menuId}`)
 
-    if (isMobile) {
-      setOpenMobile(false)
+    if (isNarrowViewport) {
+      setOpenNarrowViewport(false)
     }
   }
 

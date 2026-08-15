@@ -4,7 +4,7 @@ import { PanelLeftIcon } from "lucide-react"
 import { Slot } from "radix-ui"
 import { useTranslation } from "react-i18next"
 
-import { useIsMobile } from "@/hooks/use-mobile"
+import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,7 +27,7 @@ import {
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "220px"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
+const SIDEBAR_WIDTH_NARROW_VIEWPORT = "18rem"
 const SIDEBAR_WIDTH_ICON = "48px"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
@@ -35,9 +35,9 @@ type SidebarContextProps = {
   state: "expanded" | "collapsed"
   open: boolean
   setOpen: (open: boolean) => void
-  openMobile: boolean
-  setOpenMobile: (open: boolean) => void
-  isMobile: boolean
+  openNarrowViewport: boolean
+  setOpenNarrowViewport: (open: boolean) => void
+  isNarrowViewport: boolean
   toggleSidebar: () => void
 }
 
@@ -65,8 +65,8 @@ function SidebarProvider({
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
-  const isMobile = useIsMobile()
-  const [openMobile, setOpenMobile] = React.useState(false)
+  const isNarrowViewport = useIsNarrowViewport()
+  const [openNarrowViewport, setOpenNarrowViewport] = React.useState(false)
 
   const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
@@ -85,8 +85,10 @@ function SidebarProvider({
   )
 
   const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
-  }, [isMobile, setOpen, setOpenMobile])
+    return isNarrowViewport
+      ? setOpenNarrowViewport((open) => !open)
+      : setOpen((open) => !open)
+  }, [isNarrowViewport, setOpen, setOpenNarrowViewport])
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -110,12 +112,20 @@ function SidebarProvider({
       state,
       open,
       setOpen,
-      isMobile,
-      openMobile,
-      setOpenMobile,
+      isNarrowViewport,
+      openNarrowViewport,
+      setOpenNarrowViewport,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [
+      state,
+      open,
+      setOpen,
+      isNarrowViewport,
+      openNarrowViewport,
+      setOpenNarrowViewport,
+      toggleSidebar,
+    ]
   )
 
   return (
@@ -155,7 +165,12 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const {
+    isNarrowViewport,
+    state,
+    openNarrowViewport,
+    setOpenNarrowViewport,
+  } = useSidebar()
   const { t } = useTranslation("common")
 
   if (collapsible === "none") {
@@ -173,17 +188,21 @@ function Sidebar({
     )
   }
 
-  if (isMobile) {
+  if (isNarrowViewport) {
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+      <Sheet
+        open={openNarrowViewport}
+        onOpenChange={setOpenNarrowViewport}
+        {...props}
+      >
         <SheetContent
           data-sidebar="sidebar"
           data-slot="sidebar"
-          data-mobile="true"
+          data-narrow-viewport="true"
           className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
           style={
             {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              "--sidebar-width": SIDEBAR_WIDTH_NARROW_VIEWPORT,
             } as React.CSSProperties
           }
           side={side}
@@ -501,7 +520,7 @@ function SidebarMenuButton({
   tooltip?: string | React.ComponentProps<typeof TooltipContent>
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const Comp = asChild ? Slot.Root : "button"
-  const { isMobile, state } = useSidebar()
+  const { isNarrowViewport, state } = useSidebar()
 
   const button = (
     <Comp
@@ -530,7 +549,7 @@ function SidebarMenuButton({
       <TooltipContent
         side="right"
         align="center"
-        hidden={state !== "collapsed" || isMobile}
+        hidden={state !== "collapsed" || isNarrowViewport}
         {...tooltip}
       />
     </Tooltip>

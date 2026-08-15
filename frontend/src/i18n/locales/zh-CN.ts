@@ -7,7 +7,7 @@ const zhCN = {
     },
     sidebar: {
       title: "侧栏",
-      description: "显示移动端侧栏。",
+      description: "在窄视口中显示侧栏。",
       toggle: "切换侧栏",
     },
   },

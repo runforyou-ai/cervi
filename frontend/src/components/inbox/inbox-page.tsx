@@ -19,7 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { useIsMobile } from "@/hooks/use-mobile"
+import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { cn } from "@/lib/utils"
 
 type Conversation = {
@@ -174,12 +174,12 @@ function ConversationAvatar({ conversation }: { conversation: Conversation }) {
 
 function ConversationThread({
   conversation,
-  mobile = false,
+  narrowViewport = false,
   customerPanelOpen,
   onCustomerPanelToggle,
 }: {
   conversation: Conversation
-  mobile?: boolean
+  narrowViewport?: boolean
   customerPanelOpen?: boolean
   onCustomerPanelToggle?: () => void
 }) {
@@ -190,7 +190,7 @@ function ConversationThread({
       <header
         className={cn(
           "flex h-14 shrink-0 items-center gap-3 border-b px-4",
-          mobile && "pr-14"
+          narrowViewport && "pr-14"
         )}
       >
         <ConversationAvatar conversation={conversation} />
@@ -338,10 +338,10 @@ function CustomerPanel({ conversation }: { conversation: Conversation }) {
 
 export function InboxPage() {
   const { t } = useTranslation("inbox")
-  const isMobile = useIsMobile()
+  const isNarrowViewport = useIsNarrowViewport()
   const conversations = useMemo(() => createConversations(t), [t])
   const [selectedId, setSelectedId] = useState(conversations[0].id)
-  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
+  const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [isCustomerPanelOpen, setIsCustomerPanelOpen] = useState(
     () => window.matchMedia("(min-width: 1440px)").matches
   )
@@ -350,16 +350,16 @@ export function InboxPage() {
     conversations[0]
 
   useEffect(() => {
-    if (!isMobile) {
-      setIsMobileDetailOpen(false)
+    if (!isNarrowViewport) {
+      setIsNarrowDetailOpen(false)
     }
-  }, [isMobile])
+  }, [isNarrowViewport])
 
   function selectConversation(conversationId: string) {
     setSelectedId(conversationId)
 
-    if (isMobile) {
-      setIsMobileDetailOpen(true)
+    if (isNarrowViewport) {
+      setIsNarrowDetailOpen(true)
     }
   }
 
@@ -444,7 +444,7 @@ export function InboxPage() {
         <CustomerPanel conversation={selectedConversation} />
       ) : null}
 
-      <Sheet open={isMobileDetailOpen} onOpenChange={setIsMobileDetailOpen}>
+      <Sheet open={isNarrowDetailOpen} onOpenChange={setIsNarrowDetailOpen}>
         <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
           <SheetHeader className="sr-only">
             <SheetTitle>
@@ -452,7 +452,10 @@ export function InboxPage() {
             </SheetTitle>
             <SheetDescription>{t("detailDescription")}</SheetDescription>
           </SheetHeader>
-          <ConversationThread conversation={selectedConversation} mobile />
+          <ConversationThread
+            conversation={selectedConversation}
+            narrowViewport
+          />
         </SheetContent>
       </Sheet>
     </div>

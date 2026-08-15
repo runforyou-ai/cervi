@@ -7,7 +7,7 @@ const enUS = {
     },
     sidebar: {
       title: "Sidebar",
-      description: "Displays the mobile sidebar.",
+      description: "Displays the sidebar on narrow viewports.",
       toggle: "Toggle sidebar",
     },
   },
