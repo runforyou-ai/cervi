@@ -4,8 +4,7 @@ tasks:
   go:mod:tidy:
     summary: Runs `go mod tidy`
     internal: true
-    # Universal/multi-arch builds invoke this concurrently from parallel deps;
-    # two `go mod tidy` processes racing on go.mod can corrupt it (#4637).
+    # 多架构构建会并发依赖此任务；只运行一次可避免同时写入 go.mod。
     run: once
     cmds:
       - go mod tidy
@@ -72,11 +71,7 @@ tasks:
   build:frontend:
     label: build:frontend (DEV={{.DEV}} RUNNER={{.PACKAGE_MANAGER}})
     summary: Build the frontend project
-    # darwin:build:universal runs its per-arch builds as parallel deps, each of
-    # which depends on this task. Without run:once the two executions race:
-    # one regenerates frontend/bindings (-clean deletes it first) while the
-    # other's bundler is reading it, failing intermittently with
-    # 'Could not resolve "./bindings/<pkg>"' (#4637).
+    # 多架构构建共享绑定目录；只运行一次可避免生成器与打包器并发读写。
     run: once
     dir: frontend
     sources:
@@ -136,43 +131,6 @@ tasks:
     vars:
       SCRIPT: "{{.SCRIPT}}"
 
-  frontend:vendor:puppertino:
-    summary: Fetches Puppertino CSS into frontend/public for consistent mobile styling
-    sources:
-      - frontend/public/puppertino/puppertino.css
-    generates:
-      - frontend/public/puppertino/puppertino.css
-    cmds:
-      - |
-        set -euo pipefail
-        mkdir -p frontend/public/puppertino
-        # If bundled Puppertino exists, prefer it. Otherwise, try to fetch, but don't fail build on error.
-        if [ ! -f frontend/public/puppertino/puppertino.css ]; then
-          echo "No bundled Puppertino found. Attempting to fetch from GitHub..."
-          if curl -fsSL https://raw.githubusercontent.com/codedgar/Puppertino/main/dist/css/full.css -o frontend/public/puppertino/puppertino.css; then
-            curl -fsSL https://raw.githubusercontent.com/codedgar/Puppertino/main/LICENSE -o frontend/public/puppertino/LICENSE || true
-            echo "Puppertino CSS downloaded to frontend/public/puppertino/puppertino.css"
-          else
-            echo "Warning: Could not fetch Puppertino CSS. Proceeding without download since template may bundle it."
-          fi
-        else
-          echo "Using bundled Puppertino at frontend/public/puppertino/puppertino.css"
-        fi
-        # Ensure index.html includes Puppertino CSS and button classes
-        INDEX_HTML=frontend/index.html
-        if [ -f "$INDEX_HTML" ]; then
-          if ! grep -q 'href="/puppertino/puppertino.css"' "$INDEX_HTML"; then
-            # Insert Puppertino link tag after style.css link
-            awk '
-              /href="\/style.css"\/?/ && !x { print; print "    <link rel=\"stylesheet\" href=\"/puppertino/puppertino.css\"/>"; x=1; next }1
-            ' "$INDEX_HTML" > "$INDEX_HTML.tmp" && mv "$INDEX_HTML.tmp" "$INDEX_HTML"
-          fi
-          # Replace default .btn with Puppertino primary button classes if present
-          sed -E -i'' 's/class=\"btn\"/class=\"p-btn p-prim-col\"/g' "$INDEX_HTML" || true
-        fi
-
-
-
   generate:bindings:
     summary: Generates bindings for the frontend
     run: once
@@ -181,7 +139,8 @@ tasks:
     sources:
       - "**/*.[jt]s"
       - exclude: frontend/**/*
-      - frontend/bindings/**/*  # Rerun when switching between dev/production mode causes changes in output
+      # 构建标签变化时需要重新生成绑定。
+      - frontend/bindings/**/*
       - "**/*.go"
       - go.mod
       - go.sum
@@ -191,7 +150,7 @@ tasks:
       - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -ts -i
 
   generate:icons:
-    summary: Generates Windows `.ico` and Mac `.icns` from an image; on macOS, `-iconcomposerinput appicon.icon -macassetdir darwin` also produces `Assets.car` from a `.icon` file (skipped on other platforms).
+    summary: Generates application icons for Windows and macOS
     run: once
     dir: build
     sources:

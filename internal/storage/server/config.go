@@ -4,6 +4,7 @@ package server
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -33,6 +34,7 @@ type Config struct {
 func ConfigFromEnv() (Config, error) {
 	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	if dsn == "" {
+		slog.Warn("未配置 DATABASE_URL，使用本地开发数据库")
 		dsn = defaultDSN
 	}
 
