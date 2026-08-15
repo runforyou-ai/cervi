@@ -3,9 +3,11 @@ module github.com/runforyou-ai/cervi
 go 1.25.7
 
 require (
+	github.com/mattn/go-sqlite3 v1.14.49
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/uptrace/bun v1.2.18
 	github.com/uptrace/bun/dialect/pgdialect v1.2.18
+	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
 	github.com/wailsapp/wails/v3 v3.0.0-beta.8
 )
