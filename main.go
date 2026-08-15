@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"embed"
-
+	"fmt"
 	"log"
+	"log/slog"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -28,6 +31,22 @@ func init() {
 // and starts a goroutine that emits a time-based event every second. It subsequently runs the application and
 // logs any error that might occur.
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	// 初始化当前构建目标的存储。
+	appStorage, err := storage.Open(context.Background())
+	if err != nil {
+		return fmt.Errorf("initialize storage: %w", err)
+	}
+	defer func() {
+		if err := appStorage.Close(); err != nil {
+			slog.Warn("关闭存储失败", "error", err)
+		}
+	}()
 
 	// Create a new Wails application by providing the necessary options.
 	// Variables 'Name' and 'Description' are for application metadata.
@@ -42,6 +61,10 @@ func main() {
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
+		},
+		// Host 留空时监听 localhost；容器部署通过 WAILS_SERVER_HOST 覆盖。
+		Server: application.ServerOptions{
+			Port: 8080,
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
@@ -79,10 +102,5 @@ func main() {
 	}()
 
 	// Run the application. This blocks until the application has been exited.
-	err := app.Run()
-
-	// If an error occurred while running the application, log it and exit.
-	if err != nil {
-		log.Fatal(err)
-	}
+	return app.Run()
 }
