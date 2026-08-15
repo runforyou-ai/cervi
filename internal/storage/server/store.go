@@ -51,3 +51,8 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 func (s *Store) Close() error {
 	return s.db.Close()
 }
+
+// DB 返回服务端使用的 Bun 数据库连接。
+func (s *Store) DB() *bun.DB {
+	return s.db
+}

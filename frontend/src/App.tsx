@@ -1,51 +1,32 @@
-import { useState } from "react"
-import { Navigate, Route, Routes } from "react-router"
+import { lazy, Suspense } from "react"
+import { LoaderCircleIcon } from "lucide-react"
 
-import { LoginPage } from "@/components/login-page"
 import { Toaster } from "@/components/ui/sonner"
-import { WorkspacePage } from "@/components/workspace-page"
+import type { AppPlatform } from "@/platform/app-platform"
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const workspacePath = "/workspace/inbox"
+const WebApp = lazy(() => import("@/apps/web/web-app"))
+const DesktopApp = lazy(() => import("@/apps/desktop/desktop-app"))
+const MobileApp = lazy(() => import("@/apps/mobile/mobile-app"))
 
+function AppLoading() {
+  return (
+    <main className="flex min-h-dvh items-center justify-center">
+      <LoaderCircleIcon
+        aria-label="Loading"
+        className="size-5 animate-spin text-muted-foreground"
+      />
+    </main>
+  )
+}
+
+function App({ platform }: { platform: AppPlatform }) {
   return (
     <>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <Navigate to={isAuthenticated ? workspacePath : "/login"} replace />
-          }
-        />
-        <Route
-          path="/login"
-          element={
-            isAuthenticated ? (
-              <Navigate to={workspacePath} replace />
-            ) : (
-              <LoginPage onLogin={() => setIsAuthenticated(true)} />
-            )
-          }
-        />
-        <Route
-          path="/workspace"
-          element={
-            <Navigate to={isAuthenticated ? workspacePath : "/login"} replace />
-          }
-        />
-        <Route
-          path="/workspace/:menuId"
-          element={
-            isAuthenticated ? (
-              <WorkspacePage onLogout={() => setIsAuthenticated(false)} />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<AppLoading />}>
+        {platform === "web" ? <WebApp /> : null}
+        {platform === "desktop" ? <DesktopApp /> : null}
+        {platform === "mobile" ? <MobileApp /> : null}
+      </Suspense>
       <Toaster />
     </>
   )

@@ -17,6 +17,7 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
+// migrate 使用会话锁执行 PostgreSQL 数据库迁移。
 func migrate(ctx context.Context, db *sql.DB) error {
 	migrations, err := fs.Sub(migrationFiles, "migrations")
 	if err != nil {
@@ -43,7 +44,6 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	if len(results) == 0 {
-		slog.Info("PostgreSQL 数据库结构已是最新版本")
 		return nil
 	}
 	slog.Info("PostgreSQL 数据库迁移完成", "applied", len(results))

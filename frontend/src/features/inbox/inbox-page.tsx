@@ -1,6 +1,6 @@
-import type { TFunction } from "i18next"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import {
+  MessagesSquareIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
   SearchIcon,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import type { Conversation } from "@/api/inbox"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -22,138 +23,7 @@ import {
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { cn } from "@/lib/utils"
 
-type Conversation = {
-  id: string
-  name: string
-  initials: string
-  channel: string
-  preview: string
-  time: string
-  status: string
-  unread?: number
-  online?: boolean
-  messages: {
-    id: string
-    author: "visitor" | "agent"
-    text: string
-    time: string
-  }[]
-}
-
-function createConversations(t: TFunction<"inbox">): Conversation[] {
-  return [
-  {
-    id: "lin-xiao",
-    name: t("conversations.linXiao.name"),
-    initials: t("conversations.linXiao.initials"),
-    channel: t("channels.webChat"),
-    preview: t("conversations.linXiao.preview"),
-    time: t("conversations.linXiao.time"),
-    status: t("conversations.linXiao.status"),
-    unread: 2,
-    online: true,
-    messages: [
-      {
-        id: "lin-1",
-        author: "visitor",
-        text: t("conversations.linXiao.messages.lin1"),
-        time: "10:41",
-      },
-      {
-        id: "lin-2",
-        author: "agent",
-        text: t("conversations.linXiao.messages.lin2"),
-        time: "10:42",
-      },
-      {
-        id: "lin-3",
-        author: "visitor",
-        text: t("conversations.linXiao.messages.lin3"),
-        time: "10:43",
-      },
-    ],
-  },
-  {
-    id: "chen-yu",
-    name: t("conversations.chenYu.name"),
-    initials: t("conversations.chenYu.initials"),
-    channel: t("channels.inApp"),
-    preview: t("conversations.chenYu.preview"),
-    time: t("conversations.chenYu.time"),
-    status: t("conversations.chenYu.status"),
-    messages: [
-      {
-        id: "chen-1",
-        author: "visitor",
-        text: t("conversations.chenYu.messages.chen1"),
-        time: "10:28",
-      },
-      {
-        id: "chen-2",
-        author: "agent",
-        text: t("conversations.chenYu.messages.chen2"),
-        time: "10:31",
-      },
-      {
-        id: "chen-3",
-        author: "visitor",
-        text: t("conversations.chenYu.messages.chen3"),
-        time: "10:34",
-      },
-    ],
-  },
-  {
-    id: "zhou-ran",
-    name: t("conversations.zhouRan.name"),
-    initials: t("conversations.zhouRan.initials"),
-    channel: t("channels.webChat"),
-    preview: t("conversations.zhouRan.preview"),
-    time: t("conversations.zhouRan.time"),
-    status: t("conversations.zhouRan.status"),
-    unread: 1,
-    online: true,
-    messages: [
-      {
-        id: "zhou-1",
-        author: "visitor",
-        text: t("conversations.zhouRan.messages.zhou1"),
-        time: "10:12",
-      },
-      {
-        id: "zhou-2",
-        author: "agent",
-        text: t("conversations.zhouRan.messages.zhou2"),
-        time: "10:13",
-      },
-    ],
-  },
-  {
-    id: "alex",
-    name: t("conversations.alex.name"),
-    initials: t("conversations.alex.initials"),
-    channel: t("channels.inApp"),
-    preview: t("conversations.alex.preview"),
-    time: t("conversations.alex.time"),
-    status: t("conversations.alex.status"),
-    messages: [
-      {
-        id: "alex-1",
-        author: "visitor",
-        text: t("conversations.alex.messages.alex1"),
-        time: "09:35",
-      },
-      {
-        id: "alex-2",
-        author: "agent",
-        text: t("conversations.alex.messages.alex2"),
-        time: "09:38",
-      },
-    ],
-  },
-  ]
-}
-
-function ConversationAvatar({ conversation }: { conversation: Conversation }) {
+function InboxConversationAvatar({ conversation }: { conversation: Conversation }) {
   const { t } = useTranslation("inbox")
 
   return (
@@ -193,7 +63,7 @@ function ConversationThread({
           narrowViewport && "pr-14"
         )}
       >
-        <ConversationAvatar conversation={conversation} />
+        <InboxConversationAvatar conversation={conversation} />
         <div className="min-w-0">
           <h2 className="truncate text-sm font-medium">{conversation.name}</h2>
           <p className="truncate text-xs text-muted-foreground">
@@ -336,24 +206,78 @@ function CustomerPanel({ conversation }: { conversation: Conversation }) {
   )
 }
 
-export function InboxPage() {
+export function InboxPage({
+  conversations,
+}: {
+  conversations: Conversation[]
+}) {
   const { t } = useTranslation("inbox")
   const isNarrowViewport = useIsNarrowViewport()
-  const conversations = useMemo(() => createConversations(t), [t])
-  const [selectedId, setSelectedId] = useState(conversations[0].id)
+  const [selectedId, setSelectedId] = useState(
+    () => conversations[0]?.id ?? ""
+  )
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [isCustomerPanelOpen, setIsCustomerPanelOpen] = useState(
     () => window.matchMedia("(min-width: 1440px)").matches
   )
-  const selectedConversation =
-    conversations.find((conversation) => conversation.id === selectedId) ??
-    conversations[0]
 
   useEffect(() => {
     if (!isNarrowViewport) {
       setIsNarrowDetailOpen(false)
     }
   }, [isNarrowViewport])
+
+  useEffect(() => {
+    if (!conversations.some((conversation) => conversation.id === selectedId)) {
+      setSelectedId(conversations[0]?.id ?? "")
+    }
+  }, [conversations, selectedId])
+
+  if (conversations.length === 0) {
+    return (
+      <div className="flex min-h-0 flex-1 bg-background">
+        <section className="hidden min-h-0 w-[320px] shrink-0 flex-col border-r md:flex">
+          <div className="flex h-14 shrink-0 items-center px-4">
+            <div>
+              <h2 className="text-sm font-medium">{t("title")}</h2>
+              <p className="text-xs text-muted-foreground">
+                {t("ongoing", { count: 0 })}
+              </p>
+            </div>
+          </div>
+          <Separator />
+          <div className="p-3">
+            <div className="relative">
+              <SearchIcon className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
+              <Input
+                aria-label={t("search")}
+                placeholder={t("search")}
+                className="pl-8"
+                disabled
+              />
+            </div>
+          </div>
+        </section>
+        <section className="flex min-w-0 flex-1 items-center justify-center p-6">
+          <div className="max-w-sm text-center">
+            <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
+              <MessagesSquareIcon className="size-5 text-muted-foreground" />
+            </div>
+            <h2 className="text-base font-semibold tracking-tight">
+              {t("emptyTitle")}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t("emptyDescription")}
+            </p>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  const selectedConversation =
+    conversations.find((conversation) => conversation.id === selectedId) ??
+    conversations[0]
 
   function selectConversation(conversationId: string) {
     setSelectedId(conversationId)
@@ -403,7 +327,7 @@ export function InboxPage() {
                 )}
                 onClick={() => selectConversation(conversation.id)}
               >
-                <ConversationAvatar conversation={conversation} />
+                <InboxConversationAvatar conversation={conversation} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">
