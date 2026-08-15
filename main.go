@@ -73,20 +73,14 @@ func run() error {
 
 	// Create a new window with the necessary options.
 	// 'Title' is the title of the window.
-	// 'Mac' options tailor the window when running on macOS.
 	// 'BackgroundColour' is the background colour of the window.
 	// 'URL' is the URL that will be loaded into the webview.
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:     "Cervi",
-		Width:     1440,
-		Height:    900,
-		MinWidth:  1080,
-		MinHeight: 680,
-		Mac: application.MacWindow{
-			InvisibleTitleBarHeight: 50,
-			Backdrop:                application.MacBackdropTranslucent,
-			TitleBar:                application.MacTitleBarHiddenInset,
-		},
+		Title:            "Cervi",
+		Width:            1440,
+		Height:           900,
+		MinWidth:         1080,
+		MinHeight:        680,
 		BackgroundColour: application.NewRGB(6, 7, 15),
 		URL:              "/",
 	})
