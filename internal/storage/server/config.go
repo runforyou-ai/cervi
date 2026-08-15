@@ -1,6 +1,6 @@
 //go:build server
 
-package postgres
+package server
 
 import (
 	"fmt"
