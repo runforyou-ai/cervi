@@ -1,3 +1,5 @@
+//go:build !server
+
 // Package sqlite 提供桌面端和移动端共用的 SQLite 基础能力。
 package sqlite
 
@@ -43,9 +45,6 @@ func dataSourceName(databasePath string) string {
 		"_journal_mode": {"WAL"},
 		"mode":          {"rwc"},
 	}
-	return (&url.URL{
-		Scheme:   "file",
-		Path:     filepath.ToSlash(databasePath),
-		RawQuery: query.Encode(),
-	}).String()
+	// 直接使用文件路径，避免 Windows 盘符被解析成 URI authority。
+	return databasePath + "?" + query.Encode()
 }

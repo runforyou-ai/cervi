@@ -1,3 +1,5 @@
+//go:build !server && (ios || android)
+
 // Package mobile 管理移动端的 SQLite 存储。
 package mobile
 

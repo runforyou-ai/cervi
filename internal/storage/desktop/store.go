@@ -1,3 +1,5 @@
+//go:build !server && !ios && !android
+
 // Package desktop 管理桌面端的 SQLite 存储。
 package desktop
 
