@@ -2,8 +2,7 @@
 Version=1.0
 Name=Cervi
 Comment=Cervi is an open-source AI customer support teammate platform.
-# The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/cervi %u
+Exec=/usr/local/bin/cervi
 Terminal=false
 Type=Application
 Icon=cervi

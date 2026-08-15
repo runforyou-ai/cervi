@@ -343,7 +343,7 @@ export function InboxPage() {
   const [selectedId, setSelectedId] = useState(conversations[0].id)
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false)
   const [isCustomerPanelOpen, setIsCustomerPanelOpen] = useState(
-    () => window.innerWidth >= 1440
+    () => window.matchMedia("(min-width: 1440px)").matches
   )
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedId) ??

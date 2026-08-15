@@ -19,10 +19,5 @@ func Open(ctx context.Context) (Storage, error) {
 		return nil, fmt.Errorf("load PostgreSQL configuration: %w", err)
 	}
 
-	storage, err := postgres.Open(ctx, config)
-	if err != nil {
-		return nil, err
-	}
-
-	return storage, nil
+	return postgres.Open(ctx, config)
 }
