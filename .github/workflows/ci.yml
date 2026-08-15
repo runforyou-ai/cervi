@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  # Keep the required check available if a merge queue is enabled later.
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # Server mode has no native desktop or SQLite dependencies and matches
+      # the default used by the server Docker build.
+      CGO_ENABLED: "0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      # main.go embeds frontend/dist, which is intentionally not committed.
+      # Build it before running any Go command that compiles the main package.
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Check Go formatting
+        shell: bash
+        run: |
+          mapfile -d '' files < <(git ls-files -z -- '*.go')
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [[ -n "$unformatted" ]]; then
+            echo "These Go files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Verify Go modules
+        run: |
+          go mod verify
+          go mod tidy -diff
+
+      - name: Vet Go server build
+        run: go vet -tags=server ./...
+
+      - name: Test Go server build
+        run: go test -tags=server ./...
+
+      - name: Build production server
+        run: >
+          go build
+          -tags=server,production
+          -trimpath
+          -buildvcs=false
+          -ldflags="-w -s"
+          -o bin/cervi-server
+          .
