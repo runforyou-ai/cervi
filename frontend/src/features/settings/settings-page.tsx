@@ -1,7 +1,7 @@
 import { SettingsIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { WorkspacePageHeader } from "@/features/workspace/workspace-page"
+import { WorkspacePageHeader } from "@/features/workspace/workspace-page-header"
 
 export function SettingsPage() {
   const { t } = useTranslation("settings")
