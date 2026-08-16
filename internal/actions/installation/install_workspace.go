@@ -12,23 +12,12 @@ import (
 
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
-	commonsession "github.com/runforyou-ai/cervi/internal/common/session"
+	"github.com/runforyou-ai/cervi/internal/common/sessiontoken"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
 var ErrAlreadyInstalled = errors.New("workspace is already installed")
-
-// ValidationCode 标识企业初始化字段的校验结果。
-type ValidationCode string
-
-const (
-	ValidationOrganizationNameRequired ValidationCode = "ORGANIZATION_NAME_REQUIRED"
-	ValidationDisplayNameRequired      ValidationCode = "DISPLAY_NAME_REQUIRED"
-	ValidationEmailInvalid             ValidationCode = "EMAIL_INVALID"
-	ValidationPasswordTooShort         ValidationCode = "PASSWORD_TOO_SHORT"
-	ValidationPasswordTooLong          ValidationCode = "PASSWORD_TOO_LONG"
-)
 
 // InstallWorkspaceAction 执行企业初始化操作。
 type InstallWorkspaceAction struct {
@@ -50,16 +39,6 @@ type InstallWorkspaceOutput struct {
 	ExpiresAt time.Time
 }
 
-// ValidationError 表示企业初始化字段校验失败。
-type ValidationError struct {
-	Fields map[string]ValidationCode
-}
-
-// Error 返回企业初始化校验错误说明。
-func (e *ValidationError) Error() string {
-	return "workspace installation validation failed"
-}
-
 // NewInstallWorkspaceAction 创建企业初始化操作。
 func NewInstallWorkspaceAction(db *bun.DB) *InstallWorkspaceAction {
 	return &InstallWorkspaceAction{db: db}
@@ -78,7 +57,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 	if err != nil {
 		return InstallWorkspaceOutput{}, fmt.Errorf("hash owner password: %w", err)
 	}
-	issued, err := commonsession.Issue()
+	issued, err := sessiontoken.Issue()
 	if err != nil {
 		return InstallWorkspaceOutput{}, fmt.Errorf("create installation session: %w", err)
 	}
@@ -143,25 +122,4 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 	}
 
 	return InstallWorkspaceOutput{Principal: principal, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
-}
-
-// validateInput 校验企业初始化字段。
-func validateInput(input InstallWorkspaceInput) map[string]ValidationCode {
-	fields := make(map[string]ValidationCode)
-	if input.OrganizationName == "" {
-		fields["organizationName"] = ValidationOrganizationNameRequired
-	}
-	if input.DisplayName == "" {
-		fields["displayName"] = ValidationDisplayNameRequired
-	}
-	if !commonemail.Valid(input.Email) {
-		fields["email"] = ValidationEmailInvalid
-	}
-	switch err := commonpassword.Validate(input.Password); {
-	case errors.Is(err, commonpassword.ErrTooShort):
-		fields["password"] = ValidationPasswordTooShort
-	case errors.Is(err, commonpassword.ErrTooLong):
-		fields["password"] = ValidationPasswordTooLong
-	}
-	return fields
 }

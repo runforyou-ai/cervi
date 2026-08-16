@@ -9,7 +9,6 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	"github.com/runforyou-ai/cervi/internal/api"
-	commonsession "github.com/runforyou-ai/cervi/internal/common/session"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/uptrace/bun"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -28,11 +27,10 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 	}
 
 	db := serverStorage.DB()
-	sessions := commonsession.NewManager(db)
 	installWorkspace := installationaction.NewInstallWorkspaceAction(db)
-	login := authaction.NewLoginAction(db, sessions)
-	logout := authaction.NewLogoutAction(sessions)
-	resolveSession := authaction.NewResolveSessionQuery(sessions)
+	login := authaction.NewLoginAction(db)
+	logout := authaction.NewLogoutAction(db)
+	resolveSession := authaction.NewResolveSessionQuery(db)
 	installation := installationaction.NewStatusQuery(db)
 	loadInbox := inboxaction.NewLoadInboxQuery()
 

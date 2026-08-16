@@ -5,21 +5,21 @@ package auth
 import (
 	"context"
 
-	commonsession "github.com/runforyou-ai/cervi/internal/common/session"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
 )
 
 // ResolveSessionQuery 解析当前登录会话。
 type ResolveSessionQuery struct {
-	sessions *commonsession.Manager
+	db *bun.DB
 }
 
 // NewResolveSessionQuery 创建登录会话查询。
-func NewResolveSessionQuery(sessions *commonsession.Manager) *ResolveSessionQuery {
-	return &ResolveSessionQuery{sessions: sessions}
+func NewResolveSessionQuery(db *bun.DB) *ResolveSessionQuery {
+	return &ResolveSessionQuery{db: db}
 }
 
 // Execute 返回有效令牌对应的用户身份。
 func (q *ResolveSessionQuery) Execute(ctx context.Context, token string) (*servermodels.Principal, error) {
-	return q.sessions.Resolve(ctx, token)
+	return resolveSession(ctx, q.db, token)
 }

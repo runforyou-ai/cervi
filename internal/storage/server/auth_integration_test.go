@@ -10,7 +10,6 @@ import (
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
-	commonsession "github.com/runforyou-ai/cervi/internal/common/session"
 )
 
 // TestAuthenticationActionsWithPostgreSQL 验证 PostgreSQL 上的初始化和认证流程。
@@ -57,8 +56,8 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected principal: %#v", installedSession.Principal)
 	}
 
-	sessions := commonsession.NewManager(db)
-	principal, err := sessions.Resolve(context.Background(), installedSession.Token)
+	resolveSession := authaction.NewResolveSessionQuery(db)
+	principal, err := resolveSession.Execute(context.Background(), installedSession.Token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,12 +65,12 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected session principal: %#v", principal)
 	}
 
-	logout := authaction.NewLogoutAction(sessions)
+	logout := authaction.NewLogoutAction(db)
 	if err := logout.Execute(context.Background(), installedSession.Token); err != nil {
 		t.Fatal(err)
 	}
 
-	login := authaction.NewLoginAction(db, sessions)
+	login := authaction.NewLoginAction(db)
 	loginSession, err := login.Execute(context.Background(), authaction.LoginInput{
 		Email:    "OWNER@example.com",
 		Password: "password123",

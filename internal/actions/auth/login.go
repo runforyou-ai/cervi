@@ -11,7 +11,6 @@ import (
 
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
-	commonsession "github.com/runforyou-ai/cervi/internal/common/session"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -20,8 +19,7 @@ var ErrInvalidCredentials = errors.New("invalid credentials")
 
 // LoginAction 执行用户登录操作。
 type LoginAction struct {
-	db       *bun.DB
-	sessions *commonsession.Manager
+	db *bun.DB
 }
 
 // LoginInput 定义登录操作输入。
@@ -38,8 +36,8 @@ type LoginOutput struct {
 }
 
 // NewLoginAction 创建用户登录操作。
-func NewLoginAction(db *bun.DB, sessions *commonsession.Manager) *LoginAction {
-	return &LoginAction{db: db, sessions: sessions}
+func NewLoginAction(db *bun.DB) *LoginAction {
+	return &LoginAction{db: db}
 }
 
 // Execute 校验账号密码并创建登录会话。
@@ -60,7 +58,7 @@ func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutpu
 		return LoginOutput{}, ErrInvalidCredentials
 	}
 
-	issued, principal, err := a.sessions.Create(ctx, user.ID)
+	issued, principal, err := createSession(ctx, a.db, user.ID)
 	if err != nil {
 		return LoginOutput{}, fmt.Errorf("create login session: %w", err)
 	}
