@@ -4,10 +4,10 @@ import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
+import { toast } from "sonner"
 
 import { login } from "@/api/auth"
 import { ApiError } from "@/api/client"
-import { FormFieldMessage } from "@/components/form/form-field-message"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,7 +22,7 @@ import {
   createLoginSchema,
   type LoginFormValues,
 } from "@/features/auth/login-schema"
-import { applyServerFieldErrors } from "@/lib/form-errors"
+import { apiErrorMessage } from "@/lib/form-errors"
 
 export function LoginForm() {
   const { t } = useTranslation("auth")
@@ -30,6 +30,7 @@ export function LoginForm() {
   const schema = useMemo(() => createLoginSchema(t), [t])
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: {
       email: "",
       password: "",
@@ -50,29 +51,15 @@ export function LoginForm() {
           navigate("/setup", { replace: true })
           return
         }
-        if (
-          applyServerFieldErrors(form.setError, error.fields, [
-            "email",
-            "password",
-          ])
-        ) {
-          return
-        }
-        form.setError("root", {
-          type: "server",
-          message:
-            error.code === "INVALID_CREDENTIALS"
-              ? t("invalidCredentials")
-              : t("serverError"),
-        })
+        toast.error(apiErrorMessage(error, ["email", "password"]))
         return
       }
 
-      form.setError("root", { type: "network", message: t("networkError") })
+      toast.error(t("networkError"))
     }
   }
 
-  const { errors, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <Card>
@@ -81,7 +68,7 @@ export function LoginForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(submitLogin)} noValidate>
+        <form onSubmit={form.handleSubmit(submitLogin)}>
           <FieldGroup className="gap-3">
             <FormInputField
               name="email"
@@ -98,7 +85,6 @@ export function LoginForm() {
               type="password"
               autoComplete="current-password"
             />
-            <FormFieldMessage error={errors.root} />
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {isSubmitting ? t("submitting") : t("submit")}

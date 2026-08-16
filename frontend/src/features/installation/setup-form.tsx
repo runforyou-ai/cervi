@@ -4,10 +4,10 @@ import { EyeIcon, EyeOffIcon, LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
+import { toast } from "sonner"
 
 import { ApiError } from "@/api/client"
 import { install } from "@/api/installation"
-import { FormFieldMessage } from "@/components/form/form-field-message"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,7 +23,7 @@ import {
   createSetupSchema,
   type SetupFormValues,
 } from "@/features/installation/setup-schema"
-import { applyServerFieldErrors } from "@/lib/form-errors"
+import { apiErrorMessage } from "@/lib/form-errors"
 
 export function SetupForm() {
   const { t } = useTranslation("setup")
@@ -32,6 +32,7 @@ export function SetupForm() {
   const schema = useMemo(() => createSetupSchema(t), [t])
   const form = useForm<SetupFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: {
       organizationName: "",
       displayName: "",
@@ -54,25 +55,22 @@ export function SetupForm() {
           navigate("/login", { replace: true })
           return
         }
-        if (
-          applyServerFieldErrors(form.setError, error.fields, [
+        toast.error(
+          apiErrorMessage(error, [
             "organizationName",
             "displayName",
             "email",
             "password",
-          ])
-        ) {
-          return
-        }
-        form.setError("root", { type: "server", message: t("serverError") })
+          ]),
+        )
         return
       }
 
-      form.setError("root", { type: "network", message: t("networkError") })
+      toast.error(t("networkError"))
     }
   }
 
-  const { errors, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <Card>
@@ -81,7 +79,7 @@ export function SetupForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(submitSetup)} noValidate>
+        <form onSubmit={form.handleSubmit(submitSetup)}>
           <FieldGroup className="gap-3">
             <FormInputField
               name="organizationName"
@@ -105,9 +103,9 @@ export function SetupForm() {
             <Controller
               name="password"
               control={form.control}
-              render={({ field, fieldState }) => (
-                <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>
+              render={({ field }) => (
+                <Field className="gap-1.5">
+                  <FieldLabel htmlFor={field.name} required>
                     {t("passwordLabel")}
                   </FieldLabel>
                   <div className="relative">
@@ -118,8 +116,6 @@ export function SetupForm() {
                       autoComplete="new-password"
                       className="pr-10"
                       required
-                      aria-invalid={fieldState.invalid}
-                      aria-describedby={`${field.name}-error`}
                     />
                     <Button
                       type="button"
@@ -134,14 +130,9 @@ export function SetupForm() {
                       {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                     </Button>
                   </div>
-                  <FormFieldMessage
-                    id={`${field.name}-error`}
-                    error={fieldState.error}
-                  />
                 </Field>
               )}
             />
-            <FormFieldMessage error={errors.root} />
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {isSubmitting ? t("submitting") : t("submit")}

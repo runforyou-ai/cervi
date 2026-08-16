@@ -4,10 +4,10 @@ import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
+import { toast } from "sonner"
 
 import { ApiError } from "@/api/client"
 import { connectServer } from "@/api/server-connection"
-import { FormFieldMessage } from "@/components/form/form-field-message"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,7 +22,7 @@ import {
   createServerConnectionSchema,
   type ServerConnectionFormValues,
 } from "@/features/server-connection/server-connection-schema"
-import { applyServerFieldErrors } from "@/lib/form-errors"
+import { apiErrorMessage } from "@/lib/form-errors"
 
 export function ServerConnectionForm() {
   const { t } = useTranslation("connection")
@@ -30,6 +30,7 @@ export function ServerConnectionForm() {
   const schema = useMemo(() => createServerConnectionSchema(t), [t])
   const form = useForm<ServerConnectionFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: { serverUrl: "" },
   })
 
@@ -38,21 +39,16 @@ export function ServerConnectionForm() {
       await connectServer(values.serverUrl)
       navigate("/inbox", { replace: true })
     } catch (error) {
-      if (
-        error instanceof ApiError &&
-        applyServerFieldErrors(form.setError, error.fields, ["serverUrl"])
-      ) {
+      if (error instanceof ApiError) {
+        toast.error(apiErrorMessage(error, ["serverUrl"]))
         return
       }
 
-      form.setError("root", {
-        type: error instanceof ApiError ? "server" : "network",
-        message: t("connectionError"),
-      })
+      toast.error(t("connectionError"))
     }
   }
 
-  const { errors, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <Card>
@@ -61,7 +57,7 @@ export function ServerConnectionForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(submitServerConnection)} noValidate>
+        <form onSubmit={form.handleSubmit(submitServerConnection)}>
           <FieldGroup className="gap-3">
             <FormInputField
               name="serverUrl"
@@ -73,7 +69,6 @@ export function ServerConnectionForm() {
               autoCorrect="off"
               autoFocus
             />
-            <FormFieldMessage error={errors.root} />
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {isSubmitting ? t("submitting") : t("submit")}
