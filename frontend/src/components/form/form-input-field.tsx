@@ -42,7 +42,7 @@ export function FormInputField<T extends FieldValues>({
       name={name}
       control={control}
       render={({ field }) => (
-        <Field className="gap-1.5">
+        <Field>
           <FieldLabel htmlFor={id} required={required}>
             {label}
           </FieldLabel>

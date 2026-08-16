@@ -68,8 +68,8 @@ export function LoginForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(submitLogin)}>
-          <FieldGroup className="gap-3">
+        <form onSubmit={form.handleSubmit(submitLogin)} noValidate>
+          <FieldGroup>
             <FormInputField
               name="email"
               control={form.control}

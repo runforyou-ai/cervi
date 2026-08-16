@@ -79,8 +79,8 @@ export function SetupForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(submitSetup)}>
-          <FieldGroup className="gap-3">
+        <form onSubmit={form.handleSubmit(submitSetup)} noValidate>
+          <FieldGroup>
             <FormInputField
               name="organizationName"
               control={form.control}
@@ -104,7 +104,7 @@ export function SetupForm() {
               name="password"
               control={form.control}
               render={({ field }) => (
-                <Field className="gap-1.5">
+                <Field>
                   <FieldLabel htmlFor={field.name} required>
                     {t("passwordLabel")}
                   </FieldLabel>

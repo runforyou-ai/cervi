@@ -57,8 +57,8 @@ export function ServerConnectionForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(submitServerConnection)}>
-          <FieldGroup className="gap-3">
+        <form onSubmit={form.handleSubmit(submitServerConnection)} noValidate>
+          <FieldGroup>
             <FormInputField
               name="serverUrl"
               control={form.control}
