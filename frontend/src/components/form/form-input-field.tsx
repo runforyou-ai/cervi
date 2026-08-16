@@ -6,7 +6,6 @@ import {
   type FieldValues,
 } from "react-hook-form"
 
-import { FormFieldMessage } from "@/components/form/form-field-message"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
@@ -38,24 +37,21 @@ export function FormInputField<T extends FieldValues>({
   required = true,
   ...inputProps
 }: FormInputFieldProps<T>) {
-  const errorID = `${id}-error`
-
   return (
     <Controller
       name={name}
       control={control}
-      render={({ field, fieldState }) => (
-        <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-          <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      render={({ field }) => (
+        <Field>
+          <FieldLabel htmlFor={id} required={required}>
+            {label}
+          </FieldLabel>
           <Input
             {...field}
             {...inputProps}
             id={id}
             required={required}
-            aria-invalid={fieldState.invalid}
-            aria-describedby={errorID}
           />
-          <FormFieldMessage id={errorID} error={fieldState.error} />
         </Field>
       )}
     />
