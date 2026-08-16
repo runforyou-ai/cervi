@@ -1,0 +1,111 @@
+import { useMemo } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { LoaderCircleIcon } from "lucide-react"
+import { useForm } from "react-hook-form"
+import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
+
+import { login } from "@/api/auth"
+import { ApiError } from "@/api/client"
+import { FormFieldMessage } from "@/components/form/form-field-message"
+import { FormInputField } from "@/components/form/form-input-field"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { FieldGroup } from "@/components/ui/field"
+import {
+  createLoginSchema,
+  type LoginFormValues,
+} from "@/features/auth/login-schema"
+import { applyServerFieldErrors } from "@/lib/form-errors"
+
+export function LoginForm() {
+  const { t } = useTranslation("auth")
+  const navigate = useNavigate()
+  const schema = useMemo(() => createLoginSchema(t), [t])
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  })
+
+  async function submitLogin(values: LoginFormValues) {
+    try {
+      await login(values)
+      navigate("/inbox", { replace: true })
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.code === "SERVER_CONNECTION_REQUIRED") {
+          navigate("/connect", { replace: true })
+          return
+        }
+        if (error.code === "INSTALLATION_REQUIRED") {
+          navigate("/setup", { replace: true })
+          return
+        }
+        if (
+          applyServerFieldErrors(form.setError, error.fields, [
+            "email",
+            "password",
+          ])
+        ) {
+          return
+        }
+        form.setError("root", {
+          type: "server",
+          message:
+            error.code === "INVALID_CREDENTIALS"
+              ? t("invalidCredentials")
+              : t("serverError"),
+        })
+        return
+      }
+
+      form.setError("root", { type: "network", message: t("networkError") })
+    }
+  }
+
+  const { errors, isSubmitting } = form.formState
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={form.handleSubmit(submitLogin)} noValidate>
+          <FieldGroup className="gap-3">
+            <FormInputField
+              name="email"
+              control={form.control}
+              label={t("emailLabel")}
+              type="email"
+              autoComplete="email"
+              autoFocus
+            />
+            <FormInputField
+              name="password"
+              control={form.control}
+              label={t("passwordLabel")}
+              type="password"
+              autoComplete="current-password"
+            />
+            <FormFieldMessage error={errors.root} />
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+              {isSubmitting ? t("submitting") : t("submit")}
+            </Button>
+          </FieldGroup>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}

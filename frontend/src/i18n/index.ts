@@ -6,10 +6,9 @@ import {
   fallbackLanguage,
   resources,
   supportedLanguages,
-  type SupportedLanguage,
 } from "@/i18n/resources"
 
-function resolveBrowserLanguage(): SupportedLanguage {
+function resolveBrowserLanguage() {
   const browserLanguage = navigator.languages[0] ?? navigator.language
   const browserLocale = new Intl.Locale(browserLanguage).maximize()
 
@@ -21,10 +20,6 @@ function resolveBrowserLanguage(): SupportedLanguage {
     return "en-US"
   }
 
-  console.warn("[i18n] 浏览器语言暂未支持，使用默认语言", {
-    browserLanguage,
-    fallbackLanguage,
-  })
   return fallbackLanguage
 }
 
@@ -53,20 +48,7 @@ export async function initializeI18n() {
     },
   })
 
-  console.info("[i18n] 初始化完成", {
-    language: i18n.resolvedLanguage ?? language,
-  })
-
   return i18n
-}
-
-export async function changeLanguage(language: SupportedLanguage) {
-  await i18n.changeLanguage(language)
-  console.info("[i18n] 语言已切换", { language })
-}
-
-export function followBrowserLanguage() {
-  return changeLanguage(resolveBrowserLanguage())
 }
 
 export { i18n }

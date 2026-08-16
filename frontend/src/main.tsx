@@ -1,21 +1,23 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { ThemeProvider } from 'next-themes'
-import { HashRouter } from 'react-router'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { initializeI18n } from '@/i18n'
-import App from './App'
-import './index.css'
+import React from "react"
+import ReactDOM from "react-dom/client"
+import { ThemeProvider } from "next-themes"
+import { HashRouter } from "react-router"
+
+import App from "@/App"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import { initializeI18n } from "@/i18n"
+import "@/index.css"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 async function bootstrap() {
   await initializeI18n()
 
-  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <HashRouter>
           <TooltipProvider>
-            <App />
+            <App platform={resolveAppPlatform()} />
           </TooltipProvider>
         </HashRouter>
       </ThemeProvider>
@@ -24,5 +26,5 @@ async function bootstrap() {
 }
 
 void bootstrap().catch((error: unknown) => {
-  console.error('[i18n] 初始化失败', error)
+  console.error("应用初始化失败", error)
 })

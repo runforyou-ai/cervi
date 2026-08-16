@@ -14,6 +14,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// main 启动应用并记录无法恢复的运行错误。
 func main() {
 	if err := run(); err != nil {
 		slog.Error("Cervi 运行失败", "error", err)
@@ -21,6 +22,7 @@ func main() {
 	}
 }
 
+// run 初始化存储与应用服务，并运行 Wails 应用。
 func run() error {
 	appStorage, err := storage.Open(context.Background())
 	if err != nil {
@@ -32,13 +34,18 @@ func run() error {
 		}
 	}()
 
+	services, err := applicationServices(appStorage)
+	if err != nil {
+		return fmt.Errorf("initialize application services: %w", err)
+	}
+
 	app := application.New(application.Options{
 		Name:        "Cervi",
 		Description: "Cervi is an open-source AI customer support teammate platform",
+		Services:    services,
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
-		// Server 构建默认监听 8080 端口，地址可通过 WAILS_SERVER_HOST 覆盖。
 		Server: application.ServerOptions{
 			Port: 8080,
 		},
@@ -57,6 +64,6 @@ func run() error {
 		URL:              "/",
 	})
 
-	slog.Info("正在启动 Cervi")
+	slog.Info("启动 Cervi")
 	return app.Run()
 }

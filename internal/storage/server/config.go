@@ -70,6 +70,7 @@ func ConfigFromEnv() (Config, error) {
 	return config, nil
 }
 
+// intFromEnv 读取非负整数环境变量。
 func intFromEnv(name string, fallback int) (int, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -83,6 +84,7 @@ func intFromEnv(name string, fallback int) (int, error) {
 	return parsed, nil
 }
 
+// durationFromEnv 读取正数时长环境变量。
 func durationFromEnv(name string, fallback time.Duration) (time.Duration, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {

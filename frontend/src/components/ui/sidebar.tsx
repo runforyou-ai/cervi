@@ -616,7 +616,7 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // 每个骨架实例保持固定的随机宽度，避免重渲染时跳动。
+  // 每个骨架实例复用固定的随机宽度。
   const width = React.useMemo(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`
   }, [])
