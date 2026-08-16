@@ -63,12 +63,20 @@ const enUS = {
   workspace: {
     navigationGroup: "Workspace",
     inbox: "Inbox",
+    settings: "Settings",
+    openUserMenu: "Open the user menu for {{name}}",
     logout: "Log out",
     loggingOut: "Logging out…",
     logoutError: "Could not log out. Please try again.",
     loading: "Loading…",
     loadError: "Could not load the workspace.",
     retry: "Try again",
+  },
+  settings: {
+    title: "Settings",
+    placeholderTitle: "Settings are under development",
+    placeholderDescription:
+      "You’ll be able to manage personal preferences and workspace configuration here.",
   },
   inbox: {
     title: "Customer conversations",

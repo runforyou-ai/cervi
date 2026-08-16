@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useState } from "react"
 import {
+  ChevronsUpDownIcon,
   InboxIcon,
   LoaderCircleIcon,
   LogOutIcon,
   PanelsTopLeftIcon,
   RefreshCwIcon,
+  SettingsIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import {
+  Outlet,
+  useLocation,
+  useNavigate,
+  useOutletContext,
+} from "react-router"
 import { toast } from "sonner"
 
 import { logout } from "@/api/auth"
@@ -15,6 +22,14 @@ import { ApiError } from "@/api/client"
 import { loadInbox, type InboxData } from "@/api/inbox"
 import { InboxPage } from "@/features/inbox/inbox-page"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
 import {
   Sidebar,
@@ -30,6 +45,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 function WorkspaceNavigation({
@@ -42,6 +58,20 @@ function WorkspaceNavigation({
   loggingOut: boolean
 }) {
   const { t } = useTranslation("workspace")
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { setOpenNarrowViewport } = useSidebar()
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  function openInbox() {
+    navigate("/inbox")
+    setOpenNarrowViewport(false)
+  }
+
+  function openSettings() {
+    navigate("/settings")
+    setOpenNarrowViewport(false)
+  }
 
   return (
     <Sidebar variant="inset" collapsible="icon">
@@ -68,7 +98,11 @@ function WorkspaceNavigation({
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive tooltip={t("inbox")}>
+                <SidebarMenuButton
+                  isActive={location.pathname === "/inbox"}
+                  tooltip={t("inbox")}
+                  onClick={openInbox}
+                >
                   <InboxIcon />
                   <span>{t("inbox")}</span>
                 </SidebarMenuButton>
@@ -80,33 +114,70 @@ function WorkspaceNavigation({
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip={data.user.displayName}>
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">
-                {data.user.displayName.slice(0, 1).toUpperCase()}
-              </div>
-              <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">
-                  {data.user.displayName}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {data.user.email}
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip={t("logout")}
-              onClick={onLogout}
-              disabled={loggingOut}
+            <DropdownMenu
+              open={userMenuOpen}
+              onOpenChange={setUserMenuOpen}
             >
-              {loggingOut ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : (
-                <LogOutIcon />
-              )}
-              <span>{loggingOut ? t("loggingOut") : t("logout")}</span>
-            </SidebarMenuButton>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip={userMenuOpen ? undefined : data.user.displayName}
+                  aria-label={t("openUserMenu", {
+                    name: data.user.displayName,
+                  })}
+                >
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">
+                    {data.user.displayName.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">
+                      {data.user.displayName}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {data.user.email}
+                    </span>
+                  </div>
+                  <ChevronsUpDownIcon className="ml-auto" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="top"
+                align="start"
+                className="w-56"
+              >
+                <DropdownMenuLabel className="font-normal">
+                  <div className="grid gap-0.5 leading-tight">
+                    <span className="truncate font-medium">
+                      {data.user.displayName}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {data.user.email}
+                    </span>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={openSettings}>
+                  <SettingsIcon />
+                  {t("settings")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  destructive
+                  disabled={loggingOut}
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    onLogout()
+                  }}
+                >
+                  {loggingOut ? (
+                    <LoaderCircleIcon className="animate-spin" />
+                  ) : (
+                    <LogOutIcon />
+                  )}
+                  {loggingOut ? t("loggingOut") : t("logout")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
@@ -202,13 +273,30 @@ export function WorkspacePage() {
         loggingOut={loggingOut}
       />
       <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden md:h-[calc(100svh-1rem)]">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <h1 className="text-sm font-medium">{t("inbox")}</h1>
-        </header>
-        <InboxPage conversations={data.conversations} />
+        <Outlet context={data} />
       </SidebarInset>
     </SidebarProvider>
+  )
+}
+
+export function WorkspacePageHeader({ title }: { title: string }) {
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+      <SidebarTrigger className="-ml-1" />
+      <Separator orientation="vertical" className="mr-2 h-4" />
+      <h1 className="text-sm font-medium">{title}</h1>
+    </header>
+  )
+}
+
+export function WorkspaceInboxPage() {
+  const { t } = useTranslation("workspace")
+  const data = useOutletContext<InboxData>()
+
+  return (
+    <>
+      <WorkspacePageHeader title={t("inbox")} />
+      <InboxPage conversations={data.conversations} />
+    </>
   )
 }
