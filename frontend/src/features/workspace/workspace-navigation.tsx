@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react"
 import {
   ChevronRightIcon,
+  ChevronsUpDownIcon,
   InboxIcon,
   LoaderCircleIcon,
   LogOutIcon,
   MessagesSquareIcon,
   PanelsTopLeftIcon,
+  SettingsIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { NavLink, useLocation } from "react-router"
+import { NavLink, useLocation, useNavigate } from "react-router"
 
 import type { Principal } from "@/api/identity"
 import {
@@ -16,6 +18,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Sidebar,
   SidebarContent,
@@ -162,6 +172,14 @@ export function WorkspaceNavigation({
   loggingOut: boolean
 }) {
   const { t } = useTranslation("workspace")
+  const navigate = useNavigate()
+  const { setOpenNarrowViewport } = useSidebar()
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  function openSettings() {
+    navigate("/settings")
+    setOpenNarrowViewport(false)
+  }
 
   return (
     <Sidebar variant="inset" collapsible="icon">
@@ -188,36 +206,66 @@ export function WorkspaceNavigation({
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              tooltip={principal.user.displayName}
+            <DropdownMenu
+              open={userMenuOpen}
+              onOpenChange={setUserMenuOpen}
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">
-                {principal.user.displayName.slice(0, 1).toUpperCase()}
-              </div>
-              <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">
-                  {principal.user.displayName}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {principal.user.email}
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip={t("logout")}
-              onClick={onLogout}
-              disabled={loggingOut}
-            >
-              {loggingOut ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : (
-                <LogOutIcon />
-              )}
-              <span>{loggingOut ? t("loggingOut") : t("logout")}</span>
-            </SidebarMenuButton>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip={userMenuOpen ? undefined : principal.user.displayName}
+                  aria-label={t("openUserMenu", {
+                    name: principal.user.displayName,
+                  })}
+                >
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">
+                    {principal.user.displayName.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">
+                      {principal.user.displayName}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {principal.user.email}
+                    </span>
+                  </div>
+                  <ChevronsUpDownIcon className="ml-auto" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="grid gap-0.5 leading-tight">
+                    <span className="truncate font-medium">
+                      {principal.user.displayName}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {principal.user.email}
+                    </span>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={openSettings}>
+                  <SettingsIcon />
+                  {t("settings")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  destructive
+                  disabled={loggingOut}
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    onLogout()
+                  }}
+                >
+                  {loggingOut ? (
+                    <LoaderCircleIcon className="animate-spin" />
+                  ) : (
+                    <LogOutIcon />
+                  )}
+                  {loggingOut ? t("loggingOut") : t("logout")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

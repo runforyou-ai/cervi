@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
+import { toast } from "sonner"
 
 import type { WebsiteChannel } from "@/api/channels"
 import {
@@ -10,7 +11,6 @@ import {
   updateWebsiteChannel,
 } from "@/api/channels"
 import { ApiError } from "@/api/client"
-import { FormFieldMessage } from "@/components/form/form-field-message"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,7 +24,7 @@ import {
   createWebsiteChannelSchema,
   type WebsiteChannelFormValues,
 } from "@/features/channels/website/website-channel-schema"
-import { applyServerFieldErrors } from "@/lib/form-errors"
+import { apiErrorMessage } from "@/lib/form-errors"
 
 export function WebsiteChannelForm({
   channel,
@@ -44,6 +44,7 @@ export function WebsiteChannelForm({
   )
   const form = useForm<WebsiteChannelFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: {
       name: channel?.name ?? "",
       description: channel?.description ?? "",
@@ -69,29 +70,16 @@ export function WebsiteChannelForm({
           navigate("/channels/website", { replace: true })
           return
         }
-        if (
-          applyServerFieldErrors(form.setError, error.fields, [
-            "name",
-            "description",
-            "defaultLocale",
-          ])
-        ) {
-          return
-        }
-        form.setError("root", {
-          type: "server",
-          message: channel ? t("form.updateError") : t("form.createError"),
-        })
+        toast.error(
+          apiErrorMessage(error, ["name", "description", "defaultLocale"])
+        )
         return
       }
-      form.setError("root", {
-        type: "network",
-        message: t("form.networkError"),
-      })
+      toast.error(t("form.networkError"))
     }
   }
 
-  const { errors, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <form
@@ -111,20 +99,14 @@ export function WebsiteChannelForm({
         <Controller
           name="description"
           control={form.control}
-          render={({ field, fieldState }) => (
-            <Field className="gap-1.5" data-invalid={fieldState.invalid}>
+          render={({ field }) => (
+            <Field>
               <FieldLabel htmlFor={field.name}>
                 {t("form.description")}
               </FieldLabel>
               <Textarea
                 {...field}
                 id={field.name}
-                aria-invalid={fieldState.invalid}
-                aria-describedby={`${field.name}-error`}
-              />
-              <FormFieldMessage
-                id={`${field.name}-error`}
-                error={fieldState.error}
               />
             </Field>
           )}
@@ -133,29 +115,22 @@ export function WebsiteChannelForm({
         <Controller
           name="defaultLocale"
           control={form.control}
-          render={({ field, fieldState }) => (
-            <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={field.name}>
+          render={({ field }) => (
+            <Field>
+              <FieldLabel htmlFor={field.name} required>
                 {t("form.defaultLocale")}
               </FieldLabel>
               <NativeSelect
                 {...field}
                 id={field.name}
-                aria-invalid={fieldState.invalid}
-                aria-describedby={`${field.name}-error`}
+                required
               >
                 <option value="zh-CN">{t("locales.zhCN")}</option>
                 <option value="en-US">{t("locales.enUS")}</option>
               </NativeSelect>
-              <FormFieldMessage
-                id={`${field.name}-error`}
-                error={fieldState.error}
-              />
             </Field>
           )}
         />
-
-        <FormFieldMessage error={errors.root} />
 
         <div className="flex items-center gap-4">
           <Button type="submit" disabled={isSubmitting}>

@@ -69,6 +69,8 @@ const zhCN = {
     telegram: "Telegram",
     wechatOfficialAccount: "微信公众号",
     comingSoon: "即将支持",
+    settings: "设置",
+    openUserMenu: "打开 {{name}} 的用户菜单",
     titles: {
       websiteChannels: "网站渠道",
       createWebsiteChannel: "添加网站渠道",
@@ -151,6 +153,11 @@ const zhCN = {
         deletedAt: "删除时间",
       },
     },
+  },
+  settings: {
+    title: "设置",
+    placeholderTitle: "设置功能正在建设中",
+    placeholderDescription: "后续可在这里管理个人偏好和工作区配置。",
   },
   inbox: {
     title: "客户会话",

@@ -69,6 +69,8 @@ const enUS = {
     telegram: "Telegram",
     wechatOfficialAccount: "WeChat Official Account",
     comingSoon: "Soon",
+    settings: "Settings",
+    openUserMenu: "Open the user menu for {{name}}",
     titles: {
       websiteChannels: "Website channels",
       createWebsiteChannel: "Add website channel",
@@ -151,6 +153,12 @@ const enUS = {
         deletedAt: "Deleted at",
       },
     },
+  },
+  settings: {
+    title: "Settings",
+    placeholderTitle: "Settings are under development",
+    placeholderDescription:
+      "You’ll be able to manage personal preferences and workspace configuration here.",
   },
   inbox: {
     title: "Customer conversations",

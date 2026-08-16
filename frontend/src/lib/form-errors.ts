@@ -1,25 +1,15 @@
-import type {
-  FieldPath,
-  FieldValues,
-  UseFormSetError,
-} from "react-hook-form"
+import type { ApiError } from "@/api/client"
 
-export function applyServerFieldErrors<T extends FieldValues>(
-  setError: UseFormSetError<T>,
-  fields: Record<string, string>,
-  fieldNames: readonly FieldPath<T>[],
+export function apiErrorMessage(
+  error: ApiError,
+  fieldNames: readonly string[] = [],
 ) {
-  const errors = Object.entries(fields).filter(([, message]) => message)
-  const allowedFields = new Set<string>(fieldNames)
-  const fieldErrors = errors.filter(([name]) => allowedFields.has(name))
+  for (const name of fieldNames) {
+    const message = error.fields[name]
+    if (message) {
+      return message
+    }
+  }
 
-  fieldErrors.forEach(([name, message], index) => {
-    setError(
-      name as FieldPath<T>,
-      { type: "server", message },
-      { shouldFocus: index === 0 },
-    )
-  })
-
-  return errors.length > 0 && fieldErrors.length === errors.length
+  return Object.values(error.fields).find(Boolean) ?? error.message
 }

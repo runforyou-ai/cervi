@@ -24,8 +24,12 @@ function workspaceTitle(
     websiteChannelTrash: string
     editWebsiteChannel: string
     websiteChannels: string
+    settings: string
   }
 ) {
+  if (pathname === "/settings") {
+    return titles.settings
+  }
   if (pathname === "/channels/website/new") {
     return titles.createWebsiteChannel
   }
@@ -139,6 +143,7 @@ export function WorkspaceLayout() {
               websiteChannelTrash: t("titles.websiteChannelTrash"),
               editWebsiteChannel: t("titles.editWebsiteChannel"),
               websiteChannels: t("titles.websiteChannels"),
+              settings: t("settings"),
             })}
           </h1>
         </header>

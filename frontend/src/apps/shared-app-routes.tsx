@@ -7,6 +7,7 @@ import { WebsiteChannelTrashPage } from "@/features/channels/website/website-cha
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
+import { SettingsPage } from "@/features/settings/settings-page"
 import { WorkspaceLayout } from "@/features/workspace/workspace-layout"
 
 export function SharedAppRoutes({
@@ -24,6 +25,7 @@ export function SharedAppRoutes({
       <Route path="/login" element={<LoginPage />} />
       <Route element={<WorkspaceLayout />}>
         <Route path="/inbox" element={<InboxRoute />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route
           path="/channels"
           element={<Navigate to="/channels/website" replace />}
