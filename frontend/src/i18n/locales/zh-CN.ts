@@ -63,12 +63,19 @@ const zhCN = {
   workspace: {
     navigationGroup: "工作台",
     inbox: "收件箱",
+    settings: "设置",
+    openUserMenu: "打开 {{name}} 的用户菜单",
     logout: "退出登录",
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
     loadError: "工作台加载失败。",
     retry: "重试",
+  },
+  settings: {
+    title: "设置",
+    placeholderTitle: "设置功能正在建设中",
+    placeholderDescription: "后续可在这里管理个人偏好和工作区配置。",
   },
   inbox: {
     title: "客户会话",
