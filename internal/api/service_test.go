@@ -10,12 +10,14 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -26,23 +28,34 @@ type memoryApplication struct {
 	principal servermodels.Principal
 	password  string
 	sessions  map[string]time.Time
+	channels  map[string]servermodels.Channel
+	nextID    int
 	deleteErr error
 }
 
 // newMemoryApplication 创建未初始化的内存测试应用。
 func newMemoryApplication() *memoryApplication {
-	return &memoryApplication{sessions: make(map[string]time.Time)}
+	return &memoryApplication{
+		sessions: make(map[string]time.Time),
+		channels: make(map[string]servermodels.Channel),
+	}
 }
 
 // newTestService 使用内存执行函数组装测试 API。
 func newTestService(application *memoryApplication) *Service {
 	return NewService(Dependencies{
-		InstallWorkspace: application.install,
-		Login:            application.login,
-		Logout:           application.logout,
-		ResolveSession:   application.resolveSession,
-		Installation:     application.installationStatus,
-		LoadInbox:        application.loadInbox,
+		InstallWorkspace:      application.install,
+		Login:                 application.login,
+		Logout:                application.logout,
+		ResolveSession:        application.resolveSession,
+		Installation:          application.installationStatus,
+		LoadInbox:             application.loadInbox,
+		ListWebsiteChannels:   application.listWebsiteChannels,
+		GetWebsiteChannel:     application.getWebsiteChannel,
+		CreateWebsiteChannel:  application.createWebsiteChannel,
+		UpdateWebsiteChannel:  application.updateWebsiteChannel,
+		DeleteWebsiteChannel:  application.deleteWebsiteChannel,
+		RestoreWebsiteChannel: application.restoreWebsiteChannel,
 	})
 }
 
@@ -118,6 +131,93 @@ func (a *memoryApplication) loadInbox(_ context.Context, principal *servermodels
 	}
 }
 
+// listWebsiteChannels 按删除状态返回当前企业的网站渠道。
+func (a *memoryApplication) listWebsiteChannels(_ context.Context, principal *servermodels.Principal, deleted bool) ([]servermodels.Channel, error) {
+	channels := make([]servermodels.Channel, 0)
+	for _, item := range a.channels {
+		if item.OrganizationID != principal.Organization.ID || item.Type != channelaction.TypeWebsite {
+			continue
+		}
+		if (item.DeletedAt != nil) != deleted {
+			continue
+		}
+		channels = append(channels, item)
+	}
+	return channels, nil
+}
+
+// getWebsiteChannel 返回当前企业中未删除的网站渠道。
+func (a *memoryApplication) getWebsiteChannel(_ context.Context, principal *servermodels.Principal, channelID string) (*servermodels.Channel, error) {
+	item, exists := a.channels[channelID]
+	if !exists || item.OrganizationID != principal.Organization.ID || item.Type != channelaction.TypeWebsite || item.DeletedAt != nil {
+		return nil, channelaction.ErrNotFound
+	}
+	return &item, nil
+}
+
+// createWebsiteChannel 创建内存网站渠道。
+func (a *memoryApplication) createWebsiteChannel(_ context.Context, principal *servermodels.Principal, input channelaction.WebsiteChannelInput) (*servermodels.Channel, error) {
+	a.nextID++
+	now := time.Now()
+	item := servermodels.Channel{
+		ID:              "channel-" + strconv.Itoa(a.nextID),
+		OrganizationID:  principal.Organization.ID,
+		CreatedByUserID: principal.User.ID,
+		Type:            channelaction.TypeWebsite,
+		Name:            strings.TrimSpace(input.Name),
+		DefaultLocale:   input.DefaultLocale,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	if description := strings.TrimSpace(input.Description); description != "" {
+		item.Description = &description
+	}
+	a.channels[item.ID] = item
+	return &item, nil
+}
+
+// updateWebsiteChannel 修改内存网站渠道。
+func (a *memoryApplication) updateWebsiteChannel(_ context.Context, principal *servermodels.Principal, channelID string, input channelaction.WebsiteChannelInput) (*servermodels.Channel, error) {
+	item, exists := a.channels[channelID]
+	if !exists || item.OrganizationID != principal.Organization.ID || item.Type != channelaction.TypeWebsite || item.DeletedAt != nil {
+		return nil, channelaction.ErrNotFound
+	}
+	item.Name = strings.TrimSpace(input.Name)
+	item.Description = nil
+	if description := strings.TrimSpace(input.Description); description != "" {
+		item.Description = &description
+	}
+	item.DefaultLocale = input.DefaultLocale
+	item.UpdatedAt = time.Now()
+	a.channels[channelID] = item
+	return &item, nil
+}
+
+// deleteWebsiteChannel 软删除内存网站渠道。
+func (a *memoryApplication) deleteWebsiteChannel(_ context.Context, principal *servermodels.Principal, channelID string) error {
+	item, exists := a.channels[channelID]
+	if !exists || item.OrganizationID != principal.Organization.ID || item.Type != channelaction.TypeWebsite || item.DeletedAt != nil {
+		return channelaction.ErrNotFound
+	}
+	now := time.Now()
+	item.DeletedAt = &now
+	item.UpdatedAt = now
+	a.channels[channelID] = item
+	return nil
+}
+
+// restoreWebsiteChannel 恢复内存网站渠道。
+func (a *memoryApplication) restoreWebsiteChannel(_ context.Context, principal *servermodels.Principal, channelID string) (*servermodels.Channel, error) {
+	item, exists := a.channels[channelID]
+	if !exists || item.OrganizationID != principal.Organization.ID || item.Type != channelaction.TypeWebsite || item.DeletedAt == nil {
+		return nil, channelaction.ErrNotFound
+	}
+	item.DeletedAt = nil
+	item.UpdatedAt = time.Now()
+	a.channels[channelID] = item
+	return &item, nil
+}
+
 // TestInstallationAndAuthenticationFlow 验证安装、登录和登出的完整 HTTP 流程。
 func TestInstallationAndAuthenticationFlow(t *testing.T) {
 	application := newMemoryApplication()
@@ -167,6 +267,84 @@ func TestInstallationAndAuthenticationFlow(t *testing.T) {
 		t.Fatalf("login status = %d, want %d", loginResponse.StatusCode, http.StatusOK)
 	}
 	loginResponse.Body.Close()
+}
+
+// TestWebsiteChannelLifecycle 验证网站渠道创建、修改、回收和恢复流程。
+func TestWebsiteChannelLifecycle(t *testing.T) {
+	application := newMemoryApplication()
+	server := httptest.NewServer(newTestService(application))
+	defer server.Close()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Jar: jar}
+	installResponse := doJSON(t, client, http.MethodPost, server.URL+"/install", map[string]string{
+		"organizationName": "鹿行测试公司",
+		"displayName":      "所有者",
+		"email":            "owner@example.com",
+		"password":         "password123",
+	})
+	installResponse.Body.Close()
+	assertErrorCode(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website/not-a-uuid", nil), http.StatusNotFound, "CHANNEL_NOT_FOUND")
+
+	createResponse := doJSON(t, client, http.MethodPost, server.URL+"/channels/website", map[string]string{
+		"name":          "产品官网",
+		"description":   "接收官网访客咨询",
+		"defaultLocale": "zh-CN",
+	})
+	if createResponse.StatusCode != http.StatusCreated {
+		createResponse.Body.Close()
+		t.Fatalf("create status = %d, want %d", createResponse.StatusCode, http.StatusCreated)
+	}
+	var created servermodels.Channel
+	if err := json.NewDecoder(createResponse.Body).Decode(&created); err != nil {
+		createResponse.Body.Close()
+		t.Fatal(err)
+	}
+	createResponse.Body.Close()
+	if created.Type != channelaction.TypeWebsite || created.CreatedByUserID != "user-1" {
+		t.Fatalf("unexpected created channel: %#v", created)
+	}
+
+	updateResponse := doJSON(t, client, http.MethodPatch, server.URL+"/channels/website/"+created.ID, map[string]string{
+		"name":          "帮助中心",
+		"description":   "",
+		"defaultLocale": "en-US",
+	})
+	if updateResponse.StatusCode != http.StatusOK {
+		updateResponse.Body.Close()
+		t.Fatalf("update status = %d, want %d", updateResponse.StatusCode, http.StatusOK)
+	}
+	var updated servermodels.Channel
+	if err := json.NewDecoder(updateResponse.Body).Decode(&updated); err != nil {
+		updateResponse.Body.Close()
+		t.Fatal(err)
+	}
+	updateResponse.Body.Close()
+	if updated.Name != "帮助中心" || updated.Description != nil || updated.DefaultLocale != "en-US" {
+		t.Fatalf("unexpected updated channel: %#v", updated)
+	}
+
+	deleteResponse := doJSON(t, client, http.MethodDelete, server.URL+"/channels/website/"+created.ID, nil)
+	if deleteResponse.StatusCode != http.StatusNoContent {
+		deleteResponse.Body.Close()
+		t.Fatalf("delete status = %d, want %d", deleteResponse.StatusCode, http.StatusNoContent)
+	}
+	deleteResponse.Body.Close()
+	assertChannelListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website", nil), 0)
+	assertChannelListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website/trash", nil), 1)
+	assertErrorCode(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website/"+created.ID, nil), http.StatusNotFound, "CHANNEL_NOT_FOUND")
+
+	restoreResponse := doJSON(t, client, http.MethodPost, server.URL+"/channels/website/"+created.ID+"/restore", nil)
+	if restoreResponse.StatusCode != http.StatusOK {
+		restoreResponse.Body.Close()
+		t.Fatalf("restore status = %d, want %d", restoreResponse.StatusCode, http.StatusOK)
+	}
+	restoreResponse.Body.Close()
+	assertChannelListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website", nil), 1)
+	assertChannelListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website/trash", nil), 0)
 }
 
 // TestErrorResponseUsesRequestedLanguage 验证 API 错误响应使用请求语言。
@@ -243,6 +421,24 @@ func assertErrorCode(t *testing.T, response *http.Response, status int, code str
 	}
 	if payload.Error.Code != code {
 		t.Fatalf("error code = %q, want %q", payload.Error.Code, code)
+	}
+}
+
+// assertChannelListSize 校验网站渠道列表长度。
+func assertChannelListSize(t *testing.T, response *http.Response, size int) {
+	t.Helper()
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("list status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	var payload struct {
+		Channels []servermodels.Channel `json:"channels"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Channels) != size {
+		t.Fatalf("channel count = %d, want %d", len(payload.Channels), size)
 	}
 }
 

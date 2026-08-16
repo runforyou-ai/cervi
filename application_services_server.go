@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	"github.com/runforyou-ai/cervi/internal/api"
@@ -33,14 +34,26 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 	resolveSession := authaction.NewResolveSessionQuery(db)
 	installation := installationaction.NewStatusQuery(db)
 	loadInbox := inboxaction.NewLoadInboxQuery()
+	listWebsiteChannels := channelaction.NewListWebsiteChannelsQuery(db)
+	getWebsiteChannel := channelaction.NewGetWebsiteChannelQuery(db)
+	createWebsiteChannel := channelaction.NewCreateWebsiteChannelAction(db)
+	updateWebsiteChannel := channelaction.NewUpdateWebsiteChannelAction(db)
+	deleteWebsiteChannel := channelaction.NewDeleteWebsiteChannelAction(db)
+	restoreWebsiteChannel := channelaction.NewRestoreWebsiteChannelAction(db)
 
 	apiService := api.NewService(api.Dependencies{
-		InstallWorkspace: installWorkspace.Execute,
-		Login:            login.Execute,
-		Logout:           logout.Execute,
-		ResolveSession:   resolveSession.Execute,
-		Installation:     installation.Execute,
-		LoadInbox:        loadInbox.Execute,
+		InstallWorkspace:      installWorkspace.Execute,
+		Login:                 login.Execute,
+		Logout:                logout.Execute,
+		ResolveSession:        resolveSession.Execute,
+		Installation:          installation.Execute,
+		LoadInbox:             loadInbox.Execute,
+		ListWebsiteChannels:   listWebsiteChannels.Execute,
+		GetWebsiteChannel:     getWebsiteChannel.Execute,
+		CreateWebsiteChannel:  createWebsiteChannel.Execute,
+		UpdateWebsiteChannel:  updateWebsiteChannel.Execute,
+		DeleteWebsiteChannel:  deleteWebsiteChannel.Execute,
+		RestoreWebsiteChannel: restoreWebsiteChannel.Execute,
 	})
 	return []application.Service{
 		application.NewServiceWithOptions(apiService, application.ServiceOptions{
