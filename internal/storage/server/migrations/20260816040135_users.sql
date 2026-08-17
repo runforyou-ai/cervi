@@ -1,7 +1,7 @@
 -- +goose Up
 -- 创建企业成员表，关联关系由 Action 维护。
 CREATE TABLE users (
-    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id               uuid PRIMARY KEY DEFAULT uuidv7(),
     organization_id  uuid NOT NULL,
     email            text NOT NULL,
     display_name     text NOT NULL,

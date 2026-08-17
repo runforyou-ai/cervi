@@ -1,7 +1,7 @@
 -- +goose Up
 -- 创建登录会话表，关联关系由 Action 维护。
 CREATE TABLE sessions (
-    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id          uuid PRIMARY KEY DEFAULT uuidv7(),
     user_id     uuid NOT NULL,
     token_hash  text NOT NULL UNIQUE,
     expires_at  timestamptz NOT NULL,
