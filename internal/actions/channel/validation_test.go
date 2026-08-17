@@ -1,0 +1,117 @@
+//go:build server
+
+package channel
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+)
+
+// TestNormalizeWebsiteChannelInput 验证网站渠道字段规范化和长度限制。
+func TestNormalizeWebsiteChannelInput(t *testing.T) {
+	normalized, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
+		Name:          "  产品官网  ",
+		Description:   "  接收访客咨询  ",
+		DefaultLocale: " zh-CN ",
+	})
+	if len(fields) != 0 {
+		t.Fatalf("validation fields = %#v, want empty", fields)
+	}
+	if normalized.Name != "产品官网" || normalized.Description != "接收访客咨询" || normalized.DefaultLocale != LocaleChineseSimplified {
+		t.Fatalf("unexpected normalized input: %#v", normalized)
+	}
+
+	_, fields = normalizeWebsiteChannelInput(WebsiteChannelInput{
+		Name:          strings.Repeat("鹿", 101),
+		Description:   strings.Repeat("行", 2001),
+		DefaultLocale: "fr-FR",
+	})
+	if fields["name"] != ValidationNameTooLong {
+		t.Fatalf("name validation = %q, want %q", fields["name"], ValidationNameTooLong)
+	}
+	if fields["description"] != ValidationDescriptionTooLong {
+		t.Fatalf("description validation = %q, want %q", fields["description"], ValidationDescriptionTooLong)
+	}
+	if fields["defaultLocale"] != ValidationDefaultLocaleInvalid {
+		t.Fatalf("default locale validation = %q, want %q", fields["defaultLocale"], ValidationDefaultLocaleInvalid)
+	}
+}
+
+// TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints 验证补充平面字符按码点计数。
+func TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints(t *testing.T) {
+	_, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
+		Name:          strings.Repeat("😀", 100),
+		Description:   strings.Repeat("😀", 2000),
+		DefaultLocale: LocaleChineseSimplified,
+	})
+	if len(fields) != 0 {
+		t.Fatalf("validation fields = %#v, want empty", fields)
+	}
+
+	_, fields = normalizeWebsiteChannelInput(WebsiteChannelInput{
+		Name:          strings.Repeat("😀", 101),
+		Description:   strings.Repeat("😀", 2001),
+		DefaultLocale: LocaleChineseSimplified,
+	})
+	if fields["name"] != ValidationNameTooLong || fields["description"] != ValidationDescriptionTooLong {
+		t.Fatalf("unexpected validation fields: %#v", fields)
+	}
+}
+
+// TestMalformedChannelIDReturnsNotFound 验证非法 UUID 不会进入数据库查询。
+func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
+	principal := &servermodels.Principal{}
+	input := WebsiteChannelInput{
+		Name:          "产品官网",
+		DefaultLocale: LocaleChineseSimplified,
+	}
+
+	tests := []struct {
+		name    string
+		execute func() error
+	}{
+		{
+			name: "get",
+			execute: func() error {
+				_, err := NewGetWebsiteChannelQuery(nil).Execute(context.Background(), principal, "not-a-uuid")
+				return err
+			},
+		},
+		{
+			name: "update",
+			execute: func() error {
+				_, err := NewUpdateWebsiteChannelAction(nil).Execute(context.Background(), principal, "not-a-uuid", input)
+				return err
+			},
+		},
+		{
+			name: "delete",
+			execute: func() error {
+				return NewDeleteWebsiteChannelAction(nil).Execute(context.Background(), principal, "not-a-uuid")
+			},
+		},
+		{
+			name: "restore",
+			execute: func() error {
+				_, err := NewRestoreWebsiteChannelAction(nil).Execute(context.Background(), principal, "not-a-uuid")
+				return err
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.execute(); !errors.Is(err, ErrNotFound) {
+				t.Fatalf("error = %v, want ErrNotFound", err)
+			}
+		})
+	}
+
+	if validUUID("urn:uuid:123e4567-e89b-12d3-a456-426614174000") {
+		t.Fatal("URN UUID should not be accepted as a database identifier")
+	}
+}

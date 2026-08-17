@@ -11,3 +11,7 @@ export function login(input: { email: string; password: string }) {
 export function logout() {
   return request<void>("/auth/logout", { method: "POST" })
 }
+
+export function loadSession() {
+  return request<Principal>("/auth/session")
+}

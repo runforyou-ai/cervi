@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -31,6 +32,13 @@ var installationFieldMessageKeys = map[installationaction.ValidationCode]cervii1
 	installationaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,
 	installationaction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
 	installationaction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
+}
+
+var channelFieldMessageKeys = map[channelaction.ValidationCode]cervii18n.Key{
+	channelaction.ValidationNameRequired:         cervii18n.FieldChannelNameRequired,
+	channelaction.ValidationNameTooLong:          cervii18n.FieldChannelNameTooLong,
+	channelaction.ValidationDescriptionTooLong:   cervii18n.FieldChannelDescriptionTooLong,
+	channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
 }
 
 type errorBody struct {
@@ -55,36 +63,60 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+type websiteChannelRequest struct {
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	DefaultLocale string `json:"defaultLocale"`
+}
+
 // Dependencies 定义 HTTP API 使用的 Action 和 Query。
 type Dependencies struct {
-	InstallWorkspace func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
-	Login            func(context.Context, authaction.LoginInput) (authaction.LoginOutput, error)
-	Logout           func(context.Context, string) error
-	ResolveSession   func(context.Context, string) (*servermodels.Principal, error)
-	Installation     func(context.Context) (bool, error)
-	LoadInbox        func(context.Context, *servermodels.Principal) inboxaction.LoadInboxOutput
+	InstallWorkspace      func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
+	Login                 func(context.Context, authaction.LoginInput) (authaction.LoginOutput, error)
+	Logout                func(context.Context, string) error
+	ResolveSession        func(context.Context, string) (*servermodels.Principal, error)
+	Installation          func(context.Context) (bool, error)
+	LoadInbox             func(context.Context, *servermodels.Principal) inboxaction.LoadInboxOutput
+	ListWebsiteChannels   func(context.Context, *servermodels.Principal, bool) ([]servermodels.Channel, error)
+	GetWebsiteChannel     func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	CreateWebsiteChannel  func(context.Context, *servermodels.Principal, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
+	UpdateWebsiteChannel  func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
+	DeleteWebsiteChannel  func(context.Context, *servermodels.Principal, string) error
+	RestoreWebsiteChannel func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
 }
 
 // Service 是挂载到 Wails /api 路径的 Gin 服务。
 type Service struct {
-	router           *gin.Engine
-	installWorkspace func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
-	loginAction      func(context.Context, authaction.LoginInput) (authaction.LoginOutput, error)
-	logoutAction     func(context.Context, string) error
-	sessionQuery     func(context.Context, string) (*servermodels.Principal, error)
-	installation     func(context.Context) (bool, error)
-	loadInbox        func(context.Context, *servermodels.Principal) inboxaction.LoadInboxOutput
+	router                      *gin.Engine
+	installWorkspace            func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
+	loginAction                 func(context.Context, authaction.LoginInput) (authaction.LoginOutput, error)
+	logoutAction                func(context.Context, string) error
+	sessionQuery                func(context.Context, string) (*servermodels.Principal, error)
+	installation                func(context.Context) (bool, error)
+	loadInbox                   func(context.Context, *servermodels.Principal) inboxaction.LoadInboxOutput
+	listWebsiteChannelsQuery    func(context.Context, *servermodels.Principal, bool) ([]servermodels.Channel, error)
+	getWebsiteChannelQuery      func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	createWebsiteChannelAction  func(context.Context, *servermodels.Principal, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
+	updateWebsiteChannelAction  func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
+	deleteWebsiteChannelAction  func(context.Context, *servermodels.Principal, string) error
+	restoreWebsiteChannelAction func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
 }
 
 // NewService 创建并配置企业服务端 HTTP API。
 func NewService(dependencies Dependencies) *Service {
 	service := &Service{
-		installWorkspace: dependencies.InstallWorkspace,
-		loginAction:      dependencies.Login,
-		logoutAction:     dependencies.Logout,
-		sessionQuery:     dependencies.ResolveSession,
-		installation:     dependencies.Installation,
-		loadInbox:        dependencies.LoadInbox,
+		installWorkspace:            dependencies.InstallWorkspace,
+		loginAction:                 dependencies.Login,
+		logoutAction:                dependencies.Logout,
+		sessionQuery:                dependencies.ResolveSession,
+		installation:                dependencies.Installation,
+		loadInbox:                   dependencies.LoadInbox,
+		listWebsiteChannelsQuery:    dependencies.ListWebsiteChannels,
+		getWebsiteChannelQuery:      dependencies.GetWebsiteChannel,
+		createWebsiteChannelAction:  dependencies.CreateWebsiteChannel,
+		updateWebsiteChannelAction:  dependencies.UpdateWebsiteChannel,
+		deleteWebsiteChannelAction:  dependencies.DeleteWebsiteChannel,
+		restoreWebsiteChannelAction: dependencies.RestoreWebsiteChannel,
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -100,7 +132,15 @@ func NewService(dependencies Dependencies) *Service {
 		service.requireAuthenticated(),
 	)
 	protected.POST("/auth/logout", service.logout)
+	protected.GET("/auth/session", service.session)
 	protected.GET("/inbox", service.inbox)
+	protected.GET("/channels/website", service.listWebsiteChannels)
+	protected.GET("/channels/website/trash", service.listDeletedWebsiteChannels)
+	protected.POST("/channels/website", service.createWebsiteChannel)
+	protected.GET("/channels/website/:channelID", service.getWebsiteChannel)
+	protected.PATCH("/channels/website/:channelID", service.updateWebsiteChannel)
+	protected.DELETE("/channels/website/:channelID", service.deleteWebsiteChannel)
+	protected.POST("/channels/website/:channelID/restore", service.restoreWebsiteChannel)
 
 	service.router = router
 	return service
@@ -259,6 +299,11 @@ func (s *Service) logout(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+// session 返回当前登录用户和企业信息。
+func (s *Service) session(c *gin.Context) {
+	c.JSON(http.StatusOK, c.MustGet(principalKey).(*servermodels.Principal))
+}
+
 // inbox 返回当前用户可访问的统一收件箱。
 func (s *Service) inbox(c *gin.Context) {
 	principal := c.MustGet(principalKey).(*servermodels.Principal)
@@ -268,6 +313,132 @@ func (s *Service) inbox(c *gin.Context) {
 		"user":          output.User,
 		"conversations": output.Conversations,
 	})
+}
+
+// listWebsiteChannels 返回当前企业未删除的网站渠道。
+func (s *Service) listWebsiteChannels(c *gin.Context) {
+	s.writeWebsiteChannelList(c, false)
+}
+
+// listDeletedWebsiteChannels 返回当前企业回收站中的网站渠道。
+func (s *Service) listDeletedWebsiteChannels(c *gin.Context) {
+	s.writeWebsiteChannelList(c, true)
+}
+
+// writeWebsiteChannelList 按软删除状态返回网站渠道列表。
+func (s *Service) writeWebsiteChannelList(c *gin.Context, deleted bool) {
+	channels, err := s.listWebsiteChannelsQuery(c.Request.Context(), currentPrincipal(c), deleted)
+	if err != nil {
+		slog.Warn("读取网站渠道列表失败", "error", err)
+		writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelListFailed, nil)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"channels": channels})
+}
+
+// getWebsiteChannel 返回当前企业的网站渠道详情。
+func (s *Service) getWebsiteChannel(c *gin.Context) {
+	channel, err := s.getWebsiteChannelQuery(c.Request.Context(), currentPrincipal(c), c.Param("channelID"))
+	if s.writeWebsiteChannelError(c, err, cervii18n.ErrorChannelReadFailed) {
+		return
+	}
+	c.JSON(http.StatusOK, channel)
+}
+
+// createWebsiteChannel 创建当前企业的网站渠道。
+func (s *Service) createWebsiteChannel(c *gin.Context) {
+	request, ok := bindWebsiteChannelRequest(c)
+	if !ok {
+		return
+	}
+	channel, err := s.createWebsiteChannelAction(c.Request.Context(), currentPrincipal(c), request.websiteChannelInput())
+	if s.writeWebsiteChannelMutationError(c, err, cervii18n.ErrorChannelCreateFailed) {
+		return
+	}
+	c.JSON(http.StatusCreated, channel)
+}
+
+// updateWebsiteChannel 修改当前企业的网站渠道。
+func (s *Service) updateWebsiteChannel(c *gin.Context) {
+	request, ok := bindWebsiteChannelRequest(c)
+	if !ok {
+		return
+	}
+	channel, err := s.updateWebsiteChannelAction(c.Request.Context(), currentPrincipal(c), c.Param("channelID"), request.websiteChannelInput())
+	if s.writeWebsiteChannelMutationError(c, err, cervii18n.ErrorChannelUpdateFailed) {
+		return
+	}
+	c.JSON(http.StatusOK, channel)
+}
+
+// deleteWebsiteChannel 将当前企业的网站渠道移入回收站。
+func (s *Service) deleteWebsiteChannel(c *gin.Context) {
+	err := s.deleteWebsiteChannelAction(c.Request.Context(), currentPrincipal(c), c.Param("channelID"))
+	if s.writeWebsiteChannelError(c, err, cervii18n.ErrorChannelDeleteFailed) {
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// restoreWebsiteChannel 恢复当前企业回收站中的网站渠道。
+func (s *Service) restoreWebsiteChannel(c *gin.Context) {
+	channel, err := s.restoreWebsiteChannelAction(c.Request.Context(), currentPrincipal(c), c.Param("channelID"))
+	if s.writeWebsiteChannelError(c, err, cervii18n.ErrorChannelRestoreFailed) {
+		return
+	}
+	c.JSON(http.StatusOK, channel)
+}
+
+// currentPrincipal 返回请求中已认证的企业用户。
+func currentPrincipal(c *gin.Context) *servermodels.Principal {
+	return c.MustGet(principalKey).(*servermodels.Principal)
+}
+
+// bindWebsiteChannelRequest 解析网站渠道表单请求。
+func bindWebsiteChannelRequest(c *gin.Context) (websiteChannelRequest, bool) {
+	var request websiteChannelRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, nil)
+		return websiteChannelRequest{}, false
+	}
+	return request, true
+}
+
+// websiteChannelInput 将 HTTP 请求转换为网站渠道输入。
+func (r websiteChannelRequest) websiteChannelInput() channelaction.WebsiteChannelInput {
+	return channelaction.WebsiteChannelInput{
+		Name:          r.Name,
+		Description:   r.Description,
+		DefaultLocale: r.DefaultLocale,
+	}
+}
+
+// writeWebsiteChannelMutationError 返回网站渠道写入错误。
+func (s *Service) writeWebsiteChannelMutationError(c *gin.Context, err error, failureKey cervii18n.Key) bool {
+	var validationError *channelaction.ValidationError
+	if errors.As(err, &validationError) {
+		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
+		return true
+	}
+	return s.writeWebsiteChannelError(c, err, failureKey)
+}
+
+// writeWebsiteChannelError 返回网站渠道通用操作错误。
+func (s *Service) writeWebsiteChannelError(c *gin.Context, err error, failureKey cervii18n.Key) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, channelaction.ErrPrincipalInvalid) {
+		writeError(c, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
+		return true
+	}
+	if errors.Is(err, channelaction.ErrNotFound) {
+		writeError(c, http.StatusNotFound, "CHANNEL_NOT_FOUND", cervii18n.ErrorChannelNotFound, nil)
+		return true
+	}
+	slog.Warn("网站渠道操作失败", "error", err)
+	writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", failureKey, nil)
+	return true
 }
 
 // setSessionCookie 写入安全的登录会话 Cookie。
@@ -313,6 +484,15 @@ func installationFieldKeys(fields map[string]installationaction.ValidationCode) 
 	keys := make(map[string]cervii18n.Key, len(fields))
 	for field, code := range fields {
 		keys[field] = installationFieldMessageKeys[code]
+	}
+	return keys
+}
+
+// channelFieldKeys 将网站渠道校验码转换为本地化文案键。
+func channelFieldKeys(fields map[string]channelaction.ValidationCode) map[string]cervii18n.Key {
+	keys := make(map[string]cervii18n.Key, len(fields))
+	for field, code := range fields {
+		keys[field] = channelFieldMessageKeys[code]
 	}
 	return keys
 }
