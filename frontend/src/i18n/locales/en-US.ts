@@ -121,7 +121,6 @@ const enUS = {
     },
     form: {
       name: "Channel name",
-      namePlaceholder: "For example: Company website",
       description: "Description (optional)",
       defaultLocale: "Default visitor language",
       save: "Save",

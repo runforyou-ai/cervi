@@ -121,7 +121,6 @@ const zhCN = {
     },
     form: {
       name: "渠道名称",
-      namePlaceholder: "例如：公司官网",
       description: "说明（选填）",
       defaultLocale: "访客默认语言",
       save: "保存",

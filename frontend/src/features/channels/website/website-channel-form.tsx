@@ -102,7 +102,6 @@ export function WebsiteChannelForm({
           name="name"
           control={form.control}
           label={t("form.name")}
-          placeholder={t("form.namePlaceholder")}
           autoFocus
         />
 
