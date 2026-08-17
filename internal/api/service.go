@@ -533,6 +533,10 @@ func writeS3SettingError(c *gin.Context, err error, failureKey cervii18n.Key, op
 		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, s3SettingFieldKeys(validationError.Fields))
 		return
 	}
+	if errors.Is(err, settingaction.ErrPrincipalInvalid) {
+		writeError(c, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
+		return
+	}
 	if errors.Is(err, settingaction.ErrS3ConnectionFailed) {
 		slog.Info("S3 连接测试失败",
 			"organization_id", organizationID,

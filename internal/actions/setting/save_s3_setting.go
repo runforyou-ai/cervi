@@ -4,7 +4,9 @@ package setting
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -27,6 +29,12 @@ func (a *SaveS3SettingAction) Execute(ctx context.Context, principal *servermode
 	if len(fields) > 0 {
 		return S3Setting{}, &ValidationError{Fields: fields}
 	}
+	if principal == nil ||
+		!validUUID(principal.Organization.ID) ||
+		!validUUID(principal.User.ID) ||
+		principal.User.OrganizationID != principal.Organization.ID {
+		return S3Setting{}, ErrPrincipalInvalid
+	}
 
 	value, err := json.Marshal(input)
 	if err != nil {
@@ -37,13 +45,46 @@ func (a *SaveS3SettingAction) Execute(ctx context.Context, principal *servermode
 		Key:            s3SettingKey,
 		Value:          value,
 	}
-	_, err = a.db.NewInsert().
-		Model(record).
-		Column("organization_id", "key", "value").
-		On("CONFLICT (organization_id, key) DO UPDATE").
-		Set("value = EXCLUDED.value").
-		Set("updated_at = now()").
-		Exec(ctx)
+	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		organization := &servermodels.Organization{}
+		if err := tx.NewSelect().
+			Model(organization).
+			Column("id").
+			Where("o.id = ?", principal.Organization.ID).
+			For("KEY SHARE").
+			Scan(ctx); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrPrincipalInvalid
+			}
+			return err
+		}
+
+		user := &servermodels.User{}
+		if err := tx.NewSelect().
+			Model(user).
+			Column("id").
+			Where("u.id = ?", principal.User.ID).
+			Where("u.organization_id = ?", principal.Organization.ID).
+			For("KEY SHARE").
+			Scan(ctx); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrPrincipalInvalid
+			}
+			return err
+		}
+
+		_, err := tx.NewInsert().
+			Model(record).
+			Column("organization_id", "key", "value").
+			On("CONFLICT (organization_id, key) DO UPDATE").
+			Set("value = EXCLUDED.value").
+			Set("updated_at = now()").
+			Exec(ctx)
+		return err
+	})
+	if errors.Is(err, ErrPrincipalInvalid) {
+		return S3Setting{}, ErrPrincipalInvalid
+	}
 	if err != nil {
 		return S3Setting{}, fmt.Errorf("save S3 setting: %w", err)
 	}

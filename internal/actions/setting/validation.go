@@ -6,6 +6,8 @@ package setting
 import (
 	"net/url"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 const s3SettingKey = "object_storage.s3"
@@ -124,4 +126,10 @@ func validEndpoint(value string) bool {
 		parsed.User == nil &&
 		parsed.RawQuery == "" &&
 		parsed.Fragment == ""
+}
+
+// validUUID 判断记录标识是否为 UUID。
+func validUUID(value string) bool {
+	parsed, err := uuid.Parse(value)
+	return err == nil && strings.EqualFold(parsed.String(), value)
 }
