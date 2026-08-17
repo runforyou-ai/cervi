@@ -29,6 +29,7 @@ type memoryApplication struct {
 	password  string
 	sessions  map[string]time.Time
 	channels  map[string]servermodels.Channel
+	settings  map[string]servermodels.WebsiteChannelSetting
 	nextID    int
 	deleteErr error
 }
@@ -38,24 +39,26 @@ func newMemoryApplication() *memoryApplication {
 	return &memoryApplication{
 		sessions: make(map[string]time.Time),
 		channels: make(map[string]servermodels.Channel),
+		settings: make(map[string]servermodels.WebsiteChannelSetting),
 	}
 }
 
 // newTestService 使用内存执行函数组装测试 API。
 func newTestService(application *memoryApplication) *Service {
 	return NewService(Dependencies{
-		InstallWorkspace:      application.install,
-		Login:                 application.login,
-		Logout:                application.logout,
-		ResolveSession:        application.resolveSession,
-		Installation:          application.installationStatus,
-		LoadInbox:             application.loadInbox,
-		ListWebsiteChannels:   application.listWebsiteChannels,
-		GetWebsiteChannel:     application.getWebsiteChannel,
-		CreateWebsiteChannel:  application.createWebsiteChannel,
-		UpdateWebsiteChannel:  application.updateWebsiteChannel,
-		DeleteWebsiteChannel:  application.deleteWebsiteChannel,
-		RestoreWebsiteChannel: application.restoreWebsiteChannel,
+		InstallWorkspace:                  application.install,
+		Login:                             application.login,
+		Logout:                            application.logout,
+		ResolveSession:                    application.resolveSession,
+		Installation:                      application.installationStatus,
+		LoadInbox:                         application.loadInbox,
+		ListWebsiteChannels:               application.listWebsiteChannels,
+		GetWebsiteChannel:                 application.getWebsiteChannel,
+		CreateWebsiteChannel:              application.createWebsiteChannel,
+		UpdateWebsiteChannel:              application.updateWebsiteChannel,
+		UpdateWebsiteChannelChatInterface: application.updateWebsiteChannelChatInterface,
+		DeleteWebsiteChannel:              application.deleteWebsiteChannel,
+		RestoreWebsiteChannel:             application.restoreWebsiteChannel,
 	})
 }
 
@@ -147,12 +150,12 @@ func (a *memoryApplication) listWebsiteChannels(_ context.Context, principal *se
 }
 
 // getWebsiteChannel 返回当前企业中未删除的网站渠道。
-func (a *memoryApplication) getWebsiteChannel(_ context.Context, principal *servermodels.Principal, channelID string) (*servermodels.Channel, error) {
+func (a *memoryApplication) getWebsiteChannel(_ context.Context, principal *servermodels.Principal, channelID string) (*channelaction.WebsiteChannelDetail, error) {
 	item, exists := a.channels[channelID]
 	if !exists || item.OrganizationID != principal.Organization.ID || item.Type != channelaction.TypeWebsite || item.DeletedAt != nil {
 		return nil, channelaction.ErrNotFound
 	}
-	return &item, nil
+	return &channelaction.WebsiteChannelDetail{Channel: &item, ChatInterface: a.settings[channelID]}, nil
 }
 
 // createWebsiteChannel 创建内存网站渠道。
@@ -173,6 +176,12 @@ func (a *memoryApplication) createWebsiteChannel(_ context.Context, principal *s
 		item.Description = &description
 	}
 	a.channels[item.ID] = item
+	a.settings[item.ID] = servermodels.WebsiteChannelSetting{
+		ChannelID:      item.ID,
+		OrganizationID: item.OrganizationID,
+		ChatTitle:      item.Name,
+		ThemeColor:     channelaction.DefaultWebsiteChannelThemeColor,
+	}
 	return &item, nil
 }
 
@@ -191,6 +200,27 @@ func (a *memoryApplication) updateWebsiteChannel(_ context.Context, principal *s
 	item.UpdatedAt = time.Now()
 	a.channels[channelID] = item
 	return &item, nil
+}
+
+// updateWebsiteChannelChatInterface 修改内存网站渠道聊天界面。
+func (a *memoryApplication) updateWebsiteChannelChatInterface(_ context.Context, principal *servermodels.Principal, channelID string, input channelaction.WebsiteChannelChatInterfaceInput) (*servermodels.WebsiteChannelSetting, error) {
+	item, exists := a.channels[channelID]
+	if !exists || item.OrganizationID != principal.Organization.ID || item.Type != channelaction.TypeWebsite || item.DeletedAt != nil {
+		return nil, channelaction.ErrNotFound
+	}
+	setting := a.settings[channelID]
+	setting.ChatTitle = strings.TrimSpace(input.Title)
+	setting.ChatSubtitle = nil
+	if subtitle := strings.TrimSpace(input.Subtitle); subtitle != "" {
+		setting.ChatSubtitle = &subtitle
+	}
+	setting.GreetingMessage = nil
+	if greeting := strings.TrimSpace(input.GreetingMessage); greeting != "" {
+		setting.GreetingMessage = &greeting
+	}
+	setting.ThemeColor = strings.ToUpper(strings.TrimSpace(input.ThemeColor))
+	a.settings[channelID] = setting
+	return &setting, nil
 }
 
 // deleteWebsiteChannel 软删除内存网站渠道。
@@ -325,6 +355,41 @@ func TestWebsiteChannelLifecycle(t *testing.T) {
 	updateResponse.Body.Close()
 	if updated.Name != "帮助中心" || updated.Description != nil || updated.DefaultLocale != "en-US" {
 		t.Fatalf("unexpected updated channel: %#v", updated)
+	}
+
+	chatInterfaceResponse := doJSON(t, client, http.MethodPatch, server.URL+"/channels/website/"+created.ID+"/chat-interface", map[string]string{
+		"title":           " 在线咨询 ",
+		"subtitle":        " 通常会很快回复 ",
+		"greetingMessage": " 你好，有什么可以帮你？ ",
+		"themeColor":      "#16a34a",
+	})
+	if chatInterfaceResponse.StatusCode != http.StatusOK {
+		chatInterfaceResponse.Body.Close()
+		t.Fatalf("chat interface update status = %d, want %d", chatInterfaceResponse.StatusCode, http.StatusOK)
+	}
+	var chatInterface servermodels.WebsiteChannelSetting
+	if err := json.NewDecoder(chatInterfaceResponse.Body).Decode(&chatInterface); err != nil {
+		chatInterfaceResponse.Body.Close()
+		t.Fatal(err)
+	}
+	chatInterfaceResponse.Body.Close()
+	if chatInterface.ChatTitle != "在线咨询" || chatInterface.ChatSubtitle == nil || *chatInterface.ChatSubtitle != "通常会很快回复" || chatInterface.ThemeColor != "#16A34A" {
+		t.Fatalf("unexpected chat interface: %#v", chatInterface)
+	}
+
+	detailResponse := doJSON(t, client, http.MethodGet, server.URL+"/channels/website/"+created.ID, nil)
+	if detailResponse.StatusCode != http.StatusOK {
+		detailResponse.Body.Close()
+		t.Fatalf("detail status = %d, want %d", detailResponse.StatusCode, http.StatusOK)
+	}
+	var detail channelaction.WebsiteChannelDetail
+	if err := json.NewDecoder(detailResponse.Body).Decode(&detail); err != nil {
+		detailResponse.Body.Close()
+		t.Fatal(err)
+	}
+	detailResponse.Body.Close()
+	if detail.ChatInterface.ChatTitle != "在线咨询" || detail.ChatInterface.GreetingMessage == nil {
+		t.Fatalf("unexpected website channel detail: %#v", detail)
 	}
 
 	deleteResponse := doJSON(t, client, http.MethodDelete, server.URL+"/channels/website/"+created.ID, nil)

@@ -1,9 +1,10 @@
 -- +goose Up
+-- 创建企业成员表，关联关系由 Action 维护。
 CREATE TABLE users (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id  uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    email            text NOT NULL CHECK (btrim(email) <> ''),
-    display_name     text NOT NULL CHECK (btrim(display_name) <> ''),
+    organization_id  uuid NOT NULL,
+    email            text NOT NULL,
+    display_name     text NOT NULL,
     password_hash    text NOT NULL,
     role             text NOT NULL DEFAULT 'member',
     status           text NOT NULL DEFAULT 'active',
