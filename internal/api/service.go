@@ -40,6 +40,11 @@ var channelFieldMessageKeys = map[channelaction.ValidationCode]cervii18n.Key{
 	channelaction.ValidationNameTooLong:          cervii18n.FieldChannelNameTooLong,
 	channelaction.ValidationDescriptionTooLong:   cervii18n.FieldChannelDescriptionTooLong,
 	channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
+	channelaction.ValidationChatTitleRequired:    cervii18n.FieldChannelChatTitleRequired,
+	channelaction.ValidationChatTitleTooLong:     cervii18n.FieldChannelChatTitleTooLong,
+	channelaction.ValidationChatSubtitleTooLong:  cervii18n.FieldChannelChatSubtitleTooLong,
+	channelaction.ValidationGreetingTooLong:      cervii18n.FieldChannelGreetingTooLong,
+	channelaction.ValidationThemeColorInvalid:    cervii18n.FieldChannelThemeColorInvalid,
 }
 
 var s3SettingFieldMessageKeys = map[settingaction.ValidationCode]cervii18n.Key{
@@ -91,63 +96,73 @@ type s3SettingRequest struct {
 	ForcePathStyle  bool   `json:"forcePathStyle"`
 }
 
+type websiteChannelChatInterfaceRequest struct {
+	Title           string `json:"title"`
+	Subtitle        string `json:"subtitle"`
+	GreetingMessage string `json:"greetingMessage"`
+	ThemeColor      string `json:"themeColor"`
+}
+
 // Dependencies 定义 HTTP API 使用的 Action 和 Query。
 type Dependencies struct {
-	InstallWorkspace      func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
-	Login                 func(context.Context, authaction.LoginInput) (authaction.LoginOutput, error)
-	Logout                func(context.Context, string) error
-	ResolveSession        func(context.Context, string) (*servermodels.Principal, error)
-	Installation          func(context.Context) (bool, error)
-	LoadInbox             func(context.Context, *servermodels.Principal) inboxaction.LoadInboxOutput
-	ListWebsiteChannels   func(context.Context, *servermodels.Principal, bool) ([]servermodels.Channel, error)
-	GetWebsiteChannel     func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
-	CreateWebsiteChannel  func(context.Context, *servermodels.Principal, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
-	UpdateWebsiteChannel  func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
-	DeleteWebsiteChannel  func(context.Context, *servermodels.Principal, string) error
-	RestoreWebsiteChannel func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
-	GetS3Setting          func(context.Context, *servermodels.Principal) (settingaction.S3Setting, error)
-	SaveS3Setting         func(context.Context, *servermodels.Principal, settingaction.S3Setting) (settingaction.S3Setting, error)
-	TestS3Setting         func(context.Context, settingaction.S3Setting) error
+	InstallWorkspace                  func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
+	Login                             func(context.Context, authaction.LoginInput) (authaction.LoginOutput, error)
+	Logout                            func(context.Context, string) error
+	ResolveSession                    func(context.Context, string) (*servermodels.Principal, error)
+	Installation                      func(context.Context) (bool, error)
+	LoadInbox                         func(context.Context, *servermodels.Principal) inboxaction.LoadInboxOutput
+	ListWebsiteChannels               func(context.Context, *servermodels.Principal, bool) ([]servermodels.Channel, error)
+	GetWebsiteChannel                 func(context.Context, *servermodels.Principal, string) (*channelaction.WebsiteChannelDetail, error)
+	CreateWebsiteChannel              func(context.Context, *servermodels.Principal, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
+	UpdateWebsiteChannel              func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
+	UpdateWebsiteChannelChatInterface func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelChatInterfaceInput) (*servermodels.WebsiteChannelSetting, error)
+	DeleteWebsiteChannel              func(context.Context, *servermodels.Principal, string) error
+	RestoreWebsiteChannel             func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	GetS3Setting                      func(context.Context, *servermodels.Principal) (settingaction.S3Setting, error)
+	SaveS3Setting                     func(context.Context, *servermodels.Principal, settingaction.S3Setting) (settingaction.S3Setting, error)
+	TestS3Setting                     func(context.Context, settingaction.S3Setting) error
 }
 
 // Service 是挂载到 Wails /api 路径的 Gin 服务。
 type Service struct {
-	router                      *gin.Engine
-	installWorkspace            func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
-	loginAction                 func(context.Context, authaction.LoginInput) (authaction.LoginOutput, error)
-	logoutAction                func(context.Context, string) error
-	sessionQuery                func(context.Context, string) (*servermodels.Principal, error)
-	installation                func(context.Context) (bool, error)
-	loadInbox                   func(context.Context, *servermodels.Principal) inboxaction.LoadInboxOutput
-	listWebsiteChannelsQuery    func(context.Context, *servermodels.Principal, bool) ([]servermodels.Channel, error)
-	getWebsiteChannelQuery      func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
-	createWebsiteChannelAction  func(context.Context, *servermodels.Principal, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
-	updateWebsiteChannelAction  func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
-	deleteWebsiteChannelAction  func(context.Context, *servermodels.Principal, string) error
-	restoreWebsiteChannelAction func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
-	getS3SettingQuery           func(context.Context, *servermodels.Principal) (settingaction.S3Setting, error)
-	saveS3SettingAction         func(context.Context, *servermodels.Principal, settingaction.S3Setting) (settingaction.S3Setting, error)
-	testS3SettingAction         func(context.Context, settingaction.S3Setting) error
+	router                                  *gin.Engine
+	installWorkspace                        func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
+	loginAction                             func(context.Context, authaction.LoginInput) (authaction.LoginOutput, error)
+	logoutAction                            func(context.Context, string) error
+	sessionQuery                            func(context.Context, string) (*servermodels.Principal, error)
+	installation                            func(context.Context) (bool, error)
+	loadInbox                               func(context.Context, *servermodels.Principal) inboxaction.LoadInboxOutput
+	listWebsiteChannelsQuery                func(context.Context, *servermodels.Principal, bool) ([]servermodels.Channel, error)
+	getWebsiteChannelQuery                  func(context.Context, *servermodels.Principal, string) (*channelaction.WebsiteChannelDetail, error)
+	createWebsiteChannelAction              func(context.Context, *servermodels.Principal, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
+	updateWebsiteChannelAction              func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
+	updateWebsiteChannelChatInterfaceAction func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelChatInterfaceInput) (*servermodels.WebsiteChannelSetting, error)
+	deleteWebsiteChannelAction              func(context.Context, *servermodels.Principal, string) error
+	restoreWebsiteChannelAction             func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	getS3SettingQuery                       func(context.Context, *servermodels.Principal) (settingaction.S3Setting, error)
+	saveS3SettingAction                     func(context.Context, *servermodels.Principal, settingaction.S3Setting) (settingaction.S3Setting, error)
+	testS3SettingAction                     func(context.Context, settingaction.S3Setting) error
 }
 
 // NewService 创建并配置企业服务端 HTTP API。
 func NewService(dependencies Dependencies) *Service {
 	service := &Service{
-		installWorkspace:            dependencies.InstallWorkspace,
-		loginAction:                 dependencies.Login,
-		logoutAction:                dependencies.Logout,
-		sessionQuery:                dependencies.ResolveSession,
-		installation:                dependencies.Installation,
-		loadInbox:                   dependencies.LoadInbox,
-		listWebsiteChannelsQuery:    dependencies.ListWebsiteChannels,
-		getWebsiteChannelQuery:      dependencies.GetWebsiteChannel,
-		createWebsiteChannelAction:  dependencies.CreateWebsiteChannel,
-		updateWebsiteChannelAction:  dependencies.UpdateWebsiteChannel,
-		deleteWebsiteChannelAction:  dependencies.DeleteWebsiteChannel,
-		restoreWebsiteChannelAction: dependencies.RestoreWebsiteChannel,
-		getS3SettingQuery:           dependencies.GetS3Setting,
-		saveS3SettingAction:         dependencies.SaveS3Setting,
-		testS3SettingAction:         dependencies.TestS3Setting,
+		installWorkspace:                        dependencies.InstallWorkspace,
+		loginAction:                             dependencies.Login,
+		logoutAction:                            dependencies.Logout,
+		sessionQuery:                            dependencies.ResolveSession,
+		installation:                            dependencies.Installation,
+		loadInbox:                               dependencies.LoadInbox,
+		listWebsiteChannelsQuery:                dependencies.ListWebsiteChannels,
+		getWebsiteChannelQuery:                  dependencies.GetWebsiteChannel,
+		createWebsiteChannelAction:              dependencies.CreateWebsiteChannel,
+		updateWebsiteChannelAction:              dependencies.UpdateWebsiteChannel,
+		updateWebsiteChannelChatInterfaceAction: dependencies.UpdateWebsiteChannelChatInterface,
+		deleteWebsiteChannelAction:              dependencies.DeleteWebsiteChannel,
+		restoreWebsiteChannelAction:             dependencies.RestoreWebsiteChannel,
+		getS3SettingQuery:                       dependencies.GetS3Setting,
+		saveS3SettingAction:                     dependencies.SaveS3Setting,
+		testS3SettingAction:                     dependencies.TestS3Setting,
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -170,6 +185,7 @@ func NewService(dependencies Dependencies) *Service {
 	protected.POST("/channels/website", service.createWebsiteChannel)
 	protected.GET("/channels/website/:channelID", service.getWebsiteChannel)
 	protected.PATCH("/channels/website/:channelID", service.updateWebsiteChannel)
+	protected.PATCH("/channels/website/:channelID/chat-interface", service.updateWebsiteChannelChatInterface)
 	protected.DELETE("/channels/website/:channelID", service.deleteWebsiteChannel)
 	protected.POST("/channels/website/:channelID/restore", service.restoreWebsiteChannel)
 	protected.GET("/settings/storage/s3", service.getS3Setting)
@@ -361,9 +377,14 @@ func (s *Service) listDeletedWebsiteChannels(c *gin.Context) {
 
 // writeWebsiteChannelList 按软删除状态返回网站渠道列表。
 func (s *Service) writeWebsiteChannelList(c *gin.Context, deleted bool) {
-	channels, err := s.listWebsiteChannelsQuery(c.Request.Context(), currentPrincipal(c), deleted)
+	principal := currentPrincipal(c)
+	channels, err := s.listWebsiteChannelsQuery(c.Request.Context(), principal, deleted)
 	if err != nil {
-		slog.Warn("读取网站渠道列表失败", "error", err)
+		slog.Warn("读取网站渠道列表失败",
+			"organization_id", principal.Organization.ID,
+			"deleted", deleted,
+			"error", err,
+		)
 		writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelListFailed, nil)
 		return
 	}
@@ -385,10 +406,16 @@ func (s *Service) createWebsiteChannel(c *gin.Context) {
 	if !ok {
 		return
 	}
-	channel, err := s.createWebsiteChannelAction(c.Request.Context(), currentPrincipal(c), request.websiteChannelInput())
+	principal := currentPrincipal(c)
+	channel, err := s.createWebsiteChannelAction(c.Request.Context(), principal, request.websiteChannelInput())
 	if s.writeWebsiteChannelMutationError(c, err, cervii18n.ErrorChannelCreateFailed) {
 		return
 	}
+	slog.Info("网站渠道已创建",
+		"organization_id", principal.Organization.ID,
+		"channel_id", channel.ID,
+		"user_id", principal.User.ID,
+	)
 	c.JSON(http.StatusCreated, channel)
 }
 
@@ -398,28 +425,72 @@ func (s *Service) updateWebsiteChannel(c *gin.Context) {
 	if !ok {
 		return
 	}
-	channel, err := s.updateWebsiteChannelAction(c.Request.Context(), currentPrincipal(c), c.Param("channelID"), request.websiteChannelInput())
+	principal := currentPrincipal(c)
+	channel, err := s.updateWebsiteChannelAction(c.Request.Context(), principal, c.Param("channelID"), request.websiteChannelInput())
 	if s.writeWebsiteChannelMutationError(c, err, cervii18n.ErrorChannelUpdateFailed) {
 		return
 	}
+	slog.Info("网站渠道已更新",
+		"organization_id", principal.Organization.ID,
+		"channel_id", channel.ID,
+		"user_id", principal.User.ID,
+	)
 	c.JSON(http.StatusOK, channel)
+}
+
+// updateWebsiteChannelChatInterface 修改当前企业网站渠道的聊天界面。
+func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
+	var request websiteChannelChatInterfaceRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, nil)
+		return
+	}
+	principal := currentPrincipal(c)
+	setting, err := s.updateWebsiteChannelChatInterfaceAction(
+		c.Request.Context(),
+		principal,
+		c.Param("channelID"),
+		request.websiteChannelChatInterfaceInput(),
+	)
+	if s.writeWebsiteChannelMutationError(c, err, cervii18n.ErrorChannelChatInterfaceUpdateFailed) {
+		return
+	}
+	slog.Info("网站渠道聊天界面已更新",
+		"organization_id", principal.Organization.ID,
+		"channel_id", c.Param("channelID"),
+		"user_id", principal.User.ID,
+	)
+	c.JSON(http.StatusOK, setting)
 }
 
 // deleteWebsiteChannel 将当前企业的网站渠道移入回收站。
 func (s *Service) deleteWebsiteChannel(c *gin.Context) {
-	err := s.deleteWebsiteChannelAction(c.Request.Context(), currentPrincipal(c), c.Param("channelID"))
+	principal := currentPrincipal(c)
+	channelID := c.Param("channelID")
+	err := s.deleteWebsiteChannelAction(c.Request.Context(), principal, channelID)
 	if s.writeWebsiteChannelError(c, err, cervii18n.ErrorChannelDeleteFailed) {
 		return
 	}
+	slog.Info("网站渠道已移入回收站",
+		"organization_id", principal.Organization.ID,
+		"channel_id", channelID,
+		"user_id", principal.User.ID,
+	)
 	c.Status(http.StatusNoContent)
 }
 
 // restoreWebsiteChannel 恢复当前企业回收站中的网站渠道。
 func (s *Service) restoreWebsiteChannel(c *gin.Context) {
-	channel, err := s.restoreWebsiteChannelAction(c.Request.Context(), currentPrincipal(c), c.Param("channelID"))
+	principal := currentPrincipal(c)
+	channel, err := s.restoreWebsiteChannelAction(c.Request.Context(), principal, c.Param("channelID"))
 	if s.writeWebsiteChannelError(c, err, cervii18n.ErrorChannelRestoreFailed) {
 		return
 	}
+	slog.Info("网站渠道已恢复",
+		"organization_id", principal.Organization.ID,
+		"channel_id", channel.ID,
+		"user_id", principal.User.ID,
+	)
 	c.JSON(http.StatusOK, channel)
 }
 
@@ -493,12 +564,22 @@ func bindWebsiteChannelRequest(c *gin.Context) (websiteChannelRequest, bool) {
 	return request, true
 }
 
-// websiteChannelInput 将 HTTP 请求转换为网站渠道输入。
+// websiteChannelInput 返回网站渠道输入。
 func (r websiteChannelRequest) websiteChannelInput() channelaction.WebsiteChannelInput {
 	return channelaction.WebsiteChannelInput{
 		Name:          r.Name,
 		Description:   r.Description,
 		DefaultLocale: r.DefaultLocale,
+	}
+}
+
+// websiteChannelChatInterfaceInput 返回聊天界面输入。
+func (r websiteChannelChatInterfaceRequest) websiteChannelChatInterfaceInput() channelaction.WebsiteChannelChatInterfaceInput {
+	return channelaction.WebsiteChannelChatInterfaceInput{
+		Title:           r.Title,
+		Subtitle:        r.Subtitle,
+		GreetingMessage: r.GreetingMessage,
+		ThemeColor:      r.ThemeColor,
 	}
 }
 
@@ -558,7 +639,7 @@ func writeS3SettingError(c *gin.Context, err error, failureKey cervii18n.Key, op
 	writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", failureKey, nil)
 }
 
-// writeWebsiteChannelMutationError 返回网站渠道写入错误。
+// writeWebsiteChannelMutationError 处理网站渠道写入错误。
 func (s *Service) writeWebsiteChannelMutationError(c *gin.Context, err error, failureKey cervii18n.Key) bool {
 	var validationError *channelaction.ValidationError
 	if errors.As(err, &validationError) {
@@ -568,7 +649,7 @@ func (s *Service) writeWebsiteChannelMutationError(c *gin.Context, err error, fa
 	return s.writeWebsiteChannelError(c, err, failureKey)
 }
 
-// writeWebsiteChannelError 返回网站渠道通用操作错误。
+// writeWebsiteChannelError 处理网站渠道操作错误。
 func (s *Service) writeWebsiteChannelError(c *gin.Context, err error, failureKey cervii18n.Key) bool {
 	if err == nil {
 		return false
@@ -581,7 +662,13 @@ func (s *Service) writeWebsiteChannelError(c *gin.Context, err error, failureKey
 		writeError(c, http.StatusNotFound, "CHANNEL_NOT_FOUND", cervii18n.ErrorChannelNotFound, nil)
 		return true
 	}
-	slog.Warn("网站渠道操作失败", "error", err)
+	principal := currentPrincipal(c)
+	slog.Warn("网站渠道操作失败",
+		"organization_id", principal.Organization.ID,
+		"channel_id", c.Param("channelID"),
+		"failure_key", string(failureKey),
+		"error", err,
+	)
 	writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", failureKey, nil)
 	return true
 }

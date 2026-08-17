@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import {
   deleteWebsiteChannel,
   listWebsiteChannels,
-  type WebsiteChannel,
+  type WebsiteChannelSummary,
 } from "@/api/channels"
 import { ApiError } from "@/api/client"
 import {
@@ -39,8 +39,8 @@ function WebsiteChannelRow({
   channel,
   onDeleteRequested,
 }: {
-  channel: WebsiteChannel
-  onDeleteRequested: (channel: WebsiteChannel) => void
+  channel: WebsiteChannelSummary
+  onDeleteRequested: (channel: WebsiteChannelSummary) => void
 }) {
   const { t } = useTranslation("channels")
 
@@ -53,11 +53,6 @@ function WebsiteChannelRow({
         >
           {channel.name}
         </Link>
-      </TableCell>
-      <TableCell className="min-w-64 max-w-xl text-muted-foreground">
-        <span className="line-clamp-2">
-          {channel.description || t("list.noDescription")}
-        </span>
       </TableCell>
       <TableCell className="whitespace-nowrap">
         {t(
@@ -100,9 +95,9 @@ function WebsiteChannelRow({
 export function WebsiteChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
-  const [channels, setChannels] = useState<WebsiteChannel[]>([])
+  const [channels, setChannels] = useState<WebsiteChannelSummary[]>([])
   const [deletingChannel, setDeletingChannel] =
-    useState<WebsiteChannel | null>(null)
+    useState<WebsiteChannelSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -129,7 +124,7 @@ export function WebsiteChannelListPage() {
     void loadChannels()
   }, [loadChannels])
 
-  async function handleDelete(channel: WebsiteChannel) {
+  async function handleDelete(channel: WebsiteChannelSummary) {
     try {
       await deleteWebsiteChannel(channel.id)
       setChannels((current) =>
@@ -183,7 +178,6 @@ export function WebsiteChannelListPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{t("list.columns.name")}</TableHead>
-                  <TableHead>{t("list.columns.description")}</TableHead>
                   <TableHead>{t("list.columns.language")}</TableHead>
                   <TableHead className="text-right">
                     {t("list.columns.actions")}
@@ -194,7 +188,7 @@ export function WebsiteChannelListPage() {
                 {channels.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={4}
+                      colSpan={3}
                       className="h-32 text-center text-muted-foreground"
                     >
                       {t("list.emptyTitle")}

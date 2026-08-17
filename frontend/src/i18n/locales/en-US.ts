@@ -94,6 +94,7 @@ const enUS = {
     },
     tabs: {
       basic: "Basic information",
+      chatInterface: "Chat interface",
     },
     list: {
       title: "Website channels",
@@ -124,6 +125,7 @@ const enUS = {
       defaultLocale: "Default visitor language",
       save: "Save",
       saving: "Saving…",
+      saved: "Basic information saved.",
       cancel: "Cancel",
       loadError: "Could not load the website channel.",
       createError: "Could not create the website channel. Try again.",
@@ -134,6 +136,28 @@ const enUS = {
       nameRequired: "Enter a channel name.",
       nameTooLong: "The channel name cannot exceed 100 characters.",
       descriptionTooLong: "The channel description cannot exceed 2000 characters.",
+    },
+    chatInterface: {
+      saved: "Chat interface saved.",
+      form: {
+        title: "Chat title",
+        subtitle: "Subtitle (optional)",
+        greetingMessage: "Greeting (optional)",
+        themeColor: "Theme color",
+        colorPicker: "Choose theme color",
+      },
+      validation: {
+        titleRequired: "Enter a chat title.",
+        titleTooLong: "The chat title cannot exceed 100 characters.",
+        subtitleTooLong: "The subtitle cannot exceed 120 characters.",
+        greetingTooLong: "The greeting cannot exceed 500 characters.",
+        themeColorInvalid: "Enter a valid six-digit hexadecimal color.",
+      },
+      preview: {
+        title: "Live preview",
+        visitorMessage: "Hi, I'd like to learn more.",
+        composerPlaceholder: "Type a message…",
+      },
     },
     delete: {
       title: "Move “{{name}}” to trash?",

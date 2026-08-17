@@ -22,7 +22,7 @@ func NewCreateWebsiteChannelAction(db *bun.DB) *CreateWebsiteChannelAction {
 	return &CreateWebsiteChannelAction{db: db}
 }
 
-// Execute 校验字段并在当前企业中创建网站渠道。
+// Execute 创建网站渠道及默认聊天界面。
 func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, principal *servermodels.Principal, input WebsiteChannelInput) (*servermodels.Channel, error) {
 	input, fields := normalizeWebsiteChannelInput(input)
 	if len(fields) > 0 {
@@ -77,6 +77,20 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, principal *ser
 			Model(channel).
 			Column("organization_id", "created_by_user_id", "type", "name", "description", "default_locale").
 			Returning("*").
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+
+		setting := &servermodels.WebsiteChannelSetting{
+			ChannelID:      channel.ID,
+			OrganizationID: principal.Organization.ID,
+			ChatTitle:      channel.Name,
+			ThemeColor:     DefaultWebsiteChannelThemeColor,
+		}
+		_, err = tx.NewInsert().
+			Model(setting).
+			Column("channel_id", "organization_id", "chat_title", "theme_color").
 			Exec(ctx)
 		return err
 	})

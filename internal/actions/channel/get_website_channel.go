@@ -17,13 +17,19 @@ type GetWebsiteChannelQuery struct {
 	db *bun.DB
 }
 
+// WebsiteChannelDetail 定义网站渠道详情和访客聊天界面设置。
+type WebsiteChannelDetail struct {
+	*servermodels.Channel
+	ChatInterface servermodels.WebsiteChannelSetting `json:"chatInterface"`
+}
+
 // NewGetWebsiteChannelQuery 创建网站渠道详情查询。
 func NewGetWebsiteChannelQuery(db *bun.DB) *GetWebsiteChannelQuery {
 	return &GetWebsiteChannelQuery{db: db}
 }
 
-// Execute 返回当前企业中未删除的网站渠道。
-func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, principal *servermodels.Principal, channelID string) (*servermodels.Channel, error) {
+// Execute 返回当前企业的网站渠道详情。
+func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, principal *servermodels.Principal, channelID string) (*WebsiteChannelDetail, error) {
 	if !validUUID(channelID) {
 		return nil, ErrNotFound
 	}
@@ -41,5 +47,13 @@ func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, principal *serverm
 	if err != nil {
 		return nil, fmt.Errorf("get website channel: %w", err)
 	}
-	return channel, nil
+	setting := servermodels.WebsiteChannelSetting{}
+	if err := q.db.NewSelect().
+		Model(&setting).
+		Where("wcs.channel_id = ?", channelID).
+		Where("wcs.organization_id = ?", principal.Organization.ID).
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("get website channel settings: %w", err)
+	}
+	return &WebsiteChannelDetail{Channel: channel, ChatInterface: setting}, nil
 }
