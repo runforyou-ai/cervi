@@ -110,7 +110,6 @@ export function WebsiteChannelChatInterfaceForm({
             name="title"
             control={form.control}
             label={t("chatInterface.form.title")}
-            maxLength={100}
             autoFocus
           />
 
@@ -118,7 +117,6 @@ export function WebsiteChannelChatInterfaceForm({
             name="subtitle"
             control={form.control}
             label={t("chatInterface.form.subtitle")}
-            maxLength={120}
             required={false}
           />
 
@@ -130,7 +128,7 @@ export function WebsiteChannelChatInterfaceForm({
                 <FieldLabel htmlFor={field.name}>
                   {t("chatInterface.form.greetingMessage")}
                 </FieldLabel>
-                <Textarea {...field} id={field.name} rows={4} maxLength={500} />
+                <Textarea {...field} id={field.name} rows={4} />
               </Field>
             )}
           />
