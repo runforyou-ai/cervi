@@ -40,6 +40,7 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 	getWebsiteChannel := channelaction.NewGetWebsiteChannelQuery(db)
 	createWebsiteChannel := channelaction.NewCreateWebsiteChannelAction(db)
 	updateWebsiteChannel := channelaction.NewUpdateWebsiteChannelAction(db)
+	updateWebsiteChannelChatInterface := channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db)
 	deleteWebsiteChannel := channelaction.NewDeleteWebsiteChannelAction(db)
 	restoreWebsiteChannel := channelaction.NewRestoreWebsiteChannelAction(db)
 	listChannels := channelaction.NewListChannelsQuery(db)
@@ -53,27 +54,28 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 	restoreContact := contactaction.NewRestoreContactAction(db)
 
 	apiService := api.NewService(api.Dependencies{
-		InstallWorkspace:      installWorkspace.Execute,
-		Login:                 login.Execute,
-		Logout:                logout.Execute,
-		ResolveSession:        resolveSession.Execute,
-		Installation:          installation.Execute,
-		LoadInbox:             loadInbox.Execute,
-		ListWebsiteChannels:   listWebsiteChannels.Execute,
-		GetWebsiteChannel:     getWebsiteChannel.Execute,
-		CreateWebsiteChannel:  createWebsiteChannel.Execute,
-		UpdateWebsiteChannel:  updateWebsiteChannel.Execute,
-		DeleteWebsiteChannel:  deleteWebsiteChannel.Execute,
-		RestoreWebsiteChannel: restoreWebsiteChannel.Execute,
-		ListChannels:          listChannels.Execute,
-		ListUsers:             listUsers.Execute,
-		GetUser:               getUser.Execute,
-		ListContacts:          listContacts.Execute,
-		GetContact:            getContact.Execute,
-		CreateContact:         createContact.Execute,
-		UpdateContact:         updateContact.Execute,
-		DeleteContact:         deleteContact.Execute,
-		RestoreContact:        restoreContact.Execute,
+		InstallWorkspace:                  installWorkspace.Execute,
+		Login:                             login.Execute,
+		Logout:                            logout.Execute,
+		ResolveSession:                    resolveSession.Execute,
+		Installation:                      installation.Execute,
+		LoadInbox:                         loadInbox.Execute,
+		ListWebsiteChannels:               listWebsiteChannels.Execute,
+		GetWebsiteChannel:                 getWebsiteChannel.Execute,
+		CreateWebsiteChannel:              createWebsiteChannel.Execute,
+		UpdateWebsiteChannel:              updateWebsiteChannel.Execute,
+		UpdateWebsiteChannelChatInterface: updateWebsiteChannelChatInterface.Execute,
+		DeleteWebsiteChannel:              deleteWebsiteChannel.Execute,
+		RestoreWebsiteChannel:             restoreWebsiteChannel.Execute,
+		ListChannels:                      listChannels.Execute,
+		ListUsers:                         listUsers.Execute,
+		GetUser:                           getUser.Execute,
+		ListContacts:                      listContacts.Execute,
+		GetContact:                        getContact.Execute,
+		CreateContact:                     createContact.Execute,
+		UpdateContact:                     updateContact.Execute,
+		DeleteContact:                     deleteContact.Execute,
+		RestoreContact:                    restoreContact.Execute,
 	})
 	return []application.Service{
 		application.NewServiceWithOptions(apiService, application.ServiceOptions{

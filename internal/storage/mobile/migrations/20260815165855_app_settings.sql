@@ -1,4 +1,5 @@
 -- +goose Up
+-- 创建移动端应用设置表。
 CREATE TABLE app_settings (
     key         text PRIMARY KEY,
     value       text NOT NULL,

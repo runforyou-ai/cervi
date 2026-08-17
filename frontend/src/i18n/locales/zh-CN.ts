@@ -240,6 +240,7 @@ const zhCN = {
     },
     tabs: {
       basic: "基本信息",
+      chatInterface: "聊天界面",
     },
     list: {
       title: "网站渠道",
@@ -266,11 +267,11 @@ const zhCN = {
     },
     form: {
       name: "渠道名称",
-      namePlaceholder: "例如：公司官网",
-      description: "说明",
+      description: "说明（选填）",
       defaultLocale: "访客默认语言",
       save: "保存",
       saving: "正在保存…",
+      saved: "基本信息已保存。",
       cancel: "取消",
       loadError: "网站渠道详情加载失败。",
       createError: "创建网站渠道失败，请重试。",
@@ -281,6 +282,28 @@ const zhCN = {
       nameRequired: "请输入渠道名称。",
       nameTooLong: "渠道名称不能超过 100 个字符。",
       descriptionTooLong: "渠道说明不能超过 2000 个字符。",
+    },
+    chatInterface: {
+      saved: "聊天界面已保存。",
+      form: {
+        title: "聊天标题",
+        subtitle: "副标题（选填）",
+        greetingMessage: "欢迎语（选填）",
+        themeColor: "主题色",
+        colorPicker: "选择主题色",
+      },
+      validation: {
+        titleRequired: "请输入聊天标题。",
+        titleTooLong: "聊天标题不能超过 100 个字符。",
+        subtitleTooLong: "副标题不能超过 120 个字符。",
+        greetingTooLong: "欢迎语不能超过 500 个字符。",
+        themeColorInvalid: "请输入有效的六位十六进制颜色。",
+      },
+      preview: {
+        title: "实时预览",
+        visitorMessage: "你好，我想了解一下。",
+        composerPlaceholder: "输入消息…",
+      },
     },
     delete: {
       title: "将“{{name}}”移入回收站？",

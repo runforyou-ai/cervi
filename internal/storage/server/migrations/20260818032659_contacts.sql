@@ -1,12 +1,12 @@
 -- +goose Up
+-- 创建外部联系人表，关联关系由 Action 维护。
 CREATE TABLE contacts (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id     uuid NOT NULL,
     created_by_user_id  uuid NOT NULL,
     source_channel_id   uuid NOT NULL,
     display_name        text,
-    stage               text NOT NULL DEFAULT 'visitor'
-                            CHECK (stage IN ('visitor', 'lead', 'customer')),
+    stage               text NOT NULL DEFAULT 'visitor',
     notes               text,
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
