@@ -14,8 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -39,6 +41,21 @@ var channelFieldMessageKeys = map[channelaction.ValidationCode]cervii18n.Key{
 	channelaction.ValidationNameTooLong:          cervii18n.FieldChannelNameTooLong,
 	channelaction.ValidationDescriptionTooLong:   cervii18n.FieldChannelDescriptionTooLong,
 	channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
+}
+
+var contactFieldMessageKeys = map[contactaction.ValidationCode]cervii18n.Key{
+	contactaction.ValidationIdentityRequired: cervii18n.FieldContactIdentityRequired,
+	contactaction.ValidationChannelRequired:  cervii18n.FieldContactChannelRequired,
+	contactaction.ValidationChannelInvalid:   cervii18n.FieldContactChannelInvalid,
+	contactaction.ValidationChannelImmutable: cervii18n.FieldContactChannelImmutable,
+	contactaction.ValidationNameTooLong:      cervii18n.FieldContactNameTooLong,
+	contactaction.ValidationStageInvalid:     cervii18n.FieldContactStageInvalid,
+	contactaction.ValidationNotesTooLong:     cervii18n.FieldContactNotesTooLong,
+	contactaction.ValidationMethodsTooMany:   cervii18n.FieldContactMethodsTooMany,
+	contactaction.ValidationMethodInvalid:    cervii18n.FieldContactMethodInvalid,
+	contactaction.ValidationMethodDuplicate:  cervii18n.FieldContactMethodDuplicate,
+	contactaction.ValidationPrimaryDuplicate: cervii18n.FieldContactPrimaryDuplicate,
+	contactaction.ValidationQueryInvalid:     cervii18n.FieldContactQueryInvalid,
 }
 
 type errorBody struct {
@@ -83,6 +100,15 @@ type Dependencies struct {
 	UpdateWebsiteChannel  func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
 	DeleteWebsiteChannel  func(context.Context, *servermodels.Principal, string) error
 	RestoreWebsiteChannel func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	ListChannels          func(context.Context, *servermodels.Principal) ([]channelaction.Summary, error)
+	ListUsers             func(context.Context, *servermodels.Principal, useraction.ListInput) (useraction.ListOutput, error)
+	GetUser               func(context.Context, *servermodels.Principal, string) (*useraction.DirectoryUser, error)
+	ListContacts          func(context.Context, *servermodels.Principal, contactaction.ListInput) (contactaction.ListOutput, error)
+	GetContact            func(context.Context, *servermodels.Principal, string) (*contactaction.ContactDetail, error)
+	CreateContact         func(context.Context, *servermodels.Principal, contactaction.ContactInput) (*contactaction.ContactDetail, error)
+	UpdateContact         func(context.Context, *servermodels.Principal, string, contactaction.ContactInput) (*contactaction.ContactDetail, error)
+	DeleteContact         func(context.Context, *servermodels.Principal, string) error
+	RestoreContact        func(context.Context, *servermodels.Principal, string) (*contactaction.ContactDetail, error)
 }
 
 // Service 是挂载到 Wails /api 路径的 Gin 服务。
@@ -100,6 +126,15 @@ type Service struct {
 	updateWebsiteChannelAction  func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
 	deleteWebsiteChannelAction  func(context.Context, *servermodels.Principal, string) error
 	restoreWebsiteChannelAction func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	listChannelsQuery           func(context.Context, *servermodels.Principal) ([]channelaction.Summary, error)
+	listUsersQuery              func(context.Context, *servermodels.Principal, useraction.ListInput) (useraction.ListOutput, error)
+	getUserQuery                func(context.Context, *servermodels.Principal, string) (*useraction.DirectoryUser, error)
+	listContactsQuery           func(context.Context, *servermodels.Principal, contactaction.ListInput) (contactaction.ListOutput, error)
+	getContactQuery             func(context.Context, *servermodels.Principal, string) (*contactaction.ContactDetail, error)
+	createContactAction         func(context.Context, *servermodels.Principal, contactaction.ContactInput) (*contactaction.ContactDetail, error)
+	updateContactAction         func(context.Context, *servermodels.Principal, string, contactaction.ContactInput) (*contactaction.ContactDetail, error)
+	deleteContactAction         func(context.Context, *servermodels.Principal, string) error
+	restoreContactAction        func(context.Context, *servermodels.Principal, string) (*contactaction.ContactDetail, error)
 }
 
 // NewService 创建并配置企业服务端 HTTP API。
@@ -117,6 +152,15 @@ func NewService(dependencies Dependencies) *Service {
 		updateWebsiteChannelAction:  dependencies.UpdateWebsiteChannel,
 		deleteWebsiteChannelAction:  dependencies.DeleteWebsiteChannel,
 		restoreWebsiteChannelAction: dependencies.RestoreWebsiteChannel,
+		listChannelsQuery:           dependencies.ListChannels,
+		listUsersQuery:              dependencies.ListUsers,
+		getUserQuery:                dependencies.GetUser,
+		listContactsQuery:           dependencies.ListContacts,
+		getContactQuery:             dependencies.GetContact,
+		createContactAction:         dependencies.CreateContact,
+		updateContactAction:         dependencies.UpdateContact,
+		deleteContactAction:         dependencies.DeleteContact,
+		restoreContactAction:        dependencies.RestoreContact,
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -141,6 +185,16 @@ func NewService(dependencies Dependencies) *Service {
 	protected.PATCH("/channels/website/:channelID", service.updateWebsiteChannel)
 	protected.DELETE("/channels/website/:channelID", service.deleteWebsiteChannel)
 	protected.POST("/channels/website/:channelID/restore", service.restoreWebsiteChannel)
+	protected.GET("/channels", service.listChannels)
+	protected.GET("/users", service.listUsers)
+	protected.GET("/users/:userID", service.getUser)
+	protected.GET("/contacts", service.listContacts)
+	protected.GET("/contacts/trash", service.listDeletedContacts)
+	protected.POST("/contacts", service.createContact)
+	protected.GET("/contacts/:contactID", service.getContact)
+	protected.PATCH("/contacts/:contactID", service.updateContact)
+	protected.DELETE("/contacts/:contactID", service.deleteContact)
+	protected.POST("/contacts/:contactID/restore", service.restoreContact)
 
 	service.router = router
 	return service
@@ -493,6 +547,15 @@ func channelFieldKeys(fields map[string]channelaction.ValidationCode) map[string
 	keys := make(map[string]cervii18n.Key, len(fields))
 	for field, code := range fields {
 		keys[field] = channelFieldMessageKeys[code]
+	}
+	return keys
+}
+
+// contactFieldKeys 将联系人校验码转换为本地化文案键。
+func contactFieldKeys(fields map[string]contactaction.ValidationCode) map[string]cervii18n.Key {
+	keys := make(map[string]cervii18n.Key, len(fields))
+	for field, code := range fields {
+		keys[field] = contactFieldMessageKeys[code]
 	}
 	return keys
 }

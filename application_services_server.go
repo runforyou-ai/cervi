@@ -7,8 +7,10 @@ import (
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/uptrace/bun"
@@ -40,6 +42,15 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 	updateWebsiteChannel := channelaction.NewUpdateWebsiteChannelAction(db)
 	deleteWebsiteChannel := channelaction.NewDeleteWebsiteChannelAction(db)
 	restoreWebsiteChannel := channelaction.NewRestoreWebsiteChannelAction(db)
+	listChannels := channelaction.NewListChannelsQuery(db)
+	listUsers := useraction.NewListUsersQuery(db)
+	getUser := useraction.NewGetUserQuery(db)
+	listContacts := contactaction.NewListContactsQuery(db)
+	getContact := contactaction.NewGetContactQuery(db)
+	createContact := contactaction.NewCreateContactAction(db)
+	updateContact := contactaction.NewUpdateContactAction(db)
+	deleteContact := contactaction.NewDeleteContactAction(db)
+	restoreContact := contactaction.NewRestoreContactAction(db)
 
 	apiService := api.NewService(api.Dependencies{
 		InstallWorkspace:      installWorkspace.Execute,
@@ -54,6 +65,15 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 		UpdateWebsiteChannel:  updateWebsiteChannel.Execute,
 		DeleteWebsiteChannel:  deleteWebsiteChannel.Execute,
 		RestoreWebsiteChannel: restoreWebsiteChannel.Execute,
+		ListChannels:          listChannels.Execute,
+		ListUsers:             listUsers.Execute,
+		GetUser:               getUser.Execute,
+		ListContacts:          listContacts.Execute,
+		GetContact:            getContact.Execute,
+		CreateContact:         createContact.Execute,
+		UpdateContact:         updateContact.Execute,
+		DeleteContact:         deleteContact.Execute,
+		RestoreContact:        restoreContact.Execute,
 	})
 	return []application.Service{
 		application.NewServiceWithOptions(apiService, application.ServiceOptions{

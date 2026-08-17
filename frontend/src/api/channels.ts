@@ -19,8 +19,25 @@ export type WebsiteChannelInput = {
   defaultLocale: "zh-CN" | "en-US"
 }
 
+export type ChannelSummary = {
+  id: string
+  type: string
+  name: string
+}
+
 type WebsiteChannelListResponse = {
   channels: WebsiteChannel[]
+}
+
+type ChannelSummaryListResponse = {
+  channels: ChannelSummary[]
+}
+
+export async function listChannels(signal?: AbortSignal) {
+  const response = await request<ChannelSummaryListResponse>("/channels", {
+    signal,
+  })
+  return response.channels
 }
 
 export async function listWebsiteChannels() {

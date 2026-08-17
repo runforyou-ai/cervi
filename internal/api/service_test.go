@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -18,8 +19,10 @@ import (
 	"github.com/gin-gonic/gin"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -29,6 +32,7 @@ type memoryApplication struct {
 	password  string
 	sessions  map[string]time.Time
 	channels  map[string]servermodels.Channel
+	contacts  map[string]contactaction.ContactDetail
 	nextID    int
 	deleteErr error
 }
@@ -38,6 +42,7 @@ func newMemoryApplication() *memoryApplication {
 	return &memoryApplication{
 		sessions: make(map[string]time.Time),
 		channels: make(map[string]servermodels.Channel),
+		contacts: make(map[string]contactaction.ContactDetail),
 	}
 }
 
@@ -56,6 +61,15 @@ func newTestService(application *memoryApplication) *Service {
 		UpdateWebsiteChannel:  application.updateWebsiteChannel,
 		DeleteWebsiteChannel:  application.deleteWebsiteChannel,
 		RestoreWebsiteChannel: application.restoreWebsiteChannel,
+		ListChannels:          application.listChannels,
+		ListUsers:             application.listUsers,
+		GetUser:               application.getUser,
+		ListContacts:          application.listContacts,
+		GetContact:            application.getContact,
+		CreateContact:         application.createContact,
+		UpdateContact:         application.updateContact,
+		DeleteContact:         application.deleteContact,
+		RestoreContact:        application.restoreContact,
 	})
 }
 
@@ -218,6 +232,162 @@ func (a *memoryApplication) restoreWebsiteChannel(_ context.Context, principal *
 	return &item, nil
 }
 
+// listChannels 返回当前企业的有效渠道摘要。
+func (a *memoryApplication) listChannels(_ context.Context, principal *servermodels.Principal) ([]channelaction.Summary, error) {
+	channels := make([]channelaction.Summary, 0)
+	for _, item := range a.channels {
+		if item.OrganizationID == principal.Organization.ID && item.DeletedAt == nil {
+			channels = append(channels, channelaction.Summary{ID: item.ID, Type: item.Type, Name: item.Name})
+		}
+	}
+	return channels, nil
+}
+
+// listUsers 返回当前企业的内存团队成员。
+func (a *memoryApplication) listUsers(_ context.Context, principal *servermodels.Principal, input useraction.ListInput) (useraction.ListOutput, error) {
+	users := []useraction.DirectoryUser{memoryDirectoryUser(principal.User)}
+	return useraction.ListOutput{Users: users, Page: useraction.PageInfo{Number: input.Page, Size: input.PageSize, Total: 1}}, nil
+}
+
+// getUser 返回当前企业的内存团队成员详情。
+func (a *memoryApplication) getUser(_ context.Context, principal *servermodels.Principal, userID string) (*useraction.DirectoryUser, error) {
+	if userID != principal.User.ID {
+		return nil, useraction.ErrNotFound
+	}
+	user := memoryDirectoryUser(principal.User)
+	return &user, nil
+}
+
+func memoryDirectoryUser(user servermodels.User) useraction.DirectoryUser {
+	return useraction.DirectoryUser{
+		ID:             user.ID,
+		OrganizationID: user.OrganizationID,
+		Email:          user.Email,
+		DisplayName:    user.DisplayName,
+		Role:           user.Role,
+		Status:         user.Status,
+		CreatedAt:      time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
+	}
+}
+
+// listContacts 返回内存联系人列表。
+func (a *memoryApplication) listContacts(_ context.Context, principal *servermodels.Principal, input contactaction.ListInput) (contactaction.ListOutput, error) {
+	contacts := make([]contactaction.ContactSummary, 0)
+	for _, detail := range a.contacts {
+		item := detail.Contact
+		if item.OrganizationID != principal.Organization.ID || (item.DeletedAt != nil) != input.Deleted {
+			continue
+		}
+		summary := contactaction.ContactSummary{
+			ID: item.ID, DisplayName: item.DisplayName, Stage: item.Stage, Notes: item.Notes,
+			CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, DeletedAt: item.DeletedAt,
+		}
+		for _, method := range detail.Methods {
+			value := method.Value
+			if method.Type == contactaction.MethodEmail && summary.PrimaryEmail == nil {
+				summary.PrimaryEmail = &value
+			}
+			if method.Type == contactaction.MethodPhone && summary.PrimaryPhone == nil {
+				summary.PrimaryPhone = &value
+			}
+		}
+		contacts = append(contacts, summary)
+	}
+	return contactaction.ListOutput{
+		Contacts: contacts,
+		Page:     contactaction.PageInfo{Number: input.Page, Size: input.PageSize, Total: len(contacts)},
+	}, nil
+}
+
+// getContact 返回内存联系人详情。
+func (a *memoryApplication) getContact(_ context.Context, principal *servermodels.Principal, contactID string) (*contactaction.ContactDetail, error) {
+	detail, exists := a.contacts[contactID]
+	if !exists || detail.Contact.OrganizationID != principal.Organization.ID || detail.Contact.DeletedAt != nil {
+		return nil, contactaction.ErrNotFound
+	}
+	return &detail, nil
+}
+
+// createContact 创建内存联系人。
+func (a *memoryApplication) createContact(_ context.Context, principal *servermodels.Principal, input contactaction.ContactInput) (*contactaction.ContactDetail, error) {
+	a.nextID++
+	id := "00000000-0000-0000-0000-" + fmt.Sprintf("%012d", a.nextID)
+	now := time.Now()
+	sourceChannelID := input.ChannelID
+	contact := servermodels.Contact{
+		ID: id, OrganizationID: principal.Organization.ID, CreatedByUserID: principal.User.ID,
+		SourceChannelID: &sourceChannelID, Stage: input.Stage, CreatedAt: now, UpdatedAt: now,
+	}
+	if input.DisplayName != "" {
+		contact.DisplayName = &input.DisplayName
+	}
+	if input.Notes != "" {
+		contact.Notes = &input.Notes
+	}
+	detail := contactaction.ContactDetail{Contact: contact, Methods: memoryContactMethods(id, principal.Organization.ID, input.Methods)}
+	a.contacts[id] = detail
+	return &detail, nil
+}
+
+// updateContact 修改内存联系人。
+func (a *memoryApplication) updateContact(_ context.Context, principal *servermodels.Principal, contactID string, input contactaction.ContactInput) (*contactaction.ContactDetail, error) {
+	detail, exists := a.contacts[contactID]
+	if !exists || detail.Contact.OrganizationID != principal.Organization.ID || detail.Contact.DeletedAt != nil {
+		return nil, contactaction.ErrNotFound
+	}
+	detail.Contact.DisplayName = nil
+	detail.Contact.Notes = nil
+	if input.DisplayName != "" {
+		detail.Contact.DisplayName = &input.DisplayName
+	}
+	if input.Notes != "" {
+		detail.Contact.Notes = &input.Notes
+	}
+	detail.Contact.Stage = input.Stage
+	sourceChannelID := input.ChannelID
+	detail.Contact.SourceChannelID = &sourceChannelID
+	detail.Contact.UpdatedAt = time.Now()
+	detail.Methods = memoryContactMethods(contactID, principal.Organization.ID, input.Methods)
+	a.contacts[contactID] = detail
+	return &detail, nil
+}
+
+// deleteContact 软删除内存联系人。
+func (a *memoryApplication) deleteContact(_ context.Context, principal *servermodels.Principal, contactID string) error {
+	detail, exists := a.contacts[contactID]
+	if !exists || detail.Contact.OrganizationID != principal.Organization.ID || detail.Contact.DeletedAt != nil {
+		return contactaction.ErrNotFound
+	}
+	now := time.Now()
+	detail.Contact.DeletedAt = &now
+	detail.Contact.UpdatedAt = now
+	a.contacts[contactID] = detail
+	return nil
+}
+
+// restoreContact 恢复内存联系人。
+func (a *memoryApplication) restoreContact(_ context.Context, principal *servermodels.Principal, contactID string) (*contactaction.ContactDetail, error) {
+	detail, exists := a.contacts[contactID]
+	if !exists || detail.Contact.OrganizationID != principal.Organization.ID || detail.Contact.DeletedAt == nil {
+		return nil, contactaction.ErrNotFound
+	}
+	detail.Contact.DeletedAt = nil
+	detail.Contact.UpdatedAt = time.Now()
+	a.contacts[contactID] = detail
+	return &detail, nil
+}
+
+func memoryContactMethods(contactID, organizationID string, inputs []contactaction.MethodInput) []servermodels.ContactMethod {
+	methods := make([]servermodels.ContactMethod, 0, len(inputs))
+	for index, input := range inputs {
+		methods = append(methods, servermodels.ContactMethod{
+			ID: fmt.Sprintf("method-%d", index+1), OrganizationID: organizationID, ContactID: contactID,
+			Type: input.Type, Value: input.Value, NormalizedValue: input.Value, IsPrimary: input.IsPrimary,
+		})
+	}
+	return methods
+}
+
 // TestInstallationAndAuthenticationFlow 验证安装、登录和登出的完整 HTTP 流程。
 func TestInstallationAndAuthenticationFlow(t *testing.T) {
 	application := newMemoryApplication()
@@ -347,6 +517,89 @@ func TestWebsiteChannelLifecycle(t *testing.T) {
 	assertChannelListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website/trash", nil), 0)
 }
 
+// TestContactLifecycle 验证联系人创建、修改、回收和恢复流程。
+func TestContactLifecycle(t *testing.T) {
+	application := newMemoryApplication()
+	server := httptest.NewServer(newTestService(application))
+	defer server.Close()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Jar: jar}
+	installResponse := doJSON(t, client, http.MethodPost, server.URL+"/install", map[string]string{
+		"organizationName": "鹿行测试公司",
+		"displayName":      "所有者",
+		"email":            "owner@example.com",
+		"password":         "password123",
+	})
+	installResponse.Body.Close()
+
+	usersResponse := doJSON(t, client, http.MethodGet, server.URL+"/users", nil)
+	if usersResponse.StatusCode != http.StatusOK {
+		usersResponse.Body.Close()
+		t.Fatalf("users status = %d, want %d", usersResponse.StatusCode, http.StatusOK)
+	}
+	usersResponse.Body.Close()
+
+	createResponse := doJSON(t, client, http.MethodPost, server.URL+"/contacts", map[string]any{
+		"displayName": "林晓",
+		"channelId":   "00000000-0000-0000-0000-000000000001",
+		"stage":       "lead",
+		"notes":       "来自产品咨询",
+		"methods": []map[string]any{
+			{"type": "email", "value": "lin@example.com", "isPrimary": true},
+		},
+	})
+	if createResponse.StatusCode != http.StatusCreated {
+		createResponse.Body.Close()
+		t.Fatalf("create contact status = %d, want %d", createResponse.StatusCode, http.StatusCreated)
+	}
+	var created contactaction.ContactDetail
+	if err := json.NewDecoder(createResponse.Body).Decode(&created); err != nil {
+		createResponse.Body.Close()
+		t.Fatal(err)
+	}
+	createResponse.Body.Close()
+	if created.Contact.DisplayName == nil || *created.Contact.DisplayName != "林晓" || created.Contact.SourceChannelID == nil || *created.Contact.SourceChannelID != "00000000-0000-0000-0000-000000000001" || len(created.Methods) != 1 {
+		t.Fatalf("unexpected created contact: %#v", created)
+	}
+
+	updateResponse := doJSON(t, client, http.MethodPatch, server.URL+"/contacts/"+created.Contact.ID, map[string]any{
+		"displayName": "林晓（采购）",
+		"channelId":   "00000000-0000-0000-0000-000000000001",
+		"stage":       "customer",
+		"notes":       "",
+		"methods": []map[string]any{
+			{"type": "phone", "value": "+8613800000000", "isPrimary": true},
+		},
+	})
+	if updateResponse.StatusCode != http.StatusOK {
+		updateResponse.Body.Close()
+		t.Fatalf("update contact status = %d, want %d", updateResponse.StatusCode, http.StatusOK)
+	}
+	updateResponse.Body.Close()
+
+	deleteResponse := doJSON(t, client, http.MethodDelete, server.URL+"/contacts/"+created.Contact.ID, nil)
+	if deleteResponse.StatusCode != http.StatusNoContent {
+		deleteResponse.Body.Close()
+		t.Fatalf("delete contact status = %d, want %d", deleteResponse.StatusCode, http.StatusNoContent)
+	}
+	deleteResponse.Body.Close()
+	assertContactListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/contacts", nil), 0)
+	assertContactListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/contacts/trash", nil), 1)
+	assertErrorCode(t, doJSON(t, client, http.MethodGet, server.URL+"/contacts/"+created.Contact.ID, nil), http.StatusNotFound, "CONTACT_NOT_FOUND")
+
+	restoreResponse := doJSON(t, client, http.MethodPost, server.URL+"/contacts/"+created.Contact.ID+"/restore", nil)
+	if restoreResponse.StatusCode != http.StatusOK {
+		restoreResponse.Body.Close()
+		t.Fatalf("restore contact status = %d, want %d", restoreResponse.StatusCode, http.StatusOK)
+	}
+	restoreResponse.Body.Close()
+	assertContactListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/contacts", nil), 1)
+}
+
 // TestErrorResponseUsesRequestedLanguage 验证 API 错误响应使用请求语言。
 func TestErrorResponseUsesRequestedLanguage(t *testing.T) {
 	server := httptest.NewServer(newTestService(newMemoryApplication()))
@@ -439,6 +692,22 @@ func assertChannelListSize(t *testing.T, response *http.Response, size int) {
 	}
 	if len(payload.Channels) != size {
 		t.Fatalf("channel count = %d, want %d", len(payload.Channels), size)
+	}
+}
+
+// assertContactListSize 校验联系人列表长度。
+func assertContactListSize(t *testing.T, response *http.Response, size int) {
+	t.Helper()
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("contact list status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	var payload contactaction.ListOutput
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Contacts) != size || payload.Page.Total != size {
+		t.Fatalf("contact count = %d/%d, want %d", len(payload.Contacts), payload.Page.Total, size)
 	}
 }
 

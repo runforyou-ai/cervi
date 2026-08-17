@@ -4,6 +4,7 @@ import { LoginPage } from "@/features/auth/login-page"
 import { WebsiteChannelFormPage } from "@/features/channels/website/website-channel-form-page"
 import { WebsiteChannelListPage } from "@/features/channels/website/website-channel-list-page"
 import { WebsiteChannelTrashPage } from "@/features/channels/website/website-channel-trash-page"
+import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
@@ -26,6 +27,26 @@ export function SharedAppRoutes({
       <Route element={<WorkspaceLayout />}>
         <Route path="/inbox" element={<InboxRoute />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route
+          path="/contacts"
+          element={<Navigate to="/contacts/internal" replace />}
+        />
+        <Route
+          path="/contacts/internal"
+          element={<ContactsPage scope="internal" />}
+        />
+        <Route
+          path="/contacts/external"
+          element={<ContactsPage scope="external" />}
+        />
+        <Route
+          path="/contacts/external/trash"
+          element={<ContactsPage scope="external" deleted />}
+        />
+        <Route
+          path="/contacts/agents"
+          element={<ContactsPage scope="agents" />}
+        />
         <Route
           path="/channels"
           element={<Navigate to="/channels/website" replace />}
