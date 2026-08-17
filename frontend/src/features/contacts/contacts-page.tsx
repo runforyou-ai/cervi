@@ -129,11 +129,13 @@ function ScopeButton({
 function SubscopeButton({
   active,
   children,
+  nested = false,
   onClick,
   icon: Icon,
 }: {
   active: boolean
   children: React.ReactNode
+  nested?: boolean
   onClick: () => void
   icon?: typeof GlobeIcon
 }) {
@@ -141,7 +143,8 @@ function SubscopeButton({
     <button
       type="button"
       className={cn(
-        "flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-left text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        nested ? "pl-14" : "pl-8",
         active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
       )}
       onClick={onClick}
@@ -223,6 +226,7 @@ function ContactScopeSidebar({
                         key={channel.id}
                         active={scope === "external" && channelId === channel.id}
                         icon={type === "website" ? GlobeIcon : undefined}
+                        nested
                         onClick={() =>
                           navigate(`/contacts/external?channelId=${channel.id}`)
                         }
@@ -723,6 +727,7 @@ export function ContactsPage({
                       <TableHead>{t("columns.email")}</TableHead>
                       <TableHead>{t("columns.role")}</TableHead>
                       <TableHead>{t("columns.status")}</TableHead>
+                      <TableHead className="text-right">{t("columns.actions")}</TableHead>
                     </TableRow>
                   ) : (
                     <TableRow className="hover:bg-transparent">
@@ -739,37 +744,26 @@ export function ContactsPage({
                 <TableBody>
                   {scope === "internal" && users.length > 0
                     ? users.map((user) => (
-                        <TableRow
-                          key={user.id}
-                          tabIndex={0}
-                          className="cursor-pointer"
-                          onClick={() => setParameters({ selected: user.id })}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              setParameters({ selected: user.id })
-                            }
-                          }}
-                        >
+                        <TableRow key={user.id}>
                           <TableCell className="font-medium">{user.displayName}</TableCell>
                           <TableCell className="text-muted-foreground">{user.email}</TableCell>
                           <TableCell>{t(`roles.${user.role}`, { defaultValue: user.role })}</TableCell>
                           <TableCell>{t(`statuses.${user.status}`, { defaultValue: user.status })}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setParameters({ selected: user.id })}
+                            >
+                              {t("detail.action")}
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))
                     : null}
                   {scope === "external" && contacts.length > 0
                     ? contacts.map((contact) => (
-                        <TableRow
-                          key={contact.id}
-                          tabIndex={deleted ? undefined : 0}
-                          className={cn(!deleted && "cursor-pointer")}
-                          onClick={() => !deleted && setParameters({ selected: contact.id })}
-                          onKeyDown={(event) => {
-                            if (!deleted && event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
-                              setParameters({ selected: contact.id })
-                            }
-                          }}
-                        >
+                        <TableRow key={contact.id}>
                           <TableCell className="font-medium">{contact.displayName || t("anonymous")}</TableCell>
                           <TableCell><StageLabel stage={contact.stage} /></TableCell>
                           <TableCell className="text-muted-foreground">{contact.primaryEmail || "—"}</TableCell>
@@ -785,27 +779,36 @@ export function ContactsPage({
                               </Button>
                             </TableCell>
                           ) : (
-                            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    aria-label={t("list.more")}
-                                    title={t("list.more")}
-                                  >
-                                    <MoreHorizontalIcon />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    destructive
-                                    onSelect={() => setDeletingContact(contact)}
-                                  >
-                                    {t("delete.action")}
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setParameters({ selected: contact.id })}
+                                >
+                                  {t("detail.action")}
+                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      aria-label={t("list.more")}
+                                      title={t("list.more")}
+                                    >
+                                      <MoreHorizontalIcon />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      destructive
+                                      onSelect={() => setDeletingContact(contact)}
+                                    >
+                                      {t("delete.action")}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </TableCell>
                           )}
                         </TableRow>
@@ -813,7 +816,7 @@ export function ContactsPage({
                     : null}
                   {((scope === "internal" && users.length === 0) || (scope === "external" && contacts.length === 0)) ? (
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={scope === "internal" ? 4 : 7} className="h-32 text-center text-muted-foreground">
+                      <TableCell colSpan={scope === "internal" ? 5 : 7} className="h-32 text-center text-muted-foreground">
                         {deleted ? t("trash.empty") : t("list.empty")}
                       </TableCell>
                     </TableRow>

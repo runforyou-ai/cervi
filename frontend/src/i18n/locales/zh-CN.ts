@@ -170,6 +170,7 @@ const zhCN = {
       emptyDescription: "暂无可用的智能体。",
     },
     detail: {
+      action: "详情",
       createTitle: "添加联系人",
       createDescription: "填写外部联系人的基本资料。",
       edit: "修改",

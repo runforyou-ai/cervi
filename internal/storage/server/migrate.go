@@ -34,6 +34,7 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		db,
 		migrations,
 		goose.WithSessionLocker(locker),
+		goose.WithAllowOutofOrder(true),
 	)
 	if err != nil {
 		return fmt.Errorf("create migration provider: %w", err)

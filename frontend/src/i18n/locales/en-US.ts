@@ -170,6 +170,7 @@ const enUS = {
       emptyDescription: "No agents are available.",
     },
     detail: {
+      action: "Details",
       createTitle: "Add contact",
       createDescription: "Enter the external contact's basic details.",
       edit: "Edit",
