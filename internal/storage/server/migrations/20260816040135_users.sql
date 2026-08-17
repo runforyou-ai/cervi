@@ -3,8 +3,8 @@
 CREATE TABLE users (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id  uuid NOT NULL,
-    email            text NOT NULL CHECK (btrim(email) <> ''),
-    display_name     text NOT NULL CHECK (btrim(display_name) <> ''),
+    email            text NOT NULL,
+    display_name     text NOT NULL,
     password_hash    text NOT NULL,
     role             text NOT NULL DEFAULT 'member',
     status           text NOT NULL DEFAULT 'active',
