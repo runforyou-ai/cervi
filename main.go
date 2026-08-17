@@ -58,8 +58,8 @@ func run() error {
 		Title:            "Cervi",
 		Width:            1440,
 		Height:           900,
-		MinWidth:         1080,
-		MinHeight:        680,
+		MinWidth:         1440,
+		MinHeight:        900,
 		BackgroundColour: application.NewRGB(6, 7, 15),
 		URL:              "/",
 	})
