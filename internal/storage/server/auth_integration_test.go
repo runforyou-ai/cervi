@@ -13,6 +13,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -336,5 +337,45 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); err != nil {
 		t.Fatal(err)
+	}
+
+	s3Setting := settingaction.S3Setting{
+		Enabled:         true,
+		Provider:        settingaction.ProviderAWS,
+		Endpoint:        "https://s3.example.com",
+		Region:          "us-east-1",
+		Bucket:          "cervi",
+		AccessKeyID:     "access-key",
+		SecretAccessKey: "secret-key",
+		ForcePathStyle:  true,
+	}
+	saveS3Setting := settingaction.NewSaveS3SettingAction(db)
+	savedS3Setting, err := saveS3Setting.Execute(context.Background(), loginSession.Principal, s3Setting)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if savedS3Setting != s3Setting {
+		t.Fatalf("saved S3 setting = %#v, want %#v", savedS3Setting, s3Setting)
+	}
+	getS3Setting := settingaction.NewGetS3SettingQuery(db)
+	loadedS3Setting, err := getS3Setting.Execute(context.Background(), loginSession.Principal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedS3Setting != s3Setting {
+		t.Fatalf("loaded S3 setting = %#v, want %#v", loadedS3Setting, s3Setting)
+	}
+
+	disabledS3Setting := s3Setting
+	disabledS3Setting.Enabled = false
+	if _, err := saveS3Setting.Execute(context.Background(), loginSession.Principal, disabledS3Setting); err != nil {
+		t.Fatal(err)
+	}
+	loadedS3Setting, err = getS3Setting.Execute(context.Background(), loginSession.Principal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loadedS3Setting != disabledS3Setting {
+		t.Fatalf("disabled S3 setting = %#v, want preserved setting %#v", loadedS3Setting, disabledS3Setting)
 	}
 }

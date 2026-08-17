@@ -1,7 +1,7 @@
 -- +goose Up
 -- 创建联系人渠道身份表，关联关系由 Action 维护。
 CREATE TABLE contact_channel_identities (
-    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id               uuid PRIMARY KEY DEFAULT uuidv7(),
     organization_id  uuid NOT NULL,
     contact_id       uuid NOT NULL,
     channel_id       uuid NOT NULL,

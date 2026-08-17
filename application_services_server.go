@@ -10,6 +10,7 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/storage"
@@ -52,6 +53,9 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 	updateContact := contactaction.NewUpdateContactAction(db)
 	deleteContact := contactaction.NewDeleteContactAction(db)
 	restoreContact := contactaction.NewRestoreContactAction(db)
+	getS3Setting := settingaction.NewGetS3SettingQuery(db)
+	saveS3Setting := settingaction.NewSaveS3SettingAction(db)
+	testS3Setting := settingaction.NewTestS3SettingAction()
 
 	apiService := api.NewService(api.Dependencies{
 		InstallWorkspace:                  installWorkspace.Execute,
@@ -76,6 +80,9 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 		UpdateContact:                     updateContact.Execute,
 		DeleteContact:                     deleteContact.Execute,
 		RestoreContact:                    restoreContact.Execute,
+		GetS3Setting:                      getS3Setting.Execute,
+		SaveS3Setting:                     saveS3Setting.Execute,
+		TestS3Setting:                     testS3Setting.Execute,
 	})
 	return []application.Service{
 		application.NewServiceWithOptions(apiService, application.ServiceOptions{

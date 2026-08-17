@@ -1,7 +1,7 @@
 -- +goose Up
 -- 创建联系人联系方式表，类型和内容由 Action 校验。
 CREATE TABLE contact_methods (
-    id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                uuid PRIMARY KEY DEFAULT uuidv7(),
     organization_id   uuid NOT NULL,
     contact_id        uuid NOT NULL,
     type              text NOT NULL,

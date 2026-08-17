@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { PencilIcon } from "lucide-react"
 import { Controller, useForm, type FieldErrors } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -113,13 +112,12 @@ function DetailRow({
         {!editing && editEnabled ? (
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="sm"
             className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
             aria-label={t("detail.editField", { field: label })}
-            title={t("detail.edit")}
             onClick={onEdit}
           >
-            <PencilIcon />
+            {t("detail.edit")}
           </Button>
         ) : null}
       </div>

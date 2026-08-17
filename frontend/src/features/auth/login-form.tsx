@@ -84,6 +84,10 @@ export function LoginForm() {
               label={t("passwordLabel")}
               type="password"
               autoComplete="current-password"
+              passwordVisibilityLabels={{
+                show: t("showPassword"),
+                hide: t("hidePassword"),
+              }}
             />
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}

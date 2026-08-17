@@ -28,7 +28,7 @@ function workspaceTitle(
     contacts: string
   }
 ) {
-  if (pathname === "/settings") {
+  if (pathname.startsWith("/settings")) {
     return titles.settings
   }
   if (pathname.startsWith("/contacts")) {
