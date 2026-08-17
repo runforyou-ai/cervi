@@ -64,7 +64,6 @@ export function ServerConnectionForm() {
               control={form.control}
               label={t("serverUrlLabel")}
               type="url"
-              placeholder="https://cervi.example.com"
               autoCapitalize="none"
               autoCorrect="off"
               autoFocus

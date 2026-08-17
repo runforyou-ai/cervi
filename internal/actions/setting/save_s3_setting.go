@@ -1,0 +1,51 @@
+//go:build server
+
+package setting
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
+)
+
+// SaveS3SettingAction 保存当前企业的 S3 配置。
+type SaveS3SettingAction struct {
+	db *bun.DB
+}
+
+// NewSaveS3SettingAction 创建 S3 配置保存操作。
+func NewSaveS3SettingAction(db *bun.DB) *SaveS3SettingAction {
+	return &SaveS3SettingAction{db: db}
+}
+
+// Execute 校验并保存当前企业的 S3 配置。
+func (a *SaveS3SettingAction) Execute(ctx context.Context, principal *servermodels.Principal, input S3Setting) (S3Setting, error) {
+	input, fields := normalizeS3Setting(input)
+	if len(fields) > 0 {
+		return S3Setting{}, &ValidationError{Fields: fields}
+	}
+
+	value, err := json.Marshal(input)
+	if err != nil {
+		return S3Setting{}, fmt.Errorf("encode S3 setting: %w", err)
+	}
+	record := &servermodels.Setting{
+		OrganizationID: principal.Organization.ID,
+		Key:            s3SettingKey,
+		Value:          value,
+	}
+	_, err = a.db.NewInsert().
+		Model(record).
+		Column("organization_id", "key", "value").
+		On("CONFLICT (organization_id, key) DO UPDATE").
+		Set("value = EXCLUDED.value").
+		Set("updated_at = now()").
+		Exec(ctx)
+	if err != nil {
+		return S3Setting{}, fmt.Errorf("save S3 setting: %w", err)
+	}
+	return input, nil
+}

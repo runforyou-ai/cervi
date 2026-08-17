@@ -20,6 +20,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -31,6 +32,8 @@ type memoryApplication struct {
 	channels  map[string]servermodels.Channel
 	nextID    int
 	deleteErr error
+	s3Setting *settingaction.S3Setting
+	s3TestErr error
 }
 
 // newMemoryApplication 创建未初始化的内存测试应用。
@@ -56,6 +59,9 @@ func newTestService(application *memoryApplication) *Service {
 		UpdateWebsiteChannel:  application.updateWebsiteChannel,
 		DeleteWebsiteChannel:  application.deleteWebsiteChannel,
 		RestoreWebsiteChannel: application.restoreWebsiteChannel,
+		GetS3Setting:          application.getS3Setting,
+		SaveS3Setting:         application.saveS3Setting,
+		TestS3Setting:         application.testS3Setting,
 	})
 }
 
@@ -218,6 +224,34 @@ func (a *memoryApplication) restoreWebsiteChannel(_ context.Context, principal *
 	return &item, nil
 }
 
+// getS3Setting 返回内存中的 S3 配置。
+func (a *memoryApplication) getS3Setting(_ context.Context, _ *servermodels.Principal) (settingaction.S3Setting, error) {
+	if a.s3Setting == nil {
+		return settingaction.S3Setting{
+			Provider: settingaction.ProviderGeneric,
+			Endpoint: "https://s3.us-east-1.amazonaws.com",
+			Region:   "us-east-1",
+		}, nil
+	}
+	return *a.s3Setting, nil
+}
+
+// saveS3Setting 保存内存中的 S3 配置。
+func (a *memoryApplication) saveS3Setting(_ context.Context, _ *servermodels.Principal, input settingaction.S3Setting) (settingaction.S3Setting, error) {
+	if strings.TrimSpace(input.Endpoint) == "" {
+		return settingaction.S3Setting{}, &settingaction.ValidationError{Fields: map[string]settingaction.ValidationCode{
+			"endpoint": settingaction.ValidationEndpointRequired,
+		}}
+	}
+	a.s3Setting = &input
+	return input, nil
+}
+
+// testS3Setting 测试内存中的 S3 配置。
+func (a *memoryApplication) testS3Setting(_ context.Context, _ settingaction.S3Setting) error {
+	return a.s3TestErr
+}
+
 // TestInstallationAndAuthenticationFlow 验证安装、登录和登出的完整 HTTP 流程。
 func TestInstallationAndAuthenticationFlow(t *testing.T) {
 	application := newMemoryApplication()
@@ -345,6 +379,97 @@ func TestWebsiteChannelLifecycle(t *testing.T) {
 	restoreResponse.Body.Close()
 	assertChannelListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website", nil), 1)
 	assertChannelListSize(t, doJSON(t, client, http.MethodGet, server.URL+"/channels/website/trash", nil), 0)
+}
+
+// TestS3SettingLifecycle 验证 S3 配置读取、保存和连接测试流程。
+func TestS3SettingLifecycle(t *testing.T) {
+	application := newMemoryApplication()
+	server := httptest.NewServer(newTestService(application))
+	defer server.Close()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &http.Client{Jar: jar}
+	installResponse := doJSON(t, client, http.MethodPost, server.URL+"/install", map[string]string{
+		"organizationName": "鹿行测试公司",
+		"displayName":      "所有者",
+		"email":            "owner@example.com",
+		"password":         "password123",
+	})
+	installResponse.Body.Close()
+
+	getResponse := doJSON(t, client, http.MethodGet, server.URL+"/settings/storage/s3", nil)
+	if getResponse.StatusCode != http.StatusOK {
+		getResponse.Body.Close()
+		t.Fatalf("get empty S3 setting status = %d, want %d", getResponse.StatusCode, http.StatusOK)
+	}
+	var initial settingaction.S3Setting
+	if err := json.NewDecoder(getResponse.Body).Decode(&initial); err != nil {
+		getResponse.Body.Close()
+		t.Fatal(err)
+	}
+	getResponse.Body.Close()
+	if initial.Provider != settingaction.ProviderGeneric || initial.Endpoint != "https://s3.us-east-1.amazonaws.com" {
+		t.Fatalf("initial S3 setting = %#v, want generic provider defaults", initial)
+	}
+
+	input := settingaction.S3Setting{
+		Enabled:         true,
+		Provider:        settingaction.ProviderAWS,
+		Endpoint:        "https://s3.example.com",
+		Region:          "us-east-1",
+		Bucket:          "cervi",
+		AccessKeyID:     "access-key",
+		SecretAccessKey: "secret-key",
+		ForcePathStyle:  true,
+	}
+	saveResponse := doJSON(t, client, http.MethodPut, server.URL+"/settings/storage/s3", input)
+	if saveResponse.StatusCode != http.StatusOK {
+		saveResponse.Body.Close()
+		t.Fatalf("save S3 setting status = %d, want %d", saveResponse.StatusCode, http.StatusOK)
+	}
+	saveResponse.Body.Close()
+
+	getResponse = doJSON(t, client, http.MethodGet, server.URL+"/settings/storage/s3", nil)
+	var saved settingaction.S3Setting
+	if err := json.NewDecoder(getResponse.Body).Decode(&saved); err != nil {
+		getResponse.Body.Close()
+		t.Fatal(err)
+	}
+	getResponse.Body.Close()
+	if saved != input {
+		t.Fatalf("saved S3 setting = %#v, want %#v", saved, input)
+	}
+
+	disabledInput := input
+	disabledInput.Enabled = false
+	disableResponse := doJSON(t, client, http.MethodPut, server.URL+"/settings/storage/s3", disabledInput)
+	if disableResponse.StatusCode != http.StatusOK {
+		disableResponse.Body.Close()
+		t.Fatalf("disable S3 setting status = %d, want %d", disableResponse.StatusCode, http.StatusOK)
+	}
+	var disabled settingaction.S3Setting
+	if err := json.NewDecoder(disableResponse.Body).Decode(&disabled); err != nil {
+		disableResponse.Body.Close()
+		t.Fatal(err)
+	}
+	disableResponse.Body.Close()
+	if disabled != disabledInput {
+		t.Fatalf("disabled S3 setting = %#v, want %#v", disabled, disabledInput)
+	}
+
+	testResponse := doJSON(t, client, http.MethodPost, server.URL+"/settings/storage/s3/test", input)
+	if testResponse.StatusCode != http.StatusNoContent {
+		testResponse.Body.Close()
+		t.Fatalf("test S3 setting status = %d, want %d", testResponse.StatusCode, http.StatusNoContent)
+	}
+	testResponse.Body.Close()
+
+	application.s3TestErr = settingaction.ErrS3ConnectionFailed
+	assertErrorCode(t, doJSON(t, client, http.MethodPost, server.URL+"/settings/storage/s3/test", input), http.StatusUnprocessableEntity, "S3_CONNECTION_FAILED")
+	assertErrorCode(t, doJSON(t, client, http.MethodPut, server.URL+"/settings/storage/s3", settingaction.S3Setting{}), http.StatusBadRequest, "VALIDATION_FAILED")
 }
 
 // TestErrorResponseUsesRequestedLanguage 验证 API 错误响应使用请求语言。

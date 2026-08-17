@@ -16,6 +16,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -39,6 +40,16 @@ var channelFieldMessageKeys = map[channelaction.ValidationCode]cervii18n.Key{
 	channelaction.ValidationNameTooLong:          cervii18n.FieldChannelNameTooLong,
 	channelaction.ValidationDescriptionTooLong:   cervii18n.FieldChannelDescriptionTooLong,
 	channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
+}
+
+var s3SettingFieldMessageKeys = map[settingaction.ValidationCode]cervii18n.Key{
+	settingaction.ValidationEndpointRequired:        cervii18n.FieldS3EndpointRequired,
+	settingaction.ValidationEndpointInvalid:         cervii18n.FieldS3EndpointInvalid,
+	settingaction.ValidationProviderInvalid:         cervii18n.FieldS3ProviderInvalid,
+	settingaction.ValidationRegionRequired:          cervii18n.FieldS3RegionRequired,
+	settingaction.ValidationBucketRequired:          cervii18n.FieldS3BucketRequired,
+	settingaction.ValidationAccessKeyIDRequired:     cervii18n.FieldS3AccessKeyIDRequired,
+	settingaction.ValidationSecretAccessKeyRequired: cervii18n.FieldS3SecretAccessKeyRequired,
 }
 
 type errorBody struct {
@@ -69,6 +80,17 @@ type websiteChannelRequest struct {
 	DefaultLocale string `json:"defaultLocale"`
 }
 
+type s3SettingRequest struct {
+	Enabled         bool   `json:"enabled"`
+	Provider        string `json:"provider"`
+	Endpoint        string `json:"endpoint"`
+	Region          string `json:"region"`
+	Bucket          string `json:"bucket"`
+	AccessKeyID     string `json:"accessKeyId"`
+	SecretAccessKey string `json:"secretAccessKey"`
+	ForcePathStyle  bool   `json:"forcePathStyle"`
+}
+
 // Dependencies 定义 HTTP API 使用的 Action 和 Query。
 type Dependencies struct {
 	InstallWorkspace      func(context.Context, installationaction.InstallWorkspaceInput) (installationaction.InstallWorkspaceOutput, error)
@@ -83,6 +105,9 @@ type Dependencies struct {
 	UpdateWebsiteChannel  func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
 	DeleteWebsiteChannel  func(context.Context, *servermodels.Principal, string) error
 	RestoreWebsiteChannel func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	GetS3Setting          func(context.Context, *servermodels.Principal) (settingaction.S3Setting, error)
+	SaveS3Setting         func(context.Context, *servermodels.Principal, settingaction.S3Setting) (settingaction.S3Setting, error)
+	TestS3Setting         func(context.Context, settingaction.S3Setting) error
 }
 
 // Service 是挂载到 Wails /api 路径的 Gin 服务。
@@ -100,6 +125,9 @@ type Service struct {
 	updateWebsiteChannelAction  func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelInput) (*servermodels.Channel, error)
 	deleteWebsiteChannelAction  func(context.Context, *servermodels.Principal, string) error
 	restoreWebsiteChannelAction func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	getS3SettingQuery           func(context.Context, *servermodels.Principal) (settingaction.S3Setting, error)
+	saveS3SettingAction         func(context.Context, *servermodels.Principal, settingaction.S3Setting) (settingaction.S3Setting, error)
+	testS3SettingAction         func(context.Context, settingaction.S3Setting) error
 }
 
 // NewService 创建并配置企业服务端 HTTP API。
@@ -117,6 +145,9 @@ func NewService(dependencies Dependencies) *Service {
 		updateWebsiteChannelAction:  dependencies.UpdateWebsiteChannel,
 		deleteWebsiteChannelAction:  dependencies.DeleteWebsiteChannel,
 		restoreWebsiteChannelAction: dependencies.RestoreWebsiteChannel,
+		getS3SettingQuery:           dependencies.GetS3Setting,
+		saveS3SettingAction:         dependencies.SaveS3Setting,
+		testS3SettingAction:         dependencies.TestS3Setting,
 	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -141,6 +172,9 @@ func NewService(dependencies Dependencies) *Service {
 	protected.PATCH("/channels/website/:channelID", service.updateWebsiteChannel)
 	protected.DELETE("/channels/website/:channelID", service.deleteWebsiteChannel)
 	protected.POST("/channels/website/:channelID/restore", service.restoreWebsiteChannel)
+	protected.GET("/settings/storage/s3", service.getS3Setting)
+	protected.PUT("/settings/storage/s3", service.saveS3Setting)
+	protected.POST("/settings/storage/s3/test", service.testS3Setting)
 
 	service.router = router
 	return service
@@ -389,6 +423,61 @@ func (s *Service) restoreWebsiteChannel(c *gin.Context) {
 	c.JSON(http.StatusOK, channel)
 }
 
+// getS3Setting 返回当前企业的 S3 对象存储配置。
+func (s *Service) getS3Setting(c *gin.Context) {
+	principal := currentPrincipal(c)
+	setting, err := s.getS3SettingQuery(c.Request.Context(), principal)
+	if err != nil {
+		slog.Warn("读取 S3 配置失败", "organization_id", principal.Organization.ID, "error", err)
+		writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorS3SettingReadFailed, nil)
+		return
+	}
+	c.JSON(http.StatusOK, setting)
+}
+
+// saveS3Setting 保存当前企业的 S3 对象存储配置。
+func (s *Service) saveS3Setting(c *gin.Context) {
+	request, ok := bindS3SettingRequest(c)
+	if !ok {
+		return
+	}
+	principal := currentPrincipal(c)
+	input := request.s3SettingInput()
+	setting, err := s.saveS3SettingAction(c.Request.Context(), principal, input)
+	if err != nil {
+		writeS3SettingError(c, err, cervii18n.ErrorS3SettingSaveFailed, "save", principal.Organization.ID, input)
+		return
+	}
+	slog.Info("S3 配置已保存",
+		"organization_id", principal.Organization.ID,
+		"enabled", setting.Enabled,
+		"provider", setting.Provider,
+		"bucket", setting.Bucket,
+	)
+	c.JSON(http.StatusOK, setting)
+}
+
+// testS3Setting 测试请求中的 S3 对象存储配置。
+func (s *Service) testS3Setting(c *gin.Context) {
+	request, ok := bindS3SettingRequest(c)
+	if !ok {
+		return
+	}
+	principal := currentPrincipal(c)
+	setting := request.s3SettingInput()
+	err := s.testS3SettingAction(c.Request.Context(), setting)
+	if err != nil {
+		writeS3SettingError(c, err, cervii18n.ErrorS3ConnectionTestFailed, "test", principal.Organization.ID, setting)
+		return
+	}
+	slog.Info("S3 连接测试成功",
+		"organization_id", principal.Organization.ID,
+		"provider", setting.Provider,
+		"bucket", setting.Bucket,
+	)
+	c.Status(http.StatusNoContent)
+}
+
 // currentPrincipal 返回请求中已认证的企业用户。
 func currentPrincipal(c *gin.Context) *servermodels.Principal {
 	return c.MustGet(principalKey).(*servermodels.Principal)
@@ -411,6 +500,57 @@ func (r websiteChannelRequest) websiteChannelInput() channelaction.WebsiteChanne
 		Description:   r.Description,
 		DefaultLocale: r.DefaultLocale,
 	}
+}
+
+// bindS3SettingRequest 解析 S3 配置表单请求。
+func bindS3SettingRequest(c *gin.Context) (s3SettingRequest, bool) {
+	var request s3SettingRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, nil)
+		return s3SettingRequest{}, false
+	}
+	return request, true
+}
+
+// s3SettingInput 将 HTTP 请求转换为 S3 配置输入。
+func (r s3SettingRequest) s3SettingInput() settingaction.S3Setting {
+	return settingaction.S3Setting{
+		Enabled:         r.Enabled,
+		Provider:        r.Provider,
+		Endpoint:        r.Endpoint,
+		Region:          r.Region,
+		Bucket:          r.Bucket,
+		AccessKeyID:     r.AccessKeyID,
+		SecretAccessKey: r.SecretAccessKey,
+		ForcePathStyle:  r.ForcePathStyle,
+	}
+}
+
+// writeS3SettingError 记录并返回 S3 配置操作错误。
+func writeS3SettingError(c *gin.Context, err error, failureKey cervii18n.Key, operation string, organizationID string, setting settingaction.S3Setting) {
+	var validationError *settingaction.ValidationError
+	if errors.As(err, &validationError) {
+		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, s3SettingFieldKeys(validationError.Fields))
+		return
+	}
+	if errors.Is(err, settingaction.ErrS3ConnectionFailed) {
+		slog.Info("S3 连接测试失败",
+			"organization_id", organizationID,
+			"provider", setting.Provider,
+			"bucket", setting.Bucket,
+			"error", err,
+		)
+		writeError(c, http.StatusUnprocessableEntity, "S3_CONNECTION_FAILED", cervii18n.ErrorS3ConnectionTestFailed, nil)
+		return
+	}
+	slog.Warn("S3 配置操作失败",
+		"operation", operation,
+		"organization_id", organizationID,
+		"provider", setting.Provider,
+		"bucket", setting.Bucket,
+		"error", err,
+	)
+	writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", failureKey, nil)
 }
 
 // writeWebsiteChannelMutationError 返回网站渠道写入错误。
@@ -493,6 +633,15 @@ func channelFieldKeys(fields map[string]channelaction.ValidationCode) map[string
 	keys := make(map[string]cervii18n.Key, len(fields))
 	for field, code := range fields {
 		keys[field] = channelFieldMessageKeys[code]
+	}
+	return keys
+}
+
+// s3SettingFieldKeys 将 S3 配置校验码转换为本地化文案键。
+func s3SettingFieldKeys(fields map[string]settingaction.ValidationCode) map[string]cervii18n.Key {
+	keys := make(map[string]cervii18n.Key, len(fields))
+	for field, code := range fields {
+		keys[field] = s3SettingFieldMessageKeys[code]
 	}
 	return keys
 }

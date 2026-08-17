@@ -25,7 +25,11 @@ export function SharedAppRoutes({
       <Route path="/login" element={<LoginPage />} />
       <Route element={<WorkspaceLayout />}>
         <Route path="/inbox" element={<InboxRoute />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route
+          path="/settings"
+          element={<Navigate to="/settings/storage" replace />}
+        />
+        <Route path="/settings/storage" element={<SettingsPage />} />
         <Route
           path="/channels"
           element={<Navigate to="/channels/website" replace />}
