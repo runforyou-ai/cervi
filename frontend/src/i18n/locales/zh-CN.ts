@@ -210,8 +210,6 @@ const zhCN = {
         provider: "存储提供商",
         providerHelp: "查看 {{provider}} 接入文档",
         endpoint: "公开 Endpoint",
-        endpointDescription:
-          "浏览器将文件直接上传到此地址。请使用公开地址，并为 Cervi 配置跨域访问。",
         region: "区域",
         customRegionOption: "自定义区域",
         customRegion: "区域标识",

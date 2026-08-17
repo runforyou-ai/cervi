@@ -212,8 +212,6 @@ const enUS = {
         provider: "Storage provider",
         providerHelp: "View {{provider}} integration documentation",
         endpoint: "Public endpoint",
-        endpointDescription:
-          "The browser uploads files directly to this endpoint. Use a public address and allow cross-origin requests from Cervi.",
         region: "Region",
         customRegionOption: "Custom region",
         customRegion: "Region identifier",

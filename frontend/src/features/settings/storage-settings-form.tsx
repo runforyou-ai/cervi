@@ -465,9 +465,6 @@ export function StorageSettingsForm() {
                     required
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldDescription>
-                    {t("storage.form.endpointDescription")}
-                  </FieldDescription>
                   <FieldError errors={[fieldState.error]} />
                 </Field>
               )}
@@ -537,7 +534,7 @@ export function StorageSettingsForm() {
               </Button>
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 disabled={submitting}
                 onClick={cancelEditing}
               >
