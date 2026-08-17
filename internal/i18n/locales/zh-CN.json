@@ -68,6 +68,7 @@
   "field.s3_bucket_required": "请输入存储桶名称。",
   "field.s3_access_key_id_required": "请输入 Access Key ID。",
   "field.s3_secret_access_key_required": "请输入 Secret Access Key。",
+  "field.query_positive_integer": "请输入正整数。",
   "field.channel_chat_title_required": "请输入聊天标题。",
   "field.channel_chat_title_too_long": "聊天标题不能超过 100 个字符。",
   "field.channel_chat_subtitle_too_long": "聊天副标题不能超过 120 个字符。",

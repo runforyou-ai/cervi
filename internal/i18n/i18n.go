@@ -87,6 +87,7 @@ const (
 	FieldS3BucketRequired            Key = "field.s3_bucket_required"
 	FieldS3AccessKeyIDRequired       Key = "field.s3_access_key_id_required"
 	FieldS3SecretAccessKeyRequired   Key = "field.s3_secret_access_key_required"
+	FieldQueryPositiveInteger        Key = "field.query_positive_integer"
 	FieldServerURLComplete           Key = "field.server_url_complete"
 	FieldServerURLBaseOnly           Key = "field.server_url_base_only"
 	FieldServerURLHTTPSRequired      Key = "field.server_url_https_required"

@@ -31,7 +31,6 @@ export type ContactSummary = {
   id: string
   displayName: string | null
   stage: ContactStage
-  notes: string | null
   primaryEmail: string | null
   primaryPhone: string | null
   sourceChannelName: string

@@ -49,7 +49,6 @@ export function ContactForm({
   )
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(schema),
-    shouldUseNativeValidation: true,
     defaultValues: {
       displayName: "",
       channelId: "",
@@ -93,102 +92,108 @@ export function ContactForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form
+      onSubmit={form.handleSubmit(
+        submit,
+        () => toast.error(t("validation.checkFields")),
+      )}
+      noValidate
+    >
       <FieldGroup className="gap-5">
-          <FormInputField
-            name="displayName"
-            control={form.control}
-            label={t("form.displayName")}
-            required={false}
-            autoFocus
-          />
+        <FormInputField
+          name="displayName"
+          control={form.control}
+          label={t("form.displayName")}
+          required={false}
+          autoFocus
+        />
 
-          <Controller
-            name="channelId"
-            control={form.control}
-            render={({ field }) => (
-              <Field>
-                <FieldLabel htmlFor={field.name} required>
-                  {t("form.channel")}
-                </FieldLabel>
-                <NativeSelect {...field} id={field.name} required>
-                  <option value="" disabled>
-                    {t("form.channelPlaceholder")}
+        <Controller
+          name="channelId"
+          control={form.control}
+          render={({ field }) => (
+            <Field>
+              <FieldLabel htmlFor={field.name} required>
+                {t("form.channel")}
+              </FieldLabel>
+              <NativeSelect {...field} id={field.name} required>
+                <option value="" disabled>
+                  {t("form.channelPlaceholder")}
+                </option>
+                {channels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>
+                    {t(`channelTypes.${channel.type}`, { defaultValue: channel.type })} · {channel.name}
                   </option>
-                  {channels.map((channel) => (
-                    <option key={channel.id} value={channel.id}>
-                      {t(`channelTypes.${channel.type}`, { defaultValue: channel.type })} · {channel.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-            )}
-          />
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
+        />
 
-          <Controller
-            name="stage"
-            control={form.control}
-            render={({ field }) => (
-              <Field>
-                <FieldLabel htmlFor={field.name} required>
-                  {t("form.stage")}
-                </FieldLabel>
-                <NativeSelect {...field} id={field.name} required>
-                  <option value="visitor">{t("stages.visitor")}</option>
-                  <option value="lead">{t("stages.lead")}</option>
-                  <option value="customer">{t("stages.customer")}</option>
-                </NativeSelect>
-              </Field>
-            )}
-          />
+        <Controller
+          name="stage"
+          control={form.control}
+          render={({ field }) => (
+            <Field>
+              <FieldLabel htmlFor={field.name} required>
+                {t("form.stage")}
+              </FieldLabel>
+              <NativeSelect {...field} id={field.name} required>
+                <option value="visitor">{t("stages.visitor")}</option>
+                <option value="lead">{t("stages.lead")}</option>
+                <option value="customer">{t("stages.customer")}</option>
+              </NativeSelect>
+            </Field>
+          )}
+        />
 
-          <FormInputField
-            name="email"
-            control={form.control}
-            label={t("form.email")}
-            type="email"
-            required={false}
-          />
+        <FormInputField
+          name="email"
+          control={form.control}
+          label={t("form.email")}
+          type="email"
+          required={false}
+        />
 
-          <Controller
-            name="phone"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>{t("form.phone")}</FieldLabel>
-                <PhoneInput
-                  ref={field.ref}
-                  id={field.name}
-                  name={field.name}
-                  value={field.value}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  aria-invalid={fieldState.invalid}
-                  autoComplete="tel"
-                />
-                <FieldError errors={[fieldState.error]} />
-              </Field>
-            )}
-          />
+        <Controller
+          name="phone"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field>
+              <FieldLabel htmlFor={field.name}>{t("form.phone")}</FieldLabel>
+              <PhoneInput
+                ref={field.ref}
+                id={field.name}
+                name={field.name}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                aria-invalid={fieldState.invalid}
+                autoComplete="tel"
+              />
+              <FieldError errors={[fieldState.error]} />
+            </Field>
+          )}
+        />
 
-          <Controller
-            name="notes"
-            control={form.control}
-            render={({ field }) => (
-              <Field>
-                <FieldLabel htmlFor={field.name}>{t("form.notes")}</FieldLabel>
-                <Textarea {...field} id={field.name} />
-              </Field>
-            )}
-          />
+        <Controller
+          name="notes"
+          control={form.control}
+          render={({ field }) => (
+            <Field>
+              <FieldLabel htmlFor={field.name}>{t("form.notes")}</FieldLabel>
+              <Textarea {...field} id={field.name} />
+            </Field>
+          )}
+        />
 
-          <div className="flex items-center gap-3 pt-2">
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
-              {t("form.cancel")}
-            </Button>
+        <div className="flex items-center gap-3 pt-2">
+          <Button type="submit" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
+          </Button>
+          <Button type="button" variant="outline" onClick={onCancel}>
+            {t("form.cancel")}
+          </Button>
         </div>
       </FieldGroup>
     </form>

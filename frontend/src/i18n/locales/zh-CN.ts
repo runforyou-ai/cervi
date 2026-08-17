@@ -216,7 +216,7 @@ const zhCN = {
       notesTooLong: "备注不能超过 5000 个字符。",
     },
     delete: {
-      action: "删除联系人",
+      action: "删除",
       title: "将“{{name}}”移入回收站？",
       description: "联系人将从当前列表移除，可稍后从回收站恢复。",
       cancel: "取消",

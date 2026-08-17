@@ -68,6 +68,7 @@
   "field.s3_bucket_required": "Enter the bucket name.",
   "field.s3_access_key_id_required": "Enter the Access Key ID.",
   "field.s3_secret_access_key_required": "Enter the Secret Access Key.",
+  "field.query_positive_integer": "Enter a positive integer.",
   "field.channel_chat_title_required": "Enter a chat title.",
   "field.channel_chat_title_too_long": "The chat title cannot exceed 100 characters.",
   "field.channel_chat_subtitle_too_long": "The chat subtitle cannot exceed 120 characters.",

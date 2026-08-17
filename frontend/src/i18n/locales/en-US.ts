@@ -216,7 +216,7 @@ const enUS = {
       notesTooLong: "Notes cannot exceed 5000 characters.",
     },
     delete: {
-      action: "Delete contact",
+      action: "Delete",
       title: "Move “{{name}}” to trash?",
       description: "The contact will leave this list and can be restored from trash later.",
       cancel: "Cancel",

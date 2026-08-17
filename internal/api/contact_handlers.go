@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
@@ -115,7 +114,7 @@ func (s *Service) restoreContact(c *gin.Context) {
 	c.JSON(http.StatusOK, contact)
 }
 
-// bindContactRequest 解析联系人表单请求。
+// bindContactRequest 解析联系人请求。
 func bindContactRequest(c *gin.Context) (contactRequest, bool) {
 	var request contactRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -164,23 +163,7 @@ func contactListInput(c *gin.Context, deleted bool) (contactaction.ListInput, bo
 	}, true
 }
 
-// positiveQueryInteger 读取正整数查询参数。
-func positiveQueryInteger(c *gin.Context, name string, fallback int) (int, bool) {
-	value := c.Query(name)
-	if value == "" {
-		return fallback, true
-	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed <= 0 {
-		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{
-			name: cervii18n.FieldContactQueryInvalid,
-		})
-		return 0, false
-	}
-	return parsed, true
-}
-
-// writeContactInputError 返回联系人输入或执行错误。
+// writeContactInputError 处理联系人校验和执行错误。
 func (s *Service) writeContactInputError(c *gin.Context, err error, failureKey cervii18n.Key, operation string) bool {
 	var validationError *contactaction.ValidationError
 	if errors.As(err, &validationError) {
@@ -190,7 +173,7 @@ func (s *Service) writeContactInputError(c *gin.Context, err error, failureKey c
 	return s.writeContactError(c, err, failureKey, operation)
 }
 
-// writeContactError 返回联系人执行错误并记录服务端异常。
+// writeContactError 处理联系人操作错误。
 func (s *Service) writeContactError(c *gin.Context, err error, failureKey cervii18n.Key, operation string) bool {
 	if err == nil {
 		return false

@@ -43,7 +43,7 @@ function methodsFromDetail(
   detail: ContactDetail,
   values: ContactFormValues,
 ): ContactMethodInput[] {
-  // 详情表单只编辑每种类型的首项，其余联系方式保持不变。
+  // 仅修改每类联系方式的首项，其余项原样保留。
   const editedValues = {
     email: values.email,
     phone: values.phone,

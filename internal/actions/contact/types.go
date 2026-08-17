@@ -91,7 +91,7 @@ type ChannelIdentity struct {
 	DisplayName *string `bun:"display_name" json:"displayName"`
 }
 
-// SourceChannel 定义联系人首次添加或接入时的来源渠道。
+// SourceChannel 定义联系人来源渠道。
 type SourceChannel struct {
 	ID   string `bun:"id" json:"id"`
 	Type string `bun:"type" json:"type"`

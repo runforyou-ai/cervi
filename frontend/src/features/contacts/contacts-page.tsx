@@ -749,9 +749,9 @@ export function ContactsPage({
                           <TableCell className="text-muted-foreground">{user.email}</TableCell>
                           <TableCell>{t(`roles.${user.role}`, { defaultValue: user.role })}</TableCell>
                           <TableCell>{t(`statuses.${user.status}`, { defaultValue: user.status })}</TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right whitespace-nowrap">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               onClick={() => setParameters({ selected: user.id })}
                             >
@@ -773,16 +773,16 @@ export function ContactsPage({
                             {formatDateTime(deleted && contact.deletedAt ? contact.deletedAt : contact.createdAt)}
                           </TableCell>
                           {deleted ? (
-                            <TableCell className="text-right">
-                              <Button variant="ghost" size="sm" onClick={() => void restore(contact)}>
+                            <TableCell className="text-right whitespace-nowrap">
+                              <Button variant="outline" size="sm" onClick={() => void restore(contact)}>
                                 {t("trash.restore")}
                               </Button>
                             </TableCell>
                           ) : (
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
+                            <TableCell className="text-right whitespace-nowrap">
+                              <div className="flex justify-end gap-2">
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => setParameters({ selected: contact.id })}
                                 >

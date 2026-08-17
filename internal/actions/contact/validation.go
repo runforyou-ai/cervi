@@ -45,9 +45,6 @@ func normalizeContactInput(input ContactInput) (ContactInput, map[string]Validat
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
 	input.Stage = strings.TrimSpace(input.Stage)
 	input.Notes = strings.TrimSpace(input.Notes)
-	if input.Stage == "" {
-		input.Stage = StageVisitor
-	}
 
 	fields := make(map[string]ValidationCode)
 	if input.ChannelID == "" {
@@ -199,7 +196,7 @@ func normalizeMethodValue(methodType, value string) (string, bool) {
 	}
 }
 
-// validUUID 校验规范的 UUID 字符串。
+// validUUID 校验规范化 UUID 字符串。
 func validUUID(value string) bool {
 	parsed, err := uuid.Parse(value)
 	return err == nil && strings.EqualFold(parsed.String(), value)

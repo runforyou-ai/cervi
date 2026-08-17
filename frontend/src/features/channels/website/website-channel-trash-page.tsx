@@ -166,7 +166,7 @@ export function WebsiteChannelTrashPage() {
                       </TableCell>
                       <TableCell className="text-right whitespace-nowrap">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           disabled={restoringId === channel.id}
                           onClick={() => void handleRestore(channel)}

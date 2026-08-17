@@ -42,6 +42,9 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 	if fields["channelId"] != ValidationChannelRequired {
 		t.Fatalf("channel validation = %q, want %q", fields["channelId"], ValidationChannelRequired)
 	}
+	if fields["stage"] != ValidationStageInvalid {
+		t.Fatalf("stage validation = %q, want %q", fields["stage"], ValidationStageInvalid)
+	}
 
 	_, fields = normalizeContactInput(ContactInput{
 		DisplayName: strings.Repeat("鹿", 201),
@@ -72,6 +75,7 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 	_, fields = normalizeContactInput(ContactInput{
 		DisplayName: "林晓",
 		ChannelID:   "00000000-0000-0000-0000-000000000001",
+		Stage:       StageVisitor,
 		Methods:     tooManyMethods,
 	})
 	if fields["methods"] != ValidationMethodsTooMany {
@@ -84,6 +88,7 @@ func TestNormalizeContactInputRejectsDuplicateMethods(t *testing.T) {
 	_, fields := normalizeContactInput(ContactInput{
 		DisplayName: "林晓",
 		ChannelID:   "00000000-0000-0000-0000-000000000001",
+		Stage:       StageVisitor,
 		Methods: []MethodInput{
 			{Type: MethodEmail, Value: "lin@example.com", IsPrimary: true},
 			{Type: MethodEmail, Value: "LIN@example.com", IsPrimary: true},
