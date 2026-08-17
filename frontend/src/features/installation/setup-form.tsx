@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { EyeIcon, EyeOffIcon, LoaderCircleIcon } from "lucide-react"
-import { Controller, useForm } from "react-hook-form"
+import { LoaderCircleIcon } from "lucide-react"
+import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -17,8 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { FieldGroup } from "@/components/ui/field"
 import {
   createSetupSchema,
   type SetupFormValues,
@@ -28,7 +27,6 @@ import { apiErrorMessage } from "@/lib/form-errors"
 export function SetupForm() {
   const { t } = useTranslation("setup")
   const navigate = useNavigate()
-  const [showPassword, setShowPassword] = useState(false)
   const schema = useMemo(() => createSetupSchema(t), [t])
   const form = useForm<SetupFormValues>({
     resolver: zodResolver(schema),
@@ -100,38 +98,16 @@ export function SetupForm() {
               type="email"
               autoComplete="email"
             />
-            <Controller
+            <FormInputField
               name="password"
               control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor={field.name} required>
-                    {t("passwordLabel")}
-                  </FieldLabel>
-                  <div className="relative">
-                    <Input
-                      {...field}
-                      id={field.name}
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      className="pr-10"
-                      required
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="absolute top-1/2 right-1 -translate-y-1/2"
-                      aria-label={
-                        showPassword ? t("hidePassword") : t("showPassword")
-                      }
-                      onClick={() => setShowPassword((visible) => !visible)}
-                    >
-                      {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-                    </Button>
-                  </div>
-                </Field>
-              )}
+              label={t("passwordLabel")}
+              type="password"
+              autoComplete="new-password"
+              passwordVisibilityLabels={{
+                show: t("showPassword"),
+                hide: t("hidePassword"),
+              }}
             />
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}

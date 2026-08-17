@@ -6,7 +6,7 @@ import {
   useState,
 } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon, LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -85,13 +85,6 @@ function isConfigured(setting: StorageSettingsFormValues) {
   )
 }
 
-function maskAccessKey(value: string) {
-  if (value.length <= 8) {
-    return "••••••••"
-  }
-  return `${value.slice(0, 4)}••••${value.slice(-4)}`
-}
-
 export function StorageSettingsForm() {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
@@ -100,6 +93,7 @@ export function StorageSettingsForm() {
   const [savedSetting, setSavedSetting] =
     useState<StorageSettingsFormValues>(emptySetting)
   const [editing, setEditing] = useState(false)
+  const [secretAccessKeyVisible, setSecretAccessKeyVisible] = useState(false)
   const [disableDialogOpen, setDisableDialogOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<
     "save" | "test" | "enable" | "disable" | null
@@ -235,6 +229,7 @@ export function StorageSettingsForm() {
 
   function beginEditing() {
     form.reset(savedSetting)
+    setSecretAccessKeyVisible(false)
     setEditing(true)
   }
 
@@ -489,6 +484,10 @@ export function StorageSettingsForm() {
               label={t("storage.form.secretAccessKey")}
               type="password"
               autoComplete="new-password"
+              passwordVisibilityLabels={{
+                show: t("storage.form.showSecretAccessKey"),
+                hide: t("storage.form.hideSecretAccessKey"),
+              }}
             />
 
             <Controller
@@ -591,13 +590,35 @@ export function StorageSettingsForm() {
               <dt className="text-muted-foreground">
                 {t("storage.form.accessKeyId")}
               </dt>
-              <dd>{maskAccessKey(savedSetting.accessKeyId)}</dd>
+              <dd>{savedSetting.accessKeyId}</dd>
             </div>
             <div className="grid gap-1 border-b py-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
               <dt className="text-muted-foreground">
                 {t("storage.form.secretAccessKey")}
               </dt>
-              <dd>{t("storage.detail.credentialConfigured")}</dd>
+              <dd className="flex items-center gap-1">
+                <span>
+                  {secretAccessKeyVisible
+                    ? savedSetting.secretAccessKey
+                    : "••••••••"}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={
+                    secretAccessKeyVisible
+                      ? t("storage.form.hideSecretAccessKey")
+                      : t("storage.form.showSecretAccessKey")
+                  }
+                  aria-pressed={secretAccessKeyVisible}
+                  onClick={() =>
+                    setSecretAccessKeyVisible((visible) => !visible)
+                  }
+                >
+                  {secretAccessKeyVisible ? <EyeOffIcon /> : <EyeIcon />}
+                </Button>
+              </dd>
             </div>
             <div className="grid gap-1 py-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
               <dt className="text-muted-foreground">
