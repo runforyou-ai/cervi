@@ -1,4 +1,5 @@
 -- +goose Up
+-- 创建企业渠道表，关联关系由 Action 维护。
 CREATE TABLE channels (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id     uuid NOT NULL,
