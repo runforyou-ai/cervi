@@ -21,20 +21,28 @@ import {
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WebsiteChannelForm } from "@/features/channels/website/website-channel-form"
+import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
 
-function WebsiteChannelEditTabs({ channel }: { channel: WebsiteChannel }) {
+function WebsiteChannelEditTabs({
+  channel,
+  onChannelChange,
+}: {
+  channel: WebsiteChannel
+  onChannelChange: (channel: WebsiteChannel) => void
+}) {
   const { t } = useTranslation("channels")
   const [searchParams, setSearchParams] = useSearchParams()
-  const activeTab = searchParams.get("tab") === "basic" ? "basic" : "basic"
+  const requestedTab = searchParams.get("tab")
+  const activeTab = requestedTab === "chat-interface" ? "chat-interface" : "basic"
 
   useEffect(() => {
-    if (searchParams.get("tab") === "basic") {
+    if (requestedTab === "basic" || requestedTab === "chat-interface") {
       return
     }
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set("tab", "basic")
     setSearchParams(nextParams, { replace: true })
-  }, [searchParams, setSearchParams])
+  }, [requestedTab, searchParams, setSearchParams])
 
   return (
     <Tabs
@@ -48,9 +56,28 @@ function WebsiteChannelEditTabs({ channel }: { channel: WebsiteChannel }) {
     >
       <TabsList>
         <TabsTrigger value="basic">{t("tabs.basic")}</TabsTrigger>
+        <TabsTrigger value="chat-interface">
+          {t("tabs.chatInterface")}
+        </TabsTrigger>
       </TabsList>
-      <TabsContent value="basic">
+      <TabsContent
+        value="basic"
+        forceMount
+        className="data-[state=inactive]:hidden"
+      >
         <WebsiteChannelForm channel={channel} />
+      </TabsContent>
+      <TabsContent
+        value="chat-interface"
+        forceMount
+        className="data-[state=inactive]:hidden"
+      >
+        <WebsiteChannelChatInterfaceForm
+          channel={channel}
+          onUpdated={(chatInterface) =>
+            onChannelChange({ ...channel, chatInterface })
+          }
+        />
       </TabsContent>
     </Tabs>
   )
@@ -155,7 +182,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
         {mode === "create" ? t("create.title") : channel?.name}
       </h2>
       {mode === "edit" && channel ? (
-        <WebsiteChannelEditTabs channel={channel} />
+        <WebsiteChannelEditTabs channel={channel} onChannelChange={setChannel} />
       ) : (
         <WebsiteChannelForm />
       )}

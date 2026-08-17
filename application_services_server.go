@@ -38,22 +38,24 @@ func applicationServices(appStorage storage.Storage) ([]application.Service, err
 	getWebsiteChannel := channelaction.NewGetWebsiteChannelQuery(db)
 	createWebsiteChannel := channelaction.NewCreateWebsiteChannelAction(db)
 	updateWebsiteChannel := channelaction.NewUpdateWebsiteChannelAction(db)
+	updateWebsiteChannelChatInterface := channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db)
 	deleteWebsiteChannel := channelaction.NewDeleteWebsiteChannelAction(db)
 	restoreWebsiteChannel := channelaction.NewRestoreWebsiteChannelAction(db)
 
 	apiService := api.NewService(api.Dependencies{
-		InstallWorkspace:      installWorkspace.Execute,
-		Login:                 login.Execute,
-		Logout:                logout.Execute,
-		ResolveSession:        resolveSession.Execute,
-		Installation:          installation.Execute,
-		LoadInbox:             loadInbox.Execute,
-		ListWebsiteChannels:   listWebsiteChannels.Execute,
-		GetWebsiteChannel:     getWebsiteChannel.Execute,
-		CreateWebsiteChannel:  createWebsiteChannel.Execute,
-		UpdateWebsiteChannel:  updateWebsiteChannel.Execute,
-		DeleteWebsiteChannel:  deleteWebsiteChannel.Execute,
-		RestoreWebsiteChannel: restoreWebsiteChannel.Execute,
+		InstallWorkspace:                  installWorkspace.Execute,
+		Login:                             login.Execute,
+		Logout:                            logout.Execute,
+		ResolveSession:                    resolveSession.Execute,
+		Installation:                      installation.Execute,
+		LoadInbox:                         loadInbox.Execute,
+		ListWebsiteChannels:               listWebsiteChannels.Execute,
+		GetWebsiteChannel:                 getWebsiteChannel.Execute,
+		CreateWebsiteChannel:              createWebsiteChannel.Execute,
+		UpdateWebsiteChannel:              updateWebsiteChannel.Execute,
+		UpdateWebsiteChannelChatInterface: updateWebsiteChannelChatInterface.Execute,
+		DeleteWebsiteChannel:              deleteWebsiteChannel.Execute,
+		RestoreWebsiteChannel:             restoreWebsiteChannel.Execute,
 	})
 	return []application.Service{
 		application.NewServiceWithOptions(apiService, application.ServiceOptions{

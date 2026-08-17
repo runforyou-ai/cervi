@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import {
   deleteWebsiteChannel,
   listWebsiteChannels,
-  type WebsiteChannel,
+  type WebsiteChannelSummary,
 } from "@/api/channels"
 import { ApiError } from "@/api/client"
 import {
@@ -39,8 +39,8 @@ function WebsiteChannelRow({
   channel,
   onDeleteRequested,
 }: {
-  channel: WebsiteChannel
-  onDeleteRequested: (channel: WebsiteChannel) => void
+  channel: WebsiteChannelSummary
+  onDeleteRequested: (channel: WebsiteChannelSummary) => void
 }) {
   const { t } = useTranslation("channels")
 
@@ -100,9 +100,9 @@ function WebsiteChannelRow({
 export function WebsiteChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
-  const [channels, setChannels] = useState<WebsiteChannel[]>([])
+  const [channels, setChannels] = useState<WebsiteChannelSummary[]>([])
   const [deletingChannel, setDeletingChannel] =
-    useState<WebsiteChannel | null>(null)
+    useState<WebsiteChannelSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -129,7 +129,7 @@ export function WebsiteChannelListPage() {
     void loadChannels()
   }, [loadChannels])
 
-  async function handleDelete(channel: WebsiteChannel) {
+  async function handleDelete(channel: WebsiteChannelSummary) {
     try {
       await deleteWebsiteChannel(channel.id)
       setChannels((current) =>

@@ -7,7 +7,7 @@ import { toast } from "sonner"
 import {
   listDeletedWebsiteChannels,
   restoreWebsiteChannel,
-  type WebsiteChannel,
+  type WebsiteChannelSummary,
 } from "@/api/channels"
 import { ApiError } from "@/api/client"
 import {
@@ -33,7 +33,7 @@ export function WebsiteChannelTrashPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
-  const [channels, setChannels] = useState<WebsiteChannel[]>([])
+  const [channels, setChannels] = useState<WebsiteChannelSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [restoringId, setRestoringId] = useState("")
   const [error, setError] = useState("")
@@ -61,7 +61,7 @@ export function WebsiteChannelTrashPage() {
     void loadChannels()
   }, [loadChannels])
 
-  async function handleRestore(channel: WebsiteChannel) {
+  async function handleRestore(channel: WebsiteChannelSummary) {
     setRestoringId(channel.id)
     try {
       await restoreWebsiteChannel(channel.id)

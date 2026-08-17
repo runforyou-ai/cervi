@@ -14,8 +14,8 @@ import (
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 )
 
-// TestAuthenticationActionsWithPostgreSQL 验证 PostgreSQL 上的初始化和认证流程。
-func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
+// TestServerActionsWithPostgreSQL 验证服务端核心操作。
+func TestServerActionsWithPostgreSQL(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("TEST_DATABASE_URL is not set")
@@ -106,6 +106,29 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 	}
 	if channel.Type != channelaction.TypeWebsite || channel.CreatedByUserID != loginSession.Principal.User.ID {
 		t.Fatalf("unexpected created channel: %#v", channel)
+	}
+
+	getChannel := channelaction.NewGetWebsiteChannelQuery(db)
+	detail, err := getChannel.Execute(context.Background(), loginSession.Principal, channel.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.ChatInterface.ChatTitle != "产品官网" || detail.ChatInterface.ThemeColor != channelaction.DefaultWebsiteChannelThemeColor {
+		t.Fatalf("unexpected default chat interface: %#v", detail.ChatInterface)
+	}
+
+	updateChatInterface := channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db)
+	chatInterface, err := updateChatInterface.Execute(context.Background(), loginSession.Principal, channel.ID, channelaction.WebsiteChannelChatInterfaceInput{
+		Title:           "在线咨询",
+		Subtitle:        "通常会很快回复",
+		GreetingMessage: "你好，有什么可以帮你？",
+		ThemeColor:      "#16a34a",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chatInterface.ChatTitle != "在线咨询" || chatInterface.ChatSubtitle == nil || *chatInterface.ChatSubtitle != "通常会很快回复" || chatInterface.ThemeColor != "#16A34A" {
+		t.Fatalf("unexpected updated chat interface: %#v", chatInterface)
 	}
 
 	updateChannel := channelaction.NewUpdateWebsiteChannelAction(db)

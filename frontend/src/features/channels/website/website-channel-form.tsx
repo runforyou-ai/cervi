@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import type { WebsiteChannel } from "@/api/channels"
+import type { WebsiteChannelSummary } from "@/api/channels"
 import {
   createWebsiteChannel,
   updateWebsiteChannel,
@@ -29,7 +29,7 @@ import { apiErrorMessage } from "@/lib/form-errors"
 export function WebsiteChannelForm({
   channel,
 }: {
-  channel?: WebsiteChannel
+  channel?: WebsiteChannelSummary
 }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
