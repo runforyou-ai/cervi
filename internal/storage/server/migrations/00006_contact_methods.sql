@@ -18,6 +18,9 @@ CREATE INDEX contact_methods_organization_contact_index
 CREATE INDEX contact_methods_organization_type_value_index
     ON contact_methods (organization_id, type, normalized_value);
 
+CREATE UNIQUE INDEX contact_methods_contact_type_value_unique
+    ON contact_methods (contact_id, type, normalized_value);
+
 CREATE UNIQUE INDEX contact_methods_contact_primary_type_unique
     ON contact_methods (contact_id, type)
     WHERE is_primary;

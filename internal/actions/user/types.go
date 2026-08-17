@@ -20,15 +20,14 @@ type PageInfo struct {
 	Total  int `json:"total"`
 }
 
-// DirectoryUser 定义联系人目录展示所需的内部用户字段。
+// DirectoryUser 定义团队成员目录字段。
 type DirectoryUser struct {
-	ID             string    `json:"id"`
-	OrganizationID string    `json:"organizationId"`
-	Email          string    `json:"email"`
-	DisplayName    string    `json:"displayName"`
-	Role           string    `json:"role"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"createdAt"`
+	ID          string    `json:"id"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"displayName"`
+	Role        string    `json:"role"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 // ListOutput 定义企业成员分页结果。

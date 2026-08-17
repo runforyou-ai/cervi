@@ -37,8 +37,8 @@ import {
   getUser,
   listUsers,
   type DirectoryUser,
-  type PageInfo,
 } from "@/api/users"
+import type { PageInfo } from "@/api/types"
 import {
   ListToolbar,
   ListToolbarFilter,
@@ -51,6 +51,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -773,7 +774,7 @@ export function ContactsPage({
                           <TableCell><StageLabel stage={contact.stage} /></TableCell>
                           <TableCell className="text-muted-foreground">{contact.primaryEmail || "—"}</TableCell>
                           <TableCell className="text-muted-foreground">{contact.primaryPhone || "—"}</TableCell>
-                          <TableCell>{contact.sourceChannelName || "—"}</TableCell>
+                          <TableCell>{contact.sourceChannelName}</TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
                             {formatDateTime(deleted && contact.deletedAt ? contact.deletedAt : contact.createdAt)}
                           </TableCell>
@@ -880,7 +881,6 @@ export function ContactsPage({
             <DialogDescription>{t("detail.createDescription")}</DialogDescription>
           </DialogHeader>
           <ContactForm
-            key="new"
             channels={channels}
             onSaved={() => {
               setParameters({ new: null })
@@ -895,13 +895,14 @@ export function ContactsPage({
         open={deletingContact !== null}
         onOpenChange={(open) => !open && setDeletingContact(null)}
       >
-        <AlertDialogContent aria-describedby={undefined}>
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {t("delete.title", {
                 name: deletingContact?.displayName || t("anonymous"),
               })}
             </AlertDialogTitle>
+            <AlertDialogDescription>{t("delete.description")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("delete.cancel")}</AlertDialogCancel>

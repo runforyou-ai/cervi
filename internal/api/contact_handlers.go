@@ -38,13 +38,14 @@ func (s *Service) listDeletedContacts(c *gin.Context) {
 	s.writeContactList(c, true)
 }
 
+// writeContactList 返回指定回收状态的联系人列表。
 func (s *Service) writeContactList(c *gin.Context, deleted bool) {
 	input, ok := contactListInput(c, deleted)
 	if !ok {
 		return
 	}
 	output, err := s.listContactsQuery(c.Request.Context(), currentPrincipal(c), input)
-	if s.writeContactMutationError(c, err, cervii18n.ErrorContactListFailed) {
+	if s.writeContactInputError(c, err, cervii18n.ErrorContactListFailed, "list") {
 		return
 	}
 	c.JSON(http.StatusOK, output)
@@ -53,7 +54,7 @@ func (s *Service) writeContactList(c *gin.Context, deleted bool) {
 // getContact 返回当前企业的联系人详情。
 func (s *Service) getContact(c *gin.Context) {
 	contact, err := s.getContactQuery(c.Request.Context(), currentPrincipal(c), c.Param("contactID"))
-	if s.writeContactError(c, err, cervii18n.ErrorContactReadFailed) {
+	if s.writeContactError(c, err, cervii18n.ErrorContactReadFailed, "read") {
 		return
 	}
 	c.JSON(http.StatusOK, contact)
@@ -65,10 +66,12 @@ func (s *Service) createContact(c *gin.Context) {
 	if !ok {
 		return
 	}
-	contact, err := s.createContactAction(c.Request.Context(), currentPrincipal(c), request.contactInput())
-	if s.writeContactMutationError(c, err, cervii18n.ErrorContactCreateFailed) {
+	principal := currentPrincipal(c)
+	contact, err := s.createContactAction(c.Request.Context(), principal, request.contactInput())
+	if s.writeContactInputError(c, err, cervii18n.ErrorContactCreateFailed, "create") {
 		return
 	}
+	slog.Info("联系人创建完成", "organization_id", principal.Organization.ID, "user_id", principal.User.ID, "contact_id", contact.Contact.ID)
 	c.JSON(http.StatusCreated, contact)
 }
 
@@ -78,31 +81,41 @@ func (s *Service) updateContact(c *gin.Context) {
 	if !ok {
 		return
 	}
-	contact, err := s.updateContactAction(c.Request.Context(), currentPrincipal(c), c.Param("contactID"), request.contactInput())
-	if s.writeContactMutationError(c, err, cervii18n.ErrorContactUpdateFailed) {
+	principal := currentPrincipal(c)
+	contactID := c.Param("contactID")
+	contact, err := s.updateContactAction(c.Request.Context(), principal, contactID, request.contactInput())
+	if s.writeContactInputError(c, err, cervii18n.ErrorContactUpdateFailed, "update") {
 		return
 	}
+	slog.Info("联系人更新完成", "organization_id", principal.Organization.ID, "user_id", principal.User.ID, "contact_id", contactID)
 	c.JSON(http.StatusOK, contact)
 }
 
 // deleteContact 将当前企业的联系人移入回收站。
 func (s *Service) deleteContact(c *gin.Context) {
-	err := s.deleteContactAction(c.Request.Context(), currentPrincipal(c), c.Param("contactID"))
-	if s.writeContactError(c, err, cervii18n.ErrorContactDeleteFailed) {
+	principal := currentPrincipal(c)
+	contactID := c.Param("contactID")
+	err := s.deleteContactAction(c.Request.Context(), principal, contactID)
+	if s.writeContactError(c, err, cervii18n.ErrorContactDeleteFailed, "delete") {
 		return
 	}
+	slog.Info("联系人已移入回收站", "organization_id", principal.Organization.ID, "user_id", principal.User.ID, "contact_id", contactID)
 	c.Status(http.StatusNoContent)
 }
 
 // restoreContact 恢复当前企业回收站中的联系人。
 func (s *Service) restoreContact(c *gin.Context) {
-	contact, err := s.restoreContactAction(c.Request.Context(), currentPrincipal(c), c.Param("contactID"))
-	if s.writeContactError(c, err, cervii18n.ErrorContactRestoreFailed) {
+	principal := currentPrincipal(c)
+	contactID := c.Param("contactID")
+	contact, err := s.restoreContactAction(c.Request.Context(), principal, contactID)
+	if s.writeContactError(c, err, cervii18n.ErrorContactRestoreFailed, "restore") {
 		return
 	}
+	slog.Info("联系人恢复完成", "organization_id", principal.Organization.ID, "user_id", principal.User.ID, "contact_id", contactID)
 	c.JSON(http.StatusOK, contact)
 }
 
+// bindContactRequest 解析联系人表单请求。
 func bindContactRequest(c *gin.Context) (contactRequest, bool) {
 	var request contactRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -112,6 +125,7 @@ func bindContactRequest(c *gin.Context) (contactRequest, bool) {
 	return request, true
 }
 
+// contactInput 将 HTTP 请求转换为联系人输入。
 func (r contactRequest) contactInput() contactaction.ContactInput {
 	methods := make([]contactaction.MethodInput, 0, len(r.Methods))
 	for _, method := range r.Methods {
@@ -128,6 +142,7 @@ func (r contactRequest) contactInput() contactaction.ContactInput {
 	}
 }
 
+// contactListInput 解析联系人列表参数。
 func contactListInput(c *gin.Context, deleted bool) (contactaction.ListInput, bool) {
 	page, ok := positiveQueryInteger(c, "page", 1)
 	if !ok {
@@ -149,6 +164,7 @@ func contactListInput(c *gin.Context, deleted bool) (contactaction.ListInput, bo
 	}, true
 }
 
+// positiveQueryInteger 读取正整数查询参数。
 func positiveQueryInteger(c *gin.Context, name string, fallback int) (int, bool) {
 	value := c.Query(name)
 	if value == "" {
@@ -164,20 +180,28 @@ func positiveQueryInteger(c *gin.Context, name string, fallback int) (int, bool)
 	return parsed, true
 }
 
-func (s *Service) writeContactMutationError(c *gin.Context, err error, failureKey cervii18n.Key) bool {
+// writeContactInputError 返回联系人输入或执行错误。
+func (s *Service) writeContactInputError(c *gin.Context, err error, failureKey cervii18n.Key, operation string) bool {
 	var validationError *contactaction.ValidationError
 	if errors.As(err, &validationError) {
 		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 		return true
 	}
-	return s.writeContactError(c, err, failureKey)
+	return s.writeContactError(c, err, failureKey, operation)
 }
 
-func (s *Service) writeContactError(c *gin.Context, err error, failureKey cervii18n.Key) bool {
+// writeContactError 返回联系人执行错误并记录服务端异常。
+func (s *Service) writeContactError(c *gin.Context, err error, failureKey cervii18n.Key, operation string) bool {
 	if err == nil {
 		return false
 	}
+	principal := currentPrincipal(c)
+	logger := slog.With("operation", operation, "organization_id", principal.Organization.ID, "user_id", principal.User.ID)
+	if contactID := c.Param("contactID"); contactID != "" {
+		logger = logger.With("contact_id", contactID)
+	}
 	if errors.Is(err, contactaction.ErrPrincipalInvalid) {
+		logger.Warn("联系人操作被拒绝")
 		writeError(c, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
 		return true
 	}
@@ -185,7 +209,7 @@ func (s *Service) writeContactError(c *gin.Context, err error, failureKey cervii
 		writeError(c, http.StatusNotFound, "CONTACT_NOT_FOUND", cervii18n.ErrorContactNotFound, nil)
 		return true
 	}
-	slog.Warn("联系人操作失败", "error", err)
+	logger.Warn("联系人操作失败", "error", err)
 	writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", failureKey, nil)
 	return true
 }

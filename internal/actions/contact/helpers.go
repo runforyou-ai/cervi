@@ -11,23 +11,9 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// validatePrincipal 校验当前用户仍是企业的有效成员。
 func validatePrincipal(ctx context.Context, tx bun.Tx, principal *servermodels.Principal) error {
-	if principal == nil || !validUUID(principal.Organization.ID) || !validUUID(principal.User.ID) || principal.User.OrganizationID != principal.Organization.ID {
-		return ErrPrincipalInvalid
-	}
-
-	organizationExists, err := tx.NewSelect().
-		Model((*servermodels.Organization)(nil)).
-		Where("id = ?", principal.Organization.ID).
-		Exists(ctx)
-	if err != nil {
-		return err
-	}
-	if !organizationExists {
-		return ErrPrincipalInvalid
-	}
-
-	userExists, err := tx.NewSelect().
+	active, err := tx.NewSelect().
 		Model((*servermodels.User)(nil)).
 		Where("id = ?", principal.User.ID).
 		Where("organization_id = ?", principal.Organization.ID).
@@ -36,12 +22,13 @@ func validatePrincipal(ctx context.Context, tx bun.Tx, principal *servermodels.P
 	if err != nil {
 		return err
 	}
-	if !userExists {
+	if !active {
 		return ErrPrincipalInvalid
 	}
 	return nil
 }
 
+// validateSourceChannel 校验来源渠道属于当前企业且未删除。
 func validateSourceChannel(ctx context.Context, tx bun.Tx, organizationID, channelID string) error {
 	exists, err := tx.NewSelect().
 		Model((*servermodels.Channel)(nil)).
@@ -58,6 +45,7 @@ func validateSourceChannel(ctx context.Context, tx bun.Tx, organizationID, chann
 	return nil
 }
 
+// replaceMethods 同步联系人联系方式并保留未变更记录。
 func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID string, methods []MethodInput) error {
 	existing := make([]servermodels.ContactMethod, 0)
 	if err := tx.NewSelect().
@@ -69,21 +57,22 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 		return err
 	}
 
-	key := func(methodType, value string) string {
-		return methodType + "\x00" + value
+	type methodKey struct {
+		typeName string
+		value    string
 	}
-	desired := make(map[string]MethodInput, len(methods))
+	desired := make(map[methodKey]MethodInput, len(methods))
 	for _, method := range methods {
-		desired[key(method.Type, method.Value)] = method
+		desired[methodKey{typeName: method.Type, value: method.Value}] = method
 	}
 
-	matched := make(map[string]*servermodels.ContactMethod, len(existing))
+	existingByKey := make(map[methodKey]*servermodels.ContactMethod, len(existing))
 	obsoleteIDs := make([]string, 0)
 	for index := range existing {
 		record := &existing[index]
-		recordKey := key(record.Type, record.NormalizedValue)
-		if _, wanted := desired[recordKey]; wanted && matched[recordKey] == nil {
-			matched[recordKey] = record
+		recordKey := methodKey{typeName: record.Type, value: record.NormalizedValue}
+		if _, wanted := desired[recordKey]; wanted {
+			existingByKey[recordKey] = record
 			continue
 		}
 		obsoleteIDs = append(obsoleteIDs, record.ID)
@@ -99,8 +88,8 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 		}
 	}
 
-	// 先取消不再作为主要项的旧记录，避免同类型主要项切换时触发唯一索引冲突。
-	for recordKey, record := range matched {
+	// 先取消旧主要项，避免切换主要联系方式时触发唯一索引冲突。
+	for recordKey, record := range existingByKey {
 		if record.IsPrimary && !desired[recordKey].IsPrimary {
 			if _, err := tx.NewUpdate().
 				Model((*servermodels.ContactMethod)(nil)).
@@ -118,7 +107,7 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 
 	newRecords := make([]servermodels.ContactMethod, 0)
 	for _, method := range methods {
-		record := matched[key(method.Type, method.Value)]
+		record := existingByKey[methodKey{typeName: method.Type, value: method.Value}]
 		if record == nil {
 			newRecord := servermodels.ContactMethod{
 				OrganizationID:  organizationID,
@@ -166,21 +155,20 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 	return err
 }
 
-func loadContact(ctx context.Context, db bun.IDB, organizationID, contactID string, deleted bool) (*servermodels.Contact, error) {
+// loadContact 读取当前企业中未删除的联系人。
+func loadContact(ctx context.Context, db bun.IDB, organizationID, contactID string) (*ContactRecord, error) {
 	if !validUUID(contactID) {
 		return nil, ErrNotFound
 	}
-	contact := &servermodels.Contact{}
+	contact := &ContactRecord{}
 	query := db.NewSelect().
-		Model(contact).
+		TableExpr("contacts AS c").
+		ColumnExpr("c.id::text AS id").
+		Column("source_channel_id", "display_name", "stage", "notes", "created_at").
 		Where("c.id = ?", contactID).
-		Where("c.organization_id = ?", organizationID)
-	if deleted {
-		query = query.Where("c.deleted_at IS NOT NULL")
-	} else {
-		query = query.Where("c.deleted_at IS NULL")
-	}
-	if err := query.Scan(ctx); errors.Is(err, sql.ErrNoRows) {
+		Where("c.organization_id = ?", organizationID).
+		Where("c.deleted_at IS NULL")
+	if err := query.Scan(ctx, contact); errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	} else if err != nil {
 		return nil, err

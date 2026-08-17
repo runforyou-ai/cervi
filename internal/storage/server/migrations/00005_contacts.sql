@@ -3,7 +3,7 @@ CREATE TABLE contacts (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id     uuid NOT NULL,
     created_by_user_id  uuid NOT NULL,
-    source_channel_id   uuid,
+    source_channel_id   uuid NOT NULL,
     display_name        text,
     stage               text NOT NULL DEFAULT 'visitor'
                             CHECK (stage IN ('visitor', 'lead', 'customer')),

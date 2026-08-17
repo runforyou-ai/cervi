@@ -33,7 +33,9 @@ func (q *ListUsersQuery) Execute(ctx context.Context, principal *servermodels.Pr
 	if input.PageSize <= 0 {
 		input.PageSize = 50
 	}
-	if input.PageSize > 100 {
+	if input.PageSize > 100 ||
+		(input.Status != "" && input.Status != "active" && input.Status != "inactive") ||
+		(input.Role != "" && input.Role != "owner" && input.Role != "member") {
 		return ListOutput{}, ErrQueryInvalid
 	}
 
@@ -63,7 +65,6 @@ func (q *ListUsersQuery) Execute(ctx context.Context, principal *servermodels.Pr
 	users := make([]DirectoryUser, 0)
 	if err := applyFilters(q.db.NewSelect().TableExpr("users AS u")).
 		ColumnExpr("u.id::text AS id").
-		ColumnExpr("u.organization_id::text AS organization_id").
 		Column("email", "display_name", "role", "status", "created_at").
 		OrderExpr("lower(u.display_name) ASC, u.id ASC").
 		Limit(input.PageSize).

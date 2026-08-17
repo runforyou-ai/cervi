@@ -32,7 +32,6 @@ func (q *GetUserQuery) Execute(ctx context.Context, principal *servermodels.Prin
 	err := q.db.NewSelect().
 		TableExpr("users AS u").
 		ColumnExpr("u.id::text AS id").
-		ColumnExpr("u.organization_id::text AS organization_id").
 		Column("email", "display_name", "role", "status", "created_at").
 		Where("u.id = ?", userID).
 		Where("u.organization_id = ?", principal.Organization.ID).

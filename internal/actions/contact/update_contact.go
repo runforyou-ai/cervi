@@ -27,7 +27,7 @@ func (a *UpdateContactAction) Execute(ctx context.Context, principal *servermode
 	if !validUUID(contactID) {
 		return nil, ErrNotFound
 	}
-	input, fields := normalizeContactInput(input, false)
+	input, fields := normalizeContactInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
@@ -36,7 +36,7 @@ func (a *UpdateContactAction) Execute(ctx context.Context, principal *servermode
 		if err := validatePrincipal(ctx, tx, principal); err != nil {
 			return err
 		}
-		var sourceChannelID sql.NullString
+		var sourceChannelID string
 		if err := tx.NewSelect().
 			Table("contacts").
 			Column("source_channel_id").
@@ -49,7 +49,7 @@ func (a *UpdateContactAction) Execute(ctx context.Context, principal *servermode
 		} else if err != nil {
 			return err
 		}
-		if (sourceChannelID.Valid && sourceChannelID.String != input.ChannelID) || (!sourceChannelID.Valid && input.ChannelID != "") {
+		if sourceChannelID != input.ChannelID {
 			return &ValidationError{Fields: map[string]ValidationCode{"channelId": ValidationChannelImmutable}}
 		}
 		query := tx.NewUpdate().
@@ -66,20 +66,13 @@ func (a *UpdateContactAction) Execute(ctx context.Context, principal *servermode
 		} else {
 			query = query.Set("notes = NULL")
 		}
-		result, err := query.
+		_, err := query.
 			Where("id = ?", contactID).
 			Where("organization_id = ?", principal.Organization.ID).
 			Where("deleted_at IS NULL").
 			Exec(ctx)
 		if err != nil {
 			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return ErrNotFound
 		}
 		return replaceMethods(ctx, tx, principal.Organization.ID, contactID, input.Methods)
 	})

@@ -22,34 +22,29 @@ func NewCreateContactAction(db *bun.DB) *CreateContactAction {
 
 // Execute 校验字段并在当前企业中创建联系人。
 func (a *CreateContactAction) Execute(ctx context.Context, principal *servermodels.Principal, input ContactInput) (*ContactDetail, error) {
-	input, fields := normalizeContactInput(input, true)
+	input, fields := normalizeContactInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if principal == nil || !validUUID(principal.Organization.ID) || !validUUID(principal.User.ID) || principal.User.OrganizationID != principal.Organization.ID {
-		return nil, ErrPrincipalInvalid
-	}
-
-	sourceChannelID := input.ChannelID
-	contact := &servermodels.Contact{
-		OrganizationID:  principal.Organization.ID,
-		CreatedByUserID: principal.User.ID,
-		SourceChannelID: &sourceChannelID,
-		Stage:           input.Stage,
-	}
-	if input.DisplayName != "" {
-		contact.DisplayName = &input.DisplayName
-	}
-	if input.Notes != "" {
-		contact.Notes = &input.Notes
-	}
-
+	var contact *servermodels.Contact
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := validatePrincipal(ctx, tx, principal); err != nil {
 			return err
 		}
 		if err := validateSourceChannel(ctx, tx, principal.Organization.ID, input.ChannelID); err != nil {
 			return err
+		}
+		contact = &servermodels.Contact{
+			OrganizationID:  principal.Organization.ID,
+			CreatedByUserID: principal.User.ID,
+			SourceChannelID: input.ChannelID,
+			Stage:           input.Stage,
+		}
+		if input.DisplayName != "" {
+			contact.DisplayName = &input.DisplayName
+		}
+		if input.Notes != "" {
+			contact.Notes = &input.Notes
 		}
 		if _, err := tx.NewInsert().
 			Model(contact).

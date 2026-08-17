@@ -8,13 +8,11 @@ export function createContactSchema(messages: {
   emailInvalid: string
   phoneInvalid: string
   notesTooLong: string
-}, channelRequired = true) {
+}) {
   return z
     .object({
       displayName: z.string().trim().max(200, messages.nameTooLong),
-      channelId: channelRequired
-        ? z.string().uuid(messages.channelRequired)
-        : z.union([z.literal(""), z.string().uuid(messages.channelRequired)]),
+      channelId: z.string().uuid(messages.channelRequired),
       stage: z.enum(["visitor", "lead", "customer"]),
       email: z.union([z.literal(""), z.string().trim().email(messages.emailInvalid)]),
       phone: z

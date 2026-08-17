@@ -32,7 +32,7 @@ type EditingSection = "name" | "stage" | "methods" | "notes" | null
 function valuesFromDetail(detail: ContactDetail): ContactFormValues {
   return {
     displayName: detail.contact.displayName ?? "",
-    channelId: detail.contact.sourceChannelId ?? "",
+    channelId: detail.contact.sourceChannelId,
     stage: detail.contact.stage,
     email: detail.methods.find((method) => method.type === "email")?.value ?? "",
     phone: detail.methods.find((method) => method.type === "phone")?.value ?? "",
@@ -44,6 +44,7 @@ function methodsFromDetail(
   detail: ContactDetail,
   values: ContactFormValues,
 ): ContactMethodInput[] {
+  // 详情表单只编辑每种类型的首项，其余联系方式保持不变。
   const editedValues = {
     email: values.email,
     phone: values.phone,
@@ -171,7 +172,7 @@ export function ContactDetailView({
         emailInvalid: t("validation.emailInvalid"),
         phoneInvalid: t("validation.phoneInvalid"),
         notesTooLong: t("validation.notesTooLong"),
-      }, false),
+      }),
     [t],
   )
   const form = useForm<ContactFormValues>({
@@ -201,7 +202,7 @@ export function ContactDetailView({
   const save = form.handleSubmit(async (values) => {
     const input: ContactInput = {
       displayName: values.displayName,
-      channelId: detail.contact.sourceChannelId ?? "",
+      channelId: detail.contact.sourceChannelId,
       stage: values.stage,
       notes: values.notes,
       methods: methodsFromDetail(detail, values),
@@ -348,7 +349,7 @@ export function ContactDetailView({
             <dd className="grid gap-2">
               {detail.channelIdentities.length > 0
                 ? detail.channelIdentities.map((identity) => (
-                    <div key={identity.id}>
+                    <div key={`${identity.channelId}:${identity.externalId}`}>
                       <div>{identity.channelName}</div>
                       <div className="text-xs text-muted-foreground">
                         {identity.displayName || identity.externalId}

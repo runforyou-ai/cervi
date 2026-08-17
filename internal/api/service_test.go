@@ -27,22 +27,26 @@ import (
 )
 
 type memoryApplication struct {
-	installed bool
-	principal servermodels.Principal
-	password  string
-	sessions  map[string]time.Time
-	channels  map[string]servermodels.Channel
-	contacts  map[string]contactaction.ContactDetail
-	nextID    int
-	deleteErr error
+	installed            bool
+	principal            servermodels.Principal
+	password             string
+	sessions             map[string]time.Time
+	channels             map[string]servermodels.Channel
+	contacts             map[string]contactaction.ContactDetail
+	contactOrganizations map[string]string
+	contactDeletedAt     map[string]*time.Time
+	nextID               int
+	deleteErr            error
 }
 
 // newMemoryApplication 创建未初始化的内存测试应用。
 func newMemoryApplication() *memoryApplication {
 	return &memoryApplication{
-		sessions: make(map[string]time.Time),
-		channels: make(map[string]servermodels.Channel),
-		contacts: make(map[string]contactaction.ContactDetail),
+		sessions:             make(map[string]time.Time),
+		channels:             make(map[string]servermodels.Channel),
+		contacts:             make(map[string]contactaction.ContactDetail),
+		contactOrganizations: make(map[string]string),
+		contactDeletedAt:     make(map[string]*time.Time),
 	}
 }
 
@@ -258,15 +262,15 @@ func (a *memoryApplication) getUser(_ context.Context, principal *servermodels.P
 	return &user, nil
 }
 
+// memoryDirectoryUser 创建内存团队成员。
 func memoryDirectoryUser(user servermodels.User) useraction.DirectoryUser {
 	return useraction.DirectoryUser{
-		ID:             user.ID,
-		OrganizationID: user.OrganizationID,
-		Email:          user.Email,
-		DisplayName:    user.DisplayName,
-		Role:           user.Role,
-		Status:         user.Status,
-		CreatedAt:      time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
+		ID:          user.ID,
+		Email:       user.Email,
+		DisplayName: user.DisplayName,
+		Role:        user.Role,
+		Status:      user.Status,
+		CreatedAt:   time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -275,12 +279,13 @@ func (a *memoryApplication) listContacts(_ context.Context, principal *servermod
 	contacts := make([]contactaction.ContactSummary, 0)
 	for _, detail := range a.contacts {
 		item := detail.Contact
-		if item.OrganizationID != principal.Organization.ID || (item.DeletedAt != nil) != input.Deleted {
+		deletedAt := a.contactDeletedAt[item.ID]
+		if a.contactOrganizations[item.ID] != principal.Organization.ID || (deletedAt != nil) != input.Deleted {
 			continue
 		}
 		summary := contactaction.ContactSummary{
-			ID: item.ID, DisplayName: item.DisplayName, Stage: item.Stage, Notes: item.Notes,
-			CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, DeletedAt: item.DeletedAt,
+			ID: item.ID, DisplayName: item.DisplayName, Stage: item.Stage,
+			CreatedAt: item.CreatedAt, DeletedAt: deletedAt,
 		}
 		for _, method := range detail.Methods {
 			value := method.Value
@@ -302,7 +307,7 @@ func (a *memoryApplication) listContacts(_ context.Context, principal *servermod
 // getContact 返回内存联系人详情。
 func (a *memoryApplication) getContact(_ context.Context, principal *servermodels.Principal, contactID string) (*contactaction.ContactDetail, error) {
 	detail, exists := a.contacts[contactID]
-	if !exists || detail.Contact.OrganizationID != principal.Organization.ID || detail.Contact.DeletedAt != nil {
+	if !exists || a.contactOrganizations[contactID] != principal.Organization.ID || a.contactDeletedAt[contactID] != nil {
 		return nil, contactaction.ErrNotFound
 	}
 	return &detail, nil
@@ -313,10 +318,9 @@ func (a *memoryApplication) createContact(_ context.Context, principal *servermo
 	a.nextID++
 	id := "00000000-0000-0000-0000-" + fmt.Sprintf("%012d", a.nextID)
 	now := time.Now()
-	sourceChannelID := input.ChannelID
-	contact := servermodels.Contact{
-		ID: id, OrganizationID: principal.Organization.ID, CreatedByUserID: principal.User.ID,
-		SourceChannelID: &sourceChannelID, Stage: input.Stage, CreatedAt: now, UpdatedAt: now,
+	contact := contactaction.ContactRecord{
+		ID:              id,
+		SourceChannelID: input.ChannelID, Stage: input.Stage, CreatedAt: now,
 	}
 	if input.DisplayName != "" {
 		contact.DisplayName = &input.DisplayName
@@ -324,15 +328,16 @@ func (a *memoryApplication) createContact(_ context.Context, principal *servermo
 	if input.Notes != "" {
 		contact.Notes = &input.Notes
 	}
-	detail := contactaction.ContactDetail{Contact: contact, Methods: memoryContactMethods(id, principal.Organization.ID, input.Methods)}
+	detail := contactaction.ContactDetail{Contact: contact, Methods: memoryContactMethods(input.Methods)}
 	a.contacts[id] = detail
+	a.contactOrganizations[id] = principal.Organization.ID
 	return &detail, nil
 }
 
 // updateContact 修改内存联系人。
 func (a *memoryApplication) updateContact(_ context.Context, principal *servermodels.Principal, contactID string, input contactaction.ContactInput) (*contactaction.ContactDetail, error) {
 	detail, exists := a.contacts[contactID]
-	if !exists || detail.Contact.OrganizationID != principal.Organization.ID || detail.Contact.DeletedAt != nil {
+	if !exists || a.contactOrganizations[contactID] != principal.Organization.ID || a.contactDeletedAt[contactID] != nil {
 		return nil, contactaction.ErrNotFound
 	}
 	detail.Contact.DisplayName = nil
@@ -344,45 +349,39 @@ func (a *memoryApplication) updateContact(_ context.Context, principal *servermo
 		detail.Contact.Notes = &input.Notes
 	}
 	detail.Contact.Stage = input.Stage
-	sourceChannelID := input.ChannelID
-	detail.Contact.SourceChannelID = &sourceChannelID
-	detail.Contact.UpdatedAt = time.Now()
-	detail.Methods = memoryContactMethods(contactID, principal.Organization.ID, input.Methods)
+	detail.Contact.SourceChannelID = input.ChannelID
+	detail.Methods = memoryContactMethods(input.Methods)
 	a.contacts[contactID] = detail
 	return &detail, nil
 }
 
 // deleteContact 软删除内存联系人。
 func (a *memoryApplication) deleteContact(_ context.Context, principal *servermodels.Principal, contactID string) error {
-	detail, exists := a.contacts[contactID]
-	if !exists || detail.Contact.OrganizationID != principal.Organization.ID || detail.Contact.DeletedAt != nil {
+	_, exists := a.contacts[contactID]
+	if !exists || a.contactOrganizations[contactID] != principal.Organization.ID || a.contactDeletedAt[contactID] != nil {
 		return contactaction.ErrNotFound
 	}
 	now := time.Now()
-	detail.Contact.DeletedAt = &now
-	detail.Contact.UpdatedAt = now
-	a.contacts[contactID] = detail
+	a.contactDeletedAt[contactID] = &now
 	return nil
 }
 
 // restoreContact 恢复内存联系人。
 func (a *memoryApplication) restoreContact(_ context.Context, principal *servermodels.Principal, contactID string) (*contactaction.ContactDetail, error) {
 	detail, exists := a.contacts[contactID]
-	if !exists || detail.Contact.OrganizationID != principal.Organization.ID || detail.Contact.DeletedAt == nil {
+	if !exists || a.contactOrganizations[contactID] != principal.Organization.ID || a.contactDeletedAt[contactID] == nil {
 		return nil, contactaction.ErrNotFound
 	}
-	detail.Contact.DeletedAt = nil
-	detail.Contact.UpdatedAt = time.Now()
-	a.contacts[contactID] = detail
+	a.contactDeletedAt[contactID] = nil
 	return &detail, nil
 }
 
-func memoryContactMethods(contactID, organizationID string, inputs []contactaction.MethodInput) []servermodels.ContactMethod {
-	methods := make([]servermodels.ContactMethod, 0, len(inputs))
-	for index, input := range inputs {
-		methods = append(methods, servermodels.ContactMethod{
-			ID: fmt.Sprintf("method-%d", index+1), OrganizationID: organizationID, ContactID: contactID,
-			Type: input.Type, Value: input.Value, NormalizedValue: input.Value, IsPrimary: input.IsPrimary,
+// memoryContactMethods 创建内存联系方式。
+func memoryContactMethods(inputs []contactaction.MethodInput) []contactaction.ContactMethod {
+	methods := make([]contactaction.ContactMethod, 0, len(inputs))
+	for _, input := range inputs {
+		methods = append(methods, contactaction.ContactMethod{
+			Type: input.Type, Value: input.Value, IsPrimary: input.IsPrimary,
 		})
 	}
 	return methods
@@ -562,7 +561,7 @@ func TestContactLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	createResponse.Body.Close()
-	if created.Contact.DisplayName == nil || *created.Contact.DisplayName != "林晓" || created.Contact.SourceChannelID == nil || *created.Contact.SourceChannelID != "00000000-0000-0000-0000-000000000001" || len(created.Methods) != 1 {
+	if created.Contact.DisplayName == nil || *created.Contact.DisplayName != "林晓" || created.Contact.SourceChannelID != "00000000-0000-0000-0000-000000000001" || len(created.Methods) != 1 {
 		t.Fatalf("unexpected created contact: %#v", created)
 	}
 

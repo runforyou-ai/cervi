@@ -189,13 +189,27 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if contact.Contact.DisplayName == nil || *contact.Contact.DisplayName != "林晓" || contact.Contact.SourceChannelID == nil || *contact.Contact.SourceChannelID != channel.ID || contact.SourceChannel == nil || contact.SourceChannel.ID != channel.ID || len(contact.Methods) != 3 {
+	if contact.Contact.DisplayName == nil || *contact.Contact.DisplayName != "林晓" || contact.Contact.SourceChannelID != channel.ID || contact.SourceChannel.ID != channel.ID || len(contact.Methods) != 3 {
 		t.Fatalf("unexpected created contact: %#v", contact)
 	}
-	preservedMethods := make(map[string]servermodels.ContactMethod, len(contact.Methods))
+	type methodIdentity struct {
+		typeName string
+		value    string
+	}
+	storedMethods := make([]servermodels.ContactMethod, 0)
+	if err := db.NewSelect().
+		Model(&storedMethods).
+		Where("cm.organization_id = ?", loginSession.Principal.Organization.ID).
+		Where("cm.contact_id = ?", contact.Contact.ID).
+		Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	preservedMethods := make(map[methodIdentity]servermodels.ContactMethod, len(storedMethods))
+	for _, method := range storedMethods {
+		preservedMethods[methodIdentity{typeName: method.Type, value: method.Value}] = method
+	}
 	preservedInputs := make([]contactaction.MethodInput, 0, len(contact.Methods))
 	for _, method := range contact.Methods {
-		preservedMethods[method.Type+"\x00"+method.Value] = method
 		label := ""
 		if method.Label != nil {
 			label = *method.Label
@@ -217,8 +231,16 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 	if len(preservedContact.Methods) != len(contact.Methods) {
 		t.Fatalf("preserved methods count = %d, want %d", len(preservedContact.Methods), len(contact.Methods))
 	}
-	for _, method := range preservedContact.Methods {
-		before, ok := preservedMethods[method.Type+"\x00"+method.Value]
+	afterMethods := make([]servermodels.ContactMethod, 0)
+	if err := db.NewSelect().
+		Model(&afterMethods).
+		Where("cm.organization_id = ?", loginSession.Principal.Organization.ID).
+		Where("cm.contact_id = ?", contact.Contact.ID).
+		Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, method := range afterMethods {
+		before, ok := preservedMethods[methodIdentity{typeName: method.Type, value: method.Value}]
 		labelsEqual := (method.Label == nil && before.Label == nil) ||
 			(method.Label != nil && before.Label != nil && *method.Label == *before.Label)
 		if !ok || method.ID != before.ID || !labelsEqual || method.IsPrimary != before.IsPrimary || !method.CreatedAt.Equal(before.CreatedAt) || !method.UpdatedAt.Equal(before.UpdatedAt) {
@@ -233,30 +255,8 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if activeContacts.Page.Total != 1 || len(activeContacts.Contacts) != 1 || activeContacts.Contacts[0].PrimaryEmail == nil || activeContacts.Contacts[0].SourceChannelName == nil || *activeContacts.Contacts[0].SourceChannelName != channel.Name || activeContacts.Contacts[0].ChannelCount != 1 {
+	if activeContacts.Page.Total != 1 || len(activeContacts.Contacts) != 1 || activeContacts.Contacts[0].PrimaryEmail == nil || activeContacts.Contacts[0].SourceChannelName != channel.Name {
 		t.Fatalf("unexpected contact list: %#v", activeContacts)
-	}
-
-	var legacyContactID string
-	if err := db.NewRaw(`
-		INSERT INTO contacts (organization_id, created_by_user_id, display_name, stage)
-		VALUES (?, ?, ?, ?)
-		RETURNING id::text
-	`, loginSession.Principal.Organization.ID, loginSession.Principal.User.ID, "旧联系人", contactaction.StageVisitor).Scan(context.Background(), &legacyContactID); err != nil {
-		t.Fatal(err)
-	}
-	legacyContact, err := contactaction.NewGetContactQuery(db).Execute(context.Background(), loginSession.Principal, legacyContactID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if legacyContact.Contact.SourceChannelID != nil || legacyContact.SourceChannel != nil {
-		t.Fatalf("legacy contact source channel = %#v, want nil", legacyContact.SourceChannel)
-	}
-	if _, err := contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, legacyContactID, contactaction.ContactInput{
-		DisplayName: "旧联系人（已更新）",
-		Stage:       contactaction.StageLead,
-	}); err != nil {
-		t.Fatalf("update legacy contact: %v", err)
 	}
 
 	_, err = contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID, contactaction.ContactInput{
@@ -283,6 +283,15 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected updated contact: %#v", updatedContact)
 	}
 
+	if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loginSession.Principal.User.ID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); !errors.Is(err, contactaction.ErrPrincipalInvalid) {
+		t.Fatalf("inactive user delete error = %v, want %v", err, contactaction.ErrPrincipalInvalid)
+	}
+	if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loginSession.Principal.User.ID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -292,6 +301,15 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 	}
 	if deletedContacts.Page.Total != 1 || len(deletedContacts.Contacts) != 1 {
 		t.Fatalf("unexpected deleted contact list: %#v", deletedContacts)
+	}
+	if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loginSession.Principal.User.ID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); !errors.Is(err, contactaction.ErrPrincipalInvalid) {
+		t.Fatalf("inactive user restore error = %v, want %v", err, contactaction.ErrPrincipalInvalid)
+	}
+	if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loginSession.Principal.User.ID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); err != nil {
 		t.Fatal(err)

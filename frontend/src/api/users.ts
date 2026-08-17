@@ -1,19 +1,13 @@
 import { request } from "@/api/client"
+import type { PageInfo } from "@/api/types"
 
 export type DirectoryUser = {
   id: string
-  organizationId: string
   email: string
   displayName: string
   role: string
   status: string
   createdAt: string
-}
-
-export type PageInfo = {
-  number: number
-  size: number
-  total: number
 }
 
 type UserListResponse = {

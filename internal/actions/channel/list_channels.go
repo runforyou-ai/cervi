@@ -10,7 +10,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// Summary 定义供目录和选择器使用的渠道摘要。
+// Summary 定义渠道摘要。
 type Summary struct {
 	ID   string `bun:"id" json:"id"`
 	Type string `bun:"type" json:"type"`
@@ -22,7 +22,7 @@ type ListChannelsQuery struct {
 	db *bun.DB
 }
 
-// NewListChannelsQuery 创建通用渠道列表查询。
+// NewListChannelsQuery 创建渠道列表查询。
 func NewListChannelsQuery(db *bun.DB) *ListChannelsQuery {
 	return &ListChannelsQuery{db: db}
 }

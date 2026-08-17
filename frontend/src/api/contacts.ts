@@ -1,42 +1,30 @@
 import { request } from "@/api/client"
-import type { PageInfo } from "@/api/users"
+import type { PageInfo } from "@/api/types"
 
 export type ContactStage = "visitor" | "lead" | "customer"
 export type ContactMethodType = "email" | "phone"
 
 export type ContactMethod = {
-  id: string
-  organizationId: string
-  contactId: string
   type: ContactMethodType
   value: string
   label: string | null
   isPrimary: boolean
-  createdAt: string
-  updatedAt: string
 }
 
 export type ContactChannelIdentity = {
-  id: string
   channelId: string
-  channelType: string
   channelName: string
   externalId: string
   displayName: string | null
-  lastSeenAt: string | null
 }
 
 export type ContactRecord = {
   id: string
-  organizationId: string
-  createdByUserId: string
-  sourceChannelId?: string | null
+  sourceChannelId: string
   displayName: string | null
   stage: ContactStage
   notes: string | null
   createdAt: string
-  updatedAt: string
-  deletedAt: string | null
 }
 
 export type ContactSummary = {
@@ -46,20 +34,18 @@ export type ContactSummary = {
   notes: string | null
   primaryEmail: string | null
   primaryPhone: string | null
-  sourceChannelName: string | null
-  channelCount: number
+  sourceChannelName: string
   createdAt: string
-  updatedAt: string
   deletedAt: string | null
 }
 
 export type ContactDetail = {
   contact: ContactRecord
-  sourceChannel?: {
+  sourceChannel: {
     id: string
     type: string
     name: string
-  } | null
+  }
   methods: ContactMethod[]
   channelIdentities: ContactChannelIdentity[]
 }

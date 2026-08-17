@@ -14,9 +14,10 @@ import (
 
 // listChannels 返回当前企业的渠道摘要。
 func (s *Service) listChannels(c *gin.Context) {
-	channels, err := s.listChannelsQuery(c.Request.Context(), currentPrincipal(c))
+	principal := currentPrincipal(c)
+	channels, err := s.listChannelsQuery(c.Request.Context(), principal)
 	if err != nil {
-		slog.Warn("读取渠道摘要失败", "error", err)
+		slog.Warn("读取渠道摘要失败", "organization_id", principal.Organization.ID, "user_id", principal.User.ID, "error", err)
 		writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelSummaryListFailed, nil)
 		return
 	}
@@ -33,17 +34,16 @@ func (s *Service) listUsers(c *gin.Context) {
 	if !ok {
 		return
 	}
-	output, err := s.listUsersQuery(c.Request.Context(), currentPrincipal(c), useraction.ListInput{
+	principal := currentPrincipal(c)
+	output, err := s.listUsersQuery(c.Request.Context(), principal, useraction.ListInput{
 		Query: c.Query("q"), Status: c.Query("status"), Role: c.Query("role"), Page: page, PageSize: pageSize,
 	})
 	if errors.Is(err, useraction.ErrQueryInvalid) {
-		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{
-			"pageSize": cervii18n.FieldContactQueryInvalid,
-		})
+		writeError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, nil)
 		return
 	}
 	if err != nil {
-		slog.Warn("读取团队成员列表失败", "error", err)
+		slog.Warn("读取团队成员列表失败", "organization_id", principal.Organization.ID, "user_id", principal.User.ID, "error", err)
 		writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorUserListFailed, nil)
 		return
 	}
@@ -52,13 +52,15 @@ func (s *Service) listUsers(c *gin.Context) {
 
 // getUser 返回当前企业的团队成员详情。
 func (s *Service) getUser(c *gin.Context) {
-	user, err := s.getUserQuery(c.Request.Context(), currentPrincipal(c), c.Param("userID"))
+	principal := currentPrincipal(c)
+	userID := c.Param("userID")
+	user, err := s.getUserQuery(c.Request.Context(), principal, userID)
 	if errors.Is(err, useraction.ErrNotFound) {
 		writeError(c, http.StatusNotFound, "USER_NOT_FOUND", cervii18n.ErrorUserNotFound, nil)
 		return
 	}
 	if err != nil {
-		slog.Warn("读取团队成员详情失败", "error", err)
+		slog.Warn("读取团队成员详情失败", "organization_id", principal.Organization.ID, "user_id", principal.User.ID, "target_user_id", userID, "error", err)
 		writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorUserReadFailed, nil)
 		return
 	}

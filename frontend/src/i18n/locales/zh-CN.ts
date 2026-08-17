@@ -87,7 +87,6 @@ const zhCN = {
     retry: "重试",
   },
   contacts: {
-    title: "联系人",
     scopeNavigation: "联系人分类",
     all: "全部",
     create: "添加联系人",
@@ -168,7 +167,7 @@ const zhCN = {
     },
     agents: {
       emptyTitle: "还没有智能体",
-      emptyDescription: "智能体领域将在后续建设，联系人目录已经为它保留了统一入口。",
+      emptyDescription: "暂无可用的智能体。",
     },
     detail: {
       createTitle: "添加联系人",
@@ -216,6 +215,7 @@ const zhCN = {
     delete: {
       action: "删除联系人",
       title: "将“{{name}}”移入回收站？",
+      description: "联系人将从当前列表移除，可稍后从回收站恢复。",
       cancel: "取消",
       confirm: "移入回收站",
       deleting: "正在删除…",

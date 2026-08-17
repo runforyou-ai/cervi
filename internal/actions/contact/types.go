@@ -2,11 +2,7 @@
 
 package contact
 
-import (
-	"time"
-
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-)
+import "time"
 
 const (
 	// StageVisitor 表示尚未形成明确意向的外部联系人。
@@ -62,25 +58,37 @@ type ContactSummary struct {
 	ID                string     `bun:"id" json:"id"`
 	DisplayName       *string    `bun:"display_name" json:"displayName"`
 	Stage             string     `bun:"stage" json:"stage"`
-	Notes             *string    `bun:"notes" json:"notes"`
 	PrimaryEmail      *string    `bun:"primary_email" json:"primaryEmail"`
 	PrimaryPhone      *string    `bun:"primary_phone" json:"primaryPhone"`
-	SourceChannelName *string    `bun:"source_channel_name" json:"sourceChannelName"`
-	ChannelCount      int        `bun:"channel_count" json:"channelCount"`
+	SourceChannelName string     `bun:"source_channel_name" json:"sourceChannelName"`
 	CreatedAt         time.Time  `bun:"created_at" json:"createdAt"`
-	UpdatedAt         time.Time  `bun:"updated_at" json:"updatedAt"`
 	DeletedAt         *time.Time `bun:"deleted_at" json:"deletedAt"`
+}
+
+// ContactRecord 定义联系人详情字段。
+type ContactRecord struct {
+	ID              string    `bun:"id" json:"id"`
+	SourceChannelID string    `bun:"source_channel_id" json:"sourceChannelId"`
+	DisplayName     *string   `bun:"display_name" json:"displayName"`
+	Stage           string    `bun:"stage" json:"stage"`
+	Notes           *string   `bun:"notes" json:"notes"`
+	CreatedAt       time.Time `bun:"created_at" json:"createdAt"`
+}
+
+// ContactMethod 定义联系人详情中的联系方式。
+type ContactMethod struct {
+	Type      string  `bun:"type" json:"type"`
+	Value     string  `bun:"value" json:"value"`
+	Label     *string `bun:"label" json:"label"`
+	IsPrimary bool    `bun:"is_primary" json:"isPrimary"`
 }
 
 // ChannelIdentity 定义联系人渠道身份及渠道摘要。
 type ChannelIdentity struct {
-	ID          string     `bun:"id" json:"id"`
-	ChannelID   string     `bun:"channel_id" json:"channelId"`
-	ChannelType string     `bun:"channel_type" json:"channelType"`
-	ChannelName string     `bun:"channel_name" json:"channelName"`
-	ExternalID  string     `bun:"external_id" json:"externalId"`
-	DisplayName *string    `bun:"display_name" json:"displayName"`
-	LastSeenAt  *time.Time `bun:"last_seen_at" json:"lastSeenAt"`
+	ChannelID   string  `bun:"channel_id" json:"channelId"`
+	ChannelName string  `bun:"channel_name" json:"channelName"`
+	ExternalID  string  `bun:"external_id" json:"externalId"`
+	DisplayName *string `bun:"display_name" json:"displayName"`
 }
 
 // SourceChannel 定义联系人首次添加或接入时的来源渠道。
@@ -92,10 +100,10 @@ type SourceChannel struct {
 
 // ContactDetail 定义外部联系人完整详情。
 type ContactDetail struct {
-	Contact           servermodels.Contact         `json:"contact"`
-	SourceChannel     *SourceChannel               `json:"sourceChannel"`
-	Methods           []servermodels.ContactMethod `json:"methods"`
-	ChannelIdentities []ChannelIdentity            `json:"channelIdentities"`
+	Contact           ContactRecord     `json:"contact"`
+	SourceChannel     SourceChannel     `json:"sourceChannel"`
+	Methods           []ContactMethod   `json:"methods"`
+	ChannelIdentities []ChannelIdentity `json:"channelIdentities"`
 }
 
 // ListOutput 定义外部联系人分页结果。

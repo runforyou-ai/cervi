@@ -18,7 +18,7 @@ func TestNormalizeContactInput(t *testing.T) {
 			{Type: MethodEmail, Value: " LIN@Example.com "},
 			{Type: MethodPhone, Value: "+86 138-0000-0000"},
 		},
-	}, true)
+	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
 	}
@@ -35,7 +35,7 @@ func TestNormalizeContactInput(t *testing.T) {
 
 // TestNormalizeContactInputRejectsInvalidValues 验证联系人输入边界。
 func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
-	_, fields := normalizeContactInput(ContactInput{}, true)
+	_, fields := normalizeContactInput(ContactInput{})
 	if fields["displayName"] != ValidationIdentityRequired {
 		t.Fatalf("identity validation = %q, want %q", fields["displayName"], ValidationIdentityRequired)
 	}
@@ -51,7 +51,7 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 		Methods: []MethodInput{
 			{Type: MethodEmail, Value: "invalid"},
 		},
-	}, true)
+	})
 	if fields["displayName"] != ValidationNameTooLong || fields["stage"] != ValidationStageInvalid || fields["notes"] != ValidationNotesTooLong || fields["methods"] != ValidationMethodInvalid {
 		t.Fatalf("unexpected validation fields: %#v", fields)
 	}
@@ -59,12 +59,23 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 	for _, phone := range []string{"13800000000", "+12", "+1234567890123456"} {
 		_, fields = normalizeContactInput(ContactInput{
 			DisplayName: "林晓",
+			ChannelID:   "00000000-0000-0000-0000-000000000001",
 			Stage:       StageVisitor,
 			Methods:     []MethodInput{{Type: MethodPhone, Value: phone}},
-		}, false)
+		})
 		if fields["methods"] != ValidationMethodInvalid {
 			t.Fatalf("phone %q validation = %q, want %q", phone, fields["methods"], ValidationMethodInvalid)
 		}
+	}
+
+	tooManyMethods := make([]MethodInput, 21)
+	_, fields = normalizeContactInput(ContactInput{
+		DisplayName: "林晓",
+		ChannelID:   "00000000-0000-0000-0000-000000000001",
+		Methods:     tooManyMethods,
+	})
+	if fields["methods"] != ValidationMethodsTooMany {
+		t.Fatalf("methods validation = %q, want %q", fields["methods"], ValidationMethodsTooMany)
 	}
 }
 
@@ -77,7 +88,7 @@ func TestNormalizeContactInputRejectsDuplicateMethods(t *testing.T) {
 			{Type: MethodEmail, Value: "lin@example.com", IsPrimary: true},
 			{Type: MethodEmail, Value: "LIN@example.com", IsPrimary: true},
 		},
-	}, true)
+	})
 	if fields["methods"] != ValidationPrimaryDuplicate {
 		t.Fatalf("method validation = %q, want %q", fields["methods"], ValidationPrimaryDuplicate)
 	}

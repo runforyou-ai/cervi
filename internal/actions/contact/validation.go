@@ -29,17 +29,18 @@ const (
 	ValidationQueryInvalid     ValidationCode = "QUERY_INVALID"
 )
 
-// ValidationError 返回联系人字段校验结果。
+// ValidationError 记录联系人字段校验结果。
 type ValidationError struct {
 	Fields map[string]ValidationCode
 }
 
-// Error 返回联系人输入校验错误。
+// Error 返回联系人校验错误说明。
 func (e *ValidationError) Error() string {
 	return "contact validation failed"
 }
 
-func normalizeContactInput(input ContactInput, channelRequired bool) (ContactInput, map[string]ValidationCode) {
+// normalizeContactInput 规范化并校验联系人写入字段。
+func normalizeContactInput(input ContactInput) (ContactInput, map[string]ValidationCode) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
 	input.Stage = strings.TrimSpace(input.Stage)
@@ -49,9 +50,9 @@ func normalizeContactInput(input ContactInput, channelRequired bool) (ContactInp
 	}
 
 	fields := make(map[string]ValidationCode)
-	if channelRequired && input.ChannelID == "" {
+	if input.ChannelID == "" {
 		fields["channelId"] = ValidationChannelRequired
-	} else if input.ChannelID != "" && !validUUID(input.ChannelID) {
+	} else if !validUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelInvalid
 	}
 	if len([]rune(input.DisplayName)) > 200 {
@@ -65,44 +66,11 @@ func normalizeContactInput(input ContactInput, channelRequired bool) (ContactInp
 	}
 	if len(input.Methods) > 20 {
 		fields["methods"] = ValidationMethodsTooMany
-	}
-
-	seen := make(map[string]struct{})
-	primarySeen := make(map[string]bool)
-	firstByType := make(map[string]int)
-	for index := range input.Methods {
-		method := &input.Methods[index]
-		method.Type = strings.TrimSpace(method.Type)
-		method.Value = strings.TrimSpace(method.Value)
-		method.Label = strings.TrimSpace(method.Label)
-		if len([]rune(method.Label)) > 100 {
-			fields["methods"] = ValidationMethodInvalid
-		}
-
-		normalized, ok := normalizeMethodValue(method.Type, method.Value)
-		if !ok {
-			fields["methods"] = ValidationMethodInvalid
-			continue
-		}
-		method.Value = normalized
-		key := method.Type + "\x00" + normalized
-		if _, exists := seen[key]; exists {
-			fields["methods"] = ValidationMethodDuplicate
-		}
-		seen[key] = struct{}{}
-		if _, exists := firstByType[method.Type]; !exists {
-			firstByType[method.Type] = index
-		}
-		if method.IsPrimary {
-			if primarySeen[method.Type] {
-				fields["methods"] = ValidationPrimaryDuplicate
-			}
-			primarySeen[method.Type] = true
-		}
-	}
-	for methodType, index := range firstByType {
-		if !primarySeen[methodType] {
-			input.Methods[index].IsPrimary = true
+	} else {
+		var methodCode ValidationCode
+		input.Methods, methodCode = normalizeMethods(input.Methods)
+		if methodCode != "" {
+			fields["methods"] = methodCode
 		}
 	}
 	if input.DisplayName == "" && len(input.Methods) == 0 {
@@ -111,6 +79,59 @@ func normalizeContactInput(input ContactInput, channelRequired bool) (ContactInp
 	return input, fields
 }
 
+// normalizeMethods 规范化联系方式并返回优先级最高的错误码。
+func normalizeMethods(methods []MethodInput) ([]MethodInput, ValidationCode) {
+	type methodKey struct {
+		typeName string
+		value    string
+	}
+	seen := make(map[methodKey]struct{})
+	primarySeen := make(map[string]bool)
+	firstByType := make(map[string]int)
+	var code ValidationCode
+	for index := range methods {
+		method := &methods[index]
+		method.Type = strings.TrimSpace(method.Type)
+		method.Value = strings.TrimSpace(method.Value)
+		method.Label = strings.TrimSpace(method.Label)
+		if len([]rune(method.Label)) > 100 && code == "" {
+			code = ValidationMethodInvalid
+		}
+
+		normalized, ok := normalizeMethodValue(method.Type, method.Value)
+		if !ok {
+			if code == "" {
+				code = ValidationMethodInvalid
+			}
+			continue
+		}
+		method.Value = normalized
+		key := methodKey{typeName: method.Type, value: normalized}
+		if _, exists := seen[key]; exists {
+			if code != ValidationPrimaryDuplicate {
+				code = ValidationMethodDuplicate
+			}
+		}
+		seen[key] = struct{}{}
+		if _, exists := firstByType[method.Type]; !exists {
+			firstByType[method.Type] = index
+		}
+		if method.IsPrimary {
+			if primarySeen[method.Type] {
+				code = ValidationPrimaryDuplicate
+			}
+			primarySeen[method.Type] = true
+		}
+	}
+	for methodType, index := range firstByType {
+		if !primarySeen[methodType] {
+			methods[index].IsPrimary = true
+		}
+	}
+	return methods, code
+}
+
+// normalizeListInput 规范化并校验联系人列表参数。
 func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) {
 	input.Query = strings.TrimSpace(input.Query)
 	input.Stage = strings.TrimSpace(input.Stage)
@@ -146,6 +167,7 @@ func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) 
 	return input, fields
 }
 
+// normalizeMethodValue 规范化邮箱或国际电话号码。
 func normalizeMethodValue(methodType, value string) (string, bool) {
 	switch methodType {
 	case MethodEmail:
@@ -177,6 +199,7 @@ func normalizeMethodValue(methodType, value string) (string, bool) {
 	}
 }
 
+// validUUID 校验规范的 UUID 字符串。
 func validUUID(value string) bool {
 	parsed, err := uuid.Parse(value)
 	return err == nil && strings.EqualFold(parsed.String(), value)

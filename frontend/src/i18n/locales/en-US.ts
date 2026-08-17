@@ -87,7 +87,6 @@ const enUS = {
     retry: "Try again",
   },
   contacts: {
-    title: "Contacts",
     scopeNavigation: "Contact categories",
     all: "All",
     create: "Add contact",
@@ -168,7 +167,7 @@ const enUS = {
     },
     agents: {
       emptyTitle: "No agents yet",
-      emptyDescription: "The agent domain will be added later. The contact directory already reserves a shared entry point for it.",
+      emptyDescription: "No agents are available.",
     },
     detail: {
       createTitle: "Add contact",
@@ -216,6 +215,7 @@ const enUS = {
     delete: {
       action: "Delete contact",
       title: "Move “{{name}}” to trash?",
+      description: "The contact will leave this list and can be restored from trash later.",
       cancel: "Cancel",
       confirm: "Move to trash",
       deleting: "Deleting…",
