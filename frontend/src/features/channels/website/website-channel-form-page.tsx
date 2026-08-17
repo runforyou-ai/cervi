@@ -65,7 +65,12 @@ function WebsiteChannelEditTabs({
         forceMount
         className="data-[state=inactive]:hidden"
       >
-        <WebsiteChannelForm channel={channel} />
+        <WebsiteChannelForm
+          channel={channel}
+          onUpdated={(updated) =>
+            onChannelChange({ ...channel, ...updated })
+          }
+        />
       </TabsContent>
       <TabsContent
         value="chat-interface"

@@ -28,8 +28,10 @@ import { apiErrorMessage } from "@/lib/form-errors"
 
 export function WebsiteChannelForm({
   channel,
+  onUpdated,
 }: {
   channel?: WebsiteChannelSummary
+  onUpdated?: (value: WebsiteChannelSummary) => void
 }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
@@ -55,10 +57,18 @@ export function WebsiteChannelForm({
   async function submit(values: WebsiteChannelFormValues) {
     try {
       if (channel) {
-        await updateWebsiteChannel(channel.id, values)
-      } else {
-        await createWebsiteChannel(values)
+        const updated = await updateWebsiteChannel(channel.id, values)
+        form.reset({
+          name: updated.name,
+          description: updated.description ?? "",
+          defaultLocale: updated.defaultLocale,
+        })
+        onUpdated?.(updated)
+        toast.success(t("form.saved"))
+        return
       }
+
+      await createWebsiteChannel(values)
       navigate("/channels/website", { replace: true })
     } catch (error) {
       if (error instanceof ApiError) {

@@ -126,6 +126,7 @@ const zhCN = {
       defaultLocale: "访客默认语言",
       save: "保存",
       saving: "正在保存…",
+      saved: "基本信息已保存。",
       cancel: "取消",
       loadError: "网站渠道详情加载失败。",
       createError: "创建网站渠道失败，请重试。",

@@ -126,6 +126,7 @@ const enUS = {
       defaultLocale: "Default visitor language",
       save: "Save",
       saving: "Saving…",
+      saved: "Basic information saved.",
       cancel: "Cancel",
       loadError: "Could not load the website channel.",
       createError: "Could not create the website channel. Try again.",
