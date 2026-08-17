@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import {
   ChevronRightIcon,
   ChevronsUpDownIcon,
+  ContactRoundIcon,
   InboxIcon,
   LoaderCircleIcon,
   LogOutIcon,
@@ -73,6 +74,7 @@ function WorkspaceMenu() {
     setOpenNarrowViewport,
   } = useSidebar()
   const channelsActive = location.pathname.startsWith("/channels/")
+  const contactsActive = location.pathname.startsWith("/contacts")
   const inboxActive = location.pathname === "/inbox"
   const [channelsOpen, setChannelsOpen] = useState(channelsActive)
 
@@ -98,6 +100,19 @@ function WorkspaceMenu() {
               <NavLink to="/inbox" onClick={closeNarrowNavigation}>
                 <InboxIcon />
                 <span>{t("inbox")}</span>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={contactsActive}
+              tooltip={t("contacts")}
+            >
+              <NavLink to="/contacts/internal" onClick={closeNarrowNavigation}>
+                <ContactRoundIcon />
+                <span>{t("contacts")}</span>
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>

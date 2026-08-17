@@ -25,10 +25,14 @@ function workspaceTitle(
     editWebsiteChannel: string
     websiteChannels: string
     settings: string
+    contacts: string
   }
 ) {
   if (pathname.startsWith("/settings")) {
     return titles.settings
+  }
+  if (pathname.startsWith("/contacts")) {
+    return titles.contacts
   }
   if (pathname === "/channels/website/new") {
     return titles.createWebsiteChannel
@@ -144,6 +148,7 @@ export function WorkspaceLayout() {
               editWebsiteChannel: t("titles.editWebsiteChannel"),
               websiteChannels: t("titles.websiteChannels"),
               settings: t("settings"),
+              contacts: t("contacts"),
             })}
           </h1>
         </header>

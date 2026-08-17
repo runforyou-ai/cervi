@@ -11,8 +11,11 @@ import (
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // TestServerActionsWithPostgreSQL 验证服务端核心操作。
@@ -168,6 +171,172 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if channel.DeletedAt != nil {
 		t.Fatalf("restored channel deleted_at = %v, want nil", channel.DeletedAt)
+	}
+
+	users, err := useraction.NewListUsersQuery(db).Execute(context.Background(), loginSession.Principal, useraction.ListInput{Page: 1, PageSize: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if users.Page.Total != 1 || len(users.Users) != 1 || users.Users[0].ID != loginSession.Principal.User.ID || users.Users[0].CreatedAt.IsZero() {
+		t.Fatalf("unexpected user directory: %#v", users)
+	}
+	directoryUser, err := useraction.NewGetUserQuery(db).Execute(context.Background(), loginSession.Principal, loginSession.Principal.User.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if directoryUser.ID != loginSession.Principal.User.ID || directoryUser.CreatedAt.IsZero() {
+		t.Fatalf("unexpected directory user: %#v", directoryUser)
+	}
+
+	createContact := contactaction.NewCreateContactAction(db)
+	_, err = createContact.Execute(context.Background(), loginSession.Principal, contactaction.ContactInput{
+		DisplayName: "无效渠道联系人",
+		ChannelID:   "00000000-0000-0000-0000-000000000099",
+		Stage:       contactaction.StageVisitor,
+	})
+	var channelValidation *contactaction.ValidationError
+	if !errors.As(err, &channelValidation) || channelValidation.Fields["channelId"] != contactaction.ValidationChannelInvalid {
+		t.Fatalf("invalid channel error = %v, want channel validation", err)
+	}
+
+	contact, err := createContact.Execute(context.Background(), loginSession.Principal, contactaction.ContactInput{
+		DisplayName: "林晓",
+		ChannelID:   channel.ID,
+		Stage:       contactaction.StageLead,
+		Notes:       "采购负责人",
+		Methods: []contactaction.MethodInput{
+			{Type: contactaction.MethodEmail, Value: "LIN@example.com", Label: "工作"},
+			{Type: contactaction.MethodEmail, Value: "lin.private@example.com", Label: "私人"},
+			{Type: contactaction.MethodPhone, Value: "+86 138-0000-0000", Label: "手机"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contact.Contact.DisplayName == nil || *contact.Contact.DisplayName != "林晓" || contact.Contact.SourceChannelID != channel.ID || contact.SourceChannel.ID != channel.ID || len(contact.Methods) != 3 {
+		t.Fatalf("unexpected created contact: %#v", contact)
+	}
+	type methodIdentity struct {
+		typeName string
+		value    string
+	}
+	storedMethods := make([]servermodels.ContactMethod, 0)
+	if err := db.NewSelect().
+		Model(&storedMethods).
+		Where("cm.organization_id = ?", loginSession.Principal.Organization.ID).
+		Where("cm.contact_id = ?", contact.Contact.ID).
+		Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	preservedMethods := make(map[methodIdentity]servermodels.ContactMethod, len(storedMethods))
+	for _, method := range storedMethods {
+		preservedMethods[methodIdentity{typeName: method.Type, value: method.Value}] = method
+	}
+	preservedInputs := make([]contactaction.MethodInput, 0, len(contact.Methods))
+	for _, method := range contact.Methods {
+		label := ""
+		if method.Label != nil {
+			label = *method.Label
+		}
+		preservedInputs = append(preservedInputs, contactaction.MethodInput{
+			Type: method.Type, Value: method.Value, Label: label, IsPrimary: method.IsPrimary,
+		})
+	}
+	preservedContact, err := contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID, contactaction.ContactInput{
+		DisplayName: "林晓（已确认）",
+		ChannelID:   channel.ID,
+		Stage:       contactaction.StageLead,
+		Notes:       "采购负责人",
+		Methods:     preservedInputs,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preservedContact.Methods) != len(contact.Methods) {
+		t.Fatalf("preserved methods count = %d, want %d", len(preservedContact.Methods), len(contact.Methods))
+	}
+	afterMethods := make([]servermodels.ContactMethod, 0)
+	if err := db.NewSelect().
+		Model(&afterMethods).
+		Where("cm.organization_id = ?", loginSession.Principal.Organization.ID).
+		Where("cm.contact_id = ?", contact.Contact.ID).
+		Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, method := range afterMethods {
+		before, ok := preservedMethods[methodIdentity{typeName: method.Type, value: method.Value}]
+		labelsEqual := (method.Label == nil && before.Label == nil) ||
+			(method.Label != nil && before.Label != nil && *method.Label == *before.Label)
+		if !ok || method.ID != before.ID || !labelsEqual || method.IsPrimary != before.IsPrimary || !method.CreatedAt.Equal(before.CreatedAt) || !method.UpdatedAt.Equal(before.UpdatedAt) {
+			t.Fatalf("contact method was recreated or changed: before=%#v after=%#v", before, method)
+		}
+	}
+
+	contactList := contactaction.NewListContactsQuery(db)
+	activeContacts, err := contactList.Execute(context.Background(), loginSession.Principal, contactaction.ListInput{
+		Query: "lin@example", Stage: contactaction.StageLead, ChannelID: channel.ID, Page: 1, PageSize: 50,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if activeContacts.Page.Total != 1 || len(activeContacts.Contacts) != 1 || activeContacts.Contacts[0].PrimaryEmail == nil || activeContacts.Contacts[0].SourceChannelName != channel.Name {
+		t.Fatalf("unexpected contact list: %#v", activeContacts)
+	}
+
+	_, err = contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID, contactaction.ContactInput{
+		DisplayName: "林晓",
+		ChannelID:   "00000000-0000-0000-0000-000000000099",
+		Stage:       contactaction.StageLead,
+		Methods:     []contactaction.MethodInput{{Type: contactaction.MethodEmail, Value: "lin@example.com"}},
+	})
+	var immutableChannelValidation *contactaction.ValidationError
+	if !errors.As(err, &immutableChannelValidation) || immutableChannelValidation.Fields["channelId"] != contactaction.ValidationChannelImmutable {
+		t.Fatalf("immutable channel error = %v, want channel validation", err)
+	}
+
+	updatedContact, err := contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID, contactaction.ContactInput{
+		DisplayName: "林晓（采购）",
+		ChannelID:   channel.ID,
+		Stage:       contactaction.StageCustomer,
+		Methods:     []contactaction.MethodInput{{Type: contactaction.MethodEmail, Value: "lin@example.com"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedContact.Contact.Stage != contactaction.StageCustomer || len(updatedContact.Methods) != 1 {
+		t.Fatalf("unexpected updated contact: %#v", updatedContact)
+	}
+
+	if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loginSession.Principal.User.ID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); !errors.Is(err, contactaction.ErrPrincipalInvalid) {
+		t.Fatalf("inactive user delete error = %v, want %v", err, contactaction.ErrPrincipalInvalid)
+	}
+	if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loginSession.Principal.User.ID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); err != nil {
+		t.Fatal(err)
+	}
+	deletedContacts, err := contactList.Execute(context.Background(), loginSession.Principal, contactaction.ListInput{Deleted: true, Page: 1, PageSize: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deletedContacts.Page.Total != 1 || len(deletedContacts.Contacts) != 1 {
+		t.Fatalf("unexpected deleted contact list: %#v", deletedContacts)
+	}
+	if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loginSession.Principal.User.ID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); !errors.Is(err, contactaction.ErrPrincipalInvalid) {
+		t.Fatalf("inactive user restore error = %v, want %v", err, contactaction.ErrPrincipalInvalid)
+	}
+	if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loginSession.Principal.User.ID).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID); err != nil {
+		t.Fatal(err)
 	}
 
 	s3Setting := settingaction.S3Setting{

@@ -14,9 +14,11 @@ import (
 	"github.com/gin-gonic/gin"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -45,6 +47,21 @@ var channelFieldMessageKeys = map[channelaction.ValidationCode]cervii18n.Key{
 	channelaction.ValidationChatSubtitleTooLong:  cervii18n.FieldChannelChatSubtitleTooLong,
 	channelaction.ValidationGreetingTooLong:      cervii18n.FieldChannelGreetingTooLong,
 	channelaction.ValidationThemeColorInvalid:    cervii18n.FieldChannelThemeColorInvalid,
+}
+
+var contactFieldMessageKeys = map[contactaction.ValidationCode]cervii18n.Key{
+	contactaction.ValidationIdentityRequired: cervii18n.FieldContactIdentityRequired,
+	contactaction.ValidationChannelRequired:  cervii18n.FieldContactChannelRequired,
+	contactaction.ValidationChannelInvalid:   cervii18n.FieldContactChannelInvalid,
+	contactaction.ValidationChannelImmutable: cervii18n.FieldContactChannelImmutable,
+	contactaction.ValidationNameTooLong:      cervii18n.FieldContactNameTooLong,
+	contactaction.ValidationStageInvalid:     cervii18n.FieldContactStageInvalid,
+	contactaction.ValidationNotesTooLong:     cervii18n.FieldContactNotesTooLong,
+	contactaction.ValidationMethodsTooMany:   cervii18n.FieldContactMethodsTooMany,
+	contactaction.ValidationMethodInvalid:    cervii18n.FieldContactMethodInvalid,
+	contactaction.ValidationMethodDuplicate:  cervii18n.FieldContactMethodDuplicate,
+	contactaction.ValidationPrimaryDuplicate: cervii18n.FieldContactPrimaryDuplicate,
+	contactaction.ValidationQueryInvalid:     cervii18n.FieldContactQueryInvalid,
 }
 
 var s3SettingFieldMessageKeys = map[settingaction.ValidationCode]cervii18n.Key{
@@ -118,6 +135,15 @@ type Dependencies struct {
 	UpdateWebsiteChannelChatInterface func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelChatInterfaceInput) (*servermodels.WebsiteChannelSetting, error)
 	DeleteWebsiteChannel              func(context.Context, *servermodels.Principal, string) error
 	RestoreWebsiteChannel             func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	ListChannels                      func(context.Context, *servermodels.Principal) ([]channelaction.Summary, error)
+	ListUsers                         func(context.Context, *servermodels.Principal, useraction.ListInput) (useraction.ListOutput, error)
+	GetUser                           func(context.Context, *servermodels.Principal, string) (*useraction.DirectoryUser, error)
+	ListContacts                      func(context.Context, *servermodels.Principal, contactaction.ListInput) (contactaction.ListOutput, error)
+	GetContact                        func(context.Context, *servermodels.Principal, string) (*contactaction.ContactDetail, error)
+	CreateContact                     func(context.Context, *servermodels.Principal, contactaction.ContactInput) (*contactaction.ContactDetail, error)
+	UpdateContact                     func(context.Context, *servermodels.Principal, string, contactaction.ContactInput) (*contactaction.ContactDetail, error)
+	DeleteContact                     func(context.Context, *servermodels.Principal, string) error
+	RestoreContact                    func(context.Context, *servermodels.Principal, string) (*contactaction.ContactDetail, error)
 	GetS3Setting                      func(context.Context, *servermodels.Principal) (settingaction.S3Setting, error)
 	SaveS3Setting                     func(context.Context, *servermodels.Principal, settingaction.S3Setting) (settingaction.S3Setting, error)
 	TestS3Setting                     func(context.Context, settingaction.S3Setting) error
@@ -139,6 +165,15 @@ type Service struct {
 	updateWebsiteChannelChatInterfaceAction func(context.Context, *servermodels.Principal, string, channelaction.WebsiteChannelChatInterfaceInput) (*servermodels.WebsiteChannelSetting, error)
 	deleteWebsiteChannelAction              func(context.Context, *servermodels.Principal, string) error
 	restoreWebsiteChannelAction             func(context.Context, *servermodels.Principal, string) (*servermodels.Channel, error)
+	listChannelsQuery                       func(context.Context, *servermodels.Principal) ([]channelaction.Summary, error)
+	listUsersQuery                          func(context.Context, *servermodels.Principal, useraction.ListInput) (useraction.ListOutput, error)
+	getUserQuery                            func(context.Context, *servermodels.Principal, string) (*useraction.DirectoryUser, error)
+	listContactsQuery                       func(context.Context, *servermodels.Principal, contactaction.ListInput) (contactaction.ListOutput, error)
+	getContactQuery                         func(context.Context, *servermodels.Principal, string) (*contactaction.ContactDetail, error)
+	createContactAction                     func(context.Context, *servermodels.Principal, contactaction.ContactInput) (*contactaction.ContactDetail, error)
+	updateContactAction                     func(context.Context, *servermodels.Principal, string, contactaction.ContactInput) (*contactaction.ContactDetail, error)
+	deleteContactAction                     func(context.Context, *servermodels.Principal, string) error
+	restoreContactAction                    func(context.Context, *servermodels.Principal, string) (*contactaction.ContactDetail, error)
 	getS3SettingQuery                       func(context.Context, *servermodels.Principal) (settingaction.S3Setting, error)
 	saveS3SettingAction                     func(context.Context, *servermodels.Principal, settingaction.S3Setting) (settingaction.S3Setting, error)
 	testS3SettingAction                     func(context.Context, settingaction.S3Setting) error
@@ -160,6 +195,15 @@ func NewService(dependencies Dependencies) *Service {
 		updateWebsiteChannelChatInterfaceAction: dependencies.UpdateWebsiteChannelChatInterface,
 		deleteWebsiteChannelAction:              dependencies.DeleteWebsiteChannel,
 		restoreWebsiteChannelAction:             dependencies.RestoreWebsiteChannel,
+		listChannelsQuery:                       dependencies.ListChannels,
+		listUsersQuery:                          dependencies.ListUsers,
+		getUserQuery:                            dependencies.GetUser,
+		listContactsQuery:                       dependencies.ListContacts,
+		getContactQuery:                         dependencies.GetContact,
+		createContactAction:                     dependencies.CreateContact,
+		updateContactAction:                     dependencies.UpdateContact,
+		deleteContactAction:                     dependencies.DeleteContact,
+		restoreContactAction:                    dependencies.RestoreContact,
 		getS3SettingQuery:                       dependencies.GetS3Setting,
 		saveS3SettingAction:                     dependencies.SaveS3Setting,
 		testS3SettingAction:                     dependencies.TestS3Setting,
@@ -188,6 +232,16 @@ func NewService(dependencies Dependencies) *Service {
 	protected.PATCH("/channels/website/:channelID/chat-interface", service.updateWebsiteChannelChatInterface)
 	protected.DELETE("/channels/website/:channelID", service.deleteWebsiteChannel)
 	protected.POST("/channels/website/:channelID/restore", service.restoreWebsiteChannel)
+	protected.GET("/channels", service.listChannels)
+	protected.GET("/users", service.listUsers)
+	protected.GET("/users/:userID", service.getUser)
+	protected.GET("/contacts", service.listContacts)
+	protected.GET("/contacts/trash", service.listDeletedContacts)
+	protected.POST("/contacts", service.createContact)
+	protected.GET("/contacts/:contactID", service.getContact)
+	protected.PATCH("/contacts/:contactID", service.updateContact)
+	protected.DELETE("/contacts/:contactID", service.deleteContact)
+	protected.POST("/contacts/:contactID/restore", service.restoreContact)
 	protected.GET("/settings/storage/s3", service.getS3Setting)
 	protected.PUT("/settings/storage/s3", service.saveS3Setting)
 	protected.POST("/settings/storage/s3/test", service.testS3Setting)
@@ -725,6 +779,15 @@ func channelFieldKeys(fields map[string]channelaction.ValidationCode) map[string
 	keys := make(map[string]cervii18n.Key, len(fields))
 	for field, code := range fields {
 		keys[field] = channelFieldMessageKeys[code]
+	}
+	return keys
+}
+
+// contactFieldKeys 将联系人校验码转换为本地化文案键。
+func contactFieldKeys(fields map[string]contactaction.ValidationCode) map[string]cervii18n.Key {
+	keys := make(map[string]cervii18n.Key, len(fields))
+	for field, code := range fields {
+		keys[field] = contactFieldMessageKeys[code]
 	}
 	return keys
 }
