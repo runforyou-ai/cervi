@@ -271,5 +271,5 @@ export function getStorageProvider(id: StorageProviderId) {
 }
 
 export function getStorageRegion(provider: StorageProvider, id: string) {
-  return provider.regions.find((region) => region.id === id)!
+  return provider.regions.find((region) => region.id === id)
 }

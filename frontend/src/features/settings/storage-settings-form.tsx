@@ -38,6 +38,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -51,6 +52,8 @@ import {
 } from "@/features/settings/storage-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { openExternalURL } from "@/platform/open-external-url"
+
+const customRegionOption = "__custom__"
 
 const emptySetting: StorageSettingsFormValues = {
   enabled: false,
@@ -122,6 +125,7 @@ export function StorageSettingsForm() {
     defaultValues: emptySetting,
   })
   const activeProvider = getStorageProvider(form.watch("provider"))
+  const activeRegion = getStorageRegion(activeProvider, form.watch("region"))
   const configured = isConfigured(savedSetting)
   const displayedEnabled = configured ? savedSetting.enabled : editing
 
@@ -147,7 +151,15 @@ export function StorageSettingsForm() {
   }
 
   function selectRegion(regionId: string) {
-    const region = getStorageRegion(activeProvider, regionId)
+    if (regionId === customRegionOption) {
+      form.setValue("region", "", {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      return
+    }
+
+    const region = getStorageRegion(activeProvider, regionId)!
 
     form.setValue("region", regionId, {
       shouldDirty: true,
@@ -397,34 +409,65 @@ export function StorageSettingsForm() {
               )}
             />
 
-            <FormInputField
-              name="endpoint"
-              control={form.control}
-              label={t("storage.form.endpoint")}
-              type="url"
-            />
+            <Field>
+              <FieldLabel htmlFor="storage-region" required>
+                {t("storage.form.region")}
+              </FieldLabel>
+              <NativeSelect
+                id="storage-region"
+                value={activeRegion?.id ?? customRegionOption}
+                onChange={(event) => selectRegion(event.target.value)}
+              >
+                {activeProvider.regions.map((region) => (
+                  <option key={region.id} value={region.id}>
+                    {t(region.nameKey)} ({region.id})
+                  </option>
+                ))}
+                <option value={customRegionOption}>
+                  {t("storage.form.customRegionOption")}
+                </option>
+              </NativeSelect>
+            </Field>
+
+            {!activeRegion ? (
+              <Controller
+                name="region"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="storage-custom-region" required>
+                      {t("storage.form.customRegion")}
+                    </FieldLabel>
+                    <Input
+                      {...field}
+                      id="storage-custom-region"
+                      required
+                      aria-invalid={fieldState.invalid}
+                    />
+                    <FieldError errors={[fieldState.error]} />
+                  </Field>
+                )}
+              />
+            ) : null}
 
             <Controller
-              name="region"
+              name="endpoint"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor={field.name} required>
-                    {t("storage.form.region")}
+                    {t("storage.form.endpoint")}
                   </FieldLabel>
-                  <NativeSelect
+                  <Input
                     {...field}
                     id={field.name}
-                    aria-invalid={fieldState.invalid}
+                    type="url"
                     required
-                    onChange={(event) => selectRegion(event.target.value)}
-                  >
-                    {activeProvider.regions.map((region) => (
-                      <option key={region.id} value={region.id}>
-                        {t(region.nameKey)} ({region.id})
-                      </option>
-                    ))}
-                  </NativeSelect>
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <FieldDescription>
+                    {t("storage.form.endpointDescription")}
+                  </FieldDescription>
                   <FieldError errors={[fieldState.error]} />
                 </Field>
               )}
@@ -530,7 +573,9 @@ export function StorageSettingsForm() {
                 {t("storage.form.region")}
               </dt>
               <dd>
-                {t(detailRegion.nameKey)} · {savedSetting.region}
+                {detailRegion
+                  ? `${t(detailRegion.nameKey)} · ${savedSetting.region}`
+                  : savedSetting.region}
               </dd>
             </div>
             <div className="grid gap-1 border-b py-3 sm:grid-cols-[12rem_minmax(0,1fr)]">

@@ -534,6 +534,7 @@ func writeS3SettingError(c *gin.Context, err error, failureKey cervii18n.Key, op
 		return
 	}
 	if errors.Is(err, settingaction.ErrPrincipalInvalid) {
+		slog.Warn("S3 配置主体关联失效", "operation", operation, "organization_id", organizationID)
 		writeError(c, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
 		return
 	}
