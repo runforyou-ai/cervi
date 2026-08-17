@@ -55,6 +55,17 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 	if fields["displayName"] != ValidationNameTooLong || fields["stage"] != ValidationStageInvalid || fields["notes"] != ValidationNotesTooLong || fields["methods"] != ValidationMethodInvalid {
 		t.Fatalf("unexpected validation fields: %#v", fields)
 	}
+
+	for _, phone := range []string{"13800000000", "+12", "+1234567890123456"} {
+		_, fields = normalizeContactInput(ContactInput{
+			DisplayName: "林晓",
+			Stage:       StageVisitor,
+			Methods:     []MethodInput{{Type: MethodPhone, Value: phone}},
+		}, false)
+		if fields["methods"] != ValidationMethodInvalid {
+			t.Fatalf("phone %q validation = %q, want %q", phone, fields["methods"], ValidationMethodInvalid)
+		}
+	}
 }
 
 // TestNormalizeContactInputRejectsDuplicateMethods 验证重复联系方式和主要项。

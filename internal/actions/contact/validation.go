@@ -153,7 +153,7 @@ func normalizeMethodValue(methodType, value string) (string, bool) {
 		return normalized, commonemail.Valid(normalized)
 	case MethodPhone:
 		normalized := strings.Map(func(value rune) rune {
-			if unicode.IsDigit(value) || value == '+' {
+			if (value >= '0' && value <= '9') || value == '+' {
 				return value
 			}
 			if unicode.IsSpace(value) || value == '-' || value == '(' || value == ')' {
@@ -161,11 +161,12 @@ func normalizeMethodValue(methodType, value string) (string, bool) {
 			}
 			return value
 		}, value)
-		if len([]rune(normalized)) < 3 || len([]rune(normalized)) > 32 {
+		digits := []rune(strings.TrimPrefix(normalized, "+"))
+		if !strings.HasPrefix(normalized, "+") || len(digits) < 6 || len(digits) > 15 {
 			return "", false
 		}
-		for index, value := range normalized {
-			if unicode.IsDigit(value) || (value == '+' && index == 0) {
+		for _, value := range digits {
+			if value >= '0' && value <= '9' {
 				continue
 			}
 			return "", false

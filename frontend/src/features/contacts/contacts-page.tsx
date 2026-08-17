@@ -2,10 +2,10 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 import {
-  ArrowUpDownIcon,
   BotIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -318,6 +318,7 @@ export function ContactsPage({
   const [detailLoading, setDetailLoading] = useState(false)
   const [deletingContact, setDeletingContact] = useState<ContactSummary | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const detailTitleRef = useRef<HTMLHeadingElement>(null)
   const selected = searchParams.get("selected") ?? ""
   const creating = searchParams.get("new") === "1"
   const channelId = searchParams.get("channelId") ?? ""
@@ -677,7 +678,6 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.sort")}
                   value={sort}
-                  icon={ArrowUpDownIcon}
                   align="end"
                   options={[
                     { value: "createdAt.desc", label: t("sort.created") },
@@ -826,9 +826,15 @@ export function ContactsPage({
       </section>
 
       <Sheet open={Boolean(selected)} onOpenChange={(open) => !open && closeDetail()}>
-        <SheetContent showCloseButton={false} className="w-full gap-0 p-0 sm:max-w-xl">
+        <SheetContent
+          className="w-full gap-0 p-0 sm:max-w-xl"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            detailTitleRef.current?.focus()
+          }}
+        >
           <SheetHeader className="border-b px-6 py-4 pr-12">
-            <SheetTitle>
+            <SheetTitle ref={detailTitleRef} tabIndex={-1} className="outline-none">
               {scope === "internal"
                 ? detailUser?.displayName ?? t("detail.memberTitle")
                 : detail?.contact.displayName || t("anonymous")}

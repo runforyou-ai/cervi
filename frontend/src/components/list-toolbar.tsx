@@ -1,5 +1,5 @@
-import type { ComponentType, InputHTMLAttributes, ReactNode } from "react"
-import { CheckIcon, ListFilterIcon, SearchIcon, XIcon } from "lucide-react"
+import type { InputHTMLAttributes, ReactNode } from "react"
+import { CheckIcon, SearchIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -44,7 +44,6 @@ export function ListToolbarFilter({
   value,
   options,
   onValueChange,
-  icon: Icon = ListFilterIcon,
   align = "start",
 }: {
   label: string
@@ -52,7 +51,6 @@ export function ListToolbarFilter({
   value: string
   options: ListToolbarOption[]
   onValueChange: (value: string) => void
-  icon?: ComponentType<{ className?: string }>
   align?: "start" | "center" | "end"
 }) {
   const selected = options.find((option) => option.value === value)
@@ -61,7 +59,6 @@ export function ListToolbarFilter({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm">
-          <Icon />
           {label}
           {selected ? (
             <>
@@ -104,7 +101,6 @@ export function ListToolbarReset({
   return (
     <Button variant="ghost" size="sm" onClick={onClick}>
       {children}
-      <XIcon />
     </Button>
   )
 }

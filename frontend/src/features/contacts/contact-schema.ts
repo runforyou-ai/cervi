@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { isPossiblePhoneNumber } from "react-phone-number-input"
 
 export function createContactSchema(messages: {
   identityRequired: string
@@ -18,9 +19,8 @@ export function createContactSchema(messages: {
       email: z.union([z.literal(""), z.string().trim().email(messages.emailInvalid)]),
       phone: z
         .string()
-        .trim()
         .refine(
-          (value) => value === "" || /^[+\d][\d\s()-]{2,31}$/.test(value),
+          (value) => value === "" || isPossiblePhoneNumber(value),
           messages.phoneInvalid,
         ),
       notes: z.string().trim().max(5000, messages.notesTooLong),

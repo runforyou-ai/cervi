@@ -59,34 +59,108 @@ func validateSourceChannel(ctx context.Context, tx bun.Tx, organizationID, chann
 }
 
 func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID string, methods []MethodInput) error {
-	if _, err := tx.NewDelete().
-		Model((*servermodels.ContactMethod)(nil)).
-		Where("organization_id = ?", organizationID).
-		Where("contact_id = ?", contactID).
-		Exec(ctx); err != nil {
+	existing := make([]servermodels.ContactMethod, 0)
+	if err := tx.NewSelect().
+		Model(&existing).
+		Where("cm.organization_id = ?", organizationID).
+		Where("cm.contact_id = ?", contactID).
+		For("UPDATE").
+		Scan(ctx); err != nil {
 		return err
 	}
-	if len(methods) == 0 {
-		return nil
+
+	key := func(methodType, value string) string {
+		return methodType + "\x00" + value
+	}
+	desired := make(map[string]MethodInput, len(methods))
+	for _, method := range methods {
+		desired[key(method.Type, method.Value)] = method
 	}
 
-	records := make([]servermodels.ContactMethod, 0, len(methods))
+	matched := make(map[string]*servermodels.ContactMethod, len(existing))
+	obsoleteIDs := make([]string, 0)
+	for index := range existing {
+		record := &existing[index]
+		recordKey := key(record.Type, record.NormalizedValue)
+		if _, wanted := desired[recordKey]; wanted && matched[recordKey] == nil {
+			matched[recordKey] = record
+			continue
+		}
+		obsoleteIDs = append(obsoleteIDs, record.ID)
+	}
+	if len(obsoleteIDs) > 0 {
+		if _, err := tx.NewDelete().
+			Model((*servermodels.ContactMethod)(nil)).
+			Where("organization_id = ?", organizationID).
+			Where("contact_id = ?", contactID).
+			Where("id IN (?)", bun.In(obsoleteIDs)).
+			Exec(ctx); err != nil {
+			return err
+		}
+	}
+
+	// 先取消不再作为主要项的旧记录，避免同类型主要项切换时触发唯一索引冲突。
+	for recordKey, record := range matched {
+		if record.IsPrimary && !desired[recordKey].IsPrimary {
+			if _, err := tx.NewUpdate().
+				Model((*servermodels.ContactMethod)(nil)).
+				Set("is_primary = false").
+				Set("updated_at = now()").
+				Where("organization_id = ?", organizationID).
+				Where("contact_id = ?", contactID).
+				Where("id = ?", record.ID).
+				Exec(ctx); err != nil {
+				return err
+			}
+			record.IsPrimary = false
+		}
+	}
+
+	newRecords := make([]servermodels.ContactMethod, 0)
 	for _, method := range methods {
-		record := servermodels.ContactMethod{
-			OrganizationID:  organizationID,
-			ContactID:       contactID,
-			Type:            method.Type,
-			Value:           method.Value,
-			NormalizedValue: method.Value,
-			IsPrimary:       method.IsPrimary,
+		record := matched[key(method.Type, method.Value)]
+		if record == nil {
+			newRecord := servermodels.ContactMethod{
+				OrganizationID:  organizationID,
+				ContactID:       contactID,
+				Type:            method.Type,
+				Value:           method.Value,
+				NormalizedValue: method.Value,
+				IsPrimary:       method.IsPrimary,
+			}
+			if method.Label != "" {
+				newRecord.Label = &method.Label
+			}
+			newRecords = append(newRecords, newRecord)
+			continue
 		}
+
+		labelMatches := (record.Label == nil && method.Label == "") ||
+			(record.Label != nil && *record.Label == method.Label)
+		if labelMatches && record.IsPrimary == method.IsPrimary {
+			continue
+		}
+		var label *string
 		if method.Label != "" {
-			record.Label = &method.Label
+			label = &method.Label
 		}
-		records = append(records, record)
+		if _, err := tx.NewUpdate().
+			Model((*servermodels.ContactMethod)(nil)).
+			Set("label = ?", label).
+			Set("is_primary = ?", method.IsPrimary).
+			Set("updated_at = now()").
+			Where("organization_id = ?", organizationID).
+			Where("contact_id = ?", contactID).
+			Where("id = ?", record.ID).
+			Exec(ctx); err != nil {
+			return err
+		}
+	}
+	if len(newRecords) == 0 {
+		return nil
 	}
 	_, err := tx.NewInsert().
-		Model(&records).
+		Model(&newRecords).
 		Column("organization_id", "contact_id", "type", "value", "normalized_value", "label", "is_primary").
 		Exec(ctx)
 	return err

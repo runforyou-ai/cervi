@@ -14,8 +14,9 @@ import type { ChannelSummary } from "@/api/channels"
 import { ApiError } from "@/api/client"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
+import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   createContactSchema,
@@ -149,12 +150,25 @@ export function ContactForm({
             required={false}
           />
 
-          <FormInputField
+          <Controller
             name="phone"
             control={form.control}
-            label={t("form.phone")}
-            type="tel"
-            required={false}
+            render={({ field, fieldState }) => (
+              <Field>
+                <FieldLabel htmlFor={field.name}>{t("form.phone")}</FieldLabel>
+                <PhoneInput
+                  ref={field.ref}
+                  id={field.name}
+                  name={field.name}
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                  aria-invalid={fieldState.invalid}
+                  autoComplete="tel"
+                />
+                <FieldError errors={[fieldState.error]} />
+              </Field>
+            )}
           />
 
           <Controller

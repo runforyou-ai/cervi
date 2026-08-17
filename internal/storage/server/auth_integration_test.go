@@ -14,6 +14,7 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // TestAuthenticationActionsWithPostgreSQL 验证 PostgreSQL 上的初始化和认证流程。
@@ -180,15 +181,49 @@ func TestAuthenticationActionsWithPostgreSQL(t *testing.T) {
 		Stage:       contactaction.StageLead,
 		Notes:       "采购负责人",
 		Methods: []contactaction.MethodInput{
-			{Type: contactaction.MethodEmail, Value: "LIN@example.com"},
-			{Type: contactaction.MethodPhone, Value: "+86 138-0000-0000"},
+			{Type: contactaction.MethodEmail, Value: "LIN@example.com", Label: "工作"},
+			{Type: contactaction.MethodEmail, Value: "lin.private@example.com", Label: "私人"},
+			{Type: contactaction.MethodPhone, Value: "+86 138-0000-0000", Label: "手机"},
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if contact.Contact.DisplayName == nil || *contact.Contact.DisplayName != "林晓" || contact.Contact.SourceChannelID == nil || *contact.Contact.SourceChannelID != channel.ID || contact.SourceChannel == nil || contact.SourceChannel.ID != channel.ID || len(contact.Methods) != 2 {
+	if contact.Contact.DisplayName == nil || *contact.Contact.DisplayName != "林晓" || contact.Contact.SourceChannelID == nil || *contact.Contact.SourceChannelID != channel.ID || contact.SourceChannel == nil || contact.SourceChannel.ID != channel.ID || len(contact.Methods) != 3 {
 		t.Fatalf("unexpected created contact: %#v", contact)
+	}
+	preservedMethods := make(map[string]servermodels.ContactMethod, len(contact.Methods))
+	preservedInputs := make([]contactaction.MethodInput, 0, len(contact.Methods))
+	for _, method := range contact.Methods {
+		preservedMethods[method.Type+"\x00"+method.Value] = method
+		label := ""
+		if method.Label != nil {
+			label = *method.Label
+		}
+		preservedInputs = append(preservedInputs, contactaction.MethodInput{
+			Type: method.Type, Value: method.Value, Label: label, IsPrimary: method.IsPrimary,
+		})
+	}
+	preservedContact, err := contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID, contactaction.ContactInput{
+		DisplayName: "林晓（已确认）",
+		ChannelID:   channel.ID,
+		Stage:       contactaction.StageLead,
+		Notes:       "采购负责人",
+		Methods:     preservedInputs,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preservedContact.Methods) != len(contact.Methods) {
+		t.Fatalf("preserved methods count = %d, want %d", len(preservedContact.Methods), len(contact.Methods))
+	}
+	for _, method := range preservedContact.Methods {
+		before, ok := preservedMethods[method.Type+"\x00"+method.Value]
+		labelsEqual := (method.Label == nil && before.Label == nil) ||
+			(method.Label != nil && before.Label != nil && *method.Label == *before.Label)
+		if !ok || method.ID != before.ID || !labelsEqual || method.IsPrimary != before.IsPrimary || !method.CreatedAt.Equal(before.CreatedAt) || !method.UpdatedAt.Equal(before.UpdatedAt) {
+			t.Fatalf("contact method was recreated or changed: before=%#v after=%#v", before, method)
+		}
 	}
 
 	contactList := contactaction.NewListContactsQuery(db)

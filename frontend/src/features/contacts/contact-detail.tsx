@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { PencilIcon } from "lucide-react"
-import { useForm, type FieldErrors } from "react-hook-form"
+import { Controller, useForm, type FieldErrors } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -11,12 +11,14 @@ import {
   updateContact,
   type ContactDetail,
   type ContactInput,
+  type ContactMethodInput,
   type ContactStage,
 } from "@/api/contacts"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
+import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   createContactSchema,
@@ -36,6 +38,51 @@ function valuesFromDetail(detail: ContactDetail): ContactFormValues {
     phone: detail.methods.find((method) => method.type === "phone")?.value ?? "",
     notes: detail.contact.notes ?? "",
   }
+}
+
+function methodsFromDetail(
+  detail: ContactDetail,
+  values: ContactFormValues,
+): ContactMethodInput[] {
+  const editedValues = {
+    email: values.email,
+    phone: values.phone,
+  }
+  const handled = {
+    email: false,
+    phone: false,
+  }
+  const methods: ContactMethodInput[] = []
+
+  for (const method of detail.methods) {
+    if (!handled[method.type]) {
+      handled[method.type] = true
+      const value = editedValues[method.type]
+      if (!value) {
+        continue
+      }
+      methods.push({
+        type: method.type,
+        value,
+        label: method.label ?? undefined,
+        isPrimary: method.isPrimary,
+      })
+      continue
+    }
+    methods.push({
+      type: method.type,
+      value: method.value,
+      label: method.label ?? undefined,
+      isPrimary: method.isPrimary,
+    })
+  }
+
+  for (const type of ["email", "phone"] as const) {
+    if (!handled[type] && editedValues[type]) {
+      methods.push({ type, value: editedValues[type], isPrimary: true })
+    }
+  }
+  return methods
 }
 
 function DetailRow({
@@ -157,14 +204,7 @@ export function ContactDetailView({
       channelId: detail.contact.sourceChannelId ?? "",
       stage: values.stage,
       notes: values.notes,
-      methods: [
-        ...(values.email
-          ? [{ type: "email" as const, value: values.email, isPrimary: true }]
-          : []),
-        ...(values.phone
-          ? [{ type: "phone" as const, value: values.phone, isPrimary: true }]
-          : []),
-      ],
+      methods: methodsFromDetail(detail, values),
     }
     setSaving(true)
     try {
@@ -256,11 +296,26 @@ export function ContactDetailView({
               <Input id="contact-detail-email" type="email" {...form.register("email")} autoFocus />
               <FieldError errors={[form.formState.errors.email]} />
             </Field>
-            <Field>
-              <FieldLabel htmlFor="contact-detail-phone">{t("form.phone")}</FieldLabel>
-              <Input id="contact-detail-phone" type="tel" {...form.register("phone")} />
-              <FieldError errors={[form.formState.errors.phone]} />
-            </Field>
+            <Controller
+              name="phone"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field>
+                  <FieldLabel htmlFor="contact-detail-phone">{t("form.phone")}</FieldLabel>
+                  <PhoneInput
+                    ref={field.ref}
+                    id="contact-detail-phone"
+                    name={field.name}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    aria-invalid={fieldState.invalid}
+                    autoComplete="tel"
+                  />
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
           </div>
           <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
         </DetailRow>
