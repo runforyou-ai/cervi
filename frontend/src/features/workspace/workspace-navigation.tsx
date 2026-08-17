@@ -177,7 +177,7 @@ export function WorkspaceNavigation({
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   function openSettings() {
-    navigate("/settings")
+    navigate("/settings/storage")
     setOpenNarrowViewport(false)
   }
 

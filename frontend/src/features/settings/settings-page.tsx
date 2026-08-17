@@ -1,21 +1,58 @@
-import { SettingsIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { Link, NavLink } from "react-router"
+
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
+import { cn } from "@/lib/utils"
 
 export function SettingsPage() {
   const { t } = useTranslation("settings")
 
   return (
-    <section className="flex min-h-0 flex-1 items-center justify-center p-6">
-      <div className="max-w-sm text-center">
-        <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
-          <SettingsIcon className="size-5 text-muted-foreground" />
-        </div>
-        <h2 className="text-base font-semibold tracking-tight">
-          {t("placeholderTitle")}
+    <section className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <aside className="w-full shrink-0 border-b p-4 md:w-52 md:border-r md:border-b-0">
+        <nav aria-label={t("navigationLabel")}>
+          <NavLink
+            to="/settings/storage"
+            className={({ isActive }) =>
+              cn(
+                "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              )
+            }
+          >
+            {t("navigation.storage")}
+          </NavLink>
+        </nav>
+      </aside>
+
+      <div className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <Breadcrumb className="mb-6">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/settings/storage">{t("title")}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{t("navigation.storage")}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        <h2 className="text-xl font-semibold tracking-tight">
+          {t("storage.title")}
         </h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          {t("placeholderDescription")}
-        </p>
+        <StorageSettingsForm />
       </div>
     </section>
   )
