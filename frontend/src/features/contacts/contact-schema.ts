@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { isPossiblePhoneNumber } from "react-phone-number-input"
 
-import { ContactStage } from "@/api/contacts"
+import { ContactStage } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
 export function createContactSchema(messages: {

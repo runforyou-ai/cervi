@@ -1,4 +1,4 @@
-import { StorageProvider, type StorageProviderId } from "@/api/settings"
+import { StorageProvider, type StorageProviderId } from "@/api"
 
 type StorageProviderNameKey = `storage.providers.${StorageProviderId}`
 

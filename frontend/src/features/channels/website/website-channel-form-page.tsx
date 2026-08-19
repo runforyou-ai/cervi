@@ -8,8 +8,7 @@ import {
   useSearchParams,
 } from "react-router"
 
-import { getWebsiteChannel, type WebsiteChannel } from "@/api/channels"
-import { ApiError } from "@/api/client"
+import { ApiError, getWebsiteChannel, type WebsiteChannel } from "@/api"
 import {
   Breadcrumb,
   BreadcrumbItem,

@@ -62,7 +62,7 @@ cervi/
 ├── frontend/
 │   ├── bindings/                   # Wails 自动生成的 TypeScript 服务和类型绑定
 │   └── src/
-│       ├── api/                    # 按领域封装生成服务、认证和边界归一化
+│       ├── api/                    # 认证、绑定调用适配和边界归一化
 │       ├── apps/
 │       │   ├── web/                # Web 应用入口和路由
 │       │   ├── desktop/            # 桌面端应用入口和路由
@@ -84,6 +84,7 @@ cervi/
 - `domain` 只放置 Action、AppService 和不同平台共同使用的领域值，不放置数据库、传输层和平台逻辑。
 - `appservice` 契约是前端业务 DTO 的唯一来源；前端不得重复声明渠道、联系人、用户、会话、设置等业务模型和枚举。
 - `frontend/bindings` 由 Wails 自动生成，禁止手工修改；所有平台统一使用 `wails3 generate bindings -ts -i`，不得生成不同格式后覆盖现有绑定。
+- 前端通过 `src/api` 调用生成绑定：`client` 注入认证与错误，`service` 绑定方法并归一化可空切片；页面不直接引用 `frontend/bindings`。
 - 前端只保留表单值、组件 Props、页面状态、查询参数派生类型，以及对生成类型中可空切片的边界归一化类型。
 - 数据库模型放在对应平台的 `storage` 目录中。
 - 本地 PostgreSQL Docker 数据库由所有工作区共享，不为单独工作区创建容器、端口或数据卷；需要重建数据库结构时使用 Goose 回滚并重新执行迁移。

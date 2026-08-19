@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next"
 
-import type { WebsiteChannelChatInterfaceInput } from "@/api/channels"
+import type { WebsiteChannelChatInterfaceInput } from "@/api"
 import {
   defaultWebsiteChannelThemeColor,
   isWebsiteChannelThemeColor,

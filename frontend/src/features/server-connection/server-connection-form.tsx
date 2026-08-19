@@ -6,8 +6,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { ApiError } from "@/api/client"
-import { connectServer, getServerURL } from "@/api/server-connection"
+import { ApiError, connectServer, getServerURL } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {

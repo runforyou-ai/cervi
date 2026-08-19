@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { StorageProvider } from "@/api/settings"
+import { StorageProvider } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
 function validEndpoint(value: string) {

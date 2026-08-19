@@ -6,14 +6,14 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ApiError,
   ContactMethodType,
   ContactStage,
   createContact,
+  type ChannelSummary,
   type ContactDetail,
   type ContactInput,
-} from "@/api/contacts"
-import type { ChannelSummary } from "@/api/channels"
-import { ApiError } from "@/api/client"
+} from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"

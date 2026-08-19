@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { Locale } from "@/api/channels"
+import { Locale } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
 function unicodeLength(value: string) {

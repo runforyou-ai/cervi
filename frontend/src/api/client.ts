@@ -50,6 +50,21 @@ export async function call<T>(
   }
 }
 
+export function bind<A extends unknown[], R>(
+  fn: (meta: RequestMeta, ...args: A) => CancellablePromise<R>,
+) {
+  return (...args: [...A, AbortSignal?]) => {
+    const last = args[args.length - 1]
+    const signal = last instanceof AbortSignal ? last : undefined
+    const fnArgs = (
+      (signal || last === undefined) && args.length > 0
+        ? args.slice(0, -1)
+        : args
+    ) as A
+    return call((meta) => fn(meta, ...fnArgs), signal)
+  }
+}
+
 export function acceptSession(session: Session) {
   window.sessionStorage.setItem(
     sessionStorageKey,

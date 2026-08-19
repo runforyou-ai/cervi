@@ -5,11 +5,11 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ApiError,
   listDeletedWebsiteChannels,
   restoreWebsiteChannel,
   type WebsiteChannelSummary,
-} from "@/api/channels"
-import { ApiError } from "@/api/client"
+} from "@/api"
 import {
   Breadcrumb,
   BreadcrumbItem,

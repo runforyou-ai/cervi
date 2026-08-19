@@ -1,7 +1,6 @@
-import { loadSession } from "@/api/auth"
+import { getServerURL, loadSession } from "@/api/auth"
 import { ApiError, hasSession } from "@/api/client"
-import type { Principal } from "@/api/identity"
-import { getServerURL } from "@/api/server-connection"
+import type { Principal } from "@/api/service"
 
 export type NativeEntry =
   | { status: "ready"; principal: Principal }

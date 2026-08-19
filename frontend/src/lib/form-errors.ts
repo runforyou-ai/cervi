@@ -1,4 +1,4 @@
-import type { ApiError } from "@/api/client"
+import type { ApiError } from "@/api"
 
 export function apiErrorMessage(
   error: ApiError,

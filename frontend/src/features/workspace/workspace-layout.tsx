@@ -4,10 +4,13 @@ import { useTranslation } from "react-i18next"
 import { Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { loadSession, logout } from "@/api/auth"
-import { ApiError } from "@/api/client"
-import type { Principal } from "@/api/identity"
-import { resolveNativeEntry } from "@/api/native-entry"
+import {
+  ApiError,
+  loadSession,
+  logout,
+  resolveNativeEntry,
+  type Principal,
+} from "@/api"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {

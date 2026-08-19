@@ -13,13 +13,13 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ApiError,
+  StorageProvider,
   getS3Setting,
   saveS3Setting,
-  StorageProvider,
-  type StorageProviderId,
   testS3Setting,
-} from "@/api/settings"
-import { ApiError } from "@/api/client"
+  type StorageProviderId,
+} from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import {
   AlertDialog,

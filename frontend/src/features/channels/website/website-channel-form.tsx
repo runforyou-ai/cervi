@@ -6,12 +6,12 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ApiError,
   Locale,
   createWebsiteChannel,
   updateWebsiteChannel,
   type WebsiteChannelSummary,
-} from "@/api/channels"
-import { ApiError } from "@/api/client"
+} from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {

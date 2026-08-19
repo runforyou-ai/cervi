@@ -3,8 +3,7 @@ import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
-import { ApiError } from "@/api/client"
-import { loadInbox, type InboxData } from "@/api/inbox"
+import { ApiError, loadInbox, type InboxData } from "@/api"
 import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
 

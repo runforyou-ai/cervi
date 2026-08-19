@@ -8,7 +8,7 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import type { Conversation } from "@/api/inbox"
+import type { Conversation } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"

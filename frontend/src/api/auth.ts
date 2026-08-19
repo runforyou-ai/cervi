@@ -1,10 +1,18 @@
 import {
+  ConnectServer,
+  InstallWorkspace,
   LoadSession,
   Login,
   Logout,
+  ServerURL,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
-import type { LoginInput } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
-import { acceptSession, ApiError, call, clearSession } from "@/api/client"
+import type {
+  InstallWorkspaceInput,
+  LoginInput,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import { acceptSession, ApiError, bind, call, clearSession } from "@/api/client"
+
+export const getServerURL = bind(ServerURL)
 
 export async function login(input: LoginInput) {
   return acceptSession(await call((meta) => Login(meta, input)))
@@ -27,4 +35,13 @@ export async function loadSession() {
     }
     throw error
   }
+}
+
+export async function install(input: InstallWorkspaceInput) {
+  return acceptSession(await call((meta) => InstallWorkspace(meta, input)))
+}
+
+export async function connectServer(serverUrl: string) {
+  await call((meta) => ConnectServer(meta, serverUrl))
+  clearSession()
 }

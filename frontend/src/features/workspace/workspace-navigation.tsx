@@ -13,7 +13,7 @@ import {
 import { useTranslation } from "react-i18next"
 import { NavLink, useLocation, useNavigate } from "react-router"
 
-import type { Principal } from "@/api/identity"
+import type { Principal } from "@/api"
 import {
   Collapsible,
   CollapsibleContent,

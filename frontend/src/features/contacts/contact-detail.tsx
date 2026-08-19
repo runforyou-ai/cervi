@@ -5,15 +5,15 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { ApiError } from "@/api/client"
 import {
+  ApiError,
   ContactMethodType,
   ContactStage,
   updateContact,
   type ContactDetail,
   type ContactInput,
   type ContactMethodInput,
-} from "@/api/contacts"
+} from "@/api"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"

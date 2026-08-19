@@ -19,34 +19,29 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
-import { listChannels, type ChannelSummary } from "@/api/channels"
 import {
+  ApiError,
   ContactMethodType,
   ContactSort,
   ContactStage,
-  contactMethodTypeFromQuery,
-  contactSortFromQuery,
-  contactStageFromQuery,
-  getContact,
+  UserRole,
+  UserStatus,
   deleteContact,
+  getContact,
+  getUser,
+  listChannels,
   listContacts,
   listDeletedContacts,
+  listUsers,
   restoreContact,
+  type ChannelSummary,
   type ContactDetail,
   type ContactListResponse,
   type ContactSummary,
-} from "@/api/contacts"
-import { ApiError } from "@/api/client"
-import {
-  UserRole,
-  UserStatus,
-  getUser,
-  listUsers,
-  userRoleFromQuery,
-  userStatusFromQuery,
   type DirectoryUser,
-} from "@/api/users"
-import type { PageInfo } from "@/api/types"
+  type PageInfo,
+} from "@/api"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 import {
   ListToolbar,
   ListToolbarFilter,
@@ -336,11 +331,16 @@ export function ContactsPage({
   const selected = searchParams.get("selected") ?? ""
   const creating = searchParams.get("new") === "1"
   const channelId = searchParams.get("channelId") ?? ""
-  const stage = contactStageFromQuery(searchParams.get("stage"))
-  const methodType = contactMethodTypeFromQuery(searchParams.get("methodType"))
-  const sort = contactSortFromQuery(searchParams.get("sort"))
-  const status = userStatusFromQuery(searchParams.get("status"))
-  const role = userRoleFromQuery(searchParams.get("role"))
+  const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
+  const methodType = optionalWailsEnum(
+    ContactMethodType,
+    searchParams.get("methodType"),
+  )
+  const sort =
+    optionalWailsEnum(ContactSort, searchParams.get("sort")) ??
+    ContactSort.ContactSortCreatedAtDescending
+  const status = optionalWailsEnum(UserStatus, searchParams.get("status"))
+  const role = optionalWailsEnum(UserRole, searchParams.get("role"))
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
 
   const setParameters = useCallback(
