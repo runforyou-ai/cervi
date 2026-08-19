@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -31,7 +31,7 @@ func TestChannelContractConversion(t *testing.T) {
 	}
 
 	input := channelInput(WebsiteChannelInput{Name: "产品官网", Description: description, DefaultLocale: LocaleEnglishUnitedStates})
-	if input.DefaultLocale != channelaction.LocaleEnglishUnitedStates || input.Name != "产品官网" {
+	if input.DefaultLocale != domain.LocaleEnglishUnitedStates || input.Name != "产品官网" {
 		t.Fatalf("channel input conversion = %#v", input)
 	}
 }
@@ -42,7 +42,7 @@ func TestContactContractConversion(t *testing.T) {
 		DisplayName: "访客", ChannelID: "channel-1", Stage: ContactStageLead, Notes: "重点跟进",
 		Methods: []ContactMethodInput{{Type: ContactMethodTypeEmail, Value: "visitor@example.com", Label: "工作", IsPrimary: true}},
 	})
-	if input.Stage != contactaction.StageLead || len(input.Methods) != 1 || input.Methods[0].Type != contactaction.MethodEmail {
+	if input.Stage != domain.ContactStageLead || len(input.Methods) != 1 || input.Methods[0].Type != domain.ContactMethodTypeEmail {
 		t.Fatalf("contact input conversion = %#v", input)
 	}
 
@@ -51,10 +51,10 @@ func TestContactContractConversion(t *testing.T) {
 	detail := contactFromAction(&contactaction.ContactDetail{
 		Contact: contactaction.ContactRecord{
 			ID: "contact-1", SourceChannelID: "channel-1", DisplayName: &displayName,
-			Stage: contactaction.StageCustomer, CreatedAt: time.Now().UTC(),
+			Stage: domain.ContactStageCustomer, CreatedAt: time.Now().UTC(),
 		},
-		SourceChannel:     contactaction.SourceChannel{ID: "channel-1", Type: channelaction.TypeWebsite, Name: "产品官网"},
-		Methods:           []contactaction.ContactMethod{{Type: contactaction.MethodEmail, Value: "visitor@example.com", Label: &label, IsPrimary: true}},
+		SourceChannel:     contactaction.SourceChannel{ID: "channel-1", Type: domain.ChannelTypeWebsite, Name: "产品官网"},
+		Methods:           []contactaction.ContactMethod{{Type: domain.ContactMethodTypeEmail, Value: "visitor@example.com", Label: &label, IsPrimary: true}},
 		ChannelIdentities: []contactaction.ChannelIdentity{{ChannelID: "channel-1", ChannelName: "产品官网", ExternalID: "visitor-1"}},
 	})
 	if detail.Contact.Stage != ContactStageCustomer || detail.SourceChannel.Type != ChannelTypeWebsite || len(detail.Methods) != 1 || detail.Methods[0].Type != ContactMethodTypeEmail || len(detail.ChannelIdentities) != 1 {

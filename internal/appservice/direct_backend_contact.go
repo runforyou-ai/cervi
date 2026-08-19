@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -40,9 +41,9 @@ func (b *DirectBackend) contactError(ctx context.Context, meta RequestMeta, err 
 func contactInput(input ContactInput) contactaction.ContactInput {
 	methods := make([]contactaction.MethodInput, 0, len(input.Methods))
 	for _, method := range input.Methods {
-		methods = append(methods, contactaction.MethodInput{Type: string(method.Type), Value: method.Value, Label: method.Label, IsPrimary: method.IsPrimary})
+		methods = append(methods, contactaction.MethodInput{Type: domain.ContactMethodType(method.Type), Value: method.Value, Label: method.Label, IsPrimary: method.IsPrimary})
 	}
-	return contactaction.ContactInput{DisplayName: input.DisplayName, ChannelID: input.ChannelID, Stage: string(input.Stage), Notes: input.Notes, Methods: methods}
+	return contactaction.ContactInput{DisplayName: input.DisplayName, ChannelID: input.ChannelID, Stage: domain.ContactStage(input.Stage), Notes: input.Notes, Methods: methods}
 }
 
 func contactFromAction(contact *contactaction.ContactDetail) Contact {

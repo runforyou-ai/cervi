@@ -15,6 +15,7 @@ import (
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -94,7 +95,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	stalePrincipal.User.ID = "00000000-0000-0000-0000-000000000000"
 	_, err = createChannel.Execute(context.Background(), &stalePrincipal, channelaction.WebsiteChannelInput{
 		Name:          "无效渠道",
-		DefaultLocale: channelaction.LocaleChineseSimplified,
+		DefaultLocale: domain.LocaleChineseSimplified,
 	})
 	if !errors.Is(err, channelaction.ErrPrincipalInvalid) {
 		t.Fatalf("stale principal error = %v, want ErrPrincipalInvalid", err)
@@ -103,12 +104,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	channel, err := createChannel.Execute(context.Background(), loginSession.Principal, channelaction.WebsiteChannelInput{
 		Name:          "产品官网",
 		Description:   "接收官网访客咨询",
-		DefaultLocale: channelaction.LocaleChineseSimplified,
+		DefaultLocale: domain.LocaleChineseSimplified,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if channel.Type != channelaction.TypeWebsite || channel.CreatedByUserID != loginSession.Principal.User.ID {
+	if channel.Type != string(domain.ChannelTypeWebsite) || channel.CreatedByUserID != loginSession.Principal.User.ID {
 		t.Fatalf("unexpected created channel: %#v", channel)
 	}
 
@@ -138,12 +139,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	updateChannel := channelaction.NewUpdateWebsiteChannelAction(db)
 	channel, err = updateChannel.Execute(context.Background(), loginSession.Principal, channel.ID, channelaction.WebsiteChannelInput{
 		Name:          "帮助中心",
-		DefaultLocale: channelaction.LocaleEnglishUnitedStates,
+		DefaultLocale: domain.LocaleEnglishUnitedStates,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if channel.Name != "帮助中心" || channel.Description != nil || channel.DefaultLocale != channelaction.LocaleEnglishUnitedStates {
+	if channel.Name != "帮助中心" || channel.Description != nil || channel.DefaultLocale != string(domain.LocaleEnglishUnitedStates) {
 		t.Fatalf("unexpected updated channel: %#v", channel)
 	}
 
@@ -192,7 +193,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	_, err = createContact.Execute(context.Background(), loginSession.Principal, contactaction.ContactInput{
 		DisplayName: "无效渠道联系人",
 		ChannelID:   "00000000-0000-0000-0000-000000000099",
-		Stage:       contactaction.StageVisitor,
+		Stage:       domain.ContactStageVisitor,
 	})
 	var channelValidation *contactaction.ValidationError
 	if !errors.As(err, &channelValidation) || channelValidation.Fields["channelId"] != contactaction.ValidationChannelInvalid {
@@ -202,12 +203,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	contact, err := createContact.Execute(context.Background(), loginSession.Principal, contactaction.ContactInput{
 		DisplayName: "林晓",
 		ChannelID:   channel.ID,
-		Stage:       contactaction.StageLead,
+		Stage:       domain.ContactStageLead,
 		Notes:       "采购负责人",
 		Methods: []contactaction.MethodInput{
-			{Type: contactaction.MethodEmail, Value: "LIN@example.com", Label: "工作"},
-			{Type: contactaction.MethodEmail, Value: "lin.private@example.com", Label: "私人"},
-			{Type: contactaction.MethodPhone, Value: "+86 138-0000-0000", Label: "手机"},
+			{Type: domain.ContactMethodTypeEmail, Value: "LIN@example.com", Label: "工作"},
+			{Type: domain.ContactMethodTypeEmail, Value: "lin.private@example.com", Label: "私人"},
+			{Type: domain.ContactMethodTypePhone, Value: "+86 138-0000-0000", Label: "手机"},
 		},
 	})
 	if err != nil {
@@ -245,7 +246,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	preservedContact, err := contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID, contactaction.ContactInput{
 		DisplayName: "林晓（已确认）",
 		ChannelID:   channel.ID,
-		Stage:       contactaction.StageLead,
+		Stage:       domain.ContactStageLead,
 		Notes:       "采购负责人",
 		Methods:     preservedInputs,
 	})
@@ -274,7 +275,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	contactList := contactaction.NewListContactsQuery(db)
 	activeContacts, err := contactList.Execute(context.Background(), loginSession.Principal, contactaction.ListInput{
-		Query: "lin@example", Stage: contactaction.StageLead, ChannelID: channel.ID, Page: 1, PageSize: 50,
+		Query: "lin@example", Stage: domain.ContactStageLead, ChannelID: channel.ID, Page: 1, PageSize: 50,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -286,8 +287,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	_, err = contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID, contactaction.ContactInput{
 		DisplayName: "林晓",
 		ChannelID:   "00000000-0000-0000-0000-000000000099",
-		Stage:       contactaction.StageLead,
-		Methods:     []contactaction.MethodInput{{Type: contactaction.MethodEmail, Value: "lin@example.com"}},
+		Stage:       domain.ContactStageLead,
+		Methods:     []contactaction.MethodInput{{Type: domain.ContactMethodTypeEmail, Value: "lin@example.com"}},
 	})
 	var immutableChannelValidation *contactaction.ValidationError
 	if !errors.As(err, &immutableChannelValidation) || immutableChannelValidation.Fields["channelId"] != contactaction.ValidationChannelImmutable {
@@ -297,13 +298,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	updatedContact, err := contactaction.NewUpdateContactAction(db).Execute(context.Background(), loginSession.Principal, contact.Contact.ID, contactaction.ContactInput{
 		DisplayName: "林晓（采购）",
 		ChannelID:   channel.ID,
-		Stage:       contactaction.StageCustomer,
-		Methods:     []contactaction.MethodInput{{Type: contactaction.MethodEmail, Value: "lin@example.com"}},
+		Stage:       domain.ContactStageCustomer,
+		Methods:     []contactaction.MethodInput{{Type: domain.ContactMethodTypeEmail, Value: "lin@example.com"}},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updatedContact.Contact.Stage != contactaction.StageCustomer || len(updatedContact.Methods) != 1 {
+	if updatedContact.Contact.Stage != domain.ContactStageCustomer || len(updatedContact.Methods) != 1 {
 		t.Fatalf("unexpected updated contact: %#v", updatedContact)
 	}
 
@@ -341,7 +342,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	s3Setting := settingaction.S3Setting{
 		Enabled:         true,
-		Provider:        settingaction.ProviderAWS,
+		Provider:        domain.StorageProviderAWS,
 		Endpoint:        "https://s3.example.com",
 		Region:          "us-east-1",
 		Bucket:          "cervi",

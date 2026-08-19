@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -38,9 +39,9 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, principal *ser
 	channel := &servermodels.Channel{
 		OrganizationID:  principal.Organization.ID,
 		CreatedByUserID: principal.User.ID,
-		Type:            TypeWebsite,
+		Type:            string(domain.ChannelTypeWebsite),
 		Name:            input.Name,
-		DefaultLocale:   input.DefaultLocale,
+		DefaultLocale:   string(input.DefaultLocale),
 	}
 	if input.Description != "" {
 		channel.Description = &input.Description

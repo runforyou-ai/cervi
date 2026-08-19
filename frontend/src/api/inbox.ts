@@ -5,7 +5,7 @@ import type {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { call } from "@/api/client"
 
-export { MessageAuthor } from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
+export { MessageAuthor } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 export type {
   Message,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"

@@ -141,9 +141,9 @@ export function ContactForm({
                 {t("form.stage")}
               </FieldLabel>
               <NativeSelect {...field} id={field.name} required>
-                <option value="visitor">{t("stages.visitor")}</option>
-                <option value="lead">{t("stages.lead")}</option>
-                <option value="customer">{t("stages.customer")}</option>
+                <option value={ContactStage.ContactStageVisitor}>{t("stages.visitor")}</option>
+                <option value={ContactStage.ContactStageLead}>{t("stages.lead")}</option>
+                <option value={ContactStage.ContactStageCustomer}>{t("stages.customer")}</option>
               </NativeSelect>
             </Field>
           )}

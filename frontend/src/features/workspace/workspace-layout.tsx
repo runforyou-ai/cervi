@@ -5,9 +5,9 @@ import { Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { loadSession, logout } from "@/api/auth"
-import { ApiError, hasSession } from "@/api/client"
+import { ApiError } from "@/api/client"
 import type { Principal } from "@/api/identity"
-import { getServerURL } from "@/api/server-connection"
+import { resolveNativeEntry } from "@/api/native-entry"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -68,26 +68,21 @@ export function WorkspaceLayout({
     setError("")
     try {
       if (platform === "desktop") {
-        if ((await getServerURL()) === "") {
-          navigate("/connect", { replace: true })
+        const entry = await resolveNativeEntry()
+        if (entry.status !== "ready") {
+          navigate(entry.status === "connect" ? "/connect" : "/login", {
+            replace: true,
+          })
           return
         }
-        if (!hasSession()) {
-          navigate("/login", { replace: true })
-          return
-        }
+        setPrincipal(entry.principal)
+        return
       }
       setPrincipal(await loadSession())
     } catch (requestError) {
       if (requestError instanceof ApiError) {
-        if (requestError.code === "SERVER_CONNECTION_REQUIRED") {
-          navigate("/connect", { replace: true })
-          return
-        }
         if (requestError.code === "INSTALLATION_REQUIRED") {
-          navigate(platform === "web" ? "/setup" : "/connect", {
-            replace: true,
-          })
+          navigate("/setup", { replace: true })
           return
         }
         if (requestError.code === "AUTH_REQUIRED") {

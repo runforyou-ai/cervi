@@ -24,6 +24,9 @@ import {
   ContactMethodType,
   ContactSort,
   ContactStage,
+  contactMethodTypeFromQuery,
+  contactSortFromQuery,
+  contactStageFromQuery,
   getContact,
   deleteContact,
   listContacts,
@@ -39,6 +42,8 @@ import {
   UserStatus,
   getUser,
   listUsers,
+  userRoleFromQuery,
+  userStatusFromQuery,
   type DirectoryUser,
 } from "@/api/users"
 import type { PageInfo } from "@/api/types"
@@ -97,7 +102,6 @@ import {
 import { ContactForm } from "@/features/contacts/contact-form"
 import { ContactDetailView } from "@/features/contacts/contact-detail"
 import { useDateTime } from "@/hooks/use-date-time"
-import { parseWailsEnum } from "@/lib/wails-enum"
 import { cn } from "@/lib/utils"
 
 export type ContactScope = "internal" | "external" | "agents"
@@ -259,7 +263,7 @@ function ContactScopeSidebar({
 
 function StageLabel({ stage }: { stage: ContactStage }) {
   const { t } = useTranslation("contacts")
-  if (stage === ContactStage.$zero) return null
+  if (!stage) return null
   return (
     <span className="inline-flex rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
       {t(`stages.${stage}`)}
@@ -332,31 +336,11 @@ export function ContactsPage({
   const selected = searchParams.get("selected") ?? ""
   const creating = searchParams.get("new") === "1"
   const channelId = searchParams.get("channelId") ?? ""
-  const stage = parseWailsEnum(
-    ContactStage,
-    searchParams.get("stage"),
-    ContactStage.$zero,
-  )
-  const methodType = parseWailsEnum(
-    ContactMethodType,
-    searchParams.get("methodType"),
-    ContactMethodType.$zero,
-  )
-  const sort = parseWailsEnum(
-    ContactSort,
-    searchParams.get("sort"),
-    ContactSort.ContactSortCreatedAtDescending,
-  )
-  const status = parseWailsEnum(
-    UserStatus,
-    searchParams.get("status"),
-    UserStatus.$zero,
-  )
-  const role = parseWailsEnum(
-    UserRole,
-    searchParams.get("role"),
-    UserRole.$zero,
-  )
+  const stage = contactStageFromQuery(searchParams.get("stage"))
+  const methodType = contactMethodTypeFromQuery(searchParams.get("methodType"))
+  const sort = contactSortFromQuery(searchParams.get("sort"))
+  const status = userStatusFromQuery(searchParams.get("status"))
+  const role = userRoleFromQuery(searchParams.get("role"))
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
 
   const setParameters = useCallback(
@@ -634,10 +618,10 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.status")}
                   allLabel={t("filters.allStatuses")}
-                  value={status}
+                  value={status ?? ""}
                   options={[
-                    { value: "active", label: t("statuses.active") },
-                    { value: "inactive", label: t("statuses.inactive") },
+                    { value: UserStatus.UserStatusActive, label: t("statuses.active") },
+                    { value: UserStatus.UserStatusInactive, label: t("statuses.inactive") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ status: value || null, page: null, selected: null })
@@ -646,10 +630,10 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.role")}
                   allLabel={t("filters.allRoles")}
-                  value={role}
+                  value={role ?? ""}
                   options={[
-                    { value: "owner", label: t("roles.owner") },
-                    { value: "member", label: t("roles.member") },
+                    { value: UserRole.UserRoleOwner, label: t("roles.owner") },
+                    { value: UserRole.UserRoleMember, label: t("roles.member") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ role: value || null, page: null, selected: null })
@@ -669,11 +653,11 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.stage")}
                   allLabel={t("filters.allStages")}
-                  value={stage}
+                  value={stage ?? ""}
                   options={[
-                    { value: "visitor", label: t("stages.visitor") },
-                    { value: "lead", label: t("stages.lead") },
-                    { value: "customer", label: t("stages.customer") },
+                    { value: ContactStage.ContactStageVisitor, label: t("stages.visitor") },
+                    { value: ContactStage.ContactStageLead, label: t("stages.lead") },
+                    { value: ContactStage.ContactStageCustomer, label: t("stages.customer") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ stage: value || null, page: null, selected: null })
@@ -682,10 +666,10 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.method")}
                   allLabel={t("filters.allMethods")}
-                  value={methodType}
+                  value={methodType ?? ""}
                   options={[
-                    { value: "email", label: t("methods.email") },
-                    { value: "phone", label: t("methods.phone") },
+                    { value: ContactMethodType.ContactMethodTypeEmail, label: t("methods.email") },
+                    { value: ContactMethodType.ContactMethodTypePhone, label: t("methods.phone") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ methodType: value || null, page: null, selected: null })
@@ -707,9 +691,9 @@ export function ContactsPage({
                   value={sort}
                   align="end"
                   options={[
-                    { value: "createdAt.desc", label: t("sort.created") },
-                    { value: "updatedAt.desc", label: t("sort.updated") },
-                    { value: "displayName.asc", label: t("sort.name") },
+                    { value: ContactSort.ContactSortCreatedAtDescending, label: t("sort.created") },
+                    { value: ContactSort.ContactSortUpdatedAtDescending, label: t("sort.updated") },
+                    { value: ContactSort.ContactSortDisplayNameAscending, label: t("sort.name") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ sort: value, page: null, selected: null })

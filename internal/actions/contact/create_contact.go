@@ -38,7 +38,7 @@ func (a *CreateContactAction) Execute(ctx context.Context, principal *servermode
 			OrganizationID:  principal.Organization.ID,
 			CreatedByUserID: principal.User.ID,
 			SourceChannelID: input.ChannelID,
-			Stage:           input.Stage,
+			Stage:           string(input.Stage),
 		}
 		if input.DisplayName != "" {
 			contact.DisplayName = &input.DisplayName

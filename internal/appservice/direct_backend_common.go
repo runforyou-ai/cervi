@@ -3,6 +3,9 @@
 package appservice
 
 import (
+	"fmt"
+	"log/slog"
+
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -39,9 +42,12 @@ func installationFieldKeys(fields map[string]installationaction.ValidationCode) 
 func translateValidationFields[Code comparable](fields map[string]Code, keys map[Code]cervii18n.Key) map[string]cervii18n.Key {
 	result := make(map[string]cervii18n.Key, len(fields))
 	for field, code := range fields {
-		if key, exists := keys[code]; exists {
-			result[field] = key
+		key, exists := keys[code]
+		if !exists {
+			slog.Warn("未映射的校验错误码", "field", field, "code", fmt.Sprint(code))
+			continue
 		}
+		result[field] = key
 	}
 	return result
 }

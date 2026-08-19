@@ -1,10 +1,10 @@
 import { CancelError, type CancellablePromise } from "@wailsio/runtime"
 
-import type {
-  RequestMeta,
-  Session,
+import {
+  Locale,
+  type RequestMeta,
+  type Session,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
-import { Locale } from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
 import { i18n } from "@/i18n"
 import { fallbackLanguage } from "@/i18n/resources"
 

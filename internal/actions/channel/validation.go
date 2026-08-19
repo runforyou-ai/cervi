@@ -12,12 +12,6 @@ import (
 )
 
 const (
-	// TypeWebsite 标识网站消息渠道。
-	TypeWebsite = string(domain.ChannelTypeWebsite)
-	// LocaleChineseSimplified 标识简体中文访客语言。
-	LocaleChineseSimplified = string(domain.LocaleChineseSimplified)
-	// LocaleEnglishUnitedStates 标识美式英语访客语言。
-	LocaleEnglishUnitedStates = string(domain.LocaleEnglishUnitedStates)
 	// DefaultWebsiteChannelThemeColor 是网站聊天界面的默认主题色。
 	DefaultWebsiteChannelThemeColor = "#2563EB"
 )
@@ -53,7 +47,7 @@ func (e *ValidationError) Error() string {
 type WebsiteChannelInput struct {
 	Name          string
 	Description   string
-	DefaultLocale string
+	DefaultLocale domain.Locale
 }
 
 // WebsiteChannelChatInterfaceInput 定义网站渠道聊天界面可编辑字段。
@@ -68,7 +62,7 @@ type WebsiteChannelChatInterfaceInput struct {
 func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInput, map[string]ValidationCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
-	input.DefaultLocale = strings.TrimSpace(input.DefaultLocale)
+	input.DefaultLocale = domain.Locale(strings.TrimSpace(string(input.DefaultLocale)))
 
 	fields := make(map[string]ValidationCode)
 	if input.Name == "" {
@@ -79,7 +73,7 @@ func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInpu
 	if len([]rune(input.Description)) > 2000 {
 		fields["description"] = ValidationDescriptionTooLong
 	}
-	if input.DefaultLocale != LocaleChineseSimplified && input.DefaultLocale != LocaleEnglishUnitedStates {
+	if input.DefaultLocale != domain.LocaleChineseSimplified && input.DefaultLocale != domain.LocaleEnglishUnitedStates {
 		fields["defaultLocale"] = ValidationDefaultLocaleInvalid
 	}
 	return input, fields

@@ -280,5 +280,5 @@ export function getStorageRegion(provider: StorageProviderConfig, id: string) {
 }
 
 function isStorageProviderId(id: StorageProvider): id is StorageProviderId {
-  return id !== StorageProvider.$zero && id in storageProvidersById
+  return id in storageProvidersById
 }

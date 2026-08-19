@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -21,7 +22,7 @@ func TestNormalizeWebsiteChannelInput(t *testing.T) {
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
 	}
-	if normalized.Name != "产品官网" || normalized.Description != "接收访客咨询" || normalized.DefaultLocale != LocaleChineseSimplified {
+	if normalized.Name != "产品官网" || normalized.Description != "接收访客咨询" || normalized.DefaultLocale != domain.LocaleChineseSimplified {
 		t.Fatalf("unexpected normalized input: %#v", normalized)
 	}
 
@@ -46,7 +47,7 @@ func TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints(t *testing.T) {
 	_, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
 		Name:          strings.Repeat("😀", 100),
 		Description:   strings.Repeat("😀", 2000),
-		DefaultLocale: LocaleChineseSimplified,
+		DefaultLocale: domain.LocaleChineseSimplified,
 	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
@@ -55,7 +56,7 @@ func TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints(t *testing.T) {
 	_, fields = normalizeWebsiteChannelInput(WebsiteChannelInput{
 		Name:          strings.Repeat("😀", 101),
 		Description:   strings.Repeat("😀", 2001),
-		DefaultLocale: LocaleChineseSimplified,
+		DefaultLocale: domain.LocaleChineseSimplified,
 	})
 	if fields["name"] != ValidationNameTooLong || fields["description"] != ValidationDescriptionTooLong {
 		t.Fatalf("unexpected validation fields: %#v", fields)
@@ -93,7 +94,7 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 	principal := &servermodels.Principal{}
 	input := WebsiteChannelInput{
 		Name:          "产品官网",
-		DefaultLocale: LocaleChineseSimplified,
+		DefaultLocale: domain.LocaleChineseSimplified,
 	}
 
 	tests := []struct {

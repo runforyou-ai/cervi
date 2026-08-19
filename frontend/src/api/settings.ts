@@ -5,8 +5,8 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   StorageProvider,
-} from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
-import type { S3Setting } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+  type S3Setting,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { call } from "@/api/client"
 
 export { StorageProvider }

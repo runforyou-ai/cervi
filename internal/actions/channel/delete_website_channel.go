@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -31,7 +32,7 @@ func (a *DeleteWebsiteChannelAction) Execute(ctx context.Context, principal *ser
 		Set("updated_at = now()").
 		Where("id = ?", channelID).
 		Where("organization_id = ?", principal.Organization.ID).
-		Where("type = ?", TypeWebsite).
+		Where("type = ?", domain.ChannelTypeWebsite).
 		Where("deleted_at IS NULL").
 		Exec(ctx)
 	if err != nil {

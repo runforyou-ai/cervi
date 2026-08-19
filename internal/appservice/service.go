@@ -2,10 +2,9 @@ package appservice
 
 import "context"
 
-// Backend 定义当前运行平台需要实现的业务调用。
+// Backend 定义各运行平台都需要实现的业务调用。
 type Backend interface {
 	InstallationStatus(context.Context, RequestMeta) (bool, error)
-	InstallWorkspace(context.Context, RequestMeta, InstallWorkspaceInput) (Session, error)
 	Login(context.Context, RequestMeta, LoginInput) (Session, error)
 	Logout(context.Context, RequestMeta) error
 	LoadSession(context.Context, RequestMeta) (Principal, error)
@@ -29,6 +28,15 @@ type Backend interface {
 	GetS3Setting(context.Context, RequestMeta) (S3Setting, error)
 	SaveS3Setting(context.Context, RequestMeta, S3Setting) (S3Setting, error)
 	TestS3Setting(context.Context, RequestMeta, S3Setting) error
+}
+
+// WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。
+type WorkspaceInstaller interface {
+	InstallWorkspace(context.Context, RequestMeta, InstallWorkspaceInput) (Session, error)
+}
+
+// ServerConnector 由原生端 Backend 实现，用于企业服务器地址。
+type ServerConnector interface {
 	ServerURL(context.Context, RequestMeta) (string, error)
 	ConnectServer(context.Context, RequestMeta, string) error
 }
@@ -50,7 +58,11 @@ func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (boo
 
 // InstallWorkspace 创建企业所有者并返回登录会话。
 func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Session, error) {
-	return s.backend.InstallWorkspace(ctx, meta, input)
+	installer, ok := s.backend.(WorkspaceInstaller)
+	if !ok {
+		return Session{}, methodNotAllowedError(meta, "InstallWorkspace")
+	}
+	return installer.InstallWorkspace(ctx, meta, input)
 }
 
 // Login 校验账号密码并返回登录会话。
@@ -170,10 +182,18 @@ func (s *Service) TestS3Setting(ctx context.Context, meta RequestMeta, input S3S
 
 // ServerURL 返回原生端当前配置的企业服务器地址。
 func (s *Service) ServerURL(ctx context.Context, meta RequestMeta) (string, error) {
-	return s.backend.ServerURL(ctx, meta)
+	connector, ok := s.backend.(ServerConnector)
+	if !ok {
+		return "", methodNotAllowedError(meta, "ServerURL")
+	}
+	return connector.ServerURL(ctx, meta)
 }
 
 // ConnectServer 保存并验证原生端企业服务器地址。
 func (s *Service) ConnectServer(ctx context.Context, meta RequestMeta, serverURL string) error {
-	return s.backend.ConnectServer(ctx, meta, serverURL)
+	connector, ok := s.backend.(ServerConnector)
+	if !ok {
+		return methodNotAllowedError(meta, "ConnectServer")
+	}
+	return connector.ConnectServer(ctx, meta, serverURL)
 }

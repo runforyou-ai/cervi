@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -26,7 +27,7 @@ func (q *ListWebsiteChannelsQuery) Execute(ctx context.Context, principal *serve
 	query := q.db.NewSelect().
 		Model(&channels).
 		Where("c.organization_id = ?", principal.Organization.ID).
-		Where("c.type = ?", TypeWebsite).
+		Where("c.type = ?", domain.ChannelTypeWebsite).
 		OrderExpr("c.updated_at DESC, c.id DESC")
 	if deleted {
 		query = query.Where("c.deleted_at IS NOT NULL")

@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -32,7 +33,7 @@ func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, er
 
 func s3SettingToAction(input S3Setting) settingaction.S3Setting {
 	return settingaction.S3Setting{
-		Enabled: input.Enabled, Provider: string(input.Provider), Endpoint: input.Endpoint, Region: input.Region,
+		Enabled: input.Enabled, Provider: domain.StorageProvider(input.Provider), Endpoint: input.Endpoint, Region: input.Region,
 		Bucket: input.Bucket, AccessKeyID: input.AccessKeyID, SecretAccessKey: input.SecretAccessKey, ForcePathStyle: input.ForcePathStyle,
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,6 +16,11 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+)
+
+var (
+	_ appservice.Backend         = (*Backend)(nil)
+	_ appservice.ServerConnector = (*Backend)(nil)
 )
 
 // Backend 将类型化应用服务调用转换为远程 HTTP 请求。
@@ -40,19 +46,14 @@ func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.Reques
 	return output.Installed, err
 }
 
-// InstallWorkspace 拒绝原生端初始化企业。
-func (b *Backend) InstallWorkspace(_ context.Context, meta appservice.RequestMeta, _ appservice.InstallWorkspaceInput) (appservice.Session, error) {
-	return appservice.Session{}, localError(meta, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", cervii18n.ErrorMethodNotAllowed, nil)
-}
-
-// Login 登录远程服务端并返回访问令牌。
+// Login 校验账号密码并返回登录会话。
 func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Session, error) {
 	var output appservice.Session
 	err := b.do(ctx, meta, http.MethodPost, "/auth/login", nil, input, &output)
 	return output, err
 }
 
-// Logout 删除远程访问令牌。
+// Logout 删除远程登录会话。
 func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error {
 	return b.do(ctx, meta, http.MethodPost, "/auth/logout", nil, nil, nil)
 }
@@ -112,7 +113,7 @@ func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta ap
 	return output, err
 }
 
-// DeleteWebsiteChannel 删除远程网站渠道。
+// DeleteWebsiteChannel 将远程网站渠道移入回收站。
 func (b *Backend) DeleteWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/channels/website/"+url.PathEscape(channelID), nil, nil, nil)
 }
@@ -193,7 +194,7 @@ func (b *Backend) UpdateContact(ctx context.Context, meta appservice.RequestMeta
 	return output, err
 }
 
-// DeleteContact 删除远程联系人。
+// DeleteContact 将远程联系人移入回收站。
 func (b *Backend) DeleteContact(ctx context.Context, meta appservice.RequestMeta, contactID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/contacts/"+url.PathEscape(contactID), nil, nil, nil)
 }
@@ -237,7 +238,10 @@ func (b *Backend) ServerURL(_ context.Context, _ appservice.RequestMeta) (string
 func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) error {
 	parsed, err := parseServerURL(serverURL)
 	if err != nil {
-		validationError := err.(*serverURLValidationError)
+		var validationError *serverURLValidationError
+		if !errors.As(err, &validationError) {
+			return fmt.Errorf("parse enterprise server URL: %w", err)
+		}
 		return localError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorServerURLInvalid, map[string]cervii18n.Key{"serverUrl": validationError.messageKey})
 	}
 	state := newRemoteState(parsed)
@@ -250,6 +254,7 @@ func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta
 		return localError(meta, http.StatusBadGateway, "SERVER_UNAVAILABLE", cervii18n.ErrorServerUnavailable, map[string]cervii18n.Key{"serverUrl": cervii18n.FieldServerURLNotCervi})
 	}
 	if !installed {
+		slog.Info("企业服务器尚未初始化", "server_url", parsed.String())
 		return localError(meta, http.StatusConflict, "SERVER_INITIALIZATION_REQUIRED", cervii18n.ErrorServerInitializationRequired, nil)
 	}
 	if err := b.connection.store.SetServerURL(ctx, parsed.String()); err != nil {

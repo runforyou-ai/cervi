@@ -2,16 +2,15 @@ import {
   GetUser,
   ListUsers,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
-import type {
-  DirectoryUser,
-  UserListInput,
-  UserList as UserListResponse,
-} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import {
   UserRole,
   UserStatus,
-} from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
+  type DirectoryUser,
+  type UserListInput,
+  type UserList as UserListResponse,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { call } from "@/api/client"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 
 export { UserRole, UserStatus }
 export type { DirectoryUser, UserListResponse }
@@ -21,6 +20,16 @@ export type UserListQuery = Omit<
   "query"
 > & {
   q?: string
+}
+
+/** 从查询参数解析成员状态，空值表示不筛选。 */
+export function userStatusFromQuery(value: string | null) {
+  return optionalWailsEnum(UserStatus, value)
+}
+
+/** 从查询参数解析成员角色，空值表示不筛选。 */
+export function userRoleFromQuery(value: string | null) {
+  return optionalWailsEnum(UserRole, value)
 }
 
 export async function listUsers(query: UserListQuery, signal?: AbortSignal) {

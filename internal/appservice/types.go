@@ -8,85 +8,85 @@ import (
 )
 
 // Locale 表示应用支持的本地化语言。
-type Locale = domain.Locale
+type Locale string
 
 const (
-	LocaleChineseSimplified   = domain.LocaleChineseSimplified
-	LocaleEnglishUnitedStates = domain.LocaleEnglishUnitedStates
+	LocaleChineseSimplified   Locale = Locale(domain.LocaleChineseSimplified)
+	LocaleEnglishUnitedStates Locale = Locale(domain.LocaleEnglishUnitedStates)
 )
 
 // UserRole 表示企业成员角色。
-type UserRole = domain.UserRole
+type UserRole string
 
 const (
-	UserRoleOwner  = domain.UserRoleOwner
-	UserRoleMember = domain.UserRoleMember
+	UserRoleOwner  UserRole = UserRole(domain.UserRoleOwner)
+	UserRoleMember UserRole = UserRole(domain.UserRoleMember)
 )
 
 // UserStatus 表示企业成员状态。
-type UserStatus = domain.UserStatus
+type UserStatus string
 
 const (
-	UserStatusActive   = domain.UserStatusActive
-	UserStatusInactive = domain.UserStatusInactive
+	UserStatusActive   UserStatus = UserStatus(domain.UserStatusActive)
+	UserStatusInactive UserStatus = UserStatus(domain.UserStatusInactive)
 )
 
 // ChannelType 表示渠道类型。
-type ChannelType = domain.ChannelType
+type ChannelType string
 
 const (
-	ChannelTypeWebsite = domain.ChannelTypeWebsite
+	ChannelTypeWebsite ChannelType = ChannelType(domain.ChannelTypeWebsite)
 )
 
 // MessageAuthor 表示消息发送方。
-type MessageAuthor = domain.MessageAuthor
+type MessageAuthor string
 
 const (
-	MessageAuthorVisitor = domain.MessageAuthorVisitor
-	MessageAuthorAgent   = domain.MessageAuthorAgent
+	MessageAuthorVisitor MessageAuthor = MessageAuthor(domain.MessageAuthorVisitor)
+	MessageAuthorAgent   MessageAuthor = MessageAuthor(domain.MessageAuthorAgent)
 )
 
 // ContactStage 表示联系人阶段。
-type ContactStage = domain.ContactStage
+type ContactStage string
 
 const (
-	ContactStageVisitor  = domain.ContactStageVisitor
-	ContactStageLead     = domain.ContactStageLead
-	ContactStageCustomer = domain.ContactStageCustomer
+	ContactStageVisitor  ContactStage = ContactStage(domain.ContactStageVisitor)
+	ContactStageLead     ContactStage = ContactStage(domain.ContactStageLead)
+	ContactStageCustomer ContactStage = ContactStage(domain.ContactStageCustomer)
 )
 
 // ContactMethodType 表示联系人联系方式类型。
-type ContactMethodType = domain.ContactMethodType
+type ContactMethodType string
 
 const (
-	ContactMethodTypeEmail = domain.ContactMethodTypeEmail
-	ContactMethodTypePhone = domain.ContactMethodTypePhone
+	ContactMethodTypeEmail ContactMethodType = ContactMethodType(domain.ContactMethodTypeEmail)
+	ContactMethodTypePhone ContactMethodType = ContactMethodType(domain.ContactMethodTypePhone)
 )
 
 // ContactSort 表示联系人列表排序方式。
-type ContactSort = domain.ContactSort
+type ContactSort string
 
 const (
-	ContactSortUpdatedAtDescending  = domain.ContactSortUpdatedAtDescending
-	ContactSortCreatedAtDescending  = domain.ContactSortCreatedAtDescending
-	ContactSortDisplayNameAscending = domain.ContactSortDisplayNameAscending
+	ContactSortUpdatedAtDescending  ContactSort = ContactSort(domain.ContactSortUpdatedAtDescending)
+	ContactSortCreatedAtDescending  ContactSort = ContactSort(domain.ContactSortCreatedAtDescending)
+	ContactSortDisplayNameAscending ContactSort = ContactSort(domain.ContactSortDisplayNameAscending)
 )
 
 // StorageProvider 表示 S3 兼容对象存储提供商。
-type StorageProvider = domain.StorageProvider
+type StorageProvider string
 
 const (
-	StorageProviderGeneric = domain.StorageProviderGeneric
-	StorageProviderAWS     = domain.StorageProviderAWS
-	StorageProviderR2      = domain.StorageProviderR2
-	StorageProviderAliyun  = domain.StorageProviderAliyun
-	StorageProviderTencent = domain.StorageProviderTencent
-	StorageProviderBaidu   = domain.StorageProviderBaidu
-	StorageProviderQiniu   = domain.StorageProviderQiniu
-	StorageProviderHuawei  = domain.StorageProviderHuawei
-	StorageProviderUCloud  = domain.StorageProviderUCloud
-	StorageProviderMinIO   = domain.StorageProviderMinIO
-	StorageProviderRustFS  = domain.StorageProviderRustFS
+	StorageProviderGeneric StorageProvider = StorageProvider(domain.StorageProviderGeneric)
+	StorageProviderAWS     StorageProvider = StorageProvider(domain.StorageProviderAWS)
+	StorageProviderR2      StorageProvider = StorageProvider(domain.StorageProviderR2)
+	StorageProviderAliyun  StorageProvider = StorageProvider(domain.StorageProviderAliyun)
+	StorageProviderTencent StorageProvider = StorageProvider(domain.StorageProviderTencent)
+	StorageProviderBaidu   StorageProvider = StorageProvider(domain.StorageProviderBaidu)
+	StorageProviderQiniu   StorageProvider = StorageProvider(domain.StorageProviderQiniu)
+	StorageProviderHuawei  StorageProvider = StorageProvider(domain.StorageProviderHuawei)
+	StorageProviderUCloud  StorageProvider = StorageProvider(domain.StorageProviderUCloud)
+	StorageProviderMinIO   StorageProvider = StorageProvider(domain.StorageProviderMinIO)
+	StorageProviderRustFS  StorageProvider = StorageProvider(domain.StorageProviderRustFS)
 )
 
 // RequestMeta 携带一次应用服务调用的认证和本地化信息。

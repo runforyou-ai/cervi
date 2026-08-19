@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -51,7 +52,7 @@ func websiteChannelSettingFromModel(setting *servermodels.WebsiteChannelSetting)
 }
 
 func channelInput(input WebsiteChannelInput) channelaction.WebsiteChannelInput {
-	return channelaction.WebsiteChannelInput{Name: input.Name, Description: input.Description, DefaultLocale: string(input.DefaultLocale)}
+	return channelaction.WebsiteChannelInput{Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale)}
 }
 
 func channelFieldKeys(fields map[string]channelaction.ValidationCode) map[string]cervii18n.Key {

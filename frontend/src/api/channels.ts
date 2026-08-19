@@ -14,7 +14,7 @@ import type {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { call } from "@/api/client"
 
-export { ChannelType, Locale } from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
+export { ChannelType, Locale } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 export type {
   ChannelSummary,
   WebsiteChannel,

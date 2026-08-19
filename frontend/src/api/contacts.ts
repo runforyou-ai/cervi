@@ -10,14 +10,13 @@ import {
   ContactMethodType,
   ContactSort,
   ContactStage,
-} from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
-import type {
-  Contact,
-  ContactInput,
-  ContactList,
-  ContactListInput,
+  type Contact,
+  type ContactInput,
+  type ContactList,
+  type ContactListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { call } from "@/api/client"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 
 export { ContactMethodType, ContactSort, ContactStage }
 export type {
@@ -46,6 +45,24 @@ export type ContactListQuery = Omit<
   "query" | "deleted"
 > & {
   q?: string
+}
+
+/** 从查询参数解析联系人阶段，空值表示不筛选。 */
+export function contactStageFromQuery(value: string | null) {
+  return optionalWailsEnum(ContactStage, value)
+}
+
+/** 从查询参数解析联系方式类型，空值表示不筛选。 */
+export function contactMethodTypeFromQuery(value: string | null) {
+  return optionalWailsEnum(ContactMethodType, value)
+}
+
+/** 从查询参数解析联系人排序，缺省按创建时间倒序。 */
+export function contactSortFromQuery(value: string | null) {
+  return (
+    optionalWailsEnum(ContactSort, value) ??
+    ContactSort.ContactSortCreatedAtDescending
+  )
 }
 
 export async function listContacts(
@@ -94,7 +111,7 @@ async function listContactsByDeleted(
         stage: query.stage ?? ContactStage.$zero,
         channelId: query.channelId ?? "",
         methodType: query.methodType ?? ContactMethodType.$zero,
-        sort: query.sort ?? ContactSort.$zero,
+        sort: query.sort ?? ContactSort.ContactSortCreatedAtDescending,
         page: query.page ?? 1,
         pageSize: query.pageSize ?? 50,
         deleted,

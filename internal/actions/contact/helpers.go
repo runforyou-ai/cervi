@@ -63,7 +63,7 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 	}
 	desired := make(map[methodKey]MethodInput, len(methods))
 	for _, method := range methods {
-		desired[methodKey{typeName: method.Type, value: method.Value}] = method
+		desired[methodKey{typeName: string(method.Type), value: method.Value}] = method
 	}
 
 	existingByKey := make(map[methodKey]*servermodels.ContactMethod, len(existing))
@@ -107,12 +107,12 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 
 	newRecords := make([]servermodels.ContactMethod, 0)
 	for _, method := range methods {
-		record := existingByKey[methodKey{typeName: method.Type, value: method.Value}]
+		record := existingByKey[methodKey{typeName: string(method.Type), value: method.Value}]
 		if record == nil {
 			newRecord := servermodels.ContactMethod{
 				OrganizationID:  organizationID,
 				ContactID:       contactID,
-				Type:            method.Type,
+				Type:            string(method.Type),
 				Value:           method.Value,
 				NormalizedValue: method.Value,
 				IsPrimary:       method.IsPrimary,

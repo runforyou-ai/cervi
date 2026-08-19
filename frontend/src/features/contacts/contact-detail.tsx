@@ -255,7 +255,7 @@ export function ContactDetailView({
 
           <DetailRow
             label={t("columns.stage")}
-            value={detail.contact.stage === ContactStage.$zero ? "" : t(`stages.${detail.contact.stage}`)}
+            value={detail.contact.stage ? t(`stages.${detail.contact.stage}`) : ""}
             editing={editing === "stage"}
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("stage")}

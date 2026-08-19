@@ -15,9 +15,15 @@ import (
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+)
+
+var (
+	_ Backend            = (*DirectBackend)(nil)
+	_ WorkspaceInstaller = (*DirectBackend)(nil)
 )
 
 // DirectBackend 在服务端进程内直接调用 Action 和 Query。
@@ -93,7 +99,7 @@ func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta
 	return installed, nil
 }
 
-// InstallWorkspace 创建企业所有者并签发初始令牌。
+// InstallWorkspace 创建企业所有者并返回登录会话。
 func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Session, error) {
 	installed, err := b.InstallationStatus(ctx, meta)
 	if err != nil {
@@ -126,7 +132,7 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 	return Session{Principal: principalFromModel(output.Principal), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
-// Login 校验账号密码并签发访问令牌。
+// Login 校验账号密码并返回登录会话。
 func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Session, error) {
 	if err := b.requireInitialized(ctx, meta); err != nil {
 		return Session{}, err
@@ -146,7 +152,7 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 	return Session{Principal: principalFromModel(output.Principal), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
-// Logout 删除当前访问令牌。
+// Logout 删除当前登录会话。
 func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 	principal, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -322,7 +328,7 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 		return UserList{}, err
 	}
 	output, err := b.listUsers.Execute(ctx, principal, useraction.ListInput{
-		Query: input.Query, Status: string(input.Status), Role: string(input.Role), Page: input.Page, PageSize: input.PageSize,
+		Query: input.Query, Status: domain.UserStatus(input.Status), Role: domain.UserRole(input.Role), Page: input.Page, PageSize: input.PageSize,
 	})
 	if errors.Is(err, useraction.ErrQueryInvalid) {
 		return UserList{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, nil)
@@ -368,8 +374,8 @@ func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, inpu
 		return ContactList{}, err
 	}
 	output, err := b.listContacts.Execute(ctx, principal, contactaction.ListInput{
-		Query: input.Query, Stage: string(input.Stage), ChannelID: input.ChannelID, MethodType: string(input.MethodType),
-		Sort: string(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
+		Query: input.Query, Stage: domain.ContactStage(input.Stage), ChannelID: input.ChannelID, MethodType: domain.ContactMethodType(input.MethodType),
+		Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
 	})
 	var validationError *contactaction.ValidationError
 	if errors.As(err, &validationError) {
@@ -498,16 +504,6 @@ func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, inp
 	}
 	slog.Info("对象存储连接测试成功", "organization_id", principal.Organization.ID, "provider", input.Provider)
 	return nil
-}
-
-// ServerURL 拒绝服务端环境中的远程服务器配置读取。
-func (b *DirectBackend) ServerURL(_ context.Context, meta RequestMeta) (string, error) {
-	return "", localizedError(meta, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", cervii18n.ErrorMethodNotAllowed, nil)
-}
-
-// ConnectServer 拒绝服务端环境中的远程服务器配置。
-func (b *DirectBackend) ConnectServer(_ context.Context, meta RequestMeta, _ string) error {
-	return localizedError(meta, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", cervii18n.ErrorMethodNotAllowed, nil)
 }
 
 func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta) error {

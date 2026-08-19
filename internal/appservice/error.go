@@ -3,6 +3,10 @@ package appservice
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
+	"net/http"
+
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // Error 定义跨 Wails 和 HTTP 传输的业务错误。
@@ -24,6 +28,17 @@ func MarshalError(err error) []byte {
 	if !errors.As(err, &apiError) {
 		return nil
 	}
-	payload, _ := json.Marshal(apiError)
+	payload, err := json.Marshal(apiError)
+	if err != nil {
+		slog.Warn("序列化业务错误失败", "error", err)
+		return nil
+	}
 	return payload
+}
+
+// methodNotAllowedError 返回当前平台不支持该操作的业务错误。
+func methodNotAllowedError(meta RequestMeta, operation string) *Error {
+	slog.Warn("当前平台不支持此操作", "operation", operation)
+	message, _ := cervii18n.Localize(string(meta.Locale), cervii18n.ErrorMethodNotAllowed)
+	return &Error{Status: http.StatusMethodNotAllowed, Code: "METHOD_NOT_ALLOWED", Message: message}
 }

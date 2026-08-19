@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -40,7 +41,7 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, p
 			Column("id").
 			Where("c.id = ?", channelID).
 			Where("c.organization_id = ?", principal.Organization.ID).
-			Where("c.type = ?", TypeWebsite).
+			Where("c.type = ?", domain.ChannelTypeWebsite).
 			Where("c.deleted_at IS NULL").
 			For("UPDATE").
 			Scan(ctx); err != nil {

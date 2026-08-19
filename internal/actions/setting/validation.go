@@ -13,32 +13,18 @@ import (
 
 const s3SettingKey = "object_storage.s3"
 
-const (
-	ProviderGeneric = string(domain.StorageProviderGeneric)
-	ProviderAWS     = string(domain.StorageProviderAWS)
-	ProviderR2      = string(domain.StorageProviderR2)
-	ProviderAliyun  = string(domain.StorageProviderAliyun)
-	ProviderTencent = string(domain.StorageProviderTencent)
-	ProviderBaidu   = string(domain.StorageProviderBaidu)
-	ProviderQiniu   = string(domain.StorageProviderQiniu)
-	ProviderHuawei  = string(domain.StorageProviderHuawei)
-	ProviderUCloud  = string(domain.StorageProviderUCloud)
-	ProviderMinIO   = string(domain.StorageProviderMinIO)
-	ProviderRustFS  = string(domain.StorageProviderRustFS)
-)
-
-var supportedProviders = map[string]struct{}{
-	ProviderGeneric: {},
-	ProviderAWS:     {},
-	ProviderR2:      {},
-	ProviderAliyun:  {},
-	ProviderTencent: {},
-	ProviderBaidu:   {},
-	ProviderQiniu:   {},
-	ProviderHuawei:  {},
-	ProviderUCloud:  {},
-	ProviderMinIO:   {},
-	ProviderRustFS:  {},
+var supportedProviders = map[domain.StorageProvider]struct{}{
+	domain.StorageProviderGeneric: {},
+	domain.StorageProviderAWS:     {},
+	domain.StorageProviderR2:      {},
+	domain.StorageProviderAliyun:  {},
+	domain.StorageProviderTencent: {},
+	domain.StorageProviderBaidu:   {},
+	domain.StorageProviderQiniu:   {},
+	domain.StorageProviderHuawei:  {},
+	domain.StorageProviderUCloud:  {},
+	domain.StorageProviderMinIO:   {},
+	domain.StorageProviderRustFS:  {},
 }
 
 // ValidationCode 标识存储配置字段校验结果。
@@ -66,19 +52,19 @@ func (e *ValidationError) Error() string {
 
 // S3Setting 定义企业的 S3 对象存储配置。
 type S3Setting struct {
-	Enabled         bool   `json:"enabled"`
-	Provider        string `json:"provider"`
-	Endpoint        string `json:"endpoint"`
-	Region          string `json:"region"`
-	Bucket          string `json:"bucket"`
-	AccessKeyID     string `json:"accessKeyId"`
-	SecretAccessKey string `json:"secretAccessKey"`
-	ForcePathStyle  bool   `json:"forcePathStyle"`
+	Enabled         bool                   `json:"enabled"`
+	Provider        domain.StorageProvider `json:"provider"`
+	Endpoint        string                 `json:"endpoint"`
+	Region          string                 `json:"region"`
+	Bucket          string                 `json:"bucket"`
+	AccessKeyID     string                 `json:"accessKeyId"`
+	SecretAccessKey string                 `json:"secretAccessKey"`
+	ForcePathStyle  bool                   `json:"forcePathStyle"`
 }
 
 // normalizeS3Setting 规范化并校验 S3 配置。
 func normalizeS3Setting(input S3Setting) (S3Setting, map[string]ValidationCode) {
-	input.Provider = strings.ToLower(strings.TrimSpace(input.Provider))
+	input.Provider = domain.StorageProvider(strings.ToLower(strings.TrimSpace(string(input.Provider))))
 	input.Endpoint = strings.TrimSpace(input.Endpoint)
 	input.Region = strings.TrimSpace(input.Region)
 	input.Bucket = strings.TrimSpace(input.Bucket)
@@ -112,7 +98,7 @@ func normalizeS3Setting(input S3Setting) (S3Setting, map[string]ValidationCode) 
 // defaultS3Setting 返回尚未配置时使用的初始 S3 配置。
 func defaultS3Setting() S3Setting {
 	return S3Setting{
-		Provider: ProviderGeneric,
+		Provider: domain.StorageProviderGeneric,
 		Endpoint: "https://s3.us-east-1.amazonaws.com",
 		Region:   "us-east-1",
 	}

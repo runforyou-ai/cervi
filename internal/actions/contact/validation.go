@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识联系人字段校验结果。
@@ -43,7 +44,7 @@ func (e *ValidationError) Error() string {
 func normalizeContactInput(input ContactInput) (ContactInput, map[string]ValidationCode) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
-	input.Stage = strings.TrimSpace(input.Stage)
+	input.Stage = domain.ContactStage(strings.TrimSpace(string(input.Stage)))
 	input.Notes = strings.TrimSpace(input.Notes)
 
 	fields := make(map[string]ValidationCode)
@@ -55,7 +56,7 @@ func normalizeContactInput(input ContactInput) (ContactInput, map[string]Validat
 	if len([]rune(input.DisplayName)) > 200 {
 		fields["displayName"] = ValidationNameTooLong
 	}
-	if input.Stage != StageVisitor && input.Stage != StageLead && input.Stage != StageCustomer {
+	if input.Stage != domain.ContactStageVisitor && input.Stage != domain.ContactStageLead && input.Stage != domain.ContactStageCustomer {
 		fields["stage"] = ValidationStageInvalid
 	}
 	if len([]rune(input.Notes)) > 5000 {
@@ -88,7 +89,7 @@ func normalizeMethods(methods []MethodInput) ([]MethodInput, ValidationCode) {
 	var code ValidationCode
 	for index := range methods {
 		method := &methods[index]
-		method.Type = strings.TrimSpace(method.Type)
+		method.Type = domain.ContactMethodType(strings.TrimSpace(string(method.Type)))
 		method.Value = strings.TrimSpace(method.Value)
 		method.Label = strings.TrimSpace(method.Label)
 		if len([]rune(method.Label)) > 100 && code == "" {
@@ -103,21 +104,21 @@ func normalizeMethods(methods []MethodInput) ([]MethodInput, ValidationCode) {
 			continue
 		}
 		method.Value = normalized
-		key := methodKey{typeName: method.Type, value: normalized}
+		key := methodKey{typeName: string(method.Type), value: normalized}
 		if _, exists := seen[key]; exists {
 			if code != ValidationPrimaryDuplicate {
 				code = ValidationMethodDuplicate
 			}
 		}
 		seen[key] = struct{}{}
-		if _, exists := firstByType[method.Type]; !exists {
-			firstByType[method.Type] = index
+		if _, exists := firstByType[string(method.Type)]; !exists {
+			firstByType[string(method.Type)] = index
 		}
 		if method.IsPrimary {
-			if primarySeen[method.Type] {
+			if primarySeen[string(method.Type)] {
 				code = ValidationPrimaryDuplicate
 			}
-			primarySeen[method.Type] = true
+			primarySeen[string(method.Type)] = true
 		}
 	}
 	for methodType, index := range firstByType {
@@ -131,10 +132,10 @@ func normalizeMethods(methods []MethodInput) ([]MethodInput, ValidationCode) {
 // normalizeListInput 规范化并校验联系人列表参数。
 func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) {
 	input.Query = strings.TrimSpace(input.Query)
-	input.Stage = strings.TrimSpace(input.Stage)
+	input.Stage = domain.ContactStage(strings.TrimSpace(string(input.Stage)))
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
-	input.MethodType = strings.TrimSpace(input.MethodType)
-	input.Sort = strings.TrimSpace(input.Sort)
+	input.MethodType = domain.ContactMethodType(strings.TrimSpace(string(input.MethodType)))
+	input.Sort = domain.ContactSort(strings.TrimSpace(string(input.Sort)))
 	if input.Page <= 0 {
 		input.Page = 1
 	}
@@ -146,31 +147,31 @@ func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) 
 	if input.PageSize > 100 {
 		fields["pageSize"] = ValidationQueryInvalid
 	}
-	if input.Stage != "" && input.Stage != StageVisitor && input.Stage != StageLead && input.Stage != StageCustomer {
+	if input.Stage != "" && input.Stage != domain.ContactStageVisitor && input.Stage != domain.ContactStageLead && input.Stage != domain.ContactStageCustomer {
 		fields["stage"] = ValidationStageInvalid
 	}
-	if input.MethodType != "" && input.MethodType != MethodEmail && input.MethodType != MethodPhone {
+	if input.MethodType != "" && input.MethodType != domain.ContactMethodTypeEmail && input.MethodType != domain.ContactMethodTypePhone {
 		fields["methodType"] = ValidationQueryInvalid
 	}
 	if input.ChannelID != "" && !validUUID(input.ChannelID) {
 		fields["channelId"] = ValidationQueryInvalid
 	}
 	if input.Sort == "" {
-		input.Sort = SortCreatedAtDescending
+		input.Sort = domain.ContactSortCreatedAtDescending
 	}
-	if input.Sort != SortUpdatedAtDescending && input.Sort != SortCreatedAtDescending && input.Sort != SortDisplayNameAscending {
+	if input.Sort != domain.ContactSortUpdatedAtDescending && input.Sort != domain.ContactSortCreatedAtDescending && input.Sort != domain.ContactSortDisplayNameAscending {
 		fields["sort"] = ValidationQueryInvalid
 	}
 	return input, fields
 }
 
 // normalizeMethodValue 规范化邮箱或国际电话号码。
-func normalizeMethodValue(methodType, value string) (string, bool) {
+func normalizeMethodValue(methodType domain.ContactMethodType, value string) (string, bool) {
 	switch methodType {
-	case MethodEmail:
+	case domain.ContactMethodTypeEmail:
 		normalized := commonemail.Normalize(value)
 		return normalized, commonemail.Valid(normalized)
-	case MethodPhone:
+	case domain.ContactMethodTypePhone:
 		normalized := strings.Map(func(value rune) rune {
 			if (value >= '0' && value <= '9') || value == '+' {
 				return value

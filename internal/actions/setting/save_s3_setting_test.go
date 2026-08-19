@@ -7,13 +7,14 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // TestSaveS3SettingRejectsInvalidPrincipal 验证保存前会拒绝无效的用户企业关联。
 func TestSaveS3SettingRejectsInvalidPrincipal(t *testing.T) {
 	input := S3Setting{
-		Provider:        ProviderAWS,
+		Provider:        domain.StorageProviderAWS,
 		Endpoint:        "https://s3.us-east-1.amazonaws.com",
 		Region:          "us-east-1",
 		Bucket:          "example",

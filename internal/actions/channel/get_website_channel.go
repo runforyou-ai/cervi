@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -38,7 +39,7 @@ func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, principal *serverm
 		Model(channel).
 		Where("c.id = ?", channelID).
 		Where("c.organization_id = ?", principal.Organization.ID).
-		Where("c.type = ?", TypeWebsite).
+		Where("c.type = ?", domain.ChannelTypeWebsite).
 		Where("c.deleted_at IS NULL").
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {

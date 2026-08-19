@@ -6,15 +6,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
 // Summary 定义渠道摘要。
 type Summary struct {
-	ID   string `bun:"id" json:"id"`
-	Type string `bun:"type" json:"type"`
-	Name string `bun:"name" json:"name"`
+	ID   string             `bun:"id" json:"id"`
+	Type domain.ChannelType `bun:"type" json:"type"`
+	Name string             `bun:"name" json:"name"`
 }
 
 // ListChannelsQuery 读取当前企业的所有有效渠道。
