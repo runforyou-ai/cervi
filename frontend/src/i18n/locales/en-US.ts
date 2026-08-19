@@ -47,6 +47,7 @@ const enUS = {
     invalidCredentials: "Incorrect email or password.",
     networkError: "Could not connect to the server. Please try again.",
     serverError: "Could not log in. Please try again.",
+    changeServer: "Change server address",
   },
   connection: {
     title: "Connect to your company server",
@@ -57,10 +58,19 @@ const enUS = {
     submit: "Connect",
     submitting: "Connecting…",
     connectionError: "Could not connect to this company server. Check the address and try again.",
+    backToLogin: "Back to login",
   },
   mobile: {
     title: "Mobile app in development",
     description: "The mobile app will provide customer conversations and mobile collaboration.",
+    organization: "Company",
+    user: "Current user",
+    logout: "Log out",
+    loggingOut: "Logging out…",
+    logoutError: "Could not log out. Please try again.",
+    loading: "Loading…",
+    loadError: "Could not load the login information.",
+    retry: "Try again",
   },
   workspace: {
     navigationGroup: "Workspace",

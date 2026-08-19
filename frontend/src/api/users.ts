@@ -1,38 +1,43 @@
-import { request } from "@/api/client"
-import type { PageInfo } from "@/api/types"
+import {
+  GetUser,
+  ListUsers,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
+import type {
+  DirectoryUser,
+  UserListInput,
+  UserList as UserListResponse,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import {
+  UserRole,
+  UserStatus,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
+import { call } from "@/api/client"
 
-export type DirectoryUser = {
-  id: string
-  email: string
-  displayName: string
-  role: string
-  status: string
-  createdAt: string
-}
+export { UserRole, UserStatus }
+export type { DirectoryUser, UserListResponse }
 
-type UserListResponse = {
-  users: DirectoryUser[]
-  page: PageInfo
-}
-
-export type UserListQuery = {
+export type UserListQuery = Omit<
+  Partial<UserListInput>,
+  "query"
+> & {
   q?: string
-  status?: string
-  role?: string
-  page?: number
-  pageSize?: number
 }
 
-export function listUsers(query: UserListQuery, signal?: AbortSignal) {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== "") {
-      search.set(key, String(value))
-    }
-  }
-  return request<UserListResponse>(`/users?${search.toString()}`, { signal })
+export async function listUsers(query: UserListQuery, signal?: AbortSignal) {
+  const output = await call(
+    (meta) =>
+      ListUsers(meta, {
+        query: query.q ?? "",
+        status: query.status ?? UserStatus.$zero,
+        role: query.role ?? UserRole.$zero,
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 50,
+      }),
+    signal,
+  )
+  return { ...output, users: output.users ?? [] }
 }
 
 export function getUser(userId: string, signal?: AbortSignal) {
-  return request<DirectoryUser>(`/users/${userId}`, { signal })
+  return call((meta) => GetUser(meta, userId), signal)
 }

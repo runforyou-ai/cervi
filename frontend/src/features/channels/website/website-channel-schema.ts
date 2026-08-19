@@ -1,5 +1,8 @@
 import { z } from "zod"
 
+import { Locale } from "@/api/channels"
+import { requiredWailsEnum } from "@/lib/wails-enum"
+
 function unicodeLength(value: string) {
   return Array.from(value).length
 }
@@ -23,7 +26,7 @@ export function createWebsiteChannelSchema(messages: {
       .refine((value) => unicodeLength(value) <= 2000, {
         message: messages.descriptionTooLong,
       }),
-    defaultLocale: z.enum(["zh-CN", "en-US"]),
+    defaultLocale: requiredWailsEnum(Locale),
   })
 }
 

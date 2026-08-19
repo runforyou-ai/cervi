@@ -1,5 +1,1 @@
-export type PageInfo = {
-  number: number
-  size: number
-  total: number
-}
+export type { PageInfo } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"

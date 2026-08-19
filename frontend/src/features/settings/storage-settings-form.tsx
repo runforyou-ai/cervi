@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import {
   getS3Setting,
   saveS3Setting,
+  StorageProvider,
   type StorageProviderId,
   testS3Setting,
 } from "@/api/settings"
@@ -57,7 +58,7 @@ const customRegionOption = "__custom__"
 
 const emptySetting: StorageSettingsFormValues = {
   enabled: false,
-  provider: "generic",
+  provider: StorageProvider.StorageProviderGeneric,
   endpoint: "https://s3.us-east-1.amazonaws.com",
   region: "us-east-1",
   bucket: "",

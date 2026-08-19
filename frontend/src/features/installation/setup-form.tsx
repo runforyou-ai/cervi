@@ -45,10 +45,6 @@ export function SetupForm() {
       navigate("/inbox", { replace: true })
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.code === "SERVER_CONNECTION_REQUIRED") {
-          navigate("/connect", { replace: true })
-          return
-        }
         if (error.code === "ALREADY_INITIALIZED") {
           navigate("/login", { replace: true })
           return

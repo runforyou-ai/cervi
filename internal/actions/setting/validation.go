@@ -8,22 +8,23 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const s3SettingKey = "object_storage.s3"
 
 const (
-	ProviderGeneric = "generic"
-	ProviderAWS     = "aws"
-	ProviderR2      = "r2"
-	ProviderAliyun  = "aliyun"
-	ProviderTencent = "tencent"
-	ProviderBaidu   = "baidu"
-	ProviderQiniu   = "qiniu"
-	ProviderHuawei  = "huawei"
-	ProviderUCloud  = "ucloud"
-	ProviderMinIO   = "minio"
-	ProviderRustFS  = "rustfs"
+	ProviderGeneric = string(domain.StorageProviderGeneric)
+	ProviderAWS     = string(domain.StorageProviderAWS)
+	ProviderR2      = string(domain.StorageProviderR2)
+	ProviderAliyun  = string(domain.StorageProviderAliyun)
+	ProviderTencent = string(domain.StorageProviderTencent)
+	ProviderBaidu   = string(domain.StorageProviderBaidu)
+	ProviderQiniu   = string(domain.StorageProviderQiniu)
+	ProviderHuawei  = string(domain.StorageProviderHuawei)
+	ProviderUCloud  = string(domain.StorageProviderUCloud)
+	ProviderMinIO   = string(domain.StorageProviderMinIO)
+	ProviderRustFS  = string(domain.StorageProviderRustFS)
 )
 
 var supportedProviders = map[string]struct{}{

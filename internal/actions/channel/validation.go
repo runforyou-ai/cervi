@@ -8,15 +8,16 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const (
 	// TypeWebsite 标识网站消息渠道。
-	TypeWebsite = "website"
+	TypeWebsite = string(domain.ChannelTypeWebsite)
 	// LocaleChineseSimplified 标识简体中文访客语言。
-	LocaleChineseSimplified = "zh-CN"
+	LocaleChineseSimplified = string(domain.LocaleChineseSimplified)
 	// LocaleEnglishUnitedStates 标识美式英语访客语言。
-	LocaleEnglishUnitedStates = "en-US"
+	LocaleEnglishUnitedStates = string(domain.LocaleEnglishUnitedStates)
 	// DefaultWebsiteChannelThemeColor 是网站聊天界面的默认主题色。
 	DefaultWebsiteChannelThemeColor = "#2563EB"
 )

@@ -6,6 +6,8 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ContactMethodType,
+  ContactStage,
   createContact,
   type ContactDetail,
   type ContactInput,
@@ -52,7 +54,7 @@ export function ContactForm({
     defaultValues: {
       displayName: "",
       channelId: "",
-      stage: "visitor",
+      stage: ContactStage.ContactStageVisitor,
       email: "",
       phone: "",
       notes: "",
@@ -67,10 +69,10 @@ export function ContactForm({
       notes: values.notes,
       methods: [
         ...(values.email
-          ? [{ type: "email" as const, value: values.email, isPrimary: true }]
+          ? [{ type: ContactMethodType.ContactMethodTypeEmail, value: values.email, label: "", isPrimary: true }]
           : []),
         ...(values.phone
-          ? [{ type: "phone" as const, value: values.phone, isPrimary: true }]
+          ? [{ type: ContactMethodType.ContactMethodTypePhone, value: values.phone, label: "", isPrimary: true }]
           : []),
       ],
     }

@@ -34,6 +34,9 @@ wails3 task android:run:device
 # 运行测试
 go test ./...
 go test -tags server ./...
+
+# 重新生成前端类型绑定
+wails3 generate bindings -clean=true -ts -i
 ```
 
 前端要求 Node.js 22.22.0 或更高版本，项目构建使用 Wails v3 和 Task。
@@ -43,36 +46,45 @@ go test -tags server ./...
 ```text
 cervi/
 ├── main.go                         # 应用入口和 Wails 配置
-├── application_service_apiproxy.go # 组装原生端共用的 API 代理
-├── application_services_*.go      # 按服务端、桌面端和移动端注册服务
+├── application_services_*.go      # 按原生端和服务端注册服务
 ├── internal/
 │   ├── actions/                    # 按领域组织的 Action 与 Query
-│   ├── api/                        # 企业服务端 HTTP API
-│   ├── apiproxy/                   # 原生端到企业服务端的 API 代理
+│   ├── api/                        # Gin 对外 HTTP API 适配器
+│   ├── apiproxy/                   # 原生端到企业服务端的类型化 API 代理
+│   ├── appservice/                 # 跨平台应用服务、传输契约和平台 Backend
 │   ├── common/                     # 按能力组织的通用代码
+│   ├── domain/                     # Action 与 AppService 共用的领域枚举
 │   ├── i18n/                       # 后端本地化能力和翻译词条
 │   └── storage/
 │       ├── server/                 # PostgreSQL 连接、迁移和服务端模型
 │       ├── desktop/                # 桌面端 SQLite 存储和模型
 │       └── mobile/                 # 移动端 SQLite 存储和模型
-├── frontend/src/
-│   ├── api/                        # 按领域组织的接口请求和请求客户端
-│   ├── apps/
-│   │   ├── web/                    # Web 应用入口和路由
-│   │   ├── desktop/                # 桌面端应用入口和路由
-│   │   └── mobile/                 # 移动端独立页面
-│   ├── components/form/            # 通用表单展示组件
-│   ├── features/                   # Web 与桌面端共用的业务功能
-│   ├── i18n/                       # 国际化资源
-│   └── platform/                   # 运行平台识别
+├── frontend/
+│   ├── bindings/                   # Wails 自动生成的 TypeScript 服务和类型绑定
+│   └── src/
+│       ├── api/                    # 按领域封装生成服务、认证和边界归一化
+│       ├── apps/
+│       │   ├── web/                # Web 应用入口和路由
+│       │   ├── desktop/            # 桌面端应用入口和路由
+│       │   └── mobile/             # 移动端独立页面
+│       ├── components/form/        # 通用表单展示组件
+│       ├── features/               # Web 与桌面端共用的业务功能
+│       ├── i18n/                   # 国际化资源
+│       └── platform/               # 运行平台识别
 └── build/                          # Wails 多平台构建配置
 ```
 
 ## 开发约定
 
 - Go 具名函数和方法使用简洁、直述型中文注释。
-- HTTP 请求进入 Action，Action 直接使用 Bun，并按需调用 `common` 中的通用能力。
+- `appservice.Service` 是统一业务入口：服务端 Web 直接调用 `DirectBackend`，桌面端和移动端通过 API Proxy 调用企业服务端，Gin 只提供对外 HTTP API。
+- 服务端由 `DirectBackend` 完成认证、错误转换并调用 Action；Gin 不定义项目内前端业务类型和主要调用契约。
+- Action 直接使用 Bun，并按需调用 `common` 中的通用能力。
 - `common` 只放置无数据库、无传输层和无平台依赖的通用能力。
+- `domain` 只放置 Action、AppService 和不同平台共同使用的领域值，不放置数据库、传输层和平台逻辑。
+- `appservice` 契约是前端业务 DTO 的唯一来源；前端不得重复声明渠道、联系人、用户、会话、设置等业务模型和枚举。
+- `frontend/bindings` 由 Wails 自动生成，禁止手工修改；所有平台统一使用 `wails3 generate bindings -ts -i`，不得生成不同格式后覆盖现有绑定。
+- 前端只保留表单值、组件 Props、页面状态、查询参数派生类型，以及对生成类型中可空切片的边界归一化类型。
 - 数据库模型放在对应平台的 `storage` 目录中。
 - 本地 PostgreSQL Docker 数据库由所有工作区共享，不为单独工作区创建容器、端口或数据卷；需要重建数据库结构时使用 Goose 回滚并重新执行迁移。
 - 数据库迁移文件按 `YYYYMMDDHHMMSS_说明.sql` 格式命名，并按表拆分。
@@ -80,14 +92,16 @@ cervi/
 - 项目当前不考虑历史数据和旧接口兼容；修改模型、迁移和接口时直接实现目标结构，不编写旧数据回填、缺失记录兜底或双版本兼容逻辑，除非任务明确要求。
 - 项目当前处于早期开发阶段，密钥加密存储、接口响应脱敏等安全加固项暂不作为开发和审查的阻塞项，后续进入安全加固阶段时统一完善。
 - 角色权限体系将在后续阶段统一建设；当前仅校验用户已登录，不要求按所有者、管理员或普通成员角色限制功能访问。
-- Action 返回语言无关的错误码，API 层负责生成本地化文案。
+- Action 返回语言无关的错误码；AppService Backend 将其转换为结构化、本地化错误，Gin 只负责输出对应的 HTTP 状态和错误体。
+- Web、桌面端和移动端统一使用 Bearer Token 认证，不使用 Session Cookie；API Proxy 负责把应用服务调用转换为携带 Token 的 HTTP 请求。
+- 企业初始化只在 Web 端完成；桌面端和移动端将企业服务器地址持久化到本地 SQLite，连接成功后进入登录页，并允许从登录页修改地址。
 - Web 与桌面端共享主要业务页面，移动端保持独立入口。
 - 文件由客户端通过服务端签发的预签名请求直传对象存储；服务端不转发文件内容，Endpoint 使用客户端可访问的公开地址。
 - 前端表单使用 React Hook Form、Zod 和统一错误展示组件。
 - 表单输入框不使用 placeholder；字段含义由标签表达，必要的填写说明使用字段帮助文案展示。
 - 代码审查（review）的结果统一使用中文输出。
 - Git 提交信息以及 PR 的标题和描述统一使用中文表述。
-- 修改后运行相关测试、静态检查和前端构建。
+- 修改后运行相关测试、`go vet` 静态检查和前端构建；涉及应用服务、绑定或构建流程时同时验证 `wails3 build DEV=true` 和 `wails3 task build:server DEV=true`。
 
 ### 管理界面设计
 

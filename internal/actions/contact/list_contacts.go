@@ -45,9 +45,9 @@ func (q *ListContactsQuery) Execute(ctx context.Context, principal *servermodels
 		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = 'phone' ORDER BY cm.is_primary DESC, cm.created_at ASC LIMIT 1) AS primary_phone").
 		Join("JOIN channels AS source_channel ON source_channel.id = c.source_channel_id AND source_channel.organization_id = c.organization_id")
 	switch input.Sort {
-	case "createdAt.desc":
+	case SortCreatedAtDescending:
 		query = query.OrderExpr("c.created_at DESC, c.id DESC")
-	case "displayName.asc":
+	case SortDisplayNameAscending:
 		query = query.OrderExpr("lower(coalesce(c.display_name, '')) ASC, c.id ASC")
 	default:
 		query = query.OrderExpr("c.updated_at DESC, c.id DESC")

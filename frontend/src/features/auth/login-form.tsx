@@ -24,7 +24,11 @@ import {
 } from "@/features/auth/login-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
-export function LoginForm() {
+export function LoginForm({
+  allowServerChange = false,
+}: {
+  allowServerChange?: boolean
+}) {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
   const schema = useMemo(() => createLoginSchema(t), [t])
@@ -48,7 +52,9 @@ export function LoginForm() {
           return
         }
         if (error.code === "INSTALLATION_REQUIRED") {
-          navigate("/setup", { replace: true })
+          navigate(allowServerChange ? "/connect" : "/setup", {
+            replace: true,
+          })
           return
         }
         toast.error(apiErrorMessage(error, ["email", "password"]))
@@ -93,6 +99,16 @@ export function LoginForm() {
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {isSubmitting ? t("submitting") : t("submit")}
             </Button>
+            {allowServerChange ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={() => navigate("/connect")}
+              >
+                {t("changeServer")}
+              </Button>
+            ) : null}
           </FieldGroup>
         </form>
       </CardContent>

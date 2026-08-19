@@ -5,10 +5,11 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import type { WebsiteChannelSummary } from "@/api/channels"
 import {
+  Locale,
   createWebsiteChannel,
   updateWebsiteChannel,
+  type WebsiteChannelSummary,
 } from "@/api/channels"
 import { ApiError } from "@/api/client"
 import { FormInputField } from "@/components/form/form-input-field"
@@ -50,7 +51,7 @@ export function WebsiteChannelForm({
     defaultValues: {
       name: channel?.name ?? "",
       description: channel?.description ?? "",
-      defaultLocale: channel?.defaultLocale ?? "zh-CN",
+      defaultLocale: channel?.defaultLocale ?? Locale.LocaleChineseSimplified,
     },
   })
 
@@ -134,8 +135,8 @@ export function WebsiteChannelForm({
                 id={field.name}
                 required
               >
-                <option value="zh-CN">{t("locales.zhCN")}</option>
-                <option value="en-US">{t("locales.enUS")}</option>
+                <option value={Locale.LocaleChineseSimplified}>{t("locales.zhCN")}</option>
+                <option value={Locale.LocaleEnglishUnitedStates}>{t("locales.enUS")}</option>
               </NativeSelect>
             </Field>
           )}

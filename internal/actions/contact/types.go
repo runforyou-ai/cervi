@@ -2,19 +2,29 @@
 
 package contact
 
-import "time"
+import (
+	"time"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
+)
 
 const (
 	// StageVisitor 表示尚未形成明确意向的外部联系人。
-	StageVisitor = "visitor"
+	StageVisitor = string(domain.ContactStageVisitor)
 	// StageLead 表示具有潜在线索价值的外部联系人。
-	StageLead = "lead"
+	StageLead = string(domain.ContactStageLead)
 	// StageCustomer 表示已经成为客户的外部联系人。
-	StageCustomer = "customer"
+	StageCustomer = string(domain.ContactStageCustomer)
 	// MethodEmail 表示邮箱联系方式。
-	MethodEmail = "email"
+	MethodEmail = string(domain.ContactMethodTypeEmail)
 	// MethodPhone 表示电话联系方式。
-	MethodPhone = "phone"
+	MethodPhone = string(domain.ContactMethodTypePhone)
+	// SortUpdatedAtDescending 按最近更新时间倒序排列。
+	SortUpdatedAtDescending = string(domain.ContactSortUpdatedAtDescending)
+	// SortCreatedAtDescending 按创建时间倒序排列。
+	SortCreatedAtDescending = string(domain.ContactSortCreatedAtDescending)
+	// SortDisplayNameAscending 按显示名称升序排列。
+	SortDisplayNameAscending = string(domain.ContactSortDisplayNameAscending)
 )
 
 // MethodInput 定义联系人联系方式输入。

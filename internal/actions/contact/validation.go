@@ -156,9 +156,9 @@ func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) 
 		fields["channelId"] = ValidationQueryInvalid
 	}
 	if input.Sort == "" {
-		input.Sort = "createdAt.desc"
+		input.Sort = SortCreatedAtDescending
 	}
-	if input.Sort != "updatedAt.desc" && input.Sort != "createdAt.desc" && input.Sort != "displayName.asc" {
+	if input.Sort != SortUpdatedAtDescending && input.Sort != SortCreatedAtDescending && input.Sort != SortDisplayNameAscending {
 		fields["sort"] = ValidationQueryInvalid
 	}
 	return input, fields

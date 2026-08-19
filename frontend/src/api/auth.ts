@@ -1,17 +1,30 @@
-import { request } from "@/api/client"
-import type { Principal } from "@/api/identity"
+import {
+  LoadSession,
+  Login,
+  Logout,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
+import type { LoginInput } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import { acceptSession, ApiError, call, clearSession } from "@/api/client"
 
-export function login(input: { email: string; password: string }) {
-  return request<Principal>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(input),
-  })
+export async function login(input: LoginInput) {
+  return acceptSession(await call((meta) => Login(meta, input)))
 }
 
-export function logout() {
-  return request<void>("/auth/logout", { method: "POST" })
+export async function logout() {
+  try {
+    await call((meta) => Logout(meta))
+  } finally {
+    clearSession()
+  }
 }
 
-export function loadSession() {
-  return request<Principal>("/auth/session")
+export async function loadSession() {
+  try {
+    return await call((meta) => LoadSession(meta))
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
+      clearSession()
+    }
+    throw error
+  }
 }

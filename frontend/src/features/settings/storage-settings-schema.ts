@@ -1,6 +1,7 @@
 import { z } from "zod"
 
-import { storageProviderIds } from "@/api/settings"
+import { StorageProvider } from "@/api/settings"
+import { requiredWailsEnum } from "@/lib/wails-enum"
 
 function validEndpoint(value: string) {
   try {
@@ -28,9 +29,10 @@ export function createStorageSettingsSchema(messages: {
 }) {
   return z.object({
     enabled: z.boolean(),
-    provider: z.enum(storageProviderIds, {
-      errorMap: () => ({ message: messages.providerInvalid }),
-    }),
+    provider: requiredWailsEnum(
+      StorageProvider,
+      messages.providerInvalid,
+    ),
     endpoint: z
       .string()
       .trim()

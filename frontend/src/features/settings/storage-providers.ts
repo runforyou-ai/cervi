@@ -1,4 +1,4 @@
-import type { StorageProviderId } from "@/api/settings"
+import { StorageProvider, type StorageProviderId } from "@/api/settings"
 
 type StorageProviderNameKey = `storage.providers.${StorageProviderId}`
 
@@ -36,7 +36,7 @@ type StorageProviderRegion = {
   endpoint: string
 }
 
-type StorageProvider = {
+type StorageProviderConfig = {
   id: StorageProviderId
   nameKey: StorageProviderNameKey
   helpUrl: string
@@ -44,9 +44,9 @@ type StorageProvider = {
   regions: [StorageProviderRegion, ...StorageProviderRegion[]]
 }
 
-export const storageProviders: StorageProvider[] = [
-  {
-    id: "generic",
+const storageProvidersById = {
+  [StorageProvider.StorageProviderGeneric]: {
+    id: StorageProvider.StorageProviderGeneric,
     nameKey: "storage.providers.generic",
     helpUrl: "https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html",
     forcePathStyle: false,
@@ -58,8 +58,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "aws",
+  [StorageProvider.StorageProviderAWS]: {
+    id: StorageProvider.StorageProviderAWS,
     nameKey: "storage.providers.aws",
     helpUrl: "https://docs.aws.amazon.com/general/latest/gr/s3.html",
     forcePathStyle: false,
@@ -86,8 +86,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "r2",
+  [StorageProvider.StorageProviderR2]: {
+    id: StorageProvider.StorageProviderR2,
     nameKey: "storage.providers.r2",
     helpUrl: "https://developers.cloudflare.com/r2/api/s3/api/",
     forcePathStyle: false,
@@ -99,8 +99,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "aliyun",
+  [StorageProvider.StorageProviderAliyun]: {
+    id: StorageProvider.StorageProviderAliyun,
     nameKey: "storage.providers.aliyun",
     helpUrl: "https://help.aliyun.com/zh/oss/user-guide/regions-and-endpoints",
     forcePathStyle: false,
@@ -127,8 +127,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "tencent",
+  [StorageProvider.StorageProviderTencent]: {
+    id: StorageProvider.StorageProviderTencent,
     nameKey: "storage.providers.tencent",
     helpUrl: "https://cloud.tencent.com/document/product/436/6224",
     forcePathStyle: false,
@@ -155,8 +155,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "baidu",
+  [StorageProvider.StorageProviderBaidu]: {
+    id: StorageProvider.StorageProviderBaidu,
     nameKey: "storage.providers.baidu",
     helpUrl: "https://cloud.baidu.com/doc/BOS/s/xjwvyq9l4",
     forcePathStyle: false,
@@ -178,8 +178,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "qiniu",
+  [StorageProvider.StorageProviderQiniu]: {
+    id: StorageProvider.StorageProviderQiniu,
     nameKey: "storage.providers.qiniu",
     helpUrl: "https://developer.qiniu.com/kodo/4088/s3-access-domainname",
     forcePathStyle: false,
@@ -201,8 +201,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "huawei",
+  [StorageProvider.StorageProviderHuawei]: {
+    id: StorageProvider.StorageProviderHuawei,
     nameKey: "storage.providers.huawei",
     helpUrl: "https://console.huaweicloud.com/apiexplorer/#/endpoint/OBS",
     forcePathStyle: false,
@@ -219,8 +219,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "ucloud",
+  [StorageProvider.StorageProviderUCloud]: {
+    id: StorageProvider.StorageProviderUCloud,
     nameKey: "storage.providers.ucloud",
     helpUrl: "https://docs.ucloud.cn/ufile/s3/s3_introduction",
     forcePathStyle: false,
@@ -237,8 +237,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "minio",
+  [StorageProvider.StorageProviderMinIO]: {
+    id: StorageProvider.StorageProviderMinIO,
     nameKey: "storage.providers.minio",
     helpUrl:
       "https://docs.min.io/aistor/reference/aistor-server/http-endpoints/",
@@ -251,8 +251,8 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-  {
-    id: "rustfs",
+  [StorageProvider.StorageProviderRustFS]: {
+    id: StorageProvider.StorageProviderRustFS,
     nameKey: "storage.providers.rustfs",
     helpUrl: "https://docs.rustfs.com.cn/developer/sdk/javascript.html",
     forcePathStyle: true,
@@ -264,12 +264,21 @@ export const storageProviders: StorageProvider[] = [
       },
     ],
   },
-]
+} satisfies Record<StorageProviderId, StorageProviderConfig>
 
-export function getStorageProvider(id: StorageProviderId) {
-  return storageProviders.find((provider) => provider.id === id)!
+export const storageProviders = Object.values(storageProvidersById)
+
+export function getStorageProvider(id: StorageProvider) {
+  if (!isStorageProviderId(id)) {
+    throw new Error(`Unsupported storage provider: ${id}`)
+  }
+  return storageProvidersById[id]
 }
 
-export function getStorageRegion(provider: StorageProvider, id: string) {
+export function getStorageRegion(provider: StorageProviderConfig, id: string) {
   return provider.regions.find((region) => region.id === id)
+}
+
+function isStorageProviderId(id: StorageProvider): id is StorageProviderId {
+  return id !== StorageProvider.$zero && id in storageProvidersById
 }

@@ -47,6 +47,7 @@ const zhCN = {
     invalidCredentials: "邮箱或密码错误。",
     networkError: "无法连接服务器，请稍后重试。",
     serverError: "登录失败，请稍后重试。",
+    changeServer: "修改服务器地址",
   },
   connection: {
     title: "连接企业服务器",
@@ -57,10 +58,19 @@ const zhCN = {
     submit: "连接",
     submitting: "正在连接…",
     connectionError: "无法连接到该企业服务器，请检查地址后重试。",
+    backToLogin: "返回登录",
   },
   mobile: {
     title: "移动端正在建设",
     description: "移动端应用将提供客户会话和移动协作功能。",
+    organization: "企业",
+    user: "当前用户",
+    logout: "退出登录",
+    loggingOut: "正在退出…",
+    logoutError: "退出登录失败，请重试。",
+    loading: "正在加载…",
+    loadError: "加载登录信息失败。",
+    retry: "重试",
   },
   workspace: {
     navigationGroup: "工作台",

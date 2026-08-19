@@ -1,46 +1,29 @@
-import { request } from "@/api/client"
+import {
+  GetS3Setting,
+  SaveS3Setting,
+  TestS3Setting,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
+import {
+  StorageProvider,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
+import type { S3Setting } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import { call } from "@/api/client"
 
-export const storageProviderIds = [
-  "generic",
-  "aws",
-  "r2",
-  "aliyun",
-  "tencent",
-  "baidu",
-  "qiniu",
-  "huawei",
-  "ucloud",
-  "minio",
-  "rustfs",
-] as const
-
-export type StorageProviderId = (typeof storageProviderIds)[number]
-
-export type S3Setting = {
-  enabled: boolean
-  provider: StorageProviderId
-  endpoint: string
-  region: string
-  bucket: string
-  accessKeyId: string
-  secretAccessKey: string
-  forcePathStyle: boolean
-}
+export { StorageProvider }
+export type { S3Setting }
+export type StorageProviderId = Exclude<
+  StorageProvider,
+  StorageProvider.$zero
+>
 
 export function getS3Setting() {
-  return request<S3Setting>("/settings/storage/s3")
+  return call((meta) => GetS3Setting(meta))
 }
 
 export function saveS3Setting(input: S3Setting) {
-  return request<S3Setting>("/settings/storage/s3", {
-    method: "PUT",
-    body: JSON.stringify(input),
-  })
+  return call((meta) => SaveS3Setting(meta, input))
 }
 
 export function testS3Setting(input: S3Setting) {
-  return request<void>("/settings/storage/s3/test", {
-    method: "POST",
-    body: JSON.stringify(input),
-  })
+  return call((meta) => TestS3Setting(meta, input))
 }

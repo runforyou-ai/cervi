@@ -5,8 +5,9 @@ import { Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { loadSession, logout } from "@/api/auth"
-import { ApiError } from "@/api/client"
+import { ApiError, hasSession } from "@/api/client"
 import type { Principal } from "@/api/identity"
+import { getServerURL } from "@/api/server-connection"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -49,7 +50,11 @@ function workspaceTitle(
   return titles.inbox
 }
 
-export function WorkspaceLayout() {
+export function WorkspaceLayout({
+  platform,
+}: {
+  platform: "web" | "desktop"
+}) {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const location = useLocation()
@@ -62,6 +67,16 @@ export function WorkspaceLayout() {
     setLoading(true)
     setError("")
     try {
+      if (platform === "desktop") {
+        if ((await getServerURL()) === "") {
+          navigate("/connect", { replace: true })
+          return
+        }
+        if (!hasSession()) {
+          navigate("/login", { replace: true })
+          return
+        }
+      }
       setPrincipal(await loadSession())
     } catch (requestError) {
       if (requestError instanceof ApiError) {
@@ -70,7 +85,9 @@ export function WorkspaceLayout() {
           return
         }
         if (requestError.code === "INSTALLATION_REQUIRED") {
-          navigate("/setup", { replace: true })
+          navigate(platform === "web" ? "/setup" : "/connect", {
+            replace: true,
+          })
           return
         }
         if (requestError.code === "AUTH_REQUIRED") {
@@ -82,7 +99,7 @@ export function WorkspaceLayout() {
     } finally {
       setLoading(false)
     }
-  }, [navigate, t])
+  }, [navigate, platform, t])
 
   useEffect(() => {
     void fetchSession()
@@ -92,15 +109,11 @@ export function WorkspaceLayout() {
     setLoggingOut(true)
     try {
       await logout()
-      navigate("/login", { replace: true })
-    } catch (requestError) {
-      if (requestError instanceof ApiError && requestError.code === "AUTH_REQUIRED") {
-        navigate("/login", { replace: true })
-        return
-      }
+    } catch {
       toast.error(t("logoutError"))
     } finally {
       setLoggingOut(false)
+      navigate("/login", { replace: true })
     }
   }
 

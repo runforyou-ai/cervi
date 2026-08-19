@@ -12,19 +12,26 @@ import { SettingsPage } from "@/features/settings/settings-page"
 import { WorkspaceLayout } from "@/features/workspace/workspace-layout"
 
 export function SharedAppRoutes({
-  includeServerConnection = false,
+  platform,
 }: {
-  includeServerConnection?: boolean
+  platform: "web" | "desktop"
 }) {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/inbox" replace />} />
-      {includeServerConnection ? (
+      {platform === "desktop" ? (
         <Route path="/connect" element={<ServerConnectionPage />} />
       ) : null}
-      <Route path="/setup" element={<SetupPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<WorkspaceLayout />}>
+      {platform === "web" ? (
+        <Route path="/setup" element={<SetupPage />} />
+      ) : null}
+      <Route
+        path="/login"
+        element={
+          <LoginPage allowServerChange={platform === "desktop"} />
+        }
+      />
+      <Route element={<WorkspaceLayout platform={platform} />}>
         <Route path="/inbox" element={<InboxRoute />} />
         <Route
           path="/settings"

@@ -1,134 +1,116 @@
-import { request } from "@/api/client"
-import type { PageInfo } from "@/api/types"
+import {
+  CreateContact,
+  DeleteContact,
+  GetContact,
+  ListContacts,
+  RestoreContact,
+  UpdateContact,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
+import {
+  ContactMethodType,
+  ContactSort,
+  ContactStage,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
+import type {
+  Contact,
+  ContactInput,
+  ContactList,
+  ContactListInput,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import { call } from "@/api/client"
 
-export type ContactStage = "visitor" | "lead" | "customer"
-export type ContactMethodType = "email" | "phone"
+export { ContactMethodType, ContactSort, ContactStage }
+export type {
+  ContactChannelIdentity,
+  ContactInput,
+  ContactMethod,
+  ContactMethodInput,
+  ContactRecord,
+  ContactSummary,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 
-export type ContactMethod = {
-  type: ContactMethodType
-  value: string
-  label: string | null
-  isPrimary: boolean
+export type ContactDetail = Omit<
+  Contact,
+  "methods" | "channelIdentities"
+> & {
+  methods: NonNullable<Contact["methods"]>
+  channelIdentities: NonNullable<Contact["channelIdentities"]>
 }
 
-export type ContactChannelIdentity = {
-  channelId: string
-  channelName: string
-  externalId: string
-  displayName: string | null
+export type ContactListResponse = Omit<ContactList, "contacts"> & {
+  contacts: NonNullable<ContactList["contacts"]>
 }
 
-export type ContactRecord = {
-  id: string
-  sourceChannelId: string
-  displayName: string | null
-  stage: ContactStage
-  notes: string | null
-  createdAt: string
-}
-
-export type ContactSummary = {
-  id: string
-  displayName: string | null
-  stage: ContactStage
-  primaryEmail: string | null
-  primaryPhone: string | null
-  sourceChannelName: string
-  createdAt: string
-  deletedAt: string | null
-}
-
-export type ContactDetail = {
-  contact: ContactRecord
-  sourceChannel: {
-    id: string
-    type: string
-    name: string
-  }
-  methods: ContactMethod[]
-  channelIdentities: ContactChannelIdentity[]
-}
-
-export type ContactMethodInput = {
-  type: ContactMethodType
-  value: string
-  label?: string
-  isPrimary: boolean
-}
-
-export type ContactInput = {
-  displayName: string
-  channelId: string
-  stage: ContactStage
-  notes: string
-  methods: ContactMethodInput[]
-}
-
-export type ContactListQuery = {
+export type ContactListQuery = Omit<
+  Partial<ContactListInput>,
+  "query" | "deleted"
+> & {
   q?: string
-  stage?: ContactStage | ""
-  channelId?: string
-  methodType?: ContactMethodType | ""
-  sort?: "updatedAt.desc" | "createdAt.desc" | "displayName.asc"
-  page?: number
-  pageSize?: number
 }
 
-export type ContactListResponse = {
-  contacts: ContactSummary[]
-  page: PageInfo
-}
-
-function queryString(query: ContactListQuery) {
-  const search = new URLSearchParams()
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== "") {
-      search.set(key, String(value))
-    }
-  }
-  return search.toString()
-}
-
-export function listContacts(query: ContactListQuery, signal?: AbortSignal) {
-  return request<ContactListResponse>(`/contacts?${queryString(query)}`, {
-    signal,
-  })
-}
-
-export function listDeletedContacts(
+export async function listContacts(
   query: ContactListQuery,
   signal?: AbortSignal,
 ) {
-  return request<ContactListResponse>(
-    `/contacts/trash?${queryString(query)}`,
-    { signal },
-  )
+  return listContactsByDeleted(query, false, signal)
+}
+
+export async function listDeletedContacts(
+  query: ContactListQuery,
+  signal?: AbortSignal,
+) {
+  return listContactsByDeleted(query, true, signal)
 }
 
 export function getContact(contactId: string, signal?: AbortSignal) {
-  return request<ContactDetail>(`/contacts/${contactId}`, { signal })
+  return call((meta) => GetContact(meta, contactId), signal).then(normalizeContact)
 }
 
 export function createContact(input: ContactInput) {
-  return request<ContactDetail>("/contacts", {
-    method: "POST",
-    body: JSON.stringify(input),
-  })
+  return call((meta) => CreateContact(meta, input)).then(normalizeContact)
 }
 
 export function updateContact(contactId: string, input: ContactInput) {
-  return request<ContactDetail>(`/contacts/${contactId}`, {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  })
+  return call((meta) => UpdateContact(meta, contactId, input)).then(normalizeContact)
 }
 
 export function deleteContact(contactId: string) {
-  return request<void>(`/contacts/${contactId}`, { method: "DELETE" })
+  return call((meta) => DeleteContact(meta, contactId))
 }
 
 export function restoreContact(contactId: string) {
-  return request<ContactDetail>(`/contacts/${contactId}/restore`, {
-    method: "POST",
-  })
+  return call((meta) => RestoreContact(meta, contactId)).then(normalizeContact)
+}
+
+async function listContactsByDeleted(
+  query: ContactListQuery,
+  deleted: boolean,
+  signal?: AbortSignal,
+) {
+  const output = await call(
+    (meta) =>
+      ListContacts(meta, {
+        query: query.q ?? "",
+        stage: query.stage ?? ContactStage.$zero,
+        channelId: query.channelId ?? "",
+        methodType: query.methodType ?? ContactMethodType.$zero,
+        sort: query.sort ?? ContactSort.$zero,
+        page: query.page ?? 1,
+        pageSize: query.pageSize ?? 50,
+        deleted,
+      }),
+    signal,
+  )
+  return {
+    ...output,
+    contacts: output.contacts ?? [],
+  } satisfies ContactListResponse
+}
+
+function normalizeContact(contact: Contact): ContactDetail {
+  return {
+    ...contact,
+    methods: contact.methods ?? [],
+    channelIdentities: contact.channelIdentities ?? [],
+  }
 }

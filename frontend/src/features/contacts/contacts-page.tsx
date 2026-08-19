@@ -21,6 +21,9 @@ import { toast } from "sonner"
 
 import { listChannels, type ChannelSummary } from "@/api/channels"
 import {
+  ContactMethodType,
+  ContactSort,
+  ContactStage,
   getContact,
   deleteContact,
   listContacts,
@@ -28,12 +31,12 @@ import {
   restoreContact,
   type ContactDetail,
   type ContactListResponse,
-  type ContactMethodType,
-  type ContactStage,
   type ContactSummary,
 } from "@/api/contacts"
 import { ApiError } from "@/api/client"
 import {
+  UserRole,
+  UserStatus,
   getUser,
   listUsers,
   type DirectoryUser,
@@ -94,6 +97,7 @@ import {
 import { ContactForm } from "@/features/contacts/contact-form"
 import { ContactDetailView } from "@/features/contacts/contact-detail"
 import { useDateTime } from "@/hooks/use-date-time"
+import { parseWailsEnum } from "@/lib/wails-enum"
 import { cn } from "@/lib/utils"
 
 export type ContactScope = "internal" | "external" | "agents"
@@ -255,6 +259,7 @@ function ContactScopeSidebar({
 
 function StageLabel({ stage }: { stage: ContactStage }) {
   const { t } = useTranslation("contacts")
+  if (stage === ContactStage.$zero) return null
   return (
     <span className="inline-flex rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
       {t(`stages.${stage}`)}
@@ -327,14 +332,31 @@ export function ContactsPage({
   const selected = searchParams.get("selected") ?? ""
   const creating = searchParams.get("new") === "1"
   const channelId = searchParams.get("channelId") ?? ""
-  const stage = (searchParams.get("stage") ?? "") as ContactStage | ""
-  const methodType = (searchParams.get("methodType") ?? "") as ContactMethodType | ""
-  const sort = (searchParams.get("sort") ?? "createdAt.desc") as
-    | "updatedAt.desc"
-    | "createdAt.desc"
-    | "displayName.asc"
-  const status = searchParams.get("status") ?? ""
-  const role = searchParams.get("role") ?? ""
+  const stage = parseWailsEnum(
+    ContactStage,
+    searchParams.get("stage"),
+    ContactStage.$zero,
+  )
+  const methodType = parseWailsEnum(
+    ContactMethodType,
+    searchParams.get("methodType"),
+    ContactMethodType.$zero,
+  )
+  const sort = parseWailsEnum(
+    ContactSort,
+    searchParams.get("sort"),
+    ContactSort.ContactSortCreatedAtDescending,
+  )
+  const status = parseWailsEnum(
+    UserStatus,
+    searchParams.get("status"),
+    UserStatus.$zero,
+  )
+  const role = parseWailsEnum(
+    UserRole,
+    searchParams.get("role"),
+    UserRole.$zero,
+  )
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
 
   const setParameters = useCallback(

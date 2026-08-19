@@ -7,11 +7,12 @@ import { toast } from "sonner"
 
 import { ApiError } from "@/api/client"
 import {
+  ContactMethodType,
+  ContactStage,
   updateContact,
   type ContactDetail,
   type ContactInput,
   type ContactMethodInput,
-  type ContactStage,
 } from "@/api/contacts"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
@@ -33,8 +34,8 @@ function valuesFromDetail(detail: ContactDetail): ContactFormValues {
     displayName: detail.contact.displayName ?? "",
     channelId: detail.contact.sourceChannelId,
     stage: detail.contact.stage,
-    email: detail.methods.find((method) => method.type === "email")?.value ?? "",
-    phone: detail.methods.find((method) => method.type === "phone")?.value ?? "",
+    email: detail.methods.find((method) => method.type === ContactMethodType.ContactMethodTypeEmail)?.value ?? "",
+    phone: detail.methods.find((method) => method.type === ContactMethodType.ContactMethodTypePhone)?.value ?? "",
     notes: detail.contact.notes ?? "",
   }
 }
@@ -64,7 +65,7 @@ function methodsFromDetail(
       methods.push({
         type: method.type,
         value,
-        label: method.label ?? undefined,
+        label: method.label ?? "",
         isPrimary: method.isPrimary,
       })
       continue
@@ -72,14 +73,17 @@ function methodsFromDetail(
     methods.push({
       type: method.type,
       value: method.value,
-      label: method.label ?? undefined,
+      label: method.label ?? "",
       isPrimary: method.isPrimary,
     })
   }
 
-  for (const type of ["email", "phone"] as const) {
+  for (const type of [
+    ContactMethodType.ContactMethodTypeEmail,
+    ContactMethodType.ContactMethodTypePhone,
+  ]) {
     if (!handled[type] && editedValues[type]) {
-      methods.push({ type, value: editedValues[type], isPrimary: true })
+      methods.push({ type, value: editedValues[type], label: "", isPrimary: true })
     }
   }
   return methods
@@ -230,7 +234,7 @@ export function ContactDetailView({
   }, invalid)
 
   const empty = <span className="text-muted-foreground">{t("detail.empty")}</span>
-  const stage = form.watch("stage") as ContactStage
+  const stage = form.watch("stage")
 
   return (
     <div className="flex flex-col gap-7">
@@ -251,15 +255,15 @@ export function ContactDetailView({
 
           <DetailRow
             label={t("columns.stage")}
-            value={t(`stages.${detail.contact.stage}`)}
+            value={detail.contact.stage === ContactStage.$zero ? "" : t(`stages.${detail.contact.stage}`)}
             editing={editing === "stage"}
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("stage")}
           >
             <NativeSelect {...form.register("stage")} autoFocus value={stage}>
-              <option value="visitor">{t("stages.visitor")}</option>
-              <option value="lead">{t("stages.lead")}</option>
-              <option value="customer">{t("stages.customer")}</option>
+              <option value={ContactStage.ContactStageVisitor}>{t("stages.visitor")}</option>
+              <option value={ContactStage.ContactStageLead}>{t("stages.lead")}</option>
+              <option value={ContactStage.ContactStageCustomer}>{t("stages.customer")}</option>
             </NativeSelect>
             <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
           </DetailRow>

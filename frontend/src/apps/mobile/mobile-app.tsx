@@ -1,8 +1,95 @@
-import { SmartphoneIcon } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { LoaderCircleIcon, SmartphoneIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { Navigate, Route, Routes, useNavigate } from "react-router"
+import { toast } from "sonner"
 
-export default function MobileApp() {
+import { loadSession, logout } from "@/api/auth"
+import { ApiError, hasSession } from "@/api/client"
+import type { Principal } from "@/api/identity"
+import { getServerURL } from "@/api/server-connection"
+import { Button } from "@/components/ui/button"
+import { LoginPage } from "@/features/auth/login-page"
+import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
+
+function MobileHomePage() {
   const { t } = useTranslation("mobile")
+  const navigate = useNavigate()
+  const [principal, setPrincipal] = useState<Principal | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const fetchSession = useCallback(async () => {
+    setLoading(true)
+    setError("")
+    try {
+      if ((await getServerURL()) === "") {
+        navigate("/connect", { replace: true })
+        return
+      }
+      if (!hasSession()) {
+        navigate("/login", { replace: true })
+        return
+      }
+      setPrincipal(await loadSession())
+    } catch (requestError) {
+      if (requestError instanceof ApiError) {
+        if (
+          requestError.code === "SERVER_CONNECTION_REQUIRED" ||
+          requestError.code === "INSTALLATION_REQUIRED"
+        ) {
+          navigate("/connect", { replace: true })
+          return
+        }
+        if (requestError.code === "AUTH_REQUIRED") {
+          navigate("/login", { replace: true })
+          return
+        }
+      }
+      setError(t("loadError"))
+    } finally {
+      setLoading(false)
+    }
+  }, [navigate, t])
+
+  useEffect(() => {
+    void fetchSession()
+  }, [fetchSession])
+
+  async function handleLogout() {
+    setLoggingOut(true)
+    try {
+      await logout()
+    } catch {
+      toast.error(t("logoutError"))
+    } finally {
+      setLoggingOut(false)
+      navigate("/login", { replace: true })
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center gap-2 text-sm text-muted-foreground">
+        <LoaderCircleIcon className="size-4 animate-spin" />
+        {t("loading")}
+      </main>
+    )
+  }
+
+  if (!principal) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button className="mt-4" variant="outline" onClick={fetchSession}>
+            {t("retry")}
+          </Button>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -15,7 +102,34 @@ export default function MobileApp() {
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {t("description")}
         </p>
+        <dl className="mt-6 grid gap-4 rounded-lg border p-4 text-left text-sm">
+          <div>
+            <dt className="text-muted-foreground">{t("organization")}</dt>
+            <dd className="mt-1 font-medium">{principal.organization.name}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">{t("user")}</dt>
+            <dd className="mt-1 font-medium">{principal.user.displayName}</dd>
+            <dd className="text-muted-foreground">{principal.user.email}</dd>
+          </div>
+        </dl>
+        <Button className="mt-6" disabled={loggingOut} onClick={handleLogout}>
+          {loggingOut ? <LoaderCircleIcon className="animate-spin" /> : null}
+          {loggingOut ? t("loggingOut") : t("logout")}
+        </Button>
       </section>
     </main>
+  )
+}
+
+export default function MobileApp() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/inbox" replace />} />
+      <Route path="/connect" element={<ServerConnectionPage />} />
+      <Route path="/login" element={<LoginPage allowServerChange />} />
+      <Route path="/inbox" element={<MobileHomePage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }

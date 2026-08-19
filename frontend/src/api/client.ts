@@ -1,12 +1,22 @@
-import { fallbackLanguage } from "@/i18n/resources"
-import { i18n } from "@/i18n"
+import { CancelError, type CancellablePromise } from "@wailsio/runtime"
 
-type ErrorResponse = {
-  error?: {
-    code?: string
-    message?: string
-    fields?: Record<string, string>
-  }
+import type {
+  RequestMeta,
+  Session,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import { Locale } from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
+import { i18n } from "@/i18n"
+import { fallbackLanguage } from "@/i18n/resources"
+
+const sessionStorageKey = "cervi.session"
+
+type StoredSession = Pick<Session, "token" | "expiresAt">
+
+type ErrorCause = {
+  status: number
+  code: string
+  message: string
+  fields?: Record<string, string>
 }
 
 export class ApiError extends Error {
@@ -28,40 +38,79 @@ export class ApiError extends Error {
   }
 }
 
-export async function request<T>(
-  path: string,
-  init?: RequestInit,
+export async function call<T>(
+  operation: (meta: RequestMeta) => CancellablePromise<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
-  const headers = new Headers(init?.headers)
-  if (init?.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json")
+  try {
+    const pending = operation(requestMeta())
+    return await (signal ? pending.cancelOn(signal) : pending)
+  } catch (error) {
+    throw normalizeError(error)
   }
-  if (!headers.has("Accept-Language")) {
-    headers.set(
-      "Accept-Language",
-      i18n.resolvedLanguage ?? fallbackLanguage,
-    )
+}
+
+export function acceptSession(session: Session) {
+  window.sessionStorage.setItem(
+    sessionStorageKey,
+    JSON.stringify({ token: session.token, expiresAt: session.expiresAt }),
+  )
+  return session.principal
+}
+
+export function clearSession() {
+  window.sessionStorage.removeItem(sessionStorageKey)
+}
+
+export function hasSession() {
+  return loadToken() !== ""
+}
+
+function requestMeta(): RequestMeta {
+  return {
+    token: loadToken(),
+    locale:
+      (i18n.resolvedLanguage ?? fallbackLanguage) === "en-US"
+        ? Locale.LocaleEnglishUnitedStates
+        : Locale.LocaleChineseSimplified,
   }
+}
 
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    headers,
-    credentials: "include",
-  })
-
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as ErrorResponse
-    throw new ApiError(
-      response.status,
-      payload.error?.code ?? "UNKNOWN_ERROR",
-      payload.error?.message ?? "Request failed",
-      payload.error?.fields,
-    )
+function loadToken() {
+  const value = window.sessionStorage.getItem(sessionStorageKey)
+  if (!value) return ""
+  const session = JSON.parse(value) as StoredSession
+  if (Date.parse(session.expiresAt) <= Date.now()) {
+    clearSession()
+    return ""
   }
+  return session.token
+}
 
-  if (response.status === 204) {
-    return undefined as T
+function normalizeError(error: unknown) {
+  if (error instanceof ApiError) return error
+  if (error instanceof Error) {
+    const cause = (error as Error & { cause?: unknown }).cause
+    if (error instanceof CancelError && cause instanceof Error) return cause
+    if (isErrorCause(cause)) {
+      return new ApiError(
+        cause.status,
+        cause.code,
+        cause.message,
+        cause.fields,
+      )
+    }
+    return error
   }
+  return new ApiError(500, "UNKNOWN_ERROR", "Request failed")
+}
 
-  return (await response.json()) as T
+function isErrorCause(value: unknown): value is ErrorCause {
+  if (typeof value !== "object" || value === null) return false
+  const cause = value as Partial<ErrorCause>
+  return (
+    typeof cause.status === "number" &&
+    typeof cause.code === "string" &&
+    typeof cause.message === "string"
+  )
 }

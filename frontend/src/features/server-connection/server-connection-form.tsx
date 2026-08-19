@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -7,7 +7,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { ApiError } from "@/api/client"
-import { connectServer } from "@/api/server-connection"
+import { connectServer, getServerURL } from "@/api/server-connection"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,17 +27,26 @@ import { apiErrorMessage } from "@/lib/form-errors"
 export function ServerConnectionForm() {
   const { t } = useTranslation("connection")
   const navigate = useNavigate()
+  const [hasServer, setHasServer] = useState(false)
   const schema = useMemo(() => createServerConnectionSchema(t), [t])
   const form = useForm<ServerConnectionFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: { serverUrl: "" },
   })
+  const { reset } = form
+
+  useEffect(() => {
+    void getServerURL().then((serverUrl) => {
+      setHasServer(serverUrl !== "")
+      reset({ serverUrl })
+    })
+  }, [reset])
 
   async function submitServerConnection(values: ServerConnectionFormValues) {
     try {
       await connectServer(values.serverUrl)
-      navigate("/inbox", { replace: true })
+      navigate("/login", { replace: true })
     } catch (error) {
       if (error instanceof ApiError) {
         toast.error(apiErrorMessage(error, ["serverUrl"]))
@@ -72,6 +81,16 @@ export function ServerConnectionForm() {
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {isSubmitting ? t("submitting") : t("submit")}
             </Button>
+            {hasServer ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={() => navigate("/login", { replace: true })}
+              >
+                {t("backToLogin")}
+              </Button>
+            ) : null}
           </FieldGroup>
         </form>
       </CardContent>

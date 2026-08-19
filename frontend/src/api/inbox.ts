@@ -1,28 +1,32 @@
-import { request } from "@/api/client"
-import type { Principal } from "@/api/identity"
+import { LoadInbox } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
+import type {
+  Conversation,
+  Inbox,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import { call } from "@/api/client"
 
-export type Conversation = {
-  id: string
-  name: string
-  initials: string
-  channel: string
-  preview: string
-  time: string
-  status: string
-  unread?: number
-  online?: boolean
-  messages: {
-    id: string
-    author: "visitor" | "agent"
-    text: string
-    time: string
-  }[]
+export { MessageAuthor } from "../../bindings/github.com/runforyou-ai/cervi/internal/domain/models"
+export type {
+  Message,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+
+export type ConversationData = Omit<Conversation, "messages"> & {
+  messages: NonNullable<Conversation["messages"]>
 }
 
-export type InboxData = Principal & {
-  conversations: Conversation[]
+export type InboxData = Omit<Inbox, "conversations"> & {
+  conversations: ConversationData[]
 }
 
-export function loadInbox() {
-  return request<InboxData>("/inbox")
+export type { ConversationData as Conversation }
+
+export async function loadInbox(): Promise<InboxData> {
+  const inbox = await call((meta) => LoadInbox(meta))
+  return {
+    ...inbox,
+    conversations: (inbox.conversations ?? []).map((conversation) => ({
+      ...conversation,
+      messages: conversation.messages ?? [],
+    })),
+  }
 }
