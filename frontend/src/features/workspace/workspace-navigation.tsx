@@ -97,14 +97,8 @@ export function WorkspaceNavigation({
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
-  /** 打开设置页。 */
-  function openSettings() {
-    console.info("打开设置")
-    navigate("/settings/storage")
-  }
-
   return (
-    <aside className="flex h-full w-[72px] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
+    <aside className="cervi-workspace-rail flex h-full w-[76px] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
       <div className="flex justify-center px-3 pt-2.5 pb-1.5">
         <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
           <DropdownMenuTrigger asChild>
@@ -133,7 +127,7 @@ export function WorkspaceNavigation({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={openSettings}>
+            <DropdownMenuItem onSelect={() => navigate("/settings/storage")}>
               <SettingsIcon />
               {t("settings")}
             </DropdownMenuItem>

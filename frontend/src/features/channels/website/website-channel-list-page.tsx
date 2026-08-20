@@ -11,6 +11,8 @@ import {
   recoverSession,
   type WebsiteChannelSummary,
 } from "@/api"
+import { PageHeader } from "@/components/page-header"
+import { SelectableText } from "@/components/selectable-text"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,12 +51,7 @@ function WebsiteChannelRow({
   return (
     <TableRow>
       <TableCell className="min-w-44 font-medium">
-        <Link
-          className="hover:underline"
-          to={`/channels/website/${channel.id}`}
-        >
-          {channel.name}
-        </Link>
+        <SelectableText>{channel.name}</SelectableText>
       </TableCell>
       <TableCell className="whitespace-nowrap">
         {t(
@@ -94,7 +91,7 @@ function WebsiteChannelRow({
   )
 }
 
-/** 网站渠道列表。 */
+/** 加载并管理网站渠道列表。 */
 export function WebsiteChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
@@ -144,22 +141,17 @@ export function WebsiteChannelListPage() {
   }
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {t("list.title")}
-        </h2>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button size="sm" asChild>
-            <Link to="/channels/website/new">{t("list.create")}</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/channels/website/trash">{t("list.trash")}</Link>
-          </Button>
-        </div>
-      </div>
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+      <PageHeader title={t("list.title")}>
+        <Button size="sm" asChild>
+          <Link to="/channels/website/new">{t("list.create")}</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/channels/website/trash">{t("list.trash")}</Link>
+        </Button>
+      </PageHeader>
 
-      <div className="mt-6">
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />

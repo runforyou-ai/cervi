@@ -6,6 +6,7 @@ import {
   PagePaneNav,
   PageSplit,
 } from "@/components/page-split"
+import { PageHeader } from "@/components/page-header"
 import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
 
 /** 设置导航和对象存储表单。 */
@@ -14,7 +15,7 @@ export function SettingsPage() {
 
   return (
     <PageSplit
-      paneWidth="sm"
+      paneWidth="md"
       paneVariant="nav"
       pane={
         <PagePaneNav label={t("navigationLabel")} title={t("title")}>
@@ -24,10 +25,8 @@ export function SettingsPage() {
         </PagePaneNav>
       }
     >
+      <PageHeader title={t("storage.title")} />
       <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {t("storage.title")}
-        </h2>
         <StorageSettingsForm />
       </div>
     </PageSplit>

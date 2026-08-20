@@ -50,8 +50,10 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
-import { PageBack } from "@/components/page-back-header"
+import { PageBack } from "@/components/page-back"
+import { PageHeader } from "@/components/page-header"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
+import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -273,9 +275,29 @@ function StageLabel({ stage }: { stage: ContactStage }) {
   const { t } = useTranslation("contacts")
   if (!stage) return null
   return (
-    <span className="inline-flex rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+    <SelectableText className="inline-flex rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
       {t(`stages.${stage}`)}
-    </span>
+    </SelectableText>
+  )
+}
+
+/** 显示团队成员详情中的一个只读字段。 */
+function MemberDetailItem({
+  label,
+  value,
+  emphasized = false,
+}: {
+  label: string
+  value: string
+  emphasized?: boolean
+}) {
+  return (
+    <div>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={cn("mt-1", emphasized && "font-medium")}>
+        <SelectableText>{value}</SelectableText>
+      </dd>
+    </div>
   )
 }
 
@@ -586,31 +608,29 @@ export function ContactsPage({
       }
     >
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3 sm:px-6">
-          <div className="w-full md:hidden">
-            <NativeSelect
-              className="h-8 w-full"
-              aria-label={t("scopeNavigation")}
-              value={mobileScope}
-              onChange={(event) => changeMobileScope(event.target.value)}
-            >
-              <option value="internal">{t("scopes.internal")}</option>
-              <option value="agents">{t("scopes.agents")}</option>
-              <option value="external">{t("scopes.external")} · {t("all")}</option>
-              {channels.map((channel) => (
-                <option key={channel.id} value={`channel:${channel.id}`}>
-                  {t("scopes.external")} · {channel.name}
-                </option>
-              ))}
-              <option value="trash">{t("trash.title")}</option>
-            </NativeSelect>
-          </div>
-          <div className="mr-auto min-w-40">
-            <h2 className="font-semibold tracking-tight">{title}</h2>
-            <p className="text-xs text-muted-foreground">
-              {t("list.count", { count: page.total })}
-            </p>
-          </div>
+        <PageHeader
+          title={title}
+          beforeTitle={(
+            <div className="w-full md:hidden">
+              <NativeSelect
+                className="h-8 w-full"
+                aria-label={t("scopeNavigation")}
+                value={mobileScope}
+                onChange={(event) => changeMobileScope(event.target.value)}
+              >
+                <option value="internal">{t("scopes.internal")}</option>
+                <option value="agents">{t("scopes.agents")}</option>
+                <option value="external">{t("scopes.external")} · {t("all")}</option>
+                {channels.map((channel) => (
+                  <option key={channel.id} value={`channel:${channel.id}`}>
+                    {t("scopes.external")} · {channel.name}
+                  </option>
+                ))}
+                <option value="trash">{t("trash.title")}</option>
+              </NativeSelect>
+            </div>
+          )}
+        >
           {deleted ? (
             <PageBack to="/contacts/external" />
           ) : scope === "external" ? (
@@ -628,7 +648,7 @@ export function ContactsPage({
               </Button>
             </>
           ) : null}
-        </div>
+        </PageHeader>
 
         {scope !== "agents" ? (
           <ListToolbar>
@@ -886,11 +906,27 @@ export function ContactsPage({
                 </div>
               ) : scope === "internal" && detailUser ? (
                 <dl className="grid gap-5 text-sm">
-                  <div><dt className="text-muted-foreground">{t("columns.name")}</dt><dd className="mt-1 font-medium">{detailUser.displayName}</dd></div>
-                  <div><dt className="text-muted-foreground">{t("columns.email")}</dt><dd className="mt-1">{detailUser.email}</dd></div>
-                  <div><dt className="text-muted-foreground">{t("columns.role")}</dt><dd className="mt-1">{userRoleLabel(detailUser.role, t)}</dd></div>
-                  <div><dt className="text-muted-foreground">{t("columns.status")}</dt><dd className="mt-1">{userStatusLabel(detailUser.status, t)}</dd></div>
-                  <div><dt className="text-muted-foreground">{t("columns.createdAt")}</dt><dd className="mt-1">{formatDateTime(detailUser.createdAt)}</dd></div>
+                  <MemberDetailItem
+                    label={t("columns.name")}
+                    value={detailUser.displayName}
+                    emphasized
+                  />
+                  <MemberDetailItem
+                    label={t("columns.email")}
+                    value={detailUser.email}
+                  />
+                  <MemberDetailItem
+                    label={t("columns.role")}
+                    value={userRoleLabel(detailUser.role, t)}
+                  />
+                  <MemberDetailItem
+                    label={t("columns.status")}
+                    value={userStatusLabel(detailUser.status, t)}
+                  />
+                  <MemberDetailItem
+                    label={t("columns.createdAt")}
+                    value={formatDateTime(detailUser.createdAt)}
+                  />
                 </dl>
               ) : scope === "external" && detail ? (
                 <ContactDetailView

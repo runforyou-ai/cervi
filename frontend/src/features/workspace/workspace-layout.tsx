@@ -1,8 +1,8 @@
 /** Web 与桌面端工作台布局。 */
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useState } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Outlet, useNavigate } from "react-router"
+import { Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -15,8 +15,18 @@ import {
 import { Button } from "@/components/ui/button"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
+/** 页面导航后清除文字选区。 */
+function useClearSelectionOnNavigation() {
+  const location = useLocation()
+
+  useLayoutEffect(() => {
+    window.getSelection()?.removeAllRanges()
+  }, [location.key])
+}
+
 /** 读取会话并渲染工作台导航和子页面。 */
 export function WorkspaceLayout() {
+  useClearSelectionOnNavigation()
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const [identity, setIdentity] = useState<Identity | null>(null)
@@ -52,8 +62,11 @@ export function WorkspaceLayout() {
   }, [navigate, t])
 
   useEffect(() => {
+    if (identity) {
+      return
+    }
     void fetchIdentity()
-  }, [fetchIdentity])
+  }, [fetchIdentity, identity])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -96,7 +109,7 @@ export function WorkspaceLayout() {
   }
 
   return (
-    <div className="flex h-svh min-h-0 w-full overflow-hidden">
+    <div className="cervi-workspace-shell flex h-svh min-h-0 w-full overflow-hidden">
       <WorkspaceNavigation
         identity={identity}
         onLogout={handleLogout}

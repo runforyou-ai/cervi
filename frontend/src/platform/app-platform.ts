@@ -21,3 +21,8 @@ export function resolveAppPlatform(): AppPlatform {
   }
   return "web"
 }
+
+/** 判断桌面端是否运行在 macOS。 */
+export function isDesktopMacOS(): boolean {
+  return (window as WailsWindow)._wails?.environment?.OS === "darwin"
+}

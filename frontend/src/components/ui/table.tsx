@@ -1,14 +1,21 @@
 /** shadcn 表格。 */
 import * as React from "react"
 
+import { SelectableText } from "@/components/selectable-text"
 import { cn } from "@/lib/utils"
+
+function selectableText(children: React.ReactNode) {
+  return typeof children === "string" || typeof children === "number"
+    ? <SelectableText>{children}</SelectableText>
+    : children
+}
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div data-slot="table-container" className="relative w-full overflow-x-auto">
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
+        className={cn("w-full caption-bottom text-sm select-none", className)}
         {...props}
       />
     </div>
@@ -48,7 +55,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   )
 }
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+function TableHead({ className, children, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       data-slot="table-head"
@@ -57,18 +64,29 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
         className
       )}
       {...props}
-    />
+    >
+      {selectableText(children)}
+    </th>
   )
 }
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({ className, children, ...props }: React.ComponentProps<"td">) {
   return (
     <td
       data-slot="table-cell"
       className={cn("px-4 py-3 align-middle", className)}
       {...props}
-    />
+    >
+      {selectableText(children)}
+    </td>
   )
 }
 
-export { Table, TableBody, TableCell, TableHead, TableHeader, TableRow }
+export {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+}

@@ -108,7 +108,6 @@ const enUS = {
       external: "Search external contacts",
     },
     list: {
-      count: "{{count}} records",
       more: "More",
       loadError: "Could not load contacts.",
       empty: "No contacts match these conditions",

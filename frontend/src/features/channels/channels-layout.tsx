@@ -19,7 +19,7 @@ const channelTypes: {
   { id: "wechatOfficialAccount", labelKey: "types.wechatOfficialAccount" },
 ]
 
-/** 渠道类型分栏和当前渠道页面。 */
+/** 显示渠道类型导航和当前渠道页面。 */
 export function ChannelsLayout() {
   const { t } = useTranslation("channels")
   const location = useLocation()
@@ -31,7 +31,7 @@ export function ChannelsLayout() {
 
   return (
     <PageSplit
-      paneWidth="sm"
+      paneWidth="md"
       paneVariant="nav"
       pane={
         <PagePaneNav label={t("typeNavigation")} title={t("title")}>
@@ -52,11 +52,9 @@ export function ChannelsLayout() {
             const selected = channelTypes.find(
               (type) => type.id === event.target.value,
             )
-            if (!selected?.to) {
-              console.warn("选中了未开放的渠道类型", event.target.value)
-              return
+            if (selected?.to) {
+              navigate(selected.to)
             }
-            navigate(selected.to)
           }}
         >
           {channelTypes.map((type) => (
@@ -68,7 +66,7 @@ export function ChannelsLayout() {
           ))}
         </NativeSelect>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <Outlet />
       </div>
     </PageSplit>

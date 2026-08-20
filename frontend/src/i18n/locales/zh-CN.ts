@@ -108,7 +108,6 @@ const zhCN = {
       external: "搜索外部联系人",
     },
     list: {
-      count: "{{count}} 条记录",
       more: "更多",
       loadError: "联系人列表加载失败。",
       empty: "没有符合条件的联系人",
