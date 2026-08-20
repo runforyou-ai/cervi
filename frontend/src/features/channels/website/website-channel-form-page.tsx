@@ -145,6 +145,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
       .then((loadedChannel) => {
         if (active) {
           setChannel(loadedChannel)
+          console.info("网站渠道详情已加载", { channel_id: channelId })
         }
       })
       .catch((requestError: unknown) => {
@@ -153,6 +154,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
         }
         if (requestError instanceof ApiError) {
           if (requestError.code === "AUTH_REQUIRED") {
+            console.info("未登录，进入登录页")
             navigate("/login", { replace: true })
             return
           }
@@ -190,7 +192,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
       <div className="flex flex-1 items-center justify-center p-6 text-center">
         <div>
           <p className="text-sm text-muted-foreground">
-            {error || t("form.loadError")}
+            {error}
           </p>
           <Button
             className="mt-4"

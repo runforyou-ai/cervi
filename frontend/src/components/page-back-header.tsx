@@ -1,10 +1,10 @@
-/** 离开列表后的返回入口和页面标题。 */
+/** 离开列表后的返回和标题。 */
 import type { ReactNode } from "react"
 import { ChevronLeftIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router"
 
-/** 返回上一层列表。 */
+/** 返回列表。 */
 export function PageBack({
   to,
 }: {
@@ -23,7 +23,7 @@ export function PageBack({
   )
 }
 
-/** 子页面顶部的返回和标题。 */
+/** 子页标题和返回。 */
 export function PageBackHeader({
   to,
   title,

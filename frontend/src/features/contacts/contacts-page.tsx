@@ -1,4 +1,4 @@
-/** 联系人列表、筛选、详情和回收站。 */
+/** 通讯录列表、筛选、详情和回收站。 */
 import {
   useCallback,
   useEffect,
@@ -112,7 +112,7 @@ export type ContactScope = "internal" | "external" | "agents"
 
 type LoadState = "loading" | "ready" | "error"
 
-/** 联系人范围主按钮。 */
+/** 通讯录分类按钮。 */
 function ScopeButton({
   active,
   icon: Icon,
@@ -139,7 +139,7 @@ function ScopeButton({
   )
 }
 
-/** 联系人范围子按钮。 */
+/** 通讯录子分类按钮。 */
 function SubscopeButton({
   active,
   children,
@@ -169,7 +169,7 @@ function SubscopeButton({
   )
 }
 
-/** 联系人范围和来源渠道筛选。 */
+/** 通讯录分类和来源渠道筛选。 */
 function ContactScopeSidebar({
   scope,
   deleted,
@@ -317,7 +317,7 @@ function PageControls({
   )
 }
 
-/** 按范围列出联系人。 */
+/** 按分类列出通讯录。 */
 export function ContactsPage({
   scope,
   deleted = false,

@@ -99,30 +99,26 @@ export function PagePaneNav({
 /** 分栏左栏导航项。 */
 export function PagePaneLink({
   to,
-  comingSoon = false,
   children,
 }: {
   to?: string
-  comingSoon?: boolean
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
   const className =
     "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors"
 
-  if (comingSoon || !to) {
+  if (!to) {
     return (
       <span
         className={cn(className, "cursor-default text-muted-foreground")}
         aria-disabled="true"
-        title={comingSoon ? t("comingSoon") : undefined}
+        title={t("comingSoon")}
       >
         <span className="min-w-0 flex-1 truncate">{children}</span>
-        {comingSoon ? (
-          <span className="rounded-sm bg-sidebar-accent px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            {t("comingSoon")}
-          </span>
-        ) : null}
+        <span className="rounded-sm bg-sidebar-accent px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          {t("comingSoon")}
+        </span>
       </span>
     )
   }

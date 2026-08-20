@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
-/** 模块轨上的导航项。 */
+/** 模块轨导航项。 */
 function WorkspaceRailItem({
   to,
   icon: Icon,
@@ -51,7 +51,7 @@ function WorkspaceRailItem({
   )
 }
 
-/** 工作台主导航。 */
+/** 模块轨导航。 */
 function WorkspaceMenu() {
   const { t } = useTranslation("workspace")
   const location = useLocation()
@@ -83,7 +83,7 @@ function WorkspaceMenu() {
   )
 }
 
-/** 工作台模块轨和用户菜单。 */
+/** 渲染模块轨和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
   onLogout,

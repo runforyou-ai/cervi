@@ -1,4 +1,4 @@
-/** 加载消息数据。 */
+/** 消息列表路由。 */
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -8,7 +8,7 @@ import { ApiError, loadInbox, type InboxData } from "@/api"
 import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
 
-/** 读取消息列表，未登录则跳转。 */
+/** 校验登录后显示消息页。 */
 export function InboxRoute() {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
@@ -16,7 +16,7 @@ export function InboxRoute() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  /** 加载当前消息列表。 */
+  /** 加载消息列表。 */
   const fetchInbox = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -43,7 +43,7 @@ export function InboxRoute() {
     void fetchInbox()
   }, [fetchInbox])
 
-  if (loading && !data) {
+  if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
@@ -57,7 +57,7 @@ export function InboxRoute() {
       <div className="flex flex-1 items-center justify-center p-6 text-center">
         <div>
           <p className="text-sm text-muted-foreground">
-            {error || t("inboxLoadError")}
+            {error}
           </p>
           <Button className="mt-4" variant="outline" onClick={fetchInbox}>
             <RefreshCwIcon />

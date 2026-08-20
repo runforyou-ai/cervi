@@ -92,7 +92,7 @@ export function WorkspaceLayout({
     }
   }
 
-  if (loading && !identity) {
+  if (loading) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
@@ -106,7 +106,7 @@ export function WorkspaceLayout({
       <main className="flex min-h-svh items-center justify-center p-6">
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
-            {error || t("loadError")}
+            {error}
           </p>
           <Button className="mt-4" variant="outline" onClick={fetchIdentity}>
             <RefreshCwIcon />
