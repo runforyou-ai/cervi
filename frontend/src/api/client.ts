@@ -41,7 +41,7 @@ export class ApiError extends Error {
   }
 }
 
-/** 注入认证和语言后调用应用服务；页面卸载时只忽略结果，不取消 Wails 绑定。 */
+/** 注入认证和语言后调用应用服务。卸载时忽略结果，不取消绑定。 */
 export async function call<T>(
   operation: (meta: RequestMeta) => CancellablePromise<T>,
   signal?: AbortSignal,

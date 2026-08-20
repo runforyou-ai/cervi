@@ -106,6 +106,7 @@ func (b *DirectBackend) LoadIdentity(ctx context.Context, meta RequestMeta) (Ide
 	return identityFromModel(identity), nil
 }
 
+// installationFieldKeys 把初始化校验错误码映射为本地化文案键。
 func installationFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
 		installationaction.ValidationOrganizationNameRequired: cervii18n.FieldOrganizationNameRequired,

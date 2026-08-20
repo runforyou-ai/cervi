@@ -7,7 +7,7 @@ import { useNavigate } from "react-router"
 import { getInstallationStatus } from "@/api"
 import { LoginForm } from "@/features/auth/login-form"
 
-/** 已连接企业时展示企业名称、登录表单，以及原生端修改服务器入口。 */
+/** 已连接企业时展示企业名称、登录表单，以及原生端切换服务器入口。 */
 export function LoginPage({
   allowServerChange = false,
 }: {
@@ -44,7 +44,7 @@ export function LoginPage({
 
   if (organizationName === "") {
     return (
-      <main className="flex min-h-svh items-center justify-center">
+      <main className="flex min-h-dvh items-center justify-center">
         <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
       </main>
     )

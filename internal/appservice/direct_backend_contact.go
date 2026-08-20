@@ -109,6 +109,7 @@ func (b *DirectBackend) RestoreContact(ctx context.Context, meta RequestMeta, co
 	return contactFromAction(contact), nil
 }
 
+// contactMutationError 转换联系人写入校验和操作错误。
 func (b *DirectBackend) contactMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -120,6 +121,7 @@ func (b *DirectBackend) contactMutationError(ctx context.Context, meta RequestMe
 	return b.contactError(ctx, meta, err, failureKey)
 }
 
+// contactError 转换联系人读取和删除错误。
 func (b *DirectBackend) contactError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()

@@ -1,4 +1,4 @@
-/** 判断原生端进入工作台、登录页还是连接页。 */
+/** 原生端启动入口判断。 */
 import { getInstallationStatus, getServerURL, loadIdentity } from "@/api/auth"
 import { ApiError, hasToken } from "@/api/client"
 import type { Identity, InstallationStatus } from "@/api/service"

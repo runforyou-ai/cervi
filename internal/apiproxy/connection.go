@@ -61,6 +61,7 @@ func (e *serverURLValidationError) Error() string {
 	return string(e.messageKey)
 }
 
+// newConnection 读取已保存的企业服务器地址并建立远程连接。
 func newConnection(store Store) (*connection, error) {
 	result := &connection{store: store}
 	serverURL, err := store.GetServerURL(context.Background())
@@ -80,12 +81,14 @@ func newConnection(store Store) (*connection, error) {
 	return result, nil
 }
 
+// currentState 返回当前远程连接状态。
 func (c *connection) currentState() *remoteState {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.state
 }
 
+// newRemoteState 创建指向企业服务器的 HTTP 客户端。
 func newRemoteState(baseURL *url.URL) *remoteState {
 	return &remoteState{
 		baseURL: baseURL,
@@ -93,6 +96,7 @@ func newRemoteState(baseURL *url.URL) *remoteState {
 	}
 }
 
+// parseServerURL 校验企业服务器地址。
 func parseServerURL(value string) (*url.URL, error) {
 	value = strings.TrimSpace(value)
 	parsed, err := url.ParseRequestURI(value)
@@ -109,6 +113,7 @@ func parseServerURL(value string) (*url.URL, error) {
 	return parsed, nil
 }
 
+// isLoopbackHost 判断主机是否为回环地址。
 func isLoopbackHost(host string) bool {
 	if strings.EqualFold(host, "localhost") {
 		return true
@@ -147,6 +152,7 @@ func probeServer(ctx context.Context, state *remoteState) (appservice.Installati
 	}, nil
 }
 
+// remoteEndpoint 拼接企业服务器 API 地址。
 func remoteEndpoint(baseURL *url.URL, path, rawQuery string) string {
 	endpoint := *baseURL
 	endpoint.Path = strings.TrimRight(baseURL.Path, "/") + "/api" + path

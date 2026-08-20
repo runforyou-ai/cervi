@@ -230,8 +230,12 @@ func (b *Backend) ServerURL(_ context.Context, _ appservice.RequestMeta) (string
 
 // ProbeServer 检测企业服务器并返回公开企业名称，不保存地址。
 func (b *Backend) ProbeServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (appservice.InstallationStatus, error) {
-	_, status, err := b.inspectServer(ctx, meta, serverURL)
-	return status, err
+	state, status, err := b.inspectServer(ctx, meta, serverURL)
+	if err != nil {
+		return appservice.InstallationStatus{}, err
+	}
+	slog.Info("已检测到企业服务器", "server_url", state.baseURL.String(), "organization", status.OrganizationName)
+	return status, nil
 }
 
 // ConnectServer 验证并保存企业服务器地址。
@@ -254,6 +258,7 @@ func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta
 	return nil
 }
 
+// inspectServer 校验地址并读取远程初始化状态，不保存配置。
 func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (*remoteState, appservice.InstallationStatus, error) {
 	parsed, err := parseServerURL(serverURL)
 	if err != nil {
@@ -279,6 +284,7 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 	return state, status, nil
 }
 
+// do 向已连接的企业服务器发送 HTTP 请求。
 func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, path string, query url.Values, input, output any) error {
 	state := b.connection.currentState()
 	if state == nil {
@@ -337,23 +343,27 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	return nil
 }
 
+// localError 把错误码转换为本地化业务错误。
 func localError(meta appservice.RequestMeta, status int, code string, messageKey cervii18n.Key, fields map[string]cervii18n.Key) *appservice.Error {
 	message, _ := cervii18n.Localize(string(meta.Locale), messageKey)
 	return &appservice.Error{Status: status, Code: code, Message: message, Fields: cervii18n.LocalizeMap(string(meta.Locale), fields)}
 }
 
+// setQuery 在值非空时写入查询参数。
 func setQuery(query url.Values, name, value string) {
 	if value != "" {
 		query.Set(name, value)
 	}
 }
 
+// setOptionalQuery 在指针非空时写入查询参数。
 func setOptionalQuery[T ~string](query url.Values, name string, value *T) {
 	if value != nil {
 		setQuery(query, name, string(*value))
 	}
 }
 
+// setPositiveQuery 在值为正数时写入查询参数。
 func setPositiveQuery(query url.Values, name string, value int) {
 	if value > 0 {
 		query.Set(name, strconv.Itoa(value))

@@ -144,6 +144,7 @@ func (b *DirectBackend) ListChannels(ctx context.Context, meta RequestMeta) (Cha
 	return ChannelList{Channels: result}, nil
 }
 
+// channelMutationError 转换渠道写入校验和操作错误。
 func (b *DirectBackend) channelMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -155,6 +156,7 @@ func (b *DirectBackend) channelMutationError(ctx context.Context, meta RequestMe
 	return b.channelError(ctx, meta, err, failureKey)
 }
 
+// channelError 转换渠道读取和删除错误。
 func (b *DirectBackend) channelError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()

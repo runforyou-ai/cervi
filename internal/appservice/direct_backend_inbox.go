@@ -4,7 +4,7 @@ package appservice
 
 import "context"
 
-// LoadInbox 返回当前身份可访问的统一收件箱。
+// LoadInbox 返回当前身份所属企业和用户，会话列表暂为空。
 func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

@@ -84,6 +84,7 @@ func NewDirectBackend(db *bun.DB) *DirectBackend {
 	}
 }
 
+// requireInitialized 校验企业是否已完成初始化。
 func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta) error {
 	status, err := b.InstallationStatus(ctx, meta)
 	if err != nil {
@@ -95,6 +96,7 @@ func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta
 	return nil
 }
 
+// authenticate 校验登录令牌并返回当前身份。
 func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
 	if err := b.requireInitialized(ctx, meta); err != nil {
 		return nil, err

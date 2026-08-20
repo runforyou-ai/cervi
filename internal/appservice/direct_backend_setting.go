@@ -58,6 +58,7 @@ func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, inp
 	return nil
 }
 
+// s3SettingError 转换对象存储校验和操作错误。
 func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()

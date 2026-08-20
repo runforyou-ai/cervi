@@ -1,4 +1,4 @@
-/** 设置页，当前展示对象存储配置。 */
+/** 设置页。 */
 import { useTranslation } from "react-i18next"
 import { Link, NavLink } from "react-router"
 
