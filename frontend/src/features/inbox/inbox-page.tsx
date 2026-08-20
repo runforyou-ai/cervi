@@ -1,4 +1,4 @@
-/** 收件箱会话列表和聊天界面。 */
+/** 消息会话列表和聊天界面。 */
 import { useEffect, useState } from "react"
 import {
   MessagesSquareIcon,
@@ -211,7 +211,7 @@ function CustomerPanel({ conversation }: { conversation: Conversation }) {
   )
 }
 
-/** 收件箱会话列表。 */
+/** 消息会话列表。 */
 function InboxConversationList({
   conversations,
   selectedId,
@@ -225,15 +225,6 @@ function InboxConversationList({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-14 shrink-0 items-center px-4">
-        <div>
-          <h2 className="text-sm font-medium">{t("title")}</h2>
-          <p className="text-xs text-muted-foreground">
-            {t("ongoing", { count: conversations.length })}
-          </p>
-        </div>
-      </div>
-      <Separator />
       <div className="shrink-0 p-3">
         <div className="relative">
           <SearchIcon className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
@@ -259,8 +250,8 @@ function InboxConversationList({
                     : conversation.name
                 }
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-muted/60",
-                  selectedId === conversation.id && "bg-muted"
+                  "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-foreground/6",
+                  selectedId === conversation.id && "bg-foreground/12"
                 )}
                 onClick={() => onSelect?.(conversation.id)}
               >
@@ -294,7 +285,7 @@ function InboxConversationList({
   )
 }
 
-/** 收件箱会话列表和当前会话。 */
+/** 消息会话列表和当前会话。 */
 export function InboxPage({
   conversations,
 }: {

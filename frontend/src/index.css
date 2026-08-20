@@ -182,7 +182,7 @@ body,
   min-height: 100%;
 }
 
-/* macOS 隐藏标题栏后红绿灯叠在 webview 上；预留独立拖拽条。不进 @layer，以便压过侧栏 inset-y-0。 */
+/* macOS 隐藏标题栏后红绿灯叠在 webview 上；预留独立拖拽条。 */
 .cervi-window-drag-region {
   display: none;
 }
@@ -210,10 +210,4 @@ body,
 
 .cervi-workspace-shell {
   padding-top: var(--cervi-macos-titlebar-height, 0px);
-}
-
-[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-shell [data-slot="sidebar-container"] {
-  top: var(--cervi-macos-titlebar-height);
-  bottom: auto;
-  height: calc(100svh - var(--cervi-macos-titlebar-height));
 }

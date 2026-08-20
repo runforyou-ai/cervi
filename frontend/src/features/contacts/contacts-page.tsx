@@ -1,4 +1,4 @@
-/** 联系人列表、筛选、详情和回收站。 */
+/** 通讯录列表、筛选、详情和回收站。 */
 import {
   useCallback,
   useEffect,
@@ -21,7 +21,6 @@ import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
   ChannelType,
   ContactMethodType,
   ContactSort,
@@ -34,6 +33,7 @@ import {
   listChannels,
   listContacts,
   listDeletedContacts,
+  recoverSession,
   listUsers,
   restoreContact,
   type ChannelSummary,
@@ -50,6 +50,7 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
+import { PageBack } from "@/components/page-back-header"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { Button } from "@/components/ui/button"
 import {
@@ -111,7 +112,7 @@ export type ContactScope = "internal" | "external" | "agents"
 
 type LoadState = "loading" | "ready" | "error"
 
-/** 联系人范围主按钮。 */
+/** 通讯录分类按钮。 */
 function ScopeButton({
   active,
   icon: Icon,
@@ -127,8 +128,8 @@ function ScopeButton({
     <button
       type="button"
       className={cn(
-        "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+        "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
+        active && "bg-foreground/12 font-medium text-sidebar-accent-foreground",
       )}
       onClick={onClick}
     >
@@ -138,7 +139,7 @@ function ScopeButton({
   )
 }
 
-/** 联系人范围子按钮。 */
+/** 通讯录子分类按钮。 */
 function SubscopeButton({
   active,
   children,
@@ -156,9 +157,9 @@ function SubscopeButton({
     <button
       type="button"
       className={cn(
-        "flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
         nested ? "pl-14" : "pl-8",
-        active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+        active && "bg-foreground/12 font-medium text-sidebar-accent-foreground",
       )}
       onClick={onClick}
     >
@@ -168,7 +169,7 @@ function SubscopeButton({
   )
 }
 
-/** 联系人范围和来源渠道筛选。 */
+/** 通讯录分类和来源渠道筛选。 */
 function ContactScopeSidebar({
   scope,
   deleted,
@@ -191,7 +192,7 @@ function ContactScopeSidebar({
   }, [channels])
 
   return (
-    <PagePaneNav label={t("scopeNavigation")}>
+    <PagePaneNav label={t("scopeNavigation")} title={t("title")}>
       <ScopeButton
         active={scope === "internal"}
         icon={UsersIcon}
@@ -200,12 +201,20 @@ function ContactScopeSidebar({
         {t("scopes.internal")}
       </ScopeButton>
 
+      <ScopeButton
+        active={scope === "agents"}
+        icon={BotIcon}
+        onClick={() => navigate("/contacts/agents")}
+      >
+        {t("scopes.agents")}
+      </ScopeButton>
+
       <Collapsible defaultOpen>
         <CollapsibleTrigger asChild>
           <button
             type="button"
             className={cn(
-              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
               scope === "external" && "font-medium text-sidebar-accent-foreground",
             )}
           >
@@ -226,7 +235,7 @@ function ContactScopeSidebar({
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
-                  className="group flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  className="group flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-left text-sm text-muted-foreground hover:bg-foreground/6 hover:text-sidebar-accent-foreground"
                 >
                   <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
                   <span>{channelTypeLabel(type, t)}</span>
@@ -255,14 +264,6 @@ function ContactScopeSidebar({
           ))}
         </CollapsibleContent>
       </Collapsible>
-
-      <ScopeButton
-        active={scope === "agents"}
-        icon={BotIcon}
-        onClick={() => navigate("/contacts/agents")}
-      >
-        {t("scopes.agents")}
-      </ScopeButton>
     </PagePaneNav>
   )
 }
@@ -316,7 +317,7 @@ function PageControls({
   )
 }
 
-/** 按范围列出联系人。 */
+/** 按分类列出通讯录。 */
 export function ContactsPage({
   scope,
   deleted = false,
@@ -435,8 +436,7 @@ export function ContactsPage({
         if (error instanceof DOMException && error.name === "AbortError") {
           return
         }
-        if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-          navigate("/login", { replace: true })
+        if (recoverSession(error, navigate)) {
           return
         }
         console.warn("联系人列表加载失败", error)
@@ -470,8 +470,7 @@ export function ContactsPage({
         if (error instanceof DOMException && error.name === "AbortError") {
           return
         }
-        if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-          navigate("/login", { replace: true })
+        if (recoverSession(error, navigate)) {
           return
         }
         console.warn("联系人详情加载失败", error)
@@ -544,8 +543,7 @@ export function ContactsPage({
       }
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-        navigate("/login", { replace: true })
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("删除联系人失败", error)
@@ -563,8 +561,7 @@ export function ContactsPage({
       toast.success(t("trash.restored"))
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-        navigate("/login", { replace: true })
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("恢复联系人失败", error)
@@ -598,6 +595,7 @@ export function ContactsPage({
               onChange={(event) => changeMobileScope(event.target.value)}
             >
               <option value="internal">{t("scopes.internal")}</option>
+              <option value="agents">{t("scopes.agents")}</option>
               <option value="external">{t("scopes.external")} · {t("all")}</option>
               {channels.map((channel) => (
                 <option key={channel.id} value={`channel:${channel.id}`}>
@@ -605,7 +603,6 @@ export function ContactsPage({
                 </option>
               ))}
               <option value="trash">{t("trash.title")}</option>
-              <option value="agents">{t("scopes.agents")}</option>
             </NativeSelect>
           </div>
           <div className="mr-auto min-w-40">
@@ -614,27 +611,21 @@ export function ContactsPage({
               {t("list.count", { count: page.total })}
             </p>
           </div>
-          {scope === "external" ? (
+          {deleted ? (
+            <PageBack to="/contacts/external" />
+          ) : scope === "external" ? (
             <>
-              {deleted ? (
-                <Button variant="outline" size="sm" onClick={() => navigate("/contacts/external")}>
-                  {t("trash.back")}
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={channels.length === 0}
-                    title={channels.length === 0 ? t("form.channelRequiredHint") : undefined}
-                    onClick={() => setParameters({ new: "1", selected: null })}
-                  >
-                    {t("create")}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => navigate("/contacts/external/trash")}>
-                    {t("trash.title")}
-                  </Button>
-                </>
-              )}
+              <Button
+                size="sm"
+                disabled={channels.length === 0}
+                title={channels.length === 0 ? t("form.channelRequiredHint") : undefined}
+                onClick={() => setParameters({ new: "1", selected: null })}
+              >
+                {t("create")}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate("/contacts/external/trash")}>
+                {t("trash.title")}
+              </Button>
             </>
           ) : null}
         </div>

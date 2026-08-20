@@ -249,7 +249,7 @@ func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta
 			return ctx.Err()
 		}
 		slog.Warn("保存企业服务器配置失败", "server_url", state.baseURL.String(), "error", err)
-		return localError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorServerConnectionSaveFailed, nil)
+		return appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
 	}
 	b.connection.mu.Lock()
 	b.connection.state = state
@@ -266,7 +266,7 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 		if !errors.As(err, &validationError) {
 			return nil, appservice.InstallationStatus{}, fmt.Errorf("parse enterprise server URL: %w", err)
 		}
-		return nil, appservice.InstallationStatus{}, localError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorServerURLInvalid, map[string]cervii18n.Key{"serverUrl": validationError.messageKey})
+		return nil, appservice.InstallationStatus{}, appservice.InvalidError(meta, cervii18n.ErrorServerURLInvalid, map[string]cervii18n.Key{"serverUrl": validationError.messageKey})
 	}
 	state := newRemoteState(parsed)
 	status, err := probeServer(ctx, state)
@@ -275,11 +275,11 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 			return nil, appservice.InstallationStatus{}, ctx.Err()
 		}
 		slog.Warn("验证企业服务器失败", "server_url", parsed.String(), "error", err)
-		return nil, appservice.InstallationStatus{}, localError(meta, http.StatusBadGateway, "SERVER_UNAVAILABLE", cervii18n.ErrorServerUnavailable, map[string]cervii18n.Key{"serverUrl": cervii18n.FieldServerURLNotCervi})
+		return nil, appservice.InstallationStatus{}, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, map[string]cervii18n.Key{"serverUrl": cervii18n.FieldServerURLNotCervi}).WithState(appservice.SessionStateConnect)
 	}
 	if !status.Installed || status.OrganizationName == "" {
 		slog.Info("企业服务器尚未初始化", "server_url", parsed.String())
-		return nil, appservice.InstallationStatus{}, localError(meta, http.StatusConflict, "SERVER_INITIALIZATION_REQUIRED", cervii18n.ErrorServerInitializationRequired, nil)
+		return nil, appservice.InstallationStatus{}, appservice.InvalidError(meta, cervii18n.ErrorServerInitializationRequired, nil)
 	}
 	return state, status, nil
 }
@@ -288,7 +288,7 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, path string, query url.Values, input, output any) error {
 	state := b.connection.currentState()
 	if state == nil {
-		return localError(meta, http.StatusPreconditionRequired, "SERVER_CONNECTION_REQUIRED", cervii18n.ErrorServerConnectionRequired, nil)
+		return appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
 	}
 	var body io.Reader
 	if input != nil {
@@ -305,7 +305,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	endpoint := remoteEndpoint(state.baseURL, path, rawQuery)
 	request, err := http.NewRequestWithContext(ctx, method, endpoint, body)
 	if err != nil {
-		return localError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorRemoteRequestCreateFailed, nil)
+		return appservice.FailedError(meta, cervii18n.ErrorRemoteRequestCreateFailed)
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Accept-Language", string(meta.Locale))
@@ -321,7 +321,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 			return ctx.Err()
 		}
 		slog.Warn("企业服务器请求失败", "server_url", state.baseURL.String(), "method", method, "path", path, "error", err)
-		return localError(meta, http.StatusBadGateway, "SERVER_UNAVAILABLE", cervii18n.ErrorServerConnectionFailed, nil)
+		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil).WithState(appservice.SessionStateConnect)
 	}
 	defer response.Body.Close()
 	limited := io.LimitReader(response.Body, maxResponseBytes)
@@ -329,24 +329,23 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 		var payload errorBody
 		if err := json.NewDecoder(limited).Decode(&payload); err != nil {
 			slog.Warn("解析企业服务器错误响应失败", "server_url", state.baseURL.String(), "method", method, "path", path, "status", response.StatusCode, "error", err)
-			return &appservice.Error{Status: response.StatusCode, Code: "REMOTE_ERROR", Message: http.StatusText(response.StatusCode)}
+			return &appservice.Error{Kind: appservice.ErrorKindFailed, Message: http.StatusText(response.StatusCode)}
 		}
-		return &appservice.Error{Status: response.StatusCode, Code: payload.Error.Code, Message: payload.Error.Message, Fields: payload.Error.Fields}
+		sessionState := payload.Error.State
+		if sessionState == appservice.SessionStateSetup {
+			slog.Info("远端要求初始化，改为连接企业服务器")
+			sessionState = appservice.SessionStateConnect
+		}
+		return &appservice.Error{Kind: payload.Error.Kind, State: sessionState, Message: payload.Error.Message, Fields: payload.Error.Fields}
 	}
 	if output == nil || response.StatusCode == http.StatusNoContent {
 		return nil
 	}
 	if err := json.NewDecoder(limited).Decode(output); err != nil {
 		slog.Warn("解析企业服务器响应失败", "server_url", state.baseURL.String(), "method", method, "path", path, "status", response.StatusCode, "error", err)
-		return localError(meta, http.StatusBadGateway, "SERVER_INVALID_RESPONSE", cervii18n.ErrorServerConnectionFailed, nil)
+		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil).WithState(appservice.SessionStateConnect)
 	}
 	return nil
-}
-
-// localError 把错误码转换为本地化业务错误。
-func localError(meta appservice.RequestMeta, status int, code string, messageKey cervii18n.Key, fields map[string]cervii18n.Key) *appservice.Error {
-	message, _ := cervii18n.Localize(string(meta.Locale), messageKey)
-	return &appservice.Error{Status: status, Code: code, Message: message, Fields: cervii18n.LocalizeMap(string(meta.Locale), fields)}
 }
 
 // setQuery 在值非空时写入查询参数。

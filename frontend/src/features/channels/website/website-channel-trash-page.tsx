@@ -2,23 +2,16 @@
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
   listDeletedWebsiteChannels,
+  recoverSession,
   restoreWebsiteChannel,
   type WebsiteChannelSummary,
 } from "@/api"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageBackHeader } from "@/components/page-back-header"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -47,11 +40,7 @@ export function WebsiteChannelTrashPage() {
     try {
       setChannels(await listDeletedWebsiteChannels())
     } catch (requestError) {
-      if (
-        requestError instanceof ApiError &&
-        requestError.code === "AUTH_REQUIRED"
-      ) {
-        navigate("/login", { replace: true })
+      if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("网站渠道回收站加载失败", requestError)
@@ -75,11 +64,7 @@ export function WebsiteChannelTrashPage() {
         current.filter((item) => item.id !== channel.id)
       )
     } catch (requestError) {
-      if (
-        requestError instanceof ApiError &&
-        requestError.code === "AUTH_REQUIRED"
-      ) {
-        navigate("/login", { replace: true })
+      if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("恢复网站渠道失败", requestError)
@@ -91,25 +76,9 @@ export function WebsiteChannelTrashPage() {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/channels/website">{t("list.title")}</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{t("trash.title")}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+      <PageBackHeader to="/channels/website" title={t("trash.title")} />
 
-      <h2 className="text-xl font-semibold tracking-tight">
-        {t("trash.title")}
-      </h2>
-
-      <div className="mt-6">
+      <div>
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />

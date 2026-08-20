@@ -14,9 +14,10 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
   StorageProvider,
   getS3Setting,
+  isApiError,
+  recoverSession,
   saveS3Setting,
   testS3Setting,
   type StorageProviderId,
@@ -181,8 +182,7 @@ export function StorageSettingsForm() {
       setEditing(false)
       form.reset(setting)
     } catch (error) {
-      if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-        navigate("/login", { replace: true })
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("对象存储设置加载失败", error)
@@ -198,11 +198,10 @@ export function StorageSettingsForm() {
 
   /** 处理对象存储请求错误。 */
   function handleRequestError(error: unknown, message: string) {
-    if (error instanceof ApiError) {
-      if (error.code === "AUTH_REQUIRED") {
-        navigate("/login", { replace: true })
-        return
-      }
+    if (recoverSession(error, navigate)) {
+      return
+    }
+    if (isApiError(error)) {
       console.warn("对象存储请求失败", error)
       toast.error(apiErrorMessage(error, settingFieldNames))
       return

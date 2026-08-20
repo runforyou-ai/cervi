@@ -6,9 +6,9 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
   deleteWebsiteChannel,
   listWebsiteChannels,
+  recoverSession,
   type WebsiteChannelSummary,
 } from "@/api"
 import {
@@ -111,11 +111,7 @@ export function WebsiteChannelListPage() {
     try {
       setChannels(await listWebsiteChannels())
     } catch (requestError) {
-      if (
-        requestError instanceof ApiError &&
-        requestError.code === "AUTH_REQUIRED"
-      ) {
-        navigate("/login", { replace: true })
+      if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("网站渠道列表加载失败", requestError)
@@ -139,11 +135,7 @@ export function WebsiteChannelListPage() {
       )
       setDeletingChannel(null)
     } catch (requestError) {
-      if (
-        requestError instanceof ApiError &&
-        requestError.code === "AUTH_REQUIRED"
-      ) {
-        navigate("/login", { replace: true })
+      if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("删除网站渠道失败", requestError)

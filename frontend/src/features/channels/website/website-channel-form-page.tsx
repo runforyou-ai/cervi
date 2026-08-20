@@ -2,22 +2,16 @@
 import { useEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router"
+import { useNavigate, useParams, useSearchParams } from "react-router"
 
-import { ApiError, getWebsiteChannel, type WebsiteChannel } from "@/api"
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+  ErrorKind,
+  getWebsiteChannel,
+  isApiError,
+  recoverSession,
+  type WebsiteChannel,
+} from "@/api"
+import { PageBackHeader } from "@/components/page-back-header"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WebsiteChannelForm } from "@/features/channels/website/website-channel-form"
@@ -157,22 +151,20 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
       .then((loadedChannel) => {
         if (active) {
           setChannel(loadedChannel)
+          console.info("网站渠道详情已加载", { channel_id: channelId })
         }
       })
       .catch((requestError: unknown) => {
         if (!active) {
           return
         }
-        if (requestError instanceof ApiError) {
-          if (requestError.code === "AUTH_REQUIRED") {
-            navigate("/login", { replace: true })
-            return
-          }
-          if (requestError.code === "CHANNEL_NOT_FOUND") {
-            console.warn("网站渠道不存在", { channel_id: channelId })
-            navigate("/channels/website", { replace: true })
-            return
-          }
+        if (recoverSession(requestError, navigate)) {
+          return
+        }
+        if (isApiError(requestError) && requestError.kind === ErrorKind.ErrorKindNotFound) {
+          console.warn("网站渠道不存在", { channel_id: channelId })
+          navigate("/channels/website", { replace: true })
+          return
         }
         console.warn("网站渠道详情加载失败", requestError)
         setError(t("form.loadError"))
@@ -202,7 +194,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
       <div className="flex flex-1 items-center justify-center p-6 text-center">
         <div>
           <p className="text-sm text-muted-foreground">
-            {error || t("form.loadError")}
+            {error}
           </p>
           <Button
             className="mt-4"
@@ -218,24 +210,10 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/channels/website">{t("list.title")}</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>
-              {mode === "create" ? t("create.title") : channel?.name}
-            </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <h2 className="text-xl font-semibold tracking-tight">
-        {mode === "create" ? t("create.title") : channel?.name}
-      </h2>
+      <PageBackHeader
+        to="/channels/website"
+        title={mode === "create" ? t("create.title") : channel?.name}
+      />
       {mode === "edit" && channel ? (
         <WebsiteChannelEditTabs channel={channel} onChannelChange={setChannel} />
       ) : (

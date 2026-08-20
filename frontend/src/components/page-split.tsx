@@ -73,47 +73,52 @@ export function PageSplit({
 /** 分栏左栏导航列表。 */
 export function PagePaneNav({
   label,
+  title,
   children,
 }: {
   label: string
+  title?: string
   children: ReactNode
 }) {
   return (
-    <ScrollArea className="min-h-0 flex-1">
-      <nav className="flex flex-col gap-1 p-3" aria-label={label}>
-        {children}
-      </nav>
-    </ScrollArea>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {title ? (
+        <h2 className="shrink-0 px-4 pt-5 pb-2 text-xl font-semibold tracking-tight">
+          {title}
+        </h2>
+      ) : null}
+      <ScrollArea className="min-h-0 flex-1">
+        <nav className="flex flex-col gap-1 p-3" aria-label={label}>
+          {children}
+        </nav>
+      </ScrollArea>
+    </div>
   )
 }
 
 /** 分栏左栏导航项。 */
 export function PagePaneLink({
   to,
-  comingSoon = false,
   children,
 }: {
   to?: string
-  comingSoon?: boolean
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
   const className =
     "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors"
 
-  if (comingSoon || !to) {
+  if (!to) {
     return (
       <span
         className={cn(className, "cursor-default text-muted-foreground")}
         aria-disabled="true"
-        title={comingSoon ? t("comingSoon") : undefined}
+        title={t("comingSoon")}
       >
         <span className="min-w-0 flex-1 truncate">{children}</span>
-        {comingSoon ? (
-          <span className="rounded-sm bg-sidebar-accent px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            {t("comingSoon")}
-          </span>
-        ) : null}
+        <span className="rounded-sm bg-sidebar-accent px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          {t("comingSoon")}
+        </span>
       </span>
     )
   }
@@ -124,9 +129,9 @@ export function PagePaneLink({
       className={({ isActive }) =>
         cn(
           className,
-          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          "hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
           isActive &&
-            "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+            "bg-foreground/12 font-medium text-sidebar-accent-foreground",
         )
       }
     >

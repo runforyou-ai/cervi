@@ -8,12 +8,11 @@ import (
 // TestMarshalErrorPreservesStructuredCause 验证 Wails 错误序列化保留业务字段。
 func TestMarshalErrorPreservesStructuredCause(t *testing.T) {
 	payload := MarshalError(&Error{
-		Status:  400,
-		Code:    "VALIDATION_FAILED",
+		Kind:    ErrorKindInvalid,
 		Message: "输入有误。",
 		Fields:  map[string]string{"name": "请输入名称。"},
 	})
-	if string(payload) != `{"status":400,"code":"VALIDATION_FAILED","message":"输入有误。","fields":{"name":"请输入名称。"}}` {
+	if string(payload) != `{"kind":"invalid","message":"输入有误。","fields":{"name":"请输入名称。"}}` {
 		t.Fatalf("payload = %s", payload)
 	}
 }

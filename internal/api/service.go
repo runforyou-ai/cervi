@@ -20,9 +20,10 @@ type errorBody struct {
 }
 
 type apiError struct {
-	Code    string            `json:"code"`
-	Message string            `json:"message"`
-	Fields  map[string]string `json:"fields,omitempty"`
+	Kind    appservice.ErrorKind    `json:"kind,omitempty"`
+	State   appservice.SessionState `json:"state,omitempty"`
+	Message string                  `json:"message"`
+	Fields  map[string]string       `json:"fields,omitempty"`
 }
 
 // Service 是企业服务端对外提供的 Gin HTTP 适配器。
@@ -304,7 +305,7 @@ func bearerToken(authorization string) string {
 
 func bindJSON(c *gin.Context, output any) bool {
 	if err := c.ShouldBindJSON(output); err != nil {
-		writeLocalizedError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, nil)
+		writeApplicationError(c, appservice.InvalidError(requestMeta(c), cervii18n.ErrorValidationFailed, nil))
 		return false
 	}
 	return true
@@ -317,7 +318,7 @@ func positiveQueryInteger(c *gin.Context, name string, defaultValue int) (int, b
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
-		writeLocalizedError(c, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{name: cervii18n.FieldQueryPositiveInteger})
+		writeApplicationError(c, appservice.InvalidError(requestMeta(c), cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{name: cervii18n.FieldQueryPositiveInteger}))
 		return 0, false
 	}
 	return parsed, true
@@ -346,23 +347,19 @@ func writeApplicationError(c *gin.Context, err error) bool {
 	}
 	var applicationError *appservice.Error
 	if errors.As(err, &applicationError) {
-		_, language := cervii18n.Localize(c.GetHeader("Accept-Language"), cervii18n.ErrorInternal)
-		c.Header("Content-Language", language)
-		c.Header("Vary", "Accept-Language")
-		c.JSON(applicationError.Status, errorBody{Error: apiError{
-			Code: applicationError.Code, Message: applicationError.Message, Fields: applicationError.Fields,
-		}})
+		writeErrorBody(c, applicationError)
 		return true
 	}
 	slog.Warn("应用服务调用失败", "error", err)
-	writeLocalizedError(c, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorInternal, nil)
+	writeErrorBody(c, appservice.FailedError(requestMeta(c), cervii18n.ErrorInternal))
 	return true
 }
 
-func writeLocalizedError(c *gin.Context, status int, code string, messageKey cervii18n.Key, fields map[string]cervii18n.Key) {
-	locale := c.GetHeader("Accept-Language")
-	message, language := cervii18n.Localize(locale, messageKey)
+func writeErrorBody(c *gin.Context, applicationError *appservice.Error) {
+	_, language := cervii18n.Localize(c.GetHeader("Accept-Language"), cervii18n.ErrorInternal)
 	c.Header("Content-Language", language)
 	c.Header("Vary", "Accept-Language")
-	c.JSON(status, errorBody{Error: apiError{Code: code, Message: message, Fields: cervii18n.LocalizeMap(locale, fields)}})
+	c.JSON(applicationError.HTTPStatus(), errorBody{Error: apiError{
+		Kind: applicationError.Kind, State: applicationError.State, Message: applicationError.Message, Fields: applicationError.Fields,
+	}})
 }

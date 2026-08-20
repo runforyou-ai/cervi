@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"net/http"
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -26,7 +25,7 @@ func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, inpu
 	})
 	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
-		return ContactList{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
+		return ContactList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
 	if err != nil {
 		return ContactList{}, b.contactError(ctx, meta, err, cervii18n.ErrorContactListFailed)
@@ -116,7 +115,7 @@ func (b *DirectBackend) contactMutationError(ctx context.Context, meta RequestMe
 	}
 	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
-		return localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
 	return b.contactError(ctx, meta, err, failureKey)
 }
@@ -127,13 +126,13 @@ func (b *DirectBackend) contactError(ctx context.Context, meta RequestMeta, err 
 		return ctx.Err()
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
-		return localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, contactaction.ErrNotFound) {
-		return localizedError(meta, http.StatusNotFound, "CONTACT_NOT_FOUND", cervii18n.ErrorContactNotFound, nil)
+		return NotFoundError(meta, cervii18n.ErrorContactNotFound)
 	}
 	slog.Warn("联系人操作失败", "failure", failureKey, "error", err)
-	return localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", failureKey, nil)
+	return FailedError(meta, failureKey)
 }
 
 func contactInput(input ContactInput) contactaction.ContactInput {

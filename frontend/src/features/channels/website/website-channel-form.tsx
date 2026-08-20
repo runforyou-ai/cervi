@@ -7,9 +7,11 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
+  ErrorKind,
   Locale,
   createWebsiteChannel,
+  isApiError,
+  recoverSession,
   updateWebsiteChannel,
   type WebsiteChannelSummary,
 } from "@/api"
@@ -77,12 +79,11 @@ export function WebsiteChannelForm({
       console.info("网站渠道已创建")
       navigate("/channels/website", { replace: true })
     } catch (error) {
-      if (error instanceof ApiError) {
-        if (error.code === "AUTH_REQUIRED") {
-          navigate("/login", { replace: true })
-          return
-        }
-        if (error.code === "CHANNEL_NOT_FOUND") {
+      if (recoverSession(error, navigate)) {
+        return
+      }
+      if (isApiError(error)) {
+        if (error.kind === ErrorKind.ErrorKindNotFound) {
           console.warn("网站渠道不存在", { channel_id: channel?.id })
           navigate("/channels/website", { replace: true })
           return

@@ -7,9 +7,11 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
   ContactMethodType,
   ContactStage,
+  ErrorKind,
+  isApiError,
+  recoverSession,
   updateContact,
   type ContactDetail,
   type ContactInput,
@@ -225,12 +227,11 @@ export function ContactDetailView({
       toast.success(t("form.updated"))
       onSaved(saved)
     } catch (error) {
-      if (error instanceof ApiError) {
-        if (error.code === "AUTH_REQUIRED") {
-          navigate("/login", { replace: true })
-          return
-        }
-        if (error.code === "CONTACT_NOT_FOUND") {
+      if (recoverSession(error, navigate)) {
+        return
+      }
+      if (isApiError(error)) {
+        if (error.kind === ErrorKind.ErrorKindNotFound) {
           console.warn("联系人不存在", { contact_id: detail.contact.id })
           onNotFound()
           return

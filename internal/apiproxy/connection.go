@@ -47,9 +47,10 @@ type errorBody struct {
 }
 
 type apiError struct {
-	Code    string            `json:"code"`
-	Message string            `json:"message"`
-	Fields  map[string]string `json:"fields,omitempty"`
+	Kind    appservice.ErrorKind    `json:"kind,omitempty"`
+	State   appservice.SessionState `json:"state,omitempty"`
+	Message string                  `json:"message"`
+	Fields  map[string]string       `json:"fields,omitempty"`
 }
 
 type serverURLValidationError struct {

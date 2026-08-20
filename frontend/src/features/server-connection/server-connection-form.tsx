@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { ApiError, connectServer, getServerURL, probeServer } from "@/api"
+import { connectServer, getServerURL, isApiError, probeServer } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -81,7 +81,7 @@ export function ServerConnectionForm() {
       })
     } catch (error) {
       setDetected(null)
-      if (error instanceof ApiError) {
+      if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["serverUrl"]))
         return
       }
@@ -101,7 +101,7 @@ export function ServerConnectionForm() {
       await connectServer(detected.serverUrl)
       navigate("/login", { replace: true })
     } catch (error) {
-      if (error instanceof ApiError) {
+      if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["serverUrl"]))
         return
       }

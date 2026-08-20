@@ -15,6 +15,34 @@ const (
 	LocaleEnglishUnitedStates Locale = Locale(domain.LocaleEnglishUnitedStates)
 )
 
+// SessionState 表示会话入口。
+type SessionState string
+
+const (
+	SessionStateReady   SessionState = "ready"
+	SessionStateLogin   SessionState = "login"
+	SessionStateSetup   SessionState = "setup"
+	SessionStateConnect SessionState = "connect"
+)
+
+// ErrorKind 表示业务失败种类。
+type ErrorKind string
+
+const (
+	ErrorKindInvalid     ErrorKind = "invalid"
+	ErrorKindNotFound    ErrorKind = "not_found"
+	ErrorKindUnavailable ErrorKind = "unavailable"
+	ErrorKindFailed      ErrorKind = "failed"
+)
+
+// Session 表示当前会话。
+type Session struct {
+	State            SessionState `json:"state"`
+	Identity         *Identity    `json:"identity,omitempty"`
+	OrganizationName string       `json:"organizationName,omitempty"`
+	ErrorKind        ErrorKind    `json:"errorKind,omitempty"`
+}
+
 // UserRole 表示企业成员角色。
 type UserRole string
 

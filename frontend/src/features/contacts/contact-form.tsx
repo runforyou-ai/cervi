@@ -7,10 +7,11 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
   ContactMethodType,
   ContactStage,
   createContact,
+  isApiError,
+  recoverSession,
   type ChannelSummary,
   type ContactDetail,
   type ContactInput,
@@ -86,11 +87,10 @@ export function ContactForm({
       toast.success(t("form.created"))
       onSaved(saved)
     } catch (error) {
-      if (error instanceof ApiError) {
-        if (error.code === "AUTH_REQUIRED") {
-          navigate("/login", { replace: true })
-          return
-        }
+      if (recoverSession(error, navigate)) {
+        return
+      }
+      if (isApiError(error)) {
         console.warn("创建联系人失败", error)
         toast.error(apiErrorMessage(error, ["displayName", "channelId", "stage", "methods", "notes"]))
         return

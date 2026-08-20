@@ -1,4 +1,4 @@
-/** 消息渠道页布局，左栏列出渠道类型。 */
+/** 渠道页布局，左栏列出渠道类型。 */
 import { useTranslation } from "react-i18next"
 import { Outlet, useLocation, useNavigate } from "react-router"
 
@@ -34,13 +34,9 @@ export function ChannelsLayout() {
       paneWidth="sm"
       paneVariant="nav"
       pane={
-        <PagePaneNav label={t("typeNavigation")}>
+        <PagePaneNav label={t("typeNavigation")} title={t("title")}>
           {channelTypes.map((type) => (
-            <PagePaneLink
-              key={type.id}
-              to={type.to}
-              comingSoon={!type.to}
-            >
+            <PagePaneLink key={type.id} to={type.to}>
               {t(type.labelKey)}
             </PagePaneLink>
           ))}

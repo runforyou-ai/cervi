@@ -7,7 +7,9 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
+  ErrorKind,
+  isApiError,
+  recoverSession,
   updateWebsiteChannelChatInterface,
   type WebsiteChannel,
   type WebsiteChannelChatInterface,
@@ -81,12 +83,11 @@ export function WebsiteChannelChatInterfaceForm({
       console.info("网站渠道聊天界面已保存", { channel_id: channel.id })
       toast.success(t("chatInterface.saved"))
     } catch (error) {
-      if (error instanceof ApiError) {
-        if (error.code === "AUTH_REQUIRED") {
-          navigate("/login", { replace: true })
-          return
-        }
-        if (error.code === "CHANNEL_NOT_FOUND") {
+      if (recoverSession(error, navigate)) {
+        return
+      }
+      if (isApiError(error)) {
+        if (error.kind === ErrorKind.ErrorKindNotFound) {
           console.warn("网站渠道不存在", { channel_id: channel.id })
           navigate("/channels/website", { replace: true })
           return

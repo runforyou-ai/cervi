@@ -1,14 +1,13 @@
-/** 工作台侧栏导航和用户菜单。 */
+/** 工作台左侧模块轨和用户菜单。 */
 import { useState } from "react"
 import {
-  ChevronsUpDownIcon,
   ContactRoundIcon,
   InboxIcon,
   LoaderCircleIcon,
   LogOutIcon,
   MessagesSquareIcon,
-  PanelsTopLeftIcon,
   SettingsIcon,
+  type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, useLocation, useNavigate } from "react-router"
@@ -22,82 +21,69 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 
-/** 工作台主导航。 */
-function WorkspaceMenu() {
-  const { t } = useTranslation("workspace")
-  const location = useLocation()
-  const { isNarrowViewport, setOpenNarrowViewport } = useSidebar()
-  const inboxActive = location.pathname === "/inbox"
-  const contactsActive = location.pathname.startsWith("/contacts")
-  const channelsActive = location.pathname.startsWith("/channels")
-
-  /** 窄视口下关闭侧栏。 */
-  function closeNarrowNavigation() {
-    if (isNarrowViewport) {
-      setOpenNarrowViewport(false)
-    }
-  }
-
+/** 模块轨导航项。 */
+function WorkspaceRailItem({
+  to,
+  icon: Icon,
+  label,
+  active,
+}: {
+  to: string
+  icon: LucideIcon
+  label: string
+  active: boolean
+}) {
   return (
-    <SidebarGroup>
-      <SidebarGroupLabel>{t("navigationGroup")}</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={inboxActive} tooltip={t("inbox")}>
-              <NavLink to="/inbox" onClick={closeNarrowNavigation}>
-                <InboxIcon />
-                <span>{t("inbox")}</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={contactsActive}
-              tooltip={t("contacts")}
-            >
-              <NavLink to="/contacts/internal" onClick={closeNarrowNavigation}>
-                <ContactRoundIcon />
-                <span>{t("contacts")}</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={channelsActive}
-              tooltip={t("messageChannels")}
-            >
-              <NavLink to="/channels/website" onClick={closeNarrowNavigation}>
-                <MessagesSquareIcon />
-                <span>{t("messageChannels")}</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
+    <NavLink
+      to={to}
+      className={cn(
+        "flex h-16 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] leading-tight",
+        "hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
+        "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        active && "bg-foreground/12 font-medium text-sidebar-accent-foreground",
+      )}
+    >
+      <Icon className="size-5" />
+      <span className="line-clamp-2 text-center break-words">{label}</span>
+    </NavLink>
   )
 }
 
-/** 工作台侧栏和用户菜单。 */
+/** 模块轨导航。 */
+function WorkspaceMenu() {
+  const { t } = useTranslation("workspace")
+  const location = useLocation()
+
+  return (
+    <nav
+      className="flex flex-1 flex-col items-stretch gap-1 px-1.5 pt-1"
+      aria-label={t("navigationGroup")}
+    >
+      <WorkspaceRailItem
+        to="/inbox"
+        icon={InboxIcon}
+        label={t("inbox")}
+        active={location.pathname === "/inbox"}
+      />
+      <WorkspaceRailItem
+        to="/contacts/internal"
+        icon={ContactRoundIcon}
+        label={t("contacts")}
+        active={location.pathname.startsWith("/contacts")}
+      />
+      <WorkspaceRailItem
+        to="/channels/website"
+        icon={MessagesSquareIcon}
+        label={t("channels")}
+        active={location.pathname.startsWith("/channels")}
+      />
+    </nav>
+  )
+}
+
+/** 渲染模块轨和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
   onLogout,
@@ -109,103 +95,68 @@ export function WorkspaceNavigation({
 }) {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
-  const { setOpenNarrowViewport } = useSidebar()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   /** 打开设置页。 */
   function openSettings() {
+    console.info("打开设置")
     navigate("/settings/storage")
-    setOpenNarrowViewport(false)
   }
 
   return (
-    <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip="Cervi">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <PanelsTopLeftIcon className="size-4" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Cervi</span>
-                <span className="truncate text-xs">
+    <aside className="flex h-full w-[72px] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
+      <div className="flex justify-center px-3 pt-2.5 pb-1.5">
+        <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="flex size-10 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              aria-label={t("openUserMenu", {
+                name: identity.user.displayName,
+              })}
+            >
+              {identity.user.displayName.slice(0, 1).toUpperCase()}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start" className="w-56">
+            <DropdownMenuLabel className="font-normal">
+              <div className="grid gap-0.5 leading-tight">
+                <span className="truncate font-medium">
+                  {identity.user.displayName}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {identity.user.email}
+                </span>
+                <span className="truncate text-xs text-muted-foreground">
                   {identity.organization.name}
                 </span>
               </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
-      <SidebarContent>
-        <WorkspaceMenu />
-      </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu
-              open={userMenuOpen}
-              onOpenChange={setUserMenuOpen}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={openSettings}>
+              <SettingsIcon />
+              {t("settings")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              destructive
+              disabled={loggingOut}
+              onSelect={(event) => {
+                event.preventDefault()
+                onLogout()
+              }}
             >
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  tooltip={userMenuOpen ? undefined : identity.user.displayName}
-                  aria-label={t("openUserMenu", {
-                    name: identity.user.displayName,
-                  })}
-                >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">
-                    {identity.user.displayName.slice(0, 1).toUpperCase()}
-                  </div>
-                  <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">
-                      {identity.user.displayName}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {identity.user.email}
-                    </span>
-                  </div>
-                  <ChevronsUpDownIcon className="ml-auto" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" className="w-56">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="grid gap-0.5 leading-tight">
-                    <span className="truncate font-medium">
-                      {identity.user.displayName}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {identity.user.email}
-                    </span>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={openSettings}>
-                  <SettingsIcon />
-                  {t("settings")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  destructive
-                  disabled={loggingOut}
-                  onSelect={(event) => {
-                    event.preventDefault()
-                    onLogout()
-                  }}
-                >
-                  {loggingOut ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : (
-                    <LogOutIcon />
-                  )}
-                  {loggingOut ? t("loggingOut") : t("logout")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-    </Sidebar>
+              {loggingOut ? (
+                <LoaderCircleIcon className="animate-spin" />
+              ) : (
+                <LogOutIcon />
+              )}
+              {loggingOut ? t("loggingOut") : t("logout")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <WorkspaceMenu />
+    </aside>
   )
 }

@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { ApiError, login } from "@/api"
+import { isApiError, login, recoverSession } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,11 +25,7 @@ import {
 import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 校验并提交登录。 */
-export function LoginForm({
-  allowServerChange = false,
-}: {
-  allowServerChange?: boolean
-}) {
+export function LoginForm() {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
   const schema = useMemo(() => createLoginSchema(t), [t])
@@ -48,20 +44,10 @@ export function LoginForm({
       await login(values)
       navigate("/inbox", { replace: true })
     } catch (error) {
-      if (error instanceof ApiError) {
-        if (
-          error.code === "SERVER_CONNECTION_REQUIRED" ||
-          (allowServerChange && error.code === "SERVER_UNAVAILABLE")
-        ) {
-          navigate("/connect", { replace: true })
-          return
-        }
-        if (error.code === "INSTALLATION_REQUIRED") {
-          navigate(allowServerChange ? "/connect" : "/setup", {
-            replace: true,
-          })
-          return
-        }
+      if (recoverSession(error, navigate)) {
+        return
+      }
+      if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["email", "password"]))
         return
       }

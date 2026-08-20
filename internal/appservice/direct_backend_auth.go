@@ -22,7 +22,7 @@ func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta
 			return InstallationStatus{}, ctx.Err()
 		}
 		slog.Warn("读取初始化状态失败", "error", err)
-		return InstallationStatus{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorInstallationStatusReadFailed, nil)
+		return InstallationStatus{}, FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
 	}
 	return InstallationStatus{Installed: status.Installed, OrganizationName: status.OrganizationName}, nil
 }
@@ -34,7 +34,8 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		return Auth{}, err
 	}
 	if status.Installed {
-		return Auth{}, localizedError(meta, http.StatusConflict, "ALREADY_INITIALIZED", cervii18n.ErrorAlreadyInitialized, nil)
+		slog.Info("企业已初始化")
+		return Auth{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAlreadyInitialized).WithStatus(http.StatusConflict)
 	}
 	output, err := b.installWorkspace.Execute(ctx, installationaction.InstallWorkspaceInput{
 		OrganizationName: input.OrganizationName,
@@ -44,17 +45,18 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 	})
 	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
-		return Auth{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, installationFieldKeys(validationError.Fields))
+		return Auth{}, InvalidError(meta, cervii18n.ErrorValidationFailed, installationFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, installationaction.ErrAlreadyInstalled) {
-		return Auth{}, localizedError(meta, http.StatusConflict, "ALREADY_INITIALIZED", cervii18n.ErrorAlreadyInitialized, nil)
+		slog.Info("企业已初始化")
+		return Auth{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAlreadyInitialized).WithStatus(http.StatusConflict)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return Auth{}, ctx.Err()
 		}
 		slog.Warn("初始化企业失败", "error", err)
-		return Auth{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorInstallationFailed, nil)
+		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
 	}
 	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "owner_id", output.Identity.User.ID)
 	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
@@ -67,14 +69,14 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 	}
 	output, err := b.login.Execute(ctx, authaction.LoginInput{Email: input.Email, Password: input.Password})
 	if errors.Is(err, authaction.ErrInvalidCredentials) {
-		return Auth{}, localizedError(meta, http.StatusUnauthorized, "INVALID_CREDENTIALS", cervii18n.ErrorInvalidCredentials, nil)
+		return Auth{}, InvalidError(meta, cervii18n.ErrorInvalidCredentials, nil)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return Auth{}, ctx.Err()
 		}
 		slog.Warn("用户登录失败", "error", err)
-		return Auth{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorLoginFailed, nil)
+		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
 	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID)
 	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
@@ -91,7 +93,7 @@ func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 			return ctx.Err()
 		}
 		slog.Warn("删除登录令牌失败", "user_id", identity.User.ID, "error", err)
-		return localizedError(meta, http.StatusInternalServerError, "LOGOUT_FAILED", cervii18n.ErrorLogoutFailed, nil)
+		return FailedError(meta, cervii18n.ErrorLogoutFailed)
 	}
 	slog.Info("用户退出登录", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
 	return nil
