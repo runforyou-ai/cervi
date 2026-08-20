@@ -77,6 +77,7 @@ const zhCN = {
     inbox: "消息",
     contacts: "通讯录",
     channels: "渠道",
+    profile: "个人资料",
     settings: "设置",
     openUserMenu: "打开 {{name}} 的用户菜单",
     logout: "退出登录",
@@ -349,7 +350,12 @@ const zhCN = {
     title: "设置",
     navigationLabel: "设置菜单",
     navigation: {
+      profile: "个人资料",
       storage: "存储设置",
+    },
+    profile: {
+      title: "个人资料",
+      formLabel: "个人资料表单",
     },
     storage: {
       title: "存储设置",

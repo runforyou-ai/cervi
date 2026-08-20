@@ -77,6 +77,7 @@ const enUS = {
     inbox: "Messages",
     contacts: "Contacts",
     channels: "Channels",
+    profile: "Profile",
     settings: "Settings",
     openUserMenu: "Open the user menu for {{name}}",
     logout: "Log out",
@@ -350,7 +351,12 @@ const enUS = {
     title: "Settings",
     navigationLabel: "Settings menu",
     navigation: {
+      profile: "Profile",
       storage: "Storage",
+    },
+    profile: {
+      title: "Profile",
+      formLabel: "Profile form",
     },
     storage: {
       title: "Storage settings",
