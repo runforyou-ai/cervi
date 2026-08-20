@@ -19,7 +19,7 @@ var chromeCSS string
 //go:embed page.html
 var pageHTML string
 
-// chatJS 是访客聊天页本机演示脚本。
+// chatJS 是访客聊天页交互脚本。
 //
 //go:embed chat.js
 var chatJS string

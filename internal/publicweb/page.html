@@ -62,9 +62,10 @@
             </button>
           </div>
           <div class="cv-well">
-            <textarea id="cv-input" rows="1" maxlength="4000" placeholder="{{.Placeholder}}"></textarea>
+            <label class="cv-sr-only" for="cv-input">{{.MessageLabel}}</label>
+            <textarea id="cv-input" rows="1" maxlength="4000"></textarea>
           </div>
-          <button class="cv-tool" type="button" id="cv-emoji-toggle" aria-label="{{.EmojiLabel}}" title="{{.EmojiLabel}}">
+          <button class="cv-tool" type="button" id="cv-emoji-toggle" aria-label="{{.EmojiLabel}}" title="{{.EmojiLabel}}" aria-controls="cv-emoji" aria-expanded="false">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <path d="M8 14s1.5 2 4 2 4-2 4-2" />
@@ -73,8 +74,8 @@
             </svg>
           </button>
         </div>
-        <input class="cv-sr-only" id="cv-file-input" type="file" multiple />
-        <input class="cv-sr-only" id="cv-image-input" type="file" multiple accept="image/*" />
+        <input id="cv-file-input" type="file" multiple hidden />
+        <input id="cv-image-input" type="file" multiple accept="image/*" hidden />
       </form>
       {{end}}
     </div>

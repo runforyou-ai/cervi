@@ -1,4 +1,4 @@
-// 网站渠道嵌入脚本：在宿主页注入角标，并用 iframe 打开同一套聊天页。
+// 网站渠道嵌入脚本：在宿主页显示聊天挂件。
 (function () {
   var script = document.currentScript;
   if (!script) {
@@ -39,7 +39,7 @@
   var style = document.createElement("style");
   style.textContent = [
     ":host{all:initial}",
-    "/*CV_THEME_BLOCK*/:host{--cv-theme:#2563EB;--cv-on-theme:#FFFFFF;--cv-focus:rgba(37, 99, 235, 0.40);--cv-launcher-shadow:0 10px 28px rgba(37, 99, 235, 0.42)}/*END_CV_THEME_BLOCK*/",
+    "/*CV_THEME*/",
     ".cv-panel{position:fixed;z-index:2147483000;width:380px;height:620px;right:20px;bottom:88px;max-width:calc(100vw - 16px);max-height:calc(100vh - 108px);overflow:hidden;border:1px solid rgba(15,23,42,.14);border-radius:16px;background:#fff;box-shadow:0 24px 80px rgba(15,23,42,.22);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(8px);transition:opacity .18s ease,transform .18s ease,visibility .18s}",
     '.cv-panel[data-open="true"]{opacity:1;visibility:visible;pointer-events:auto;transform:none}',
     ".cv-frame{display:block;width:100%;height:100%;border:0;background:#fff}",
@@ -136,7 +136,6 @@
       panel.style.top = "0";
       panel.style.bottom = "0";
       panel.style.width = "100vw";
-      panel.style.height = "100vh";
       panel.style.height = "100dvh";
       panel.style.maxWidth = "none";
       panel.style.maxHeight = "none";

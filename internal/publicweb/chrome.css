@@ -214,8 +214,8 @@ html.cv-embed .cv-close { display: inline-flex; }
 }
 .cv-bubble p { margin: 0; }
 .cv-bubble-assistant {
-  background: var(--cv-assistant-bubble, #fff);
-  color: var(--cv-assistant-text, hsl(0 0% 3.9%));
+  background: var(--cv-assistant-bubble);
+  color: var(--cv-assistant-text);
   border-radius: 16px 16px 16px 2px;
 }
 .cv-greeting {
@@ -372,7 +372,6 @@ a.cv-card { color: inherit; }
   box-shadow: none;
   border: 0;
 }
-#cv-input::placeholder { color: var(--muted-foreground); }
 .cv-empty {
   flex: 1 1 auto;
   min-height: 0;
@@ -422,13 +421,6 @@ html.cv-link .cv-chrome {
   .cv-header { padding-left: 24px; padding-right: 24px; }
   .cv-messages { padding-left: 24px; padding-right: 24px; }
   .cv-close { right: 24px; }
-}
-@supports not (height: 100dvh) {
-  html.cv-link body,
-  html.cv-link .cv-chrome {
-    height: 100vh;
-    max-height: 100vh;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }

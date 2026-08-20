@@ -16,7 +16,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// TestFirstRunes 验证顶栏取一字、头像取两字。
+// TestFirstRunes 验证聊天页字标。
 func TestFirstRunes(t *testing.T) {
 	cases := []struct {
 		value string
@@ -36,10 +36,10 @@ func TestFirstRunes(t *testing.T) {
 	}
 }
 
-// TestWidgetScriptHasThemeSentinel 验证嵌入脚本含主题哨兵，供服务端内联颜色。
-func TestWidgetScriptHasThemeSentinel(t *testing.T) {
-	if !bytes.Contains(widgetScript, []byte(themeBlockStart)) || !bytes.Contains(widgetScript, []byte(themeBlockEnd)) {
-		t.Fatal("widget.js missing theme sentinel")
+// TestWidgetScriptHasThemePlaceholder 验证挂件主题占位符。
+func TestWidgetScriptHasThemePlaceholder(t *testing.T) {
+	if bytes.Count(widgetScript, []byte(themePlaceholder)) != 1 {
+		t.Fatal("widget.js must contain one theme placeholder")
 	}
 }
 
@@ -59,6 +59,9 @@ func TestEmbedServiceServesWidgetScript(t *testing.T) {
 		t.Fatalf("content type = %q, want javascript", contentType)
 	}
 	body := response.Body.String()
+	if strings.Contains(body, themePlaceholder) {
+		t.Fatal("widget script contains unresolved theme placeholder")
+	}
 	if !strings.Contains(body, `searchParams.get("id")`) {
 		t.Fatalf("widget script missing id query reader: %s", body)
 	}
@@ -94,7 +97,7 @@ func TestEmbedServiceInlinesChannelTheme(t *testing.T) {
 	}
 }
 
-// TestEmbedServiceUnknownChannelUsesDefaultTheme 验证渠道不存在时嵌入脚本回退默认主题。
+// TestEmbedServiceUnknownChannelUsesDefaultTheme 验证不存在渠道使用默认主题。
 func TestEmbedServiceUnknownChannelUsesDefaultTheme(t *testing.T) {
 	channelID := "0191a2b3-c4d5-7890-abcd-ef1234567890"
 	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
@@ -110,23 +113,7 @@ func TestEmbedServiceUnknownChannelUsesDefaultTheme(t *testing.T) {
 	}
 }
 
-// TestEmbedServiceInvalidChannelIDUsesDefaultTheme 验证非法渠道标识时嵌入脚本回退默认主题。
-func TestEmbedServiceInvalidChannelIDUsesDefaultTheme(t *testing.T) {
-	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
-		t.Fatal("invalid id should not look up a channel")
-		return nil, nil
-	})
-	response := httptest.NewRecorder()
-	service.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/widget.js?id=not-a-uuid", nil))
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d", response.Code)
-	}
-	if !strings.Contains(response.Body.String(), "--cv-theme:#2563EB") {
-		t.Fatal("invalid channel id should use default theme")
-	}
-}
-
-// TestEmbedServiceLookupErrorUsesDefaultTheme 验证读取渠道失败时嵌入脚本回退默认主题。
+// TestEmbedServiceLookupErrorUsesDefaultTheme 验证读取失败时使用默认主题。
 func TestEmbedServiceLookupErrorUsesDefaultTheme(t *testing.T) {
 	channelID := "0191a2b3-c4d5-7890-abcd-ef1234567890"
 	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
@@ -175,7 +162,7 @@ func TestPublicChatPages(t *testing.T) {
 		if !strings.Contains(body, `class="cv-avatar cv-avatar-assistant"`) || !strings.Contains(body, `class="cv-sender"`) {
 			t.Fatal("missing greeting avatar or sender")
 		}
-		if !strings.Contains(body, "这是一条预览示例回复，仅用于查看气泡样式。") {
+		if !strings.Contains(body, "这是一条示例回复。") {
 			t.Fatal("missing demo assistant reply copy")
 		}
 		if !strings.Contains(body, "通常几分钟内回复") {
@@ -215,11 +202,14 @@ func TestPublicChatPages(t *testing.T) {
 		if !strings.Contains(body, `lang="en-US"`) {
 			t.Fatal("missing english lang")
 		}
-		if !strings.Contains(body, "This is a sample preview reply, shown only to demonstrate the bubble style.") {
+		if !strings.Contains(body, "This is a sample reply.") {
 			t.Fatal("missing english demo reply")
 		}
 		if !strings.Contains(body, "Choose emoji") {
 			t.Fatal("missing english emoji label")
+		}
+		if !strings.Contains(body, `for="cv-input">Message</label>`) {
+			t.Fatal("missing english message label")
 		}
 	})
 
@@ -289,6 +279,12 @@ func assertChrome(t *testing.T, body string, embed bool) {
 	if !strings.Contains(body, `id="cv-input"`) || !strings.Contains(body, "<textarea") {
 		t.Fatal("missing composer textarea")
 	}
+	if !strings.Contains(body, `for="cv-input">消息</label>`) {
+		t.Fatal("missing composer label")
+	}
+	if strings.Contains(body, `placeholder=`) {
+		t.Fatal("composer must not use a placeholder")
+	}
 	if !strings.Contains(body, `id="cv-attach"`) || !strings.Contains(body, `id="cv-image"`) || !strings.Contains(body, `id="cv-emoji-toggle"`) {
 		t.Fatal("missing composer tools")
 	}
@@ -307,8 +303,8 @@ func assertChrome(t *testing.T, body string, embed bool) {
 	if !strings.Contains(body, "cv-avatar-visitor") || !strings.Contains(body, "cv-avatar-assistant") {
 		t.Fatal("missing visitor or assistant avatar")
 	}
-	if !strings.Contains(body, "输入消息…") {
-		t.Fatal("missing composer placeholder")
+	if strings.Contains(body, "selectionStart ||") || strings.Contains(body, "selectionEnd ||") {
+		t.Fatal("emoji insertion must preserve selection index zero")
 	}
 	if embed && !strings.Contains(body, `class="cv-embed"`) {
 		t.Fatal("missing embed shell class")

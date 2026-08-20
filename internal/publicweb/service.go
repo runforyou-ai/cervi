@@ -13,15 +13,10 @@ import (
 	"strings"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// themeBlockStart 与 themeBlockEnd 标记嵌入脚本里由服务端替换的主题变量。
-const (
-	themeBlockStart = "/*CV_THEME_BLOCK*/"
-	themeBlockEnd   = "/*END_CV_THEME_BLOCK*/"
-)
+const themePlaceholder = "/*CV_THEME*/"
 
 // Lookup 按渠道标识读取公开网站渠道。
 type Lookup func(context.Context, string) (*channelaction.PublicWebsiteChannel, error)
@@ -34,7 +29,7 @@ type pageView struct {
 	AvatarInitials string
 	Greeting       string
 	DemoReply      string
-	Placeholder    string
+	MessageLabel   string
 	EmptyMessage   string
 	CloseLabel     string
 	AttachLabel    string
@@ -105,7 +100,7 @@ func allowPublicMethod(writer http.ResponseWriter, request *http.Request) bool {
 
 // writeWidgetScript 返回按渠道内联主题色的网站嵌入脚本。
 func (s *EmbedService) writeWidgetScript(writer http.ResponseWriter, request *http.Request) {
-	theme := DefaultTheme()
+	theme := defaultTheme()
 	channelID := strings.TrimSpace(request.URL.Query().Get("id"))
 	if channelID != "" {
 		theme = s.lookupWidgetTheme(request.Context(), channelID)
@@ -118,47 +113,34 @@ func (s *EmbedService) writeWidgetScript(writer http.ResponseWriter, request *ht
 	}
 }
 
-// lookupWidgetTheme 读取渠道主题色；读失败时回退默认蓝并记日志。
-func (s *EmbedService) lookupWidgetTheme(ctx context.Context, channelID string) Theme {
-	if !common.ValidUUID(channelID) {
-		slog.Warn("网站嵌入脚本渠道标识无效", "channel_id", channelID)
-		return DefaultTheme()
-	}
+// lookupWidgetTheme 读取挂件主题。
+func (s *EmbedService) lookupWidgetTheme(ctx context.Context, channelID string) theme {
 	channel, err := s.lookup(ctx, channelID)
 	if errors.Is(err, channelaction.ErrNotFound) {
-		slog.Warn("网站嵌入脚本渠道不存在", "channel_id", channelID)
-		return DefaultTheme()
+		slog.Info("网站嵌入脚本渠道不存在", "channel_id", channelID)
+		return defaultTheme()
 	}
 	if err != nil {
 		slog.Warn("读取网站嵌入脚本渠道失败", "channel_id", channelID, "error", err)
-		return DefaultTheme()
+		return defaultTheme()
 	}
-	return ParseTheme(channel.ThemeColor)
+	return parseTheme(channel.ThemeColor)
 }
 
-// scriptWithTheme 把计算后的主题变量写入脚本哨兵块。
-func scriptWithTheme(theme Theme) []byte {
-	start := bytes.Index(widgetScript, []byte(themeBlockStart))
-	end := bytes.Index(widgetScript, []byte(themeBlockEnd))
-	if start < 0 || end < 0 || end < start {
-		slog.Error("网站嵌入脚本缺少主题哨兵")
-		return widgetScript
-	}
-	end += len(themeBlockEnd)
-	block := []byte(themeBlockStart + theme.HostCSS() + themeBlockEnd)
-	script := make([]byte, 0, start+len(block)+len(widgetScript)-end)
-	script = append(script, widgetScript[:start]...)
-	script = append(script, block...)
-	script = append(script, widgetScript[end:]...)
-	return script
+// scriptWithTheme 写入挂件主题变量。
+func scriptWithTheme(theme theme) []byte {
+	return bytes.Replace(widgetScript, []byte(themePlaceholder), []byte(theme.hostCSS()), 1)
 }
 
 // writeChatPage 渲染公开聊天页。
 func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Lookup, channelID string, entry string) {
 	channel, err := lookup(request.Context(), channelID)
 	if errors.Is(err, channelaction.ErrNotFound) {
+		if err := writePage(writer, notFoundView(request, entry), http.StatusNotFound); err != nil {
+			slog.Warn("写入网站渠道不可用页面失败", "channel_id", channelID, "entry", entry, "error", err)
+			return
+		}
 		slog.Info("网站渠道聊天入口不存在", "channel_id", channelID, "entry", entry)
-		_ = writePage(writer, notFoundView(request, entry), http.StatusNotFound)
 		return
 	}
 	if err != nil {
@@ -167,9 +149,10 @@ func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Loo
 		return
 	}
 	if err := writePage(writer, chatView(channel, entry), http.StatusOK); err != nil {
+		slog.Warn("写入网站渠道聊天页失败", "channel_id", channel.ID, "entry", entry, "error", err)
 		return
 	}
-	slog.Info("打开网站渠道聊天页", "channel_id", channel.ID, "entry", entry, "title", channel.Title)
+	slog.Info("打开网站渠道聊天页", "channel_id", channel.ID, "entry", entry)
 }
 
 // writePage 写入公开聊天 HTML。
@@ -178,33 +161,23 @@ func writePage(writer http.ResponseWriter, page pageView, status int) error {
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("X-Content-Type-Options", "nosniff")
 	writer.Header().Set("Content-Security-Policy", "frame-ancestors *")
-	// X-Frame-Options 无法按域名放行，用无效值避免上游补 SAMEORIGIN。
-	writer.Header().Set("X-Frame-Options", "ALLOWALL")
 	writer.WriteHeader(status)
-	if err := pageTemplate.Execute(writer, page); err != nil {
-		slog.Warn("渲染公开聊天页失败", "title", page.Title, "error", err)
-		return err
-	}
-	return nil
+	return pageTemplate.Execute(writer, page)
 }
 
 // chatView 按渠道设置生成聊天页。
 func chatView(channel *channelaction.PublicWebsiteChannel, entry string) pageView {
 	english := channel.DefaultLocale == domain.LocaleEnglishUnitedStates
-	page := baseView(entry, ParseTheme(channel.ThemeColor), english)
+	page := baseView(entry, parseTheme(channel.ThemeColor), english)
 	page.Title = channel.Title
 	page.Subtitle = channel.Subtitle
 	page.Monogram = firstRunes(channel.Title, 1)
 	page.AvatarInitials = firstRunes(channel.Title, 2)
 	page.Greeting = channel.Greeting
 	if english {
-		page.Placeholder = "Type a message…"
-		page.DemoReply = "This is a sample preview reply, shown only to demonstrate the bubble style."
-		page.Lang = "en-US"
+		page.DemoReply = "This is a sample reply."
 	} else {
-		page.Placeholder = "输入消息…"
-		page.DemoReply = "这是一条预览示例回复，仅用于查看气泡样式。"
-		page.Lang = "zh-CN"
+		page.DemoReply = "这是一条示例回复。"
 	}
 	return page
 }
@@ -212,37 +185,39 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string) pageVie
 // notFoundView 返回聊天入口不存在时的页面。
 func notFoundView(request *http.Request, entry string) pageView {
 	english := prefersEnglish(request.Header.Get("Accept-Language"))
-	page := baseView(entry, DefaultTheme(), english)
+	page := baseView(entry, defaultTheme(), english)
 	page.NotFound = true
 	page.Monogram = "?"
 	page.AvatarInitials = "?"
 	if english {
-		page.Lang = "en-US"
 		page.Title = "Chat unavailable"
 		page.EmptyMessage = "This chat link is not available."
 	} else {
-		page.Lang = "zh-CN"
 		page.Title = "无法打开聊天"
 		page.EmptyMessage = "这个聊天入口不可用。"
 	}
 	return page
 }
 
-// baseView 填充聊天页的共用字段。
-func baseView(entry string, theme Theme, english bool) pageView {
+// baseView 填充聊天页共用内容。
+func baseView(entry string, theme theme, english bool) pageView {
 	page := pageView{
 		Shell:     entry,
 		ShowClose: entry == "embed",
-		ThemeCSS:  template.CSS(theme.RootCSS()),
+		ThemeCSS:  template.CSS(theme.rootCSS()),
 		ChromeCSS: template.CSS(chromeCSS),
 		ChatJS:    template.JS(chatJS),
 	}
 	if english {
+		page.Lang = "en-US"
+		page.MessageLabel = "Message"
 		page.CloseLabel = "Close chat"
 		page.AttachLabel = "Attach file"
 		page.ImageLabel = "Add image"
 		page.EmojiLabel = "Choose emoji"
 	} else {
+		page.Lang = "zh-CN"
+		page.MessageLabel = "消息"
 		page.CloseLabel = "关闭聊天"
 		page.AttachLabel = "添加附件"
 		page.ImageLabel = "添加图片"
@@ -251,21 +226,16 @@ func baseView(entry string, theme Theme, english bool) pageView {
 	return page
 }
 
-// firstRunes 取标题前若干字作为顶栏或头像字标。
+// firstRunes 返回标题开头的字标。
 func firstRunes(value string, count int) string {
-	var out strings.Builder
-	taken := 0
-	for _, character := range strings.TrimSpace(value) {
-		out.WriteString(strings.ToUpper(string(character)))
-		taken++
-		if taken >= count {
-			break
-		}
-	}
-	if out.Len() == 0 {
+	characters := []rune(strings.ToUpper(strings.TrimSpace(value)))
+	if len(characters) == 0 {
 		return "?"
 	}
-	return out.String()
+	if len(characters) > count {
+		characters = characters[:count]
+	}
+	return string(characters)
 }
 
 // prefersEnglish 判断请求是否优先使用英语。

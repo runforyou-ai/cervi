@@ -4,7 +4,7 @@ package publicweb
 
 import "testing"
 
-// TestParseTheme 验证主题色对比字色和焦点色。
+// TestParseTheme 验证主题对比色和焦点色。
 func TestParseTheme(t *testing.T) {
 	cases := []struct {
 		input   string
@@ -23,10 +23,10 @@ func TestParseTheme(t *testing.T) {
 		{"#006EFA", "#006EFA", "#FFFFFF", "rgba(0, 110, 250, 0.40)"},
 	}
 	for _, test := range cases {
-		theme := ParseTheme(test.input)
+		theme := parseTheme(test.input)
 		if theme.Color != test.color || theme.OnColor != test.onColor || theme.Focus != test.focus {
 			t.Fatalf(
-				"ParseTheme(%q) = %+v, want color=%s on=%s focus=%s",
+				"parseTheme(%q) = %+v, want color=%s on=%s focus=%s",
 				test.input,
 				theme,
 				test.color,
@@ -37,11 +37,11 @@ func TestParseTheme(t *testing.T) {
 	}
 }
 
-// TestDefaultTheme 验证默认蓝主题。
+// TestDefaultTheme 验证默认主题。
 func TestDefaultTheme(t *testing.T) {
-	theme := DefaultTheme()
+	theme := defaultTheme()
 	if theme.Color != "#2563EB" || theme.OnColor != "#FFFFFF" {
-		t.Fatalf("DefaultTheme() = %+v", theme)
+		t.Fatalf("defaultTheme() = %+v", theme)
 	}
 	if theme.LauncherShadow != "0 10px 28px rgba(37, 99, 235, 0.42)" {
 		t.Fatalf("launcher shadow = %q", theme.LauncherShadow)

@@ -19,21 +19,21 @@ const (
 	paintDark  = "#1C1917"
 )
 
-// Theme 是访客页使用的主题色。
-type Theme struct {
+// theme 保存访客页主题颜色。
+type theme struct {
 	Color          string
 	OnColor        string
 	Focus          string
 	LauncherShadow string
 }
 
-// DefaultTheme 返回默认蓝主题。
-func DefaultTheme() Theme {
-	return ParseTheme(channelaction.DefaultWebsiteChannelThemeColor)
+// defaultTheme 返回默认主题。
+func defaultTheme() theme {
+	return parseTheme(channelaction.DefaultWebsiteChannelThemeColor)
 }
 
-// ParseTheme 把十六进制主题色算成访客页颜色，非法值回退默认蓝。
-func ParseTheme(value string) Theme {
+// parseTheme 计算访客页颜色并过滤非法主题色。
+func parseTheme(value string) theme {
 	normalized := strings.ToUpper(strings.TrimSpace(value))
 	if !themeColorPattern.MatchString(normalized) {
 		normalized = channelaction.DefaultWebsiteChannelThemeColor
@@ -52,7 +52,7 @@ func ParseTheme(value string) Theme {
 		focus = "rgba(28, 25, 23, 0.35)"
 		shadow = "0 8px 24px rgba(28, 25, 23, 0.12)"
 	}
-	return Theme{
+	return theme{
 		Color:          normalized,
 		OnColor:        onColor,
 		Focus:          focus,
@@ -60,8 +60,8 @@ func ParseTheme(value string) Theme {
 	}
 }
 
-// RootCSS 返回页面 :root 变量。
-func (t Theme) RootCSS() string {
+// rootCSS 返回聊天页主题变量。
+func (t theme) rootCSS() string {
 	page := fmt.Sprintf(
 		"linear-gradient(160deg, color-mix(in srgb, %s 20%%, #ffffff), color-mix(in srgb, %s 7%%, #ffffff) 45%%, #ffffff 100%%)",
 		t.Color,
@@ -76,8 +76,8 @@ func (t Theme) RootCSS() string {
 	)
 }
 
-// HostCSS 返回挂件 Shadow DOM 的 :host 变量。
-func (t Theme) HostCSS() string {
+// hostCSS 返回挂件主题变量。
+func (t theme) hostCSS() string {
 	return fmt.Sprintf(
 		":host{--cv-theme:%s;--cv-on-theme:%s;--cv-focus:%s;--cv-launcher-shadow:%s}",
 		t.Color,

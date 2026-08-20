@@ -1,4 +1,4 @@
-// 访客聊天页本机演示：发送只渲染到当前页，不请求后端，刷新即清空。
+// 网站渠道访客聊天页交互；消息仅在当前页面展示。
 (function () {
   var messages = document.getElementById("cv-messages");
   var composer = document.getElementById("cv-composer");
@@ -6,14 +6,11 @@
   var emojiPanel = document.getElementById("cv-emoji");
   var fileInput = document.getElementById("cv-file-input");
   var imageInput = document.getElementById("cv-image-input");
-  if (!messages || !composer || !input) {
-    return;
-  }
 
   var chrome = messages.closest(".cv-chrome");
   var lightbox = null;
-  var avatarInitials = chrome.getAttribute("data-avatar") || "?";
-  var demoReply = chrome.getAttribute("data-demo-reply") || "";
+  var avatarInitials = chrome.getAttribute("data-avatar");
+  var demoReply = chrome.getAttribute("data-demo-reply");
   var MAX_ATTACHMENT_COUNT = 10;
   var COMPOSER_MAX_HEIGHT = 160;
   var emojis = [
@@ -149,7 +146,7 @@
   }
 
   function fileKind(file) {
-    var type = file.type || "";
+    var type = file.type;
     if (type.indexOf("image/") === 0) {
       return "image";
     }
@@ -267,7 +264,7 @@
     lightbox.innerHTML = "";
     var img = document.createElement("img");
     img.src = url;
-    img.alt = name || "";
+    img.alt = name;
     lightbox.appendChild(img);
     lightbox.hidden = false;
   }
@@ -300,7 +297,7 @@
 
   function appendVisitorMessage(text, files) {
     var hasText = Boolean(text);
-    var hasFiles = files && files.length > 0;
+    var hasFiles = files.length > 0;
     if (!hasText && !hasFiles) {
       return;
     }
@@ -383,8 +380,10 @@
   }
 
   function insertEmoji(emoji) {
-    var start = input.selectionStart || input.value.length;
-    var end = input.selectionEnd || input.value.length;
+    var start =
+      input.selectionStart === null ? input.value.length : input.selectionStart;
+    var end =
+      input.selectionEnd === null ? input.value.length : input.selectionEnd;
     input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
     var cursor = start + emoji.length;
     input.setSelectionRange(cursor, cursor);
@@ -398,10 +397,10 @@
       return [];
     }
     var files = [];
-    var items = clipboard.items || [];
+    var items = clipboard.items;
     for (var i = 0; i < items.length; i += 1) {
       var item = items[i];
-      if (item.kind !== "file" || (item.type || "").indexOf("image/") !== 0) {
+      if (item.kind !== "file" || item.type.indexOf("image/") !== 0) {
         continue;
       }
       var file = item.getAsFile();
@@ -433,6 +432,7 @@
       button.addEventListener("click", function () {
         insertEmoji(emoji);
         emojiPanel.hidden = true;
+        emojiToggle.setAttribute("aria-expanded", "false");
       });
       emojiPanel.appendChild(button);
     });
@@ -481,6 +481,7 @@
   });
   emojiToggle.addEventListener("click", function () {
     emojiPanel.hidden = !emojiPanel.hidden;
+    emojiToggle.setAttribute("aria-expanded", String(!emojiPanel.hidden));
   });
   document.addEventListener("click", function (event) {
     if (
@@ -491,5 +492,6 @@
       return;
     }
     emojiPanel.hidden = true;
+    emojiToggle.setAttribute("aria-expanded", "false");
   });
 })();
