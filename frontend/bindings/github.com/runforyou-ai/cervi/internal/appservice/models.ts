@@ -327,6 +327,14 @@ export interface PageInfo {
 }
 
 /**
+ * ProfileInput 定义当前用户可编辑的个人资料字段。
+ */
+export interface ProfileInput {
+    "displayName": string;
+    "email": string;
+}
+
+/**
  * RequestMeta 携带一次应用服务调用的认证和本地化信息。
  */
 export interface RequestMeta {

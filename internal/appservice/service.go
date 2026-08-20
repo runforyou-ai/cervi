@@ -8,6 +8,7 @@ type Backend interface {
 	Login(context.Context, RequestMeta, LoginInput) (Auth, error)
 	Logout(context.Context, RequestMeta) error
 	LoadIdentity(context.Context, RequestMeta) (Identity, error)
+	UpdateProfile(context.Context, RequestMeta, ProfileInput) (User, error)
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
 	ListWebsiteChannels(context.Context, RequestMeta, bool) (WebsiteChannelList, error)
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
@@ -79,6 +80,11 @@ func (s *Service) Logout(ctx context.Context, meta RequestMeta) error {
 // LoadIdentity 返回当前登录身份。
 func (s *Service) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity, error) {
 	return s.backend.LoadIdentity(ctx, meta)
+}
+
+// UpdateProfile 修改当前用户的姓名和邮箱。
+func (s *Service) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (User, error) {
+	return s.backend.UpdateProfile(ctx, meta, input)
 }
 
 // LoadInbox 返回当前用户的统一收件箱。

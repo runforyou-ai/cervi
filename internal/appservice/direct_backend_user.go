@@ -8,9 +8,38 @@ import (
 	"log/slog"
 
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
+
+// UpdateProfile 修改当前用户的姓名和邮箱。
+func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (User, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return User{}, err
+	}
+	user, err := b.updateProfile.Execute(ctx, identity, useraction.ProfileInput{
+		DisplayName: input.DisplayName,
+		Email:       input.Email,
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return User{}, ctx.Err()
+		}
+		var validationError *common.FieldError
+		if errors.As(err, &validationError) {
+			return User{}, InvalidError(meta, cervii18n.ErrorValidationFailed, profileFieldKeys(validationError.Fields))
+		}
+		if errors.Is(err, common.ErrIdentityInvalid) {
+			return User{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		}
+		slog.Warn("保存个人资料失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		return User{}, FailedError(meta, cervii18n.ErrorProfileUpdateFailed)
+	}
+	slog.Info("个人资料保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
+	return userFromModel(*user), nil
+}
 
 // ListUsers 返回企业成员列表。
 func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
@@ -56,4 +85,14 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 		return DirectoryUser{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
 	}
 	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), CreatedAt: user.CreatedAt}, nil
+}
+
+// profileFieldKeys 把个人资料校验错误码映射为本地化文案键。
+func profileFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+	keys := map[common.FieldCode]cervii18n.Key{
+		useraction.ValidationDisplayNameRequired: cervii18n.FieldDisplayNameRequired,
+		useraction.ValidationEmailInvalid:        cervii18n.FieldEmailInvalid,
+		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
+	}
+	return translateValidationFields(fields, keys)
 }

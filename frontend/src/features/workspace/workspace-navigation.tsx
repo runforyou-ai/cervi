@@ -1,5 +1,4 @@
 /** 工作台左侧模块轨和用户菜单。 */
-import { useState } from "react"
 import {
   ContactRoundIcon,
   InboxIcon,
@@ -7,6 +6,7 @@ import {
   LogOutIcon,
   MessagesSquareIcon,
   SettingsIcon,
+  UserRoundIcon,
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -95,12 +95,11 @@ export function WorkspaceNavigation({
 }) {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   return (
     <aside className="cervi-workspace-rail flex h-full w-[76px] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
       <div className="flex justify-center px-3 pt-2.5 pb-1.5">
-        <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+        <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
@@ -127,7 +126,15 @@ export function WorkspaceNavigation({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => navigate("/settings/storage")}>
+            <DropdownMenuItem
+              onSelect={() => navigate("/settings/profile")}
+            >
+              <UserRoundIcon />
+              {t("profile")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => navigate("/settings/storage")}
+            >
               <SettingsIcon />
               {t("settings")}
             </DropdownMenuItem>

@@ -77,6 +77,7 @@ const zhCN = {
     inbox: "消息",
     contacts: "通讯录",
     channels: "渠道",
+    profile: "个人资料",
     settings: "设置",
     openUserMenu: "打开 {{name}} 的用户菜单",
     logout: "退出登录",
@@ -349,7 +350,23 @@ const zhCN = {
     title: "设置",
     navigationLabel: "设置菜单",
     navigation: {
+      profile: "个人资料",
       storage: "存储设置",
+    },
+    profile: {
+      title: "个人资料",
+      formLabel: "个人资料表单",
+      displayName: "姓名",
+      email: "邮箱",
+      save: "保存",
+      saving: "正在保存…",
+      saveSuccess: "个人资料已保存。",
+      saveError: "保存个人资料失败，请重试。",
+      validation: {
+        displayNameRequired: "请输入姓名。",
+        emailRequired: "请输入邮箱。",
+        emailInvalid: "请输入有效的邮箱。",
+      },
     },
     storage: {
       title: "存储设置",

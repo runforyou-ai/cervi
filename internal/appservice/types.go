@@ -172,6 +172,12 @@ type Identity struct {
 	User         User         `json:"user"`
 }
 
+// ProfileInput 定义当前用户可编辑的个人资料字段。
+type ProfileInput struct {
+	DisplayName string `json:"displayName"`
+	Email       string `json:"email"`
+}
+
 // Conversation 定义收件箱中的会话。
 type Conversation struct {
 	ID       string    `json:"id"`

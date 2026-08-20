@@ -18,6 +18,7 @@ type testBackend struct {
 	appservice.Backend
 	lastMeta     appservice.RequestMeta
 	lastUserList appservice.UserListInput
+	lastProfile  appservice.ProfileInput
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
@@ -42,6 +43,16 @@ func (b *testBackend) LoadIdentity(_ context.Context, meta appservice.RequestMet
 		return appservice.Identity{}, &appservice.Error{State: appservice.SessionStateLogin, Message: "请先登录。"}
 	}
 	return testIdentity(), nil
+}
+
+// UpdateProfile 记录个人资料输入并返回更新后的用户。
+func (b *testBackend) UpdateProfile(_ context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.User, error) {
+	b.lastMeta = meta
+	b.lastProfile = input
+	identity := testIdentity()
+	identity.User.DisplayName = input.DisplayName
+	identity.User.Email = input.Email
+	return identity.User, nil
 }
 
 func (b *testBackend) ListUsers(_ context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
@@ -116,6 +127,25 @@ func TestListQueryIsConvertedToTypedInput(t *testing.T) {
 	}
 	if backend.lastUserList.Query != "lin" || backend.lastUserList.Status == nil || *backend.lastUserList.Status != "active" || backend.lastUserList.Page != 2 || backend.lastUserList.PageSize != 25 {
 		t.Fatalf("typed input = %#v", backend.lastUserList)
+	}
+}
+
+// TestUpdateProfileUsesTypedInput 验证个人资料请求转换为类型化服务输入。
+func TestUpdateProfileUsesTypedInput(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	response := doJSON(t, http.MethodPatch, server.URL+"/profile", appservice.ProfileInput{
+		DisplayName: "林晓",
+		Email:       "lin@example.com",
+	}, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	if backend.lastMeta.Token != "test-token" || backend.lastProfile.DisplayName != "林晓" || backend.lastProfile.Email != "lin@example.com" {
+		t.Fatalf("profile input = %#v, meta = %#v", backend.lastProfile, backend.lastMeta)
 	}
 }
 

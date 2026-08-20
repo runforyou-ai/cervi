@@ -63,6 +63,13 @@ func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta)
 	return output, err
 }
 
+// UpdateProfile 修改远程当前用户的姓名和邮箱。
+func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.User, error) {
+	var output appservice.User
+	err := b.do(ctx, meta, http.MethodPatch, "/profile", nil, input, &output)
+	return output, err
+}
+
 // LoadInbox 返回当前用户的远程收件箱。
 func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta) (appservice.Inbox, error) {
 	var output appservice.Inbox

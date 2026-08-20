@@ -77,6 +77,7 @@ const enUS = {
     inbox: "Messages",
     contacts: "Contacts",
     channels: "Channels",
+    profile: "Profile",
     settings: "Settings",
     openUserMenu: "Open the user menu for {{name}}",
     logout: "Log out",
@@ -350,7 +351,23 @@ const enUS = {
     title: "Settings",
     navigationLabel: "Settings menu",
     navigation: {
+      profile: "Profile",
       storage: "Storage",
+    },
+    profile: {
+      title: "Profile",
+      formLabel: "Profile form",
+      displayName: "Name",
+      email: "Email",
+      save: "Save",
+      saving: "Saving…",
+      saveSuccess: "Profile saved.",
+      saveError: "Could not save the profile. Try again.",
+      validation: {
+        displayNameRequired: "Enter your name.",
+        emailRequired: "Enter your email.",
+        emailInvalid: "Enter a valid email address.",
+      },
     },
     storage: {
       title: "Storage settings",

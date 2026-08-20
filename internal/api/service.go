@@ -44,6 +44,7 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/auth/login", service.login)
 	router.POST("/auth/logout", service.logout)
 	router.GET("/auth/identity", service.loadIdentity)
+	router.PATCH("/profile", service.updateProfile)
 	router.GET("/inbox", service.loadInbox)
 	router.GET("/channels/website", service.listWebsiteChannels)
 	router.GET("/channels/website/trash", service.listDeletedWebsiteChannels)
@@ -116,6 +117,16 @@ func (s *Service) logout(c *gin.Context) {
 func (s *Service) loadIdentity(c *gin.Context) {
 	identity, err := s.application.LoadIdentity(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, identity, err)
+}
+
+// updateProfile 保存当前用户的个人资料。
+func (s *Service) updateProfile(c *gin.Context) {
+	var input appservice.ProfileInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	user, err := s.application.UpdateProfile(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, user, err)
 }
 
 func (s *Service) loadInbox(c *gin.Context) {

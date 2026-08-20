@@ -204,6 +204,13 @@ export function UpdateContact(meta: $models.RequestMeta, contactID: string, inpu
 }
 
 /**
+ * UpdateProfile 修改当前用户的姓名和邮箱。
+ */
+export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.User> {
+    return $Call.ByID(1804531972, meta, input);
+}
+
+/**
  * UpdateWebsiteChannel 修改网站渠道。
  */
 export function UpdateWebsiteChannel(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelInput): $CancellablePromise<$models.WebsiteChannelSummary> {

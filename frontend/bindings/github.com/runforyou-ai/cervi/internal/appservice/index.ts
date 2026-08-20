@@ -44,6 +44,7 @@ export type {
     Message,
     Organization,
     PageInfo,
+    ProfileInput,
     RequestMeta,
     S3Setting,
     Session,
