@@ -135,6 +135,13 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 				return err
 			},
 		},
+		{
+			name: "get public",
+			execute: func() error {
+				_, err := NewGetPublicWebsiteChannelQuery(nil).Execute(context.Background(), "not-a-uuid")
+				return err
+			},
+		},
 	}
 
 	for _, test := range tests {

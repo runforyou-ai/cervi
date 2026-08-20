@@ -257,6 +257,7 @@ const zhCN = {
     tabs: {
       basic: "基本信息",
       chatInterface: "聊天界面",
+      usage: "使用方式",
     },
     list: {
       title: "网站渠道",
@@ -298,6 +299,18 @@ const zhCN = {
       nameRequired: "请输入渠道名称。",
       nameTooLong: "渠道名称不能超过 100 个字符。",
       descriptionTooLong: "渠道说明不能超过 2000 个字符。",
+    },
+    usage: {
+      embed: "网站嵌入",
+      link: "聊天链接",
+      snippet: "安装代码",
+      snippetHelp: "把这段代码放到网站页面中，右下角会出现聊天入口。",
+      chatUrl: "聊天链接",
+      chatUrlHelp: "把这个链接发给访客。",
+      copy: "复制",
+      copied: "已复制",
+      copyFailed: "复制失败，请手动复制。",
+      originError: "无法生成对外入口，请稍后重试。",
     },
     chatInterface: {
       saved: "聊天界面已保存。",
