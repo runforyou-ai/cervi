@@ -143,6 +143,48 @@
 }
 
 @layer components {
+  .cervi-window-drag-region {
+    display: none;
+  }
+
+  [data-native-os="darwin"] {
+    --cervi-macos-titlebar-height: 28px;
+  }
+
+  [data-native-os="darwin"] > .cervi-window-drag-region {
+    --wails-draggable: drag;
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 40;
+    display: block;
+    height: var(--cervi-macos-titlebar-height);
+  }
+
+  [data-native-os="darwin"]:has(.cervi-workspace-shell) > .cervi-window-drag-region,
+  [data-native-os="darwin"][data-window-fullscreen="true"] > .cervi-window-drag-region {
+    display: none;
+  }
+
+  [data-native-os="darwin"] .cervi-window-drag-surface {
+    --wails-draggable: drag;
+  }
+
+  [data-native-os="darwin"] .cervi-window-drag-surface :is(a, button, input, select, textarea, [role="button"]) {
+    --wails-draggable: no-drag;
+  }
+
+  [data-native-os="darwin"] .cervi-workspace-sidebar-header {
+    padding-top: calc(0.5rem + var(--cervi-macos-titlebar-height));
+  }
+
+  [data-native-os="darwin"][data-window-fullscreen="true"] .cervi-window-drag-surface {
+    --wails-draggable: no-drag;
+  }
+
+  [data-native-os="darwin"][data-window-fullscreen="true"] .cervi-workspace-sidebar-header {
+    padding-top: 0.5rem;
+  }
+
   .cervi-phone-input {
     @apply h-9 w-full rounded-md border border-input bg-transparent shadow-xs transition-[color,box-shadow];
   }

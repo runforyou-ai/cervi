@@ -120,7 +120,7 @@ export function WorkspaceNavigation({
 
   return (
     <Sidebar variant="inset" collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="cervi-window-drag-surface cervi-workspace-sidebar-header">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" tooltip="Cervi">

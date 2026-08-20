@@ -62,6 +62,9 @@ func run() error {
 		MinHeight:        900,
 		BackgroundColour: application.NewRGB(6, 7, 15),
 		URL:              "/",
+		Mac: application.MacWindow{
+			TitleBar: application.MacTitleBarHidden,
+		},
 	})
 
 	slog.Info("启动 Cervi")

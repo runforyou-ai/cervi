@@ -137,14 +137,14 @@ export function WorkspaceLayout({
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="cervi-workspace-shell">
       <WorkspaceNavigation
         identity={identity}
         onLogout={handleLogout}
         loggingOut={loggingOut}
       />
       <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden md:h-[calc(100svh-1rem)]">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+        <header className="cervi-window-drag-surface flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <h1 className="text-sm font-medium">
