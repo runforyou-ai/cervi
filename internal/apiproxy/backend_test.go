@@ -94,13 +94,23 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	meta := appservice.RequestMeta{Locale: "zh-CN"}
+	status, err := backend.ProbeServer(context.Background(), meta, remote.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Installed || status.OrganizationName != "鹿行" {
+		t.Fatalf("probe status = %#v", status)
+	}
+	if store.serverURL != "" {
+		t.Fatalf("probe should not save server URL, got %q", store.serverURL)
+	}
 	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil {
 		t.Fatal(err)
 	}
 	if store.serverURL != remote.URL {
 		t.Fatalf("server URL = %q, want %q", store.serverURL, remote.URL)
 	}
-	status, err := backend.InstallationStatus(context.Background(), meta)
+	status, err = backend.InstallationStatus(context.Background(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}

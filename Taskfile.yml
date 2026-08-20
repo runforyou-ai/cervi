@@ -98,17 +98,16 @@ tasks:
           GOOSE_CMD: '{{if .VERSION}}down-to {{.VERSION}}{{else}}down{{end}}'
           GOOSE_REPEAT: '{{if .VERSION}}1{{else}}{{.STEP | default 1}}{{end}}'
 
-  migrate:fresh:
-    summary: 清空本地库后重新执行服务端迁移
+  migrate:reset:
+    summary: 回滚全部服务端迁移后重新执行
     desc: |
-      删除 public schema 后重新执行全部迁移。
-      作用于 docker compose 中的共享本地 PostgreSQL，会清空其中全部数据。
+      使用 Goose reset 回滚全部迁移，再执行 up。
+      通过 DATABASE_URL 连接数据库，不依赖 Docker。
       执行前请先停止服务端。
-    preconditions:
-      - sh: docker compose exec -T postgres pg_isready -U cervi -d cervi >/dev/null
-        msg: "本地 PostgreSQL 未就绪。请先运行：docker compose up -d postgres"
     cmds:
-      - docker compose exec -T postgres psql -U cervi -d cervi -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+      - task: migrate:run
+        vars:
+          GOOSE_CMD: reset
       - task: migrate
 
   make:migration:

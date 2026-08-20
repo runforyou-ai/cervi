@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/appservice"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -116,30 +117,34 @@ func isLoopbackHost(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// probeServer 读取企业服务器的初始化状态。
-func probeServer(ctx context.Context, state *remoteState) (bool, error) {
+// probeServer 读取企业服务器的初始化状态和公开企业名称。
+func probeServer(ctx context.Context, state *remoteState) (appservice.InstallationStatus, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, remoteEndpoint(state.baseURL, "/installation/status", ""), nil)
 	if err != nil {
-		return false, err
+		return appservice.InstallationStatus{}, err
 	}
 	response, err := state.client.Do(request)
 	if err != nil {
-		return false, err
+		return appservice.InstallationStatus{}, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return false, fmt.Errorf("服务器返回 HTTP %d", response.StatusCode)
+		return appservice.InstallationStatus{}, fmt.Errorf("服务器返回 HTTP %d", response.StatusCode)
 	}
 	var payload struct {
-		Installed *bool `json:"installed"`
+		Installed        *bool  `json:"installed"`
+		OrganizationName string `json:"organizationName"`
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(&payload); err != nil {
-		return false, errors.New("服务器响应格式不正确")
+		return appservice.InstallationStatus{}, errors.New("服务器响应格式不正确")
 	}
 	if payload.Installed == nil {
-		return false, errors.New("目标地址未提供 Cervi API")
+		return appservice.InstallationStatus{}, errors.New("目标地址未提供 Cervi API")
 	}
-	return *payload.Installed, nil
+	return appservice.InstallationStatus{
+		Installed:        *payload.Installed,
+		OrganizationName: strings.TrimSpace(payload.OrganizationName),
+	}, nil
 }
 
 func remoteEndpoint(baseURL *url.URL, path, rawQuery string) string {

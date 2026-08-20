@@ -109,6 +109,7 @@ func (b *DirectBackend) LoadIdentity(ctx context.Context, meta RequestMeta) (Ide
 func installationFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
 		installationaction.ValidationOrganizationNameRequired: cervii18n.FieldOrganizationNameRequired,
+		installationaction.ValidationOrganizationNameTooLong:  cervii18n.FieldOrganizationNameTooLong,
 		installationaction.ValidationDisplayNameRequired:      cervii18n.FieldDisplayNameRequired,
 		installationaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,
 		installationaction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,

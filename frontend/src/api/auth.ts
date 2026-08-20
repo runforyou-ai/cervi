@@ -6,6 +6,7 @@ import {
   LoadIdentity,
   Login,
   Logout,
+  ProbeServer,
   ServerURL,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
@@ -50,6 +51,9 @@ export async function loadIdentity() {
 export async function install(input: InstallWorkspaceInput) {
   return storeToken(await call((meta) => InstallWorkspace(meta, input)))
 }
+
+/** 检测企业服务器并返回公开企业名称，不保存地址。 */
+export const probeServer = bind(ProbeServer)
 
 /** 保存企业服务器地址并清除本地令牌。 */
 export async function connectServer(serverUrl: string) {

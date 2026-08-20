@@ -8,6 +8,7 @@ export {
   loadIdentity,
   login,
   logout,
+  probeServer,
 } from "@/api/auth"
 export { resolveNativeEntry, type NativeEntry } from "@/api/native-entry"
 export * from "@/api/service"

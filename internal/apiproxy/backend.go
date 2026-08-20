@@ -228,41 +228,55 @@ func (b *Backend) ServerURL(_ context.Context, _ appservice.RequestMeta) (string
 	return state.baseURL.String(), nil
 }
 
+// ProbeServer 检测企业服务器并返回公开企业名称，不保存地址。
+func (b *Backend) ProbeServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (appservice.InstallationStatus, error) {
+	_, status, err := b.inspectServer(ctx, meta, serverURL)
+	return status, err
+}
+
 // ConnectServer 验证并保存企业服务器地址。
 func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) error {
-	parsed, err := parseServerURL(serverURL)
+	state, _, err := b.inspectServer(ctx, meta, serverURL)
 	if err != nil {
-		var validationError *serverURLValidationError
-		if !errors.As(err, &validationError) {
-			return fmt.Errorf("parse enterprise server URL: %w", err)
-		}
-		return localError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorServerURLInvalid, map[string]cervii18n.Key{"serverUrl": validationError.messageKey})
+		return err
 	}
-	state := newRemoteState(parsed)
-	installed, err := probeServer(ctx, state)
-	if err != nil {
+	if err := b.connection.store.SetServerURL(ctx, state.baseURL.String()); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		slog.Warn("验证企业服务器失败", "server_url", parsed.String(), "error", err)
-		return localError(meta, http.StatusBadGateway, "SERVER_UNAVAILABLE", cervii18n.ErrorServerUnavailable, map[string]cervii18n.Key{"serverUrl": cervii18n.FieldServerURLNotCervi})
-	}
-	if !installed {
-		slog.Info("企业服务器尚未初始化", "server_url", parsed.String())
-		return localError(meta, http.StatusConflict, "SERVER_INITIALIZATION_REQUIRED", cervii18n.ErrorServerInitializationRequired, nil)
-	}
-	if err := b.connection.store.SetServerURL(ctx, parsed.String()); err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		slog.Warn("保存企业服务器配置失败", "server_url", parsed.String(), "error", err)
+		slog.Warn("保存企业服务器配置失败", "server_url", state.baseURL.String(), "error", err)
 		return localError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorServerConnectionSaveFailed, nil)
 	}
 	b.connection.mu.Lock()
 	b.connection.state = state
 	b.connection.mu.Unlock()
-	slog.Info("企业服务器连接成功", "server_url", parsed.String())
+	slog.Info("企业服务器连接成功", "server_url", state.baseURL.String())
 	return nil
+}
+
+func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (*remoteState, appservice.InstallationStatus, error) {
+	parsed, err := parseServerURL(serverURL)
+	if err != nil {
+		var validationError *serverURLValidationError
+		if !errors.As(err, &validationError) {
+			return nil, appservice.InstallationStatus{}, fmt.Errorf("parse enterprise server URL: %w", err)
+		}
+		return nil, appservice.InstallationStatus{}, localError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorServerURLInvalid, map[string]cervii18n.Key{"serverUrl": validationError.messageKey})
+	}
+	state := newRemoteState(parsed)
+	status, err := probeServer(ctx, state)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, appservice.InstallationStatus{}, ctx.Err()
+		}
+		slog.Warn("验证企业服务器失败", "server_url", parsed.String(), "error", err)
+		return nil, appservice.InstallationStatus{}, localError(meta, http.StatusBadGateway, "SERVER_UNAVAILABLE", cervii18n.ErrorServerUnavailable, map[string]cervii18n.Key{"serverUrl": cervii18n.FieldServerURLNotCervi})
+	}
+	if !status.Installed || status.OrganizationName == "" {
+		slog.Info("企业服务器尚未初始化", "server_url", parsed.String())
+		return nil, appservice.InstallationStatus{}, localError(meta, http.StatusConflict, "SERVER_INITIALIZATION_REQUIRED", cervii18n.ErrorServerInitializationRequired, nil)
+	}
+	return state, status, nil
 }
 
 func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, path string, query url.Values, input, output any) error {

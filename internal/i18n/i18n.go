@@ -55,6 +55,7 @@ const (
 	ErrorServerConnectionFailed           Key = "error.server_connection_failed"
 
 	FieldOrganizationNameRequired    Key = "field.organization_name_required"
+	FieldOrganizationNameTooLong     Key = "field.organization_name_too_long"
 	FieldDisplayNameRequired         Key = "field.display_name_required"
 	FieldEmailInvalid                Key = "field.email_invalid"
 	FieldPasswordTooShort            Key = "field.password_too_short"

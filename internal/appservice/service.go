@@ -38,6 +38,7 @@ type WorkspaceInstaller interface {
 // ServerConnector 由原生端 Backend 实现，用于企业服务器地址。
 type ServerConnector interface {
 	ServerURL(context.Context, RequestMeta) (string, error)
+	ProbeServer(context.Context, RequestMeta, string) (InstallationStatus, error)
 	ConnectServer(context.Context, RequestMeta, string) error
 }
 
@@ -187,6 +188,15 @@ func (s *Service) ServerURL(ctx context.Context, meta RequestMeta) (string, erro
 		return "", methodNotAllowedError(meta, "ServerURL")
 	}
 	return connector.ServerURL(ctx, meta)
+}
+
+// ProbeServer 检测企业服务器并返回公开企业名称，不保存地址。
+func (s *Service) ProbeServer(ctx context.Context, meta RequestMeta, serverURL string) (InstallationStatus, error) {
+	connector, ok := s.backend.(ServerConnector)
+	if !ok {
+		return InstallationStatus{}, methodNotAllowedError(meta, "ProbeServer")
+	}
+	return connector.ProbeServer(ctx, meta, serverURL)
 }
 
 // ConnectServer 保存并验证原生端企业服务器地址。

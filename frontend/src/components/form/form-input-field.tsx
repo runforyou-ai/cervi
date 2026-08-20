@@ -19,6 +19,7 @@ type FormInputFieldProps<T extends FieldValues> = {
   label: ReactNode
   id?: string
   required?: boolean
+  endAction?: ReactNode
   passwordVisibilityLabels?: {
     show: string
     hide: string
@@ -37,13 +38,14 @@ type FormInputFieldProps<T extends FieldValues> = {
   | "aria-describedby"
 >
 
-/** 渲染受控表单输入，密码框可切换可见性。 */
+/** 渲染受控表单输入，可切换密码可见性或附带末尾操作。 */
 export function FormInputField<T extends FieldValues>({
   control,
   name,
   label,
   id = name,
   required = true,
+  endAction,
   passwordVisibilityLabels,
   className,
   ...inputProps
@@ -55,6 +57,26 @@ export function FormInputField<T extends FieldValues>({
       name={name}
       control={control}
       render={({ field }) => {
+        const trailing = passwordVisibilityLabels ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="absolute top-1/2 right-1 -translate-y-1/2"
+            aria-label={
+              passwordVisible
+                ? passwordVisibilityLabels.hide
+                : passwordVisibilityLabels.show
+            }
+            aria-pressed={passwordVisible}
+            onClick={() => setPasswordVisible((visible) => !visible)}
+          >
+            {passwordVisible ? <EyeOffIcon /> : <EyeIcon />}
+          </Button>
+        ) : (
+          endAction
+        )
+
         const input = (
           <Input
             {...field}
@@ -67,7 +89,7 @@ export function FormInputField<T extends FieldValues>({
                   : "password"
                 : inputProps.type
             }
-            className={cn(passwordVisibilityLabels && "pr-10", className)}
+            className={cn(trailing && "pr-10", className)}
             required={required}
           />
         )
@@ -77,24 +99,10 @@ export function FormInputField<T extends FieldValues>({
             <FieldLabel htmlFor={id} required={required}>
               {label}
             </FieldLabel>
-            {passwordVisibilityLabels ? (
+            {trailing ? (
               <div className="relative">
                 {input}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="absolute top-1/2 right-1 -translate-y-1/2"
-                  aria-label={
-                    passwordVisible
-                      ? passwordVisibilityLabels.hide
-                      : passwordVisibilityLabels.show
-                  }
-                  aria-pressed={passwordVisible}
-                  onClick={() => setPasswordVisible((visible) => !visible)}
-                >
-                  {passwordVisible ? <EyeOffIcon /> : <EyeIcon />}
-                </Button>
+                {trailing}
               </div>
             ) : (
               input

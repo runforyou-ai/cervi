@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import { getInstallationStatus } from "@/api"
-import { Button } from "@/components/ui/button"
 import { LoginForm } from "@/features/auth/login-form"
 
 /** 已连接企业时展示企业名称、登录表单，以及原生端修改服务器入口。 */
@@ -52,21 +51,21 @@ export function LoginPage({
   }
 
   return (
-    <main className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+    <main className="flex min-h-dvh w-full items-center justify-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10">
       <div className="w-full max-w-sm">
-        <div className="mb-6 text-center">
-          <p className="text-lg font-semibold tracking-tight">{organizationName}</p>
-          {allowServerChange ? (
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto px-0 text-muted-foreground"
-              onClick={() => navigate("/connect")}
-            >
-              {t("changeServer")}
-            </Button>
-          ) : null}
+        <div className="mb-8 w-full">
+          <p className="text-center text-xl font-medium tracking-tight">
+            {organizationName}
+            {allowServerChange ? (
+              <button
+                type="button"
+                className="ml-2.5 inline-block whitespace-nowrap align-bottom text-[11px] font-medium tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
+                onClick={() => navigate("/connect")}
+              >
+                {t("changeServer")}
+              </button>
+            ) : null}
+          </p>
         </div>
         <LoginForm allowServerChange={allowServerChange} />
       </div>

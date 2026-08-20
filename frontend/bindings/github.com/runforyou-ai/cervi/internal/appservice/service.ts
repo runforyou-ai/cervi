@@ -148,6 +148,13 @@ export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
 }
 
 /**
+ * ProbeServer 检测企业服务器并返回公开企业名称，不保存地址。
+ */
+export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<$models.InstallationStatus> {
+    return $Call.ByID(885726575, meta, serverURL);
+}
+
+/**
  * RestoreContact 恢复联系人。
  */
 export function RestoreContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {

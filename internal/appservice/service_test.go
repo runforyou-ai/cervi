@@ -21,6 +21,9 @@ func TestPlatformMethodsRequireCapability(t *testing.T) {
 	_, err = service.ServerURL(context.Background(), meta)
 	assertMethodNotAllowed(t, err)
 
+	_, err = service.ProbeServer(context.Background(), meta, "https://cervi.example.com")
+	assertMethodNotAllowed(t, err)
+
 	err = service.ConnectServer(context.Background(), meta, "https://cervi.example.com")
 	assertMethodNotAllowed(t, err)
 }

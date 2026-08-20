@@ -16,7 +16,7 @@ wails3 task migrate:status
 wails3 task migrate:rollback
 wails3 task migrate:rollback STEP=3
 wails3 task migrate:rollback VERSION=20260818032701
-wails3 task migrate:fresh
+wails3 task migrate:reset
 wails3 task make:migration NAME=create_example_table
 
 # 启动桌面端 / 服务端
@@ -94,7 +94,7 @@ cervi/
 ### 认证与多端
 
 - 各端统一使用 Bearer Token，不使用 Cookie。登录令牌保存在 `localStorage`。API Proxy 把应用服务调用转成携带 Token 的 HTTP 请求。
-- 企业初始化只在 Web 端完成。桌面端和移动端把企业服务器地址存到本地 SQLite，连上后进入登录页，并允许从登录页修改地址。
+- 企业初始化只在 Web 端完成。桌面端和移动端先检测企业服务器并确认企业名称，再连接并进入登录页；登录页可更换地址。
 - 登录页展示已连接企业的名称；读不到时，桌面端和移动端回到连接页，Web 端回到初始化页。
 - Web 与桌面端共享主要业务页面，移动端保持独立入口。
 - 文件由客户端通过服务端签发的预签名请求直传对象存储；服务端不转发文件内容，Endpoint 使用客户端可访问的公开地址。
@@ -102,7 +102,7 @@ cervi/
 ### 数据与迁移
 
 - 本地 PostgreSQL 由所有工作区共享，不为单独工作区创建容器、端口或数据卷。
-- 重建库结构使用 `wails3 task migrate:fresh`，或先回滚再 `migrate`；回滚和重建前先停止服务端。
+- 重建库结构使用 `wails3 task migrate:reset`，或先回滚再 `migrate`；回滚和重建前先停止服务端。
 - 迁移文件按 `YYYYMMDDHHMMSS_说明.sql` 命名，按表拆分，不创建外键和 `CHECK` 约束。
 
 ### 当前阶段

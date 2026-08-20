@@ -41,6 +41,7 @@
   "error.remote_request_create_failed": "Could not create the company server request.",
   "error.server_connection_failed": "The company server connection failed.",
   "field.organization_name_required": "Enter the company name.",
+  "field.organization_name_too_long": "The company name cannot exceed 32 characters.",
   "field.display_name_required": "Enter your name.",
   "field.email_invalid": "Enter a valid email address.",
   "field.password_too_short": "Password must contain at least 8 characters.",

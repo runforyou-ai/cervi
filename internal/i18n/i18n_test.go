@@ -66,6 +66,7 @@ func TestAllMessageKeysCanBeLocalized(t *testing.T) {
 		ErrorRemoteRequestCreateFailed,
 		ErrorServerConnectionFailed,
 		FieldOrganizationNameRequired,
+		FieldOrganizationNameTooLong,
 		FieldDisplayNameRequired,
 		FieldEmailInvalid,
 		FieldPasswordTooShort,
