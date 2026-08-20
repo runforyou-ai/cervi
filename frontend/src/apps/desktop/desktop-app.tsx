@@ -3,10 +3,9 @@ import { useEffect, useState } from "react"
 import { Events, Window } from "@wailsio/runtime"
 
 import { SharedAppRoutes } from "@/apps/shared-app-routes"
-import { WindowDragRegion } from "@/components/window-drag-region"
-import { resolveDesktopOperatingSystem } from "@/platform/app-platform"
+import { isDesktopMacOS } from "@/platform/app-platform"
 
-/** 监听原生窗口全屏状态，供 macOS 标题栏布局避让使用。 */
+/** 同步原生窗口全屏状态。 */
 function useWindowFullscreen(enabled: boolean) {
   const [fullscreen, setFullscreen] = useState(false)
 
@@ -15,12 +14,11 @@ function useWindowFullscreen(enabled: boolean) {
       return
     }
 
-    let active = true
-    void Window.IsFullscreen().then((currentFullscreen) => {
-      if (active) {
-        setFullscreen(currentFullscreen)
-      }
-    })
+    void Window.IsFullscreen()
+      .then(setFullscreen)
+      .catch((error: unknown) => {
+        console.warn("读取窗口全屏状态失败", error)
+      })
 
     const stopFullscreen = Events.On(
       Events.Types.Common.WindowFullscreen,
@@ -32,7 +30,6 @@ function useWindowFullscreen(enabled: boolean) {
     )
 
     return () => {
-      active = false
       stopFullscreen()
       stopUnFullscreen()
     }
@@ -43,16 +40,16 @@ function useWindowFullscreen(enabled: boolean) {
 
 /** 渲染桌面端路由。 */
 export default function DesktopApp() {
-  const operatingSystem = resolveDesktopOperatingSystem()
-  const fullscreen = useWindowFullscreen(operatingSystem === "darwin")
+  const macOS = isDesktopMacOS()
+  const fullscreen = useWindowFullscreen(macOS)
 
   return (
     <div
       className="cervi-desktop-app min-h-dvh"
-      data-native-os={operatingSystem ?? undefined}
+      data-native-os={macOS ? "darwin" : undefined}
       data-window-fullscreen={fullscreen ? "true" : "false"}
     >
-      <WindowDragRegion />
+      <div aria-hidden="true" className="cervi-window-drag-region" />
       <SharedAppRoutes platform="desktop" />
     </div>
   )

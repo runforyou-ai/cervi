@@ -182,20 +182,16 @@ body,
   min-height: 100%;
 }
 
-/* macOS 隐藏标题栏后红绿灯叠在 webview 上；预留独立拖拽条。 */
+/* macOS 隐藏标题栏后为窗口按钮保留顶部空间。 */
+[data-native-os="darwin"] {
+  --cervi-macos-titlebar-height: 28px;
+}
+
 .cervi-window-drag-region {
   display: none;
 }
 
-[data-native-os="darwin"] {
-  --cervi-macos-titlebar-height: 0px;
-}
-
-[data-native-os="darwin"][data-window-fullscreen="false"] {
-  --cervi-macos-titlebar-height: 28px;
-}
-
-[data-native-os="darwin"] > .cervi-window-drag-region {
+[data-native-os="darwin"][data-window-fullscreen="false"] > .cervi-window-drag-region {
   --wails-draggable: drag;
   position: fixed;
   inset: 0 0 auto;
@@ -204,10 +200,30 @@ body,
   height: var(--cervi-macos-titlebar-height);
 }
 
-[data-native-os="darwin"][data-window-fullscreen="true"] > .cervi-window-drag-region {
+[data-native-os="darwin"]:has(.cervi-workspace-shell) > .cervi-window-drag-region {
   display: none;
 }
 
-.cervi-workspace-shell {
-  padding-top: var(--cervi-macos-titlebar-height, 0px);
+/* 工作台只允许一级栏、页头空白和空会话主区拖动窗口。 */
+[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-rail {
+  --wails-draggable: drag;
+  padding-top: var(--cervi-macos-titlebar-height);
+}
+
+[data-native-os="darwin"][data-window-fullscreen="false"] :is(
+  [data-slot="page-header"],
+  [data-slot="page-header-actions"],
+  .cervi-inbox-empty-main
+) {
+  --wails-draggable: drag;
+}
+
+[data-native-os="darwin"] :is(
+  .cervi-workspace-rail :is(a, button),
+  [data-slot="page-split-pane"],
+  [data-slot="page-header-title"],
+  [data-slot="page-header"] :is(a, button, input, select),
+  .cervi-inbox-empty-main [data-slot="empty-state-content"]
+) {
+  --wails-draggable: no-drag;
 }

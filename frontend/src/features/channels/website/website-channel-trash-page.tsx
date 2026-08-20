@@ -11,7 +11,9 @@ import {
   restoreWebsiteChannel,
   type WebsiteChannelSummary,
 } from "@/api"
-import { PageBackHeader } from "@/components/page-back-header"
+import { PageBack } from "@/components/page-back"
+import { PageHeader } from "@/components/page-header"
+import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -23,7 +25,7 @@ import {
 } from "@/components/ui/table"
 import { useDateTime } from "@/hooks/use-date-time"
 
-/** 已删除的网站渠道。 */
+/** 加载并恢复已删除的网站渠道。 */
 export function WebsiteChannelTrashPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
@@ -75,10 +77,12 @@ export function WebsiteChannelTrashPage() {
   }
 
   return (
-    <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <PageBackHeader to="/channels/website" title={t("trash.title")} />
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+      <PageHeader title={t("trash.title")}>
+        <PageBack to="/channels/website" />
+      </PageHeader>
 
-      <div>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
@@ -122,9 +126,9 @@ export function WebsiteChannelTrashPage() {
                         {channel.name}
                       </TableCell>
                       <TableCell className="min-w-64 max-w-xl text-muted-foreground">
-                        <span className="line-clamp-2">
+                        <SelectableText className="line-clamp-2">
                           {channel.description || t("list.noDescription")}
-                        </span>
+                        </SelectableText>
                       </TableCell>
                       <TableCell className="whitespace-nowrap">
                         {t(

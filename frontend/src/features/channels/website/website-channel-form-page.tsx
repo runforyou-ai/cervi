@@ -11,7 +11,8 @@ import {
   recoverSession,
   type WebsiteChannel,
 } from "@/api"
-import { PageBackHeader } from "@/components/page-back-header"
+import { PageBack } from "@/components/page-back"
+import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WebsiteChannelForm } from "@/features/channels/website/website-channel-form"
@@ -151,7 +152,6 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
       .then((loadedChannel) => {
         if (active) {
           setChannel(loadedChannel)
-          console.info("网站渠道详情已加载", { channel_id: channelId })
         }
       })
       .catch((requestError: unknown) => {
@@ -180,45 +180,45 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
     }
   }, [channelId, mode, navigate, reloadKey, t])
 
-  if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
-        <LoaderCircleIcon className="size-4 animate-spin" />
-        {t("loading")}
-      </div>
-    )
-  }
-
-  if (mode === "edit" && !channel) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-6 text-center">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {error}
-          </p>
-          <Button
-            className="mt-4"
-            variant="outline"
-            onClick={() => setReloadKey((current) => current + 1)}
-          >
-            {t("retry")}
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <PageBackHeader
-        to="/channels/website"
-        title={mode === "create" ? t("create.title") : channel?.name}
-      />
-      {mode === "edit" && channel ? (
-        <WebsiteChannelEditTabs channel={channel} onChannelChange={setChannel} />
-      ) : (
-        <WebsiteChannelForm />
-      )}
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+      <PageHeader
+        title={
+          mode === "create"
+            ? t("create.title")
+            : channel?.name ?? t("edit.title")
+        }
+      >
+        <PageBack to="/channels/website" />
+      </PageHeader>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+        {loading ? (
+          <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
+            <LoaderCircleIcon className="size-4 animate-spin" />
+            {t("loading")}
+          </div>
+        ) : mode === "edit" && !channel ? (
+          <div className="flex min-h-48 items-center justify-center text-center">
+            <div>
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <Button
+                className="mt-4"
+                variant="outline"
+                onClick={() => setReloadKey((current) => current + 1)}
+              >
+                {t("retry")}
+              </Button>
+            </div>
+          </div>
+        ) : mode === "edit" && channel ? (
+          <WebsiteChannelEditTabs
+            channel={channel}
+            onChannelChange={setChannel}
+          />
+        ) : (
+          <WebsiteChannelForm />
+        )}
+      </div>
     </div>
   )
 }

@@ -62,17 +62,20 @@ function ConversationThread({
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header
+        data-slot="page-header"
         className={cn(
           "flex h-14 shrink-0 items-center gap-3 border-b px-4",
           narrowViewport && "pr-14"
         )}
       >
-        <InboxConversationAvatar conversation={conversation} />
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-medium">{conversation.name}</h2>
-          <p className="truncate text-xs text-muted-foreground">
-            {conversation.channel} · {conversation.status}
-          </p>
+        <div data-slot="page-header-title" className="flex min-w-0 items-center gap-3">
+          <InboxConversationAvatar conversation={conversation} />
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-medium">{conversation.name}</h2>
+            <p className="truncate text-xs text-muted-foreground">
+              {conversation.channel} · {conversation.status}
+            </p>
+          </div>
         </div>
         {onCustomerPanelToggle ? (
           <Button
@@ -172,8 +175,10 @@ function CustomerPanel({ conversation }: { conversation: Conversation }) {
 
   return (
     <aside className="hidden min-h-0 w-80 shrink-0 flex-col border-l bg-background md:flex">
-      <header className="flex h-14 shrink-0 items-center border-b px-4">
-        <h2 className="text-sm font-medium">{t("customerPanel.title")}</h2>
+      <header data-slot="page-header" className="flex h-14 shrink-0 items-center border-b px-4">
+        <h2 data-slot="page-header-title" className="text-sm font-medium">
+          {t("customerPanel.title")}
+        </h2>
       </header>
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-6 p-4">
@@ -321,9 +326,9 @@ export function InboxPage({
         pane={
           <InboxConversationList conversations={conversations} />
         }
-        mainClassName="items-center justify-center p-6"
+        mainClassName="cervi-inbox-empty-main items-center justify-center p-6"
       >
-        <div className="max-w-sm text-center">
+        <div data-slot="empty-state-content" className="max-w-sm text-center">
           <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
             <MessagesSquareIcon className="size-5 text-muted-foreground" />
           </div>

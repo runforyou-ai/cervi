@@ -48,7 +48,7 @@ export function PageSplit({
       <aside
         data-slot="page-split-pane"
         className={cn(
-          "min-h-0 shrink-0 flex-col overflow-hidden border-r",
+          "min-h-0 shrink-0 flex-col overflow-hidden border-r select-none",
           paneOnNarrowClass[paneOnNarrow],
           paneWidthClass[paneWidth],
           paneVariant === "nav" && "bg-sidebar text-sidebar-foreground",

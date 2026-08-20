@@ -22,7 +22,7 @@ export type ListToolbarOption = {
 /** 列表工具栏容器。 */
 export function ListToolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6">
+    <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 select-none sm:px-6">
       {children}
     </div>
   )
