@@ -1,3 +1,4 @@
+/** 网站渠道回收站页。 */
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/table"
 import { useDateTime } from "@/hooks/use-date-time"
 
+/** 展示已删除的网站渠道并支持恢复。 */
 export function WebsiteChannelTrashPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
@@ -38,6 +40,7 @@ export function WebsiteChannelTrashPage() {
   const [restoringId, setRestoringId] = useState("")
   const [error, setError] = useState("")
 
+  /** 加载已删除的网站渠道。 */
   const loadChannels = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -61,6 +64,7 @@ export function WebsiteChannelTrashPage() {
     void loadChannels()
   }, [loadChannels])
 
+  /** 恢复网站渠道。 */
   async function handleRestore(channel: WebsiteChannelSummary) {
     setRestoringId(channel.id)
     try {

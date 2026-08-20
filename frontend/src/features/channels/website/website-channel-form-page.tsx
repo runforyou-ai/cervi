@@ -1,3 +1,4 @@
+/** 网站渠道创建页和编辑页。 */
 import { useEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -22,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WebsiteChannelForm } from "@/features/channels/website/website-channel-form"
 import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
 
+/** 网站渠道编辑页签，与 URL 同步。 */
 function WebsiteChannelEditTabs({
   channel,
   onChannelChange,
@@ -87,6 +89,7 @@ function WebsiteChannelEditTabs({
   )
 }
 
+/** 创建或编辑网站渠道。 */
 export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()

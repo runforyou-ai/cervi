@@ -1,3 +1,4 @@
+/** 注入请求认证信息，并把应用服务错误转换为前端错误。 */
 import { CancelError, type CancellablePromise } from "@wailsio/runtime"
 
 import {
@@ -19,11 +20,13 @@ type ErrorCause = {
   fields?: Record<string, string>
 }
 
+/** 应用服务返回的结构化业务错误。 */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly fields: Record<string, string>
 
+  /** 创建结构化业务错误。 */
   constructor(
     status: number,
     code: string,
@@ -38,6 +41,7 @@ export class ApiError extends Error {
   }
 }
 
+/** 注入认证和语言后调用应用服务。 */
 export async function call<T>(
   operation: (meta: RequestMeta) => CancellablePromise<T>,
   signal?: AbortSignal,
@@ -50,6 +54,7 @@ export async function call<T>(
   }
 }
 
+/** 把应用服务方法包装成自动注入认证信息的前端调用。 */
 export function bind<A extends unknown[], R>(
   fn: (meta: RequestMeta, ...args: A) => CancellablePromise<R>,
 ) {
@@ -65,6 +70,7 @@ export function bind<A extends unknown[], R>(
   }
 }
 
+/** 保存登录令牌并返回当前身份。 */
 export function acceptSession(session: Session) {
   window.sessionStorage.setItem(
     sessionStorageKey,
@@ -73,14 +79,17 @@ export function acceptSession(session: Session) {
   return session.identity
 }
 
+/** 清除本地保存的登录令牌。 */
 export function clearSession() {
   window.sessionStorage.removeItem(sessionStorageKey)
 }
 
+/** 判断本地是否仍有未过期的登录令牌。 */
 export function hasSession() {
   return loadToken() !== ""
 }
 
+/** 组装当前请求的令牌和语言。 */
 function requestMeta(): RequestMeta {
   return {
     token: loadToken(),
@@ -91,6 +100,7 @@ function requestMeta(): RequestMeta {
   }
 }
 
+/** 读取未过期的登录令牌。 */
 function loadToken() {
   const value = window.sessionStorage.getItem(sessionStorageKey)
   if (!value) return ""
@@ -102,6 +112,7 @@ function loadToken() {
   return session.token
 }
 
+/** 把应用服务异常转换为前端错误。 */
 function normalizeError(error: unknown) {
   if (error instanceof ApiError) return error
   if (error instanceof Error) {
@@ -120,6 +131,7 @@ function normalizeError(error: unknown) {
   return new ApiError(500, "UNKNOWN_ERROR", "Request failed")
 }
 
+/** 判断异常原因是否为结构化业务错误。 */
 function isErrorCause(value: unknown): value is ErrorCause {
   if (typeof value !== "object" || value === null) return false
   const cause = value as Partial<ErrorCause>

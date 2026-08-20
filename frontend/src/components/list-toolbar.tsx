@@ -1,3 +1,4 @@
+/** 列表页工具栏、搜索框和筛选器。 */
 import type { InputHTMLAttributes, ReactNode } from "react"
 import { CheckIcon, SearchIcon } from "lucide-react"
 
@@ -18,6 +19,7 @@ export type ListToolbarOption = {
   label: string
 }
 
+/** 列表工具栏容器。 */
 export function ListToolbar({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6">
@@ -26,6 +28,7 @@ export function ListToolbar({ children }: { children: ReactNode }) {
   )
 }
 
+/** 列表搜索输入框。 */
 export function ListToolbarSearch({
   className,
   ...props
@@ -38,6 +41,7 @@ export function ListToolbarSearch({
   )
 }
 
+/** 列表筛选下拉。 */
 export function ListToolbarFilter({
   label,
   allLabel,
@@ -91,6 +95,7 @@ export function ListToolbarFilter({
   )
 }
 
+/** 清除列表筛选。 */
 export function ListToolbarReset({
   children,
   onClick,

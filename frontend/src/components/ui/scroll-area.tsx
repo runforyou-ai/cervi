@@ -1,3 +1,4 @@
+/** shadcn 滚动区域。 */
 import * as React from "react"
 import { ScrollArea as ScrollAreaPrimitive } from "radix-ui"
 

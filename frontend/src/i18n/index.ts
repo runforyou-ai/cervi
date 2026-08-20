@@ -1,3 +1,4 @@
+/** 初始化 i18next 并同步文档语言。 */
 import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
 
@@ -8,6 +9,7 @@ import {
   supportedLanguages,
 } from "@/i18n/resources"
 
+/** 根据浏览器语言选择应用语言。 */
 function resolveBrowserLanguage() {
   const browserLanguage = navigator.languages[0] ?? navigator.language
   const browserLocale = new Intl.Locale(browserLanguage).maximize()
@@ -23,6 +25,7 @@ function resolveBrowserLanguage() {
   return fallbackLanguage
 }
 
+/** 把文档语言和阅读方向同步到当前语言。 */
 function syncDocumentLanguage(language: string) {
   document.documentElement.lang = language
   document.documentElement.dir = i18n.dir(language)
@@ -30,6 +33,7 @@ function syncDocumentLanguage(language: string) {
 
 i18n.on("languageChanged", syncDocumentLanguage)
 
+/** 初始化国际化资源。 */
 export async function initializeI18n() {
   const language = resolveBrowserLanguage()
 

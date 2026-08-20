@@ -1,3 +1,4 @@
+/** 登录表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
@@ -23,6 +24,7 @@ import {
 } from "@/features/auth/login-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
+/** 校验并提交登录。 */
 export function LoginForm({
   allowServerChange = false,
 }: {
@@ -40,6 +42,7 @@ export function LoginForm({
     },
   })
 
+  /** 提交登录并进入收件箱。 */
   async function submitLogin(values: LoginFormValues) {
     try {
       await login(values)

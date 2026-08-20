@@ -1,3 +1,4 @@
+/** 带标签和校验状态的表单输入框。 */
 import { type ComponentProps, type ReactNode, useState } from "react"
 import { EyeIcon, EyeOffIcon } from "lucide-react"
 import {
@@ -36,6 +37,7 @@ type FormInputFieldProps<T extends FieldValues> = {
   | "aria-describedby"
 >
 
+/** 渲染受控表单输入，密码框可切换可见性。 */
 export function FormInputField<T extends FieldValues>({
   control,
   name,

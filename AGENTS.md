@@ -77,6 +77,7 @@ cervi/
 ## 开发约定
 
 - Go 具名函数和方法使用简洁、直述型中文注释。
+- 前端 `src` 业务代码使用简洁、直述型中文注释：每个文件在文件头说明职责，每个具名函数、组件和导出函数用一行注释说明作用。`frontend/bindings` 由工具生成，禁止添加注释。`components/ui` 为 shadcn 组件，只保留文件头注释。
 - `appservice.Service` 是统一业务入口：服务端 Web 直接调用 `DirectBackend`，桌面端和移动端通过 API Proxy 调用企业服务端，Gin 只提供对外 HTTP API。
 - 服务端由 `DirectBackend` 完成认证、错误转换并调用 Action；Gin 不定义项目内前端业务类型和主要调用契约。
 - Action 直接使用 Bun，并按需调用 `common` 中的通用能力。

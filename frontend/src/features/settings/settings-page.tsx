@@ -1,3 +1,4 @@
+/** 设置页，当前展示对象存储配置。 */
 import { useTranslation } from "react-i18next"
 import { Link, NavLink } from "react-router"
 
@@ -12,6 +13,7 @@ import {
 import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
 import { cn } from "@/lib/utils"
 
+/** 渲染设置导航和对象存储表单。 */
 export function SettingsPage() {
   const { t } = useTranslation("settings")
 

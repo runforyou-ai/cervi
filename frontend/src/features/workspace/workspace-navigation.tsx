@@ -1,3 +1,4 @@
+/** 工作台侧栏导航和用户菜单。 */
 import { useEffect, useState } from "react"
 import {
   ChevronRightIcon,
@@ -45,6 +46,7 @@ import {
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 
+/** 尚未开放的渠道入口。 */
 function ComingSoonChannel({ title }: { title: string }) {
   const { t } = useTranslation("workspace")
 
@@ -65,6 +67,7 @@ function ComingSoonChannel({ title }: { title: string }) {
   )
 }
 
+/** 工作台主导航菜单。 */
 function WorkspaceMenu() {
   const { t } = useTranslation("workspace")
   const location = useLocation()
@@ -84,6 +87,7 @@ function WorkspaceMenu() {
     }
   }, [channelsActive, location.pathname])
 
+  /** 窄视口下关闭侧栏。 */
   function closeNarrowNavigation() {
     if (isNarrowViewport) {
       setOpenNarrowViewport(false)
@@ -177,6 +181,7 @@ function WorkspaceMenu() {
   )
 }
 
+/** 渲染工作台侧栏、导航和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
   onLogout,
@@ -191,6 +196,7 @@ export function WorkspaceNavigation({
   const { setOpenNarrowViewport } = useSidebar()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
+  /** 打开设置页。 */
   function openSettings() {
     navigate("/settings/storage")
     setOpenNarrowViewport(false)

@@ -1,9 +1,11 @@
+/** 联系人表单校验规则。 */
 import { z } from "zod"
 import { isPossiblePhoneNumber } from "react-phone-number-input"
 
 import { ContactStage } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
+/** 创建联系人表单校验。 */
 export function createContactSchema(messages: {
   identityRequired: string
   channelRequired: string

@@ -1,3 +1,4 @@
+/** 联系人详情和分节编辑。 */
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, type FieldErrors } from "react-hook-form"
@@ -29,6 +30,7 @@ import { apiErrorMessage } from "@/lib/form-errors"
 
 type EditingSection = "name" | "stage" | "methods" | "notes" | null
 
+/** 把联系人详情转换为表单值。 */
 function valuesFromDetail(detail: ContactDetail): ContactFormValues {
   return {
     displayName: detail.contact.displayName ?? "",
@@ -40,6 +42,7 @@ function valuesFromDetail(detail: ContactDetail): ContactFormValues {
   }
 }
 
+/** 用表单值更新联系方式，其余项原样保留。 */
 function methodsFromDetail(
   detail: ContactDetail,
   values: ContactFormValues,
@@ -89,6 +92,7 @@ function methodsFromDetail(
   return methods
 }
 
+/** 详情行，支持进入编辑。 */
 function DetailRow({
   label,
   value,
@@ -129,6 +133,7 @@ function DetailRow({
   )
 }
 
+/** 详情分节编辑的保存和取消。 */
 function EditActions({
   saving,
   onSave,
@@ -151,6 +156,7 @@ function EditActions({
   )
 }
 
+/** 展示并分节编辑联系人详情。 */
 export function ContactDetailView({
   detail,
   onSaved,
@@ -187,16 +193,19 @@ export function ContactDetailView({
     setEditing(null)
   }, [detail, form])
 
+  /** 取消当前分节编辑。 */
   function cancelEdit() {
     form.reset(valuesFromDetail(detail))
     setEditing(null)
   }
 
+  /** 开始编辑指定分节。 */
   function startEditing(section: Exclude<EditingSection, null>) {
     form.reset(valuesFromDetail(detail))
     setEditing(section)
   }
 
+  /** 校验失败时提示错误。 */
   function invalid(_errors: FieldErrors<ContactFormValues>) {
     toast.error(t("validation.checkFields"))
   }

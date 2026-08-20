@@ -1,3 +1,4 @@
+/** 美式英语界面文案。 */
 const enUS = {
   common: {
     notifications: "Notifications",

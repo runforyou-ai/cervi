@@ -1,5 +1,7 @@
+/** 登录页。 */
 import { LoginForm } from "@/features/auth/login-form"
 
+/** 展示登录表单。 */
 export function LoginPage({
   allowServerChange = false,
 }: {

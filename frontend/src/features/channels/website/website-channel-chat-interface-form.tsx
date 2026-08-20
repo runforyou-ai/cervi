@@ -1,3 +1,4 @@
+/** 网站渠道聊天界面表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
@@ -33,6 +34,7 @@ const presetColors = [
   "#EA580C",
 ]
 
+/** 修改网站渠道聊天界面。 */
 export function WebsiteChannelChatInterfaceForm({
   channel,
   onUpdated,
@@ -65,6 +67,7 @@ export function WebsiteChannelChatInterfaceForm({
   })
   const previewValue = useWatch({ control: form.control })
 
+  /** 提交聊天界面设置。 */
   async function submit(values: WebsiteChannelChatInterfaceFormValues) {
     try {
       const updated = await updateWebsiteChannelChatInterface(channel.id, values)

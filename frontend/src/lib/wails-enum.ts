@@ -1,3 +1,4 @@
+/** 处理 Wails 字符串枚举的空值。 */
 import { z } from "zod"
 
 type WailsStringEnum = Record<string, string> & { $zero: string }

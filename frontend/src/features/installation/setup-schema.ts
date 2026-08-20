@@ -1,3 +1,4 @@
+/** 企业初始化表单校验规则。 */
 import { z } from "zod"
 
 type SetupTranslator = (
@@ -11,6 +12,7 @@ type SetupTranslator = (
     | "passwordTooLong",
 ) => string
 
+/** 创建企业初始化表单校验。 */
 export function createSetupSchema(t: SetupTranslator) {
   return z.object({
     organizationName: z.string().trim().min(1, t("organizationNameRequired")),

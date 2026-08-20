@@ -1,3 +1,4 @@
+/** 企业初始化表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
@@ -23,6 +24,7 @@ import {
 } from "@/features/installation/setup-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
+/** 创建企业和第一个所有者账号。 */
 export function SetupForm() {
   const { t } = useTranslation("setup")
   const navigate = useNavigate()
@@ -38,6 +40,7 @@ export function SetupForm() {
     },
   })
 
+  /** 提交企业初始化并进入收件箱。 */
   async function submitSetup(values: SetupFormValues) {
     try {
       await install(values)

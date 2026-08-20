@@ -1,3 +1,4 @@
+/** Web 与桌面端工作台布局。 */
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/sidebar"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
+/** 根据路径返回工作台页面标题。 */
 function workspaceTitle(
   pathname: string,
   titles: {
@@ -53,6 +55,7 @@ function workspaceTitle(
   return titles.inbox
 }
 
+/** 校验登录状态并渲染工作台侧栏和子页面。 */
 export function WorkspaceLayout({
   platform,
 }: {
@@ -66,6 +69,7 @@ export function WorkspaceLayout({
   const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
 
+  /** 读取当前登录身份，未登录则跳转。 */
   const fetchSession = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -103,6 +107,7 @@ export function WorkspaceLayout({
     void fetchSession()
   }, [fetchSession])
 
+  /** 退出登录并回到登录页。 */
   async function handleLogout() {
     setLoggingOut(true)
     try {

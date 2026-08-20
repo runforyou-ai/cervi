@@ -1,3 +1,4 @@
+/** 新建联系人表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
@@ -26,6 +27,7 @@ import {
 } from "@/features/contacts/contact-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
+/** 创建联系人。 */
 export function ContactForm({
   channels,
   onSaved,
@@ -61,6 +63,7 @@ export function ContactForm({
     },
   })
 
+  /** 提交新建联系人。 */
   async function submit(values: ContactFormValues) {
     const input: ContactInput = {
       displayName: values.displayName,

@@ -1,3 +1,4 @@
+/** 网站渠道基础信息表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
@@ -27,6 +28,7 @@ import {
 } from "@/features/channels/website/website-channel-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
+/** 创建或修改网站渠道基础信息。 */
 export function WebsiteChannelForm({
   channel,
   onUpdated,
@@ -55,6 +57,7 @@ export function WebsiteChannelForm({
     },
   })
 
+  /** 提交网站渠道基础信息。 */
   async function submit(values: WebsiteChannelFormValues) {
     try {
       if (channel) {

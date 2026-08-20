@@ -1,9 +1,11 @@
+/** 企业服务器地址表单校验规则。 */
 import { z } from "zod"
 
 type ServerConnectionTranslator = (
   key: "serverUrlRequired" | "serverUrlInvalid",
 ) => string
 
+/** 判断企业服务器地址是否为有效的 http(s) URL。 */
 function isValidServerUrl(value: string) {
   try {
     const url = new URL(value)
@@ -13,6 +15,7 @@ function isValidServerUrl(value: string) {
   }
 }
 
+/** 创建企业服务器地址表单校验。 */
 export function createServerConnectionSchema(t: ServerConnectionTranslator) {
   return z.object({
     serverUrl: z

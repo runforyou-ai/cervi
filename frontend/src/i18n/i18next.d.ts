@@ -1,3 +1,4 @@
+/** 为 i18next 声明当前项目的命名空间和词条类型。 */
 import "i18next"
 
 import type { defaultNamespace, resources } from "@/i18n/resources"

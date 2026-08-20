@@ -1,3 +1,4 @@
+/** shadcn 对话框。 */
 import * as React from "react"
 import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"

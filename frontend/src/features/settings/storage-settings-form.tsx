@@ -1,3 +1,4 @@
+/** 对象存储设置表单。 */
 import {
   type MouseEvent,
   useCallback,
@@ -76,6 +77,7 @@ const settingFieldNames = [
   "secretAccessKey",
 ] as const
 
+/** 判断对象存储设置是否已填写完整。 */
 function isConfigured(setting: StorageSettingsFormValues) {
   return Boolean(
     setting.endpoint.trim() &&
@@ -86,6 +88,7 @@ function isConfigured(setting: StorageSettingsFormValues) {
   )
 }
 
+/** 读取、保存和测试对象存储设置。 */
 export function StorageSettingsForm() {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
@@ -124,6 +127,7 @@ export function StorageSettingsForm() {
   const configured = isConfigured(savedSetting)
   const displayedEnabled = configured ? savedSetting.enabled : editing
 
+  /** 切换对象存储提供商并填充默认区域。 */
   function selectProvider(providerId: StorageProviderId) {
     const provider = getStorageProvider(providerId)
     const region = provider.regions[0]
@@ -145,6 +149,7 @@ export function StorageSettingsForm() {
     })
   }
 
+  /** 选择预设区域或改为自定义区域。 */
   function selectRegion(regionId: string) {
     if (regionId === customRegionOption) {
       form.setValue("region", "", {
@@ -166,6 +171,7 @@ export function StorageSettingsForm() {
     })
   }
 
+  /** 读取已保存的对象存储设置。 */
   const loadSetting = useCallback(async () => {
     setLoading(true)
     setLoadError("")
@@ -189,6 +195,7 @@ export function StorageSettingsForm() {
     void loadSetting()
   }, [loadSetting])
 
+  /** 处理对象存储请求错误。 */
   function handleRequestError(error: unknown, fallback: string) {
     if (error instanceof ApiError) {
       if (error.code === "AUTH_REQUIRED") {
@@ -201,6 +208,7 @@ export function StorageSettingsForm() {
     toast.error(fallback)
   }
 
+  /** 保存对象存储设置。 */
   async function save(values: StorageSettingsFormValues) {
     setPendingAction("save")
     try {
@@ -216,6 +224,7 @@ export function StorageSettingsForm() {
     }
   }
 
+  /** 测试对象存储连接。 */
   async function test(values: StorageSettingsFormValues) {
     setPendingAction("test")
     try {
@@ -228,17 +237,20 @@ export function StorageSettingsForm() {
     }
   }
 
+  /** 进入编辑模式。 */
   function beginEditing() {
     form.reset(savedSetting)
     setSecretAccessKeyVisible(false)
     setEditing(true)
   }
 
+  /** 取消编辑并恢复已保存的设置。 */
   function cancelEditing() {
     form.reset(savedSetting)
     setEditing(false)
   }
 
+  /** 切换对象存储启用状态。 */
   function changeEnabled(checked: boolean) {
     if (!configured) {
       if (checked) {
@@ -257,6 +269,7 @@ export function StorageSettingsForm() {
     setDisableDialogOpen(true)
   }
 
+  /** 启用已保存的对象存储设置。 */
   async function enableSavedSetting() {
     const nextSetting = { ...savedSetting, enabled: true }
     setPendingAction("enable")
@@ -273,6 +286,7 @@ export function StorageSettingsForm() {
     }
   }
 
+  /** 关闭对象存储。 */
   async function disableSavedSetting() {
     const nextSetting = { ...savedSetting, enabled: false }
     setDisableDialogOpen(false)
@@ -290,6 +304,7 @@ export function StorageSettingsForm() {
     }
   }
 
+  /** 打开当前提供商的帮助文档。 */
   async function openProviderHelp(event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault()
     try {

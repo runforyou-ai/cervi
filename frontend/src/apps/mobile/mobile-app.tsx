@@ -1,3 +1,4 @@
+/** 移动端独立入口、路由和首页。 */
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon, SmartphoneIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { LoginPage } from "@/features/auth/login-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
 
+/** 移动端登录后首页。 */
 function MobileHomePage() {
   const { t } = useTranslation("mobile")
   const navigate = useNavigate()
@@ -17,6 +19,7 @@ function MobileHomePage() {
   const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
 
+  /** 读取原生端入口并加载当前身份。 */
   const fetchSession = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -40,6 +43,7 @@ function MobileHomePage() {
     void fetchSession()
   }, [fetchSession])
 
+  /** 退出登录并回到登录页。 */
   async function handleLogout() {
     setLoggingOut(true)
     try {
@@ -105,6 +109,7 @@ function MobileHomePage() {
   )
 }
 
+/** 渲染移动端路由。 */
 export default function MobileApp() {
   return (
     <Routes>

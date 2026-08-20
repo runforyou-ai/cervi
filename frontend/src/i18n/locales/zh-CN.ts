@@ -1,3 +1,4 @@
+/** 简体中文界面文案。 */
 const zhCN = {
   common: {
     notifications: "通知",

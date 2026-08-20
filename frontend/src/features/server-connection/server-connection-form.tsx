@@ -1,3 +1,4 @@
+/** 企业服务器地址表单。 */
 import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
@@ -23,6 +24,7 @@ import {
 } from "@/features/server-connection/server-connection-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
+/** 校验并保存企业服务器地址。 */
 export function ServerConnectionForm() {
   const { t } = useTranslation("connection")
   const navigate = useNavigate()
@@ -42,6 +44,7 @@ export function ServerConnectionForm() {
     })
   }, [reset])
 
+  /** 保存企业服务器地址并进入登录页。 */
   async function submitServerConnection(values: ServerConnectionFormValues) {
     try {
       await connectServer(values.serverUrl)

@@ -1,3 +1,4 @@
+/** 联系人列表、筛选、详情和回收站。 */
 import {
   useCallback,
   useEffect,
@@ -103,6 +104,7 @@ export type ContactScope = "internal" | "external" | "agents"
 
 type LoadState = "loading" | "ready" | "error"
 
+/** 联系人范围主按钮。 */
 function ScopeButton({
   active,
   icon: Icon,
@@ -129,6 +131,7 @@ function ScopeButton({
   )
 }
 
+/** 联系人范围子按钮。 */
 function SubscopeButton({
   active,
   children,
@@ -158,6 +161,7 @@ function SubscopeButton({
   )
 }
 
+/** 联系人范围和来源渠道筛选。 */
 function ContactScopeSidebar({
   scope,
   deleted,
@@ -256,6 +260,7 @@ function ContactScopeSidebar({
   )
 }
 
+/** 联系人阶段标签。 */
 function StageLabel({ stage }: { stage: ContactStage }) {
   const { t } = useTranslation("contacts")
   if (!stage) return null
@@ -266,6 +271,7 @@ function StageLabel({ stage }: { stage: ContactStage }) {
   )
 }
 
+/** 联系人列表分页。 */
 function PageControls({
   page,
   onPageChange,
@@ -303,6 +309,7 @@ function PageControls({
   )
 }
 
+/** 联系人列表页，支持内部成员、外部联系人和回收站。 */
 export function ContactsPage({
   scope,
   deleted = false,
@@ -343,6 +350,7 @@ export function ContactsPage({
   const role = optionalWailsEnum(UserRole, searchParams.get("role"))
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
 
+  /** 更新列表查询参数。 */
   const setParameters = useCallback(
     (changes: Record<string, string | null>) => {
       setSearchParams((current) => {
@@ -382,6 +390,7 @@ export function ContactsPage({
     return () => controller.abort()
   }, [])
 
+  /** 按当前范围加载联系人或企业成员列表。 */
   const loadList = useCallback(
     async (signal?: AbortSignal) => {
       setLoadState("loading")
@@ -480,6 +489,7 @@ export function ContactsPage({
           ? `channel:${channelId}`
           : "external"
 
+  /** 窄视口下切换联系人范围。 */
   function changeMobileScope(value: string) {
     if (value === "internal") {
       navigate("/contacts/internal")
@@ -494,17 +504,20 @@ export function ContactsPage({
     }
   }
 
+  /** 关闭联系人详情。 */
   function closeDetail() {
     setParameters({ selected: null, new: null })
     setDetail(null)
     setDetailUser(null)
   }
 
+  /** 刷新列表并关闭详情。 */
   function refreshAndClose() {
     closeDetail()
     setRefreshVersion((current) => current + 1)
   }
 
+  /** 将联系人移入回收站。 */
   async function removeContact() {
     if (!deletingContact) {
       return
@@ -529,6 +542,7 @@ export function ContactsPage({
     }
   }
 
+  /** 恢复联系人。 */
   async function restore(item: ContactSummary) {
     try {
       await restoreContact(item.id)

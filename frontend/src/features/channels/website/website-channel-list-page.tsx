@@ -1,3 +1,4 @@
+/** 网站渠道列表页。 */
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -35,6 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+/** 网站渠道列表中的一行。 */
 function WebsiteChannelRow({
   channel,
   onDeleteRequested,
@@ -92,6 +94,7 @@ function WebsiteChannelRow({
   )
 }
 
+/** 展示网站渠道列表并支持删除。 */
 export function WebsiteChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
@@ -101,6 +104,7 @@ export function WebsiteChannelListPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
+  /** 加载网站渠道列表。 */
   const loadChannels = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -124,6 +128,7 @@ export function WebsiteChannelListPage() {
     void loadChannels()
   }, [loadChannels])
 
+  /** 将网站渠道移入回收站。 */
   async function handleDelete(channel: WebsiteChannelSummary) {
     try {
       await deleteWebsiteChannel(channel.id)

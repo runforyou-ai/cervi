@@ -1,3 +1,4 @@
+/** 注册应用支持的语言和翻译资源。 */
 import enUS from "@/i18n/locales/en-US"
 import zhCN from "@/i18n/locales/zh-CN"
 

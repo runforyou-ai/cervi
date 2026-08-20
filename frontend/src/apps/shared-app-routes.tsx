@@ -1,3 +1,4 @@
+/** Web 与桌面端共用的业务路由。 */
 import { Navigate, Route, Routes } from "react-router"
 
 import { LoginPage } from "@/features/auth/login-page"
@@ -11,6 +12,7 @@ import { ServerConnectionPage } from "@/features/server-connection/server-connec
 import { SettingsPage } from "@/features/settings/settings-page"
 import { WorkspaceLayout } from "@/features/workspace/workspace-layout"
 
+/** 按平台注册登录、工作台和业务页面路由。 */
 export function SharedAppRoutes({
   platform,
 }: {

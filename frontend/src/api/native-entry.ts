@@ -1,3 +1,4 @@
+/** 判断原生端进入工作台、登录页还是连接页。 */
 import { getServerURL, loadSession } from "@/api/auth"
 import { ApiError, hasSession } from "@/api/client"
 import type { Identity } from "@/api/service"
