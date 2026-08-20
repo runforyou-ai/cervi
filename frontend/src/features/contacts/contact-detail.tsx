@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
+import { channelTypeLabel } from "@/features/contacts/contact-labels"
 import {
   createContactSchema,
   type ContactFormValues,
@@ -42,12 +43,11 @@ function valuesFromDetail(detail: ContactDetail): ContactFormValues {
   }
 }
 
-/** 用表单值更新联系方式，其余项原样保留。 */
+/** 用表单值更新每类联系方式的首项，其余项保持不变。 */
 function methodsFromDetail(
   detail: ContactDetail,
   values: ContactFormValues,
 ): ContactMethodInput[] {
-  // 仅修改每类联系方式的首项，其余项原样保留。
   const editedValues = {
     email: values.email,
     phone: values.phone,
@@ -156,7 +156,7 @@ function EditActions({
   )
 }
 
-/** 展示并分节编辑联系人详情。 */
+/** 分节编辑联系人详情。 */
 export function ContactDetailView({
   detail,
   onSaved,
@@ -221,6 +221,7 @@ export function ContactDetailView({
     setSaving(true)
     try {
       const saved = await updateContact(detail.contact.id, input)
+      console.info("联系人已保存", { contact_id: detail.contact.id })
       toast.success(t("form.updated"))
       onSaved(saved)
     } catch (error) {
@@ -230,12 +231,15 @@ export function ContactDetailView({
           return
         }
         if (error.code === "CONTACT_NOT_FOUND") {
+          console.warn("联系人不存在", { contact_id: detail.contact.id })
           onNotFound()
           return
         }
+        console.warn("保存联系人失败", error)
         toast.error(apiErrorMessage(error, ["displayName", "stage", "methods", "notes"]))
         return
       }
+      console.warn("保存联系人失败", error)
       toast.error(t("form.networkError"))
     } finally {
       setSaving(false)
@@ -281,7 +285,7 @@ export function ContactDetailView({
             <div className="w-28 shrink-0 text-muted-foreground">{t("detail.sourceChannel")}</div>
             <div className="min-w-0 flex-1">
               {detail.sourceChannel
-                ? `${t(`channelTypes.${detail.sourceChannel.type}`, { defaultValue: detail.sourceChannel.type })} · ${detail.sourceChannel.name}`
+                ? `${channelTypeLabel(detail.sourceChannel.type, t)} · ${detail.sourceChannel.name}`
                 : empty}
             </div>
           </div>

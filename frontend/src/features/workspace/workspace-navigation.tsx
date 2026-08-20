@@ -1,7 +1,6 @@
 /** 工作台侧栏导航和用户菜单。 */
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
-  ChevronRightIcon,
   ChevronsUpDownIcon,
   ContactRoundIcon,
   InboxIcon,
@@ -15,11 +14,6 @@ import { useTranslation } from "react-i18next"
 import { NavLink, useLocation, useNavigate } from "react-router"
 
 import type { Identity } from "@/api"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,53 +33,17 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { cn } from "@/lib/utils"
 
-/** 尚未开放的渠道入口。 */
-function ComingSoonChannel({ title }: { title: string }) {
-  const { t } = useTranslation("workspace")
-
-  return (
-    <SidebarMenuSubItem>
-      <SidebarMenuSubButton
-        asChild
-        aria-disabled="true"
-      >
-        <span className="justify-between" title={t("comingSoon")}>
-          <span>{title}</span>
-          <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            {t("comingSoon")}
-          </span>
-        </span>
-      </SidebarMenuSubButton>
-    </SidebarMenuSubItem>
-  )
-}
-
-/** 工作台主导航菜单。 */
+/** 工作台主导航。 */
 function WorkspaceMenu() {
   const { t } = useTranslation("workspace")
   const location = useLocation()
-  const {
-    state,
-    isNarrowViewport,
-    setOpenNarrowViewport,
-  } = useSidebar()
-  const channelsActive = location.pathname.startsWith("/channels/")
-  const contactsActive = location.pathname.startsWith("/contacts")
+  const { isNarrowViewport, setOpenNarrowViewport } = useSidebar()
   const inboxActive = location.pathname === "/inbox"
-  const [channelsOpen, setChannelsOpen] = useState(channelsActive)
-
-  useEffect(() => {
-    if (channelsActive) {
-      setChannelsOpen(true)
-    }
-  }, [channelsActive, location.pathname])
+  const contactsActive = location.pathname.startsWith("/contacts")
+  const channelsActive = location.pathname.startsWith("/channels")
 
   /** 窄视口下关闭侧栏。 */
   function closeNarrowNavigation() {
@@ -121,67 +79,25 @@ function WorkspaceMenu() {
             </SidebarMenuButton>
           </SidebarMenuItem>
 
-          <Collapsible asChild open={channelsOpen} onOpenChange={setChannelsOpen}>
-            <SidebarMenuItem>
-              {state === "collapsed" && !isNarrowViewport ? (
-                <SidebarMenuButton
-                  asChild
-                  isActive={channelsActive}
-                  tooltip={t("messageChannels")}
-                >
-                  <NavLink to="/channels/website">
-                    <MessagesSquareIcon />
-                    <span>{t("messageChannels")}</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              ) : (
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton
-                    isActive={channelsActive && !channelsOpen}
-                    aria-label={t("toggleMessageChannels")}
-                  >
-                    <MessagesSquareIcon />
-                    <span>{t("messageChannels")}</span>
-                    <ChevronRightIcon
-                      className={cn(
-                        "ml-auto transition-transform duration-200",
-                        channelsOpen && "rotate-90"
-                      )}
-                    />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-              )}
-
-              <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-[collapsible-up_160ms_ease-in] data-[state=open]:animate-[collapsible-down_180ms_ease-out]">
-                <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton
-                      asChild
-                      isActive={location.pathname.startsWith(
-                        "/channels/website"
-                      )}
-                    >
-                      <NavLink
-                        to="/channels/website"
-                        onClick={closeNarrowNavigation}
-                      >
-                        <span>{t("website")}</span>
-                      </NavLink>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <ComingSoonChannel title={t("telegram")} />
-                  <ComingSoonChannel title={t("wechatOfficialAccount")} />
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={channelsActive}
+              tooltip={t("messageChannels")}
+            >
+              <NavLink to="/channels/website" onClick={closeNarrowNavigation}>
+                <MessagesSquareIcon />
+                <span>{t("messageChannels")}</span>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
   )
 }
 
-/** 渲染工作台侧栏、导航和用户菜单。 */
+/** 工作台侧栏和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
   onLogout,

@@ -68,11 +68,13 @@ export function WebsiteChannelForm({
           defaultLocale: updated.defaultLocale,
         })
         onUpdated?.(updated)
+        console.info("网站渠道已保存", { channel_id: channel.id })
         toast.success(t("form.saved"))
         return
       }
 
       await createWebsiteChannel(values)
+      console.info("网站渠道已创建")
       navigate("/channels/website", { replace: true })
     } catch (error) {
       if (error instanceof ApiError) {
@@ -81,14 +83,17 @@ export function WebsiteChannelForm({
           return
         }
         if (error.code === "CHANNEL_NOT_FOUND") {
+          console.warn("网站渠道不存在", { channel_id: channel?.id })
           navigate("/channels/website", { replace: true })
           return
         }
+        console.warn("保存网站渠道失败", error)
         toast.error(
           apiErrorMessage(error, ["name", "description", "defaultLocale"])
         )
         return
       }
+      console.warn("保存网站渠道失败", error)
       toast.error(t("form.networkError"))
     }
   }

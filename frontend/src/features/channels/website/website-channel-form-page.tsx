@@ -123,10 +123,12 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
             return
           }
           if (requestError.code === "CHANNEL_NOT_FOUND") {
+            console.warn("网站渠道不存在", { channel_id: channelId })
             navigate("/channels/website", { replace: true })
             return
           }
         }
+        console.warn("网站渠道详情加载失败", requestError)
         setError(t("form.loadError"))
       })
       .finally(() => {

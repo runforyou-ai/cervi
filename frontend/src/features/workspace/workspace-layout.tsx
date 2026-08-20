@@ -26,12 +26,9 @@ function workspaceTitle(
   pathname: string,
   titles: {
     inbox: string
-    createWebsiteChannel: string
-    websiteChannelTrash: string
-    editWebsiteChannel: string
-    websiteChannels: string
-    settings: string
     contacts: string
+    messageChannels: string
+    settings: string
   }
 ) {
   if (pathname.startsWith("/settings")) {
@@ -40,22 +37,13 @@ function workspaceTitle(
   if (pathname.startsWith("/contacts")) {
     return titles.contacts
   }
-  if (pathname === "/channels/website/new") {
-    return titles.createWebsiteChannel
-  }
-  if (pathname === "/channels/website/trash") {
-    return titles.websiteChannelTrash
-  }
-  if (pathname.startsWith("/channels/website/")) {
-    return titles.editWebsiteChannel
-  }
-  if (pathname.startsWith("/channels/website")) {
-    return titles.websiteChannels
+  if (pathname.startsWith("/channels")) {
+    return titles.messageChannels
   }
   return titles.inbox
 }
 
-/** 校验登录状态并渲染工作台侧栏和子页面。 */
+/** 校验登录后显示工作台侧栏和子页面。 */
 export function WorkspaceLayout({
   platform,
 }: {
@@ -97,6 +85,7 @@ export function WorkspaceLayout({
           return
         }
       }
+      console.warn("工作台身份加载失败", requestError)
       setError(t("loadError"))
     } finally {
       setLoading(false)
@@ -112,7 +101,9 @@ export function WorkspaceLayout({
     setLoggingOut(true)
     try {
       await logout()
-    } catch {
+      console.info("用户退出登录")
+    } catch (error) {
+      console.warn("退出登录失败", error)
       toast.error(t("logoutError"))
     } finally {
       setLoggingOut(false)
@@ -159,12 +150,9 @@ export function WorkspaceLayout({
           <h1 className="text-sm font-medium">
             {workspaceTitle(location.pathname, {
               inbox: t("inbox"),
-              createWebsiteChannel: t("titles.createWebsiteChannel"),
-              websiteChannelTrash: t("titles.websiteChannelTrash"),
-              editWebsiteChannel: t("titles.editWebsiteChannel"),
-              websiteChannels: t("titles.websiteChannels"),
-              settings: t("settings"),
               contacts: t("contacts"),
+              messageChannels: t("messageChannels"),
+              settings: t("settings"),
             })}
           </h1>
         </header>

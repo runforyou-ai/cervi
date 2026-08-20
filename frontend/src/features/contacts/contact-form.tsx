@@ -21,6 +21,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { NativeSelect } from "@/components/ui/native-select"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
+import { channelTypeLabel } from "@/features/contacts/contact-labels"
 import {
   createContactSchema,
   type ContactFormValues,
@@ -81,6 +82,7 @@ export function ContactForm({
     }
     try {
       const saved = await createContact(input)
+      console.info("联系人已创建", { contact_id: saved.contact.id })
       toast.success(t("form.created"))
       onSaved(saved)
     } catch (error) {
@@ -89,9 +91,11 @@ export function ContactForm({
           navigate("/login", { replace: true })
           return
         }
+        console.warn("创建联系人失败", error)
         toast.error(apiErrorMessage(error, ["displayName", "channelId", "stage", "methods", "notes"]))
         return
       }
+      console.warn("创建联系人失败", error)
       toast.error(t("form.networkError"))
     }
   }
@@ -127,7 +131,7 @@ export function ContactForm({
                 </option>
                 {channels.map((channel) => (
                   <option key={channel.id} value={channel.id}>
-                    {t(`channelTypes.${channel.type}`, { defaultValue: channel.type })} · {channel.name}
+                    {channelTypeLabel(channel.type, t)} · {channel.name}
                   </option>
                 ))}
               </NativeSelect>

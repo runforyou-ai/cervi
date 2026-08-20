@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table"
 import { useDateTime } from "@/hooks/use-date-time"
 
-/** 展示已删除的网站渠道并支持恢复。 */
+/** 已删除的网站渠道。 */
 export function WebsiteChannelTrashPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
@@ -54,6 +54,7 @@ export function WebsiteChannelTrashPage() {
         navigate("/login", { replace: true })
         return
       }
+      console.warn("网站渠道回收站加载失败", requestError)
       setError(t("trash.loadError"))
     } finally {
       setLoading(false)
@@ -69,6 +70,7 @@ export function WebsiteChannelTrashPage() {
     setRestoringId(channel.id)
     try {
       await restoreWebsiteChannel(channel.id)
+      console.info("网站渠道已恢复", { channel_id: channel.id })
       setChannels((current) =>
         current.filter((item) => item.id !== channel.id)
       )
@@ -80,6 +82,7 @@ export function WebsiteChannelTrashPage() {
         navigate("/login", { replace: true })
         return
       }
+      console.warn("恢复网站渠道失败", requestError)
       toast.error(t("trash.restoreError"))
     } finally {
       setRestoringId("")

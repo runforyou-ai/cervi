@@ -78,6 +78,7 @@ export function WebsiteChannelChatInterfaceForm({
         themeColor: updated.themeColor,
       })
       onUpdated(updated)
+      console.info("网站渠道聊天界面已保存", { channel_id: channel.id })
       toast.success(t("chatInterface.saved"))
     } catch (error) {
       if (error instanceof ApiError) {
@@ -86,9 +87,11 @@ export function WebsiteChannelChatInterfaceForm({
           return
         }
         if (error.code === "CHANNEL_NOT_FOUND") {
+          console.warn("网站渠道不存在", { channel_id: channel.id })
           navigate("/channels/website", { replace: true })
           return
         }
+        console.warn("保存网站渠道聊天界面失败", error)
         toast.error(
           apiErrorMessage(error, [
             "title",
@@ -99,6 +102,7 @@ export function WebsiteChannelChatInterfaceForm({
         )
         return
       }
+      console.warn("保存网站渠道聊天界面失败", error)
       toast.error(t("form.networkError"))
     }
   }

@@ -6,6 +6,7 @@ const zhCN = {
     actions: {
       close: "关闭",
     },
+    comingSoon: "即将支持",
     sidebar: {
       title: "侧栏",
       description: "在窄视口中显示侧栏。",
@@ -80,19 +81,8 @@ const zhCN = {
     inbox: "收件箱",
     contacts: "联系人",
     messageChannels: "消息渠道",
-    toggleMessageChannels: "展开或收起消息渠道",
-    website: "网站",
-    telegram: "Telegram",
-    wechatOfficialAccount: "微信公众号",
-    comingSoon: "即将支持",
     settings: "设置",
     openUserMenu: "打开 {{name}} 的用户菜单",
-    titles: {
-      websiteChannels: "网站渠道",
-      createWebsiteChannel: "添加网站渠道",
-      editWebsiteChannel: "网站渠道设置",
-      websiteChannelTrash: "网站渠道回收站",
-    },
     logout: "退出登录",
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
@@ -248,6 +238,13 @@ const zhCN = {
     },
   },
   channels: {
+    typeNavigation: "渠道类型",
+    typeComingSoon: "{{name}} · 即将支持",
+    types: {
+      website: "网站",
+      telegram: "Telegram",
+      wechatOfficialAccount: "微信公众号",
+    },
     loading: "正在加载…",
     retry: "重试",
     locales: {

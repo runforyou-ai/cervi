@@ -1,4 +1,4 @@
-/** 加载收件箱数据并交给收件箱页面展示。 */
+/** 加载收件箱数据。 */
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -8,7 +8,7 @@ import { ApiError, loadInbox, type InboxData } from "@/api"
 import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
 
-/** 读取收件箱并处理未登录跳转。 */
+/** 读取收件箱，未登录则跳转。 */
 export function InboxRoute() {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
@@ -16,7 +16,7 @@ export function InboxRoute() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  /** 加载当前用户的统一收件箱。 */
+  /** 加载当前收件箱。 */
   const fetchInbox = useCallback(async () => {
     setLoading(true)
     setError("")
@@ -27,6 +27,7 @@ export function InboxRoute() {
         navigate("/login", { replace: true })
         return
       }
+      console.warn("收件箱加载失败", requestError)
       setError(t("inboxLoadError"))
     } finally {
       setLoading(false)
