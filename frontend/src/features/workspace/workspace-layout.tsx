@@ -11,6 +11,7 @@ import {
   sessionPath,
   SessionState,
   type Identity,
+  type User,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
@@ -83,6 +84,11 @@ export function WorkspaceLayout() {
     }
   }
 
+  /** 把保存后的用户资料同步到工作台导航。 */
+  function updateUser(user: User) {
+    setIdentity((current) => (current ? { ...current, user } : current))
+  }
+
   if (loading) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -116,7 +122,7 @@ export function WorkspaceLayout() {
         loggingOut={loggingOut}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-        <Outlet context={identity} />
+        <Outlet context={{ identity, updateUser }} />
       </div>
     </div>
   )

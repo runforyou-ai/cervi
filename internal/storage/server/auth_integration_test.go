@@ -197,6 +197,47 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected directory user: %#v", directoryUser)
 	}
 
+	updateProfile := useraction.NewUpdateProfileAction(db)
+	updatedUser, err := updateProfile.Execute(context.Background(), loggedIn.Identity, useraction.ProfileInput{
+		DisplayName: "  新姓名  ",
+		Email:       " NEW@Example.com ",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedUser.DisplayName != "新姓名" || updatedUser.Email != "new@example.com" {
+		t.Fatalf("updated user = %#v", updatedUser)
+	}
+	resolvedAfterUpdate, err := resolveIdentity.Execute(context.Background(), loggedIn.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolvedAfterUpdate == nil || resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.User.DisplayName != "新姓名" {
+		t.Fatalf("identity after profile update = %#v", resolvedAfterUpdate)
+	}
+
+	otherUser := &servermodels.User{
+		OrganizationID: loggedIn.Identity.Organization.ID,
+		Email:          "other@example.com",
+		DisplayName:    "其他成员",
+		PasswordHash:   "unused",
+		Role:           string(domain.UserRoleMember),
+		Status:         string(domain.UserStatusActive),
+	}
+	if _, err := db.NewInsert().Model(otherUser).
+		Column("organization_id", "email", "display_name", "password_hash", "role", "status").
+		Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	_, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
+		DisplayName: "新姓名",
+		Email:       "OTHER@example.com",
+	})
+	var profileValidation *useraction.ValidationError
+	if !errors.As(err, &profileValidation) || profileValidation.Fields["email"] != useraction.ValidationEmailDuplicate {
+		t.Fatalf("duplicate profile email error = %v, want email validation", err)
+	}
+
 	createContact := contactaction.NewCreateContactAction(db)
 	_, err = createContact.Execute(context.Background(), loggedIn.Identity, contactaction.ContactInput{
 		DisplayName: "无效渠道联系人",

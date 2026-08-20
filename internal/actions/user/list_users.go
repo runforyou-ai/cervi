@@ -1,6 +1,6 @@
 //go:build server
 
-// Package user 实现企业内部用户目录查询。
+// Package user 实现企业成员领域的查询和操作。
 package user
 
 import (
