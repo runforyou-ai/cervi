@@ -12,6 +12,15 @@ Cervi 是一款开源、以私有化部署为主的 AI 原生企业协作产品�
 # 启动本地 PostgreSQL
 docker compose up -d postgres
 
+# 服务端数据库迁移
+wails3 task migrate
+wails3 task migrate:status
+wails3 task migrate:rollback
+wails3 task migrate:rollback STEP=3
+wails3 task migrate:rollback VERSION=20260818032701
+wails3 task migrate:fresh
+wails3 task make:migration NAME=create_example_table
+
 # 启动桌面端开发环境
 wails3 dev
 
