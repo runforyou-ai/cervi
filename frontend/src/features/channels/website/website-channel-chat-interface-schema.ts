@@ -1,17 +1,21 @@
+/** 网站渠道聊天界面表单校验规则。 */
 import { z } from "zod"
 
 export const defaultWebsiteChannelThemeColor = "#2563EB"
 
+/** 按 Unicode 字符计算长度。 */
 function unicodeLength(value: string) {
   return Array.from(value).length
 }
 
+/** 判断主题色是否为六位十六进制颜色。 */
 export function isWebsiteChannelThemeColor(
   value: string | undefined
 ): value is string {
   return /^#[0-9A-Fa-f]{6}$/.test(value ?? "")
 }
 
+/** 创建网站渠道聊天界面校验。 */
 export function createWebsiteChannelChatInterfaceSchema(messages: {
   titleRequired: string
   titleTooLong: string

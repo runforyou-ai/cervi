@@ -12,6 +12,7 @@ import (
 type Key string
 
 const (
+	ErrorInternal                         Key = "error.internal"
 	ErrorMethodNotAllowed                 Key = "error.method_not_allowed"
 	ErrorInstallationStatusReadFailed     Key = "error.installation_status_read_failed"
 	ErrorAlreadyInitialized               Key = "error.already_initialized"
@@ -20,7 +21,6 @@ const (
 	ErrorAuthenticationRequired           Key = "error.authentication_required"
 	ErrorValidationFailed                 Key = "error.validation_failed"
 	ErrorInstallationFailed               Key = "error.installation_failed"
-	ErrorAuthenticationInputInvalid       Key = "error.authentication_input_invalid"
 	ErrorInvalidCredentials               Key = "error.invalid_credentials"
 	ErrorLoginFailed                      Key = "error.login_failed"
 	ErrorLogoutFailed                     Key = "error.logout_failed"
@@ -47,14 +47,15 @@ const (
 	ErrorS3SettingSaveFailed              Key = "error.s3_setting_save_failed"
 	ErrorS3ConnectionTestFailed           Key = "error.s3_connection_test_failed"
 	ErrorServerURLInvalid                 Key = "error.server_url_invalid"
-	ErrorServerConnectionCreateFailed     Key = "error.server_connection_create_failed"
 	ErrorServerUnavailable                Key = "error.server_unavailable"
 	ErrorServerConnectionSaveFailed       Key = "error.server_connection_save_failed"
 	ErrorServerConnectionRequired         Key = "error.server_connection_required"
+	ErrorServerInitializationRequired     Key = "error.server_initialization_required"
 	ErrorRemoteRequestCreateFailed        Key = "error.remote_request_create_failed"
 	ErrorServerConnectionFailed           Key = "error.server_connection_failed"
 
 	FieldOrganizationNameRequired    Key = "field.organization_name_required"
+	FieldOrganizationNameTooLong     Key = "field.organization_name_too_long"
 	FieldDisplayNameRequired         Key = "field.display_name_required"
 	FieldEmailInvalid                Key = "field.email_invalid"
 	FieldPasswordTooShort            Key = "field.password_too_short"

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -21,12 +22,12 @@ func NewRestoreContactAction(db *bun.DB) *RestoreContactAction {
 }
 
 // Execute 恢复当前企业中已软删除的联系人。
-func (a *RestoreContactAction) Execute(ctx context.Context, principal *servermodels.Principal, contactID string) (*ContactDetail, error) {
-	if !validUUID(contactID) {
+func (a *RestoreContactAction) Execute(ctx context.Context, identity *servermodels.Identity, contactID string) (*ContactDetail, error) {
+	if !common.ValidUUID(contactID) {
 		return nil, ErrNotFound
 	}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validatePrincipal(ctx, tx, principal); err != nil {
+		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
 		result, err := tx.NewUpdate().
@@ -34,7 +35,7 @@ func (a *RestoreContactAction) Execute(ctx context.Context, principal *servermod
 			Set("deleted_at = NULL").
 			Set("updated_at = now()").
 			Where("id = ?", contactID).
-			Where("organization_id = ?", principal.Organization.ID).
+			Where("organization_id = ?", identity.Organization.ID).
 			Where("deleted_at IS NOT NULL").
 			Exec(ctx)
 		if err != nil {
@@ -52,5 +53,5 @@ func (a *RestoreContactAction) Execute(ctx context.Context, principal *servermod
 	if err != nil {
 		return nil, fmt.Errorf("restore contact: %w", err)
 	}
-	return NewGetContactQuery(a.db).Execute(ctx, principal, contactID)
+	return NewGetContactQuery(a.db).Execute(ctx, identity, contactID)
 }

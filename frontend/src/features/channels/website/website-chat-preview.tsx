@@ -1,11 +1,13 @@
+/** 网站渠道聊天界面预览。 */
 import { useTranslation } from "react-i18next"
 
-import type { WebsiteChannelChatInterfaceInput } from "@/api/channels"
+import type { WebsiteChannelChatInterfaceInput } from "@/api"
 import {
   defaultWebsiteChannelThemeColor,
   isWebsiteChannelThemeColor,
 } from "@/features/channels/website/website-channel-chat-interface-schema"
 
+/** 计算十六进制颜色的相对亮度。 */
 function relativeLuminance(hexColor: string) {
   const channels = hexColor
     .slice(1)
@@ -20,6 +22,7 @@ function relativeLuminance(hexColor: string) {
   return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
 }
 
+/** 根据背景色选择对比度更高的前景色。 */
 function contrastingForeground(backgroundColor: string) {
   const luminance = relativeLuminance(backgroundColor)
   const whiteContrast = 1.05 / (luminance + 0.05)
@@ -28,6 +31,7 @@ function contrastingForeground(backgroundColor: string) {
   return whiteContrast >= blackContrast ? "#FFFFFF" : "#000000"
 }
 
+/** 按当前设置预览访客聊天界面。 */
 export function WebsiteChatPreview({
   value,
 }: {

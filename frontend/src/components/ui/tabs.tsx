@@ -1,3 +1,4 @@
+/** shadcn 页签。 */
 import * as React from "react"
 import { Tabs as TabsPrimitive } from "radix-ui"
 

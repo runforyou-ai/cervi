@@ -13,7 +13,7 @@ import (
 const mobileDatabaseName = "cervi-mobile.db"
 
 // Open 初始化移动端使用的 SQLite 存储。
-func Open(ctx context.Context) (Storage, error) {
+func Open(ctx context.Context) (*mobilestorage.Store, error) {
 	databasePath := filepath.Join(application.Mobile.StoragePath(), mobileDatabaseName)
 	return mobilestorage.Open(ctx, databasePath)
 }

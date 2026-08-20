@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -21,20 +22,20 @@ func NewListContactsQuery(db *bun.DB) *ListContactsQuery {
 }
 
 // Execute 返回满足查询条件的分页联系人列表。
-func (q *ListContactsQuery) Execute(ctx context.Context, principal *servermodels.Principal, input ListInput) (ListOutput, error) {
+func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListInput) (ListOutput, error) {
 	input, fields := normalizeListInput(input)
 	if len(fields) > 0 {
 		return ListOutput{}, &ValidationError{Fields: fields}
 	}
 
-	countQuery := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), principal.Organization.ID, input)
+	countQuery := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), identity.Organization.ID, input)
 	total, err := countQuery.Count(ctx)
 	if err != nil {
 		return ListOutput{}, fmt.Errorf("count contacts: %w", err)
 	}
 
 	contacts := make([]ContactSummary, 0)
-	query := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), principal.Organization.ID, input).
+	query := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), identity.Organization.ID, input).
 		ColumnExpr("c.id::text AS id").
 		ColumnExpr("c.display_name").
 		ColumnExpr("c.stage").
@@ -45,9 +46,9 @@ func (q *ListContactsQuery) Execute(ctx context.Context, principal *servermodels
 		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = 'phone' ORDER BY cm.is_primary DESC, cm.created_at ASC LIMIT 1) AS primary_phone").
 		Join("JOIN channels AS source_channel ON source_channel.id = c.source_channel_id AND source_channel.organization_id = c.organization_id")
 	switch input.Sort {
-	case "createdAt.desc":
+	case domain.ContactSortCreatedAtDescending:
 		query = query.OrderExpr("c.created_at DESC, c.id DESC")
-	case "displayName.asc":
+	case domain.ContactSortDisplayNameAscending:
 		query = query.OrderExpr("lower(coalesce(c.display_name, '')) ASC, c.id ASC")
 	default:
 		query = query.OrderExpr("c.updated_at DESC, c.id DESC")

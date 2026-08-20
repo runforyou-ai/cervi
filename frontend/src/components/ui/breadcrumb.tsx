@@ -1,3 +1,4 @@
+/** shadcn 面包屑导航。 */
 import * as React from "react"
 import { Slot } from "radix-ui"
 

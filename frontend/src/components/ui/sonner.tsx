@@ -1,3 +1,4 @@
+/** shadcn 轻提示。 */
 import {
   CircleCheckIcon,
   InfoIcon,

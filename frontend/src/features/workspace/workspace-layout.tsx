@@ -1,12 +1,17 @@
+/** Web 与桌面端工作台布局。 */
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { loadSession, logout } from "@/api/auth"
-import { ApiError } from "@/api/client"
-import type { Principal } from "@/api/identity"
+import {
+  ApiError,
+  loadIdentity,
+  logout,
+  resolveNativeEntry,
+  type Identity,
+} from "@/api"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -16,6 +21,7 @@ import {
 } from "@/components/ui/sidebar"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
+/** 根据路径返回工作台页面标题。 */
 function workspaceTitle(
   pathname: string,
   titles: {
@@ -49,26 +55,39 @@ function workspaceTitle(
   return titles.inbox
 }
 
-export function WorkspaceLayout() {
+/** 校验登录状态并渲染工作台侧栏和子页面。 */
+export function WorkspaceLayout({
+  platform,
+}: {
+  platform: "web" | "desktop"
+}) {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const location = useLocation()
-  const [principal, setPrincipal] = useState<Principal | null>(null)
+  const [identity, setIdentity] = useState<Identity | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
 
-  const fetchSession = useCallback(async () => {
+  /** 读取当前登录身份，未登录则跳转。 */
+  const fetchIdentity = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      setPrincipal(await loadSession())
-    } catch (requestError) {
-      if (requestError instanceof ApiError) {
-        if (requestError.code === "SERVER_CONNECTION_REQUIRED") {
-          navigate("/connect", { replace: true })
+      if (platform === "desktop") {
+        const entry = await resolveNativeEntry()
+        if (entry.status !== "ready") {
+          navigate(entry.status === "connect" ? "/connect" : "/login", {
+            replace: true,
+          })
           return
         }
+        setIdentity(entry.identity)
+        return
+      }
+      setIdentity(await loadIdentity())
+    } catch (requestError) {
+      if (requestError instanceof ApiError) {
         if (requestError.code === "INSTALLATION_REQUIRED") {
           navigate("/setup", { replace: true })
           return
@@ -82,29 +101,26 @@ export function WorkspaceLayout() {
     } finally {
       setLoading(false)
     }
-  }, [navigate, t])
+  }, [navigate, platform, t])
 
   useEffect(() => {
-    void fetchSession()
-  }, [fetchSession])
+    void fetchIdentity()
+  }, [fetchIdentity])
 
+  /** 退出登录并回到登录页。 */
   async function handleLogout() {
     setLoggingOut(true)
     try {
       await logout()
-      navigate("/login", { replace: true })
-    } catch (requestError) {
-      if (requestError instanceof ApiError && requestError.code === "AUTH_REQUIRED") {
-        navigate("/login", { replace: true })
-        return
-      }
+    } catch {
       toast.error(t("logoutError"))
     } finally {
       setLoggingOut(false)
+      navigate("/login", { replace: true })
     }
   }
 
-  if (loading && !principal) {
+  if (loading && !identity) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
@@ -113,14 +129,14 @@ export function WorkspaceLayout() {
     )
   }
 
-  if (!principal) {
+  if (!identity) {
     return (
       <main className="flex min-h-svh items-center justify-center p-6">
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
             {error || t("loadError")}
           </p>
-          <Button className="mt-4" variant="outline" onClick={fetchSession}>
+          <Button className="mt-4" variant="outline" onClick={fetchIdentity}>
             <RefreshCwIcon />
             {t("retry")}
           </Button>
@@ -132,7 +148,7 @@ export function WorkspaceLayout() {
   return (
     <SidebarProvider>
       <WorkspaceNavigation
-        principal={principal}
+        identity={identity}
         onLogout={handleLogout}
         loggingOut={loggingOut}
       />
@@ -153,7 +169,7 @@ export function WorkspaceLayout() {
           </h1>
         </header>
         <div className="flex min-h-0 flex-1 overflow-auto">
-          <Outlet context={principal} />
+          <Outlet context={identity} />
         </div>
       </SidebarInset>
     </SidebarProvider>

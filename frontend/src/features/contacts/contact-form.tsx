@@ -1,3 +1,4 @@
+/** 新建联系人表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
@@ -6,12 +7,14 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ApiError,
+  ContactMethodType,
+  ContactStage,
   createContact,
+  type ChannelSummary,
   type ContactDetail,
   type ContactInput,
-} from "@/api/contacts"
-import type { ChannelSummary } from "@/api/channels"
-import { ApiError } from "@/api/client"
+} from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -24,6 +27,7 @@ import {
 } from "@/features/contacts/contact-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
+/** 创建联系人。 */
 export function ContactForm({
   channels,
   onSaved,
@@ -52,13 +56,14 @@ export function ContactForm({
     defaultValues: {
       displayName: "",
       channelId: "",
-      stage: "visitor",
+      stage: ContactStage.ContactStageVisitor,
       email: "",
       phone: "",
       notes: "",
     },
   })
 
+  /** 提交新建联系人。 */
   async function submit(values: ContactFormValues) {
     const input: ContactInput = {
       displayName: values.displayName,
@@ -67,10 +72,10 @@ export function ContactForm({
       notes: values.notes,
       methods: [
         ...(values.email
-          ? [{ type: "email" as const, value: values.email, isPrimary: true }]
+          ? [{ type: ContactMethodType.ContactMethodTypeEmail, value: values.email, label: "", isPrimary: true }]
           : []),
         ...(values.phone
-          ? [{ type: "phone" as const, value: values.phone, isPrimary: true }]
+          ? [{ type: ContactMethodType.ContactMethodTypePhone, value: values.phone, label: "", isPrimary: true }]
           : []),
       ],
     }
@@ -139,9 +144,9 @@ export function ContactForm({
                 {t("form.stage")}
               </FieldLabel>
               <NativeSelect {...field} id={field.name} required>
-                <option value="visitor">{t("stages.visitor")}</option>
-                <option value="lead">{t("stages.lead")}</option>
-                <option value="customer">{t("stages.customer")}</option>
+                <option value={ContactStage.ContactStageVisitor}>{t("stages.visitor")}</option>
+                <option value={ContactStage.ContactStageLead}>{t("stages.lead")}</option>
+                <option value={ContactStage.ContactStageCustomer}>{t("stages.customer")}</option>
               </NativeSelect>
             </Field>
           )}

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -21,12 +22,12 @@ func NewDeleteContactAction(db *bun.DB) *DeleteContactAction {
 }
 
 // Execute 软删除当前企业的联系人。
-func (a *DeleteContactAction) Execute(ctx context.Context, principal *servermodels.Principal, contactID string) error {
-	if !validUUID(contactID) {
+func (a *DeleteContactAction) Execute(ctx context.Context, identity *servermodels.Identity, contactID string) error {
+	if !common.ValidUUID(contactID) {
 		return ErrNotFound
 	}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validatePrincipal(ctx, tx, principal); err != nil {
+		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
 		result, err := tx.NewUpdate().
@@ -34,7 +35,7 @@ func (a *DeleteContactAction) Execute(ctx context.Context, principal *servermode
 			Set("deleted_at = now()").
 			Set("updated_at = now()").
 			Where("id = ?", contactID).
-			Where("organization_id = ?", principal.Organization.ID).
+			Where("organization_id = ?", identity.Organization.ID).
 			Where("deleted_at IS NULL").
 			Exec(ctx)
 		if err != nil {

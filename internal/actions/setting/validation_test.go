@@ -2,13 +2,17 @@
 
 package setting
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
+)
 
 // TestNormalizeS3Setting 验证 S3 配置规范化和字段校验。
 func TestNormalizeS3Setting(t *testing.T) {
 	normalized, fields := normalizeS3Setting(S3Setting{
 		Enabled:         true,
-		Provider:        ProviderAWS,
+		Provider:        domain.StorageProviderAWS,
 		Endpoint:        " https://s3.example.com ",
 		Region:          " us-east-1 ",
 		Bucket:          " cervi ",
@@ -22,7 +26,7 @@ func TestNormalizeS3Setting(t *testing.T) {
 		t.Fatalf("unexpected normalized setting: %#v", normalized)
 	}
 
-	normalized.Provider = ProviderMinIO
+	normalized.Provider = domain.StorageProviderMinIO
 	if _, minioFields := normalizeS3Setting(normalized); len(minioFields) != 0 {
 		t.Fatalf("unexpected MinIO validation fields: %#v", minioFields)
 	}

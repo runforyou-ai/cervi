@@ -1,3 +1,4 @@
+/** shadcn 分隔线。 */
 import * as React from "react"
 import { Separator as SeparatorPrimitive } from "radix-ui"
 

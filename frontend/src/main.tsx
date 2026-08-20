@@ -1,3 +1,4 @@
+/** 初始化国际化并挂载前端应用。 */
 import React from "react"
 import ReactDOM from "react-dom/client"
 import { ThemeProvider } from "next-themes"
@@ -9,6 +10,7 @@ import { initializeI18n } from "@/i18n"
 import "@/index.css"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
+/** 启动前端应用。 */
 async function bootstrap() {
   await initializeI18n()
 

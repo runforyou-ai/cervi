@@ -21,8 +21,8 @@ func NewGetContactQuery(db *bun.DB) *GetContactQuery {
 }
 
 // Execute 返回当前企业中未删除的联系人详情。
-func (q *GetContactQuery) Execute(ctx context.Context, principal *servermodels.Principal, contactID string) (*ContactDetail, error) {
-	contact, err := loadContact(ctx, q.db, principal.Organization.ID, contactID)
+func (q *GetContactQuery) Execute(ctx context.Context, identity *servermodels.Identity, contactID string) (*ContactDetail, error) {
+	contact, err := loadContact(ctx, q.db, identity.Organization.ID, contactID)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (q *GetContactQuery) Execute(ctx context.Context, principal *servermodels.P
 		TableExpr("channels AS ch").
 		ColumnExpr("ch.id::text AS id").
 		Column("type", "name").
-		Where("ch.organization_id = ?", principal.Organization.ID).
+		Where("ch.organization_id = ?", identity.Organization.ID).
 		Where("ch.id = ?", contact.SourceChannelID).
 		Scan(ctx, &sourceChannel); err != nil {
 		return nil, fmt.Errorf("read contact source channel: %w", err)
@@ -41,7 +41,7 @@ func (q *GetContactQuery) Execute(ctx context.Context, principal *servermodels.P
 	if err := q.db.NewSelect().
 		TableExpr("contact_methods AS cm").
 		Column("type", "value", "label", "is_primary").
-		Where("cm.organization_id = ?", principal.Organization.ID).
+		Where("cm.organization_id = ?", identity.Organization.ID).
 		Where("cm.contact_id = ?", contactID).
 		OrderExpr("cm.type ASC, cm.is_primary DESC, cm.created_at ASC").
 		Scan(ctx, &methods); err != nil {
@@ -56,7 +56,7 @@ func (q *GetContactQuery) Execute(ctx context.Context, principal *servermodels.P
 		ColumnExpr("cci.external_id").
 		ColumnExpr("cci.display_name").
 		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
-		Where("cci.organization_id = ?", principal.Organization.ID).
+		Where("cci.organization_id = ?", identity.Organization.ID).
 		Where("cci.contact_id = ?", contactID).
 		OrderExpr("cci.updated_at DESC, cci.id DESC").
 		Scan(ctx, &identities); err != nil {

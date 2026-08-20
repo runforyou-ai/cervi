@@ -1,7 +1,10 @@
+/** 对象存储设置表单校验规则。 */
 import { z } from "zod"
 
-import { storageProviderIds } from "@/api/settings"
+import { StorageProvider } from "@/api"
+import { requiredWailsEnum } from "@/lib/wails-enum"
 
+/** 判断对象存储服务地址是否完整有效。 */
 function validEndpoint(value: string) {
   try {
     const endpoint = new URL(value)
@@ -17,6 +20,7 @@ function validEndpoint(value: string) {
   }
 }
 
+/** 创建对象存储设置校验。 */
 export function createStorageSettingsSchema(messages: {
   providerInvalid: string
   endpointRequired: string
@@ -28,9 +32,10 @@ export function createStorageSettingsSchema(messages: {
 }) {
   return z.object({
     enabled: z.boolean(),
-    provider: z.enum(storageProviderIds, {
-      errorMap: () => ({ message: messages.providerInvalid }),
-    }),
+    provider: requiredWailsEnum(
+      StorageProvider,
+      messages.providerInvalid,
+    ),
     endpoint: z
       .string()
       .trim()

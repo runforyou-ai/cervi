@@ -2,13 +2,17 @@
 
 package user
 
-import "time"
+import (
+	"time"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
+)
 
 // ListInput 定义企业成员目录查询条件。
 type ListInput struct {
 	Query    string
-	Status   string
-	Role     string
+	Status   domain.UserStatus
+	Role     domain.UserRole
 	Page     int
 	PageSize int
 }
@@ -22,12 +26,12 @@ type PageInfo struct {
 
 // DirectoryUser 定义团队成员目录字段。
 type DirectoryUser struct {
-	ID          string    `json:"id"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"displayName"`
-	Role        string    `json:"role"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID          string            `json:"id"`
+	Email       string            `json:"email"`
+	DisplayName string            `json:"displayName"`
+	Role        domain.UserRole   `json:"role"`
+	Status      domain.UserStatus `json:"status"`
+	CreatedAt   time.Time         `json:"createdAt"`
 }
 
 // ListOutput 定义企业成员分页结果。

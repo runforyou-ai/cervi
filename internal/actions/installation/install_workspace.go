@@ -12,7 +12,7 @@ import (
 
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
-	"github.com/runforyou-ai/cervi/internal/common/sessiontoken"
+	"github.com/runforyou-ai/cervi/internal/common/token"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -32,9 +32,9 @@ type InstallWorkspaceInput struct {
 	Password         string
 }
 
-// InstallWorkspaceOutput 返回企业所有者和初始会话。
+// InstallWorkspaceOutput 返回企业所有者和初始令牌。
 type InstallWorkspaceOutput struct {
-	Principal *servermodels.Principal
+	Identity  *servermodels.Identity
 	Token     string
 	ExpiresAt time.Time
 }
@@ -44,7 +44,7 @@ func NewInstallWorkspaceAction(db *bun.DB) *InstallWorkspaceAction {
 	return &InstallWorkspaceAction{db: db}
 }
 
-// Execute 校验初始化信息并创建企业所有者和会话。
+// Execute 校验初始化信息并创建企业所有者和登录令牌。
 func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorkspaceInput) (InstallWorkspaceOutput, error) {
 	input.OrganizationName = strings.TrimSpace(input.OrganizationName)
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
@@ -57,12 +57,12 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 	if err != nil {
 		return InstallWorkspaceOutput{}, fmt.Errorf("hash owner password: %w", err)
 	}
-	issued, err := sessiontoken.Issue()
+	issued, err := token.Issue()
 	if err != nil {
-		return InstallWorkspaceOutput{}, fmt.Errorf("create installation session: %w", err)
+		return InstallWorkspaceOutput{}, fmt.Errorf("issue installation token: %w", err)
 	}
 
-	principal := &servermodels.Principal{}
+	identity := &servermodels.Identity{}
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.ExecContext(ctx, "LOCK TABLE organizations IN EXCLUSIVE MODE"); err != nil {
 			return err
@@ -101,7 +101,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			return err
 		}
 
-		record := &servermodels.Session{
+		record := &servermodels.Token{
 			UserID:    user.ID,
 			TokenHash: issued.TokenHash,
 			ExpiresAt: issued.ExpiresAt,
@@ -113,13 +113,13 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			return err
 		}
 
-		principal.Organization = *organization
-		principal.User = *user
+		identity.Organization = *organization
+		identity.User = *user
 		return nil
 	})
 	if err != nil {
 		return InstallWorkspaceOutput{}, fmt.Errorf("install workspace: %w", err)
 	}
 
-	return InstallWorkspaceOutput{Principal: principal, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
+	return InstallWorkspaceOutput{Identity: identity, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
 }

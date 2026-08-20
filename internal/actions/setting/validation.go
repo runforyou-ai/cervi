@@ -7,41 +7,28 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const s3SettingKey = "object_storage.s3"
 
-const (
-	ProviderGeneric = "generic"
-	ProviderAWS     = "aws"
-	ProviderR2      = "r2"
-	ProviderAliyun  = "aliyun"
-	ProviderTencent = "tencent"
-	ProviderBaidu   = "baidu"
-	ProviderQiniu   = "qiniu"
-	ProviderHuawei  = "huawei"
-	ProviderUCloud  = "ucloud"
-	ProviderMinIO   = "minio"
-	ProviderRustFS  = "rustfs"
-)
-
-var supportedProviders = map[string]struct{}{
-	ProviderGeneric: {},
-	ProviderAWS:     {},
-	ProviderR2:      {},
-	ProviderAliyun:  {},
-	ProviderTencent: {},
-	ProviderBaidu:   {},
-	ProviderQiniu:   {},
-	ProviderHuawei:  {},
-	ProviderUCloud:  {},
-	ProviderMinIO:   {},
-	ProviderRustFS:  {},
+var supportedProviders = map[domain.StorageProvider]struct{}{
+	domain.StorageProviderGeneric: {},
+	domain.StorageProviderAWS:     {},
+	domain.StorageProviderR2:      {},
+	domain.StorageProviderAliyun:  {},
+	domain.StorageProviderTencent: {},
+	domain.StorageProviderBaidu:   {},
+	domain.StorageProviderQiniu:   {},
+	domain.StorageProviderHuawei:  {},
+	domain.StorageProviderUCloud:  {},
+	domain.StorageProviderMinIO:   {},
+	domain.StorageProviderRustFS:  {},
 }
 
 // ValidationCode 标识存储配置字段校验结果。
-type ValidationCode string
+type ValidationCode = common.FieldCode
 
 const (
 	ValidationEndpointRequired        ValidationCode = "ENDPOINT_REQUIRED"
@@ -53,31 +40,24 @@ const (
 	ValidationSecretAccessKeyRequired ValidationCode = "SECRET_ACCESS_KEY_REQUIRED"
 )
 
-// ValidationError 返回存储配置字段校验结果。
-type ValidationError struct {
-	Fields map[string]ValidationCode
-}
-
-// Error 返回存储配置输入校验错误。
-func (e *ValidationError) Error() string {
-	return "storage setting validation failed"
-}
+// ValidationError 表示存储配置字段校验失败。
+type ValidationError = common.FieldError
 
 // S3Setting 定义企业的 S3 对象存储配置。
 type S3Setting struct {
-	Enabled         bool   `json:"enabled"`
-	Provider        string `json:"provider"`
-	Endpoint        string `json:"endpoint"`
-	Region          string `json:"region"`
-	Bucket          string `json:"bucket"`
-	AccessKeyID     string `json:"accessKeyId"`
-	SecretAccessKey string `json:"secretAccessKey"`
-	ForcePathStyle  bool   `json:"forcePathStyle"`
+	Enabled         bool                   `json:"enabled"`
+	Provider        domain.StorageProvider `json:"provider"`
+	Endpoint        string                 `json:"endpoint"`
+	Region          string                 `json:"region"`
+	Bucket          string                 `json:"bucket"`
+	AccessKeyID     string                 `json:"accessKeyId"`
+	SecretAccessKey string                 `json:"secretAccessKey"`
+	ForcePathStyle  bool                   `json:"forcePathStyle"`
 }
 
 // normalizeS3Setting 规范化并校验 S3 配置。
 func normalizeS3Setting(input S3Setting) (S3Setting, map[string]ValidationCode) {
-	input.Provider = strings.ToLower(strings.TrimSpace(input.Provider))
+	input.Provider = domain.StorageProvider(strings.ToLower(strings.TrimSpace(string(input.Provider))))
 	input.Endpoint = strings.TrimSpace(input.Endpoint)
 	input.Region = strings.TrimSpace(input.Region)
 	input.Bucket = strings.TrimSpace(input.Bucket)
@@ -111,7 +91,7 @@ func normalizeS3Setting(input S3Setting) (S3Setting, map[string]ValidationCode) 
 // defaultS3Setting 返回尚未配置时使用的初始 S3 配置。
 func defaultS3Setting() S3Setting {
 	return S3Setting{
-		Provider: ProviderGeneric,
+		Provider: domain.StorageProviderGeneric,
 		Endpoint: "https://s3.us-east-1.amazonaws.com",
 		Region:   "us-east-1",
 	}
@@ -126,10 +106,4 @@ func validEndpoint(value string) bool {
 		parsed.User == nil &&
 		parsed.RawQuery == "" &&
 		parsed.Fragment == ""
-}
-
-// validUUID 判断记录标识是否为 UUID。
-func validUUID(value string) bool {
-	parsed, err := uuid.Parse(value)
-	return err == nil && strings.EqualFold(parsed.String(), value)
 }

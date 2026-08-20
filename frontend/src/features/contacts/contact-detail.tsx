@@ -1,3 +1,4 @@
+/** 联系人详情和分节编辑。 */
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, type FieldErrors } from "react-hook-form"
@@ -5,14 +6,15 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { ApiError } from "@/api/client"
 import {
+  ApiError,
+  ContactMethodType,
+  ContactStage,
   updateContact,
   type ContactDetail,
   type ContactInput,
   type ContactMethodInput,
-  type ContactStage,
-} from "@/api/contacts"
+} from "@/api"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -28,17 +30,19 @@ import { apiErrorMessage } from "@/lib/form-errors"
 
 type EditingSection = "name" | "stage" | "methods" | "notes" | null
 
+/** 把联系人详情转换为表单值。 */
 function valuesFromDetail(detail: ContactDetail): ContactFormValues {
   return {
     displayName: detail.contact.displayName ?? "",
     channelId: detail.contact.sourceChannelId,
     stage: detail.contact.stage,
-    email: detail.methods.find((method) => method.type === "email")?.value ?? "",
-    phone: detail.methods.find((method) => method.type === "phone")?.value ?? "",
+    email: detail.methods.find((method) => method.type === ContactMethodType.ContactMethodTypeEmail)?.value ?? "",
+    phone: detail.methods.find((method) => method.type === ContactMethodType.ContactMethodTypePhone)?.value ?? "",
     notes: detail.contact.notes ?? "",
   }
 }
 
+/** 用表单值更新联系方式，其余项原样保留。 */
 function methodsFromDetail(
   detail: ContactDetail,
   values: ContactFormValues,
@@ -64,7 +68,7 @@ function methodsFromDetail(
       methods.push({
         type: method.type,
         value,
-        label: method.label ?? undefined,
+        label: method.label ?? "",
         isPrimary: method.isPrimary,
       })
       continue
@@ -72,19 +76,23 @@ function methodsFromDetail(
     methods.push({
       type: method.type,
       value: method.value,
-      label: method.label ?? undefined,
+      label: method.label ?? "",
       isPrimary: method.isPrimary,
     })
   }
 
-  for (const type of ["email", "phone"] as const) {
+  for (const type of [
+    ContactMethodType.ContactMethodTypeEmail,
+    ContactMethodType.ContactMethodTypePhone,
+  ]) {
     if (!handled[type] && editedValues[type]) {
-      methods.push({ type, value: editedValues[type], isPrimary: true })
+      methods.push({ type, value: editedValues[type], label: "", isPrimary: true })
     }
   }
   return methods
 }
 
+/** 详情行，支持进入编辑。 */
 function DetailRow({
   label,
   value,
@@ -125,6 +133,7 @@ function DetailRow({
   )
 }
 
+/** 详情分节编辑的保存和取消。 */
 function EditActions({
   saving,
   onSave,
@@ -147,6 +156,7 @@ function EditActions({
   )
 }
 
+/** 展示并分节编辑联系人详情。 */
 export function ContactDetailView({
   detail,
   onSaved,
@@ -183,16 +193,19 @@ export function ContactDetailView({
     setEditing(null)
   }, [detail, form])
 
+  /** 取消当前分节编辑。 */
   function cancelEdit() {
     form.reset(valuesFromDetail(detail))
     setEditing(null)
   }
 
+  /** 开始编辑指定分节。 */
   function startEditing(section: Exclude<EditingSection, null>) {
     form.reset(valuesFromDetail(detail))
     setEditing(section)
   }
 
+  /** 校验失败时提示错误。 */
   function invalid(_errors: FieldErrors<ContactFormValues>) {
     toast.error(t("validation.checkFields"))
   }
@@ -230,7 +243,7 @@ export function ContactDetailView({
   }, invalid)
 
   const empty = <span className="text-muted-foreground">{t("detail.empty")}</span>
-  const stage = form.watch("stage") as ContactStage
+  const stage = form.watch("stage")
 
   return (
     <div className="flex flex-col gap-7">
@@ -251,15 +264,15 @@ export function ContactDetailView({
 
           <DetailRow
             label={t("columns.stage")}
-            value={t(`stages.${detail.contact.stage}`)}
+            value={detail.contact.stage ? t(`stages.${detail.contact.stage}`) : ""}
             editing={editing === "stage"}
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("stage")}
           >
             <NativeSelect {...form.register("stage")} autoFocus value={stage}>
-              <option value="visitor">{t("stages.visitor")}</option>
-              <option value="lead">{t("stages.lead")}</option>
-              <option value="customer">{t("stages.customer")}</option>
+              <option value={ContactStage.ContactStageVisitor}>{t("stages.visitor")}</option>
+              <option value={ContactStage.ContactStageLead}>{t("stages.lead")}</option>
+              <option value={ContactStage.ContactStageCustomer}>{t("stages.customer")}</option>
             </NativeSelect>
             <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
           </DetailRow>

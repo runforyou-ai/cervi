@@ -1,3 +1,4 @@
+/** 登录表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
@@ -6,8 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { login } from "@/api/auth"
-import { ApiError } from "@/api/client"
+import { ApiError, login } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,7 +24,12 @@ import {
 } from "@/features/auth/login-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
-export function LoginForm() {
+/** 校验并提交登录。 */
+export function LoginForm({
+  allowServerChange = false,
+}: {
+  allowServerChange?: boolean
+}) {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
   const schema = useMemo(() => createLoginSchema(t), [t])
@@ -37,18 +42,24 @@ export function LoginForm() {
     },
   })
 
+  /** 提交登录并进入收件箱。 */
   async function submitLogin(values: LoginFormValues) {
     try {
       await login(values)
       navigate("/inbox", { replace: true })
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.code === "SERVER_CONNECTION_REQUIRED") {
+        if (
+          error.code === "SERVER_CONNECTION_REQUIRED" ||
+          (allowServerChange && error.code === "SERVER_UNAVAILABLE")
+        ) {
           navigate("/connect", { replace: true })
           return
         }
         if (error.code === "INSTALLATION_REQUIRED") {
-          navigate("/setup", { replace: true })
+          navigate(allowServerChange ? "/connect" : "/setup", {
+            replace: true,
+          })
           return
         }
         toast.error(apiErrorMessage(error, ["email", "password"]))

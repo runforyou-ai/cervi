@@ -1,3 +1,4 @@
+/** shadcn 折叠面板。 */
 import { Collapsible as CollapsiblePrimitive } from "radix-ui"
 
 const Collapsible = CollapsiblePrimitive.Root

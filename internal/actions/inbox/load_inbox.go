@@ -24,11 +24,11 @@ func NewLoadInboxQuery() *LoadInboxQuery {
 	return &LoadInboxQuery{}
 }
 
-// Execute 返回当前身份可访问的统一收件箱。
-func (q *LoadInboxQuery) Execute(_ context.Context, principal *servermodels.Principal) LoadInboxOutput {
+// Execute 返回当前身份所属企业和用户，会话列表暂为空。
+func (q *LoadInboxQuery) Execute(_ context.Context, identity *servermodels.Identity) LoadInboxOutput {
 	return LoadInboxOutput{
-		Organization:  principal.Organization,
-		User:          principal.User,
+		Organization:  identity.Organization,
+		User:          identity.User,
 		Conversations: []any{},
 	}
 }

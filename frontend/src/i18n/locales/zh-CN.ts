@@ -1,3 +1,4 @@
+/** 简体中文界面文案。 */
 const zhCN = {
   common: {
     notifications: "通知",
@@ -19,6 +20,7 @@ const zhCN = {
     emailLabel: "邮箱",
     passwordLabel: "密码（至少 8 个字符）",
     organizationNameRequired: "请输入公司名称。",
+    organizationNameTooLong: "公司名称不能超过 32 个字符。",
     displayNameRequired: "请输入你的姓名。",
     emailRequired: "请输入邮箱。",
     emailInvalid: "请输入有效的邮箱。",
@@ -33,7 +35,7 @@ const zhCN = {
     serverError: "初始化失败，请稍后重试。",
   },
   auth: {
-    title: "登录 Cervi",
+    title: "登录",
     description: "使用所有者邮箱和密码登录。",
     emailLabel: "邮箱",
     passwordLabel: "密码",
@@ -47,6 +49,7 @@ const zhCN = {
     invalidCredentials: "邮箱或密码错误。",
     networkError: "无法连接服务器，请稍后重试。",
     serverError: "登录失败，请稍后重试。",
+    changeServer: "切换",
   },
   connection: {
     title: "连接企业服务器",
@@ -54,13 +57,23 @@ const zhCN = {
     serverUrlLabel: "企业服务器地址",
     serverUrlRequired: "请输入企业服务器地址。",
     serverUrlInvalid: "请输入完整有效的企业服务器地址。",
-    submit: "连接",
-    submitting: "正在连接…",
+    detect: "检测",
+    detecting: "正在检测…",
+    connect: "连接",
+    connecting: "正在连接…",
     connectionError: "无法连接到该企业服务器，请检查地址后重试。",
   },
   mobile: {
     title: "移动端正在建设",
     description: "移动端应用将提供客户会话和移动协作功能。",
+    organization: "企业",
+    user: "当前用户",
+    logout: "退出登录",
+    loggingOut: "正在退出…",
+    logoutError: "退出登录失败，请重试。",
+    loading: "正在加载…",
+    loadError: "加载登录信息失败。",
+    retry: "重试",
   },
   workspace: {
     navigationGroup: "工作台",

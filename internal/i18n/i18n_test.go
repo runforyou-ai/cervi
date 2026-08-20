@@ -46,6 +46,7 @@ func TestLocalizeMatchesRequestedLanguage(t *testing.T) {
 // TestAllMessageKeysCanBeLocalized 验证全部类型化文案键均存在中英文翻译。
 func TestAllMessageKeysCanBeLocalized(t *testing.T) {
 	keys := []Key{
+		ErrorInternal,
 		ErrorMethodNotAllowed,
 		ErrorInstallationStatusReadFailed,
 		ErrorAlreadyInitialized,
@@ -54,18 +55,18 @@ func TestAllMessageKeysCanBeLocalized(t *testing.T) {
 		ErrorAuthenticationRequired,
 		ErrorValidationFailed,
 		ErrorInstallationFailed,
-		ErrorAuthenticationInputInvalid,
 		ErrorInvalidCredentials,
 		ErrorLoginFailed,
 		ErrorLogoutFailed,
 		ErrorServerURLInvalid,
-		ErrorServerConnectionCreateFailed,
 		ErrorServerUnavailable,
 		ErrorServerConnectionSaveFailed,
 		ErrorServerConnectionRequired,
+		ErrorServerInitializationRequired,
 		ErrorRemoteRequestCreateFailed,
 		ErrorServerConnectionFailed,
 		FieldOrganizationNameRequired,
+		FieldOrganizationNameTooLong,
 		FieldDisplayNameRequired,
 		FieldEmailInvalid,
 		FieldPasswordTooShort,

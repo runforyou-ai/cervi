@@ -1,3 +1,4 @@
+/** 美式英语界面文案。 */
 const enUS = {
   common: {
     notifications: "Notifications",
@@ -19,6 +20,7 @@ const enUS = {
     emailLabel: "Email",
     passwordLabel: "Password (at least 8 characters)",
     organizationNameRequired: "Enter the company name.",
+    organizationNameTooLong: "The company name cannot exceed 32 characters.",
     displayNameRequired: "Enter your name.",
     emailRequired: "Enter your email.",
     emailInvalid: "Enter a valid email address.",
@@ -33,7 +35,7 @@ const enUS = {
     serverError: "Could not finish setup. Please try again.",
   },
   auth: {
-    title: "Log in to Cervi",
+    title: "Log in",
     description: "Use the owner email and password to log in.",
     emailLabel: "Email",
     passwordLabel: "Password",
@@ -47,6 +49,7 @@ const enUS = {
     invalidCredentials: "Incorrect email or password.",
     networkError: "Could not connect to the server. Please try again.",
     serverError: "Could not log in. Please try again.",
+    changeServer: "Switch",
   },
   connection: {
     title: "Connect to your company server",
@@ -54,13 +57,23 @@ const enUS = {
     serverUrlLabel: "Company server address",
     serverUrlRequired: "Enter the company server address.",
     serverUrlInvalid: "Enter a complete and valid company server address.",
-    submit: "Connect",
-    submitting: "Connecting…",
+    detect: "Detect",
+    detecting: "Detecting…",
+    connect: "Connect",
+    connecting: "Connecting…",
     connectionError: "Could not connect to this company server. Check the address and try again.",
   },
   mobile: {
     title: "Mobile app in development",
     description: "The mobile app will provide customer conversations and mobile collaboration.",
+    organization: "Company",
+    user: "Current user",
+    logout: "Log out",
+    loggingOut: "Logging out…",
+    logoutError: "Could not log out. Please try again.",
+    loading: "Loading…",
+    loadError: "Could not load the login information.",
+    retry: "Try again",
   },
   workspace: {
     navigationGroup: "Workspace",

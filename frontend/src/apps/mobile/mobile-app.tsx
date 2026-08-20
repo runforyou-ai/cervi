@@ -1,8 +1,82 @@
-import { SmartphoneIcon } from "lucide-react"
+/** 移动端独立入口、路由和首页。 */
+import { useCallback, useEffect, useState } from "react"
+import { LoaderCircleIcon, SmartphoneIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { Navigate, Route, Routes, useNavigate } from "react-router"
+import { toast } from "sonner"
 
-export default function MobileApp() {
+import { logout, resolveNativeEntry, type Identity } from "@/api"
+import { Button } from "@/components/ui/button"
+import { LoginPage } from "@/features/auth/login-page"
+import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
+
+/** 移动端登录后首页。 */
+function MobileHomePage() {
   const { t } = useTranslation("mobile")
+  const navigate = useNavigate()
+  const [identity, setIdentity] = useState<Identity | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  /** 读取原生端入口并加载当前身份。 */
+  const fetchIdentity = useCallback(async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const entry = await resolveNativeEntry()
+      if (entry.status !== "ready") {
+        navigate(entry.status === "connect" ? "/connect" : "/login", {
+          replace: true,
+        })
+        return
+      }
+      setIdentity(entry.identity)
+    } catch {
+      setError(t("loadError"))
+    } finally {
+      setLoading(false)
+    }
+  }, [navigate, t])
+
+  useEffect(() => {
+    void fetchIdentity()
+  }, [fetchIdentity])
+
+  /** 退出登录并回到登录页。 */
+  async function handleLogout() {
+    setLoggingOut(true)
+    try {
+      await logout()
+    } catch {
+      toast.error(t("logoutError"))
+    } finally {
+      setLoggingOut(false)
+      navigate("/login", { replace: true })
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center gap-2 text-sm text-muted-foreground">
+        <LoaderCircleIcon className="size-4 animate-spin" />
+        {t("loading")}
+      </main>
+    )
+  }
+
+  if (!identity) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button className="mt-4" variant="outline" onClick={fetchIdentity}>
+            {t("retry")}
+          </Button>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -15,7 +89,35 @@ export default function MobileApp() {
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
           {t("description")}
         </p>
+        <dl className="mt-6 grid gap-4 rounded-lg border p-4 text-left text-sm">
+          <div>
+            <dt className="text-muted-foreground">{t("organization")}</dt>
+            <dd className="mt-1 font-medium">{identity.organization.name}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">{t("user")}</dt>
+            <dd className="mt-1 font-medium">{identity.user.displayName}</dd>
+            <dd className="text-muted-foreground">{identity.user.email}</dd>
+          </div>
+        </dl>
+        <Button className="mt-6" disabled={loggingOut} onClick={handleLogout}>
+          {loggingOut ? <LoaderCircleIcon className="animate-spin" /> : null}
+          {loggingOut ? t("loggingOut") : t("logout")}
+        </Button>
       </section>
     </main>
+  )
+}
+
+/** 渲染移动端路由。 */
+export default function MobileApp() {
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/inbox" replace />} />
+      <Route path="/connect" element={<ServerConnectionPage />} />
+      <Route path="/login" element={<LoginPage allowServerChange />} />
+      <Route path="/inbox" element={<MobileHomePage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }

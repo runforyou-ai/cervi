@@ -1,3 +1,4 @@
+/** 统一收件箱会话列表和聊天界面。 */
 import { useEffect, useState } from "react"
 import {
   MessagesSquareIcon,
@@ -8,7 +9,7 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import type { Conversation } from "@/api/inbox"
+import type { Conversation } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -23,6 +24,7 @@ import {
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { cn } from "@/lib/utils"
 
+/** 会话头像和在线状态。 */
 function InboxConversationAvatar({ conversation }: { conversation: Conversation }) {
   const { t } = useTranslation("inbox")
 
@@ -42,6 +44,7 @@ function InboxConversationAvatar({ conversation }: { conversation: Conversation 
   )
 }
 
+/** 当前会话的消息列表和输入区。 */
 function ConversationThread({
   conversation,
   narrowViewport = false,
@@ -162,6 +165,7 @@ function ConversationThread({
   )
 }
 
+/** 当前会话的访客资料侧栏。 */
 function CustomerPanel({ conversation }: { conversation: Conversation }) {
   const { t } = useTranslation("inbox")
 
@@ -206,6 +210,7 @@ function CustomerPanel({ conversation }: { conversation: Conversation }) {
   )
 }
 
+/** 展示收件箱会话列表和当前会话。 */
 export function InboxPage({
   conversations,
 }: {
@@ -279,6 +284,7 @@ export function InboxPage({
     conversations.find((conversation) => conversation.id === selectedId) ??
     conversations[0]
 
+  /** 选中一个会话。 */
   function selectConversation(conversationId: string) {
     setSelectedId(conversationId)
 

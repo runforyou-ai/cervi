@@ -1,3 +1,4 @@
+/** shadcn 国际电话号码输入。 */
 import * as React from "react"
 import { useTranslation } from "react-i18next"
 import PhoneNumberInput, {

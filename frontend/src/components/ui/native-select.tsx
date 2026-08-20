@@ -1,3 +1,4 @@
+/** shadcn 原生下拉选择。 */
 import * as React from "react"
 import { ChevronDownIcon } from "lucide-react"
 

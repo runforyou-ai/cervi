@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,8 +24,8 @@ func NewUpdateContactAction(db *bun.DB) *UpdateContactAction {
 }
 
 // Execute 校验并更新当前企业的联系人及联系方式。
-func (a *UpdateContactAction) Execute(ctx context.Context, principal *servermodels.Principal, contactID string, input ContactInput) (*ContactDetail, error) {
-	if !validUUID(contactID) {
+func (a *UpdateContactAction) Execute(ctx context.Context, identity *servermodels.Identity, contactID string, input ContactInput) (*ContactDetail, error) {
+	if !common.ValidUUID(contactID) {
 		return nil, ErrNotFound
 	}
 	input, fields := normalizeContactInput(input)
@@ -33,7 +34,7 @@ func (a *UpdateContactAction) Execute(ctx context.Context, principal *servermode
 	}
 
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validatePrincipal(ctx, tx, principal); err != nil {
+		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
 		var sourceChannelID string
@@ -41,7 +42,7 @@ func (a *UpdateContactAction) Execute(ctx context.Context, principal *servermode
 			Table("contacts").
 			Column("source_channel_id").
 			Where("id = ?", contactID).
-			Where("organization_id = ?", principal.Organization.ID).
+			Where("organization_id = ?", identity.Organization.ID).
 			Where("deleted_at IS NULL").
 			For("UPDATE").
 			Scan(ctx, &sourceChannelID); errors.Is(err, sql.ErrNoRows) {
@@ -68,16 +69,16 @@ func (a *UpdateContactAction) Execute(ctx context.Context, principal *servermode
 		}
 		_, err := query.
 			Where("id = ?", contactID).
-			Where("organization_id = ?", principal.Organization.ID).
+			Where("organization_id = ?", identity.Organization.ID).
 			Where("deleted_at IS NULL").
 			Exec(ctx)
 		if err != nil {
 			return err
 		}
-		return replaceMethods(ctx, tx, principal.Organization.ID, contactID, input.Methods)
+		return replaceMethods(ctx, tx, identity.Organization.ID, contactID, input.Methods)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update contact: %w", err)
 	}
-	return NewGetContactQuery(a.db).Execute(ctx, principal, contactID)
+	return NewGetContactQuery(a.db).Execute(ctx, identity, contactID)
 }

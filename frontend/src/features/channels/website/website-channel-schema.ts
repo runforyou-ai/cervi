@@ -1,9 +1,15 @@
+/** 网站渠道基础信息表单校验规则。 */
 import { z } from "zod"
 
+import { Locale } from "@/api"
+import { requiredWailsEnum } from "@/lib/wails-enum"
+
+/** 按 Unicode 字符计算长度。 */
 function unicodeLength(value: string) {
   return Array.from(value).length
 }
 
+/** 创建网站渠道基础信息校验。 */
 export function createWebsiteChannelSchema(messages: {
   nameRequired: string
   nameTooLong: string
@@ -23,7 +29,7 @@ export function createWebsiteChannelSchema(messages: {
       .refine((value) => unicodeLength(value) <= 2000, {
         message: messages.descriptionTooLong,
       }),
-    defaultLocale: z.enum(["zh-CN", "en-US"]),
+    defaultLocale: requiredWailsEnum(Locale),
   })
 }
 

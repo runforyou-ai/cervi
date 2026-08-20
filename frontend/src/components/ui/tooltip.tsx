@@ -1,3 +1,4 @@
+/** shadcn 悬停提示。 */
 import * as React from "react"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
 

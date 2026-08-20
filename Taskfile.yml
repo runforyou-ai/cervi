@@ -61,3 +61,95 @@ tasks:
     summary: Builds and runs the Docker image
     cmds:
       - task: common:run:docker
+
+  migrate:
+    summary: 执行待运行的服务端迁移
+    desc: |
+      执行所有待运行的服务端迁移。服务端启动时也会自动执行。
+    cmds:
+      - task: migrate:run
+        vars:
+          GOOSE_CMD: up
+          GOOSE_FLAGS: -allow-missing
+
+  migrate:status:
+    summary: 查看服务端迁移状态
+    desc: 查看每条迁移是否已执行。
+    cmds:
+      - task: migrate:run
+        vars:
+          GOOSE_CMD: status
+
+  migrate:rollback:
+    summary: 回滚服务端迁移
+    desc: |
+      回滚最近一次迁移。
+      回滚多步：wails3 task migrate:rollback STEP=3
+      回滚到指定版本：wails3 task migrate:rollback VERSION=20260818032701
+      回滚前请先停止服务端，避免启动时再次自动 up。
+    preconditions:
+      - sh: '{{if .STEP}}{{if regexMatch "^[1-9][0-9]*$" .STEP}}true{{else}}false{{end}}{{else}}true{{end}}'
+        msg: "STEP 必须是正整数，例如：wails3 task migrate:rollback STEP=3"
+      - sh: '{{if .VERSION}}{{if regexMatch "^[0-9]+$" .VERSION}}true{{else}}false{{end}}{{else}}true{{end}}'
+        msg: "VERSION 必须是迁移时间戳，例如：wails3 task migrate:rollback VERSION=20260818032701"
+    cmds:
+      - task: migrate:run
+        vars:
+          GOOSE_CMD: '{{if .VERSION}}down-to {{.VERSION}}{{else}}down{{end}}'
+          GOOSE_REPEAT: '{{if .VERSION}}1{{else}}{{.STEP | default 1}}{{end}}'
+
+  migrate:reset:
+    summary: 回滚全部服务端迁移后重新执行
+    desc: |
+      使用 Goose reset 回滚全部迁移，再执行 up。
+      通过 DATABASE_URL 连接数据库，不依赖 Docker。
+      执行前请先停止服务端。
+    cmds:
+      - task: migrate:run
+        vars:
+          GOOSE_CMD: reset
+      - task: migrate
+
+  make:migration:
+    silent: true
+    summary: 创建服务端迁移文件
+    desc: |
+      在 internal/storage/server/migrations 下创建空迁移文件。
+      用法：wails3 task make:migration NAME=create_example_table
+    vars:
+      SERVER_MIGRATIONS_DIR: internal/storage/server/migrations
+    preconditions:
+      - sh: '{{if .NAME}}true{{else}}false{{end}}'
+        msg: "请指定 NAME，例如：wails3 task make:migration NAME=create_example_table"
+      - sh: '{{if .NAME}}{{if regexMatch "^[A-Za-z0-9_]+$" .NAME}}true{{else}}false{{end}}{{else}}true{{end}}'
+        msg: "NAME 只能包含字母、数字和下划线"
+    cmds:
+      - |
+        set -euo pipefail
+        file="{{.SERVER_MIGRATIONS_DIR}}/$(date +%Y%m%d%H%M%S)_{{.NAME}}.sql"
+        printf '%s\n' '-- +goose Up' '' '-- +goose Down' '' > "$file"
+        echo "Created $file"
+
+  migrate:run:
+    internal: true
+    silent: true
+    summary: 对服务端 PostgreSQL 执行 Goose 命令
+    vars:
+      SERVER_MIGRATIONS_DIR: internal/storage/server/migrations
+      DATABASE_URL: '{{.DATABASE_URL | default "postgres://cervi:cervi_local_dev@localhost:5432/cervi?sslmode=disable"}}'
+      GOOSE_REPEAT: '{{.GOOSE_REPEAT | default 1}}'
+      GOOSE_VERSION:
+        sh: go list -m -f '{{"{{.Version}}"}}' github.com/pressly/goose/v3
+    cmds:
+      - |
+        set -euo pipefail
+        i=0
+        while [ "$i" -lt "{{.GOOSE_REPEAT}}" ]; do
+          go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} \
+            {{.GOOSE_FLAGS}} \
+            -dir {{.SERVER_MIGRATIONS_DIR}} \
+            postgres \
+            "{{.DATABASE_URL}}" \
+            {{.GOOSE_CMD}}
+          i=$((i+1))
+        done

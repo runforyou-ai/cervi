@@ -1,3 +1,4 @@
+/** shadcn 表单标签。 */
 import * as React from "react"
 import { Label as LabelPrimitive } from "radix-ui"
 

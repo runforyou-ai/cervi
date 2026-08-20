@@ -1,3 +1,4 @@
+/** 网站渠道基础信息表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
@@ -5,12 +6,13 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import type { WebsiteChannelSummary } from "@/api/channels"
 import {
+  ApiError,
+  Locale,
   createWebsiteChannel,
   updateWebsiteChannel,
-} from "@/api/channels"
-import { ApiError } from "@/api/client"
+  type WebsiteChannelSummary,
+} from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,6 +28,7 @@ import {
 } from "@/features/channels/website/website-channel-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
+/** 创建或修改网站渠道基础信息。 */
 export function WebsiteChannelForm({
   channel,
   onUpdated,
@@ -50,10 +53,11 @@ export function WebsiteChannelForm({
     defaultValues: {
       name: channel?.name ?? "",
       description: channel?.description ?? "",
-      defaultLocale: channel?.defaultLocale ?? "zh-CN",
+      defaultLocale: channel?.defaultLocale ?? Locale.LocaleChineseSimplified,
     },
   })
 
+  /** 提交网站渠道基础信息。 */
   async function submit(values: WebsiteChannelFormValues) {
     try {
       if (channel) {
@@ -134,8 +138,8 @@ export function WebsiteChannelForm({
                 id={field.name}
                 required
               >
-                <option value="zh-CN">{t("locales.zhCN")}</option>
-                <option value="en-US">{t("locales.enUS")}</option>
+                <option value={Locale.LocaleChineseSimplified}>{t("locales.zhCN")}</option>
+                <option value={Locale.LocaleEnglishUnitedStates}>{t("locales.enUS")}</option>
               </NativeSelect>
             </Field>
           )}

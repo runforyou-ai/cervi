@@ -1,3 +1,4 @@
+/** 企业初始化表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
@@ -6,8 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { ApiError } from "@/api/client"
-import { install } from "@/api/installation"
+import { ApiError, install } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/features/installation/setup-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
+/** 创建企业和第一个所有者账号。 */
 export function SetupForm() {
   const { t } = useTranslation("setup")
   const navigate = useNavigate()
@@ -39,16 +40,13 @@ export function SetupForm() {
     },
   })
 
+  /** 提交企业初始化并进入收件箱。 */
   async function submitSetup(values: SetupFormValues) {
     try {
       await install(values)
       navigate("/inbox", { replace: true })
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.code === "SERVER_CONNECTION_REQUIRED") {
-          navigate("/connect", { replace: true })
-          return
-        }
         if (error.code === "ALREADY_INITIALIZED") {
           navigate("/login", { replace: true })
           return

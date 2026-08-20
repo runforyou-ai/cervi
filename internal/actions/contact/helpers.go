@@ -7,23 +7,24 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// validatePrincipal 校验当前用户仍是企业的有效成员。
-func validatePrincipal(ctx context.Context, tx bun.Tx, principal *servermodels.Principal) error {
+// validateIdentity 校验当前用户仍是企业的有效成员。
+func validateIdentity(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
 	active, err := tx.NewSelect().
 		Model((*servermodels.User)(nil)).
-		Where("id = ?", principal.User.ID).
-		Where("organization_id = ?", principal.Organization.ID).
+		Where("id = ?", identity.User.ID).
+		Where("organization_id = ?", identity.Organization.ID).
 		Where("status = ?", "active").
 		Exists(ctx)
 	if err != nil {
 		return err
 	}
 	if !active {
-		return ErrPrincipalInvalid
+		return common.ErrIdentityInvalid
 	}
 	return nil
 }
@@ -63,7 +64,7 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 	}
 	desired := make(map[methodKey]MethodInput, len(methods))
 	for _, method := range methods {
-		desired[methodKey{typeName: method.Type, value: method.Value}] = method
+		desired[methodKey{typeName: string(method.Type), value: method.Value}] = method
 	}
 
 	existingByKey := make(map[methodKey]*servermodels.ContactMethod, len(existing))
@@ -107,12 +108,12 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 
 	newRecords := make([]servermodels.ContactMethod, 0)
 	for _, method := range methods {
-		record := existingByKey[methodKey{typeName: method.Type, value: method.Value}]
+		record := existingByKey[methodKey{typeName: string(method.Type), value: method.Value}]
 		if record == nil {
 			newRecord := servermodels.ContactMethod{
 				OrganizationID:  organizationID,
 				ContactID:       contactID,
-				Type:            method.Type,
+				Type:            string(method.Type),
 				Value:           method.Value,
 				NormalizedValue: method.Value,
 				IsPrimary:       method.IsPrimary,
@@ -157,7 +158,7 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 
 // loadContact 读取当前企业中未删除的联系人。
 func loadContact(ctx context.Context, db bun.IDB, organizationID, contactID string) (*ContactRecord, error) {
-	if !validUUID(contactID) {
+	if !common.ValidUUID(contactID) {
 		return nil, ErrNotFound
 	}
 	contact := &ContactRecord{}

@@ -1,9 +1,11 @@
+/** 登录表单校验规则。 */
 import { z } from "zod"
 
 type LoginTranslator = (
   key: "emailRequired" | "emailInvalid" | "passwordRequired",
 ) => string
 
+/** 创建登录表单校验。 */
 export function createLoginSchema(t: LoginTranslator) {
   return z.object({
     email: z

@@ -45,7 +45,6 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
-// openSQLite 创建移动端 SQLite 数据库连接。
 func openSQLite(ctx context.Context, databasePath string) (*bun.DB, error) {
 	if err := os.MkdirAll(filepath.Dir(databasePath), 0o700); err != nil {
 		return nil, fmt.Errorf("create SQLite data directory: %w", err)
@@ -64,7 +63,6 @@ func openSQLite(ctx context.Context, databasePath string) (*bun.DB, error) {
 	return db, nil
 }
 
-// sqliteDataSourceName 创建移动端 SQLite 数据源名称。
 func sqliteDataSourceName(databasePath string) string {
 	query := url.Values{
 		"_busy_timeout": {"5000"},

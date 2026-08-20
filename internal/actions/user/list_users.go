@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,10 +24,10 @@ func NewListUsersQuery(db *bun.DB) *ListUsersQuery {
 }
 
 // Execute 返回满足条件的企业成员分页列表。
-func (q *ListUsersQuery) Execute(ctx context.Context, principal *servermodels.Principal, input ListInput) (ListOutput, error) {
+func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListInput) (ListOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
-	input.Status = strings.TrimSpace(input.Status)
-	input.Role = strings.TrimSpace(input.Role)
+	input.Status = domain.UserStatus(strings.TrimSpace(string(input.Status)))
+	input.Role = domain.UserRole(strings.TrimSpace(string(input.Role)))
 	if input.Page <= 0 {
 		input.Page = 1
 	}
@@ -34,13 +35,13 @@ func (q *ListUsersQuery) Execute(ctx context.Context, principal *servermodels.Pr
 		input.PageSize = 50
 	}
 	if input.PageSize > 100 ||
-		(input.Status != "" && input.Status != "active" && input.Status != "inactive") ||
-		(input.Role != "" && input.Role != "owner" && input.Role != "member") {
+		(input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) ||
+		(input.Role != "" && input.Role != domain.UserRoleOwner && input.Role != domain.UserRoleMember) {
 		return ListOutput{}, ErrQueryInvalid
 	}
 
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
-		query = query.Where("u.organization_id = ?", principal.Organization.ID)
+		query = query.Where("u.organization_id = ?", identity.Organization.ID)
 		if input.Status != "" {
 			query = query.Where("u.status = ?", input.Status)
 		}

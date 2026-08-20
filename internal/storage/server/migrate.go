@@ -17,7 +17,7 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
-// migrate 使用会话锁执行 PostgreSQL 数据库迁移。
+// migrate 使用 Goose 迁移锁执行 PostgreSQL 数据库迁移。
 func migrate(ctx context.Context, db *sql.DB) error {
 	migrations, err := fs.Sub(migrationFiles, "migrations")
 	if err != nil {

@@ -21,24 +21,24 @@ func NewCreateContactAction(db *bun.DB) *CreateContactAction {
 }
 
 // Execute 校验字段并在当前企业中创建联系人。
-func (a *CreateContactAction) Execute(ctx context.Context, principal *servermodels.Principal, input ContactInput) (*ContactDetail, error) {
+func (a *CreateContactAction) Execute(ctx context.Context, identity *servermodels.Identity, input ContactInput) (*ContactDetail, error) {
 	input, fields := normalizeContactInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
 	var contact *servermodels.Contact
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validatePrincipal(ctx, tx, principal); err != nil {
+		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := validateSourceChannel(ctx, tx, principal.Organization.ID, input.ChannelID); err != nil {
+		if err := validateSourceChannel(ctx, tx, identity.Organization.ID, input.ChannelID); err != nil {
 			return err
 		}
 		contact = &servermodels.Contact{
-			OrganizationID:  principal.Organization.ID,
-			CreatedByUserID: principal.User.ID,
+			OrganizationID:  identity.Organization.ID,
+			CreatedByUserID: identity.User.ID,
 			SourceChannelID: input.ChannelID,
-			Stage:           input.Stage,
+			Stage:           string(input.Stage),
 		}
 		if input.DisplayName != "" {
 			contact.DisplayName = &input.DisplayName
@@ -58,5 +58,5 @@ func (a *CreateContactAction) Execute(ctx context.Context, principal *servermode
 	if err != nil {
 		return nil, fmt.Errorf("create contact: %w", err)
 	}
-	return NewGetContactQuery(a.db).Execute(ctx, principal, contact.ID)
+	return NewGetContactQuery(a.db).Execute(ctx, identity, contact.ID)
 }

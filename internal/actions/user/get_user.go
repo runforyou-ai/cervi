@@ -24,7 +24,7 @@ func NewGetUserQuery(db *bun.DB) *GetUserQuery {
 }
 
 // Execute 返回当前企业的指定用户。
-func (q *GetUserQuery) Execute(ctx context.Context, principal *servermodels.Principal, userID string) (*DirectoryUser, error) {
+func (q *GetUserQuery) Execute(ctx context.Context, identity *servermodels.Identity, userID string) (*DirectoryUser, error) {
 	if _, err := uuid.Parse(userID); err != nil {
 		return nil, ErrNotFound
 	}
@@ -34,7 +34,7 @@ func (q *GetUserQuery) Execute(ctx context.Context, principal *servermodels.Prin
 		ColumnExpr("u.id::text AS id").
 		Column("email", "display_name", "role", "status", "created_at").
 		Where("u.id = ?", userID).
-		Where("u.organization_id = ?", principal.Organization.ID).
+		Where("u.organization_id = ?", identity.Organization.ID).
 		Scan(ctx, user)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound

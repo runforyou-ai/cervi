@@ -7,16 +7,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const (
-	// TypeWebsite 标识网站消息渠道。
-	TypeWebsite = "website"
-	// LocaleChineseSimplified 标识简体中文访客语言。
-	LocaleChineseSimplified = "zh-CN"
-	// LocaleEnglishUnitedStates 标识美式英语访客语言。
-	LocaleEnglishUnitedStates = "en-US"
 	// DefaultWebsiteChannelThemeColor 是网站聊天界面的默认主题色。
 	DefaultWebsiteChannelThemeColor = "#2563EB"
 )
@@ -24,7 +19,7 @@ const (
 var themeColorPattern = regexp.MustCompile(`^#[0-9A-F]{6}$`)
 
 // ValidationCode 标识网站渠道字段校验结果。
-type ValidationCode string
+type ValidationCode = common.FieldCode
 
 const (
 	ValidationNameRequired         ValidationCode = "NAME_REQUIRED"
@@ -39,20 +34,13 @@ const (
 )
 
 // ValidationError 表示网站渠道字段校验失败。
-type ValidationError struct {
-	Fields map[string]ValidationCode
-}
-
-// Error 返回网站渠道输入校验错误。
-func (e *ValidationError) Error() string {
-	return "website channel validation failed"
-}
+type ValidationError = common.FieldError
 
 // WebsiteChannelInput 定义网站渠道可编辑字段。
 type WebsiteChannelInput struct {
 	Name          string
 	Description   string
-	DefaultLocale string
+	DefaultLocale domain.Locale
 }
 
 // WebsiteChannelChatInterfaceInput 定义网站渠道聊天界面可编辑字段。
@@ -67,7 +55,7 @@ type WebsiteChannelChatInterfaceInput struct {
 func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInput, map[string]ValidationCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
-	input.DefaultLocale = strings.TrimSpace(input.DefaultLocale)
+	input.DefaultLocale = domain.Locale(strings.TrimSpace(string(input.DefaultLocale)))
 
 	fields := make(map[string]ValidationCode)
 	if input.Name == "" {
@@ -78,7 +66,7 @@ func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInpu
 	if len([]rune(input.Description)) > 2000 {
 		fields["description"] = ValidationDescriptionTooLong
 	}
-	if input.DefaultLocale != LocaleChineseSimplified && input.DefaultLocale != LocaleEnglishUnitedStates {
+	if input.DefaultLocale != domain.LocaleChineseSimplified && input.DefaultLocale != domain.LocaleEnglishUnitedStates {
 		fields["defaultLocale"] = ValidationDefaultLocaleInvalid
 	}
 	return input, fields
@@ -107,10 +95,4 @@ func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterface
 		fields["themeColor"] = ValidationThemeColorInvalid
 	}
 	return input, fields
-}
-
-// validUUID 判断记录标识是否为 UUID。
-func validUUID(value string) bool {
-	parsed, err := uuid.Parse(value)
-	return err == nil && strings.EqualFold(parsed.String(), value)
 }

@@ -1,8 +1,10 @@
+/** 企业初始化表单校验规则。 */
 import { z } from "zod"
 
 type SetupTranslator = (
   key:
     | "organizationNameRequired"
+    | "organizationNameTooLong"
     | "displayNameRequired"
     | "emailRequired"
     | "emailInvalid"
@@ -11,9 +13,14 @@ type SetupTranslator = (
     | "passwordTooLong",
 ) => string
 
+/** 创建企业初始化表单校验。 */
 export function createSetupSchema(t: SetupTranslator) {
   return z.object({
-    organizationName: z.string().trim().min(1, t("organizationNameRequired")),
+    organizationName: z
+      .string()
+      .trim()
+      .min(1, t("organizationNameRequired"))
+      .max(32, t("organizationNameTooLong")),
     displayName: z.string().trim().min(1, t("displayNameRequired")),
     email: z
       .string()

@@ -1,3 +1,4 @@
+/** 联系人列表、筛选、详情和回收站。 */
 import {
   useCallback,
   useEffect,
@@ -19,26 +20,29 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
-import { listChannels, type ChannelSummary } from "@/api/channels"
 import {
-  getContact,
+  ApiError,
+  ContactMethodType,
+  ContactSort,
+  ContactStage,
+  UserRole,
+  UserStatus,
   deleteContact,
+  getContact,
+  getUser,
+  listChannels,
   listContacts,
   listDeletedContacts,
+  listUsers,
   restoreContact,
+  type ChannelSummary,
   type ContactDetail,
   type ContactListResponse,
-  type ContactMethodType,
-  type ContactStage,
   type ContactSummary,
-} from "@/api/contacts"
-import { ApiError } from "@/api/client"
-import {
-  getUser,
-  listUsers,
   type DirectoryUser,
-} from "@/api/users"
-import type { PageInfo } from "@/api/types"
+  type PageInfo,
+} from "@/api"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 import {
   ListToolbar,
   ListToolbarFilter,
@@ -100,6 +104,7 @@ export type ContactScope = "internal" | "external" | "agents"
 
 type LoadState = "loading" | "ready" | "error"
 
+/** 联系人范围主按钮。 */
 function ScopeButton({
   active,
   icon: Icon,
@@ -126,6 +131,7 @@ function ScopeButton({
   )
 }
 
+/** 联系人范围子按钮。 */
 function SubscopeButton({
   active,
   children,
@@ -155,6 +161,7 @@ function SubscopeButton({
   )
 }
 
+/** 联系人范围和来源渠道筛选。 */
 function ContactScopeSidebar({
   scope,
   deleted,
@@ -253,8 +260,10 @@ function ContactScopeSidebar({
   )
 }
 
+/** 联系人阶段标签。 */
 function StageLabel({ stage }: { stage: ContactStage }) {
   const { t } = useTranslation("contacts")
+  if (!stage) return null
   return (
     <span className="inline-flex rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
       {t(`stages.${stage}`)}
@@ -262,6 +271,7 @@ function StageLabel({ stage }: { stage: ContactStage }) {
   )
 }
 
+/** 联系人列表分页。 */
 function PageControls({
   page,
   onPageChange,
@@ -299,6 +309,7 @@ function PageControls({
   )
 }
 
+/** 联系人列表页，支持内部成员、外部联系人和回收站。 */
 export function ContactsPage({
   scope,
   deleted = false,
@@ -327,16 +338,19 @@ export function ContactsPage({
   const selected = searchParams.get("selected") ?? ""
   const creating = searchParams.get("new") === "1"
   const channelId = searchParams.get("channelId") ?? ""
-  const stage = (searchParams.get("stage") ?? "") as ContactStage | ""
-  const methodType = (searchParams.get("methodType") ?? "") as ContactMethodType | ""
-  const sort = (searchParams.get("sort") ?? "createdAt.desc") as
-    | "updatedAt.desc"
-    | "createdAt.desc"
-    | "displayName.asc"
-  const status = searchParams.get("status") ?? ""
-  const role = searchParams.get("role") ?? ""
+  const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
+  const methodType = optionalWailsEnum(
+    ContactMethodType,
+    searchParams.get("methodType"),
+  )
+  const sort =
+    optionalWailsEnum(ContactSort, searchParams.get("sort")) ??
+    ContactSort.ContactSortCreatedAtDescending
+  const status = optionalWailsEnum(UserStatus, searchParams.get("status"))
+  const role = optionalWailsEnum(UserRole, searchParams.get("role"))
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
 
+  /** 更新列表查询参数。 */
   const setParameters = useCallback(
     (changes: Record<string, string | null>) => {
       setSearchParams((current) => {
@@ -376,6 +390,7 @@ export function ContactsPage({
     return () => controller.abort()
   }, [])
 
+  /** 按当前范围加载联系人或企业成员列表。 */
   const loadList = useCallback(
     async (signal?: AbortSignal) => {
       setLoadState("loading")
@@ -384,7 +399,7 @@ export function ContactsPage({
           const loader = deleted ? listDeletedContacts : listContacts
           const response: ContactListResponse = await loader(
             {
-              q: query,
+              query,
               stage,
               channelId: deleted ? "" : channelId,
               methodType,
@@ -398,7 +413,7 @@ export function ContactsPage({
           setPage(response.page)
         } else if (scope === "internal") {
           const response = await listUsers(
-            { q: query, status, role, page: currentPage, pageSize: 50 },
+            { query, status, role, page: currentPage, pageSize: 50 },
             signal,
           )
           setUsers(response.users)
@@ -474,6 +489,7 @@ export function ContactsPage({
           ? `channel:${channelId}`
           : "external"
 
+  /** 窄视口下切换联系人范围。 */
   function changeMobileScope(value: string) {
     if (value === "internal") {
       navigate("/contacts/internal")
@@ -488,17 +504,20 @@ export function ContactsPage({
     }
   }
 
+  /** 关闭联系人详情。 */
   function closeDetail() {
     setParameters({ selected: null, new: null })
     setDetail(null)
     setDetailUser(null)
   }
 
+  /** 刷新列表并关闭详情。 */
   function refreshAndClose() {
     closeDetail()
     setRefreshVersion((current) => current + 1)
   }
 
+  /** 将联系人移入回收站。 */
   async function removeContact() {
     if (!deletingContact) {
       return
@@ -523,6 +542,7 @@ export function ContactsPage({
     }
   }
 
+  /** 恢复联系人。 */
   async function restore(item: ContactSummary) {
     try {
       await restoreContact(item.id)
@@ -612,10 +632,10 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.status")}
                   allLabel={t("filters.allStatuses")}
-                  value={status}
+                  value={status ?? ""}
                   options={[
-                    { value: "active", label: t("statuses.active") },
-                    { value: "inactive", label: t("statuses.inactive") },
+                    { value: UserStatus.UserStatusActive, label: t("statuses.active") },
+                    { value: UserStatus.UserStatusInactive, label: t("statuses.inactive") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ status: value || null, page: null, selected: null })
@@ -624,10 +644,10 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.role")}
                   allLabel={t("filters.allRoles")}
-                  value={role}
+                  value={role ?? ""}
                   options={[
-                    { value: "owner", label: t("roles.owner") },
-                    { value: "member", label: t("roles.member") },
+                    { value: UserRole.UserRoleOwner, label: t("roles.owner") },
+                    { value: UserRole.UserRoleMember, label: t("roles.member") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ role: value || null, page: null, selected: null })
@@ -647,11 +667,11 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.stage")}
                   allLabel={t("filters.allStages")}
-                  value={stage}
+                  value={stage ?? ""}
                   options={[
-                    { value: "visitor", label: t("stages.visitor") },
-                    { value: "lead", label: t("stages.lead") },
-                    { value: "customer", label: t("stages.customer") },
+                    { value: ContactStage.ContactStageVisitor, label: t("stages.visitor") },
+                    { value: ContactStage.ContactStageLead, label: t("stages.lead") },
+                    { value: ContactStage.ContactStageCustomer, label: t("stages.customer") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ stage: value || null, page: null, selected: null })
@@ -660,10 +680,10 @@ export function ContactsPage({
                 <ListToolbarFilter
                   label={t("filters.method")}
                   allLabel={t("filters.allMethods")}
-                  value={methodType}
+                  value={methodType ?? ""}
                   options={[
-                    { value: "email", label: t("methods.email") },
-                    { value: "phone", label: t("methods.phone") },
+                    { value: ContactMethodType.ContactMethodTypeEmail, label: t("methods.email") },
+                    { value: ContactMethodType.ContactMethodTypePhone, label: t("methods.phone") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ methodType: value || null, page: null, selected: null })
@@ -685,9 +705,9 @@ export function ContactsPage({
                   value={sort}
                   align="end"
                   options={[
-                    { value: "createdAt.desc", label: t("sort.created") },
-                    { value: "updatedAt.desc", label: t("sort.updated") },
-                    { value: "displayName.asc", label: t("sort.name") },
+                    { value: ContactSort.ContactSortCreatedAtDescending, label: t("sort.created") },
+                    { value: ContactSort.ContactSortUpdatedAtDescending, label: t("sort.updated") },
+                    { value: ContactSort.ContactSortDisplayNameAscending, label: t("sort.name") },
                   ]}
                   onValueChange={(value) =>
                     setParameters({ sort: value, page: null, selected: null })

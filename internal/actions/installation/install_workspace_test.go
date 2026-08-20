@@ -23,3 +23,18 @@ func TestInstallRejectsPasswordLongerThanBcryptLimit(t *testing.T) {
 		t.Fatalf("error = %#v, want password validation error", err)
 	}
 }
+
+// TestInstallRejectsOrganizationNameLongerThanLimit 验证初始化操作拒绝过长的公司名称。
+func TestInstallRejectsOrganizationNameLongerThanLimit(t *testing.T) {
+	action := NewInstallWorkspaceAction(nil)
+	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
+		OrganizationName: strings.Repeat("名", maxOrganizationNameLength+1),
+		DisplayName:      "所有者",
+		Email:            "owner@example.com",
+		Password:         "password123",
+	})
+	var validationError *ValidationError
+	if !errors.As(err, &validationError) || validationError.Fields["organizationName"] != ValidationOrganizationNameTooLong {
+		t.Fatalf("error = %#v, want organization name too long", err)
+	}
+}

@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // TestS3SettingActionExecute 验证 S3 连接测试会签名并访问目标存储桶。
@@ -29,7 +31,7 @@ func TestS3SettingActionExecute(t *testing.T) {
 	action := NewTestS3SettingAction()
 	err := action.Execute(context.Background(), S3Setting{
 		Enabled:         true,
-		Provider:        ProviderGeneric,
+		Provider:        domain.StorageProviderGeneric,
 		Endpoint:        server.URL,
 		Region:          "us-east-1",
 		Bucket:          "cervi",
@@ -52,7 +54,7 @@ func TestS3SettingActionReturnsConnectionError(t *testing.T) {
 	action := NewTestS3SettingAction()
 	err := action.Execute(context.Background(), S3Setting{
 		Enabled:         true,
-		Provider:        ProviderGeneric,
+		Provider:        domain.StorageProviderGeneric,
 		Endpoint:        server.URL,
 		Region:          "us-east-1",
 		Bucket:          "cervi",

@@ -1,3 +1,4 @@
+/** Web 与桌面端共用的业务路由。 */
 import { Navigate, Route, Routes } from "react-router"
 
 import { LoginPage } from "@/features/auth/login-page"
@@ -11,20 +12,28 @@ import { ServerConnectionPage } from "@/features/server-connection/server-connec
 import { SettingsPage } from "@/features/settings/settings-page"
 import { WorkspaceLayout } from "@/features/workspace/workspace-layout"
 
+/** 按平台注册登录、工作台和业务页面路由。 */
 export function SharedAppRoutes({
-  includeServerConnection = false,
+  platform,
 }: {
-  includeServerConnection?: boolean
+  platform: "web" | "desktop"
 }) {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/inbox" replace />} />
-      {includeServerConnection ? (
+      {platform === "desktop" ? (
         <Route path="/connect" element={<ServerConnectionPage />} />
       ) : null}
-      <Route path="/setup" element={<SetupPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route element={<WorkspaceLayout />}>
+      {platform === "web" ? (
+        <Route path="/setup" element={<SetupPage />} />
+      ) : null}
+      <Route
+        path="/login"
+        element={
+          <LoginPage allowServerChange={platform === "desktop"} />
+        }
+      />
+      <Route element={<WorkspaceLayout platform={platform} />}>
         <Route path="/inbox" element={<InboxRoute />} />
         <Route
           path="/settings"

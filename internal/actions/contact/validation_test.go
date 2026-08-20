@@ -5,6 +5,8 @@ package contact
 import (
 	"strings"
 	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // TestNormalizeContactInput 验证联系人字段和联系方式规范化。
@@ -15,14 +17,14 @@ func TestNormalizeContactInput(t *testing.T) {
 		Stage:       " lead ",
 		Notes:       "  采购负责人  ",
 		Methods: []MethodInput{
-			{Type: MethodEmail, Value: " LIN@Example.com "},
-			{Type: MethodPhone, Value: "+86 138-0000-0000"},
+			{Type: domain.ContactMethodTypeEmail, Value: " LIN@Example.com "},
+			{Type: domain.ContactMethodTypePhone, Value: "+86 138-0000-0000"},
 		},
 	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
 	}
-	if input.DisplayName != "林晓" || input.Stage != StageLead || input.Notes != "采购负责人" {
+	if input.DisplayName != "林晓" || input.Stage != domain.ContactStageLead || input.Notes != "采购负责人" {
 		t.Fatalf("unexpected normalized contact: %#v", input)
 	}
 	if input.Methods[0].Value != "lin@example.com" || !input.Methods[0].IsPrimary {
@@ -52,7 +54,7 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 		Stage:       "internal",
 		Notes:       strings.Repeat("行", 5001),
 		Methods: []MethodInput{
-			{Type: MethodEmail, Value: "invalid"},
+			{Type: domain.ContactMethodTypeEmail, Value: "invalid"},
 		},
 	})
 	if fields["displayName"] != ValidationNameTooLong || fields["stage"] != ValidationStageInvalid || fields["notes"] != ValidationNotesTooLong || fields["methods"] != ValidationMethodInvalid {
@@ -63,8 +65,8 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 		_, fields = normalizeContactInput(ContactInput{
 			DisplayName: "林晓",
 			ChannelID:   "00000000-0000-0000-0000-000000000001",
-			Stage:       StageVisitor,
-			Methods:     []MethodInput{{Type: MethodPhone, Value: phone}},
+			Stage:       domain.ContactStageVisitor,
+			Methods:     []MethodInput{{Type: domain.ContactMethodTypePhone, Value: phone}},
 		})
 		if fields["methods"] != ValidationMethodInvalid {
 			t.Fatalf("phone %q validation = %q, want %q", phone, fields["methods"], ValidationMethodInvalid)
@@ -75,7 +77,7 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 	_, fields = normalizeContactInput(ContactInput{
 		DisplayName: "林晓",
 		ChannelID:   "00000000-0000-0000-0000-000000000001",
-		Stage:       StageVisitor,
+		Stage:       domain.ContactStageVisitor,
 		Methods:     tooManyMethods,
 	})
 	if fields["methods"] != ValidationMethodsTooMany {
@@ -88,10 +90,10 @@ func TestNormalizeContactInputRejectsDuplicateMethods(t *testing.T) {
 	_, fields := normalizeContactInput(ContactInput{
 		DisplayName: "林晓",
 		ChannelID:   "00000000-0000-0000-0000-000000000001",
-		Stage:       StageVisitor,
+		Stage:       domain.ContactStageVisitor,
 		Methods: []MethodInput{
-			{Type: MethodEmail, Value: "lin@example.com", IsPrimary: true},
-			{Type: MethodEmail, Value: "LIN@example.com", IsPrimary: true},
+			{Type: domain.ContactMethodTypeEmail, Value: "lin@example.com", IsPrimary: true},
+			{Type: domain.ContactMethodTypeEmail, Value: "LIN@example.com", IsPrimary: true},
 		},
 	})
 	if fields["methods"] != ValidationPrimaryDuplicate {
