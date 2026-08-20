@@ -22,6 +22,22 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WebsiteChannelForm } from "@/features/channels/website/website-channel-form"
 import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
+import {
+  WebsiteChannelUsagePanel,
+  type WebsiteChannelAccess,
+} from "@/features/channels/website/website-channel-usage-panel"
+
+const editTabs = ["basic", "chat-interface", "usage"] as const
+
+type EditTab = (typeof editTabs)[number]
+
+function isEditTab(value: string | null): value is EditTab {
+  return editTabs.some((tab) => tab === value)
+}
+
+function isAccessTab(value: string | null): value is WebsiteChannelAccess {
+  return value === "embed" || value === "link"
+}
 
 /** 网站渠道编辑页签，与 URL 同步。 */
 function WebsiteChannelEditTabs({
@@ -34,32 +50,51 @@ function WebsiteChannelEditTabs({
   const { t } = useTranslation("channels")
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get("tab")
-  const activeTab = requestedTab === "chat-interface" ? "chat-interface" : "basic"
+  const requestedAccess = searchParams.get("access")
+  const activeTab = isEditTab(requestedTab) ? requestedTab : "basic"
+  const activeAccess: WebsiteChannelAccess =
+    requestedAccess === "link" ? "link" : "embed"
 
   useEffect(() => {
-    if (requestedTab === "basic" || requestedTab === "chat-interface") {
+    const tabValid = isEditTab(requestedTab)
+    const accessValid = isAccessTab(requestedAccess)
+    if (tabValid && (activeTab !== "usage" || accessValid)) {
       return
     }
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.set("tab", "basic")
+    if (!tabValid) {
+      nextParams.set("tab", "basic")
+    }
+    if (activeTab === "usage" && !accessValid) {
+      nextParams.set("access", "embed")
+    }
     setSearchParams(nextParams, { replace: true })
-  }, [requestedTab, searchParams, setSearchParams])
+  }, [activeTab, requestedAccess, requestedTab, searchParams, setSearchParams])
+
+  function setTab(value: string) {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set("tab", value)
+    if (value === "usage" && !isAccessTab(nextParams.get("access"))) {
+      nextParams.set("access", "embed")
+    }
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  function setAccess(value: WebsiteChannelAccess) {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set("tab", "usage")
+    nextParams.set("access", value)
+    setSearchParams(nextParams, { replace: true })
+  }
 
   return (
-    <Tabs
-      className="mt-6"
-      value={activeTab}
-      onValueChange={(value) => {
-        const nextParams = new URLSearchParams(searchParams)
-        nextParams.set("tab", value)
-        setSearchParams(nextParams, { replace: true })
-      }}
-    >
+    <Tabs className="mt-6" value={activeTab} onValueChange={setTab}>
       <TabsList>
         <TabsTrigger value="basic">{t("tabs.basic")}</TabsTrigger>
         <TabsTrigger value="chat-interface">
           {t("tabs.chatInterface")}
         </TabsTrigger>
+        <TabsTrigger value="usage">{t("tabs.usage")}</TabsTrigger>
       </TabsList>
       <TabsContent
         value="basic"
@@ -83,6 +118,17 @@ function WebsiteChannelEditTabs({
           onUpdated={(chatInterface) =>
             onChannelChange({ ...channel, chatInterface })
           }
+        />
+      </TabsContent>
+      <TabsContent
+        value="usage"
+        forceMount
+        className="data-[state=inactive]:hidden"
+      >
+        <WebsiteChannelUsagePanel
+          channelId={channel.id}
+          access={activeAccess}
+          onAccessChange={setAccess}
         />
       </TabsContent>
     </Tabs>

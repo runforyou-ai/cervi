@@ -257,6 +257,7 @@ const enUS = {
     tabs: {
       basic: "Basic information",
       chatInterface: "Chat interface",
+      usage: "How to use",
     },
     list: {
       title: "Website channels",
@@ -298,6 +299,19 @@ const enUS = {
       nameRequired: "Enter a channel name.",
       nameTooLong: "The channel name cannot exceed 100 characters.",
       descriptionTooLong: "The channel description cannot exceed 2000 characters.",
+    },
+    usage: {
+      embed: "Website embed",
+      link: "Chat link",
+      snippet: "Install code",
+      snippetHelp:
+        "Add this code to your website. A chat button will appear in the bottom-right corner.",
+      chatUrl: "Chat link",
+      chatUrlHelp: "Share this link with visitors.",
+      copy: "Copy",
+      copied: "Copied",
+      copyFailed: "Could not copy. Copy the text manually.",
+      originError: "Could not generate the public entry. Try again later.",
     },
     chatInterface: {
       saved: "Chat interface saved.",
