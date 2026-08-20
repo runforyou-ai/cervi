@@ -143,48 +143,6 @@
 }
 
 @layer components {
-  .cervi-window-drag-region {
-    display: none;
-  }
-
-  [data-native-os="darwin"] {
-    --cervi-macos-titlebar-height: 28px;
-  }
-
-  [data-native-os="darwin"] > .cervi-window-drag-region {
-    --wails-draggable: drag;
-    position: fixed;
-    inset: 0 0 auto;
-    z-index: 40;
-    display: block;
-    height: var(--cervi-macos-titlebar-height);
-  }
-
-  [data-native-os="darwin"]:has(.cervi-workspace-shell) > .cervi-window-drag-region,
-  [data-native-os="darwin"][data-window-fullscreen="true"] > .cervi-window-drag-region {
-    display: none;
-  }
-
-  [data-native-os="darwin"] .cervi-window-drag-surface {
-    --wails-draggable: drag;
-  }
-
-  [data-native-os="darwin"] .cervi-window-drag-surface :is(a, button, input, select, textarea, [role="button"]) {
-    --wails-draggable: no-drag;
-  }
-
-  [data-native-os="darwin"] .cervi-workspace-sidebar-header {
-    padding-top: calc(0.5rem + var(--cervi-macos-titlebar-height));
-  }
-
-  [data-native-os="darwin"][data-window-fullscreen="true"] .cervi-window-drag-surface {
-    --wails-draggable: no-drag;
-  }
-
-  [data-native-os="darwin"][data-window-fullscreen="true"] .cervi-workspace-sidebar-header {
-    padding-top: 0.5rem;
-  }
-
   .cervi-phone-input {
     @apply h-9 w-full rounded-md border border-input bg-transparent shadow-xs transition-[color,box-shadow];
   }
@@ -222,4 +180,40 @@ html,
 body,
 #root {
   min-height: 100%;
+}
+
+/* macOS 隐藏标题栏后红绿灯叠在 webview 上；预留独立拖拽条。不进 @layer，以便压过侧栏 inset-y-0。 */
+.cervi-window-drag-region {
+  display: none;
+}
+
+[data-native-os="darwin"] {
+  --cervi-macos-titlebar-height: 0px;
+}
+
+[data-native-os="darwin"][data-window-fullscreen="false"] {
+  --cervi-macos-titlebar-height: 28px;
+}
+
+[data-native-os="darwin"] > .cervi-window-drag-region {
+  --wails-draggable: drag;
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  display: block;
+  height: var(--cervi-macos-titlebar-height);
+}
+
+[data-native-os="darwin"][data-window-fullscreen="true"] > .cervi-window-drag-region {
+  display: none;
+}
+
+.cervi-workspace-shell {
+  padding-top: var(--cervi-macos-titlebar-height, 0px);
+}
+
+[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-shell [data-slot="sidebar-container"] {
+  top: var(--cervi-macos-titlebar-height);
+  bottom: auto;
+  height: calc(100svh - var(--cervi-macos-titlebar-height));
 }
