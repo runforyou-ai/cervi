@@ -9,6 +9,7 @@ import {
   PageSplit,
 } from "@/components/page-split"
 import { PageHeader } from "@/components/page-header"
+import { AppearanceSettings } from "@/features/settings/appearance-settings"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
@@ -22,7 +23,7 @@ type SettingsOutletContext = {
 export function SettingsPage({
   section,
 }: {
-  section: "profile" | "password" | "storage"
+  section: "profile" | "password" | "appearance" | "storage"
 }) {
   const { t } = useTranslation("settings")
   const { identity, updateUser } = useOutletContext<SettingsOutletContext>()
@@ -40,6 +41,9 @@ export function SettingsPage({
           <PagePaneLink to="/settings/password">
             {t("navigation.password")}
           </PagePaneLink>
+          <PagePaneLink to="/settings/appearance">
+            {t("navigation.appearance")}
+          </PagePaneLink>
           <PagePaneLink to="/settings/storage">
             {t("navigation.storage")}
           </PagePaneLink>
@@ -52,6 +56,8 @@ export function SettingsPage({
           <ProfileSettingsForm user={identity.user} onUpdated={updateUser} />
         ) : section === "password" ? (
           <ChangePasswordForm />
+        ) : section === "appearance" ? (
+          <AppearanceSettings />
         ) : (
           <StorageSettingsForm />
         )}

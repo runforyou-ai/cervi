@@ -49,6 +49,10 @@ export function SharedAppRoutes({
           element={<SettingsPage section="password" />}
         />
         <Route
+          path="/settings/appearance"
+          element={<SettingsPage section="appearance" />}
+        />
+        <Route
           path="/settings/storage"
           element={<SettingsPage section="storage" />}
         />

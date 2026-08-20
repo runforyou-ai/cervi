@@ -353,6 +353,7 @@ const enUS = {
     navigation: {
       profile: "Profile",
       password: "Change password",
+      appearance: "Appearance",
       storage: "Storage",
     },
     profile: {
@@ -387,6 +388,15 @@ const enUS = {
         newPasswordTooLong: "The new password cannot exceed 72 UTF-8 bytes.",
         confirmPasswordRequired: "Enter the new password again.",
         passwordMismatch: "The new passwords do not match.",
+      },
+    },
+    appearance: {
+      title: "Appearance",
+      theme: "Theme",
+      options: {
+        system: "System",
+        light: "Light",
+        dark: "Dark",
       },
     },
     storage: {

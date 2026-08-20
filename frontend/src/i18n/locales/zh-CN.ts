@@ -352,6 +352,7 @@ const zhCN = {
     navigation: {
       profile: "个人资料",
       password: "修改密码",
+      appearance: "外观设置",
       storage: "存储设置",
     },
     profile: {
@@ -386,6 +387,15 @@ const zhCN = {
         newPasswordTooLong: "新密码不能超过 72 个 UTF-8 字节。",
         confirmPasswordRequired: "请再次输入新密码。",
         passwordMismatch: "两次输入的新密码不一致。",
+      },
+    },
+    appearance: {
+      title: "外观设置",
+      theme: "主题",
+      options: {
+        system: "跟随系统",
+        light: "浅色",
+        dark: "深色",
       },
     },
     storage: {
