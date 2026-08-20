@@ -1,4 +1,4 @@
-/** 统一收件箱会话列表和聊天界面。 */
+/** 收件箱会话列表和聊天界面。 */
 import { useEffect, useState } from "react"
 import {
   MessagesSquareIcon,
@@ -10,6 +10,7 @@ import {
 import { useTranslation } from "react-i18next"
 
 import type { Conversation } from "@/api"
+import { PageSplit } from "@/components/page-split"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -170,7 +171,7 @@ function CustomerPanel({ conversation }: { conversation: Conversation }) {
   const { t } = useTranslation("inbox")
 
   return (
-    <aside className="hidden min-h-0 w-[320px] shrink-0 flex-col border-l bg-background md:flex">
+    <aside className="hidden min-h-0 w-80 shrink-0 flex-col border-l bg-background md:flex">
       <header className="flex h-14 shrink-0 items-center border-b px-4">
         <h2 className="text-sm font-medium">{t("customerPanel.title")}</h2>
       </header>
@@ -210,7 +211,90 @@ function CustomerPanel({ conversation }: { conversation: Conversation }) {
   )
 }
 
-/** 展示收件箱会话列表和当前会话。 */
+/** 收件箱会话列表。 */
+function InboxConversationList({
+  conversations,
+  selectedId,
+  onSelect,
+}: {
+  conversations: Conversation[]
+  selectedId?: string
+  onSelect?: (conversationId: string) => void
+}) {
+  const { t } = useTranslation("inbox")
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex h-14 shrink-0 items-center px-4">
+        <div>
+          <h2 className="text-sm font-medium">{t("title")}</h2>
+          <p className="text-xs text-muted-foreground">
+            {t("ongoing", { count: conversations.length })}
+          </p>
+        </div>
+      </div>
+      <Separator />
+      <div className="shrink-0 p-3">
+        <div className="relative">
+          <SearchIcon className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
+          <Input
+            aria-label={t("search")}
+            placeholder={t("search")}
+            className="pl-8"
+            disabled={conversations.length === 0}
+          />
+        </div>
+      </div>
+      {conversations.length === 0 ? null : (
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="grid gap-1 px-2 pb-3">
+            {conversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                type="button"
+                aria-pressed={selectedId === conversation.id}
+                aria-label={
+                  conversation.unread
+                    ? `${conversation.name}, ${t("unread", { count: conversation.unread })}`
+                    : conversation.name
+                }
+                className={cn(
+                  "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-muted/60",
+                  selectedId === conversation.id && "bg-muted"
+                )}
+                onClick={() => onSelect?.(conversation.id)}
+              >
+                <InboxConversationAvatar conversation={conversation} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">
+                      {conversation.name}
+                    </span>
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+                      {conversation.time}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 flex items-center gap-2">
+                    <span className="truncate text-xs text-muted-foreground">
+                      {conversation.preview}
+                    </span>
+                    {conversation.unread ? (
+                      <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                        {conversation.unread}
+                      </span>
+                    ) : null}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  )
+}
+
+/** 收件箱会话列表和当前会话。 */
 export function InboxPage({
   conversations,
 }: {
@@ -240,43 +324,26 @@ export function InboxPage({
 
   if (conversations.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 bg-background">
-        <section className="hidden min-h-0 w-[320px] shrink-0 flex-col border-r md:flex">
-          <div className="flex h-14 shrink-0 items-center px-4">
-            <div>
-              <h2 className="text-sm font-medium">{t("title")}</h2>
-              <p className="text-xs text-muted-foreground">
-                {t("ongoing", { count: 0 })}
-              </p>
-            </div>
+      <PageSplit
+        paneWidth="lg"
+        className="bg-background"
+        pane={
+          <InboxConversationList conversations={conversations} />
+        }
+        mainClassName="items-center justify-center p-6"
+      >
+        <div className="max-w-sm text-center">
+          <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
+            <MessagesSquareIcon className="size-5 text-muted-foreground" />
           </div>
-          <Separator />
-          <div className="p-3">
-            <div className="relative">
-              <SearchIcon className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
-              <Input
-                aria-label={t("search")}
-                placeholder={t("search")}
-                className="pl-8"
-                disabled
-              />
-            </div>
-          </div>
-        </section>
-        <section className="flex min-w-0 flex-1 items-center justify-center p-6">
-          <div className="max-w-sm text-center">
-            <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
-              <MessagesSquareIcon className="size-5 text-muted-foreground" />
-            </div>
-            <h2 className="text-base font-semibold tracking-tight">
-              {t("emptyTitle")}
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("emptyDescription")}
-            </p>
-          </div>
-        </section>
-      </div>
+          <h2 className="text-base font-semibold tracking-tight">
+            {t("emptyTitle")}
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("emptyDescription")}
+          </p>
+        </div>
+      </PageSplit>
     )
   }
 
@@ -294,85 +361,37 @@ export function InboxPage({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden bg-background">
-      <section className="flex min-h-0 w-full shrink-0 flex-col border-r md:w-[320px]">
-        <div className="flex h-14 shrink-0 items-center px-4">
-          <div>
-            <h2 className="text-sm font-medium">{t("title")}</h2>
-            <p className="text-xs text-muted-foreground">
-              {t("ongoing", { count: conversations.length })}
-            </p>
-          </div>
-        </div>
-        <Separator />
-        <div className="shrink-0 p-3">
-          <div className="relative">
-            <SearchIcon className="absolute top-2 left-2.5 size-4 text-muted-foreground" />
-            <Input
-              aria-label={t("search")}
-              placeholder={t("search")}
-              className="pl-8"
-            />
-          </div>
-        </div>
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="grid gap-1 px-2 pb-3">
-            {conversations.map((conversation) => (
-              <button
-                key={conversation.id}
-                type="button"
-                aria-pressed={selectedId === conversation.id}
-                aria-label={
-                  conversation.unread
-                    ? `${conversation.name}, ${t("unread", { count: conversation.unread })}`
-                    : conversation.name
-                }
-                className={cn(
-                  "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-muted/60",
-                  selectedId === conversation.id && "bg-muted"
-                )}
-                onClick={() => selectConversation(conversation.id)}
-              >
-                <InboxConversationAvatar conversation={conversation} />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {conversation.name}
-                    </span>
-                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                      {conversation.time}
-                    </span>
-                  </span>
-                  <span className="mt-0.5 flex items-center gap-2">
-                    <span className="truncate text-xs text-muted-foreground">
-                      {conversation.preview}
-                    </span>
-                    {conversation.unread ? (
-                      <span className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-                        {conversation.unread}
-                      </span>
-                    ) : null}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </ScrollArea>
-      </section>
+    <>
+      <PageSplit
+        paneWidth="lg"
+        paneOnNarrow="fill"
+        className="overflow-x-auto overflow-y-hidden bg-background"
+        pane={
+          <InboxConversationList
+            conversations={conversations}
+            selectedId={selectedId}
+            onSelect={selectConversation}
+          />
+        }
+        mainClassName={cn(
+          "hidden md:flex md:flex-row",
+          isCustomerPanelOpen ? "min-w-[880px]" : "min-w-[560px]",
+        )}
+      >
+        <section className="min-h-0 min-w-[560px] flex-1">
+          <ConversationThread
+            conversation={selectedConversation}
+            customerPanelOpen={isCustomerPanelOpen}
+            onCustomerPanelToggle={() =>
+              setIsCustomerPanelOpen((isOpen) => !isOpen)
+            }
+          />
+        </section>
 
-      <section className="hidden min-w-[560px] flex-1 md:block">
-        <ConversationThread
-          conversation={selectedConversation}
-          customerPanelOpen={isCustomerPanelOpen}
-          onCustomerPanelToggle={() =>
-            setIsCustomerPanelOpen((isOpen) => !isOpen)
-          }
-        />
-      </section>
-
-      {isCustomerPanelOpen ? (
-        <CustomerPanel conversation={selectedConversation} />
-      ) : null}
+        {isCustomerPanelOpen ? (
+          <CustomerPanel conversation={selectedConversation} />
+        ) : null}
+      </PageSplit>
 
       <Sheet open={isNarrowDetailOpen} onOpenChange={setIsNarrowDetailOpen}>
         <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
@@ -388,6 +407,6 @@ export function InboxPage({
           />
         </SheetContent>
       </Sheet>
-    </div>
+    </>
   )
 }

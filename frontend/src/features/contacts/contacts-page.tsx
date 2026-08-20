@@ -22,6 +22,7 @@ import { toast } from "sonner"
 
 import {
   ApiError,
+  ChannelType,
   ContactMethodType,
   ContactSort,
   ContactStage,
@@ -49,6 +50,7 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
+import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -97,6 +99,11 @@ import {
 } from "@/components/ui/table"
 import { ContactForm } from "@/features/contacts/contact-form"
 import { ContactDetailView } from "@/features/contacts/contact-detail"
+import {
+  channelTypeLabel,
+  userRoleLabel,
+  userStatusLabel,
+} from "@/features/contacts/contact-labels"
 import { useDateTime } from "@/hooks/use-date-time"
 import { cn } from "@/lib/utils"
 
@@ -176,7 +183,7 @@ function ContactScopeSidebar({
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
   const groupedChannels = useMemo(() => {
-    const groups = new Map<string, ChannelSummary[]>()
+    const groups = new Map<ChannelType, ChannelSummary[]>()
     for (const channel of channels) {
       groups.set(channel.type, [...(groups.get(channel.type) ?? []), channel])
     }
@@ -184,79 +191,79 @@ function ContactScopeSidebar({
   }, [channels])
 
   return (
-    <aside className="hidden w-60 shrink-0 border-r bg-sidebar text-sidebar-foreground md:flex md:flex-col">
-      <ScrollArea className="min-h-0 flex-1">
-        <nav className="flex flex-col gap-1 p-3" aria-label={t("scopeNavigation")}>
-          <ScopeButton
-            active={scope === "internal"}
-            icon={UsersIcon}
-            onClick={() => navigate("/contacts/internal")}
-          >
-            {t("scopes.internal")}
-          </ScopeButton>
+    <PagePaneNav label={t("scopeNavigation")}>
+      <ScopeButton
+        active={scope === "internal"}
+        icon={UsersIcon}
+        onClick={() => navigate("/contacts/internal")}
+      >
+        {t("scopes.internal")}
+      </ScopeButton>
 
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  scope === "external" && "font-medium text-sidebar-accent-foreground",
-                )}
-              >
-                <ContactRoundIcon className="size-4" />
-                <span>{t("scopes.external")}</span>
-                <ChevronRightIcon className="ml-auto size-4 transition-transform group-data-[state=open]:rotate-90" />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="flex flex-col gap-0.5">
-              <SubscopeButton
-                active={scope === "external" && !deleted && !channelId}
-                onClick={() => navigate("/contacts/external")}
-              >
-                {t("all")}
-              </SubscopeButton>
-              {groupedChannels.map(([type, items]) => (
-                <Collapsible key={type} defaultOpen>
-                  <CollapsibleTrigger asChild>
-                    <button
-                      type="button"
-                      className="group flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    >
-                      <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
-                      <span>{t(`channelTypes.${type}`, { defaultValue: type })}</span>
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="flex flex-col gap-0.5">
-                    {items.map((channel) => (
-                      <SubscopeButton
-                        key={channel.id}
-                        active={scope === "external" && channelId === channel.id}
-                        icon={type === "website" ? GlobeIcon : undefined}
-                        nested
-                        onClick={() =>
-                          navigate(`/contacts/external?channelId=${channel.id}`)
-                        }
-                      >
-                        {channel.name}
-                      </SubscopeButton>
-                    ))}
-                  </CollapsibleContent>
-                </Collapsible>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-
-          <ScopeButton
-            active={scope === "agents"}
-            icon={BotIcon}
-            onClick={() => navigate("/contacts/agents")}
+      <Collapsible defaultOpen>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              scope === "external" && "font-medium text-sidebar-accent-foreground",
+            )}
           >
-            {t("scopes.agents")}
-          </ScopeButton>
-        </nav>
-      </ScrollArea>
-    </aside>
+            <ContactRoundIcon className="size-4" />
+            <span>{t("scopes.external")}</span>
+            <ChevronRightIcon className="ml-auto size-4 transition-transform group-data-[state=open]:rotate-90" />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="flex flex-col gap-0.5">
+          <SubscopeButton
+            active={scope === "external" && !deleted && !channelId}
+            onClick={() => navigate("/contacts/external")}
+          >
+            {t("all")}
+          </SubscopeButton>
+          {groupedChannels.map(([type, items]) => (
+            <Collapsible key={type} defaultOpen>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="group flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
+                  <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
+                  <span>{channelTypeLabel(type, t)}</span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="flex flex-col gap-0.5">
+                {items.map((channel) => (
+                  <SubscopeButton
+                    key={channel.id}
+                    active={scope === "external" && channelId === channel.id}
+                    icon={
+                      type === ChannelType.ChannelTypeWebsite
+                        ? GlobeIcon
+                        : undefined
+                    }
+                    nested
+                    onClick={() =>
+                      navigate(`/contacts/external?channelId=${channel.id}`)
+                    }
+                  >
+                    {channel.name}
+                  </SubscopeButton>
+                ))}
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+
+      <ScopeButton
+        active={scope === "agents"}
+        icon={BotIcon}
+        onClick={() => navigate("/contacts/agents")}
+      >
+        {t("scopes.agents")}
+      </ScopeButton>
+    </PagePaneNav>
   )
 }
 
@@ -309,7 +316,7 @@ function PageControls({
   )
 }
 
-/** 联系人列表页，支持内部成员、外部联系人和回收站。 */
+/** 按范围列出联系人。 */
 export function ContactsPage({
   scope,
   deleted = false,
@@ -383,9 +390,11 @@ export function ContactsPage({
     void listChannels(controller.signal)
       .then(setChannels)
       .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setChannels([])
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return
         }
+        console.warn("渠道列表加载失败", error)
+        setChannels([])
       })
     return () => controller.abort()
   }, [])
@@ -430,6 +439,7 @@ export function ContactsPage({
           navigate("/login", { replace: true })
           return
         }
+        console.warn("联系人列表加载失败", error)
         setLoadState("error")
       }
     },
@@ -464,6 +474,7 @@ export function ContactsPage({
           navigate("/login", { replace: true })
           return
         }
+        console.warn("联系人详情加载失败", error)
         toast.error(t("detail.loadError"))
         setParameters({ selected: null })
       })
@@ -525,6 +536,7 @@ export function ContactsPage({
     setDeleting(true)
     try {
       await deleteContact(deletingContact.id)
+      console.info("联系人已移入回收站", { contact_id: deletingContact.id })
       toast.success(t("delete.success"))
       setDeletingContact(null)
       if (selected === deletingContact.id) {
@@ -536,6 +548,7 @@ export function ContactsPage({
         navigate("/login", { replace: true })
         return
       }
+      console.warn("删除联系人失败", error)
       toast.error(t("delete.error"))
     } finally {
       setDeleting(false)
@@ -546,6 +559,7 @@ export function ContactsPage({
   async function restore(item: ContactSummary) {
     try {
       await restoreContact(item.id)
+      console.info("联系人已恢复", { contact_id: item.id })
       toast.success(t("trash.restored"))
       setRefreshVersion((current) => current + 1)
     } catch (error) {
@@ -553,6 +567,7 @@ export function ContactsPage({
         navigate("/login", { replace: true })
         return
       }
+      console.warn("恢复联系人失败", error)
       toast.error(t("trash.restoreError"))
     }
   }
@@ -561,15 +576,19 @@ export function ContactsPage({
   const hasInternalFilters = Boolean(status || role)
 
   return (
-    <div className="flex min-h-0 w-full flex-1 overflow-hidden">
-      <ContactScopeSidebar
-        scope={scope}
-        deleted={deleted}
-        channelId={channelId}
-        channels={channels}
-      />
-
-      <section className="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <PageSplit
+      paneWidth="md"
+      paneVariant="nav"
+      pane={
+        <ContactScopeSidebar
+          scope={scope}
+          deleted={deleted}
+          channelId={channelId}
+          channels={channels}
+        />
+      }
+    >
+      <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3 sm:px-6">
           <div className="w-full md:hidden">
             <NativeSelect
@@ -767,8 +786,8 @@ export function ContactsPage({
                         <TableRow key={user.id}>
                           <TableCell className="font-medium">{user.displayName}</TableCell>
                           <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                          <TableCell>{t(`roles.${user.role}`, { defaultValue: user.role })}</TableCell>
-                          <TableCell>{t(`statuses.${user.status}`, { defaultValue: user.status })}</TableCell>
+                          <TableCell>{userRoleLabel(user.role, t)}</TableCell>
+                          <TableCell>{userStatusLabel(user.status, t)}</TableCell>
                           <TableCell className="text-right whitespace-nowrap">
                             <Button
                               variant="outline"
@@ -878,8 +897,8 @@ export function ContactsPage({
                 <dl className="grid gap-5 text-sm">
                   <div><dt className="text-muted-foreground">{t("columns.name")}</dt><dd className="mt-1 font-medium">{detailUser.displayName}</dd></div>
                   <div><dt className="text-muted-foreground">{t("columns.email")}</dt><dd className="mt-1">{detailUser.email}</dd></div>
-                  <div><dt className="text-muted-foreground">{t("columns.role")}</dt><dd className="mt-1">{t(`roles.${detailUser.role}`, { defaultValue: detailUser.role })}</dd></div>
-                  <div><dt className="text-muted-foreground">{t("columns.status")}</dt><dd className="mt-1">{t(`statuses.${detailUser.status}`, { defaultValue: detailUser.status })}</dd></div>
+                  <div><dt className="text-muted-foreground">{t("columns.role")}</dt><dd className="mt-1">{userRoleLabel(detailUser.role, t)}</dd></div>
+                  <div><dt className="text-muted-foreground">{t("columns.status")}</dt><dd className="mt-1">{userStatusLabel(detailUser.status, t)}</dd></div>
                   <div><dt className="text-muted-foreground">{t("columns.createdAt")}</dt><dd className="mt-1">{formatDateTime(detailUser.createdAt)}</dd></div>
                 </dl>
               ) : scope === "external" && detail ? (
@@ -935,6 +954,6 @@ export function ContactsPage({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageSplit>
   )
 }

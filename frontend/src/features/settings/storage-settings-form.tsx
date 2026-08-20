@@ -185,6 +185,7 @@ export function StorageSettingsForm() {
         navigate("/login", { replace: true })
         return
       }
+      console.warn("对象存储设置加载失败", error)
       setLoadError(t("storage.loadError"))
     } finally {
       setLoading(false)
@@ -196,16 +197,18 @@ export function StorageSettingsForm() {
   }, [loadSetting])
 
   /** 处理对象存储请求错误。 */
-  function handleRequestError(error: unknown, fallback: string) {
+  function handleRequestError(error: unknown, message: string) {
     if (error instanceof ApiError) {
       if (error.code === "AUTH_REQUIRED") {
         navigate("/login", { replace: true })
         return
       }
+      console.warn("对象存储请求失败", error)
       toast.error(apiErrorMessage(error, settingFieldNames))
       return
     }
-    toast.error(fallback)
+    console.warn("对象存储请求失败", error)
+    toast.error(message)
   }
 
   /** 保存对象存储设置。 */
@@ -216,6 +219,7 @@ export function StorageSettingsForm() {
       setSavedSetting(saved)
       setEditing(false)
       form.reset(saved)
+      console.info("对象存储设置已保存")
       toast.success(t("storage.saveSuccess"))
     } catch (error) {
       handleRequestError(error, t("storage.saveError"))
@@ -229,6 +233,7 @@ export function StorageSettingsForm() {
     setPendingAction("test")
     try {
       await testS3Setting(values)
+      console.info("对象存储连接测试成功")
       toast.success(t("storage.testSuccess"))
     } catch (error) {
       handleRequestError(error, t("storage.testError"))
@@ -278,6 +283,7 @@ export function StorageSettingsForm() {
       const enabledSetting = await saveS3Setting(nextSetting)
       setSavedSetting(enabledSetting)
       form.reset(enabledSetting)
+      console.info("对象存储已启用")
       toast.success(t("storage.enableSuccess"))
     } catch (error) {
       handleRequestError(error, t("storage.enableError"))
@@ -296,6 +302,7 @@ export function StorageSettingsForm() {
       setSavedSetting(disabledSetting)
       setEditing(false)
       form.reset(disabledSetting)
+      console.info("对象存储已停用")
       toast.success(t("storage.disableSuccess"))
     } catch (error) {
       handleRequestError(error, t("storage.disableError"))
@@ -309,7 +316,8 @@ export function StorageSettingsForm() {
     event.preventDefault()
     try {
       await openExternalURL(activeProvider.helpUrl)
-    } catch {
+    } catch (error) {
+      console.warn("打开对象存储帮助文档失败", error)
       toast.error(t("storage.openDocumentationError"))
     }
   }

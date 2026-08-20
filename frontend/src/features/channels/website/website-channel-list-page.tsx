@@ -94,7 +94,7 @@ function WebsiteChannelRow({
   )
 }
 
-/** 展示网站渠道列表并支持删除。 */
+/** 网站渠道列表。 */
 export function WebsiteChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
@@ -118,6 +118,7 @@ export function WebsiteChannelListPage() {
         navigate("/login", { replace: true })
         return
       }
+      console.warn("网站渠道列表加载失败", requestError)
       setError(t("list.loadError"))
     } finally {
       setLoading(false)
@@ -132,6 +133,7 @@ export function WebsiteChannelListPage() {
   async function handleDelete(channel: WebsiteChannelSummary) {
     try {
       await deleteWebsiteChannel(channel.id)
+      console.info("网站渠道已移入回收站", { channel_id: channel.id })
       setChannels((current) =>
         current.filter((item) => item.id !== channel.id)
       )
@@ -144,6 +146,7 @@ export function WebsiteChannelListPage() {
         navigate("/login", { replace: true })
         return
       }
+      console.warn("删除网站渠道失败", requestError)
       toast.error(t("delete.error"))
     }
   }

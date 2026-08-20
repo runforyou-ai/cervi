@@ -6,6 +6,7 @@ const enUS = {
     actions: {
       close: "Close",
     },
+    comingSoon: "Soon",
     sidebar: {
       title: "Sidebar",
       description: "Displays the sidebar on narrow viewports.",
@@ -80,19 +81,8 @@ const enUS = {
     inbox: "Inbox",
     contacts: "Contacts",
     messageChannels: "Messaging channels",
-    toggleMessageChannels: "Expand or collapse messaging channels",
-    website: "Website",
-    telegram: "Telegram",
-    wechatOfficialAccount: "WeChat Official Account",
-    comingSoon: "Soon",
     settings: "Settings",
     openUserMenu: "Open the user menu for {{name}}",
-    titles: {
-      websiteChannels: "Website channels",
-      createWebsiteChannel: "Add website channel",
-      editWebsiteChannel: "Website channel settings",
-      websiteChannelTrash: "Website channel trash",
-    },
     logout: "Log out",
     loggingOut: "Logging out…",
     logoutError: "Could not log out. Please try again.",
@@ -248,6 +238,13 @@ const enUS = {
     },
   },
   channels: {
+    typeNavigation: "Channel types",
+    typeComingSoon: "{{name}} · Soon",
+    types: {
+      website: "Website",
+      telegram: "Telegram",
+      wechatOfficialAccount: "WeChat Official Account",
+    },
     loading: "Loading…",
     retry: "Try again",
     locales: {
