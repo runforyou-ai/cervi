@@ -5,6 +5,7 @@ const enUS = {
     closeNotification: "Close notification",
     actions: {
       close: "Close",
+      back: "Back",
     },
     comingSoon: "Soon",
   },
@@ -226,7 +227,6 @@ const enUS = {
     },
     trash: {
       title: "Trash",
-      back: "Back to external contacts",
       empty: "Trash is empty",
       restore: "Restore",
       restored: "Contact restored",

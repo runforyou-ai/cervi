@@ -2,22 +2,10 @@
 import { useEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router"
+import { useNavigate, useParams, useSearchParams } from "react-router"
 
 import { ApiError, getWebsiteChannel, type WebsiteChannel } from "@/api"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { PageBackHeader } from "@/components/page-back-header"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WebsiteChannelForm } from "@/features/channels/website/website-channel-form"
@@ -218,24 +206,10 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
 
   return (
     <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/channels/website">{t("list.title")}</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>
-              {mode === "create" ? t("create.title") : channel?.name}
-            </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <h2 className="text-xl font-semibold tracking-tight">
-        {mode === "create" ? t("create.title") : channel?.name}
-      </h2>
+      <PageBackHeader
+        to="/channels/website"
+        title={mode === "create" ? t("create.title") : channel?.name}
+      />
       {mode === "edit" && channel ? (
         <WebsiteChannelEditTabs channel={channel} onChannelChange={setChannel} />
       ) : (

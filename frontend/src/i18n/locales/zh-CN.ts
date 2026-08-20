@@ -5,6 +5,7 @@ const zhCN = {
     closeNotification: "关闭通知",
     actions: {
       close: "关闭",
+      back: "返回",
     },
     comingSoon: "即将支持",
   },
@@ -226,7 +227,6 @@ const zhCN = {
     },
     trash: {
       title: "回收站",
-      back: "返回外部联系人",
       empty: "回收站是空的",
       restore: "恢复",
       restored: "联系人已恢复",

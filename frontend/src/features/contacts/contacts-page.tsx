@@ -50,6 +50,7 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
+import { PageBack } from "@/components/page-back-header"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { Button } from "@/components/ui/button"
 import {
@@ -614,27 +615,21 @@ export function ContactsPage({
               {t("list.count", { count: page.total })}
             </p>
           </div>
-          {scope === "external" ? (
+          {deleted ? (
+            <PageBack to="/contacts/external" />
+          ) : scope === "external" ? (
             <>
-              {deleted ? (
-                <Button variant="outline" size="sm" onClick={() => navigate("/contacts/external")}>
-                  {t("trash.back")}
-                </Button>
-              ) : (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={channels.length === 0}
-                    title={channels.length === 0 ? t("form.channelRequiredHint") : undefined}
-                    onClick={() => setParameters({ new: "1", selected: null })}
-                  >
-                    {t("create")}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => navigate("/contacts/external/trash")}>
-                    {t("trash.title")}
-                  </Button>
-                </>
-              )}
+              <Button
+                size="sm"
+                disabled={channels.length === 0}
+                title={channels.length === 0 ? t("form.channelRequiredHint") : undefined}
+                onClick={() => setParameters({ new: "1", selected: null })}
+              >
+                {t("create")}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate("/contacts/external/trash")}>
+                {t("trash.title")}
+              </Button>
             </>
           ) : null}
         </div>
