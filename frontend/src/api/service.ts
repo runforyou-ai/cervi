@@ -1,5 +1,6 @@
 /** 绑定应用服务方法，并归一化可空切片。 */
 import {
+  ChangePassword,
   CreateContact,
   CreateWebsiteChannel,
   DeleteContact,
@@ -18,6 +19,7 @@ import {
   SaveS3Setting,
   TestS3Setting,
   UpdateContact,
+  UpdateProfile,
   UpdateWebsiteChannel,
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -88,6 +90,10 @@ export const getS3Setting = bind(GetS3Setting)
 export const saveS3Setting = bind(SaveS3Setting)
 /** 测试对象存储连接。 */
 export const testS3Setting = bind(TestS3Setting)
+/** 修改当前用户的姓名和邮箱。 */
+export const updateProfile = bind(UpdateProfile)
+/** 修改当前用户的登录密码。 */
+export const changePassword = bind(ChangePassword)
 
 const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)

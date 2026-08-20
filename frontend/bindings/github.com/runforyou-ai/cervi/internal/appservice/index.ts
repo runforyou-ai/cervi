@@ -22,6 +22,7 @@ export {
 
 export type {
     Auth,
+    ChangePasswordInput,
     ChannelList,
     ChannelSummary,
     Contact,
@@ -44,6 +45,7 @@ export type {
     Message,
     Organization,
     PageInfo,
+    ProfileInput,
     RequestMeta,
     S3Setting,
     Session,

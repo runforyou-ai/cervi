@@ -11,6 +11,14 @@ export interface Auth {
 }
 
 /**
+ * ChangePasswordInput 定义当前用户修改密码所需字段。
+ */
+export interface ChangePasswordInput {
+    "currentPassword": string;
+    "newPassword": string;
+}
+
+/**
  * ChannelList 定义渠道选择项列表。
  */
 export interface ChannelList {
@@ -324,6 +332,14 @@ export interface PageInfo {
     "number": number;
     "size": number;
     "total": number;
+}
+
+/**
+ * ProfileInput 定义当前用户可编辑的个人资料字段。
+ */
+export interface ProfileInput {
+    "displayName": string;
+    "email": string;
 }
 
 /**

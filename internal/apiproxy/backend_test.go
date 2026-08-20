@@ -87,6 +87,34 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			writeTestJSON(writer, http.StatusUnauthorized, map[string]any{"error": map[string]string{
 				"state": "login", "message": "Authentication required.",
 			}})
+		case "/api/profile":
+			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected profile request", http.StatusBadRequest)
+				return
+			}
+			var input appservice.ProfileInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, map[string]string{
+				"id": "user-1", "organizationId": "organization-1", "displayName": input.DisplayName, "email": input.Email,
+			})
+		case "/api/password":
+			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected password request", http.StatusBadRequest)
+				return
+			}
+			var input appservice.ChangePasswordInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if input.CurrentPassword != "password123" || input.NewPassword != "new-password123" {
+				http.Error(writer, "unexpected password input", http.StatusBadRequest)
+				return
+			}
+			writer.WriteHeader(http.StatusNoContent)
 		case "/api/auth/login":
 			writeTestJSON(writer, http.StatusOK, map[string]any{
 				"identity": map[string]any{
@@ -146,6 +174,22 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	}
 	meta.Token = auth.Token
 	if _, err := backend.LoadInbox(context.Background(), meta); err != nil {
+		t.Fatal(err)
+	}
+	user, err := backend.UpdateProfile(context.Background(), meta, appservice.ProfileInput{
+		DisplayName: "林晓",
+		Email:       "lin@example.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.DisplayName != "林晓" || user.Email != "lin@example.com" {
+		t.Fatalf("updated user = %#v", user)
+	}
+	if err := backend.ChangePassword(context.Background(), meta, appservice.ChangePasswordInput{
+		CurrentPassword: "password123",
+		NewPassword:     "new-password123",
+	}); err != nil {
 		t.Fatal(err)
 	}
 }

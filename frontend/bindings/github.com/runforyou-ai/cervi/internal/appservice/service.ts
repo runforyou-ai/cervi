@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * ChangePassword 核验当前密码并保存新密码。
+ */
+export function ChangePassword(meta: $models.RequestMeta, input: $models.ChangePasswordInput): $CancellablePromise<void> {
+    return $Call.ByID(3645111243, meta, input);
+}
+
+/**
  * ConnectServer 保存并验证原生端企业服务器地址。
  */
 export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<void> {
@@ -201,6 +208,13 @@ export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3Settin
  */
 export function UpdateContact(meta: $models.RequestMeta, contactID: string, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(183062653, meta, contactID, input);
+}
+
+/**
+ * UpdateProfile 修改当前用户的姓名和邮箱。
+ */
+export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.User> {
+    return $Call.ByID(1804531972, meta, input);
 }
 
 /**

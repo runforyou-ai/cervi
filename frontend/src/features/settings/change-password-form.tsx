@@ -1,4 +1,4 @@
-/** 个人资料设置表单。 */
+/** 修改密码表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { isApiError, recoverSession, updateProfile, type User } from "@/api"
+import { changePassword, isApiError, recoverSession } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -17,49 +17,43 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
-  createProfileSettingsSchema,
-  type ProfileSettingsFormValues,
-} from "@/features/settings/profile-settings-schema"
+  createChangePasswordSchema,
+  type ChangePasswordFormValues,
+} from "@/features/settings/change-password-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
-/** 修改当前用户的姓名和邮箱。 */
-export function ProfileSettingsForm({
-  user,
-  onUpdated,
-}: {
-  user: User
-  onUpdated: (user: User) => void
-}) {
+/** 修改当前用户的登录密码。 */
+export function ChangePasswordForm() {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
-  const schema = useMemo(() => createProfileSettingsSchema(t), [t])
-  const form = useForm<ProfileSettingsFormValues>({
+  const schema = useMemo(() => createChangePasswordSchema(t), [t])
+  const form = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      displayName: user.displayName,
-      email: user.email,
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
     },
   })
 
-  /** 保存个人资料并同步工作台中的当前用户。 */
-  async function save(values: ProfileSettingsFormValues) {
+  /** 提交密码修改。 */
+  async function save(values: ChangePasswordFormValues) {
     try {
-      const updated = await updateProfile(values)
-      form.reset({
-        displayName: updated.displayName,
-        email: updated.email,
+      await changePassword({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
       })
-      onUpdated(updated)
-      console.info("个人资料已保存", { user_id: updated.id })
-      toast.success(t("profile.saveSuccess"))
+      form.reset()
+      console.info("密码修改成功")
+      toast.success(t("password.saveSuccess"))
     } catch (error) {
       if (recoverSession(error, navigate)) {
         return
       }
-      console.warn("保存个人资料失败", error)
+      console.warn("修改密码失败", error)
       if (isApiError(error)) {
         let fieldError = false
-        for (const name of ["displayName", "email"] as const) {
+        for (const name of ["currentPassword", "newPassword"] as const) {
           const message = error.fields[name]
           if (!message) {
             continue
@@ -74,7 +68,7 @@ export function ProfileSettingsForm({
         toast.error(apiErrorMessage(error))
         return
       }
-      toast.error(t("profile.saveError"))
+      toast.error(t("password.saveError"))
     }
   }
 
@@ -83,23 +77,24 @@ export function ProfileSettingsForm({
   return (
     <form
       className="mt-6 w-full max-w-xl"
-      aria-label={t("profile.formLabel")}
+      aria-label={t("password.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
     >
       <FieldGroup className="gap-6">
         <Controller
-          name="displayName"
+          name="currentPassword"
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name} required>
-                {t("profile.displayName")}
+                {t("password.currentPassword")}
               </FieldLabel>
               <Input
                 {...field}
                 id={field.name}
-                autoComplete="name"
+                type="password"
+                autoComplete="current-password"
                 aria-invalid={fieldState.invalid}
                 required
                 autoFocus
@@ -109,18 +104,38 @@ export function ProfileSettingsForm({
           )}
         />
         <Controller
-          name="email"
+          name="newPassword"
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name} required>
-                {t("profile.email")}
+                {t("password.newPassword")}
               </FieldLabel>
               <Input
                 {...field}
                 id={field.name}
-                type="email"
-                autoComplete="email"
+                type="password"
+                autoComplete="new-password"
+                aria-invalid={fieldState.invalid}
+                required
+              />
+              <FieldError errors={[fieldState.error]} />
+            </Field>
+          )}
+        />
+        <Controller
+          name="confirmPassword"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name} required>
+                {t("password.confirmPassword")}
+              </FieldLabel>
+              <Input
+                {...field}
+                id={field.name}
+                type="password"
+                autoComplete="new-password"
                 aria-invalid={fieldState.invalid}
                 required
               />
@@ -133,7 +148,7 @@ export function ProfileSettingsForm({
             {isSubmitting ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : null}
-            {isSubmitting ? t("profile.saving") : t("profile.save")}
+            {isSubmitting ? t("password.saving") : t("password.save")}
           </Button>
         </div>
       </FieldGroup>

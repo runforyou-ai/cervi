@@ -44,6 +44,8 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/auth/login", service.login)
 	router.POST("/auth/logout", service.logout)
 	router.GET("/auth/identity", service.loadIdentity)
+	router.PATCH("/profile", service.updateProfile)
+	router.PATCH("/password", service.changePassword)
 	router.GET("/inbox", service.loadInbox)
 	router.GET("/channels/website", service.listWebsiteChannels)
 	router.GET("/channels/website/trash", service.listDeletedWebsiteChannels)
@@ -116,6 +118,25 @@ func (s *Service) logout(c *gin.Context) {
 func (s *Service) loadIdentity(c *gin.Context) {
 	identity, err := s.application.LoadIdentity(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, identity, err)
+}
+
+// updateProfile 保存当前用户的个人资料。
+func (s *Service) updateProfile(c *gin.Context) {
+	var input appservice.ProfileInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	user, err := s.application.UpdateProfile(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, user, err)
+}
+
+// changePassword 修改当前用户的登录密码。
+func (s *Service) changePassword(c *gin.Context) {
+	var input appservice.ChangePasswordInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.ChangePassword(c.Request.Context(), requestMeta(c), input))
 }
 
 func (s *Service) loadInbox(c *gin.Context) {
