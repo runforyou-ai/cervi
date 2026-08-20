@@ -373,7 +373,10 @@ export function InboxPage({
             onSelect={selectConversation}
           />
         }
-        mainClassName="hidden md:flex md:flex-row"
+        mainClassName={cn(
+          "hidden md:flex md:flex-row",
+          isCustomerPanelOpen ? "min-w-[880px]" : "min-w-[560px]",
+        )}
       >
         <section className="min-h-0 min-w-[560px] flex-1">
           <ConversationThread
