@@ -5,13 +5,9 @@ const enUS = {
     closeNotification: "Close notification",
     actions: {
       close: "Close",
+      back: "Back",
     },
     comingSoon: "Soon",
-    sidebar: {
-      title: "Sidebar",
-      description: "Displays the sidebar on narrow viewports.",
-      toggle: "Toggle sidebar",
-    },
   },
   setup: {
     title: "Set up Cervi",
@@ -78,9 +74,9 @@ const enUS = {
   },
   workspace: {
     navigationGroup: "Workspace",
-    inbox: "Inbox",
+    inbox: "Messages",
     contacts: "Contacts",
-    messageChannels: "Messaging channels",
+    channels: "Channels",
     settings: "Settings",
     openUserMenu: "Open the user menu for {{name}}",
     logout: "Log out",
@@ -88,10 +84,11 @@ const enUS = {
     logoutError: "Could not log out. Please try again.",
     loading: "Loading…",
     loadError: "Could not load the workspace.",
-    inboxLoadError: "Could not load the inbox.",
+    inboxLoadError: "Could not load messages.",
     retry: "Try again",
   },
   contacts: {
+    title: "Contacts",
     scopeNavigation: "Contact categories",
     all: "All",
     create: "Add contact",
@@ -230,7 +227,6 @@ const enUS = {
     },
     trash: {
       title: "Trash",
-      back: "Back to external contacts",
       empty: "Trash is empty",
       restore: "Restore",
       restored: "Contact restored",
@@ -238,6 +234,7 @@ const enUS = {
     },
   },
   channels: {
+    title: "Channels",
     typeNavigation: "Channel types",
     typeComingSoon: "{{name}} · Soon",
     types: {
@@ -476,10 +473,6 @@ const enUS = {
     },
   },
   inbox: {
-    title: "Customer conversations",
-    ongoing: "{{count}} ongoing",
-    ongoing_one: "{{count}} ongoing",
-    ongoing_other: "{{count}} ongoing",
     search: "Search conversations",
     emptyTitle: "No customer conversations yet",
     emptyDescription:
