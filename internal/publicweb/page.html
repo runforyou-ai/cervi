@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}" class="cv-{{.Shell}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{{.Title}}</title>
+    <style>
+      {{.ThemeCSS}}
+      {{.ChromeCSS}}
+    </style>
+  </head>
+  <body>
+    <div class="cv-chrome" data-avatar="{{.AvatarInitials}}" data-demo-reply="{{.DemoReply}}">
+      <header class="cv-header">
+        <div class="cv-pill">
+          <div class="cv-mono" aria-hidden="true">{{.Monogram}}</div>
+          <div class="cv-header-text">
+            <p class="cv-title" title="{{.Title}}">{{.Title}}</p>
+            {{if .Subtitle}}<p class="cv-subtitle" title="{{.Subtitle}}">{{.Subtitle}}</p>{{end}}
+          </div>
+        </div>
+        {{if .ShowClose}}
+        <button class="cv-close" type="button" id="cv-close" aria-label="{{.CloseLabel}}" title="{{.CloseLabel}}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+        {{end}}
+      </header>
+      {{if .NotFound}}
+      <div class="cv-empty">{{.EmptyMessage}}</div>
+      {{else}}
+      <div class="cv-messages" id="cv-messages">
+        {{if .Greeting}}
+        <div class="cv-msg cv-msg-assistant cv-msg-greeting">
+          <div class="cv-msg-body">
+            <div class="cv-avatar cv-avatar-assistant" aria-hidden="true">{{.AvatarInitials}}</div>
+            <div class="cv-msg-main">
+              <div class="cv-sender">{{.Title}}</div>
+              <div class="cv-bubble cv-bubble-assistant"><p class="cv-greeting">{{.Greeting}}</p></div>
+            </div>
+          </div>
+        </div>
+        {{end}}
+      </div>
+      <form class="cv-composer" id="cv-composer" action="#" method="dialog">
+        <div class="cv-emoji" id="cv-emoji" hidden></div>
+        <div class="cv-dock">
+          <div class="cv-tools">
+            <button class="cv-tool" type="button" id="cv-attach" aria-label="{{.AttachLabel}}" title="{{.AttachLabel}}">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+            </button>
+            <button class="cv-tool" type="button" id="cv-image" aria-label="{{.ImageLabel}}" title="{{.ImageLabel}}">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              </svg>
+            </button>
+          </div>
+          <div class="cv-well">
+            <label class="cv-sr-only" for="cv-input">{{.MessageLabel}}</label>
+            <textarea id="cv-input" rows="1" maxlength="4000"></textarea>
+          </div>
+          <button class="cv-tool" type="button" id="cv-emoji-toggle" aria-label="{{.EmojiLabel}}" title="{{.EmojiLabel}}" aria-controls="cv-emoji" aria-expanded="false">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+              <line x1="9" x2="9.01" y1="9" y2="9" />
+              <line x1="15" x2="15.01" y1="9" y2="9" />
+            </svg>
+          </button>
+        </div>
+        <input id="cv-file-input" type="file" multiple hidden />
+        <input id="cv-image-input" type="file" multiple accept="image/*" hidden />
+      </form>
+      {{end}}
+    </div>
+    {{if not .NotFound}}
+    <script>{{.ChatJS}}</script>
+    {{end}}
+    {{if .ShowClose}}
+    <script>
+      document.getElementById("cv-close").addEventListener("click", function () {
+        window.parent.postMessage({ type: "cervi:close" }, "*");
+      });
+    </script>
+    {{end}}
+  </body>
+</html>
