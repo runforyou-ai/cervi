@@ -7,11 +7,6 @@ const zhCN = {
       close: "关闭",
     },
     comingSoon: "即将支持",
-    sidebar: {
-      title: "侧栏",
-      description: "在窄视口中显示侧栏。",
-      toggle: "切换侧栏",
-    },
   },
   setup: {
     title: "初始化 Cervi",
@@ -78,9 +73,9 @@ const zhCN = {
   },
   workspace: {
     navigationGroup: "工作台",
-    inbox: "收件箱",
-    contacts: "联系人",
-    messageChannels: "消息渠道",
+    inbox: "消息",
+    contacts: "通讯录",
+    channels: "渠道",
     settings: "设置",
     openUserMenu: "打开 {{name}} 的用户菜单",
     logout: "退出登录",
@@ -88,10 +83,11 @@ const zhCN = {
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
     loadError: "工作台加载失败。",
-    inboxLoadError: "收件箱加载失败。",
+    inboxLoadError: "消息加载失败。",
     retry: "重试",
   },
   contacts: {
+    title: "通讯录",
     scopeNavigation: "联系人分类",
     all: "全部",
     create: "添加联系人",
@@ -238,6 +234,7 @@ const zhCN = {
     },
   },
   channels: {
+    title: "渠道",
     typeNavigation: "渠道类型",
     typeComingSoon: "{{name}} · 即将支持",
     types: {
@@ -473,10 +470,6 @@ const zhCN = {
     },
   },
   inbox: {
-    title: "客户会话",
-    ongoing: "{{count}} 个进行中",
-    ongoing_one: "{{count}} 个进行中",
-    ongoing_other: "{{count}} 个进行中",
     search: "搜索会话",
     emptyTitle: "还没有客户会话",
     emptyDescription: "接入网站渠道后，新会话会出现在这里。",

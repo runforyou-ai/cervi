@@ -73,17 +73,26 @@ export function PageSplit({
 /** 分栏左栏导航列表。 */
 export function PagePaneNav({
   label,
+  title,
   children,
 }: {
   label: string
+  title?: string
   children: ReactNode
 }) {
   return (
-    <ScrollArea className="min-h-0 flex-1">
-      <nav className="flex flex-col gap-1 p-3" aria-label={label}>
-        {children}
-      </nav>
-    </ScrollArea>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {title ? (
+        <h2 className="shrink-0 px-4 pt-5 pb-2 text-xl font-semibold tracking-tight">
+          {title}
+        </h2>
+      ) : null}
+      <ScrollArea className="min-h-0 flex-1">
+        <nav className="flex flex-col gap-1 p-3" aria-label={label}>
+          {children}
+        </nav>
+      </ScrollArea>
+    </div>
   )
 }
 
@@ -124,9 +133,9 @@ export function PagePaneLink({
       className={({ isActive }) =>
         cn(
           className,
-          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          "hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
           isActive &&
-            "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+            "bg-foreground/12 font-medium text-sidebar-accent-foreground",
         )
       }
     >

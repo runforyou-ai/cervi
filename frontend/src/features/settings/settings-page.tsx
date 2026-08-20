@@ -26,7 +26,7 @@ export function SettingsPage() {
       paneWidth="sm"
       paneVariant="nav"
       pane={
-        <PagePaneNav label={t("navigationLabel")}>
+        <PagePaneNav label={t("navigationLabel")} title={t("title")}>
           <PagePaneLink to="/settings/storage">
             {t("navigation.storage")}
           </PagePaneLink>

@@ -127,8 +127,8 @@ function ScopeButton({
     <button
       type="button"
       className={cn(
-        "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+        "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
+        active && "bg-foreground/12 font-medium text-sidebar-accent-foreground",
       )}
       onClick={onClick}
     >
@@ -156,9 +156,9 @@ function SubscopeButton({
     <button
       type="button"
       className={cn(
-        "flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
         nested ? "pl-14" : "pl-8",
-        active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+        active && "bg-foreground/12 font-medium text-sidebar-accent-foreground",
       )}
       onClick={onClick}
     >
@@ -191,7 +191,7 @@ function ContactScopeSidebar({
   }, [channels])
 
   return (
-    <PagePaneNav label={t("scopeNavigation")}>
+    <PagePaneNav label={t("scopeNavigation")} title={t("title")}>
       <ScopeButton
         active={scope === "internal"}
         icon={UsersIcon}
@@ -200,12 +200,20 @@ function ContactScopeSidebar({
         {t("scopes.internal")}
       </ScopeButton>
 
+      <ScopeButton
+        active={scope === "agents"}
+        icon={BotIcon}
+        onClick={() => navigate("/contacts/agents")}
+      >
+        {t("scopes.agents")}
+      </ScopeButton>
+
       <Collapsible defaultOpen>
         <CollapsibleTrigger asChild>
           <button
             type="button"
             className={cn(
-              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
               scope === "external" && "font-medium text-sidebar-accent-foreground",
             )}
           >
@@ -226,7 +234,7 @@ function ContactScopeSidebar({
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
-                  className="group flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-left text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  className="group flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-left text-sm text-muted-foreground hover:bg-foreground/6 hover:text-sidebar-accent-foreground"
                 >
                   <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
                   <span>{channelTypeLabel(type, t)}</span>
@@ -255,14 +263,6 @@ function ContactScopeSidebar({
           ))}
         </CollapsibleContent>
       </Collapsible>
-
-      <ScopeButton
-        active={scope === "agents"}
-        icon={BotIcon}
-        onClick={() => navigate("/contacts/agents")}
-      >
-        {t("scopes.agents")}
-      </ScopeButton>
     </PagePaneNav>
   )
 }
@@ -598,6 +598,7 @@ export function ContactsPage({
               onChange={(event) => changeMobileScope(event.target.value)}
             >
               <option value="internal">{t("scopes.internal")}</option>
+              <option value="agents">{t("scopes.agents")}</option>
               <option value="external">{t("scopes.external")} · {t("all")}</option>
               {channels.map((channel) => (
                 <option key={channel.id} value={`channel:${channel.id}`}>
@@ -605,7 +606,6 @@ export function ContactsPage({
                 </option>
               ))}
               <option value="trash">{t("trash.title")}</option>
-              <option value="agents">{t("scopes.agents")}</option>
             </NativeSelect>
           </div>
           <div className="mr-auto min-w-40">

@@ -34,7 +34,7 @@ export function ChannelsLayout() {
       paneWidth="sm"
       paneVariant="nav"
       pane={
-        <PagePaneNav label={t("typeNavigation")}>
+        <PagePaneNav label={t("typeNavigation")} title={t("title")}>
           {channelTypes.map((type) => (
             <PagePaneLink
               key={type.id}

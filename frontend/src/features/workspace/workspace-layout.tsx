@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Outlet, useLocation, useNavigate } from "react-router"
+import { Outlet, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -13,37 +13,9 @@ import {
   type Identity,
 } from "@/api"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
-/** 根据路径返回工作台页面标题。 */
-function workspaceTitle(
-  pathname: string,
-  titles: {
-    inbox: string
-    contacts: string
-    messageChannels: string
-    settings: string
-  }
-) {
-  if (pathname.startsWith("/settings")) {
-    return titles.settings
-  }
-  if (pathname.startsWith("/contacts")) {
-    return titles.contacts
-  }
-  if (pathname.startsWith("/channels")) {
-    return titles.messageChannels
-  }
-  return titles.inbox
-}
-
-/** 校验登录后显示工作台侧栏和子页面。 */
+/** 校验登录后显示工作台导航和子页面。 */
 export function WorkspaceLayout({
   platform,
 }: {
@@ -51,7 +23,6 @@ export function WorkspaceLayout({
 }) {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
-  const location = useLocation()
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -65,22 +36,32 @@ export function WorkspaceLayout({
       if (platform === "desktop") {
         const entry = await resolveNativeEntry()
         if (entry.status !== "ready") {
+          console.info("桌面端入口未就绪", { status: entry.status })
           navigate(entry.status === "connect" ? "/connect" : "/login", {
             replace: true,
           })
           return
         }
         setIdentity(entry.identity)
+        console.info("工作台身份已加载", {
+          organization: entry.identity.organization.name,
+        })
         return
       }
-      setIdentity(await loadIdentity())
+      const currentIdentity = await loadIdentity()
+      setIdentity(currentIdentity)
+      console.info("工作台身份已加载", {
+        organization: currentIdentity.organization.name,
+      })
     } catch (requestError) {
       if (requestError instanceof ApiError) {
         if (requestError.code === "INSTALLATION_REQUIRED") {
+          console.info("企业未初始化，进入初始化页")
           navigate("/setup", { replace: true })
           return
         }
         if (requestError.code === "AUTH_REQUIRED") {
+          console.info("未登录，进入登录页")
           navigate("/login", { replace: true })
           return
         }
@@ -137,29 +118,15 @@ export function WorkspaceLayout({
   }
 
   return (
-    <SidebarProvider>
+    <div className="flex h-svh min-h-0 w-full overflow-hidden">
       <WorkspaceNavigation
         identity={identity}
         onLogout={handleLogout}
         loggingOut={loggingOut}
       />
-      <SidebarInset className="h-svh min-h-0 min-w-0 overflow-hidden md:h-[calc(100svh-1rem)]">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <h1 className="text-sm font-medium">
-            {workspaceTitle(location.pathname, {
-              inbox: t("inbox"),
-              contacts: t("contacts"),
-              messageChannels: t("messageChannels"),
-              settings: t("settings"),
-            })}
-          </h1>
-        </header>
-        <div className="flex min-h-0 flex-1 overflow-auto">
-          <Outlet context={identity} />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <Outlet context={identity} />
+      </div>
+    </div>
   )
 }
