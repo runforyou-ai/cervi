@@ -28,10 +28,64 @@ func TestPlatformMethodsRequireCapability(t *testing.T) {
 	assertMethodNotAllowed(t, err)
 }
 
+type sessionBackend struct {
+	Backend
+	installed   bool
+	orgName     string
+	identity    Identity
+	identityErr error
+}
+
+func (b *sessionBackend) InstallationStatus(context.Context, RequestMeta) (InstallationStatus, error) {
+	return InstallationStatus{Installed: b.installed, OrganizationName: b.orgName}, nil
+}
+
+func (b *sessionBackend) LoadIdentity(context.Context, RequestMeta) (Identity, error) {
+	if b.identityErr != nil {
+		return Identity{}, b.identityErr
+	}
+	return b.identity, nil
+}
+
+// TestLoadSessionResolvesWebEntry 验证 Web 端按初始化与登录状态选择入口。
+func TestLoadSessionResolvesWebEntry(t *testing.T) {
+	identity := Identity{
+		Organization: Organization{ID: "organization-1", Name: "鹿行"},
+		User:         User{ID: "user-1", DisplayName: "所有者"},
+	}
+	service := New(&sessionBackend{installed: false})
+	session, err := service.LoadSession(context.Background(), RequestMeta{})
+	if err != nil || session.State != SessionStateSetup {
+		t.Fatalf("uninstalled session = %+v, err = %v", session, err)
+	}
+
+	service = New(&sessionBackend{installed: true, orgName: "鹿行"})
+	session, err = service.LoadSession(context.Background(), RequestMeta{})
+	if err != nil || session.State != SessionStateLogin || session.OrganizationName != "鹿行" {
+		t.Fatalf("anonymous session = %+v, err = %v", session, err)
+	}
+
+	service = New(&sessionBackend{installed: true, orgName: "鹿行", identity: identity})
+	session, err = service.LoadSession(context.Background(), RequestMeta{Token: "token"})
+	if err != nil || session.State != SessionStateReady || session.Identity == nil || session.Identity.User.ID != "user-1" {
+		t.Fatalf("ready session = %+v, err = %v", session, err)
+	}
+
+	service = New(&sessionBackend{
+		installed:   true,
+		orgName:     "鹿行",
+		identityErr: &Error{State: SessionStateLogin, Message: "请先登录。"},
+	})
+	session, err = service.LoadSession(context.Background(), RequestMeta{Token: "expired"})
+	if err != nil || session.State != SessionStateLogin || session.OrganizationName != "鹿行" {
+		t.Fatalf("expired session = %+v, err = %v", session, err)
+	}
+}
+
 func assertMethodNotAllowed(t *testing.T, err error) {
 	t.Helper()
 	var apiError *Error
-	if !errors.As(err, &apiError) || apiError.Code != "METHOD_NOT_ALLOWED" {
+	if !errors.As(err, &apiError) || apiError.Kind != ErrorKindFailed {
 		t.Fatalf("error = %#v, want METHOD_NOT_ALLOWED", err)
 	}
 }

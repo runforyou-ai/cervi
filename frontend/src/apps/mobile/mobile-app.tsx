@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import { Navigate, Route, Routes, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { logout, resolveNativeEntry, type Identity } from "@/api"
+import { loadSession, logout, sessionPath, SessionState, type Identity } from "@/api"
 import { Button } from "@/components/ui/button"
 import { LoginPage } from "@/features/auth/login-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
@@ -19,19 +19,22 @@ function MobileHomePage() {
   const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
 
-  /** 读取原生端入口并加载当前身份。 */
+  /** 读取会话，未就绪则跳转入口。 */
   const fetchIdentity = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      const entry = await resolveNativeEntry()
-      if (entry.status !== "ready") {
-        navigate(entry.status === "connect" ? "/connect" : "/login", {
-          replace: true,
-        })
+      const session = await loadSession()
+      if (session.state === SessionState.SessionStateReady && session.identity) {
+        setIdentity(session.identity)
         return
       }
-      setIdentity(entry.identity)
+      const path = sessionPath(session.state)
+      if (path) {
+        navigate(path, { replace: true })
+        return
+      }
+      setError(t("loadError"))
     } catch {
       setError(t("loadError"))
     } finally {

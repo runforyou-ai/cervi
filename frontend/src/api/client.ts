@@ -2,6 +2,7 @@
 import { CancelError, type CancellablePromise } from "@wailsio/runtime"
 
 import {
+  ErrorKind,
   Locale,
   type Auth,
   type RequestMeta,
@@ -14,31 +15,36 @@ const tokenStorageKey = "cervi.token"
 type StoredToken = Pick<Auth, "token" | "expiresAt">
 
 type ErrorCause = {
-  status: number
-  code: string
+  kind?: string
+  state?: string
   message: string
   fields?: Record<string, string>
 }
 
 /** 应用服务返回的结构化业务错误。 */
 export class ApiError extends Error {
-  readonly status: number
-  readonly code: string
+  readonly kind: string
+  readonly state: string
   readonly fields: Record<string, string>
 
   /** 创建结构化业务错误。 */
   constructor(
-    status: number,
-    code: string,
+    kind: string,
+    state: string,
     message: string,
     fields: Record<string, string> = {},
   ) {
     super(message)
     this.name = "ApiError"
-    this.status = status
-    this.code = code
+    this.kind = kind
+    this.state = state
     this.fields = fields
   }
+}
+
+/** 判断是否为应用服务业务错误。 */
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError
 }
 
 /** 注入认证和语言后调用应用服务。卸载时忽略结果，不取消绑定。 */
@@ -95,11 +101,6 @@ export function clearToken() {
   window.localStorage.removeItem(tokenStorageKey)
 }
 
-/** 判断本地是否仍有未过期的登录令牌。 */
-export function hasToken() {
-  return loadToken() !== ""
-}
-
 /** 组装当前请求的令牌和语言。 */
 function requestMeta(): RequestMeta {
   return {
@@ -131,15 +132,15 @@ function normalizeError(error: unknown) {
     if (error instanceof CancelError && cause instanceof Error) return cause
     if (isErrorCause(cause)) {
       return new ApiError(
-        cause.status,
-        cause.code,
+        cause.kind ?? "",
+        cause.state ?? "",
         cause.message,
-        cause.fields,
+        cause.fields ?? {},
       )
     }
     return error
   }
-  return new ApiError(500, "UNKNOWN_ERROR", "Request failed")
+  return new ApiError(ErrorKind.ErrorKindFailed, "", "Request failed")
 }
 
 /** 判断异常原因是否为结构化业务错误。 */
@@ -147,8 +148,7 @@ function isErrorCause(value: unknown): value is ErrorCause {
   if (typeof value !== "object" || value === null) return false
   const cause = value as Partial<ErrorCause>
   return (
-    typeof cause.status === "number" &&
-    typeof cause.code === "string" &&
-    typeof cause.message === "string"
+    typeof cause.message === "string" &&
+    ("kind" in cause || "state" in cause || "fields" in cause)
   )
 }

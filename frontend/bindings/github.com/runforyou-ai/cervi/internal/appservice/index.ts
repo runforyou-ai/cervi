@@ -11,8 +11,10 @@ export {
     ContactMethodType,
     ContactSort,
     ContactStage,
+    ErrorKind,
     Locale,
     MessageAuthor,
+    SessionState,
     StorageProvider,
     UserRole,
     UserStatus
@@ -44,6 +46,7 @@ export type {
     PageInfo,
     RequestMeta,
     S3Setting,
+    Session,
     User,
     UserList,
     UserListInput,

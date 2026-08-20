@@ -27,7 +27,7 @@ func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta
 func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
 	b.lastMeta = meta
 	if input.Email != "owner@example.com" || input.Password != "password123" {
-		return appservice.Auth{}, &appservice.Error{Status: http.StatusUnauthorized, Code: "INVALID_CREDENTIALS", Message: "账号或密码错误。"}
+		return appservice.Auth{}, &appservice.Error{Kind: appservice.ErrorKindInvalid, Message: "账号或密码错误。"}
 	}
 	return appservice.Auth{
 		Identity:  testIdentity(),
@@ -39,7 +39,7 @@ func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, inpu
 func (b *testBackend) LoadIdentity(_ context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
 	b.lastMeta = meta
 	if meta.Token != "test-token" {
-		return appservice.Identity{}, &appservice.Error{Status: http.StatusUnauthorized, Code: "AUTH_REQUIRED", Message: "请先登录。"}
+		return appservice.Identity{}, &appservice.Error{State: appservice.SessionStateLogin, Message: "请先登录。"}
 	}
 	return testIdentity(), nil
 }
@@ -72,7 +72,7 @@ func TestAuthenticationUsesBearerToken(t *testing.T) {
 	}
 
 	unauthorized := doJSON(t, http.MethodGet, server.URL+"/auth/identity", nil, "")
-	assertErrorCode(t, unauthorized, http.StatusUnauthorized, "AUTH_REQUIRED")
+	assertError(t, unauthorized, http.StatusUnauthorized, "", appservice.SessionStateLogin)
 
 	authorized := doJSON(t, http.MethodGet, server.URL+"/auth/identity", nil, auth.Token)
 	defer authorized.Body.Close()
@@ -134,7 +134,7 @@ func TestInvalidJSONUsesRequestedLanguage(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer response.Body.Close()
-	assertErrorResponse(t, response, http.StatusBadRequest, "VALIDATION_FAILED")
+	assertError(t, response, http.StatusBadRequest, appservice.ErrorKindInvalid, "")
 	if response.Header.Get("Content-Language") != "zh-CN" {
 		t.Fatalf("language = %q, want zh-CN", response.Header.Get("Content-Language"))
 	}
@@ -182,14 +182,9 @@ func doJSON(t *testing.T, method, endpoint string, body any, token string) *http
 	return response
 }
 
-func assertErrorCode(t *testing.T, response *http.Response, status int, code string) {
+func assertError(t *testing.T, response *http.Response, status int, kind appservice.ErrorKind, state appservice.SessionState) {
 	t.Helper()
 	defer response.Body.Close()
-	assertErrorResponse(t, response, status, code)
-}
-
-func assertErrorResponse(t *testing.T, response *http.Response, status int, code string) {
-	t.Helper()
 	if response.StatusCode != status {
 		t.Fatalf("status = %d, want %d", response.StatusCode, status)
 	}
@@ -197,7 +192,7 @@ func assertErrorResponse(t *testing.T, response *http.Response, status int, code
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload.Error.Code != code {
-		t.Fatalf("error code = %q, want %q", payload.Error.Code, code)
+	if payload.Error.Kind != kind || payload.Error.State != state {
+		t.Fatalf("error = %+v, want kind %q state %q", payload.Error, kind, state)
 	}
 }

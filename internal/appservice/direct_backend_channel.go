@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"net/http"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -27,7 +26,7 @@ func (b *DirectBackend) ListWebsiteChannels(ctx context.Context, meta RequestMet
 			return WebsiteChannelList{}, ctx.Err()
 		}
 		slog.Warn("读取网站渠道列表失败", "organization_id", identity.Organization.ID, "deleted", deleted, "error", err)
-		return WebsiteChannelList{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelListFailed, nil)
+		return WebsiteChannelList{}, FailedError(meta, cervii18n.ErrorChannelListFailed)
 	}
 	result := make([]WebsiteChannelSummary, 0, len(channels))
 	for index := range channels {
@@ -135,7 +134,7 @@ func (b *DirectBackend) ListChannels(ctx context.Context, meta RequestMeta) (Cha
 			return ChannelList{}, ctx.Err()
 		}
 		slog.Warn("读取渠道列表失败", "organization_id", identity.Organization.ID, "error", err)
-		return ChannelList{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelSummaryListFailed, nil)
+		return ChannelList{}, FailedError(meta, cervii18n.ErrorChannelSummaryListFailed)
 	}
 	result := make([]ChannelSummary, 0, len(channels))
 	for _, channel := range channels {
@@ -151,7 +150,7 @@ func (b *DirectBackend) channelMutationError(ctx context.Context, meta RequestMe
 	}
 	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
-		return localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
 	}
 	return b.channelError(ctx, meta, err, failureKey)
 }
@@ -162,13 +161,13 @@ func (b *DirectBackend) channelError(ctx context.Context, meta RequestMeta, err 
 		return ctx.Err()
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
-		return localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, channelaction.ErrNotFound) {
-		return localizedError(meta, http.StatusNotFound, "CHANNEL_NOT_FOUND", cervii18n.ErrorChannelNotFound, nil)
+		return NotFoundError(meta, cervii18n.ErrorChannelNotFound)
 	}
 	slog.Warn("网站渠道操作失败", "failure", failureKey, "error", err)
-	return localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", failureKey, nil)
+	return FailedError(meta, failureKey)
 }
 
 func websiteChannelFromModel(channel *servermodels.Channel) WebsiteChannelSummary {

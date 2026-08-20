@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { ApiError, install } from "@/api"
+import { isApiError, install, recoverSession } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,11 +46,10 @@ export function SetupForm() {
       await install(values)
       navigate("/inbox", { replace: true })
     } catch (error) {
-      if (error instanceof ApiError) {
-        if (error.code === "ALREADY_INITIALIZED") {
-          navigate("/login", { replace: true })
-          return
-        }
+      if (recoverSession(error, navigate)) {
+        return
+      }
+      if (isApiError(error)) {
         toast.error(
           apiErrorMessage(error, [
             "organizationName",

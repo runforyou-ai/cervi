@@ -5,7 +5,6 @@ package appservice
 import (
 	"context"
 	"log/slog"
-	"net/http"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
@@ -91,7 +90,7 @@ func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta
 		return err
 	}
 	if !status.Installed {
-		return localizedError(meta, http.StatusConflict, "INSTALLATION_REQUIRED", cervii18n.ErrorInstallationRequired, nil)
+		return SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
 	}
 	return nil
 }
@@ -102,7 +101,7 @@ func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*se
 		return nil, err
 	}
 	if meta.Token == "" {
-		return nil, localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
+		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	identity, err := b.resolveIdentity.Execute(ctx, meta.Token)
 	if err != nil {
@@ -110,10 +109,11 @@ func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*se
 			return nil, ctx.Err()
 		}
 		slog.Warn("读取登录令牌失败", "error", err)
-		return nil, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorAuthenticationStatusFailed, nil)
+		return nil, FailedError(meta, cervii18n.ErrorAuthenticationStatusFailed)
 	}
 	if identity == nil {
-		return nil, localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
+		slog.Info("登录令牌无效")
+		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	return identity, nil
 }

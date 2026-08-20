@@ -134,6 +134,13 @@ export function LoadInbox(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
+ * LoadSession 返回当前应进入的会话入口。
+ */
+export function LoadSession(meta: $models.RequestMeta): $CancellablePromise<$models.Session> {
+    return $Call.ByID(2537050686, meta);
+}
+
+/**
  * Login 校验账号密码并返回登录令牌。
  */
 export function Login(meta: $models.RequestMeta, input: $models.LoginInput): $CancellablePromise<$models.Auth> {

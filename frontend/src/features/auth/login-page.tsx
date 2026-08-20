@@ -4,10 +4,10 @@ import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
-import { getInstallationStatus } from "@/api"
+import { loadSession, sessionPath, SessionState } from "@/api"
 import { LoginForm } from "@/features/auth/login-form"
 
-/** 已连接企业时展示企业名称、登录表单，以及原生端切换服务器入口。 */
+/** 已登录则进入工作台；已连接企业时展示企业名称、登录表单，以及原生端切换服务器入口。 */
 export function LoginPage({
   allowServerChange = false,
 }: {
@@ -15,34 +15,47 @@ export function LoginPage({
 }) {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
   const [organizationName, setOrganizationName] = useState("")
 
   useEffect(() => {
     const controller = new AbortController()
     const disconnectedPath = allowServerChange ? "/connect" : "/setup"
 
-    void getInstallationStatus(controller.signal)
-      .then((status) => {
+    /** 按会话入口进入工作台或展示登录表单。 */
+    async function prepareLoginPage() {
+      try {
+        const session = await loadSession(controller.signal)
         if (controller.signal.aborted) {
           return
         }
-        const name = status.organizationName.trim()
-        if (!status.installed || name === "") {
-          navigate(disconnectedPath, { replace: true })
+        if (session.state === SessionState.SessionStateReady) {
+          navigate("/inbox", { replace: true })
           return
         }
-        setOrganizationName(name)
-      })
-      .catch(() => {
+        if (session.state === SessionState.SessionStateLogin) {
+          setOrganizationName(session.organizationName?.trim() ?? "")
+          return
+        }
+        navigate(sessionPath(session.state) ?? disconnectedPath, {
+          replace: true,
+        })
+      } catch {
         if (!controller.signal.aborted) {
           navigate(disconnectedPath, { replace: true })
         }
-      })
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
+      }
+    }
 
+    void prepareLoginPage()
     return () => controller.abort()
   }, [allowServerChange, navigate])
 
-  if (organizationName === "") {
+  if (loading || organizationName === "") {
     return (
       <main className="flex min-h-dvh items-center justify-center">
         <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
@@ -67,7 +80,7 @@ export function LoginPage({
             ) : null}
           </p>
         </div>
-        <LoginForm allowServerChange={allowServerChange} />
+        <LoginForm />
       </div>
     </main>
   )

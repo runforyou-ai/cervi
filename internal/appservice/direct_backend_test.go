@@ -88,7 +88,7 @@ func TestDirectBackendMapsValidationErrors(t *testing.T) {
 	if !ok {
 		t.Fatalf("error type = %T", err)
 	}
-	if applicationError.Status != http.StatusBadRequest || applicationError.Code != "VALIDATION_FAILED" || applicationError.Fields["stage"] != "请选择有效的联系人阶段。" {
+	if applicationError.Kind != ErrorKindInvalid || applicationError.HTTPStatus() != http.StatusBadRequest || applicationError.Fields["stage"] != "请选择有效的联系人阶段。" {
 		t.Fatalf("application error = %#v", applicationError)
 	}
 
@@ -99,7 +99,7 @@ func TestDirectBackendMapsValidationErrors(t *testing.T) {
 		cervii18n.ErrorS3SettingSaveFailed,
 	)
 	converted := settingError.(*Error)
-	if converted.Status != http.StatusBadRequest || converted.Fields["provider"] == "" {
+	if converted.Kind != ErrorKindInvalid || converted.HTTPStatus() != http.StatusBadRequest || converted.Fields["provider"] == "" {
 		t.Fatalf("setting error = %#v", converted)
 	}
 }

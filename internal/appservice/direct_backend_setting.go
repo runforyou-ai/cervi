@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"net/http"
 
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -26,7 +25,7 @@ func (b *DirectBackend) GetS3Setting(ctx context.Context, meta RequestMeta) (S3S
 			return S3Setting{}, ctx.Err()
 		}
 		slog.Warn("读取对象存储设置失败", "organization_id", identity.Organization.ID, "error", err)
-		return S3Setting{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorS3SettingReadFailed, nil)
+		return S3Setting{}, FailedError(meta, cervii18n.ErrorS3SettingReadFailed)
 	}
 	return s3SettingFromAction(setting), nil
 }
@@ -65,16 +64,16 @@ func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, er
 	}
 	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
-		return localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, s3SettingFieldKeys(validationError.Fields))
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, s3SettingFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
-		return localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, settingaction.ErrS3ConnectionFailed) {
-		return localizedError(meta, http.StatusUnprocessableEntity, "S3_CONNECTION_FAILED", cervii18n.ErrorS3ConnectionTestFailed, nil)
+		return FailedError(meta, cervii18n.ErrorS3ConnectionTestFailed)
 	}
 	slog.Warn("对象存储操作失败", "failure", failureKey, "error", err)
-	return localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", failureKey, nil)
+	return FailedError(meta, failureKey)
 }
 
 func s3SettingToAction(input S3Setting) settingaction.S3Setting {

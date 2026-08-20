@@ -4,7 +4,7 @@ import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
-import { ApiError, loadInbox, type InboxData } from "@/api"
+import { loadInbox, recoverSession, type InboxData } from "@/api"
 import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
 
@@ -27,9 +27,7 @@ export function InboxRoute() {
         conversation_count: inbox.conversations.length,
       })
     } catch (requestError) {
-      if (requestError instanceof ApiError && requestError.code === "AUTH_REQUIRED") {
-        console.info("未登录，进入登录页")
-        navigate("/login", { replace: true })
+      if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("消息加载失败", requestError)
