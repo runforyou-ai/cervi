@@ -37,6 +37,7 @@ export type {
     Identity,
     Inbox,
     InstallWorkspaceInput,
+    InstallationStatus,
     LoginInput,
     Message,
     Organization,

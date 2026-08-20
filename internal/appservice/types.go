@@ -95,6 +95,12 @@ type RequestMeta struct {
 	Locale Locale `json:"locale"`
 }
 
+// InstallationStatus 定义企业初始化状态和公开企业名称。
+type InstallationStatus struct {
+	Installed        bool   `json:"installed"`
+	OrganizationName string `json:"organizationName"`
+}
+
 // InstallWorkspaceInput 定义企业初始化输入。
 type InstallWorkspaceInput struct {
 	OrganizationName string `json:"organizationName"`

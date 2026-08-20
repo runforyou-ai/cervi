@@ -34,7 +34,7 @@ const zhCN = {
     serverError: "初始化失败，请稍后重试。",
   },
   auth: {
-    title: "登录 Cervi",
+    title: "登录",
     description: "使用所有者邮箱和密码登录。",
     emailLabel: "邮箱",
     passwordLabel: "密码",

@@ -49,7 +49,10 @@ export function LoginForm({
       navigate("/inbox", { replace: true })
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.code === "SERVER_CONNECTION_REQUIRED") {
+        if (
+          error.code === "SERVER_CONNECTION_REQUIRED" ||
+          (allowServerChange && error.code === "SERVER_UNAVAILABLE")
+        ) {
           navigate("/connect", { replace: true })
           return
         }
@@ -101,16 +104,6 @@ export function LoginForm({
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {isSubmitting ? t("submitting") : t("submit")}
             </Button>
-            {allowServerChange ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={isSubmitting}
-                onClick={() => navigate("/connect")}
-              >
-                {t("changeServer")}
-              </Button>
-            ) : null}
           </FieldGroup>
         </form>
       </CardContent>

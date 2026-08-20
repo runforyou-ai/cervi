@@ -37,13 +37,11 @@ func NewBackend(store Store) (*Backend, error) {
 	return &Backend{connection: remoteConnection}, nil
 }
 
-// InstallationStatus 返回远程服务端是否已完成初始化。
-func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.RequestMeta) (bool, error) {
-	var output struct {
-		Installed bool `json:"installed"`
-	}
+// InstallationStatus 返回远程服务端初始化状态和公开企业名称。
+func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.RequestMeta) (appservice.InstallationStatus, error) {
+	var output appservice.InstallationStatus
 	err := b.do(ctx, meta, http.MethodGet, "/installation/status", nil, nil, &output)
-	return output.Installed, err
+	return output, err
 }
 
 // Login 校验账号密码并返回登录令牌。

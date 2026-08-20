@@ -85,9 +85,9 @@ export function InstallWorkspace(meta: $models.RequestMeta, input: $models.Insta
 }
 
 /**
- * InstallationStatus 返回服务端是否已完成初始化。
+ * InstallationStatus 返回服务端初始化状态和公开企业名称。
  */
-export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromise<boolean> {
+export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromise<$models.InstallationStatus> {
     return $Call.ByID(3480414020, meta);
 }
 

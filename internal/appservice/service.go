@@ -4,7 +4,7 @@ import "context"
 
 // Backend 定义各运行平台都需要实现的业务调用。
 type Backend interface {
-	InstallationStatus(context.Context, RequestMeta) (bool, error)
+	InstallationStatus(context.Context, RequestMeta) (InstallationStatus, error)
 	Login(context.Context, RequestMeta, LoginInput) (Auth, error)
 	Logout(context.Context, RequestMeta) error
 	LoadIdentity(context.Context, RequestMeta) (Identity, error)
@@ -51,8 +51,8 @@ func New(backend Backend) *Service {
 	return &Service{backend: backend}
 }
 
-// InstallationStatus 返回服务端是否已完成初始化。
-func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (bool, error) {
+// InstallationStatus 返回服务端初始化状态和公开企业名称。
+func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
 	return s.backend.InstallationStatus(ctx, meta)
 }
 

@@ -1,7 +1,8 @@
-/** 登录、登出、企业初始化和企业服务器地址调用。 */
+/** 登录、登出、企业初始化、初始化状态和企业服务器地址调用。 */
 import {
   ConnectServer,
   InstallWorkspace,
+  InstallationStatus,
   LoadIdentity,
   Login,
   Logout,
@@ -15,6 +16,9 @@ import { ApiError, bind, call, clearToken, storeToken } from "@/api/client"
 
 /** 读取已保存的企业服务器地址。 */
 export const getServerURL = bind(ServerURL)
+
+/** 读取企业初始化状态和公开企业名称。 */
+export const getInstallationStatus = bind(InstallationStatus)
 
 /** 登录并保存当前令牌。 */
 export async function login(input: LoginInput) {

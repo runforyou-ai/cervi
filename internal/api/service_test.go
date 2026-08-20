@@ -20,8 +20,8 @@ type testBackend struct {
 	lastUserList appservice.UserListInput
 }
 
-func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (bool, error) {
-	return true, nil
+func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
+	return appservice.InstallationStatus{Installed: true, OrganizationName: "鹿行"}, nil
 }
 
 func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
@@ -81,6 +81,25 @@ func TestAuthenticationUsesBearerToken(t *testing.T) {
 	}
 	if backend.lastMeta.Token != auth.Token {
 		t.Fatalf("backend token = %q, want %q", backend.lastMeta.Token, auth.Token)
+	}
+}
+
+// TestInstallationStatusReturnsOrganizationName 验证未登录可读取公开企业名称。
+func TestInstallationStatusReturnsOrganizationName(t *testing.T) {
+	server := httptest.NewServer(NewService(appservice.New(&testBackend{})))
+	defer server.Close()
+
+	response := doJSON(t, http.MethodGet, server.URL+"/installation/status", nil, "")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	var status appservice.InstallationStatus
+	if err := json.NewDecoder(response.Body).Decode(&status); err != nil {
+		t.Fatal(err)
+	}
+	if !status.Installed || status.OrganizationName != "鹿行" {
+		t.Fatalf("status = %#v", status)
 	}
 }
 

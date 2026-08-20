@@ -1,12 +1,17 @@
 /** 判断原生端进入工作台、登录页还是连接页。 */
-import { getServerURL, loadIdentity } from "@/api/auth"
+import { getInstallationStatus, getServerURL, loadIdentity } from "@/api/auth"
 import { ApiError, hasToken } from "@/api/client"
-import type { Identity } from "@/api/service"
+import type { Identity, InstallationStatus } from "@/api/service"
 
 export type NativeEntry =
   | { status: "ready"; identity: Identity }
   | { status: "connect" }
   | { status: "login" }
+
+/** 判断是否已连接到已初始化的企业。 */
+function isConnectedEnterprise(status: InstallationStatus) {
+  return status.installed && status.organizationName.trim() !== ""
+}
 
 /** 判断原生端进入工作台、登录页还是连接页。 */
 export async function resolveNativeEntry(): Promise<NativeEntry> {
@@ -14,7 +19,15 @@ export async function resolveNativeEntry(): Promise<NativeEntry> {
     return { status: "connect" }
   }
   if (!hasToken()) {
-    return { status: "login" }
+    try {
+      const status = await getInstallationStatus()
+      if (!isConnectedEnterprise(status)) {
+        return { status: "connect" }
+      }
+      return { status: "login" }
+    } catch {
+      return { status: "connect" }
+    }
   }
   try {
     return { status: "ready", identity: await loadIdentity() }
@@ -22,7 +35,8 @@ export async function resolveNativeEntry(): Promise<NativeEntry> {
     if (error instanceof ApiError) {
       if (
         error.code === "SERVER_CONNECTION_REQUIRED" ||
-        error.code === "INSTALLATION_REQUIRED"
+        error.code === "INSTALLATION_REQUIRED" ||
+        error.code === "SERVER_UNAVAILABLE"
       ) {
         return { status: "connect" }
       }

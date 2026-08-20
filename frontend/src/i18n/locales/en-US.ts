@@ -34,7 +34,7 @@ const enUS = {
     serverError: "Could not finish setup. Please try again.",
   },
   auth: {
-    title: "Log in to Cervi",
+    title: "Log in",
     description: "Use the owner email and password to log in.",
     emailLabel: "Email",
     passwordLabel: "Password",

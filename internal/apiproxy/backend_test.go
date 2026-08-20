@@ -61,7 +61,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/api/installation/status":
-			writeTestJSON(writer, http.StatusOK, map[string]bool{"installed": true})
+			writeTestJSON(writer, http.StatusOK, map[string]any{"installed": true, "organizationName": "鹿行"})
 		case "/api/inbox":
 			if request.Header.Get("Authorization") == "Bearer test-token" {
 				writeTestJSON(writer, http.StatusOK, map[string]any{
@@ -99,6 +99,13 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	}
 	if store.serverURL != remote.URL {
 		t.Fatalf("server URL = %q, want %q", store.serverURL, remote.URL)
+	}
+	status, err := backend.InstallationStatus(context.Background(), meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Installed || status.OrganizationName != "鹿行" {
+		t.Fatalf("status = %#v", status)
 	}
 	serverURL, err := backend.ServerURL(context.Background(), meta)
 	if err != nil {

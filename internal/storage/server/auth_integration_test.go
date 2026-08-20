@@ -46,7 +46,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if alreadyInstalled {
+	if alreadyInstalled.Installed {
 		t.Fatal("fresh database is already installed")
 	}
 
@@ -62,6 +62,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if installed.Identity.User.Role != "owner" || installed.Identity.Organization.Name != "鹿行测试公司" {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
+	}
+	currentStatus, err := status.Execute(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !currentStatus.Installed || currentStatus.OrganizationName != "鹿行测试公司" {
+		t.Fatalf("status = %#v", currentStatus)
 	}
 
 	resolveIdentity := authaction.NewResolveIdentityQuery(db)

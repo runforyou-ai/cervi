@@ -243,6 +243,14 @@ export interface InstallWorkspaceInput {
 }
 
 /**
+ * InstallationStatus 定义企业初始化状态和公开企业名称。
+ */
+export interface InstallationStatus {
+    "installed": boolean;
+    "organizationName": string;
+}
+
+/**
  * Locale 表示应用支持的本地化语言。
  */
 export enum Locale {

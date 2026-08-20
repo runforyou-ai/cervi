@@ -2,6 +2,7 @@
 export { ApiError, hasToken } from "@/api/client"
 export {
   connectServer,
+  getInstallationStatus,
   getServerURL,
   install,
   loadIdentity,

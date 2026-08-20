@@ -41,17 +41,28 @@ export class ApiError extends Error {
   }
 }
 
-/** 注入认证和语言后调用应用服务。 */
+/** 注入认证和语言后调用应用服务；页面卸载时只忽略结果，不取消 Wails 绑定。 */
 export async function call<T>(
   operation: (meta: RequestMeta) => CancellablePromise<T>,
   signal?: AbortSignal,
 ): Promise<T> {
   try {
-    const pending = operation(requestMeta())
-    return await (signal ? pending.cancelOn(signal) : pending)
+    const result = await operation(requestMeta())
+    if (signal?.aborted) {
+      throw abortError()
+    }
+    return result
   } catch (error) {
+    if (signal?.aborted) {
+      throw abortError()
+    }
     throw normalizeError(error)
   }
+}
+
+/** 返回调用方已离开后应忽略的中止错误。 */
+function abortError() {
+  return new DOMException("The operation was aborted.", "AbortError")
 }
 
 /** 把应用服务方法包装成自动注入认证信息的前端调用。 */

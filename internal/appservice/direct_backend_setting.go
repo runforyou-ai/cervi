@@ -14,6 +14,50 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
+// GetS3Setting 返回当前企业的对象存储设置。
+func (b *DirectBackend) GetS3Setting(ctx context.Context, meta RequestMeta) (S3Setting, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return S3Setting{}, err
+	}
+	setting, err := b.getS3Setting.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return S3Setting{}, ctx.Err()
+		}
+		slog.Warn("读取对象存储设置失败", "organization_id", identity.Organization.ID, "error", err)
+		return S3Setting{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorS3SettingReadFailed, nil)
+	}
+	return s3SettingFromAction(setting), nil
+}
+
+// SaveS3Setting 保存当前企业的对象存储设置。
+func (b *DirectBackend) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) (S3Setting, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return S3Setting{}, err
+	}
+	setting, err := b.saveS3Setting.Execute(ctx, identity, s3SettingToAction(input))
+	if err != nil {
+		return S3Setting{}, b.s3SettingError(ctx, meta, err, cervii18n.ErrorS3SettingSaveFailed)
+	}
+	slog.Info("对象存储设置保存成功", "organization_id", identity.Organization.ID, "provider", setting.Provider, "enabled", setting.Enabled)
+	return s3SettingFromAction(setting), nil
+}
+
+// TestS3Setting 测试对象存储连接。
+func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) error {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	if err := b.testS3Setting.Execute(ctx, s3SettingToAction(input)); err != nil {
+		return b.s3SettingError(ctx, meta, err, cervii18n.ErrorS3ConnectionTestFailed)
+	}
+	slog.Info("对象存储连接测试成功", "organization_id", identity.Organization.ID, "provider", input.Provider)
+	return nil
+}
+
 func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()

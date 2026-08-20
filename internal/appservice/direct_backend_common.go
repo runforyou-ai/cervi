@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
-	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -29,17 +27,6 @@ func userFromModel(user servermodels.User) User {
 	return User{ID: user.ID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status)}
 }
 
-func installationFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		installationaction.ValidationOrganizationNameRequired: cervii18n.FieldOrganizationNameRequired,
-		installationaction.ValidationDisplayNameRequired:      cervii18n.FieldDisplayNameRequired,
-		installationaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,
-		installationaction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
-		installationaction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
-	}
-	return translateValidationFields(fields, keys)
-}
-
 func translateValidationFields[Code comparable](fields map[string]Code, keys map[Code]cervii18n.Key) map[string]cervii18n.Key {
 	result := make(map[string]cervii18n.Key, len(fields))
 	for field, code := range fields {
@@ -51,4 +38,11 @@ func translateValidationFields[Code comparable](fields map[string]Code, keys map
 		result[field] = key
 	}
 	return result
+}
+
+func optionalDomain[T ~string, D ~string](value *T) D {
+	if value == nil {
+		return ""
+	}
+	return D(*value)
 }

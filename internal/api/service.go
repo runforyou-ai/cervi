@@ -76,11 +76,8 @@ func (s *Service) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 }
 
 func (s *Service) installationStatus(c *gin.Context) {
-	installed, err := s.application.InstallationStatus(c.Request.Context(), requestMeta(c))
-	if writeApplicationError(c, err) {
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"installed": installed})
+	status, err := s.application.InstallationStatus(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, status, err)
 }
 
 func (s *Service) install(c *gin.Context) {
