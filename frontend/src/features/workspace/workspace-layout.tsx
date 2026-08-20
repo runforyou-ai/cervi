@@ -9,7 +9,7 @@ import {
   loadSession,
   logout,
   resolveNativeEntry,
-  type Principal,
+  type Identity,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -61,7 +61,7 @@ export function WorkspaceLayout({
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const location = useLocation()
-  const [principal, setPrincipal] = useState<Principal | null>(null)
+  const [identity, setIdentity] = useState<Identity | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
@@ -78,10 +78,10 @@ export function WorkspaceLayout({
           })
           return
         }
-        setPrincipal(entry.principal)
+        setIdentity(entry.identity)
         return
       }
-      setPrincipal(await loadSession())
+      setIdentity(await loadSession())
     } catch (requestError) {
       if (requestError instanceof ApiError) {
         if (requestError.code === "INSTALLATION_REQUIRED") {
@@ -115,7 +115,7 @@ export function WorkspaceLayout({
     }
   }
 
-  if (loading && !principal) {
+  if (loading && !identity) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
@@ -124,7 +124,7 @@ export function WorkspaceLayout({
     )
   }
 
-  if (!principal) {
+  if (!identity) {
     return (
       <main className="flex min-h-svh items-center justify-center p-6">
         <div className="text-center">
@@ -143,7 +143,7 @@ export function WorkspaceLayout({
   return (
     <SidebarProvider>
       <WorkspaceNavigation
-        principal={principal}
+        identity={identity}
         onLogout={handleLogout}
         loggingOut={loggingOut}
       />
@@ -164,7 +164,7 @@ export function WorkspaceLayout({
           </h1>
         </header>
         <div className="flex min-h-0 flex-1 overflow-auto">
-          <Outlet context={principal} />
+          <Outlet context={identity} />
         </div>
       </SidebarInset>
     </SidebarProvider>

@@ -19,6 +19,7 @@ export {
 } from "./models.js";
 
 export type {
+    ChannelList,
     ChannelSummary,
     Contact,
     ContactChannelIdentity,
@@ -32,13 +33,13 @@ export type {
     ContactSummary,
     Conversation,
     DirectoryUser,
+    Identity,
     Inbox,
     InstallWorkspaceInput,
     LoginInput,
     Message,
     Organization,
     PageInfo,
-    Principal,
     RequestMeta,
     S3Setting,
     Session,
@@ -49,5 +50,6 @@ export type {
     WebsiteChannelChatInterface,
     WebsiteChannelChatInterfaceInput,
     WebsiteChannelInput,
+    WebsiteChannelList,
     WebsiteChannelSummary
 } from "./models.js";

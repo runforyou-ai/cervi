@@ -24,7 +24,7 @@ func NewListUsersQuery(db *bun.DB) *ListUsersQuery {
 }
 
 // Execute 返回满足条件的企业成员分页列表。
-func (q *ListUsersQuery) Execute(ctx context.Context, principal *servermodels.Principal, input ListInput) (ListOutput, error) {
+func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListInput) (ListOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
 	input.Status = domain.UserStatus(strings.TrimSpace(string(input.Status)))
 	input.Role = domain.UserRole(strings.TrimSpace(string(input.Role)))
@@ -41,7 +41,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, principal *servermodels.Pr
 	}
 
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
-		query = query.Where("u.organization_id = ?", principal.Organization.ID)
+		query = query.Where("u.organization_id = ?", identity.Organization.ID)
 		if input.Status != "" {
 			query = query.Where("u.status = ?", input.Status)
 		}

@@ -59,8 +59,8 @@ func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error
 }
 
 // LoadSession 返回当前远程登录身份。
-func (b *Backend) LoadSession(ctx context.Context, meta appservice.RequestMeta) (appservice.Principal, error) {
-	var output appservice.Principal
+func (b *Backend) LoadSession(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
+	var output appservice.Identity
 	err := b.do(ctx, meta, http.MethodGet, "/auth/session", nil, nil, &output)
 	return output, err
 }
@@ -73,16 +73,14 @@ func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta) (a
 }
 
 // ListWebsiteChannels 返回远程网站渠道列表。
-func (b *Backend) ListWebsiteChannels(ctx context.Context, meta appservice.RequestMeta, deleted bool) ([]appservice.WebsiteChannelSummary, error) {
+func (b *Backend) ListWebsiteChannels(ctx context.Context, meta appservice.RequestMeta, deleted bool) (appservice.WebsiteChannelList, error) {
 	path := "/channels/website"
 	if deleted {
 		path += "/trash"
 	}
-	var output struct {
-		Channels []appservice.WebsiteChannelSummary `json:"channels"`
-	}
+	var output appservice.WebsiteChannelList
 	err := b.do(ctx, meta, http.MethodGet, path, nil, nil, &output)
-	return output.Channels, err
+	return output, err
 }
 
 // GetWebsiteChannel 返回远程网站渠道详情。
@@ -126,20 +124,18 @@ func (b *Backend) RestoreWebsiteChannel(ctx context.Context, meta appservice.Req
 }
 
 // ListChannels 返回远程渠道选择项。
-func (b *Backend) ListChannels(ctx context.Context, meta appservice.RequestMeta) ([]appservice.ChannelSummary, error) {
-	var output struct {
-		Channels []appservice.ChannelSummary `json:"channels"`
-	}
+func (b *Backend) ListChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.ChannelList, error) {
+	var output appservice.ChannelList
 	err := b.do(ctx, meta, http.MethodGet, "/channels", nil, nil, &output)
-	return output.Channels, err
+	return output, err
 }
 
 // ListUsers 返回远程企业成员列表。
 func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
 	query := url.Values{}
-	setQuery(query, "q", input.Query)
-	setQuery(query, "status", string(input.Status))
-	setQuery(query, "role", string(input.Role))
+	setQuery(query, "query", input.Query)
+	setOptionalQuery(query, "status", input.Status)
+	setOptionalQuery(query, "role", input.Role)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	var output appservice.UserList
@@ -161,10 +157,10 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 		path += "/trash"
 	}
 	query := url.Values{}
-	setQuery(query, "q", input.Query)
-	setQuery(query, "stage", string(input.Stage))
+	setQuery(query, "query", input.Query)
+	setOptionalQuery(query, "stage", input.Stage)
 	setQuery(query, "channelId", input.ChannelID)
-	setQuery(query, "methodType", string(input.MethodType))
+	setOptionalQuery(query, "methodType", input.MethodType)
 	setQuery(query, "sort", string(input.Sort))
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
@@ -337,6 +333,12 @@ func localError(meta appservice.RequestMeta, status int, code string, messageKey
 func setQuery(query url.Values, name, value string) {
 	if value != "" {
 		query.Set(name, value)
+	}
+}
+
+func setOptionalQuery[T ~string](query url.Values, name string, value *T) {
+	if value != nil {
+		setQuery(query, name, string(*value))
 	}
 }
 

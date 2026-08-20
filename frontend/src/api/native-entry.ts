@@ -1,9 +1,9 @@
 import { getServerURL, loadSession } from "@/api/auth"
 import { ApiError, hasSession } from "@/api/client"
-import type { Principal } from "@/api/service"
+import type { Identity } from "@/api/service"
 
 export type NativeEntry =
-  | { status: "ready"; principal: Principal }
+  | { status: "ready"; identity: Identity }
   | { status: "connect" }
   | { status: "login" }
 
@@ -16,7 +16,7 @@ export async function resolveNativeEntry(): Promise<NativeEntry> {
     return { status: "login" }
   }
   try {
-    return { status: "ready", principal: await loadSession() }
+    return { status: "ready", identity: await loadSession() }
   } catch (error) {
     if (error instanceof ApiError) {
       if (

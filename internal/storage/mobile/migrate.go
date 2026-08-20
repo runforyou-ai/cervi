@@ -16,7 +16,6 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
-// migrate 执行移动端 SQLite 数据库迁移。
 func migrate(ctx context.Context, db *sql.DB) error {
 	migrations, err := fs.Sub(migrationFiles, "migrations")
 	if err != nil {
@@ -31,10 +30,9 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	applied := len(results)
-	if applied == 0 {
+	if len(results) == 0 {
 		return nil
 	}
-	slog.Info("移动端数据库迁移完成", "applied", applied)
+	slog.Info("移动端数据库迁移完成", "applied", len(results))
 	return nil
 }

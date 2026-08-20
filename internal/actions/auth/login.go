@@ -30,7 +30,7 @@ type LoginInput struct {
 
 // LoginOutput 返回登录身份和新会话。
 type LoginOutput struct {
-	Principal *servermodels.Principal
+	Identity  *servermodels.Identity
 	Token     string
 	ExpiresAt time.Time
 }
@@ -58,9 +58,9 @@ func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutpu
 		return LoginOutput{}, ErrInvalidCredentials
 	}
 
-	issued, principal, err := createSession(ctx, a.db, user.ID)
+	issued, identity, err := createSession(ctx, a.db, user.ID)
 	if err != nil {
 		return LoginOutput{}, fmt.Errorf("create login session: %w", err)
 	}
-	return LoginOutput{Principal: principal, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
+	return LoginOutput{Identity: identity, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
 }

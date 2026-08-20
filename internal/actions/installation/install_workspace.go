@@ -34,7 +34,7 @@ type InstallWorkspaceInput struct {
 
 // InstallWorkspaceOutput 返回企业所有者和初始会话。
 type InstallWorkspaceOutput struct {
-	Principal *servermodels.Principal
+	Identity  *servermodels.Identity
 	Token     string
 	ExpiresAt time.Time
 }
@@ -62,7 +62,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		return InstallWorkspaceOutput{}, fmt.Errorf("create installation session: %w", err)
 	}
 
-	principal := &servermodels.Principal{}
+	identity := &servermodels.Identity{}
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.ExecContext(ctx, "LOCK TABLE organizations IN EXCLUSIVE MODE"); err != nil {
 			return err
@@ -113,13 +113,13 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			return err
 		}
 
-		principal.Organization = *organization
-		principal.User = *user
+		identity.Organization = *organization
+		identity.User = *user
 		return nil
 	})
 	if err != nil {
 		return InstallWorkspaceOutput{}, fmt.Errorf("install workspace: %w", err)
 	}
 
-	return InstallWorkspaceOutput{Principal: principal, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
+	return InstallWorkspaceOutput{Identity: identity, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
 }

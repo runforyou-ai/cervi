@@ -57,8 +57,8 @@ cervi/
 │   ├── i18n/                       # 后端本地化能力和翻译词条
 │   └── storage/
 │       ├── server/                 # PostgreSQL 连接、迁移和服务端模型
-│       ├── desktop/                # 桌面端 SQLite 存储和模型
-│       └── mobile/                 # 移动端 SQLite 存储和模型
+│       ├── desktop/                # 桌面端 SQLite 存储、迁移和模型
+│       └── mobile/                 # 移动端 SQLite 存储、迁移和模型
 ├── frontend/
 │   ├── bindings/                   # Wails 自动生成的 TypeScript 服务和类型绑定
 │   └── src/

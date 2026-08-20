@@ -7,16 +7,16 @@ type Backend interface {
 	InstallationStatus(context.Context, RequestMeta) (bool, error)
 	Login(context.Context, RequestMeta, LoginInput) (Session, error)
 	Logout(context.Context, RequestMeta) error
-	LoadSession(context.Context, RequestMeta) (Principal, error)
+	LoadSession(context.Context, RequestMeta) (Identity, error)
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
-	ListWebsiteChannels(context.Context, RequestMeta, bool) ([]WebsiteChannelSummary, error)
+	ListWebsiteChannels(context.Context, RequestMeta, bool) (WebsiteChannelList, error)
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
 	CreateWebsiteChannel(context.Context, RequestMeta, WebsiteChannelInput) (WebsiteChannelSummary, error)
 	UpdateWebsiteChannel(context.Context, RequestMeta, string, WebsiteChannelInput) (WebsiteChannelSummary, error)
 	UpdateWebsiteChannelChatInterface(context.Context, RequestMeta, string, WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error)
 	DeleteWebsiteChannel(context.Context, RequestMeta, string) error
 	RestoreWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
-	ListChannels(context.Context, RequestMeta) ([]ChannelSummary, error)
+	ListChannels(context.Context, RequestMeta) (ChannelList, error)
 	ListUsers(context.Context, RequestMeta, UserListInput) (UserList, error)
 	GetUser(context.Context, RequestMeta, string) (DirectoryUser, error)
 	ListContacts(context.Context, RequestMeta, ContactListInput) (ContactList, error)
@@ -76,7 +76,7 @@ func (s *Service) Logout(ctx context.Context, meta RequestMeta) error {
 }
 
 // LoadSession 返回当前登录身份。
-func (s *Service) LoadSession(ctx context.Context, meta RequestMeta) (Principal, error) {
+func (s *Service) LoadSession(ctx context.Context, meta RequestMeta) (Identity, error) {
 	return s.backend.LoadSession(ctx, meta)
 }
 
@@ -86,7 +86,7 @@ func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error
 }
 
 // ListWebsiteChannels 返回网站渠道列表。
-func (s *Service) ListWebsiteChannels(ctx context.Context, meta RequestMeta, deleted bool) ([]WebsiteChannelSummary, error) {
+func (s *Service) ListWebsiteChannels(ctx context.Context, meta RequestMeta, deleted bool) (WebsiteChannelList, error) {
 	return s.backend.ListWebsiteChannels(ctx, meta, deleted)
 }
 
@@ -121,7 +121,7 @@ func (s *Service) RestoreWebsiteChannel(ctx context.Context, meta RequestMeta, c
 }
 
 // ListChannels 返回当前企业的渠道选择项。
-func (s *Service) ListChannels(ctx context.Context, meta RequestMeta) ([]ChannelSummary, error) {
+func (s *Service) ListChannels(ctx context.Context, meta RequestMeta) (ChannelList, error) {
 	return s.backend.ListChannels(ctx, meta)
 }
 

@@ -21,54 +21,19 @@ import {
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
-  ContactMethodType,
   ContactSort,
-  ContactStage,
   StorageProvider,
-  UserRole,
-  UserStatus,
   type Contact,
   type ContactInput,
   type ContactList,
   type ContactListInput,
-  type Conversation,
+  type Conversation as GeneratedConversation,
   type Inbox,
   type UserListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 
-export {
-  ChannelType,
-  ContactMethodType,
-  ContactSort,
-  ContactStage,
-  Locale,
-  MessageAuthor,
-  StorageProvider,
-  UserRole,
-  UserStatus,
-} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
-export type {
-  ChannelSummary,
-  ContactChannelIdentity,
-  ContactInput,
-  ContactMethod,
-  ContactMethodInput,
-  ContactRecord,
-  ContactSummary,
-  DirectoryUser,
-  Message,
-  Organization,
-  PageInfo,
-  Principal,
-  S3Setting,
-  User,
-  WebsiteChannel,
-  WebsiteChannelChatInterface,
-  WebsiteChannelChatInterfaceInput,
-  WebsiteChannelInput,
-  WebsiteChannelSummary,
-} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+export * from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 
 export type StorageProviderId = Exclude<
   StorageProvider,
@@ -84,26 +49,19 @@ export type ContactListResponse = Omit<ContactList, "contacts"> & {
   contacts: NonNullable<ContactList["contacts"]>
 }
 
-export type ContactListQuery = Omit<
-  Partial<ContactListInput>,
-  "query" | "deleted"
-> & {
-  q?: string
-}
+export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
 
-export type UserListQuery = Omit<Partial<UserListInput>, "query"> & {
-  q?: string
-}
+export type UserListQuery = Partial<UserListInput>
 
-export type ConversationData = Omit<Conversation, "messages"> & {
-  messages: NonNullable<Conversation["messages"]>
+export type ConversationData = Omit<GeneratedConversation, "messages"> & {
+  messages: NonNullable<GeneratedConversation["messages"]>
 }
 
 export type InboxData = Omit<Inbox, "conversations"> & {
   conversations: ConversationData[]
 }
 
-export type { ConversationData as Conversation }
+export type Conversation = ConversationData
 
 export const getWebsiteChannel = bind(GetWebsiteChannel)
 export const createWebsiteChannel = bind(CreateWebsiteChannel)
@@ -134,15 +92,15 @@ function asList<T>(value: T[] | null | undefined): T[] {
 }
 
 export function listChannels(signal?: AbortSignal) {
-  return listChannelsBound(signal).then(asList)
+  return listChannelsBound(signal).then((list) => asList(list.channels))
 }
 
 export function listWebsiteChannels() {
-  return listWebsiteChannelsBound(false).then(asList)
+  return listWebsiteChannelsBound(false).then((list) => asList(list.channels))
 }
 
 export function listDeletedWebsiteChannels() {
-  return listWebsiteChannelsBound(true).then(asList)
+  return listWebsiteChannelsBound(true).then((list) => asList(list.channels))
 }
 
 export function getContact(contactId: string, signal?: AbortSignal) {
@@ -175,14 +133,14 @@ export function listDeletedContacts(
 export function listUsers(query: UserListQuery, signal?: AbortSignal) {
   return listUsersBound(
     {
-      query: query.q ?? "",
-      status: query.status ?? UserStatus.$zero,
-      role: query.role ?? UserRole.$zero,
+      query: query.query ?? "",
+      status: query.status ?? null,
+      role: query.role ?? null,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 50,
     },
     signal,
-  ).then((output) => ({ ...output, users: output.users ?? [] }))
+  ).then((output) => ({ ...output, users: asList(output.users) }))
 }
 
 export async function loadInbox(): Promise<InboxData> {
@@ -203,10 +161,10 @@ async function listContactsByDeleted(
 ) {
   const output = await listContactsBound(
     {
-      query: query.q ?? "",
-      stage: query.stage ?? ContactStage.$zero,
+      query: query.query ?? "",
+      stage: query.stage ?? null,
       channelId: query.channelId ?? "",
-      methodType: query.methodType ?? ContactMethodType.$zero,
+      methodType: query.methodType ?? null,
       sort: query.sort ?? ContactSort.ContactSortCreatedAtDescending,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 50,

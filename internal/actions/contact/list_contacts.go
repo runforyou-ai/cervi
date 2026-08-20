@@ -22,20 +22,20 @@ func NewListContactsQuery(db *bun.DB) *ListContactsQuery {
 }
 
 // Execute 返回满足查询条件的分页联系人列表。
-func (q *ListContactsQuery) Execute(ctx context.Context, principal *servermodels.Principal, input ListInput) (ListOutput, error) {
+func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListInput) (ListOutput, error) {
 	input, fields := normalizeListInput(input)
 	if len(fields) > 0 {
 		return ListOutput{}, &ValidationError{Fields: fields}
 	}
 
-	countQuery := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), principal.Organization.ID, input)
+	countQuery := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), identity.Organization.ID, input)
 	total, err := countQuery.Count(ctx)
 	if err != nil {
 		return ListOutput{}, fmt.Errorf("count contacts: %w", err)
 	}
 
 	contacts := make([]ContactSummary, 0)
-	query := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), principal.Organization.ID, input).
+	query := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), identity.Organization.ID, input).
 		ColumnExpr("c.id::text AS id").
 		ColumnExpr("c.display_name").
 		ColumnExpr("c.stage").

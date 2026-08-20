@@ -7,13 +7,14 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/google/uuid"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
+	"github.com/runforyou-ai/cervi/internal/common/fielderror"
+	"github.com/runforyou-ai/cervi/internal/common/recordid"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识联系人字段校验结果。
-type ValidationCode string
+type ValidationCode = fielderror.Code
 
 const (
 	ValidationIdentityRequired ValidationCode = "IDENTITY_REQUIRED"
@@ -30,15 +31,8 @@ const (
 	ValidationQueryInvalid     ValidationCode = "QUERY_INVALID"
 )
 
-// ValidationError 记录联系人字段校验结果。
-type ValidationError struct {
-	Fields map[string]ValidationCode
-}
-
-// Error 返回联系人校验错误说明。
-func (e *ValidationError) Error() string {
-	return "contact validation failed"
-}
+// ValidationError 表示联系人字段校验失败。
+type ValidationError = fielderror.Error
 
 // normalizeContactInput 规范化并校验联系人写入字段。
 func normalizeContactInput(input ContactInput) (ContactInput, map[string]ValidationCode) {
@@ -50,7 +44,7 @@ func normalizeContactInput(input ContactInput) (ContactInput, map[string]Validat
 	fields := make(map[string]ValidationCode)
 	if input.ChannelID == "" {
 		fields["channelId"] = ValidationChannelRequired
-	} else if !validUUID(input.ChannelID) {
+	} else if !recordid.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelInvalid
 	}
 	if len([]rune(input.DisplayName)) > 200 {
@@ -153,7 +147,7 @@ func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) 
 	if input.MethodType != "" && input.MethodType != domain.ContactMethodTypeEmail && input.MethodType != domain.ContactMethodTypePhone {
 		fields["methodType"] = ValidationQueryInvalid
 	}
-	if input.ChannelID != "" && !validUUID(input.ChannelID) {
+	if input.ChannelID != "" && !recordid.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationQueryInvalid
 	}
 	if input.Sort == "" {
@@ -195,10 +189,4 @@ func normalizeMethodValue(methodType domain.ContactMethodType, value string) (st
 	default:
 		return "", false
 	}
-}
-
-// validUUID 校验规范化 UUID 字符串。
-func validUUID(value string) bool {
-	parsed, err := uuid.Parse(value)
-	return err == nil && strings.EqualFold(parsed.String(), value)
 }

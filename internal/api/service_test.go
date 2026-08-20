@@ -30,18 +30,18 @@ func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, inpu
 		return appservice.Session{}, &appservice.Error{Status: http.StatusUnauthorized, Code: "INVALID_CREDENTIALS", Message: "账号或密码错误。"}
 	}
 	return appservice.Session{
-		Principal: testPrincipal(),
+		Identity:  testIdentity(),
 		Token:     "session-token",
 		ExpiresAt: time.Now().Add(time.Hour),
 	}, nil
 }
 
-func (b *testBackend) LoadSession(_ context.Context, meta appservice.RequestMeta) (appservice.Principal, error) {
+func (b *testBackend) LoadSession(_ context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
 	b.lastMeta = meta
 	if meta.Token != "session-token" {
-		return appservice.Principal{}, &appservice.Error{Status: http.StatusUnauthorized, Code: "AUTH_REQUIRED", Message: "请先登录。"}
+		return appservice.Identity{}, &appservice.Error{Status: http.StatusUnauthorized, Code: "AUTH_REQUIRED", Message: "请先登录。"}
 	}
-	return testPrincipal(), nil
+	return testIdentity(), nil
 }
 
 func (b *testBackend) ListUsers(_ context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
@@ -90,12 +90,12 @@ func TestListQueryIsConvertedToTypedInput(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 
-	response := doJSON(t, http.MethodGet, server.URL+"/users?q=lin&status=active&page=2&pageSize=25", nil, "session-token")
+	response := doJSON(t, http.MethodGet, server.URL+"/users?query=lin&status=active&page=2&pageSize=25", nil, "session-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
-	if backend.lastUserList.Query != "lin" || backend.lastUserList.Status != "active" || backend.lastUserList.Page != 2 || backend.lastUserList.PageSize != 25 {
+	if backend.lastUserList.Query != "lin" || backend.lastUserList.Status == nil || *backend.lastUserList.Status != "active" || backend.lastUserList.Page != 2 || backend.lastUserList.PageSize != 25 {
 		t.Fatalf("typed input = %#v", backend.lastUserList)
 	}
 }
@@ -131,8 +131,8 @@ func TestBearerTokenParsing(t *testing.T) {
 	}
 }
 
-func testPrincipal() appservice.Principal {
-	return appservice.Principal{
+func testIdentity() appservice.Identity {
+	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
 		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "owner@example.com", DisplayName: "所有者", Role: "owner", Status: "active"},
 	}

@@ -94,7 +94,7 @@ export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromi
 /**
  * ListChannels 返回当前企业的渠道选择项。
  */
-export function ListChannels(meta: $models.RequestMeta): $CancellablePromise<$models.ChannelSummary[] | null> {
+export function ListChannels(meta: $models.RequestMeta): $CancellablePromise<$models.ChannelList> {
     return $Call.ByID(390964174, meta);
 }
 
@@ -115,7 +115,7 @@ export function ListUsers(meta: $models.RequestMeta, input: $models.UserListInpu
 /**
  * ListWebsiteChannels 返回网站渠道列表。
  */
-export function ListWebsiteChannels(meta: $models.RequestMeta, deleted: boolean): $CancellablePromise<$models.WebsiteChannelSummary[] | null> {
+export function ListWebsiteChannels(meta: $models.RequestMeta, deleted: boolean): $CancellablePromise<$models.WebsiteChannelList> {
     return $Call.ByID(97229659, meta, deleted);
 }
 
@@ -129,7 +129,7 @@ export function LoadInbox(meta: $models.RequestMeta): $CancellablePromise<$model
 /**
  * LoadSession 返回当前登录身份。
  */
-export function LoadSession(meta: $models.RequestMeta): $CancellablePromise<$models.Principal> {
+export function LoadSession(meta: $models.RequestMeta): $CancellablePromise<$models.Identity> {
     return $Call.ByID(2537050686, meta);
 }
 

@@ -116,8 +116,8 @@ func (s *Service) logout(c *gin.Context) {
 }
 
 func (s *Service) loadSession(c *gin.Context) {
-	principal, err := s.application.LoadSession(c.Request.Context(), requestMeta(c))
-	writeResult(c, http.StatusOK, principal, err)
+	identity, err := s.application.LoadSession(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, identity, err)
 }
 
 func (s *Service) loadInbox(c *gin.Context) {
@@ -134,8 +134,8 @@ func (s *Service) listDeletedWebsiteChannels(c *gin.Context) {
 }
 
 func (s *Service) writeWebsiteChannelList(c *gin.Context, deleted bool) {
-	channels, err := s.application.ListWebsiteChannels(c.Request.Context(), requestMeta(c), deleted)
-	writeResult(c, http.StatusOK, gin.H{"channels": channels}, err)
+	list, err := s.application.ListWebsiteChannels(c.Request.Context(), requestMeta(c), deleted)
+	writeResult(c, http.StatusOK, list, err)
 }
 
 func (s *Service) getWebsiteChannel(c *gin.Context) {
@@ -181,8 +181,8 @@ func (s *Service) restoreWebsiteChannel(c *gin.Context) {
 }
 
 func (s *Service) listChannels(c *gin.Context) {
-	channels, err := s.application.ListChannels(c.Request.Context(), requestMeta(c))
-	writeResult(c, http.StatusOK, gin.H{"channels": channels}, err)
+	list, err := s.application.ListChannels(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, list, err)
 }
 
 func (s *Service) listUsers(c *gin.Context) {
@@ -195,7 +195,7 @@ func (s *Service) listUsers(c *gin.Context) {
 		return
 	}
 	users, err := s.application.ListUsers(c.Request.Context(), requestMeta(c), appservice.UserListInput{
-		Query: c.Query("q"), Status: appservice.UserStatus(c.Query("status")), Role: appservice.UserRole(c.Query("role")), Page: page, PageSize: pageSize,
+		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Role: optionalEnum[appservice.UserRole](c.Query("role")), Page: page, PageSize: pageSize,
 	})
 	writeResult(c, http.StatusOK, users, err)
 }
@@ -223,7 +223,7 @@ func (s *Service) writeContactList(c *gin.Context, deleted bool) {
 		return
 	}
 	contacts, err := s.application.ListContacts(c.Request.Context(), requestMeta(c), appservice.ContactListInput{
-		Query: c.Query("q"), Stage: appservice.ContactStage(c.Query("stage")), ChannelID: c.Query("channelId"), MethodType: appservice.ContactMethodType(c.Query("methodType")),
+		Query: c.Query("query"), Stage: optionalEnum[appservice.ContactStage](c.Query("stage")), ChannelID: c.Query("channelId"), MethodType: optionalEnum[appservice.ContactMethodType](c.Query("methodType")),
 		Sort: appservice.ContactSort(c.Query("sort")), Page: page, PageSize: pageSize, Deleted: deleted,
 	})
 	writeResult(c, http.StatusOK, contacts, err)
@@ -283,6 +283,14 @@ func (s *Service) testS3Setting(c *gin.Context) {
 	}
 	err := s.application.TestS3Setting(c.Request.Context(), requestMeta(c), input)
 	writeEmpty(c, err)
+}
+
+func optionalEnum[T ~string](value string) *T {
+	if value == "" {
+		return nil
+	}
+	typed := T(value)
+	return &typed
 }
 
 func requestMeta(c *gin.Context) appservice.RequestMeta {

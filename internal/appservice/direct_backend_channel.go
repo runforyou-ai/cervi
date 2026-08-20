@@ -9,6 +9,8 @@ import (
 	"net/http"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/common/fielderror"
+	"github.com/runforyou-ai/cervi/internal/common/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -18,7 +20,7 @@ func (b *DirectBackend) channelMutationError(ctx context.Context, meta RequestMe
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *channelaction.ValidationError
+	var validationError *fielderror.Error
 	if errors.As(err, &validationError) {
 		return localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
 	}
@@ -29,7 +31,7 @@ func (b *DirectBackend) channelError(ctx context.Context, meta RequestMeta, err 
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, channelaction.ErrPrincipalInvalid) {
+	if errors.Is(err, identity.ErrInvalid) {
 		return localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
 	}
 	if errors.Is(err, channelaction.ErrNotFound) {
@@ -55,8 +57,8 @@ func channelInput(input WebsiteChannelInput) channelaction.WebsiteChannelInput {
 	return channelaction.WebsiteChannelInput{Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale)}
 }
 
-func channelFieldKeys(fields map[string]channelaction.ValidationCode) map[string]cervii18n.Key {
-	keys := map[channelaction.ValidationCode]cervii18n.Key{
+func channelFieldKeys(fields map[string]fielderror.Code) map[string]cervii18n.Key {
+	keys := map[fielderror.Code]cervii18n.Key{
 		channelaction.ValidationNameRequired: cervii18n.FieldChannelNameRequired, channelaction.ValidationNameTooLong: cervii18n.FieldChannelNameTooLong,
 		channelaction.ValidationDescriptionTooLong: cervii18n.FieldChannelDescriptionTooLong, channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
 		channelaction.ValidationChatTitleRequired: cervii18n.FieldChannelChatTitleRequired, channelaction.ValidationChatTitleTooLong: cervii18n.FieldChannelChatTitleTooLong,

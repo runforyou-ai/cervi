@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common/recordid"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,8 +25,8 @@ func NewUpdateWebsiteChannelChatInterfaceAction(db *bun.DB) *UpdateWebsiteChanne
 }
 
 // Execute 校验渠道归属并保存聊天界面设置。
-func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, principal *servermodels.Principal, channelID string, input WebsiteChannelChatInterfaceInput) (*servermodels.WebsiteChannelSetting, error) {
-	if !validUUID(channelID) {
+func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input WebsiteChannelChatInterfaceInput) (*servermodels.WebsiteChannelSetting, error) {
+	if !recordid.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
 	input, fields := normalizeWebsiteChannelChatInterfaceInput(input)
@@ -40,7 +41,7 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, p
 			Model(channel).
 			Column("id").
 			Where("c.id = ?", channelID).
-			Where("c.organization_id = ?", principal.Organization.ID).
+			Where("c.organization_id = ?", identity.Organization.ID).
 			Where("c.type = ?", domain.ChannelTypeWebsite).
 			Where("c.deleted_at IS NULL").
 			For("UPDATE").
@@ -67,7 +68,7 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, p
 			Set("theme_color = ?", input.ThemeColor).
 			Set("updated_at = now()").
 			Where("wcs.channel_id = ?", channelID).
-			Where("wcs.organization_id = ?", principal.Organization.ID).
+			Where("wcs.organization_id = ?", identity.Organization.ID).
 			Returning("*").
 			Scan(ctx)
 	})

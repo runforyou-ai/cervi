@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	"github.com/runforyou-ai/cervi/internal/common/fielderror"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -16,8 +17,8 @@ func localizedError(meta RequestMeta, status int, code string, messageKey cervii
 	return &Error{Status: status, Code: code, Message: message, Fields: cervii18n.LocalizeMap(string(meta.Locale), fieldKeys)}
 }
 
-func principalFromModel(principal *servermodels.Principal) Principal {
-	return Principal{Organization: organizationFromModel(principal.Organization), User: userFromModel(principal.User)}
+func identityFromModel(identity *servermodels.Identity) Identity {
+	return Identity{Organization: organizationFromModel(identity.Organization), User: userFromModel(identity.User)}
 }
 
 func organizationFromModel(organization servermodels.Organization) Organization {
@@ -28,8 +29,8 @@ func userFromModel(user servermodels.User) User {
 	return User{ID: user.ID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status)}
 }
 
-func installationFieldKeys(fields map[string]installationaction.ValidationCode) map[string]cervii18n.Key {
-	keys := map[installationaction.ValidationCode]cervii18n.Key{
+func installationFieldKeys(fields map[string]fielderror.Code) map[string]cervii18n.Key {
+	keys := map[fielderror.Code]cervii18n.Key{
 		installationaction.ValidationOrganizationNameRequired: cervii18n.FieldOrganizationNameRequired,
 		installationaction.ValidationDisplayNameRequired:      cervii18n.FieldDisplayNameRequired,
 		installationaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,

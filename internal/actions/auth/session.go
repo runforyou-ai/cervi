@@ -14,7 +14,7 @@ import (
 )
 
 // createSession 创建用户会话并返回对应身份。
-func createSession(ctx context.Context, db *bun.DB, userID string) (sessiontoken.Issued, *servermodels.Principal, error) {
+func createSession(ctx context.Context, db *bun.DB, userID string) (sessiontoken.Issued, *servermodels.Identity, error) {
 	issued, err := sessiontoken.Issue()
 	if err != nil {
 		return sessiontoken.Issued{}, nil, fmt.Errorf("issue session: %w", err)
@@ -31,19 +31,19 @@ func createSession(ctx context.Context, db *bun.DB, userID string) (sessiontoken
 		return sessiontoken.Issued{}, nil, fmt.Errorf("save session: %w", err)
 	}
 
-	principal, err := resolveSession(ctx, db, issued.Token)
+	identity, err := resolveSession(ctx, db, issued.Token)
 	if err != nil {
-		return sessiontoken.Issued{}, nil, fmt.Errorf("find session principal: %w", err)
+		return sessiontoken.Issued{}, nil, fmt.Errorf("find session identity: %w", err)
 	}
-	if principal == nil {
-		return sessiontoken.Issued{}, nil, errors.New("find session principal: empty result")
+	if identity == nil {
+		return sessiontoken.Issued{}, nil, errors.New("find session identity: empty result")
 	}
-	return issued, principal, nil
+	return issued, identity, nil
 }
 
 // resolveSession 返回有效令牌对应的用户身份。
-func resolveSession(ctx context.Context, db *bun.DB, token string) (*servermodels.Principal, error) {
-	principal := &servermodels.Principal{}
+func resolveSession(ctx context.Context, db *bun.DB, token string) (*servermodels.Identity, error) {
+	identity := &servermodels.Identity{}
 	err := db.NewRaw(`
 		SELECT
 			o.id::text,
@@ -62,14 +62,14 @@ func resolveSession(ctx context.Context, db *bun.DB, token string) (*servermodel
 		LIMIT 1
 	`, sessiontoken.Hash(token)).Scan(
 		ctx,
-		&principal.Organization.ID,
-		&principal.Organization.Name,
-		&principal.User.ID,
-		&principal.User.OrganizationID,
-		&principal.User.Email,
-		&principal.User.DisplayName,
-		&principal.User.Role,
-		&principal.User.Status,
+		&identity.Organization.ID,
+		&identity.Organization.Name,
+		&identity.User.ID,
+		&identity.User.OrganizationID,
+		&identity.User.Email,
+		&identity.User.DisplayName,
+		&identity.User.Role,
+		&identity.User.Status,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -77,10 +77,10 @@ func resolveSession(ctx context.Context, db *bun.DB, token string) (*servermodel
 	if err != nil {
 		return nil, err
 	}
-	if principal.User.Status != "active" {
+	if identity.User.Status != "active" {
 		return nil, nil
 	}
-	return principal, nil
+	return identity, nil
 }
 
 // revokeSession 删除令牌对应的登录会话。

@@ -390,7 +390,7 @@ export function ContactsPage({
           const loader = deleted ? listDeletedContacts : listContacts
           const response: ContactListResponse = await loader(
             {
-              q: query,
+              query,
               stage,
               channelId: deleted ? "" : channelId,
               methodType,
@@ -404,7 +404,7 @@ export function ContactsPage({
           setPage(response.page)
         } else if (scope === "internal") {
           const response = await listUsers(
-            { q: query, status, role, page: currentPage, pageSize: 50 },
+            { query, status, role, page: currentPage, pageSize: 50 },
             signal,
           )
           setUsers(response.users)

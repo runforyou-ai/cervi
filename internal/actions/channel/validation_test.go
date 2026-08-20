@@ -91,7 +91,7 @@ func TestNormalizeWebsiteChannelChatInterfaceInput(t *testing.T) {
 
 // TestMalformedChannelIDReturnsNotFound 验证非法 UUID 不会进入数据库查询。
 func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
-	principal := &servermodels.Principal{}
+	identity := &servermodels.Identity{}
 	input := WebsiteChannelInput{
 		Name:          "产品官网",
 		DefaultLocale: domain.LocaleChineseSimplified,
@@ -104,34 +104,34 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 		{
 			name: "get",
 			execute: func() error {
-				_, err := NewGetWebsiteChannelQuery(nil).Execute(context.Background(), principal, "not-a-uuid")
+				_, err := NewGetWebsiteChannelQuery(nil).Execute(context.Background(), identity, "not-a-uuid")
 				return err
 			},
 		},
 		{
 			name: "update",
 			execute: func() error {
-				_, err := NewUpdateWebsiteChannelAction(nil).Execute(context.Background(), principal, "not-a-uuid", input)
+				_, err := NewUpdateWebsiteChannelAction(nil).Execute(context.Background(), identity, "not-a-uuid", input)
 				return err
 			},
 		},
 		{
 			name: "update chat interface",
 			execute: func() error {
-				_, err := NewUpdateWebsiteChannelChatInterfaceAction(nil).Execute(context.Background(), principal, "not-a-uuid", WebsiteChannelChatInterfaceInput{})
+				_, err := NewUpdateWebsiteChannelChatInterfaceAction(nil).Execute(context.Background(), identity, "not-a-uuid", WebsiteChannelChatInterfaceInput{})
 				return err
 			},
 		},
 		{
 			name: "delete",
 			execute: func() error {
-				return NewDeleteWebsiteChannelAction(nil).Execute(context.Background(), principal, "not-a-uuid")
+				return NewDeleteWebsiteChannelAction(nil).Execute(context.Background(), identity, "not-a-uuid")
 			},
 		},
 		{
 			name: "restore",
 			execute: func() error {
-				_, err := NewRestoreWebsiteChannelAction(nil).Execute(context.Background(), principal, "not-a-uuid")
+				_, err := NewRestoreWebsiteChannelAction(nil).Execute(context.Background(), identity, "not-a-uuid")
 				return err
 			},
 		},
@@ -143,9 +143,5 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 				t.Fatalf("error = %v, want ErrNotFound", err)
 			}
 		})
-	}
-
-	if validUUID("urn:uuid:123e4567-e89b-12d3-a456-426614174000") {
-		t.Fatal("URN UUID should not be accepted as a database identifier")
 	}
 }

@@ -70,7 +70,7 @@ export function acceptSession(session: Session) {
     sessionStorageKey,
     JSON.stringify({ token: session.token, expiresAt: session.expiresAt }),
   )
-  return session.principal
+  return session.identity
 }
 
 export function clearSession() {

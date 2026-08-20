@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common/recordid"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -30,15 +31,15 @@ func NewGetWebsiteChannelQuery(db *bun.DB) *GetWebsiteChannelQuery {
 }
 
 // Execute 返回当前企业的网站渠道详情。
-func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, principal *servermodels.Principal, channelID string) (*WebsiteChannelDetail, error) {
-	if !validUUID(channelID) {
+func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) (*WebsiteChannelDetail, error) {
+	if !recordid.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
 	channel := &servermodels.Channel{}
 	err := q.db.NewSelect().
 		Model(channel).
 		Where("c.id = ?", channelID).
-		Where("c.organization_id = ?", principal.Organization.ID).
+		Where("c.organization_id = ?", identity.Organization.ID).
 		Where("c.type = ?", domain.ChannelTypeWebsite).
 		Where("c.deleted_at IS NULL").
 		Scan(ctx)
@@ -52,7 +53,7 @@ func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, principal *serverm
 	if err := q.db.NewSelect().
 		Model(&setting).
 		Where("wcs.channel_id = ?", channelID).
-		Where("wcs.organization_id = ?", principal.Organization.ID).
+		Where("wcs.organization_id = ?", identity.Organization.ID).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("get website channel settings: %w", err)
 	}

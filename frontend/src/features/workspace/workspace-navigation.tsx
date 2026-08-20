@@ -13,7 +13,7 @@ import {
 import { useTranslation } from "react-i18next"
 import { NavLink, useLocation, useNavigate } from "react-router"
 
-import type { Principal } from "@/api"
+import type { Identity } from "@/api"
 import {
   Collapsible,
   CollapsibleContent,
@@ -178,11 +178,11 @@ function WorkspaceMenu() {
 }
 
 export function WorkspaceNavigation({
-  principal,
+  identity,
   onLogout,
   loggingOut,
 }: {
-  principal: Principal
+  identity: Identity
   onLogout: () => void
   loggingOut: boolean
 }) {
@@ -208,7 +208,7 @@ export function WorkspaceNavigation({
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Cervi</span>
                 <span className="truncate text-xs">
-                  {principal.organization.name}
+                  {identity.organization.name}
                 </span>
               </div>
             </SidebarMenuButton>
@@ -228,20 +228,20 @@ export function WorkspaceNavigation({
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  tooltip={userMenuOpen ? undefined : principal.user.displayName}
+                  tooltip={userMenuOpen ? undefined : identity.user.displayName}
                   aria-label={t("openUserMenu", {
-                    name: principal.user.displayName,
+                    name: identity.user.displayName,
                   })}
                 >
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold">
-                    {principal.user.displayName.slice(0, 1).toUpperCase()}
+                    {identity.user.displayName.slice(0, 1).toUpperCase()}
                   </div>
                   <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">
-                      {principal.user.displayName}
+                      {identity.user.displayName}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {principal.user.email}
+                      {identity.user.email}
                     </span>
                   </div>
                   <ChevronsUpDownIcon className="ml-auto" />
@@ -251,10 +251,10 @@ export function WorkspaceNavigation({
                 <DropdownMenuLabel className="font-normal">
                   <div className="grid gap-0.5 leading-tight">
                     <span className="truncate font-medium">
-                      {principal.user.displayName}
+                      {identity.user.displayName}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {principal.user.email}
+                      {identity.user.email}
                     </span>
                   </div>
                 </DropdownMenuLabel>

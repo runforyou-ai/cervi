@@ -111,7 +111,7 @@ type LoginInput struct {
 
 // Session 包含登录身份和访问令牌。
 type Session struct {
-	Principal Principal `json:"principal"`
+	Identity  Identity  `json:"identity"`
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expiresAt"`
 }
@@ -132,8 +132,8 @@ type User struct {
 	Status         UserStatus `json:"status"`
 }
 
-// Principal 定义当前用户及其所属企业。
-type Principal struct {
+// Identity 定义当前用户及其所属企业。
+type Identity struct {
 	Organization Organization `json:"organization"`
 	User         User         `json:"user"`
 }
@@ -217,6 +217,16 @@ type ChannelSummary struct {
 	Name string      `json:"name"`
 }
 
+// ChannelList 定义渠道选择项列表。
+type ChannelList struct {
+	Channels []ChannelSummary `json:"channels"`
+}
+
+// WebsiteChannelList 定义网站渠道列表。
+type WebsiteChannelList struct {
+	Channels []WebsiteChannelSummary `json:"channels"`
+}
+
 // PageInfo 定义分页信息。
 type PageInfo struct {
 	Number int `json:"number"`
@@ -226,11 +236,11 @@ type PageInfo struct {
 
 // UserListInput 定义企业成员列表查询条件。
 type UserListInput struct {
-	Query    string     `json:"query"`
-	Status   UserStatus `json:"status"`
-	Role     UserRole   `json:"role"`
-	Page     int        `json:"page"`
-	PageSize int        `json:"pageSize"`
+	Query    string      `json:"query"`
+	Status   *UserStatus `json:"status,omitempty"`
+	Role     *UserRole   `json:"role,omitempty"`
+	Page     int         `json:"page"`
+	PageSize int         `json:"pageSize"`
 }
 
 // DirectoryUser 定义企业成员目录字段。
@@ -268,14 +278,14 @@ type ContactInput struct {
 
 // ContactListInput 定义联系人列表查询条件。
 type ContactListInput struct {
-	Query      string            `json:"query"`
-	Stage      ContactStage      `json:"stage"`
-	ChannelID  string            `json:"channelId"`
-	MethodType ContactMethodType `json:"methodType"`
-	Sort       ContactSort       `json:"sort"`
-	Page       int               `json:"page"`
-	PageSize   int               `json:"pageSize"`
-	Deleted    bool              `json:"deleted"`
+	Query      string             `json:"query"`
+	Stage      *ContactStage      `json:"stage,omitempty"`
+	ChannelID  string             `json:"channelId"`
+	MethodType *ContactMethodType `json:"methodType,omitempty"`
+	Sort       ContactSort        `json:"sort"`
+	Page       int                `json:"page"`
+	PageSize   int                `json:"pageSize"`
+	Deleted    bool               `json:"deleted"`
 }
 
 // ContactSummary 定义联系人列表项。

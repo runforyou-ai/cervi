@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/runforyou-ai/cervi/internal/common/fielderror"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -28,7 +28,7 @@ var supportedProviders = map[domain.StorageProvider]struct{}{
 }
 
 // ValidationCode 标识存储配置字段校验结果。
-type ValidationCode string
+type ValidationCode = fielderror.Code
 
 const (
 	ValidationEndpointRequired        ValidationCode = "ENDPOINT_REQUIRED"
@@ -40,15 +40,8 @@ const (
 	ValidationSecretAccessKeyRequired ValidationCode = "SECRET_ACCESS_KEY_REQUIRED"
 )
 
-// ValidationError 返回存储配置字段校验结果。
-type ValidationError struct {
-	Fields map[string]ValidationCode
-}
-
-// Error 返回存储配置输入校验错误。
-func (e *ValidationError) Error() string {
-	return "storage setting validation failed"
-}
+// ValidationError 表示存储配置字段校验失败。
+type ValidationError = fielderror.Error
 
 // S3Setting 定义企业的 S3 对象存储配置。
 type S3Setting struct {
@@ -113,10 +106,4 @@ func validEndpoint(value string) bool {
 		parsed.User == nil &&
 		parsed.RawQuery == "" &&
 		parsed.Fragment == ""
-}
-
-// validUUID 判断记录标识是否为 UUID。
-func validUUID(value string) bool {
-	parsed, err := uuid.Parse(value)
-	return err == nil && strings.EqualFold(parsed.String(), value)
 }

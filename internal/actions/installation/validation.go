@@ -6,11 +6,12 @@ import (
 	"errors"
 
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
+	"github.com/runforyou-ai/cervi/internal/common/fielderror"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 )
 
 // ValidationCode 标识企业初始化字段的校验结果。
-type ValidationCode string
+type ValidationCode = fielderror.Code
 
 const (
 	ValidationOrganizationNameRequired ValidationCode = "ORGANIZATION_NAME_REQUIRED"
@@ -21,14 +22,7 @@ const (
 )
 
 // ValidationError 表示企业初始化字段校验失败。
-type ValidationError struct {
-	Fields map[string]ValidationCode
-}
-
-// Error 返回企业初始化校验错误说明。
-func (e *ValidationError) Error() string {
-	return "workspace installation validation failed"
-}
+type ValidationError = fielderror.Error
 
 // validateInput 校验企业初始化字段。
 func validateInput(input InstallWorkspaceInput) map[string]ValidationCode {

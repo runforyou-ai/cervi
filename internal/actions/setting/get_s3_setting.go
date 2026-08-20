@@ -24,12 +24,12 @@ func NewGetS3SettingQuery(db *bun.DB) *GetS3SettingQuery {
 }
 
 // Execute 返回当前企业的 S3 配置，尚未配置时返回默认配置。
-func (q *GetS3SettingQuery) Execute(ctx context.Context, principal *servermodels.Principal) (S3Setting, error) {
+func (q *GetS3SettingQuery) Execute(ctx context.Context, identity *servermodels.Identity) (S3Setting, error) {
 	record := &servermodels.Setting{}
 	err := q.db.NewSelect().
 		Model(record).
 		Column("value").
-		Where("organization_id = ?", principal.Organization.ID).
+		Where("organization_id = ?", identity.Organization.ID).
 		Where("key = ?", s3SettingKey).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {

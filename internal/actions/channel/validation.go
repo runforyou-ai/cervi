@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/runforyou-ai/cervi/internal/common/fielderror"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -19,7 +19,7 @@ const (
 var themeColorPattern = regexp.MustCompile(`^#[0-9A-F]{6}$`)
 
 // ValidationCode 标识网站渠道字段校验结果。
-type ValidationCode string
+type ValidationCode = fielderror.Code
 
 const (
 	ValidationNameRequired         ValidationCode = "NAME_REQUIRED"
@@ -34,14 +34,7 @@ const (
 )
 
 // ValidationError 表示网站渠道字段校验失败。
-type ValidationError struct {
-	Fields map[string]ValidationCode
-}
-
-// Error 返回网站渠道输入校验错误。
-func (e *ValidationError) Error() string {
-	return "website channel validation failed"
-}
+type ValidationError = fielderror.Error
 
 // WebsiteChannelInput 定义网站渠道可编辑字段。
 type WebsiteChannelInput struct {
@@ -102,10 +95,4 @@ func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterface
 		fields["themeColor"] = ValidationThemeColorInvalid
 	}
 	return input, fields
-}
-
-// validUUID 判断记录标识是否为 UUID。
-func validUUID(value string) bool {
-	parsed, err := uuid.Parse(value)
-	return err == nil && strings.EqualFold(parsed.String(), value)
 }

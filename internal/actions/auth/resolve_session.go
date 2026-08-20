@@ -20,6 +20,6 @@ func NewResolveSessionQuery(db *bun.DB) *ResolveSessionQuery {
 }
 
 // Execute 返回有效令牌对应的用户身份。
-func (q *ResolveSessionQuery) Execute(ctx context.Context, token string) (*servermodels.Principal, error) {
+func (q *ResolveSessionQuery) Execute(ctx context.Context, token string) (*servermodels.Identity, error) {
 	return resolveSession(ctx, q.db, token)
 }

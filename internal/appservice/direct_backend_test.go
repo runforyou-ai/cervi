@@ -12,6 +12,7 @@ import (
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
+	"github.com/runforyou-ai/cervi/internal/common/fielderror"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -80,7 +81,7 @@ func TestDirectBackendMapsValidationErrors(t *testing.T) {
 	err := backend.contactMutationError(
 		context.Background(),
 		RequestMeta{Locale: LocaleChineseSimplified},
-		&contactaction.ValidationError{Fields: map[string]contactaction.ValidationCode{"stage": contactaction.ValidationStageInvalid}},
+		&fielderror.Error{Fields: map[string]fielderror.Code{"stage": contactaction.ValidationStageInvalid}},
 		cervii18n.ErrorContactUpdateFailed,
 	)
 	applicationError, ok := err.(*Error)
@@ -94,7 +95,7 @@ func TestDirectBackendMapsValidationErrors(t *testing.T) {
 	settingError := backend.s3SettingError(
 		context.Background(),
 		RequestMeta{Locale: LocaleEnglishUnitedStates},
-		&settingaction.ValidationError{Fields: map[string]settingaction.ValidationCode{"provider": settingaction.ValidationProviderInvalid}},
+		&fielderror.Error{Fields: map[string]fielderror.Code{"provider": settingaction.ValidationProviderInvalid}},
 		cervii18n.ErrorS3SettingSaveFailed,
 	)
 	converted := settingError.(*Error)

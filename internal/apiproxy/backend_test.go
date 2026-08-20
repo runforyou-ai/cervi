@@ -76,7 +76,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			}})
 		case "/api/auth/login":
 			writeTestJSON(writer, http.StatusOK, map[string]any{
-				"principal": map[string]any{
+				"identity": map[string]any{
 					"organization": map[string]string{"id": "organization-1", "name": "鹿行"},
 					"user":         map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "owner@example.com"},
 				},

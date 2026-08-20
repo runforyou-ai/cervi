@@ -15,6 +15,7 @@ import (
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	"github.com/runforyou-ai/cervi/internal/common/fielderror"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -114,7 +115,7 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		Email:            input.Email,
 		Password:         input.Password,
 	})
-	var validationError *installationaction.ValidationError
+	var validationError *fielderror.Error
 	if errors.As(err, &validationError) {
 		return Session{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, installationFieldKeys(validationError.Fields))
 	}
@@ -128,8 +129,8 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		slog.Warn("初始化企业失败", "error", err)
 		return Session{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorInstallationFailed, nil)
 	}
-	slog.Info("企业初始化完成", "organization_id", output.Principal.Organization.ID, "owner_id", output.Principal.User.ID)
-	return Session{Principal: principalFromModel(output.Principal), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "owner_id", output.Identity.User.ID)
+	return Session{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
 // Login 校验账号密码并返回登录会话。
@@ -148,13 +149,13 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 		slog.Warn("用户登录失败", "error", err)
 		return Session{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorLoginFailed, nil)
 	}
-	slog.Info("用户登录成功", "organization_id", output.Principal.Organization.ID, "user_id", output.Principal.User.ID)
-	return Session{Principal: principalFromModel(output.Principal), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID)
+	return Session{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
 // Logout 删除当前登录会话。
 func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return err
 	}
@@ -162,29 +163,29 @@ func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		slog.Warn("删除登录会话失败", "user_id", principal.User.ID, "error", err)
+		slog.Warn("删除登录会话失败", "user_id", identity.User.ID, "error", err)
 		return localizedError(meta, http.StatusInternalServerError, "LOGOUT_FAILED", cervii18n.ErrorLogoutFailed, nil)
 	}
-	slog.Info("用户退出登录", "organization_id", principal.Organization.ID, "user_id", principal.User.ID)
+	slog.Info("用户退出登录", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
 	return nil
 }
 
 // LoadSession 返回令牌对应的当前身份。
-func (b *DirectBackend) LoadSession(ctx context.Context, meta RequestMeta) (Principal, error) {
-	principal, err := b.authenticate(ctx, meta)
+func (b *DirectBackend) LoadSession(ctx context.Context, meta RequestMeta) (Identity, error) {
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return Principal{}, err
+		return Identity{}, err
 	}
-	return principalFromModel(principal), nil
+	return identityFromModel(identity), nil
 }
 
 // LoadInbox 返回当前身份可访问的统一收件箱。
 func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Inbox{}, err
 	}
-	output := b.loadInbox.Execute(ctx, principal)
+	output := b.loadInbox.Execute(ctx, identity)
 	return Inbox{
 		Organization:  organizationFromModel(output.Organization),
 		User:          userFromModel(output.User),
@@ -193,33 +194,33 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox,
 }
 
 // ListWebsiteChannels 返回当前企业的网站渠道。
-func (b *DirectBackend) ListWebsiteChannels(ctx context.Context, meta RequestMeta, deleted bool) ([]WebsiteChannelSummary, error) {
-	principal, err := b.authenticate(ctx, meta)
+func (b *DirectBackend) ListWebsiteChannels(ctx context.Context, meta RequestMeta, deleted bool) (WebsiteChannelList, error) {
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return nil, err
+		return WebsiteChannelList{}, err
 	}
-	channels, err := b.listWebsiteChannels.Execute(ctx, principal, deleted)
+	channels, err := b.listWebsiteChannels.Execute(ctx, identity, deleted)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return WebsiteChannelList{}, ctx.Err()
 		}
-		slog.Warn("读取网站渠道列表失败", "organization_id", principal.Organization.ID, "deleted", deleted, "error", err)
-		return nil, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelListFailed, nil)
+		slog.Warn("读取网站渠道列表失败", "organization_id", identity.Organization.ID, "deleted", deleted, "error", err)
+		return WebsiteChannelList{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelListFailed, nil)
 	}
 	result := make([]WebsiteChannelSummary, 0, len(channels))
 	for index := range channels {
 		result = append(result, websiteChannelFromModel(&channels[index]))
 	}
-	return result, nil
+	return WebsiteChannelList{Channels: result}, nil
 }
 
 // GetWebsiteChannel 返回网站渠道详情。
 func (b *DirectBackend) GetWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannel, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return WebsiteChannel{}, err
 	}
-	detail, err := b.getWebsiteChannel.Execute(ctx, principal, channelID)
+	detail, err := b.getWebsiteChannel.Execute(ctx, identity, channelID)
 	if err != nil {
 		return WebsiteChannel{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelReadFailed)
 	}
@@ -231,104 +232,104 @@ func (b *DirectBackend) GetWebsiteChannel(ctx context.Context, meta RequestMeta,
 
 // CreateWebsiteChannel 创建网站渠道。
 func (b *DirectBackend) CreateWebsiteChannel(ctx context.Context, meta RequestMeta, input WebsiteChannelInput) (WebsiteChannelSummary, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return WebsiteChannelSummary{}, err
 	}
-	channel, err := b.createWebsiteChannel.Execute(ctx, principal, channelInput(input))
+	channel, err := b.createWebsiteChannel.Execute(ctx, identity, channelInput(input))
 	if err != nil {
 		return WebsiteChannelSummary{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelCreateFailed)
 	}
-	slog.Info("网站渠道创建成功", "organization_id", principal.Organization.ID, "channel_id", channel.ID)
+	slog.Info("网站渠道创建成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID)
 	return websiteChannelFromModel(channel), nil
 }
 
 // UpdateWebsiteChannel 修改网站渠道。
 func (b *DirectBackend) UpdateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelInput) (WebsiteChannelSummary, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return WebsiteChannelSummary{}, err
 	}
-	channel, err := b.updateWebsiteChannel.Execute(ctx, principal, channelID, channelInput(input))
+	channel, err := b.updateWebsiteChannel.Execute(ctx, identity, channelID, channelInput(input))
 	if err != nil {
 		return WebsiteChannelSummary{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed)
 	}
-	slog.Info("网站渠道更新成功", "organization_id", principal.Organization.ID, "channel_id", channel.ID)
+	slog.Info("网站渠道更新成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID)
 	return websiteChannelFromModel(channel), nil
 }
 
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
 func (b *DirectBackend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return WebsiteChannelChatInterface{}, err
 	}
-	setting, err := b.updateWebsiteChannelChatInterface.Execute(ctx, principal, channelID, channelaction.WebsiteChannelChatInterfaceInput{
+	setting, err := b.updateWebsiteChannelChatInterface.Execute(ctx, identity, channelID, channelaction.WebsiteChannelChatInterfaceInput{
 		Title: input.Title, Subtitle: input.Subtitle, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor,
 	})
 	if err != nil {
 		return WebsiteChannelChatInterface{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelChatInterfaceUpdateFailed)
 	}
-	slog.Info("网站渠道聊天界面更新成功", "organization_id", principal.Organization.ID, "channel_id", channelID)
+	slog.Info("网站渠道聊天界面更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
 	return websiteChannelSettingFromModel(setting), nil
 }
 
 // DeleteWebsiteChannel 将网站渠道移入回收站。
 func (b *DirectBackend) DeleteWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) error {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return err
 	}
-	if err := b.deleteWebsiteChannel.Execute(ctx, principal, channelID); err != nil {
+	if err := b.deleteWebsiteChannel.Execute(ctx, identity, channelID); err != nil {
 		return b.channelError(ctx, meta, err, cervii18n.ErrorChannelDeleteFailed)
 	}
-	slog.Info("网站渠道移入回收站", "organization_id", principal.Organization.ID, "channel_id", channelID)
+	slog.Info("网站渠道移入回收站", "organization_id", identity.Organization.ID, "channel_id", channelID)
 	return nil
 }
 
 // RestoreWebsiteChannel 恢复网站渠道。
 func (b *DirectBackend) RestoreWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return WebsiteChannelSummary{}, err
 	}
-	channel, err := b.restoreWebsiteChannel.Execute(ctx, principal, channelID)
+	channel, err := b.restoreWebsiteChannel.Execute(ctx, identity, channelID)
 	if err != nil {
 		return WebsiteChannelSummary{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelRestoreFailed)
 	}
-	slog.Info("网站渠道恢复成功", "organization_id", principal.Organization.ID, "channel_id", channel.ID)
+	slog.Info("网站渠道恢复成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID)
 	return websiteChannelFromModel(channel), nil
 }
 
 // ListChannels 返回当前企业的渠道选择项。
-func (b *DirectBackend) ListChannels(ctx context.Context, meta RequestMeta) ([]ChannelSummary, error) {
-	principal, err := b.authenticate(ctx, meta)
+func (b *DirectBackend) ListChannels(ctx context.Context, meta RequestMeta) (ChannelList, error) {
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return nil, err
+		return ChannelList{}, err
 	}
-	channels, err := b.listChannels.Execute(ctx, principal)
+	channels, err := b.listChannels.Execute(ctx, identity)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			return ChannelList{}, ctx.Err()
 		}
-		slog.Warn("读取渠道列表失败", "organization_id", principal.Organization.ID, "error", err)
-		return nil, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelSummaryListFailed, nil)
+		slog.Warn("读取渠道列表失败", "organization_id", identity.Organization.ID, "error", err)
+		return ChannelList{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorChannelSummaryListFailed, nil)
 	}
 	result := make([]ChannelSummary, 0, len(channels))
 	for _, channel := range channels {
 		result = append(result, ChannelSummary{ID: channel.ID, Type: ChannelType(channel.Type), Name: channel.Name})
 	}
-	return result, nil
+	return ChannelList{Channels: result}, nil
 }
 
 // ListUsers 返回企业成员列表。
 func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return UserList{}, err
 	}
-	output, err := b.listUsers.Execute(ctx, principal, useraction.ListInput{
-		Query: input.Query, Status: domain.UserStatus(input.Status), Role: domain.UserRole(input.Role), Page: input.Page, PageSize: input.PageSize,
+	output, err := b.listUsers.Execute(ctx, identity, useraction.ListInput{
+		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Role: optionalDomain[UserRole, domain.UserRole](input.Role), Page: input.Page, PageSize: input.PageSize,
 	})
 	if errors.Is(err, useraction.ErrQueryInvalid) {
 		return UserList{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, nil)
@@ -337,7 +338,7 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 		if ctx.Err() != nil {
 			return UserList{}, ctx.Err()
 		}
-		slog.Warn("读取企业成员列表失败", "organization_id", principal.Organization.ID, "error", err)
+		slog.Warn("读取企业成员列表失败", "organization_id", identity.Organization.ID, "error", err)
 		return UserList{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorUserListFailed, nil)
 	}
 	users := make([]DirectoryUser, 0, len(output.Users))
@@ -349,11 +350,11 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 
 // GetUser 返回企业成员详情。
 func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return DirectoryUser{}, err
 	}
-	user, err := b.getUser.Execute(ctx, principal, userID)
+	user, err := b.getUser.Execute(ctx, identity, userID)
 	if errors.Is(err, useraction.ErrNotFound) {
 		return DirectoryUser{}, localizedError(meta, http.StatusNotFound, "USER_NOT_FOUND", cervii18n.ErrorUserNotFound, nil)
 	}
@@ -361,7 +362,7 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 		if ctx.Err() != nil {
 			return DirectoryUser{}, ctx.Err()
 		}
-		slog.Warn("读取企业成员失败", "organization_id", principal.Organization.ID, "user_id", userID, "error", err)
+		slog.Warn("读取企业成员失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
 		return DirectoryUser{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorUserReadFailed, nil)
 	}
 	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), CreatedAt: user.CreatedAt}, nil
@@ -369,15 +370,15 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 
 // ListContacts 返回联系人列表。
 func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, input ContactListInput) (ContactList, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return ContactList{}, err
 	}
-	output, err := b.listContacts.Execute(ctx, principal, contactaction.ListInput{
-		Query: input.Query, Stage: domain.ContactStage(input.Stage), ChannelID: input.ChannelID, MethodType: domain.ContactMethodType(input.MethodType),
+	output, err := b.listContacts.Execute(ctx, identity, contactaction.ListInput{
+		Query: input.Query, Stage: optionalDomain[ContactStage, domain.ContactStage](input.Stage), ChannelID: input.ChannelID, MethodType: optionalDomain[ContactMethodType, domain.ContactMethodType](input.MethodType),
 		Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
 	})
-	var validationError *contactaction.ValidationError
+	var validationError *fielderror.Error
 	if errors.As(err, &validationError) {
 		return ContactList{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
@@ -396,11 +397,11 @@ func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, inpu
 
 // GetContact 返回联系人详情。
 func (b *DirectBackend) GetContact(ctx context.Context, meta RequestMeta, contactID string) (Contact, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Contact{}, err
 	}
-	contact, err := b.getContact.Execute(ctx, principal, contactID)
+	contact, err := b.getContact.Execute(ctx, identity, contactID)
 	if err != nil {
 		return Contact{}, b.contactError(ctx, meta, err, cervii18n.ErrorContactReadFailed)
 	}
@@ -409,71 +410,71 @@ func (b *DirectBackend) GetContact(ctx context.Context, meta RequestMeta, contac
 
 // CreateContact 创建联系人。
 func (b *DirectBackend) CreateContact(ctx context.Context, meta RequestMeta, input ContactInput) (Contact, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Contact{}, err
 	}
-	contact, err := b.createContact.Execute(ctx, principal, contactInput(input))
+	contact, err := b.createContact.Execute(ctx, identity, contactInput(input))
 	if err != nil {
 		return Contact{}, b.contactMutationError(ctx, meta, err, cervii18n.ErrorContactCreateFailed)
 	}
-	slog.Info("联系人创建成功", "organization_id", principal.Organization.ID, "contact_id", contact.Contact.ID)
+	slog.Info("联系人创建成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
 	return contactFromAction(contact), nil
 }
 
 // UpdateContact 修改联系人。
 func (b *DirectBackend) UpdateContact(ctx context.Context, meta RequestMeta, contactID string, input ContactInput) (Contact, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Contact{}, err
 	}
-	contact, err := b.updateContact.Execute(ctx, principal, contactID, contactInput(input))
+	contact, err := b.updateContact.Execute(ctx, identity, contactID, contactInput(input))
 	if err != nil {
 		return Contact{}, b.contactMutationError(ctx, meta, err, cervii18n.ErrorContactUpdateFailed)
 	}
-	slog.Info("联系人更新成功", "organization_id", principal.Organization.ID, "contact_id", contact.Contact.ID)
+	slog.Info("联系人更新成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
 	return contactFromAction(contact), nil
 }
 
 // DeleteContact 将联系人移入回收站。
 func (b *DirectBackend) DeleteContact(ctx context.Context, meta RequestMeta, contactID string) error {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return err
 	}
-	if err := b.deleteContact.Execute(ctx, principal, contactID); err != nil {
+	if err := b.deleteContact.Execute(ctx, identity, contactID); err != nil {
 		return b.contactError(ctx, meta, err, cervii18n.ErrorContactDeleteFailed)
 	}
-	slog.Info("联系人移入回收站", "organization_id", principal.Organization.ID, "contact_id", contactID)
+	slog.Info("联系人移入回收站", "organization_id", identity.Organization.ID, "contact_id", contactID)
 	return nil
 }
 
 // RestoreContact 恢复联系人。
 func (b *DirectBackend) RestoreContact(ctx context.Context, meta RequestMeta, contactID string) (Contact, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Contact{}, err
 	}
-	contact, err := b.restoreContact.Execute(ctx, principal, contactID)
+	contact, err := b.restoreContact.Execute(ctx, identity, contactID)
 	if err != nil {
 		return Contact{}, b.contactError(ctx, meta, err, cervii18n.ErrorContactRestoreFailed)
 	}
-	slog.Info("联系人恢复成功", "organization_id", principal.Organization.ID, "contact_id", contact.Contact.ID)
+	slog.Info("联系人恢复成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
 	return contactFromAction(contact), nil
 }
 
 // GetS3Setting 返回当前企业的对象存储设置。
 func (b *DirectBackend) GetS3Setting(ctx context.Context, meta RequestMeta) (S3Setting, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return S3Setting{}, err
 	}
-	setting, err := b.getS3Setting.Execute(ctx, principal)
+	setting, err := b.getS3Setting.Execute(ctx, identity)
 	if err != nil {
 		if ctx.Err() != nil {
 			return S3Setting{}, ctx.Err()
 		}
-		slog.Warn("读取对象存储设置失败", "organization_id", principal.Organization.ID, "error", err)
+		slog.Warn("读取对象存储设置失败", "organization_id", identity.Organization.ID, "error", err)
 		return S3Setting{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorS3SettingReadFailed, nil)
 	}
 	return s3SettingFromAction(setting), nil
@@ -481,28 +482,28 @@ func (b *DirectBackend) GetS3Setting(ctx context.Context, meta RequestMeta) (S3S
 
 // SaveS3Setting 保存当前企业的对象存储设置。
 func (b *DirectBackend) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) (S3Setting, error) {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return S3Setting{}, err
 	}
-	setting, err := b.saveS3Setting.Execute(ctx, principal, s3SettingToAction(input))
+	setting, err := b.saveS3Setting.Execute(ctx, identity, s3SettingToAction(input))
 	if err != nil {
 		return S3Setting{}, b.s3SettingError(ctx, meta, err, cervii18n.ErrorS3SettingSaveFailed)
 	}
-	slog.Info("对象存储设置保存成功", "organization_id", principal.Organization.ID, "provider", setting.Provider, "enabled", setting.Enabled)
+	slog.Info("对象存储设置保存成功", "organization_id", identity.Organization.ID, "provider", setting.Provider, "enabled", setting.Enabled)
 	return s3SettingFromAction(setting), nil
 }
 
 // TestS3Setting 测试对象存储连接。
 func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) error {
-	principal, err := b.authenticate(ctx, meta)
+	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return err
 	}
 	if err := b.testS3Setting.Execute(ctx, s3SettingToAction(input)); err != nil {
 		return b.s3SettingError(ctx, meta, err, cervii18n.ErrorS3ConnectionTestFailed)
 	}
-	slog.Info("对象存储连接测试成功", "organization_id", principal.Organization.ID, "provider", input.Provider)
+	slog.Info("对象存储连接测试成功", "organization_id", identity.Organization.ID, "provider", input.Provider)
 	return nil
 }
 
@@ -517,14 +518,14 @@ func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta
 	return nil
 }
 
-func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*servermodels.Principal, error) {
+func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
 	if err := b.requireInitialized(ctx, meta); err != nil {
 		return nil, err
 	}
 	if meta.Token == "" {
 		return nil, localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
 	}
-	principal, err := b.resolveSession.Execute(ctx, meta.Token)
+	identity, err := b.resolveSession.Execute(ctx, meta.Token)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -532,8 +533,15 @@ func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*se
 		slog.Warn("读取登录会话失败", "error", err)
 		return nil, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorAuthenticationStatusFailed, nil)
 	}
-	if principal == nil {
+	if identity == nil {
 		return nil, localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
 	}
-	return principal, nil
+	return identity, nil
+}
+
+func optionalDomain[T ~string, D ~string](value *T) D {
+	if value == nil {
+		return ""
+	}
+	return D(*value)
 }

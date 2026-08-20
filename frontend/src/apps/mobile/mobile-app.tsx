@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Navigate, Route, Routes, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { logout, resolveNativeEntry, type Principal } from "@/api"
+import { logout, resolveNativeEntry, type Identity } from "@/api"
 import { Button } from "@/components/ui/button"
 import { LoginPage } from "@/features/auth/login-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
@@ -12,7 +12,7 @@ import { ServerConnectionPage } from "@/features/server-connection/server-connec
 function MobileHomePage() {
   const { t } = useTranslation("mobile")
   const navigate = useNavigate()
-  const [principal, setPrincipal] = useState<Principal | null>(null)
+  const [identity, setIdentity] = useState<Identity | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
@@ -28,7 +28,7 @@ function MobileHomePage() {
         })
         return
       }
-      setPrincipal(entry.principal)
+      setIdentity(entry.identity)
     } catch {
       setError(t("loadError"))
     } finally {
@@ -61,7 +61,7 @@ function MobileHomePage() {
     )
   }
 
-  if (!principal) {
+  if (!identity) {
     return (
       <main className="flex min-h-dvh items-center justify-center p-6">
         <div className="text-center">
@@ -88,12 +88,12 @@ function MobileHomePage() {
         <dl className="mt-6 grid gap-4 rounded-lg border p-4 text-left text-sm">
           <div>
             <dt className="text-muted-foreground">{t("organization")}</dt>
-            <dd className="mt-1 font-medium">{principal.organization.name}</dd>
+            <dd className="mt-1 font-medium">{identity.organization.name}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">{t("user")}</dt>
-            <dd className="mt-1 font-medium">{principal.user.displayName}</dd>
-            <dd className="text-muted-foreground">{principal.user.email}</dd>
+            <dd className="mt-1 font-medium">{identity.user.displayName}</dd>
+            <dd className="text-muted-foreground">{identity.user.email}</dd>
           </div>
         </dl>
         <Button className="mt-6" disabled={loggingOut} onClick={handleLogout}>

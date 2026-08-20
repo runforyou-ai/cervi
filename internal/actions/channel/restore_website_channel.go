@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common/recordid"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -22,8 +23,8 @@ func NewRestoreWebsiteChannelAction(db *bun.DB) *RestoreWebsiteChannelAction {
 }
 
 // Execute 恢复当前企业中已软删除的网站渠道。
-func (a *RestoreWebsiteChannelAction) Execute(ctx context.Context, principal *servermodels.Principal, channelID string) (*servermodels.Channel, error) {
-	if !validUUID(channelID) {
+func (a *RestoreWebsiteChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) (*servermodels.Channel, error) {
+	if !recordid.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
 	channel := &servermodels.Channel{}
@@ -32,7 +33,7 @@ func (a *RestoreWebsiteChannelAction) Execute(ctx context.Context, principal *se
 		Set("deleted_at = NULL").
 		Set("updated_at = now()").
 		Where("c.id = ?", channelID).
-		Where("c.organization_id = ?", principal.Organization.ID).
+		Where("c.organization_id = ?", identity.Organization.ID).
 		Where("c.type = ?", domain.ChannelTypeWebsite).
 		Where("c.deleted_at IS NOT NULL").
 		Returning("*").

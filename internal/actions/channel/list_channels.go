@@ -29,14 +29,14 @@ func NewListChannelsQuery(db *bun.DB) *ListChannelsQuery {
 }
 
 // Execute 返回当前企业未删除的渠道摘要。
-func (q *ListChannelsQuery) Execute(ctx context.Context, principal *servermodels.Principal) ([]Summary, error) {
+func (q *ListChannelsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]Summary, error) {
 	channels := make([]Summary, 0)
 	if err := q.db.NewSelect().
 		TableExpr("channels AS c").
 		ColumnExpr("c.id::text AS id").
 		ColumnExpr("c.type").
 		ColumnExpr("c.name").
-		Where("c.organization_id = ?", principal.Organization.ID).
+		Where("c.organization_id = ?", identity.Organization.ID).
 		Where("c.deleted_at IS NULL").
 		OrderExpr("c.type ASC, lower(c.name) ASC, c.id ASC").
 		Scan(ctx, &channels); err != nil {

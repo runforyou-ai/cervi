@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	identityerr "github.com/runforyou-ai/cervi/internal/common/identity"
+	"github.com/runforyou-ai/cervi/internal/common/recordid"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,21 +26,21 @@ func NewCreateWebsiteChannelAction(db *bun.DB) *CreateWebsiteChannelAction {
 }
 
 // Execute 创建网站渠道及默认聊天界面。
-func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, principal *servermodels.Principal, input WebsiteChannelInput) (*servermodels.Channel, error) {
+func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, input WebsiteChannelInput) (*servermodels.Channel, error) {
 	input, fields := normalizeWebsiteChannelInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if principal == nil ||
-		!validUUID(principal.Organization.ID) ||
-		!validUUID(principal.User.ID) ||
-		principal.User.OrganizationID != principal.Organization.ID {
-		return nil, ErrPrincipalInvalid
+	if identity == nil ||
+		!recordid.ValidUUID(identity.Organization.ID) ||
+		!recordid.ValidUUID(identity.User.ID) ||
+		identity.User.OrganizationID != identity.Organization.ID {
+		return nil, identityerr.ErrInvalid
 	}
 
 	channel := &servermodels.Channel{
-		OrganizationID:  principal.Organization.ID,
-		CreatedByUserID: principal.User.ID,
+		OrganizationID:  identity.Organization.ID,
+		CreatedByUserID: identity.User.ID,
 		Type:            string(domain.ChannelTypeWebsite),
 		Name:            input.Name,
 		DefaultLocale:   string(input.DefaultLocale),
@@ -51,11 +53,11 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, principal *ser
 		if err := tx.NewSelect().
 			Model(organization).
 			Column("id").
-			Where("o.id = ?", principal.Organization.ID).
+			Where("o.id = ?", identity.Organization.ID).
 			For("KEY SHARE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return ErrPrincipalInvalid
+				return identityerr.ErrInvalid
 			}
 			return err
 		}
@@ -64,12 +66,12 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, principal *ser
 		if err := tx.NewSelect().
 			Model(user).
 			Column("id").
-			Where("u.id = ?", principal.User.ID).
-			Where("u.organization_id = ?", principal.Organization.ID).
+			Where("u.id = ?", identity.User.ID).
+			Where("u.organization_id = ?", identity.Organization.ID).
 			For("KEY SHARE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return ErrPrincipalInvalid
+				return identityerr.ErrInvalid
 			}
 			return err
 		}
@@ -85,7 +87,7 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, principal *ser
 
 		setting := &servermodels.WebsiteChannelSetting{
 			ChannelID:      channel.ID,
-			OrganizationID: principal.Organization.ID,
+			OrganizationID: identity.Organization.ID,
 			ChatTitle:      channel.Name,
 			ThemeColor:     DefaultWebsiteChannelThemeColor,
 		}
@@ -95,8 +97,8 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, principal *ser
 			Exec(ctx)
 		return err
 	})
-	if errors.Is(err, ErrPrincipalInvalid) {
-		return nil, ErrPrincipalInvalid
+	if errors.Is(err, identityerr.ErrInvalid) {
+		return nil, identityerr.ErrInvalid
 	}
 	if err != nil {
 		return nil, fmt.Errorf("create website channel: %w", err)

@@ -2,8 +2,8 @@
 
 package models
 
-// Principal 表示当前用户及其所属企业。
-type Principal struct {
+// Identity 表示当前用户及其所属企业。
+type Identity struct {
 	Organization Organization `json:"organization"`
 	User         User         `json:"user"`
 }
