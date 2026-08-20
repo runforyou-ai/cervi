@@ -4,7 +4,7 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 返回网站渠道独立聊天链接。 */
 export function websiteChannelChatURL(origin: string, channelId: string) {
-  return `${trimOrigin(origin)}/ch/${channelId}`
+  return `${trimOrigin(origin)}/chat/${channelId}`
 }
 
 /** 返回网站渠道嵌入安装代码。 */

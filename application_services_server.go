@@ -29,7 +29,7 @@ func applicationServices(appStorage *serverstorage.Store) ([]application.Service
 			Route: "/embed",
 		}),
 		application.NewServiceWithOptions(publicweb.NewChatService(publicLookup), application.ServiceOptions{
-			Route: "/ch/",
+			Route: "/chat/",
 		}),
 	}, nil
 }
