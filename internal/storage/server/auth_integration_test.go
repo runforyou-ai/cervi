@@ -216,6 +216,28 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("identity after profile update = %#v", resolvedAfterUpdate)
 	}
 
+	changePassword := useraction.NewChangePasswordAction(db)
+	err = changePassword.Execute(context.Background(), resolvedAfterUpdate, useraction.ChangePasswordInput{
+		CurrentPassword: "incorrect-password",
+		NewPassword:     "new-password123",
+	})
+	var passwordValidation *useraction.ValidationError
+	if !errors.As(err, &passwordValidation) || passwordValidation.Fields["currentPassword"] != useraction.ValidationCurrentPasswordIncorrect {
+		t.Fatalf("incorrect current password error = %v, want current password validation", err)
+	}
+	if err := changePassword.Execute(context.Background(), resolvedAfterUpdate, useraction.ChangePasswordInput{
+		CurrentPassword: "password123",
+		NewPassword:     "new-password123",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := login.Execute(context.Background(), authaction.LoginInput{Email: "new@example.com", Password: "password123"}); !errors.Is(err, authaction.ErrInvalidCredentials) {
+		t.Fatalf("old password login error = %v, want invalid credentials", err)
+	}
+	if _, err := login.Execute(context.Background(), authaction.LoginInput{Email: "new@example.com", Password: "new-password123"}); err != nil {
+		t.Fatalf("new password login error = %v", err)
+	}
+
 	otherUser := &servermodels.User{
 		OrganizationID: loggedIn.Identity.Organization.ID,
 		Email:          "other@example.com",

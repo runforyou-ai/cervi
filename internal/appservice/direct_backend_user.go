@@ -41,6 +41,34 @@ func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, inp
 	return userFromModel(*user), nil
 }
 
+// ChangePassword 核验当前密码并保存新密码。
+func (b *DirectBackend) ChangePassword(ctx context.Context, meta RequestMeta, input ChangePasswordInput) error {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	err = b.changePassword.Execute(ctx, identity, useraction.ChangePasswordInput{
+		CurrentPassword: input.CurrentPassword,
+		NewPassword:     input.NewPassword,
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		var validationError *common.FieldError
+		if errors.As(err, &validationError) {
+			return InvalidError(meta, cervii18n.ErrorValidationFailed, passwordFieldKeys(validationError.Fields))
+		}
+		if errors.Is(err, common.ErrIdentityInvalid) {
+			return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		}
+		slog.Warn("修改密码失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		return FailedError(meta, cervii18n.ErrorPasswordUpdateFailed)
+	}
+	slog.Info("密码修改成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
+	return nil
+}
+
 // ListUsers 返回企业成员列表。
 func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	identity, err := b.authenticate(ctx, meta)
@@ -93,6 +121,16 @@ func profileFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 		useraction.ValidationDisplayNameRequired: cervii18n.FieldDisplayNameRequired,
 		useraction.ValidationEmailInvalid:        cervii18n.FieldEmailInvalid,
 		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
+	}
+	return translateValidationFields(fields, keys)
+}
+
+// passwordFieldKeys 把密码校验错误码映射为本地化文案键。
+func passwordFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+	keys := map[common.FieldCode]cervii18n.Key{
+		useraction.ValidationCurrentPasswordIncorrect: cervii18n.FieldCurrentPasswordIncorrect,
+		useraction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
+		useraction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
 	}
 	return translateValidationFields(fields, keys)
 }

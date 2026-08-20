@@ -70,6 +70,11 @@ func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta
 	return output, err
 }
 
+// ChangePassword 修改远程当前用户的登录密码。
+func (b *Backend) ChangePassword(ctx context.Context, meta appservice.RequestMeta, input appservice.ChangePasswordInput) error {
+	return b.do(ctx, meta, http.MethodPatch, "/password", nil, input, nil)
+}
+
 // LoadInbox 返回当前用户的远程收件箱。
 func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta) (appservice.Inbox, error) {
 	var output appservice.Inbox

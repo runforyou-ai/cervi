@@ -12,6 +12,7 @@ import (
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -101,6 +102,14 @@ func TestDirectBackendMapsValidationErrors(t *testing.T) {
 	converted := settingError.(*Error)
 	if converted.Kind != ErrorKindInvalid || converted.HTTPStatus() != http.StatusBadRequest || converted.Fields["provider"] == "" {
 		t.Fatalf("setting error = %#v", converted)
+	}
+
+	passwordFields := passwordFieldKeys(map[string]common.FieldCode{
+		"currentPassword": useraction.ValidationCurrentPasswordIncorrect,
+		"newPassword":     useraction.ValidationPasswordTooShort,
+	})
+	if passwordFields["currentPassword"] != cervii18n.FieldCurrentPasswordIncorrect || passwordFields["newPassword"] != cervii18n.FieldPasswordTooShort {
+		t.Fatalf("password field keys = %#v", passwordFields)
 	}
 }
 

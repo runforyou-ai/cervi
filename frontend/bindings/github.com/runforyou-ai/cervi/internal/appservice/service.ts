@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * ChangePassword 核验当前密码并保存新密码。
+ */
+export function ChangePassword(meta: $models.RequestMeta, input: $models.ChangePasswordInput): $CancellablePromise<void> {
+    return $Call.ByID(3645111243, meta, input);
+}
+
+/**
  * ConnectServer 保存并验证原生端企业服务器地址。
  */
 export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<void> {

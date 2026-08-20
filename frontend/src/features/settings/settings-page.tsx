@@ -9,6 +9,7 @@ import {
   PageSplit,
 } from "@/components/page-split"
 import { PageHeader } from "@/components/page-header"
+import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
 
@@ -21,11 +22,11 @@ type SettingsOutletContext = {
 export function SettingsPage({
   section,
 }: {
-  section: "profile" | "storage"
+  section: "profile" | "password" | "storage"
 }) {
   const { t } = useTranslation("settings")
   const { identity, updateUser } = useOutletContext<SettingsOutletContext>()
-  const profile = section === "profile"
+  const title = t(`${section}.title`)
 
   return (
     <PageSplit
@@ -36,16 +37,21 @@ export function SettingsPage({
           <PagePaneLink to="/settings/profile">
             {t("navigation.profile")}
           </PagePaneLink>
+          <PagePaneLink to="/settings/password">
+            {t("navigation.password")}
+          </PagePaneLink>
           <PagePaneLink to="/settings/storage">
             {t("navigation.storage")}
           </PagePaneLink>
         </PagePaneNav>
       }
     >
-      <PageHeader title={t(profile ? "profile.title" : "storage.title")} />
+      <PageHeader title={title} />
       <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
-        {profile ? (
+        {section === "profile" ? (
           <ProfileSettingsForm user={identity.user} onUpdated={updateUser} />
+        ) : section === "password" ? (
+          <ChangePasswordForm />
         ) : (
           <StorageSettingsForm />
         )}

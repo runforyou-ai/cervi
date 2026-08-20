@@ -352,6 +352,7 @@ const enUS = {
     navigationLabel: "Settings menu",
     navigation: {
       profile: "Profile",
+      password: "Change password",
       storage: "Storage",
     },
     profile: {
@@ -367,6 +368,25 @@ const enUS = {
         displayNameRequired: "Enter your name.",
         emailRequired: "Enter your email.",
         emailInvalid: "Enter a valid email address.",
+      },
+    },
+    password: {
+      title: "Change password",
+      formLabel: "Change password form",
+      currentPassword: "Current password",
+      newPassword: "New password",
+      confirmPassword: "Confirm password",
+      save: "Change password",
+      saving: "Changing…",
+      saveSuccess: "Password changed.",
+      saveError: "Could not change the password. Try again.",
+      validation: {
+        currentPasswordRequired: "Enter your current password.",
+        newPasswordRequired: "Enter a new password.",
+        newPasswordTooShort: "The new password must contain at least 8 characters.",
+        newPasswordTooLong: "The new password cannot exceed 72 UTF-8 bytes.",
+        confirmPasswordRequired: "Enter the new password again.",
+        passwordMismatch: "The new passwords do not match.",
       },
     },
     storage: {

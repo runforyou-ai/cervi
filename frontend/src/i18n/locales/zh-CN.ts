@@ -351,6 +351,7 @@ const zhCN = {
     navigationLabel: "设置菜单",
     navigation: {
       profile: "个人资料",
+      password: "修改密码",
       storage: "存储设置",
     },
     profile: {
@@ -366,6 +367,25 @@ const zhCN = {
         displayNameRequired: "请输入姓名。",
         emailRequired: "请输入邮箱。",
         emailInvalid: "请输入有效的邮箱。",
+      },
+    },
+    password: {
+      title: "修改密码",
+      formLabel: "修改密码表单",
+      currentPassword: "当前密码",
+      newPassword: "新密码",
+      confirmPassword: "确认密码",
+      save: "修改密码",
+      saving: "正在修改…",
+      saveSuccess: "密码已修改。",
+      saveError: "修改密码失败，请重试。",
+      validation: {
+        currentPasswordRequired: "请输入当前密码。",
+        newPasswordRequired: "请输入新密码。",
+        newPasswordTooShort: "新密码至少需要 8 个字符。",
+        newPasswordTooLong: "新密码不能超过 72 个 UTF-8 字节。",
+        confirmPasswordRequired: "请再次输入新密码。",
+        passwordMismatch: "两次输入的新密码不一致。",
       },
     },
     storage: {
