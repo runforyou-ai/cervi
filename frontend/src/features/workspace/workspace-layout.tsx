@@ -6,21 +6,17 @@ import { Outlet, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
-  loadIdentity,
+  loadSession,
   logout,
-  resolveNativeEntry,
+  sessionPath,
+  SessionState,
   type Identity,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
-/** 校验登录后显示工作台导航和子页面。 */
-export function WorkspaceLayout({
-  platform,
-}: {
-  platform: "web" | "desktop"
-}) {
+/** 读取会话并渲染工作台导航和子页面。 */
+export function WorkspaceLayout() {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const [identity, setIdentity] = useState<Identity | null>(null)
@@ -28,50 +24,32 @@ export function WorkspaceLayout({
   const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
 
-  /** 读取当前登录身份，未登录则跳转。 */
+  /** 读取会话，未就绪则跳转入口。 */
   const fetchIdentity = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      if (platform === "desktop") {
-        const entry = await resolveNativeEntry()
-        if (entry.status !== "ready") {
-          console.info("桌面端入口未就绪", { status: entry.status })
-          navigate(entry.status === "connect" ? "/connect" : "/login", {
-            replace: true,
-          })
-          return
-        }
-        setIdentity(entry.identity)
+      const session = await loadSession()
+      if (session.state === SessionState.SessionStateReady && session.identity) {
+        setIdentity(session.identity)
         console.info("工作台身份已加载", {
-          organization: entry.identity.organization.name,
+          organization: session.identity.organization.name,
         })
         return
       }
-      const currentIdentity = await loadIdentity()
-      setIdentity(currentIdentity)
-      console.info("工作台身份已加载", {
-        organization: currentIdentity.organization.name,
-      })
-    } catch (requestError) {
-      if (requestError instanceof ApiError) {
-        if (requestError.code === "INSTALLATION_REQUIRED") {
-          console.info("企业未初始化，进入初始化页")
-          navigate("/setup", { replace: true })
-          return
-        }
-        if (requestError.code === "AUTH_REQUIRED") {
-          console.info("未登录，进入登录页")
-          navigate("/login", { replace: true })
-          return
-        }
+      const path = sessionPath(session.state)
+      if (path) {
+        navigate(path, { replace: true })
+        return
       }
+      setError(t("loadError"))
+    } catch (requestError) {
       console.warn("工作台身份加载失败", requestError)
       setError(t("loadError"))
     } finally {
       setLoading(false)
     }
-  }, [navigate, platform, t])
+  }, [navigate, t])
 
   useEffect(() => {
     void fetchIdentity()

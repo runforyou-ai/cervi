@@ -21,7 +21,6 @@ import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ApiError,
   ChannelType,
   ContactMethodType,
   ContactSort,
@@ -34,6 +33,7 @@ import {
   listChannels,
   listContacts,
   listDeletedContacts,
+  recoverSession,
   listUsers,
   restoreContact,
   type ChannelSummary,
@@ -436,8 +436,7 @@ export function ContactsPage({
         if (error instanceof DOMException && error.name === "AbortError") {
           return
         }
-        if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-          navigate("/login", { replace: true })
+        if (recoverSession(error, navigate)) {
           return
         }
         console.warn("联系人列表加载失败", error)
@@ -471,8 +470,7 @@ export function ContactsPage({
         if (error instanceof DOMException && error.name === "AbortError") {
           return
         }
-        if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-          navigate("/login", { replace: true })
+        if (recoverSession(error, navigate)) {
           return
         }
         console.warn("联系人详情加载失败", error)
@@ -545,8 +543,7 @@ export function ContactsPage({
       }
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-        navigate("/login", { replace: true })
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("删除联系人失败", error)
@@ -564,8 +561,7 @@ export function ContactsPage({
       toast.success(t("trash.restored"))
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-        navigate("/login", { replace: true })
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("恢复联系人失败", error)

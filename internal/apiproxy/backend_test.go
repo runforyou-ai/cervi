@@ -37,8 +37,8 @@ func TestBackendRequiresEnterpriseServer(t *testing.T) {
 	}
 	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"})
 	var apiError *appservice.Error
-	if !errors.As(err, &apiError) || apiError.Code != "SERVER_CONNECTION_REQUIRED" {
-		t.Fatalf("error = %#v, want SERVER_CONNECTION_REQUIRED", err)
+	if !errors.As(err, &apiError) || apiError.State != appservice.SessionStateConnect {
+		t.Fatalf("error = %#v, want connect session", err)
 	}
 }
 
@@ -53,6 +53,19 @@ func TestBackendPreservesCancellation(t *testing.T) {
 	_, err = backend.LoadInbox(ctx, appservice.RequestMeta{})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context canceled", err)
+	}
+}
+
+// TestBackendUnavailableReturnsConnect 验证企业服务器不可用时进入连接页。
+func TestBackendUnavailableReturnsConnect(t *testing.T) {
+	backend, err := NewBackend(&memoryStore{serverURL: "http://127.0.0.1:1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"})
+	var apiError *appservice.Error
+	if !errors.As(err, &apiError) || apiError.Kind != appservice.ErrorKindUnavailable || apiError.State != appservice.SessionStateConnect {
+		t.Fatalf("error = %#v, want unavailable connect", err)
 	}
 }
 
@@ -72,7 +85,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				return
 			}
 			writeTestJSON(writer, http.StatusUnauthorized, map[string]any{"error": map[string]string{
-				"code": "AUTH_REQUIRED", "message": "Authentication required.",
+				"state": "login", "message": "Authentication required.",
 			}})
 		case "/api/auth/login":
 			writeTestJSON(writer, http.StatusOK, map[string]any{
@@ -155,8 +168,8 @@ func TestBackendRejectsUninitializedServer(t *testing.T) {
 	}
 	err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
 	var apiError *appservice.Error
-	if !errors.As(err, &apiError) || apiError.Code != "SERVER_INITIALIZATION_REQUIRED" {
-		t.Fatalf("error = %#v, want SERVER_INITIALIZATION_REQUIRED", err)
+	if !errors.As(err, &apiError) || apiError.Kind != appservice.ErrorKindInvalid {
+		t.Fatalf("error = %#v, want invalid", err)
 	}
 	if store.serverURL != "" {
 		t.Fatalf("server URL = %q, want empty", store.serverURL)
@@ -176,8 +189,8 @@ func TestBackendRejectsNonCerviServer(t *testing.T) {
 	}
 	err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
 	var apiError *appservice.Error
-	if !errors.As(err, &apiError) || apiError.Code != "SERVER_UNAVAILABLE" {
-		t.Fatalf("error = %#v, want SERVER_UNAVAILABLE", err)
+	if !errors.As(err, &apiError) || apiError.Kind != appservice.ErrorKindUnavailable || apiError.State != appservice.SessionStateConnect {
+		t.Fatalf("error = %#v, want unavailable connect", err)
 	}
 }
 

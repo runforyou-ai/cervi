@@ -216,6 +216,21 @@ export interface DirectoryUser {
 }
 
 /**
+ * ErrorKind 表示业务失败种类。
+ */
+export enum ErrorKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ErrorKindInvalid = "invalid",
+    ErrorKindNotFound = "not_found",
+    ErrorKindUnavailable = "unavailable",
+    ErrorKindFailed = "failed",
+};
+
+/**
  * Identity 定义当前用户及其所属企业。
  */
 export interface Identity {
@@ -332,6 +347,31 @@ export interface S3Setting {
     "secretAccessKey": string;
     "forcePathStyle": boolean;
 }
+
+/**
+ * Session 表示当前会话。
+ */
+export interface Session {
+    "state": SessionState;
+    "identity"?: Identity | null;
+    "organizationName"?: string;
+    "errorKind"?: ErrorKind;
+}
+
+/**
+ * SessionState 表示会话入口。
+ */
+export enum SessionState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    SessionStateReady = "ready",
+    SessionStateLogin = "login",
+    SessionStateSetup = "setup",
+    SessionStateConnect = "connect",
+};
 
 /**
  * StorageProvider 表示 S3 兼容对象存储提供商。

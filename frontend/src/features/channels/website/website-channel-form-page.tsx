@@ -4,7 +4,13 @@ import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams, useSearchParams } from "react-router"
 
-import { ApiError, getWebsiteChannel, type WebsiteChannel } from "@/api"
+import {
+  ErrorKind,
+  getWebsiteChannel,
+  isApiError,
+  recoverSession,
+  type WebsiteChannel,
+} from "@/api"
 import { PageBackHeader } from "@/components/page-back-header"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -152,17 +158,13 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
         if (!active) {
           return
         }
-        if (requestError instanceof ApiError) {
-          if (requestError.code === "AUTH_REQUIRED") {
-            console.info("未登录，进入登录页")
-            navigate("/login", { replace: true })
-            return
-          }
-          if (requestError.code === "CHANNEL_NOT_FOUND") {
-            console.warn("网站渠道不存在", { channel_id: channelId })
-            navigate("/channels/website", { replace: true })
-            return
-          }
+        if (recoverSession(requestError, navigate)) {
+          return
+        }
+        if (isApiError(requestError) && requestError.kind === ErrorKind.ErrorKindNotFound) {
+          console.warn("网站渠道不存在", { channel_id: channelId })
+          navigate("/channels/website", { replace: true })
+          return
         }
         console.warn("网站渠道详情加载失败", requestError)
         setError(t("form.loadError"))

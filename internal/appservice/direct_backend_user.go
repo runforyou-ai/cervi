@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"net/http"
 
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -23,14 +22,14 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Role: optionalDomain[UserRole, domain.UserRole](input.Role), Page: input.Page, PageSize: input.PageSize,
 	})
 	if errors.Is(err, useraction.ErrQueryInvalid) {
-		return UserList{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, nil)
+		return UserList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return UserList{}, ctx.Err()
 		}
 		slog.Warn("读取企业成员列表失败", "organization_id", identity.Organization.ID, "error", err)
-		return UserList{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorUserListFailed, nil)
+		return UserList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
 	}
 	users := make([]DirectoryUser, 0, len(output.Users))
 	for _, user := range output.Users {
@@ -47,14 +46,14 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 	}
 	user, err := b.getUser.Execute(ctx, identity, userID)
 	if errors.Is(err, useraction.ErrNotFound) {
-		return DirectoryUser{}, localizedError(meta, http.StatusNotFound, "USER_NOT_FOUND", cervii18n.ErrorUserNotFound, nil)
+		return DirectoryUser{}, NotFoundError(meta, cervii18n.ErrorUserNotFound)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return DirectoryUser{}, ctx.Err()
 		}
 		slog.Warn("读取企业成员失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
-		return DirectoryUser{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorUserReadFailed, nil)
+		return DirectoryUser{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
 	}
 	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), CreatedAt: user.CreatedAt}, nil
 }

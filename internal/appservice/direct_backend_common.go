@@ -10,12 +10,6 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// localizedError 把错误码转换为本地化业务错误。
-func localizedError(meta RequestMeta, status int, code string, messageKey cervii18n.Key, fieldKeys map[string]cervii18n.Key) *Error {
-	message, _ := cervii18n.Localize(string(meta.Locale), messageKey)
-	return &Error{Status: status, Code: code, Message: message, Fields: cervii18n.LocalizeMap(string(meta.Locale), fieldKeys)}
-}
-
 // identityFromModel 把存储身份转换为应用契约。
 func identityFromModel(identity *servermodels.Identity) Identity {
 	return Identity{Organization: organizationFromModel(identity.Organization), User: userFromModel(identity.User)}

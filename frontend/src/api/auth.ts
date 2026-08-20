@@ -1,9 +1,7 @@
-/** 登录、登出、企业初始化、初始化状态和企业服务器地址调用。 */
+/** 登录、登出、企业初始化和企业服务器地址调用。 */
 import {
   ConnectServer,
   InstallWorkspace,
-  InstallationStatus,
-  LoadIdentity,
   Login,
   Logout,
   ProbeServer,
@@ -13,13 +11,10 @@ import type {
   InstallWorkspaceInput,
   LoginInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
-import { ApiError, bind, call, clearToken, storeToken } from "@/api/client"
+import { bind, call, clearToken, storeToken } from "@/api/client"
 
 /** 读取已保存的企业服务器地址。 */
 export const getServerURL = bind(ServerURL)
-
-/** 读取企业初始化状态和公开企业名称。 */
-export const getInstallationStatus = bind(InstallationStatus)
 
 /** 登录并保存当前令牌。 */
 export async function login(input: LoginInput) {
@@ -32,18 +27,6 @@ export async function logout() {
     await call((meta) => Logout(meta))
   } finally {
     clearToken()
-  }
-}
-
-/** 读取当前登录身份；未登录时清除本地令牌。 */
-export async function loadIdentity() {
-  try {
-    return await call((meta) => LoadIdentity(meta))
-  } catch (error) {
-    if (error instanceof ApiError && error.code === "AUTH_REQUIRED") {
-      clearToken()
-    }
-    throw error
   }
 }
 
