@@ -1,6 +1,6 @@
 /** 判断原生端进入工作台、登录页还是连接页。 */
-import { getServerURL, loadSession } from "@/api/auth"
-import { ApiError, hasSession } from "@/api/client"
+import { getServerURL, loadIdentity } from "@/api/auth"
+import { ApiError, hasToken } from "@/api/client"
 import type { Identity } from "@/api/service"
 
 export type NativeEntry =
@@ -13,11 +13,11 @@ export async function resolveNativeEntry(): Promise<NativeEntry> {
   if ((await getServerURL()) === "") {
     return { status: "connect" }
   }
-  if (!hasSession()) {
+  if (!hasToken()) {
     return { status: "login" }
   }
   try {
-    return { status: "ready", identity: await loadSession() }
+    return { status: "ready", identity: await loadIdentity() }
   } catch (error) {
     if (error instanceof ApiError) {
       if (

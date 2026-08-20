@@ -19,6 +19,7 @@ export {
 } from "./models.js";
 
 export type {
+    Auth,
     ChannelList,
     ChannelSummary,
     Contact,
@@ -42,7 +43,6 @@ export type {
     PageInfo,
     RequestMeta,
     S3Setting,
-    Session,
     User,
     UserList,
     UserListInput,

@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/runforyou-ai/cervi/internal/common/fielderror"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -19,7 +19,7 @@ const (
 var themeColorPattern = regexp.MustCompile(`^#[0-9A-F]{6}$`)
 
 // ValidationCode 标识网站渠道字段校验结果。
-type ValidationCode = fielderror.Code
+type ValidationCode = common.FieldCode
 
 const (
 	ValidationNameRequired         ValidationCode = "NAME_REQUIRED"
@@ -34,7 +34,7 @@ const (
 )
 
 // ValidationError 表示网站渠道字段校验失败。
-type ValidationError = fielderror.Error
+type ValidationError = common.FieldError
 
 // WebsiteChannelInput 定义网站渠道可编辑字段。
 type WebsiteChannelInput struct {

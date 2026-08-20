@@ -7,8 +7,7 @@ import (
 	"database/sql"
 	"errors"
 
-	identityerr "github.com/runforyou-ai/cervi/internal/common/identity"
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -25,7 +24,7 @@ func validateIdentity(ctx context.Context, tx bun.Tx, identity *servermodels.Ide
 		return err
 	}
 	if !active {
-		return identityerr.ErrInvalid
+		return common.ErrIdentityInvalid
 	}
 	return nil
 }
@@ -159,7 +158,7 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 
 // loadContact 读取当前企业中未删除的联系人。
 func loadContact(ctx context.Context, db bun.IDB, organizationID, contactID string) (*ContactRecord, error) {
-	if !recordid.ValidUUID(contactID) {
+	if !common.ValidUUID(contactID) {
 		return nil, ErrNotFound
 	}
 	contact := &ContactRecord{}

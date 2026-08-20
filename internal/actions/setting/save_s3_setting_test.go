@@ -7,7 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/runforyou-ai/cervi/internal/common/identity"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -49,8 +49,8 @@ func TestSaveS3SettingRejectsInvalidIdentity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NewSaveS3SettingAction(nil).Execute(context.Background(), tt.identity, input)
-			if !errors.Is(err, identity.ErrInvalid) {
-				t.Fatalf("Execute() error = %v, want identity.ErrInvalid", err)
+			if !errors.Is(err, common.ErrIdentityInvalid) {
+				t.Fatalf("Execute() error = %v, want common.ErrIdentityInvalid", err)
 			}
 		})
 	}

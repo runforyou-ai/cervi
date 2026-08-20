@@ -1,5 +1,4 @@
-// Package recordid 校验记录标识。
-package recordid
+package common
 
 import (
 	"strings"

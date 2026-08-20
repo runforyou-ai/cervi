@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,7 +24,7 @@ func NewUpdateWebsiteChannelAction(db *bun.DB) *UpdateWebsiteChannelAction {
 
 // Execute 校验并更新当前企业的网站渠道。
 func (a *UpdateWebsiteChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input WebsiteChannelInput) (*servermodels.Channel, error) {
-	if !recordid.ValidUUID(channelID) {
+	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
 	input, fields := normalizeWebsiteChannelInput(input)

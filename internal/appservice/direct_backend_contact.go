@@ -9,8 +9,7 @@ import (
 	"net/http"
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
-	"github.com/runforyou-ai/cervi/internal/common/fielderror"
-	"github.com/runforyou-ai/cervi/internal/common/identity"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
@@ -19,7 +18,7 @@ func (b *DirectBackend) contactMutationError(ctx context.Context, meta RequestMe
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *fielderror.Error
+	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
 		return localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
@@ -30,7 +29,7 @@ func (b *DirectBackend) contactError(ctx context.Context, meta RequestMeta, err 
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, identity.ErrInvalid) {
+	if errors.Is(err, common.ErrIdentityInvalid) {
 		return localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
 	}
 	if errors.Is(err, contactaction.ErrNotFound) {
@@ -69,8 +68,8 @@ func contactFromAction(contact *contactaction.ContactDetail) Contact {
 	}
 }
 
-func contactFieldKeys(fields map[string]fielderror.Code) map[string]cervii18n.Key {
-	keys := map[fielderror.Code]cervii18n.Key{
+func contactFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+	keys := map[common.FieldCode]cervii18n.Key{
 		contactaction.ValidationIdentityRequired: cervii18n.FieldContactIdentityRequired, contactaction.ValidationChannelRequired: cervii18n.FieldContactChannelRequired,
 		contactaction.ValidationChannelInvalid: cervii18n.FieldContactChannelInvalid, contactaction.ValidationChannelImmutable: cervii18n.FieldContactChannelImmutable,
 		contactaction.ValidationNameTooLong: cervii18n.FieldContactNameTooLong, contactaction.ValidationStageInvalid: cervii18n.FieldContactStageInvalid,

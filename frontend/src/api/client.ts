@@ -3,15 +3,15 @@ import { CancelError, type CancellablePromise } from "@wailsio/runtime"
 
 import {
   Locale,
+  type Auth,
   type RequestMeta,
-  type Session,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { i18n } from "@/i18n"
 import { fallbackLanguage } from "@/i18n/resources"
 
-const sessionStorageKey = "cervi.session"
+const tokenStorageKey = "cervi.token"
 
-type StoredSession = Pick<Session, "token" | "expiresAt">
+type StoredToken = Pick<Auth, "token" | "expiresAt">
 
 type ErrorCause = {
   status: number
@@ -71,21 +71,21 @@ export function bind<A extends unknown[], R>(
 }
 
 /** 保存登录令牌并返回当前身份。 */
-export function acceptSession(session: Session) {
-  window.sessionStorage.setItem(
-    sessionStorageKey,
-    JSON.stringify({ token: session.token, expiresAt: session.expiresAt }),
+export function storeToken(auth: Auth) {
+  window.localStorage.setItem(
+    tokenStorageKey,
+    JSON.stringify({ token: auth.token, expiresAt: auth.expiresAt }),
   )
-  return session.identity
+  return auth.identity
 }
 
 /** 清除本地保存的登录令牌。 */
-export function clearSession() {
-  window.sessionStorage.removeItem(sessionStorageKey)
+export function clearToken() {
+  window.localStorage.removeItem(tokenStorageKey)
 }
 
 /** 判断本地是否仍有未过期的登录令牌。 */
-export function hasSession() {
+export function hasToken() {
   return loadToken() !== ""
 }
 
@@ -102,14 +102,14 @@ function requestMeta(): RequestMeta {
 
 /** 读取未过期的登录令牌。 */
 function loadToken() {
-  const value = window.sessionStorage.getItem(sessionStorageKey)
+  const value = window.localStorage.getItem(tokenStorageKey)
   if (!value) return ""
-  const session = JSON.parse(value) as StoredSession
-  if (Date.parse(session.expiresAt) <= Date.now()) {
-    clearSession()
+  const stored = JSON.parse(value) as StoredToken
+  if (Date.parse(stored.expiresAt) <= Date.now()) {
+    clearToken()
     return ""
   }
-  return session.token
+  return stored.token
 }
 
 /** 把应用服务异常转换为前端错误。 */

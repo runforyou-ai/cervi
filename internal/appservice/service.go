@@ -5,9 +5,9 @@ import "context"
 // Backend 定义各运行平台都需要实现的业务调用。
 type Backend interface {
 	InstallationStatus(context.Context, RequestMeta) (bool, error)
-	Login(context.Context, RequestMeta, LoginInput) (Session, error)
+	Login(context.Context, RequestMeta, LoginInput) (Auth, error)
 	Logout(context.Context, RequestMeta) error
-	LoadSession(context.Context, RequestMeta) (Identity, error)
+	LoadIdentity(context.Context, RequestMeta) (Identity, error)
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
 	ListWebsiteChannels(context.Context, RequestMeta, bool) (WebsiteChannelList, error)
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
@@ -32,7 +32,7 @@ type Backend interface {
 
 // WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。
 type WorkspaceInstaller interface {
-	InstallWorkspace(context.Context, RequestMeta, InstallWorkspaceInput) (Session, error)
+	InstallWorkspace(context.Context, RequestMeta, InstallWorkspaceInput) (Auth, error)
 }
 
 // ServerConnector 由原生端 Backend 实现，用于企业服务器地址。
@@ -56,28 +56,28 @@ func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (boo
 	return s.backend.InstallationStatus(ctx, meta)
 }
 
-// InstallWorkspace 创建企业所有者并返回登录会话。
-func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Session, error) {
+// InstallWorkspace 创建企业所有者并返回登录令牌。
+func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
 	installer, ok := s.backend.(WorkspaceInstaller)
 	if !ok {
-		return Session{}, methodNotAllowedError(meta, "InstallWorkspace")
+		return Auth{}, methodNotAllowedError(meta, "InstallWorkspace")
 	}
 	return installer.InstallWorkspace(ctx, meta, input)
 }
 
-// Login 校验账号密码并返回登录会话。
-func (s *Service) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Session, error) {
+// Login 校验账号密码并返回登录令牌。
+func (s *Service) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
 	return s.backend.Login(ctx, meta, input)
 }
 
-// Logout 删除当前登录会话。
+// Logout 删除当前登录令牌。
 func (s *Service) Logout(ctx context.Context, meta RequestMeta) error {
 	return s.backend.Logout(ctx, meta)
 }
 
-// LoadSession 返回当前登录身份。
-func (s *Service) LoadSession(ctx context.Context, meta RequestMeta) (Identity, error) {
-	return s.backend.LoadSession(ctx, meta)
+// LoadIdentity 返回当前登录身份。
+func (s *Service) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity, error) {
+	return s.backend.LoadIdentity(ctx, meta)
 }
 
 // LoadInbox 返回当前用户的统一收件箱。

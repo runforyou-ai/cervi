@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -32,7 +32,7 @@ func NewGetWebsiteChannelQuery(db *bun.DB) *GetWebsiteChannelQuery {
 
 // Execute 返回当前企业的网站渠道详情。
 func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) (*WebsiteChannelDetail, error) {
-	if !recordid.ValidUUID(channelID) {
+	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
 	channel := &servermodels.Channel{}

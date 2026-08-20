@@ -78,9 +78,9 @@ export function GetWebsiteChannel(meta: $models.RequestMeta, channelID: string):
 }
 
 /**
- * InstallWorkspace 创建企业所有者并返回登录会话。
+ * InstallWorkspace 创建企业所有者并返回登录令牌。
  */
-export function InstallWorkspace(meta: $models.RequestMeta, input: $models.InstallWorkspaceInput): $CancellablePromise<$models.Session> {
+export function InstallWorkspace(meta: $models.RequestMeta, input: $models.InstallWorkspaceInput): $CancellablePromise<$models.Auth> {
     return $Call.ByID(3665964242, meta, input);
 }
 
@@ -120,6 +120,13 @@ export function ListWebsiteChannels(meta: $models.RequestMeta, deleted: boolean)
 }
 
 /**
+ * LoadIdentity 返回当前登录身份。
+ */
+export function LoadIdentity(meta: $models.RequestMeta): $CancellablePromise<$models.Identity> {
+    return $Call.ByID(430146704, meta);
+}
+
+/**
  * LoadInbox 返回当前用户的统一收件箱。
  */
 export function LoadInbox(meta: $models.RequestMeta): $CancellablePromise<$models.Inbox> {
@@ -127,21 +134,14 @@ export function LoadInbox(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
- * LoadSession 返回当前登录身份。
+ * Login 校验账号密码并返回登录令牌。
  */
-export function LoadSession(meta: $models.RequestMeta): $CancellablePromise<$models.Identity> {
-    return $Call.ByID(2537050686, meta);
-}
-
-/**
- * Login 校验账号密码并返回登录会话。
- */
-export function Login(meta: $models.RequestMeta, input: $models.LoginInput): $CancellablePromise<$models.Session> {
+export function Login(meta: $models.RequestMeta, input: $models.LoginInput): $CancellablePromise<$models.Auth> {
     return $Call.ByID(3058727111, meta, input);
 }
 
 /**
- * Logout 删除当前登录会话。
+ * Logout 删除当前登录令牌。
  */
 export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
     return $Call.ByID(991463980, meta);

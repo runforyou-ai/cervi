@@ -9,8 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	identityerr "github.com/runforyou-ai/cervi/internal/common/identity"
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -32,10 +31,10 @@ func (a *SaveS3SettingAction) Execute(ctx context.Context, identity *servermodel
 		return S3Setting{}, &ValidationError{Fields: fields}
 	}
 	if identity == nil ||
-		!recordid.ValidUUID(identity.Organization.ID) ||
-		!recordid.ValidUUID(identity.User.ID) ||
+		!common.ValidUUID(identity.Organization.ID) ||
+		!common.ValidUUID(identity.User.ID) ||
 		identity.User.OrganizationID != identity.Organization.ID {
-		return S3Setting{}, identityerr.ErrInvalid
+		return S3Setting{}, common.ErrIdentityInvalid
 	}
 
 	value, err := json.Marshal(input)
@@ -56,7 +55,7 @@ func (a *SaveS3SettingAction) Execute(ctx context.Context, identity *servermodel
 			For("KEY SHARE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return identityerr.ErrInvalid
+				return common.ErrIdentityInvalid
 			}
 			return err
 		}
@@ -70,7 +69,7 @@ func (a *SaveS3SettingAction) Execute(ctx context.Context, identity *servermodel
 			For("KEY SHARE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return identityerr.ErrInvalid
+				return common.ErrIdentityInvalid
 			}
 			return err
 		}
@@ -84,8 +83,8 @@ func (a *SaveS3SettingAction) Execute(ctx context.Context, identity *servermodel
 			Exec(ctx)
 		return err
 	})
-	if errors.Is(err, identityerr.ErrInvalid) {
-		return S3Setting{}, identityerr.ErrInvalid
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return S3Setting{}, common.ErrIdentityInvalid
 	}
 	if err != nil {
 		return S3Setting{}, fmt.Errorf("save S3 setting: %w", err)

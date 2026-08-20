@@ -7,7 +7,7 @@ import { toast } from "sonner"
 
 import {
   ApiError,
-  loadSession,
+  loadIdentity,
   logout,
   resolveNativeEntry,
   type Identity,
@@ -70,7 +70,7 @@ export function WorkspaceLayout({
   const [loggingOut, setLoggingOut] = useState(false)
 
   /** 读取当前登录身份，未登录则跳转。 */
-  const fetchSession = useCallback(async () => {
+  const fetchIdentity = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
@@ -85,7 +85,7 @@ export function WorkspaceLayout({
         setIdentity(entry.identity)
         return
       }
-      setIdentity(await loadSession())
+      setIdentity(await loadIdentity())
     } catch (requestError) {
       if (requestError instanceof ApiError) {
         if (requestError.code === "INSTALLATION_REQUIRED") {
@@ -104,8 +104,8 @@ export function WorkspaceLayout({
   }, [navigate, platform, t])
 
   useEffect(() => {
-    void fetchSession()
-  }, [fetchSession])
+    void fetchIdentity()
+  }, [fetchIdentity])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -136,7 +136,7 @@ export function WorkspaceLayout({
           <p className="text-sm text-muted-foreground">
             {error || t("loadError")}
           </p>
-          <Button className="mt-4" variant="outline" onClick={fetchSession}>
+          <Button className="mt-4" variant="outline" onClick={fetchIdentity}>
             <RefreshCwIcon />
             {t("retry")}
           </Button>

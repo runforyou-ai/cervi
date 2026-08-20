@@ -28,7 +28,7 @@ type LoginInput struct {
 	Password string
 }
 
-// LoginOutput 返回登录身份和新会话。
+// LoginOutput 返回登录身份和新令牌。
 type LoginOutput struct {
 	Identity  *servermodels.Identity
 	Token     string
@@ -40,7 +40,7 @@ func NewLoginAction(db *bun.DB) *LoginAction {
 	return &LoginAction{db: db}
 }
 
-// Execute 校验账号密码并创建登录会话。
+// Execute 校验账号密码并签发登录令牌。
 func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutput, error) {
 	user := &servermodels.User{}
 	err := a.db.NewSelect().
@@ -58,9 +58,9 @@ func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutpu
 		return LoginOutput{}, ErrInvalidCredentials
 	}
 
-	issued, identity, err := createSession(ctx, a.db, user.ID)
+	issued, identity, err := issueToken(ctx, a.db, user.ID)
 	if err != nil {
-		return LoginOutput{}, fmt.Errorf("create login session: %w", err)
+		return LoginOutput{}, fmt.Errorf("issue login token: %w", err)
 	}
 	return LoginOutput{Identity: identity, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
 }

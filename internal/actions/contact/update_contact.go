@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -25,7 +25,7 @@ func NewUpdateContactAction(db *bun.DB) *UpdateContactAction {
 
 // Execute 校验并更新当前企业的联系人及联系方式。
 func (a *UpdateContactAction) Execute(ctx context.Context, identity *servermodels.Identity, contactID string, input ContactInput) (*ContactDetail, error) {
-	if !recordid.ValidUUID(contactID) {
+	if !common.ValidUUID(contactID) {
 		return nil, ErrNotFound
 	}
 	input, fields := normalizeContactInput(input)

@@ -8,8 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	identityerr "github.com/runforyou-ai/cervi/internal/common/identity"
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -32,10 +31,10 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 		return nil, &ValidationError{Fields: fields}
 	}
 	if identity == nil ||
-		!recordid.ValidUUID(identity.Organization.ID) ||
-		!recordid.ValidUUID(identity.User.ID) ||
+		!common.ValidUUID(identity.Organization.ID) ||
+		!common.ValidUUID(identity.User.ID) ||
 		identity.User.OrganizationID != identity.Organization.ID {
-		return nil, identityerr.ErrInvalid
+		return nil, common.ErrIdentityInvalid
 	}
 
 	channel := &servermodels.Channel{
@@ -57,7 +56,7 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 			For("KEY SHARE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return identityerr.ErrInvalid
+				return common.ErrIdentityInvalid
 			}
 			return err
 		}
@@ -71,7 +70,7 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 			For("KEY SHARE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return identityerr.ErrInvalid
+				return common.ErrIdentityInvalid
 			}
 			return err
 		}
@@ -97,8 +96,8 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 			Exec(ctx)
 		return err
 	})
-	if errors.Is(err, identityerr.ErrInvalid) {
-		return nil, identityerr.ErrInvalid
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return nil, common.ErrIdentityInvalid
 	}
 	if err != nil {
 		return nil, fmt.Errorf("create website channel: %w", err)

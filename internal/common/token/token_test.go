@@ -1,11 +1,10 @@
-package sessiontoken
+package token
 
 import (
 	"testing"
 	"time"
 )
 
-// TestIssue 验证会话令牌签发结果。
 func TestIssue(t *testing.T) {
 	issued, err := Issue()
 	if err != nil {
@@ -16,6 +15,6 @@ func TestIssue(t *testing.T) {
 	}
 	remaining := time.Until(issued.ExpiresAt)
 	if remaining < defaultDuration-time.Minute || remaining > defaultDuration {
-		t.Fatalf("session duration = %v, want about %v", remaining, defaultDuration)
+		t.Fatalf("token duration = %v, want about %v", remaining, defaultDuration)
 	}
 }

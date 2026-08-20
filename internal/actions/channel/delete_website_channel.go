@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,7 +24,7 @@ func NewDeleteWebsiteChannelAction(db *bun.DB) *DeleteWebsiteChannelAction {
 
 // Execute 软删除当前企业的网站渠道。
 func (a *DeleteWebsiteChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) error {
-	if !recordid.ValidUUID(channelID) {
+	if !common.ValidUUID(channelID) {
 		return ErrNotFound
 	}
 	result, err := a.db.NewUpdate().

@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,7 +23,7 @@ func NewRestoreContactAction(db *bun.DB) *RestoreContactAction {
 
 // Execute 恢复当前企业中已软删除的联系人。
 func (a *RestoreContactAction) Execute(ctx context.Context, identity *servermodels.Identity, contactID string) (*ContactDetail, error) {
-	if !recordid.ValidUUID(contactID) {
+	if !common.ValidUUID(contactID) {
 		return nil, ErrNotFound
 	}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {

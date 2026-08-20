@@ -7,14 +7,13 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
-	"github.com/runforyou-ai/cervi/internal/common/fielderror"
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识联系人字段校验结果。
-type ValidationCode = fielderror.Code
+type ValidationCode = common.FieldCode
 
 const (
 	ValidationIdentityRequired ValidationCode = "IDENTITY_REQUIRED"
@@ -32,7 +31,7 @@ const (
 )
 
 // ValidationError 表示联系人字段校验失败。
-type ValidationError = fielderror.Error
+type ValidationError = common.FieldError
 
 // normalizeContactInput 规范化并校验联系人写入字段。
 func normalizeContactInput(input ContactInput) (ContactInput, map[string]ValidationCode) {
@@ -44,7 +43,7 @@ func normalizeContactInput(input ContactInput) (ContactInput, map[string]Validat
 	fields := make(map[string]ValidationCode)
 	if input.ChannelID == "" {
 		fields["channelId"] = ValidationChannelRequired
-	} else if !recordid.ValidUUID(input.ChannelID) {
+	} else if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelInvalid
 	}
 	if len([]rune(input.DisplayName)) > 200 {
@@ -147,7 +146,7 @@ func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) 
 	if input.MethodType != "" && input.MethodType != domain.ContactMethodTypeEmail && input.MethodType != domain.ContactMethodTypePhone {
 		fields["methodType"] = ValidationQueryInvalid
 	}
-	if input.ChannelID != "" && !recordid.ValidUUID(input.ChannelID) {
+	if input.ChannelID != "" && !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationQueryInvalid
 	}
 	if input.Sort == "" {

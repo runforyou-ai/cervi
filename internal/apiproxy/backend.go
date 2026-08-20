@@ -46,22 +46,22 @@ func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.Reques
 	return output.Installed, err
 }
 
-// Login 校验账号密码并返回登录会话。
-func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Session, error) {
-	var output appservice.Session
+// Login 校验账号密码并返回登录令牌。
+func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
+	var output appservice.Auth
 	err := b.do(ctx, meta, http.MethodPost, "/auth/login", nil, input, &output)
 	return output, err
 }
 
-// Logout 删除远程登录会话。
+// Logout 删除远程登录令牌。
 func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error {
 	return b.do(ctx, meta, http.MethodPost, "/auth/logout", nil, nil, nil)
 }
 
-// LoadSession 返回当前远程登录身份。
-func (b *Backend) LoadSession(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
+// LoadIdentity 返回当前远程登录身份。
+func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
 	var output appservice.Identity
-	err := b.do(ctx, meta, http.MethodGet, "/auth/session", nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/auth/identity", nil, nil, &output)
 	return output, err
 }
 

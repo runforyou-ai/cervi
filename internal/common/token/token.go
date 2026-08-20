@@ -1,5 +1,5 @@
-// Package sessiontoken 提供登录会话令牌的签发和哈希能力。
-package sessiontoken
+// Package token 提供登录令牌的签发和哈希。
+package token
 
 import (
 	"crypto/rand"
@@ -11,29 +11,29 @@ import (
 
 const defaultDuration = 30 * 24 * time.Hour
 
-// Issued 表示新签发的会话令牌。
+// Issued 表示新签发的登录令牌。
 type Issued struct {
 	Token     string
 	TokenHash string
 	ExpiresAt time.Time
 }
 
-// Issue 签发有效期为三十天的会话令牌。
+// Issue 签发有效期为三十天的登录令牌。
 func Issue() (Issued, error) {
 	buffer := make([]byte, 32)
 	if _, err := rand.Read(buffer); err != nil {
 		return Issued{}, err
 	}
-	token := base64.RawURLEncoding.EncodeToString(buffer)
+	value := base64.RawURLEncoding.EncodeToString(buffer)
 	return Issued{
-		Token:     token,
-		TokenHash: Hash(token),
+		Token:     value,
+		TokenHash: Hash(value),
 		ExpiresAt: time.Now().Add(defaultDuration),
 	}, nil
 }
 
-// Hash 计算会话令牌的 SHA-256 哈希。
-func Hash(token string) string {
-	sum := sha256.Sum256([]byte(token))
+// Hash 计算登录令牌的 SHA-256 哈希。
+func Hash(value string) string {
+	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
 }

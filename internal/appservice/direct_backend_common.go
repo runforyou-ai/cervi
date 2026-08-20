@@ -7,7 +7,7 @@ import (
 	"log/slog"
 
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
-	"github.com/runforyou-ai/cervi/internal/common/fielderror"
+	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -29,8 +29,8 @@ func userFromModel(user servermodels.User) User {
 	return User{ID: user.ID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status)}
 }
 
-func installationFieldKeys(fields map[string]fielderror.Code) map[string]cervii18n.Key {
-	keys := map[fielderror.Code]cervii18n.Key{
+func installationFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+	keys := map[common.FieldCode]cervii18n.Key{
 		installationaction.ValidationOrganizationNameRequired: cervii18n.FieldOrganizationNameRequired,
 		installationaction.ValidationDisplayNameRequired:      cervii18n.FieldDisplayNameRequired,
 		installationaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,

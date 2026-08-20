@@ -20,7 +20,7 @@ function MobileHomePage() {
   const [loggingOut, setLoggingOut] = useState(false)
 
   /** 读取原生端入口并加载当前身份。 */
-  const fetchSession = useCallback(async () => {
+  const fetchIdentity = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
@@ -40,8 +40,8 @@ function MobileHomePage() {
   }, [navigate, t])
 
   useEffect(() => {
-    void fetchSession()
-  }, [fetchSession])
+    void fetchIdentity()
+  }, [fetchIdentity])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -70,7 +70,7 @@ function MobileHomePage() {
       <main className="flex min-h-dvh items-center justify-center p-6">
         <div className="text-center">
           <p className="text-sm text-muted-foreground">{error}</p>
-          <Button className="mt-4" variant="outline" onClick={fetchSession}>
+          <Button className="mt-4" variant="outline" onClick={fetchIdentity}>
             {t("retry")}
           </Button>
         </div>

@@ -24,21 +24,21 @@ func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta
 	return true, nil
 }
 
-func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Session, error) {
+func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
 	b.lastMeta = meta
 	if input.Email != "owner@example.com" || input.Password != "password123" {
-		return appservice.Session{}, &appservice.Error{Status: http.StatusUnauthorized, Code: "INVALID_CREDENTIALS", Message: "账号或密码错误。"}
+		return appservice.Auth{}, &appservice.Error{Status: http.StatusUnauthorized, Code: "INVALID_CREDENTIALS", Message: "账号或密码错误。"}
 	}
-	return appservice.Session{
+	return appservice.Auth{
 		Identity:  testIdentity(),
-		Token:     "session-token",
+		Token:     "test-token",
 		ExpiresAt: time.Now().Add(time.Hour),
 	}, nil
 }
 
-func (b *testBackend) LoadSession(_ context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
+func (b *testBackend) LoadIdentity(_ context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
 	b.lastMeta = meta
-	if meta.Token != "session-token" {
+	if meta.Token != "test-token" {
 		return appservice.Identity{}, &appservice.Error{Status: http.StatusUnauthorized, Code: "AUTH_REQUIRED", Message: "请先登录。"}
 	}
 	return testIdentity(), nil
@@ -63,24 +63,24 @@ func TestAuthenticationUsesBearerToken(t *testing.T) {
 	if loginResponse.StatusCode != http.StatusOK {
 		t.Fatalf("login status = %d, want %d", loginResponse.StatusCode, http.StatusOK)
 	}
-	var session appservice.Session
-	if err := json.NewDecoder(loginResponse.Body).Decode(&session); err != nil {
+	var auth appservice.Auth
+	if err := json.NewDecoder(loginResponse.Body).Decode(&auth); err != nil {
 		t.Fatal(err)
 	}
-	if session.Token != "session-token" {
-		t.Fatalf("token = %q, want session-token", session.Token)
+	if auth.Token != "test-token" {
+		t.Fatalf("token = %q, want test-token", auth.Token)
 	}
 
-	unauthorized := doJSON(t, http.MethodGet, server.URL+"/auth/session", nil, "")
+	unauthorized := doJSON(t, http.MethodGet, server.URL+"/auth/identity", nil, "")
 	assertErrorCode(t, unauthorized, http.StatusUnauthorized, "AUTH_REQUIRED")
 
-	authorized := doJSON(t, http.MethodGet, server.URL+"/auth/session", nil, session.Token)
+	authorized := doJSON(t, http.MethodGet, server.URL+"/auth/identity", nil, auth.Token)
 	defer authorized.Body.Close()
 	if authorized.StatusCode != http.StatusOK {
-		t.Fatalf("session status = %d, want %d", authorized.StatusCode, http.StatusOK)
+		t.Fatalf("identity status = %d, want %d", authorized.StatusCode, http.StatusOK)
 	}
-	if backend.lastMeta.Token != session.Token {
-		t.Fatalf("backend token = %q, want %q", backend.lastMeta.Token, session.Token)
+	if backend.lastMeta.Token != auth.Token {
+		t.Fatalf("backend token = %q, want %q", backend.lastMeta.Token, auth.Token)
 	}
 }
 
@@ -90,7 +90,7 @@ func TestListQueryIsConvertedToTypedInput(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 
-	response := doJSON(t, http.MethodGet, server.URL+"/users?query=lin&status=active&page=2&pageSize=25", nil, "session-token")
+	response := doJSON(t, http.MethodGet, server.URL+"/users?query=lin&status=active&page=2&pageSize=25", nil, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
@@ -123,10 +123,10 @@ func TestInvalidJSONUsesRequestedLanguage(t *testing.T) {
 
 // TestBearerTokenParsing 验证 Bearer Token 请求头解析规则。
 func TestBearerTokenParsing(t *testing.T) {
-	if token := bearerToken("Bearer session-token"); token != "session-token" {
-		t.Fatalf("token = %q, want session-token", token)
+	if token := bearerToken("Bearer test-token"); token != "test-token" {
+		t.Fatalf("token = %q, want test-token", token)
 	}
-	if token := bearerToken("Basic session-token"); token != "" {
+	if token := bearerToken("Basic test-token"); token != "" {
 		t.Fatalf("basic token = %q, want empty", token)
 	}
 }

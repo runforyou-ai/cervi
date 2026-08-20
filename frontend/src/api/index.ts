@@ -1,10 +1,10 @@
 /** 前端业务 API 入口，统一导出认证、绑定调用和契约类型。 */
-export { ApiError, hasSession } from "@/api/client"
+export { ApiError, hasToken } from "@/api/client"
 export {
   connectServer,
   getServerURL,
   install,
-  loadSession,
+  loadIdentity,
   login,
   logout,
 } from "@/api/auth"

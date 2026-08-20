@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/runforyou-ai/cervi/internal/common/fielderror"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -28,7 +28,7 @@ var supportedProviders = map[domain.StorageProvider]struct{}{
 }
 
 // ValidationCode 标识存储配置字段校验结果。
-type ValidationCode = fielderror.Code
+type ValidationCode = common.FieldCode
 
 const (
 	ValidationEndpointRequired        ValidationCode = "ENDPOINT_REQUIRED"
@@ -41,7 +41,7 @@ const (
 )
 
 // ValidationError 表示存储配置字段校验失败。
-type ValidationError = fielderror.Error
+type ValidationError = common.FieldError
 
 // S3Setting 定义企业的 S3 对象存储配置。
 type S3Setting struct {

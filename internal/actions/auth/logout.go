@@ -18,7 +18,7 @@ func NewLogoutAction(db *bun.DB) *LogoutAction {
 	return &LogoutAction{db: db}
 }
 
-// Execute 删除当前令牌对应的登录会话。
+// Execute 删除当前登录令牌。
 func (a *LogoutAction) Execute(ctx context.Context, token string) error {
-	return revokeSession(ctx, a.db, token)
+	return revokeToken(ctx, a.db, token)
 }

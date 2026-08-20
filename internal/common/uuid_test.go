@@ -1,4 +1,4 @@
-package recordid
+package common
 
 import "testing"
 

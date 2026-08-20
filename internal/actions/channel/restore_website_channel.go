@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common/recordid"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,7 +24,7 @@ func NewRestoreWebsiteChannelAction(db *bun.DB) *RestoreWebsiteChannelAction {
 
 // Execute 恢复当前企业中已软删除的网站渠道。
 func (a *RestoreWebsiteChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) (*servermodels.Channel, error) {
-	if !recordid.ValidUUID(channelID) {
+	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
 	channel := &servermodels.Channel{}

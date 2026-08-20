@@ -15,7 +15,7 @@ import (
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
-	"github.com/runforyou-ai/cervi/internal/common/fielderror"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -32,7 +32,7 @@ type DirectBackend struct {
 	installWorkspace                  *installationaction.InstallWorkspaceAction
 	login                             *authaction.LoginAction
 	logout                            *authaction.LogoutAction
-	resolveSession                    *authaction.ResolveSessionQuery
+	resolveIdentity                   *authaction.ResolveIdentityQuery
 	installation                      *installationaction.StatusQuery
 	loadInbox                         *inboxaction.LoadInboxQuery
 	listWebsiteChannels               *channelaction.ListWebsiteChannelsQuery
@@ -62,7 +62,7 @@ func NewDirectBackend(db *bun.DB) *DirectBackend {
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
 		logout:                            authaction.NewLogoutAction(db),
-		resolveSession:                    authaction.NewResolveSessionQuery(db),
+		resolveIdentity:                   authaction.NewResolveIdentityQuery(db),
 		installation:                      installationaction.NewStatusQuery(db),
 		loadInbox:                         inboxaction.NewLoadInboxQuery(),
 		listWebsiteChannels:               channelaction.NewListWebsiteChannelsQuery(db),
@@ -100,14 +100,14 @@ func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta
 	return installed, nil
 }
 
-// InstallWorkspace 创建企业所有者并返回登录会话。
-func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Session, error) {
+// InstallWorkspace 创建企业所有者并返回登录令牌。
+func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
 	installed, err := b.InstallationStatus(ctx, meta)
 	if err != nil {
-		return Session{}, err
+		return Auth{}, err
 	}
 	if installed {
-		return Session{}, localizedError(meta, http.StatusConflict, "ALREADY_INITIALIZED", cervii18n.ErrorAlreadyInitialized, nil)
+		return Auth{}, localizedError(meta, http.StatusConflict, "ALREADY_INITIALIZED", cervii18n.ErrorAlreadyInitialized, nil)
 	}
 	output, err := b.installWorkspace.Execute(ctx, installationaction.InstallWorkspaceInput{
 		OrganizationName: input.OrganizationName,
@@ -115,45 +115,45 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		Email:            input.Email,
 		Password:         input.Password,
 	})
-	var validationError *fielderror.Error
+	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
-		return Session{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, installationFieldKeys(validationError.Fields))
+		return Auth{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, installationFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, installationaction.ErrAlreadyInstalled) {
-		return Session{}, localizedError(meta, http.StatusConflict, "ALREADY_INITIALIZED", cervii18n.ErrorAlreadyInitialized, nil)
+		return Auth{}, localizedError(meta, http.StatusConflict, "ALREADY_INITIALIZED", cervii18n.ErrorAlreadyInitialized, nil)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
-			return Session{}, ctx.Err()
+			return Auth{}, ctx.Err()
 		}
 		slog.Warn("初始化企业失败", "error", err)
-		return Session{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorInstallationFailed, nil)
+		return Auth{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorInstallationFailed, nil)
 	}
 	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "owner_id", output.Identity.User.ID)
-	return Session{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
-// Login 校验账号密码并返回登录会话。
-func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Session, error) {
+// Login 校验账号密码并返回登录令牌。
+func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
 	if err := b.requireInitialized(ctx, meta); err != nil {
-		return Session{}, err
+		return Auth{}, err
 	}
 	output, err := b.login.Execute(ctx, authaction.LoginInput{Email: input.Email, Password: input.Password})
 	if errors.Is(err, authaction.ErrInvalidCredentials) {
-		return Session{}, localizedError(meta, http.StatusUnauthorized, "INVALID_CREDENTIALS", cervii18n.ErrorInvalidCredentials, nil)
+		return Auth{}, localizedError(meta, http.StatusUnauthorized, "INVALID_CREDENTIALS", cervii18n.ErrorInvalidCredentials, nil)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
-			return Session{}, ctx.Err()
+			return Auth{}, ctx.Err()
 		}
 		slog.Warn("用户登录失败", "error", err)
-		return Session{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorLoginFailed, nil)
+		return Auth{}, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorLoginFailed, nil)
 	}
 	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID)
-	return Session{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
-// Logout 删除当前登录会话。
+// Logout 删除当前登录令牌。
 func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -163,15 +163,15 @@ func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		slog.Warn("删除登录会话失败", "user_id", identity.User.ID, "error", err)
+		slog.Warn("删除登录令牌失败", "user_id", identity.User.ID, "error", err)
 		return localizedError(meta, http.StatusInternalServerError, "LOGOUT_FAILED", cervii18n.ErrorLogoutFailed, nil)
 	}
 	slog.Info("用户退出登录", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
 	return nil
 }
 
-// LoadSession 返回令牌对应的当前身份。
-func (b *DirectBackend) LoadSession(ctx context.Context, meta RequestMeta) (Identity, error) {
+// LoadIdentity 返回令牌对应的当前身份。
+func (b *DirectBackend) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Identity{}, err
@@ -378,7 +378,7 @@ func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, inpu
 		Query: input.Query, Stage: optionalDomain[ContactStage, domain.ContactStage](input.Stage), ChannelID: input.ChannelID, MethodType: optionalDomain[ContactMethodType, domain.ContactMethodType](input.MethodType),
 		Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
 	})
-	var validationError *fielderror.Error
+	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
 		return ContactList{}, localizedError(meta, http.StatusBadRequest, "VALIDATION_FAILED", cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
@@ -525,12 +525,12 @@ func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*se
 	if meta.Token == "" {
 		return nil, localizedError(meta, http.StatusUnauthorized, "AUTH_REQUIRED", cervii18n.ErrorAuthenticationRequired, nil)
 	}
-	identity, err := b.resolveSession.Execute(ctx, meta.Token)
+	identity, err := b.resolveIdentity.Execute(ctx, meta.Token)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		slog.Warn("读取登录会话失败", "error", err)
+		slog.Warn("读取登录令牌失败", "error", err)
 		return nil, localizedError(meta, http.StatusInternalServerError, "INTERNAL_ERROR", cervii18n.ErrorAuthenticationStatusFailed, nil)
 	}
 	if identity == nil {

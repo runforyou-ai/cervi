@@ -109,8 +109,8 @@ type LoginInput struct {
 	Password string `json:"password"`
 }
 
-// Session 包含登录身份和访问令牌。
-type Session struct {
+// Auth 包含登录身份和访问令牌。
+type Auth struct {
 	Identity  Identity  `json:"identity"`
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expiresAt"`

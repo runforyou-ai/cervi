@@ -42,7 +42,7 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/install", service.install)
 	router.POST("/auth/login", service.login)
 	router.POST("/auth/logout", service.logout)
-	router.GET("/auth/session", service.loadSession)
+	router.GET("/auth/identity", service.loadIdentity)
 	router.GET("/inbox", service.loadInbox)
 	router.GET("/channels/website", service.listWebsiteChannels)
 	router.GET("/channels/website/trash", service.listDeletedWebsiteChannels)
@@ -88,11 +88,11 @@ func (s *Service) install(c *gin.Context) {
 	if !bindJSON(c, &input) {
 		return
 	}
-	session, err := s.application.InstallWorkspace(c.Request.Context(), requestMeta(c), input)
+	auth, err := s.application.InstallWorkspace(c.Request.Context(), requestMeta(c), input)
 	if writeApplicationError(c, err) {
 		return
 	}
-	c.JSON(http.StatusCreated, session)
+	c.JSON(http.StatusCreated, auth)
 }
 
 func (s *Service) login(c *gin.Context) {
@@ -100,11 +100,11 @@ func (s *Service) login(c *gin.Context) {
 	if !bindJSON(c, &input) {
 		return
 	}
-	session, err := s.application.Login(c.Request.Context(), requestMeta(c), input)
+	auth, err := s.application.Login(c.Request.Context(), requestMeta(c), input)
 	if writeApplicationError(c, err) {
 		return
 	}
-	c.JSON(http.StatusOK, session)
+	c.JSON(http.StatusOK, auth)
 }
 
 func (s *Service) logout(c *gin.Context) {
@@ -115,8 +115,8 @@ func (s *Service) logout(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (s *Service) loadSession(c *gin.Context) {
-	identity, err := s.application.LoadSession(c.Request.Context(), requestMeta(c))
+func (s *Service) loadIdentity(c *gin.Context) {
+	identity, err := s.application.LoadIdentity(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, identity, err)
 }
 
