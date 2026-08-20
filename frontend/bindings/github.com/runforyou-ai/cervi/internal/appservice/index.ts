@@ -22,6 +22,7 @@ export {
 
 export type {
     Auth,
+    ChangePasswordInput,
     ChannelList,
     ChannelSummary,
     Contact,

@@ -19,6 +19,7 @@ type testBackend struct {
 	lastMeta     appservice.RequestMeta
 	lastUserList appservice.UserListInput
 	lastProfile  appservice.ProfileInput
+	lastPassword appservice.ChangePasswordInput
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
@@ -53,6 +54,13 @@ func (b *testBackend) UpdateProfile(_ context.Context, meta appservice.RequestMe
 	identity.User.DisplayName = input.DisplayName
 	identity.User.Email = input.Email
 	return identity.User, nil
+}
+
+// ChangePassword 记录修改密码输入。
+func (b *testBackend) ChangePassword(_ context.Context, meta appservice.RequestMeta, input appservice.ChangePasswordInput) error {
+	b.lastMeta = meta
+	b.lastPassword = input
+	return nil
 }
 
 func (b *testBackend) ListUsers(_ context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
@@ -146,6 +154,25 @@ func TestUpdateProfileUsesTypedInput(t *testing.T) {
 	}
 	if backend.lastMeta.Token != "test-token" || backend.lastProfile.DisplayName != "林晓" || backend.lastProfile.Email != "lin@example.com" {
 		t.Fatalf("profile input = %#v, meta = %#v", backend.lastProfile, backend.lastMeta)
+	}
+}
+
+// TestChangePasswordUsesTypedInput 验证修改密码请求转换为类型化服务输入。
+func TestChangePasswordUsesTypedInput(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	response := doJSON(t, http.MethodPatch, server.URL+"/password", appservice.ChangePasswordInput{
+		CurrentPassword: "password123",
+		NewPassword:     "new-password123",
+	}, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusNoContent)
+	}
+	if backend.lastMeta.Token != "test-token" || backend.lastPassword.CurrentPassword != "password123" || backend.lastPassword.NewPassword != "new-password123" {
+		t.Fatalf("password input = %#v, meta = %#v", backend.lastPassword, backend.lastMeta)
 	}
 }
 

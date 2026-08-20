@@ -11,6 +11,14 @@ export interface Auth {
 }
 
 /**
+ * ChangePasswordInput 定义当前用户修改密码所需字段。
+ */
+export interface ChangePasswordInput {
+    "currentPassword": string;
+    "newPassword": string;
+}
+
+/**
  * ChannelList 定义渠道选择项列表。
  */
 export interface ChannelList {

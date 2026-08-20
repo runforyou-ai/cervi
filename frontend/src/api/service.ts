@@ -1,5 +1,6 @@
 /** 绑定应用服务方法，并归一化可空切片。 */
 import {
+  ChangePassword,
   CreateContact,
   CreateWebsiteChannel,
   DeleteContact,
@@ -91,6 +92,8 @@ export const saveS3Setting = bind(SaveS3Setting)
 export const testS3Setting = bind(TestS3Setting)
 /** 修改当前用户的姓名和邮箱。 */
 export const updateProfile = bind(UpdateProfile)
+/** 修改当前用户的登录密码。 */
+export const changePassword = bind(ChangePassword)
 
 const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)
