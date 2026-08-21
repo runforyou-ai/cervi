@@ -4,15 +4,19 @@ import {
   CompleteFileUpload,
   CreateContact,
   CreateFileUpload,
+  CreateRole,
   CreateWebsiteChannel,
   DeleteContact,
+  DeleteRole,
   DeleteWebsiteChannel,
   GetContact,
+  GetRole,
   GetS3Setting,
   GetUser,
   GetWebsiteChannel,
   ListChannels,
   ListContacts,
+  ListRoles,
   ListUsers,
   ListWebsiteChannels,
   LoadInbox,
@@ -24,6 +28,7 @@ import {
   UpdateContact,
   UpdateOrganization,
   UpdateProfile,
+  UpdateRole,
   UpdateUserPreferences,
   UpdateUserWorkStatus,
   UpdateWebsiteChannel,
@@ -38,6 +43,9 @@ import {
   type ContactListInput,
   type Conversation as GeneratedConversation,
   type Inbox,
+  type PermissionDefinition,
+  type Role,
+  type RoleInput,
   type UserListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -71,6 +79,15 @@ export type InboxData = Omit<Inbox, "conversations"> & {
 }
 
 export type Conversation = ConversationData
+
+export type RoleData = Omit<Role, "permissions"> & {
+  permissions: NonNullable<Role["permissions"]>
+}
+
+export type RoleListData = {
+  roles: RoleData[]
+  permissions: PermissionDefinition[]
+}
 
 /** 读取网站渠道详情。 */
 export const getWebsiteChannel = bind(GetWebsiteChannel)
@@ -112,6 +129,8 @@ export const changePassword = bind(ChangePassword)
 export const updateUserPreferences = bind(UpdateUserPreferences)
 /** 修改当前用户主动设置的工作状态。 */
 export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
+/** 删除自定义角色。 */
+export const deleteRole = bind(DeleteRole)
 
 const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)
@@ -122,6 +141,10 @@ const createContactBound = bind(CreateContact)
 const updateContactBound = bind(UpdateContact)
 const restoreContactBound = bind(RestoreContact)
 const loadInboxBound = bind(LoadInbox)
+const listRolesBound = bind(ListRoles)
+const getRoleBound = bind(GetRole)
+const createRoleBound = bind(CreateRole)
+const updateRoleBound = bind(UpdateRole)
 
 /** 把可空切片转换为空数组。 */
 function asList<T>(value: T[] | null | undefined): T[] {
@@ -202,6 +225,29 @@ export async function loadInbox(): Promise<InboxData> {
   }
 }
 
+/** 读取角色和预定义权限目录。 */
+export function listRoles(signal?: AbortSignal): Promise<RoleListData> {
+  return listRolesBound(signal).then((output) => ({
+    roles: asList(output.roles).map(normalizeRole),
+    permissions: asList(output.permissions),
+  }))
+}
+
+/** 读取角色详情。 */
+export function getRole(roleId: string, signal?: AbortSignal) {
+  return getRoleBound(roleId, signal).then(normalizeRole)
+}
+
+/** 创建自定义角色。 */
+export function createRole(input: RoleInput) {
+  return createRoleBound(input).then(normalizeRole)
+}
+
+/** 修改角色信息和权限。 */
+export function updateRole(roleId: string, input: RoleInput) {
+  return updateRoleBound(roleId, input).then(normalizeRole)
+}
+
 /** 按是否回收站读取联系人列表。 */
 async function listContactsByDeleted(
   query: ContactListQuery,
@@ -234,4 +280,9 @@ function normalizeContact(contact: Contact): ContactDetail {
     methods: asList(contact.methods),
     channelIdentities: asList(contact.channelIdentities),
   }
+}
+
+/** 把角色中的可空权限切片转换为空数组。 */
+function normalizeRole(role: Role): RoleData {
+  return { ...role, permissions: asList(role.permissions) }
 }

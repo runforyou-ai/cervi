@@ -50,6 +50,13 @@ export function CreateFileUpload(meta: $models.RequestMeta, input: $models.FileU
 }
 
 /**
+ * CreateRole 创建自定义角色。
+ */
+export function CreateRole(meta: $models.RequestMeta, input: $models.RoleInput): $CancellablePromise<$models.Role> {
+    return $Call.ByID(2598423454, meta, input);
+}
+
+/**
  * CreateWebsiteChannel 创建网站渠道。
  */
 export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.WebsiteChannelInput): $CancellablePromise<$models.WebsiteChannelSummary> {
@@ -64,6 +71,13 @@ export function DeleteContact(meta: $models.RequestMeta, contactID: string): $Ca
 }
 
 /**
+ * DeleteRole 删除自定义角色。
+ */
+export function DeleteRole(meta: $models.RequestMeta, roleID: string): $CancellablePromise<void> {
+    return $Call.ByID(3214219121, meta, roleID);
+}
+
+/**
  * DeleteWebsiteChannel 将网站渠道移入回收站。
  */
 export function DeleteWebsiteChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<void> {
@@ -75,6 +89,13 @@ export function DeleteWebsiteChannel(meta: $models.RequestMeta, channelID: strin
  */
 export function GetContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
     return $Call.ByID(1550866366, meta, contactID);
+}
+
+/**
+ * GetRole 返回当前企业的角色详情。
+ */
+export function GetRole(meta: $models.RequestMeta, roleID: string): $CancellablePromise<$models.Role> {
+    return $Call.ByID(4002500470, meta, roleID);
 }
 
 /**
@@ -124,6 +145,13 @@ export function ListChannels(meta: $models.RequestMeta): $CancellablePromise<$mo
  */
 export function ListContacts(meta: $models.RequestMeta, input: $models.ContactListInput): $CancellablePromise<$models.ContactList> {
     return $Call.ByID(1872706983, meta, input);
+}
+
+/**
+ * ListRoles 返回当前企业的角色和预定义权限目录。
+ */
+export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$models.RoleList> {
+    return $Call.ByID(3773953103, meta);
 }
 
 /**
@@ -243,6 +271,13 @@ export function UpdateOrganization(meta: $models.RequestMeta, input: $models.Org
  */
 export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.User> {
     return $Call.ByID(1804531972, meta, input);
+}
+
+/**
+ * UpdateRole 修改角色信息和权限。
+ */
+export function UpdateRole(meta: $models.RequestMeta, roleID: string, input: $models.RoleInput): $CancellablePromise<$models.Role> {
+    return $Call.ByID(747750943, meta, roleID, input);
 }
 
 /**

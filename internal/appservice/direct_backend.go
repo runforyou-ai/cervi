@@ -13,6 +13,7 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
+	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/filestore"
@@ -54,6 +55,11 @@ type DirectBackend struct {
 	updateContact                     *contactaction.UpdateContactAction
 	deleteContact                     *contactaction.DeleteContactAction
 	restoreContact                    *contactaction.RestoreContactAction
+	listRoles                         *roleaction.ListRolesQuery
+	getRole                           *roleaction.GetRoleQuery
+	createRole                        *roleaction.CreateRoleAction
+	updateRole                        *roleaction.UpdateRoleAction
+	deleteRole                        *roleaction.DeleteRoleAction
 	updateOrganization                *organizationaction.UpdateOrganizationAction
 	getS3Setting                      *settingaction.GetS3SettingQuery
 	saveS3Setting                     *settingaction.SaveS3SettingAction
@@ -93,6 +99,11 @@ func NewDirectBackend(db *bun.DB, localFiles *filestore.LocalStore) *DirectBacke
 		updateContact:                     contactaction.NewUpdateContactAction(db),
 		deleteContact:                     contactaction.NewDeleteContactAction(db),
 		restoreContact:                    contactaction.NewRestoreContactAction(db),
+		listRoles:                         roleaction.NewListRolesQuery(db),
+		getRole:                           roleaction.NewGetRoleQuery(db),
+		createRole:                        roleaction.NewCreateRoleAction(db),
+		updateRole:                        roleaction.NewUpdateRoleAction(db),
+		deleteRole:                        roleaction.NewDeleteRoleAction(db),
 		updateOrganization:                organizationaction.NewUpdateOrganizationAction(db),
 		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),

@@ -380,6 +380,67 @@ export interface PageInfo {
 }
 
 /**
+ * PermissionCode 表示一项预定义权限。
+ */
+export enum PermissionCode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    PermissionExternalContactsView = "external_contacts.view",
+    PermissionExternalContactsManage = "external_contacts.manage",
+    PermissionTeamMembersView = "team_members.view",
+    PermissionChannelsView = "channels.view",
+    PermissionChannelsManage = "channels.manage",
+    PermissionRolesView = "roles.view",
+    PermissionRolesManage = "roles.manage",
+    PermissionOrganizationView = "organization.view",
+    PermissionOrganizationManage = "organization.manage",
+    PermissionStorageView = "storage.view",
+    PermissionStorageManage = "storage.manage",
+};
+
+/**
+ * PermissionDefinition 定义权限目录中的一项权限。
+ */
+export interface PermissionDefinition {
+    "code": PermissionCode;
+    "resource": PermissionResource;
+    "level": PermissionLevel;
+}
+
+/**
+ * PermissionLevel 表示权限操作层级。
+ */
+export enum PermissionLevel {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    PermissionLevelView = "view",
+    PermissionLevelManage = "manage",
+};
+
+/**
+ * PermissionResource 表示权限所属功能。
+ */
+export enum PermissionResource {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    PermissionResourceExternalContacts = "external_contacts",
+    PermissionResourceTeamMembers = "team_members",
+    PermissionResourceChannels = "channels",
+    PermissionResourceRoles = "roles",
+    PermissionResourceOrganization = "organization",
+    PermissionResourceStorage = "storage",
+};
+
+/**
  * ProfileImageFile 定义原生端选择的用户头像文件。
  */
 export interface ProfileImageFile {
@@ -403,6 +464,52 @@ export interface ProfileInput {
 export interface RequestMeta {
     "token": string;
     "locale": Locale;
+}
+
+/**
+ * Role 定义企业角色及其权限。
+ */
+export interface Role {
+    "id": string;
+    "kind": RoleKind;
+    "name": string;
+    "description": string;
+    "permissions": PermissionCode[] | null;
+    "memberCount": number;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * RoleInput 定义角色可编辑字段。
+ */
+export interface RoleInput {
+    "name": string;
+    "description": string;
+    "permissions": PermissionCode[] | null;
+}
+
+/**
+ * RoleKind 表示角色类型。
+ */
+export enum RoleKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    RoleKindAdmin = "admin",
+    RoleKindCustomerService = "customer_service",
+    RoleKindMember = "member",
+    RoleKindCustom = "custom",
+};
+
+/**
+ * RoleList 定义角色和预定义权限目录。
+ */
+export interface RoleList {
+    "roles": Role[] | null;
+    "permissions": PermissionDefinition[] | null;
 }
 
 /**
