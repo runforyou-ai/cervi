@@ -476,6 +476,7 @@ const enUS = {
       security: "Login & security",
       preferences: "Preferences",
       organization: "Company information",
+      aiProviders: "AI providers",
       roles: "Roles and permissions",
       storage: "Storage",
     },
@@ -561,6 +562,10 @@ const enUS = {
         nameRequired: "Enter the company name.",
         nameTooLong: "The company name cannot exceed 32 characters.",
       },
+    },
+    aiProviders: {
+      title: "AI providers",
+      placeholder: "AI provider settings are coming soon.",
     },
     roles: {
       title: "Roles and permissions",
