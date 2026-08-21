@@ -73,7 +73,7 @@ export function ChangePasswordForm() {
     }
   }
 
-  const { isDirty, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <form
@@ -145,7 +145,7 @@ export function ChangePasswordForm() {
           )}
         />
         <div>
-          <Button type="submit" disabled={!isDirty || isSubmitting}>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : null}

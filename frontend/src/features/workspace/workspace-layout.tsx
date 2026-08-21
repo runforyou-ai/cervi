@@ -10,6 +10,7 @@ import {
   sessionPath,
   SessionState,
   type Identity,
+  type Organization,
   type User,
 } from "@/api"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
@@ -78,6 +79,11 @@ export function WorkspaceLayout({
     setIdentity((current) => (current ? { ...current, user } : current))
   }
 
+  /** 同步工作台中的最新企业信息。 */
+  function updateOrganization(organization: Organization) {
+    setIdentity((current) => (current ? { ...current, organization } : current))
+  }
+
   if (status === "unavailable" && !identity) {
     return (
       <ServerUnavailableState
@@ -120,7 +126,11 @@ export function WorkspaceLayout({
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
           <Outlet
-            context={{ identity, updateUser } satisfies WorkspaceOutletContext}
+            context={{
+              identity,
+              updateOrganization,
+              updateUser,
+            } satisfies WorkspaceOutletContext}
           />
         </div>
       </div>

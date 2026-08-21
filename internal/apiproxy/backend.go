@@ -226,6 +226,13 @@ func (b *Backend) RestoreContact(ctx context.Context, meta appservice.RequestMet
 	return output, err
 }
 
+// UpdateOrganization 修改远程企业名称。
+func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
+	var output appservice.Organization
+	err := b.do(ctx, meta, http.MethodPut, "/settings/organization", nil, input, &output)
+	return output, err
+}
+
 // GetS3Setting 返回远程对象存储设置。
 func (b *Backend) GetS3Setting(ctx context.Context, meta appservice.RequestMeta) (appservice.S3Setting, error) {
 	var output appservice.S3Setting

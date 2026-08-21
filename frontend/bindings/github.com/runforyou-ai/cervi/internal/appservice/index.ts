@@ -44,6 +44,7 @@ export type {
     LoginInput,
     Message,
     Organization,
+    OrganizationInput,
     PageInfo,
     ProfileInput,
     RequestMeta,

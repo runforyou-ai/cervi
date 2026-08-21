@@ -11,6 +11,7 @@ import (
 	"time"
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -110,6 +111,13 @@ func TestDirectBackendMapsValidationErrors(t *testing.T) {
 	})
 	if passwordFields["currentPassword"] != cervii18n.FieldCurrentPasswordIncorrect || passwordFields["newPassword"] != cervii18n.FieldPasswordTooShort {
 		t.Fatalf("password field keys = %#v", passwordFields)
+	}
+
+	organizationFields := organizationFieldKeys(map[string]common.FieldCode{
+		"name": organizationaction.ValidationNameRequired,
+	})
+	if organizationFields["name"] != cervii18n.FieldOrganizationNameRequired {
+		t.Fatalf("organization field keys = %#v", organizationFields)
 	}
 }
 

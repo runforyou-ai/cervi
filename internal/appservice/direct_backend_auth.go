@@ -28,7 +28,7 @@ func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta
 	return InstallationStatus{Installed: status.Installed, OrganizationName: status.OrganizationName}, nil
 }
 
-// InstallWorkspace 创建企业所有者并返回登录令牌。
+// InstallWorkspace 创建企业管理员并返回登录令牌。
 func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
 	status, err := b.InstallationStatus(ctx, meta)
 	if err != nil {
@@ -61,7 +61,7 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		slog.Warn("初始化企业失败", "error", err)
 		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
 	}
-	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "owner_id", output.Identity.User.ID)
+	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "admin_id", output.Identity.User.ID)
 	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 

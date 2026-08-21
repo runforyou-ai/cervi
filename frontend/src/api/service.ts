@@ -19,6 +19,7 @@ import {
   SaveS3Setting,
   TestS3Setting,
   UpdateContact,
+  UpdateOrganization,
   UpdateProfile,
   UpdateUserPreferences,
   UpdateUserWorkStatus,
@@ -88,6 +89,8 @@ export const deleteContact = bind(DeleteContact)
 export const getUser = bind(GetUser)
 /** 读取对象存储设置。 */
 export const getS3Setting = bind(GetS3Setting)
+/** 修改当前企业名称。 */
+export const updateOrganization = bind(UpdateOrganization)
 /** 保存对象存储设置。 */
 export const saveS3Setting = bind(SaveS3Setting)
 /** 测试对象存储连接。 */
