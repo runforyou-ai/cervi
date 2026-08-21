@@ -204,7 +204,7 @@ export function WorkspaceNavigation({
                     {identity.user.displayName}
                   </span>
                   <span className="truncate text-xs text-muted-foreground">
-                    {identity.organization.name}
+                    {identity.user.email}
                   </span>
                 </div>
               </div>
