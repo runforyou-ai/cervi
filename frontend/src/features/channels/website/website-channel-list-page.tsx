@@ -8,7 +8,6 @@ import { toast } from "sonner"
 import {
   deleteWebsiteChannel,
   listWebsiteChannels,
-  recoverSession,
   type WebsiteChannelSummary,
 } from "@/api"
 import { PageContent } from "@/components/page-content"
@@ -38,6 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { recoverSession } from "@/lib/session-navigation"
 
 /** 网站渠道列表中的一行。 */
 function WebsiteChannelRow({

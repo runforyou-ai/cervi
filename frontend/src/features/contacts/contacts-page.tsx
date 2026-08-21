@@ -33,7 +33,6 @@ import {
   listChannels,
   listContacts,
   listDeletedContacts,
-  recoverSession,
   listUsers,
   restoreContact,
   type ChannelSummary,
@@ -43,6 +42,7 @@ import {
   type DirectoryUser,
   type PageInfo,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 import {
   ListToolbar,
@@ -730,7 +730,7 @@ export function ContactsPage({
                   allLabel={t("filters.allRoles")}
                   value={role ?? ""}
                   options={[
-                    { value: UserRole.UserRoleOwner, label: t("roles.owner") },
+                    { value: UserRole.UserRoleAdmin, label: t("roles.admin") },
                     { value: UserRole.UserRoleMember, label: t("roles.member") },
                   ]}
                   onValueChange={(value) =>

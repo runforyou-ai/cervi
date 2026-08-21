@@ -7,16 +7,16 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ErrorKind,
   isApiError,
-  recoverSession,
+  isNotFoundApiError,
   updateWebsiteChannelChatInterface,
   type WebsiteChannel,
   type WebsiteChannelChatInterface,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -86,12 +86,12 @@ export function WebsiteChannelChatInterfaceForm({
       if (recoverSession(error, navigate)) {
         return
       }
+      if (isNotFoundApiError(error)) {
+        console.warn("网站渠道不存在", { channel_id: channel.id })
+        navigate("/channels/website", { replace: true })
+        return
+      }
       if (isApiError(error)) {
-        if (error.kind === ErrorKind.ErrorKindNotFound) {
-          console.warn("网站渠道不存在", { channel_id: channel.id })
-          navigate("/channels/website", { replace: true })
-          return
-        }
         console.warn("保存网站渠道聊天界面失败", error)
         toast.error(
           apiErrorMessage(error, [
@@ -142,7 +142,6 @@ export function WebsiteChannelChatInterfaceForm({
                   rows={4}
                   aria-invalid={fieldState.invalid}
                 />
-                <FieldError errors={[fieldState.error]} />
               </Field>
             )}
           />
@@ -190,7 +189,6 @@ export function WebsiteChannelChatInterfaceForm({
                       aria-invalid={fieldState.invalid}
                     />
                   </div>
-                  <FieldError errors={[fieldState.error]} />
                 </Field>
               )
             }}

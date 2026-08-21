@@ -7,14 +7,10 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { changePassword, isApiError, recoverSession } from "@/api"
+import { changePassword, isApiError } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   createChangePasswordSchema,
@@ -29,6 +25,7 @@ export function ChangePasswordForm() {
   const schema = useMemo(() => createChangePasswordSchema(t), [t])
   const form = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: {
       currentPassword: "",
       newPassword: "",
@@ -52,27 +49,16 @@ export function ChangePasswordForm() {
       }
       console.warn("修改密码失败", error)
       if (isApiError(error)) {
-        let fieldError = false
-        for (const name of ["currentPassword", "newPassword"] as const) {
-          const message = error.fields[name]
-          if (!message) {
-            continue
-          }
-          const shouldFocus = !fieldError
-          fieldError = true
-          form.setError(name, { message }, { shouldFocus })
-        }
-        if (fieldError) {
-          return
-        }
-        toast.error(apiErrorMessage(error))
+        toast.error(
+          apiErrorMessage(error, ["currentPassword", "newPassword"]),
+        )
         return
       }
       toast.error(t("password.saveError"))
     }
   }
 
-  const { isDirty, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <form
@@ -99,7 +85,6 @@ export function ChangePasswordForm() {
                 required
                 autoFocus
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -119,7 +104,6 @@ export function ChangePasswordForm() {
                 aria-invalid={fieldState.invalid}
                 required
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -139,12 +123,11 @@ export function ChangePasswordForm() {
                 aria-invalid={fieldState.invalid}
                 required
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
         <div>
-          <Button type="submit" disabled={!isDirty || isSubmitting}>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : null}

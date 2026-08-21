@@ -29,9 +29,9 @@ export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $
 }
 
 /**
- * ConnectServer 保存并验证原生端企业服务器地址。
+ * ConnectServer 验证并保存原生端企业服务器地址，并返回地址是否变化。
  */
-export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<void> {
+export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<boolean> {
     return $Call.ByID(1075777931, meta, serverURL);
 }
 
@@ -99,7 +99,7 @@ export function GetWebsiteChannel(meta: $models.RequestMeta, channelID: string):
 }
 
 /**
- * InstallWorkspace 创建企业所有者并返回登录令牌。
+ * InstallWorkspace 创建企业管理员并返回登录令牌。
  */
 export function InstallWorkspace(meta: $models.RequestMeta, input: $models.InstallWorkspaceInput): $CancellablePromise<$models.Auth> {
     return $Call.ByID(3665964242, meta, input);
@@ -229,6 +229,13 @@ export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3Settin
  */
 export function UpdateContact(meta: $models.RequestMeta, contactID: string, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(183062653, meta, contactID, input);
+}
+
+/**
+ * UpdateOrganization 修改当前企业名称。
+ */
+export function UpdateOrganization(meta: $models.RequestMeta, input: $models.OrganizationInput): $CancellablePromise<$models.Organization> {
+    return $Call.ByID(272970364, meta, input);
 }
 
 /**

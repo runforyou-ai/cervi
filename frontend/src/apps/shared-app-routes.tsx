@@ -37,7 +37,11 @@ export function SharedAppRoutes({
           <LoginPage allowServerChange={platform === "desktop"} />
         }
       />
-      <Route element={<WorkspaceLayout />}>
+      <Route
+        element={
+          <WorkspaceLayout allowServerChange={platform === "desktop"} />
+        }
+      >
         <Route path="/inbox" element={<InboxRoute />} />
         <Route
           path="/account"
@@ -57,9 +61,16 @@ export function SharedAppRoutes({
         />
         <Route
           path="/settings"
-          element={<Navigate to="/settings/storage" replace />}
+          element={<Navigate to="/settings/organization" replace />}
         />
-        <Route path="/settings/storage" element={<SystemSettingsPage />} />
+        <Route
+          path="/settings/organization"
+          element={<SystemSettingsPage section="organization" />}
+        />
+        <Route
+          path="/settings/storage"
+          element={<SystemSettingsPage section="storage" />}
+        />
         <Route
           path="/contacts"
           element={<Navigate to="/contacts/internal" replace />}

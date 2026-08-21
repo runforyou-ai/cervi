@@ -1,50 +1,39 @@
 /** 移动端独立入口、路由和首页。 */
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { LoaderCircleIcon, SmartphoneIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Navigate, Route, Routes, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { loadSession, logout, sessionPath, SessionState, type Identity } from "@/api"
+import { logout, sessionPath, SessionState, type Identity } from "@/api"
 import { Button } from "@/components/ui/button"
 import { LoginPage } from "@/features/auth/login-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
+import { ServerUnavailableState } from "@/features/session/server-unavailable-state"
+import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
+import { useSessionLoader } from "@/features/session/use-session-loader"
 
 /** 移动端登录后首页。 */
 function MobileHomePage() {
   const { t } = useTranslation("mobile")
   const navigate = useNavigate()
   const [identity, setIdentity] = useState<Identity | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
-
-  /** 读取会话，未就绪则跳转入口。 */
-  const fetchIdentity = useCallback(async () => {
-    setLoading(true)
-    setError("")
-    try {
-      const session = await loadSession()
-      if (session.state === SessionState.SessionStateReady && session.identity) {
-        setIdentity(session.identity)
-        return
-      }
-      const path = sessionPath(session.state)
-      if (path) {
-        navigate(path, { replace: true })
-        return
-      }
-      setError(t("loadError"))
-    } catch {
-      setError(t("loadError"))
-    } finally {
-      setLoading(false)
-    }
-  }, [navigate, t])
+  const { status, session, retry } = useSessionLoader()
 
   useEffect(() => {
-    void fetchIdentity()
-  }, [fetchIdentity])
+    if (status !== "loaded" || !session) {
+      return
+    }
+    if (session.state === SessionState.SessionStateReady && session.identity) {
+      setIdentity(session.identity)
+      return
+    }
+    const path = sessionPath(session.state)
+    if (path) {
+      navigate(path, { replace: true })
+    }
+  }, [navigate, session, status])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -59,7 +48,21 @@ function MobileHomePage() {
     }
   }
 
-  if (loading) {
+  if (status === "unavailable" && !identity) {
+    return (
+      <ServerUnavailableState
+        onRetry={retry}
+        onChangeServer={() => navigate("/connect", { replace: true })}
+      />
+    )
+  }
+
+  if (
+    !identity &&
+    (status === "loading" ||
+      (status === "loaded" &&
+        session?.state === SessionState.SessionStateReady))
+  ) {
     return (
       <main className="flex min-h-dvh items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
@@ -69,16 +72,7 @@ function MobileHomePage() {
   }
 
   if (!identity) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center p-6">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <Button className="mt-4" variant="outline" onClick={fetchIdentity}>
-            {t("retry")}
-          </Button>
-        </div>
-      </main>
-    )
+    return <SessionLoadFailedState onRetry={retry} />
   }
 
   return (

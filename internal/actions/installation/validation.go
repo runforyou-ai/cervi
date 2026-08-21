@@ -15,8 +15,6 @@ import (
 // ValidationCode 标识企业初始化字段的校验结果。
 type ValidationCode = common.FieldCode
 
-const maxOrganizationNameLength = 32
-
 const (
 	ValidationOrganizationNameRequired ValidationCode = "ORGANIZATION_NAME_REQUIRED"
 	ValidationOrganizationNameTooLong  ValidationCode = "ORGANIZATION_NAME_TOO_LONG"
@@ -36,7 +34,7 @@ func validateInput(input InstallWorkspaceInput) map[string]ValidationCode {
 	fields := make(map[string]ValidationCode)
 	if input.OrganizationName == "" {
 		fields["organizationName"] = ValidationOrganizationNameRequired
-	} else if len([]rune(input.OrganizationName)) > maxOrganizationNameLength {
+	} else if len([]rune(input.OrganizationName)) > domain.OrganizationNameMaxLength {
 		fields["organizationName"] = ValidationOrganizationNameTooLong
 	}
 	if input.DisplayName == "" {

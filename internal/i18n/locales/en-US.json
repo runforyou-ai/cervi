@@ -37,6 +37,7 @@
   "error.preferences_update_failed": "Could not save language and time zone.",
   "error.work_status_update_failed": "Could not save the work status.",
   "error.channel_summary_list_failed": "Could not load channels.",
+  "error.organization_update_failed": "Could not save the company name.",
   "error.s3_setting_read_failed": "Could not load the object storage settings.",
   "error.s3_setting_save_failed": "Could not save the object storage settings.",
   "error.s3_connection_test_failed": "Could not connect to object storage. Check the settings.",

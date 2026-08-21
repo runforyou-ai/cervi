@@ -69,6 +69,7 @@ func NewService(application *appservice.Service) *Service {
 	router.PATCH("/contacts/:contactID", service.updateContact)
 	router.DELETE("/contacts/:contactID", service.deleteContact)
 	router.POST("/contacts/:contactID/restore", service.restoreContact)
+	router.PUT("/settings/organization", service.updateOrganization)
 	router.GET("/settings/storage/s3", service.getS3Setting)
 	router.PUT("/settings/storage/s3", service.saveS3Setting)
 	router.POST("/settings/storage/s3/test", service.testS3Setting)
@@ -319,6 +320,16 @@ func (s *Service) deleteContact(c *gin.Context) {
 func (s *Service) restoreContact(c *gin.Context) {
 	contact, err := s.application.RestoreContact(c.Request.Context(), requestMeta(c), c.Param("contactID"))
 	writeResult(c, http.StatusOK, contact, err)
+}
+
+// updateOrganization 修改当前企业名称。
+func (s *Service) updateOrganization(c *gin.Context) {
+	var input appservice.OrganizationInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	organization, err := s.application.UpdateOrganization(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, organization, err)
 }
 
 func (s *Service) getS3Setting(c *gin.Context) {

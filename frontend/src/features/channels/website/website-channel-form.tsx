@@ -7,19 +7,18 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ErrorKind,
   Locale,
   createWebsiteChannel,
   isApiError,
-  recoverSession,
+  isNotFoundApiError,
   updateWebsiteChannel,
   type WebsiteChannelSummary,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
   Field,
-  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -83,12 +82,12 @@ export function WebsiteChannelForm({
       if (recoverSession(error, navigate)) {
         return
       }
+      if (isNotFoundApiError(error)) {
+        console.warn("网站渠道不存在", { channel_id: channel?.id })
+        navigate("/channels/website", { replace: true })
+        return
+      }
       if (isApiError(error)) {
-        if (error.kind === ErrorKind.ErrorKindNotFound) {
-          console.warn("网站渠道不存在", { channel_id: channel?.id })
-          navigate("/channels/website", { replace: true })
-          return
-        }
         console.warn("保存网站渠道失败", error)
         toast.error(
           apiErrorMessage(error, ["name", "description", "defaultLocale"])
@@ -129,7 +128,6 @@ export function WebsiteChannelForm({
                 id={field.name}
                 aria-invalid={fieldState.invalid}
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -151,7 +149,6 @@ export function WebsiteChannelForm({
                 <option value={Locale.LocaleChineseSimplified}>{t("locales.zhCN")}</option>
                 <option value={Locale.LocaleEnglishUnitedStates}>{t("locales.enUS")}</option>
               </NativeSelect>
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />

@@ -19,9 +19,9 @@ wails3 task migrate:rollback VERSION=20260818032701
 wails3 task migrate:reset
 wails3 task make:migration NAME=create_example_table
 
-# 启动桌面端 / 服务端
-wails3 dev
+# 先启动服务端，再启动桌面端及 MCP 服务
 wails3 task run:server
+WAILS_MCP=1 wails3 dev
 
 # 移动端
 wails3 task ios:install:deps
@@ -37,6 +37,7 @@ wails3 generate bindings -clean=true -ts -i
 ```
 
 前端要求 Node.js 22.22.0 或更高版本，项目构建使用 Wails v3 和 Task。
+按上述顺序启动后，可通过 Wails MCP 获取桌面端页面信息。
 
 ## 代码组织
 
@@ -88,7 +89,8 @@ cervi/
 - `frontend/bindings` 由上方绑定命令生成，禁止手工修改，也不得用不同格式覆盖。
 - 页面只通过 `src/api` 调用绑定：`client` 注入认证与错误，`service` 绑定方法并归一化可空切片。页面不直接引用 `frontend/bindings`。
 - 前端只保留表单值、组件 Props、页面状态、查询参数派生类型，以及对生成类型中可空切片的边界归一化类型。
-- 表单使用 React Hook Form、Zod 和统一错误展示组件。输入框不使用 placeholder；字段含义由标签表达，必要说明用字段帮助文案。
+- 表单使用 React Hook Form 和 Zod，并统一启用 `shouldUseNativeValidation`。客户端字段校验只通过浏览器在对应输入控件上提示，不在字段下方渲染 `FieldError`，也不同时弹出 Toast；服务端业务错误通过 Toast 展示，不使用 `setError` 回写字段。
+- 输入框不使用 placeholder；字段含义由标签表达，必要说明用字段帮助文案。
 - 页面卸载时忽略过期结果，不要取消 Wails 绑定调用。
 
 ### 认证与多端
@@ -109,14 +111,14 @@ cervi/
 
 - 不考虑历史数据和旧接口兼容。改模型、迁移和接口时直接实现目标结构，不写旧数据回填、缺失记录兜底或双版本逻辑，除非任务明确要求。
 - 密钥加密存储、接口响应脱敏等安全加固暂不阻塞开发和审查。
-- 角色权限后续统一建设；当前只校验已登录，不按所有者、管理员或普通成员限制功能。
+- 角色权限后续统一建设；当前只校验已登录，不按管理员或普通成员限制功能。
 
-### 注释、语言与验证
+### 注释与语言
 
 - Go 具名函数和方法使用简洁、直述型中文注释。
 - 前端 `src` 业务代码同样：文件头说明职责，具名函数、组件和导出函数各一行注释。`frontend/bindings` 禁止加注释；`components/ui` 只保留文件头。
 - 代码审查结果、Git 提交信息以及 PR 的标题和描述使用中文。
-- 修改后运行相关测试、`go vet` 和前端构建。涉及应用服务、绑定或构建流程时，同时验证 `wails3 build DEV=true` 和 `wails3 task build:server DEV=true`。
+- 除非用户明确要求，不运行测试、`go vet` 或构建。
 
 ### 界面控制
 

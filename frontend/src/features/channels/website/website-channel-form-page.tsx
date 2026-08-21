@@ -5,12 +5,11 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useParams, useSearchParams } from "react-router"
 
 import {
-  ErrorKind,
   getWebsiteChannel,
-  isApiError,
-  recoverSession,
+  isNotFoundApiError,
   type WebsiteChannel,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { PageBack } from "@/components/page-back"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
@@ -166,7 +165,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
         if (recoverSession(requestError, navigate)) {
           return
         }
-        if (isApiError(requestError) && requestError.kind === ErrorKind.ErrorKindNotFound) {
+        if (isNotFoundApiError(requestError)) {
           console.warn("网站渠道不存在", { channel_id: channelId })
           navigate("/channels/website", { replace: true })
           return

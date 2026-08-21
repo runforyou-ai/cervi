@@ -40,14 +40,13 @@ type Session struct {
 	State            SessionState `json:"state"`
 	Identity         *Identity    `json:"identity,omitempty"`
 	OrganizationName string       `json:"organizationName,omitempty"`
-	ErrorKind        ErrorKind    `json:"errorKind,omitempty"`
 }
 
 // UserRole 表示企业成员角色。
 type UserRole string
 
 const (
-	UserRoleOwner  UserRole = UserRole(domain.UserRoleOwner)
+	UserRoleAdmin  UserRole = UserRole(domain.UserRoleAdmin)
 	UserRoleMember UserRole = UserRole(domain.UserRoleMember)
 )
 
@@ -164,6 +163,11 @@ type Auth struct {
 // Organization 定义当前企业信息。
 type Organization struct {
 	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// OrganizationInput 定义企业名称修改输入。
+type OrganizationInput struct {
 	Name string `json:"name"`
 }
 

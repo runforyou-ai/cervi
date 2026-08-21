@@ -16,12 +16,12 @@ import { NavLink, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  recoverSession,
   updateUserWorkStatus,
   type Identity,
   type User,
   type WorkStatus,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -97,7 +97,7 @@ function WorkspaceMenu() {
       />
       <div className="mt-auto pb-1">
         <WorkspaceRailItem
-          to="/settings/storage"
+          to="/settings/organization"
           icon={SettingsIcon}
           label={t("systemSettings")}
           active={location.pathname.startsWith("/settings")}

@@ -225,21 +225,6 @@ export interface DirectoryUser {
 }
 
 /**
- * ErrorKind 表示业务失败种类。
- */
-export enum ErrorKind {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    ErrorKindInvalid = "invalid",
-    ErrorKindNotFound = "not_found",
-    ErrorKindUnavailable = "unavailable",
-    ErrorKindFailed = "failed",
-};
-
-/**
  * File 定义前端可使用的文件元数据。
  */
 export interface File {
@@ -379,6 +364,13 @@ export interface Organization {
 }
 
 /**
+ * OrganizationInput 定义企业名称修改输入。
+ */
+export interface OrganizationInput {
+    "name": string;
+}
+
+/**
  * PageInfo 定义分页信息。
  */
 export interface PageInfo {
@@ -435,7 +427,6 @@ export interface Session {
     "state": SessionState;
     "identity"?: Identity | null;
     "organizationName"?: string;
-    "errorKind"?: ErrorKind;
 }
 
 /**
@@ -527,7 +518,7 @@ export enum UserRole {
      */
     $zero = "",
 
-    UserRoleOwner = "owner",
+    UserRoleAdmin = "admin",
     UserRoleMember = "member",
 };
 

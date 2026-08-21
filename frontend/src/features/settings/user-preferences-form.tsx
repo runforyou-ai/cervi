@@ -11,12 +11,12 @@ import { toast } from "sonner"
 import {
   isApiError,
   Locale,
-  recoverSession,
   updateUserPreferences,
   type User,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import {
   AppearanceSettings,
@@ -47,6 +47,7 @@ export function UserPreferencesForm({
   )
   const form = useForm<UserPreferencesFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: {
       locale: user.locale as UserPreferencesFormValues["locale"],
       timeZone: user.timeZone,
@@ -90,26 +91,14 @@ export function UserPreferencesForm({
       }
       console.warn("保存偏好设置失败", error)
       if (isApiError(error)) {
-        let fieldError = false
-        for (const name of ["locale", "timeZone"] as const) {
-          const message = error.fields[name]
-          if (!message) {
-            continue
-          }
-          form.setError(name, { message }, { shouldFocus: !fieldError })
-          fieldError = true
-        }
-        if (fieldError) {
-          return
-        }
-        toast.error(apiErrorMessage(error))
+        toast.error(apiErrorMessage(error, ["locale", "timeZone"]))
         return
       }
       toast.error(t("preferences.saveError"))
     }
   }
 
-  const { isDirty, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <form
@@ -139,7 +128,6 @@ export function UserPreferencesForm({
                   {t("preferences.languages.enUS")}
                 </option>
               </NativeSelect>
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -162,7 +150,6 @@ export function UserPreferencesForm({
                   </option>
                 ))}
               </NativeSelect>
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -180,7 +167,7 @@ export function UserPreferencesForm({
           )}
         />
         <div>
-          <Button type="submit" disabled={!isDirty || isSubmitting}>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
             {isSubmitting ? t("preferences.saving") : t("preferences.save")}
           </Button>

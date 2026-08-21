@@ -91,7 +91,7 @@ export function ServerConnectionForm() {
     }
   }
 
-  /** 保存已检测的企业服务器并进入登录页。 */
+  /** 保存已检测的企业服务器并重新解析会话入口。 */
   async function connectDetectedServer() {
     if (!detected) {
       return
@@ -99,7 +99,7 @@ export function ServerConnectionForm() {
     setConnecting(true)
     try {
       await connectServer(detected.serverUrl)
-      navigate("/login", { replace: true })
+      navigate("/inbox", { replace: true })
     } catch (error) {
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["serverUrl"]))

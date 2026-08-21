@@ -9,7 +9,7 @@ import {
 } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
@@ -108,7 +108,6 @@ export function FormInputField<T extends FieldValues>({
             ) : (
               input
             )}
-            <FieldError errors={[fieldState.error]} />
           </Field>
         )
       }}

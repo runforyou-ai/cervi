@@ -31,6 +31,7 @@ type Backend interface {
 	UpdateContact(context.Context, RequestMeta, string, ContactInput) (Contact, error)
 	DeleteContact(context.Context, RequestMeta, string) error
 	RestoreContact(context.Context, RequestMeta, string) (Contact, error)
+	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
 	GetS3Setting(context.Context, RequestMeta) (S3Setting, error)
 	SaveS3Setting(context.Context, RequestMeta, S3Setting) (S3Setting, error)
 	TestS3Setting(context.Context, RequestMeta, S3Setting) error
@@ -45,7 +46,7 @@ type WorkspaceInstaller interface {
 type ServerConnector interface {
 	ServerURL(context.Context, RequestMeta) (string, error)
 	ProbeServer(context.Context, RequestMeta, string) (InstallationStatus, error)
-	ConnectServer(context.Context, RequestMeta, string) error
+	ConnectServer(context.Context, RequestMeta, string) (bool, error)
 }
 
 // ProfileImageSelector 由支持原生文件对话框的平台实现。
@@ -83,7 +84,7 @@ func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (Ins
 	return s.backend.InstallationStatus(ctx, meta)
 }
 
-// InstallWorkspace 创建企业所有者并返回登录令牌。
+// InstallWorkspace 创建企业管理员并返回登录令牌。
 func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
 	installer, ok := s.backend.(WorkspaceInstaller)
 	if !ok {
@@ -230,6 +231,11 @@ func (s *Service) RestoreContact(ctx context.Context, meta RequestMeta, contactI
 	return s.backend.RestoreContact(ctx, meta, contactID)
 }
 
+// UpdateOrganization 修改当前企业名称。
+func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
+	return s.backend.UpdateOrganization(ctx, meta, input)
+}
+
 // GetS3Setting 返回当前企业的对象存储设置。
 func (s *Service) GetS3Setting(ctx context.Context, meta RequestMeta) (S3Setting, error) {
 	return s.backend.GetS3Setting(ctx, meta)
@@ -263,11 +269,11 @@ func (s *Service) ProbeServer(ctx context.Context, meta RequestMeta, serverURL s
 	return connector.ProbeServer(ctx, meta, serverURL)
 }
 
-// ConnectServer 保存并验证原生端企业服务器地址。
-func (s *Service) ConnectServer(ctx context.Context, meta RequestMeta, serverURL string) error {
+// ConnectServer 验证并保存原生端企业服务器地址，并返回地址是否变化。
+func (s *Service) ConnectServer(ctx context.Context, meta RequestMeta, serverURL string) (bool, error) {
 	connector, ok := s.backend.(ServerConnector)
 	if !ok {
-		return methodNotAllowedError(meta, "ConnectServer")
+		return false, methodNotAllowedError(meta, "ConnectServer")
 	}
 	return connector.ConnectServer(ctx, meta, serverURL)
 }

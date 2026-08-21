@@ -50,6 +50,7 @@ const (
 	ErrorPreferencesUpdateFailed          Key = "error.preferences_update_failed"
 	ErrorWorkStatusUpdateFailed           Key = "error.work_status_update_failed"
 	ErrorChannelSummaryListFailed         Key = "error.channel_summary_list_failed"
+	ErrorOrganizationUpdateFailed         Key = "error.organization_update_failed"
 	ErrorS3SettingReadFailed              Key = "error.s3_setting_read_failed"
 	ErrorS3SettingSaveFailed              Key = "error.s3_setting_save_failed"
 	ErrorS3ConnectionTestFailed           Key = "error.s3_connection_test_failed"

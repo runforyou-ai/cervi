@@ -14,6 +14,7 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -54,8 +55,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	install := installationaction.NewInstallWorkspaceAction(db)
 	installed, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
 		OrganizationName: "鹿行测试公司",
-		DisplayName:      "所有者",
-		Email:            "owner@example.com",
+		DisplayName:      "管理员",
+		Email:            "admin@example.com",
 		Password:         "password123",
 		Locale:           domain.LocaleEnglishUnitedStates,
 		TimeZone:         "America/New_York",
@@ -63,7 +64,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installed.Identity.User.Role != "owner" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.User.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.User.Role != string(domain.UserRoleAdmin) || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.User.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	currentStatus, err := status.Execute(context.Background())
@@ -79,7 +80,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if identity == nil || identity.User.Email != "owner@example.com" {
+	if identity == nil || identity.User.Email != "admin@example.com" {
 		t.Fatalf("unexpected identity: %#v", identity)
 	}
 
@@ -90,7 +91,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	login := authaction.NewLoginAction(db)
 	loggedIn, err := login.Execute(context.Background(), authaction.LoginInput{
-		Email:    "OWNER@example.com",
+		Email:    "ADMIN@example.com",
 		Password: "password123",
 	})
 	if err != nil {
@@ -98,6 +99,22 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if loggedIn.Identity.User.ID != installed.Identity.User.ID {
 		t.Fatalf("login user = %q, want %q", loggedIn.Identity.User.ID, installed.Identity.User.ID)
+	}
+
+	updateOrganization := organizationaction.NewUpdateOrganizationAction(db)
+	organization, err := updateOrganization.Execute(context.Background(), loggedIn.Identity, organizationaction.Input{Name: "  鹿行协作  "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if organization.Name != "鹿行协作" {
+		t.Fatalf("updated organization name = %q, want 鹿行协作", organization.Name)
+	}
+	currentStatus, err = status.Execute(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if currentStatus.OrganizationName != "鹿行协作" {
+		t.Fatalf("status organization name = %q, want 鹿行协作", currentStatus.OrganizationName)
 	}
 
 	createChannel := channelaction.NewCreateWebsiteChannelAction(db)

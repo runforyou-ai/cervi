@@ -6,6 +6,16 @@ const zhCN = {
     actions: {
       close: "关闭",
       back: "返回",
+      retry: "重试",
+      changeServer: "更换服务器",
+    },
+    serverUnavailable: {
+      title: "企业服务器暂时不可用",
+      description: "请稍后重试。",
+    },
+    sessionLoadFailed: {
+      title: "无法读取登录状态",
+      description: "请重试。",
     },
     comingSoon: "即将支持",
     workStatuses: {
@@ -16,13 +26,13 @@ const zhCN = {
   },
   setup: {
     title: "初始化 Cervi",
-    description: "创建公司和第一个所有者账号。",
-    organizationNameLabel: "公司名称",
+    description: "创建企业和第一个管理员账号。",
+    organizationNameLabel: "企业名称",
     displayNameLabel: "你的姓名",
     emailLabel: "邮箱",
     passwordLabel: "密码（至少 8 个字符）",
-    organizationNameRequired: "请输入公司名称。",
-    organizationNameTooLong: "公司名称不能超过 32 个字符。",
+    organizationNameRequired: "请输入企业名称。",
+    organizationNameTooLong: "企业名称不能超过 32 个字符。",
     displayNameRequired: "请输入你的姓名。",
     emailRequired: "请输入邮箱。",
     emailInvalid: "请输入有效的邮箱。",
@@ -38,7 +48,7 @@ const zhCN = {
   },
   auth: {
     title: "登录",
-    description: "使用所有者邮箱和密码登录。",
+    description: "使用邮箱和密码登录。",
     emailLabel: "邮箱",
     passwordLabel: "密码",
     emailRequired: "请输入邮箱。",
@@ -74,8 +84,6 @@ const zhCN = {
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
-    loadError: "加载登录信息失败。",
-    retry: "重试",
   },
   workspace: {
     navigationGroup: "工作台",
@@ -91,7 +99,6 @@ const zhCN = {
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
-    loadError: "工作台加载失败。",
     inboxLoadError: "消息加载失败。",
     retry: "重试",
   },
@@ -168,7 +175,7 @@ const zhCN = {
       page: "第 {{current}} / {{total}} 页",
     },
     roles: {
-      owner: "所有者",
+      admin: "管理员",
       member: "成员",
     },
     statuses: {
@@ -363,6 +370,7 @@ const zhCN = {
       profile: "个人资料",
       security: "登录与安全",
       preferences: "偏好设置",
+      organization: "企业信息",
       storage: "存储设置",
     },
     profile: {
@@ -431,6 +439,20 @@ const zhCN = {
         system: "跟随系统",
         light: "浅色",
         dark: "深色",
+      },
+    },
+    organization: {
+      title: "企业信息",
+      saveError: "保存企业名称失败，请重试。",
+      saveSuccess: "企业名称已保存。",
+      form: {
+        name: "企业名称",
+        save: "保存",
+        saving: "保存中…",
+      },
+      validation: {
+        nameRequired: "请输入企业名称。",
+        nameTooLong: "企业名称不能超过 32 个字符。",
       },
     },
     storage: {

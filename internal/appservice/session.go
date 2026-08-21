@@ -58,7 +58,6 @@ func (s *Service) loadNativeSession(ctx context.Context, meta RequestMeta) (Sess
 		if convErr != nil {
 			return Session{}, convErr
 		}
-		slog.Warn("无法读取企业状态，进入连接页", "error", err)
 		return session, nil
 	}
 	name := strings.TrimSpace(status.OrganizationName)
@@ -85,7 +84,7 @@ func (s *Service) loadNativeSession(ctx context.Context, meta RequestMeta) (Sess
 // sessionFromError 把会话类错误转换成入口；无法转换则原样返回错误。
 func sessionFromError(err error, organizationName string, native bool) (Session, error) {
 	state := SessionStateOf(err)
-	if native && (IsUnavailable(err) || state == SessionStateSetup || state == SessionStateConnect) {
+	if native && (state == SessionStateSetup || state == SessionStateConnect) {
 		return Session{State: SessionStateConnect}, nil
 	}
 	if state == SessionStateLogin {
