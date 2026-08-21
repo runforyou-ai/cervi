@@ -19,8 +19,8 @@ func TestNormalizeUploadInput(t *testing.T) {
 	if normalized.FileName != "avatar.png" || normalized.ContentType != "image/png" {
 		t.Fatalf("normalized input = %#v", normalized)
 	}
-	if originalObjectName(normalized) != "original.png" {
-		t.Fatalf("object name = %q, want original.png", originalObjectName(normalized))
+	if key := storageKey("org", "file", normalized.ContentType); key != "organizations/org/files/file.png" {
+		t.Fatalf("storage key = %q", key)
 	}
 
 	_, fields = normalizeUploadInput(UploadInput{Purpose: domain.FilePurposeUserAvatar, FileName: "avatar.svg", ContentType: "image/svg+xml", ByteSize: maxAvatarByteSize + 1})

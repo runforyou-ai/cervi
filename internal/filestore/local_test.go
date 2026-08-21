@@ -11,7 +11,7 @@ import (
 // TestLocalStoreSave 验证本地存储按受控键原子写入内容。
 func TestLocalStoreSave(t *testing.T) {
 	store := &LocalStore{root: t.TempDir()}
-	key := "organizations/org/files/file/original.png"
+	key := "organizations/org/files/file.png"
 	if err := store.Save(context.Background(), key, strings.NewReader("avatar"), 6); err != nil {
 		t.Fatal(err)
 	}

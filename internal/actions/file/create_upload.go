@@ -42,7 +42,7 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 		CreatedByUserID: identity.User.ID,
 		Purpose:         string(input.Purpose),
 		StorageBackend:  string(backend),
-		StorageKey:      "organizations/" + identity.Organization.ID + "/files/" + id + "/" + originalObjectName(input),
+		StorageKey:      storageKey(identity.Organization.ID, id, input.ContentType),
 		OriginalName:    input.FileName,
 		ContentType:     input.ContentType,
 		ByteSize:        input.ByteSize,
@@ -52,6 +52,11 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 		return nil, fmt.Errorf("create file upload: %w", err)
 	}
 	return record, nil
+}
+
+// storageKey 返回以文件编号命名的存储键。
+func storageKey(organizationID, fileID, contentType string) string {
+	return "organizations/" + organizationID + "/files/" + fileID + avatarFileExtensions[contentType]
 }
 
 // DeletePending 删除无法继续上传的待处理文件记录。

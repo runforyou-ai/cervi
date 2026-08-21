@@ -27,15 +27,10 @@ const (
 // ValidationError 表示文件字段校验失败。
 type ValidationError = common.FieldError
 
-var avatarContentTypes = map[string]string{
+var avatarFileExtensions = map[string]string{
 	"image/jpeg": ".jpg",
 	"image/png":  ".png",
 	"image/webp": ".webp",
-}
-
-// originalObjectName 返回带规范化后缀的原始文件对象名。
-func originalObjectName(input UploadInput) string {
-	return "original" + avatarContentTypes[input.ContentType]
 }
 
 // UploadInput 定义待上传文件的客户端元数据。
@@ -62,7 +57,7 @@ func normalizeUploadInput(input UploadInput) (UploadInput, map[string]Validation
 	if input.Purpose != domain.FilePurposeUserAvatar {
 		fields["purpose"] = ValidationPurposeInvalid
 	}
-	if _, exists := avatarContentTypes[input.ContentType]; !exists {
+	if _, exists := avatarFileExtensions[input.ContentType]; !exists {
 		fields["contentType"] = ValidationContentTypeInvalid
 	}
 	if input.ByteSize <= 0 || input.ByteSize > maxAvatarByteSize {

@@ -15,7 +15,7 @@ func TestPresignRequests(t *testing.T) {
 		Endpoint: "https://storage.example.com", Region: "us-east-1", Bucket: "cervi",
 		AccessKeyID: "access-key", SecretAccessKey: "secret-key", ForcePathStyle: true,
 	}
-	put, err := PresignPut(context.Background(), config, "organizations/org/files/file/original.png", "image/png")
+	put, err := PresignPut(context.Background(), config, "organizations/org/files/file.png", "image/png")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestPresignRequests(t *testing.T) {
 		t.Fatalf("browser upload request contains forbidden Host header: %#v", put.Headers)
 	}
 
-	get, err := PresignGet(context.Background(), config, "organizations/org/files/file/original.png", "image/png", "头像.png")
+	get, err := PresignGet(context.Background(), config, "organizations/org/files/file.png", "image/png", "头像.png")
 	if err != nil {
 		t.Fatal(err)
 	}
