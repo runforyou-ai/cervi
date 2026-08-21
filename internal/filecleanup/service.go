@@ -60,7 +60,7 @@ func (s *Service) Start(ctx context.Context) {
 	}()
 }
 
-// run 清理当前已过期的所有文件批次。
+// run 执行一轮临时文件清理。
 func (s *Service) run(ctx context.Context) {
 	scheduledCount := s.scheduleExpired(ctx)
 	deletedCount := 0

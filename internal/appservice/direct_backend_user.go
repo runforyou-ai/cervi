@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 
-	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -33,7 +32,7 @@ func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, inp
 		if errors.As(err, &validationError) {
 			return User{}, InvalidError(meta, cervii18n.ErrorValidationFailed, profileFieldKeys(validationError.Fields))
 		}
-		if errors.Is(err, fileaction.ErrFileNotFound) {
+		if errors.Is(err, useraction.ErrAvatarFileNotFound) {
 			return User{}, NotFoundError(meta, cervii18n.ErrorFileNotFound)
 		}
 		if errors.Is(err, common.ErrIdentityInvalid) {

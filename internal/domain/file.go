@@ -15,7 +15,7 @@ const (
 	FilePurposeUserAvatar FilePurpose = "user_avatar"
 )
 
-// FileStatus 定义文件上传状态。
+// FileStatus 定义文件生命周期状态。
 type FileStatus string
 
 const (

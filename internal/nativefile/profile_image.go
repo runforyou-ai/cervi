@@ -36,10 +36,7 @@ func NewProfileImageSelector() *ProfileImageSelector {
 }
 
 // SelectProfileImage 选择并读取用户头像图片。
-func (s *ProfileImageSelector) SelectProfileImage(ctx context.Context, meta appservice.RequestMeta) (appservice.ProfileImageFile, error) {
-	if err := ctx.Err(); err != nil {
-		return appservice.ProfileImageFile{}, err
-	}
+func (*ProfileImageSelector) SelectProfileImage(_ context.Context, meta appservice.RequestMeta) (appservice.ProfileImageFile, error) {
 	app := application.Get()
 	if app == nil {
 		return appservice.ProfileImageFile{}, errors.New("application is not initialized")
@@ -71,7 +68,6 @@ func (s *ProfileImageSelector) SelectProfileImage(ctx context.Context, meta apps
 		slog.Warn("读取头像文件失败", "file_name", filepath.Base(path), "error", err)
 		return appservice.ProfileImageFile{}, err
 	}
-	slog.Info("已选择头像文件", "file_name", selected.Name, "byte_size", selected.ByteSize)
 	return selected, nil
 }
 
@@ -98,7 +94,6 @@ func readProfileImageFile(path string) (appservice.ProfileImageFile, error) {
 	return appservice.ProfileImageFile{
 		Name:        filepath.Base(path),
 		ContentType: contentType,
-		ByteSize:    info.Size(),
 		DataBase64:  base64.StdEncoding.EncodeToString(content),
 	}, nil
 }

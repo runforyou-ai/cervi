@@ -52,7 +52,6 @@ export function ProfileSettingsForm({
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const avatarRequestID = useRef(0)
-  const mounted = useRef(true)
   const [pendingAvatar, setPendingAvatar] = useState<PendingAvatar | null>(null)
   const [selectingAvatar, setSelectingAvatar] = useState(false)
   const schema = useMemo(() => createProfileSettingsSchema(t), [t])
@@ -75,23 +74,19 @@ export function ProfileSettingsForm({
   }, [pendingAvatar?.previewURL])
 
   useEffect(() => {
-    mounted.current = true
     return () => {
-      mounted.current = false
+      avatarRequestID.current += 1
     }
   }, [])
 
   /** 跟踪当前候选头像的上传结果。 */
-  function monitorAvatarUpload(candidate: PendingAvatar) {
-    if (!candidate.upload) {
-      return
-    }
-    void candidate.upload.then(
+  function monitorAvatarUpload(
+    candidate: PendingAvatar,
+    upload: Promise<string>,
+  ) {
+    void upload.then(
       (fileID) => {
-        if (
-          !mounted.current ||
-          avatarRequestID.current !== candidate.requestID
-        ) {
+        if (avatarRequestID.current !== candidate.requestID) {
           return
         }
         setPendingAvatar((current) =>
@@ -101,10 +96,7 @@ export function ProfileSettingsForm({
         )
       },
       (error) => {
-        if (
-          !mounted.current ||
-          avatarRequestID.current !== candidate.requestID
-        ) {
+        if (avatarRequestID.current !== candidate.requestID) {
           return
         }
         setPendingAvatar((current) =>
@@ -128,19 +120,19 @@ export function ProfileSettingsForm({
     ).then((file) => file.id)
     const uploading = { ...candidate, status: "uploading" as const, upload }
     setPendingAvatar(uploading)
-    monitorAvatarUpload(uploading)
+    monitorAvatarUpload(uploading, upload)
     return upload
   }
 
-  /** 校验新的用户头像并在保存前预览。 */
-  function previewAvatar(selected: File) {
+  /** 校验、预览并上传新的用户头像。 */
+  function prepareAvatar(selected: File) {
     if (!avatarContentTypes.has(selected.type)) {
       toast.error(t("profile.avatarTypeError"))
-      return false
+      return
     }
     if (selected.size <= 0 || selected.size > maxAvatarByteSize) {
       toast.error(t("profile.avatarSizeError"))
-      return false
+      return
     }
     const candidate: PendingAvatar = {
       requestID: avatarRequestID.current + 1,
@@ -151,7 +143,6 @@ export function ProfileSettingsForm({
     }
     avatarRequestID.current = candidate.requestID
     startAvatarUpload(candidate)
-    return true
   }
 
   /** 处理 Web 文件选择器返回的头像图片。 */
@@ -159,7 +150,7 @@ export function ProfileSettingsForm({
     const selected = event.target.files?.[0]
     event.target.value = ""
     if (selected) {
-      previewAvatar(selected)
+      prepareAvatar(selected)
     }
   }
 
@@ -180,7 +171,7 @@ export function ProfileSettingsForm({
       for (let index = 0; index < binary.length; index += 1) {
         content[index] = binary.charCodeAt(index)
       }
-      previewAvatar(
+      prepareAvatar(
         new File([content], selected.name, { type: selected.contentType }),
       )
     } catch (error) {

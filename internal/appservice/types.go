@@ -239,7 +239,6 @@ type FileUpload struct {
 type ProfileImageFile struct {
 	Name        string `json:"name"`
 	ContentType string `json:"contentType"`
-	ByteSize    int64  `json:"byteSize"`
 	DataBase64  string `json:"dataBase64"`
 }
 

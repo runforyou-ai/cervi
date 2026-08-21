@@ -124,10 +124,5 @@ func (s *LocalStore) path(key string) (string, error) {
 	if cleaned == "." || filepath.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
 		return "", errors.New("invalid local file storage key")
 	}
-	target := filepath.Join(s.root, cleaned)
-	relative, err := filepath.Rel(s.root, target)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", errors.New("local file storage key escapes root")
-	}
-	return target, nil
+	return filepath.Join(s.root, cleaned), nil
 }

@@ -64,7 +64,7 @@ func (a *MarkUploadedAction) Execute(ctx context.Context, identity *servermodels
 	query := a.db.NewUpdate().Model(record).
 		Set("status = ?", domain.FileStatusUploaded).
 		Set("etag = ?", optionalString(etag)).
-		Set("uploaded_at = COALESCE(uploaded_at, now())").
+		Set("uploaded_at = now()").
 		Set("expires_at = ?", expiresAt).
 		Set("updated_at = now()").
 		Where("f.id = ?", fileID).

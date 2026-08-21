@@ -92,7 +92,6 @@ func (s *Service) uploadLocalFile(writer http.ResponseWriter, request *http.Requ
 		http.Error(writer, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	slog.Info("本地文件内容已写入", "organization_id", record.OrganizationID, "file_id", record.ID, "byte_size", record.ByteSize)
 	writer.WriteHeader(http.StatusNoContent)
 }
 

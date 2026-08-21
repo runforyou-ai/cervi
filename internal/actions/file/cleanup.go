@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// CleanupAction 安排并删除过期文件记录。
+// CleanupAction 维护过期文件的清理队列。
 type CleanupAction struct {
 	db *bun.DB
 }

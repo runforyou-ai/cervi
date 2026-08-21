@@ -62,17 +62,6 @@ func storageKey(organizationID, fileID, contentType string) string {
 	return "organizations/" + organizationID + "/files/" + fileID + avatarFileExtensions[contentType]
 }
 
-// DeletePending 删除无法继续上传的待处理文件记录。
-func (a *CreateUploadAction) DeletePending(ctx context.Context, organizationID, fileID string) error {
-	_, err := a.db.NewDelete().
-		Model((*servermodels.File)(nil)).
-		Where("organization_id = ?", organizationID).
-		Where("id = ?", fileID).
-		Where("status = ?", domain.FileStatusPending).
-		Exec(ctx)
-	return err
-}
-
 // validIdentity 判断用户企业关系是否有效。
 func validIdentity(identity *servermodels.Identity) bool {
 	return identity != nil && common.ValidUUID(identity.Organization.ID) && common.ValidUUID(identity.User.ID) && identity.User.OrganizationID == identity.Organization.ID

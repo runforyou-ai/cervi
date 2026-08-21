@@ -21,7 +21,7 @@ func TestReadProfileImageFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if selected.Name != "avatar.png" || selected.ContentType != "image/png" || selected.ByteSize != int64(len(content)) || selected.DataBase64 != base64.StdEncoding.EncodeToString(content) {
+	if selected.Name != "avatar.png" || selected.ContentType != "image/png" || selected.DataBase64 != base64.StdEncoding.EncodeToString(content) {
 		t.Fatalf("selected image = %#v", selected)
 	}
 

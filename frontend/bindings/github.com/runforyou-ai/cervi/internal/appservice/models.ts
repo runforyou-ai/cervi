@@ -385,7 +385,6 @@ export interface PageInfo {
 export interface ProfileImageFile {
     "name": string;
     "contentType": string;
-    "byteSize": number;
     "dataBase64": string;
 }
 

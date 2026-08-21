@@ -35,9 +35,8 @@ type SignedRequest struct {
 
 // ObjectInfo 返回对象存储中的文件元数据。
 type ObjectInfo struct {
-	ByteSize    int64
-	ContentType string
-	ETag        string
+	ByteSize int64
+	ETag     string
 }
 
 // PresignPut 创建对象直传请求。
@@ -77,7 +76,7 @@ func Stat(ctx context.Context, config S3Config, key string) (ObjectInfo, error) 
 	if err != nil {
 		return ObjectInfo{}, err
 	}
-	return ObjectInfo{ByteSize: aws.ToInt64(output.ContentLength), ContentType: aws.ToString(output.ContentType), ETag: aws.ToString(output.ETag)}, nil
+	return ObjectInfo{ByteSize: aws.ToInt64(output.ContentLength), ETag: aws.ToString(output.ETag)}, nil
 }
 
 // Delete 删除对象存储文件。

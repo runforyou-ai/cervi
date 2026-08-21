@@ -44,12 +44,8 @@ func (b *DirectBackend) CreateFileUpload(ctx context.Context, meta RequestMeta, 
 	}
 	request, err := b.fileUploadRequest(ctx, meta, record, setting)
 	if err != nil {
-		if cleanupErr := b.createFileUpload.DeletePending(ctx, identity.Organization.ID, record.ID); cleanupErr != nil {
-			slog.Warn("清理待上传文件记录失败", "organization_id", identity.Organization.ID, "file_id", record.ID, "error", cleanupErr)
-		}
 		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
-	slog.Info("文件上传已创建", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "file_id", record.ID, "storage_backend", backend)
 	return FileUpload{File: fileFromModel(record), Request: request}, nil
 }
 
@@ -105,7 +101,7 @@ func (b *DirectBackend) fileUploadRequest(ctx context.Context, meta RequestMeta,
 	return FileUploadRequest{Method: signed.Method, URL: signed.URL, Headers: signed.Headers}, nil
 }
 
-// statFile 核验文件在其原始存储位置中的元数据。
+// statFile 按文件记录的存储类型核验内容。
 func (b *DirectBackend) statFile(ctx context.Context, identity *servermodels.Identity, record *servermodels.File) (string, int64, error) {
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
 		info, err := b.localFiles.Stat(record.StorageKey)

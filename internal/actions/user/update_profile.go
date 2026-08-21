@@ -9,13 +9,15 @@ import (
 	"fmt"
 	"time"
 
-	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/driver/pgdriver"
 )
+
+// ErrAvatarFileNotFound 表示头像文件不可关联。
+var ErrAvatarFileNotFound = errors.New("avatar file not found")
 
 // UpdateProfileAction 修改当前用户的个人资料。
 type UpdateProfileAction struct {
@@ -50,7 +52,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			Set("updated_at = now()")
 		if input.AvatarFileID != "" {
 			if !common.ValidUUID(input.AvatarFileID) {
-				return fileaction.ErrFileNotFound
+				return ErrAvatarFileNotFound
 			}
 			currentUser := &servermodels.User{}
 			if err := tx.NewSelect().Model(currentUser).
@@ -74,14 +76,14 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				For("UPDATE").
 				Scan(ctx); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
-					return fileaction.ErrFileNotFound
+					return ErrAvatarFileNotFound
 				}
 				return err
 			}
 			sameAvatar := previousAvatarFileID != nil && *previousAvatarFileID == file.ID
 			if file.Status == string(domain.FileStatusUploaded) {
 				if file.ExpiresAt == nil || !file.ExpiresAt.After(time.Now().UTC()) {
-					return fileaction.ErrFileNotFound
+					return ErrAvatarFileNotFound
 				}
 				if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
 					Set("status = ?", domain.FileStatusActive).
@@ -93,7 +95,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 					return err
 				}
 			} else if file.Status != string(domain.FileStatusActive) || !sameAvatar {
-				return fileaction.ErrFileNotFound
+				return ErrAvatarFileNotFound
 			}
 			query = query.Set("avatar_file_id = ?", file.ID)
 		}
