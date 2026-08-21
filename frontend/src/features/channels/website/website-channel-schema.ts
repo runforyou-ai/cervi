@@ -1,7 +1,7 @@
 /** 网站渠道基础信息表单校验规则。 */
 import { z } from "zod"
 
-import { Locale } from "@/api"
+import { ChannelType, Locale } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
 /** 按 Unicode 字符计算长度。 */
@@ -16,6 +16,7 @@ export function createWebsiteChannelSchema(messages: {
   descriptionTooLong: string
 }) {
   return z.object({
+    type: requiredWailsEnum(ChannelType),
     name: z
       .string()
       .trim()

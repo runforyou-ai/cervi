@@ -27,14 +27,14 @@ func TestChannelContractConversion(t *testing.T) {
 	channel := websiteChannelFromModel(&servermodels.Channel{
 		ID: "channel-1", OrganizationID: "organization-1", CreatedByUserID: "user-1",
 		Type: string(ChannelTypeWebsite), Name: "产品官网", Description: &description,
-		DefaultLocale: string(LocaleChineseSimplified), CreatedAt: now, UpdatedAt: now,
+		DefaultLocale: string(LocaleChineseSimplified), Enabled: true, CreatedAt: now, UpdatedAt: now,
 	})
-	if channel.Type != ChannelTypeWebsite || channel.DefaultLocale != LocaleChineseSimplified || channel.Description == nil || *channel.Description != description {
+	if channel.Type != ChannelTypeWebsite || channel.DefaultLocale != LocaleChineseSimplified || !channel.Enabled || channel.Description == nil || *channel.Description != description {
 		t.Fatalf("channel conversion = %#v", channel)
 	}
 
-	input := channelInput(WebsiteChannelInput{Name: "产品官网", Description: description, DefaultLocale: LocaleEnglishUnitedStates})
-	if input.DefaultLocale != domain.LocaleEnglishUnitedStates || input.Name != "产品官网" {
+	input := channelInput(WebsiteChannelInput{Type: ChannelTypeWebsite, Name: "产品官网", Description: description, DefaultLocale: LocaleEnglishUnitedStates})
+	if input.Type != domain.ChannelTypeWebsite || input.DefaultLocale != domain.LocaleEnglishUnitedStates || input.Name != "产品官网" {
 		t.Fatalf("channel input conversion = %#v", input)
 	}
 }

@@ -2,12 +2,11 @@
 import { Navigate, Route, Routes } from "react-router"
 
 import { LoginPage } from "@/features/auth/login-page"
-import { ChannelsLayout } from "@/features/channels/channels-layout"
 import { WebsiteChannelFormPage } from "@/features/channels/website/website-channel-form-page"
 import { WebsiteChannelListPage } from "@/features/channels/website/website-channel-list-page"
-import { WebsiteChannelTrashPage } from "@/features/channels/website/website-channel-trash-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
+import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
 import { RoleFormPage } from "@/features/settings/role-form-page"
@@ -100,16 +99,15 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
           path="/contacts/external"
           element={<ContactsPage scope="external" />}
         />
-        <Route path="/channels" element={<ChannelsLayout />}>
-          <Route index element={<Navigate to="website" replace />} />
-          <Route path="website" element={<WebsiteChannelListPage />} />
+        <Route path="/integrations" element={<IntegrationsLayout />}>
+          <Route index element={<Navigate to="channels" replace />} />
+          <Route path="channels" element={<WebsiteChannelListPage />} />
           <Route
-            path="website/new"
+            path="channels/new"
             element={<WebsiteChannelFormPage mode="create" />}
           />
-          <Route path="website/trash" element={<WebsiteChannelTrashPage />} />
           <Route
-            path="website/:channelId"
+            path="channels/:channelId"
             element={<WebsiteChannelFormPage mode="edit" />}
           />
         </Route>

@@ -41,7 +41,6 @@ func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, identity *servermo
 		Where("c.id = ?", channelID).
 		Where("c.organization_id = ?", identity.Organization.ID).
 		Where("c.type = ?", domain.ChannelTypeWebsite).
-		Where("c.deleted_at IS NULL").
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound

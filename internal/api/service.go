@@ -52,13 +52,12 @@ func NewService(application *appservice.Service) *Service {
 	router.PATCH("/work-status", service.updateUserWorkStatus)
 	router.GET("/inbox", service.loadInbox)
 	router.GET("/channels/website", service.listWebsiteChannels)
-	router.GET("/channels/website/trash", service.listDeletedWebsiteChannels)
 	router.POST("/channels/website", service.createWebsiteChannel)
 	router.GET("/channels/website/:channelID", service.getWebsiteChannel)
 	router.PATCH("/channels/website/:channelID", service.updateWebsiteChannel)
 	router.PATCH("/channels/website/:channelID/chat-interface", service.updateWebsiteChannelChatInterface)
-	router.DELETE("/channels/website/:channelID", service.deleteWebsiteChannel)
-	router.POST("/channels/website/:channelID/restore", service.restoreWebsiteChannel)
+	router.POST("/channels/website/:channelID/deactivate", service.deactivateWebsiteChannel)
+	router.POST("/channels/website/:channelID/activate", service.activateWebsiteChannel)
 	router.GET("/channels", service.listChannels)
 	router.GET("/users", service.listUsers)
 	router.POST("/users", service.createUser)
@@ -201,24 +200,19 @@ func (s *Service) loadInbox(c *gin.Context) {
 	writeResult(c, http.StatusOK, inbox, err)
 }
 
+// listWebsiteChannels 返回网站渠道列表。
 func (s *Service) listWebsiteChannels(c *gin.Context) {
-	s.writeWebsiteChannelList(c, false)
-}
-
-func (s *Service) listDeletedWebsiteChannels(c *gin.Context) {
-	s.writeWebsiteChannelList(c, true)
-}
-
-func (s *Service) writeWebsiteChannelList(c *gin.Context, deleted bool) {
-	list, err := s.application.ListWebsiteChannels(c.Request.Context(), requestMeta(c), deleted)
+	list, err := s.application.ListWebsiteChannels(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, list, err)
 }
 
+// getWebsiteChannel 返回网站渠道详情。
 func (s *Service) getWebsiteChannel(c *gin.Context) {
 	channel, err := s.application.GetWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
 	writeResult(c, http.StatusOK, channel, err)
 }
 
+// createWebsiteChannel 创建网站渠道。
 func (s *Service) createWebsiteChannel(c *gin.Context) {
 	var input appservice.WebsiteChannelInput
 	if !bindJSON(c, &input) {
@@ -228,6 +222,7 @@ func (s *Service) createWebsiteChannel(c *gin.Context) {
 	writeResult(c, http.StatusCreated, channel, err)
 }
 
+// updateWebsiteChannel 修改网站渠道基础信息。
 func (s *Service) updateWebsiteChannel(c *gin.Context) {
 	var input appservice.WebsiteChannelInput
 	if !bindJSON(c, &input) {
@@ -237,6 +232,7 @@ func (s *Service) updateWebsiteChannel(c *gin.Context) {
 	writeResult(c, http.StatusOK, channel, err)
 }
 
+// updateWebsiteChannelChatInterface 修改网站渠道聊天界面。
 func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
 	var input appservice.WebsiteChannelChatInterfaceInput
 	if !bindJSON(c, &input) {
@@ -246,16 +242,19 @@ func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
 	writeResult(c, http.StatusOK, setting, err)
 }
 
-func (s *Service) deleteWebsiteChannel(c *gin.Context) {
-	err := s.application.DeleteWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
-	writeEmpty(c, err)
-}
-
-func (s *Service) restoreWebsiteChannel(c *gin.Context) {
-	channel, err := s.application.RestoreWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
+// deactivateWebsiteChannel 停用网站渠道。
+func (s *Service) deactivateWebsiteChannel(c *gin.Context) {
+	channel, err := s.application.DeactivateWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
 	writeResult(c, http.StatusOK, channel, err)
 }
 
+// activateWebsiteChannel 启用网站渠道。
+func (s *Service) activateWebsiteChannel(c *gin.Context) {
+	channel, err := s.application.ActivateWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
+	writeResult(c, http.StatusOK, channel, err)
+}
+
+// listChannels 返回可用渠道选项。
 func (s *Service) listChannels(c *gin.Context) {
 	list, err := s.application.ListChannels(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, list, err)

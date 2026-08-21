@@ -139,6 +139,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	staleIdentity.User = loggedIn.Identity.User
 	staleIdentity.User.ID = "00000000-0000-0000-0000-000000000000"
 	_, err = createChannel.Execute(context.Background(), &staleIdentity, channelaction.WebsiteChannelInput{
+		Type:          domain.ChannelTypeWebsite,
 		Name:          "无效渠道",
 		DefaultLocale: domain.LocaleChineseSimplified,
 	})
@@ -147,6 +148,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 
 	channel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.WebsiteChannelInput{
+		Type:          domain.ChannelTypeWebsite,
 		Name:          "产品官网",
 		Description:   "接收官网访客咨询",
 		DefaultLocale: domain.LocaleChineseSimplified,
@@ -183,6 +185,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	updateChannel := channelaction.NewUpdateWebsiteChannelAction(db)
 	channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelInput{
+		Type:          domain.ChannelTypeWebsite,
 		Name:          "帮助中心",
 		DefaultLocale: domain.LocaleEnglishUnitedStates,
 	})
@@ -193,30 +196,29 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected updated channel: %#v", channel)
 	}
 
-	deleteChannel := channelaction.NewDeleteWebsiteChannelAction(db)
-	if err := deleteChannel.Execute(context.Background(), loggedIn.Identity, channel.ID); err != nil {
+	updateChannelStatus := channelaction.NewUpdateWebsiteChannelStatusAction(db)
+	channel, err = updateChannelStatus.Execute(context.Background(), loggedIn.Identity, channel.ID, false)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if channel.Enabled {
+		t.Fatal("channel enabled = true, want false")
 	}
 	listChannels := channelaction.NewListWebsiteChannelsQuery(db)
-	activeChannels, err := listChannels.Execute(context.Background(), loggedIn.Identity, false)
+	channels, err := listChannels.Execute(context.Background(), loggedIn.Identity)
 	if err != nil {
 		t.Fatal(err)
 	}
-	deletedChannels, err := listChannels.Execute(context.Background(), loggedIn.Identity, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(activeChannels) != 0 || len(deletedChannels) != 1 {
-		t.Fatalf("active channels = %d, deleted channels = %d", len(activeChannels), len(deletedChannels))
+	if len(channels) != 1 || channels[0].Enabled {
+		t.Fatalf("unexpected disabled channels: %#v", channels)
 	}
 
-	restoreChannel := channelaction.NewRestoreWebsiteChannelAction(db)
-	channel, err = restoreChannel.Execute(context.Background(), loggedIn.Identity, channel.ID)
+	channel, err = updateChannelStatus.Execute(context.Background(), loggedIn.Identity, channel.ID, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if channel.DeletedAt != nil {
-		t.Fatalf("restored channel deleted_at = %v, want nil", channel.DeletedAt)
+	if !channel.Enabled {
+		t.Fatal("channel enabled = false, want true")
 	}
 
 	users, err := useraction.NewListUsersQuery(db).Execute(context.Background(), loggedIn.Identity, useraction.ListInput{Page: 1, PageSize: 50})

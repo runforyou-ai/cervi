@@ -15,13 +15,13 @@ type Backend interface {
 	UpdateUserPreferences(context.Context, RequestMeta, UserPreferencesInput) (User, error)
 	UpdateUserWorkStatus(context.Context, RequestMeta, UserWorkStatusInput) (User, error)
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
-	ListWebsiteChannels(context.Context, RequestMeta, bool) (WebsiteChannelList, error)
+	ListWebsiteChannels(context.Context, RequestMeta) (WebsiteChannelList, error)
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
 	CreateWebsiteChannel(context.Context, RequestMeta, WebsiteChannelInput) (WebsiteChannelSummary, error)
 	UpdateWebsiteChannel(context.Context, RequestMeta, string, WebsiteChannelInput) (WebsiteChannelSummary, error)
 	UpdateWebsiteChannelChatInterface(context.Context, RequestMeta, string, WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error)
-	DeleteWebsiteChannel(context.Context, RequestMeta, string) error
-	RestoreWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
+	DeactivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
+	ActivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
 	ListChannels(context.Context, RequestMeta) (ChannelList, error)
 	ListUsers(context.Context, RequestMeta, UserListInput) (UserList, error)
 	GetUser(context.Context, RequestMeta, string) (DirectoryUser, error)
@@ -168,8 +168,8 @@ func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error
 }
 
 // ListWebsiteChannels 返回网站渠道列表。
-func (s *Service) ListWebsiteChannels(ctx context.Context, meta RequestMeta, deleted bool) (WebsiteChannelList, error) {
-	return s.backend.ListWebsiteChannels(ctx, meta, deleted)
+func (s *Service) ListWebsiteChannels(ctx context.Context, meta RequestMeta) (WebsiteChannelList, error) {
+	return s.backend.ListWebsiteChannels(ctx, meta)
 }
 
 // GetWebsiteChannel 返回网站渠道详情。
@@ -182,7 +182,7 @@ func (s *Service) CreateWebsiteChannel(ctx context.Context, meta RequestMeta, in
 	return s.backend.CreateWebsiteChannel(ctx, meta, input)
 }
 
-// UpdateWebsiteChannel 修改网站渠道。
+// UpdateWebsiteChannel 修改网站渠道基础信息。
 func (s *Service) UpdateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelInput) (WebsiteChannelSummary, error) {
 	return s.backend.UpdateWebsiteChannel(ctx, meta, channelID, input)
 }
@@ -192,14 +192,14 @@ func (s *Service) UpdateWebsiteChannelChatInterface(ctx context.Context, meta Re
 	return s.backend.UpdateWebsiteChannelChatInterface(ctx, meta, channelID, input)
 }
 
-// DeleteWebsiteChannel 将网站渠道移入回收站。
-func (s *Service) DeleteWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) error {
-	return s.backend.DeleteWebsiteChannel(ctx, meta, channelID)
+// DeactivateWebsiteChannel 停用网站渠道。
+func (s *Service) DeactivateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
+	return s.backend.DeactivateWebsiteChannel(ctx, meta, channelID)
 }
 
-// RestoreWebsiteChannel 恢复网站渠道。
-func (s *Service) RestoreWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
-	return s.backend.RestoreWebsiteChannel(ctx, meta, channelID)
+// ActivateWebsiteChannel 启用网站渠道。
+func (s *Service) ActivateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
+	return s.backend.ActivateWebsiteChannel(ctx, meta, channelID)
 }
 
 // ListChannels 返回当前企业的渠道选择项。

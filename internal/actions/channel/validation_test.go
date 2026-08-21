@@ -15,6 +15,7 @@ import (
 // TestNormalizeWebsiteChannelInput 验证网站渠道字段规范化和长度限制。
 func TestNormalizeWebsiteChannelInput(t *testing.T) {
 	normalized, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
+		Type:          domain.ChannelTypeWebsite,
 		Name:          "  产品官网  ",
 		Description:   "  接收访客咨询  ",
 		DefaultLocale: " zh-CN ",
@@ -27,10 +28,14 @@ func TestNormalizeWebsiteChannelInput(t *testing.T) {
 	}
 
 	_, fields = normalizeWebsiteChannelInput(WebsiteChannelInput{
+		Type:          "email",
 		Name:          strings.Repeat("鹿", 101),
 		Description:   strings.Repeat("行", 2001),
 		DefaultLocale: "fr-FR",
 	})
+	if fields["type"] != ValidationTypeInvalid {
+		t.Fatalf("type validation = %q, want %q", fields["type"], ValidationTypeInvalid)
+	}
 	if fields["name"] != ValidationNameTooLong {
 		t.Fatalf("name validation = %q, want %q", fields["name"], ValidationNameTooLong)
 	}
@@ -45,6 +50,7 @@ func TestNormalizeWebsiteChannelInput(t *testing.T) {
 // TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints 验证补充平面字符按码点计数。
 func TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints(t *testing.T) {
 	_, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
+		Type:          domain.ChannelTypeWebsite,
 		Name:          strings.Repeat("😀", 100),
 		Description:   strings.Repeat("😀", 2000),
 		DefaultLocale: domain.LocaleChineseSimplified,
@@ -54,6 +60,7 @@ func TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints(t *testing.T) {
 	}
 
 	_, fields = normalizeWebsiteChannelInput(WebsiteChannelInput{
+		Type:          domain.ChannelTypeWebsite,
 		Name:          strings.Repeat("😀", 101),
 		Description:   strings.Repeat("😀", 2001),
 		DefaultLocale: domain.LocaleChineseSimplified,
@@ -93,6 +100,7 @@ func TestNormalizeWebsiteChannelChatInterfaceInput(t *testing.T) {
 func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 	identity := &servermodels.Identity{}
 	input := WebsiteChannelInput{
+		Type:          domain.ChannelTypeWebsite,
 		Name:          "产品官网",
 		DefaultLocale: domain.LocaleChineseSimplified,
 	}
@@ -123,15 +131,9 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 			},
 		},
 		{
-			name: "delete",
+			name: "update status",
 			execute: func() error {
-				return NewDeleteWebsiteChannelAction(nil).Execute(context.Background(), identity, "not-a-uuid")
-			},
-		},
-		{
-			name: "restore",
-			execute: func() error {
-				_, err := NewRestoreWebsiteChannelAction(nil).Execute(context.Background(), identity, "not-a-uuid")
+				_, err := NewUpdateWebsiteChannelStatusAction(nil).Execute(context.Background(), identity, "not-a-uuid", false)
 				return err
 			},
 		},

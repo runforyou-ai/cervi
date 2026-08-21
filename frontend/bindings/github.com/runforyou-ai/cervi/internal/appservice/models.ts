@@ -781,9 +781,9 @@ export interface WebsiteChannel {
     "name": string;
     "description": string | null;
     "defaultLocale": Locale;
+    "enabled": boolean;
     "createdAt": string;
     "updatedAt": string;
-    "deletedAt": string | null;
     "chatInterface": WebsiteChannelChatInterface;
 }
 
@@ -808,9 +808,10 @@ export interface WebsiteChannelChatInterfaceInput {
 }
 
 /**
- * WebsiteChannelInput 定义网站渠道可编辑字段。
+ * WebsiteChannelInput 定义网站渠道基础字段。
  */
 export interface WebsiteChannelInput {
+    "type": ChannelType;
     "name": string;
     "description": string;
     "defaultLocale": Locale;
@@ -834,9 +835,9 @@ export interface WebsiteChannelSummary {
     "name": string;
     "description": string | null;
     "defaultLocale": Locale;
+    "enabled": boolean;
     "createdAt": string;
     "updatedAt": string;
-    "deletedAt": string | null;
 }
 
 /**
