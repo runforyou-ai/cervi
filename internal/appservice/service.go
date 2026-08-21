@@ -44,7 +44,7 @@ type WorkspaceInstaller interface {
 type ServerConnector interface {
 	ServerURL(context.Context, RequestMeta) (string, error)
 	ProbeServer(context.Context, RequestMeta, string) (InstallationStatus, error)
-	ConnectServer(context.Context, RequestMeta, string) error
+	ConnectServer(context.Context, RequestMeta, string) (bool, error)
 }
 
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
@@ -229,11 +229,11 @@ func (s *Service) ProbeServer(ctx context.Context, meta RequestMeta, serverURL s
 	return connector.ProbeServer(ctx, meta, serverURL)
 }
 
-// ConnectServer 保存并验证原生端企业服务器地址。
-func (s *Service) ConnectServer(ctx context.Context, meta RequestMeta, serverURL string) error {
+// ConnectServer 验证并保存原生端企业服务器地址，并返回地址是否变化。
+func (s *Service) ConnectServer(ctx context.Context, meta RequestMeta, serverURL string) (bool, error) {
 	connector, ok := s.backend.(ServerConnector)
 	if !ok {
-		return methodNotAllowedError(meta, "ConnectServer")
+		return false, methodNotAllowedError(meta, "ConnectServer")
 	}
 	return connector.ConnectServer(ctx, meta, serverURL)
 }

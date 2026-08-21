@@ -7,10 +7,10 @@ import { toast } from "sonner"
 
 import {
   listDeletedWebsiteChannels,
-  recoverSession,
   restoreWebsiteChannel,
   type WebsiteChannelSummary,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { PageBack } from "@/components/page-back"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"

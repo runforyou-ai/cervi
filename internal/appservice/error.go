@@ -114,12 +114,6 @@ func SessionStateOf(err error) SessionState {
 	return ""
 }
 
-// IsUnavailable 判断是否为依赖服务不可用。
-func IsUnavailable(err error) bool {
-	var apiError *Error
-	return errors.As(err, &apiError) && apiError.Kind == ErrorKindUnavailable
-}
-
 // methodNotAllowedError 返回当前平台不支持该操作的业务错误。
 func methodNotAllowedError(meta RequestMeta, operation string) *Error {
 	slog.Warn("当前平台不支持此操作", "operation", operation)

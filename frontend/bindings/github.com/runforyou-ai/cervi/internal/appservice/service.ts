@@ -22,9 +22,9 @@ export function ChangePassword(meta: $models.RequestMeta, input: $models.ChangeP
 }
 
 /**
- * ConnectServer 保存并验证原生端企业服务器地址。
+ * ConnectServer 验证并保存原生端企业服务器地址，并返回地址是否变化。
  */
-export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<void> {
+export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<boolean> {
     return $Call.ByID(1075777931, meta, serverURL);
 }
 

@@ -271,24 +271,25 @@ func (b *Backend) ProbeServer(ctx context.Context, meta appservice.RequestMeta, 
 	return status, nil
 }
 
-// ConnectServer 验证并保存企业服务器地址。
-func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) error {
+// ConnectServer 验证并保存企业服务器地址，并返回地址是否变化。
+func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (bool, error) {
 	state, _, err := b.inspectServer(ctx, meta, serverURL)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := b.connection.store.SetServerURL(ctx, state.baseURL.String()); err != nil {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return false, ctx.Err()
 		}
 		slog.Warn("保存企业服务器配置失败", "server_url", state.baseURL.String(), "error", err)
-		return appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
+		return false, appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
 	}
 	b.connection.mu.Lock()
+	changed := b.connection.state == nil || b.connection.state.baseURL.String() != state.baseURL.String()
 	b.connection.state = state
 	b.connection.mu.Unlock()
-	slog.Info("企业服务器连接成功", "server_url", state.baseURL.String())
-	return nil
+	slog.Info("企业服务器连接成功", "server_url", state.baseURL.String(), "changed", changed)
+	return changed, nil
 }
 
 // inspectServer 校验地址并读取远程初始化状态，不保存配置。
@@ -308,7 +309,7 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 			return nil, appservice.InstallationStatus{}, ctx.Err()
 		}
 		slog.Warn("验证企业服务器失败", "server_url", parsed.String(), "error", err)
-		return nil, appservice.InstallationStatus{}, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, map[string]cervii18n.Key{"serverUrl": cervii18n.FieldServerURLNotCervi}).WithState(appservice.SessionStateConnect)
+		return nil, appservice.InstallationStatus{}, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, map[string]cervii18n.Key{"serverUrl": cervii18n.FieldServerURLNotCervi})
 	}
 	if !status.Installed || status.OrganizationName == "" {
 		slog.Info("企业服务器尚未初始化", "server_url", parsed.String())
@@ -354,7 +355,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 			return ctx.Err()
 		}
 		slog.Warn("企业服务器请求失败", "server_url", state.baseURL.String(), "method", method, "path", path, "error", err)
-		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil).WithState(appservice.SessionStateConnect)
+		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
 	defer response.Body.Close()
 	limited := io.LimitReader(response.Body, maxResponseBytes)
@@ -376,7 +377,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	}
 	if err := json.NewDecoder(limited).Decode(output); err != nil {
 		slog.Warn("解析企业服务器响应失败", "server_url", state.baseURL.String(), "method", method, "path", path, "status", response.StatusCode, "error", err)
-		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil).WithState(appservice.SessionStateConnect)
+		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
 	return nil
 }

@@ -1,13 +1,16 @@
 /** 登录页。 */
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
-import { loadSession, sessionPath, SessionState } from "@/api"
+import { sessionPath, SessionState } from "@/api"
 import { LoginForm } from "@/features/auth/login-form"
+import { ServerUnavailableState } from "@/features/session/server-unavailable-state"
+import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
+import { useSessionLoader } from "@/features/session/use-session-loader"
 
-/** 已登录则进入工作台；已连接企业时展示企业名称、登录表单，以及原生端切换服务器入口。 */
+/** 解析登录入口，并展示企业登录或服务器错误状态。 */
 export function LoginPage({
   allowServerChange = false,
 }: {
@@ -15,47 +18,48 @@ export function LoginPage({
 }) {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [organizationName, setOrganizationName] = useState("")
+  const { status, session, retry } = useSessionLoader()
+  const disconnectedPath = allowServerChange ? "/connect" : "/setup"
 
   useEffect(() => {
-    const controller = new AbortController()
-    const disconnectedPath = allowServerChange ? "/connect" : "/setup"
-
-    /** 按会话入口进入工作台或展示登录表单。 */
-    async function prepareLoginPage() {
-      try {
-        const session = await loadSession(controller.signal)
-        if (controller.signal.aborted) {
-          return
-        }
-        if (session.state === SessionState.SessionStateReady) {
-          navigate("/inbox", { replace: true })
-          return
-        }
-        if (session.state === SessionState.SessionStateLogin) {
-          setOrganizationName(session.organizationName?.trim() ?? "")
-          return
-        }
-        navigate(sessionPath(session.state) ?? disconnectedPath, {
-          replace: true,
-        })
-      } catch {
-        if (!controller.signal.aborted) {
-          navigate(disconnectedPath, { replace: true })
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
-      }
+    if (status !== "loaded" || !session) {
+      return
     }
+    if (session.state === SessionState.SessionStateReady) {
+      navigate("/inbox", { replace: true })
+      return
+    }
+    if (session.state !== SessionState.SessionStateLogin) {
+      navigate(sessionPath(session.state) ?? disconnectedPath, {
+        replace: true,
+      })
+    }
+  }, [disconnectedPath, navigate, session, status])
 
-    void prepareLoginPage()
-    return () => controller.abort()
-  }, [allowServerChange, navigate])
+  if (status === "unavailable") {
+    return (
+      <ServerUnavailableState
+        onRetry={retry}
+        onChangeServer={
+          allowServerChange
+            ? () => navigate("/connect", { replace: true })
+            : undefined
+        }
+      />
+    )
+  }
 
-  if (loading || organizationName === "") {
+  if (status === "failed") {
+    return <SessionLoadFailedState onRetry={retry} />
+  }
+
+  const organizationName = session?.organizationName?.trim() ?? ""
+
+  if (
+    status !== "loaded" ||
+    session?.state !== SessionState.SessionStateLogin ||
+    organizationName === ""
+  ) {
     return (
       <main className="flex min-h-dvh items-center justify-center">
         <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />

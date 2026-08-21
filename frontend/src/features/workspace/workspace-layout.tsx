@@ -1,12 +1,11 @@
 /** Web 与桌面端工作台布局。 */
-import { useCallback, useEffect, useLayoutEffect, useState } from "react"
-import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
+import { useEffect, useLayoutEffect, useState } from "react"
+import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  loadSession,
   logout,
   sessionPath,
   SessionState,
@@ -14,8 +13,10 @@ import {
   type Organization,
   type User,
 } from "@/api"
-import { Button } from "@/components/ui/button"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
+import { ServerUnavailableState } from "@/features/session/server-unavailable-state"
+import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
+import { useSessionLoader } from "@/features/session/use-session-loader"
 import type { WorkspaceOutletContext } from "@/features/workspace/workspace-context"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
@@ -29,48 +30,34 @@ function useClearSelectionOnNavigation() {
 }
 
 /** 读取会话并渲染工作台导航和子页面。 */
-export function WorkspaceLayout() {
+export function WorkspaceLayout({
+  allowServerChange = false,
+}: {
+  allowServerChange?: boolean
+}) {
   useClearSelectionOnNavigation()
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const [identity, setIdentity] = useState<Identity | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
   const [loggingOut, setLoggingOut] = useState(false)
-
-  /** 读取会话，未就绪则跳转入口。 */
-  const fetchIdentity = useCallback(async () => {
-    setLoading(true)
-    setError("")
-    try {
-      const session = await loadSession()
-      if (session.state === SessionState.SessionStateReady && session.identity) {
-        setIdentity(session.identity)
-        console.info("工作台身份已加载", {
-          organization: session.identity.organization.name,
-        })
-        return
-      }
-      const path = sessionPath(session.state)
-      if (path) {
-        navigate(path, { replace: true })
-        return
-      }
-      setError(t("loadError"))
-    } catch (requestError) {
-      console.warn("工作台身份加载失败", requestError)
-      setError(t("loadError"))
-    } finally {
-      setLoading(false)
-    }
-  }, [navigate, t])
+  const { status, session, retry } = useSessionLoader()
 
   useEffect(() => {
-    if (identity) {
+    if (status !== "loaded" || !session) {
       return
     }
-    void fetchIdentity()
-  }, [fetchIdentity, identity])
+    if (session.state === SessionState.SessionStateReady && session.identity) {
+      setIdentity(session.identity)
+      console.info("工作台身份已加载", {
+        organization: session.identity.organization.name,
+      })
+      return
+    }
+    const path = sessionPath(session.state)
+    if (path) {
+      navigate(path, { replace: true })
+    }
+  }, [navigate, session, status])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -97,7 +84,25 @@ export function WorkspaceLayout() {
     setIdentity((current) => (current ? { ...current, organization } : current))
   }
 
-  if (loading) {
+  if (status === "unavailable" && !identity) {
+    return (
+      <ServerUnavailableState
+        onRetry={retry}
+        onChangeServer={
+          allowServerChange
+            ? () => navigate("/connect", { replace: true })
+            : undefined
+        }
+      />
+    )
+  }
+
+  if (
+    !identity &&
+    (status === "loading" ||
+      (status === "loaded" &&
+        session?.state === SessionState.SessionStateReady))
+  ) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
@@ -107,19 +112,7 @@ export function WorkspaceLayout() {
   }
 
   if (!identity) {
-    return (
-      <main className="flex min-h-svh items-center justify-center p-6">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">
-            {error}
-          </p>
-          <Button className="mt-4" variant="outline" onClick={fetchIdentity}>
-            <RefreshCwIcon />
-            {t("retry")}
-          </Button>
-        </div>
-      </main>
-    )
+    return <SessionLoadFailedState onRetry={retry} />
   }
 
   return (

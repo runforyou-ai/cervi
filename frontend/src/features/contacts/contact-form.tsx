@@ -11,11 +11,11 @@ import {
   ContactStage,
   createContact,
   isApiError,
-  recoverSession,
   type ChannelSummary,
   type ContactDetail,
   type ContactInput,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"

@@ -6,6 +6,16 @@ const enUS = {
     actions: {
       close: "Close",
       back: "Back",
+      retry: "Try again",
+      changeServer: "Change server",
+    },
+    serverUnavailable: {
+      title: "The company server is temporarily unavailable",
+      description: "Please try again later.",
+    },
+    sessionLoadFailed: {
+      title: "Could not load the login status",
+      description: "Please try again.",
     },
     comingSoon: "Soon",
     workStatuses: {
@@ -74,8 +84,6 @@ const enUS = {
     loggingOut: "Logging out…",
     logoutError: "Could not log out. Please try again.",
     loading: "Loading…",
-    loadError: "Could not load the login information.",
-    retry: "Try again",
   },
   workspace: {
     navigationGroup: "Workspace",
@@ -91,7 +99,6 @@ const enUS = {
     loggingOut: "Logging out…",
     logoutError: "Could not log out. Please try again.",
     loading: "Loading…",
-    loadError: "Could not load the workspace.",
     inboxLoadError: "Could not load messages.",
     retry: "Try again",
   },

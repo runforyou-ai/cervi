@@ -16,12 +16,12 @@ import { NavLink, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  recoverSession,
   updateUserWorkStatus,
   type Identity,
   type User,
   type WorkStatus,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,

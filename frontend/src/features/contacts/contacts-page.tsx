@@ -33,7 +33,6 @@ import {
   listChannels,
   listContacts,
   listDeletedContacts,
-  recoverSession,
   listUsers,
   restoreContact,
   type ChannelSummary,
@@ -43,6 +42,7 @@ import {
   type DirectoryUser,
   type PageInfo,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 import {
   ListToolbar,

@@ -40,7 +40,6 @@ type Session struct {
 	State            SessionState `json:"state"`
 	Identity         *Identity    `json:"identity,omitempty"`
 	OrganizationName string       `json:"organizationName,omitempty"`
-	ErrorKind        ErrorKind    `json:"errorKind,omitempty"`
 }
 
 // UserRole 表示企业成员角色。

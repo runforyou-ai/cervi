@@ -4,7 +4,8 @@ import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
-import { loadInbox, recoverSession, type InboxData } from "@/api"
+import { loadInbox, type InboxData } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
 

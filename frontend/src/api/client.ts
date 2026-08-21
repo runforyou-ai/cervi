@@ -2,7 +2,6 @@
 import { CancelError, type CancellablePromise } from "@wailsio/runtime"
 
 import {
-  ErrorKind,
   Locale,
   type Auth,
   type RequestMeta,
@@ -45,6 +44,16 @@ export class ApiError extends Error {
 /** 判断是否为应用服务业务错误。 */
 export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError
+}
+
+/** 判断是否为依赖服务暂时不可用错误。 */
+export function isUnavailableApiError(error: unknown): error is ApiError {
+  return isApiError(error) && error.kind === "unavailable"
+}
+
+/** 判断是否为资源不存在错误。 */
+export function isNotFoundApiError(error: unknown): error is ApiError {
+  return isApiError(error) && error.kind === "not_found"
 }
 
 /** 注入认证和语言后调用应用服务。卸载时忽略结果，不取消绑定。 */
@@ -140,7 +149,7 @@ function normalizeError(error: unknown) {
     }
     return error
   }
-  return new ApiError(ErrorKind.ErrorKindFailed, "", "Request failed")
+  return new ApiError("failed", "", "Request failed")
 }
 
 /** 判断异常原因是否为结构化业务错误。 */
