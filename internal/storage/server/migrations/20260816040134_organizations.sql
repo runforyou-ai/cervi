@@ -7,5 +7,11 @@ CREATE TABLE organizations (
     updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
+COMMENT ON TABLE organizations IS '企业组织';
+COMMENT ON COLUMN organizations.id IS '企业编号';
+COMMENT ON COLUMN organizations.name IS '企业名称';
+COMMENT ON COLUMN organizations.created_at IS '创建时间';
+COMMENT ON COLUMN organizations.updated_at IS '更新时间';
+
 -- +goose Down
 DROP TABLE organizations;
