@@ -76,12 +76,12 @@ export function ChangePasswordForm() {
 
   return (
     <form
-      className="mt-6 w-full max-w-xl"
+      className="w-full max-w-xl"
       aria-label={t("password.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
     >
-      <FieldGroup className="gap-6">
+      <FieldGroup>
         <Controller
           name="currentPassword"
           control={form.control}

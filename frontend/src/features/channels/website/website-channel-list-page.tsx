@@ -11,6 +11,7 @@ import {
   recoverSession,
   type WebsiteChannelSummary,
 } from "@/api"
+import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
 import {
@@ -151,7 +152,7 @@ export function WebsiteChannelListPage() {
         </Button>
       </PageHeader>
 
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+      <PageContent>
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
@@ -199,7 +200,7 @@ export function WebsiteChannelListPage() {
             </Table>
           </div>
         )}
-      </div>
+      </PageContent>
 
       <AlertDialog
         open={deletingChannel !== null}

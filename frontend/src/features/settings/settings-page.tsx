@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 
 import type { Identity, User } from "@/api"
+import { PageContent } from "@/components/page-content"
 import {
   PagePaneLink,
   PagePaneNav,
@@ -51,7 +52,7 @@ export function SettingsPage({
       }
     >
       <PageHeader title={title} />
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+      <PageContent>
         {section === "profile" ? (
           <ProfileSettingsForm user={identity.user} onUpdated={updateUser} />
         ) : section === "password" ? (
@@ -61,7 +62,7 @@ export function SettingsPage({
         ) : (
           <StorageSettingsForm />
         )}
-      </div>
+      </PageContent>
     </PageSplit>
   )
 }

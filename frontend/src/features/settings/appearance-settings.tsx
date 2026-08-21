@@ -76,10 +76,10 @@ export function AppearanceSettings() {
   }
 
   return (
-    <FieldSet className="mt-6 w-full max-w-2xl gap-0">
+    <FieldSet className="w-full max-w-2xl gap-0">
       <FieldLegend className="mb-0">{t("appearance.theme")}</FieldLegend>
       <div
-        className="mt-6 grid gap-3 sm:grid-cols-3"
+        className="mt-4 grid gap-3 sm:grid-cols-3"
         data-slot="radio-group"
       >
         {themeOptions.map(({ value, icon: Icon }) => {

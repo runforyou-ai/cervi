@@ -20,6 +20,7 @@ import { openExternalURL } from "@/platform/open-external-url"
 
 export type WebsiteChannelAccess = "embed" | "link"
 
+/** 展示网站渠道的嵌入代码和独立访问链接。 */
 export function WebsiteChannelUsagePanel({
   channelId,
   access,
@@ -44,13 +45,15 @@ export function WebsiteChannelUsagePanel({
           return
         }
         if (value === "") {
+          console.warn("网站渠道访问地址为空")
           setError(t("usage.originError"))
           return
         }
         setOrigin(value)
       })
-      .catch(() => {
+      .catch((requestError: unknown) => {
         if (active) {
+          console.warn("网站渠道访问地址解析失败", requestError)
           setError(t("usage.originError"))
         }
       })
@@ -70,12 +73,15 @@ export function WebsiteChannelUsagePanel({
   const snippet = origin ? websiteChannelWidgetSnippet(origin, channelId) : ""
   const chatUrl = origin ? websiteChannelChatURL(origin, channelId) : ""
 
+  /** 复制渠道使用内容并反馈结果。 */
   async function copy(value: string, target: "snippet" | "link") {
     try {
       await navigator.clipboard.writeText(value)
       setCopied(target)
       setCopyFailed(false)
-    } catch {
+      console.info("网站渠道使用内容已复制", { channel_id: channelId, target })
+    } catch (error) {
+      console.warn("复制网站渠道使用内容失败", error)
       setCopied("")
       setCopyFailed(true)
     }
@@ -96,7 +102,6 @@ export function WebsiteChannelUsagePanel({
 
   return (
     <Tabs
-      className="mt-6"
       value={access}
       onValueChange={(value) => onAccessChange(value as WebsiteChannelAccess)}
     >
