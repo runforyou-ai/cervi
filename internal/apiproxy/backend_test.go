@@ -79,7 +79,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			if request.Header.Get("Authorization") == "Bearer test-token" {
 				writeTestJSON(writer, http.StatusOK, map[string]any{
 					"organization":  map[string]string{"id": "organization-1", "name": "鹿行"},
-					"user":          map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "owner@example.com"},
+					"user":          map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "admin@example.com"},
 					"conversations": []any{},
 				})
 				return
@@ -145,7 +145,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			writeTestJSON(writer, http.StatusOK, map[string]any{
 				"identity": map[string]any{
 					"organization": map[string]string{"id": "organization-1", "name": "鹿行"},
-					"user":         map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "owner@example.com"},
+					"user":         map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "admin@example.com"},
 				},
 				"token": "test-token", "expiresAt": time.Now().Add(time.Hour),
 			})
@@ -204,7 +204,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if serverURL != remote.URL {
 		t.Fatalf("configured server URL = %q, want %q", serverURL, remote.URL)
 	}
-	auth, err := backend.Login(context.Background(), meta, appservice.LoginInput{Email: "owner@example.com", Password: "password123"})
+	auth, err := backend.Login(context.Background(), meta, appservice.LoginInput{Email: "admin@example.com", Password: "password123"})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -472,7 +472,7 @@ export enum UserRole {
      */
     $zero = "",
 
-    UserRoleOwner = "owner",
+    UserRoleAdmin = "admin",
     UserRoleMember = "member",
 };
 

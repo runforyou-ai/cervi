@@ -54,8 +54,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	install := installationaction.NewInstallWorkspaceAction(db)
 	installed, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
 		OrganizationName: "鹿行测试公司",
-		DisplayName:      "所有者",
-		Email:            "owner@example.com",
+		DisplayName:      "管理员",
+		Email:            "admin@example.com",
 		Password:         "password123",
 		Locale:           domain.LocaleEnglishUnitedStates,
 		TimeZone:         "America/New_York",
@@ -63,7 +63,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installed.Identity.User.Role != "owner" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.User.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.User.Role != string(domain.UserRoleAdmin) || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.User.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	currentStatus, err := status.Execute(context.Background())
@@ -79,7 +79,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if identity == nil || identity.User.Email != "owner@example.com" {
+	if identity == nil || identity.User.Email != "admin@example.com" {
 		t.Fatalf("unexpected identity: %#v", identity)
 	}
 
@@ -90,7 +90,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	login := authaction.NewLoginAction(db)
 	loggedIn, err := login.Execute(context.Background(), authaction.LoginInput{
-		Email:    "OWNER@example.com",
+		Email:    "ADMIN@example.com",
 		Password: "password123",
 	})
 	if err != nil {

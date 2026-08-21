@@ -16,7 +16,7 @@ const zhCN = {
   },
   setup: {
     title: "初始化 Cervi",
-    description: "创建企业和第一个所有者账号。",
+    description: "创建企业和第一个管理员账号。",
     organizationNameLabel: "企业名称",
     displayNameLabel: "你的姓名",
     emailLabel: "邮箱",
@@ -38,7 +38,7 @@ const zhCN = {
   },
   auth: {
     title: "登录",
-    description: "使用所有者邮箱和密码登录。",
+    description: "使用邮箱和密码登录。",
     emailLabel: "邮箱",
     passwordLabel: "密码",
     emailRequired: "请输入邮箱。",
@@ -168,7 +168,7 @@ const zhCN = {
       page: "第 {{current}} / {{total}} 页",
     },
     roles: {
-      owner: "所有者",
+      admin: "管理员",
       member: "成员",
     },
     statuses: {

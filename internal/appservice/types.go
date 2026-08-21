@@ -47,7 +47,7 @@ type Session struct {
 type UserRole string
 
 const (
-	UserRoleOwner  UserRole = UserRole(domain.UserRoleOwner)
+	UserRoleAdmin  UserRole = UserRole(domain.UserRoleAdmin)
 	UserRoleMember UserRole = UserRole(domain.UserRoleMember)
 )
 

@@ -31,7 +31,7 @@ func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta
 
 func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
 	b.lastMeta = meta
-	if input.Email != "owner@example.com" || input.Password != "password123" {
+	if input.Email != "admin@example.com" || input.Password != "password123" {
 		return appservice.Auth{}, &appservice.Error{Kind: appservice.ErrorKindInvalid, Message: "账号或密码错误。"}
 	}
 	return appservice.Auth{
@@ -105,7 +105,7 @@ func TestAuthenticationUsesBearerToken(t *testing.T) {
 	defer server.Close()
 
 	loginResponse := doJSON(t, http.MethodPost, server.URL+"/auth/login", map[string]string{
-		"email": "owner@example.com", "password": "password123",
+		"email": "admin@example.com", "password": "password123",
 	}, "")
 	defer loginResponse.Body.Close()
 	if loginResponse.StatusCode != http.StatusOK {
@@ -296,7 +296,7 @@ func TestBearerTokenParsing(t *testing.T) {
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
-		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "owner@example.com", DisplayName: "所有者", Role: "owner", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", WorkStatus: appservice.WorkStatusWorking},
+		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", Role: appservice.UserRoleAdmin, Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", WorkStatus: appservice.WorkStatusWorking},
 	}
 }
 

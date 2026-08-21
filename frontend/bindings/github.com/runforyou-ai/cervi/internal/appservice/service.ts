@@ -85,7 +85,7 @@ export function GetWebsiteChannel(meta: $models.RequestMeta, channelID: string):
 }
 
 /**
- * InstallWorkspace 创建企业所有者并返回登录令牌。
+ * InstallWorkspace 创建企业管理员并返回登录令牌。
  */
 export function InstallWorkspace(meta: $models.RequestMeta, input: $models.InstallWorkspaceInput): $CancellablePromise<$models.Auth> {
     return $Call.ByID(3665964242, meta, input);

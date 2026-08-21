@@ -62,7 +62,7 @@ func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (Ins
 	return s.backend.InstallationStatus(ctx, meta)
 }
 
-// InstallWorkspace 创建企业所有者并返回登录令牌。
+// InstallWorkspace 创建企业管理员并返回登录令牌。
 func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
 	installer, ok := s.backend.(WorkspaceInstaller)
 	if !ok {
