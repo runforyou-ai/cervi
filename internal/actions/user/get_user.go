@@ -4,41 +4,28 @@ package user
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// GetUserQuery 读取当前企业的内部用户详情。
+// GetUserQuery 读取当前企业的成员详情。
 type GetUserQuery struct {
 	db *bun.DB
 }
 
-// NewGetUserQuery 创建内部用户详情查询。
+// NewGetUserQuery 创建企业成员详情查询。
 func NewGetUserQuery(db *bun.DB) *GetUserQuery {
 	return &GetUserQuery{db: db}
 }
 
-// Execute 返回当前企业的指定用户。
+// Execute 返回当前企业的指定成员。
 func (q *GetUserQuery) Execute(ctx context.Context, identity *servermodels.Identity, userID string) (*DirectoryUser, error) {
-	if _, err := uuid.Parse(userID); err != nil {
-		return nil, ErrNotFound
+	if err := validateIdentity(ctx, q.db, identity); err != nil {
+		return nil, err
 	}
-	user := &DirectoryUser{}
-	err := q.db.NewSelect().
-		TableExpr("users AS u").
-		ColumnExpr("u.id::text AS id").
-		Column("email", "display_name", "role", "status", "work_status", "created_at").
-		Where("u.id = ?", userID).
-		Where("u.organization_id = ?", identity.Organization.ID).
-		Scan(ctx, user)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
+	user, err := loadDirectoryUser(ctx, q.db, identity.Organization.ID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}

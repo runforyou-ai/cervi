@@ -28,6 +28,18 @@ func TestNormalizeProfileInput(t *testing.T) {
 	}
 }
 
+// TestNormalizeCreateInput 验证新增成员字段会规范化并校验角色与密码。
+func TestNormalizeCreateInput(t *testing.T) {
+	input, fields := normalizeCreateInput(CreateInput{DisplayName: "  林晓  ", Email: " LIN@EXAMPLE.COM ", Password: "password123", Role: domain.UserRoleMember})
+	if len(fields) != 0 || input.DisplayName != "林晓" || input.Email != "lin@example.com" {
+		t.Fatalf("input = %#v, fields = %#v", input, fields)
+	}
+	_, fields = normalizeCreateInput(CreateInput{DisplayName: "", Email: "bad", Password: "short", Role: "owner"})
+	if fields["displayName"] != ValidationDisplayNameRequired || fields["email"] != ValidationEmailInvalid || fields["password"] != ValidationPasswordTooShort || fields["role"] != ValidationRoleInvalid {
+		t.Fatalf("fields = %#v", fields)
+	}
+}
+
 // TestPreferencesValidation 验证语言和 IANA 时区校验。
 func TestPreferencesValidation(t *testing.T) {
 	fields := validatePreferencesInput(PreferencesInput{

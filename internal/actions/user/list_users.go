@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// ListUsersQuery 读取当前企业的内部用户列表。
+// ListUsersQuery 读取当前企业的成员列表。
 type ListUsersQuery struct {
 	db *bun.DB
 }
@@ -28,6 +29,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	input.Query = strings.TrimSpace(input.Query)
 	input.Status = domain.UserStatus(strings.TrimSpace(string(input.Status)))
 	input.Role = domain.UserRole(strings.TrimSpace(string(input.Role)))
+	input.TeamID = strings.TrimSpace(input.TeamID)
 	if input.Page <= 0 {
 		input.Page = 1
 	}
@@ -36,8 +38,12 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	}
 	if input.PageSize > 100 ||
 		(input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) ||
-		(input.Role != "" && input.Role != domain.UserRoleAdmin && input.Role != domain.UserRoleMember) {
+		(input.Role != "" && input.Role != domain.UserRoleAdmin && input.Role != domain.UserRoleMember) ||
+		(input.TeamID != "" && !common.ValidUUID(input.TeamID)) {
 		return ListOutput{}, ErrQueryInvalid
+	}
+	if err := validateIdentity(ctx, q.db, identity); err != nil {
+		return ListOutput{}, err
 	}
 
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
@@ -47,6 +53,9 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		}
 		if input.Role != "" {
 			query = query.Where("u.role = ?", input.Role)
+		}
+		if input.TeamID != "" {
+			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.identity_type = ? AND tm.identity_id = u.id AND tm.team_id = ?)", domain.MemberIdentityTypeUser, input.TeamID)
 		}
 		if input.Query != "" {
 			pattern := "%" + input.Query + "%"
@@ -72,6 +81,13 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		Offset((input.Page-1)*input.PageSize).
 		Scan(ctx, &users); err != nil {
 		return ListOutput{}, fmt.Errorf("list users: %w", err)
+	}
+	for index := range users {
+		teams, err := loadUserTeams(ctx, q.db, identity.Organization.ID, users[index].ID)
+		if err != nil {
+			return ListOutput{}, fmt.Errorf("load user teams: %w", err)
+		}
+		users[index].Teams = teams
 	}
 	return ListOutput{Users: users, Page: PageInfo{Number: input.Page, Size: input.PageSize, Total: total}}, nil
 }

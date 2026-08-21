@@ -1,5 +1,5 @@
 /** 联系人详情和分节编辑。 */
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -17,7 +17,6 @@ import {
   type ContactMethodInput,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
-import { Button } from "@/components/ui/button"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -28,6 +27,10 @@ import {
   createContactSchema,
   type ContactFormValues,
 } from "@/features/contacts/contact-schema"
+import {
+  DetailEditActions,
+  DetailEditRow,
+} from "@/features/contacts/detail-edit-row"
 import { useDateTime } from "@/hooks/use-date-time"
 import { apiErrorMessage } from "@/lib/form-errors"
 
@@ -39,8 +42,14 @@ function valuesFromDetail(detail: ContactDetail): ContactFormValues {
     displayName: detail.contact.displayName ?? "",
     channelId: detail.contact.sourceChannelId,
     stage: detail.contact.stage,
-    email: detail.methods.find((method) => method.type === ContactMethodType.ContactMethodTypeEmail)?.value ?? "",
-    phone: detail.methods.find((method) => method.type === ContactMethodType.ContactMethodTypePhone)?.value ?? "",
+    email:
+      detail.methods.find(
+        (method) => method.type === ContactMethodType.ContactMethodTypeEmail,
+      )?.value ?? "",
+    phone:
+      detail.methods.find(
+        (method) => method.type === ContactMethodType.ContactMethodTypePhone,
+      )?.value ?? "",
     notes: detail.contact.notes ?? "",
   }
 }
@@ -88,74 +97,15 @@ function methodsFromDetail(
     ContactMethodType.ContactMethodTypePhone,
   ]) {
     if (!handled[type] && editedValues[type]) {
-      methods.push({ type, value: editedValues[type], label: "", isPrimary: true })
+      methods.push({
+        type,
+        value: editedValues[type],
+        label: "",
+        isPrimary: true,
+      })
     }
   }
   return methods
-}
-
-/** 详情行，支持进入编辑。 */
-function DetailRow({
-  label,
-  value,
-  editing,
-  editEnabled,
-  onEdit,
-  children,
-}: {
-  label: string
-  value: ReactNode
-  editing: boolean
-  editEnabled: boolean
-  onEdit: () => void
-  children: ReactNode
-}) {
-  const { t } = useTranslation("contacts")
-
-  return (
-    <div className="group rounded-md px-2 py-2.5 transition-colors hover:bg-muted/50 focus-within:bg-muted/50">
-      <div className="flex items-start gap-3">
-        <div className="w-28 shrink-0 pt-1 text-sm text-muted-foreground">{label}</div>
-        <div className="min-w-0 flex-1">
-          {editing ? children : <div className="pt-1 text-sm break-words">{value}</div>}
-        </div>
-        {!editing && editEnabled ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-            aria-label={t("detail.editField", { field: label })}
-            onClick={onEdit}
-          >
-            {t("detail.edit")}
-          </Button>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
-/** 详情分节编辑的保存和取消。 */
-function EditActions({
-  saving,
-  onSave,
-  onCancel,
-}: {
-  saving: boolean
-  onSave: () => void
-  onCancel: () => void
-}) {
-  const { t } = useTranslation("contacts")
-  return (
-    <div className="mt-3 flex items-center gap-2">
-      <Button size="sm" disabled={saving} onClick={onSave}>
-        {saving ? t("form.saving") : t("form.save")}
-      </Button>
-      <Button variant="outline" size="sm" disabled={saving} onClick={onCancel}>
-        {t("form.cancel")}
-      </Button>
-    </div>
-  )
 }
 
 /** 分节编辑联系人详情。 */
@@ -233,7 +183,9 @@ export function ContactDetailView({
       }
       if (isApiError(error)) {
         console.warn("保存联系人失败", error)
-        toast.error(apiErrorMessage(error, ["displayName", "stage", "methods", "notes"]))
+        toast.error(
+          apiErrorMessage(error, ["displayName", "stage", "methods", "notes"]),
+        )
         return
       }
       console.warn("保存联系人失败", error)
@@ -243,15 +195,19 @@ export function ContactDetailView({
     }
   })
 
-  const empty = <span className="text-muted-foreground">{t("detail.empty")}</span>
+  const empty = (
+    <span className="text-muted-foreground">{t("detail.empty")}</span>
+  )
   const stage = form.watch("stage")
 
   return (
     <div className="flex flex-col gap-7">
       <section>
-        <h3 className="mb-2 text-sm font-medium">{t("detail.basicInformation")}</h3>
+        <h3 className="mb-2 text-sm font-medium">
+          {t("detail.basicInformation")}
+        </h3>
         <div className="divide-y">
-          <DetailRow
+          <DetailEditRow
             label={t("columns.name")}
             value={detail.contact.displayName || empty}
             editing={editing === "name"}
@@ -259,26 +215,44 @@ export function ContactDetailView({
             onEdit={() => startEditing("name")}
           >
             <Input {...form.register("displayName")} autoFocus />
-            <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
-          </DetailRow>
+            <DetailEditActions
+              saving={saving}
+              onSave={() => void save()}
+              onCancel={cancelEdit}
+            />
+          </DetailEditRow>
 
-          <DetailRow
+          <DetailEditRow
             label={t("columns.stage")}
-            value={detail.contact.stage ? t(`stages.${detail.contact.stage}`) : ""}
+            value={
+              detail.contact.stage ? t(`stages.${detail.contact.stage}`) : ""
+            }
             editing={editing === "stage"}
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("stage")}
           >
             <NativeSelect {...form.register("stage")} autoFocus value={stage}>
-              <option value={ContactStage.ContactStageVisitor}>{t("stages.visitor")}</option>
-              <option value={ContactStage.ContactStageLead}>{t("stages.lead")}</option>
-              <option value={ContactStage.ContactStageCustomer}>{t("stages.customer")}</option>
+              <option value={ContactStage.ContactStageVisitor}>
+                {t("stages.visitor")}
+              </option>
+              <option value={ContactStage.ContactStageLead}>
+                {t("stages.lead")}
+              </option>
+              <option value={ContactStage.ContactStageCustomer}>
+                {t("stages.customer")}
+              </option>
             </NativeSelect>
-            <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
-          </DetailRow>
+            <DetailEditActions
+              saving={saving}
+              onSave={() => void save()}
+              onCancel={cancelEdit}
+            />
+          </DetailEditRow>
 
           <div className="flex items-start gap-3 px-2 py-3 text-sm">
-            <div className="w-28 shrink-0 text-muted-foreground">{t("detail.sourceChannel")}</div>
+            <div className="w-28 shrink-0 text-muted-foreground">
+              {t("detail.sourceChannel")}
+            </div>
             <div className="min-w-0 flex-1">
               {detail.sourceChannel
                 ? `${channelTypeLabel(detail.sourceChannel.type, t)} · ${detail.sourceChannel.name}`
@@ -289,13 +263,19 @@ export function ContactDetailView({
       </section>
 
       <section>
-        <h3 className="mb-2 text-sm font-medium">{t("detail.contactMethods")}</h3>
-        <DetailRow
+        <h3 className="mb-2 text-sm font-medium">
+          {t("detail.contactMethods")}
+        </h3>
+        <DetailEditRow
           label={t("detail.emailAndPhone")}
           value={
             <div className="grid gap-1.5">
-              <div>{t("form.email")}: {form.getValues("email") || empty}</div>
-              <div>{t("form.phone")}: {form.getValues("phone") || empty}</div>
+              <div>
+                {t("form.email")}: {form.getValues("email") || empty}
+              </div>
+              <div>
+                {t("form.phone")}: {form.getValues("phone") || empty}
+              </div>
             </div>
           }
           editing={editing === "methods"}
@@ -304,15 +284,24 @@ export function ContactDetailView({
         >
           <div className="grid gap-4">
             <Field>
-              <FieldLabel htmlFor="contact-detail-email">{t("form.email")}</FieldLabel>
-              <Input id="contact-detail-email" type="email" {...form.register("email")} autoFocus />
+              <FieldLabel htmlFor="contact-detail-email">
+                {t("form.email")}
+              </FieldLabel>
+              <Input
+                id="contact-detail-email"
+                type="email"
+                {...form.register("email")}
+                autoFocus
+              />
             </Field>
             <Controller
               name="phone"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field>
-                  <FieldLabel htmlFor="contact-detail-phone">{t("form.phone")}</FieldLabel>
+                  <FieldLabel htmlFor="contact-detail-phone">
+                    {t("form.phone")}
+                  </FieldLabel>
                   <PhoneInput
                     ref={field.ref}
                     id="contact-detail-phone"
@@ -327,13 +316,17 @@ export function ContactDetailView({
               )}
             />
           </div>
-          <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
-        </DetailRow>
+          <DetailEditActions
+            saving={saving}
+            onSave={() => void save()}
+            onCancel={cancelEdit}
+          />
+        </DetailEditRow>
       </section>
 
       <section>
         <h3 className="mb-2 text-sm font-medium">{t("form.notes")}</h3>
-        <DetailRow
+        <DetailEditRow
           label={t("form.notes")}
           value={detail.contact.notes || empty}
           editing={editing === "notes"}
@@ -341,19 +334,29 @@ export function ContactDetailView({
           onEdit={() => startEditing("notes")}
         >
           <Textarea {...form.register("notes")} autoFocus rows={5} />
-          <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
-        </DetailRow>
+          <DetailEditActions
+            saving={saving}
+            onSave={() => void save()}
+            onCancel={cancelEdit}
+          />
+        </DetailEditRow>
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium">{t("detail.otherInformation")}</h3>
+        <h3 className="mb-3 text-sm font-medium">
+          {t("detail.otherInformation")}
+        </h3>
         <dl className="grid gap-4 px-2 text-sm">
           <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-muted-foreground">{t("columns.addedAt")}</dt>
+            <dt className="w-28 shrink-0 text-muted-foreground">
+              {t("columns.addedAt")}
+            </dt>
             <dd>{formatDateTime(detail.contact.createdAt)}</dd>
           </div>
           <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-muted-foreground">{t("detail.linkedChannels")}</dt>
+            <dt className="w-28 shrink-0 text-muted-foreground">
+              {t("detail.linkedChannels")}
+            </dt>
             <dd className="grid gap-2">
               {detail.channelIdentities.length > 0
                 ? detail.channelIdentities.map((identity) => (

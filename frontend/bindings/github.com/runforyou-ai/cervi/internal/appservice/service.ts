@@ -36,6 +36,20 @@ export function CreateContact(meta: $models.RequestMeta, input: $models.ContactI
 }
 
 /**
+ * CreateTeam 创建企业团队。
+ */
+export function CreateTeam(meta: $models.RequestMeta, input: $models.TeamInput): $CancellablePromise<$models.Team> {
+    return $Call.ByID(3796040671, meta, input);
+}
+
+/**
+ * CreateUser 创建企业成员账号。
+ */
+export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserInput): $CancellablePromise<$models.DirectoryUser> {
+    return $Call.ByID(2291845417, meta, input);
+}
+
+/**
  * CreateWebsiteChannel 创建网站渠道。
  */
 export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.WebsiteChannelInput): $CancellablePromise<$models.WebsiteChannelSummary> {
@@ -43,10 +57,24 @@ export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.W
 }
 
 /**
+ * DeactivateUser 停用企业成员账号。
+ */
+export function DeactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.DirectoryUser> {
+    return $Call.ByID(3624391107, meta, userID);
+}
+
+/**
  * DeleteContact 将联系人移入回收站。
  */
 export function DeleteContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<void> {
     return $Call.ByID(1228681067, meta, contactID);
+}
+
+/**
+ * DeleteTeam 删除企业团队及其成员关系。
+ */
+export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $CancellablePromise<void> {
+    return $Call.ByID(798533364, meta, teamID);
 }
 
 /**
@@ -113,6 +141,13 @@ export function ListContacts(meta: $models.RequestMeta, input: $models.ContactLi
 }
 
 /**
+ * ListTeams 返回企业团队列表。
+ */
+export function ListTeams(meta: $models.RequestMeta, input: $models.TeamListInput): $CancellablePromise<$models.TeamList> {
+    return $Call.ByID(3776706348, meta, input);
+}
+
+/**
  * ListUsers 返回企业成员列表。
  */
 export function ListUsers(meta: $models.RequestMeta, input: $models.UserListInput): $CancellablePromise<$models.UserList> {
@@ -169,6 +204,20 @@ export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $Canc
 }
 
 /**
+ * ReactivateUser 恢复企业成员账号。
+ */
+export function ReactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.DirectoryUser> {
+    return $Call.ByID(2986051725, meta, userID);
+}
+
+/**
+ * RemoveTeamMember 移出团队成员。
+ */
+export function RemoveTeamMember(meta: $models.RequestMeta, teamID: string, identityType: $models.MemberIdentityType, identityID: string): $CancellablePromise<void> {
+    return $Call.ByID(2159012173, meta, teamID, identityType, identityID);
+}
+
+/**
  * RestoreContact 恢复联系人。
  */
 export function RestoreContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
@@ -222,6 +271,20 @@ export function UpdateOrganization(meta: $models.RequestMeta, input: $models.Org
  */
 export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.User> {
     return $Call.ByID(1804531972, meta, input);
+}
+
+/**
+ * UpdateTeam 修改企业团队。
+ */
+export function UpdateTeam(meta: $models.RequestMeta, teamID: string, input: $models.TeamInput): $CancellablePromise<$models.Team> {
+    return $Call.ByID(2807681714, meta, teamID, input);
+}
+
+/**
+ * UpdateUser 修改企业成员资料、角色和所属团队。
+ */
+export function UpdateUser(meta: $models.RequestMeta, userID: string, input: $models.UpdateDirectoryUserInput): $CancellablePromise<$models.DirectoryUser> {
+    return $Call.ByID(2151183832, meta, userID, input);
 }
 
 /**

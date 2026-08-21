@@ -130,7 +130,7 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 		return UserList{}, err
 	}
 	output, err := b.listUsers.Execute(ctx, identity, useraction.ListInput{
-		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Role: optionalDomain[UserRole, domain.UserRole](input.Role), Page: input.Page, PageSize: input.PageSize,
+		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Role: optionalDomain[UserRole, domain.UserRole](input.Role), TeamID: input.TeamID, Page: input.Page, PageSize: input.PageSize,
 	})
 	if errors.Is(err, useraction.ErrQueryInvalid) {
 		return UserList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
@@ -144,7 +144,7 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 	}
 	users := make([]DirectoryUser, 0, len(output.Users))
 	for _, user := range output.Users {
-		users = append(users, DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), CreatedAt: user.CreatedAt})
+		users = append(users, directoryUserFromAction(user))
 	}
 	return UserList{Users: users, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
@@ -166,7 +166,109 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 		slog.Warn("读取企业成员失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
 		return DirectoryUser{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
 	}
-	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), CreatedAt: user.CreatedAt}, nil
+	return directoryUserFromAction(*user), nil
+}
+
+// CreateUser 创建企业成员账号。
+func (b *DirectBackend) CreateUser(ctx context.Context, meta RequestMeta, input CreateUserInput) (DirectoryUser, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return DirectoryUser{}, err
+	}
+	user, err := b.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, Role: domain.UserRole(input.Role), TeamIDs: input.TeamIDs})
+	if err != nil {
+		return DirectoryUser{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
+	}
+	slog.Info("企业成员创建成功", "organization_id", identity.Organization.ID, "user_id", user.ID)
+	return directoryUserFromAction(*user), nil
+}
+
+// UpdateUser 修改企业成员资料、角色和所属团队。
+func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateDirectoryUserInput) (DirectoryUser, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return DirectoryUser{}, err
+	}
+	user, err := b.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, Role: domain.UserRole(input.Role), TeamIDs: input.TeamIDs})
+	if err != nil {
+		return DirectoryUser{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
+	}
+	slog.Info("企业成员更新成功", "organization_id", identity.Organization.ID, "user_id", userID)
+	return directoryUserFromAction(*user), nil
+}
+
+// DeactivateUser 停用企业成员账号。
+func (b *DirectBackend) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
+	return b.updateDirectoryUserStatus(ctx, meta, userID, domain.UserStatusInactive)
+}
+
+// ReactivateUser 恢复企业成员账号。
+func (b *DirectBackend) ReactivateUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
+	return b.updateDirectoryUserStatus(ctx, meta, userID, domain.UserStatusActive)
+}
+
+// updateDirectoryUserStatus 修改企业成员账号状态。
+func (b *DirectBackend) updateDirectoryUserStatus(ctx context.Context, meta RequestMeta, userID string, status domain.UserStatus) (DirectoryUser, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return DirectoryUser{}, err
+	}
+	user, err := b.updateUserStatus.Execute(ctx, identity, userID, status)
+	if err != nil {
+		return DirectoryUser{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
+	}
+	slog.Info("企业成员状态更新成功", "organization_id", identity.Organization.ID, "user_id", userID, "status", status)
+	return directoryUserFromAction(*user), nil
+}
+
+// userMutationError 转换企业成员写入错误。
+func (b *DirectBackend) userMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, userID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var validationError *common.FieldError
+	if errors.As(err, &validationError) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, userFieldKeys(validationError.Fields))
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, useraction.ErrNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorUserNotFound)
+	}
+	if errors.Is(err, useraction.ErrSelfDeactivate) {
+		return InvalidError(meta, cervii18n.ErrorUserSelfDeactivate, nil)
+	}
+	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
+	if userID != "" {
+		attributes = append(attributes, "user_id", userID)
+	}
+	slog.Warn("企业成员操作失败", attributes...)
+	return FailedError(meta, failureKey)
+}
+
+// directoryUserFromAction 转换企业成员目录契约。
+func directoryUserFromAction(user useraction.DirectoryUser) DirectoryUser {
+	teams := make([]TeamSummary, 0, len(user.Teams))
+	for _, team := range user.Teams {
+		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
+	}
+	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
+}
+
+// userFieldKeys 把企业成员校验错误码映射为本地化文案键。
+func userFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+	keys := map[common.FieldCode]cervii18n.Key{
+		useraction.ValidationDisplayNameRequired: cervii18n.FieldDisplayNameRequired,
+		useraction.ValidationEmailInvalid:        cervii18n.FieldEmailInvalid,
+		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
+		useraction.ValidationPasswordTooShort:    cervii18n.FieldPasswordTooShort,
+		useraction.ValidationPasswordTooLong:     cervii18n.FieldPasswordTooLong,
+		useraction.ValidationRoleInvalid:         cervii18n.FieldUserRoleInvalid,
+		useraction.ValidationTeamInvalid:         cervii18n.FieldUserTeamInvalid,
+		useraction.ValidationStatusInvalid:       cervii18n.FieldUserStatusInvalid,
+	}
+	return translateValidationFields(fields, keys)
 }
 
 // profileFieldKeys 把个人资料校验错误码映射为本地化文案键。

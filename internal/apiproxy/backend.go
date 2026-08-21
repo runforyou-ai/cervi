@@ -160,6 +160,7 @@ func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, in
 	setQuery(query, "query", input.Query)
 	setOptionalQuery(query, "status", input.Status)
 	setOptionalQuery(query, "role", input.Role)
+	setQuery(query, "teamId", input.TeamID)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	var output appservice.UserList
@@ -172,6 +173,69 @@ func (b *Backend) GetUser(ctx context.Context, meta appservice.RequestMeta, user
 	var output appservice.DirectoryUser
 	err := b.do(ctx, meta, http.MethodGet, "/users/"+url.PathEscape(userID), nil, nil, &output)
 	return output, err
+}
+
+// CreateUser 创建远程企业成员账号。
+func (b *Backend) CreateUser(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateUserInput) (appservice.DirectoryUser, error) {
+	var output appservice.DirectoryUser
+	err := b.do(ctx, meta, http.MethodPost, "/users", nil, input, &output)
+	return output, err
+}
+
+// UpdateUser 修改远程企业成员。
+func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateDirectoryUserInput) (appservice.DirectoryUser, error) {
+	var output appservice.DirectoryUser
+	err := b.do(ctx, meta, http.MethodPatch, "/users/"+url.PathEscape(userID), nil, input, &output)
+	return output, err
+}
+
+// DeactivateUser 停用远程企业成员账号。
+func (b *Backend) DeactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.DirectoryUser, error) {
+	var output appservice.DirectoryUser
+	err := b.do(ctx, meta, http.MethodPost, "/users/"+url.PathEscape(userID)+"/deactivate", nil, nil, &output)
+	return output, err
+}
+
+// ReactivateUser 恢复远程企业成员账号。
+func (b *Backend) ReactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.DirectoryUser, error) {
+	var output appservice.DirectoryUser
+	err := b.do(ctx, meta, http.MethodPost, "/users/"+url.PathEscape(userID)+"/reactivate", nil, nil, &output)
+	return output, err
+}
+
+// ListTeams 返回远程企业团队列表。
+func (b *Backend) ListTeams(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamListInput) (appservice.TeamList, error) {
+	query := url.Values{}
+	setQuery(query, "query", input.Query)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	var output appservice.TeamList
+	err := b.do(ctx, meta, http.MethodGet, "/teams", query, nil, &output)
+	return output, err
+}
+
+// CreateTeam 创建远程企业团队。
+func (b *Backend) CreateTeam(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamInput) (appservice.Team, error) {
+	var output appservice.Team
+	err := b.do(ctx, meta, http.MethodPost, "/teams", nil, input, &output)
+	return output, err
+}
+
+// UpdateTeam 修改远程企业团队。
+func (b *Backend) UpdateTeam(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamInput) (appservice.Team, error) {
+	var output appservice.Team
+	err := b.do(ctx, meta, http.MethodPatch, "/teams/"+url.PathEscape(teamID), nil, input, &output)
+	return output, err
+}
+
+// DeleteTeam 删除远程企业团队。
+func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, teamID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID), nil, nil, nil)
+}
+
+// RemoveTeamMember 移出远程团队成员。
+func (b *Backend) RemoveTeamMember(ctx context.Context, meta appservice.RequestMeta, teamID string, identityType appservice.MemberIdentityType, identityID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID)+"/members/"+url.PathEscape(string(identityType))+"/"+url.PathEscape(identityID), nil, nil, nil)
 }
 
 // ListContacts 返回远程联系人列表。

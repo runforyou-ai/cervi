@@ -73,11 +73,13 @@ const enUS = {
     detecting: "Detecting…",
     connect: "Connect",
     connecting: "Connecting…",
-    connectionError: "Could not connect to this company server. Check the address and try again.",
+    connectionError:
+      "Could not connect to this company server. Check the address and try again.",
   },
   mobile: {
     title: "Mobile app in development",
-    description: "The mobile app will provide customer conversations and mobile collaboration.",
+    description:
+      "The mobile app will provide customer conversations and mobile collaboration.",
     organization: "Company",
     user: "Current user",
     logout: "Log out",
@@ -104,22 +106,29 @@ const enUS = {
   },
   contacts: {
     title: "Contacts",
-    scopeNavigation: "Contact categories",
+    scopeNavigation: "Directory categories",
     all: "All",
     create: "Add contact",
     anonymous: "Anonymous visitor",
     loading: "Loading…",
     retry: "Retry",
+    add: {
+      label: "Add",
+      member: "Add company member",
+      agent: "Add agent (coming soon)",
+      external: "Add external contact",
+    },
     scopes: {
-      internal: "Team members",
+      members: "Company members",
       external: "External contacts",
-      agents: "Agents",
     },
     channelTypes: {
       website: "Websites",
     },
     search: {
-      internal: "Search team members",
+      members: "Search company members",
+      agents: "Search agents",
+      identities: "Search company members or agents",
       external: "Search external contacts",
     },
     list: {
@@ -134,6 +143,7 @@ const enUS = {
       role: "Role",
       status: "Account status",
       workStatus: "Work status",
+      teams: "Teams",
       stage: "Stage",
       channels: "Channels",
       createdAt: "Created",
@@ -157,11 +167,19 @@ const enUS = {
       sort: "Sort",
       status: "Member status",
       role: "Member role",
+      category: "Category",
+      view: "Show",
+      activeContacts: "Current contacts",
       allStages: "All stages",
       allMethods: "All contact methods",
       allStatuses: "All statuses",
       allRoles: "All roles",
+      allCategories: "All categories",
       clear: "Clear all",
+    },
+    identityCategories: {
+      user: "Company members",
+      agent: "Agents",
     },
     sort: {
       updated: "Recently updated",
@@ -182,9 +200,86 @@ const enUS = {
       active: "Active",
       inactive: "Inactive",
     },
-    agents: {
-      emptyTitle: "No agents yet",
-      emptyDescription: "No agents are available.",
+    members: {
+      create: "Add member",
+      createDescription: "Create an account that can sign in to this company.",
+      form: {
+        name: "Name",
+        email: "Email",
+        password: "Initial password",
+        role: "Company role",
+        teams: "Teams",
+        noTeams: "There are no teams to select.",
+        save: "Save",
+        saving: "Saving…",
+        cancel: "Cancel",
+        created: "Company member added",
+        updated: "Company member saved",
+        networkError: "Could not connect to the server. Try again later.",
+      },
+      validation: {
+        nameRequired: "Enter a name.",
+        emailRequired: "Enter an email address.",
+        emailInvalid: "Enter a valid email address.",
+        passwordRequired: "Enter an initial password.",
+        passwordTooShort: "Password must contain at least 8 characters.",
+        passwordTooLong: "Password cannot exceed 72 UTF-8 bytes.",
+        roleRequired: "Select a company role.",
+      },
+      status: {
+        deactivate: "Deactivate",
+        reactivate: "Reactivate",
+        deactivateTitle: "Deactivate “{{name}}”?",
+        reactivateTitle: "Reactivate “{{name}}”?",
+        deactivateDescription:
+          "This member will no longer be able to sign in. Team memberships will be kept.",
+        reactivateDescription:
+          "This member can sign in again with the same team memberships.",
+        cancel: "Cancel",
+        confirm: "Confirm",
+        saving: "Updating…",
+        deactivated: "Company member deactivated",
+        reactivated: "Company member reactivated",
+        error: "Could not update the member status. Try again.",
+      },
+    },
+    teams: {
+      create: "Create team",
+      createDescription: "Enter a team name and description.",
+      edit: "Edit",
+      editDescription: "Update the team name and description.",
+      form: {
+        name: "Team name",
+        description: "Team description",
+        save: "Save",
+        saving: "Saving…",
+        cancel: "Cancel",
+        created: "Team created",
+        updated: "Team saved",
+        networkError: "Could not connect to the server. Try again later.",
+      },
+      validation: {
+        nameRequired: "Enter a team name.",
+        nameTooLong: "The team name cannot exceed 64 characters.",
+        descriptionTooLong:
+          "The team description cannot exceed 500 characters.",
+      },
+      members: {
+        remove: "Remove from team",
+        removeTitle: "Remove “{{name}}” from the team?",
+        removeDescription: "The member account will not be deactivated.",
+        removed: "Member removed from team",
+        removeError: "Could not remove the team member. Try again.",
+      },
+      delete: {
+        action: "Delete team",
+        title: "Delete “{{name}}”?",
+        description:
+          "{{count}} members will leave this team. Their accounts will not be deleted.",
+        confirm: "Delete team",
+        success: "Team deleted",
+        error: "Could not delete the team. Try again.",
+      },
     },
     detail: {
       action: "Details",
@@ -199,8 +294,8 @@ const enUS = {
       emailAndPhone: "Email and phone",
       otherInformation: "Other information",
       linkedChannels: "Linked channels",
-      memberTitle: "Team member",
-      memberDescription: "View an internal organization user.",
+      memberTitle: "Company member",
+      memberDescription: "View and edit a company member.",
       contactDescription: "View and edit an external contact.",
       loadError: "Could not load contact details.",
       channels: "Connected channels",
@@ -233,7 +328,8 @@ const enUS = {
     delete: {
       action: "Delete",
       title: "Move “{{name}}” to trash?",
-      description: "The contact will leave this list and can be restored from trash later.",
+      description:
+        "The contact will leave this list and can be restored from trash later.",
       cancel: "Cancel",
       confirm: "Move to trash",
       deleting: "Deleting…",
@@ -244,6 +340,12 @@ const enUS = {
       title: "Trash",
       empty: "Trash is empty",
       restore: "Restore",
+      restoreTitle: "Restore “{{name}}”?",
+      restoreDescription:
+        "The contact will leave trash and return to the current contacts list.",
+      restoreCancel: "Cancel",
+      restoreConfirm: "Restore contact",
+      restoring: "Restoring…",
       restored: "Contact restored",
       restoreError: "Could not restore the contact. Try again.",
     },
@@ -307,7 +409,8 @@ const enUS = {
     validation: {
       nameRequired: "Enter a channel name.",
       nameTooLong: "The channel name cannot exceed 100 characters.",
-      descriptionTooLong: "The channel description cannot exceed 2000 characters.",
+      descriptionTooLong:
+        "The channel description cannot exceed 2000 characters.",
     },
     usage: {
       embed: "Website embed",
@@ -401,7 +504,8 @@ const enUS = {
       validation: {
         currentPasswordRequired: "Enter your current password.",
         newPasswordRequired: "Enter a new password.",
-        newPasswordTooShort: "The new password must contain at least 8 characters.",
+        newPasswordTooShort:
+          "The new password must contain at least 8 characters.",
         newPasswordTooLong: "The new password cannot exceed 72 UTF-8 bytes.",
         confirmPasswordRequired: "Enter the new password again.",
         passwordMismatch: "The new passwords do not match.",
