@@ -7,12 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import {
-  isApiError,
-  recoverSession,
-  updateOrganization,
-  type Organization,
-} from "@/api"
+import { isApiError, updateOrganization, type Organization } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
@@ -21,6 +16,7 @@ import {
   type OrganizationSettingsFormValues,
 } from "@/features/settings/organization-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { recoverSession } from "@/lib/session-navigation"
 
 /** 显示并修改当前企业名称。 */
 export function OrganizationSettingsForm({
