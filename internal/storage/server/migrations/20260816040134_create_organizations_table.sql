@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建企业组织表。
+-- 创建企业表。
 CREATE TABLE organizations (
     id          uuid PRIMARY KEY DEFAULT uuidv7(),
     name        text NOT NULL,

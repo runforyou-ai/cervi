@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建网站渠道设置表，关联关系由 Action 维护。
+-- 创建网站渠道聊天界面设置表。
 CREATE TABLE website_channel_settings (
     channel_id          uuid PRIMARY KEY,
     organization_id     uuid NOT NULL,

@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建企业文件元数据表，文件内容保存在本地目录或对象存储。
+-- 创建企业文件元数据表。
 CREATE TABLE files (
     id                  uuid PRIMARY KEY DEFAULT uuidv7(),
     organization_id     uuid NOT NULL,

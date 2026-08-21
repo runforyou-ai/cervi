@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建企业设置表，关联关系由 Action 维护。
+-- 创建企业设置表。
 CREATE TABLE settings (
     organization_id  uuid NOT NULL,
     key              text NOT NULL,

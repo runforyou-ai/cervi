@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建联系人渠道身份表，关联关系由 Action 维护。
+-- 创建联系人渠道身份表。
 CREATE TABLE contact_channel_identities (
     id               uuid PRIMARY KEY DEFAULT uuidv7(),
     organization_id  uuid NOT NULL,

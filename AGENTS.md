@@ -105,7 +105,7 @@ cervi/
 
 - 本地 PostgreSQL 由所有工作区共享，不为单独工作区创建容器、端口或数据卷。
 - 重建库结构使用 `wails3 task migrate:reset`，或先回滚再 `migrate`；回滚和重建前先停止服务端。
-- 迁移文件按 `YYYYMMDDHHMMSS_说明.sql` 命名，按表拆分，不创建外键和 `CHECK` 约束。
+- 建表迁移按 `YYYYMMDDHHMMSS_create_<table>_table.sql` 命名，每个文件只创建一张表，不创建外键和 `CHECK` 约束。
 - 迁移中使用简洁中文 `COMMENT ON` 说明表和业务字段。
 
 ### 当前阶段

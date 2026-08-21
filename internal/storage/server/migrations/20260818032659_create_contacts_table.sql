@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建外部联系人表，关联关系由 Action 维护。
+-- 创建外部联系人表。
 CREATE TABLE contacts (
     id                  uuid PRIMARY KEY DEFAULT uuidv7(),
     organization_id     uuid NOT NULL,

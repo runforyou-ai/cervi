@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建登录令牌表，关联关系由 Action 维护。
+-- 创建登录令牌表。
 CREATE TABLE tokens (
     id          uuid PRIMARY KEY DEFAULT uuidv7(),
     user_id     uuid NOT NULL,
