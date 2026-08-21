@@ -103,7 +103,7 @@ export function UserPreferencesForm({
     }
   }
 
-  const { isDirty, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <form
@@ -174,7 +174,7 @@ export function UserPreferencesForm({
           )}
         />
         <div>
-          <Button type="submit" disabled={!isDirty || isSubmitting}>
+          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
             {isSubmitting ? t("preferences.saving") : t("preferences.save")}
           </Button>

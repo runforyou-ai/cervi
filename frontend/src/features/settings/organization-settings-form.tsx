@@ -87,7 +87,7 @@ export function OrganizationSettingsForm({
     }
   }
 
-  const { isDirty, isSubmitting } = form.formState
+  const { isSubmitting } = form.formState
 
   return (
     <form
@@ -102,7 +102,7 @@ export function OrganizationSettingsForm({
           label={t("organization.form.name")}
           autoFocus
         />
-        <Button type="submit" disabled={!isDirty || isSubmitting}>
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
           {isSubmitting
             ? t("organization.form.saving")
