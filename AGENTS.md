@@ -88,7 +88,8 @@ cervi/
 - `frontend/bindings` 由上方绑定命令生成，禁止手工修改，也不得用不同格式覆盖。
 - 页面只通过 `src/api` 调用绑定：`client` 注入认证与错误，`service` 绑定方法并归一化可空切片。页面不直接引用 `frontend/bindings`。
 - 前端只保留表单值、组件 Props、页面状态、查询参数派生类型，以及对生成类型中可空切片的边界归一化类型。
-- 表单使用 React Hook Form、Zod 和统一错误展示组件。输入框不使用 placeholder；字段含义由标签表达，必要说明用字段帮助文案。
+- 表单使用 React Hook Form 和 Zod，并统一启用 `shouldUseNativeValidation`。客户端字段校验只通过浏览器在对应输入控件上提示，不在字段下方渲染 `FieldError`，也不同时弹出 Toast；服务端业务错误通过 Toast 展示，不使用 `setError` 回写字段。
+- 输入框不使用 placeholder；字段含义由标签表达，必要说明用字段帮助文案。
 - 页面卸载时忽略过期结果，不要取消 Wails 绑定调用。
 
 ### 认证与多端

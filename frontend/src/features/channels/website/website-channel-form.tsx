@@ -19,7 +19,6 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
   Field,
-  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -129,7 +128,6 @@ export function WebsiteChannelForm({
                 id={field.name}
                 aria-invalid={fieldState.invalid}
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -151,7 +149,6 @@ export function WebsiteChannelForm({
                 <option value={Locale.LocaleChineseSimplified}>{t("locales.zhCN")}</option>
                 <option value={Locale.LocaleEnglishUnitedStates}>{t("locales.enUS")}</option>
               </NativeSelect>
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />

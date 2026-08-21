@@ -75,12 +75,7 @@ export function OrganizationSettingsForm({
         error,
       })
       if (isApiError(error)) {
-        const message = error.fields.name
-        if (message) {
-          form.setError("name", { message }, { shouldFocus: true })
-          return
-        }
-        toast.error(apiErrorMessage(error))
+        toast.error(apiErrorMessage(error, ["name"]))
         return
       }
       toast.error(t("organization.saveError"))
