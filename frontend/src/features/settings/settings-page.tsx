@@ -67,7 +67,7 @@ export function SystemSettingsPage({
   section,
   children,
 }: {
-  section: "organization" | "roles" | "storage"
+  section: "organization" | "aiProviders" | "roles" | "storage"
   children?: ReactNode
 }) {
   const { t } = useTranslation("settings")
@@ -85,6 +85,9 @@ export function SystemSettingsPage({
         >
           <PagePaneLink to="/settings/organization">
             {t("navigation.organization")}
+          </PagePaneLink>
+          <PagePaneLink to="/settings/ai-providers">
+            {t("navigation.aiProviders")}
           </PagePaneLink>
           <PagePaneLink to="/settings/roles">
             {t("navigation.roles")}
@@ -106,6 +109,10 @@ export function SystemSettingsPage({
                 organization={identity.organization}
                 onUpdated={updateOrganization}
               />
+            ) : section === "aiProviders" ? (
+              <p className="text-sm text-muted-foreground">
+                {t("aiProviders.placeholder")}
+              </p>
             ) : (
               <StorageSettingsForm />
             )}

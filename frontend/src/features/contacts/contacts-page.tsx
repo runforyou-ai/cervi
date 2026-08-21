@@ -42,7 +42,7 @@ import {
   listUsers,
   reactivateUser,
   deleteTeam,
-  removeTeamMember,
+  removeTeamMembers,
   restoreContact,
   type ChannelSummary,
   type ContactDetail,
@@ -52,6 +52,7 @@ import {
   type PageInfo,
   type RoleData,
   type Team,
+  type TeamSummary,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
@@ -66,12 +67,6 @@ import { PageHeader } from "@/components/page-header"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -117,11 +112,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { ContactForm } from "@/features/contacts/contact-form"
 import { ContactDetailView } from "@/features/contacts/contact-detail"
 import { MemberDetailView } from "@/features/contacts/member-detail"
 import { MemberForm } from "@/features/contacts/member-form"
 import { TeamForm } from "@/features/contacts/team-form"
+import { TeamMemberPicker } from "@/features/contacts/team-member-picker"
 import { roleDisplayName } from "@/features/roles/role-labels"
 import { useWorkspace } from "@/features/workspace/workspace-context"
 import {
@@ -142,6 +143,49 @@ const contactNavLeafActiveClass =
 const contactNavPathActiveClass = "font-medium text-sidebar-accent-foreground"
 const contactNavSubitemClass =
   "flex h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors"
+
+/** 显示团队摘要，并在悬停或聚焦时逐行列出全部团队。 */
+function JoinedTeamsCell({ teams }: { teams: TeamSummary[] }) {
+  const { t } = useTranslation("contacts")
+
+  if (teams.length === 0) return "—"
+
+  const summary =
+    teams.length === 1
+      ? teams[0].name
+      : teams.length === 2
+        ? t("teams.joinedPair", {
+            first: teams[0].name,
+            second: teams[1].name,
+          })
+        : t("teams.joinedSummary", {
+            first: teams[0].name,
+            second: teams[1].name,
+            count: teams.length,
+          })
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className="block max-w-xs cursor-help truncate outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {summary}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={4} className="max-w-xs">
+        <ul className="grid gap-1 text-left">
+          {teams.map((team) => (
+            <li key={team.id} className="break-words">
+              {team.name}
+            </li>
+          ))}
+        </ul>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
 
 /** 通讯录子分类按钮。 */
 const SubscopeButton = forwardRef<
@@ -182,7 +226,6 @@ function ContactScopeSidebar({
   channels,
   teamId,
   teams,
-  onDeleteTeam,
 }: {
   scope: ContactScope
   deleted: boolean
@@ -190,7 +233,6 @@ function ContactScopeSidebar({
   channels: ChannelSummary[]
   teamId: string
   teams: Team[]
-  onDeleteTeam: (team: Team) => void
 }) {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
@@ -264,34 +306,14 @@ function ContactScopeSidebar({
             {t("all")}
           </SubscopeButton>
           {teams.map((team) => (
-            <ContextMenu key={team.id}>
-              <ContextMenuTrigger asChild>
-                <SubscopeButton
-                  active={scope === "members" && teamId === team.id}
-                  icon={PanelsTopLeftIcon}
-                  onClick={() =>
-                    navigate(`/contacts/members?teamId=${team.id}`)
-                  }
-                >
-                  {team.name}
-                </SubscopeButton>
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem
-                  onSelect={() =>
-                    navigate(`/contacts/members?teamId=${team.id}&editTeam=1`)
-                  }
-                >
-                  {t("teams.edit")}
-                </ContextMenuItem>
-                <ContextMenuItem
-                  destructive
-                  onSelect={() => onDeleteTeam(team)}
-                >
-                  {t("teams.delete.action")}
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
+            <SubscopeButton
+              key={team.id}
+              active={scope === "members" && teamId === team.id}
+              icon={PanelsTopLeftIcon}
+              onClick={() => navigate(`/contacts/members?teamId=${team.id}`)}
+            >
+              {team.name}
+            </SubscopeButton>
           ))}
         </CollapsibleContent>
       </Collapsible>
@@ -467,8 +489,12 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [changingUserStatus, setChangingUserStatus] =
     useState<DirectoryUserData | null>(null)
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
-  const [removingTeamMember, setRemovingTeamMember] =
-    useState<DirectoryUserData | null>(null)
+  const [removingTeamMembers, setRemovingTeamMembers] = useState<
+    DirectoryUserData[]
+  >([])
+  const [selectedTeamMemberIDs, setSelectedTeamMemberIDs] = useState<
+    Set<string>
+  >(new Set())
   const [deleting, setDeleting] = useState(false)
   const detailTitleRef = useRef<HTMLHeadingElement>(null)
   const catalogRequestID = useRef(0)
@@ -479,6 +505,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const creating = searchParams.get("new") === "1"
   const creatingTeam = searchParams.get("newTeam") === "1"
   const editingTeam = searchParams.get("editTeam") === "1"
+  const addingTeamMembers = searchParams.get("addMembers") === "1"
   const channelId = searchParams.get("channelId") ?? ""
   const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
   const methodType = optionalWailsEnum(
@@ -524,6 +551,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   )
 
   useEffect(() => setSearch(query), [query])
+  useEffect(() => {
+    setSelectedTeamMemberIDs(new Set())
+  }, [category, currentPage, query, roleId, status, teamId])
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       if (search !== query) {
@@ -796,18 +826,30 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     }
   }
 
-  /** 将企业成员移出当前团队。 */
-  async function removeMemberFromCurrentTeam() {
-    if (!selectedTeam || !removingTeamMember) return
+  /** 将选中的企业成员批量移出当前团队。 */
+  async function removeMembersFromCurrentTeam() {
+    if (!selectedTeam || removingTeamMembers.length === 0) return
     setDeleting(true)
     try {
-      await removeTeamMember(
-        selectedTeam.id,
-        MemberIdentityType.MemberIdentityTypeUser,
-        removingTeamMember.id,
+      const saved = await removeTeamMembers(selectedTeam.id, {
+        members: removingTeamMembers.map((member) => ({
+          identityType: MemberIdentityType.MemberIdentityTypeUser,
+          identityId: member.id,
+        })),
+      })
+      setTeams((current) =>
+        current.map((team) => (team.id === saved.id ? saved : team)),
       )
-      setRemovingTeamMember(null)
-      toast.success(t("teams.members.removed"))
+      toast.success(
+        t(
+          removingTeamMembers.length === 1
+            ? "teams.members.removed"
+            : "teams.members.removedMultiple",
+          { count: removingTeamMembers.length },
+        ),
+      )
+      setRemovingTeamMembers([])
+      setSelectedTeamMemberIDs(new Set())
       setRefreshVersion((current) => current + 1)
     } catch (error) {
       if (recoverSession(error, navigate)) return
@@ -828,6 +870,29 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       roleId ||
       category === MemberIdentityType.MemberIdentityTypeAgent,
   )
+  const allVisibleTeamMembersSelected =
+    users.length > 0 &&
+    users.every((user) => selectedTeamMemberIDs.has(user.id))
+
+  /** 切换当前页所有团队成员的选中状态。 */
+  function toggleAllVisibleTeamMembers(checked: boolean) {
+    setSelectedTeamMemberIDs(
+      checked ? new Set(users.map((user) => user.id)) : new Set(),
+    )
+  }
+
+  /** 切换单个团队成员的选中状态。 */
+  function toggleTeamMember(userID: string, checked: boolean) {
+    setSelectedTeamMemberIDs((current) => {
+      const next = new Set(current)
+      if (checked) {
+        next.add(userID)
+      } else {
+        next.delete(userID)
+      }
+      return next
+    })
+  }
 
   return (
     <PageSplit
@@ -841,7 +906,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
           channels={channels}
           teamId={teamId}
           teams={teams}
-          onDeleteTeam={setDeletingTeam}
         />
       }
     >
@@ -873,7 +937,60 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
               </NativeSelect>
             </div>
           }
-        />
+        >
+          {selectedTeam ? (
+            <>
+              {selectedTeamMemberIDs.size > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setRemovingTeamMembers(
+                      users.filter((user) =>
+                        selectedTeamMemberIDs.has(user.id),
+                      ),
+                    )
+                  }
+                >
+                  {t("teams.members.removeSelected", {
+                    count: selectedTeamMemberIDs.size,
+                  })}
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                onClick={() => setParameters({ addMembers: "1" })}
+              >
+                {t("teams.members.add")}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("teams.more")}
+                    title={t("teams.more")}
+                  >
+                    <MoreHorizontalIcon />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={() => setParameters({ editTeam: "1" })}
+                  >
+                    {t("teams.edit")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    destructive
+                    onSelect={() => setDeletingTeam(selectedTeam)}
+                  >
+                    {t("teams.delete.action")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : null}
+        </PageHeader>
 
         <ListToolbar>
           <ListToolbarSearch
@@ -1113,9 +1230,22 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 <TableHeader>
                   {scope === "members" ? (
                     <TableRow className="hover:bg-transparent">
+                      {selectedTeam ? (
+                        <TableHead className="w-10">
+                          <input
+                            type="checkbox"
+                            className="size-4 accent-primary"
+                            aria-label={t("teams.members.selectAll")}
+                            checked={allVisibleTeamMembersSelected}
+                            onChange={(event) =>
+                              toggleAllVisibleTeamMembers(event.target.checked)
+                            }
+                          />
+                        </TableHead>
+                      ) : null}
                       <TableHead>{t("columns.name")}</TableHead>
                       <TableHead>{t("columns.email")}</TableHead>
-                      <TableHead>{t("columns.teams")}</TableHead>
+                      <TableHead>{t("columns.joinedTeams")}</TableHead>
                       <TableHead>{t("columns.role")}</TableHead>
                       <TableHead>{t("columns.status")}</TableHead>
                       <TableHead className="text-right">
@@ -1146,6 +1276,24 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                   users.length > 0
                     ? users.map((user) => (
                         <TableRow key={user.id}>
+                          {selectedTeam ? (
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                className="size-4 accent-primary"
+                                aria-label={t("teams.members.selectMember", {
+                                  name: user.displayName,
+                                })}
+                                checked={selectedTeamMemberIDs.has(user.id)}
+                                onChange={(event) =>
+                                  toggleTeamMember(
+                                    user.id,
+                                    event.target.checked,
+                                  )
+                                }
+                              />
+                            </TableCell>
+                          ) : null}
                           <TableCell className="font-medium">
                             {user.displayName}
                           </TableCell>
@@ -1153,11 +1301,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                             {user.email}
                           </TableCell>
                           <TableCell className="max-w-xs">
-                            {user.teams.length > 0
-                              ? user.teams
-                                  .map((team) => team.name)
-                                  .join("、")
-                              : "—"}
+                            <JoinedTeamsCell teams={user.teams} />
                           </TableCell>
                           <TableCell>
                             {roleDisplayName(user.role, tCommon)}
@@ -1194,7 +1338,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                                   {selectedTeam ? (
                                     <DropdownMenuItem
                                       onSelect={() =>
-                                        setRemovingTeamMember(user)
+                                        setRemovingTeamMembers([user])
                                       }
                                     >
                                       {t("teams.members.remove")}
@@ -1299,7 +1443,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                   (scope === "external" && contacts.length === 0) ? (
                     <TableRow className="hover:bg-transparent">
                       <TableCell
-                        colSpan={scope === "members" ? 6 : 7}
+                        colSpan={
+                          scope === "members" ? (selectedTeam ? 7 : 6) : 7
+                        }
                         className="h-32 text-center text-muted-foreground"
                       >
                         {deleted ? t("trash.empty") : t("list.empty")}
@@ -1453,18 +1599,18 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={editingTeam && Boolean(selectedTeam)}
-        onOpenChange={(open) => !open && setParameters({ editTeam: null })}
-      >
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{t("teams.edit")}</DialogTitle>
-            <DialogDescription>
-              {t("teams.createDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedTeam ? (
+      {selectedTeam ? (
+        <Dialog
+          open={editingTeam}
+          onOpenChange={(open) => !open && setParameters({ editTeam: null })}
+        >
+          <DialogContent className="max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{t("teams.edit")}</DialogTitle>
+              <DialogDescription>
+                {t("teams.createDescription")}
+              </DialogDescription>
+            </DialogHeader>
             <TeamForm
               team={selectedTeam}
               onSaved={(saved) => {
@@ -1475,9 +1621,38 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
               }}
               onCancel={() => setParameters({ editTeam: null })}
             />
-          ) : null}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {selectedTeam ? (
+        <Dialog
+          open={addingTeamMembers}
+          onOpenChange={(open) => !open && setParameters({ addMembers: null })}
+        >
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{t("teams.members.add")}</DialogTitle>
+              <DialogDescription>
+                {t("teams.members.addDescription", {
+                  name: selectedTeam.name,
+                })}
+              </DialogDescription>
+            </DialogHeader>
+            <TeamMemberPicker
+              team={selectedTeam}
+              onSaved={(saved) => {
+                setTeams((current) =>
+                  current.map((team) => (team.id === saved.id ? saved : team)),
+                )
+                setParameters({ addMembers: null })
+                setRefreshVersion((current) => current + 1)
+              }}
+              onCancel={() => setParameters({ addMembers: null })}
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       <AlertDialog
         open={deletingTeam !== null}
@@ -1507,25 +1682,33 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       </AlertDialog>
 
       <AlertDialog
-        open={removingTeamMember !== null}
-        onOpenChange={(open) => !open && setRemovingTeamMember(null)}
+        open={removingTeamMembers.length > 0}
+        onOpenChange={(open) => !open && setRemovingTeamMembers([])}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("teams.members.removeTitle", {
-                name: removingTeamMember?.displayName ?? "",
-              })}
+              {removingTeamMembers.length === 1
+                ? t("teams.members.removeTitle", {
+                    name: removingTeamMembers[0].displayName,
+                  })
+                : t("teams.members.removeMultipleTitle", {
+                    count: removingTeamMembers.length,
+                  })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("teams.members.removeDescription")}
+              {t(
+                removingTeamMembers.length === 1
+                  ? "teams.members.removeDescription"
+                  : "teams.members.removeMultipleDescription",
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("teams.form.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
-              onClick={() => void removeMemberFromCurrentTeam()}
+              onClick={() => void removeMembersFromCurrentTeam()}
             >
               {t("teams.members.remove")}
             </AlertDialogAction>

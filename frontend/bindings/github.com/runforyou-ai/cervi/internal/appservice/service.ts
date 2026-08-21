@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * AddTeamMembers 将企业成员批量加入团队。
+ */
+export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
+    return $Call.ByID(1201335915, meta, teamID, input);
+}
+
+/**
  * ChangePassword 核验当前密码并保存新密码。
  */
 export function ChangePassword(meta: $models.RequestMeta, input: $models.ChangePasswordInput): $CancellablePromise<void> {
@@ -183,6 +190,13 @@ export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
+ * ListTeamMemberCandidates 返回尚未加入团队的企业成员。
+ */
+export function ListTeamMemberCandidates(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberCandidateInput): $CancellablePromise<$models.TeamMemberCandidateList> {
+    return $Call.ByID(1106825595, meta, teamID, input);
+}
+
+/**
  * ListTeams 返回企业团队列表。
  */
 export function ListTeams(meta: $models.RequestMeta, input: $models.TeamListInput): $CancellablePromise<$models.TeamList> {
@@ -253,10 +267,10 @@ export function ReactivateUser(meta: $models.RequestMeta, userID: string): $Canc
 }
 
 /**
- * RemoveTeamMember 移出团队成员。
+ * RemoveTeamMembers 将企业成员批量移出团队。
  */
-export function RemoveTeamMember(meta: $models.RequestMeta, teamID: string, identityType: $models.MemberIdentityType, identityID: string): $CancellablePromise<void> {
-    return $Call.ByID(2159012173, meta, teamID, identityType, identityID);
+export function RemoveTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
+    return $Call.ByID(3538693274, meta, teamID, input);
 }
 
 /**
