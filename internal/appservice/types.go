@@ -58,6 +58,14 @@ const (
 	UserStatusInactive UserStatus = UserStatus(domain.UserStatusInactive)
 )
 
+// MemberIdentityType 表示可以加入团队的一等身份类型。
+type MemberIdentityType string
+
+const (
+	MemberIdentityTypeUser  MemberIdentityType = MemberIdentityType(domain.MemberIdentityTypeUser)
+	MemberIdentityTypeAgent MemberIdentityType = MemberIdentityType(domain.MemberIdentityTypeAgent)
+)
+
 // WorkStatus 表示成员主动设置的工作状态。
 type WorkStatus string
 
@@ -360,25 +368,79 @@ type UserListInput struct {
 	Query    string      `json:"query"`
 	Status   *UserStatus `json:"status,omitempty"`
 	Role     *UserRole   `json:"role,omitempty"`
+	TeamID   string      `json:"teamId"`
 	Page     int         `json:"page"`
 	PageSize int         `json:"pageSize"`
 }
 
+// CreateUserInput 定义新增企业成员字段。
+type CreateUserInput struct {
+	DisplayName string   `json:"displayName"`
+	Email       string   `json:"email"`
+	Password    string   `json:"password"`
+	Role        UserRole `json:"role"`
+	TeamIDs     []string `json:"teamIds"`
+}
+
+// UpdateDirectoryUserInput 定义企业成员可编辑字段。
+type UpdateDirectoryUserInput struct {
+	DisplayName string   `json:"displayName"`
+	Email       string   `json:"email"`
+	Role        UserRole `json:"role"`
+	TeamIDs     []string `json:"teamIds"`
+}
+
+// TeamSummary 定义团队选择项和成员所属团队字段。
+type TeamSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // DirectoryUser 定义企业成员目录字段。
 type DirectoryUser struct {
-	ID          string     `json:"id"`
-	Email       string     `json:"email"`
-	DisplayName string     `json:"displayName"`
-	Role        UserRole   `json:"role"`
-	Status      UserStatus `json:"status"`
-	WorkStatus  WorkStatus `json:"workStatus"`
-	CreatedAt   time.Time  `json:"createdAt"`
+	ID          string        `json:"id"`
+	Email       string        `json:"email"`
+	DisplayName string        `json:"displayName"`
+	Role        UserRole      `json:"role"`
+	Status      UserStatus    `json:"status"`
+	WorkStatus  WorkStatus    `json:"workStatus"`
+	Teams       []TeamSummary `json:"teams"`
+	CreatedAt   time.Time     `json:"createdAt"`
 }
 
 // UserList 定义企业成员分页结果。
 type UserList struct {
 	Users []DirectoryUser `json:"users"`
 	Page  PageInfo        `json:"page"`
+}
+
+// TeamInput 定义团队可编辑字段。
+type TeamInput struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// Team 定义团队详情。
+type Team struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	MemberCount int       `json:"memberCount"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// TeamListInput 定义团队列表查询条件。
+type TeamListInput struct {
+	Query    string `json:"query"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"pageSize"`
+}
+
+// TeamList 定义团队分页结果。
+type TeamList struct {
+	Teams []Team   `json:"teams"`
+	Page  PageInfo `json:"page"`
 }
 
 // ContactMethodInput 定义联系人联系方式输入。

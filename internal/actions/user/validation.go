@@ -13,7 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// ValidationCode 标识用户设置字段校验结果。
+// ValidationCode 标识用户字段校验结果。
 type ValidationCode = common.FieldCode
 
 const (
@@ -26,9 +26,12 @@ const (
 	ValidationLocaleInvalid            ValidationCode = "LOCALE_INVALID"
 	ValidationTimeZoneInvalid          ValidationCode = "TIME_ZONE_INVALID"
 	ValidationWorkStatusInvalid        ValidationCode = "WORK_STATUS_INVALID"
+	ValidationRoleInvalid              ValidationCode = "USER_ROLE_INVALID"
+	ValidationTeamInvalid              ValidationCode = "USER_TEAM_INVALID"
+	ValidationStatusInvalid            ValidationCode = "USER_STATUS_INVALID"
 )
 
-// ValidationError 表示用户设置字段校验失败。
+// ValidationError 表示用户字段校验失败。
 type ValidationError = common.FieldError
 
 // ProfileInput 定义当前用户可编辑的个人资料字段。
@@ -36,6 +39,34 @@ type ProfileInput struct {
 	DisplayName  string
 	Email        string
 	AvatarFileID string
+}
+
+// normalizeCreateInput 规范化并校验新增企业成员字段。
+func normalizeCreateInput(input CreateInput) (CreateInput, map[string]ValidationCode) {
+	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
+	input.DisplayName = profile.DisplayName
+	input.Email = profile.Email
+	if input.Role != domain.UserRoleAdmin && input.Role != domain.UserRoleMember {
+		fields["role"] = ValidationRoleInvalid
+	}
+	switch err := commonpassword.Validate(input.Password); {
+	case errors.Is(err, commonpassword.ErrTooShort):
+		fields["password"] = ValidationPasswordTooShort
+	case errors.Is(err, commonpassword.ErrTooLong):
+		fields["password"] = ValidationPasswordTooLong
+	}
+	return input, fields
+}
+
+// normalizeUpdateInput 规范化并校验企业成员字段。
+func normalizeUpdateInput(input UpdateInput) (UpdateInput, map[string]ValidationCode) {
+	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
+	input.DisplayName = profile.DisplayName
+	input.Email = profile.Email
+	if input.Role != domain.UserRoleAdmin && input.Role != domain.UserRoleMember {
+		fields["role"] = ValidationRoleInvalid
+	}
+	return input, fields
 }
 
 // ChangePasswordInput 定义当前用户修改密码所需字段。

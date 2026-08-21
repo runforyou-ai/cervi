@@ -61,7 +61,16 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/channels/website/:channelID/restore", service.restoreWebsiteChannel)
 	router.GET("/channels", service.listChannels)
 	router.GET("/users", service.listUsers)
+	router.POST("/users", service.createUser)
 	router.GET("/users/:userID", service.getUser)
+	router.PATCH("/users/:userID", service.updateUser)
+	router.POST("/users/:userID/deactivate", service.deactivateUser)
+	router.POST("/users/:userID/reactivate", service.reactivateUser)
+	router.GET("/teams", service.listTeams)
+	router.POST("/teams", service.createTeam)
+	router.PATCH("/teams/:teamID", service.updateTeam)
+	router.DELETE("/teams/:teamID", service.deleteTeam)
+	router.DELETE("/teams/:teamID/members/:identityType/:identityID", service.removeTeamMember)
 	router.GET("/contacts", service.listContacts)
 	router.GET("/contacts/trash", service.listDeletedContacts)
 	router.POST("/contacts", service.createContact)
@@ -255,7 +264,7 @@ func (s *Service) listUsers(c *gin.Context) {
 		return
 	}
 	users, err := s.application.ListUsers(c.Request.Context(), requestMeta(c), appservice.UserListInput{
-		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Role: optionalEnum[appservice.UserRole](c.Query("role")), Page: page, PageSize: pageSize,
+		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Role: optionalEnum[appservice.UserRole](c.Query("role")), TeamID: c.Query("teamId"), Page: page, PageSize: pageSize,
 	})
 	writeResult(c, http.StatusOK, users, err)
 }
@@ -263,6 +272,73 @@ func (s *Service) listUsers(c *gin.Context) {
 func (s *Service) getUser(c *gin.Context) {
 	user, err := s.application.GetUser(c.Request.Context(), requestMeta(c), c.Param("userID"))
 	writeResult(c, http.StatusOK, user, err)
+}
+
+func (s *Service) createUser(c *gin.Context) {
+	var input appservice.CreateUserInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	user, err := s.application.CreateUser(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, user, err)
+}
+
+func (s *Service) updateUser(c *gin.Context) {
+	var input appservice.UpdateDirectoryUserInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	user, err := s.application.UpdateUser(c.Request.Context(), requestMeta(c), c.Param("userID"), input)
+	writeResult(c, http.StatusOK, user, err)
+}
+
+func (s *Service) deactivateUser(c *gin.Context) {
+	user, err := s.application.DeactivateUser(c.Request.Context(), requestMeta(c), c.Param("userID"))
+	writeResult(c, http.StatusOK, user, err)
+}
+
+func (s *Service) reactivateUser(c *gin.Context) {
+	user, err := s.application.ReactivateUser(c.Request.Context(), requestMeta(c), c.Param("userID"))
+	writeResult(c, http.StatusOK, user, err)
+}
+
+func (s *Service) listTeams(c *gin.Context) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return
+	}
+	teams, err := s.application.ListTeams(c.Request.Context(), requestMeta(c), appservice.TeamListInput{Query: c.Query("query"), Page: page, PageSize: pageSize})
+	writeResult(c, http.StatusOK, teams, err)
+}
+
+func (s *Service) createTeam(c *gin.Context) {
+	var input appservice.TeamInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	team, err := s.application.CreateTeam(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, team, err)
+}
+
+func (s *Service) updateTeam(c *gin.Context) {
+	var input appservice.TeamInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	team, err := s.application.UpdateTeam(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
+	writeResult(c, http.StatusOK, team, err)
+}
+
+func (s *Service) deleteTeam(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteTeam(c.Request.Context(), requestMeta(c), c.Param("teamID")))
+}
+
+func (s *Service) removeTeamMember(c *gin.Context) {
+	writeEmpty(c, s.application.RemoveTeamMember(c.Request.Context(), requestMeta(c), c.Param("teamID"), appservice.MemberIdentityType(c.Param("identityType")), c.Param("identityID")))
 }
 
 func (s *Service) listContacts(c *gin.Context) {

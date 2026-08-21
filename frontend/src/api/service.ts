@@ -4,8 +4,12 @@ import {
   CompleteFileUpload,
   CreateContact,
   CreateFileUpload,
+  CreateTeam,
+  CreateUser,
+  DeactivateUser,
   CreateWebsiteChannel,
   DeleteContact,
+  DeleteTeam,
   DeleteWebsiteChannel,
   GetContact,
   GetS3Setting,
@@ -13,15 +17,20 @@ import {
   GetWebsiteChannel,
   ListChannels,
   ListContacts,
+  ListTeams,
   ListUsers,
   ListWebsiteChannels,
   LoadInbox,
+  ReactivateUser,
+  RemoveTeamMember,
   RestoreContact,
   RestoreWebsiteChannel,
   SaveS3Setting,
   SelectProfileImage,
   TestS3Setting,
   UpdateContact,
+  UpdateTeam,
+  UpdateUser,
   UpdateOrganization,
   UpdateProfile,
   UpdateUserPreferences,
@@ -37,17 +46,19 @@ import {
   type ContactList,
   type ContactListInput,
   type Conversation as GeneratedConversation,
+  type CreateUserInput,
+  type DirectoryUser,
   type Inbox,
+  type TeamListInput,
+  type UpdateDirectoryUserInput,
+  type UserList,
   type UserListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 
 export * from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 
-export type StorageProviderId = Exclude<
-  StorageProvider,
-  StorageProvider.$zero
->
+export type StorageProviderId = Exclude<StorageProvider, StorageProvider.$zero>
 
 export type ContactDetail = Omit<Contact, "methods" | "channelIdentities"> & {
   methods: NonNullable<Contact["methods"]>
@@ -61,6 +72,16 @@ export type ContactListResponse = Omit<ContactList, "contacts"> & {
 export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
 
 export type UserListQuery = Partial<UserListInput>
+
+export type TeamListQuery = Partial<TeamListInput>
+
+export type DirectoryUserData = Omit<DirectoryUser, "teams"> & {
+  teams: NonNullable<DirectoryUser["teams"]>
+}
+
+export type UserListResponse = Omit<UserList, "users"> & {
+  users: DirectoryUserData[]
+}
 
 export type ConversationData = Omit<GeneratedConversation, "messages"> & {
   messages: NonNullable<GeneratedConversation["messages"]>
@@ -88,8 +109,14 @@ export const deleteWebsiteChannel = bind(DeleteWebsiteChannel)
 export const restoreWebsiteChannel = bind(RestoreWebsiteChannel)
 /** 将联系人移入回收站。 */
 export const deleteContact = bind(DeleteContact)
-/** 读取企业成员详情。 */
-export const getUser = bind(GetUser)
+/** 创建企业团队。 */
+export const createTeam = bind(CreateTeam)
+/** 修改企业团队。 */
+export const updateTeam = bind(UpdateTeam)
+/** 删除企业团队。 */
+export const deleteTeam = bind(DeleteTeam)
+/** 移出团队成员。 */
+export const removeTeamMember = bind(RemoveTeamMember)
 /** 读取对象存储设置。 */
 export const getS3Setting = bind(GetS3Setting)
 /** 修改当前企业名称。 */
@@ -116,6 +143,12 @@ export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
 const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)
 const listUsersBound = bind(ListUsers)
+const listTeamsBound = bind(ListTeams)
+const getUserBound = bind(GetUser)
+const createUserBound = bind(CreateUser)
+const updateUserBound = bind(UpdateUser)
+const deactivateUserBound = bind(DeactivateUser)
+const reactivateUserBound = bind(ReactivateUser)
 const listContactsBound = bind(ListContacts)
 const getContactBound = bind(GetContact)
 const createContactBound = bind(CreateContact)
@@ -126,6 +159,36 @@ const loadInboxBound = bind(LoadInbox)
 /** 把可空切片转换为空数组。 */
 function asList<T>(value: T[] | null | undefined): T[] {
   return value ?? []
+}
+
+/** 归一化企业成员所属团队。 */
+function normalizeDirectoryUser(user: DirectoryUser): DirectoryUserData {
+  return { ...user, teams: asList(user.teams) }
+}
+
+/** 读取企业成员详情。 */
+export function getUser(userId: string, signal?: AbortSignal) {
+  return getUserBound(userId, signal).then(normalizeDirectoryUser)
+}
+
+/** 创建企业成员账号。 */
+export function createUser(input: CreateUserInput) {
+  return createUserBound(input).then(normalizeDirectoryUser)
+}
+
+/** 修改企业成员资料、角色和所属团队。 */
+export function updateUser(userId: string, input: UpdateDirectoryUserInput) {
+  return updateUserBound(userId, input).then(normalizeDirectoryUser)
+}
+
+/** 停用企业成员账号。 */
+export function deactivateUser(userId: string) {
+  return deactivateUserBound(userId).then(normalizeDirectoryUser)
+}
+
+/** 恢复企业成员账号。 */
+export function reactivateUser(userId: string) {
+  return reactivateUserBound(userId).then(normalizeDirectoryUser)
 }
 
 /** 读取当前企业的渠道选择项。 */
@@ -183,11 +246,27 @@ export function listUsers(query: UserListQuery, signal?: AbortSignal) {
       query: query.query ?? "",
       status: query.status ?? null,
       role: query.role ?? null,
+      teamId: query.teamId ?? "",
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 50,
     },
     signal,
-  ).then((output) => ({ ...output, users: asList(output.users) }))
+  ).then((output) => ({
+    ...output,
+    users: asList(output.users).map(normalizeDirectoryUser),
+  }))
+}
+
+/** 读取企业团队列表。 */
+export function listTeams(query: TeamListQuery = {}, signal?: AbortSignal) {
+  return listTeamsBound(
+    {
+      query: query.query ?? "",
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 50,
+    },
+    signal,
+  ).then((output) => ({ ...output, teams: asList(output.teams) }))
 }
 
 /** 读取统一收件箱。 */

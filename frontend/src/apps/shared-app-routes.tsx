@@ -17,11 +17,7 @@ import {
 import { WorkspaceLayout } from "@/features/workspace/workspace-layout"
 
 /** 按平台注册登录、工作台和业务页面路由。 */
-export function SharedAppRoutes({
-  platform,
-}: {
-  platform: "web" | "desktop"
-}) {
+export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/inbox" replace />} />
@@ -33,14 +29,10 @@ export function SharedAppRoutes({
       ) : null}
       <Route
         path="/login"
-        element={
-          <LoginPage allowServerChange={platform === "desktop"} />
-        }
+        element={<LoginPage allowServerChange={platform === "desktop"} />}
       />
       <Route
-        element={
-          <WorkspaceLayout allowServerChange={platform === "desktop"} />
-        }
+        element={<WorkspaceLayout allowServerChange={platform === "desktop"} />}
       >
         <Route path="/inbox" element={<InboxRoute />} />
         <Route
@@ -73,23 +65,15 @@ export function SharedAppRoutes({
         />
         <Route
           path="/contacts"
-          element={<Navigate to="/contacts/internal" replace />}
+          element={<Navigate to="/contacts/members" replace />}
         />
         <Route
-          path="/contacts/internal"
-          element={<ContactsPage scope="internal" />}
+          path="/contacts/members"
+          element={<ContactsPage scope="members" />}
         />
         <Route
           path="/contacts/external"
           element={<ContactsPage scope="external" />}
-        />
-        <Route
-          path="/contacts/external/trash"
-          element={<ContactsPage scope="external" deleted />}
-        />
-        <Route
-          path="/contacts/agents"
-          element={<ContactsPage scope="agents" />}
         />
         <Route path="/channels" element={<ChannelsLayout />}>
           <Route index element={<Navigate to="website" replace />} />
@@ -98,10 +82,7 @@ export function SharedAppRoutes({
             path="website/new"
             element={<WebsiteChannelFormPage mode="create" />}
           />
-          <Route
-            path="website/trash"
-            element={<WebsiteChannelTrashPage />}
-          />
+          <Route path="website/trash" element={<WebsiteChannelTrashPage />} />
           <Route
             path="website/:channelId"
             element={<WebsiteChannelFormPage mode="edit" />}

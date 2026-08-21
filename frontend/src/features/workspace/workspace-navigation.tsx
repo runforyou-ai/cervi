@@ -84,7 +84,7 @@ function WorkspaceMenu() {
         active={location.pathname === "/inbox"}
       />
       <WorkspaceRailItem
-        to="/contacts/internal"
+        to="/contacts/members"
         icon={ContactRoundIcon}
         label={t("contacts")}
         active={location.pathname.startsWith("/contacts")}
@@ -229,9 +229,7 @@ export function WorkspaceNavigation({
                   <span className="flex-1">
                     {workStatusLabel(workStatus, tCommon)}
                   </span>
-                  {selected ? (
-                    <CheckIcon className="text-primary" />
-                  ) : null}
+                  {selected ? <CheckIcon className="text-primary" /> : null}
                 </DropdownMenuItem>
               )
             })}

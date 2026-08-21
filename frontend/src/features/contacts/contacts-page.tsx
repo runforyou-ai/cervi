@@ -1,19 +1,22 @@
 /** 通讯录列表、筛选、详情和回收站。 */
 import {
+  forwardRef,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
+  type ButtonHTMLAttributes,
 } from "react"
 import {
-  BotIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ContactRoundIcon,
   GlobeIcon,
   LoaderCircleIcon,
   MoreHorizontalIcon,
+  PanelsTopLeftIcon,
+  PlusIcon,
   UsersIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -25,22 +28,29 @@ import {
   ContactMethodType,
   ContactSort,
   ContactStage,
+  MemberIdentityType,
   UserRole,
   UserStatus,
+  deactivateUser,
   deleteContact,
   getContact,
   getUser,
   listChannels,
   listContacts,
   listDeletedContacts,
+  listTeams,
   listUsers,
+  reactivateUser,
+  deleteTeam,
+  removeTeamMember,
   restoreContact,
   type ChannelSummary,
   type ContactDetail,
   type ContactListResponse,
   type ContactSummary,
-  type DirectoryUser,
+  type DirectoryUserData,
   type PageInfo,
+  type Team,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
@@ -50,13 +60,18 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
-import { PageBack } from "@/components/page-back"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { SelectableText } from "@/components/selectable-text"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -104,11 +119,9 @@ import {
 } from "@/components/ui/table"
 import { ContactForm } from "@/features/contacts/contact-form"
 import { ContactDetailView } from "@/features/contacts/contact-detail"
-import {
-  WorkStatusBadge,
-  WorkStatusDot,
-  workStatusLabel,
-} from "@/features/users/work-status"
+import { MemberDetailView } from "@/features/contacts/member-detail"
+import { MemberForm } from "@/features/contacts/member-form"
+import { TeamForm } from "@/features/contacts/team-form"
 import { useWorkspace } from "@/features/workspace/workspace-context"
 import {
   channelTypeLabel,
@@ -118,7 +131,7 @@ import {
 import { useDateTime } from "@/hooks/use-date-time"
 import { cn } from "@/lib/utils"
 
-export type ContactScope = "internal" | "external" | "agents"
+type ContactScope = "members" | "external"
 
 type LoadState = "loading" | "ready" | "error"
 
@@ -126,69 +139,40 @@ const contactNavHoverClass =
   "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
 const contactNavLeafActiveClass =
   "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-const contactNavPathActiveClass =
-  "font-medium text-sidebar-accent-foreground"
+const contactNavPathActiveClass = "font-medium text-sidebar-accent-foreground"
 const contactNavSubitemClass =
   "flex h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors"
 
-/** 通讯录分类按钮。 */
-function ScopeButton({
-  active,
-  icon: Icon,
-  children,
-  onClick,
-}: {
-  active: boolean
-  icon: typeof UsersIcon
-  children: React.ReactNode
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
-        contactNavHoverClass,
-        active && contactNavLeafActiveClass,
-      )}
-      onClick={onClick}
-    >
-      <Icon className="size-4 shrink-0" />
-      <span className="truncate">{children}</span>
-    </button>
-  )
-}
-
 /** 通讯录子分类按钮。 */
-function SubscopeButton({
-  active,
-  children,
-  nested = false,
-  onClick,
-  icon: Icon,
-}: {
-  active: boolean
-  children: React.ReactNode
-  nested?: boolean
-  onClick: () => void
-  icon?: typeof GlobeIcon
-}) {
+const SubscopeButton = forwardRef<
+  HTMLButtonElement,
+  {
+    active: boolean
+    nested?: boolean
+    icon?: typeof GlobeIcon
+  } & ButtonHTMLAttributes<HTMLButtonElement>
+>(function SubscopeButton(
+  { active, children, nested = false, icon: Icon, className, ...props },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type="button"
       className={cn(
         contactNavSubitemClass,
         contactNavHoverClass,
         nested ? "pl-14" : "pl-8",
         active && contactNavLeafActiveClass,
+        className,
       )}
-      onClick={onClick}
+      {...props}
     >
       {Icon ? <Icon className="size-3.5 shrink-0" /> : null}
       <span className="truncate">{children}</span>
     </button>
   )
-}
+})
 
 /** 通讯录分类和来源渠道筛选。 */
 function ContactScopeSidebar({
@@ -196,11 +180,17 @@ function ContactScopeSidebar({
   deleted,
   channelId,
   channels,
+  teamId,
+  teams,
+  onDeleteTeam,
 }: {
   scope: ContactScope
   deleted: boolean
   channelId: string
   channels: ChannelSummary[]
+  teamId: string
+  teams: Team[]
+  onDeleteTeam: (team: Team) => void
 }) {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
@@ -213,22 +203,97 @@ function ContactScopeSidebar({
   }, [channels])
 
   return (
-    <PagePaneNav label={t("scopeNavigation")} title={t("title")}>
-      <ScopeButton
-        active={scope === "internal"}
-        icon={UsersIcon}
-        onClick={() => navigate("/contacts/internal")}
-      >
-        {t("scopes.internal")}
-      </ScopeButton>
-
-      <ScopeButton
-        active={scope === "agents"}
-        icon={BotIcon}
-        onClick={() => navigate("/contacts/agents")}
-      >
-        {t("scopes.agents")}
-      </ScopeButton>
+    <PagePaneNav
+      label={t("scopeNavigation")}
+      title={t("title")}
+      action={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("add.label")}
+              title={t("add.label")}
+            >
+              <PlusIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" align="start">
+            <DropdownMenuItem
+              onSelect={() => navigate("/contacts/members?new=1")}
+            >
+              {t("add.member")}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>{t("add.agent")}</DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => navigate("/contacts/members?newTeam=1")}
+            >
+              {t("teams.create")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={channels.length === 0}
+              onSelect={() => navigate("/contacts/external?new=1")}
+            >
+              {t("add.external")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      }
+    >
+      <Collapsible defaultOpen>
+        <CollapsibleTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
+              contactNavHoverClass,
+              scope === "members" && contactNavPathActiveClass,
+            )}
+          >
+            <UsersIcon className="size-4" />
+            <span>{t("scopes.members")}</span>
+            <ChevronRightIcon className="ml-auto size-4 transition-transform group-data-[state=open]:rotate-90" />
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="flex flex-col gap-0.5">
+          <SubscopeButton
+            active={scope === "members" && !teamId}
+            onClick={() => navigate("/contacts/members")}
+          >
+            {t("all")}
+          </SubscopeButton>
+          {teams.map((team) => (
+            <ContextMenu key={team.id}>
+              <ContextMenuTrigger asChild>
+                <SubscopeButton
+                  active={scope === "members" && teamId === team.id}
+                  icon={PanelsTopLeftIcon}
+                  onClick={() =>
+                    navigate(`/contacts/members?teamId=${team.id}`)
+                  }
+                >
+                  {team.name}
+                </SubscopeButton>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onSelect={() =>
+                    navigate(`/contacts/members?teamId=${team.id}&editTeam=1`)
+                  }
+                >
+                  {t("teams.edit")}
+                </ContextMenuItem>
+                <ContextMenuItem
+                  destructive
+                  onSelect={() => onDeleteTeam(team)}
+                >
+                  {t("teams.delete.action")}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
 
       <Collapsible defaultOpen>
         <CollapsibleTrigger asChild>
@@ -323,30 +388,6 @@ function UserStatusBadge({
   )
 }
 
-/** 显示团队成员详情中的一个只读字段。 */
-function MemberDetailItem({
-  label,
-  value,
-  emphasized = false,
-}: {
-  label: string
-  value: React.ReactNode
-  emphasized?: boolean
-}) {
-  return (
-    <div>
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className={cn("mt-1", emphasized && "font-medium")}>
-        {typeof value === "string" ? (
-          <SelectableText>{value}</SelectableText>
-        ) : (
-          value
-        )}
-      </dd>
-    </div>
-  )
-}
-
 /** 联系人列表分页。 */
 function PageControls({
   page,
@@ -370,7 +411,9 @@ function PageControls({
           <ChevronLeftIcon />
           {t("pagination.previous")}
         </Button>
-        <span>{t("pagination.page", { current: page.number, total: totalPages })}</span>
+        <span>
+          {t("pagination.page", { current: page.number, total: totalPages })}
+        </span>
         <Button
           variant="outline"
           size="sm"
@@ -386,16 +429,9 @@ function PageControls({
 }
 
 /** 按分类列出通讯录。 */
-export function ContactsPage({
-  scope,
-  deleted = false,
-}: {
-  scope: ContactScope
-  deleted?: boolean
-}) {
+export function ContactsPage({ scope }: { scope: ContactScope }) {
   const { t } = useTranslation("contacts")
-  const { t: tCommon } = useTranslation("common")
-  const { identity } = useWorkspace()
+  const { identity, updateUser: updateWorkspaceUser } = useWorkspace()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -403,18 +439,31 @@ export function ContactsPage({
   const [search, setSearch] = useState(query)
   const [channels, setChannels] = useState<ChannelSummary[]>([])
   const [contacts, setContacts] = useState<ContactSummary[]>([])
-  const [users, setUsers] = useState<DirectoryUser[]>([])
+  const [users, setUsers] = useState<DirectoryUserData[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
   const [page, setPage] = useState<PageInfo>({ number: 1, size: 50, total: 0 })
   const [loadState, setLoadState] = useState<LoadState>("loading")
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [detail, setDetail] = useState<ContactDetail | null>(null)
-  const [detailUser, setDetailUser] = useState<DirectoryUser | null>(null)
+  const [detailUser, setDetailUser] = useState<DirectoryUserData | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [deletingContact, setDeletingContact] = useState<ContactSummary | null>(null)
+  const [deletingContact, setDeletingContact] = useState<ContactSummary | null>(
+    null,
+  )
+  const [restoringContact, setRestoringContact] =
+    useState<ContactSummary | null>(null)
+  const [changingUserStatus, setChangingUserStatus] =
+    useState<DirectoryUserData | null>(null)
+  const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
+  const [removingTeamMember, setRemovingTeamMember] =
+    useState<DirectoryUserData | null>(null)
   const [deleting, setDeleting] = useState(false)
   const detailTitleRef = useRef<HTMLHeadingElement>(null)
   const selected = searchParams.get("selected") ?? ""
+  const deleted = scope === "external" && searchParams.get("view") === "trash"
   const creating = searchParams.get("new") === "1"
+  const creatingTeam = searchParams.get("newTeam") === "1"
+  const editingTeam = searchParams.get("editTeam") === "1"
   const channelId = searchParams.get("channelId") ?? ""
   const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
   const methodType = optionalWailsEnum(
@@ -426,11 +475,17 @@ export function ContactsPage({
     ContactSort.ContactSortCreatedAtDescending
   const status = optionalWailsEnum(UserStatus, searchParams.get("status"))
   const role = optionalWailsEnum(UserRole, searchParams.get("role"))
+  const category =
+    optionalWailsEnum(MemberIdentityType, searchParams.get("category")) ?? ""
+  const teamId = searchParams.get("teamId") ?? ""
+  const selectedTeam = teams.find((team) => team.id === teamId)
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
 
   /** 当前用户使用工作台中的即时状态，其他成员使用目录查询结果。 */
-  function memberWorkStatus(user: DirectoryUser) {
-    return user.id === identity.user.id ? identity.user.workStatus : user.workStatus
+  function memberWorkStatus(user: DirectoryUserData) {
+    return user.id === identity.user.id
+      ? identity.user.workStatus
+      : user.workStatus
   }
 
   /** 更新列表查询参数。 */
@@ -463,14 +518,21 @@ export function ContactsPage({
 
   useEffect(() => {
     const controller = new AbortController()
-    void listChannels(controller.signal)
-      .then(setChannels)
+    void Promise.all([
+      listChannels(controller.signal),
+      listTeams({ pageSize: 100 }, controller.signal),
+    ])
+      .then(([channelItems, teamOutput]) => {
+        setChannels(channelItems)
+        setTeams(teamOutput.teams)
+      })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") {
           return
         }
         console.warn("渠道列表加载失败", error)
         setChannels([])
+        setTeams([])
       })
     return () => controller.abort()
   }, [])
@@ -496,15 +558,18 @@ export function ContactsPage({
           )
           setContacts(response.contacts)
           setPage(response.page)
-        } else if (scope === "internal") {
-          const response = await listUsers(
-            { query, status, role, page: currentPage, pageSize: 50 },
-            signal,
-          )
-          setUsers(response.users)
-          setPage(response.page)
         } else {
-          setPage({ number: 1, size: 50, total: 0 })
+          if (category === MemberIdentityType.MemberIdentityTypeAgent) {
+            setUsers([])
+            setPage({ number: 1, size: 50, total: 0 })
+          } else {
+            const response = await listUsers(
+              { query, status, role, teamId, page: currentPage, pageSize: 50 },
+              signal,
+            )
+            setUsers(response.users)
+            setPage(response.page)
+          }
         }
         setLoadState("ready")
       } catch (error) {
@@ -518,7 +583,21 @@ export function ContactsPage({
         setLoadState("error")
       }
     },
-    [channelId, currentPage, deleted, methodType, navigate, query, role, scope, sort, stage, status],
+    [
+      channelId,
+      category,
+      currentPage,
+      deleted,
+      methodType,
+      navigate,
+      query,
+      role,
+      scope,
+      sort,
+      stage,
+      status,
+      teamId,
+    ],
   )
 
   useEffect(() => {
@@ -535,11 +614,10 @@ export function ContactsPage({
     }
     const controller = new AbortController()
     setDetailLoading(true)
-    const loader = scope === "external"
-      ? getContact(selected, controller.signal).then(setDetail)
-      : scope === "internal"
-        ? getUser(selected, controller.signal).then(setDetailUser)
-        : Promise.resolve()
+    const loader =
+      scope === "external"
+        ? getContact(selected, controller.signal).then(setDetail)
+        : getUser(selected, controller.signal).then(setDetailUser)
     void loader
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -557,31 +635,25 @@ export function ContactsPage({
   }, [navigate, scope, selected, setParameters, t])
 
   const selectedChannel = channels.find((channel) => channel.id === channelId)
-  const title = scope === "internal"
-    ? t("scopes.internal")
-    : scope === "agents"
-      ? t("scopes.agents")
-      : deleted
-        ? t("trash.title")
-        : selectedChannel?.name ?? t("scopes.external")
-  const mobileScope = scope === "internal"
-    ? "internal"
-    : scope === "agents"
-      ? "agents"
-      : deleted
-        ? "trash"
-        : channelId
-          ? `channel:${channelId}`
-          : "external"
+  const title =
+    scope === "members"
+      ? (selectedTeam?.name ?? t("scopes.members"))
+      : (selectedChannel?.name ?? t("scopes.external"))
+  const mobileScope =
+    scope === "members"
+      ? teamId
+        ? `team:${teamId}`
+        : "members"
+      : channelId
+        ? `channel:${channelId}`
+        : "external"
 
   /** 窄视口下切换联系人范围。 */
   function changeMobileScope(value: string) {
-    if (value === "internal") {
-      navigate("/contacts/internal")
-    } else if (value === "agents") {
-      navigate("/contacts/agents")
-    } else if (value === "trash") {
-      navigate("/contacts/external/trash")
+    if (value === "members") {
+      navigate("/contacts/members")
+    } else if (value.startsWith("team:")) {
+      navigate(`/contacts/members?teamId=${value.slice("team:".length)}`)
     } else if (value.startsWith("channel:")) {
       navigate(`/contacts/external?channelId=${value.slice("channel:".length)}`)
     } else {
@@ -629,11 +701,14 @@ export function ContactsPage({
   }
 
   /** 恢复联系人。 */
-  async function restore(item: ContactSummary) {
+  async function restore() {
+    if (!restoringContact) return
+    setDeleting(true)
     try {
-      await restoreContact(item.id)
-      console.info("联系人已恢复", { contact_id: item.id })
+      await restoreContact(restoringContact.id)
+      console.info("联系人已恢复", { contact_id: restoringContact.id })
       toast.success(t("trash.restored"))
+      setRestoringContact(null)
       setRefreshVersion((current) => current + 1)
     } catch (error) {
       if (recoverSession(error, navigate)) {
@@ -641,11 +716,89 @@ export function ContactsPage({
       }
       console.warn("恢复联系人失败", error)
       toast.error(t("trash.restoreError"))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  /** 停用或恢复企业成员账号。 */
+  async function changeUserStatus() {
+    if (!changingUserStatus) return
+    setDeleting(true)
+    try {
+      const saved =
+        changingUserStatus.status === UserStatus.UserStatusActive
+          ? await deactivateUser(changingUserStatus.id)
+          : await reactivateUser(changingUserStatus.id)
+      toast.success(
+        t(
+          changingUserStatus.status === UserStatus.UserStatusActive
+            ? "members.status.deactivated"
+            : "members.status.reactivated",
+        ),
+      )
+      setChangingUserStatus(null)
+      setDetailUser(saved)
+      setRefreshVersion((current) => current + 1)
+    } catch (error) {
+      if (recoverSession(error, navigate)) return
+      console.warn("修改企业成员状态失败", error)
+      toast.error(t("members.status.error"))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  /** 删除当前团队并返回全部企业成员。 */
+  async function removeCurrentTeam() {
+    if (!deletingTeam) return
+    const deletingTeamID = deletingTeam.id
+    setDeleting(true)
+    try {
+      await deleteTeam(deletingTeamID)
+      setTeams((current) =>
+        current.filter((team) => team.id !== deletingTeamID),
+      )
+      setDeletingTeam(null)
+      toast.success(t("teams.delete.success"))
+      if (teamId === deletingTeamID) {
+        navigate("/contacts/members", { replace: true })
+      }
+    } catch (error) {
+      if (recoverSession(error, navigate)) return
+      console.warn("删除团队失败", error)
+      toast.error(t("teams.delete.error"))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  /** 将企业成员移出当前团队。 */
+  async function removeMemberFromCurrentTeam() {
+    if (!selectedTeam || !removingTeamMember) return
+    setDeleting(true)
+    try {
+      await removeTeamMember(
+        selectedTeam.id,
+        MemberIdentityType.MemberIdentityTypeUser,
+        removingTeamMember.id,
+      )
+      setRemovingTeamMember(null)
+      toast.success(t("teams.members.removed"))
+      setRefreshVersion((current) => current + 1)
+    } catch (error) {
+      if (recoverSession(error, navigate)) return
+      console.warn("移出团队成员失败", error)
+      toast.error(t("teams.members.removeError"))
+    } finally {
+      setDeleting(false)
     }
   }
 
   const hasExternalFilters = Boolean(stage || methodType)
-  const hasInternalFilters = Boolean(status || role)
+  const hasInternalFilters = Boolean(
+    status || role || category === MemberIdentityType.MemberIdentityTypeAgent,
+  )
 
   return (
     <PageSplit
@@ -657,13 +810,16 @@ export function ContactsPage({
           deleted={deleted}
           channelId={channelId}
           channels={channels}
+          teamId={teamId}
+          teams={teams}
+          onDeleteTeam={setDeletingTeam}
         />
       }
     >
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={title}
-          beforeTitle={(
+          beforeTitle={
             <div className="w-full md:hidden">
               <NativeSelect
                 className="h-8 w-full"
@@ -671,136 +827,253 @@ export function ContactsPage({
                 value={mobileScope}
                 onChange={(event) => changeMobileScope(event.target.value)}
               >
-                <option value="internal">{t("scopes.internal")}</option>
-                <option value="agents">{t("scopes.agents")}</option>
-                <option value="external">{t("scopes.external")} · {t("all")}</option>
+                <option value="members">{t("scopes.members")}</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={`team:${team.id}`}>
+                    {t("scopes.members")} · {team.name}
+                  </option>
+                ))}
+                <option value="external">
+                  {t("scopes.external")} · {t("all")}
+                </option>
                 {channels.map((channel) => (
                   <option key={channel.id} value={`channel:${channel.id}`}>
                     {t("scopes.external")} · {channel.name}
                   </option>
                 ))}
-                <option value="trash">{t("trash.title")}</option>
               </NativeSelect>
             </div>
-          )}
-        >
-          {deleted ? (
-            <PageBack to="/contacts/external" />
-          ) : scope === "external" ? (
+          }
+        />
+
+        <ListToolbar>
+          <ListToolbarSearch
+            value={search}
+            aria-label={
+              scope === "members"
+                ? t(
+                    category === MemberIdentityType.MemberIdentityTypeAgent
+                      ? "search.agents"
+                      : category === MemberIdentityType.MemberIdentityTypeUser
+                        ? "search.members"
+                        : "search.identities",
+                  )
+                : t("search.external")
+            }
+            placeholder={
+              scope === "members"
+                ? t(
+                    category === MemberIdentityType.MemberIdentityTypeAgent
+                      ? "search.agents"
+                      : category === MemberIdentityType.MemberIdentityTypeUser
+                        ? "search.members"
+                        : "search.identities",
+                  )
+                : t("search.external")
+            }
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {scope === "members" ? (
             <>
-              <Button
-                size="sm"
-                disabled={channels.length === 0}
-                title={channels.length === 0 ? t("form.channelRequiredHint") : undefined}
-                onClick={() => setParameters({ new: "1", selected: null })}
-              >
-                {t("create")}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate("/contacts/external/trash")}>
-                {t("trash.title")}
-              </Button>
+              <ListToolbarFilter
+                label={t("filters.category")}
+                allLabel={t("filters.allCategories")}
+                value={category}
+                options={[
+                  {
+                    value: MemberIdentityType.MemberIdentityTypeUser,
+                    label: t("identityCategories.user"),
+                  },
+                  {
+                    value: MemberIdentityType.MemberIdentityTypeAgent,
+                    label: t("identityCategories.agent"),
+                  },
+                ]}
+                onValueChange={(value) =>
+                  setParameters({
+                    category: value || null,
+                    status: null,
+                    role: null,
+                    page: null,
+                    selected: null,
+                  })
+                }
+              />
+              {category !== MemberIdentityType.MemberIdentityTypeAgent ? (
+                <>
+                  <ListToolbarFilter
+                    label={t("filters.status")}
+                    allLabel={t("filters.allStatuses")}
+                    value={status ?? ""}
+                    options={[
+                      {
+                        value: UserStatus.UserStatusActive,
+                        label: t("statuses.active"),
+                      },
+                      {
+                        value: UserStatus.UserStatusInactive,
+                        label: t("statuses.inactive"),
+                      },
+                    ]}
+                    onValueChange={(value) =>
+                      setParameters({
+                        status: value || null,
+                        page: null,
+                        selected: null,
+                      })
+                    }
+                  />
+                  <ListToolbarFilter
+                    label={t("filters.role")}
+                    allLabel={t("filters.allRoles")}
+                    value={role ?? ""}
+                    options={[
+                      {
+                        value: UserRole.UserRoleAdmin,
+                        label: t("roles.admin"),
+                      },
+                      {
+                        value: UserRole.UserRoleMember,
+                        label: t("roles.member"),
+                      },
+                    ]}
+                    onValueChange={(value) =>
+                      setParameters({
+                        role: value || null,
+                        page: null,
+                        selected: null,
+                      })
+                    }
+                  />
+                </>
+              ) : null}
+              {hasInternalFilters ? (
+                <ListToolbarReset
+                  onClick={() =>
+                    setParameters({
+                      status: null,
+                      role: null,
+                      category: null,
+                      page: null,
+                    })
+                  }
+                >
+                  {t("filters.clear")}
+                </ListToolbarReset>
+              ) : null}
             </>
           ) : null}
-        </PageHeader>
-
-        {scope !== "agents" ? (
-          <ListToolbar>
-            <ListToolbarSearch
-              value={search}
-              aria-label={scope === "internal" ? t("search.internal") : t("search.external")}
-              placeholder={scope === "internal" ? t("search.internal") : t("search.external")}
-              onChange={(event) => setSearch(event.target.value)}
+          {scope === "external" ? (
+            <ListToolbarFilter
+              label={t("filters.view")}
+              value={deleted ? "trash" : "active"}
+              options={[
+                { value: "active", label: t("filters.activeContacts") },
+                { value: "trash", label: t("trash.title") },
+              ]}
+              onValueChange={(value) =>
+                setParameters({
+                  view: value === "trash" ? "trash" : null,
+                  stage: null,
+                  methodType: null,
+                  page: null,
+                  selected: null,
+                })
+              }
             />
-            {scope === "internal" ? (
-              <>
-                <ListToolbarFilter
-                  label={t("filters.status")}
-                  allLabel={t("filters.allStatuses")}
-                  value={status ?? ""}
-                  options={[
-                    { value: UserStatus.UserStatusActive, label: t("statuses.active") },
-                    { value: UserStatus.UserStatusInactive, label: t("statuses.inactive") },
-                  ]}
-                  onValueChange={(value) =>
-                    setParameters({ status: value || null, page: null, selected: null })
+          ) : null}
+          {scope === "external" && !deleted ? (
+            <>
+              <ListToolbarFilter
+                label={t("filters.stage")}
+                allLabel={t("filters.allStages")}
+                value={stage ?? ""}
+                options={[
+                  {
+                    value: ContactStage.ContactStageVisitor,
+                    label: t("stages.visitor"),
+                  },
+                  {
+                    value: ContactStage.ContactStageLead,
+                    label: t("stages.lead"),
+                  },
+                  {
+                    value: ContactStage.ContactStageCustomer,
+                    label: t("stages.customer"),
+                  },
+                ]}
+                onValueChange={(value) =>
+                  setParameters({
+                    stage: value || null,
+                    page: null,
+                    selected: null,
+                  })
+                }
+              />
+              <ListToolbarFilter
+                label={t("filters.method")}
+                allLabel={t("filters.allMethods")}
+                value={methodType ?? ""}
+                options={[
+                  {
+                    value: ContactMethodType.ContactMethodTypeEmail,
+                    label: t("methods.email"),
+                  },
+                  {
+                    value: ContactMethodType.ContactMethodTypePhone,
+                    label: t("methods.phone"),
+                  },
+                ]}
+                onValueChange={(value) =>
+                  setParameters({
+                    methodType: value || null,
+                    page: null,
+                    selected: null,
+                  })
+                }
+              />
+              {hasExternalFilters ? (
+                <ListToolbarReset
+                  onClick={() =>
+                    setParameters({
+                      stage: null,
+                      methodType: null,
+                      page: null,
+                    })
                   }
-                />
-                <ListToolbarFilter
-                  label={t("filters.role")}
-                  allLabel={t("filters.allRoles")}
-                  value={role ?? ""}
-                  options={[
-                    { value: UserRole.UserRoleAdmin, label: t("roles.admin") },
-                    { value: UserRole.UserRoleMember, label: t("roles.member") },
-                  ]}
-                  onValueChange={(value) =>
-                    setParameters({ role: value || null, page: null, selected: null })
-                  }
-                />
-                {hasInternalFilters ? (
-                  <ListToolbarReset
-                    onClick={() => setParameters({ status: null, role: null, page: null })}
-                  >
-                    {t("filters.clear")}
-                  </ListToolbarReset>
-                ) : null}
-              </>
-            ) : null}
-            {scope === "external" && !deleted ? (
-              <>
-                <ListToolbarFilter
-                  label={t("filters.stage")}
-                  allLabel={t("filters.allStages")}
-                  value={stage ?? ""}
-                  options={[
-                    { value: ContactStage.ContactStageVisitor, label: t("stages.visitor") },
-                    { value: ContactStage.ContactStageLead, label: t("stages.lead") },
-                    { value: ContactStage.ContactStageCustomer, label: t("stages.customer") },
-                  ]}
-                  onValueChange={(value) =>
-                    setParameters({ stage: value || null, page: null, selected: null })
-                  }
-                />
-                <ListToolbarFilter
-                  label={t("filters.method")}
-                  allLabel={t("filters.allMethods")}
-                  value={methodType ?? ""}
-                  options={[
-                    { value: ContactMethodType.ContactMethodTypeEmail, label: t("methods.email") },
-                    { value: ContactMethodType.ContactMethodTypePhone, label: t("methods.phone") },
-                  ]}
-                  onValueChange={(value) =>
-                    setParameters({ methodType: value || null, page: null, selected: null })
-                  }
-                />
-                {hasExternalFilters ? (
-                  <ListToolbarReset
-                    onClick={() => setParameters({ stage: null, methodType: null, page: null })}
-                  >
-                    {t("filters.clear")}
-                  </ListToolbarReset>
-                ) : null}
-              </>
-            ) : null}
-            {scope === "external" ? (
-              <div className="ml-auto">
-                <ListToolbarFilter
-                  label={t("filters.sort")}
-                  value={sort}
-                  align="end"
-                  options={[
-                    { value: ContactSort.ContactSortCreatedAtDescending, label: t("sort.created") },
-                    { value: ContactSort.ContactSortUpdatedAtDescending, label: t("sort.updated") },
-                    { value: ContactSort.ContactSortDisplayNameAscending, label: t("sort.name") },
-                  ]}
-                  onValueChange={(value) =>
-                    setParameters({ sort: value, page: null, selected: null })
-                  }
-                />
-              </div>
-            ) : null}
-          </ListToolbar>
-        ) : null}
+                >
+                  {t("filters.clear")}
+                </ListToolbarReset>
+              ) : null}
+            </>
+          ) : null}
+          {scope === "external" ? (
+            <div className="ml-auto">
+              <ListToolbarFilter
+                label={t("filters.sort")}
+                value={sort}
+                align="end"
+                options={[
+                  {
+                    value: ContactSort.ContactSortCreatedAtDescending,
+                    label: t("sort.created"),
+                  },
+                  {
+                    value: ContactSort.ContactSortUpdatedAtDescending,
+                    label: t("sort.updated"),
+                  },
+                  {
+                    value: ContactSort.ContactSortDisplayNameAscending,
+                    label: t("sort.name"),
+                  },
+                ]}
+                onValueChange={(value) =>
+                  setParameters({ sort: value, page: null, selected: null })
+                }
+              />
+            </div>
+          ) : null}
+        </ListToolbar>
 
         <PageContent>
           {loadState === "loading" ? (
@@ -810,28 +1083,31 @@ export function ContactsPage({
             </div>
           ) : loadState === "error" ? (
             <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-              <p className="text-sm text-muted-foreground">{t("list.loadError")}</p>
-              <Button className="mt-4" variant="outline" onClick={() => void loadList()}>
+              <p className="text-sm text-muted-foreground">
+                {t("list.loadError")}
+              </p>
+              <Button
+                className="mt-4"
+                variant="outline"
+                onClick={() => void loadList()}
+              >
                 {t("retry")}
               </Button>
-            </div>
-          ) : scope === "agents" ? (
-            <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed text-center">
-              <BotIcon className="size-8 text-muted-foreground" />
-              <h3 className="mt-4 font-medium">{t("agents.emptyTitle")}</h3>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t("agents.emptyDescription")}</p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border bg-card">
               <Table>
                 <TableHeader>
-                  {scope === "internal" ? (
+                  {scope === "members" ? (
                     <TableRow className="hover:bg-transparent">
                       <TableHead>{t("columns.name")}</TableHead>
                       <TableHead>{t("columns.email")}</TableHead>
+                      <TableHead>{t("columns.teams")}</TableHead>
                       <TableHead>{t("columns.role")}</TableHead>
                       <TableHead>{t("columns.status")}</TableHead>
-                      <TableHead className="text-right">{t("columns.actions")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("columns.actions")}
+                      </TableHead>
                     </TableRow>
                   ) : (
                     <TableRow className="hover:bg-transparent">
@@ -840,31 +1116,36 @@ export function ContactsPage({
                       <TableHead>{t("columns.email")}</TableHead>
                       <TableHead>{t("columns.phone")}</TableHead>
                       <TableHead>{t("columns.channels")}</TableHead>
-                      <TableHead>{deleted ? t("columns.deletedAt") : t("columns.addedAt")}</TableHead>
-                      <TableHead className="text-right">{t("columns.actions")}</TableHead>
+                      <TableHead>
+                        {deleted
+                          ? t("columns.deletedAt")
+                          : t("columns.addedAt")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("columns.actions")}
+                      </TableHead>
                     </TableRow>
                   )}
                 </TableHeader>
                 <TableBody>
-                  {scope === "internal" && users.length > 0
+                  {scope === "members" &&
+                  category !== MemberIdentityType.MemberIdentityTypeAgent &&
+                  users.length > 0
                     ? users.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2.5">
-                              <span
-                                className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-xs font-semibold text-secondary-foreground"
-                                title={workStatusLabel(memberWorkStatus(user), tCommon)}
-                              >
-                                {user.displayName.slice(0, 1).toUpperCase()}
-                                <WorkStatusDot
-                                  status={memberWorkStatus(user)}
-                                  className="absolute -right-0.5 -bottom-0.5 size-2 ring-2 ring-card"
-                                />
-                              </span>
-                              <span>{user.displayName}</span>
-                            </div>
+                            {user.displayName}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {user.email}
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                            {user.teams.length > 0
+                              ? user.teams
+                                  .map((team) => team.name)
+                                  .join("、")
+                              : "—"}
+                          </TableCell>
                           <TableCell>{userRoleLabel(user.role, t)}</TableCell>
                           <TableCell>
                             <UserStatusBadge
@@ -873,13 +1154,55 @@ export function ContactsPage({
                             />
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setParameters({ selected: user.id })}
-                            >
-                              {t("detail.action")}
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setParameters({ selected: user.id })
+                                }
+                              >
+                                {t("detail.action")}
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={t("list.more")}
+                                    title={t("list.more")}
+                                  >
+                                    <MoreHorizontalIcon />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {selectedTeam ? (
+                                    <DropdownMenuItem
+                                      onSelect={() =>
+                                        setRemovingTeamMember(user)
+                                      }
+                                    >
+                                      {t("teams.members.remove")}
+                                    </DropdownMenuItem>
+                                  ) : null}
+                                  <DropdownMenuItem
+                                    disabled={user.id === identity.user.id}
+                                    destructive={
+                                      user.status ===
+                                      UserStatus.UserStatusActive
+                                    }
+                                    onSelect={() => setChangingUserStatus(user)}
+                                  >
+                                    {t(
+                                      user.status ===
+                                        UserStatus.UserStatusActive
+                                        ? "members.status.deactivate"
+                                        : "members.status.reactivate",
+                                    )}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -887,17 +1210,33 @@ export function ContactsPage({
                   {scope === "external" && contacts.length > 0
                     ? contacts.map((contact) => (
                         <TableRow key={contact.id}>
-                          <TableCell className="font-medium">{contact.displayName || t("anonymous")}</TableCell>
-                          <TableCell><StageLabel stage={contact.stage} /></TableCell>
-                          <TableCell className="text-muted-foreground">{contact.primaryEmail || "—"}</TableCell>
-                          <TableCell className="text-muted-foreground">{contact.primaryPhone || "—"}</TableCell>
+                          <TableCell className="font-medium">
+                            {contact.displayName || t("anonymous")}
+                          </TableCell>
+                          <TableCell>
+                            <StageLabel stage={contact.stage} />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {contact.primaryEmail || "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {contact.primaryPhone || "—"}
+                          </TableCell>
                           <TableCell>{contact.sourceChannelName}</TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {formatDateTime(deleted && contact.deletedAt ? contact.deletedAt : contact.createdAt)}
+                            {formatDateTime(
+                              deleted && contact.deletedAt
+                                ? contact.deletedAt
+                                : contact.createdAt,
+                            )}
                           </TableCell>
                           {deleted ? (
                             <TableCell className="text-right whitespace-nowrap">
-                              <Button variant="outline" size="sm" onClick={() => void restore(contact)}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setRestoringContact(contact)}
+                              >
                                 {t("trash.restore")}
                               </Button>
                             </TableCell>
@@ -907,7 +1246,9 @@ export function ContactsPage({
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => setParameters({ selected: contact.id })}
+                                  onClick={() =>
+                                    setParameters({ selected: contact.id })
+                                  }
                                 >
                                   {t("detail.action")}
                                 </Button>
@@ -925,7 +1266,9 @@ export function ContactsPage({
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem
                                       destructive
-                                      onSelect={() => setDeletingContact(contact)}
+                                      onSelect={() =>
+                                        setDeletingContact(contact)
+                                      }
                                     >
                                       {t("delete.action")}
                                     </DropdownMenuItem>
@@ -937,22 +1280,34 @@ export function ContactsPage({
                         </TableRow>
                       ))
                     : null}
-                  {((scope === "internal" && users.length === 0) || (scope === "external" && contacts.length === 0)) ? (
+                  {(scope === "members" && users.length === 0) ||
+                  (scope === "external" && contacts.length === 0) ? (
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={scope === "internal" ? 5 : 7} className="h-32 text-center text-muted-foreground">
+                      <TableCell
+                        colSpan={scope === "members" ? 6 : 7}
+                        className="h-32 text-center text-muted-foreground"
+                      >
                         {deleted ? t("trash.empty") : t("list.empty")}
                       </TableCell>
                     </TableRow>
                   ) : null}
                 </TableBody>
               </Table>
-              <PageControls page={page} onPageChange={(number) => setParameters({ page: String(number), selected: null })} />
+              <PageControls
+                page={page}
+                onPageChange={(number) =>
+                  setParameters({ page: String(number), selected: null })
+                }
+              />
             </div>
           )}
         </PageContent>
       </section>
 
-      <Sheet open={Boolean(selected)} onOpenChange={(open) => !open && closeDetail()}>
+      <Sheet
+        open={Boolean(selected)}
+        onOpenChange={(open) => !open && closeDetail()}
+      >
         <SheetContent
           className="w-full gap-0 p-0 sm:max-w-xl"
           onOpenAutoFocus={(event) => {
@@ -961,13 +1316,19 @@ export function ContactsPage({
           }}
         >
           <SheetHeader className="border-b px-6 py-4 pr-12">
-            <SheetTitle ref={detailTitleRef} tabIndex={-1} className="outline-none">
-              {scope === "internal"
-                ? detailUser?.displayName ?? t("detail.memberTitle")
+            <SheetTitle
+              ref={detailTitleRef}
+              tabIndex={-1}
+              className="outline-none"
+            >
+              {scope === "members"
+                ? (detailUser?.displayName ?? t("detail.memberTitle"))
                 : detail?.contact.displayName || t("anonymous")}
             </SheetTitle>
             <SheetDescription>
-              {scope === "internal" ? t("detail.memberDescription") : t("detail.contactDescription")}
+              {scope === "members"
+                ? t("detail.memberDescription")
+                : t("detail.contactDescription")}
             </SheetDescription>
           </SheetHeader>
           <ScrollArea className="min-h-0 flex-1">
@@ -977,41 +1338,26 @@ export function ContactsPage({
                   <LoaderCircleIcon className="size-4 animate-spin" />
                   {t("loading")}
                 </div>
-              ) : scope === "internal" && detailUser ? (
-                <dl className="grid gap-5 text-sm">
-                  <MemberDetailItem
-                    label={t("columns.name")}
-                    value={detailUser.displayName}
-                    emphasized
-                  />
-                  <MemberDetailItem
-                    label={t("columns.email")}
-                    value={detailUser.email}
-                  />
-                  <MemberDetailItem
-                    label={t("columns.role")}
-                    value={userRoleLabel(detailUser.role, t)}
-                  />
-                  <MemberDetailItem
-                    label={t("columns.status")}
-                    value={
-                      <UserStatusBadge
-                        status={detailUser.status}
-                        label={userStatusLabel(detailUser.status, t)}
-                      />
+              ) : scope === "members" && detailUser ? (
+                <MemberDetailView
+                  user={detailUser}
+                  teams={teams}
+                  workStatus={memberWorkStatus(detailUser)}
+                  onSaved={(saved) => {
+                    setDetailUser(saved)
+                    setRefreshVersion((current) => current + 1)
+                    if (saved.id === identity.user.id) {
+                      updateWorkspaceUser({
+                        ...identity.user,
+                        displayName: saved.displayName,
+                        email: saved.email,
+                        role: saved.role,
+                        status: saved.status,
+                      })
                     }
-                  />
-                  <MemberDetailItem
-                    label={t("columns.workStatus")}
-                    value={
-                      <WorkStatusBadge status={memberWorkStatus(detailUser)} />
-                    }
-                  />
-                  <MemberDetailItem
-                    label={t("columns.createdAt")}
-                    value={formatDateTime(detailUser.createdAt)}
-                  />
-                </dl>
+                  }}
+                  onNotFound={refreshAndClose}
+                />
               ) : scope === "external" && detail ? (
                 <ContactDetailView
                   detail={detail}
@@ -1027,22 +1373,184 @@ export function ContactsPage({
         </SheetContent>
       </Sheet>
 
-      <Dialog open={creating} onOpenChange={(open) => !open && setParameters({ new: null })}>
+      <Dialog
+        open={creating}
+        onOpenChange={(open) => !open && setParameters({ new: null })}
+      >
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>{t("detail.createTitle")}</DialogTitle>
-            <DialogDescription>{t("detail.createDescription")}</DialogDescription>
+            <DialogTitle>
+              {t(scope === "members" ? "members.create" : "detail.createTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                scope === "members"
+                  ? "members.createDescription"
+                  : "detail.createDescription",
+              )}
+            </DialogDescription>
           </DialogHeader>
-          <ContactForm
-            channels={channels}
-            onSaved={() => {
-              setParameters({ new: null })
-              setRefreshVersion((current) => current + 1)
+          {scope === "members" ? (
+            <MemberForm
+              teams={teams}
+              defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
+              onSaved={() => {
+                setParameters({ new: null })
+                setRefreshVersion((current) => current + 1)
+              }}
+              onCancel={() => setParameters({ new: null })}
+            />
+          ) : (
+            <ContactForm
+              channels={channels}
+              onSaved={() => {
+                setParameters({ new: null })
+                setRefreshVersion((current) => current + 1)
+              }}
+              onCancel={() => setParameters({ new: null })}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={creatingTeam}
+        onOpenChange={(open) => !open && setParameters({ newTeam: null })}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t("teams.create")}</DialogTitle>
+            <DialogDescription>
+              {t("teams.editDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <TeamForm
+            onSaved={(team) => {
+              setTeams((current) => [...current, team])
+              navigate(`/contacts/members?teamId=${team.id}`, {
+                replace: true,
+              })
             }}
-            onCancel={() => setParameters({ new: null })}
+            onCancel={() => setParameters({ newTeam: null })}
           />
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={editingTeam && Boolean(selectedTeam)}
+        onOpenChange={(open) => !open && setParameters({ editTeam: null })}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t("teams.edit")}</DialogTitle>
+            <DialogDescription>
+              {t("teams.createDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedTeam ? (
+            <TeamForm
+              team={selectedTeam}
+              onSaved={(saved) => {
+                setTeams((current) =>
+                  current.map((team) => (team.id === saved.id ? saved : team)),
+                )
+                setParameters({ editTeam: null })
+              }}
+              onCancel={() => setParameters({ editTeam: null })}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={deletingTeam !== null}
+        onOpenChange={(open) => !open && setDeletingTeam(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("teams.delete.title", { name: deletingTeam?.name ?? "" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("teams.delete.description", {
+                count: deletingTeam?.memberCount ?? 0,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("teams.form.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={() => void removeCurrentTeam()}
+            >
+              {t("teams.delete.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={removingTeamMember !== null}
+        onOpenChange={(open) => !open && setRemovingTeamMember(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("teams.members.removeTitle", {
+                name: removingTeamMember?.displayName ?? "",
+              })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("teams.members.removeDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("teams.form.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={() => void removeMemberFromCurrentTeam()}
+            >
+              {t("teams.members.remove")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={changingUserStatus !== null}
+        onOpenChange={(open) => !open && setChangingUserStatus(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                changingUserStatus?.status === UserStatus.UserStatusActive
+                  ? "members.status.deactivateTitle"
+                  : "members.status.reactivateTitle",
+                { name: changingUserStatus?.displayName ?? "" },
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                changingUserStatus?.status === UserStatus.UserStatusActive
+                  ? "members.status.deactivateDescription"
+                  : "members.status.reactivateDescription",
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("members.status.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={() => void changeUserStatus()}
+            >
+              {deleting
+                ? t("members.status.saving")
+                : t("members.status.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={deletingContact !== null}
@@ -1055,12 +1563,44 @@ export function ContactsPage({
                 name: deletingContact?.displayName || t("anonymous"),
               })}
             </AlertDialogTitle>
-            <AlertDialogDescription>{t("delete.description")}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {t("delete.description")}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("delete.cancel")}</AlertDialogCancel>
-            <AlertDialogAction disabled={deleting} onClick={() => void removeContact()}>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={() => void removeContact()}
+            >
               {deleting ? t("delete.deleting") : t("delete.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={restoringContact !== null}
+        onOpenChange={(open) => !open && setRestoringContact(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("trash.restoreTitle", {
+                name: restoringContact?.displayName || t("anonymous"),
+              })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("trash.restoreDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("trash.restoreCancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={() => void restore()}
+            >
+              {deleting ? t("trash.restoring") : t("trash.restoreConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
