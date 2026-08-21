@@ -13,6 +13,7 @@ import (
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/common/token"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -30,6 +31,8 @@ type InstallWorkspaceInput struct {
 	DisplayName      string
 	Email            string
 	Password         string
+	Locale           domain.Locale
+	TimeZone         string
 }
 
 // InstallWorkspaceOutput 返回企业所有者和初始令牌。
@@ -92,11 +95,13 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			PasswordHash:   passwordHash,
 			Role:           "owner",
 			Status:         "active",
+			Locale:         string(input.Locale),
+			TimeZone:       input.TimeZone,
 		}
 		if _, err := tx.NewInsert().
 			Model(user).
-			Column("organization_id", "email", "display_name", "password_hash", "role", "status").
-			Returning("id").
+			Column("organization_id", "email", "display_name", "password_hash", "role", "status", "locale", "time_zone").
+			Returning("id, work_status").
 			Exec(ctx); err != nil {
 			return err
 		}

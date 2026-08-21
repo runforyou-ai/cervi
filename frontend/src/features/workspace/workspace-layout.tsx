@@ -14,6 +14,8 @@ import {
   type User,
 } from "@/api"
 import { Button } from "@/components/ui/button"
+import { UserPreferencesProvider } from "@/contexts/user-preferences"
+import type { WorkspaceOutletContext } from "@/features/workspace/workspace-context"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
 /** 页面导航后清除文字选区。 */
@@ -115,15 +117,20 @@ export function WorkspaceLayout() {
   }
 
   return (
-    <div className="cervi-workspace-shell flex h-svh min-h-0 w-full overflow-hidden">
-      <WorkspaceNavigation
-        identity={identity}
-        onLogout={handleLogout}
-        loggingOut={loggingOut}
-      />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-        <Outlet context={{ identity, updateUser }} />
+    <UserPreferencesProvider user={identity.user}>
+      <div className="cervi-workspace-shell flex h-svh min-h-0 w-full overflow-hidden">
+        <WorkspaceNavigation
+          identity={identity}
+          onUserUpdated={updateUser}
+          onLogout={handleLogout}
+          loggingOut={loggingOut}
+        />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <Outlet
+            context={{ identity, updateUser } satisfies WorkspaceOutletContext}
+          />
+        </div>
       </div>
-    </div>
+    </UserPreferencesProvider>
   )
 }

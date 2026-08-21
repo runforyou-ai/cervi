@@ -59,6 +59,15 @@ const (
 	UserStatusInactive UserStatus = UserStatus(domain.UserStatusInactive)
 )
 
+// WorkStatus 表示成员主动设置的工作状态。
+type WorkStatus string
+
+const (
+	WorkStatusWorking WorkStatus = WorkStatus(domain.WorkStatusWorking)
+	WorkStatusAway    WorkStatus = WorkStatus(domain.WorkStatusAway)
+	WorkStatusOffDuty WorkStatus = WorkStatus(domain.WorkStatusOffDuty)
+)
+
 // ChannelType 表示渠道类型。
 type ChannelType string
 
@@ -135,6 +144,8 @@ type InstallWorkspaceInput struct {
 	DisplayName      string `json:"displayName"`
 	Email            string `json:"email"`
 	Password         string `json:"password"`
+	Locale           Locale `json:"locale"`
+	TimeZone         string `json:"timeZone"`
 }
 
 // LoginInput 定义登录输入。
@@ -164,6 +175,9 @@ type User struct {
 	DisplayName    string     `json:"displayName"`
 	Role           UserRole   `json:"role"`
 	Status         UserStatus `json:"status"`
+	Locale         Locale     `json:"locale"`
+	TimeZone       string     `json:"timeZone"`
+	WorkStatus     WorkStatus `json:"workStatus"`
 }
 
 // Identity 定义当前用户及其所属企业。
@@ -182,6 +196,17 @@ type ProfileInput struct {
 type ChangePasswordInput struct {
 	CurrentPassword string `json:"currentPassword"`
 	NewPassword     string `json:"newPassword"`
+}
+
+// UserPreferencesInput 定义当前用户的语言和时区设置。
+type UserPreferencesInput struct {
+	Locale   Locale `json:"locale"`
+	TimeZone string `json:"timeZone"`
+}
+
+// UserWorkStatusInput 定义当前用户主动设置的工作状态。
+type UserWorkStatusInput struct {
+	WorkStatus WorkStatus `json:"workStatus"`
 }
 
 // Conversation 定义收件箱中的会话。
@@ -296,6 +321,7 @@ type DirectoryUser struct {
 	DisplayName string     `json:"displayName"`
 	Role        UserRole   `json:"role"`
 	Status      UserStatus `json:"status"`
+	WorkStatus  WorkStatus `json:"workStatus"`
 	CreatedAt   time.Time  `json:"createdAt"`
 }
 

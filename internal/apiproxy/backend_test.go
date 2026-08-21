@@ -115,6 +115,32 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				return
 			}
 			writer.WriteHeader(http.StatusNoContent)
+		case "/api/preferences":
+			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected preferences request", http.StatusBadRequest)
+				return
+			}
+			var input appservice.UserPreferencesInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, map[string]string{
+				"id": "user-1", "organizationId": "organization-1", "locale": string(input.Locale), "timeZone": input.TimeZone,
+			})
+		case "/api/work-status":
+			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected work status request", http.StatusBadRequest)
+				return
+			}
+			var input appservice.UserWorkStatusInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, map[string]string{
+				"id": "user-1", "organizationId": "organization-1", "workStatus": string(input.WorkStatus),
+			})
 		case "/api/auth/login":
 			writeTestJSON(writer, http.StatusOK, map[string]any{
 				"identity": map[string]any{
@@ -191,6 +217,24 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 		NewPassword:     "new-password123",
 	}); err != nil {
 		t.Fatal(err)
+	}
+	preferences, err := backend.UpdateUserPreferences(context.Background(), meta, appservice.UserPreferencesInput{
+		Locale: appservice.LocaleEnglishUnitedStates, TimeZone: "America/New_York",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preferences.Locale != appservice.LocaleEnglishUnitedStates || preferences.TimeZone != "America/New_York" {
+		t.Fatalf("updated preferences = %#v", preferences)
+	}
+	workStatus, err := backend.UpdateUserWorkStatus(context.Background(), meta, appservice.UserWorkStatusInput{
+		WorkStatus: appservice.WorkStatusAway,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workStatus.WorkStatus != appservice.WorkStatusAway {
+		t.Fatalf("updated work status = %#v", workStatus)
 	}
 }
 

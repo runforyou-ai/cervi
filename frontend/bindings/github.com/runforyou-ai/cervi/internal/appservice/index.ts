@@ -17,7 +17,8 @@ export {
     SessionState,
     StorageProvider,
     UserRole,
-    UserStatus
+    UserStatus,
+    WorkStatus
 } from "./models.js";
 
 export type {
@@ -52,6 +53,8 @@ export type {
     User,
     UserList,
     UserListInput,
+    UserPreferencesInput,
+    UserWorkStatusInput,
     WebsiteChannel,
     WebsiteChannelChatInterface,
     WebsiteChannelChatInterfaceInput,

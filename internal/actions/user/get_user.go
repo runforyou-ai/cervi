@@ -32,7 +32,7 @@ func (q *GetUserQuery) Execute(ctx context.Context, identity *servermodels.Ident
 	err := q.db.NewSelect().
 		TableExpr("users AS u").
 		ColumnExpr("u.id::text AS id").
-		Column("email", "display_name", "role", "status", "created_at").
+		Column("email", "display_name", "role", "status", "work_status", "created_at").
 		Where("u.id = ?", userID).
 		Where("u.organization_id = ?", identity.Organization.ID).
 		Scan(ctx, user)

@@ -1,18 +1,23 @@
-/** 外观主题设置。 */
+/** 偏好设置中的主题字段。 */
 import { CheckIcon, MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
-import { useTheme } from "next-themes"
 import { useTranslation } from "react-i18next"
 
 import { FieldLegend, FieldSet } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
 
+/** 偏好设置支持的主题。 */
+export const themePreferences = ["system", "light", "dark"] as const
+
+export type ThemePreference = (typeof themePreferences)[number]
+
 const themeOptions = [
   { value: "system", icon: MonitorIcon },
   { value: "light", icon: SunIcon },
   { value: "dark", icon: MoonIcon },
-] as const
-
-type ThemePreference = (typeof themeOptions)[number]["value"]
+] as const satisfies ReadonlyArray<{
+  value: ThemePreference
+  icon: typeof MonitorIcon
+}>
 
 const themePreviewClasses = {
   system: {
@@ -38,7 +43,7 @@ const themePreviewClasses = {
   { canvas: string; sidebar: string; line: string; panel: string }
 >
 
-/** 展示主题的界面预览。 */
+/** 展示主题界面预览。 */
 function ThemePreview({ theme }: { theme: ThemePreference }) {
   const classes = themePreviewClasses[theme]
 
@@ -63,51 +68,56 @@ function ThemePreview({ theme }: { theme: ThemePreference }) {
   )
 }
 
-/** 设置界面主题。 */
-export function AppearanceSettings() {
+/** 渲染主题选择字段。 */
+export function AppearanceSettings({
+  name,
+  value,
+  invalid,
+  onBlur,
+  onChange,
+}: {
+  name: string
+  value: ThemePreference
+  invalid: boolean
+  onBlur: () => void
+  onChange: (value: ThemePreference) => void
+}) {
   const { t } = useTranslation("settings")
-  const { theme, setTheme } = useTheme()
-  const selectedTheme = theme ?? "system"
-
-  /** 应用并记录主题选择。 */
-  function selectTheme(value: ThemePreference) {
-    setTheme(value)
-    console.info("外观主题已切换", { theme: value })
-  }
 
   return (
-    <FieldSet className="w-full max-w-2xl gap-0">
+    <FieldSet className="w-full gap-0" aria-invalid={invalid}>
       <FieldLegend className="mb-0">{t("appearance.theme")}</FieldLegend>
       <div
         className="mt-4 grid gap-3 sm:grid-cols-3"
         data-slot="radio-group"
       >
-        {themeOptions.map(({ value, icon: Icon }) => {
-          const checked = selectedTheme === value
+        {themeOptions.map(({ value: optionValue, icon: Icon }) => {
+          const checked = value === optionValue
 
           return (
             <label
-              key={value}
+              key={optionValue}
               className={cn(
                 "min-w-0 cursor-pointer rounded-lg border-2 p-3 transition-[border-color,box-shadow]",
-                "hover:border-foreground/30",
-                "has-focus-visible:border-ring",
+                "hover:border-foreground/30 has-focus-visible:border-ring",
                 checked ? "border-primary" : "border-border",
               )}
             >
               <input
                 className="sr-only"
                 type="radio"
-                name="theme"
-                value={value}
+                name={name}
+                value={optionValue}
                 checked={checked}
-                onChange={() => selectTheme(value)}
+                aria-invalid={invalid}
+                onBlur={onBlur}
+                onChange={() => onChange(optionValue)}
               />
-              <ThemePreview theme={value} />
+              <ThemePreview theme={optionValue} />
               <span className="mt-3 flex items-center gap-2 text-sm font-medium">
                 <Icon className="size-4 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate">
-                  {t(`appearance.options.${value}`)}
+                  {t(`appearance.options.${optionValue}`)}
                 </span>
                 <CheckIcon
                   className={cn(

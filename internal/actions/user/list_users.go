@@ -66,7 +66,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	users := make([]DirectoryUser, 0)
 	if err := applyFilters(q.db.NewSelect().TableExpr("users AS u")).
 		ColumnExpr("u.id::text AS id").
-		Column("email", "display_name", "role", "status", "created_at").
+		Column("email", "display_name", "role", "status", "work_status", "created_at").
 		OrderExpr("lower(u.display_name) ASC, u.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).

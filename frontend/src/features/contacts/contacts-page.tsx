@@ -105,6 +105,12 @@ import {
 import { ContactForm } from "@/features/contacts/contact-form"
 import { ContactDetailView } from "@/features/contacts/contact-detail"
 import {
+  WorkStatusBadge,
+  WorkStatusDot,
+  workStatusLabel,
+} from "@/features/users/work-status"
+import { useWorkspace } from "@/features/workspace/workspace-context"
+import {
   channelTypeLabel,
   userRoleLabel,
   userStatusLabel,
@@ -388,6 +394,8 @@ export function ContactsPage({
   deleted?: boolean
 }) {
   const { t } = useTranslation("contacts")
+  const { t: tCommon } = useTranslation("common")
+  const { identity } = useWorkspace()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -419,6 +427,11 @@ export function ContactsPage({
   const status = optionalWailsEnum(UserStatus, searchParams.get("status"))
   const role = optionalWailsEnum(UserRole, searchParams.get("role"))
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
+
+  /** 当前用户使用工作台中的即时状态，其他成员使用目录查询结果。 */
+  function memberWorkStatus(user: DirectoryUser) {
+    return user.id === identity.user.id ? identity.user.workStatus : user.workStatus
+  }
 
   /** 更新列表查询参数。 */
   const setParameters = useCallback(
@@ -836,7 +849,21 @@ export function ContactsPage({
                   {scope === "internal" && users.length > 0
                     ? users.map((user) => (
                         <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.displayName}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-xs font-semibold text-secondary-foreground"
+                                title={workStatusLabel(memberWorkStatus(user), tCommon)}
+                              >
+                                {user.displayName.slice(0, 1).toUpperCase()}
+                                <WorkStatusDot
+                                  status={memberWorkStatus(user)}
+                                  className="absolute -right-0.5 -bottom-0.5 size-2 ring-2 ring-card"
+                                />
+                              </span>
+                              <span>{user.displayName}</span>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-muted-foreground">{user.email}</TableCell>
                           <TableCell>{userRoleLabel(user.role, t)}</TableCell>
                           <TableCell>
@@ -972,6 +999,12 @@ export function ContactsPage({
                         status={detailUser.status}
                         label={userStatusLabel(detailUser.status, t)}
                       />
+                    }
+                  />
+                  <MemberDetailItem
+                    label={t("columns.workStatus")}
+                    value={
+                      <WorkStatusBadge status={memberWorkStatus(detailUser)} />
                     }
                   />
                   <MemberDetailItem
