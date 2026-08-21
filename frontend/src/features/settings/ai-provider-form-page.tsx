@@ -69,6 +69,7 @@ export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
   const [loadingModels, setLoadingModels] = useState(false)
   const loadVersion = useRef(0)
   const mounted = useRef(true)
+  const formElement = useRef<HTMLFormElement>(null)
   const schema = useMemo(
     () =>
       createAIProviderSchema({
@@ -291,6 +292,11 @@ export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
     }
   }
 
+  /** 显示第一个无效输入框的浏览器原生提示。 */
+  function showValidationError() {
+    formElement.current?.reportValidity()
+  }
+
   const title =
     mode === "create"
       ? t("aiProviders.form.createTitle")
@@ -320,8 +326,9 @@ export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
           </div>
         ) : (
           <form
+            ref={formElement}
             className="w-full max-w-3xl space-y-8"
-            onSubmit={form.handleSubmit(save)}
+            onSubmit={form.handleSubmit(save, showValidationError)}
             noValidate
           >
             <FieldGroup>
