@@ -287,9 +287,32 @@ func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, t
 	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID), nil, nil, nil)
 }
 
-// RemoveTeamMember 移出远程团队成员。
-func (b *Backend) RemoveTeamMember(ctx context.Context, meta appservice.RequestMeta, teamID string, identityType appservice.MemberIdentityType, identityID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID)+"/members/"+url.PathEscape(string(identityType))+"/"+url.PathEscape(identityID), nil, nil, nil)
+// ListTeamMemberCandidates 返回远程团队可添加的企业成员。
+func (b *Backend) ListTeamMemberCandidates(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberCandidateInput) (appservice.TeamMemberCandidateList, error) {
+	query := url.Values{}
+	setQuery(query, "query", input.Query)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	var output appservice.TeamMemberCandidateList
+	err := b.do(ctx, meta, http.MethodGet, "/teams/"+url.PathEscape(teamID)+"/member-candidates", query, nil, &output)
+	for index := range output.Members {
+		output.Members[index].AvatarURL = b.absoluteContentURL(output.Members[index].AvatarURL)
+	}
+	return output, err
+}
+
+// AddTeamMembers 将远程企业成员批量加入团队。
+func (b *Backend) AddTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
+	var output appservice.Team
+	err := b.do(ctx, meta, http.MethodPost, "/teams/"+url.PathEscape(teamID)+"/members", nil, input, &output)
+	return output, err
+}
+
+// RemoveTeamMembers 将远程企业成员批量移出团队。
+func (b *Backend) RemoveTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
+	var output appservice.Team
+	err := b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID)+"/members", nil, input, &output)
+	return output, err
 }
 
 // ListContacts 返回远程联系人列表。

@@ -523,6 +523,39 @@ type TeamList struct {
 	Page  PageInfo `json:"page"`
 }
 
+// TeamMemberCandidateInput 定义可加入团队的成员查询条件。
+type TeamMemberCandidateInput struct {
+	Query    string `json:"query"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"pageSize"`
+}
+
+// TeamMemberCandidate 定义可加入团队的企业成员。
+type TeamMemberCandidate struct {
+	IdentityType MemberIdentityType `json:"identityType"`
+	IdentityID   string             `json:"identityId"`
+	DisplayName  string             `json:"displayName"`
+	AvatarURL    string             `json:"avatarUrl"`
+	Role         RoleSummary        `json:"role"`
+}
+
+// TeamMemberCandidateList 定义可加入团队的成员分页结果。
+type TeamMemberCandidateList struct {
+	Members []TeamMemberCandidate `json:"members"`
+	Page    PageInfo              `json:"page"`
+}
+
+// TeamMemberIdentityInput 定义要变更的团队成员身份。
+type TeamMemberIdentityInput struct {
+	IdentityType MemberIdentityType `json:"identityType"`
+	IdentityID   string             `json:"identityId"`
+}
+
+// TeamMemberInput 定义批量变更团队的身份列表。
+type TeamMemberInput struct {
+	Members []TeamMemberIdentityInput `json:"members"`
+}
+
 // ContactMethodInput 定义联系人联系方式输入。
 type ContactMethodInput struct {
 	Type      ContactMethodType `json:"type"`

@@ -71,17 +71,61 @@ func (b *DirectBackend) DeleteTeam(ctx context.Context, meta RequestMeta, teamID
 	return nil
 }
 
-// RemoveTeamMember 移出团队成员。
-func (b *DirectBackend) RemoveTeamMember(ctx context.Context, meta RequestMeta, teamID string, identityType MemberIdentityType, identityID string) error {
+// ListTeamMemberCandidates 返回尚未加入团队的企业成员。
+func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return err
+		return TeamMemberCandidateList{}, err
 	}
-	if err := b.removeTeamMember.Execute(ctx, identity, teamID, domain.MemberIdentityType(identityType), identityID); err != nil {
-		return b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberRemoveFailed, identity.Organization.ID, teamID)
+	output, err := b.listTeamMemberCandidates.Execute(ctx, identity, teamID, teamaction.MemberCandidateInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
+	if err != nil {
+		return TeamMemberCandidateList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
 	}
-	slog.Info("团队成员移出成功", "organization_id", identity.Organization.ID, "team_id", teamID, "identity_type", identityType, "identity_id", identityID)
-	return nil
+	members := make([]TeamMemberCandidate, 0, len(output.Members))
+	for _, member := range output.Members {
+		members = append(members, TeamMemberCandidate{
+			IdentityType: MemberIdentityType(member.IdentityType), IdentityID: member.IdentityID,
+			DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
+			Role: RoleSummary{ID: member.RoleID, Kind: RoleKind(member.RoleKind), Name: member.RoleName},
+		})
+	}
+	return TeamMemberCandidateList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
+}
+
+// AddTeamMembers 将企业成员批量加入团队。
+func (b *DirectBackend) AddTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return Team{}, err
+	}
+	members := make([]teamaction.MemberIdentity, 0, len(input.Members))
+	for _, member := range input.Members {
+		members = append(members, teamaction.MemberIdentity{Type: domain.MemberIdentityType(member.IdentityType), ID: member.IdentityID})
+	}
+	team, err := b.addTeamMembers.Execute(ctx, identity, teamID, members)
+	if err != nil {
+		return Team{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberAddFailed, identity.Organization.ID, teamID)
+	}
+	slog.Info("团队成员添加成功", "organization_id", identity.Organization.ID, "team_id", teamID, "requested_member_count", len(members))
+	return teamFromAction(*team), nil
+}
+
+// RemoveTeamMembers 将企业成员批量移出团队。
+func (b *DirectBackend) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return Team{}, err
+	}
+	members := make([]teamaction.MemberIdentity, 0, len(input.Members))
+	for _, member := range input.Members {
+		members = append(members, teamaction.MemberIdentity{Type: domain.MemberIdentityType(member.IdentityType), ID: member.IdentityID})
+	}
+	team, err := b.removeTeamMembers.Execute(ctx, identity, teamID, members)
+	if err != nil {
+		return Team{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberRemoveFailed, identity.Organization.ID, teamID)
+	}
+	slog.Info("团队成员移出成功", "organization_id", identity.Organization.ID, "team_id", teamID, "requested_member_count", len(members))
+	return teamFromAction(*team), nil
 }
 
 // teamError 转换团队领域错误。
@@ -101,6 +145,9 @@ func (b *DirectBackend) teamError(ctx context.Context, meta RequestMeta, err err
 	}
 	if errors.Is(err, teamaction.ErrMemberNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorTeamMemberNotFound)
+	}
+	if errors.Is(err, teamaction.ErrMemberInvalid) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if teamID != "" {

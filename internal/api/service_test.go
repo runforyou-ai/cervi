@@ -23,8 +23,7 @@ type testBackend struct {
 	lastUpdateUser   appservice.UpdateDirectoryUserInput
 	lastTeamList     appservice.TeamListInput
 	lastTeam         appservice.TeamInput
-	lastIdentityType appservice.MemberIdentityType
-	lastIdentityID   string
+	lastTeamMembers  appservice.TeamMemberInput
 	lastProfile      appservice.ProfileInput
 	lastFileUpload   appservice.FileUploadInput
 	lastFileID       string
@@ -137,12 +136,23 @@ func (b *testBackend) CreateTeam(_ context.Context, meta appservice.RequestMeta,
 	return appservice.Team{ID: "team-1", Name: input.Name, Description: input.Description}, nil
 }
 
-// RemoveTeamMember 记录测试中的团队身份移出参数。
-func (b *testBackend) RemoveTeamMember(_ context.Context, meta appservice.RequestMeta, _ string, identityType appservice.MemberIdentityType, identityID string) error {
+// ListTeamMemberCandidates 返回测试中的空候选列表。
+func (b *testBackend) ListTeamMemberCandidates(_ context.Context, _ appservice.RequestMeta, _ string, input appservice.TeamMemberCandidateInput) (appservice.TeamMemberCandidateList, error) {
+	return appservice.TeamMemberCandidateList{Members: []appservice.TeamMemberCandidate{}, Page: appservice.PageInfo{Number: input.Page, Size: input.PageSize}}, nil
+}
+
+// AddTeamMembers 返回测试中的团队。
+func (b *testBackend) AddTeamMembers(_ context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
 	b.lastMeta = meta
-	b.lastIdentityType = identityType
-	b.lastIdentityID = identityID
-	return nil
+	b.lastTeamMembers = input
+	return appservice.Team{ID: teamID}, nil
+}
+
+// RemoveTeamMembers 返回测试中的团队。
+func (b *testBackend) RemoveTeamMembers(_ context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
+	b.lastMeta = meta
+	b.lastTeamMembers = input
+	return appservice.Team{ID: teamID}, nil
 }
 
 // UpdateOrganization 保存测试企业名称。
@@ -247,10 +257,16 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 		t.Fatalf("status = %d, input = %#v", listResponse.StatusCode, backend.lastTeamList)
 	}
 
-	removeResponse := doJSON(t, http.MethodDelete, server.URL+"/teams/team-1/members/agent/agent-2", nil, "test-token")
+	addResponse := doJSON(t, http.MethodPost, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.MemberIdentityTypeUser, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
+	defer addResponse.Body.Close()
+	if addResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.MemberIdentityTypeUser {
+		t.Fatalf("status = %d, input = %#v", addResponse.StatusCode, backend.lastTeamMembers)
+	}
+
+	removeResponse := doJSON(t, http.MethodDelete, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.MemberIdentityTypeAgent, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
 	defer removeResponse.Body.Close()
-	if removeResponse.StatusCode != http.StatusNoContent || backend.lastIdentityType != appservice.MemberIdentityTypeAgent || backend.lastIdentityID != "agent-2" {
-		t.Fatalf("status = %d, identity type = %q, identity id = %q", removeResponse.StatusCode, backend.lastIdentityType, backend.lastIdentityID)
+	if removeResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.MemberIdentityTypeAgent {
+		t.Fatalf("status = %d, input = %#v", removeResponse.StatusCode, backend.lastTeamMembers)
 	}
 }
 
