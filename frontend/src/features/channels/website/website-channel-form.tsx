@@ -19,6 +19,7 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
   Field,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -103,11 +104,11 @@ export function WebsiteChannelForm({
 
   return (
     <form
-      className="mt-6 w-full"
+      className="w-full max-w-2xl"
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
-      <FieldGroup className="gap-6">
+      <FieldGroup>
         <FormInputField
           name="name"
           control={form.control}
@@ -118,15 +119,17 @@ export function WebsiteChannelForm({
         <Controller
           name="description"
           control={form.control}
-          render={({ field }) => (
-            <Field>
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name}>
                 {t("form.description")}
               </FieldLabel>
               <Textarea
                 {...field}
                 id={field.name}
+                aria-invalid={fieldState.invalid}
               />
+              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -134,8 +137,8 @@ export function WebsiteChannelForm({
         <Controller
           name="defaultLocale"
           control={form.control}
-          render={({ field }) => (
-            <Field>
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name} required>
                 {t("form.defaultLocale")}
               </FieldLabel>
@@ -143,15 +146,17 @@ export function WebsiteChannelForm({
                 {...field}
                 id={field.name}
                 required
+                aria-invalid={fieldState.invalid}
               >
                 <option value={Locale.LocaleChineseSimplified}>{t("locales.zhCN")}</option>
                 <option value={Locale.LocaleEnglishUnitedStates}>{t("locales.enUS")}</option>
               </NativeSelect>
+              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? t("form.saving") : t("form.save")}
           </Button>

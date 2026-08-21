@@ -9,7 +9,7 @@ import {
 } from "react-hook-form"
 
 import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
@@ -56,7 +56,7 @@ export function FormInputField<T extends FieldValues>({
     <Controller
       name={name}
       control={control}
-      render={({ field }) => {
+      render={({ field, fieldState }) => {
         const trailing = passwordVisibilityLabels ? (
           <Button
             type="button"
@@ -91,11 +91,12 @@ export function FormInputField<T extends FieldValues>({
             }
             className={cn(trailing && "pr-10", className)}
             required={required}
+            aria-invalid={fieldState.invalid}
           />
         )
 
         return (
-          <Field>
+          <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor={id} required={required}>
               {label}
             </FieldLabel>
@@ -107,6 +108,7 @@ export function FormInputField<T extends FieldValues>({
             ) : (
               input
             )}
+            <FieldError errors={[fieldState.error]} />
           </Field>
         )
       }}

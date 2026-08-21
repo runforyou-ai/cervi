@@ -16,7 +16,7 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -111,9 +111,9 @@ export function WebsiteChannelChatInterfaceForm({
   const { isSubmitting } = form.formState
 
   return (
-    <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+    <div className="grid max-w-6xl gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
       <form className="w-full" onSubmit={form.handleSubmit(submit)} noValidate>
-        <FieldGroup className="gap-6">
+        <FieldGroup>
           <FormInputField
             name="title"
             control={form.control}
@@ -131,12 +131,18 @@ export function WebsiteChannelChatInterfaceForm({
           <Controller
             name="greetingMessage"
             control={form.control}
-            render={({ field }) => (
-              <Field>
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor={field.name}>
                   {t("chatInterface.form.greetingMessage")}
                 </FieldLabel>
-                <Textarea {...field} id={field.name} rows={4} />
+                <Textarea
+                  {...field}
+                  id={field.name}
+                  rows={4}
+                  aria-invalid={fieldState.invalid}
+                />
+                <FieldError errors={[fieldState.error]} />
               </Field>
             )}
           />
@@ -144,12 +150,12 @@ export function WebsiteChannelChatInterfaceForm({
           <Controller
             name="themeColor"
             control={form.control}
-            render={({ field }) => {
+            render={({ field, fieldState }) => {
               const colorValue = isWebsiteChannelThemeColor(field.value)
                 ? field.value
                 : defaultWebsiteChannelThemeColor
               return (
-                <Field>
+                <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor={field.name} required>
                     {t("chatInterface.form.themeColor")}
                   </FieldLabel>
@@ -181,14 +187,16 @@ export function WebsiteChannelChatInterfaceForm({
                       className="w-32 font-mono uppercase"
                       maxLength={7}
                       required
+                      aria-invalid={fieldState.invalid}
                     />
                   </div>
+                  <FieldError errors={[fieldState.error]} />
                 </Field>
               )
             }}
           />
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting
                 ? t("form.saving")

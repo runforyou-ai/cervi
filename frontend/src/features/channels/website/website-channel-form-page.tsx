@@ -12,6 +12,7 @@ import {
   type WebsiteChannel,
 } from "@/api"
 import { PageBack } from "@/components/page-back"
+import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -26,10 +27,12 @@ const editTabs = ["basic", "chat-interface", "usage"] as const
 
 type EditTab = (typeof editTabs)[number]
 
+/** 判断值是否为渠道编辑页签。 */
 function isEditTab(value: string | null): value is EditTab {
   return editTabs.some((tab) => tab === value)
 }
 
+/** 判断值是否为渠道访问方式页签。 */
 function isAccessTab(value: string | null): value is WebsiteChannelAccess {
   return value === "embed" || value === "link"
 }
@@ -66,6 +69,7 @@ function WebsiteChannelEditTabs({
     setSearchParams(nextParams, { replace: true })
   }, [activeTab, requestedAccess, requestedTab, searchParams, setSearchParams])
 
+  /** 切换渠道编辑页签并同步 URL。 */
   function setTab(value: string) {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set("tab", value)
@@ -75,6 +79,7 @@ function WebsiteChannelEditTabs({
     setSearchParams(nextParams, { replace: true })
   }
 
+  /** 切换渠道访问方式并同步 URL。 */
   function setAccess(value: WebsiteChannelAccess) {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set("tab", "usage")
@@ -83,7 +88,7 @@ function WebsiteChannelEditTabs({
   }
 
   return (
-    <Tabs className="mt-6" value={activeTab} onValueChange={setTab}>
+    <Tabs value={activeTab} onValueChange={setTab}>
       <TabsList>
         <TabsTrigger value="basic">{t("tabs.basic")}</TabsTrigger>
         <TabsTrigger value="chat-interface">
@@ -94,7 +99,7 @@ function WebsiteChannelEditTabs({
       <TabsContent
         value="basic"
         forceMount
-        className="data-[state=inactive]:hidden"
+        className="mt-6 data-[state=inactive]:hidden"
       >
         <WebsiteChannelForm
           channel={channel}
@@ -106,7 +111,7 @@ function WebsiteChannelEditTabs({
       <TabsContent
         value="chat-interface"
         forceMount
-        className="data-[state=inactive]:hidden"
+        className="mt-6 data-[state=inactive]:hidden"
       >
         <WebsiteChannelChatInterfaceForm
           channel={channel}
@@ -118,7 +123,7 @@ function WebsiteChannelEditTabs({
       <TabsContent
         value="usage"
         forceMount
-        className="data-[state=inactive]:hidden"
+        className="mt-6 data-[state=inactive]:hidden"
       >
         <WebsiteChannelUsagePanel
           channelId={channel.id}
@@ -191,7 +196,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
       >
         <PageBack to="/channels/website" />
       </PageHeader>
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+      <PageContent>
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
@@ -218,7 +223,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
         ) : (
           <WebsiteChannelForm />
         )}
-      </div>
+      </PageContent>
     </div>
   )
 }

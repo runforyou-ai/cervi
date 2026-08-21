@@ -12,6 +12,7 @@ import {
   type WebsiteChannelSummary,
 } from "@/api"
 import { PageBack } from "@/components/page-back"
+import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
@@ -82,7 +83,7 @@ export function WebsiteChannelTrashPage() {
         <PageBack to="/channels/website" />
       </PageHeader>
 
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+      <PageContent>
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
@@ -163,7 +164,7 @@ export function WebsiteChannelTrashPage() {
             </Table>
           </div>
         )}
-      </div>
+      </PageContent>
     </div>
   )
 }
