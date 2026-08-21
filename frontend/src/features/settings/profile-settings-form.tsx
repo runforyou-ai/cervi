@@ -82,12 +82,12 @@ export function ProfileSettingsForm({
 
   return (
     <form
-      className="mt-6 w-full max-w-xl"
+      className="w-full max-w-xl"
       aria-label={t("profile.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
     >
-      <FieldGroup className="gap-6">
+      <FieldGroup>
         <Controller
           name="displayName"
           control={form.control}

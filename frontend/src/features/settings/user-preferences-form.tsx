@@ -85,17 +85,23 @@ export function UserPreferencesForm({
       })
       toast.success(t("preferences.saveSuccess"))
     } catch (error) {
-      if (recoverSession(error, navigate)) return
+      if (recoverSession(error, navigate)) {
+        return
+      }
       console.warn("保存偏好设置失败", error)
       if (isApiError(error)) {
         let fieldError = false
         for (const name of ["locale", "timeZone"] as const) {
           const message = error.fields[name]
-          if (!message) continue
+          if (!message) {
+            continue
+          }
           form.setError(name, { message }, { shouldFocus: !fieldError })
           fieldError = true
         }
-        if (fieldError) return
+        if (fieldError) {
+          return
+        }
         toast.error(apiErrorMessage(error))
         return
       }
@@ -107,12 +113,12 @@ export function UserPreferencesForm({
 
   return (
     <form
-      className="mt-6 w-full max-w-xl"
+      className="w-full max-w-2xl"
       aria-label={t("preferences.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
     >
-      <FieldGroup className="gap-6">
+      <FieldGroup>
         <Controller
           name="locale"
           control={form.control}

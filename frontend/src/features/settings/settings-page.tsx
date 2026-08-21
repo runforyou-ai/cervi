@@ -1,12 +1,13 @@
 /** 设置页。 */
 import { useTranslation } from "react-i18next"
 
-import { PageHeader } from "@/components/page-header"
+import { PageContent } from "@/components/page-content"
 import {
   PagePaneLink,
   PagePaneNav,
   PageSplit,
 } from "@/components/page-split"
+import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { OrganizationSettingsForm } from "@/features/settings/organization-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
@@ -46,7 +47,7 @@ export function PersonalSettingsPage({
       }
     >
       <PageHeader title={title} />
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+      <PageContent>
         {section === "profile" ? (
           <ProfileSettingsForm user={identity.user} onUpdated={updateUser} />
         ) : section === "security" ? (
@@ -54,7 +55,7 @@ export function PersonalSettingsPage({
         ) : (
           <UserPreferencesForm user={identity.user} onUpdated={updateUser} />
         )}
-      </div>
+      </PageContent>
     </PageSplit>
   )
 }
@@ -88,7 +89,7 @@ export function SystemSettingsPage({
       }
     >
       <PageHeader title={title} />
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+      <PageContent>
         {section === "organization" ? (
           <OrganizationSettingsForm
             organization={identity.organization}
@@ -97,7 +98,7 @@ export function SystemSettingsPage({
         ) : (
           <StorageSettingsForm />
         )}
-      </div>
+      </PageContent>
     </PageSplit>
   )
 }

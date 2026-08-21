@@ -91,7 +91,7 @@ export function OrganizationSettingsForm({
 
   return (
     <form
-      className="mt-6 w-full max-w-xl"
+      className="w-full max-w-xl"
       onSubmit={form.handleSubmit(save)}
       noValidate
     >

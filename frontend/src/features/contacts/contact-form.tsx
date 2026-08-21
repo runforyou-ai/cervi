@@ -120,12 +120,17 @@ export function ContactForm({
         <Controller
           name="channelId"
           control={form.control}
-          render={({ field }) => (
-            <Field>
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name} required>
                 {t("form.channel")}
               </FieldLabel>
-              <NativeSelect {...field} id={field.name} required>
+              <NativeSelect
+                {...field}
+                id={field.name}
+                required
+                aria-invalid={fieldState.invalid}
+              >
                 <option value="" disabled>
                   {t("form.channelPlaceholder")}
                 </option>
@@ -135,6 +140,7 @@ export function ContactForm({
                   </option>
                 ))}
               </NativeSelect>
+              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -142,16 +148,22 @@ export function ContactForm({
         <Controller
           name="stage"
           control={form.control}
-          render={({ field }) => (
-            <Field>
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name} required>
                 {t("form.stage")}
               </FieldLabel>
-              <NativeSelect {...field} id={field.name} required>
+              <NativeSelect
+                {...field}
+                id={field.name}
+                required
+                aria-invalid={fieldState.invalid}
+              >
                 <option value={ContactStage.ContactStageVisitor}>{t("stages.visitor")}</option>
                 <option value={ContactStage.ContactStageLead}>{t("stages.lead")}</option>
                 <option value={ContactStage.ContactStageCustomer}>{t("stages.customer")}</option>
               </NativeSelect>
+              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -188,15 +200,20 @@ export function ContactForm({
         <Controller
           name="notes"
           control={form.control}
-          render={({ field }) => (
-            <Field>
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={field.name}>{t("form.notes")}</FieldLabel>
-              <Textarea {...field} id={field.name} />
+              <Textarea
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+              />
+              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex items-center gap-2 pt-2">
           <Button type="submit" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
           </Button>
