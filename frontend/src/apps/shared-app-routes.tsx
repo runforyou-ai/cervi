@@ -61,6 +61,10 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
           element={<SystemSettingsPage section="organization" />}
         />
         <Route
+          path="/settings/ai-providers"
+          element={<SystemSettingsPage section="aiProviders" />}
+        />
+        <Route
           path="/settings/roles"
           element={<SystemSettingsPage section="roles" />}
         />

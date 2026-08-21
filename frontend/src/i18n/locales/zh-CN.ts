@@ -466,6 +466,7 @@ const zhCN = {
       security: "登录与安全",
       preferences: "偏好设置",
       organization: "企业信息",
+      aiProviders: "AI 供应商",
       roles: "角色与权限",
       storage: "存储设置",
     },
@@ -550,6 +551,10 @@ const zhCN = {
         nameRequired: "请输入企业名称。",
         nameTooLong: "企业名称不能超过 32 个字符。",
       },
+    },
+    aiProviders: {
+      title: "AI 供应商",
+      placeholder: "AI 供应商设置即将开放。",
     },
     roles: {
       title: "角色与权限",
