@@ -51,6 +51,7 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageBack } from "@/components/page-back"
+import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { SelectableText } from "@/components/selectable-text"
@@ -706,6 +707,7 @@ export function ContactsPage({
           <ListToolbar>
             <ListToolbarSearch
               value={search}
+              aria-label={scope === "internal" ? t("search.internal") : t("search.external")}
               placeholder={scope === "internal" ? t("search.internal") : t("search.external")}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -800,7 +802,7 @@ export function ContactsPage({
           </ListToolbar>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6">
+        <PageContent>
           {loadState === "loading" ? (
             <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
               <LoaderCircleIcon className="size-4 animate-spin" />
@@ -947,7 +949,7 @@ export function ContactsPage({
               <PageControls page={page} onPageChange={(number) => setParameters({ page: String(number), selected: null })} />
             </div>
           )}
-        </div>
+        </PageContent>
       </section>
 
       <Sheet open={Boolean(selected)} onOpenChange={(open) => !open && closeDetail()}>

@@ -1,6 +1,7 @@
 /** 设置页。 */
 import { useTranslation } from "react-i18next"
 
+import { PageContent } from "@/components/page-content"
 import {
   PagePaneLink,
   PagePaneNav,
@@ -45,7 +46,7 @@ export function PersonalSettingsPage({
       }
     >
       <PageHeader title={title} />
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+      <PageContent>
         {section === "profile" ? (
           <ProfileSettingsForm user={identity.user} onUpdated={updateUser} />
         ) : section === "security" ? (
@@ -53,7 +54,7 @@ export function PersonalSettingsPage({
         ) : (
           <UserPreferencesForm user={identity.user} onUpdated={updateUser} />
         )}
-      </div>
+      </PageContent>
     </PageSplit>
   )
 }
@@ -78,9 +79,9 @@ export function SystemSettingsPage() {
       }
     >
       <PageHeader title={t("storage.title")} />
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 sm:px-6 lg:px-8">
+      <PageContent>
         <StorageSettingsForm />
-      </div>
+      </PageContent>
     </PageSplit>
   )
 }

@@ -19,10 +19,10 @@ export function PageHeader({
       className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-3 select-none sm:px-6 md:h-14 md:flex-nowrap md:py-0"
     >
       {beforeTitle}
-      <div className="mr-auto min-w-40">
+      <div className="mr-auto min-w-0 flex-1">
         <h2
           data-slot="page-header-title"
-          className="w-fit text-base leading-6 font-semibold tracking-tight"
+          className="w-fit max-w-full truncate text-base leading-6 font-semibold tracking-tight"
         >
           <SelectableText>{title}</SelectableText>
         </h2>

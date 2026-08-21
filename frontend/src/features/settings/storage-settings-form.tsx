@@ -324,7 +324,7 @@ export function StorageSettingsForm() {
 
   if (loading) {
     return (
-      <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
         {t("storage.loading")}
       </div>
@@ -333,7 +333,7 @@ export function StorageSettingsForm() {
 
   if (loadError) {
     return (
-      <div className="mt-8">
+      <div>
         <p className="text-sm text-muted-foreground">{loadError}</p>
         <Button
           className="mt-4"
@@ -351,7 +351,7 @@ export function StorageSettingsForm() {
   const detailRegion = getStorageRegion(detailProvider, savedSetting.region)
 
   return (
-    <div className="mt-6 w-full">
+    <div className="w-full max-w-3xl">
       <Field className="gap-2">
         <FieldLabel htmlFor="storage-enabled">
           {t("storage.form.enabled")}
@@ -377,16 +377,16 @@ export function StorageSettingsForm() {
 
       {editing ? (
         <form
-          className="mt-8 w-full"
+          className="mt-6 w-full"
           onSubmit={form.handleSubmit(save)}
           noValidate
         >
-          <h3 className="mb-6 text-base font-medium">
+          <h3 className="mb-4 text-base font-medium">
             {configured
               ? t("storage.form.editTitle")
               : t("storage.form.configureTitle")}
           </h3>
-          <FieldGroup className="gap-6">
+          <FieldGroup>
             <Controller
               name="provider"
               control={form.control}
@@ -539,7 +539,7 @@ export function StorageSettingsForm() {
               )}
             />
 
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2">
               <Button type="submit" disabled={submitting}>
                 {pendingAction === "save"
                   ? t("storage.form.saving")
@@ -660,7 +660,7 @@ export function StorageSettingsForm() {
             </div>
           </dl>
 
-          <div className="mt-6 flex flex-wrap items-center gap-4">
+          <div className="mt-6 flex flex-wrap items-center gap-2">
             {!savedSetting.enabled ? (
               <Button
                 type="button"
