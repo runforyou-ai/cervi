@@ -22,6 +22,7 @@ var themeColorPattern = regexp.MustCompile(`^#[0-9A-F]{6}$`)
 type ValidationCode = common.FieldCode
 
 const (
+	ValidationTypeInvalid          ValidationCode = "TYPE_INVALID"
 	ValidationNameRequired         ValidationCode = "NAME_REQUIRED"
 	ValidationNameTooLong          ValidationCode = "NAME_TOO_LONG"
 	ValidationDescriptionTooLong   ValidationCode = "DESCRIPTION_TOO_LONG"
@@ -36,8 +37,9 @@ const (
 // ValidationError 表示网站渠道字段校验失败。
 type ValidationError = common.FieldError
 
-// WebsiteChannelInput 定义网站渠道可编辑字段。
+// WebsiteChannelInput 定义网站渠道基础字段。
 type WebsiteChannelInput struct {
+	Type          domain.ChannelType
 	Name          string
 	Description   string
 	DefaultLocale domain.Locale
@@ -53,11 +55,15 @@ type WebsiteChannelChatInterfaceInput struct {
 
 // normalizeWebsiteChannelInput 规范化并校验网站渠道输入。
 func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInput, map[string]ValidationCode) {
+	input.Type = domain.ChannelType(strings.TrimSpace(string(input.Type)))
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 	input.DefaultLocale = domain.Locale(strings.TrimSpace(string(input.DefaultLocale)))
 
 	fields := make(map[string]ValidationCode)
+	if input.Type != domain.ChannelTypeWebsite {
+		fields["type"] = ValidationTypeInvalid
+	}
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
 	} else if len([]rune(input.Name)) > 100 {

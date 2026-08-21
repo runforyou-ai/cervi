@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -40,7 +39,7 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 	channel := &servermodels.Channel{
 		OrganizationID:  identity.Organization.ID,
 		CreatedByUserID: identity.User.ID,
-		Type:            string(domain.ChannelTypeWebsite),
+		Type:            string(input.Type),
 		Name:            input.Name,
 		DefaultLocale:   string(input.DefaultLocale),
 	}

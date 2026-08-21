@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * ActivateWebsiteChannel 启用网站渠道。
+ */
+export function ActivateWebsiteChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.WebsiteChannelSummary> {
+    return $Call.ByID(141044523, meta, channelID);
+}
+
+/**
  * AddTeamMembers 将企业成员批量加入团队。
  */
 export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
@@ -99,6 +106,13 @@ export function DeactivateUser(meta: $models.RequestMeta, userID: string): $Canc
 }
 
 /**
+ * DeactivateWebsiteChannel 停用网站渠道。
+ */
+export function DeactivateWebsiteChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.WebsiteChannelSummary> {
+    return $Call.ByID(1439117156, meta, channelID);
+}
+
+/**
  * DeleteAIProvider 删除 AI 供应商。
  */
 export function DeleteAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<void> {
@@ -124,13 +138,6 @@ export function DeleteRole(meta: $models.RequestMeta, roleID: string): $Cancella
  */
 export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $CancellablePromise<void> {
     return $Call.ByID(798533364, meta, teamID);
-}
-
-/**
- * DeleteWebsiteChannel 将网站渠道移入回收站。
- */
-export function DeleteWebsiteChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<void> {
-    return $Call.ByID(2696547045, meta, channelID);
 }
 
 /**
@@ -248,8 +255,8 @@ export function ListUsers(meta: $models.RequestMeta, input: $models.UserListInpu
 /**
  * ListWebsiteChannels 返回网站渠道列表。
  */
-export function ListWebsiteChannels(meta: $models.RequestMeta, deleted: boolean): $CancellablePromise<$models.WebsiteChannelList> {
-    return $Call.ByID(97229659, meta, deleted);
+export function ListWebsiteChannels(meta: $models.RequestMeta): $CancellablePromise<$models.WebsiteChannelList> {
+    return $Call.ByID(97229659, meta);
 }
 
 /**
@@ -313,13 +320,6 @@ export function RemoveTeamMembers(meta: $models.RequestMeta, teamID: string, inp
  */
 export function RestoreContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
     return $Call.ByID(468810132, meta, contactID);
-}
-
-/**
- * RestoreWebsiteChannel 恢复网站渠道。
- */
-export function RestoreWebsiteChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.WebsiteChannelSummary> {
-    return $Call.ByID(2580943420, meta, channelID);
 }
 
 /**
@@ -414,7 +414,7 @@ export function UpdateUserWorkStatus(meta: $models.RequestMeta, input: $models.U
 }
 
 /**
- * UpdateWebsiteChannel 修改网站渠道。
+ * UpdateWebsiteChannel 修改网站渠道基础信息。
  */
 export function UpdateWebsiteChannel(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelInput): $CancellablePromise<$models.WebsiteChannelSummary> {
     return $Call.ByID(1921858211, meta, channelID, input);

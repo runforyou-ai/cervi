@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdateWebsiteChannelAction 修改网站渠道设置。
+// UpdateWebsiteChannelAction 修改网站渠道基础信息。
 type UpdateWebsiteChannelAction struct {
 	db *bun.DB
 }
@@ -46,7 +46,6 @@ func (a *UpdateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 		Where("c.id = ?", channelID).
 		Where("c.organization_id = ?", identity.Organization.ID).
 		Where("c.type = ?", domain.ChannelTypeWebsite).
-		Where("c.deleted_at IS NULL").
 		Returning("*").
 		Exec(ctx)
 	if err != nil {

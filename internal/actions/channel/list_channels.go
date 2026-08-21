@@ -18,7 +18,7 @@ type Summary struct {
 	Name string             `bun:"name" json:"name"`
 }
 
-// ListChannelsQuery 读取当前企业的所有有效渠道。
+// ListChannelsQuery 读取当前企业的所有已启用渠道。
 type ListChannelsQuery struct {
 	db *bun.DB
 }
@@ -28,7 +28,7 @@ func NewListChannelsQuery(db *bun.DB) *ListChannelsQuery {
 	return &ListChannelsQuery{db: db}
 }
 
-// Execute 返回当前企业未删除的渠道摘要。
+// Execute 返回当前企业已启用的渠道摘要。
 func (q *ListChannelsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]Summary, error) {
 	channels := make([]Summary, 0)
 	if err := q.db.NewSelect().
@@ -37,7 +37,7 @@ func (q *ListChannelsQuery) Execute(ctx context.Context, identity *servermodels.
 		ColumnExpr("c.type").
 		ColumnExpr("c.name").
 		Where("c.organization_id = ?", identity.Organization.ID).
-		Where("c.deleted_at IS NULL").
+		Where("c.enabled = TRUE").
 		OrderExpr("c.type ASC, lower(c.name) ASC, c.id ASC").
 		Scan(ctx, &channels); err != nil {
 		return nil, fmt.Errorf("list channels: %w", err)

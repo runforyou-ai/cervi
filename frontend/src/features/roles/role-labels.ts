@@ -2,8 +2,10 @@
 import type { TFunction } from "i18next"
 
 import {
+  PermissionLevel,
   PermissionResource,
   RoleKind,
+  type PermissionDefinition,
   type RoleData,
 } from "@/api"
 
@@ -27,12 +29,14 @@ export function roleDisplayName(
   }
 }
 
-/** 返回内置角色说明。 */
-export function builtInRoleDescription(
+/** 返回角色面向使用者的说明。 */
+export function roleDescription(
   role: RoleData,
   t: TFunction<"settings">,
 ) {
   switch (role.kind) {
+    case RoleKind.RoleKindCustom:
+      return role.description
     case RoleKind.RoleKindAdmin:
       return t("roles.kindsDescriptions.admin")
     case RoleKind.RoleKindCustomerService:
@@ -40,7 +44,7 @@ export function builtInRoleDescription(
     case RoleKind.RoleKindMember:
       return t("roles.kindsDescriptions.member")
     default:
-      console.warn("非内置角色缺少固定说明", role.kind)
+      console.warn("未知的角色类型", role.kind)
       return role.description
   }
 }
@@ -67,4 +71,18 @@ export function permissionResourceLabel(
       console.warn("未知的权限功能", resource)
       return String(resource)
   }
+}
+
+/** 返回一项权限的完整显示名称。 */
+export function permissionDefinitionLabel(
+  permission: Pick<PermissionDefinition, "level" | "resource">,
+  t: TFunction<"settings">,
+) {
+  return t("roles.permissions.label", {
+    level:
+      permission.level === PermissionLevel.PermissionLevelView
+        ? t("roles.permissions.columns.view")
+        : t("roles.permissions.columns.manage"),
+    resource: permissionResourceLabel(permission.resource, t),
+  })
 }

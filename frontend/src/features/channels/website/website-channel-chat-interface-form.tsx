@@ -88,7 +88,7 @@ export function WebsiteChannelChatInterfaceForm({
       }
       if (isNotFoundApiError(error)) {
         console.warn("网站渠道不存在", { channel_id: channel.id })
-        navigate("/channels/website", { replace: true })
+        navigate("/integrations/channels", { replace: true })
         return
       }
       if (isApiError(error)) {
@@ -201,7 +201,7 @@ export function WebsiteChannelChatInterfaceForm({
                 : t("form.save")}
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/channels/website">{t("form.cancel")}</Link>
+              <Link to="/integrations/channels">{t("form.cancel")}</Link>
             </Button>
           </div>
         </FieldGroup>

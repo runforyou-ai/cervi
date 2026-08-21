@@ -151,13 +151,9 @@ func (b *Backend) absoluteContentURL(value string) string {
 }
 
 // ListWebsiteChannels 返回远程网站渠道列表。
-func (b *Backend) ListWebsiteChannels(ctx context.Context, meta appservice.RequestMeta, deleted bool) (appservice.WebsiteChannelList, error) {
-	path := "/channels/website"
-	if deleted {
-		path += "/trash"
-	}
+func (b *Backend) ListWebsiteChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.WebsiteChannelList, error) {
 	var output appservice.WebsiteChannelList
-	err := b.do(ctx, meta, http.MethodGet, path, nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/channels/website", nil, nil, &output)
 	return output, err
 }
 
@@ -175,7 +171,7 @@ func (b *Backend) CreateWebsiteChannel(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
-// UpdateWebsiteChannel 修改远程网站渠道。
+// UpdateWebsiteChannel 修改远程网站渠道基础信息。
 func (b *Backend) UpdateWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelInput) (appservice.WebsiteChannelSummary, error) {
 	var output appservice.WebsiteChannelSummary
 	err := b.do(ctx, meta, http.MethodPatch, "/channels/website/"+url.PathEscape(channelID), nil, input, &output)
@@ -189,15 +185,17 @@ func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta ap
 	return output, err
 }
 
-// DeleteWebsiteChannel 将远程网站渠道移入回收站。
-func (b *Backend) DeleteWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/channels/website/"+url.PathEscape(channelID), nil, nil, nil)
+// DeactivateWebsiteChannel 停用远程网站渠道。
+func (b *Backend) DeactivateWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.WebsiteChannelSummary, error) {
+	var output appservice.WebsiteChannelSummary
+	err := b.do(ctx, meta, http.MethodPost, "/channels/website/"+url.PathEscape(channelID)+"/deactivate", nil, nil, &output)
+	return output, err
 }
 
-// RestoreWebsiteChannel 恢复远程网站渠道。
-func (b *Backend) RestoreWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.WebsiteChannelSummary, error) {
+// ActivateWebsiteChannel 启用远程网站渠道。
+func (b *Backend) ActivateWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.WebsiteChannelSummary, error) {
 	var output appservice.WebsiteChannelSummary
-	err := b.do(ctx, meta, http.MethodPost, "/channels/website/"+url.PathEscape(channelID)+"/restore", nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodPost, "/channels/website/"+url.PathEscape(channelID)+"/activate", nil, nil, &output)
 	return output, err
 }
 

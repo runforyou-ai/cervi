@@ -15,17 +15,17 @@ import (
 )
 
 // ListWebsiteChannels 返回当前企业的网站渠道。
-func (b *DirectBackend) ListWebsiteChannels(ctx context.Context, meta RequestMeta, deleted bool) (WebsiteChannelList, error) {
+func (b *DirectBackend) ListWebsiteChannels(ctx context.Context, meta RequestMeta) (WebsiteChannelList, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return WebsiteChannelList{}, err
 	}
-	channels, err := b.listWebsiteChannels.Execute(ctx, identity, deleted)
+	channels, err := b.listWebsiteChannels.Execute(ctx, identity)
 	if err != nil {
 		if ctx.Err() != nil {
 			return WebsiteChannelList{}, ctx.Err()
 		}
-		slog.Warn("读取网站渠道列表失败", "organization_id", identity.Organization.ID, "deleted", deleted, "error", err)
+		slog.Warn("读取网站渠道列表失败", "organization_id", identity.Organization.ID, "error", err)
 		return WebsiteChannelList{}, FailedError(meta, cervii18n.ErrorChannelListFailed)
 	}
 	result := make([]WebsiteChannelSummary, 0, len(channels))
@@ -65,7 +65,7 @@ func (b *DirectBackend) CreateWebsiteChannel(ctx context.Context, meta RequestMe
 	return websiteChannelFromModel(channel), nil
 }
 
-// UpdateWebsiteChannel 修改网站渠道。
+// UpdateWebsiteChannel 修改网站渠道基础信息。
 func (b *DirectBackend) UpdateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelInput) (WebsiteChannelSummary, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -95,30 +95,31 @@ func (b *DirectBackend) UpdateWebsiteChannelChatInterface(ctx context.Context, m
 	return websiteChannelSettingFromModel(setting), nil
 }
 
-// DeleteWebsiteChannel 将网站渠道移入回收站。
-func (b *DirectBackend) DeleteWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.deleteWebsiteChannel.Execute(ctx, identity, channelID); err != nil {
-		return b.channelError(ctx, meta, err, cervii18n.ErrorChannelDeleteFailed)
-	}
-	slog.Info("网站渠道移入回收站", "organization_id", identity.Organization.ID, "channel_id", channelID)
-	return nil
-}
-
-// RestoreWebsiteChannel 恢复网站渠道。
-func (b *DirectBackend) RestoreWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
+// DeactivateWebsiteChannel 停用网站渠道。
+func (b *DirectBackend) DeactivateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return WebsiteChannelSummary{}, err
 	}
-	channel, err := b.restoreWebsiteChannel.Execute(ctx, identity, channelID)
+	channel, err := b.updateWebsiteChannelStatus.Execute(ctx, identity, channelID, false)
 	if err != nil {
-		return WebsiteChannelSummary{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelRestoreFailed)
+		return WebsiteChannelSummary{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed)
 	}
-	slog.Info("网站渠道恢复成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID)
+	slog.Info("网站渠道状态已更新", "organization_id", identity.Organization.ID, "channel_id", channelID, "enabled", false)
+	return websiteChannelFromModel(channel), nil
+}
+
+// ActivateWebsiteChannel 启用网站渠道。
+func (b *DirectBackend) ActivateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return WebsiteChannelSummary{}, err
+	}
+	channel, err := b.updateWebsiteChannelStatus.Execute(ctx, identity, channelID, true)
+	if err != nil {
+		return WebsiteChannelSummary{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed)
+	}
+	slog.Info("网站渠道状态已更新", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "enabled", true)
 	return websiteChannelFromModel(channel), nil
 }
 
@@ -155,7 +156,7 @@ func (b *DirectBackend) channelMutationError(ctx context.Context, meta RequestMe
 	return b.channelError(ctx, meta, err, failureKey)
 }
 
-// channelError 转换渠道读取和删除错误。
+// channelError 转换渠道读取和状态修改错误。
 func (b *DirectBackend) channelError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -173,8 +174,8 @@ func (b *DirectBackend) channelError(ctx context.Context, meta RequestMeta, err 
 func websiteChannelFromModel(channel *servermodels.Channel) WebsiteChannelSummary {
 	return WebsiteChannelSummary{
 		ID: channel.ID, OrganizationID: channel.OrganizationID, CreatedByUserID: channel.CreatedByUserID,
-		Type: ChannelType(channel.Type), Name: channel.Name, Description: channel.Description, DefaultLocale: Locale(channel.DefaultLocale),
-		CreatedAt: channel.CreatedAt, UpdatedAt: channel.UpdatedAt, DeletedAt: channel.DeletedAt,
+		Type: ChannelType(channel.Type), Name: channel.Name, Description: channel.Description, DefaultLocale: Locale(channel.DefaultLocale), Enabled: channel.Enabled,
+		CreatedAt: channel.CreatedAt, UpdatedAt: channel.UpdatedAt,
 	}
 }
 
@@ -183,16 +184,21 @@ func websiteChannelSettingFromModel(setting *servermodels.WebsiteChannelSetting)
 }
 
 func channelInput(input WebsiteChannelInput) channelaction.WebsiteChannelInput {
-	return channelaction.WebsiteChannelInput{Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale)}
+	return channelaction.WebsiteChannelInput{Type: domain.ChannelType(input.Type), Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale)}
 }
 
 func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		channelaction.ValidationNameRequired: cervii18n.FieldChannelNameRequired, channelaction.ValidationNameTooLong: cervii18n.FieldChannelNameTooLong,
-		channelaction.ValidationDescriptionTooLong: cervii18n.FieldChannelDescriptionTooLong, channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
-		channelaction.ValidationChatTitleRequired: cervii18n.FieldChannelChatTitleRequired, channelaction.ValidationChatTitleTooLong: cervii18n.FieldChannelChatTitleTooLong,
-		channelaction.ValidationChatSubtitleTooLong: cervii18n.FieldChannelChatSubtitleTooLong, channelaction.ValidationGreetingTooLong: cervii18n.FieldChannelGreetingTooLong,
-		channelaction.ValidationThemeColorInvalid: cervii18n.FieldChannelThemeColorInvalid,
+		channelaction.ValidationTypeInvalid:          cervii18n.FieldChannelTypeInvalid,
+		channelaction.ValidationNameRequired:         cervii18n.FieldChannelNameRequired,
+		channelaction.ValidationNameTooLong:          cervii18n.FieldChannelNameTooLong,
+		channelaction.ValidationDescriptionTooLong:   cervii18n.FieldChannelDescriptionTooLong,
+		channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
+		channelaction.ValidationChatTitleRequired:    cervii18n.FieldChannelChatTitleRequired,
+		channelaction.ValidationChatTitleTooLong:     cervii18n.FieldChannelChatTitleTooLong,
+		channelaction.ValidationChatSubtitleTooLong:  cervii18n.FieldChannelChatSubtitleTooLong,
+		channelaction.ValidationGreetingTooLong:      cervii18n.FieldChannelGreetingTooLong,
+		channelaction.ValidationThemeColorInvalid:    cervii18n.FieldChannelThemeColorInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

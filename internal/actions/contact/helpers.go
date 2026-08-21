@@ -29,13 +29,13 @@ func validateIdentity(ctx context.Context, tx bun.Tx, identity *servermodels.Ide
 	return nil
 }
 
-// validateSourceChannel 校验来源渠道属于当前企业且未删除。
+// validateSourceChannel 校验来源渠道属于当前企业且已启用。
 func validateSourceChannel(ctx context.Context, tx bun.Tx, organizationID, channelID string) error {
 	exists, err := tx.NewSelect().
 		Model((*servermodels.Channel)(nil)).
 		Where("organization_id = ?", organizationID).
 		Where("id = ?", channelID).
-		Where("deleted_at IS NULL").
+		Where("enabled = TRUE").
 		Exists(ctx)
 	if err != nil {
 		return err

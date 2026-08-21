@@ -1,5 +1,6 @@
 /** 绑定应用服务方法，并归一化可空切片。 */
 import {
+  ActivateWebsiteChannel,
   AddTeamMembers,
   ChangePassword,
   CompleteFileUpload,
@@ -9,13 +10,13 @@ import {
   CreateRole,
   CreateTeam,
   CreateUser,
-  DeactivateUser,
   CreateWebsiteChannel,
+  DeactivateUser,
+  DeactivateWebsiteChannel,
   DeleteContact,
   DeleteAIProvider,
   DeleteRole,
   DeleteTeam,
-  DeleteWebsiteChannel,
   GetContact,
   GetAIProvider,
   GetRole,
@@ -35,7 +36,6 @@ import {
   ReactivateUser,
   RemoveTeamMembers,
   RestoreContact,
-  RestoreWebsiteChannel,
   SaveS3Setting,
   SelectProfileImage,
   TestS3Setting,
@@ -153,16 +153,16 @@ export type RoleListData = Omit<RoleList, "roles" | "permissions"> & {
 export const getWebsiteChannel = bind(GetWebsiteChannel)
 /** 创建网站渠道。 */
 export const createWebsiteChannel = bind(CreateWebsiteChannel)
-/** 修改网站渠道。 */
+/** 修改网站渠道基础信息。 */
 export const updateWebsiteChannel = bind(UpdateWebsiteChannel)
 /** 修改网站渠道聊天界面。 */
 export const updateWebsiteChannelChatInterface = bind(
   UpdateWebsiteChannelChatInterface,
 )
-/** 将网站渠道移入回收站。 */
-export const deleteWebsiteChannel = bind(DeleteWebsiteChannel)
-/** 恢复网站渠道。 */
-export const restoreWebsiteChannel = bind(RestoreWebsiteChannel)
+/** 停用网站渠道。 */
+export const deactivateWebsiteChannel = bind(DeactivateWebsiteChannel)
+/** 启用网站渠道。 */
+export const activateWebsiteChannel = bind(ActivateWebsiteChannel)
 /** 将联系人移入回收站。 */
 export const deleteContact = bind(DeleteContact)
 /** 创建企业团队。 */
@@ -333,12 +333,7 @@ export function listChannels(signal?: AbortSignal) {
 
 /** 读取网站渠道列表。 */
 export function listWebsiteChannels() {
-  return listWebsiteChannelsBound(false).then((list) => asList(list.channels))
-}
-
-/** 读取已删除的网站渠道列表。 */
-export function listDeletedWebsiteChannels() {
-  return listWebsiteChannelsBound(true).then((list) => asList(list.channels))
+  return listWebsiteChannelsBound().then((list) => asList(list.channels))
 }
 
 /** 读取联系人详情。 */

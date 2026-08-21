@@ -392,9 +392,9 @@ type WebsiteChannelSummary struct {
 	Name            string      `json:"name"`
 	Description     *string     `json:"description"`
 	DefaultLocale   Locale      `json:"defaultLocale"`
+	Enabled         bool        `json:"enabled"`
 	CreatedAt       time.Time   `json:"createdAt"`
 	UpdatedAt       time.Time   `json:"updatedAt"`
-	DeletedAt       *time.Time  `json:"deletedAt"`
 }
 
 // WebsiteChannel 定义网站渠道详情。
@@ -403,11 +403,12 @@ type WebsiteChannel struct {
 	ChatInterface WebsiteChannelChatInterface `json:"chatInterface"`
 }
 
-// WebsiteChannelInput 定义网站渠道可编辑字段。
+// WebsiteChannelInput 定义网站渠道基础字段。
 type WebsiteChannelInput struct {
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	DefaultLocale Locale `json:"defaultLocale"`
+	Type          ChannelType `json:"type"`
+	Name          string      `json:"name"`
+	Description   string      `json:"description"`
+	DefaultLocale Locale      `json:"defaultLocale"`
 }
 
 // WebsiteChannelChatInterface 定义网站渠道访客界面设置。
