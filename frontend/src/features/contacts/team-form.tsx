@@ -1,5 +1,5 @@
 /** 新建和编辑团队表单。 */
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -48,6 +48,10 @@ export function TeamForm({
     },
   })
 
+  useEffect(() => {
+    if (!team) form.setFocus("name")
+  }, [form, team])
+
   /** 提交团队表单。 */
   async function submit(values: TeamFormValues) {
     try {
@@ -74,7 +78,6 @@ export function TeamForm({
           name="name"
           control={form.control}
           label={t("teams.form.name")}
-          autoFocus={!team}
         />
         <Controller
           name="description"

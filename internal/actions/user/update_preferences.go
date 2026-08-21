@@ -42,7 +42,7 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 		Set("updated_at = now()").
 		Where("u.id = ?", identity.User.ID).
 		Where("u.organization_id = ?", identity.Organization.ID).
-		Returning("id, organization_id, email, display_name, role, status, locale, time_zone, work_status, avatar_file_id").
+		Returning("id, organization_id, email, display_name, role_id, status, locale, time_zone, work_status, avatar_file_id").
 		Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("update user preferences: %w", err)

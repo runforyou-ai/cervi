@@ -23,6 +23,11 @@ const enUS = {
       away: "Taking a break",
       offDuty: "Off work",
     },
+    roles: {
+      admin: "Administrator",
+      customerService: "Customer service",
+      member: "Member",
+    },
   },
   setup: {
     title: "Set up Cervi",
@@ -191,10 +196,6 @@ const enUS = {
       previous: "Previous",
       next: "Next",
       page: "Page {{current}} of {{total}}",
-    },
-    roles: {
-      admin: "Administrator",
-      member: "Member",
     },
     statuses: {
       active: "Active",
@@ -565,11 +566,6 @@ const enUS = {
       title: "Roles and permissions",
       loading: "Loading…",
       retry: "Retry",
-      kinds: {
-        admin: "Administrator",
-        customerService: "Customer service",
-        member: "Member",
-      },
       kindsDescriptions: {
         admin: "Administrators have every permission and their access cannot be changed.",
         customerService: "Customer service is a built-in role for handling customer conversations.",
@@ -581,6 +577,7 @@ const enUS = {
         delete: "Delete",
         more: "More",
         loadError: "Could not load roles.",
+        limitReached: "A company cannot have more than 20 roles.",
         empty: "No roles yet",
         permissionSummary: "{{view}} view, {{manage}} manage",
         columns: {

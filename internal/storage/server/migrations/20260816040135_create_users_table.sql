@@ -6,7 +6,7 @@ CREATE TABLE users (
     email                   text NOT NULL,
     display_name            text NOT NULL,
     password_hash           text NOT NULL,
-    role                    text NOT NULL DEFAULT 'member',
+    role_id                 uuid NOT NULL,
     status                  text NOT NULL DEFAULT 'active',
     locale                  text NOT NULL DEFAULT 'zh-CN',
     time_zone               text NOT NULL DEFAULT 'Asia/Shanghai',
@@ -23,7 +23,7 @@ COMMENT ON COLUMN users.organization_id IS '所属企业编号';
 COMMENT ON COLUMN users.email IS '登录邮箱';
 COMMENT ON COLUMN users.display_name IS '显示名称';
 COMMENT ON COLUMN users.password_hash IS '登录密码哈希';
-COMMENT ON COLUMN users.role IS '企业角色';
+COMMENT ON COLUMN users.role_id IS '企业角色编号';
 COMMENT ON COLUMN users.status IS '成员状态';
 COMMENT ON COLUMN users.locale IS '界面语言';
 COMMENT ON COLUMN users.time_zone IS '日期时间显示时区';
@@ -35,6 +35,9 @@ COMMENT ON COLUMN users.updated_at IS '更新时间';
 
 CREATE UNIQUE INDEX users_organization_email_unique
     ON users (organization_id, lower(email));
+
+CREATE INDEX users_organization_role_index
+    ON users (organization_id, role_id);
 
 -- +goose Down
 DROP TABLE users;

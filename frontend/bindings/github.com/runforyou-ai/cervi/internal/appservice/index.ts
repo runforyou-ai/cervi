@@ -21,7 +21,6 @@ export {
     RoleKind,
     SessionState,
     StorageProvider,
-    UserRole,
     UserStatus,
     WorkStatus
 } from "./models.js";
@@ -64,6 +63,7 @@ export type {
     Role,
     RoleInput,
     RoleList,
+    RoleSummary,
     S3Setting,
     Session,
     Team,

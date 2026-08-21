@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-// TestListUsersRejectsInvalidFilters 验证成员状态和角色白名单。
+// TestListUsersRejectsInvalidFilters 验证成员状态和角色编号。
 func TestListUsersRejectsInvalidFilters(t *testing.T) {
 	query := NewListUsersQuery(nil)
 	for _, input := range []ListInput{
 		{Status: "deleted", Page: 1, PageSize: 50},
-		{Role: "administrator", Page: 1, PageSize: 50},
+		{RoleID: "administrator", Page: 1, PageSize: 50},
 		{Page: 1, PageSize: 101},
 	} {
 		if _, err := query.Execute(context.Background(), nil, input); !errors.Is(err, ErrQueryInvalid) {

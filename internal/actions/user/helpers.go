@@ -33,7 +33,7 @@ func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Id
 	return nil
 }
 
-// loadDirectoryUser 读取企业成员及所属团队。
+// loadDirectoryUser 读取企业成员、角色和所属团队。
 func loadDirectoryUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*DirectoryUser, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
@@ -41,7 +41,9 @@ func loadDirectoryUser(ctx context.Context, db bun.IDB, organizationID, userID s
 	user := &DirectoryUser{}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text AS id").
-		Column("email", "display_name", "role", "status", "work_status", "created_at").
+		ColumnExpr("u.email, u.display_name, u.status, u.work_status, u.created_at").
+		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
+		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
 		Where("u.id = ?", userID).
 		Where("u.organization_id = ?", organizationID).
 		Scan(ctx, user)
@@ -53,6 +55,27 @@ func loadDirectoryUser(ctx context.Context, db bun.IDB, organizationID, userID s
 	}
 	user.Teams, err = loadUserTeams(ctx, db, organizationID, userID)
 	return user, err
+}
+
+// validateRoleID 校验并锁定当前企业的角色。
+func validateRoleID(ctx context.Context, db bun.IDB, organizationID, roleID string) error {
+	if !common.ValidUUID(roleID) {
+		return &ValidationError{Fields: map[string]ValidationCode{"roleId": ValidationRoleInvalid}}
+	}
+	role := &servermodels.Role{}
+	err := db.NewSelect().Model(role).
+		Column("id").
+		Where("organization_id = ?", organizationID).
+		Where("id = ?", roleID).
+		For("KEY SHARE").
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &ValidationError{Fields: map[string]ValidationCode{"roleId": ValidationRoleInvalid}}
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // loadUserTeams 读取成员所属的全部团队。

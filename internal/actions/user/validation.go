@@ -46,8 +46,9 @@ func normalizeCreateInput(input CreateInput) (CreateInput, map[string]Validation
 	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
 	input.DisplayName = profile.DisplayName
 	input.Email = profile.Email
-	if input.Role != domain.UserRoleAdmin && input.Role != domain.UserRoleMember {
-		fields["role"] = ValidationRoleInvalid
+	input.RoleID = strings.TrimSpace(input.RoleID)
+	if !common.ValidUUID(input.RoleID) {
+		fields["roleId"] = ValidationRoleInvalid
 	}
 	switch err := commonpassword.Validate(input.Password); {
 	case errors.Is(err, commonpassword.ErrTooShort):
@@ -63,8 +64,9 @@ func normalizeUpdateInput(input UpdateInput) (UpdateInput, map[string]Validation
 	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
 	input.DisplayName = profile.DisplayName
 	input.Email = profile.Email
-	if input.Role != domain.UserRoleAdmin && input.Role != domain.UserRoleMember {
-		fields["role"] = ValidationRoleInvalid
+	input.RoleID = strings.TrimSpace(input.RoleID)
+	if !common.ValidUUID(input.RoleID) {
+		fields["roleId"] = ValidationRoleInvalid
 	}
 	return input, fields
 }

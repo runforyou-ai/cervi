@@ -32,13 +32,16 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
+		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {
+			return err
+		}
 		user := &servermodels.User{
 			OrganizationID: identity.Organization.ID,
 			Email:          input.Email, DisplayName: input.DisplayName, PasswordHash: passwordHash,
-			Role: string(input.Role), Status: "active", Locale: identity.User.Locale, TimeZone: identity.User.TimeZone,
+			RoleID: input.RoleID, Status: "active", Locale: identity.User.Locale, TimeZone: identity.User.TimeZone,
 		}
 		_, err := tx.NewInsert().Model(user).
-			Column("organization_id", "email", "display_name", "password_hash", "role", "status", "locale", "time_zone").
+			Column("organization_id", "email", "display_name", "password_hash", "role_id", "status", "locale", "time_zone").
 			Returning("id").Exec(ctx)
 		if isUniqueViolation(err) {
 			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}

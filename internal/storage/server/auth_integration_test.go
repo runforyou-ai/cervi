@@ -65,7 +65,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installed.Identity.User.Role != string(domain.UserRoleAdmin) || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.User.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.User.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	currentStatus, err := status.Execute(context.Background())
@@ -222,8 +222,15 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	memberRole := &servermodels.Role{}
+	if err := db.NewSelect().Model(memberRole).
+		Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+		Where("kind = ?", domain.RoleKindMember).
+		Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	createdMember, err := useraction.NewCreateUserAction(db).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
-		DisplayName: "团队成员", Email: "member@example.com", Password: "password123", Role: domain.UserRoleMember, TeamIDs: []string{team.ID},
+		DisplayName: "团队成员", Email: "member@example.com", Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -245,7 +252,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := useraction.NewUpdateUserAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
-		DisplayName: createdMember.DisplayName, Email: createdMember.Email, Role: createdMember.Role, TeamIDs: []string{team.ID},
+		DisplayName: createdMember.DisplayName, Email: createdMember.Email, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -381,11 +388,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		Email:          "other@example.com",
 		DisplayName:    "其他成员",
 		PasswordHash:   "unused",
-		Role:           string(domain.UserRoleMember),
+		RoleID:         memberRole.ID,
 		Status:         string(domain.UserStatusActive),
 	}
 	if _, err := db.NewInsert().Model(otherUser).
-		Column("organization_id", "email", "display_name", "password_hash", "role", "status").
+		Column("organization_id", "email", "display_name", "password_hash", "role_id", "status").
 		Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}

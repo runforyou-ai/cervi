@@ -116,13 +116,13 @@ func (b *testBackend) ListUsers(_ context.Context, meta appservice.RequestMeta, 
 func (b *testBackend) CreateUser(_ context.Context, meta appservice.RequestMeta, input appservice.CreateUserInput) (appservice.DirectoryUser, error) {
 	b.lastMeta = meta
 	b.lastCreateUser = input
-	return appservice.DirectoryUser{ID: "user-2", DisplayName: input.DisplayName, Email: input.Email, Role: input.Role, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
+	return appservice.DirectoryUser{ID: "user-2", DisplayName: input.DisplayName, Email: input.Email, Role: appservice.RoleSummary{ID: input.RoleID}, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
 }
 
 func (b *testBackend) UpdateUser(_ context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateDirectoryUserInput) (appservice.DirectoryUser, error) {
 	b.lastMeta = meta
 	b.lastUpdateUser = input
-	return appservice.DirectoryUser{ID: userID, DisplayName: input.DisplayName, Email: input.Email, Role: input.Role, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
+	return appservice.DirectoryUser{ID: userID, DisplayName: input.DisplayName, Email: input.Email, Role: appservice.RoleSummary{ID: input.RoleID}, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
 }
 
 func (b *testBackend) ListTeams(_ context.Context, meta appservice.RequestMeta, input appservice.TeamListInput) (appservice.TeamList, error) {
@@ -211,12 +211,12 @@ func TestListQueryIsConvertedToTypedInput(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 
-	response := doJSON(t, http.MethodGet, server.URL+"/users?query=lin&status=active&teamId=0198ddee-c056-7bc5-a1d9-586f878ee965&page=2&pageSize=25", nil, "test-token")
+	response := doJSON(t, http.MethodGet, server.URL+"/users?query=lin&status=active&roleId=0198ddee-c056-7bc5-a1d9-586f878ee966&teamId=0198ddee-c056-7bc5-a1d9-586f878ee965&page=2&pageSize=25", nil, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
-	if backend.lastUserList.Query != "lin" || backend.lastUserList.Status == nil || *backend.lastUserList.Status != "active" || backend.lastUserList.TeamID == "" || backend.lastUserList.Page != 2 || backend.lastUserList.PageSize != 25 {
+	if backend.lastUserList.Query != "lin" || backend.lastUserList.Status == nil || *backend.lastUserList.Status != "active" || backend.lastUserList.RoleID == "" || backend.lastUserList.TeamID == "" || backend.lastUserList.Page != 2 || backend.lastUserList.PageSize != 25 {
 		t.Fatalf("typed input = %#v", backend.lastUserList)
 	}
 }
@@ -228,7 +228,7 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 	defer server.Close()
 
 	memberResponse := doJSON(t, http.MethodPost, server.URL+"/users", appservice.CreateUserInput{
-		DisplayName: "林晓", Email: "lin@example.com", Password: "password123", Role: appservice.UserRoleMember, TeamIDs: []string{"team-1"},
+		DisplayName: "林晓", Email: "lin@example.com", Password: "password123", RoleID: "0198ddee-c056-7bc5-a1d9-586f878ee966", TeamIDs: []string{"team-1"},
 	}, "test-token")
 	defer memberResponse.Body.Close()
 	if memberResponse.StatusCode != http.StatusCreated || backend.lastCreateUser.DisplayName != "林晓" || len(backend.lastCreateUser.TeamIDs) != 1 {
@@ -405,7 +405,7 @@ func TestBearerTokenParsing(t *testing.T) {
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
-		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", Role: appservice.UserRoleAdmin, Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", WorkStatus: appservice.WorkStatusWorking},
+		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", WorkStatus: appservice.WorkStatusWorking},
 	}
 }
 

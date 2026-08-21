@@ -33,7 +33,7 @@ func (b *DirectBackend) ListRoles(ctx context.Context, meta RequestMeta) (RoleLi
 			Code: PermissionCode(permission.Code), Resource: PermissionResource(permission.Resource), Level: PermissionLevel(permission.Level),
 		})
 	}
-	return RoleList{Roles: roles, Permissions: permissions}, nil
+	return RoleList{Roles: roles, Permissions: permissions, Maximum: roleaction.MaxRolesPerOrganization}, nil
 }
 
 // GetRole 返回当前企业的角色详情。
@@ -102,6 +102,9 @@ func (b *DirectBackend) roleMutationError(ctx context.Context, meta RequestMeta,
 	if errors.Is(err, roleaction.ErrAdminImmutable) {
 		return InvalidError(meta, cervii18n.ErrorRoleAdminImmutable, nil)
 	}
+	if errors.Is(err, roleaction.ErrLimitReached) {
+		return InvalidError(meta, cervii18n.ErrorRoleLimitReached, nil)
+	}
 	return b.roleError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
@@ -115,6 +118,9 @@ func (b *DirectBackend) roleError(ctx context.Context, meta RequestMeta, err err
 	}
 	if errors.Is(err, roleaction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorRoleNotFound)
+	}
+	if errors.Is(err, roleaction.ErrInUse) {
+		return InvalidError(meta, cervii18n.ErrorRoleInUse, nil)
 	}
 	logAttributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	slog.Warn("角色操作失败", append(logAttributes, attributes...)...)

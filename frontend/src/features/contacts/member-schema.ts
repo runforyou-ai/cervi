@@ -1,9 +1,6 @@
 /** 企业成员表单校验规则。 */
 import { z } from "zod"
 
-import { UserRole } from "@/api"
-import { requiredWailsEnum } from "@/lib/wails-enum"
-
 /** 创建企业成员表单校验规则。 */
 export function createMemberSchema(
   messages: {
@@ -34,7 +31,7 @@ export function createMemberSchema(
             (value) => new TextEncoder().encode(value).length <= 72,
             messages.passwordTooLong,
           ),
-    role: requiredWailsEnum(UserRole, messages.roleRequired),
+    roleId: z.string().uuid(messages.roleRequired),
     teamIds: z.array(z.string().uuid()),
   })
 }

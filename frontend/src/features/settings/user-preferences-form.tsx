@@ -109,6 +109,19 @@ export function UserPreferencesForm({
     >
       <FieldGroup>
         <Controller
+          name="theme"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <AppearanceSettings
+              name={field.name}
+              value={field.value}
+              invalid={fieldState.invalid}
+              onBlur={field.onBlur}
+              onChange={field.onChange}
+            />
+          )}
+        />
+        <Controller
           name="locale"
           control={form.control}
           render={({ field, fieldState }) => (
@@ -151,19 +164,6 @@ export function UserPreferencesForm({
                 ))}
               </NativeSelect>
             </Field>
-          )}
-        />
-        <Controller
-          name="theme"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <AppearanceSettings
-              name={field.name}
-              value={field.value}
-              invalid={fieldState.invalid}
-              onBlur={field.onBlur}
-              onChange={field.onChange}
-            />
           )}
         />
         <div>

@@ -218,7 +218,7 @@ export interface CreateUserInput {
     "displayName": string;
     "email": string;
     "password": string;
-    "role": UserRole;
+    "roleId": string;
     "teamIds": string[] | null;
 }
 
@@ -229,7 +229,7 @@ export interface DirectoryUser {
     "id": string;
     "email": string;
     "displayName": string;
-    "role": UserRole;
+    "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -531,11 +531,21 @@ export enum RoleKind {
 };
 
 /**
- * RoleList 定义角色和预定义权限目录。
+ * RoleList 定义角色、数量上限和权限目录。
  */
 export interface RoleList {
     "roles": Role[] | null;
     "permissions": PermissionDefinition[] | null;
+    "maximum": number;
+}
+
+/**
+ * RoleSummary 定义成员关联角色的精简字段。
+ */
+export interface RoleSummary {
+    "id": string;
+    "kind": RoleKind;
+    "name": string;
 }
 
 /**
@@ -649,7 +659,7 @@ export interface TeamSummary {
 export interface UpdateDirectoryUserInput {
     "displayName": string;
     "email": string;
-    "role": UserRole;
+    "roleId": string;
     "teamIds": string[] | null;
 }
 
@@ -661,7 +671,7 @@ export interface User {
     "organizationId": string;
     "email": string;
     "displayName": string;
-    "role": UserRole;
+    "roleId": string;
     "status": UserStatus;
     "locale": Locale;
     "timeZone": string;
@@ -683,7 +693,7 @@ export interface UserList {
 export interface UserListInput {
     "query": string;
     "status"?: UserStatus | null;
-    "role"?: UserRole | null;
+    "roleId": string;
     "teamId": string;
     "page": number;
     "pageSize": number;
@@ -696,19 +706,6 @@ export interface UserPreferencesInput {
     "locale": Locale;
     "timeZone": string;
 }
-
-/**
- * UserRole 表示企业成员角色。
- */
-export enum UserRole {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    UserRoleAdmin = "admin",
-    UserRoleMember = "member",
-};
 
 /**
  * UserStatus 表示企业成员状态。

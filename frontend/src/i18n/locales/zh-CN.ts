@@ -23,6 +23,11 @@ const zhCN = {
       away: "休息一下",
       offDuty: "下班了",
     },
+    roles: {
+      admin: "管理员",
+      customerService: "客服",
+      member: "成员",
+    },
   },
   setup: {
     title: "初始化 Cervi",
@@ -189,10 +194,6 @@ const zhCN = {
       previous: "上一页",
       next: "下一页",
       page: "第 {{current}} / {{total}} 页",
-    },
-    roles: {
-      admin: "管理员",
-      member: "成员",
     },
     statuses: {
       active: "正常",
@@ -554,11 +555,6 @@ const zhCN = {
       title: "角色与权限",
       loading: "正在加载…",
       retry: "重试",
-      kinds: {
-        admin: "管理员",
-        customerService: "客服",
-        member: "成员",
-      },
       kindsDescriptions: {
         admin: "管理员拥有全部权限，角色权限不可修改。",
         customerService: "客服是处理客户沟通的内置角色。",
@@ -570,6 +566,7 @@ const zhCN = {
         delete: "删除",
         more: "更多",
         loadError: "角色列表加载失败。",
+        limitReached: "企业角色数量不能超过 20 个。",
         empty: "还没有角色",
         permissionSummary: "{{view}} 项查看，{{manage}} 项管理",
         columns: {

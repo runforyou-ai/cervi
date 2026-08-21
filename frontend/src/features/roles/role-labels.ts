@@ -1,4 +1,4 @@
-/** 角色与权限的界面文案映射。 */
+/** 角色与权限的共享界面文案映射。 */
 import type { TFunction } from "i18next"
 
 import {
@@ -8,14 +8,17 @@ import {
 } from "@/api"
 
 /** 返回角色显示名称。 */
-export function roleDisplayName(role: RoleData, t: TFunction<"settings">) {
+export function roleDisplayName(
+  role: Pick<RoleData, "kind" | "name">,
+  t: TFunction<"common">,
+) {
   switch (role.kind) {
     case RoleKind.RoleKindAdmin:
-      return t("roles.kinds.admin")
+      return t("roles.admin")
     case RoleKind.RoleKindCustomerService:
-      return t("roles.kinds.customerService")
+      return t("roles.customerService")
     case RoleKind.RoleKindMember:
-      return t("roles.kinds.member")
+      return t("roles.member")
     case RoleKind.RoleKindCustom:
       return role.name
     default:
