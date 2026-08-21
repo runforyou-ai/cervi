@@ -51,6 +51,8 @@ const (
 	ErrorTeamCreateFailed                 Key = "error.team_create_failed"
 	ErrorTeamUpdateFailed                 Key = "error.team_update_failed"
 	ErrorTeamDeleteFailed                 Key = "error.team_delete_failed"
+	ErrorTeamMemberListFailed             Key = "error.team_member_list_failed"
+	ErrorTeamMemberAddFailed              Key = "error.team_member_add_failed"
 	ErrorTeamMemberNotFound               Key = "error.team_member_not_found"
 	ErrorTeamMemberRemoveFailed           Key = "error.team_member_remove_failed"
 	ErrorRoleNotFound                     Key = "error.role_not_found"

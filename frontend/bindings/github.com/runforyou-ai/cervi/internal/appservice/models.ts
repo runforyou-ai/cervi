@@ -715,6 +715,49 @@ export interface TeamListInput {
 }
 
 /**
+ * TeamMemberCandidate 定义可加入团队的企业成员。
+ */
+export interface TeamMemberCandidate {
+    "identityType": MemberIdentityType;
+    "identityId": string;
+    "displayName": string;
+    "avatarUrl": string;
+    "role": RoleSummary;
+}
+
+/**
+ * TeamMemberCandidateInput 定义可加入团队的成员查询条件。
+ */
+export interface TeamMemberCandidateInput {
+    "query": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * TeamMemberCandidateList 定义可加入团队的成员分页结果。
+ */
+export interface TeamMemberCandidateList {
+    "members": TeamMemberCandidate[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * TeamMemberIdentityInput 定义要变更的团队成员身份。
+ */
+export interface TeamMemberIdentityInput {
+    "identityType": MemberIdentityType;
+    "identityId": string;
+}
+
+/**
+ * TeamMemberInput 定义批量变更团队的身份列表。
+ */
+export interface TeamMemberInput {
+    "members": TeamMemberIdentityInput[] | null;
+}
+
+/**
  * TeamSummary 定义团队选择项和成员所属团队字段。
  */
 export interface TeamSummary {
