@@ -20,8 +20,8 @@ export function channelTypeLabel(
 /** 成员角色文案。 */
 export function userRoleLabel(role: UserRole, t: TFunction<"contacts">) {
   switch (role) {
-    case UserRole.UserRoleOwner:
-      return t("roles.owner")
+    case UserRole.UserRoleAdmin:
+      return t("roles.admin")
     case UserRole.UserRoleMember:
       return t("roles.member")
     default:

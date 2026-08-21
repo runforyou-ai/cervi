@@ -16,7 +16,7 @@ const enUS = {
   },
   setup: {
     title: "Set up Cervi",
-    description: "Create the company and its first owner account.",
+    description: "Create the company and its first administrator account.",
     organizationNameLabel: "Company name",
     displayNameLabel: "Your name",
     emailLabel: "Email",
@@ -38,7 +38,7 @@ const enUS = {
   },
   auth: {
     title: "Log in",
-    description: "Use the owner email and password to log in.",
+    description: "Use your email and password to log in.",
     emailLabel: "Email",
     passwordLabel: "Password",
     emailRequired: "Enter your email.",
@@ -168,7 +168,7 @@ const enUS = {
       page: "Page {{current}} of {{total}}",
     },
     roles: {
-      owner: "Owner",
+      admin: "Administrator",
       member: "Member",
     },
     statuses: {
@@ -364,6 +364,7 @@ const enUS = {
       profile: "Profile",
       security: "Login & security",
       preferences: "Preferences",
+      organization: "Company information",
       storage: "Storage",
     },
     profile: {
@@ -425,6 +426,20 @@ const enUS = {
         system: "System",
         light: "Light",
         dark: "Dark",
+      },
+    },
+    organization: {
+      title: "Company information",
+      saveError: "Could not save the company name. Try again.",
+      saveSuccess: "Company name saved.",
+      form: {
+        name: "Company name",
+        save: "Save",
+        saving: "Saving…",
+      },
+      validation: {
+        nameRequired: "Enter the company name.",
+        nameTooLong: "The company name cannot exceed 32 characters.",
       },
     },
     storage: {

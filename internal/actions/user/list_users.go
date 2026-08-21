@@ -36,7 +36,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	}
 	if input.PageSize > 100 ||
 		(input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) ||
-		(input.Role != "" && input.Role != domain.UserRoleOwner && input.Role != domain.UserRoleMember) {
+		(input.Role != "" && input.Role != domain.UserRoleAdmin && input.Role != domain.UserRoleMember) {
 		return ListOutput{}, ErrQueryInvalid
 	}
 

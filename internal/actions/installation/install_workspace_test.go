@@ -16,8 +16,8 @@ func TestInstallRejectsPasswordLongerThanBcryptLimit(t *testing.T) {
 	action := NewInstallWorkspaceAction(nil)
 	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
 		OrganizationName: "鹿行测试公司",
-		DisplayName:      "所有者",
-		Email:            "owner@example.com",
+		DisplayName:      "管理员",
+		Email:            "admin@example.com",
 		Password:         strings.Repeat("中", 25),
 	})
 	var validationError *ValidationError
@@ -31,8 +31,8 @@ func TestInstallRejectsInvalidLocaleAndTimeZone(t *testing.T) {
 	action := NewInstallWorkspaceAction(nil)
 	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
 		OrganizationName: "鹿行测试公司",
-		DisplayName:      "所有者",
-		Email:            "owner@example.com",
+		DisplayName:      "管理员",
+		Email:            "admin@example.com",
 		Password:         "password123",
 		Locale:           domain.Locale("fr-FR"),
 		TimeZone:         "invalid",
@@ -43,13 +43,13 @@ func TestInstallRejectsInvalidLocaleAndTimeZone(t *testing.T) {
 	}
 }
 
-// TestInstallRejectsOrganizationNameLongerThanLimit 验证初始化操作拒绝过长的公司名称。
+// TestInstallRejectsOrganizationNameLongerThanLimit 验证初始化操作拒绝过长的企业名称。
 func TestInstallRejectsOrganizationNameLongerThanLimit(t *testing.T) {
 	action := NewInstallWorkspaceAction(nil)
 	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
-		OrganizationName: strings.Repeat("名", maxOrganizationNameLength+1),
-		DisplayName:      "所有者",
-		Email:            "owner@example.com",
+		OrganizationName: strings.Repeat("名", domain.OrganizationNameMaxLength+1),
+		DisplayName:      "管理员",
+		Email:            "admin@example.com",
 		Password:         "password123",
 	})
 	var validationError *ValidationError

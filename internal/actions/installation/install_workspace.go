@@ -35,7 +35,7 @@ type InstallWorkspaceInput struct {
 	TimeZone         string
 }
 
-// InstallWorkspaceOutput 返回企业所有者和初始令牌。
+// InstallWorkspaceOutput 返回企业管理员和初始令牌。
 type InstallWorkspaceOutput struct {
 	Identity  *servermodels.Identity
 	Token     string
@@ -47,7 +47,7 @@ func NewInstallWorkspaceAction(db *bun.DB) *InstallWorkspaceAction {
 	return &InstallWorkspaceAction{db: db}
 }
 
-// Execute 校验初始化信息并创建企业所有者和登录令牌。
+// Execute 校验初始化信息并创建企业管理员和登录令牌。
 func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorkspaceInput) (InstallWorkspaceOutput, error) {
 	input.OrganizationName = strings.TrimSpace(input.OrganizationName)
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
@@ -58,7 +58,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 
 	passwordHash, err := commonpassword.Hash(input.Password)
 	if err != nil {
-		return InstallWorkspaceOutput{}, fmt.Errorf("hash owner password: %w", err)
+		return InstallWorkspaceOutput{}, fmt.Errorf("hash administrator password: %w", err)
 	}
 	issued, err := token.Issue()
 	if err != nil {
@@ -93,7 +93,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			Email:          input.Email,
 			DisplayName:    input.DisplayName,
 			PasswordHash:   passwordHash,
-			Role:           "owner",
+			Role:           string(domain.UserRoleAdmin),
 			Status:         "active",
 			Locale:         string(input.Locale),
 			TimeZone:       input.TimeZone,

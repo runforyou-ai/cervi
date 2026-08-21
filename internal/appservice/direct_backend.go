@@ -11,6 +11,7 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -51,6 +52,7 @@ type DirectBackend struct {
 	updateContact                     *contactaction.UpdateContactAction
 	deleteContact                     *contactaction.DeleteContactAction
 	restoreContact                    *contactaction.RestoreContactAction
+	updateOrganization                *organizationaction.UpdateOrganizationAction
 	getS3Setting                      *settingaction.GetS3SettingQuery
 	saveS3Setting                     *settingaction.SaveS3SettingAction
 	testS3Setting                     *settingaction.TestS3SettingAction
@@ -85,6 +87,7 @@ func NewDirectBackend(db *bun.DB) *DirectBackend {
 		updateContact:                     contactaction.NewUpdateContactAction(db),
 		deleteContact:                     contactaction.NewDeleteContactAction(db),
 		restoreContact:                    contactaction.NewRestoreContactAction(db),
+		updateOrganization:                organizationaction.NewUpdateOrganizationAction(db),
 		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),
 		testS3Setting:                     settingaction.NewTestS3SettingAction(),
