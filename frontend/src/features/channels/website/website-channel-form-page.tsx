@@ -10,7 +10,6 @@ import {
   type WebsiteChannel,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
-import { PageBack } from "@/components/page-back"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -192,9 +191,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
             ? t("create.title")
             : channel?.name ?? t("edit.title")
         }
-      >
-        <PageBack to="/integrations/channels" />
-      </PageHeader>
+      />
       <PageContent>
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
