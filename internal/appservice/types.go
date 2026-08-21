@@ -167,6 +167,11 @@ type Organization struct {
 	Name string `json:"name"`
 }
 
+// OrganizationInput 定义企业名称修改输入。
+type OrganizationInput struct {
+	Name string `json:"name"`
+}
+
 // User 定义当前企业成员信息。
 type User struct {
 	ID             string     `json:"id"`

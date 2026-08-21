@@ -329,6 +329,13 @@ export interface Organization {
 }
 
 /**
+ * OrganizationInput 定义企业名称修改输入。
+ */
+export interface OrganizationInput {
+    "name": string;
+}
+
+/**
  * PageInfo 定义分页信息。
  */
 export interface PageInfo {

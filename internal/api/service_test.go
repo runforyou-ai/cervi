@@ -16,12 +16,13 @@ import (
 
 type testBackend struct {
 	appservice.Backend
-	lastMeta        appservice.RequestMeta
-	lastUserList    appservice.UserListInput
-	lastProfile     appservice.ProfileInput
-	lastPassword    appservice.ChangePasswordInput
-	lastPreferences appservice.UserPreferencesInput
-	lastWorkStatus  appservice.UserWorkStatusInput
+	lastMeta         appservice.RequestMeta
+	lastOrganization appservice.OrganizationInput
+	lastUserList     appservice.UserListInput
+	lastProfile      appservice.ProfileInput
+	lastPassword     appservice.ChangePasswordInput
+	lastPreferences  appservice.UserPreferencesInput
+	lastWorkStatus   appservice.UserWorkStatusInput
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
@@ -88,6 +89,13 @@ func (b *testBackend) ListUsers(_ context.Context, meta appservice.RequestMeta, 
 	b.lastMeta = meta
 	b.lastUserList = input
 	return appservice.UserList{Users: []appservice.DirectoryUser{}, Page: appservice.PageInfo{Number: input.Page, Size: input.PageSize}}, nil
+}
+
+// UpdateOrganization 保存测试企业名称。
+func (b *testBackend) UpdateOrganization(_ context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
+	b.lastMeta = meta
+	b.lastOrganization = input
+	return appservice.Organization{ID: testIdentity().Organization.ID, Name: input.Name}, nil
 }
 
 // TestAuthenticationUsesBearerToken 验证登录返回令牌且后续请求读取 Bearer Token。
@@ -231,6 +239,26 @@ func TestUpdateUserWorkStatusUsesTypedInput(t *testing.T) {
 	}
 	if backend.lastMeta.Token != "test-token" || backend.lastWorkStatus.WorkStatus != appservice.WorkStatusAway {
 		t.Fatalf("work status input = %#v, meta = %#v", backend.lastWorkStatus, backend.lastMeta)
+	}
+}
+
+// TestOrganizationSettingsUseTypedContract 验证企业信息接口保存类型化契约。
+func TestOrganizationSettingsUseTypedContract(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	updateResponse := doJSON(t, http.MethodPut, server.URL+"/settings/organization", appservice.OrganizationInput{Name: "鹿行协作"}, "test-token")
+	defer updateResponse.Body.Close()
+	if updateResponse.StatusCode != http.StatusOK {
+		t.Fatalf("update status = %d, want %d", updateResponse.StatusCode, http.StatusOK)
+	}
+	var organization appservice.Organization
+	if err := json.NewDecoder(updateResponse.Body).Decode(&organization); err != nil {
+		t.Fatal(err)
+	}
+	if organization.Name != "鹿行协作" || backend.lastMeta.Token != "test-token" || backend.lastOrganization.Name != "鹿行协作" {
+		t.Fatalf("organization = %#v, meta = %#v", organization, backend.lastMeta)
 	}
 }
 

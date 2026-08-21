@@ -13,6 +13,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -97,6 +98,22 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if loggedIn.Identity.User.ID != installed.Identity.User.ID {
 		t.Fatalf("login user = %q, want %q", loggedIn.Identity.User.ID, installed.Identity.User.ID)
+	}
+
+	updateOrganization := organizationaction.NewUpdateOrganizationAction(db)
+	organization, err := updateOrganization.Execute(context.Background(), loggedIn.Identity, organizationaction.Input{Name: "  鹿行协作  "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if organization.Name != "鹿行协作" {
+		t.Fatalf("updated organization name = %q, want 鹿行协作", organization.Name)
+	}
+	currentStatus, err = status.Execute(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if currentStatus.OrganizationName != "鹿行协作" {
+		t.Fatalf("status organization name = %q, want 鹿行协作", currentStatus.OrganizationName)
 	}
 
 	createChannel := channelaction.NewCreateWebsiteChannelAction(db)

@@ -43,11 +43,11 @@ func TestInstallRejectsInvalidLocaleAndTimeZone(t *testing.T) {
 	}
 }
 
-// TestInstallRejectsOrganizationNameLongerThanLimit 验证初始化操作拒绝过长的公司名称。
+// TestInstallRejectsOrganizationNameLongerThanLimit 验证初始化操作拒绝过长的企业名称。
 func TestInstallRejectsOrganizationNameLongerThanLimit(t *testing.T) {
 	action := NewInstallWorkspaceAction(nil)
 	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
-		OrganizationName: strings.Repeat("名", maxOrganizationNameLength+1),
+		OrganizationName: strings.Repeat("名", domain.OrganizationNameMaxLength+1),
 		DisplayName:      "所有者",
 		Email:            "owner@example.com",
 		Password:         "password123",

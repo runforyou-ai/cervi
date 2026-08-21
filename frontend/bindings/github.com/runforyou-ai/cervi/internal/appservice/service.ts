@@ -211,6 +211,13 @@ export function UpdateContact(meta: $models.RequestMeta, contactID: string, inpu
 }
 
 /**
+ * UpdateOrganization 修改当前企业名称。
+ */
+export function UpdateOrganization(meta: $models.RequestMeta, input: $models.OrganizationInput): $CancellablePromise<$models.Organization> {
+    return $Call.ByID(272970364, meta, input);
+}
+
+/**
  * UpdateProfile 修改当前用户的姓名和邮箱。
  */
 export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.User> {

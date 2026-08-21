@@ -29,6 +29,7 @@ type Backend interface {
 	UpdateContact(context.Context, RequestMeta, string, ContactInput) (Contact, error)
 	DeleteContact(context.Context, RequestMeta, string) error
 	RestoreContact(context.Context, RequestMeta, string) (Contact, error)
+	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
 	GetS3Setting(context.Context, RequestMeta) (S3Setting, error)
 	SaveS3Setting(context.Context, RequestMeta, S3Setting) (S3Setting, error)
 	TestS3Setting(context.Context, RequestMeta, S3Setting) error
@@ -188,6 +189,11 @@ func (s *Service) DeleteContact(ctx context.Context, meta RequestMeta, contactID
 // RestoreContact 恢复联系人。
 func (s *Service) RestoreContact(ctx context.Context, meta RequestMeta, contactID string) (Contact, error) {
 	return s.backend.RestoreContact(ctx, meta, contactID)
+}
+
+// UpdateOrganization 修改当前企业名称。
+func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
+	return s.backend.UpdateOrganization(ctx, meta, input)
 }
 
 // GetS3Setting 返回当前企业的对象存储设置。

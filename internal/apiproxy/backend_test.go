@@ -149,6 +149,19 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				},
 				"token": "test-token", "expiresAt": time.Now().Add(time.Hour),
 			})
+		case "/api/settings/organization":
+			if request.Method != http.MethodPut || request.Header.Get("Authorization") != "Bearer test-token" {
+				writeTestJSON(writer, http.StatusUnauthorized, map[string]any{"error": map[string]string{
+					"code": "AUTH_REQUIRED", "message": "Authentication required.",
+				}})
+				return
+			}
+			var input appservice.OrganizationInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, appservice.Organization{ID: "organization-1", Name: input.Name})
 		default:
 			http.NotFound(writer, request)
 		}
@@ -235,6 +248,10 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	}
 	if workStatus.WorkStatus != appservice.WorkStatusAway {
 		t.Fatalf("updated work status = %#v", workStatus)
+	}
+	organization, err := backend.UpdateOrganization(context.Background(), meta, appservice.OrganizationInput{Name: "鹿行协作"})
+	if err != nil || organization.Name != "鹿行协作" {
+		t.Fatalf("updated organization = %#v, error = %v", organization, err)
 	}
 }
 
