@@ -96,6 +96,33 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 	return userFromModel(*user), nil
 }
 
+// UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
+func (b *DirectBackend) UpdateUserWorkStatus(ctx context.Context, meta RequestMeta, input UserWorkStatusInput) (User, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return User{}, err
+	}
+	user, err := b.updateUserWorkStatus.Execute(ctx, identity, useraction.WorkStatusInput{
+		WorkStatus: domain.WorkStatus(input.WorkStatus),
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return User{}, ctx.Err()
+		}
+		var validationError *common.FieldError
+		if errors.As(err, &validationError) {
+			return User{}, InvalidError(meta, cervii18n.ErrorValidationFailed, workStatusFieldKeys(validationError.Fields))
+		}
+		if errors.Is(err, common.ErrIdentityInvalid) {
+			return User{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		}
+		slog.Warn("保存工作状态失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		return User{}, FailedError(meta, cervii18n.ErrorWorkStatusUpdateFailed)
+	}
+	slog.Info("工作状态保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "work_status", input.WorkStatus)
+	return userFromModel(*user), nil
+}
+
 // ListUsers 返回企业成员列表。
 func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	identity, err := b.authenticate(ctx, meta)
@@ -117,7 +144,7 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 	}
 	users := make([]DirectoryUser, 0, len(output.Users))
 	for _, user := range output.Users {
-		users = append(users, DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), CreatedAt: user.CreatedAt})
+		users = append(users, DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), CreatedAt: user.CreatedAt})
 	}
 	return UserList{Users: users, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
@@ -139,7 +166,7 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 		slog.Warn("读取企业成员失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
 		return DirectoryUser{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
 	}
-	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), CreatedAt: user.CreatedAt}, nil
+	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), CreatedAt: user.CreatedAt}, nil
 }
 
 // profileFieldKeys 把个人资料校验错误码映射为本地化文案键。
@@ -167,6 +194,14 @@ func preferencesFieldKeys(fields map[string]common.FieldCode) map[string]cervii1
 	keys := map[common.FieldCode]cervii18n.Key{
 		useraction.ValidationLocaleInvalid:   cervii18n.FieldLocaleInvalid,
 		useraction.ValidationTimeZoneInvalid: cervii18n.FieldTimeZoneInvalid,
+	}
+	return translateValidationFields(fields, keys)
+}
+
+// workStatusFieldKeys 把工作状态校验错误码映射为本地化文案键。
+func workStatusFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+	keys := map[common.FieldCode]cervii18n.Key{
+		useraction.ValidationWorkStatusInvalid: cervii18n.FieldWorkStatusInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

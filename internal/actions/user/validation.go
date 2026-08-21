@@ -25,6 +25,7 @@ const (
 	ValidationPasswordTooLong          ValidationCode = "PASSWORD_TOO_LONG"
 	ValidationLocaleInvalid            ValidationCode = "LOCALE_INVALID"
 	ValidationTimeZoneInvalid          ValidationCode = "TIME_ZONE_INVALID"
+	ValidationWorkStatusInvalid        ValidationCode = "WORK_STATUS_INVALID"
 )
 
 // ValidationError 表示用户设置字段校验失败。
@@ -46,6 +47,11 @@ type ChangePasswordInput struct {
 type PreferencesInput struct {
 	Locale   domain.Locale
 	TimeZone string
+}
+
+// WorkStatusInput 定义当前用户主动设置的工作状态。
+type WorkStatusInput struct {
+	WorkStatus domain.WorkStatus
 }
 
 // normalizeProfileInput 规范化并校验个人资料输入。
@@ -84,6 +90,18 @@ func normalizePreferencesInput(input PreferencesInput) (PreferencesInput, map[st
 	}
 	if !commontimezone.Valid(input.TimeZone) {
 		fields["timeZone"] = ValidationTimeZoneInvalid
+	}
+	return input, fields
+}
+
+// normalizeWorkStatusInput 规范化并校验工作状态。
+func normalizeWorkStatusInput(input WorkStatusInput) (WorkStatusInput, map[string]ValidationCode) {
+	input.WorkStatus = domain.WorkStatus(strings.TrimSpace(string(input.WorkStatus)))
+	fields := make(map[string]ValidationCode)
+	if input.WorkStatus != domain.WorkStatusWorking &&
+		input.WorkStatus != domain.WorkStatusAway &&
+		input.WorkStatus != domain.WorkStatusOffDuty {
+		fields["workStatus"] = ValidationWorkStatusInvalid
 	}
 	return input, fields
 }

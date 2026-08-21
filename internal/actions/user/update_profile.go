@@ -44,7 +44,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		Set("updated_at = now()").
 		Where("u.id = ?", identity.User.ID).
 		Where("u.organization_id = ?", identity.Organization.ID).
-		Returning("id, organization_id, email, display_name, role, status, locale, time_zone").
+		Returning("id, organization_id, email, display_name, role, status, locale, time_zone, work_status, work_status_updated_at").
 		Exec(ctx)
 	if isUniqueViolation(err) {
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}

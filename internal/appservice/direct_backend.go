@@ -44,6 +44,7 @@ type DirectBackend struct {
 	updateProfile                     *useraction.UpdateProfileAction
 	changePassword                    *useraction.ChangePasswordAction
 	updateUserPreferences             *useraction.UpdatePreferencesAction
+	updateUserWorkStatus              *useraction.UpdateWorkStatusAction
 	listContacts                      *contactaction.ListContactsQuery
 	getContact                        *contactaction.GetContactQuery
 	createContact                     *contactaction.CreateContactAction
@@ -77,6 +78,7 @@ func NewDirectBackend(db *bun.DB) *DirectBackend {
 		updateProfile:                     useraction.NewUpdateProfileAction(db),
 		changePassword:                    useraction.NewChangePasswordAction(db),
 		updateUserPreferences:             useraction.NewUpdatePreferencesAction(db),
+		updateUserWorkStatus:              useraction.NewUpdateWorkStatusAction(db),
 		listContacts:                      contactaction.NewListContactsQuery(db),
 		getContact:                        contactaction.NewGetContactQuery(db),
 		createContact:                     contactaction.NewCreateContactAction(db),

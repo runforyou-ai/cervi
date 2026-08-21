@@ -17,6 +17,12 @@ import { Button } from "@/components/ui/button"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
+/** 工作台子页面共享的当前身份和用户更新入口。 */
+export type WorkspaceOutletContext = {
+  identity: Identity
+  updateUser: (user: User) => void
+}
+
 /** 页面导航后清除文字选区。 */
 function useClearSelectionOnNavigation() {
   const location = useLocation()
@@ -120,6 +126,7 @@ export function WorkspaceLayout() {
       <div className="cervi-workspace-shell flex h-svh min-h-0 w-full overflow-hidden">
         <WorkspaceNavigation
           identity={identity}
+          onUserUpdated={updateUser}
           onLogout={handleLogout}
           loggingOut={loggingOut}
         />

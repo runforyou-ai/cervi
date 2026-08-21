@@ -21,6 +21,7 @@ type testBackend struct {
 	lastProfile     appservice.ProfileInput
 	lastPassword    appservice.ChangePasswordInput
 	lastPreferences appservice.UserPreferencesInput
+	lastWorkStatus  appservice.UserWorkStatusInput
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
@@ -71,6 +72,15 @@ func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.R
 	identity := testIdentity()
 	identity.User.Locale = input.Locale
 	identity.User.TimeZone = input.TimeZone
+	return identity.User, nil
+}
+
+// UpdateUserWorkStatus 记录工作状态输入并返回更新后的用户。
+func (b *testBackend) UpdateUserWorkStatus(_ context.Context, meta appservice.RequestMeta, input appservice.UserWorkStatusInput) (appservice.User, error) {
+	b.lastMeta = meta
+	b.lastWorkStatus = input
+	identity := testIdentity()
+	identity.User.WorkStatus = input.WorkStatus
 	return identity.User, nil
 }
 
@@ -206,6 +216,24 @@ func TestUpdateUserPreferencesUsesTypedInput(t *testing.T) {
 	}
 }
 
+// TestUpdateUserWorkStatusUsesTypedInput 验证工作状态请求转换为类型化服务输入。
+func TestUpdateUserWorkStatusUsesTypedInput(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	response := doJSON(t, http.MethodPatch, server.URL+"/work-status", appservice.UserWorkStatusInput{
+		WorkStatus: appservice.WorkStatusAway,
+	}, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	if backend.lastMeta.Token != "test-token" || backend.lastWorkStatus.WorkStatus != appservice.WorkStatusAway {
+		t.Fatalf("work status input = %#v, meta = %#v", backend.lastWorkStatus, backend.lastMeta)
+	}
+}
+
 // TestInvalidJSONUsesRequestedLanguage 验证 HTTP 适配层的输入错误使用请求语言。
 func TestInvalidJSONUsesRequestedLanguage(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(&testBackend{})))
@@ -240,7 +268,7 @@ func TestBearerTokenParsing(t *testing.T) {
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
-		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "owner@example.com", DisplayName: "所有者", Role: "owner", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai"},
+		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "owner@example.com", DisplayName: "所有者", Role: "owner", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", WorkStatus: appservice.WorkStatusWorking},
 	}
 }
 

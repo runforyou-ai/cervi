@@ -55,7 +55,9 @@ func resolveIdentity(ctx context.Context, db *bun.DB, value string) (*servermode
 			u.role,
 			u.status,
 			u.locale,
-			u.time_zone
+			u.time_zone,
+			u.work_status,
+			u.work_status_updated_at
 		FROM tokens AS token
 		JOIN users AS u ON u.id = token.user_id
 		JOIN organizations AS o ON o.id = u.organization_id
@@ -74,6 +76,8 @@ func resolveIdentity(ctx context.Context, db *bun.DB, value string) (*servermode
 		&identity.User.Status,
 		&identity.User.Locale,
 		&identity.User.TimeZone,
+		&identity.User.WorkStatus,
+		&identity.User.WorkStatusUpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

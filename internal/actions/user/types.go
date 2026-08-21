@@ -31,6 +31,7 @@ type DirectoryUser struct {
 	DisplayName string            `json:"displayName"`
 	Role        domain.UserRole   `json:"role"`
 	Status      domain.UserStatus `json:"status"`
+	WorkStatus  domain.WorkStatus `json:"workStatus"`
 	CreatedAt   time.Time         `json:"createdAt"`
 }
 

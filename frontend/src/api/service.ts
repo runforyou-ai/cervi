@@ -21,6 +21,7 @@ import {
   UpdateContact,
   UpdateProfile,
   UpdateUserPreferences,
+  UpdateUserWorkStatus,
   UpdateWebsiteChannel,
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -97,6 +98,8 @@ export const updateProfile = bind(UpdateProfile)
 export const changePassword = bind(ChangePassword)
 /** 修改当前用户的语言和时区设置。 */
 export const updateUserPreferences = bind(UpdateUserPreferences)
+/** 修改当前用户主动设置的工作状态。 */
+export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
 
 const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)

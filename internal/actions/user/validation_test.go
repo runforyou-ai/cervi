@@ -42,6 +42,18 @@ func TestPreferencesValidation(t *testing.T) {
 	}
 }
 
+// TestWorkStatusValidation 验证工作状态白名单和空白规范化。
+func TestWorkStatusValidation(t *testing.T) {
+	normalized, fields := normalizeWorkStatusInput(WorkStatusInput{WorkStatus: " away "})
+	if len(fields) != 0 || normalized.WorkStatus != domain.WorkStatusAway {
+		t.Fatalf("valid work status = %#v, fields = %#v", normalized, fields)
+	}
+	_, fields = normalizeWorkStatusInput(WorkStatusInput{WorkStatus: "offline"})
+	if fields["workStatus"] != ValidationWorkStatusInvalid {
+		t.Fatalf("invalid work status fields = %#v", fields)
+	}
+}
+
 // TestValidateChangePasswordInput 验证新密码长度规则。
 func TestValidateChangePasswordInput(t *testing.T) {
 	if fields := validateChangePasswordInput(ChangePasswordInput{NewPassword: "password123"}); len(fields) != 0 {

@@ -17,7 +17,7 @@ import {
   UsersIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate, useSearchParams } from "react-router"
+import { useNavigate, useOutletContext, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -42,6 +42,7 @@ import {
   type ContactSummary,
   type DirectoryUser,
   type PageInfo,
+  type WorkStatus,
 } from "@/api"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 import {
@@ -103,6 +104,12 @@ import {
 } from "@/components/ui/table"
 import { ContactForm } from "@/features/contacts/contact-form"
 import { ContactDetailView } from "@/features/contacts/contact-detail"
+import {
+  WorkStatusBadge,
+  WorkStatusDot,
+  workStatusLabel,
+} from "@/features/users/work-status"
+import type { WorkspaceOutletContext } from "@/features/workspace/workspace-layout"
 import {
   channelTypeLabel,
   userRoleLabel,
@@ -316,6 +323,12 @@ function UserStatusBadge({
   )
 }
 
+/** 显示成员主动设置的工作状态。 */
+function MemberWorkStatusBadge({ status }: { status: WorkStatus }) {
+  const { t } = useTranslation("common")
+  return <WorkStatusBadge status={status} label={workStatusLabel(status, t)} />
+}
+
 /** 显示团队成员详情中的一个只读字段。 */
 function MemberDetailItem({
   label,
@@ -387,6 +400,8 @@ export function ContactsPage({
   deleted?: boolean
 }) {
   const { t } = useTranslation("contacts")
+  const { t: tCommon } = useTranslation("common")
+  const { identity } = useOutletContext<WorkspaceOutletContext>()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -418,6 +433,11 @@ export function ContactsPage({
   const status = optionalWailsEnum(UserStatus, searchParams.get("status"))
   const role = optionalWailsEnum(UserRole, searchParams.get("role"))
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
+
+  /** 当前用户使用工作台中的即时状态，其他成员使用目录查询结果。 */
+  function memberWorkStatus(user: DirectoryUser) {
+    return user.id === identity.user.id ? identity.user.workStatus : user.workStatus
+  }
 
   /** 更新列表查询参数。 */
   const setParameters = useCallback(
@@ -834,7 +854,21 @@ export function ContactsPage({
                   {scope === "internal" && users.length > 0
                     ? users.map((user) => (
                         <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.displayName}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2.5">
+                              <span
+                                className="relative flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-xs font-semibold text-secondary-foreground"
+                                title={workStatusLabel(memberWorkStatus(user), tCommon)}
+                              >
+                                {user.displayName.slice(0, 1).toUpperCase()}
+                                <WorkStatusDot
+                                  status={memberWorkStatus(user)}
+                                  className="absolute -right-0.5 -bottom-0.5 size-2 ring-2 ring-card"
+                                />
+                              </span>
+                              <span>{user.displayName}</span>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-muted-foreground">{user.email}</TableCell>
                           <TableCell>{userRoleLabel(user.role, t)}</TableCell>
                           <TableCell>
@@ -971,6 +1005,10 @@ export function ContactsPage({
                         label={userStatusLabel(detailUser.status, t)}
                       />
                     }
+                  />
+                  <MemberDetailItem
+                    label={t("columns.workStatus")}
+                    value={<MemberWorkStatusBadge status={memberWorkStatus(detailUser)} />}
                   />
                   <MemberDetailItem
                     label={t("columns.createdAt")}

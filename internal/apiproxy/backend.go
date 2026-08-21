@@ -82,6 +82,13 @@ func (b *Backend) UpdateUserPreferences(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// UpdateUserWorkStatus 保存远程当前用户主动设置的工作状态。
+func (b *Backend) UpdateUserWorkStatus(ctx context.Context, meta appservice.RequestMeta, input appservice.UserWorkStatusInput) (appservice.User, error) {
+	var output appservice.User
+	err := b.do(ctx, meta, http.MethodPatch, "/work-status", nil, input, &output)
+	return output, err
+}
+
 // LoadInbox 返回当前用户的远程收件箱。
 func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta) (appservice.Inbox, error) {
 	var output appservice.Inbox

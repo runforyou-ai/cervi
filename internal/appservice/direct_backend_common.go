@@ -25,6 +25,7 @@ func userFromModel(user servermodels.User) User {
 	return User{
 		ID: user.ID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName,
 		Role: UserRole(user.Role), Status: UserStatus(user.Status), Locale: Locale(user.Locale), TimeZone: user.TimeZone,
+		WorkStatus: WorkStatus(user.WorkStatus), WorkStatusUpdatedAt: user.WorkStatusUpdatedAt,
 	}
 }
 

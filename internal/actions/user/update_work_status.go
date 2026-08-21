@@ -11,19 +11,19 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdatePreferencesAction 修改当前用户的语言和时区设置。
-type UpdatePreferencesAction struct {
+// UpdateWorkStatusAction 修改当前用户主动设置的工作状态。
+type UpdateWorkStatusAction struct {
 	db *bun.DB
 }
 
-// NewUpdatePreferencesAction 创建语言和时区修改操作。
-func NewUpdatePreferencesAction(db *bun.DB) *UpdatePreferencesAction {
-	return &UpdatePreferencesAction{db: db}
+// NewUpdateWorkStatusAction 创建工作状态修改操作。
+func NewUpdateWorkStatusAction(db *bun.DB) *UpdateWorkStatusAction {
+	return &UpdateWorkStatusAction{db: db}
 }
 
-// Execute 校验并保存当前用户的语言和时区设置。
-func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *servermodels.Identity, input PreferencesInput) (*servermodels.User, error) {
-	input, fields := normalizePreferencesInput(input)
+// Execute 校验并保存当前用户的工作状态。
+func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkStatusInput) (*servermodels.User, error) {
+	input, fields := normalizeWorkStatusInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
@@ -37,19 +37,19 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 	user := &servermodels.User{}
 	result, err := a.db.NewUpdate().
 		Model(user).
-		Set("locale = ?", input.Locale).
-		Set("time_zone = ?", input.TimeZone).
+		Set("work_status = ?", input.WorkStatus).
+		Set("work_status_updated_at = now()").
 		Set("updated_at = now()").
 		Where("u.id = ?", identity.User.ID).
 		Where("u.organization_id = ?", identity.Organization.ID).
 		Returning("id, organization_id, email, display_name, role, status, locale, time_zone, work_status, work_status_updated_at").
 		Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("update user preferences: %w", err)
+		return nil, fmt.Errorf("update user work status: %w", err)
 	}
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return nil, fmt.Errorf("read updated user preferences count: %w", err)
+		return nil, fmt.Errorf("read updated user work status count: %w", err)
 	}
 	if rows == 0 {
 		return nil, common.ErrIdentityInvalid

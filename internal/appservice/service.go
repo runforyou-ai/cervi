@@ -11,6 +11,7 @@ type Backend interface {
 	UpdateProfile(context.Context, RequestMeta, ProfileInput) (User, error)
 	ChangePassword(context.Context, RequestMeta, ChangePasswordInput) error
 	UpdateUserPreferences(context.Context, RequestMeta, UserPreferencesInput) (User, error)
+	UpdateUserWorkStatus(context.Context, RequestMeta, UserWorkStatusInput) (User, error)
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
 	ListWebsiteChannels(context.Context, RequestMeta, bool) (WebsiteChannelList, error)
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
@@ -97,6 +98,11 @@ func (s *Service) ChangePassword(ctx context.Context, meta RequestMeta, input Ch
 // UpdateUserPreferences 保存当前用户的语言和时区设置。
 func (s *Service) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (User, error) {
 	return s.backend.UpdateUserPreferences(ctx, meta, input)
+}
+
+// UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
+func (s *Service) UpdateUserWorkStatus(ctx context.Context, meta RequestMeta, input UserWorkStatusInput) (User, error) {
+	return s.backend.UpdateUserWorkStatus(ctx, meta, input)
 }
 
 // LoadInbox 返回当前用户的统一收件箱。

@@ -1,6 +1,7 @@
 /** 工作台左侧模块轨和用户菜单。 */
 import { useRef, useState } from "react"
 import {
+  CheckIcon,
   ContactRoundIcon,
   InboxIcon,
   LoaderCircleIcon,
@@ -12,8 +13,15 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, useLocation, useNavigate } from "react-router"
+import { toast } from "sonner"
 
-import type { Identity } from "@/api"
+import {
+  recoverSession,
+  updateUserWorkStatus,
+  type Identity,
+  type User,
+  type WorkStatus,
+} from "@/api"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +30,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  selectableWorkStatuses,
+  WorkStatusDot,
+  workStatusLabel,
+} from "@/features/users/work-status"
 import { cn } from "@/lib/utils"
 
 /** 模块轨导航项。 */
@@ -96,16 +109,20 @@ function WorkspaceMenu() {
 /** 渲染模块轨和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
+  onUserUpdated,
   onLogout,
   loggingOut,
 }: {
   identity: Identity
+  onUserUpdated: (user: User) => void
   onLogout: () => void
   loggingOut: boolean
 }) {
   const { t } = useTranslation("workspace")
+  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [updatingWorkStatus, setUpdatingWorkStatus] = useState<WorkStatus | null>(null)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
 
@@ -113,6 +130,30 @@ export function WorkspaceNavigation({
   function navigateFromUserMenu(path: string) {
     skipUserMenuFocusRestoreRef.current = true
     navigate(path)
+  }
+
+  /** 立即保存工作状态，并在失败时恢复原状态。 */
+  async function changeWorkStatus(workStatus: WorkStatus) {
+    if (workStatus === identity.user.workStatus || updatingWorkStatus) {
+      return
+    }
+
+    const previous = identity.user
+    setUpdatingWorkStatus(workStatus)
+    onUserUpdated({ ...previous, workStatus })
+    try {
+      const updated = await updateUserWorkStatus({ workStatus })
+      onUserUpdated(updated)
+      console.info("工作状态已切换", { work_status: workStatus })
+    } catch (error) {
+      onUserUpdated(previous)
+      if (!recoverSession(error, navigate)) {
+        console.warn("切换工作状态失败", error)
+        toast.error(t("workStatusUpdateError"))
+      }
+    } finally {
+      setUpdatingWorkStatus(null)
+    }
   }
 
   return (
@@ -123,12 +164,16 @@ export function WorkspaceNavigation({
             <button
               ref={userMenuTriggerRef}
               type="button"
-              className="flex size-10 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              className="relative flex size-10 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               aria-label={t("openUserMenu", {
                 name: identity.user.displayName,
               })}
             >
               {identity.user.displayName.slice(0, 1).toUpperCase()}
+              <WorkStatusDot
+                status={identity.user.workStatus}
+                className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
+              />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -147,8 +192,12 @@ export function WorkspaceNavigation({
           >
             <DropdownMenuLabel className="font-normal">
               <div className="flex items-center gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
+                <div className="relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
                   {identity.user.displayName.slice(0, 1).toUpperCase()}
+                  <WorkStatusDot
+                    status={identity.user.workStatus}
+                    className="absolute -right-0.5 -bottom-0.5 ring-2 ring-popover"
+                  />
                 </div>
                 <div className="grid min-w-0 gap-1 leading-tight">
                   <span className="truncate font-medium">
@@ -160,6 +209,30 @@ export function WorkspaceNavigation({
                 </div>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
+              {t("workStatus")}
+            </DropdownMenuLabel>
+            {selectableWorkStatuses.map((workStatus) => {
+              const selected = identity.user.workStatus === workStatus
+              return (
+                <DropdownMenuItem
+                  key={workStatus}
+                  disabled={updatingWorkStatus !== null}
+                  onSelect={() => void changeWorkStatus(workStatus)}
+                >
+                  <WorkStatusDot status={workStatus} className="size-2" />
+                  <span className="flex-1">
+                    {workStatusLabel(workStatus, tCommon)}
+                  </span>
+                  {updatingWorkStatus === workStatus ? (
+                    <LoaderCircleIcon className="animate-spin" />
+                  ) : selected ? (
+                    <CheckIcon className="text-primary" />
+                  ) : null}
+                </DropdownMenuItem>
+              )
+            })}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => navigateFromUserMenu("/account/profile")}
