@@ -24,7 +24,7 @@ import {
 } from "@/features/installation/setup-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 
-/** 创建企业和第一个所有者账号。 */
+/** 创建企业和第一个管理员账号。 */
 export function SetupForm() {
   const { t } = useTranslation("setup")
   const navigate = useNavigate()

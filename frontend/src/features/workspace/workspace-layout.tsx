@@ -11,6 +11,7 @@ import {
   sessionPath,
   SessionState,
   type Identity,
+  type Organization,
   type User,
 } from "@/api"
 import { Button } from "@/components/ui/button"
@@ -91,6 +92,11 @@ export function WorkspaceLayout() {
     setIdentity((current) => (current ? { ...current, user } : current))
   }
 
+  /** 同步工作台中的最新企业信息。 */
+  function updateOrganization(organization: Organization) {
+    setIdentity((current) => (current ? { ...current, organization } : current))
+  }
+
   if (loading) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -127,7 +133,11 @@ export function WorkspaceLayout() {
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
           <Outlet
-            context={{ identity, updateUser } satisfies WorkspaceOutletContext}
+            context={{
+              identity,
+              updateOrganization,
+              updateUser,
+            } satisfies WorkspaceOutletContext}
           />
         </div>
       </div>
