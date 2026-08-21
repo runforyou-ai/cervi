@@ -255,10 +255,9 @@ function InboxConversationList({
                     : conversation.name
                 }
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors",
-                  selectedId === conversation.id
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/60 hover:text-accent-foreground",
+                  "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-accent hover:text-accent-foreground",
+                  selectedId === conversation.id &&
+                    "bg-accent text-accent-foreground"
                 )}
                 onClick={() => onSelect?.(conversation.id)}
               >

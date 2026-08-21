@@ -41,10 +41,10 @@ function WorkspaceRailItem({
       to={to}
       className={cn(
         "flex h-16 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] leading-tight",
+        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        active
-          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-          : "hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+        active &&
+          "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
       )}
     >
       <Icon className="size-5" />
