@@ -2,7 +2,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
-import { Controller, useFieldArray, useForm } from "react-hook-form"
+import {
+  Controller,
+  type FieldErrors,
+  useFieldArray,
+  useForm,
+} from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
@@ -54,6 +59,25 @@ function formatTokenCount(value: number) {
   return String(value)
 }
 
+/** 返回模型目录中的第一条字段校验提示。 */
+function modelValidationMessage(
+  errors: FieldErrors<AIProviderFormValues>["models"],
+) {
+  if (!errors) return ""
+  if (typeof errors.root?.message === "string") return errors.root.message
+  if (!Array.isArray(errors)) return ""
+  for (const model of errors) {
+    if (!model) continue
+    const error =
+      model.identifier ??
+      model.name ??
+      model.contextWindow ??
+      model.maxOutputTokens
+    if (typeof error?.message === "string") return error.message
+  }
+  return ""
+}
+
 /** 显示供应商资料、连接设置和模型目录表单。 */
 export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation("settings")
@@ -69,7 +93,6 @@ export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
   const [loadingModels, setLoadingModels] = useState(false)
   const loadVersion = useRef(0)
   const mounted = useRef(true)
-  const formElement = useRef<HTMLFormElement>(null)
   const schema = useMemo(
     () =>
       createAIProviderSchema({
@@ -292,15 +315,11 @@ export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
     }
   }
 
-  /** 显示第一个无效输入框的浏览器原生提示。 */
-  function showValidationError() {
-    formElement.current?.reportValidity()
-  }
-
   const title =
     mode === "create"
       ? t("aiProviders.form.createTitle")
       : t("aiProviders.form.editTitle")
+  const modelErrorMessage = modelValidationMessage(form.formState.errors.models)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -326,9 +345,8 @@ export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
           </div>
         ) : (
           <form
-            ref={formElement}
             className="w-full max-w-3xl space-y-8"
-            onSubmit={form.handleSubmit(save, showValidationError)}
+            onSubmit={form.handleSubmit(save)}
             noValidate
           >
             <FieldGroup>
@@ -534,6 +552,11 @@ export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
                   </TableBody>
                 </Table>
               </div>
+              {modelErrorMessage ? (
+                <p className="mt-2 text-sm text-destructive" role="alert">
+                  {modelErrorMessage}
+                </p>
+              ) : null}
             </section>
 
             <div className="flex items-center gap-2">
