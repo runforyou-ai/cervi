@@ -17,7 +17,7 @@ import {
   UsersIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate, useOutletContext, useSearchParams } from "react-router"
+import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -42,7 +42,6 @@ import {
   type ContactSummary,
   type DirectoryUser,
   type PageInfo,
-  type WorkStatus,
 } from "@/api"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 import {
@@ -109,7 +108,7 @@ import {
   WorkStatusDot,
   workStatusLabel,
 } from "@/features/users/work-status"
-import type { WorkspaceOutletContext } from "@/features/workspace/workspace-layout"
+import { useWorkspace } from "@/features/workspace/workspace-context"
 import {
   channelTypeLabel,
   userRoleLabel,
@@ -323,12 +322,6 @@ function UserStatusBadge({
   )
 }
 
-/** 显示成员主动设置的工作状态。 */
-function MemberWorkStatusBadge({ status }: { status: WorkStatus }) {
-  const { t } = useTranslation("common")
-  return <WorkStatusBadge status={status} label={workStatusLabel(status, t)} />
-}
-
 /** 显示团队成员详情中的一个只读字段。 */
 function MemberDetailItem({
   label,
@@ -401,7 +394,7 @@ export function ContactsPage({
 }) {
   const { t } = useTranslation("contacts")
   const { t: tCommon } = useTranslation("common")
-  const { identity } = useOutletContext<WorkspaceOutletContext>()
+  const { identity } = useWorkspace()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1008,7 +1001,9 @@ export function ContactsPage({
                   />
                   <MemberDetailItem
                     label={t("columns.workStatus")}
-                    value={<MemberWorkStatusBadge status={memberWorkStatus(detailUser)} />}
+                    value={
+                      <WorkStatusBadge status={memberWorkStatus(detailUser)} />
+                    }
                   />
                   <MemberDetailItem
                     label={t("columns.createdAt")}

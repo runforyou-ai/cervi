@@ -427,7 +427,6 @@ export interface User {
     "locale": Locale;
     "timeZone": string;
     "workStatus": WorkStatus;
-    "workStatusUpdatedAt": string;
 }
 
 /**

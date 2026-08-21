@@ -30,27 +30,29 @@ func TestNormalizeProfileInput(t *testing.T) {
 
 // TestPreferencesValidation 验证语言和 IANA 时区校验。
 func TestPreferencesValidation(t *testing.T) {
-	_, fields := normalizePreferencesInput(PreferencesInput{
+	fields := validatePreferencesInput(PreferencesInput{
 		Locale: domain.LocaleChineseSimplified, TimeZone: "Asia/Shanghai",
 	})
 	if len(fields) != 0 {
 		t.Fatalf("valid preferences fields = %#v, want empty", fields)
 	}
-	_, fields = normalizePreferencesInput(PreferencesInput{Locale: "fr-FR", TimeZone: "invalid"})
+	fields = validatePreferencesInput(PreferencesInput{Locale: "fr-FR", TimeZone: "invalid"})
 	if fields["locale"] != ValidationLocaleInvalid || fields["timeZone"] != ValidationTimeZoneInvalid {
 		t.Fatalf("invalid preferences fields = %#v", fields)
 	}
 }
 
-// TestWorkStatusValidation 验证工作状态白名单和空白规范化。
+// TestWorkStatusValidation 验证工作状态白名单。
 func TestWorkStatusValidation(t *testing.T) {
-	normalized, fields := normalizeWorkStatusInput(WorkStatusInput{WorkStatus: " away "})
-	if len(fields) != 0 || normalized.WorkStatus != domain.WorkStatusAway {
-		t.Fatalf("valid work status = %#v, fields = %#v", normalized, fields)
+	fields := validateWorkStatusInput(WorkStatusInput{WorkStatus: domain.WorkStatusAway})
+	if len(fields) != 0 {
+		t.Fatalf("valid work status fields = %#v", fields)
 	}
-	_, fields = normalizeWorkStatusInput(WorkStatusInput{WorkStatus: "offline"})
-	if fields["workStatus"] != ValidationWorkStatusInvalid {
-		t.Fatalf("invalid work status fields = %#v", fields)
+	for _, status := range []domain.WorkStatus{" away ", "offline"} {
+		fields = validateWorkStatusInput(WorkStatusInput{WorkStatus: status})
+		if fields["workStatus"] != ValidationWorkStatusInvalid {
+			t.Fatalf("work status %q fields = %#v", status, fields)
+		}
 	}
 }
 

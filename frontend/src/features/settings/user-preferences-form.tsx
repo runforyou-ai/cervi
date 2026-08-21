@@ -29,20 +29,6 @@ import {
 import { apiErrorMessage } from "@/lib/form-errors"
 import { supportedTimeZones } from "@/lib/time-zones"
 
-/** 把用户契约中的语言收窄为表单支持的选项。 */
-function formLocale(
-  locale: User["locale"],
-): UserPreferencesFormValues["locale"] {
-  return locale === Locale.LocaleEnglishUnitedStates
-    ? Locale.LocaleEnglishUnitedStates
-    : Locale.LocaleChineseSimplified
-}
-
-/** 把主题设置收窄为表单支持的选项。 */
-function formTheme(theme: string | undefined): ThemePreference {
-  return theme === "light" || theme === "dark" ? theme : "system"
-}
-
 /** 修改当前用户的界面语言、日期时间显示时区和外观主题。 */
 export function UserPreferencesForm({
   user,
@@ -51,7 +37,7 @@ export function UserPreferencesForm({
   user: User
   onUpdated: (user: User) => void
 }) {
-  const { t, i18n } = useTranslation("settings")
+  const { t } = useTranslation("settings")
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const schema = useMemo(() => createUserPreferencesSchema(t), [t])
@@ -62,19 +48,22 @@ export function UserPreferencesForm({
   const form = useForm<UserPreferencesFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      locale: formLocale(user.locale),
+      locale: user.locale as UserPreferencesFormValues["locale"],
       timeZone: user.timeZone,
-      theme: formTheme(theme),
+      theme: (theme ?? "system") as ThemePreference,
     },
   })
 
+  /** next-themes 初始化后同步未编辑的主题字段。 */
   useEffect(() => {
     if (!form.formState.dirtyFields.theme) {
-      form.setValue("theme", formTheme(theme), { shouldDirty: false })
+      form.setValue("theme", (theme ?? "system") as ThemePreference, {
+        shouldDirty: false,
+      })
     }
   }, [form, theme])
 
-  /** 保存全部偏好并立即刷新界面语言、时间和主题。 */
+  /** 保存语言、时区和主题设置。 */
   async function save(values: UserPreferencesFormValues) {
     try {
       const updated = await updateUserPreferences({
@@ -83,12 +72,17 @@ export function UserPreferencesForm({
       })
       setTheme(values.theme)
       form.reset({
-        locale: formLocale(updated.locale),
+        locale: values.locale,
         timeZone: updated.timeZone,
         theme: values.theme,
       })
       onUpdated(updated)
-      await i18n.changeLanguage(updated.locale)
+      console.info("偏好设置已保存", {
+        user_id: updated.id,
+        locale: updated.locale,
+        time_zone: updated.timeZone,
+        theme: values.theme,
+      })
       toast.success(t("preferences.saveSuccess"))
     } catch (error) {
       if (recoverSession(error, navigate)) return

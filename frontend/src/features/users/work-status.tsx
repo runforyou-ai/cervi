@@ -1,10 +1,12 @@
 /** 工作状态的统一文案和语义化展示。 */
 import type { ComponentProps } from "react"
 import type { TFunction } from "i18next"
+import { useTranslation } from "react-i18next"
 
 import { WorkStatus } from "@/api"
 import { cn } from "@/lib/utils"
 
+/** 用户菜单允许主动切换的工作状态。 */
 export const selectableWorkStatuses = [
   WorkStatus.WorkStatusWorking,
   WorkStatus.WorkStatusAway,
@@ -36,7 +38,8 @@ function workStatusDotClass(status: WorkStatus) {
     case WorkStatus.WorkStatusOffDuty:
       return "bg-muted-foreground"
     default:
-      return "bg-muted-foreground"
+      console.warn("未知的工作状态颜色", status)
+      return ""
   }
 }
 
@@ -49,18 +52,24 @@ export function WorkStatusDot({
   return (
     <span
       aria-hidden="true"
-      className={cn("inline-block size-2.5 shrink-0 rounded-full", workStatusDotClass(status), className)}
+      className={cn(
+        "inline-block size-2.5 shrink-0 rounded-full",
+        workStatusDotClass(status),
+        className,
+      )}
       {...props}
     />
   )
 }
 
 /** 用带文字的徽标显示工作状态。 */
-export function WorkStatusBadge({ status, label }: { status: WorkStatus; label: string }) {
+export function WorkStatusBadge({ status }: { status: WorkStatus }) {
+  const { t } = useTranslation("common")
+
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
       <WorkStatusDot status={status} className="size-1.5" />
-      {label}
+      {workStatusLabel(status, t)}
     </span>
   )
 }

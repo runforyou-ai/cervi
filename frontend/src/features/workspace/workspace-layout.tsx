@@ -15,13 +15,8 @@ import {
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
+import type { WorkspaceOutletContext } from "@/features/workspace/workspace-context"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
-
-/** 工作台子页面共享的当前身份和用户更新入口。 */
-export type WorkspaceOutletContext = {
-  identity: Identity
-  updateUser: (user: User) => void
-}
 
 /** 页面导航后清除文字选区。 */
 function useClearSelectionOnNavigation() {
@@ -131,7 +126,9 @@ export function WorkspaceLayout() {
           loggingOut={loggingOut}
         />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <Outlet context={{ identity, updateUser }} />
+          <Outlet
+            context={{ identity, updateUser } satisfies WorkspaceOutletContext}
+          />
         </div>
       </div>
     </UserPreferencesProvider>

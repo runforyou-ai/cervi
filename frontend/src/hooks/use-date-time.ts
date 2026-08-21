@@ -1,13 +1,13 @@
-/** 按当前语言格式化日期时间。 */
+/** 按当前用户语言和时区格式化日期时间。 */
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 
-import { useUserPreferences } from "@/contexts/user-preferences"
+import { useUserTimeZone } from "@/contexts/user-preferences"
 
-/** 返回按当前语言格式化日期时间的方法。 */
+/** 返回按当前用户语言和时区格式化日期时间的方法。 */
 export function useDateTime() {
   const { i18n } = useTranslation()
-  const { timeZone } = useUserPreferences()
+  const timeZone = useUserTimeZone()
   const formatter = useMemo(
     () =>
       new Intl.DateTimeFormat(i18n.resolvedLanguage, {

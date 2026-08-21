@@ -1,6 +1,5 @@
 /** 设置页。 */
 import { useTranslation } from "react-i18next"
-import { useOutletContext } from "react-router"
 
 import {
   PagePaneLink,
@@ -12,7 +11,7 @@ import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
-import type { WorkspaceOutletContext } from "@/features/workspace/workspace-layout"
+import { useWorkspace } from "@/features/workspace/workspace-context"
 
 /** 个人设置导航和当前设置表单。 */
 export function PersonalSettingsPage({
@@ -21,7 +20,7 @@ export function PersonalSettingsPage({
   section: "profile" | "security" | "preferences"
 }) {
   const { t } = useTranslation("settings")
-  const { identity, updateUser } = useOutletContext<WorkspaceOutletContext>()
+  const { identity, updateUser } = useWorkspace()
   const title = t(`${section}.title`)
 
   return (

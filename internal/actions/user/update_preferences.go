@@ -23,7 +23,7 @@ func NewUpdatePreferencesAction(db *bun.DB) *UpdatePreferencesAction {
 
 // Execute 校验并保存当前用户的语言和时区设置。
 func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *servermodels.Identity, input PreferencesInput) (*servermodels.User, error) {
-	input, fields := normalizePreferencesInput(input)
+	fields := validatePreferencesInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
@@ -42,7 +42,7 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 		Set("updated_at = now()").
 		Where("u.id = ?", identity.User.ID).
 		Where("u.organization_id = ?", identity.Organization.ID).
-		Returning("id, organization_id, email, display_name, role, status, locale, time_zone, work_status, work_status_updated_at").
+		Returning("id, organization_id, email, display_name, role, status, locale, time_zone, work_status").
 		Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("update user preferences: %w", err)

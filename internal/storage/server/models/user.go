@@ -2,25 +2,20 @@
 
 package models
 
-import (
-	"time"
-
-	"github.com/uptrace/bun"
-)
+import "github.com/uptrace/bun"
 
 // User 表示 PostgreSQL 中的企业成员。
 type User struct {
 	bun.BaseModel `bun:"table:users,alias:u"`
 
-	ID                  string    `bun:"id,pk" json:"id"`
-	OrganizationID      string    `bun:"organization_id" json:"organizationId"`
-	Email               string    `bun:"email" json:"email"`
-	DisplayName         string    `bun:"display_name" json:"displayName"`
-	PasswordHash        string    `bun:"password_hash" json:"-"`
-	Role                string    `bun:"role" json:"role"`
-	Status              string    `bun:"status" json:"status"`
-	Locale              string    `bun:"locale" json:"locale"`
-	TimeZone            string    `bun:"time_zone" json:"timeZone"`
-	WorkStatus          string    `bun:"work_status" json:"workStatus"`
-	WorkStatusUpdatedAt time.Time `bun:"work_status_updated_at" json:"workStatusUpdatedAt"`
+	ID             string `bun:"id,pk" json:"id"`
+	OrganizationID string `bun:"organization_id" json:"organizationId"`
+	Email          string `bun:"email" json:"email"`
+	DisplayName    string `bun:"display_name" json:"displayName"`
+	PasswordHash   string `bun:"password_hash" json:"-"`
+	Role           string `bun:"role" json:"role"`
+	Status         string `bun:"status" json:"status"`
+	Locale         string `bun:"locale" json:"locale"`
+	TimeZone       string `bun:"time_zone" json:"timeZone"`
+	WorkStatus     string `bun:"work_status" json:"workStatus"`
 }

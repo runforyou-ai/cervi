@@ -1,19 +1,13 @@
-/** 提供浏览器时区默认值和完整 IANA 时区选项。 */
+/** 提供浏览器时区和 IANA 时区选项。 */
 
-type IntlWithSupportedValues = typeof Intl & {
-  supportedValuesOf?: (key: "timeZone") => string[]
-}
-
-/** 返回浏览器当前 IANA 时区，无法读取时使用 UTC。 */
+/** 返回浏览器当前 IANA 时区。 */
 export function resolveBrowserTimeZone() {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+  return Intl.DateTimeFormat().resolvedOptions().timeZone
 }
 
 /** 返回当前运行环境支持的全部 IANA 时区。 */
-export function supportedTimeZones(current?: string) {
-  const values =
-    (Intl as IntlWithSupportedValues).supportedValuesOf?.("timeZone") ?? []
+export function supportedTimeZones(current: string) {
   return Array.from(
-    new Set(["UTC", current ?? resolveBrowserTimeZone(), ...values]),
+    new Set(["UTC", current, ...Intl.supportedValuesOf("timeZone")]),
   ).sort((left, right) => left.localeCompare(right))
 }

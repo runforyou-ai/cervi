@@ -1,16 +1,10 @@
-/** 向工作台页面提供当前用户的语言和时区设置。 */
+/** 同步当前用户语言并提供日期时间显示时区。 */
 import { createContext, useContext, useEffect, type ReactNode } from "react"
 
-import { Locale, type User } from "@/api"
+import type { User } from "@/api"
 import { i18n } from "@/i18n"
-import { resolveBrowserTimeZone } from "@/lib/time-zones"
 
-type UserPreferences = Pick<User, "locale" | "timeZone">
-
-const UserPreferencesContext = createContext<UserPreferences>({
-  locale: Locale.LocaleChineseSimplified,
-  timeZone: resolveBrowserTimeZone(),
-})
+const UserTimeZoneContext = createContext<User["timeZone"] | null>(null)
 
 /** 同步用户语言并向子页面提供用户时区。 */
 export function UserPreferencesProvider({
@@ -21,19 +15,23 @@ export function UserPreferencesProvider({
   children: ReactNode
 }) {
   useEffect(() => {
-    void i18n.changeLanguage(user.locale)
+    void i18n.changeLanguage(user.locale).catch((error) => {
+      console.warn("切换界面语言失败", error)
+    })
   }, [user.locale])
 
   return (
-    <UserPreferencesContext.Provider
-      value={{ locale: user.locale, timeZone: user.timeZone }}
-    >
+    <UserTimeZoneContext.Provider value={user.timeZone}>
       {children}
-    </UserPreferencesContext.Provider>
+    </UserTimeZoneContext.Provider>
   )
 }
 
-/** 返回当前用户的语言和时区设置。 */
-export function useUserPreferences() {
-  return useContext(UserPreferencesContext)
+/** 返回当前用户的日期时间显示时区。 */
+export function useUserTimeZone() {
+  const timeZone = useContext(UserTimeZoneContext)
+  if (timeZone === null) {
+    throw new Error("useUserTimeZone 必须在 UserPreferencesProvider 内使用")
+  }
+  return timeZone
 }

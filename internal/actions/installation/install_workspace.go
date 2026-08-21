@@ -52,7 +52,6 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 	input.OrganizationName = strings.TrimSpace(input.OrganizationName)
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	input.Email = commonemail.Normalize(input.Email)
-	input.TimeZone = strings.TrimSpace(input.TimeZone)
 	if fields := validateInput(input); len(fields) > 0 {
 		return InstallWorkspaceOutput{}, &ValidationError{Fields: fields}
 	}
@@ -102,7 +101,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		if _, err := tx.NewInsert().
 			Model(user).
 			Column("organization_id", "email", "display_name", "password_hash", "role", "status", "locale", "time_zone").
-			Returning("id").
+			Returning("id, work_status").
 			Exec(ctx); err != nil {
 			return err
 		}

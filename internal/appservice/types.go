@@ -169,16 +169,15 @@ type Organization struct {
 
 // User 定义当前企业成员信息。
 type User struct {
-	ID                  string     `json:"id"`
-	OrganizationID      string     `json:"organizationId"`
-	Email               string     `json:"email"`
-	DisplayName         string     `json:"displayName"`
-	Role                UserRole   `json:"role"`
-	Status              UserStatus `json:"status"`
-	Locale              Locale     `json:"locale"`
-	TimeZone            string     `json:"timeZone"`
-	WorkStatus          WorkStatus `json:"workStatus"`
-	WorkStatusUpdatedAt time.Time  `json:"workStatusUpdatedAt"`
+	ID             string     `json:"id"`
+	OrganizationID string     `json:"organizationId"`
+	Email          string     `json:"email"`
+	DisplayName    string     `json:"displayName"`
+	Role           UserRole   `json:"role"`
+	Status         UserStatus `json:"status"`
+	Locale         Locale     `json:"locale"`
+	TimeZone       string     `json:"timeZone"`
+	WorkStatus     WorkStatus `json:"workStatus"`
 }
 
 // Identity 定义当前用户及其所属企业。

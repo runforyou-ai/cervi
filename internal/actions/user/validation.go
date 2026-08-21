@@ -81,9 +81,8 @@ func validateChangePasswordInput(input ChangePasswordInput) map[string]Validatio
 	return fields
 }
 
-// normalizePreferencesInput 规范化并校验语言和时区设置。
-func normalizePreferencesInput(input PreferencesInput) (PreferencesInput, map[string]ValidationCode) {
-	input.TimeZone = strings.TrimSpace(input.TimeZone)
+// validatePreferencesInput 校验语言和时区设置。
+func validatePreferencesInput(input PreferencesInput) map[string]ValidationCode {
 	fields := make(map[string]ValidationCode)
 	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
 		fields["locale"] = ValidationLocaleInvalid
@@ -91,17 +90,16 @@ func normalizePreferencesInput(input PreferencesInput) (PreferencesInput, map[st
 	if !commontimezone.Valid(input.TimeZone) {
 		fields["timeZone"] = ValidationTimeZoneInvalid
 	}
-	return input, fields
+	return fields
 }
 
-// normalizeWorkStatusInput 规范化并校验工作状态。
-func normalizeWorkStatusInput(input WorkStatusInput) (WorkStatusInput, map[string]ValidationCode) {
-	input.WorkStatus = domain.WorkStatus(strings.TrimSpace(string(input.WorkStatus)))
+// validateWorkStatusInput 校验工作状态。
+func validateWorkStatusInput(input WorkStatusInput) map[string]ValidationCode {
 	fields := make(map[string]ValidationCode)
 	if input.WorkStatus != domain.WorkStatusWorking &&
 		input.WorkStatus != domain.WorkStatusAway &&
 		input.WorkStatus != domain.WorkStatusOffDuty {
 		fields["workStatus"] = ValidationWorkStatusInvalid
 	}
-	return input, fields
+	return fields
 }

@@ -40,7 +40,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("connect to PostgreSQL: %w", err)
 	}
-	slog.Info("PostgreSQL 连接成功")
+	slog.Info("PostgreSQL 连接成功", "timezone", "UTC")
 
 	if err := migrate(startupCtx, sqlDB); err != nil {
 		_ = db.Close()

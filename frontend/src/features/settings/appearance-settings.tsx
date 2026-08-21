@@ -1,15 +1,15 @@
-/** 偏好表单中的外观主题字段。 */
+/** 偏好设置中的主题字段。 */
 import { useTranslation } from "react-i18next"
 
 import { Field, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 
-/** 定义偏好表单支持的外观主题。 */
+/** 偏好设置支持的主题。 */
 export const themePreferences = ["system", "light", "dark"] as const
 
 export type ThemePreference = (typeof themePreferences)[number]
 
-/** 展示与其他偏好字段一致的主题选择框。 */
+/** 渲染主题选择字段。 */
 export function AppearanceSettings({
   name,
   value,

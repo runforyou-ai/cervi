@@ -92,7 +92,7 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 		slog.Warn("保存语言和时区失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
 		return User{}, FailedError(meta, cervii18n.ErrorPreferencesUpdateFailed)
 	}
-	slog.Info("语言和时区保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
+	slog.Info("语言和时区保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "locale", input.Locale, "time_zone", input.TimeZone)
 	return userFromModel(*user), nil
 }
 

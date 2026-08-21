@@ -122,7 +122,7 @@ export function WorkspaceNavigation({
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [updatingWorkStatus, setUpdatingWorkStatus] = useState<WorkStatus | null>(null)
+  const [changingWorkStatus, setChangingWorkStatus] = useState(false)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
 
@@ -134,12 +134,12 @@ export function WorkspaceNavigation({
 
   /** 立即保存工作状态，并在失败时恢复原状态。 */
   async function changeWorkStatus(workStatus: WorkStatus) {
-    if (workStatus === identity.user.workStatus || updatingWorkStatus) {
+    if (workStatus === identity.user.workStatus || changingWorkStatus) {
       return
     }
 
     const previous = identity.user
-    setUpdatingWorkStatus(workStatus)
+    setChangingWorkStatus(true)
     onUserUpdated({ ...previous, workStatus })
     try {
       const updated = await updateUserWorkStatus({ workStatus })
@@ -152,7 +152,7 @@ export function WorkspaceNavigation({
         toast.error(t("workStatusUpdateError"))
       }
     } finally {
-      setUpdatingWorkStatus(null)
+      setChangingWorkStatus(false)
     }
   }
 
@@ -218,16 +218,14 @@ export function WorkspaceNavigation({
               return (
                 <DropdownMenuItem
                   key={workStatus}
-                  disabled={updatingWorkStatus !== null}
+                  disabled={changingWorkStatus}
                   onSelect={() => void changeWorkStatus(workStatus)}
                 >
                   <WorkStatusDot status={workStatus} className="size-2" />
                   <span className="flex-1">
                     {workStatusLabel(workStatus, tCommon)}
                   </span>
-                  {updatingWorkStatus === workStatus ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : selected ? (
+                  {selected ? (
                     <CheckIcon className="text-primary" />
                   ) : null}
                 </DropdownMenuItem>
