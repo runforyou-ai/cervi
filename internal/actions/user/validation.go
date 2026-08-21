@@ -36,8 +36,9 @@ type ValidationError = common.FieldError
 
 // ProfileInput 定义当前用户可编辑的个人资料字段。
 type ProfileInput struct {
-	DisplayName string
-	Email       string
+	DisplayName  string
+	Email        string
+	AvatarFileID string
 }
 
 // normalizeCreateInput 规范化并校验新增企业成员字段。
@@ -89,6 +90,7 @@ type WorkStatusInput struct {
 func normalizeProfileInput(input ProfileInput) (ProfileInput, map[string]ValidationCode) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	input.Email = commonemail.Normalize(input.Email)
+	input.AvatarFileID = strings.TrimSpace(input.AvatarFileID)
 
 	fields := make(map[string]ValidationCode)
 	if input.DisplayName == "" {

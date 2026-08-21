@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -48,6 +49,7 @@ func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.Reques
 func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
 	var output appservice.Auth
 	err := b.do(ctx, meta, http.MethodPost, "/auth/login", nil, input, &output)
+	b.normalizeUser(&output.Identity.User)
 	return output, err
 }
 
@@ -60,13 +62,32 @@ func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error
 func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
 	var output appservice.Identity
 	err := b.do(ctx, meta, http.MethodGet, "/auth/identity", nil, nil, &output)
+	b.normalizeUser(&output.User)
 	return output, err
 }
 
-// UpdateProfile 修改远程当前用户的姓名和邮箱。
+// UpdateProfile 修改远程当前用户的头像、姓名和邮箱。
 func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPatch, "/profile", nil, input, &output)
+	b.normalizeUser(&output)
+	return output, err
+}
+
+// CreateFileUpload 创建远程文件上传请求。
+func (b *Backend) CreateFileUpload(ctx context.Context, meta appservice.RequestMeta, input appservice.FileUploadInput) (appservice.FileUpload, error) {
+	var output appservice.FileUpload
+	err := b.do(ctx, meta, http.MethodPost, "/files/uploads", nil, input, &output)
+	b.normalizeFile(&output.File)
+	output.Request.URL = b.absoluteContentURL(output.Request.URL)
+	return output, err
+}
+
+// CompleteFileUpload 核验并完成远程文件上传。
+func (b *Backend) CompleteFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) (appservice.File, error) {
+	var output appservice.File
+	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/complete", nil, nil, &output)
+	b.normalizeFile(&output)
 	return output, err
 }
 
@@ -79,6 +100,7 @@ func (b *Backend) ChangePassword(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) UpdateUserPreferences(ctx context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPatch, "/preferences", nil, input, &output)
+	b.normalizeUser(&output)
 	return output, err
 }
 
@@ -86,6 +108,7 @@ func (b *Backend) UpdateUserPreferences(ctx context.Context, meta appservice.Req
 func (b *Backend) UpdateUserWorkStatus(ctx context.Context, meta appservice.RequestMeta, input appservice.UserWorkStatusInput) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPatch, "/work-status", nil, input, &output)
+	b.normalizeUser(&output)
 	return output, err
 }
 
@@ -93,7 +116,38 @@ func (b *Backend) UpdateUserWorkStatus(ctx context.Context, meta appservice.Requ
 func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta) (appservice.Inbox, error) {
 	var output appservice.Inbox
 	err := b.do(ctx, meta, http.MethodGet, "/inbox", nil, nil, &output)
+	b.normalizeUser(&output.User)
 	return output, err
+}
+
+// normalizeUser 将服务端相对头像地址转换为企业服务器绝对地址。
+func (b *Backend) normalizeUser(user *appservice.User) {
+	user.AvatarURL = b.absoluteContentURL(user.AvatarURL)
+}
+
+// normalizeFile 将服务端相对文件地址转换为企业服务器绝对地址。
+func (b *Backend) normalizeFile(file *appservice.File) {
+	file.ContentURL = b.absoluteContentURL(file.ContentURL)
+}
+
+// absoluteContentURL 为原生端补全企业服务器文件地址。
+func (b *Backend) absoluteContentURL(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	parsed, err := url.Parse(value)
+	if err == nil && parsed.IsAbs() {
+		return parsed.String()
+	}
+	state := b.connection.currentState()
+	if state == nil {
+		return value
+	}
+	endpoint := *state.baseURL
+	endpoint.Path = strings.TrimRight(state.baseURL.Path, "/") + "/" + strings.TrimLeft(value, "/")
+	endpoint.RawQuery = ""
+	endpoint.Fragment = ""
+	return endpoint.String()
 }
 
 // ListWebsiteChannels 返回远程网站渠道列表。

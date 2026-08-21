@@ -9,12 +9,14 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	"github.com/runforyou-ai/cervi/internal/filestore"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -65,10 +67,14 @@ type DirectBackend struct {
 	getS3Setting                      *settingaction.GetS3SettingQuery
 	saveS3Setting                     *settingaction.SaveS3SettingAction
 	testS3Setting                     *settingaction.TestS3SettingAction
+	createFileUpload                  *fileaction.CreateUploadAction
+	getFile                           *fileaction.GetQuery
+	markFileUploaded                  *fileaction.MarkUploadedAction
+	localFiles                        *filestore.LocalStore
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *filestore.LocalStore) *DirectBackend {
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -108,6 +114,10 @@ func NewDirectBackend(db *bun.DB) *DirectBackend {
 		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),
 		testS3Setting:                     settingaction.NewTestS3SettingAction(),
+		createFileUpload:                  fileaction.NewCreateUploadAction(db),
+		getFile:                           fileaction.NewGetQuery(db),
+		markFileUploaded:                  fileaction.NewMarkUploadedAction(db),
+		localFiles:                        localFiles,
 	}
 }
 

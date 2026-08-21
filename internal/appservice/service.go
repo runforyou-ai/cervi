@@ -9,6 +9,8 @@ type Backend interface {
 	Logout(context.Context, RequestMeta) error
 	LoadIdentity(context.Context, RequestMeta) (Identity, error)
 	UpdateProfile(context.Context, RequestMeta, ProfileInput) (User, error)
+	CreateFileUpload(context.Context, RequestMeta, FileUploadInput) (FileUpload, error)
+	CompleteFileUpload(context.Context, RequestMeta, string) (File, error)
 	ChangePassword(context.Context, RequestMeta, ChangePasswordInput) error
 	UpdateUserPreferences(context.Context, RequestMeta, UserPreferencesInput) (User, error)
 	UpdateUserWorkStatus(context.Context, RequestMeta, UserWorkStatusInput) (User, error)
@@ -56,14 +58,34 @@ type ServerConnector interface {
 	ConnectServer(context.Context, RequestMeta, string) (bool, error)
 }
 
+// ProfileImageSelector 由支持原生文件对话框的平台实现。
+type ProfileImageSelector interface {
+	SelectProfileImage(context.Context, RequestMeta) (ProfileImageFile, error)
+}
+
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
 type Service struct {
-	backend Backend
+	backend              Backend
+	profileImageSelector ProfileImageSelector
+}
+
+// Option 配置平台专属的应用服务能力。
+type Option func(*Service)
+
+// WithProfileImageSelector 注入原生端头像文件选择器。
+func WithProfileImageSelector(selector ProfileImageSelector) Option {
+	return func(service *Service) {
+		service.profileImageSelector = selector
+	}
 }
 
 // New 创建跨平台应用服务。
-func New(backend Backend) *Service {
-	return &Service{backend: backend}
+func New(backend Backend, options ...Option) *Service {
+	service := &Service{backend: backend}
+	for _, option := range options {
+		option(service)
+	}
+	return service
 }
 
 // InstallationStatus 返回服务端初始化状态和公开企业名称。
@@ -95,9 +117,27 @@ func (s *Service) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity,
 	return s.backend.LoadIdentity(ctx, meta)
 }
 
-// UpdateProfile 修改当前用户的姓名和邮箱。
+// UpdateProfile 修改当前用户的头像、姓名和邮箱。
 func (s *Service) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (User, error) {
 	return s.backend.UpdateProfile(ctx, meta, input)
+}
+
+// CreateFileUpload 创建文件上传请求。
+func (s *Service) CreateFileUpload(ctx context.Context, meta RequestMeta, input FileUploadInput) (FileUpload, error) {
+	return s.backend.CreateFileUpload(ctx, meta, input)
+}
+
+// CompleteFileUpload 核验并完成文件上传。
+func (s *Service) CompleteFileUpload(ctx context.Context, meta RequestMeta, fileID string) (File, error) {
+	return s.backend.CompleteFileUpload(ctx, meta, fileID)
+}
+
+// SelectProfileImage 在原生端选择并读取用户头像图片。
+func (s *Service) SelectProfileImage(ctx context.Context, meta RequestMeta) (ProfileImageFile, error) {
+	if s.profileImageSelector == nil {
+		return ProfileImageFile{}, methodNotAllowedError(meta, "SelectProfileImage")
+	}
+	return s.profileImageSelector.SelectProfileImage(ctx, meta)
 }
 
 // ChangePassword 核验当前密码并保存新密码。

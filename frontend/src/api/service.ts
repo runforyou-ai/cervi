@@ -1,7 +1,9 @@
 /** 绑定应用服务方法，并归一化可空切片。 */
 import {
   ChangePassword,
+  CompleteFileUpload,
   CreateContact,
+  CreateFileUpload,
   CreateTeam,
   CreateUser,
   DeactivateUser,
@@ -24,6 +26,7 @@ import {
   RestoreContact,
   RestoreWebsiteChannel,
   SaveS3Setting,
+  SelectProfileImage,
   TestS3Setting,
   UpdateContact,
   UpdateTeam,
@@ -122,8 +125,14 @@ export const updateOrganization = bind(UpdateOrganization)
 export const saveS3Setting = bind(SaveS3Setting)
 /** 测试对象存储连接。 */
 export const testS3Setting = bind(TestS3Setting)
-/** 修改当前用户的姓名和邮箱。 */
+/** 修改当前用户的头像、姓名和邮箱。 */
 export const updateProfile = bind(UpdateProfile)
+/** 创建文件上传请求。 */
+export const createFileUpload = bind(CreateFileUpload)
+/** 核验并完成文件上传。 */
+export const completeFileUpload = bind(CompleteFileUpload)
+/** 使用原生文件对话框选择用户头像图片。 */
+export const selectProfileImage = bind(SelectProfileImage)
 /** 修改当前用户的登录密码。 */
 export const changePassword = bind(ChangePassword)
 /** 修改当前用户的语言和时区设置。 */

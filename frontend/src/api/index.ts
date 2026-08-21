@@ -14,4 +14,5 @@ export {
   probeServer,
 } from "@/api/auth"
 export { loadSession, sessionPath } from "@/api/session"
+export { uploadFile, uploadFileContent } from "@/api/uploads"
 export * from "@/api/service"

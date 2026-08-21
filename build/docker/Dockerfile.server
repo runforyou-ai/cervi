@@ -62,6 +62,10 @@ EXPOSE 8080
 # Bind to all interfaces (required for Docker)
 # Can be overridden at runtime with -e WAILS_SERVER_HOST=...
 ENV WAILS_SERVER_HOST=0.0.0.0
+ENV FILE_STORAGE_PATH=/data/files
+
+# 持久化对象存储停用期间上传的本地文件。
+VOLUME ["/data/files"]
 
 # Run the server
 ENTRYPOINT ["/server"]

@@ -126,7 +126,6 @@ export function StorageSettingsForm() {
   const activeProvider = getStorageProvider(form.watch("provider"))
   const activeRegion = getStorageRegion(activeProvider, form.watch("region"))
   const configured = isConfigured(savedSetting)
-  const displayedEnabled = configured ? savedSetting.enabled : editing
 
   /** 切换对象存储提供商并填充默认区域。 */
   function selectProvider(providerId: StorageProviderId) {
@@ -254,25 +253,6 @@ export function StorageSettingsForm() {
     setEditing(false)
   }
 
-  /** 切换对象存储启用状态。 */
-  function changeEnabled(checked: boolean) {
-    if (!configured) {
-      if (checked) {
-        form.reset({ ...savedSetting, enabled: true })
-        setEditing(true)
-      } else {
-        cancelEditing()
-      }
-      return
-    }
-
-    if (checked) {
-      void enableSavedSetting()
-      return
-    }
-    setDisableDialogOpen(true)
-  }
-
   /** 启用已保存的对象存储设置。 */
   async function enableSavedSetting() {
     const nextSetting = { ...savedSetting, enabled: true }
@@ -351,32 +331,9 @@ export function StorageSettingsForm() {
 
   return (
     <div className="w-full max-w-3xl">
-      <Field className="gap-2">
-        <FieldLabel htmlFor="storage-enabled">
-          {t("storage.form.enabled")}
-        </FieldLabel>
-        <div className="flex items-center gap-3">
-          <Switch
-            id="storage-enabled"
-            checked={displayedEnabled}
-            disabled={submitting || (editing && configured)}
-            onCheckedChange={changeEnabled}
-          />
-          <FieldDescription>
-            {!configured
-              ? editing
-                ? t("storage.state.configuringDescription")
-                : t("storage.state.unconfiguredDescription")
-              : savedSetting.enabled
-                ? t("storage.state.enabledDescription")
-                : t("storage.state.disabledDescription")}
-          </FieldDescription>
-        </div>
-      </Field>
-
       {editing ? (
         <form
-          className="mt-6 w-full"
+          className="w-full"
           onSubmit={form.handleSubmit(save)}
           noValidate
         >
@@ -563,7 +520,7 @@ export function StorageSettingsForm() {
           </FieldGroup>
         </form>
       ) : configured ? (
-        <section className="mt-8" aria-labelledby="storage-detail-title">
+        <section aria-labelledby="storage-detail-title">
           <h3 id="storage-detail-title" className="text-base font-medium">
             {t("storage.detail.title")}
           </h3>
@@ -700,7 +657,18 @@ export function StorageSettingsForm() {
             ) : null}
           </div>
         </section>
-      ) : null}
+      ) : (
+        <div className="grid gap-4">
+          <p className="text-sm text-muted-foreground">
+            {t("storage.state.unconfiguredDescription")}
+          </p>
+          <div>
+            <Button type="button" onClick={beginEditing}>
+              {t("storage.actions.configure")}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <AlertDialog
         open={disableDialogOpen}
