@@ -8,7 +8,6 @@ import {
   LogOutIcon,
   MessagesSquareIcon,
   SettingsIcon,
-  UserRoundIcon,
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -54,7 +53,7 @@ function WorkspaceRailItem({
     <NavLink
       to={to}
       className={cn(
-        "flex h-16 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] leading-tight",
+        "my-0.5 flex h-14 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] leading-tight",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active &&
@@ -191,7 +190,10 @@ export function WorkspaceNavigation({
               userMenuTriggerRef.current?.blur()
             }}
           >
-            <DropdownMenuLabel className="font-normal">
+            <DropdownMenuItem
+              className="p-2"
+              onSelect={() => navigateFromUserMenu("/account/profile")}
+            >
               <div className="flex items-center gap-3">
                 <div className="relative size-10 shrink-0">
                   <UserAvatar
@@ -212,9 +214,9 @@ export function WorkspaceNavigation({
                   </span>
                 </div>
               </div>
-            </DropdownMenuLabel>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
+            <DropdownMenuLabel className="text-sm text-muted-foreground">
               {t("workStatus")}
             </DropdownMenuLabel>
             {selectableWorkStatuses.map((workStatus) => {
@@ -222,6 +224,7 @@ export function WorkspaceNavigation({
               return (
                 <DropdownMenuItem
                   key={workStatus}
+                  className="text-xs"
                   disabled={changingWorkStatus}
                   onSelect={() => void changeWorkStatus(workStatus)}
                 >
@@ -233,13 +236,6 @@ export function WorkspaceNavigation({
                 </DropdownMenuItem>
               )
             })}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() => navigateFromUserMenu("/account/profile")}
-            >
-              <UserRoundIcon />
-              {t("personalSettings")}
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               destructive

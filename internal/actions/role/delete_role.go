@@ -34,6 +34,16 @@ func (a *DeleteRoleAction) Execute(ctx context.Context, identity *servermodels.I
 		if domain.RoleKind(role.Kind) != domain.RoleKindCustom {
 			return ErrBuiltInDeleteForbidden
 		}
+		inUse, err := tx.NewSelect().Model((*servermodels.User)(nil)).
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("role_id = ?", role.ID).
+			Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if inUse {
+			return ErrInUse
+		}
 		if _, err := tx.NewDelete().
 			Model((*servermodels.RolePermission)(nil)).
 			Where("organization_id = ?", identity.Organization.ID).

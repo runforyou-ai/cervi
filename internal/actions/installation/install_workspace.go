@@ -88,24 +88,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			return err
 		}
 
-		user := &servermodels.User{
-			OrganizationID: organization.ID,
-			Email:          input.Email,
-			DisplayName:    input.DisplayName,
-			PasswordHash:   passwordHash,
-			Role:           string(domain.UserRoleAdmin),
-			Status:         "active",
-			Locale:         string(input.Locale),
-			TimeZone:       input.TimeZone,
-		}
-		if _, err := tx.NewInsert().
-			Model(user).
-			Column("organization_id", "email", "display_name", "password_hash", "role", "status", "locale", "time_zone").
-			Returning("id, work_status").
-			Exec(ctx); err != nil {
-			return err
-		}
-
+		var adminRoleID string
 		for _, kind := range domain.BuiltInRoleKinds() {
 			role := &servermodels.Role{OrganizationID: organization.ID, Kind: string(kind)}
 			if _, err := tx.NewInsert().
@@ -114,6 +97,9 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 				Returning("id").
 				Exec(ctx); err != nil {
 				return err
+			}
+			if kind == domain.RoleKindAdmin {
+				adminRoleID = role.ID
 			}
 			permissions := domain.DefaultRolePermissions(kind)
 			if len(permissions) == 0 {
@@ -133,6 +119,24 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 				Exec(ctx); err != nil {
 				return err
 			}
+		}
+
+		user := &servermodels.User{
+			OrganizationID: organization.ID,
+			Email:          input.Email,
+			DisplayName:    input.DisplayName,
+			PasswordHash:   passwordHash,
+			RoleID:         adminRoleID,
+			Status:         "active",
+			Locale:         string(input.Locale),
+			TimeZone:       input.TimeZone,
+		}
+		if _, err := tx.NewInsert().
+			Model(user).
+			Column("organization_id", "email", "display_name", "password_hash", "role_id", "status", "locale", "time_zone").
+			Returning("id, work_status").
+			Exec(ctx); err != nil {
+			return err
 		}
 
 		record := &servermodels.Token{

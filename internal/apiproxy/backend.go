@@ -213,7 +213,7 @@ func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, in
 	query := url.Values{}
 	setQuery(query, "query", input.Query)
 	setOptionalQuery(query, "status", input.Status)
-	setOptionalQuery(query, "role", input.Role)
+	setQuery(query, "roleId", input.RoleID)
 	setQuery(query, "teamId", input.TeamID)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)

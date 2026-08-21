@@ -269,7 +269,7 @@ func (s *Service) listUsers(c *gin.Context) {
 		return
 	}
 	users, err := s.application.ListUsers(c.Request.Context(), requestMeta(c), appservice.UserListInput{
-		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Role: optionalEnum[appservice.UserRole](c.Query("role")), TeamID: c.Query("teamId"), Page: page, PageSize: pageSize,
+		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), RoleID: c.Query("roleId"), TeamID: c.Query("teamId"), Page: page, PageSize: pageSize,
 	})
 	writeResult(c, http.StatusOK, users, err)
 }

@@ -38,7 +38,7 @@ import {
   builtInRoleDescription,
   permissionResourceLabel,
   roleDisplayName,
-} from "@/features/settings/role-labels"
+} from "@/features/roles/role-labels"
 import {
   createRoleSettingsSchema,
   type RoleSettingsFormValues,
@@ -63,6 +63,7 @@ function permissionRows(definitions: PermissionDefinition[]) {
 /** 显示角色资料和权限表单。 */
 export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   const { t } = useTranslation("settings")
+  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const { roleId = "" } = useParams()
   const [role, setRole] = useState<RoleData | null>(null)
@@ -106,7 +107,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         name: currentRole
           ? currentRole.kind === RoleKind.RoleKindCustom
             ? currentRole.name
-            : roleDisplayName(currentRole, t)
+            : roleDisplayName(currentRole, tCommon)
           : "",
         description: currentRole?.description ?? "",
         permissions: currentRole?.permissions ?? [],
@@ -119,7 +120,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
     } finally {
       if (version === loadVersion.current) setLoading(false)
     }
-  }, [form, mode, navigate, roleId, t])
+  }, [form, mode, navigate, roleId, tCommon])
 
   useEffect(() => {
     mounted.current = true
@@ -196,7 +197,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
     mode === "create"
       ? t("roles.form.createTitle")
       : role
-        ? roleDisplayName(role, t)
+        ? roleDisplayName(role, tCommon)
         : t("roles.form.detailTitle")
   const rows = permissionRows(definitions)
 

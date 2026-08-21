@@ -12,7 +12,7 @@ import (
 type ListInput struct {
 	Query    string
 	Status   domain.UserStatus
-	Role     domain.UserRole
+	RoleID   string
 	TeamID   string
 	Page     int
 	PageSize int
@@ -23,7 +23,7 @@ type CreateInput struct {
 	DisplayName string
 	Email       string
 	Password    string
-	Role        domain.UserRole
+	RoleID      string
 	TeamIDs     []string
 }
 
@@ -31,7 +31,7 @@ type CreateInput struct {
 type UpdateInput struct {
 	DisplayName string
 	Email       string
-	Role        domain.UserRole
+	RoleID      string
 	TeamIDs     []string
 }
 
@@ -47,7 +47,9 @@ type DirectoryUser struct {
 	ID          string            `json:"id"`
 	Email       string            `json:"email"`
 	DisplayName string            `json:"displayName"`
-	Role        domain.UserRole   `json:"role"`
+	RoleID      string            `json:"roleId" bun:"role_id"`
+	RoleKind    domain.RoleKind   `json:"roleKind" bun:"role_kind"`
+	RoleName    string            `json:"roleName" bun:"role_name"`
 	Status      domain.UserStatus `json:"status"`
 	WorkStatus  domain.WorkStatus `json:"workStatus"`
 	Teams       []TeamSummary     `json:"teams"`

@@ -57,6 +57,7 @@ import {
   type PermissionDefinition,
   type Role,
   type RoleInput,
+  type RoleList,
   type TeamListInput,
   type UpdateDirectoryUserInput,
   type UserList,
@@ -105,7 +106,7 @@ export type RoleData = Omit<Role, "permissions"> & {
   permissions: NonNullable<Role["permissions"]>
 }
 
-export type RoleListData = {
+export type RoleListData = Omit<RoleList, "roles" | "permissions"> & {
   roles: RoleData[]
   permissions: PermissionDefinition[]
 }
@@ -268,7 +269,7 @@ export function listUsers(query: UserListQuery, signal?: AbortSignal) {
     {
       query: query.query ?? "",
       status: query.status ?? null,
-      role: query.role ?? null,
+      roleId: query.roleId ?? "",
       teamId: query.teamId ?? "",
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 50,
@@ -304,9 +305,10 @@ export async function loadInbox(): Promise<InboxData> {
   }
 }
 
-/** 读取角色和预定义权限目录。 */
+/** 读取角色、数量上限和权限目录。 */
 export function listRoles(signal?: AbortSignal): Promise<RoleListData> {
   return listRolesBound(signal).then((output) => ({
+    ...output,
     roles: asList(output.roles).map(normalizeRole),
     permissions: asList(output.permissions),
   }))

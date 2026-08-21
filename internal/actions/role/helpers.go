@@ -79,7 +79,7 @@ func loadPermissions(ctx context.Context, db bun.IDB, organizationID string, rol
 	return output, nil
 }
 
-// loadMemberCounts 按成员角色类型统计角色人数。
+// loadMemberCounts 按成员关联角色统计角色人数。
 func loadMemberCounts(ctx context.Context, db bun.IDB, organizationID string, roleIDs []string) (map[string]int, error) {
 	output := make(map[string]int, len(roleIDs))
 	if len(roleIDs) == 0 {
@@ -93,7 +93,7 @@ func loadMemberCounts(ctx context.Context, db bun.IDB, organizationID string, ro
 		TableExpr("roles AS r").
 		ColumnExpr("r.id::text AS role_id").
 		ColumnExpr("count(u.id) AS member_count").
-		Join("LEFT JOIN users AS u ON u.organization_id = r.organization_id AND u.role = r.kind").
+		Join("LEFT JOIN users AS u ON u.organization_id = r.organization_id AND u.role_id = r.id").
 		Where("r.organization_id = ?", organizationID).
 		Where("r.id IN (?)", bun.In(roleIDs)).
 		GroupExpr("r.id").

@@ -6,10 +6,14 @@ import { cn } from "@/lib/utils"
 /** 按语义显示成功或中性状态。 */
 export function StatusBadge({
   variant,
+  showDot = true,
   className,
   children,
   ...props
-}: ComponentProps<"span"> & { variant: "success" | "muted" }) {
+}: ComponentProps<"span"> & {
+  variant: "success" | "muted"
+  showDot?: boolean
+}) {
   return (
     <span
       className={cn(
@@ -21,7 +25,7 @@ export function StatusBadge({
       )}
       {...props}
     >
-      {variant === "success" ? (
+      {variant === "success" && showDot ? (
         <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
       ) : null}
       {children}

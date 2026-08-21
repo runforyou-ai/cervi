@@ -32,6 +32,22 @@ func (a *CreateRoleAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
+		organization := &servermodels.Organization{}
+		if err := tx.NewSelect().Model(organization).
+			Where("id = ?", identity.Organization.ID).
+			For("UPDATE").
+			Scan(ctx); err != nil {
+			return err
+		}
+		count, err := tx.NewSelect().Model((*servermodels.Role)(nil)).
+			Where("organization_id = ?", identity.Organization.ID).
+			Count(ctx)
+		if err != nil {
+			return err
+		}
+		if count >= MaxRolesPerOrganization {
+			return ErrLimitReached
+		}
 		role = servermodels.Role{
 			OrganizationID: identity.Organization.ID,
 			Kind:           string(domain.RoleKindCustom),

@@ -1,5 +1,5 @@
 /** 新建企业成员表单。 */
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -7,9 +7,10 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  UserRole,
+  RoleKind,
   createUser,
   isApiError,
+  type RoleData,
   type Team,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
@@ -23,6 +24,7 @@ import {
 import { NativeSelect } from "@/components/ui/native-select"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { roleDisplayName } from "@/features/roles/role-labels"
 import {
   createMemberSchema,
   type MemberFormValues,
@@ -31,17 +33,24 @@ import {
 /** 创建企业成员。 */
 export function MemberForm({
   teams,
+  roles,
   defaultTeamIds = [],
   onSaved,
   onCancel,
 }: {
   teams: Team[]
+  roles: RoleData[]
   defaultTeamIds?: string[]
   onSaved: () => void
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
+  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
+  const defaultRoleID =
+    roles.find((role) => role.kind === RoleKind.RoleKindMember)?.id ??
+    roles[0]?.id ??
+    ""
   const schema = useMemo(
     () =>
       createMemberSchema(
@@ -65,10 +74,16 @@ export function MemberForm({
       displayName: "",
       email: "",
       password: "",
-      role: UserRole.UserRoleMember,
+      roleId: defaultRoleID,
       teamIds: defaultTeamIds,
     },
   })
+
+  useEffect(() => {
+    if (!form.getValues("roleId") && defaultRoleID) {
+      form.setValue("roleId", defaultRoleID)
+    }
+  }, [defaultRoleID, form])
 
   /** 提交企业成员表单。 */
   async function submit(values: MemberFormValues) {
@@ -77,7 +92,7 @@ export function MemberForm({
         displayName: values.displayName,
         email: values.email,
         password: values.password,
-        role: values.role,
+        roleId: values.roleId,
         teamIds: values.teamIds,
       })
       toast.success(t("members.form.created"))
@@ -91,7 +106,7 @@ export function MemberForm({
               "displayName",
               "email",
               "password",
-              "role",
+              "roleId",
               "teamIds",
             ])
           : t("members.form.networkError"),
@@ -121,7 +136,7 @@ export function MemberForm({
           type="password"
         />
         <Controller
-          name="role"
+          name="roleId"
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
@@ -133,12 +148,11 @@ export function MemberForm({
                 id={field.name}
                 aria-invalid={fieldState.invalid}
               >
-                <option value={UserRole.UserRoleMember}>
-                  {t("roles.member")}
-                </option>
-                <option value={UserRole.UserRoleAdmin}>
-                  {t("roles.admin")}
-                </option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {roleDisplayName(role, tCommon)}
+                  </option>
+                ))}
               </NativeSelect>
             </Field>
           )}

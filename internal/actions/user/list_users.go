@@ -28,7 +28,7 @@ func NewListUsersQuery(db *bun.DB) *ListUsersQuery {
 func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListInput) (ListOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
 	input.Status = domain.UserStatus(strings.TrimSpace(string(input.Status)))
-	input.Role = domain.UserRole(strings.TrimSpace(string(input.Role)))
+	input.RoleID = strings.TrimSpace(input.RoleID)
 	input.TeamID = strings.TrimSpace(input.TeamID)
 	if input.Page <= 0 {
 		input.Page = 1
@@ -38,7 +38,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	}
 	if input.PageSize > 100 ||
 		(input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) ||
-		(input.Role != "" && input.Role != domain.UserRoleAdmin && input.Role != domain.UserRoleMember) ||
+		(input.RoleID != "" && !common.ValidUUID(input.RoleID)) ||
 		(input.TeamID != "" && !common.ValidUUID(input.TeamID)) {
 		return ListOutput{}, ErrQueryInvalid
 	}
@@ -51,8 +51,8 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		if input.Status != "" {
 			query = query.Where("u.status = ?", input.Status)
 		}
-		if input.Role != "" {
-			query = query.Where("u.role = ?", input.Role)
+		if input.RoleID != "" {
+			query = query.Where("u.role_id = ?", input.RoleID)
 		}
 		if input.TeamID != "" {
 			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.identity_type = ? AND tm.identity_id = u.id AND tm.team_id = ?)", domain.MemberIdentityTypeUser, input.TeamID)
@@ -75,7 +75,9 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	users := make([]DirectoryUser, 0)
 	if err := applyFilters(q.db.NewSelect().TableExpr("users AS u")).
 		ColumnExpr("u.id::text AS id").
-		Column("email", "display_name", "role", "status", "work_status", "created_at").
+		ColumnExpr("u.email, u.display_name, u.status, u.work_status, u.created_at").
+		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
+		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
 		OrderExpr("lower(u.display_name) ASC, u.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).

@@ -29,7 +29,6 @@ import {
   ContactSort,
   ContactStage,
   MemberIdentityType,
-  UserRole,
   UserStatus,
   deactivateUser,
   deleteContact,
@@ -38,6 +37,7 @@ import {
   listChannels,
   listContacts,
   listDeletedContacts,
+  listRoles,
   listTeams,
   listUsers,
   reactivateUser,
@@ -50,6 +50,7 @@ import {
   type ContactSummary,
   type DirectoryUserData,
   type PageInfo,
+  type RoleData,
   type Team,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
@@ -64,7 +65,6 @@ import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { SelectableText } from "@/components/selectable-text"
-import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   ContextMenu,
@@ -122,10 +122,10 @@ import { ContactDetailView } from "@/features/contacts/contact-detail"
 import { MemberDetailView } from "@/features/contacts/member-detail"
 import { MemberForm } from "@/features/contacts/member-form"
 import { TeamForm } from "@/features/contacts/team-form"
+import { roleDisplayName } from "@/features/roles/role-labels"
 import { useWorkspace } from "@/features/workspace/workspace-context"
 import {
   channelTypeLabel,
-  userRoleLabel,
   userStatusLabel,
 } from "@/features/contacts/contact-labels"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -212,6 +212,7 @@ function ContactScopeSidebar({
             <Button
               variant="ghost"
               size="icon-sm"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
               aria-label={t("add.label")}
               title={t("add.label")}
             >
@@ -226,15 +227,15 @@ function ContactScopeSidebar({
             </DropdownMenuItem>
             <DropdownMenuItem disabled>{t("add.agent")}</DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={() => navigate("/contacts/members?newTeam=1")}
-            >
-              {t("teams.create")}
-            </DropdownMenuItem>
-            <DropdownMenuItem
               disabled={channels.length === 0}
               onSelect={() => navigate("/contacts/external?new=1")}
             >
               {t("add.external")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => navigate("/contacts/members?newTeam=1")}
+            >
+              {t("teams.create")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -384,7 +385,16 @@ function UserStatusBadge({
   const active = status === UserStatus.UserStatusActive
 
   return (
-    <StatusBadge variant={active ? "success" : "muted"}>{label}</StatusBadge>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+        active
+          ? "bg-success/15 text-success"
+          : "bg-muted text-muted-foreground",
+      )}
+    >
+      {label}
+    </span>
   )
 }
 
@@ -431,6 +441,7 @@ function PageControls({
 /** 按分类列出通讯录。 */
 export function ContactsPage({ scope }: { scope: ContactScope }) {
   const { t } = useTranslation("contacts")
+  const { t: tCommon } = useTranslation("common")
   const { identity, updateUser: updateWorkspaceUser } = useWorkspace()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
@@ -440,6 +451,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [channels, setChannels] = useState<ChannelSummary[]>([])
   const [contacts, setContacts] = useState<ContactSummary[]>([])
   const [users, setUsers] = useState<DirectoryUserData[]>([])
+  const [roles, setRoles] = useState<RoleData[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [page, setPage] = useState<PageInfo>({ number: 1, size: 50, total: 0 })
   const [loadState, setLoadState] = useState<LoadState>("loading")
@@ -459,6 +471,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     useState<DirectoryUserData | null>(null)
   const [deleting, setDeleting] = useState(false)
   const detailTitleRef = useRef<HTMLHeadingElement>(null)
+  const catalogRequestID = useRef(0)
+  const listRequestID = useRef(0)
+  const detailRequestID = useRef(0)
   const selected = searchParams.get("selected") ?? ""
   const deleted = scope === "external" && searchParams.get("view") === "trash"
   const creating = searchParams.get("new") === "1"
@@ -473,8 +488,10 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const sort =
     optionalWailsEnum(ContactSort, searchParams.get("sort")) ??
     ContactSort.ContactSortCreatedAtDescending
-  const status = optionalWailsEnum(UserStatus, searchParams.get("status"))
-  const role = optionalWailsEnum(UserRole, searchParams.get("role"))
+  const status =
+    optionalWailsEnum(UserStatus, searchParams.get("status")) ??
+    UserStatus.UserStatusActive
+  const roleId = searchParams.get("roleId") ?? ""
   const category =
     optionalWailsEnum(MemberIdentityType, searchParams.get("category")) ?? ""
   const teamId = searchParams.get("teamId") ?? ""
@@ -517,93 +534,93 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   }, [query, search, setParameters])
 
   useEffect(() => {
-    const controller = new AbortController()
+    const requestID = ++catalogRequestID.current
     void Promise.all([
-      listChannels(controller.signal),
-      listTeams({ pageSize: 100 }, controller.signal),
+      listChannels(),
+      listRoles(),
+      listTeams({ pageSize: 100 }),
     ])
-      .then(([channelItems, teamOutput]) => {
+      .then(([channelItems, roleOutput, teamOutput]) => {
+        if (requestID !== catalogRequestID.current) return
         setChannels(channelItems)
+        setRoles(roleOutput.roles)
         setTeams(teamOutput.teams)
       })
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return
-        }
-        console.warn("渠道列表加载失败", error)
+        if (requestID !== catalogRequestID.current) return
+        console.warn("通讯录筛选数据加载失败", error)
         setChannels([])
+        setRoles([])
         setTeams([])
       })
-    return () => controller.abort()
+    return () => {
+      catalogRequestID.current += 1
+    }
   }, [])
 
   /** 按当前范围加载联系人或企业成员列表。 */
-  const loadList = useCallback(
-    async (signal?: AbortSignal) => {
-      setLoadState("loading")
-      try {
-        if (scope === "external") {
-          const loader = deleted ? listDeletedContacts : listContacts
-          const response: ContactListResponse = await loader(
-            {
-              query,
-              stage,
-              channelId: deleted ? "" : channelId,
-              methodType,
-              sort,
-              page: currentPage,
-              pageSize: 50,
-            },
-            signal,
-          )
-          setContacts(response.contacts)
-          setPage(response.page)
-        } else {
-          if (category === MemberIdentityType.MemberIdentityTypeAgent) {
-            setUsers([])
-            setPage({ number: 1, size: 50, total: 0 })
-          } else {
-            const response = await listUsers(
-              { query, status, role, teamId, page: currentPage, pageSize: 50 },
-              signal,
-            )
-            setUsers(response.users)
-            setPage(response.page)
-          }
-        }
-        setLoadState("ready")
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return
-        }
-        if (recoverSession(error, navigate)) {
-          return
-        }
-        console.warn("联系人列表加载失败", error)
-        setLoadState("error")
+  const loadList = useCallback(async () => {
+    const requestID = ++listRequestID.current
+    setLoadState("loading")
+    try {
+      if (scope === "external") {
+        const loader = deleted ? listDeletedContacts : listContacts
+        const response: ContactListResponse = await loader({
+          query,
+          stage,
+          channelId: deleted ? "" : channelId,
+          methodType,
+          sort,
+          page: currentPage,
+          pageSize: 50,
+        })
+        if (requestID !== listRequestID.current) return
+        setContacts(response.contacts)
+        setPage(response.page)
+      } else if (category === MemberIdentityType.MemberIdentityTypeAgent) {
+        setUsers([])
+        setPage({ number: 1, size: 50, total: 0 })
+      } else {
+        const response = await listUsers({
+          query,
+          status,
+          roleId,
+          teamId,
+          page: currentPage,
+          pageSize: 50,
+        })
+        if (requestID !== listRequestID.current) return
+        setUsers(response.users)
+        setPage(response.page)
       }
-    },
-    [
-      channelId,
-      category,
-      currentPage,
-      deleted,
-      methodType,
-      navigate,
-      query,
-      role,
-      scope,
-      sort,
-      stage,
-      status,
-      teamId,
-    ],
-  )
+      setLoadState("ready")
+    } catch (error) {
+      if (requestID !== listRequestID.current) return
+      if (recoverSession(error, navigate)) return
+      console.warn("联系人列表加载失败", error)
+      setLoadState("error")
+    }
+  }, [
+    channelId,
+    category,
+    currentPage,
+    deleted,
+    methodType,
+    navigate,
+    query,
+    roleId,
+    scope,
+    sort,
+    stage,
+    status,
+    teamId,
+  ])
 
   useEffect(() => {
-    const controller = new AbortController()
-    void loadList(controller.signal)
-    return () => controller.abort()
+    void loadList()
+    return () => {
+      listRequestID.current += 1
+    }
   }, [loadList, refreshVersion])
 
   useEffect(() => {
@@ -612,17 +629,19 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     if (!selected) {
       return
     }
-    const controller = new AbortController()
+    const requestID = ++detailRequestID.current
     setDetailLoading(true)
     const loader =
       scope === "external"
-        ? getContact(selected, controller.signal).then(setDetail)
-        : getUser(selected, controller.signal).then(setDetailUser)
+        ? getContact(selected).then((output) => {
+            if (requestID === detailRequestID.current) setDetail(output)
+          })
+        : getUser(selected).then((output) => {
+            if (requestID === detailRequestID.current) setDetailUser(output)
+          })
     void loader
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return
-        }
+        if (requestID !== detailRequestID.current) return
         if (recoverSession(error, navigate)) {
           return
         }
@@ -630,8 +649,12 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         toast.error(t("detail.loadError"))
         setParameters({ selected: null })
       })
-      .finally(() => setDetailLoading(false))
-    return () => controller.abort()
+      .finally(() => {
+        if (requestID === detailRequestID.current) setDetailLoading(false)
+      })
+    return () => {
+      detailRequestID.current += 1
+    }
   }, [navigate, scope, selected, setParameters, t])
 
   const selectedChannel = channels.find((channel) => channel.id === channelId)
@@ -796,8 +819,14 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   }
 
   const hasExternalFilters = Boolean(stage || methodType)
+  const roleOptions = roles.map((item) => ({
+    value: item.id,
+    label: roleDisplayName(item, tCommon),
+  }))
   const hasInternalFilters = Boolean(
-    status || role || category === MemberIdentityType.MemberIdentityTypeAgent,
+    status !== UserStatus.UserStatusActive ||
+      roleId ||
+      category === MemberIdentityType.MemberIdentityTypeAgent,
   )
 
   return (
@@ -861,15 +890,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 : t("search.external")
             }
             placeholder={
-              scope === "members"
-                ? t(
-                    category === MemberIdentityType.MemberIdentityTypeAgent
-                      ? "search.agents"
-                      : category === MemberIdentityType.MemberIdentityTypeUser
-                        ? "search.members"
-                        : "search.identities",
-                  )
-                : t("search.external")
+              scope === "external" ? t("search.external") : undefined
             }
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -893,7 +914,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                   setParameters({
                     category: value || null,
                     status: null,
-                    role: null,
+                    roleId: null,
                     page: null,
                     selected: null,
                   })
@@ -903,8 +924,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 <>
                   <ListToolbarFilter
                     label={t("filters.status")}
-                    allLabel={t("filters.allStatuses")}
-                    value={status ?? ""}
+                    value={status}
                     options={[
                       {
                         value: UserStatus.UserStatusActive,
@@ -917,7 +937,8 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                     ]}
                     onValueChange={(value) =>
                       setParameters({
-                        status: value || null,
+                        status:
+                          value === UserStatus.UserStatusActive ? null : value,
                         page: null,
                         selected: null,
                       })
@@ -926,20 +947,12 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                   <ListToolbarFilter
                     label={t("filters.role")}
                     allLabel={t("filters.allRoles")}
-                    value={role ?? ""}
-                    options={[
-                      {
-                        value: UserRole.UserRoleAdmin,
-                        label: t("roles.admin"),
-                      },
-                      {
-                        value: UserRole.UserRoleMember,
-                        label: t("roles.member"),
-                      },
-                    ]}
+                    value={roleId}
+                    options={roleOptions}
+                    contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
                     onValueChange={(value) =>
                       setParameters({
-                        role: value || null,
+                        roleId: value || null,
                         page: null,
                         selected: null,
                       })
@@ -952,7 +965,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                   onClick={() =>
                     setParameters({
                       status: null,
-                      role: null,
+                      roleId: null,
                       category: null,
                       page: null,
                     })
@@ -1146,7 +1159,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                                   .join("、")
                               : "—"}
                           </TableCell>
-                          <TableCell>{userRoleLabel(user.role, t)}</TableCell>
+                          <TableCell>
+                            {roleDisplayName(user.role, tCommon)}
+                          </TableCell>
                           <TableCell>
                             <UserStatusBadge
                               status={user.status}
@@ -1342,6 +1357,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 <MemberDetailView
                   user={detailUser}
                   teams={teams}
+                  roles={roles}
                   workStatus={memberWorkStatus(detailUser)}
                   onSaved={(saved) => {
                     setDetailUser(saved)
@@ -1351,7 +1367,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                         ...identity.user,
                         displayName: saved.displayName,
                         email: saved.email,
-                        role: saved.role,
+                        roleId: saved.role.id,
                         status: saved.status,
                       })
                     }
@@ -1393,6 +1409,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
           {scope === "members" ? (
             <MemberForm
               teams={teams}
+              roles={roles}
               defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
               onSaved={() => {
                 setParameters({ new: null })

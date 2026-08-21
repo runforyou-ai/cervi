@@ -7,6 +7,7 @@ import { toast } from "sonner"
 
 import {
   deleteRole,
+  isApiError,
   listRoles,
   PermissionLevel,
   RoleKind,
@@ -41,8 +42,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { roleDisplayName } from "@/features/settings/role-labels"
+import { roleDisplayName } from "@/features/roles/role-labels"
 import { recoverSession } from "@/lib/session-navigation"
+import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 显示角色已配置的查看和管理权限数量。 */
 function permissionSummary(
@@ -67,9 +69,11 @@ function permissionSummary(
 /** 加载并管理企业角色列表。 */
 export function RoleListPage() {
   const { t } = useTranslation("settings")
+  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const [roles, setRoles] = useState<RoleData[]>([])
   const [permissions, setPermissions] = useState<PermissionDefinition[]>([])
+  const [maximum, setMaximum] = useState<number | null>(null)
   const [deletingRole, setDeletingRole] = useState<RoleData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -87,6 +91,7 @@ export function RoleListPage() {
       if (version !== loadVersion.current) return
       setRoles(output.roles)
       setPermissions(output.permissions)
+      setMaximum(output.maximum)
     } catch (requestError) {
       if (version !== loadVersion.current) return
       if (recoverSession(requestError, navigate)) return
@@ -125,7 +130,11 @@ export function RoleListPage() {
         role_id: deletingRole.id,
         error: requestError,
       })
-      toast.error(t("roles.delete.error"))
+      toast.error(
+        isApiError(requestError)
+          ? apiErrorMessage(requestError)
+          : t("roles.delete.error"),
+      )
     } finally {
       if (mounted.current) setDeleting(false)
     }
@@ -134,9 +143,19 @@ export function RoleListPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={t("roles.title")}>
-        <Button size="sm" asChild>
-          <Link to="/settings/roles/new">{t("roles.list.create")}</Link>
-        </Button>
+        {maximum !== null && roles.length < maximum ? (
+          <Button size="sm" asChild>
+            <Link to="/settings/roles/new">{t("roles.list.create")}</Link>
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            disabled
+            title={maximum === null ? undefined : t("roles.list.limitReached")}
+          >
+            {t("roles.list.create")}
+          </Button>
+        )}
       </PageHeader>
       <PageContent>
         {loading ? (
@@ -179,7 +198,9 @@ export function RoleListPage() {
                 ) : roles.map((role) => (
                   <TableRow key={role.id}>
                     <TableCell className="font-medium">
-                      <SelectableText>{roleDisplayName(role, t)}</SelectableText>
+                      <SelectableText>
+                        {roleDisplayName(role, tCommon)}
+                      </SelectableText>
                     </TableCell>
                     <TableCell>{role.memberCount}</TableCell>
                     <TableCell className="text-muted-foreground">
@@ -232,7 +253,7 @@ export function RoleListPage() {
             <AlertDialogTitle>
               {deletingRole
                 ? t("roles.delete.title", {
-                    name: roleDisplayName(deletingRole, t),
+                    name: roleDisplayName(deletingRole, tCommon),
                   })
                 : null}
             </AlertDialogTitle>

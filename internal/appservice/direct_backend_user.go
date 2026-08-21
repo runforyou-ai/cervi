@@ -134,7 +134,7 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 		return UserList{}, err
 	}
 	output, err := b.listUsers.Execute(ctx, identity, useraction.ListInput{
-		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Role: optionalDomain[UserRole, domain.UserRole](input.Role), TeamID: input.TeamID, Page: input.Page, PageSize: input.PageSize,
+		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), RoleID: input.RoleID, TeamID: input.TeamID, Page: input.Page, PageSize: input.PageSize,
 	})
 	if errors.Is(err, useraction.ErrQueryInvalid) {
 		return UserList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
@@ -179,11 +179,11 @@ func (b *DirectBackend) CreateUser(ctx context.Context, meta RequestMeta, input 
 	if err != nil {
 		return DirectoryUser{}, err
 	}
-	user, err := b.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, Role: domain.UserRole(input.Role), TeamIDs: input.TeamIDs})
+	user, err := b.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
 	if err != nil {
 		return DirectoryUser{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
 	}
-	slog.Info("企业成员创建成功", "organization_id", identity.Organization.ID, "user_id", user.ID)
+	slog.Info("企业成员创建成功", "organization_id", identity.Organization.ID, "user_id", user.ID, "role_id", user.RoleID)
 	return directoryUserFromAction(*user), nil
 }
 
@@ -193,11 +193,11 @@ func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID
 	if err != nil {
 		return DirectoryUser{}, err
 	}
-	user, err := b.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, Role: domain.UserRole(input.Role), TeamIDs: input.TeamIDs})
+	user, err := b.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
 	if err != nil {
 		return DirectoryUser{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}
-	slog.Info("企业成员更新成功", "organization_id", identity.Organization.ID, "user_id", userID)
+	slog.Info("企业成员更新成功", "organization_id", identity.Organization.ID, "user_id", userID, "role_id", user.RoleID)
 	return directoryUserFromAction(*user), nil
 }
 
@@ -257,7 +257,7 @@ func directoryUserFromAction(user useraction.DirectoryUser) DirectoryUser {
 	for _, team := range user.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
+	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
 }
 
 // userFieldKeys 把企业成员校验错误码映射为本地化文案键。
@@ -268,7 +268,7 @@ func userFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key 
 		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
 		useraction.ValidationPasswordTooShort:    cervii18n.FieldPasswordTooShort,
 		useraction.ValidationPasswordTooLong:     cervii18n.FieldPasswordTooLong,
-		useraction.ValidationRoleInvalid:         cervii18n.FieldUserRoleInvalid,
+		useraction.ValidationRoleInvalid:         cervii18n.FieldMemberRoleInvalid,
 		useraction.ValidationTeamInvalid:         cervii18n.FieldUserTeamInvalid,
 		useraction.ValidationStatusInvalid:       cervii18n.FieldUserStatusInvalid,
 	}

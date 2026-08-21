@@ -13,7 +13,7 @@ type User struct {
 	Email          string  `bun:"email" json:"email"`
 	DisplayName    string  `bun:"display_name" json:"displayName"`
 	PasswordHash   string  `bun:"password_hash" json:"-"`
-	Role           string  `bun:"role" json:"role"`
+	RoleID         string  `bun:"role_id" json:"roleId"`
 	Status         string  `bun:"status" json:"status"`
 	Locale         string  `bun:"locale" json:"locale"`
 	TimeZone       string  `bun:"time_zone" json:"timeZone"`

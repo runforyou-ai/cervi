@@ -42,14 +42,6 @@ type Session struct {
 	OrganizationName string       `json:"organizationName,omitempty"`
 }
 
-// UserRole 表示企业成员角色。
-type UserRole string
-
-const (
-	UserRoleAdmin  UserRole = UserRole(domain.UserRoleAdmin)
-	UserRoleMember UserRole = UserRole(domain.UserRoleMember)
-)
-
 // UserStatus 表示企业成员状态。
 type UserStatus string
 
@@ -246,10 +238,18 @@ type Role struct {
 	UpdatedAt   time.Time        `json:"updatedAt"`
 }
 
-// RoleList 定义角色和预定义权限目录。
+// RoleSummary 定义成员关联角色的精简字段。
+type RoleSummary struct {
+	ID   string   `json:"id"`
+	Kind RoleKind `json:"kind"`
+	Name string   `json:"name"`
+}
+
+// RoleList 定义角色、数量上限和权限目录。
 type RoleList struct {
 	Roles       []Role                 `json:"roles"`
 	Permissions []PermissionDefinition `json:"permissions"`
+	Maximum     int                    `json:"maximum"`
 }
 
 // RoleInput 定义角色可编辑字段。
@@ -265,7 +265,7 @@ type User struct {
 	OrganizationID string     `json:"organizationId"`
 	Email          string     `json:"email"`
 	DisplayName    string     `json:"displayName"`
-	Role           UserRole   `json:"role"`
+	RoleID         string     `json:"roleId"`
 	Status         UserStatus `json:"status"`
 	Locale         Locale     `json:"locale"`
 	TimeZone       string     `json:"timeZone"`
@@ -447,7 +447,7 @@ type PageInfo struct {
 type UserListInput struct {
 	Query    string      `json:"query"`
 	Status   *UserStatus `json:"status,omitempty"`
-	Role     *UserRole   `json:"role,omitempty"`
+	RoleID   string      `json:"roleId"`
 	TeamID   string      `json:"teamId"`
 	Page     int         `json:"page"`
 	PageSize int         `json:"pageSize"`
@@ -458,7 +458,7 @@ type CreateUserInput struct {
 	DisplayName string   `json:"displayName"`
 	Email       string   `json:"email"`
 	Password    string   `json:"password"`
-	Role        UserRole `json:"role"`
+	RoleID      string   `json:"roleId"`
 	TeamIDs     []string `json:"teamIds"`
 }
 
@@ -466,7 +466,7 @@ type CreateUserInput struct {
 type UpdateDirectoryUserInput struct {
 	DisplayName string   `json:"displayName"`
 	Email       string   `json:"email"`
-	Role        UserRole `json:"role"`
+	RoleID      string   `json:"roleId"`
 	TeamIDs     []string `json:"teamIds"`
 }
 
@@ -481,7 +481,7 @@ type DirectoryUser struct {
 	ID          string        `json:"id"`
 	Email       string        `json:"email"`
 	DisplayName string        `json:"displayName"`
-	Role        UserRole      `json:"role"`
+	Role        RoleSummary   `json:"role"`
 	Status      UserStatus    `json:"status"`
 	WorkStatus  WorkStatus    `json:"workStatus"`
 	Teams       []TeamSummary `json:"teams"`

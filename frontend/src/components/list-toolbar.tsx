@@ -49,6 +49,7 @@ export function ListToolbarFilter({
   options,
   onValueChange,
   align = "start",
+  contentClassName,
 }: {
   label: string
   allLabel?: string
@@ -56,6 +57,7 @@ export function ListToolbarFilter({
   options: ListToolbarOption[]
   onValueChange: (value: string) => void
   align?: "start" | "center" | "end"
+  contentClassName?: string
 }) {
   const selected = options.find((option) => option.value === value)
 
@@ -72,7 +74,10 @@ export function ListToolbarFilter({
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} className="min-w-44">
+      <DropdownMenuContent
+        align={align}
+        className={cn("min-w-44", contentClassName)}
+      >
         <DropdownMenuLabel>{label}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {allLabel ? (

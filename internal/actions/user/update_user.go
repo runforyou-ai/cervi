@@ -31,10 +31,13 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
+		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {
+			return err
+		}
 		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("email = ?", input.Email).
-			Set("role = ?", input.Role).
+			Set("role_id = ?", input.RoleID).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", userID).

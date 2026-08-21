@@ -7,22 +7,19 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  UserRole,
   UserStatus,
   isApiError,
   isNotFoundApiError,
   updateUser,
   type DirectoryUserData,
+  type RoleData,
   type Team,
 } from "@/api"
 import { Field, FieldDescription } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { StatusBadge } from "@/components/status-badge"
-import {
-  userRoleLabel,
-  userStatusLabel,
-} from "@/features/contacts/contact-labels"
+import { userStatusLabel } from "@/features/contacts/contact-labels"
 import {
   DetailEditActions,
   DetailEditRow,
@@ -35,6 +32,7 @@ import { WorkStatusBadge } from "@/features/users/work-status"
 import { useDateTime } from "@/hooks/use-date-time"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { roleDisplayName } from "@/features/roles/role-labels"
 
 type EditingField = "name" | "email" | "role" | "teams" | null
 
@@ -44,7 +42,7 @@ function valuesFromUser(user: DirectoryUserData): MemberFormValues {
     displayName: user.displayName,
     email: user.email,
     password: "",
-    role: user.role,
+    roleId: user.role.id,
     teamIds: user.teams.map((team) => team.id),
   }
 }
@@ -69,17 +67,20 @@ function ReadonlyDetailRow({
 export function MemberDetailView({
   user,
   teams,
+  roles,
   workStatus,
   onSaved,
   onNotFound,
 }: {
   user: DirectoryUserData
   teams: Team[]
+  roles: RoleData[]
   workStatus: DirectoryUserData["workStatus"]
   onSaved: (user: DirectoryUserData) => void
   onNotFound: () => void
 }) {
   const { t } = useTranslation("contacts")
+  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [editing, setEditing] = useState<EditingField>(null)
@@ -129,7 +130,7 @@ export function MemberDetailView({
       const saved = await updateUser(user.id, {
         displayName: values.displayName,
         email: values.email,
-        role: values.role,
+        roleId: values.roleId,
         teamIds: values.teamIds,
       })
       toast.success(t("members.form.updated"))
@@ -143,7 +144,12 @@ export function MemberDetailView({
       console.warn("保存企业成员失败", error)
       toast.error(
         isApiError(error)
-          ? apiErrorMessage(error, ["displayName", "email", "role", "teamIds"])
+          ? apiErrorMessage(error, [
+              "displayName",
+              "email",
+              "roleId",
+              "teamIds",
+            ])
           : t("members.form.networkError"),
       )
     } finally {
@@ -194,16 +200,17 @@ export function MemberDetailView({
 
           <DetailEditRow
             label={t("columns.role")}
-            value={userRoleLabel(user.role, t)}
+            value={roleDisplayName(user.role, tCommon)}
             editing={editing === "role"}
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("role")}
           >
-            <NativeSelect {...form.register("role")} autoFocus>
-              <option value={UserRole.UserRoleMember}>
-                {t("roles.member")}
-              </option>
-              <option value={UserRole.UserRoleAdmin}>{t("roles.admin")}</option>
+            <NativeSelect {...form.register("roleId")} autoFocus>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {roleDisplayName(role, tCommon)}
+                </option>
+              ))}
             </NativeSelect>
             <DetailEditActions
               saving={saving}
@@ -214,6 +221,7 @@ export function MemberDetailView({
 
           <ReadonlyDetailRow label={t("columns.status")}>
             <StatusBadge
+              showDot={false}
               variant={
                 user.status === UserStatus.UserStatusActive
                   ? "success"
@@ -225,7 +233,7 @@ export function MemberDetailView({
           </ReadonlyDetailRow>
 
           <ReadonlyDetailRow label={t("columns.workStatus")}>
-            <WorkStatusBadge status={workStatus} />
+            <WorkStatusBadge status={workStatus} showDot={false} />
           </ReadonlyDetailRow>
         </div>
       </section>

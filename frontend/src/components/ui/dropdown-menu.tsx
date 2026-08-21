@@ -24,8 +24,13 @@ function DropdownMenuTrigger(
 function DropdownMenuContent({
   className,
   sideOffset = 4,
+  onCloseAutoFocus,
+  onPointerDownCapture,
+  onPointerDownOutside,
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+  const closedByPointerRef = React.useRef(false)
+
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
@@ -35,6 +40,21 @@ function DropdownMenuContent({
           "z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-32 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-hidden data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className,
         )}
+        onPointerDownCapture={(event) => {
+          closedByPointerRef.current = true
+          onPointerDownCapture?.(event)
+        }}
+        onPointerDownOutside={(event) => {
+          closedByPointerRef.current = true
+          onPointerDownOutside?.(event)
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          if (closedByPointerRef.current) {
+            event.preventDefault()
+          }
+          closedByPointerRef.current = false
+        }}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>
