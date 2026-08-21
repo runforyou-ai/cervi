@@ -12,6 +12,7 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
@@ -216,16 +217,41 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected directory user: %#v", directoryUser)
 	}
 
-	updateProfile := useraction.NewUpdateProfileAction(db)
-	updatedUser, err := updateProfile.Execute(context.Background(), loggedIn.Identity, useraction.ProfileInput{
-		DisplayName: "  新姓名  ",
-		Email:       " NEW@Example.com ",
+	avatar, err := fileaction.NewCreateUploadAction(db).Execute(context.Background(), loggedIn.Identity, domain.FileStorageBackendLocal, fileaction.UploadInput{
+		Purpose: domain.FilePurposeUserAvatar, FileName: "avatar.png", ContentType: "image/png", ByteSize: 1024,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updatedUser.DisplayName != "新姓名" || updatedUser.Email != "new@example.com" {
+	if avatar.Status != string(domain.FileStatusPending) || avatar.ExpiresAt == nil {
+		t.Fatalf("pending avatar = %#v", avatar)
+	}
+	avatar, err = fileaction.NewMarkUploadedAction(db).Execute(context.Background(), loggedIn.Identity, avatar.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if avatar.Status != string(domain.FileStatusUploaded) || avatar.ExpiresAt == nil {
+		t.Fatalf("uploaded avatar = %#v", avatar)
+	}
+
+	updateProfile := useraction.NewUpdateProfileAction(db)
+	updatedUser, err := updateProfile.Execute(context.Background(), loggedIn.Identity, useraction.ProfileInput{
+		DisplayName:  "  新姓名  ",
+		Email:        " NEW@Example.com ",
+		AvatarFileID: avatar.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedUser.DisplayName != "新姓名" || updatedUser.Email != "new@example.com" || updatedUser.AvatarFileID == nil || *updatedUser.AvatarFileID != avatar.ID {
 		t.Fatalf("updated user = %#v", updatedUser)
+	}
+	activeAvatar := &servermodels.File{}
+	if err := db.NewSelect().Model(activeAvatar).Where("f.id = ?", avatar.ID).Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if activeAvatar.Status != string(domain.FileStatusActive) || activeAvatar.ExpiresAt != nil {
+		t.Fatalf("active avatar = %#v", activeAvatar)
 	}
 	resolvedAfterUpdate, err := resolveIdentity.Execute(context.Background(), loggedIn.Token)
 	if err != nil {
@@ -233,6 +259,59 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if resolvedAfterUpdate == nil || resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.User.DisplayName != "新姓名" {
 		t.Fatalf("identity after profile update = %#v", resolvedAfterUpdate)
+	}
+	replacement, err := fileaction.NewCreateUploadAction(db).Execute(context.Background(), resolvedAfterUpdate, domain.FileStorageBackendLocal, fileaction.UploadInput{
+		Purpose: domain.FilePurposeUserAvatar, FileName: "replacement.webp", ContentType: "image/webp", ByteSize: 2048,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacement, err = fileaction.NewMarkUploadedAction(db).Execute(context.Background(), resolvedAfterUpdate, replacement.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updatedUser, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
+		DisplayName: "新姓名", Email: "new@example.com", AvatarFileID: replacement.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedUser.AvatarFileID == nil || *updatedUser.AvatarFileID != replacement.ID {
+		t.Fatalf("replacement avatar user = %#v", updatedUser)
+	}
+	if err := db.NewSelect().Model(activeAvatar).Where("f.id = ?", avatar.ID).Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if activeAvatar.Status != string(domain.FileStatusDeleting) || activeAvatar.ExpiresAt == nil {
+		t.Fatalf("replaced avatar = %#v", activeAvatar)
+	}
+	cleanup := fileaction.NewCleanupAction(db)
+	claimed, err := cleanup.ClaimDeleting(context.Background(), time.Now().UTC().Add(time.Second), time.Now().UTC().Add(time.Hour), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(claimed) != 1 || claimed[0].ID != avatar.ID {
+		t.Fatalf("claimed files = %#v", claimed)
+	}
+	if err := cleanup.DeleteClaimed(context.Background(), avatar.ID); err != nil {
+		t.Fatal(err)
+	}
+	resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
+		DisplayName: "不应保存的姓名", Email: "discarded@example.com", AvatarFileID: "00000000-0000-0000-0000-000000000099",
+	})
+	if !errors.Is(err, useraction.ErrAvatarFileNotFound) {
+		t.Fatalf("invalid avatar error = %v, want file not found", err)
+	}
+	resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.User.DisplayName != "新姓名" {
+		t.Fatalf("profile changed after invalid avatar: %#v", resolvedAfterUpdate.User)
 	}
 
 	changePassword := useraction.NewChangePasswordAction(db)
@@ -270,13 +349,39 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	retryAvatar, err := fileaction.NewCreateUploadAction(db).Execute(context.Background(), resolvedAfterUpdate, domain.FileStorageBackendLocal, fileaction.UploadInput{
+		Purpose: domain.FilePurposeUserAvatar, FileName: "retry.png", ContentType: "image/png", ByteSize: 4096,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	retryAvatar, err = fileaction.NewMarkUploadedAction(db).Execute(context.Background(), resolvedAfterUpdate, retryAvatar.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	_, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
-		DisplayName: "新姓名",
-		Email:       "OTHER@example.com",
+		DisplayName:  "新姓名",
+		Email:        "OTHER@example.com",
+		AvatarFileID: retryAvatar.ID,
 	})
 	var profileValidation *useraction.ValidationError
 	if !errors.As(err, &profileValidation) || profileValidation.Fields["email"] != useraction.ValidationEmailDuplicate {
 		t.Fatalf("duplicate profile email error = %v, want email validation", err)
+	}
+	if err := db.NewSelect().Model(retryAvatar).Where("f.id = ?", retryAvatar.ID).Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if retryAvatar.Status != string(domain.FileStatusUploaded) || retryAvatar.ExpiresAt == nil {
+		t.Fatalf("retry avatar after validation failure = %#v", retryAvatar)
+	}
+	updatedUser, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
+		DisplayName: "新姓名", Email: "new@example.com", AvatarFileID: retryAvatar.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedUser.AvatarFileID == nil || *updatedUser.AvatarFileID != retryAvatar.ID {
+		t.Fatalf("retried profile avatar = %#v", updatedUser)
 	}
 
 	createContact := contactaction.NewCreateContactAction(db)

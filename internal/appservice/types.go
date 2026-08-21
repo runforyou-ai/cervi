@@ -182,6 +182,7 @@ type User struct {
 	Locale         Locale     `json:"locale"`
 	TimeZone       string     `json:"timeZone"`
 	WorkStatus     WorkStatus `json:"workStatus"`
+	AvatarURL      string     `json:"avatarUrl"`
 }
 
 // Identity 定义当前用户及其所属企业。
@@ -192,8 +193,53 @@ type Identity struct {
 
 // ProfileInput 定义当前用户可编辑的个人资料字段。
 type ProfileInput struct {
-	DisplayName string `json:"displayName"`
-	Email       string `json:"email"`
+	DisplayName  string `json:"displayName"`
+	Email        string `json:"email"`
+	AvatarFileID string `json:"avatarFileId"`
+}
+
+// FilePurpose 表示文件上传用途。
+type FilePurpose string
+
+const (
+	FilePurposeUserAvatar FilePurpose = FilePurpose(domain.FilePurposeUserAvatar)
+)
+
+// FileUploadInput 定义创建上传所需的文件元数据。
+type FileUploadInput struct {
+	Purpose     FilePurpose `json:"purpose"`
+	FileName    string      `json:"fileName"`
+	ContentType string      `json:"contentType"`
+	ByteSize    int64       `json:"byteSize"`
+}
+
+// File 定义前端可使用的文件元数据。
+type File struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	ContentType string `json:"contentType"`
+	ByteSize    int64  `json:"byteSize"`
+	ContentURL  string `json:"contentUrl"`
+}
+
+// FileUploadRequest 定义客户端上传文件内容所需的 HTTP 请求。
+type FileUploadRequest struct {
+	Method  string            `json:"method"`
+	URL     string            `json:"url"`
+	Headers map[string]string `json:"headers"`
+}
+
+// FileUpload 包含待上传文件和内容上传请求。
+type FileUpload struct {
+	File    File              `json:"file"`
+	Request FileUploadRequest `json:"request"`
+}
+
+// ProfileImageFile 定义原生端选择的用户头像文件。
+type ProfileImageFile struct {
+	Name        string `json:"name"`
+	ContentType string `json:"contentType"`
+	DataBase64  string `json:"dataBase64"`
 }
 
 // ChangePasswordInput 定义当前用户修改密码所需字段。

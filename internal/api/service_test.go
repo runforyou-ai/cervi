@@ -20,6 +20,8 @@ type testBackend struct {
 	lastOrganization appservice.OrganizationInput
 	lastUserList     appservice.UserListInput
 	lastProfile      appservice.ProfileInput
+	lastFileUpload   appservice.FileUploadInput
+	lastFileID       string
 	lastPassword     appservice.ChangePasswordInput
 	lastPreferences  appservice.UserPreferencesInput
 	lastWorkStatus   appservice.UserWorkStatusInput
@@ -57,6 +59,20 @@ func (b *testBackend) UpdateProfile(_ context.Context, meta appservice.RequestMe
 	identity.User.DisplayName = input.DisplayName
 	identity.User.Email = input.Email
 	return identity.User, nil
+}
+
+// CreateFileUpload 记录文件上传输入并返回上传请求。
+func (b *testBackend) CreateFileUpload(_ context.Context, meta appservice.RequestMeta, input appservice.FileUploadInput) (appservice.FileUpload, error) {
+	b.lastMeta = meta
+	b.lastFileUpload = input
+	return appservice.FileUpload{File: appservice.File{ID: "file-1"}, Request: appservice.FileUploadRequest{Method: http.MethodPut, URL: "/files/file-1/content"}}, nil
+}
+
+// CompleteFileUpload 记录完成上传的文件编号。
+func (b *testBackend) CompleteFileUpload(_ context.Context, meta appservice.RequestMeta, fileID string) (appservice.File, error) {
+	b.lastMeta = meta
+	b.lastFileID = fileID
+	return appservice.File{ID: fileID}, nil
 }
 
 // ChangePassword 记录修改密码输入。
@@ -174,15 +190,37 @@ func TestUpdateProfileUsesTypedInput(t *testing.T) {
 	defer server.Close()
 
 	response := doJSON(t, http.MethodPatch, server.URL+"/profile", appservice.ProfileInput{
-		DisplayName: "林晓",
-		Email:       "lin@example.com",
+		DisplayName:  "林晓",
+		Email:        "lin@example.com",
+		AvatarFileID: "file-1",
 	}, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
-	if backend.lastMeta.Token != "test-token" || backend.lastProfile.DisplayName != "林晓" || backend.lastProfile.Email != "lin@example.com" {
+	if backend.lastMeta.Token != "test-token" || backend.lastProfile.DisplayName != "林晓" || backend.lastProfile.Email != "lin@example.com" || backend.lastProfile.AvatarFileID != "file-1" {
 		t.Fatalf("profile input = %#v, meta = %#v", backend.lastProfile, backend.lastMeta)
+	}
+}
+
+// TestFileUploadRoutesUseTypedInput 验证文件上传接口使用统一契约。
+func TestFileUploadRoutesUseTypedInput(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	created := doJSON(t, http.MethodPost, server.URL+"/files/uploads", appservice.FileUploadInput{
+		Purpose: appservice.FilePurposeUserAvatar, FileName: "avatar.png", ContentType: "image/png", ByteSize: 1024,
+	}, "test-token")
+	created.Body.Close()
+	if created.StatusCode != http.StatusCreated || backend.lastFileUpload.FileName != "avatar.png" {
+		t.Fatalf("create status = %d, input = %#v", created.StatusCode, backend.lastFileUpload)
+	}
+
+	completed := doJSON(t, http.MethodPost, server.URL+"/files/file-1/complete", nil, "test-token")
+	completed.Body.Close()
+	if completed.StatusCode != http.StatusOK || backend.lastFileID != "file-1" {
+		t.Fatalf("complete status = %d, file ID = %q", completed.StatusCode, backend.lastFileID)
 	}
 }
 
