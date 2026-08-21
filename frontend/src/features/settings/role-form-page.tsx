@@ -15,6 +15,7 @@ import {
   PermissionLevel,
   RoleKind,
   updateRole,
+  updateUser,
   type PermissionCode,
   type PermissionDefinition,
   type PermissionResource,
@@ -35,16 +36,23 @@ import {
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  builtInRoleDescription,
   permissionResourceLabel,
+  roleDescription,
   roleDisplayName,
 } from "@/features/roles/role-labels"
 import {
   createRoleSettingsSchema,
+  roleNameMaxLength,
   type RoleSettingsFormValues,
 } from "@/features/settings/role-settings-schema"
+import {
+  RoleMemberDialog,
+  type RoleMemberChange,
+} from "@/features/settings/role-member-dialog"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+
+const newRoleID = "new-role"
 
 /** 按权限功能整理查看和管理选项。 */
 function permissionRows(definitions: PermissionDefinition[]) {
@@ -67,7 +75,10 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   const navigate = useNavigate()
   const { roleId = "" } = useParams()
   const [role, setRole] = useState<RoleData | null>(null)
+  const [roles, setRoles] = useState<RoleData[]>([])
   const [definitions, setDefinitions] = useState<PermissionDefinition[]>([])
+  const [memberDialogOpen, setMemberDialogOpen] = useState(false)
+  const [memberChanges, setMemberChanges] = useState<RoleMemberChange[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const loadVersion = useRef(0)
@@ -87,8 +98,31 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
     defaultValues: { name: "", description: "", permissions: [] },
   })
   const selected = useWatch({ control: form.control, name: "permissions" })
+  const roleName = useWatch({ control: form.control, name: "name" })
   const admin = role?.kind === RoleKind.RoleKindAdmin
   const custom = mode === "create" || role?.kind === RoleKind.RoleKindCustom
+  const memberTargetRole = useMemo<RoleData | null>(() => {
+    if (role) return role
+    if (mode !== "create") return null
+    return {
+      id: newRoleID,
+      kind: RoleKind.RoleKindCustom,
+      name: roleName.trim() || t("roles.members.newRole"),
+      description: "",
+      permissions: selected,
+      memberCount: 0,
+      createdAt: "",
+      updatedAt: "",
+    }
+  }, [mode, role, roleName, selected, t])
+  const memberDialogRoles = useMemo(
+    () =>
+      memberTargetRole &&
+      !roles.some((item) => item.id === memberTargetRole.id)
+        ? [...roles, memberTargetRole]
+        : roles,
+    [memberTargetRole, roles],
+  )
 
   /** 读取权限目录和待编辑角色。 */
   const load = useCallback(async () => {
@@ -101,15 +135,19 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         mode === "detail" ? getRole(roleId) : Promise.resolve(null),
       ])
       if (version !== loadVersion.current) return
+      setRoles(catalog.roles)
       setDefinitions(catalog.permissions)
       setRole(currentRole)
+      setMemberChanges([])
       form.reset({
         name: currentRole
           ? currentRole.kind === RoleKind.RoleKindCustom
             ? currentRole.name
             : roleDisplayName(currentRole, tCommon)
           : "",
-        description: currentRole?.description ?? "",
+        description: currentRole
+          ? roleDescription(currentRole, t)
+          : "",
         permissions: currentRole?.permissions ?? [],
       })
     } catch (requestError) {
@@ -120,7 +158,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
     } finally {
       if (version === loadVersion.current) setLoading(false)
     }
-  }, [form, mode, navigate, roleId, tCommon])
+  }, [form, mode, navigate, roleId, t, tCommon])
 
   useEffect(() => {
     mounted.current = true
@@ -164,14 +202,51 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
     })
   }
 
-  /** 创建或保存角色。 */
+  /** 保存角色资料、权限和成员配置。 */
   async function save(values: RoleSettingsFormValues) {
+    let createdRoleID = ""
+    let targetRoleID = roleId
     try {
       if (mode === "create") {
-        await createRole(values)
+        const created = await createRole(values)
+        createdRoleID = created.id
+        targetRoleID = created.id
       } else {
-        await updateRole(roleId, values)
+        if (!admin) await updateRole(roleId, values)
       }
+      const savedChanges: RoleMemberChange[] = []
+      let memberError: unknown
+      for (const change of memberChanges) {
+        const nextRoleID =
+          change.nextRoleID === newRoleID ? targetRoleID : change.nextRoleID
+        try {
+          await updateUser(change.user.id, {
+            displayName: change.user.displayName,
+            email: change.user.email,
+            roleId: nextRoleID,
+            teamIds: change.user.teams.map((team) => team.id),
+          })
+          savedChanges.push({ ...change, nextRoleID })
+        } catch (requestError) {
+          if (recoverSession(requestError, navigate)) return
+          memberError ??= requestError
+        }
+      }
+      if (!mounted.current) return
+      if (savedChanges.length > 0) {
+        const savedUserIDs = new Set(
+          savedChanges.map((change) => change.user.id),
+        )
+        setMemberChanges((current) =>
+          current.filter((change) => !savedUserIDs.has(change.user.id)),
+        )
+        if (mode === "detail") {
+          for (const change of savedChanges) {
+            updateMemberCounts(change.previousRoleID, change.nextRoleID)
+          }
+        }
+      }
+      if (memberError) throw memberError
       if (!mounted.current) return
       toast.success(
         mode === "create"
@@ -182,14 +257,19 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
     } catch (requestError) {
       if (!mounted.current) return
       if (recoverSession(requestError, navigate)) return
-      console.warn("保存角色失败", { role_id: roleId, error: requestError })
+      console.warn("保存角色失败", {
+        role_id: targetRoleID,
+        error: requestError,
+      })
       if (isApiError(requestError)) {
         toast.error(
           apiErrorMessage(requestError, ["name", "description", "permissions"]),
         )
+        if (createdRoleID) navigate(`/settings/roles/${createdRoleID}`)
         return
       }
       toast.error(t("roles.form.saveError"))
+      if (createdRoleID) navigate(`/settings/roles/${createdRoleID}`)
     }
   }
 
@@ -200,10 +280,40 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         ? roleDisplayName(role, tCommon)
         : t("roles.form.detailTitle")
   const rows = permissionRows(definitions)
+  const pendingRoleIDs = useMemo(
+    () =>
+      Object.fromEntries(
+        memberChanges.map((change) => [change.user.id, change.nextRoleID]),
+      ),
+    [memberChanges],
+  )
+  const memberCount = memberTargetRole
+    ? memberChanges.reduce((count, change) => {
+        if (change.previousRoleID === memberTargetRole.id) count -= 1
+        if (change.nextRoleID === memberTargetRole.id) count += 1
+        return count
+      }, memberTargetRole.memberCount)
+    : 0
 
   /** 返回角色列表。 */
   function cancel() {
     navigate("/settings/roles")
+  }
+
+  /** 更新已保存成员调整对应的角色人数。 */
+  function updateMemberCounts(previousRoleID: string, nextRoleID: string) {
+    if (previousRoleID === nextRoleID) return
+    const updateCount = (item: RoleData) => {
+      if (item.id === previousRoleID) {
+        return { ...item, memberCount: item.memberCount - 1 }
+      }
+      if (item.id === nextRoleID) {
+        return { ...item, memberCount: item.memberCount + 1 }
+      }
+      return item
+    }
+    setRoles((current) => current.map(updateCount))
+    setRole((current) => (current ? updateCount(current) : current))
   }
 
   return (
@@ -230,13 +340,15 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
             onSubmit={form.handleSubmit(save)}
             noValidate
           >
-            {custom ? (
+            <div className="space-y-5">
               <FieldGroup>
                 <FormInputField
                   name="name"
                   control={form.control}
                   label={t("roles.form.name")}
-                  autoFocus
+                  autoFocus={custom}
+                  disabled={!custom}
+                  maxLength={roleNameMaxLength}
                 />
                 <Controller
                   name="description"
@@ -249,103 +361,121 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
                       <Textarea
                         {...field}
                         id="role-description"
+                        disabled={!custom}
                         aria-invalid={fieldState.invalid}
                       />
                     </Field>
                   )}
                 />
               </FieldGroup>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {role ? builtInRoleDescription(role, t) : null}
-              </p>
-            )}
 
-            <section>
-              <div className="mb-3">
-                <h3 className="font-medium">{t("roles.permissions.title")}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {admin
-                    ? t("roles.permissions.adminDescription")
-                    : t("roles.permissions.description")}
-                </p>
-              </div>
-              <div className="overflow-hidden rounded-lg border bg-card">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>{t("roles.permissions.columns.function")}</TableHead>
-                      <TableHead className="w-28 text-center">
-                        {t("roles.permissions.columns.view")}
-                      </TableHead>
-                      <TableHead className="w-28 text-center">
-                        {t("roles.permissions.columns.manage")}
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map(([resource, levels]) => (
-                      <TableRow key={resource}>
-                        <TableCell className="font-medium">
-                          {permissionResourceLabel(resource, t)}
-                        </TableCell>
-                        {[
-                          PermissionLevel.PermissionLevelView,
-                          PermissionLevel.PermissionLevelManage,
-                        ].map((level) => {
-                          const definition = levels[level]
-                          if (!definition) {
+              {memberTargetRole ? (
+                <section className="flex items-center justify-between gap-4 rounded-lg border bg-card p-4">
+                  <div>
+                    <h3 className="font-medium">{t("roles.members.sectionTitle")}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("roles.members.count", { count: memberCount })}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMemberDialogOpen(true)}
+                  >
+                    {t("roles.members.configure")}
+                  </Button>
+                </section>
+              ) : null}
+
+              <section>
+                <div className="mb-3">
+                  <h3 className="font-medium">{t("roles.permissions.title")}</h3>
+                  {admin ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("roles.permissions.adminDescription")}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="overflow-hidden rounded-lg border bg-card">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>{t("roles.permissions.columns.function")}</TableHead>
+                        <TableHead className="w-28 text-center">
+                          {t("roles.permissions.columns.view")}
+                        </TableHead>
+                        <TableHead className="w-28 text-center">
+                          {t("roles.permissions.columns.manage")}
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map(([resource, levels]) => (
+                        <TableRow key={resource}>
+                          <TableCell className="font-medium">
+                            {permissionResourceLabel(resource, t)}
+                          </TableCell>
+                          {[
+                            PermissionLevel.PermissionLevelView,
+                            PermissionLevel.PermissionLevelManage,
+                          ].map((level) => {
+                            const definition = levels[level]
+                            if (!definition) {
+                              return (
+                                <TableCell key={level} className="text-center text-muted-foreground">
+                                  —
+                                </TableCell>
+                              )
+                            }
+                            const checked = admin || selected.includes(definition.code)
+                            const manage = levels[PermissionLevel.PermissionLevelManage]
+                            const viewRequired =
+                              level === PermissionLevel.PermissionLevelView &&
+                              manage &&
+                              selected.includes(manage.code)
                             return (
-                              <TableCell key={level} className="text-center text-muted-foreground">
-                                —
+                              <TableCell key={level} className="text-center">
+                                <input
+                                  type="checkbox"
+                                  className="size-4 accent-primary"
+                                  checked={checked}
+                                  disabled={admin || Boolean(viewRequired)}
+                                  aria-label={t("roles.permissions.toggle", {
+                                    resource: permissionResourceLabel(resource, t),
+                                    level:
+                                      level === PermissionLevel.PermissionLevelView
+                                        ? t("roles.permissions.columns.view")
+                                        : t("roles.permissions.columns.manage"),
+                                  })}
+                                  onChange={(event) =>
+                                    togglePermission(definition, event.target.checked)
+                                  }
+                                />
                               </TableCell>
                             )
-                          }
-                          const checked = admin || selected.includes(definition.code)
-                          const manage = levels[PermissionLevel.PermissionLevelManage]
-                          const viewRequired =
-                            level === PermissionLevel.PermissionLevelView &&
-                            manage &&
-                            selected.includes(manage.code)
-                          return (
-                            <TableCell key={level} className="text-center">
-                              <input
-                                type="checkbox"
-                                className="size-4 accent-primary"
-                                checked={checked}
-                                disabled={admin || Boolean(viewRequired)}
-                                aria-label={t("roles.permissions.toggle", {
-                                  resource: permissionResourceLabel(resource, t),
-                                  level:
-                                    level === PermissionLevel.PermissionLevelView
-                                      ? t("roles.permissions.columns.view")
-                                      : t("roles.permissions.columns.manage"),
-                                })}
-                                onChange={(event) =>
-                                  togglePermission(definition, event.target.checked)
-                                }
-                              />
-                            </TableCell>
-                          )
-                        })}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </section>
+                          })}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </section>
+
+            </div>
 
             <div className="flex items-center gap-2">
-              {!admin ? (
-                <Button type="submit" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : null}
-                  {form.formState.isSubmitting
-                    ? t("roles.form.saving")
-                    : t("roles.form.save")}
-                </Button>
-              ) : null}
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : null}
+                {form.formState.isSubmitting
+                  ? t("roles.form.saving")
+                  : t("roles.form.save")}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -358,6 +488,13 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
           </form>
         )}
       </PageContent>
+      <RoleMemberDialog
+        role={memberDialogOpen ? memberTargetRole : null}
+        roles={memberDialogRoles}
+        pendingRoleIDs={pendingRoleIDs}
+        onOpenChange={setMemberDialogOpen}
+        onConfirm={setMemberChanges}
+      />
     </div>
   )
 }

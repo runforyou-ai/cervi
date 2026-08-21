@@ -3,6 +3,9 @@ import { z } from "zod"
 
 import { PermissionCode } from "@/api"
 
+/** 自定义角色名称允许的最大字符数。 */
+export const roleNameMaxLength = 10
+
 /** 创建角色设置表单校验。 */
 export function createRoleSettingsSchema(messages: {
   nameRequired: string
@@ -14,7 +17,7 @@ export function createRoleSettingsSchema(messages: {
       .string()
       .trim()
       .min(1, messages.nameRequired)
-      .max(50, messages.nameTooLong),
+      .max(roleNameMaxLength, messages.nameTooLong),
     description: z
       .string()
       .trim()
