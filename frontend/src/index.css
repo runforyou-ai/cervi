@@ -38,6 +38,7 @@
     --color-border: var(--border);
     --color-destructive-foreground: var(--destructive-foreground);
     --color-destructive: var(--destructive);
+    --color-success-foreground: var(--success-foreground);
     --color-success: var(--success);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
@@ -62,10 +63,6 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/*
-  主题采用统一浅色层级：一级图标轨、二级导航和内容区通过轻微背景差与边框区分。
-  交互色统一使用品牌蓝，背景与边框保持中性灰阶。
-*/
 :root {
     --background: oklch(1 0 0);
     --foreground: oklch(0.141 0.005 285.823);
@@ -75,20 +72,20 @@
     --popover-foreground: oklch(0.141 0.005 285.823);
 
     --primary: oklch(0.6578 0.1846 253.49);
-    --primary-foreground: oklch(1 0 0);
+    --primary-foreground: oklch(0.18 0.02 253.49);
 
     --secondary: oklch(0.967 0.001 286.375);
     --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.967 0.001 286.375);
     --muted-foreground: oklch(0.552 0.016 285.938);
 
-    /* 通用组件的悬停态使用浅蓝。 */
     --accent: oklch(0.94 0.03 253.49);
     --accent-foreground: oklch(0.42 0.10 253.49);
 
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(1 0 0);
     --success: oklch(0.6200 0.1500 149.5);
+    --success-foreground: oklch(0.50 0.10 149.5);
 
     --border: oklch(0.90 0.004 286.32);
     --input: oklch(0.90 0.004 286.32);
@@ -109,17 +106,16 @@
     --shadow-lg: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10);
     --shadow-xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 8px 10px -2px hsl(0 0% 0% / 0.10);
     --shadow-2xl: 0px 4px 8px -1px hsl(0 0% 0% / 0.25);
-    /* 图标轨使用最浅一档灰。 */
+    /* 图标轨必须深于二级导航，并使用边框分隔层级。 */
     --sidebar: oklch(0.972 0.002 286);
     --sidebar-foreground: oklch(0.35 0.006 286);
     --sidebar-primary: oklch(0.6578 0.1846 253.49);
-    --sidebar-primary-foreground: oklch(1 0 0);
+    --sidebar-primary-foreground: oklch(0.18 0.02 253.49);
     --sidebar-accent: oklch(0.90 0.045 253.49);
     --sidebar-accent-foreground: oklch(0.42 0.10 253.49);
     --sidebar-border: oklch(0.88 0.004 286);
     --sidebar-ring: oklch(0.6578 0.1846 253.49);
 
-    /* 二级导航比图标轨略亮，接近内容区。 */
     --sidebar-secondary: oklch(0.99 0.001 286);
 }
 
@@ -132,7 +128,7 @@
     --popover-foreground: oklch(0.985 0 0);
 
     --primary: oklch(0.6578 0.1846 253.49);
-    --primary-foreground: oklch(0.985 0 0);
+    --primary-foreground: oklch(0.18 0.02 253.49);
 
     --secondary: oklch(0.274 0.006 286.033);
     --secondary-foreground: oklch(0.985 0 0);
@@ -145,6 +141,7 @@
     --destructive: oklch(0.704 0.191 22.216);
     --destructive-foreground: oklch(0.985 0 0);
     --success: oklch(0.6800 0.1500 149.5);
+    --success-foreground: oklch(0.80 0.10 149.5);
 
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
@@ -159,7 +156,7 @@
     --sidebar: oklch(0.21 0.006 285.885);
     --sidebar-foreground: oklch(0.90 0.003 286);
     --sidebar-primary: oklch(0.6578 0.1846 253.49);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-primary-foreground: oklch(0.18 0.02 253.49);
     --sidebar-accent: oklch(0.30 0.06 253.49);
     --sidebar-accent-foreground: oklch(0.90 0.03 253.49);
     --sidebar-border: oklch(1 0 0 / 10%);
@@ -196,7 +193,7 @@
   }
 
   .cervi-phone-input:has(.PhoneInputInput[aria-invalid="true"]) {
-    @apply border-destructive ring-destructive/20 dark:ring-destructive/40;
+    @apply border-destructive;
   }
 
   .cervi-phone-input.PhoneInput--disabled {

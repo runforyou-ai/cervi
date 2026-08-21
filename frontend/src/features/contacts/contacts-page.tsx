@@ -116,7 +116,7 @@ export type ContactScope = "internal" | "external" | "agents"
 type LoadState = "loading" | "ready" | "error"
 
 const contactNavHoverClass =
-  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+  "hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
 const contactNavLeafActiveClass =
   "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
 const contactNavPathActiveClass =
@@ -141,8 +141,7 @@ function ScopeButton({
       type="button"
       className={cn(
         "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
-        contactNavHoverClass,
-        active && contactNavLeafActiveClass,
+        active ? contactNavLeafActiveClass : contactNavHoverClass,
       )}
       onClick={onClick}
     >
@@ -171,9 +170,8 @@ function SubscopeButton({
       type="button"
       className={cn(
         contactNavSubitemClass,
-        contactNavHoverClass,
         nested ? "pl-14" : "pl-8",
-        active && contactNavLeafActiveClass,
+        active ? contactNavLeafActiveClass : contactNavHoverClass,
       )}
       onClick={onClick}
     >

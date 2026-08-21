@@ -131,9 +131,9 @@ export function PagePaneLink({
       className={({ isActive }) =>
         cn(
           className,
-          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-          isActive &&
-            "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+          isActive
+            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+            : "hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
         )
       }
     >

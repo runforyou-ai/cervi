@@ -89,9 +89,9 @@ export function AppearanceSettings() {
             <label
               key={value}
               className={cn(
-                "min-w-0 cursor-pointer rounded-lg border-2 p-3 transition-[border-color,box-shadow]",
+                "min-w-0 cursor-pointer rounded-lg border-2 p-3 transition-colors",
                 "hover:border-foreground/30",
-                "has-focus-visible:border-ring",
+                "has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring",
                 checked ? "border-primary" : "border-border",
               )}
             >
