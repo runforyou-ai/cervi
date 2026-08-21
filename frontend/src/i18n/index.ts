@@ -10,7 +10,7 @@ import {
 } from "@/i18n/resources"
 
 /** 根据浏览器语言选择应用语言。 */
-function resolveBrowserLanguage() {
+export function resolveBrowserLanguage() {
   const browserLanguage = navigator.languages[0] ?? navigator.language
   const browserLocale = new Intl.Locale(browserLanguage).maximize()
 

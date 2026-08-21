@@ -8,6 +8,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
+	commontimezone "github.com/runforyou-ai/cervi/internal/common/timezone"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识企业初始化字段的校验结果。
@@ -22,6 +24,8 @@ const (
 	ValidationEmailInvalid             ValidationCode = "EMAIL_INVALID"
 	ValidationPasswordTooShort         ValidationCode = "PASSWORD_TOO_SHORT"
 	ValidationPasswordTooLong          ValidationCode = "PASSWORD_TOO_LONG"
+	ValidationLocaleInvalid            ValidationCode = "LOCALE_INVALID"
+	ValidationTimeZoneInvalid          ValidationCode = "TIME_ZONE_INVALID"
 )
 
 // ValidationError 表示企业初始化字段校验失败。
@@ -46,6 +50,12 @@ func validateInput(input InstallWorkspaceInput) map[string]ValidationCode {
 		fields["password"] = ValidationPasswordTooShort
 	case errors.Is(err, commonpassword.ErrTooLong):
 		fields["password"] = ValidationPasswordTooLong
+	}
+	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
+		fields["locale"] = ValidationLocaleInvalid
+	}
+	if !commontimezone.Valid(input.TimeZone) {
+		fields["timeZone"] = ValidationTimeZoneInvalid
 	}
 	return fields
 }

@@ -15,4 +15,7 @@ type User struct {
 	PasswordHash   string `bun:"password_hash" json:"-"`
 	Role           string `bun:"role" json:"role"`
 	Status         string `bun:"status" json:"status"`
+	Locale         string `bun:"locale" json:"locale"`
+	TimeZone       string `bun:"time_zone" json:"timeZone"`
+	WorkStatus     string `bun:"work_status" json:"workStatus"`
 }

@@ -220,6 +220,7 @@ export interface DirectoryUser {
     "displayName": string;
     "role": UserRole;
     "status": UserStatus;
+    "workStatus": WorkStatus;
     "createdAt": string;
 }
 
@@ -263,6 +264,8 @@ export interface InstallWorkspaceInput {
     "displayName": string;
     "email": string;
     "password": string;
+    "locale": Locale;
+    "timeZone": string;
 }
 
 /**
@@ -421,6 +424,9 @@ export interface User {
     "displayName": string;
     "role": UserRole;
     "status": UserStatus;
+    "locale": Locale;
+    "timeZone": string;
+    "workStatus": WorkStatus;
 }
 
 /**
@@ -440,6 +446,14 @@ export interface UserListInput {
     "role"?: UserRole | null;
     "page": number;
     "pageSize": number;
+}
+
+/**
+ * UserPreferencesInput 定义当前用户的语言和时区设置。
+ */
+export interface UserPreferencesInput {
+    "locale": Locale;
+    "timeZone": string;
 }
 
 /**
@@ -467,6 +481,13 @@ export enum UserStatus {
     UserStatusActive = "active",
     UserStatusInactive = "inactive",
 };
+
+/**
+ * UserWorkStatusInput 定义当前用户主动设置的工作状态。
+ */
+export interface UserWorkStatusInput {
+    "workStatus": WorkStatus;
+}
 
 /**
  * WebsiteChannel 定义网站渠道详情。
@@ -536,3 +557,17 @@ export interface WebsiteChannelSummary {
     "updatedAt": string;
     "deletedAt": string | null;
 }
+
+/**
+ * WorkStatus 表示成员主动设置的工作状态。
+ */
+export enum WorkStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkStatusWorking = "working",
+    WorkStatusAway = "away",
+    WorkStatusOffDuty = "off_duty",
+};

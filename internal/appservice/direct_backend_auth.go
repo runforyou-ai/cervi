@@ -11,6 +11,7 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -42,6 +43,8 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		DisplayName:      input.DisplayName,
 		Email:            input.Email,
 		Password:         input.Password,
+		Locale:           domain.Locale(input.Locale),
+		TimeZone:         input.TimeZone,
 	})
 	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
@@ -117,6 +120,8 @@ func installationFieldKeys(fields map[string]common.FieldCode) map[string]cervii
 		installationaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,
 		installationaction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
 		installationaction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
+		installationaction.ValidationLocaleInvalid:            cervii18n.FieldLocaleInvalid,
+		installationaction.ValidationTimeZoneInvalid:          cervii18n.FieldTimeZoneInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

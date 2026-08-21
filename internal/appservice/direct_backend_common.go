@@ -22,7 +22,11 @@ func organizationFromModel(organization servermodels.Organization) Organization 
 
 // userFromModel 把存储用户转换为应用契约。
 func userFromModel(user servermodels.User) User {
-	return User{ID: user.ID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName, Role: UserRole(user.Role), Status: UserStatus(user.Status)}
+	return User{
+		ID: user.ID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName,
+		Role: UserRole(user.Role), Status: UserStatus(user.Status), Locale: Locale(user.Locale), TimeZone: user.TimeZone,
+		WorkStatus: WorkStatus(user.WorkStatus),
+	}
 }
 
 // translateValidationFields 把校验错误码映射为本地化文案键。

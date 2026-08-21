@@ -9,6 +9,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
+	commontimezone "github.com/runforyou-ai/cervi/internal/common/timezone"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识用户设置字段校验结果。
@@ -21,6 +23,9 @@ const (
 	ValidationCurrentPasswordIncorrect ValidationCode = "CURRENT_PASSWORD_INCORRECT"
 	ValidationPasswordTooShort         ValidationCode = "PASSWORD_TOO_SHORT"
 	ValidationPasswordTooLong          ValidationCode = "PASSWORD_TOO_LONG"
+	ValidationLocaleInvalid            ValidationCode = "LOCALE_INVALID"
+	ValidationTimeZoneInvalid          ValidationCode = "TIME_ZONE_INVALID"
+	ValidationWorkStatusInvalid        ValidationCode = "WORK_STATUS_INVALID"
 )
 
 // ValidationError 表示用户设置字段校验失败。
@@ -36,6 +41,17 @@ type ProfileInput struct {
 type ChangePasswordInput struct {
 	CurrentPassword string
 	NewPassword     string
+}
+
+// PreferencesInput 定义当前用户的语言和时区设置。
+type PreferencesInput struct {
+	Locale   domain.Locale
+	TimeZone string
+}
+
+// WorkStatusInput 定义当前用户主动设置的工作状态。
+type WorkStatusInput struct {
+	WorkStatus domain.WorkStatus
 }
 
 // normalizeProfileInput 规范化并校验个人资料输入。
@@ -61,6 +77,29 @@ func validateChangePasswordInput(input ChangePasswordInput) map[string]Validatio
 		fields["newPassword"] = ValidationPasswordTooShort
 	case errors.Is(err, commonpassword.ErrTooLong):
 		fields["newPassword"] = ValidationPasswordTooLong
+	}
+	return fields
+}
+
+// validatePreferencesInput 校验语言和时区设置。
+func validatePreferencesInput(input PreferencesInput) map[string]ValidationCode {
+	fields := make(map[string]ValidationCode)
+	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
+		fields["locale"] = ValidationLocaleInvalid
+	}
+	if !commontimezone.Valid(input.TimeZone) {
+		fields["timeZone"] = ValidationTimeZoneInvalid
+	}
+	return fields
+}
+
+// validateWorkStatusInput 校验工作状态。
+func validateWorkStatusInput(input WorkStatusInput) map[string]ValidationCode {
+	fields := make(map[string]ValidationCode)
+	if input.WorkStatus != domain.WorkStatusWorking &&
+		input.WorkStatus != domain.WorkStatusAway &&
+		input.WorkStatus != domain.WorkStatusOffDuty {
+		fields["workStatus"] = ValidationWorkStatusInvalid
 	}
 	return fields
 }
