@@ -8,9 +8,9 @@ CREATE TABLE channels (
     name                text NOT NULL,
     description         text,
     default_locale      text NOT NULL DEFAULT 'zh-CN',
+    enabled             boolean NOT NULL DEFAULT true,
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
-    deleted_at          timestamptz
+    updated_at          timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE channels IS '企业消息渠道';
@@ -20,13 +20,13 @@ COMMENT ON COLUMN channels.created_by_user_id IS '创建人编号';
 COMMENT ON COLUMN channels.type IS '渠道类型';
 COMMENT ON COLUMN channels.name IS '渠道名称';
 COMMENT ON COLUMN channels.description IS '渠道描述';
-COMMENT ON COLUMN channels.default_locale IS '默认语言';
+COMMENT ON COLUMN channels.default_locale IS '默认接待语言';
+COMMENT ON COLUMN channels.enabled IS '是否启用';
 COMMENT ON COLUMN channels.created_at IS '创建时间';
 COMMENT ON COLUMN channels.updated_at IS '更新时间';
-COMMENT ON COLUMN channels.deleted_at IS '移入回收站时间';
 
-CREATE INDEX channels_organization_type_deleted_at_index
-    ON channels (organization_id, type, deleted_at);
+CREATE INDEX channels_organization_type_enabled_index
+    ON channels (organization_id, type, enabled);
 
 -- +goose Down
 DROP TABLE channels;

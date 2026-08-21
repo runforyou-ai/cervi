@@ -7,6 +7,7 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ChannelType,
   Locale,
   createWebsiteChannel,
   isApiError,
@@ -53,6 +54,7 @@ export function WebsiteChannelForm({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: {
+      type: channel?.type ?? ChannelType.ChannelTypeWebsite,
       name: channel?.name ?? "",
       description: channel?.description ?? "",
       defaultLocale: channel?.defaultLocale ?? Locale.LocaleChineseSimplified,
@@ -65,6 +67,7 @@ export function WebsiteChannelForm({
       if (channel) {
         const updated = await updateWebsiteChannel(channel.id, values)
         form.reset({
+          type: updated.type,
           name: updated.name,
           description: updated.description ?? "",
           defaultLocale: updated.defaultLocale,
@@ -75,22 +78,22 @@ export function WebsiteChannelForm({
         return
       }
 
-      await createWebsiteChannel(values)
-      console.info("网站渠道已创建")
-      navigate("/channels/website", { replace: true })
+      const created = await createWebsiteChannel(values)
+      console.info("网站渠道已创建", { channel_id: created.id })
+      navigate("/integrations/channels", { replace: true })
     } catch (error) {
       if (recoverSession(error, navigate)) {
         return
       }
-      if (isNotFoundApiError(error)) {
-        console.warn("网站渠道不存在", { channel_id: channel?.id })
-        navigate("/channels/website", { replace: true })
+      if (channel && isNotFoundApiError(error)) {
+        console.warn("网站渠道不存在", { channel_id: channel.id })
+        navigate("/integrations/channels", { replace: true })
         return
       }
       if (isApiError(error)) {
         console.warn("保存网站渠道失败", error)
         toast.error(
-          apiErrorMessage(error, ["name", "description", "defaultLocale"])
+          apiErrorMessage(error, ["type", "name", "description", "defaultLocale"])
         )
         return
       }
@@ -108,6 +111,30 @@ export function WebsiteChannelForm({
       noValidate
     >
       <FieldGroup>
+        {!channel ? (
+          <Controller
+            name="type"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor={field.name} required>
+                  {t("form.type")}
+                </FieldLabel>
+                <NativeSelect
+                  {...field}
+                  id={field.name}
+                  required
+                  aria-invalid={fieldState.invalid}
+                >
+                  <option value={ChannelType.ChannelTypeWebsite}>
+                    {t("types.website")}
+                  </option>
+                </NativeSelect>
+              </Field>
+            )}
+          />
+        ) : null}
+
         <FormInputField
           name="name"
           control={form.control}
@@ -146,8 +173,12 @@ export function WebsiteChannelForm({
                 required
                 aria-invalid={fieldState.invalid}
               >
-                <option value={Locale.LocaleChineseSimplified}>{t("locales.zhCN")}</option>
-                <option value={Locale.LocaleEnglishUnitedStates}>{t("locales.enUS")}</option>
+                <option value={Locale.LocaleChineseSimplified}>
+                  {t("locales.zhCN")}
+                </option>
+                <option value={Locale.LocaleEnglishUnitedStates}>
+                  {t("locales.enUS")}
+                </option>
               </NativeSelect>
             </Field>
           )}
@@ -158,7 +189,7 @@ export function WebsiteChannelForm({
             {isSubmitting ? t("form.saving") : t("form.save")}
           </Button>
           <Button variant="outline" asChild>
-            <Link to="/channels/website">{t("form.cancel")}</Link>
+            <Link to="/integrations/channels">{t("form.cancel")}</Link>
           </Button>
         </div>
       </FieldGroup>

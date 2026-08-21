@@ -6,7 +6,7 @@ import {
   InboxIcon,
   LoaderCircleIcon,
   LogOutIcon,
-  MessagesSquareIcon,
+  PlugIcon,
   SettingsIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -89,10 +89,10 @@ function WorkspaceMenu() {
         active={location.pathname.startsWith("/contacts")}
       />
       <WorkspaceRailItem
-        to="/channels/website"
-        icon={MessagesSquareIcon}
-        label={t("channels")}
-        active={location.pathname.startsWith("/channels")}
+        to="/integrations/channels"
+        icon={PlugIcon}
+        label={t("integrations")}
+        active={location.pathname.startsWith("/integrations")}
       />
       <div className="mt-auto pb-1">
         <WorkspaceRailItem

@@ -167,7 +167,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
         }
         if (isNotFoundApiError(requestError)) {
           console.warn("网站渠道不存在", { channel_id: channelId })
-          navigate("/channels/website", { replace: true })
+          navigate("/integrations/channels", { replace: true })
           return
         }
         console.warn("网站渠道详情加载失败", requestError)
@@ -193,7 +193,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
             : channel?.name ?? t("edit.title")
         }
       >
-        <PageBack to="/channels/website" />
+        <PageBack to="/integrations/channels" />
       </PageHeader>
       <PageContent>
         {loading ? (

@@ -40,7 +40,7 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 	channel := &servermodels.Channel{
 		OrganizationID:  identity.Organization.ID,
 		CreatedByUserID: identity.User.ID,
-		Type:            string(domain.ChannelTypeWebsite),
+		Type:            string(input.Type),
 		Name:            input.Name,
 		DefaultLocale:   string(input.DefaultLocale),
 	}

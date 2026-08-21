@@ -43,7 +43,6 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, i
 			Where("c.id = ?", channelID).
 			Where("c.organization_id = ?", identity.Organization.ID).
 			Where("c.type = ?", domain.ChannelTypeWebsite).
-			Where("c.deleted_at IS NULL").
 			For("UPDATE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
