@@ -70,7 +70,9 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/teams", service.createTeam)
 	router.PATCH("/teams/:teamID", service.updateTeam)
 	router.DELETE("/teams/:teamID", service.deleteTeam)
-	router.DELETE("/teams/:teamID/members/:identityType/:identityID", service.removeTeamMember)
+	router.GET("/teams/:teamID/member-candidates", service.listTeamMemberCandidates)
+	router.POST("/teams/:teamID/members", service.addTeamMembers)
+	router.DELETE("/teams/:teamID/members", service.removeTeamMembers)
 	router.GET("/contacts", service.listContacts)
 	router.GET("/contacts/trash", service.listDeletedContacts)
 	router.POST("/contacts", service.createContact)
@@ -342,8 +344,38 @@ func (s *Service) deleteTeam(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteTeam(c.Request.Context(), requestMeta(c), c.Param("teamID")))
 }
 
-func (s *Service) removeTeamMember(c *gin.Context) {
-	writeEmpty(c, s.application.RemoveTeamMember(c.Request.Context(), requestMeta(c), c.Param("teamID"), appservice.MemberIdentityType(c.Param("identityType")), c.Param("identityID")))
+// listTeamMemberCandidates 返回尚未加入团队的企业成员。
+func (s *Service) listTeamMemberCandidates(c *gin.Context) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return
+	}
+	members, err := s.application.ListTeamMemberCandidates(c.Request.Context(), requestMeta(c), c.Param("teamID"), appservice.TeamMemberCandidateInput{Query: c.Query("query"), Page: page, PageSize: pageSize})
+	writeResult(c, http.StatusOK, members, err)
+}
+
+// addTeamMembers 将企业成员批量加入团队。
+func (s *Service) addTeamMembers(c *gin.Context) {
+	var input appservice.TeamMemberInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	team, err := s.application.AddTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
+	writeResult(c, http.StatusOK, team, err)
+}
+
+// removeTeamMembers 将企业成员批量移出团队。
+func (s *Service) removeTeamMembers(c *gin.Context) {
+	var input appservice.TeamMemberInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	team, err := s.application.RemoveTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
+	writeResult(c, http.StatusOK, team, err)
 }
 
 func (s *Service) listContacts(c *gin.Context) {
