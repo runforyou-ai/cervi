@@ -41,9 +41,10 @@ function WorkspaceRailItem({
       to={to}
       className={cn(
         "flex h-16 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] leading-tight",
-        "hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
+        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        active && "bg-foreground/12 font-medium text-sidebar-accent-foreground",
+        active &&
+          "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
       )}
     >
       <Icon className="size-5" />
@@ -107,7 +108,7 @@ export function WorkspaceNavigation({
   }
 
   return (
-    <aside className="cervi-workspace-rail flex h-full w-[76px] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
+    <aside className="cervi-workspace-rail flex h-full w-[76px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="flex justify-center px-3 pt-2.5 pb-1.5">
         <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
           <DropdownMenuTrigger asChild>

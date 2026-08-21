@@ -54,6 +54,7 @@ import { PageBack } from "@/components/page-back"
 import { PageHeader } from "@/components/page-header"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { SelectableText } from "@/components/selectable-text"
+import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -114,6 +115,15 @@ export type ContactScope = "internal" | "external" | "agents"
 
 type LoadState = "loading" | "ready" | "error"
 
+const contactNavHoverClass =
+  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+const contactNavLeafActiveClass =
+  "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+const contactNavPathActiveClass =
+  "font-medium text-sidebar-accent-foreground"
+const contactNavSubitemClass =
+  "flex h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors"
+
 /** 通讯录分类按钮。 */
 function ScopeButton({
   active,
@@ -130,8 +140,9 @@ function ScopeButton({
     <button
       type="button"
       className={cn(
-        "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
-        active && "bg-foreground/12 font-medium text-sidebar-accent-foreground",
+        "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
+        contactNavHoverClass,
+        active && contactNavLeafActiveClass,
       )}
       onClick={onClick}
     >
@@ -159,9 +170,10 @@ function SubscopeButton({
     <button
       type="button"
       className={cn(
-        "flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
+        contactNavSubitemClass,
+        contactNavHoverClass,
         nested ? "pl-14" : "pl-8",
-        active && "bg-foreground/12 font-medium text-sidebar-accent-foreground",
+        active && contactNavLeafActiveClass,
       )}
       onClick={onClick}
     >
@@ -216,8 +228,9 @@ function ContactScopeSidebar({
           <button
             type="button"
             className={cn(
-              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
-              scope === "external" && "font-medium text-sidebar-accent-foreground",
+              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
+              contactNavHoverClass,
+              scope === "external" && contactNavPathActiveClass,
             )}
           >
             <ContactRoundIcon className="size-4" />
@@ -237,7 +250,14 @@ function ContactScopeSidebar({
               <CollapsibleTrigger asChild>
                 <button
                   type="button"
-                  className="group flex min-h-8 w-full items-center gap-2 rounded-md py-1.5 pr-2 pl-8 text-left text-sm text-muted-foreground hover:bg-foreground/6 hover:text-sidebar-accent-foreground"
+                  className={cn(
+                    "group pl-8",
+                    contactNavSubitemClass,
+                    contactNavHoverClass,
+                    scope === "external" &&
+                      items.some((channel) => channel.id === channelId) &&
+                      contactNavPathActiveClass,
+                  )}
                 >
                   <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
                   <span>{channelTypeLabel(type, t)}</span>
@@ -281,6 +301,21 @@ function StageLabel({ stage }: { stage: ContactStage }) {
   )
 }
 
+/** 显示成员状态徽标。 */
+function UserStatusBadge({
+  status,
+  label,
+}: {
+  status: UserStatus
+  label: string
+}) {
+  const active = status === UserStatus.UserStatusActive
+
+  return (
+    <StatusBadge variant={active ? "success" : "muted"}>{label}</StatusBadge>
+  )
+}
+
 /** 显示团队成员详情中的一个只读字段。 */
 function MemberDetailItem({
   label,
@@ -288,14 +323,18 @@ function MemberDetailItem({
   emphasized = false,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
   emphasized?: boolean
 }) {
   return (
     <div>
       <dt className="text-muted-foreground">{label}</dt>
       <dd className={cn("mt-1", emphasized && "font-medium")}>
-        <SelectableText>{value}</SelectableText>
+        {typeof value === "string" ? (
+          <SelectableText>{value}</SelectableText>
+        ) : (
+          value
+        )}
       </dd>
     </div>
   )
@@ -798,7 +837,12 @@ export function ContactsPage({
                           <TableCell className="font-medium">{user.displayName}</TableCell>
                           <TableCell className="text-muted-foreground">{user.email}</TableCell>
                           <TableCell>{userRoleLabel(user.role, t)}</TableCell>
-                          <TableCell>{userStatusLabel(user.status, t)}</TableCell>
+                          <TableCell>
+                            <UserStatusBadge
+                              status={user.status}
+                              label={userStatusLabel(user.status, t)}
+                            />
+                          </TableCell>
                           <TableCell className="text-right whitespace-nowrap">
                             <Button
                               variant="outline"
@@ -921,7 +965,12 @@ export function ContactsPage({
                   />
                   <MemberDetailItem
                     label={t("columns.status")}
-                    value={userStatusLabel(detailUser.status, t)}
+                    value={
+                      <UserStatusBadge
+                        status={detailUser.status}
+                        label={userStatusLabel(detailUser.status, t)}
+                      />
+                    }
                   />
                   <MemberDetailItem
                     label={t("columns.createdAt")}

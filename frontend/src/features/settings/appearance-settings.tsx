@@ -91,7 +91,7 @@ export function AppearanceSettings() {
               className={cn(
                 "min-w-0 cursor-pointer rounded-lg border-2 p-3 transition-[border-color,box-shadow]",
                 "hover:border-foreground/30",
-                "has-focus-visible:ring-ring/50 has-focus-visible:ring-3",
+                "has-focus-visible:border-ring",
                 checked ? "border-primary" : "border-border",
               )}
             >
