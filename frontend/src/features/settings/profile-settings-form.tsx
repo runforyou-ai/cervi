@@ -9,12 +9,7 @@ import { toast } from "sonner"
 
 import { isApiError, recoverSession, updateProfile, type User } from "@/api"
 import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   createProfileSettingsSchema,
@@ -35,6 +30,7 @@ export function ProfileSettingsForm({
   const schema = useMemo(() => createProfileSettingsSchema(t), [t])
   const form = useForm<ProfileSettingsFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: {
       displayName: user.displayName,
       email: user.email,
@@ -58,20 +54,7 @@ export function ProfileSettingsForm({
       }
       console.warn("保存个人资料失败", error)
       if (isApiError(error)) {
-        let fieldError = false
-        for (const name of ["displayName", "email"] as const) {
-          const message = error.fields[name]
-          if (!message) {
-            continue
-          }
-          const shouldFocus = !fieldError
-          fieldError = true
-          form.setError(name, { message }, { shouldFocus })
-        }
-        if (fieldError) {
-          return
-        }
-        toast.error(apiErrorMessage(error))
+        toast.error(apiErrorMessage(error, ["displayName", "email"]))
         return
       }
       toast.error(t("profile.saveError"))
@@ -104,7 +87,6 @@ export function ProfileSettingsForm({
                 required
                 autoFocus
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -124,7 +106,6 @@ export function ProfileSettingsForm({
                 aria-invalid={fieldState.invalid}
                 required
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />

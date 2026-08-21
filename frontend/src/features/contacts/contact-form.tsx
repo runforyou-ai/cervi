@@ -18,7 +18,7 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
@@ -55,6 +55,7 @@ export function ContactForm({
   )
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: {
       displayName: "",
       channelId: "",
@@ -101,13 +102,7 @@ export function ContactForm({
   }
 
   return (
-    <form
-      onSubmit={form.handleSubmit(
-        submit,
-        () => toast.error(t("validation.checkFields")),
-      )}
-      noValidate
-    >
+    <form onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup className="gap-5">
         <FormInputField
           name="displayName"
@@ -140,7 +135,6 @@ export function ContactForm({
                   </option>
                 ))}
               </NativeSelect>
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -163,7 +157,6 @@ export function ContactForm({
                 <option value={ContactStage.ContactStageLead}>{t("stages.lead")}</option>
                 <option value={ContactStage.ContactStageCustomer}>{t("stages.customer")}</option>
               </NativeSelect>
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -192,7 +185,6 @@ export function ContactForm({
                 aria-invalid={fieldState.invalid}
                 autoComplete="tel"
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -208,7 +200,6 @@ export function ContactForm({
                 id={field.name}
                 aria-invalid={fieldState.invalid}
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />

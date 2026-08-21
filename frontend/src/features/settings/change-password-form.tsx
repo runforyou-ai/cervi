@@ -9,12 +9,7 @@ import { toast } from "sonner"
 
 import { changePassword, isApiError, recoverSession } from "@/api"
 import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
   createChangePasswordSchema,
@@ -29,6 +24,7 @@ export function ChangePasswordForm() {
   const schema = useMemo(() => createChangePasswordSchema(t), [t])
   const form = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: {
       currentPassword: "",
       newPassword: "",
@@ -52,20 +48,9 @@ export function ChangePasswordForm() {
       }
       console.warn("修改密码失败", error)
       if (isApiError(error)) {
-        let fieldError = false
-        for (const name of ["currentPassword", "newPassword"] as const) {
-          const message = error.fields[name]
-          if (!message) {
-            continue
-          }
-          const shouldFocus = !fieldError
-          fieldError = true
-          form.setError(name, { message }, { shouldFocus })
-        }
-        if (fieldError) {
-          return
-        }
-        toast.error(apiErrorMessage(error))
+        toast.error(
+          apiErrorMessage(error, ["currentPassword", "newPassword"]),
+        )
         return
       }
       toast.error(t("password.saveError"))
@@ -99,7 +84,6 @@ export function ChangePasswordForm() {
                 required
                 autoFocus
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -119,7 +103,6 @@ export function ChangePasswordForm() {
                 aria-invalid={fieldState.invalid}
                 required
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />
@@ -139,7 +122,6 @@ export function ChangePasswordForm() {
                 aria-invalid={fieldState.invalid}
                 required
               />
-              <FieldError errors={[fieldState.error]} />
             </Field>
           )}
         />

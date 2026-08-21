@@ -16,7 +16,7 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -142,7 +142,6 @@ export function WebsiteChannelChatInterfaceForm({
                   rows={4}
                   aria-invalid={fieldState.invalid}
                 />
-                <FieldError errors={[fieldState.error]} />
               </Field>
             )}
           />
@@ -190,7 +189,6 @@ export function WebsiteChannelChatInterfaceForm({
                       aria-invalid={fieldState.invalid}
                     />
                   </div>
-                  <FieldError errors={[fieldState.error]} />
                 </Field>
               )
             }}

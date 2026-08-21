@@ -38,7 +38,6 @@ import { Button } from "@/components/ui/button"
 import {
   Field,
   FieldDescription,
-  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -423,7 +422,6 @@ export function StorageSettingsForm() {
                       })}
                     </a>
                   </FieldDescription>
-                  <FieldError errors={[fieldState.error]} />
                 </Field>
               )}
             />
@@ -463,7 +461,6 @@ export function StorageSettingsForm() {
                       required
                       aria-invalid={fieldState.invalid}
                     />
-                    <FieldError errors={[fieldState.error]} />
                   </Field>
                 )}
               />
@@ -484,7 +481,6 @@ export function StorageSettingsForm() {
                     required
                     aria-invalid={fieldState.invalid}
                   />
-                  <FieldError errors={[fieldState.error]} />
                 </Field>
               )}
             />

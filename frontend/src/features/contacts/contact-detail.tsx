@@ -1,7 +1,7 @@
 /** 联系人详情和分节编辑。 */
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm, type FieldErrors } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -18,7 +18,7 @@ import {
   type ContactMethodInput,
 } from "@/api"
 import { Button } from "@/components/ui/button"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { PhoneInput } from "@/components/ui/phone-input"
@@ -187,6 +187,7 @@ export function ContactDetailView({
   )
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
     defaultValues: valuesFromDetail(detail),
   })
 
@@ -205,11 +206,6 @@ export function ContactDetailView({
   function startEditing(section: Exclude<EditingSection, null>) {
     form.reset(valuesFromDetail(detail))
     setEditing(section)
-  }
-
-  /** 校验失败时提示错误。 */
-  function invalid(_errors: FieldErrors<ContactFormValues>) {
-    toast.error(t("validation.checkFields"))
   }
 
   const save = form.handleSubmit(async (values) => {
@@ -245,7 +241,7 @@ export function ContactDetailView({
     } finally {
       setSaving(false)
     }
-  }, invalid)
+  })
 
   const empty = <span className="text-muted-foreground">{t("detail.empty")}</span>
   const stage = form.watch("stage")
@@ -263,7 +259,6 @@ export function ContactDetailView({
             onEdit={() => startEditing("name")}
           >
             <Input {...form.register("displayName")} autoFocus />
-            <FieldError errors={[form.formState.errors.displayName]} />
             <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
           </DetailRow>
 
@@ -311,7 +306,6 @@ export function ContactDetailView({
             <Field>
               <FieldLabel htmlFor="contact-detail-email">{t("form.email")}</FieldLabel>
               <Input id="contact-detail-email" type="email" {...form.register("email")} autoFocus />
-              <FieldError errors={[form.formState.errors.email]} />
             </Field>
             <Controller
               name="phone"
@@ -329,7 +323,6 @@ export function ContactDetailView({
                     aria-invalid={fieldState.invalid}
                     autoComplete="tel"
                   />
-                  <FieldError errors={[fieldState.error]} />
                 </Field>
               )}
             />
@@ -348,7 +341,6 @@ export function ContactDetailView({
           onEdit={() => startEditing("notes")}
         >
           <Textarea {...form.register("notes")} autoFocus rows={5} />
-          <FieldError errors={[form.formState.errors.notes]} />
           <EditActions saving={saving} onSave={() => void save()} onCancel={cancelEdit} />
         </DetailRow>
       </section>
