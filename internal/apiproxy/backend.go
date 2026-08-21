@@ -344,6 +344,39 @@ func (b *Backend) RestoreContact(ctx context.Context, meta appservice.RequestMet
 	return output, err
 }
 
+// ListRoles 返回远程企业角色和预定义权限目录。
+func (b *Backend) ListRoles(ctx context.Context, meta appservice.RequestMeta) (appservice.RoleList, error) {
+	var output appservice.RoleList
+	err := b.do(ctx, meta, http.MethodGet, "/settings/roles", nil, nil, &output)
+	return output, err
+}
+
+// GetRole 返回远程企业角色详情。
+func (b *Backend) GetRole(ctx context.Context, meta appservice.RequestMeta, roleID string) (appservice.Role, error) {
+	var output appservice.Role
+	err := b.do(ctx, meta, http.MethodGet, "/settings/roles/"+url.PathEscape(roleID), nil, nil, &output)
+	return output, err
+}
+
+// CreateRole 创建远程企业自定义角色。
+func (b *Backend) CreateRole(ctx context.Context, meta appservice.RequestMeta, input appservice.RoleInput) (appservice.Role, error) {
+	var output appservice.Role
+	err := b.do(ctx, meta, http.MethodPost, "/settings/roles", nil, input, &output)
+	return output, err
+}
+
+// UpdateRole 修改远程企业角色。
+func (b *Backend) UpdateRole(ctx context.Context, meta appservice.RequestMeta, roleID string, input appservice.RoleInput) (appservice.Role, error) {
+	var output appservice.Role
+	err := b.do(ctx, meta, http.MethodPut, "/settings/roles/"+url.PathEscape(roleID), nil, input, &output)
+	return output, err
+}
+
+// DeleteRole 删除远程企业自定义角色。
+func (b *Backend) DeleteRole(ctx context.Context, meta appservice.RequestMeta, roleID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/settings/roles/"+url.PathEscape(roleID), nil, nil, nil)
+}
+
 // UpdateOrganization 修改远程企业名称。
 func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	var output appservice.Organization

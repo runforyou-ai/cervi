@@ -10,6 +10,7 @@ import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
+import { RoleFormPage } from "@/features/settings/role-form-page"
 import {
   PersonalSettingsPage,
   SystemSettingsPage,
@@ -58,6 +59,26 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
         <Route
           path="/settings/organization"
           element={<SystemSettingsPage section="organization" />}
+        />
+        <Route
+          path="/settings/roles"
+          element={<SystemSettingsPage section="roles" />}
+        />
+        <Route
+          path="/settings/roles/new"
+          element={
+            <SystemSettingsPage section="roles">
+              <RoleFormPage mode="create" />
+            </SystemSettingsPage>
+          }
+        />
+        <Route
+          path="/settings/roles/:roleId"
+          element={
+            <SystemSettingsPage section="roles">
+              <RoleFormPage mode="detail" />
+            </SystemSettingsPage>
+          }
         />
         <Route
           path="/settings/storage"

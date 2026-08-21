@@ -106,6 +106,35 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			return err
 		}
 
+		for _, kind := range domain.BuiltInRoleKinds() {
+			role := &servermodels.Role{OrganizationID: organization.ID, Kind: string(kind)}
+			if _, err := tx.NewInsert().
+				Model(role).
+				Column("organization_id", "kind").
+				Returning("id").
+				Exec(ctx); err != nil {
+				return err
+			}
+			permissions := domain.DefaultRolePermissions(kind)
+			if len(permissions) == 0 {
+				continue
+			}
+			records := make([]servermodels.RolePermission, 0, len(permissions))
+			for _, permission := range permissions {
+				records = append(records, servermodels.RolePermission{
+					OrganizationID: organization.ID,
+					RoleID:         role.ID,
+					Permission:     string(permission),
+				})
+			}
+			if _, err := tx.NewInsert().
+				Model(&records).
+				Column("organization_id", "role_id", "permission").
+				Exec(ctx); err != nil {
+				return err
+			}
+		}
+
 		record := &servermodels.Token{
 			UserID:    user.ID,
 			TokenHash: issued.TokenHash,

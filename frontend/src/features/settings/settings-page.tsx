@@ -1,4 +1,5 @@
 /** 设置页。 */
+import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { PageContent } from "@/components/page-content"
@@ -11,6 +12,7 @@ import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { OrganizationSettingsForm } from "@/features/settings/organization-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
+import { RoleListPage } from "@/features/settings/role-list-page"
 import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
 import { useWorkspace } from "@/features/workspace/workspace-context"
@@ -63,8 +65,10 @@ export function PersonalSettingsPage({
 /** 系统设置导航和当前设置表单。 */
 export function SystemSettingsPage({
   section,
+  children,
 }: {
-  section: "organization" | "storage"
+  section: "organization" | "roles" | "storage"
+  children?: ReactNode
 }) {
   const { t } = useTranslation("settings")
   const { identity, updateOrganization } = useWorkspace()
@@ -82,23 +86,32 @@ export function SystemSettingsPage({
           <PagePaneLink to="/settings/organization">
             {t("navigation.organization")}
           </PagePaneLink>
+          <PagePaneLink to="/settings/roles">
+            {t("navigation.roles")}
+          </PagePaneLink>
           <PagePaneLink to="/settings/storage">
             {t("navigation.storage")}
           </PagePaneLink>
         </PagePaneNav>
       }
     >
-      <PageHeader title={title} />
-      <PageContent>
-        {section === "organization" ? (
-          <OrganizationSettingsForm
-            organization={identity.organization}
-            onUpdated={updateOrganization}
-          />
-        ) : (
-          <StorageSettingsForm />
-        )}
-      </PageContent>
+      {section === "roles" ? (
+        children ?? <RoleListPage />
+      ) : (
+        <>
+          <PageHeader title={title} />
+          <PageContent>
+            {section === "organization" ? (
+              <OrganizationSettingsForm
+                organization={identity.organization}
+                onUpdated={updateOrganization}
+              />
+            ) : (
+              <StorageSettingsForm />
+            )}
+          </PageContent>
+        </>
+      )}
     </PageSplit>
   )
 }

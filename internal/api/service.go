@@ -78,6 +78,11 @@ func NewService(application *appservice.Service) *Service {
 	router.PATCH("/contacts/:contactID", service.updateContact)
 	router.DELETE("/contacts/:contactID", service.deleteContact)
 	router.POST("/contacts/:contactID/restore", service.restoreContact)
+	router.GET("/settings/roles", service.listRoles)
+	router.POST("/settings/roles", service.createRole)
+	router.GET("/settings/roles/:roleID", service.getRole)
+	router.PUT("/settings/roles/:roleID", service.updateRole)
+	router.DELETE("/settings/roles/:roleID", service.deleteRole)
 	router.PUT("/settings/organization", service.updateOrganization)
 	router.GET("/settings/storage/s3", service.getS3Setting)
 	router.PUT("/settings/storage/s3", service.saveS3Setting)
@@ -396,6 +401,43 @@ func (s *Service) deleteContact(c *gin.Context) {
 func (s *Service) restoreContact(c *gin.Context) {
 	contact, err := s.application.RestoreContact(c.Request.Context(), requestMeta(c), c.Param("contactID"))
 	writeResult(c, http.StatusOK, contact, err)
+}
+
+// listRoles 返回企业角色和预定义权限目录。
+func (s *Service) listRoles(c *gin.Context) {
+	roles, err := s.application.ListRoles(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, roles, err)
+}
+
+// getRole 返回企业角色详情。
+func (s *Service) getRole(c *gin.Context) {
+	role, err := s.application.GetRole(c.Request.Context(), requestMeta(c), c.Param("roleID"))
+	writeResult(c, http.StatusOK, role, err)
+}
+
+// createRole 创建自定义角色。
+func (s *Service) createRole(c *gin.Context) {
+	var input appservice.RoleInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	role, err := s.application.CreateRole(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, role, err)
+}
+
+// updateRole 修改角色信息和权限。
+func (s *Service) updateRole(c *gin.Context) {
+	var input appservice.RoleInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	role, err := s.application.UpdateRole(c.Request.Context(), requestMeta(c), c.Param("roleID"), input)
+	writeResult(c, http.StatusOK, role, err)
+}
+
+// deleteRole 删除自定义角色。
+func (s *Service) deleteRole(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteRole(c.Request.Context(), requestMeta(c), c.Param("roleID")))
 }
 
 // updateOrganization 修改当前企业名称。

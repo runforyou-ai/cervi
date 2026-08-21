@@ -40,6 +40,11 @@ type Backend interface {
 	UpdateContact(context.Context, RequestMeta, string, ContactInput) (Contact, error)
 	DeleteContact(context.Context, RequestMeta, string) error
 	RestoreContact(context.Context, RequestMeta, string) (Contact, error)
+	ListRoles(context.Context, RequestMeta) (RoleList, error)
+	GetRole(context.Context, RequestMeta, string) (Role, error)
+	CreateRole(context.Context, RequestMeta, RoleInput) (Role, error)
+	UpdateRole(context.Context, RequestMeta, string, RoleInput) (Role, error)
+	DeleteRole(context.Context, RequestMeta, string) error
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
 	GetS3Setting(context.Context, RequestMeta) (S3Setting, error)
 	SaveS3Setting(context.Context, RequestMeta, S3Setting) (S3Setting, error)
@@ -283,6 +288,31 @@ func (s *Service) DeleteContact(ctx context.Context, meta RequestMeta, contactID
 // RestoreContact 恢复联系人。
 func (s *Service) RestoreContact(ctx context.Context, meta RequestMeta, contactID string) (Contact, error) {
 	return s.backend.RestoreContact(ctx, meta, contactID)
+}
+
+// ListRoles 返回当前企业的角色和预定义权限目录。
+func (s *Service) ListRoles(ctx context.Context, meta RequestMeta) (RoleList, error) {
+	return s.backend.ListRoles(ctx, meta)
+}
+
+// GetRole 返回当前企业的角色详情。
+func (s *Service) GetRole(ctx context.Context, meta RequestMeta, roleID string) (Role, error) {
+	return s.backend.GetRole(ctx, meta, roleID)
+}
+
+// CreateRole 创建自定义角色。
+func (s *Service) CreateRole(ctx context.Context, meta RequestMeta, input RoleInput) (Role, error) {
+	return s.backend.CreateRole(ctx, meta, input)
+}
+
+// UpdateRole 修改角色信息和权限。
+func (s *Service) UpdateRole(ctx context.Context, meta RequestMeta, roleID string, input RoleInput) (Role, error) {
+	return s.backend.UpdateRole(ctx, meta, roleID, input)
+}
+
+// DeleteRole 删除自定义角色。
+func (s *Service) DeleteRole(ctx context.Context, meta RequestMeta, roleID string) error {
+	return s.backend.DeleteRole(ctx, meta, roleID)
 }
 
 // UpdateOrganization 修改当前企业名称。
