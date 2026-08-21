@@ -25,8 +25,21 @@ func userFromModel(user servermodels.User) User {
 	return User{
 		ID: user.ID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName,
 		Role: UserRole(user.Role), Status: UserStatus(user.Status), Locale: Locale(user.Locale), TimeZone: user.TimeZone,
-		WorkStatus: WorkStatus(user.WorkStatus),
+		WorkStatus: WorkStatus(user.WorkStatus), AvatarURL: avatarContentURL(user.AvatarFileID),
 	}
+}
+
+// avatarContentURL 返回当前头像的稳定内容地址。
+func avatarContentURL(fileID *string) string {
+	if fileID == nil || *fileID == "" {
+		return ""
+	}
+	return fileContentURL(*fileID)
+}
+
+// fileContentURL 返回文件内容服务地址。
+func fileContentURL(fileID string) string {
+	return "/files/" + fileID + "/content"
 }
 
 // translateValidationFields 把校验错误码映射为本地化文案键。

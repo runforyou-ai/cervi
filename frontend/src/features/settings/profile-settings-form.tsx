@@ -1,5 +1,5 @@
 /** 个人资料设置表单。 */
-import { useMemo } from "react"
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -7,7 +7,17 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { isApiError, recoverSession, updateProfile, type User } from "@/api"
+import {
+  completeFileUpload,
+  createFileUpload,
+  FilePurpose,
+  isApiError,
+  recoverSession,
+  selectProfileImage,
+  updateProfile,
+  uploadFileContent,
+  type User,
+} from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -21,8 +31,19 @@ import {
   type ProfileSettingsFormValues,
 } from "@/features/settings/profile-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { UserAvatar } from "@/features/users/user-avatar"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
-/** 修改当前用户的姓名和邮箱。 */
+const avatarContentTypes = new Set(["image/jpeg", "image/png", "image/webp"])
+const maxAvatarByteSize = 5 * 1024 * 1024
+const avatarFileAccept = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+
+type PendingAvatar = {
+  file: File
+  previewURL: string
+}
+
+/** 修改当前用户的头像、姓名和邮箱。 */
 export function ProfileSettingsForm({
   user,
   onUpdated,
@@ -32,6 +53,9 @@ export function ProfileSettingsForm({
 }) {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [pendingAvatar, setPendingAvatar] = useState<PendingAvatar | null>(null)
+  const [selectingAvatar, setSelectingAvatar] = useState(false)
   const schema = useMemo(() => createProfileSettingsSchema(t), [t])
   const form = useForm<ProfileSettingsFormValues>({
     resolver: zodResolver(schema),
@@ -41,14 +65,91 @@ export function ProfileSettingsForm({
     },
   })
 
+  useEffect(() => {
+    const previewURL = pendingAvatar?.previewURL
+    return () => {
+      if (previewURL) {
+        URL.revokeObjectURL(previewURL)
+      }
+    }
+  }, [pendingAvatar?.previewURL])
+
+  /** 校验新的用户头像并在保存前预览。 */
+  function previewAvatar(selected: File) {
+    if (!avatarContentTypes.has(selected.type)) {
+      toast.error(t("profile.avatarTypeError"))
+      return false
+    }
+    if (selected.size <= 0 || selected.size > maxAvatarByteSize) {
+      toast.error(t("profile.avatarSizeError"))
+      return false
+    }
+    setPendingAvatar({ file: selected, previewURL: URL.createObjectURL(selected) })
+    return true
+  }
+
+  /** 处理 Web 文件选择器返回的头像图片。 */
+  function selectBrowserAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files?.[0]
+    event.target.value = ""
+    if (selected) {
+      previewAvatar(selected)
+    }
+  }
+
+  /** 按当前平台打开头像图片选择器。 */
+  async function chooseAvatar() {
+    if (resolveAppPlatform() !== "desktop") {
+      fileInputRef.current?.click()
+      return
+    }
+    setSelectingAvatar(true)
+    try {
+      const selected = await selectProfileImage()
+      if (!selected.name) {
+        return
+      }
+      const binary = window.atob(selected.dataBase64)
+      const content = new Uint8Array(binary.length)
+      for (let index = 0; index < binary.length; index += 1) {
+        content[index] = binary.charCodeAt(index)
+      }
+      previewAvatar(
+        new File([content], selected.name, { type: selected.contentType }),
+      )
+    } catch (error) {
+      console.warn("选择用户头像失败", error)
+      toast.error(t("profile.avatarChooseError"))
+    } finally {
+      setSelectingAvatar(false)
+    }
+  }
+
   /** 保存个人资料并同步工作台中的当前用户。 */
   async function save(values: ProfileSettingsFormValues) {
+    let uploadingAvatar = false
     try {
-      const updated = await updateProfile(values)
+      let avatarFileId = ""
+      if (pendingAvatar) {
+        uploadingAvatar = true
+        const selected = pendingAvatar.file
+        const upload = await createFileUpload({
+          purpose: FilePurpose.FilePurposeUserAvatar,
+          fileName: selected.name,
+          contentType: selected.type,
+          byteSize: selected.size,
+        })
+        await uploadFileContent(upload.request, selected)
+        const completed = await completeFileUpload(upload.file.id)
+        avatarFileId = completed.id
+        uploadingAvatar = false
+      }
+      const updated = await updateProfile({ ...values, avatarFileId })
       form.reset({
         displayName: updated.displayName,
         email: updated.email,
       })
+      setPendingAvatar(null)
       onUpdated(updated)
       console.info("个人资料已保存", { user_id: updated.id })
       toast.success(t("profile.saveSuccess"))
@@ -74,7 +175,9 @@ export function ProfileSettingsForm({
         toast.error(apiErrorMessage(error))
         return
       }
-      toast.error(t("profile.saveError"))
+      toast.error(
+        t(uploadingAvatar ? "profile.avatarUploadError" : "profile.saveError"),
+      )
     }
   }
 
@@ -88,6 +191,42 @@ export function ProfileSettingsForm({
       noValidate
     >
       <FieldGroup>
+        <Field>
+          <FieldLabel>{t("profile.avatar")}</FieldLabel>
+          <div>
+            <input
+              ref={fileInputRef}
+              className="sr-only"
+              type="file"
+              accept={avatarFileAccept}
+              aria-label={t("profile.avatarChoose")}
+              onChange={selectBrowserAvatar}
+            />
+            <button
+              className="group relative size-20 overflow-hidden rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              type="button"
+              aria-label={t("profile.avatarChoose")}
+              disabled={selectingAvatar || isSubmitting}
+              onClick={() => void chooseAvatar()}
+            >
+              <UserAvatar
+                user={
+                  pendingAvatar
+                    ? { ...user, avatarUrl: pendingAvatar.previewURL }
+                    : user
+                }
+                className="size-full rounded-full text-2xl"
+              />
+              <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                {selectingAvatar ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : (
+                  t("profile.avatarChange")
+                )}
+              </span>
+            </button>
+          </div>
+        </Field>
         <Controller
           name="displayName"
           control={form.control}
@@ -129,7 +268,10 @@ export function ProfileSettingsForm({
           )}
         />
         <div>
-          <Button type="submit" disabled={!isDirty || isSubmitting}>
+          <Button
+            type="submit"
+            disabled={(!isDirty && !pendingAvatar) || isSubmitting}
+          >
             {isSubmitting ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : null}

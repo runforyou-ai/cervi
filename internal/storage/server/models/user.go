@@ -8,14 +8,15 @@ import "github.com/uptrace/bun"
 type User struct {
 	bun.BaseModel `bun:"table:users,alias:u"`
 
-	ID             string `bun:"id,pk" json:"id"`
-	OrganizationID string `bun:"organization_id" json:"organizationId"`
-	Email          string `bun:"email" json:"email"`
-	DisplayName    string `bun:"display_name" json:"displayName"`
-	PasswordHash   string `bun:"password_hash" json:"-"`
-	Role           string `bun:"role" json:"role"`
-	Status         string `bun:"status" json:"status"`
-	Locale         string `bun:"locale" json:"locale"`
-	TimeZone       string `bun:"time_zone" json:"timeZone"`
-	WorkStatus     string `bun:"work_status" json:"workStatus"`
+	ID             string  `bun:"id,pk" json:"id"`
+	OrganizationID string  `bun:"organization_id" json:"organizationId"`
+	Email          string  `bun:"email" json:"email"`
+	DisplayName    string  `bun:"display_name" json:"displayName"`
+	PasswordHash   string  `bun:"password_hash" json:"-"`
+	Role           string  `bun:"role" json:"role"`
+	Status         string  `bun:"status" json:"status"`
+	Locale         string  `bun:"locale" json:"locale"`
+	TimeZone       string  `bun:"time_zone" json:"timeZone"`
+	WorkStatus     string  `bun:"work_status" json:"workStatus"`
+	AvatarFileID   *string `bun:"avatar_file_id" json:"avatarFileId"`
 }

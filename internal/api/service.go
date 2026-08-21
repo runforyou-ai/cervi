@@ -45,6 +45,8 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/auth/logout", service.logout)
 	router.GET("/auth/identity", service.loadIdentity)
 	router.PATCH("/profile", service.updateProfile)
+	router.POST("/files/uploads", service.createFileUpload)
+	router.POST("/files/:fileID/complete", service.completeFileUpload)
 	router.PATCH("/password", service.changePassword)
 	router.PATCH("/preferences", service.updateUserPreferences)
 	router.PATCH("/work-status", service.updateUserWorkStatus)
@@ -130,6 +132,22 @@ func (s *Service) updateProfile(c *gin.Context) {
 	}
 	user, err := s.application.UpdateProfile(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, user, err)
+}
+
+// createFileUpload 创建文件上传请求。
+func (s *Service) createFileUpload(c *gin.Context) {
+	var input appservice.FileUploadInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	upload, err := s.application.CreateFileUpload(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, upload, err)
+}
+
+// completeFileUpload 核验并完成文件上传。
+func (s *Service) completeFileUpload(c *gin.Context) {
+	file, err := s.application.CompleteFileUpload(c.Request.Context(), requestMeta(c), c.Param("fileID"))
+	writeResult(c, http.StatusOK, file, err)
 }
 
 // changePassword 修改当前用户的登录密码。

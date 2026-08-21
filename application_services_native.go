@@ -7,6 +7,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/apiproxy"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/nativefile"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -16,7 +17,7 @@ func applicationServices(appStorage apiproxy.Store) ([]application.Service, erro
 	if err != nil {
 		return nil, fmt.Errorf("initialize remote application backend: %w", err)
 	}
-	service := appservice.New(backend)
+	service := appservice.New(backend, appservice.WithProfileImageSelector(nativefile.NewProfileImageSelector()))
 	return []application.Service{
 		application.NewServiceWithOptions(service, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,

@@ -22,6 +22,13 @@ export function ChangePassword(meta: $models.RequestMeta, input: $models.ChangeP
 }
 
 /**
+ * CompleteFileUpload 核验并完成文件上传。
+ */
+export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<$models.File> {
+    return $Call.ByID(3172652722, meta, fileID);
+}
+
+/**
  * ConnectServer 保存并验证原生端企业服务器地址。
  */
 export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<void> {
@@ -33,6 +40,13 @@ export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $Ca
  */
 export function CreateContact(meta: $models.RequestMeta, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(2172055030, meta, input);
+}
+
+/**
+ * CreateFileUpload 创建文件上传请求。
+ */
+export function CreateFileUpload(meta: $models.RequestMeta, input: $models.FileUploadInput): $CancellablePromise<$models.FileUpload> {
+    return $Call.ByID(1790184161, meta, input);
 }
 
 /**
@@ -190,6 +204,13 @@ export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3Settin
 }
 
 /**
+ * SelectProfileImage 在原生端选择并读取用户头像图片。
+ */
+export function SelectProfileImage(meta: $models.RequestMeta): $CancellablePromise<$models.ProfileImageFile> {
+    return $Call.ByID(1937167372, meta);
+}
+
+/**
  * ServerURL 返回原生端当前配置的企业服务器地址。
  */
 export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string> {
@@ -211,7 +232,7 @@ export function UpdateContact(meta: $models.RequestMeta, contactID: string, inpu
 }
 
 /**
- * UpdateProfile 修改当前用户的姓名和邮箱。
+ * UpdateProfile 修改当前用户的头像、姓名和邮箱。
  */
 export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.User> {
     return $Call.ByID(1804531972, meta, input);

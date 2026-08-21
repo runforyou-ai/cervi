@@ -12,6 +12,7 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
@@ -199,15 +200,27 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected directory user: %#v", directoryUser)
 	}
 
-	updateProfile := useraction.NewUpdateProfileAction(db)
-	updatedUser, err := updateProfile.Execute(context.Background(), loggedIn.Identity, useraction.ProfileInput{
-		DisplayName: "  新姓名  ",
-		Email:       " NEW@Example.com ",
+	avatar, err := fileaction.NewCreateUploadAction(db).Execute(context.Background(), loggedIn.Identity, domain.FileStorageBackendLocal, fileaction.UploadInput{
+		Purpose: domain.FilePurposeUserAvatar, FileName: "avatar.png", ContentType: "image/png", ByteSize: 1024,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updatedUser.DisplayName != "新姓名" || updatedUser.Email != "new@example.com" {
+	avatar, err = fileaction.NewMarkReadyAction(db).Execute(context.Background(), loggedIn.Identity, avatar.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updateProfile := useraction.NewUpdateProfileAction(db)
+	updatedUser, err := updateProfile.Execute(context.Background(), loggedIn.Identity, useraction.ProfileInput{
+		DisplayName:  "  新姓名  ",
+		Email:        " NEW@Example.com ",
+		AvatarFileID: avatar.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedUser.DisplayName != "新姓名" || updatedUser.Email != "new@example.com" || updatedUser.AvatarFileID == nil || *updatedUser.AvatarFileID != avatar.ID {
 		t.Fatalf("updated user = %#v", updatedUser)
 	}
 	resolvedAfterUpdate, err := resolveIdentity.Execute(context.Background(), loggedIn.Token)
@@ -216,6 +229,19 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if resolvedAfterUpdate == nil || resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.User.DisplayName != "新姓名" {
 		t.Fatalf("identity after profile update = %#v", resolvedAfterUpdate)
+	}
+	_, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
+		DisplayName: "不应保存的姓名", Email: "discarded@example.com", AvatarFileID: "00000000-0000-0000-0000-000000000099",
+	})
+	if !errors.Is(err, fileaction.ErrFileNotFound) {
+		t.Fatalf("invalid avatar error = %v, want file not found", err)
+	}
+	resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.User.DisplayName != "新姓名" {
+		t.Fatalf("profile changed after invalid avatar: %#v", resolvedAfterUpdate.User)
 	}
 
 	changePassword := useraction.NewChangePasswordAction(db)

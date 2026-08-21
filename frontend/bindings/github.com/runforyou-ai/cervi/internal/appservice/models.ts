@@ -240,6 +240,56 @@ export enum ErrorKind {
 };
 
 /**
+ * File 定义前端可使用的文件元数据。
+ */
+export interface File {
+    "id": string;
+    "name": string;
+    "contentType": string;
+    "byteSize": number;
+    "contentUrl": string;
+}
+
+/**
+ * FilePurpose 表示文件上传用途。
+ */
+export enum FilePurpose {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    FilePurposeUserAvatar = "user_avatar",
+};
+
+/**
+ * FileUpload 包含待上传文件和内容上传请求。
+ */
+export interface FileUpload {
+    "file": File;
+    "request": FileUploadRequest;
+}
+
+/**
+ * FileUploadInput 定义创建上传所需的文件元数据。
+ */
+export interface FileUploadInput {
+    "purpose": FilePurpose;
+    "fileName": string;
+    "contentType": string;
+    "byteSize": number;
+}
+
+/**
+ * FileUploadRequest 定义客户端上传文件内容所需的 HTTP 请求。
+ */
+export interface FileUploadRequest {
+    "method": string;
+    "url": string;
+    "headers": { [_ in string]?: string } | null;
+}
+
+/**
  * Identity 定义当前用户及其所属企业。
  */
 export interface Identity {
@@ -338,11 +388,22 @@ export interface PageInfo {
 }
 
 /**
+ * ProfileImageFile 定义原生端选择的用户头像文件。
+ */
+export interface ProfileImageFile {
+    "name": string;
+    "contentType": string;
+    "byteSize": number;
+    "dataBase64": string;
+}
+
+/**
  * ProfileInput 定义当前用户可编辑的个人资料字段。
  */
 export interface ProfileInput {
     "displayName": string;
     "email": string;
+    "avatarFileId": string;
 }
 
 /**
@@ -427,6 +488,7 @@ export interface User {
     "locale": Locale;
     "timeZone": string;
     "workStatus": WorkStatus;
+    "avatarUrl": string;
 }
 
 /**

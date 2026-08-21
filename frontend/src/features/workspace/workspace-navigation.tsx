@@ -35,6 +35,7 @@ import {
   WorkStatusDot,
   workStatusLabel,
 } from "@/features/users/work-status"
+import { UserAvatar } from "@/features/users/user-avatar"
 import { cn } from "@/lib/utils"
 
 /** 模块轨导航项。 */
@@ -169,7 +170,7 @@ export function WorkspaceNavigation({
                 name: identity.user.displayName,
               })}
             >
-              {identity.user.displayName.slice(0, 1).toUpperCase()}
+              <UserAvatar user={identity.user} className="size-full rounded-lg" />
               <WorkStatusDot
                 status={identity.user.workStatus}
                 className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
@@ -192,8 +193,11 @@ export function WorkspaceNavigation({
           >
             <DropdownMenuLabel className="font-normal">
               <div className="flex items-center gap-3">
-                <div className="relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
-                  {identity.user.displayName.slice(0, 1).toUpperCase()}
+                <div className="relative size-10 shrink-0">
+                  <UserAvatar
+                    user={identity.user}
+                    className="size-10 rounded-lg text-sm"
+                  />
                   <WorkStatusDot
                     status={identity.user.workStatus}
                     className="absolute -right-0.5 -bottom-0.5 ring-2 ring-popover"

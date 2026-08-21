@@ -42,6 +42,20 @@ func TestBackendRequiresEnterpriseServer(t *testing.T) {
 	}
 }
 
+// TestAbsoluteContentURL 验证原生端文件地址指向已连接的企业服务器。
+func TestAbsoluteContentURL(t *testing.T) {
+	backend, err := NewBackend(&memoryStore{serverURL: "https://cervi.example.com/company"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := backend.absoluteContentURL("/files/file-1/content"); got != "https://cervi.example.com/company/files/file-1/content" {
+		t.Fatalf("content URL = %q", got)
+	}
+	if got := backend.absoluteContentURL("https://storage.example.com/object"); got != "https://storage.example.com/object" {
+		t.Fatalf("absolute content URL = %q", got)
+	}
+}
+
 // TestBackendPreservesCancellation 验证远程请求取消不会转换为连接错误。
 func TestBackendPreservesCancellation(t *testing.T) {
 	backend, err := NewBackend(&memoryStore{serverURL: "http://127.0.0.1:1"})
@@ -97,8 +111,13 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				http.Error(writer, err.Error(), http.StatusBadRequest)
 				return
 			}
+			if input.AvatarFileID != "file-1" {
+				http.Error(writer, "unexpected avatar file", http.StatusBadRequest)
+				return
+			}
 			writeTestJSON(writer, http.StatusOK, map[string]string{
 				"id": "user-1", "organizationId": "organization-1", "displayName": input.DisplayName, "email": input.Email,
+				"avatarUrl": "/files/file-1/content",
 			})
 		case "/api/password":
 			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
@@ -203,13 +222,14 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	user, err := backend.UpdateProfile(context.Background(), meta, appservice.ProfileInput{
-		DisplayName: "林晓",
-		Email:       "lin@example.com",
+		DisplayName:  "林晓",
+		Email:        "lin@example.com",
+		AvatarFileID: "file-1",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if user.DisplayName != "林晓" || user.Email != "lin@example.com" {
+	if user.DisplayName != "林晓" || user.Email != "lin@example.com" || user.AvatarURL != remote.URL+"/files/file-1/content" {
 		t.Fatalf("updated user = %#v", user)
 	}
 	if err := backend.ChangePassword(context.Background(), meta, appservice.ChangePasswordInput{

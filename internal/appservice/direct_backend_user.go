@@ -7,21 +7,23 @@ import (
 	"errors"
 	"log/slog"
 
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
-// UpdateProfile 修改当前用户的姓名和邮箱。
+// UpdateProfile 修改当前用户的头像、姓名和邮箱。
 func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (User, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return User{}, err
 	}
 	user, err := b.updateProfile.Execute(ctx, identity, useraction.ProfileInput{
-		DisplayName: input.DisplayName,
-		Email:       input.Email,
+		DisplayName:  input.DisplayName,
+		Email:        input.Email,
+		AvatarFileID: input.AvatarFileID,
 	})
 	if err != nil {
 		if ctx.Err() != nil {
@@ -30,6 +32,9 @@ func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, inp
 		var validationError *common.FieldError
 		if errors.As(err, &validationError) {
 			return User{}, InvalidError(meta, cervii18n.ErrorValidationFailed, profileFieldKeys(validationError.Fields))
+		}
+		if errors.Is(err, fileaction.ErrFileNotFound) {
+			return User{}, NotFoundError(meta, cervii18n.ErrorFileNotFound)
 		}
 		if errors.Is(err, common.ErrIdentityInvalid) {
 			return User{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
