@@ -44,6 +44,14 @@ func TestNormalizeInputRejectsInvalidFields(t *testing.T) {
 	}
 }
 
+// TestNormalizeInputRejectsLongName 验证自定义角色名称长度上限。
+func TestNormalizeInputRejectsLongName(t *testing.T) {
+	_, fields := normalizeInput(Input{Name: string(make([]rune, maxRoleNameLength+1))}, true)
+	if fields["name"] != ValidationNameTooLong {
+		t.Fatalf("name validation = %q", fields["name"])
+	}
+}
+
 // TestNormalizeInputIgnoresBuiltInMetadata 验证内置角色只校验权限。
 func TestNormalizeInputIgnoresBuiltInMetadata(t *testing.T) {
 	input, fields := normalizeInput(Input{

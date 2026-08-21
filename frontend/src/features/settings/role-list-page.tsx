@@ -9,7 +9,6 @@ import {
   deleteRole,
   isApiError,
   listRoles,
-  PermissionLevel,
   RoleKind,
   type PermissionDefinition,
   type RoleData,
@@ -42,28 +41,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { roleDisplayName } from "@/features/roles/role-labels"
+import {
+  permissionDefinitionLabel,
+  roleDescription,
+  roleDisplayName,
+} from "@/features/roles/role-labels"
 import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 
-/** 显示角色已配置的查看和管理权限数量。 */
+/** 显示角色已配置的权限名称和总数。 */
 function permissionSummary(
   role: RoleData,
   definitions: PermissionDefinition[],
   t: ReturnType<typeof useTranslation<"settings">>["t"],
 ) {
   const selected = new Set(role.permissions)
-  const view = definitions.filter(
-    (item) =>
-      item.level === PermissionLevel.PermissionLevelView &&
-      selected.has(item.code),
-  ).length
-  const manage = definitions.filter(
-    (item) =>
-      item.level === PermissionLevel.PermissionLevelManage &&
-      selected.has(item.code),
-  ).length
-  return t("roles.list.permissionSummary", { view, manage })
+  const labels = definitions
+    .filter((item) => selected.has(item.code))
+    .map((item) => permissionDefinitionLabel(item, t))
+  if (labels.length === 0) return t("roles.list.permissionEmpty")
+  const items = labels.slice(0, 2).join(t("roles.list.permissionSeparator"))
+  return labels.length > 2
+    ? t("roles.list.permissionSummary", { items, count: labels.length })
+    : items
 }
 
 /** 加载并管理企业角色列表。 */
@@ -173,13 +173,18 @@ export function RoleListPage() {
             </Button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border bg-card">
+          <div className="@container overflow-hidden rounded-lg border bg-card">
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{t("roles.list.columns.name")}</TableHead>
+                  <TableHead className="hidden w-64 @3xl:table-cell">
+                    {t("roles.list.columns.description")}
+                  </TableHead>
                   <TableHead>{t("roles.list.columns.memberCount")}</TableHead>
-                  <TableHead>{t("roles.list.columns.permissions")}</TableHead>
+                  <TableHead className="hidden @3xl:table-cell">
+                    {t("roles.list.columns.permissions")}
+                  </TableHead>
                   <TableHead className="text-right">
                     {t("roles.list.columns.actions")}
                   </TableHead>
@@ -189,55 +194,65 @@ export function RoleListPage() {
                 {roles.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="h-32 text-center text-muted-foreground"
                     >
                       {t("roles.list.empty")}
                     </TableCell>
                   </TableRow>
-                ) : roles.map((role) => (
-                  <TableRow key={role.id}>
-                    <TableCell className="font-medium">
-                      <SelectableText>
-                        {roleDisplayName(role, tCommon)}
-                      </SelectableText>
-                    </TableCell>
-                    <TableCell>{role.memberCount}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {permissionSummary(role, permissions, t)}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/settings/roles/${role.id}`}>
-                            {t("roles.list.view")}
-                          </Link>
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={t("roles.list.more")}
-                              title={t("roles.list.more")}
-                            >
-                              <MoreHorizontalIcon />
+                ) : (
+                  roles.map((role) => {
+                    const description = roleDescription(role, t)
+                    return (
+                      <TableRow key={role.id}>
+                        <TableCell className="font-medium">
+                          <SelectableText>
+                            {roleDisplayName(role, tCommon)}
+                          </SelectableText>
+                        </TableCell>
+                        <TableCell className="hidden max-w-64 text-muted-foreground @3xl:table-cell">
+                          <span className="block truncate" title={description}>
+                            {description}
+                          </span>
+                        </TableCell>
+                        <TableCell>{role.memberCount}</TableCell>
+                        <TableCell className="hidden text-muted-foreground @3xl:table-cell">
+                          {permissionSummary(role, permissions, t)}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link to={`/settings/roles/${role.id}`}>
+                                {t("roles.list.view")}
+                              </Link>
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              disabled={role.kind !== RoleKind.RoleKindCustom}
-                              className="text-destructive focus:text-destructive"
-                              onSelect={() => setDeletingRole(role)}
-                            >
-                              {t("roles.list.delete")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={t("roles.list.more")}
+                                  title={t("roles.list.more")}
+                                >
+                                  <MoreHorizontalIcon />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  disabled={role.kind !== RoleKind.RoleKindCustom}
+                                  className="text-destructive focus:text-destructive"
+                                  onSelect={() => setDeletingRole(role)}
+                                >
+                                  {t("roles.list.delete")}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
+                )}
               </TableBody>
             </Table>
           </div>

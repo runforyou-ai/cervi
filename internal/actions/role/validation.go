@@ -18,6 +18,7 @@ const (
 	ValidationNameDuplicate      ValidationCode = "NAME_DUPLICATE"
 	ValidationDescriptionTooLong ValidationCode = "DESCRIPTION_TOO_LONG"
 	ValidationPermissionsInvalid ValidationCode = "PERMISSIONS_INVALID"
+	maxRoleNameLength                           = 10
 )
 
 // ValidationError 表示角色字段校验失败。
@@ -31,7 +32,7 @@ func normalizeInput(input Input, custom bool) (Input, map[string]ValidationCode)
 		input.Description = strings.TrimSpace(input.Description)
 		if input.Name == "" {
 			fields["name"] = ValidationNameRequired
-		} else if len([]rune(input.Name)) > 50 {
+		} else if len([]rune(input.Name)) > maxRoleNameLength {
 			fields["name"] = ValidationNameTooLong
 		}
 		if len([]rune(input.Description)) > 200 {

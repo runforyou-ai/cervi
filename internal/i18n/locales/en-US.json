@@ -93,7 +93,7 @@
   "field.file_byte_size_invalid": "The image cannot exceed 5 MB.",
   "field.file_purpose_invalid": "The file upload purpose is invalid.",
   "field.role_name_required": "Enter a role name.",
-  "field.role_name_too_long": "The role name cannot exceed 50 characters.",
+  "field.role_name_too_long": "The role name cannot exceed 10 characters.",
   "field.role_name_duplicate": "This role name is already in use.",
   "field.role_description_too_long": "The role description cannot exceed 200 characters.",
   "field.role_permissions_invalid": "The role contains unsupported permissions.",

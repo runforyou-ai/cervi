@@ -93,7 +93,7 @@
   "field.file_byte_size_invalid": "图片大小不能超过 5 MB。",
   "field.file_purpose_invalid": "文件上传用途无效。",
   "field.role_name_required": "请输入角色名称。",
-  "field.role_name_too_long": "角色名称不能超过 50 个字符。",
+  "field.role_name_too_long": "角色名称不能超过 10 个字符。",
   "field.role_name_duplicate": "角色名称已存在。",
   "field.role_description_too_long": "角色说明不能超过 200 个字符。",
   "field.role_permissions_invalid": "角色权限包含不支持的项目。",
