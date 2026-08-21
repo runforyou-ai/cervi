@@ -565,15 +565,100 @@ const enUS = {
     },
     aiProviders: {
       title: "AI providers",
-      placeholder: "AI provider settings are coming soon.",
+      loading: "Loading…",
+      retry: "Retry",
+      brands: {
+        deepseek: "deepseek",
+      },
+      list: {
+        create: "Add provider",
+        edit: "Edit",
+        delete: "Delete",
+        more: "More",
+        loadError: "Could not load AI providers.",
+        empty: "No AI providers yet",
+        columns: {
+          brand: "Brand",
+          name: "Name",
+          apiUrl: "API URL",
+          actions: "Actions",
+        },
+      },
+      form: {
+        createTitle: "Add provider",
+        editTitle: "Edit provider",
+        brand: "Brand",
+        name: "Name",
+        apiKey: "API key",
+        apiUrl: "API URL",
+        showAPIKey: "Show API key",
+        hideAPIKey: "Hide API key",
+        save: "Save",
+        saving: "Saving…",
+        cancel: "Cancel",
+        createSuccess: "AI provider added.",
+        updateSuccess: "AI provider saved.",
+        saveError: "Could not save the AI provider. Try again.",
+        loadError: "Could not load the AI provider.",
+      },
+      models: {
+        title: "Model catalog",
+        manualAdd: "Add manually",
+        fetch: "Get available models",
+        loading: "Loading…",
+        loadError: "Could not load available models. Try again.",
+        empty: "No models added",
+        dialogTitle: "Select models to add",
+        select: "Select",
+        toggle: "Select {{name}}",
+        editField: "{{field}}, row {{row}}",
+        delete: "Delete",
+        clearAll: "Clear all",
+        cancel: "Cancel",
+        confirm: "Confirm",
+        columns: {
+          identifier: "Model ID",
+          name: "Model name",
+          contextWindow: "Context window",
+          maxOutputTokens: "Maximum output tokens",
+          actions: "Actions",
+        },
+      },
+      delete: {
+        title: "Delete “{{name}}”?",
+        description:
+          "The provider and its model catalog will no longer be available.",
+        cancel: "Cancel",
+        confirm: "Delete",
+        deleting: "Deleting…",
+        success: "AI provider deleted.",
+        error: "Could not delete the AI provider. Try again.",
+      },
+      validation: {
+        brandInvalid: "Select a supported AI provider brand.",
+        nameRequired: "Enter a provider name.",
+        nameTooLong: "The provider name cannot exceed 100 characters.",
+        apiKeyRequired: "Enter an API key.",
+        apiKeyTooLong: "The API key cannot exceed 2048 characters.",
+        apiUrlRequired: "Enter an API URL.",
+        apiUrlInvalid: "Enter a complete HTTP or HTTPS API URL.",
+        modelIdentifierRequired: "Enter a model ID.",
+        modelIdentifierTooLong: "The model ID cannot exceed 200 characters.",
+        modelNameRequired: "Enter a model name.",
+        modelNameTooLong: "The model name cannot exceed 200 characters.",
+        tokenCountInvalid: "Enter a positive integer or use K or M format.",
+        modelIdentifierDuplicate: "Model IDs must be unique.",
+      },
     },
     roles: {
       title: "Roles and permissions",
       loading: "Loading…",
       retry: "Retry",
       kindsDescriptions: {
-        admin: "Administrators have every permission and their access cannot be changed.",
-        customerService: "Customer service is a built-in role for handling customer conversations.",
+        admin:
+          "Administrators have every permission and their access cannot be changed.",
+        customerService:
+          "Customer service is a built-in role for handling customer conversations.",
         member: "Member is a built-in role for internal team communication.",
       },
       list: {
@@ -607,7 +692,8 @@ const enUS = {
       },
       permissions: {
         title: "Permissions",
-        description: "Manage permission includes view access for the same feature.",
+        description:
+          "Manage permission includes view access for the same feature.",
         adminDescription: "Administrators always have every permission.",
         toggle: "{{resource}}: {{level}}",
         columns: {
@@ -627,7 +713,8 @@ const enUS = {
       validation: {
         nameRequired: "Enter a role name.",
         nameTooLong: "The role name cannot exceed 50 characters.",
-        descriptionTooLong: "The role description cannot exceed 200 characters.",
+        descriptionTooLong:
+          "The role description cannot exceed 200 characters.",
       },
       delete: {
         title: "Delete “{{name}}”?",

@@ -45,6 +45,12 @@ type Backend interface {
 	CreateRole(context.Context, RequestMeta, RoleInput) (Role, error)
 	UpdateRole(context.Context, RequestMeta, string, RoleInput) (Role, error)
 	DeleteRole(context.Context, RequestMeta, string) error
+	ListAIProviders(context.Context, RequestMeta) (AIProviderList, error)
+	GetAIProvider(context.Context, RequestMeta, string) (AIProvider, error)
+	ListAvailableAIModels(context.Context, RequestMeta, AIProviderBrand) (AIProviderModelList, error)
+	CreateAIProvider(context.Context, RequestMeta, AIProviderInput) (AIProvider, error)
+	UpdateAIProvider(context.Context, RequestMeta, string, AIProviderInput) (AIProvider, error)
+	DeleteAIProvider(context.Context, RequestMeta, string) error
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
 	GetS3Setting(context.Context, RequestMeta) (S3Setting, error)
 	SaveS3Setting(context.Context, RequestMeta, S3Setting) (S3Setting, error)
@@ -313,6 +319,36 @@ func (s *Service) UpdateRole(ctx context.Context, meta RequestMeta, roleID strin
 // DeleteRole 删除自定义角色。
 func (s *Service) DeleteRole(ctx context.Context, meta RequestMeta, roleID string) error {
 	return s.backend.DeleteRole(ctx, meta, roleID)
+}
+
+// ListAIProviders 返回当前企业的 AI 供应商列表。
+func (s *Service) ListAIProviders(ctx context.Context, meta RequestMeta) (AIProviderList, error) {
+	return s.backend.ListAIProviders(ctx, meta)
+}
+
+// GetAIProvider 返回当前企业中的 AI 供应商详情。
+func (s *Service) GetAIProvider(ctx context.Context, meta RequestMeta, providerID string) (AIProvider, error) {
+	return s.backend.GetAIProvider(ctx, meta, providerID)
+}
+
+// ListAvailableAIModels 返回指定品牌的可用模型目录。
+func (s *Service) ListAvailableAIModels(ctx context.Context, meta RequestMeta, brand AIProviderBrand) (AIProviderModelList, error) {
+	return s.backend.ListAvailableAIModels(ctx, meta, brand)
+}
+
+// CreateAIProvider 创建 AI 供应商。
+func (s *Service) CreateAIProvider(ctx context.Context, meta RequestMeta, input AIProviderInput) (AIProvider, error) {
+	return s.backend.CreateAIProvider(ctx, meta, input)
+}
+
+// UpdateAIProvider 修改 AI 供应商。
+func (s *Service) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderInput) (AIProvider, error) {
+	return s.backend.UpdateAIProvider(ctx, meta, providerID, input)
+}
+
+// DeleteAIProvider 删除 AI 供应商。
+func (s *Service) DeleteAIProvider(ctx context.Context, meta RequestMeta, providerID string) error {
+	return s.backend.DeleteAIProvider(ctx, meta, providerID)
 }
 
 // UpdateOrganization 修改当前企业名称。

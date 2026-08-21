@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,7 +25,7 @@ func NewDeleteRoleAction(db *bun.DB) *DeleteRoleAction {
 // Execute 删除当前企业中的自定义角色及其权限。
 func (a *DeleteRoleAction) Execute(ctx context.Context, identity *servermodels.Identity, roleID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		role, err := loadRole(ctx, tx, identity.Organization.ID, roleID, true)

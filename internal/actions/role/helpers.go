@@ -14,29 +14,6 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 )
 
-// validateIdentity 校验当前用户仍属于当前企业。
-func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
-	if identity == nil ||
-		!common.ValidUUID(identity.Organization.ID) ||
-		!common.ValidUUID(identity.User.ID) ||
-		identity.User.OrganizationID != identity.Organization.ID {
-		return common.ErrIdentityInvalid
-	}
-	active, err := db.NewSelect().
-		Model((*servermodels.User)(nil)).
-		Where("id = ?", identity.User.ID).
-		Where("organization_id = ?", identity.Organization.ID).
-		Where("status = ?", "active").
-		Exists(ctx)
-	if err != nil {
-		return err
-	}
-	if !active {
-		return common.ErrIdentityInvalid
-	}
-	return nil
-}
-
 // loadRole 读取当前企业中的角色。
 func loadRole(ctx context.Context, db bun.IDB, organizationID, roleID string, lock bool) (*servermodels.Role, error) {
 	if !common.ValidUUID(roleID) {
