@@ -5,6 +5,8 @@ package user
 import (
 	"strings"
 	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // TestNormalizeProfileInput 验证个人资料输入规范化和字段校验。
@@ -23,6 +25,20 @@ func TestNormalizeProfileInput(t *testing.T) {
 	_, fields = normalizeProfileInput(ProfileInput{Email: "invalid"})
 	if fields["displayName"] != ValidationDisplayNameRequired || fields["email"] != ValidationEmailInvalid {
 		t.Fatalf("fields = %#v", fields)
+	}
+}
+
+// TestPreferencesValidation 验证语言和 IANA 时区校验。
+func TestPreferencesValidation(t *testing.T) {
+	_, fields := normalizePreferencesInput(PreferencesInput{
+		Locale: domain.LocaleChineseSimplified, TimeZone: "Asia/Shanghai",
+	})
+	if len(fields) != 0 {
+		t.Fatalf("valid preferences fields = %#v, want empty", fields)
+	}
+	_, fields = normalizePreferencesInput(PreferencesInput{Locale: "fr-FR", TimeZone: "invalid"})
+	if fields["locale"] != ValidationLocaleInvalid || fields["timeZone"] != ValidationTimeZoneInvalid {
+		t.Fatalf("invalid preferences fields = %#v", fields)
 	}
 }
 

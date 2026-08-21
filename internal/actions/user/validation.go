@@ -9,6 +9,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
+	commontimezone "github.com/runforyou-ai/cervi/internal/common/timezone"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识用户设置字段校验结果。
@@ -21,6 +23,8 @@ const (
 	ValidationCurrentPasswordIncorrect ValidationCode = "CURRENT_PASSWORD_INCORRECT"
 	ValidationPasswordTooShort         ValidationCode = "PASSWORD_TOO_SHORT"
 	ValidationPasswordTooLong          ValidationCode = "PASSWORD_TOO_LONG"
+	ValidationLocaleInvalid            ValidationCode = "LOCALE_INVALID"
+	ValidationTimeZoneInvalid          ValidationCode = "TIME_ZONE_INVALID"
 )
 
 // ValidationError 表示用户设置字段校验失败。
@@ -36,6 +40,12 @@ type ProfileInput struct {
 type ChangePasswordInput struct {
 	CurrentPassword string
 	NewPassword     string
+}
+
+// PreferencesInput 定义当前用户的语言和时区设置。
+type PreferencesInput struct {
+	Locale   domain.Locale
+	TimeZone string
 }
 
 // normalizeProfileInput 规范化并校验个人资料输入。
@@ -63,4 +73,17 @@ func validateChangePasswordInput(input ChangePasswordInput) map[string]Validatio
 		fields["newPassword"] = ValidationPasswordTooLong
 	}
 	return fields
+}
+
+// normalizePreferencesInput 规范化并校验语言和时区设置。
+func normalizePreferencesInput(input PreferencesInput) (PreferencesInput, map[string]ValidationCode) {
+	input.TimeZone = strings.TrimSpace(input.TimeZone)
+	fields := make(map[string]ValidationCode)
+	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
+		fields["locale"] = ValidationLocaleInvalid
+	}
+	if !commontimezone.Valid(input.TimeZone) {
+		fields["timeZone"] = ValidationTimeZoneInvalid
+	}
+	return input, fields
 }

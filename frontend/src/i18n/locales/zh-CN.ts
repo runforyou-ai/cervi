@@ -77,8 +77,8 @@ const zhCN = {
     inbox: "消息",
     contacts: "通讯录",
     channels: "渠道",
-    profile: "个人资料",
-    settings: "设置",
+    personalSettings: "个人设置",
+    systemSettings: "系统设置",
     openUserMenu: "打开 {{name}} 的用户菜单",
     logout: "退出登录",
     loggingOut: "正在退出…",
@@ -347,12 +347,14 @@ const zhCN = {
     },
   },
   settings: {
-    title: "设置",
-    navigationLabel: "设置菜单",
+    personalTitle: "个人设置",
+    personalNavigationLabel: "个人设置菜单",
+    systemTitle: "系统设置",
+    systemNavigationLabel: "系统设置菜单",
     navigation: {
       profile: "个人资料",
-      password: "修改密码",
-      appearance: "外观设置",
+      security: "登录与安全",
+      preferences: "偏好设置",
       storage: "存储设置",
     },
     profile: {
@@ -371,7 +373,6 @@ const zhCN = {
       },
     },
     password: {
-      title: "修改密码",
       formLabel: "修改密码表单",
       currentPassword: "当前密码",
       newPassword: "新密码",
@@ -389,8 +390,27 @@ const zhCN = {
         passwordMismatch: "两次输入的新密码不一致。",
       },
     },
+    security: {
+      title: "登录与安全",
+    },
+    preferences: {
+      title: "偏好设置",
+      formLabel: "偏好设置表单",
+      language: "语言",
+      timeZone: "时区",
+      languages: {
+        zhCN: "简体中文",
+        enUS: "English",
+      },
+      save: "保存",
+      saving: "正在保存…",
+      saveSuccess: "偏好设置已保存。",
+      saveError: "保存偏好设置失败，请重试。",
+      validation: {
+        timeZoneRequired: "请选择时区。",
+      },
+    },
     appearance: {
-      title: "外观设置",
       theme: "主题",
       options: {
         system: "跟随系统",

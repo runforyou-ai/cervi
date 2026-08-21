@@ -20,6 +20,7 @@ import {
   TestS3Setting,
   UpdateContact,
   UpdateProfile,
+  UpdateUserPreferences,
   UpdateWebsiteChannel,
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -94,6 +95,8 @@ export const testS3Setting = bind(TestS3Setting)
 export const updateProfile = bind(UpdateProfile)
 /** 修改当前用户的登录密码。 */
 export const changePassword = bind(ChangePassword)
+/** 修改当前用户的语言和时区设置。 */
+export const updateUserPreferences = bind(UpdateUserPreferences)
 
 const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)

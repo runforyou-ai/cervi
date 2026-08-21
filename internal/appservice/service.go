@@ -10,6 +10,7 @@ type Backend interface {
 	LoadIdentity(context.Context, RequestMeta) (Identity, error)
 	UpdateProfile(context.Context, RequestMeta, ProfileInput) (User, error)
 	ChangePassword(context.Context, RequestMeta, ChangePasswordInput) error
+	UpdateUserPreferences(context.Context, RequestMeta, UserPreferencesInput) (User, error)
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
 	ListWebsiteChannels(context.Context, RequestMeta, bool) (WebsiteChannelList, error)
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
@@ -91,6 +92,11 @@ func (s *Service) UpdateProfile(ctx context.Context, meta RequestMeta, input Pro
 // ChangePassword 核验当前密码并保存新密码。
 func (s *Service) ChangePassword(ctx context.Context, meta RequestMeta, input ChangePasswordInput) error {
 	return s.backend.ChangePassword(ctx, meta, input)
+}
+
+// UpdateUserPreferences 保存当前用户的语言和时区设置。
+func (s *Service) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (User, error) {
+	return s.backend.UpdateUserPreferences(ctx, meta, input)
 }
 
 // LoadInbox 返回当前用户的统一收件箱。

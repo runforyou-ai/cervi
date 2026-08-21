@@ -80,6 +80,14 @@ function WorkspaceMenu() {
         label={t("channels")}
         active={location.pathname.startsWith("/channels")}
       />
+      <div className="mt-auto pb-1">
+        <WorkspaceRailItem
+          to="/settings/storage"
+          icon={SettingsIcon}
+          label={t("systemSettings")}
+          active={location.pathname.startsWith("/settings")}
+        />
+      </div>
     </nav>
   )
 }
@@ -153,16 +161,10 @@ export function WorkspaceNavigation({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onSelect={() => navigateFromUserMenu("/settings/profile")}
+              onSelect={() => navigateFromUserMenu("/account/profile")}
             >
               <UserRoundIcon />
-              {t("profile")}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => navigateFromUserMenu("/settings/storage")}
-            >
-              <SettingsIcon />
-              {t("settings")}
+              {t("personalSettings")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

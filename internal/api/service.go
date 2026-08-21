@@ -46,6 +46,7 @@ func NewService(application *appservice.Service) *Service {
 	router.GET("/auth/identity", service.loadIdentity)
 	router.PATCH("/profile", service.updateProfile)
 	router.PATCH("/password", service.changePassword)
+	router.PATCH("/preferences", service.updateUserPreferences)
 	router.GET("/inbox", service.loadInbox)
 	router.GET("/channels/website", service.listWebsiteChannels)
 	router.GET("/channels/website/trash", service.listDeletedWebsiteChannels)
@@ -137,6 +138,16 @@ func (s *Service) changePassword(c *gin.Context) {
 		return
 	}
 	writeEmpty(c, s.application.ChangePassword(c.Request.Context(), requestMeta(c), input))
+}
+
+// updateUserPreferences 保存当前用户的语言和时区设置。
+func (s *Service) updateUserPreferences(c *gin.Context) {
+	var input appservice.UserPreferencesInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	user, err := s.application.UpdateUserPreferences(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, user, err)
 }
 
 func (s *Service) loadInbox(c *gin.Context) {

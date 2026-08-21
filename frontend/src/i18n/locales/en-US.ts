@@ -77,8 +77,8 @@ const enUS = {
     inbox: "Messages",
     contacts: "Contacts",
     channels: "Channels",
-    profile: "Profile",
-    settings: "Settings",
+    personalSettings: "Personal settings",
+    systemSettings: "System settings",
     openUserMenu: "Open the user menu for {{name}}",
     logout: "Log out",
     loggingOut: "Logging out…",
@@ -348,12 +348,14 @@ const enUS = {
     },
   },
   settings: {
-    title: "Settings",
-    navigationLabel: "Settings menu",
+    personalTitle: "Personal settings",
+    personalNavigationLabel: "Personal settings menu",
+    systemTitle: "System settings",
+    systemNavigationLabel: "System settings menu",
     navigation: {
       profile: "Profile",
-      password: "Change password",
-      appearance: "Appearance",
+      security: "Login & security",
+      preferences: "Preferences",
       storage: "Storage",
     },
     profile: {
@@ -372,7 +374,6 @@ const enUS = {
       },
     },
     password: {
-      title: "Change password",
       formLabel: "Change password form",
       currentPassword: "Current password",
       newPassword: "New password",
@@ -390,8 +391,27 @@ const enUS = {
         passwordMismatch: "The new passwords do not match.",
       },
     },
+    security: {
+      title: "Login & security",
+    },
+    preferences: {
+      title: "Preferences",
+      formLabel: "Preferences form",
+      language: "Language",
+      timeZone: "Time zone",
+      languages: {
+        zhCN: "简体中文",
+        enUS: "English",
+      },
+      save: "Save",
+      saving: "Saving…",
+      saveSuccess: "Preferences saved.",
+      saveError: "Could not save preferences. Try again.",
+      validation: {
+        timeZoneRequired: "Select a time zone.",
+      },
+    },
     appearance: {
-      title: "Appearance",
       theme: "Theme",
       options: {
         system: "System",

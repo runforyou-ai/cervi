@@ -16,10 +16,11 @@ import (
 
 type testBackend struct {
 	appservice.Backend
-	lastMeta     appservice.RequestMeta
-	lastUserList appservice.UserListInput
-	lastProfile  appservice.ProfileInput
-	lastPassword appservice.ChangePasswordInput
+	lastMeta        appservice.RequestMeta
+	lastUserList    appservice.UserListInput
+	lastProfile     appservice.ProfileInput
+	lastPassword    appservice.ChangePasswordInput
+	lastPreferences appservice.UserPreferencesInput
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
@@ -61,6 +62,16 @@ func (b *testBackend) ChangePassword(_ context.Context, meta appservice.RequestM
 	b.lastMeta = meta
 	b.lastPassword = input
 	return nil
+}
+
+// UpdateUserPreferences 记录语言和时区输入并返回更新后的用户。
+func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.User, error) {
+	b.lastMeta = meta
+	b.lastPreferences = input
+	identity := testIdentity()
+	identity.User.Locale = input.Locale
+	identity.User.TimeZone = input.TimeZone
+	return identity.User, nil
 }
 
 func (b *testBackend) ListUsers(_ context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
@@ -176,6 +187,25 @@ func TestChangePasswordUsesTypedInput(t *testing.T) {
 	}
 }
 
+// TestUpdateUserPreferencesUsesTypedInput 验证语言和时区请求转换为类型化服务输入。
+func TestUpdateUserPreferencesUsesTypedInput(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	response := doJSON(t, http.MethodPatch, server.URL+"/preferences", appservice.UserPreferencesInput{
+		Locale:   appservice.LocaleEnglishUnitedStates,
+		TimeZone: "America/New_York",
+	}, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
+	}
+	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" {
+		t.Fatalf("preferences input = %#v, meta = %#v", backend.lastPreferences, backend.lastMeta)
+	}
+}
+
 // TestInvalidJSONUsesRequestedLanguage 验证 HTTP 适配层的输入错误使用请求语言。
 func TestInvalidJSONUsesRequestedLanguage(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(&testBackend{})))
@@ -210,7 +240,7 @@ func TestBearerTokenParsing(t *testing.T) {
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
-		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "owner@example.com", DisplayName: "所有者", Role: "owner", Status: "active"},
+		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "owner@example.com", DisplayName: "所有者", Role: "owner", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai"},
 	}
 }
 

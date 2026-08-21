@@ -10,7 +10,10 @@ import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
-import { SettingsPage } from "@/features/settings/settings-page"
+import {
+  PersonalSettingsPage,
+  SystemSettingsPage,
+} from "@/features/settings/settings-page"
 import { WorkspaceLayout } from "@/features/workspace/workspace-layout"
 
 /** 按平台注册登录、工作台和业务页面路由。 */
@@ -37,25 +40,26 @@ export function SharedAppRoutes({
       <Route element={<WorkspaceLayout />}>
         <Route path="/inbox" element={<InboxRoute />} />
         <Route
+          path="/account"
+          element={<Navigate to="/account/profile" replace />}
+        />
+        <Route
+          path="/account/profile"
+          element={<PersonalSettingsPage section="profile" />}
+        />
+        <Route
+          path="/account/security"
+          element={<PersonalSettingsPage section="security" />}
+        />
+        <Route
+          path="/account/preferences"
+          element={<PersonalSettingsPage section="preferences" />}
+        />
+        <Route
           path="/settings"
-          element={<Navigate to="/settings/profile" replace />}
+          element={<Navigate to="/settings/storage" replace />}
         />
-        <Route
-          path="/settings/profile"
-          element={<SettingsPage section="profile" />}
-        />
-        <Route
-          path="/settings/password"
-          element={<SettingsPage section="password" />}
-        />
-        <Route
-          path="/settings/appearance"
-          element={<SettingsPage section="appearance" />}
-        />
-        <Route
-          path="/settings/storage"
-          element={<SettingsPage section="storage" />}
-        />
+        <Route path="/settings/storage" element={<SystemSettingsPage />} />
         <Route
           path="/contacts"
           element={<Navigate to="/contacts/internal" replace />}

@@ -56,11 +56,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		DisplayName:      "所有者",
 		Email:            "owner@example.com",
 		Password:         "password123",
+		Locale:           domain.LocaleEnglishUnitedStates,
+		TimeZone:         "America/New_York",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installed.Identity.User.Role != "owner" || installed.Identity.Organization.Name != "鹿行测试公司" {
+	if installed.Identity.User.Role != "owner" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	currentStatus, err := status.Execute(context.Background())

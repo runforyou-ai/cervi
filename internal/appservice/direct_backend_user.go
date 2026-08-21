@@ -69,6 +69,33 @@ func (b *DirectBackend) ChangePassword(ctx context.Context, meta RequestMeta, in
 	return nil
 }
 
+// UpdateUserPreferences 保存当前用户的语言和时区设置。
+func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (User, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return User{}, err
+	}
+	user, err := b.updateUserPreferences.Execute(ctx, identity, useraction.PreferencesInput{
+		Locale: domain.Locale(input.Locale), TimeZone: input.TimeZone,
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return User{}, ctx.Err()
+		}
+		var validationError *common.FieldError
+		if errors.As(err, &validationError) {
+			return User{}, InvalidError(meta, cervii18n.ErrorValidationFailed, preferencesFieldKeys(validationError.Fields))
+		}
+		if errors.Is(err, common.ErrIdentityInvalid) {
+			return User{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		}
+		slog.Warn("保存语言和时区失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		return User{}, FailedError(meta, cervii18n.ErrorPreferencesUpdateFailed)
+	}
+	slog.Info("语言和时区保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
+	return userFromModel(*user), nil
+}
+
 // ListUsers 返回企业成员列表。
 func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	identity, err := b.authenticate(ctx, meta)
@@ -131,6 +158,15 @@ func passwordFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.
 		useraction.ValidationCurrentPasswordIncorrect: cervii18n.FieldCurrentPasswordIncorrect,
 		useraction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
 		useraction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
+	}
+	return translateValidationFields(fields, keys)
+}
+
+// preferencesFieldKeys 把语言和时区校验错误码映射为本地化文案键。
+func preferencesFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+	keys := map[common.FieldCode]cervii18n.Key{
+		useraction.ValidationLocaleInvalid:   cervii18n.FieldLocaleInvalid,
+		useraction.ValidationTimeZoneInvalid: cervii18n.FieldTimeZoneInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

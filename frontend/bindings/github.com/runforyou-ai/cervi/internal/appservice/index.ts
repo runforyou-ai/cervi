@@ -52,6 +52,7 @@ export type {
     User,
     UserList,
     UserListInput,
+    UserPreferencesInput,
     WebsiteChannel,
     WebsiteChannelChatInterface,
     WebsiteChannelChatInterfaceInput,

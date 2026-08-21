@@ -263,6 +263,8 @@ export interface InstallWorkspaceInput {
     "displayName": string;
     "email": string;
     "password": string;
+    "locale": Locale;
+    "timeZone": string;
 }
 
 /**
@@ -421,6 +423,8 @@ export interface User {
     "displayName": string;
     "role": UserRole;
     "status": UserStatus;
+    "locale": Locale;
+    "timeZone": string;
 }
 
 /**
@@ -440,6 +444,14 @@ export interface UserListInput {
     "role"?: UserRole | null;
     "page": number;
     "pageSize": number;
+}
+
+/**
+ * UserPreferencesInput 定义当前用户的语言和时区设置。
+ */
+export interface UserPreferencesInput {
+    "locale": Locale;
+    "timeZone": string;
 }
 
 /**

@@ -26,7 +26,10 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 		slog.Warn("PostgreSQL 最大连接数未设置限制")
 	}
 
-	sqlDB := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.DSN)))
+	sqlDB := sql.OpenDB(pgdriver.NewConnector(
+		pgdriver.WithDSN(config.DSN),
+		pgdriver.WithConnParams(map[string]any{"timezone": "UTC"}),
+	))
 	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
 	sqlDB.SetConnMaxLifetime(config.ConnMaxLifetime)

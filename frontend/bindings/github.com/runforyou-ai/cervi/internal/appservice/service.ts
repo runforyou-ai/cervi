@@ -218,6 +218,13 @@ export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileI
 }
 
 /**
+ * UpdateUserPreferences 保存当前用户的语言和时区设置。
+ */
+export function UpdateUserPreferences(meta: $models.RequestMeta, input: $models.UserPreferencesInput): $CancellablePromise<$models.User> {
+    return $Call.ByID(3982988274, meta, input);
+}
+
+/**
  * UpdateWebsiteChannel 修改网站渠道。
  */
 export function UpdateWebsiteChannel(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelInput): $CancellablePromise<$models.WebsiteChannelSummary> {
