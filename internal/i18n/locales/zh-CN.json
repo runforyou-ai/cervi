@@ -36,6 +36,8 @@
   "error.team_create_failed": "创建团队失败。",
   "error.team_update_failed": "保存团队失败。",
   "error.team_delete_failed": "删除团队失败。",
+  "error.team_member_list_failed": "读取可添加成员失败。",
+  "error.team_member_add_failed": "添加团队成员失败。",
   "error.team_member_not_found": "团队成员关系不存在。",
   "error.team_member_remove_failed": "移出团队成员失败。",
   "error.role_not_found": "没有找到这个角色。",

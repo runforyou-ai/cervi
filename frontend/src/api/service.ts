@@ -1,6 +1,7 @@
 /** 绑定应用服务方法，并归一化可空切片。 */
 import {
   ActivateWebsiteChannel,
+  AddTeamMembers,
   ChangePassword,
   CompleteFileUpload,
   CreateContact,
@@ -8,9 +9,9 @@ import {
   CreateRole,
   CreateTeam,
   CreateUser,
+  CreateWebsiteChannel,
   DeactivateUser,
   DeactivateWebsiteChannel,
-  CreateWebsiteChannel,
   DeleteContact,
   DeleteRole,
   DeleteTeam,
@@ -23,11 +24,12 @@ import {
   ListContacts,
   ListRoles,
   ListTeams,
+  ListTeamMemberCandidates,
   ListUsers,
   ListWebsiteChannels,
   LoadInbox,
   ReactivateUser,
-  RemoveTeamMember,
+  RemoveTeamMembers,
   RestoreContact,
   SaveS3Setting,
   SelectProfileImage,
@@ -59,6 +61,9 @@ import {
   type RoleInput,
   type RoleList,
   type TeamListInput,
+  type TeamMemberCandidate,
+  type TeamMemberCandidateInput,
+  type TeamMemberCandidateList,
   type UpdateDirectoryUserInput,
   type UserList,
   type UserListInput,
@@ -83,6 +88,15 @@ export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
 export type UserListQuery = Partial<UserListInput>
 
 export type TeamListQuery = Partial<TeamListInput>
+
+export type TeamMemberCandidateQuery = Partial<TeamMemberCandidateInput>
+
+export type TeamMemberCandidateListData = Omit<
+  TeamMemberCandidateList,
+  "members"
+> & {
+  members: TeamMemberCandidate[]
+}
 
 export type DirectoryUserData = Omit<DirectoryUser, "teams"> & {
   teams: NonNullable<DirectoryUser["teams"]>
@@ -133,8 +147,10 @@ export const createTeam = bind(CreateTeam)
 export const updateTeam = bind(UpdateTeam)
 /** 删除企业团队。 */
 export const deleteTeam = bind(DeleteTeam)
-/** 移出团队成员。 */
-export const removeTeamMember = bind(RemoveTeamMember)
+/** 将企业成员批量加入团队。 */
+export const addTeamMembers = bind(AddTeamMembers)
+/** 将企业成员批量移出团队。 */
+export const removeTeamMembers = bind(RemoveTeamMembers)
 /** 读取对象存储设置。 */
 export const getS3Setting = bind(GetS3Setting)
 /** 修改当前企业名称。 */
@@ -164,6 +180,7 @@ const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)
 const listUsersBound = bind(ListUsers)
 const listTeamsBound = bind(ListTeams)
+const listTeamMemberCandidatesBound = bind(ListTeamMemberCandidates)
 const getUserBound = bind(GetUser)
 const createUserBound = bind(CreateUser)
 const updateUserBound = bind(UpdateUser)
@@ -183,6 +200,26 @@ const updateRoleBound = bind(UpdateRole)
 /** 把可空切片转换为空数组。 */
 function asList<T>(value: T[] | null | undefined): T[] {
   return value ?? []
+}
+
+/** 读取尚未加入团队的企业成员。 */
+export function listTeamMemberCandidates(
+  teamId: string,
+  query: TeamMemberCandidateQuery = {},
+  signal?: AbortSignal,
+): Promise<TeamMemberCandidateListData> {
+  return listTeamMemberCandidatesBound(
+    teamId,
+    {
+      query: query.query ?? "",
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 50,
+    },
+    signal,
+  ).then((output) => ({
+    ...output,
+    members: asList(output.members),
+  }))
 }
 
 /** 归一化企业成员所属团队。 */

@@ -68,6 +68,22 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.User.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
+	defaultTeam := &servermodels.Team{}
+	if err := db.NewSelect().Model(defaultTeam).
+		Where("organization_id = ?", installed.Identity.Organization.ID).
+		Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if defaultTeam.Name != "Customer Service Team" || defaultTeam.CreatedByUserID != installed.Identity.User.ID {
+		t.Fatalf("unexpected default team: %#v", defaultTeam)
+	}
+	defaultTeamMembers, err := db.NewSelect().Model((*servermodels.TeamMember)(nil)).
+		Where("organization_id = ?", installed.Identity.Organization.ID).
+		Where("team_id = ?", defaultTeam.ID).
+		Count(context.Background())
+	if err != nil || defaultTeamMembers != 0 {
+		t.Fatalf("default team member count = %d, error = %v", defaultTeamMembers, err)
+	}
 	currentStatus, err := status.Execute(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -250,8 +266,16 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusActive); err != nil {
 		t.Fatal(err)
 	}
-	if err := teamaction.NewRemoveMemberAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, domain.MemberIdentityTypeUser, createdMember.ID); err != nil {
+	if _, err := teamaction.NewRemoveMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{Type: domain.MemberIdentityTypeUser, ID: createdMember.ID}}); err != nil {
 		t.Fatal(err)
+	}
+	candidates, err := teamaction.NewListMemberCandidatesQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberCandidateInput{Query: createdMember.DisplayName, Page: 1, PageSize: 50})
+	if err != nil || candidates.Page.Total != 1 || len(candidates.Members) != 1 || candidates.Members[0].IdentityID != createdMember.ID {
+		t.Fatalf("team member candidates = %#v, error = %v", candidates, err)
+	}
+	team, err = teamaction.NewAddMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{Type: domain.MemberIdentityTypeUser, ID: createdMember.ID}})
+	if err != nil || team.MemberCount != 1 {
+		t.Fatalf("team after adding member = %#v, error = %v", team, err)
 	}
 	if _, err := useraction.NewUpdateUserAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
 		DisplayName: createdMember.DisplayName, Email: createdMember.Email, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},

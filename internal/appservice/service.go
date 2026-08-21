@@ -33,7 +33,9 @@ type Backend interface {
 	CreateTeam(context.Context, RequestMeta, TeamInput) (Team, error)
 	UpdateTeam(context.Context, RequestMeta, string, TeamInput) (Team, error)
 	DeleteTeam(context.Context, RequestMeta, string) error
-	RemoveTeamMember(context.Context, RequestMeta, string, MemberIdentityType, string) error
+	ListTeamMemberCandidates(context.Context, RequestMeta, string, TeamMemberCandidateInput) (TeamMemberCandidateList, error)
+	AddTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
+	RemoveTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
 	ListContacts(context.Context, RequestMeta, ContactListInput) (ContactList, error)
 	GetContact(context.Context, RequestMeta, string) (Contact, error)
 	CreateContact(context.Context, RequestMeta, ContactInput) (Contact, error)
@@ -255,9 +257,19 @@ func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID strin
 	return s.backend.DeleteTeam(ctx, meta, teamID)
 }
 
-// RemoveTeamMember 移出团队成员。
-func (s *Service) RemoveTeamMember(ctx context.Context, meta RequestMeta, teamID string, identityType MemberIdentityType, identityID string) error {
-	return s.backend.RemoveTeamMember(ctx, meta, teamID, identityType, identityID)
+// ListTeamMemberCandidates 返回尚未加入团队的企业成员。
+func (s *Service) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
+	return s.backend.ListTeamMemberCandidates(ctx, meta, teamID, input)
+}
+
+// AddTeamMembers 将企业成员批量加入团队。
+func (s *Service) AddTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
+	return s.backend.AddTeamMembers(ctx, meta, teamID, input)
+}
+
+// RemoveTeamMembers 将企业成员批量移出团队。
+func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
+	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
 }
 
 // ListContacts 返回联系人列表。

@@ -52,7 +52,9 @@ type DirectBackend struct {
 	createTeam                        *teamaction.CreateTeamAction
 	updateTeam                        *teamaction.UpdateTeamAction
 	deleteTeam                        *teamaction.DeleteTeamAction
-	removeTeamMember                  *teamaction.RemoveMemberAction
+	listTeamMemberCandidates          *teamaction.ListMemberCandidatesQuery
+	addTeamMembers                    *teamaction.AddMembersAction
+	removeTeamMembers                 *teamaction.RemoveMembersAction
 	updateProfile                     *useraction.UpdateProfileAction
 	changePassword                    *useraction.ChangePasswordAction
 	updateUserPreferences             *useraction.UpdatePreferencesAction
@@ -103,7 +105,9 @@ func NewDirectBackend(db *bun.DB, localFiles *filestore.LocalStore) *DirectBacke
 		createTeam:                        teamaction.NewCreateTeamAction(db),
 		updateTeam:                        teamaction.NewUpdateTeamAction(db),
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
-		removeTeamMember:                  teamaction.NewRemoveMemberAction(db),
+		listTeamMemberCandidates:          teamaction.NewListMemberCandidatesQuery(db),
+		addTeamMembers:                    teamaction.NewAddMembersAction(db),
+		removeTeamMembers:                 teamaction.NewRemoveMembersAction(db),
 		updateProfile:                     useraction.NewUpdateProfileAction(db),
 		changePassword:                    useraction.NewChangePasswordAction(db),
 		updateUserPreferences:             useraction.NewUpdatePreferencesAction(db),
