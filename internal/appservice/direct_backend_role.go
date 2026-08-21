@@ -105,7 +105,7 @@ func (b *DirectBackend) roleMutationError(ctx context.Context, meta RequestMeta,
 	return b.roleError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
-// roleError 转换角色读取和删除错误。
+// roleError 转换角色通用操作错误。
 func (b *DirectBackend) roleError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if ctx.Err() != nil {
 		return ctx.Err()

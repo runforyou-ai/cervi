@@ -54,7 +54,7 @@ func normalizeInput(input Input, custom bool) (Input, map[string]ValidationCode)
 		}
 	}
 
-	input.Permissions = input.Permissions[:0]
+	input.Permissions = make([]domain.PermissionCode, 0, len(selected))
 	for _, definition := range domain.PermissionDefinitions() {
 		if _, ok := selected[definition.Code]; ok {
 			input.Permissions = append(input.Permissions, definition.Code)

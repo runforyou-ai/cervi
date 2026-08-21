@@ -43,3 +43,18 @@ func TestNormalizeInputRejectsInvalidFields(t *testing.T) {
 		t.Fatalf("permission validation = %q", fields["permissions"])
 	}
 }
+
+// TestNormalizeInputIgnoresBuiltInMetadata 验证内置角色只校验权限。
+func TestNormalizeInputIgnoresBuiltInMetadata(t *testing.T) {
+	input, fields := normalizeInput(Input{
+		Name:        string(make([]rune, 51)),
+		Description: string(make([]rune, 201)),
+		Permissions: []domain.PermissionCode{domain.PermissionTeamMembersView},
+	}, false)
+	if len(fields) != 0 {
+		t.Fatalf("validation fields = %v, want empty", fields)
+	}
+	if input.Name != "" || input.Description != "" {
+		t.Fatalf("built-in metadata = (%q, %q), want empty", input.Name, input.Description)
+	}
+}
