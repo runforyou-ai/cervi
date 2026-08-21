@@ -38,7 +38,7 @@ function InboxConversationAvatar({ conversation }: { conversation: Conversation 
         <span
           role="img"
           aria-label={t("onlineIndicator")}
-          className="absolute right-0 bottom-0 size-2.5 rounded-full border-2 border-background bg-primary"
+          className="absolute right-0 bottom-0 size-2.5 rounded-full border-2 border-background bg-success"
         />
       ) : null}
     </div>
@@ -255,8 +255,9 @@ function InboxConversationList({
                     : conversation.name
                 }
                 className={cn(
-                  "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-foreground/6",
-                  selectedId === conversation.id && "bg-foreground/12"
+                  "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-accent hover:text-accent-foreground",
+                  selectedId === conversation.id &&
+                    "bg-accent text-accent-foreground"
                 )}
                 onClick={() => onSelect?.(conversation.id)}
               >

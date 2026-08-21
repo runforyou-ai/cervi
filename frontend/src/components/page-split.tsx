@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { NavLink } from "react-router"
 
+import { StatusBadge } from "@/components/status-badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 
@@ -51,7 +52,8 @@ export function PageSplit({
           "min-h-0 shrink-0 flex-col overflow-hidden border-r select-none",
           paneOnNarrowClass[paneOnNarrow],
           paneWidthClass[paneWidth],
-          paneVariant === "nav" && "bg-sidebar text-sidebar-foreground",
+          paneVariant === "nav" &&
+            "border-sidebar-border bg-sidebar-secondary text-sidebar-foreground",
           paneClassName,
         )}
       >
@@ -116,9 +118,9 @@ export function PagePaneLink({
         title={t("comingSoon")}
       >
         <span className="min-w-0 flex-1 truncate">{children}</span>
-        <span className="rounded-sm bg-sidebar-accent px-1.5 py-0.5 text-[10px] text-muted-foreground">
+        <StatusBadge variant="muted">
           {t("comingSoon")}
-        </span>
+        </StatusBadge>
       </span>
     )
   }
@@ -129,9 +131,9 @@ export function PagePaneLink({
       className={({ isActive }) =>
         cn(
           className,
-          "hover:bg-foreground/6 hover:text-sidebar-accent-foreground",
+          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
           isActive &&
-            "bg-foreground/12 font-medium text-sidebar-accent-foreground",
+            "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
         )
       }
     >
