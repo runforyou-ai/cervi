@@ -50,8 +50,10 @@ export async function install(
 /** 检测企业服务器并返回公开企业名称，不保存地址。 */
 export const probeServer = bind(ProbeServer)
 
-/** 保存企业服务器地址并清除本地令牌。 */
+/** 保存企业服务器地址，仅在实际切换服务器时清除本地令牌。 */
 export async function connectServer(serverUrl: string) {
-  await call((meta) => ConnectServer(meta, serverUrl))
-  clearToken()
+  const changed = await call((meta) => ConnectServer(meta, serverUrl))
+  if (changed) {
+    clearToken()
+  }
 }

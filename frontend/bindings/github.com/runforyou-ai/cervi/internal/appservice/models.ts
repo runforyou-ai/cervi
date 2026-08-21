@@ -225,21 +225,6 @@ export interface DirectoryUser {
 }
 
 /**
- * ErrorKind 表示业务失败种类。
- */
-export enum ErrorKind {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    ErrorKindInvalid = "invalid",
-    ErrorKindNotFound = "not_found",
-    ErrorKindUnavailable = "unavailable",
-    ErrorKindFailed = "failed",
-};
-
-/**
  * Identity 定义当前用户及其所属企业。
  */
 export interface Identity {
@@ -374,7 +359,6 @@ export interface Session {
     "state": SessionState;
     "identity"?: Identity | null;
     "organizationName"?: string;
-    "errorKind"?: ErrorKind;
 }
 
 /**

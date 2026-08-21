@@ -9,14 +9,14 @@ import { toast } from "sonner"
 import {
   ContactMethodType,
   ContactStage,
-  ErrorKind,
   isApiError,
-  recoverSession,
+  isNotFoundApiError,
   updateContact,
   type ContactDetail,
   type ContactInput,
   type ContactMethodInput,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -230,12 +230,12 @@ export function ContactDetailView({
       if (recoverSession(error, navigate)) {
         return
       }
+      if (isNotFoundApiError(error)) {
+        console.warn("联系人不存在", { contact_id: detail.contact.id })
+        onNotFound()
+        return
+      }
       if (isApiError(error)) {
-        if (error.kind === ErrorKind.ErrorKindNotFound) {
-          console.warn("联系人不存在", { contact_id: detail.contact.id })
-          onNotFound()
-          return
-        }
         console.warn("保存联系人失败", error)
         toast.error(apiErrorMessage(error, ["displayName", "stage", "methods", "notes"]))
         return

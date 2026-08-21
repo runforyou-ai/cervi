@@ -11,10 +11,10 @@ import { toast } from "sonner"
 import {
   isApiError,
   Locale,
-  recoverSession,
   updateUserPreferences,
   type User,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"

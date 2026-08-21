@@ -8,9 +8,9 @@ import { toast } from "sonner"
 import {
   deleteWebsiteChannel,
   listWebsiteChannels,
-  recoverSession,
   type WebsiteChannelSummary,
 } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
 import {

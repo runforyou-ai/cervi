@@ -11,7 +11,6 @@ export {
     ContactMethodType,
     ContactSort,
     ContactStage,
-    ErrorKind,
     Locale,
     MessageAuthor,
     SessionState,

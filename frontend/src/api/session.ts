@@ -1,16 +1,15 @@
-/** 读取会话入口，并把会话错误转到对应路由。 */
-import type { NavigateFunction } from "react-router"
-
-import {
-  ErrorKind,
-  SessionState,
-} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+/** 读取会话入口和对应路由。 */
+import { SessionState } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { LoadSession } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
-import { call, clearToken, isApiError } from "@/api/client"
+import { call, clearToken } from "@/api/client"
 
-/** 读取当前应进入的会话入口。 */
-export function loadSession(signal?: AbortSignal) {
-  return call((meta) => LoadSession(meta), signal)
+/** 读取当前应进入的会话入口，进入登录状态时清除本地令牌。 */
+export async function loadSession(signal?: AbortSignal) {
+  const session = await call((meta) => LoadSession(meta), signal)
+  if (session.state === SessionState.SessionStateLogin) {
+    clearToken()
+  }
+  return session
 }
 
 /** 将会话状态映射为路由。 */
@@ -25,25 +24,4 @@ export function sessionPath(state: string) {
     default:
       return null
   }
-}
-
-/** 会话未就绪时跳转到对应入口。 */
-export function recoverSession(
-  error: unknown,
-  navigate: NavigateFunction,
-): boolean {
-  if (!isApiError(error)) {
-    return false
-  }
-  const path =
-    sessionPath(error.state) ??
-    (error.kind === ErrorKind.ErrorKindUnavailable ? "/connect" : null)
-  if (!path) {
-    return false
-  }
-  if (error.state === SessionState.SessionStateLogin) {
-    clearToken()
-  }
-  navigate(path, { replace: true })
-  return true
 }

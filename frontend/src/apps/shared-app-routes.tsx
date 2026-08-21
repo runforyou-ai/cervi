@@ -37,7 +37,11 @@ export function SharedAppRoutes({
           <LoginPage allowServerChange={platform === "desktop"} />
         }
       />
-      <Route element={<WorkspaceLayout />}>
+      <Route
+        element={
+          <WorkspaceLayout allowServerChange={platform === "desktop"} />
+        }
+      >
         <Route path="/inbox" element={<InboxRoute />} />
         <Route
           path="/account"
