@@ -16,6 +16,7 @@ import (
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -215,6 +216,45 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if directoryUser.ID != loggedIn.Identity.User.ID || directoryUser.CreatedAt.IsZero() {
 		t.Fatalf("unexpected directory user: %#v", directoryUser)
+	}
+
+	team, err := teamaction.NewCreateTeamAction(db).Execute(context.Background(), loggedIn.Identity, teamaction.Input{Name: "客户成功", Description: "服务客户"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	createdMember, err := useraction.NewCreateUserAction(db).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
+		DisplayName: "团队成员", Email: "member@example.com", Password: "password123", Role: domain.UserRoleMember, TeamIDs: []string{team.ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(createdMember.Teams) != 1 || createdMember.Teams[0].ID != team.ID {
+		t.Fatalf("created member teams = %#v", createdMember.Teams)
+	}
+	teamUsers, err := useraction.NewListUsersQuery(db).Execute(context.Background(), loggedIn.Identity, useraction.ListInput{TeamID: team.ID, Page: 1, PageSize: 50})
+	if err != nil || teamUsers.Page.Total != 1 || len(teamUsers.Users) != 1 {
+		t.Fatalf("team users = %#v, error = %v", teamUsers, err)
+	}
+	if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusActive); err != nil {
+		t.Fatal(err)
+	}
+	if err := teamaction.NewRemoveMemberAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, domain.MemberIdentityTypeUser, createdMember.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := useraction.NewUpdateUserAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
+		DisplayName: createdMember.DisplayName, Email: createdMember.Email, Role: createdMember.Role, TeamIDs: []string{team.ID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := teamaction.NewDeleteTeamAction(db).Execute(context.Background(), loggedIn.Identity, team.ID); err != nil {
+		t.Fatal(err)
+	}
+	memberAfterTeamDelete, err := useraction.NewGetUserQuery(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID)
+	if err != nil || len(memberAfterTeamDelete.Teams) != 0 {
+		t.Fatalf("member after team delete = %#v, error = %v", memberAfterTeamDelete, err)
 	}
 
 	avatar, err := fileaction.NewCreateUploadAction(db).Execute(context.Background(), loggedIn.Identity, domain.FileStorageBackendLocal, fileaction.UploadInput{

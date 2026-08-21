@@ -25,6 +25,15 @@ type Backend interface {
 	ListChannels(context.Context, RequestMeta) (ChannelList, error)
 	ListUsers(context.Context, RequestMeta, UserListInput) (UserList, error)
 	GetUser(context.Context, RequestMeta, string) (DirectoryUser, error)
+	CreateUser(context.Context, RequestMeta, CreateUserInput) (DirectoryUser, error)
+	UpdateUser(context.Context, RequestMeta, string, UpdateDirectoryUserInput) (DirectoryUser, error)
+	DeactivateUser(context.Context, RequestMeta, string) (DirectoryUser, error)
+	ReactivateUser(context.Context, RequestMeta, string) (DirectoryUser, error)
+	ListTeams(context.Context, RequestMeta, TeamListInput) (TeamList, error)
+	CreateTeam(context.Context, RequestMeta, TeamInput) (Team, error)
+	UpdateTeam(context.Context, RequestMeta, string, TeamInput) (Team, error)
+	DeleteTeam(context.Context, RequestMeta, string) error
+	RemoveTeamMember(context.Context, RequestMeta, string, MemberIdentityType, string) error
 	ListContacts(context.Context, RequestMeta, ContactListInput) (ContactList, error)
 	GetContact(context.Context, RequestMeta, string) (Contact, error)
 	CreateContact(context.Context, RequestMeta, ContactInput) (Contact, error)
@@ -204,6 +213,51 @@ func (s *Service) ListUsers(ctx context.Context, meta RequestMeta, input UserLis
 // GetUser 返回企业成员详情。
 func (s *Service) GetUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
 	return s.backend.GetUser(ctx, meta, userID)
+}
+
+// CreateUser 创建企业成员账号。
+func (s *Service) CreateUser(ctx context.Context, meta RequestMeta, input CreateUserInput) (DirectoryUser, error) {
+	return s.backend.CreateUser(ctx, meta, input)
+}
+
+// UpdateUser 修改企业成员资料、角色和所属团队。
+func (s *Service) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateDirectoryUserInput) (DirectoryUser, error) {
+	return s.backend.UpdateUser(ctx, meta, userID, input)
+}
+
+// DeactivateUser 停用企业成员账号。
+func (s *Service) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
+	return s.backend.DeactivateUser(ctx, meta, userID)
+}
+
+// ReactivateUser 恢复企业成员账号。
+func (s *Service) ReactivateUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
+	return s.backend.ReactivateUser(ctx, meta, userID)
+}
+
+// ListTeams 返回企业团队列表。
+func (s *Service) ListTeams(ctx context.Context, meta RequestMeta, input TeamListInput) (TeamList, error) {
+	return s.backend.ListTeams(ctx, meta, input)
+}
+
+// CreateTeam 创建企业团队。
+func (s *Service) CreateTeam(ctx context.Context, meta RequestMeta, input TeamInput) (Team, error) {
+	return s.backend.CreateTeam(ctx, meta, input)
+}
+
+// UpdateTeam 修改企业团队。
+func (s *Service) UpdateTeam(ctx context.Context, meta RequestMeta, teamID string, input TeamInput) (Team, error) {
+	return s.backend.UpdateTeam(ctx, meta, teamID, input)
+}
+
+// DeleteTeam 删除企业团队及其成员关系。
+func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID string) error {
+	return s.backend.DeleteTeam(ctx, meta, teamID)
+}
+
+// RemoveTeamMember 移出团队成员。
+func (s *Service) RemoveTeamMember(ctx context.Context, meta RequestMeta, teamID string, identityType MemberIdentityType, identityID string) error {
+	return s.backend.RemoveTeamMember(ctx, meta, teamID, identityType, identityID)
 }
 
 // ListContacts 返回联系人列表。

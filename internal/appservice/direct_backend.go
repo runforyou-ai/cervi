@@ -15,6 +15,7 @@ import (
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/filestore"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -45,6 +46,14 @@ type DirectBackend struct {
 	listChannels                      *channelaction.ListChannelsQuery
 	listUsers                         *useraction.ListUsersQuery
 	getUser                           *useraction.GetUserQuery
+	createUser                        *useraction.CreateUserAction
+	updateUser                        *useraction.UpdateUserAction
+	updateUserStatus                  *useraction.UpdateStatusAction
+	listTeams                         *teamaction.ListTeamsQuery
+	createTeam                        *teamaction.CreateTeamAction
+	updateTeam                        *teamaction.UpdateTeamAction
+	deleteTeam                        *teamaction.DeleteTeamAction
+	removeTeamMember                  *teamaction.RemoveMemberAction
 	updateProfile                     *useraction.UpdateProfileAction
 	changePassword                    *useraction.ChangePasswordAction
 	updateUserPreferences             *useraction.UpdatePreferencesAction
@@ -89,6 +98,14 @@ func NewDirectBackend(db *bun.DB, localFiles *filestore.LocalStore) *DirectBacke
 		listChannels:                      channelaction.NewListChannelsQuery(db),
 		listUsers:                         useraction.NewListUsersQuery(db),
 		getUser:                           useraction.NewGetUserQuery(db),
+		createUser:                        useraction.NewCreateUserAction(db),
+		updateUser:                        useraction.NewUpdateUserAction(db),
+		updateUserStatus:                  useraction.NewUpdateStatusAction(db),
+		listTeams:                         teamaction.NewListTeamsQuery(db),
+		createTeam:                        teamaction.NewCreateTeamAction(db),
+		updateTeam:                        teamaction.NewUpdateTeamAction(db),
+		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
+		removeTeamMember:                  teamaction.NewRemoveMemberAction(db),
 		updateProfile:                     useraction.NewUpdateProfileAction(db),
 		changePassword:                    useraction.NewChangePasswordAction(db),
 		updateUserPreferences:             useraction.NewUpdatePreferencesAction(db),

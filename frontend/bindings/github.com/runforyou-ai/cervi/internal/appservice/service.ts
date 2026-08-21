@@ -57,10 +57,31 @@ export function CreateRole(meta: $models.RequestMeta, input: $models.RoleInput):
 }
 
 /**
+ * CreateTeam 创建企业团队。
+ */
+export function CreateTeam(meta: $models.RequestMeta, input: $models.TeamInput): $CancellablePromise<$models.Team> {
+    return $Call.ByID(3796040671, meta, input);
+}
+
+/**
+ * CreateUser 创建企业成员账号。
+ */
+export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserInput): $CancellablePromise<$models.DirectoryUser> {
+    return $Call.ByID(2291845417, meta, input);
+}
+
+/**
  * CreateWebsiteChannel 创建网站渠道。
  */
 export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.WebsiteChannelInput): $CancellablePromise<$models.WebsiteChannelSummary> {
     return $Call.ByID(372928498, meta, input);
+}
+
+/**
+ * DeactivateUser 停用企业成员账号。
+ */
+export function DeactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.DirectoryUser> {
+    return $Call.ByID(3624391107, meta, userID);
 }
 
 /**
@@ -75,6 +96,13 @@ export function DeleteContact(meta: $models.RequestMeta, contactID: string): $Ca
  */
 export function DeleteRole(meta: $models.RequestMeta, roleID: string): $CancellablePromise<void> {
     return $Call.ByID(3214219121, meta, roleID);
+}
+
+/**
+ * DeleteTeam 删除企业团队及其成员关系。
+ */
+export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $CancellablePromise<void> {
+    return $Call.ByID(798533364, meta, teamID);
 }
 
 /**
@@ -155,6 +183,13 @@ export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
+ * ListTeams 返回企业团队列表。
+ */
+export function ListTeams(meta: $models.RequestMeta, input: $models.TeamListInput): $CancellablePromise<$models.TeamList> {
+    return $Call.ByID(3776706348, meta, input);
+}
+
+/**
  * ListUsers 返回企业成员列表。
  */
 export function ListUsers(meta: $models.RequestMeta, input: $models.UserListInput): $CancellablePromise<$models.UserList> {
@@ -208,6 +243,20 @@ export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
  */
 export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<$models.InstallationStatus> {
     return $Call.ByID(885726575, meta, serverURL);
+}
+
+/**
+ * ReactivateUser 恢复企业成员账号。
+ */
+export function ReactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.DirectoryUser> {
+    return $Call.ByID(2986051725, meta, userID);
+}
+
+/**
+ * RemoveTeamMember 移出团队成员。
+ */
+export function RemoveTeamMember(meta: $models.RequestMeta, teamID: string, identityType: $models.MemberIdentityType, identityID: string): $CancellablePromise<void> {
+    return $Call.ByID(2159012173, meta, teamID, identityType, identityID);
 }
 
 /**
@@ -278,6 +327,20 @@ export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileI
  */
 export function UpdateRole(meta: $models.RequestMeta, roleID: string, input: $models.RoleInput): $CancellablePromise<$models.Role> {
     return $Call.ByID(747750943, meta, roleID, input);
+}
+
+/**
+ * UpdateTeam 修改企业团队。
+ */
+export function UpdateTeam(meta: $models.RequestMeta, teamID: string, input: $models.TeamInput): $CancellablePromise<$models.Team> {
+    return $Call.ByID(2807681714, meta, teamID, input);
+}
+
+/**
+ * UpdateUser 修改企业成员资料、角色和所属团队。
+ */
+export function UpdateUser(meta: $models.RequestMeta, userID: string, input: $models.UpdateDirectoryUserInput): $CancellablePromise<$models.DirectoryUser> {
+    return $Call.ByID(2151183832, meta, userID, input);
 }
 
 /**

@@ -19,6 +19,12 @@ type testBackend struct {
 	lastMeta         appservice.RequestMeta
 	lastOrganization appservice.OrganizationInput
 	lastUserList     appservice.UserListInput
+	lastCreateUser   appservice.CreateUserInput
+	lastUpdateUser   appservice.UpdateDirectoryUserInput
+	lastTeamList     appservice.TeamListInput
+	lastTeam         appservice.TeamInput
+	lastIdentityType appservice.MemberIdentityType
+	lastIdentityID   string
 	lastProfile      appservice.ProfileInput
 	lastFileUpload   appservice.FileUploadInput
 	lastFileID       string
@@ -107,6 +113,38 @@ func (b *testBackend) ListUsers(_ context.Context, meta appservice.RequestMeta, 
 	return appservice.UserList{Users: []appservice.DirectoryUser{}, Page: appservice.PageInfo{Number: input.Page, Size: input.PageSize}}, nil
 }
 
+func (b *testBackend) CreateUser(_ context.Context, meta appservice.RequestMeta, input appservice.CreateUserInput) (appservice.DirectoryUser, error) {
+	b.lastMeta = meta
+	b.lastCreateUser = input
+	return appservice.DirectoryUser{ID: "user-2", DisplayName: input.DisplayName, Email: input.Email, Role: input.Role, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
+}
+
+func (b *testBackend) UpdateUser(_ context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateDirectoryUserInput) (appservice.DirectoryUser, error) {
+	b.lastMeta = meta
+	b.lastUpdateUser = input
+	return appservice.DirectoryUser{ID: userID, DisplayName: input.DisplayName, Email: input.Email, Role: input.Role, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
+}
+
+func (b *testBackend) ListTeams(_ context.Context, meta appservice.RequestMeta, input appservice.TeamListInput) (appservice.TeamList, error) {
+	b.lastMeta = meta
+	b.lastTeamList = input
+	return appservice.TeamList{Teams: []appservice.Team{}, Page: appservice.PageInfo{Number: input.Page, Size: input.PageSize}}, nil
+}
+
+func (b *testBackend) CreateTeam(_ context.Context, meta appservice.RequestMeta, input appservice.TeamInput) (appservice.Team, error) {
+	b.lastMeta = meta
+	b.lastTeam = input
+	return appservice.Team{ID: "team-1", Name: input.Name, Description: input.Description}, nil
+}
+
+// RemoveTeamMember 记录测试中的团队身份移出参数。
+func (b *testBackend) RemoveTeamMember(_ context.Context, meta appservice.RequestMeta, _ string, identityType appservice.MemberIdentityType, identityID string) error {
+	b.lastMeta = meta
+	b.lastIdentityType = identityType
+	b.lastIdentityID = identityID
+	return nil
+}
+
 // UpdateOrganization 保存测试企业名称。
 func (b *testBackend) UpdateOrganization(_ context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	b.lastMeta = meta
@@ -173,13 +211,46 @@ func TestListQueryIsConvertedToTypedInput(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 
-	response := doJSON(t, http.MethodGet, server.URL+"/users?query=lin&status=active&page=2&pageSize=25", nil, "test-token")
+	response := doJSON(t, http.MethodGet, server.URL+"/users?query=lin&status=active&teamId=0198ddee-c056-7bc5-a1d9-586f878ee965&page=2&pageSize=25", nil, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
-	if backend.lastUserList.Query != "lin" || backend.lastUserList.Status == nil || *backend.lastUserList.Status != "active" || backend.lastUserList.Page != 2 || backend.lastUserList.PageSize != 25 {
+	if backend.lastUserList.Query != "lin" || backend.lastUserList.Status == nil || *backend.lastUserList.Status != "active" || backend.lastUserList.TeamID == "" || backend.lastUserList.Page != 2 || backend.lastUserList.PageSize != 25 {
 		t.Fatalf("typed input = %#v", backend.lastUserList)
+	}
+}
+
+// TestMemberAndTeamMutationsUseTypedContracts 验证成员和团队写入使用类型化契约。
+func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	memberResponse := doJSON(t, http.MethodPost, server.URL+"/users", appservice.CreateUserInput{
+		DisplayName: "林晓", Email: "lin@example.com", Password: "password123", Role: appservice.UserRoleMember, TeamIDs: []string{"team-1"},
+	}, "test-token")
+	defer memberResponse.Body.Close()
+	if memberResponse.StatusCode != http.StatusCreated || backend.lastCreateUser.DisplayName != "林晓" || len(backend.lastCreateUser.TeamIDs) != 1 {
+		t.Fatalf("status = %d, input = %#v", memberResponse.StatusCode, backend.lastCreateUser)
+	}
+
+	teamResponse := doJSON(t, http.MethodPost, server.URL+"/teams", appservice.TeamInput{Name: "客户成功", Description: "服务客户"}, "test-token")
+	defer teamResponse.Body.Close()
+	if teamResponse.StatusCode != http.StatusCreated || backend.lastTeam.Name != "客户成功" {
+		t.Fatalf("status = %d, input = %#v", teamResponse.StatusCode, backend.lastTeam)
+	}
+
+	listResponse := doJSON(t, http.MethodGet, server.URL+"/teams?query=客户&page=2&pageSize=20", nil, "test-token")
+	defer listResponse.Body.Close()
+	if listResponse.StatusCode != http.StatusOK || backend.lastTeamList.Query != "客户" || backend.lastTeamList.Page != 2 || backend.lastTeamList.PageSize != 20 {
+		t.Fatalf("status = %d, input = %#v", listResponse.StatusCode, backend.lastTeamList)
+	}
+
+	removeResponse := doJSON(t, http.MethodDelete, server.URL+"/teams/team-1/members/agent/agent-2", nil, "test-token")
+	defer removeResponse.Body.Close()
+	if removeResponse.StatusCode != http.StatusNoContent || backend.lastIdentityType != appservice.MemberIdentityTypeAgent || backend.lastIdentityID != "agent-2" {
+		t.Fatalf("status = %d, identity type = %q, identity id = %q", removeResponse.StatusCode, backend.lastIdentityType, backend.lastIdentityID)
 	}
 }
 

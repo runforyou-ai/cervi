@@ -5,8 +5,8 @@ import "testing"
 // TestPermissionDefinitionsExcludeInbox 验证权限目录只包含当前可配置功能且不定义收件箱权限。
 func TestPermissionDefinitionsExcludeInbox(t *testing.T) {
 	definitions := PermissionDefinitions()
-	if len(definitions) != 11 {
-		t.Fatalf("permission count = %d, want 11", len(definitions))
+	if len(definitions) != 12 {
+		t.Fatalf("permission count = %d, want 12", len(definitions))
 	}
 	for _, definition := range definitions {
 		if definition.Code == "" || definition.Resource == "" || definition.Level == "" {

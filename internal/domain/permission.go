@@ -7,6 +7,7 @@ const (
 	PermissionExternalContactsView   PermissionCode = "external_contacts.view"
 	PermissionExternalContactsManage PermissionCode = "external_contacts.manage"
 	PermissionTeamMembersView        PermissionCode = "team_members.view"
+	PermissionTeamMembersManage      PermissionCode = "team_members.manage"
 	PermissionChannelsView           PermissionCode = "channels.view"
 	PermissionChannelsManage         PermissionCode = "channels.manage"
 	PermissionRolesView              PermissionCode = "roles.view"
@@ -48,6 +49,7 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionExternalContactsView, Resource: PermissionResourceExternalContacts, Level: PermissionLevelView},
 	{Code: PermissionExternalContactsManage, Resource: PermissionResourceExternalContacts, Level: PermissionLevelManage},
 	{Code: PermissionTeamMembersView, Resource: PermissionResourceTeamMembers, Level: PermissionLevelView},
+	{Code: PermissionTeamMembersManage, Resource: PermissionResourceTeamMembers, Level: PermissionLevelManage},
 	{Code: PermissionChannelsView, Resource: PermissionResourceChannels, Level: PermissionLevelView},
 	{Code: PermissionChannelsManage, Resource: PermissionResourceChannels, Level: PermissionLevelManage},
 	{Code: PermissionRolesView, Resource: PermissionResourceRoles, Level: PermissionLevelView},

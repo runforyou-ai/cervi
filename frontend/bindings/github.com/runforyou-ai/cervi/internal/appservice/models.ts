@@ -212,6 +212,17 @@ export interface Conversation {
 }
 
 /**
+ * CreateUserInput 定义新增企业成员字段。
+ */
+export interface CreateUserInput {
+    "displayName": string;
+    "email": string;
+    "password": string;
+    "role": UserRole;
+    "teamIds": string[] | null;
+}
+
+/**
  * DirectoryUser 定义企业成员目录字段。
  */
 export interface DirectoryUser {
@@ -221,6 +232,7 @@ export interface DirectoryUser {
     "role": UserRole;
     "status": UserStatus;
     "workStatus": WorkStatus;
+    "teams": TeamSummary[] | null;
     "createdAt": string;
 }
 
@@ -333,6 +345,19 @@ export interface LoginInput {
 }
 
 /**
+ * MemberIdentityType 表示可以加入团队的一等身份类型。
+ */
+export enum MemberIdentityType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MemberIdentityTypeUser = "user",
+    MemberIdentityTypeAgent = "agent",
+};
+
+/**
  * Message 定义收件箱会话中的消息。
  */
 export interface Message {
@@ -391,6 +416,7 @@ export enum PermissionCode {
     PermissionExternalContactsView = "external_contacts.view",
     PermissionExternalContactsManage = "external_contacts.manage",
     PermissionTeamMembersView = "team_members.view",
+    PermissionTeamMembersManage = "team_members.manage",
     PermissionChannelsView = "channels.view",
     PermissionChannelsManage = "channels.manage",
     PermissionRolesView = "roles.view",
@@ -573,6 +599,61 @@ export enum StorageProvider {
 };
 
 /**
+ * Team 定义团队详情。
+ */
+export interface Team {
+    "id": string;
+    "name": string;
+    "description": string;
+    "memberCount": number;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * TeamInput 定义团队可编辑字段。
+ */
+export interface TeamInput {
+    "name": string;
+    "description": string;
+}
+
+/**
+ * TeamList 定义团队分页结果。
+ */
+export interface TeamList {
+    "teams": Team[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * TeamListInput 定义团队列表查询条件。
+ */
+export interface TeamListInput {
+    "query": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * TeamSummary 定义团队选择项和成员所属团队字段。
+ */
+export interface TeamSummary {
+    "id": string;
+    "name": string;
+}
+
+/**
+ * UpdateDirectoryUserInput 定义企业成员可编辑字段。
+ */
+export interface UpdateDirectoryUserInput {
+    "displayName": string;
+    "email": string;
+    "role": UserRole;
+    "teamIds": string[] | null;
+}
+
+/**
  * User 定义当前企业成员信息。
  */
 export interface User {
@@ -603,6 +684,7 @@ export interface UserListInput {
     "query": string;
     "status"?: UserStatus | null;
     "role"?: UserRole | null;
+    "teamId": string;
     "page": number;
     "pageSize": number;
 }

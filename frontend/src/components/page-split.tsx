@@ -76,18 +76,23 @@ export function PageSplit({
 export function PagePaneNav({
   label,
   title,
+  action,
   children,
 }: {
   label: string
   title?: string
+  action?: ReactNode
   children: ReactNode
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {title ? (
-        <h2 className="shrink-0 px-4 pt-5 pb-2 text-xl font-semibold tracking-tight">
-          {title}
-        </h2>
+        <div className="flex shrink-0 items-center gap-2 px-4 pt-5 pb-2">
+          <h2 className="min-w-0 flex-1 truncate text-xl font-semibold tracking-tight">
+            {title}
+          </h2>
+          {action}
+        </div>
       ) : null}
       <ScrollArea className="min-h-0 flex-1">
         <nav className="flex flex-col gap-1 p-3" aria-label={label}>
@@ -118,9 +123,7 @@ export function PagePaneLink({
         title={t("comingSoon")}
       >
         <span className="min-w-0 flex-1 truncate">{children}</span>
-        <StatusBadge variant="muted">
-          {t("comingSoon")}
-        </StatusBadge>
+        <StatusBadge variant="muted">{t("comingSoon")}</StatusBadge>
       </span>
     )
   }
