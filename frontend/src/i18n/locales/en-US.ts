@@ -666,7 +666,10 @@ const enUS = {
         modelIdentifierTooLong: "The model ID cannot exceed 200 characters.",
         modelNameRequired: "Enter a model name.",
         modelNameTooLong: "The model name cannot exceed 200 characters.",
-        tokenCountInvalid: "Enter a positive integer or use K or M format.",
+        contextWindowInvalid:
+          "Context window must be positive, such as 131072, 256K, or 1M.",
+        maxOutputTokensInvalid:
+          "Maximum output tokens must be positive, such as 8192, 64K, or 1M.",
         modelIdentifierDuplicate: "Model IDs must be unique.",
       },
     },

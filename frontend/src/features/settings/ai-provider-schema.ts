@@ -33,7 +33,8 @@ export function createAIProviderSchema(messages: {
   modelIdentifierTooLong: string
   modelNameRequired: string
   modelNameTooLong: string
-  tokenCountInvalid: string
+  contextWindowInvalid: string
+  maxOutputTokensInvalid: string
   modelIdentifierDuplicate: string
 }) {
   return z.object({
@@ -71,14 +72,14 @@ export function createAIProviderSchema(messages: {
             .trim()
             .refine(
               (value) => parseTokenCount(value) !== null,
-              messages.tokenCountInvalid,
+              messages.contextWindowInvalid,
             ),
           maxOutputTokens: z
             .string()
             .trim()
             .refine(
               (value) => parseTokenCount(value) !== null,
-              messages.tokenCountInvalid,
+              messages.maxOutputTokensInvalid,
             ),
         }),
       )

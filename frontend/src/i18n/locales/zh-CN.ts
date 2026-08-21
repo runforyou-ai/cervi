@@ -654,7 +654,9 @@ const zhCN = {
         modelIdentifierTooLong: "模型标识不能超过 200 个字符。",
         modelNameRequired: "请输入模型名称。",
         modelNameTooLong: "模型名称不能超过 200 个字符。",
-        tokenCountInvalid: "请输入正整数，或使用 K、M 格式。",
+        contextWindowInvalid: "上下文窗口必须是正数，例如 131072、256K 或 1M。",
+        maxOutputTokensInvalid:
+          "最大输出 token 数必须是正数，例如 8192、64K 或 1M。",
         modelIdentifierDuplicate: "模型标识不能重复。",
       },
     },

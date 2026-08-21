@@ -87,7 +87,10 @@ export function AIProviderFormPage({ mode }: { mode: "create" | "edit" }) {
         ),
         modelNameRequired: t("aiProviders.validation.modelNameRequired"),
         modelNameTooLong: t("aiProviders.validation.modelNameTooLong"),
-        tokenCountInvalid: t("aiProviders.validation.tokenCountInvalid"),
+        contextWindowInvalid: t("aiProviders.validation.contextWindowInvalid"),
+        maxOutputTokensInvalid: t(
+          "aiProviders.validation.maxOutputTokensInvalid",
+        ),
         modelIdentifierDuplicate: t(
           "aiProviders.validation.modelIdentifierDuplicate",
         ),
