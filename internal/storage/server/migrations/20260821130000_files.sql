@@ -13,9 +13,9 @@ CREATE TABLE files (
     status              text NOT NULL DEFAULT 'pending',
     etag                text,
     uploaded_at         timestamptz,
+    expires_at          timestamptz,
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
-    deleted_at          timestamptz
+    updated_at          timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE UNIQUE INDEX files_storage_key_unique
@@ -23,6 +23,10 @@ CREATE UNIQUE INDEX files_storage_key_unique
 
 CREATE INDEX files_organization_status_created_index
     ON files (organization_id, status, created_at DESC);
+
+CREATE INDEX files_status_expires_index
+    ON files (status, expires_at)
+    WHERE expires_at IS NOT NULL;
 
 -- +goose Down
 DROP TABLE files;

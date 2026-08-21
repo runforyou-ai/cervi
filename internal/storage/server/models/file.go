@@ -24,7 +24,7 @@ type File struct {
 	Status          string     `bun:"status"`
 	ETag            *string    `bun:"etag"`
 	UploadedAt      *time.Time `bun:"uploaded_at"`
+	ExpiresAt       *time.Time `bun:"expires_at"`
 	CreatedAt       time.Time  `bun:"created_at"`
 	UpdatedAt       time.Time  `bun:"updated_at"`
-	DeletedAt       *time.Time `bun:"deleted_at"`
 }

@@ -5,6 +5,7 @@ package file
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -36,6 +37,7 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 		return nil, fmt.Errorf("invalid file storage backend %q", backend)
 	}
 	id := uuid.NewString()
+	expiresAt := time.Now().UTC().Add(temporaryFileLifetime)
 	record := &servermodels.File{
 		ID:              id,
 		OrganizationID:  identity.Organization.ID,
@@ -47,6 +49,7 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 		ContentType:     input.ContentType,
 		ByteSize:        input.ByteSize,
 		Status:          string(domain.FileStatusPending),
+		ExpiresAt:       &expiresAt,
 	}
 	if _, err := a.db.NewInsert().Model(record).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("create file upload: %w", err)

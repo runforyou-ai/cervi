@@ -19,6 +19,8 @@ const (
 type FileStatus string
 
 const (
-	FileStatusPending FileStatus = "pending"
-	FileStatusReady   FileStatus = "ready"
+	FileStatusPending  FileStatus = "pending"
+	FileStatusUploaded FileStatus = "uploaded"
+	FileStatusActive   FileStatus = "active"
+	FileStatusDeleting FileStatus = "deleting"
 )

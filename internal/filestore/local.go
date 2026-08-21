@@ -106,6 +106,18 @@ func (s *LocalStore) Stat(key string) (os.FileInfo, error) {
 	return os.Stat(path)
 }
 
+// Delete 删除本地文件，文件不存在时直接成功。
+func (s *LocalStore) Delete(key string) error {
+	path, err := s.path(key)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("delete local file: %w", err)
+	}
+	return nil
+}
+
 // path 将受控存储键转换为本地绝对路径。
 func (s *LocalStore) path(key string) (string, error) {
 	cleaned := filepath.Clean(filepath.FromSlash(strings.TrimSpace(key)))

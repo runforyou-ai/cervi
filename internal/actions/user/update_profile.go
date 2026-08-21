@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -41,6 +42,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 
 	user := &servermodels.User{}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var previousAvatarFileID *string
 		query := tx.NewUpdate().
 			Model(user).
 			Set("display_name = ?", input.DisplayName).
@@ -50,19 +52,48 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			if !common.ValidUUID(input.AvatarFileID) {
 				return fileaction.ErrFileNotFound
 			}
+			currentUser := &servermodels.User{}
+			if err := tx.NewSelect().Model(currentUser).
+				Column("avatar_file_id").
+				Where("u.id = ?", identity.User.ID).
+				Where("u.organization_id = ?", identity.Organization.ID).
+				For("UPDATE").
+				Scan(ctx); errors.Is(err, sql.ErrNoRows) {
+				return common.ErrIdentityInvalid
+			} else if err != nil {
+				return err
+			}
+			previousAvatarFileID = currentUser.AvatarFileID
+
 			file := &servermodels.File{}
 			if err := tx.NewSelect().Model(file).
-				Column("id").
+				Column("id", "status", "expires_at").
 				Where("f.id = ?", input.AvatarFileID).
 				Where("f.organization_id = ?", identity.Organization.ID).
 				Where("f.purpose = ?", domain.FilePurposeUserAvatar).
-				Where("f.status = ?", domain.FileStatusReady).
-				Where("f.deleted_at IS NULL").
+				For("UPDATE").
 				Scan(ctx); err != nil {
 				if errors.Is(err, sql.ErrNoRows) {
 					return fileaction.ErrFileNotFound
 				}
 				return err
+			}
+			sameAvatar := previousAvatarFileID != nil && *previousAvatarFileID == file.ID
+			if file.Status == string(domain.FileStatusUploaded) {
+				if file.ExpiresAt == nil || !file.ExpiresAt.After(time.Now().UTC()) {
+					return fileaction.ErrFileNotFound
+				}
+				if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
+					Set("status = ?", domain.FileStatusActive).
+					Set("expires_at = NULL").
+					Set("updated_at = now()").
+					Where("id = ?", file.ID).
+					Where("status = ?", domain.FileStatusUploaded).
+					Exec(ctx); err != nil {
+					return err
+				}
+			} else if file.Status != string(domain.FileStatusActive) || !sameAvatar {
+				return fileaction.ErrFileNotFound
 			}
 			query = query.Set("avatar_file_id = ?", file.ID)
 		}
@@ -80,6 +111,18 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		}
 		if rows == 0 {
 			return common.ErrIdentityInvalid
+		}
+		if previousAvatarFileID != nil && *previousAvatarFileID != input.AvatarFileID {
+			if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
+				Set("status = ?", domain.FileStatusDeleting).
+				Set("expires_at = now()").
+				Set("updated_at = now()").
+				Where("id = ?", *previousAvatarFileID).
+				Where("organization_id = ?", identity.Organization.ID).
+				Where("status = ?", domain.FileStatusActive).
+				Exec(ctx); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

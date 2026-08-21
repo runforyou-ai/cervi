@@ -80,6 +80,15 @@ func Stat(ctx context.Context, config S3Config, key string) (ObjectInfo, error) 
 	return ObjectInfo{ByteSize: aws.ToInt64(output.ContentLength), ContentType: aws.ToString(output.ContentType), ETag: aws.ToString(output.ETag)}, nil
 }
 
+// Delete 删除对象存储文件。
+func Delete(ctx context.Context, config S3Config, key string) error {
+	_, err := newS3Client(config).DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(config.Bucket),
+		Key:    aws.String(key),
+	})
+	return err
+}
+
 // newS3Client 创建 S3 兼容客户端。
 func newS3Client(config S3Config) *s3.Client {
 	return s3.New(s3.Options{

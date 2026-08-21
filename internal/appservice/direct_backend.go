@@ -60,7 +60,7 @@ type DirectBackend struct {
 	testS3Setting                     *settingaction.TestS3SettingAction
 	createFileUpload                  *fileaction.CreateUploadAction
 	getFile                           *fileaction.GetQuery
-	markFileReady                     *fileaction.MarkReadyAction
+	markFileUploaded                  *fileaction.MarkUploadedAction
 	localFiles                        *filestore.LocalStore
 }
 
@@ -99,7 +99,7 @@ func NewDirectBackend(db *bun.DB, localFiles *filestore.LocalStore) *DirectBacke
 		testS3Setting:                     settingaction.NewTestS3SettingAction(),
 		createFileUpload:                  fileaction.NewCreateUploadAction(db),
 		getFile:                           fileaction.NewGetQuery(db),
-		markFileReady:                     fileaction.NewMarkReadyAction(db),
+		markFileUploaded:                  fileaction.NewMarkUploadedAction(db),
 		localFiles:                        localFiles,
 	}
 }

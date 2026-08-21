@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
@@ -62,8 +63,17 @@ func (b *DirectBackend) CompleteFileUpload(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
-	if record.Status == string(domain.FileStatusReady) {
+	if record.Status == string(domain.FileStatusActive) {
 		return fileFromModel(record), nil
+	}
+	if record.Status == string(domain.FileStatusUploaded) {
+		if record.ExpiresAt != nil && record.ExpiresAt.After(time.Now().UTC()) {
+			return fileFromModel(record), nil
+		}
+		return File{}, b.fileOperationError(ctx, meta, fileaction.ErrFileNotFound, cervii18n.ErrorFileUploadCompleteFailed)
+	}
+	if record.Status != string(domain.FileStatusPending) || record.ExpiresAt == nil || !record.ExpiresAt.After(time.Now().UTC()) {
+		return File{}, b.fileOperationError(ctx, meta, fileaction.ErrFileNotFound, cervii18n.ErrorFileUploadCompleteFailed)
 	}
 	etag, actualSize, err := b.statFile(ctx, identity, record)
 	if err != nil || actualSize != record.ByteSize {
@@ -72,7 +82,7 @@ func (b *DirectBackend) CompleteFileUpload(ctx context.Context, meta RequestMeta
 		}
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
-	record, err = b.markFileReady.Execute(ctx, identity, record.ID, etag)
+	record, err = b.markFileUploaded.Execute(ctx, identity, record.ID, etag)
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}

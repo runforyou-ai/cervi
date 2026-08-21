@@ -23,6 +23,12 @@ func TestLocalStoreSave(t *testing.T) {
 	if info.Size() != 6 {
 		t.Fatalf("size = %d, want 6", info.Size())
 	}
+	if err := store.Delete(key); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Delete(key); err != nil {
+		t.Fatalf("delete missing file: %v", err)
+	}
 	if _, err := store.Stat("../outside"); err == nil {
 		t.Fatal("expected traversal key to fail")
 	}

@@ -3,9 +3,12 @@
 package main
 
 import (
+	"context"
+
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/filecleanup"
 	"github.com/runforyou-ai/cervi/internal/filecontent"
 	"github.com/runforyou-ai/cervi/internal/filestore"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
@@ -23,6 +26,7 @@ func applicationServices(appStorage *serverstorage.Store) ([]application.Service
 	boundService := appservice.New(directBackend)
 	httpAPI := api.NewService(boundService)
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
+	cleanupLifecycle := &fileCleanupLifecycle{service: filecleanup.NewService(appStorage.DB(), localFiles)}
 
 	return []application.Service{
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{
@@ -34,6 +38,7 @@ func applicationServices(appStorage *serverstorage.Store) ([]application.Service
 		application.NewServiceWithOptions(filecontent.NewService(appStorage.DB(), localFiles), application.ServiceOptions{
 			Route: "/files/",
 		}),
+		application.NewService(cleanupLifecycle),
 		application.NewServiceWithOptions(publicweb.NewEmbedService(publicLookup), application.ServiceOptions{
 			Route: "/embed",
 		}),
@@ -41,4 +46,15 @@ func applicationServices(appStorage *serverstorage.Store) ([]application.Service
 			Route: "/chat/",
 		}),
 	}, nil
+}
+
+// fileCleanupLifecycle 将文件清理循环接入 Wails 服务生命周期。
+type fileCleanupLifecycle struct {
+	service *filecleanup.Service
+}
+
+// ServiceStartup 在企业服务端启动后运行文件清理循环。
+func (l *fileCleanupLifecycle) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
+	l.service.Start(ctx)
+	return nil
 }

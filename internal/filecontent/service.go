@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
@@ -78,7 +79,7 @@ func (s *Service) uploadLocalFile(writer http.ResponseWriter, request *http.Requ
 		writeFileError(writer, err)
 		return
 	}
-	if record.StorageBackend != string(domain.FileStorageBackendLocal) || record.Status != string(domain.FileStatusPending) {
+	if record.StorageBackend != string(domain.FileStorageBackendLocal) || record.Status != string(domain.FileStatusPending) || record.ExpiresAt == nil || !record.ExpiresAt.After(time.Now().UTC()) {
 		http.Error(writer, http.StatusText(http.StatusConflict), http.StatusConflict)
 		return
 	}
@@ -97,7 +98,7 @@ func (s *Service) uploadLocalFile(writer http.ResponseWriter, request *http.Requ
 
 // serveFile 输出本地内容或跳转到对象存储预签名地址。
 func (s *Service) serveFile(writer http.ResponseWriter, request *http.Request, fileID string) {
-	record, err := s.getFile.GetReadyByID(request.Context(), fileID)
+	record, err := s.getFile.GetActiveByID(request.Context(), fileID)
 	if err != nil {
 		writeFileError(writer, err)
 		return

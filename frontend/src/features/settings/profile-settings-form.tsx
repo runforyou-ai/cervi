@@ -8,13 +8,11 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  completeFileUpload,
-  createFileUpload,
   FilePurpose,
   isApiError,
   selectProfileImage,
   updateProfile,
-  uploadFileContent,
+  uploadFile,
   type User,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
@@ -34,8 +32,12 @@ const maxAvatarByteSize = 5 * 1024 * 1024
 const avatarFileAccept = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
 
 type PendingAvatar = {
+  requestID: number
   file: File
   previewURL: string
+  status: "uploading" | "uploaded" | "failed"
+  fileID: string
+  upload?: Promise<string>
 }
 
 /** 修改当前用户的头像、姓名和邮箱。 */
@@ -49,6 +51,8 @@ export function ProfileSettingsForm({
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const avatarRequestID = useRef(0)
+  const mounted = useRef(true)
   const [pendingAvatar, setPendingAvatar] = useState<PendingAvatar | null>(null)
   const [selectingAvatar, setSelectingAvatar] = useState(false)
   const schema = useMemo(() => createProfileSettingsSchema(t), [t])
@@ -70,6 +74,64 @@ export function ProfileSettingsForm({
     }
   }, [pendingAvatar?.previewURL])
 
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  /** 跟踪当前候选头像的上传结果。 */
+  function monitorAvatarUpload(candidate: PendingAvatar) {
+    if (!candidate.upload) {
+      return
+    }
+    void candidate.upload.then(
+      (fileID) => {
+        if (
+          !mounted.current ||
+          avatarRequestID.current !== candidate.requestID
+        ) {
+          return
+        }
+        setPendingAvatar((current) =>
+          current?.requestID === candidate.requestID
+            ? { ...current, status: "uploaded", fileID, upload: undefined }
+            : current,
+        )
+      },
+      (error) => {
+        if (
+          !mounted.current ||
+          avatarRequestID.current !== candidate.requestID
+        ) {
+          return
+        }
+        setPendingAvatar((current) =>
+          current?.requestID === candidate.requestID
+            ? { ...current, status: "failed", upload: undefined }
+            : current,
+        )
+        console.warn("上传用户头像失败", error)
+        if (!recoverSession(error, navigate)) {
+          toast.error(t("profile.avatarUploadError"))
+        }
+      },
+    )
+  }
+
+  /** 立即上传候选头像并保留业务关联所需的文件编号。 */
+  function startAvatarUpload(candidate: PendingAvatar) {
+    const upload = uploadFile(
+      candidate.file,
+      FilePurpose.FilePurposeUserAvatar,
+    ).then((file) => file.id)
+    const uploading = { ...candidate, status: "uploading" as const, upload }
+    setPendingAvatar(uploading)
+    monitorAvatarUpload(uploading)
+    return upload
+  }
+
   /** 校验新的用户头像并在保存前预览。 */
   function previewAvatar(selected: File) {
     if (!avatarContentTypes.has(selected.type)) {
@@ -80,7 +142,15 @@ export function ProfileSettingsForm({
       toast.error(t("profile.avatarSizeError"))
       return false
     }
-    setPendingAvatar({ file: selected, previewURL: URL.createObjectURL(selected) })
+    const candidate: PendingAvatar = {
+      requestID: avatarRequestID.current + 1,
+      file: selected,
+      previewURL: URL.createObjectURL(selected),
+      status: "uploading",
+      fileID: "",
+    }
+    avatarRequestID.current = candidate.requestID
+    startAvatarUpload(candidate)
     return true
   }
 
@@ -127,24 +197,21 @@ export function ProfileSettingsForm({
     try {
       let avatarFileId = ""
       if (pendingAvatar) {
-        uploadingAvatar = true
-        const selected = pendingAvatar.file
-        const upload = await createFileUpload({
-          purpose: FilePurpose.FilePurposeUserAvatar,
-          fileName: selected.name,
-          contentType: selected.type,
-          byteSize: selected.size,
-        })
-        await uploadFileContent(upload.request, selected)
-        const completed = await completeFileUpload(upload.file.id)
-        avatarFileId = completed.id
-        uploadingAvatar = false
+        avatarFileId = pendingAvatar.fileID
+        if (!avatarFileId) {
+          uploadingAvatar = true
+          avatarFileId = await (
+            pendingAvatar.upload ?? startAvatarUpload(pendingAvatar)
+          )
+          uploadingAvatar = false
+        }
       }
       const updated = await updateProfile({ ...values, avatarFileId })
       form.reset({
         displayName: updated.displayName,
         email: updated.email,
       })
+      avatarRequestID.current += 1
       setPendingAvatar(null)
       onUpdated(updated)
       console.info("个人资料已保存", { user_id: updated.id })
@@ -201,7 +268,7 @@ export function ProfileSettingsForm({
                 className="size-full rounded-full text-2xl"
               />
               <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                {selectingAvatar ? (
+                {selectingAvatar || pendingAvatar?.status === "uploading" ? (
                   <LoaderCircleIcon className="animate-spin" />
                 ) : (
                   t("profile.avatarChange")

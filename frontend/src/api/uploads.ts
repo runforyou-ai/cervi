@@ -1,5 +1,22 @@
-/** 执行服务端签发的文件内容上传请求。 */
-import type { FileUploadRequest } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+/** 创建文件记录并将内容上传到最终存储位置。 */
+import type {
+  FilePurpose,
+  FileUploadRequest,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+
+import { completeFileUpload, createFileUpload } from "@/api/service"
+
+/** 创建、上传并确认一个临时文件。 */
+export async function uploadFile(file: globalThis.File, purpose: FilePurpose) {
+  const upload = await createFileUpload({
+    purpose,
+    fileName: file.name,
+    contentType: file.type,
+    byteSize: file.size,
+  })
+  await uploadFileContent(upload.request, file)
+  return completeFileUpload(upload.file.id)
+}
 
 /** 将浏览器文件直接上传到请求指定的最终存储位置。 */
 export async function uploadFileContent(

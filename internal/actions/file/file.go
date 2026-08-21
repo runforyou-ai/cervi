@@ -8,12 +8,15 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
+
+const temporaryFileLifetime = 24 * time.Hour
 
 // ErrFileNotFound 表示企业中没有可用的指定文件。
 var ErrFileNotFound = errors.New("file not found")
@@ -33,42 +36,45 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 	if !validIdentity(identity) {
 		return nil, common.ErrIdentityInvalid
 	}
-	return get(ctx, q.db, identity.Organization.ID, fileID, false)
+	return get(ctx, q.db, identity.Organization.ID, fileID, "")
 }
 
-// GetReadyByID 返回已上传且未删除的指定文件。
-func (q *GetQuery) GetReadyByID(ctx context.Context, fileID string) (*servermodels.File, error) {
-	return get(ctx, q.db, "", fileID, true)
+// GetActiveByID 返回已关联业务数据的指定文件。
+func (q *GetQuery) GetActiveByID(ctx context.Context, fileID string) (*servermodels.File, error) {
+	return get(ctx, q.db, "", fileID, domain.FileStatusActive)
 }
 
-// MarkReadyAction 将核验通过的文件标记为已上传。
-type MarkReadyAction struct {
+// MarkUploadedAction 将核验通过的文件标记为已上传。
+type MarkUploadedAction struct {
 	db *bun.DB
 }
 
-// NewMarkReadyAction 创建文件完成操作。
-func NewMarkReadyAction(db *bun.DB) *MarkReadyAction {
-	return &MarkReadyAction{db: db}
+// NewMarkUploadedAction 创建文件上传完成操作。
+func NewMarkUploadedAction(db *bun.DB) *MarkUploadedAction {
+	return &MarkUploadedAction{db: db}
 }
 
 // Execute 保存文件上传结果并返回最新记录。
-func (a *MarkReadyAction) Execute(ctx context.Context, identity *servermodels.Identity, fileID, etag string) (*servermodels.File, error) {
+func (a *MarkUploadedAction) Execute(ctx context.Context, identity *servermodels.Identity, fileID, etag string) (*servermodels.File, error) {
 	if !validIdentity(identity) {
 		return nil, common.ErrIdentityInvalid
 	}
+	expiresAt := time.Now().UTC().Add(temporaryFileLifetime)
 	record := &servermodels.File{}
 	query := a.db.NewUpdate().Model(record).
-		Set("status = ?", domain.FileStatusReady).
+		Set("status = ?", domain.FileStatusUploaded).
 		Set("etag = ?", optionalString(etag)).
 		Set("uploaded_at = COALESCE(uploaded_at, now())").
+		Set("expires_at = ?", expiresAt).
 		Set("updated_at = now()").
 		Where("f.id = ?", fileID).
 		Where("f.organization_id = ?", identity.Organization.ID).
-		Where("f.deleted_at IS NULL").
+		Where("f.status = ?", domain.FileStatusPending).
+		Where("f.expires_at > now()").
 		Returning("*")
 	result, err := query.Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("mark file ready: %w", err)
+		return nil, fmt.Errorf("mark file uploaded: %w", err)
 	}
 	rows, err := result.RowsAffected()
 	if err != nil {
@@ -81,17 +87,17 @@ func (a *MarkReadyAction) Execute(ctx context.Context, identity *servermodels.Id
 }
 
 // get 按文件和可选企业范围读取元数据。
-func get(ctx context.Context, db *bun.DB, organizationID, fileID string, ready bool) (*servermodels.File, error) {
+func get(ctx context.Context, db *bun.DB, organizationID, fileID string, status domain.FileStatus) (*servermodels.File, error) {
 	if !common.ValidUUID(fileID) {
 		return nil, ErrFileNotFound
 	}
 	record := &servermodels.File{}
-	query := db.NewSelect().Model(record).Where("f.id = ?", fileID).Where("f.deleted_at IS NULL")
+	query := db.NewSelect().Model(record).Where("f.id = ?", fileID)
 	if organizationID != "" {
 		query = query.Where("f.organization_id = ?", organizationID)
 	}
-	if ready {
-		query = query.Where("f.status = ?", domain.FileStatusReady)
+	if status != "" {
+		query = query.Where("f.status = ?", status)
 	}
 	if err := query.Scan(ctx); errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrFileNotFound
