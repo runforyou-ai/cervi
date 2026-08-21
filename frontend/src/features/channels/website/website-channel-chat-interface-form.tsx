@@ -29,7 +29,7 @@ import { WebsiteChatPreview } from "@/features/channels/website/website-chat-pre
 import { apiErrorMessage } from "@/lib/form-errors"
 
 const presetColors = [
-  "#2563EB",
+  defaultWebsiteChannelThemeColor,
   "#16A34A",
   "#9333EA",
   "#E11D48",

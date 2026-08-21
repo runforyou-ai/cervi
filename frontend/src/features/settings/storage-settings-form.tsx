@@ -23,6 +23,7 @@ import {
   type StorageProviderId,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { StatusBadge } from "@/components/status-badge"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -576,9 +577,13 @@ export function StorageSettingsForm() {
                 {t("storage.detail.status")}
               </dt>
               <dd>
-                {savedSetting.enabled
-                  ? t("storage.detail.enabled")
-                  : t("storage.detail.disabled")}
+                <StatusBadge
+                  variant={savedSetting.enabled ? "success" : "muted"}
+                >
+                  {savedSetting.enabled
+                    ? t("storage.detail.enabled")
+                    : t("storage.detail.disabled")}
+                </StatusBadge>
               </dd>
             </div>
             <div className="grid gap-1 border-b py-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
