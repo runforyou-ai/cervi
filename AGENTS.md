@@ -40,10 +40,16 @@ go test -tags server ./...
 wails3 generate bindings -clean=true -ts -i
 ```
 
-前端要求 Node.js 22.22.0 或更高版本，项目构建使用 Wails v3 和 Task。
+前端要求 Node.js 24.0.0 或更高版本，项目构建使用 Wails v3 和 Task。
 Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite、MCP 端口和 PostgreSQL 数据库。按上述顺序启动后，可通过 Wails MCP 获取桌面端页面信息。
 
 真机通过 `CERVI_PUBLIC_URL` 连接服务端。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
+
+### Wails 版本同步
+
+- `go.mod` 中的 `github.com/wailsapp/wails/v3`、`frontend/package.json` 中的 `@wailsio/runtime` 与本机 `wails3` CLI 必须使用同一精确版本；前端运行时禁止使用 `latest`、`^` 或 `~` 范围。按 `go.mod` 安装 CLI：`go install github.com/wailsapp/wails/v3/cmd/wails3@$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)`。
+- 升级 Wails 时先阅读目标版本的官方发布说明，再使用目标版本 CLI 在临时目录生成 React 脚手架，对比官方模板和 `build-assets`。`build/` 已包含服务端、桌面端和移动端定制，不得直接覆盖；只人工合并与当前项目相关的官方变更。
+- Wails 升级后重新生成绑定，并验证前端构建、Go 测试、服务端构建和当前平台原生端构建；涉及移动端脚手架时同时验证 Android 与 iOS 构建配置。
 
 ## 代码组织
 
