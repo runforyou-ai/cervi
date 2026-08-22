@@ -1,10 +1,17 @@
 version: '3'
 
+dotenv:
+  - .env
+
 vars:
   APP_NAME: "cervi"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  WORKSPACE: '{{.CERVI_WORKSPACE | default ""}}'
+  DATABASE_NAME: '{{.CERVI_DATABASE_NAME | default ""}}'
+  INFRA_COMPOSE_PROJECT: '{{.CERVI_INFRA_COMPOSE_PROJECT | default "cervi"}}'
+  POSTGRES_USER: '{{.CERVI_POSTGRES_USER | default "cervi"}}'
   # GOOS 默认使用当前系统，也可在交叉构建时显式覆盖。
   GOOS: '{{.GOOS | default OS}}'
 
@@ -34,8 +41,64 @@ tasks:
 
   dev:
     summary: Runs the application in development mode
+    deps:
+      - env:check
     cmds:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  env:check:
+    silent: true
+    summary: 校验当前工作区开发环境
+    preconditions:
+      - sh: '{{if regexMatch "^[a-z0-9][a-z0-9_-]*$" .WORKSPACE}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置有效的 CERVI_WORKSPACE"
+      - sh: '{{if regexMatch "^[a-z][a-z0-9_]*$" .DATABASE_NAME}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置有效的 CERVI_DATABASE_NAME"
+      - sh: '{{if .DATABASE_URL}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 DATABASE_URL"
+      - sh: '{{if .WAILS_SERVER_PORT}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 WAILS_SERVER_PORT"
+      - sh: '{{if .WAILS_VITE_PORT}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 WAILS_VITE_PORT"
+      - sh: '{{if .WAILS_MCP_PORT}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 WAILS_MCP_PORT"
+      - sh: '{{if .CERVI_PUBLIC_URL}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 CERVI_PUBLIC_URL"
+      - sh: 'case "{{.DATABASE_URL}}" in */{{.DATABASE_NAME}}\?*|*/{{.DATABASE_NAME}}) true ;; *) false ;; esac'
+        msg: "DATABASE_URL 中的数据库名必须与 CERVI_DATABASE_NAME 一致"
+    cmds:
+      - 'echo "工作区 {{.WORKSPACE}}：Server {{.WAILS_SERVER_PORT}}，Vite {{.WAILS_VITE_PORT}}，MCP {{.WAILS_MCP_PORT}}，数据库 {{.DATABASE_NAME}}，公网 {{.CERVI_PUBLIC_URL}}"'
+
+  db:ensure:
+    silent: true
+    summary: 确保当前工作区数据库已创建
+    deps:
+      - env:check
+    preconditions:
+      - sh: docker info >/dev/null 2>&1
+        msg: "Docker 未运行，无法连接主工作区 PostgreSQL"
+    cmds:
+      - |
+        set -euo pipefail
+        exists=$(docker compose -p "{{.INFRA_COMPOSE_PROJECT}}" exec -T postgres \
+          psql -U "{{.POSTGRES_USER}}" -d postgres -tAc \
+          "SELECT 1 FROM pg_database WHERE datname = '{{.DATABASE_NAME}}'")
+        if [ "$exists" = "1" ]; then
+          echo "数据库 {{.DATABASE_NAME}} 已存在"
+          exit 0
+        fi
+        docker compose -p "{{.INFRA_COMPOSE_PROJECT}}" exec -T postgres \
+          createdb -U "{{.POSTGRES_USER}}" "{{.DATABASE_NAME}}"
+        echo "已创建数据库 {{.DATABASE_NAME}}"
+
+  db:list:
+    silent: true
+    summary: 查看共享 PostgreSQL 中的数据库
+    preconditions:
+      - sh: docker info >/dev/null 2>&1
+        msg: "Docker 未运行，无法连接主工作区 PostgreSQL"
+    cmds:
+      - docker compose -p "{{.INFRA_COMPOSE_PROJECT}}" exec -T postgres psql -U "{{.POSTGRES_USER}}" -d postgres -c '\l'
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)
@@ -49,6 +112,8 @@ tasks:
 
   run:server:
     summary: Runs the application in server mode
+    deps:
+      - db:ensure
     cmds:
       - task: common:run:server
 
@@ -66,6 +131,8 @@ tasks:
     summary: 执行待运行的服务端迁移
     desc: |
       执行所有待运行的服务端迁移。服务端启动时也会自动执行。
+    deps:
+      - db:ensure
     cmds:
       - task: migrate:run
         vars:
@@ -75,6 +142,8 @@ tasks:
   migrate:status:
     summary: 查看服务端迁移状态
     desc: 查看每条迁移是否已执行。
+    deps:
+      - db:ensure
     cmds:
       - task: migrate:run
         vars:
@@ -87,6 +156,8 @@ tasks:
       回滚多步：wails3 task migrate:rollback STEP=3
       回滚到指定版本：wails3 task migrate:rollback VERSION=20260818032701
       回滚前请先停止服务端，避免启动时再次自动 up。
+    deps:
+      - db:ensure
     preconditions:
       - sh: '{{if .STEP}}{{if regexMatch "^[1-9][0-9]*$" .STEP}}true{{else}}false{{end}}{{else}}true{{end}}'
         msg: "STEP 必须是正整数，例如：wails3 task migrate:rollback STEP=3"
@@ -102,8 +173,10 @@ tasks:
     summary: 回滚全部服务端迁移后重新执行
     desc: |
       使用 Goose reset 回滚全部迁移，再执行 up。
-      通过 DATABASE_URL 连接数据库，不依赖 Docker。
+      使用 .env 中 DATABASE_URL 指定的当前工作区数据库。
       执行前请先停止服务端。
+    deps:
+      - db:ensure
     cmds:
       - task: migrate:run
         vars:
@@ -136,10 +209,13 @@ tasks:
     summary: 对服务端 PostgreSQL 执行 Goose 命令
     vars:
       SERVER_MIGRATIONS_DIR: internal/storage/server/migrations
-      DATABASE_URL: '{{.DATABASE_URL | default "postgres://cervi:cervi_local_dev@localhost:5432/cervi?sslmode=disable"}}'
+      DATABASE_URL: '{{.DATABASE_URL}}'
       GOOSE_REPEAT: '{{.GOOSE_REPEAT | default 1}}'
       GOOSE_VERSION:
         sh: go list -m -f '{{"{{.Version}}"}}' github.com/pressly/goose/v3
+    preconditions:
+      - sh: '{{if .DATABASE_URL}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 DATABASE_URL"
     cmds:
       - |
         set -euo pipefail
