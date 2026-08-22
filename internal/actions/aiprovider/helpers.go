@@ -5,7 +5,9 @@ package aiprovider
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -14,7 +16,7 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 )
 
-// loadProvider 读取当前企业中的 AI 供应商。
+// loadProvider 读取当前企业中的模型服务供应商。
 func loadProvider(ctx context.Context, db bun.IDB, organizationID, providerID string, lock bool) (*servermodels.AIProvider, error) {
 	if !common.ValidUUID(providerID) {
 		return nil, ErrNotFound
@@ -48,8 +50,13 @@ func loadModels(ctx context.Context, db bun.IDB, organizationID, providerID stri
 	}
 	models := make([]Model, 0, len(records))
 	for _, record := range records {
+		inputModalities := make([]domain.AIModelInputModality, 0)
+		if err := json.Unmarshal(record.InputModalities, &inputModalities); err != nil {
+			return nil, fmt.Errorf("decode model %q input modalities: %w", record.Identifier, err)
+		}
 		models = append(models, Model{
-			Identifier: record.Identifier, Name: record.Name, ContextWindow: record.ContextWindow, MaxOutputTokens: record.MaxOutputTokens,
+			Identifier: record.Identifier, Name: record.Name, Type: domain.AIModelType(record.Type),
+			InputModalities: inputModalities, ContextWindow: record.ContextWindow, MaxOutputTokens: record.MaxOutputTokens,
 		})
 	}
 	return models, nil
@@ -66,22 +73,27 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 	}
 	records := make([]servermodels.AIProviderModel, 0, len(models))
 	for _, model := range models {
+		inputModalities, err := json.Marshal(model.InputModalities)
+		if err != nil {
+			return err
+		}
 		records = append(records, servermodels.AIProviderModel{
 			ProviderID: providerID, OrganizationID: organizationID, Identifier: model.Identifier,
-			Name: model.Name, ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
+			Name: model.Name, Type: string(model.Type), ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
+			InputModalities: inputModalities,
 		})
-	}
-	if len(records) == 0 {
-		return nil
 	}
 	_, err := tx.NewInsert().
 		Model(&records).
-		Column("provider_id", "organization_id", "identifier", "name", "context_window", "max_output_tokens").
+		Column(
+			"provider_id", "organization_id", "identifier", "name", "model_type", "input_modalities",
+			"context_window", "max_output_tokens",
+		).
 		Exec(ctx)
 	return err
 }
 
-// recordFromModel 转换 AI 供应商存储模型。
+// recordFromModel 转换模型服务供应商存储模型。
 func recordFromModel(provider servermodels.AIProvider, models []Model) Record {
 	return Record{
 		ID: provider.ID, Brand: domain.AIProviderBrand(provider.Brand), Name: provider.Name,

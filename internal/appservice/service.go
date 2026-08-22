@@ -339,32 +339,32 @@ func (s *Service) DeleteRole(ctx context.Context, meta RequestMeta, roleID strin
 	return s.backend.DeleteRole(ctx, meta, roleID)
 }
 
-// ListAIProviders 返回当前企业的 AI 供应商列表。
+// ListAIProviders 返回当前企业的模型服务供应商列表。
 func (s *Service) ListAIProviders(ctx context.Context, meta RequestMeta) (AIProviderList, error) {
 	return s.backend.ListAIProviders(ctx, meta)
 }
 
-// GetAIProvider 返回当前企业中的 AI 供应商详情。
+// GetAIProvider 返回当前企业中的模型服务供应商详情。
 func (s *Service) GetAIProvider(ctx context.Context, meta RequestMeta, providerID string) (AIProvider, error) {
 	return s.backend.GetAIProvider(ctx, meta, providerID)
 }
 
-// ListAvailableAIModels 返回指定品牌的可用模型目录。
+// ListAvailableAIModels 返回指定品牌的预设模型目录。
 func (s *Service) ListAvailableAIModels(ctx context.Context, meta RequestMeta, brand AIProviderBrand) (AIProviderModelList, error) {
 	return s.backend.ListAvailableAIModels(ctx, meta, brand)
 }
 
-// CreateAIProvider 创建 AI 供应商。
+// CreateAIProvider 创建模型服务供应商。
 func (s *Service) CreateAIProvider(ctx context.Context, meta RequestMeta, input AIProviderInput) (AIProvider, error) {
 	return s.backend.CreateAIProvider(ctx, meta, input)
 }
 
-// UpdateAIProvider 修改 AI 供应商。
+// UpdateAIProvider 修改模型服务供应商。
 func (s *Service) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderInput) (AIProvider, error) {
 	return s.backend.UpdateAIProvider(ctx, meta, providerID, input)
 }
 
-// DeleteAIProvider 删除 AI 供应商。
+// DeleteAIProvider 删除模型服务供应商。
 func (s *Service) DeleteAIProvider(ctx context.Context, meta RequestMeta, providerID string) error {
 	return s.backend.DeleteAIProvider(ctx, meta, providerID)
 }
