@@ -493,6 +493,7 @@ const enUS = {
         maxOutputTokensInvalid:
           "Maximum output tokens must be positive, such as 8192, 64K, or 1M.",
         modelIdentifierDuplicate: "Model IDs must be unique.",
+        modelsRequired: "Add at least one model.",
       },
     },
   },

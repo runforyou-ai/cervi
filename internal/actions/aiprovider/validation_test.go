@@ -46,6 +46,16 @@ func TestNormalizeInputRejectsInvalidModels(t *testing.T) {
 	}
 }
 
+// TestNormalizeInputRejectsEmptyModels 验证模型目录为空时不允许保存供应商。
+func TestNormalizeInputRejectsEmptyModels(t *testing.T) {
+	_, fields := normalizeInput(Input{
+		Brand: domain.AIProviderBrandDeepSeek, Name: "供应商", APIKey: "secret", APIURL: "https://api.deepseek.com",
+	})
+	if fields["models"] != ValidationModelsInvalid {
+		t.Fatalf("normalizeInput() fields = %#v", fields)
+	}
+}
+
 // TestNormalizeInputAcceptsEmbeddingModalities 验证嵌入模型可声明输入模态且不保存输出 Token 数。
 func TestNormalizeInputAcceptsEmbeddingModalities(t *testing.T) {
 	input, fields := normalizeInput(Input{

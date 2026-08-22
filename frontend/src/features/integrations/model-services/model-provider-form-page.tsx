@@ -139,8 +139,6 @@ export function ModelProviderFormPage({
   const [availableModels, setAvailableModels] = useState<AIProviderModelData[]>(
     [],
   )
-  const [modelSelectionInitialized, setModelSelectionInitialized] =
-    useState(false)
   const [draftModelIDs, setDraftModelIDs] = useState<Set<string>>(new Set())
   const [loadingModels, setLoadingModels] = useState(false)
   const loadVersion = useRef(0)
@@ -181,6 +179,7 @@ export function ModelProviderFormPage({
         modelIdentifierDuplicate: t(
           "modelServices.validation.modelIdentifierDuplicate",
         ),
+        modelsRequired: t("modelServices.validation.modelsRequired"),
       }),
     [t],
   )
@@ -215,7 +214,6 @@ export function ModelProviderFormPage({
         apiUrl: provider.apiUrl,
         models: provider.models.map(modelFormValue),
       })
-      setModelSelectionInitialized(true)
     } catch (requestError) {
       if (version !== loadVersion.current) return
       if (recoverSession(requestError, navigate)) return
@@ -245,19 +243,8 @@ export function ModelProviderFormPage({
     try {
       const models = await listAvailableAIModels(form.getValues("brand"))
       if (!mounted.current) return
-      const current = form.getValues("models")
-      const catalogIDs = new Set(models.map((model) => model.identifier))
-      const selectedCatalogIDs = current
-        .filter((model) => catalogIDs.has(model.identifier))
-        .map((model) => model.identifier)
       setAvailableModels(models)
-      setDraftModelIDs(
-        new Set(
-          modelSelectionInitialized
-            ? selectedCatalogIDs
-            : models.map((model) => model.identifier),
-        ),
-      )
+      setDraftModelIDs(new Set(models.map((model) => model.identifier)))
       setModelDialogOpen(true)
     } catch (requestError) {
       if (!mounted.current) return
@@ -288,23 +275,20 @@ export function ModelProviderFormPage({
     setDraftModelIDs(new Set())
   }
 
-  /** 确认模型选择并保留手动添加的目录项。 */
+  /** 确认模型选择并追加目录中尚不存在的模型。 */
   function confirmModels() {
     const current = form.getValues("models")
-    const catalogIDs = new Set(availableModels.map((model) => model.identifier))
-    const customModels = current.filter(
-      (model) => !catalogIDs.has(model.identifier),
+    const existingIDs = new Set(
+      current.map((model) => model.identifier.trim()),
     )
-    const presetModels = availableModels
-      .filter((model) => draftModelIDs.has(model.identifier))
-      .map((model) => {
-        const existing = current.find(
-          (item) => item.identifier === model.identifier,
-        )
-        return existing ?? modelFormValue(model)
-      })
-    modelFields.replace([...customModels, ...presetModels])
-    setModelSelectionInitialized(true)
+    const modelsToAppend = availableModels
+      .filter(
+        (model) =>
+          draftModelIDs.has(model.identifier) &&
+          !existingIDs.has(model.identifier),
+      )
+      .map(modelFormValue)
+    if (modelsToAppend.length > 0) modelFields.append(modelsToAppend)
     setModelDialogOpen(false)
   }
 
@@ -443,7 +427,6 @@ export function ModelProviderFormPage({
                         }
                         modelFields.replace([])
                         setAvailableModels([])
-                        setModelSelectionInitialized(false)
                       }}
                     >
                       {aiProviderBrands.map((brand) => (
@@ -680,7 +663,12 @@ export function ModelProviderFormPage({
             </section>
 
             <div className="flex items-center gap-2">
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+              <Button
+                type="submit"
+                disabled={
+                  form.formState.isSubmitting || modelFields.fields.length === 0
+                }
+              >
                 {form.formState.isSubmitting ? (
                   <LoaderCircleIcon className="animate-spin" />
                 ) : null}

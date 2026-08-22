@@ -43,6 +43,7 @@ export function createAIProviderSchema(messages: {
   contextWindowInvalid: string
   maxOutputTokensInvalid: string
   modelIdentifierDuplicate: string
+  modelsRequired: string
 }) {
   return z.object({
     brand: requiredWailsEnum(AIProviderBrand, messages.brandInvalid),
@@ -106,6 +107,7 @@ export function createAIProviderSchema(messages: {
             }
           }),
       )
+      .min(1, messages.modelsRequired)
       .superRefine((models, context) => {
         const identifiers = new Set<string>()
         models.forEach((model, index) => {

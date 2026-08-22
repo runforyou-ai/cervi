@@ -112,7 +112,7 @@
   "field.ai_provider_api_key_too_long": "API 密钥不能超过 2048 个字符。",
   "field.ai_provider_api_url_required": "请输入 API 地址。",
   "field.ai_provider_api_url_invalid": "请输入完整有效的 HTTP 或 HTTPS API 地址。",
-  "field.ai_provider_models_invalid": "请检查模型目录中的类型、输入类型、标识、名称和 Token 数。",
+  "field.ai_provider_models_invalid": "请至少添加一个模型，并检查模型类型、输入类型、标识、名称和 Token 数。",
   "field.channel_type_invalid": "请选择支持的渠道类别。",
   "field.channel_name_required": "请输入渠道名称。",
   "field.channel_name_too_long": "渠道名称不能超过 100 个字符。",

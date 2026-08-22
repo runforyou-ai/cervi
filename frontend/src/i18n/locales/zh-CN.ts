@@ -482,6 +482,7 @@ const zhCN = {
         maxOutputTokensInvalid:
           "最大输出 token 数必须是正数，例如 8192、64K 或 1M。",
         modelIdentifierDuplicate: "模型标识不能重复。",
+        modelsRequired: "请至少添加一个模型。",
       },
     },
   },

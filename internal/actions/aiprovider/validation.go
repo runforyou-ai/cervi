@@ -74,6 +74,9 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 		seen[model.Identifier] = struct{}{}
 		models = append(models, model)
 	}
+	if len(models) == 0 {
+		fields["models"] = ValidationModelsInvalid
+	}
 	input.Models = models
 	return input, fields
 }

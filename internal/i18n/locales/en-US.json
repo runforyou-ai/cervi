@@ -112,7 +112,7 @@
   "field.ai_provider_api_key_too_long": "The API key cannot exceed 2048 characters.",
   "field.ai_provider_api_url_required": "Enter an API URL.",
   "field.ai_provider_api_url_invalid": "Enter a complete HTTP or HTTPS API URL.",
-  "field.ai_provider_models_invalid": "Check the model types, input types, IDs, names, and token counts.",
+  "field.ai_provider_models_invalid": "Add at least one model and check its type, input types, ID, name, and token counts.",
   "field.channel_type_invalid": "Select a supported channel category.",
   "field.channel_name_required": "Enter a channel name.",
   "field.channel_name_too_long": "The channel name cannot exceed 100 characters.",
