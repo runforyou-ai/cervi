@@ -1,6 +1,6 @@
 //go:build server
 
-package autohttps
+package api
 
 import (
 	"bytes"
@@ -77,7 +77,7 @@ func TestRequestHostKeepsLocalAddressesOnHTTP(t *testing.T) {
 
 // TestAllowCertificateRequiresHTTPEntry 验证无缓存的公网域名必须先通过 HTTP 入口访问。
 func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
-	service := &Service{}
+	service := &HTTPSEntry{}
 	const host = "test-https.runforyou.app"
 	if err := service.allowCertificate(t.Context(), host); err == nil {
 		t.Fatal("expected unapproved domain to be rejected")
@@ -92,10 +92,10 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 	}
 }
 
-// TestNewServiceExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
-func TestNewServiceExternalDoesNotCreateListeners(t *testing.T) {
+// TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
+func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
 	t.Setenv("CERVI_HTTPS_MODE", "external")
-	service, err := NewService()
+	service, err := NewHTTPSEntry()
 	if err != nil {
 		t.Fatalf("new external service: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestAllowCertificateRestoresCachedDomain(t *testing.T) {
 	if err := cache.Put(t.Context(), host, cachedCertificate(t, host)); err != nil {
 		t.Fatalf("cache certificate: %v", err)
 	}
-	service := &Service{cache: cache}
+	service := &HTTPSEntry{cache: cache}
 	if err := service.allowCertificate(t.Context(), host); err != nil {
 		t.Fatalf("cached domain rejected: %v", err)
 	}

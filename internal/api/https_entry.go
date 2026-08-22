@@ -1,7 +1,6 @@
 //go:build server
 
-// Package autohttps 为服务端提供可选的内嵌自动 HTTPS 入口。
-package autohttps
+package api
 
 import (
 	"context"
@@ -34,8 +33,8 @@ const (
 
 type httpsMode string
 
-// Service 根据部署模式选择是否监听 HTTP 和 HTTPS，并代理到 Wails server。
-type Service struct {
+// HTTPSEntry 根据部署模式代理 Wails server 并管理 HTTPS。
+type HTTPSEntry struct {
 	mode        httpsMode
 	cache       autocert.Cache
 	cachePath   string
@@ -46,13 +45,13 @@ type Service struct {
 	allowed     sync.Map
 }
 
-// NewService 根据当前部署模式创建自动 HTTPS 服务。
-func NewService() (*Service, error) {
+// NewHTTPSEntry 根据部署模式创建 HTTPS 入口。
+func NewHTTPSEntry() (*HTTPSEntry, error) {
 	mode, err := httpsModeFromEnv()
 	if err != nil {
 		return nil, err
 	}
-	service := &Service{mode: mode}
+	service := &HTTPSEntry{mode: mode}
 	if mode != modeAuto {
 		return service, nil
 	}
@@ -93,7 +92,7 @@ func NewService() (*Service, error) {
 }
 
 // Start 根据部署模式启动自动 HTTPS 入口。
-func (s *Service) Start(ctx context.Context) error {
+func (s *HTTPSEntry) Start(ctx context.Context) error {
 	if s.mode == modeExternal {
 		slog.Info("HTTPS 由外部入口管理", "server_port", serverPort())
 		return nil
@@ -124,7 +123,7 @@ func (s *Service) Start(ctx context.Context) error {
 }
 
 // Shutdown 关闭 HTTP 和 HTTPS 监听器。
-func (s *Service) Shutdown() error {
+func (s *HTTPSEntry) Shutdown() error {
 	if s.mode != modeAuto {
 		return nil
 	}
@@ -136,14 +135,14 @@ func (s *Service) Shutdown() error {
 }
 
 // serve 运行一个入口并记录无法恢复的监听错误。
-func (s *Service) serve(protocol string, run func() error) {
+func (s *HTTPSEntry) serve(protocol string, run func() error) {
 	if err := run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("自动 HTTPS 入口停止", "protocol", protocol, "error", err)
 	}
 }
 
 // serveHTTP 为本地地址保留 HTTP，并为公网域名启用 HTTPS。
-func (s *Service) serveHTTP(writer http.ResponseWriter, request *http.Request) {
+func (s *HTTPSEntry) serveHTTP(writer http.ResponseWriter, request *http.Request) {
 	host, local := requestHost(request.Host)
 	if local {
 		s.proxy.ServeHTTP(writer, request)
@@ -158,7 +157,7 @@ func (s *Service) serveHTTP(writer http.ResponseWriter, request *http.Request) {
 }
 
 // allowCertificate 只允许通过 HTTP 入口或已有证书缓存确认的公网域名。
-func (s *Service) allowCertificate(ctx context.Context, host string) error {
+func (s *HTTPSEntry) allowCertificate(ctx context.Context, host string) error {
 	host, local := requestHost(host)
 	if host == "" || local {
 		return fmt.Errorf("host is not a public domain")
@@ -175,7 +174,7 @@ func (s *Service) allowCertificate(ctx context.Context, host string) error {
 }
 
 // cachedCertificateMatches 判断持久化缓存中是否存在属于该域名的证书。
-func (s *Service) cachedCertificateMatches(ctx context.Context, host string) bool {
+func (s *HTTPSEntry) cachedCertificateMatches(ctx context.Context, host string) bool {
 	if s.cache == nil {
 		return false
 	}
