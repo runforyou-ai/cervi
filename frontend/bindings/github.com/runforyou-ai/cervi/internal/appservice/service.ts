@@ -50,7 +50,7 @@ export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $Ca
 }
 
 /**
- * CreateAIProvider 创建 AI 供应商。
+ * CreateAIProvider 创建模型服务供应商。
  */
 export function CreateAIProvider(meta: $models.RequestMeta, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
     return $Call.ByID(3165377185, meta, input);
@@ -113,7 +113,7 @@ export function DeactivateWebsiteChannel(meta: $models.RequestMeta, channelID: s
 }
 
 /**
- * DeleteAIProvider 删除 AI 供应商。
+ * DeleteAIProvider 删除模型服务供应商。
  */
 export function DeleteAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<void> {
     return $Call.ByID(1350701494, meta, providerID);
@@ -141,7 +141,7 @@ export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $Cancella
 }
 
 /**
- * GetAIProvider 返回当前企业中的 AI 供应商详情。
+ * GetAIProvider 返回当前企业中的模型服务供应商详情。
  */
 export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<$models.AIProvider> {
     return $Call.ByID(3088524329, meta, providerID);
@@ -197,14 +197,14 @@ export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromi
 }
 
 /**
- * ListAIProviders 返回当前企业的 AI 供应商列表。
+ * ListAIProviders 返回当前企业的模型服务供应商列表。
  */
 export function ListAIProviders(meta: $models.RequestMeta): $CancellablePromise<$models.AIProviderList> {
     return $Call.ByID(3759328446, meta);
 }
 
 /**
- * ListAvailableAIModels 返回指定品牌的可用模型目录。
+ * ListAvailableAIModels 返回指定品牌的预设模型目录。
  */
 export function ListAvailableAIModels(meta: $models.RequestMeta, brand: $models.AIProviderBrand): $CancellablePromise<$models.AIProviderModelList> {
     return $Call.ByID(3483353293, meta, brand);
@@ -351,7 +351,7 @@ export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3Settin
 }
 
 /**
- * UpdateAIProvider 修改 AI 供应商。
+ * UpdateAIProvider 修改模型服务供应商。
  */
 export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
     return $Call.ByID(3982600252, meta, providerID, input);

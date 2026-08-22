@@ -11,17 +11,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// GetAIProviderQuery 查询当前企业中的 AI 供应商。
+// GetAIProviderQuery 查询当前企业中的模型服务供应商。
 type GetAIProviderQuery struct {
 	db *bun.DB
 }
 
-// NewGetAIProviderQuery 创建 AI 供应商详情查询。
+// NewGetAIProviderQuery 创建模型服务供应商详情查询。
 func NewGetAIProviderQuery(db *bun.DB) *GetAIProviderQuery {
 	return &GetAIProviderQuery{db: db}
 }
 
-// Execute 返回指定 AI 供应商及其模型目录。
+// Execute 返回模型服务供应商及其模型目录。
 func (q *GetAIProviderQuery) Execute(ctx context.Context, identity *servermodels.Identity, providerID string) (*Record, error) {
 	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return nil, err

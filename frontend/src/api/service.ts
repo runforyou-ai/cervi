@@ -53,6 +53,8 @@ import {
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
+  AIModelInputModality,
+  AIModelType,
   AIProviderBrand,
   ContactSort,
   StorageProvider,
@@ -90,13 +92,36 @@ export type StorageProviderId = Exclude<StorageProvider, StorageProvider.$zero>
 
 export type AIProviderBrandId = Exclude<AIProviderBrand, AIProviderBrand.$zero>
 
+export type AIModelTypeId = Exclude<AIModelType, AIModelType.$zero>
+
+export type AIModelInputModalityId = Exclude<
+  AIModelInputModality,
+  AIModelInputModality.$zero
+>
+
+export type AIProviderModelData = Omit<
+  AIProviderModel,
+  "type" | "inputModalities"
+> & {
+  type: AIModelTypeId
+  inputModalities: AIModelInputModalityId[]
+}
+
 export type AIProviderData = Omit<AIProvider, "brand" | "models"> & {
   brand: AIProviderBrandId
-  models: AIProviderModel[]
+  models: AIProviderModelData[]
+}
+
+export type AIProviderSummaryData = Omit<
+  AIProviderSummary,
+  "brand" | "modelTypes"
+> & {
+  brand: AIProviderBrandId
+  modelTypes: AIModelTypeId[]
 }
 
 export type AIProviderListData = Omit<AIProviderList, "providers"> & {
-  providers: AIProviderSummary[]
+  providers: AIProviderSummaryData[]
 }
 
 export type ContactDetail = Omit<Contact, "methods" | "channelIdentities"> & {
@@ -209,39 +234,39 @@ const listAvailableAIModelsBound = bind(ListAvailableAIModels)
 const createAIProviderBound = bind(CreateAIProvider)
 const updateAIProviderBound = bind(UpdateAIProvider)
 
-/** 读取当前企业的 AI 供应商列表。 */
+/** 读取当前企业的模型服务供应商列表。 */
 export function listAIProviders() {
   return listAIProvidersBound().then(
     (output): AIProviderListData => ({
       ...output,
-      providers: asList(output.providers),
+      providers: asList(output.providers).map(normalizeAIProviderSummary),
     }),
   )
 }
 
-/** 读取 AI 供应商详情。 */
+/** 读取模型服务供应商详情。 */
 export function getAIProvider(providerId: string) {
   return getAIProviderBound(providerId).then(normalizeAIProvider)
 }
 
-/** 读取指定品牌的可用模型目录。 */
+/** 读取指定品牌的预设模型目录。 */
 export function listAvailableAIModels(brand: AIProviderBrand) {
   return listAvailableAIModelsBound(brand).then((output: AIProviderModelList) =>
-    asList(output.models),
+    asList(output.models).map(normalizeAIProviderModel),
   )
 }
 
-/** 创建 AI 供应商。 */
+/** 创建模型服务供应商。 */
 export function createAIProvider(input: AIProviderInput) {
   return createAIProviderBound(input).then(normalizeAIProvider)
 }
 
-/** 修改 AI 供应商。 */
+/** 修改模型服务供应商。 */
 export function updateAIProvider(providerId: string, input: AIProviderInput) {
   return updateAIProviderBound(providerId, input).then(normalizeAIProvider)
 }
 
-/** 删除 AI 供应商。 */
+/** 删除模型服务供应商。 */
 export const deleteAIProvider = bind(DeleteAIProvider)
 
 const listChannelsBound = bind(ListChannels)
@@ -270,12 +295,34 @@ function asList<T>(value: T[] | null | undefined): T[] {
   return value ?? []
 }
 
-/** 归一化 AI 供应商模型目录。 */
+/** 归一化模型服务供应商详情。 */
 function normalizeAIProvider(provider: AIProvider): AIProviderData {
   return {
     ...provider,
     brand: provider.brand as AIProviderBrandId,
-    models: asList(provider.models),
+    models: asList(provider.models).map(normalizeAIProviderModel),
+  }
+}
+
+/** 归一化模型服务供应商列表项。 */
+function normalizeAIProviderSummary(
+  provider: AIProviderSummary,
+): AIProviderSummaryData {
+  return {
+    ...provider,
+    brand: provider.brand as AIProviderBrandId,
+    modelTypes: asList(provider.modelTypes) as AIModelTypeId[],
+  }
+}
+
+/** 归一化模型目录项。 */
+function normalizeAIProviderModel(model: AIProviderModel): AIProviderModelData {
+  return {
+    ...model,
+    type: model.type as AIModelTypeId,
+    inputModalities: asList(
+      model.inputModalities,
+    ) as AIModelInputModalityId[],
   }
 }
 
