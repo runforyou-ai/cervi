@@ -18,6 +18,8 @@ type Input struct {
 type Model struct {
 	Identifier      string
 	Name            string
+	Type            domain.AIModelType
+	InputModalities []domain.AIModelInputModality
 	ContextWindow   int64
 	MaxOutputTokens int64
 }
@@ -34,8 +36,9 @@ type Record struct {
 
 // Summary 定义 AI 供应商列表项。
 type Summary struct {
-	ID     string
-	Brand  domain.AIProviderBrand
-	Name   string
-	APIURL string
+	ID         string
+	Brand      domain.AIProviderBrand
+	Name       string
+	APIURL     string
+	ModelTypes []domain.AIModelType
 }

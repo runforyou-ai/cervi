@@ -113,6 +113,27 @@ type AIProviderBrand string
 
 const (
 	AIProviderBrandDeepSeek AIProviderBrand = AIProviderBrand(domain.AIProviderBrandDeepSeek)
+	AIProviderBrandAlibaba  AIProviderBrand = AIProviderBrand(domain.AIProviderBrandAlibaba)
+	AIProviderBrandOpenAI   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOpenAI)
+)
+
+// AIModelType 表示 AI 模型用途。
+type AIModelType string
+
+const (
+	AIModelTypeChat      AIModelType = AIModelType(domain.AIModelTypeChat)
+	AIModelTypeEmbedding AIModelType = AIModelType(domain.AIModelTypeEmbedding)
+	AIModelTypeRerank    AIModelType = AIModelType(domain.AIModelTypeRerank)
+)
+
+// AIModelInputModality 表示模型支持的输入模态。
+type AIModelInputModality string
+
+const (
+	AIModelInputModalityText  AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityText)
+	AIModelInputModalityImage AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityImage)
+	AIModelInputModalityAudio AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityAudio)
+	AIModelInputModalityVideo AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityVideo)
 )
 
 // StorageProvider 表示 S3 兼容对象存储提供商。
@@ -674,10 +695,12 @@ type AIProviderInput struct {
 
 // AIProviderModel 定义 AI 供应商模型目录项。
 type AIProviderModel struct {
-	Identifier      string `json:"identifier"`
-	Name            string `json:"name"`
-	ContextWindow   int64  `json:"contextWindow"`
-	MaxOutputTokens int64  `json:"maxOutputTokens"`
+	Identifier      string                 `json:"identifier"`
+	Name            string                 `json:"name"`
+	Type            AIModelType            `json:"type"`
+	InputModalities []AIModelInputModality `json:"inputModalities"`
+	ContextWindow   int64                  `json:"contextWindow"`
+	MaxOutputTokens int64                  `json:"maxOutputTokens"`
 }
 
 // AIProvider 定义企业 AI 供应商及其模型目录。
@@ -692,10 +715,11 @@ type AIProvider struct {
 
 // AIProviderSummary 定义企业 AI 供应商列表项。
 type AIProviderSummary struct {
-	ID     string          `json:"id"`
-	Brand  AIProviderBrand `json:"brand"`
-	Name   string          `json:"name"`
-	APIURL string          `json:"apiUrl"`
+	ID         string          `json:"id"`
+	Brand      AIProviderBrand `json:"brand"`
+	Name       string          `json:"name"`
+	APIURL     string          `json:"apiUrl"`
+	ModelTypes []AIModelType   `json:"modelTypes"`
 }
 
 // AIProviderList 定义企业 AI 供应商列表。

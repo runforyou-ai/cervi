@@ -25,8 +25,13 @@ func (b *DirectBackend) ListAIProviders(ctx context.Context, meta RequestMeta) (
 	}
 	output := make([]AIProviderSummary, 0, len(providers))
 	for _, provider := range providers {
+		modelTypes := make([]AIModelType, 0, len(provider.ModelTypes))
+		for _, modelType := range provider.ModelTypes {
+			modelTypes = append(modelTypes, AIModelType(modelType))
+		}
 		output = append(output, AIProviderSummary{
 			ID: provider.ID, Brand: AIProviderBrand(provider.Brand), Name: provider.Name, APIURL: provider.APIURL,
+			ModelTypes: modelTypes,
 		})
 	}
 	return AIProviderList{Providers: output}, nil
@@ -129,7 +134,9 @@ func aiProviderInput(input AIProviderInput) aiprovideraction.Input {
 	models := make([]aiprovideraction.Model, 0, len(input.Models))
 	for _, model := range input.Models {
 		models = append(models, aiprovideraction.Model{
-			Identifier: model.Identifier, Name: model.Name, ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
+			Identifier: model.Identifier, Name: model.Name, Type: domain.AIModelType(model.Type),
+			InputModalities: aiModelInputModalitiesToDomain(model.InputModalities),
+			ContextWindow:   model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
 		})
 	}
 	return aiprovideraction.Input{
@@ -150,10 +157,30 @@ func aiProviderModelsFromAction(input []aiprovideraction.Model) []AIProviderMode
 	models := make([]AIProviderModel, 0, len(input))
 	for _, model := range input {
 		models = append(models, AIProviderModel{
-			Identifier: model.Identifier, Name: model.Name, ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
+			Identifier: model.Identifier, Name: model.Name, Type: AIModelType(model.Type),
+			InputModalities: aiModelInputModalitiesFromDomain(model.InputModalities),
+			ContextWindow:   model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
 		})
 	}
 	return models
+}
+
+// aiModelInputModalitiesToDomain 转换模型输入模态到领域值。
+func aiModelInputModalitiesToDomain(input []AIModelInputModality) []domain.AIModelInputModality {
+	output := make([]domain.AIModelInputModality, 0, len(input))
+	for _, modality := range input {
+		output = append(output, domain.AIModelInputModality(modality))
+	}
+	return output
+}
+
+// aiModelInputModalitiesFromDomain 转换领域模型输入模态到应用契约。
+func aiModelInputModalitiesFromDomain(input []domain.AIModelInputModality) []AIModelInputModality {
+	output := make([]AIModelInputModality, 0, len(input))
+	for _, modality := range input {
+		output = append(output, AIModelInputModality(modality))
+	}
+	return output
 }
 
 // aiProviderFieldKeys 把 AI 供应商校验错误码映射为本地化文案键。

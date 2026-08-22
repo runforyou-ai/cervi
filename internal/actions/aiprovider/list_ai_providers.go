@@ -36,10 +36,29 @@ func (q *ListAIProvidersQuery) Execute(ctx context.Context, identity *servermode
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("list AI providers: %w", err)
 	}
+	modelRecords := make([]servermodels.AIProviderModel, 0)
+	if err := q.db.NewSelect().
+		Model(&modelRecords).
+		Column("provider_id", "model_type").
+		Where("aipm.organization_id = ?", identity.Organization.ID).
+		Group("provider_id", "model_type").
+		Order("provider_id ASC").
+		Order("model_type ASC").
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("list AI provider model types: %w", err)
+	}
+	modelTypesByProvider := make(map[string][]domain.AIModelType)
+	for _, record := range modelRecords {
+		modelTypesByProvider[record.ProviderID] = append(
+			modelTypesByProvider[record.ProviderID],
+			domain.AIModelType(record.Type),
+		)
+	}
 	output := make([]Summary, 0, len(providers))
 	for _, provider := range providers {
 		output = append(output, Summary{
 			ID: provider.ID, Brand: domain.AIProviderBrand(provider.Brand), Name: provider.Name, APIURL: provider.APIURL,
+			ModelTypes: modelTypesByProvider[provider.ID],
 		})
 	}
 	return output, nil

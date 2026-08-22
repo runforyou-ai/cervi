@@ -5,6 +5,7 @@ package aiprovider
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -48,8 +49,13 @@ func loadModels(ctx context.Context, db bun.IDB, organizationID, providerID stri
 	}
 	models := make([]Model, 0, len(records))
 	for _, record := range records {
+		inputModalities := make([]domain.AIModelInputModality, 0)
+		if err := json.Unmarshal(record.InputModalities, &inputModalities); err != nil {
+			return nil, err
+		}
 		models = append(models, Model{
-			Identifier: record.Identifier, Name: record.Name, ContextWindow: record.ContextWindow, MaxOutputTokens: record.MaxOutputTokens,
+			Identifier: record.Identifier, Name: record.Name, Type: domain.AIModelType(record.Type),
+			InputModalities: inputModalities, ContextWindow: record.ContextWindow, MaxOutputTokens: record.MaxOutputTokens,
 		})
 	}
 	return models, nil
@@ -66,9 +72,14 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 	}
 	records := make([]servermodels.AIProviderModel, 0, len(models))
 	for _, model := range models {
+		inputModalities, err := json.Marshal(model.InputModalities)
+		if err != nil {
+			return err
+		}
 		records = append(records, servermodels.AIProviderModel{
 			ProviderID: providerID, OrganizationID: organizationID, Identifier: model.Identifier,
-			Name: model.Name, ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
+			Name: model.Name, Type: string(model.Type), ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
+			InputModalities: inputModalities,
 		})
 	}
 	if len(records) == 0 {
@@ -76,7 +87,10 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 	}
 	_, err := tx.NewInsert().
 		Model(&records).
-		Column("provider_id", "organization_id", "identifier", "name", "context_window", "max_output_tokens").
+		Column(
+			"provider_id", "organization_id", "identifier", "name", "model_type", "input_modalities",
+			"context_window", "max_output_tokens",
+		).
 		Exec(ctx)
 	return err
 }

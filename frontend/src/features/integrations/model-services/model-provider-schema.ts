@@ -1,10 +1,14 @@
-/** AI 供应商表单校验规则。 */
+/** 模型服务供应商表单校验规则。 */
 import { z } from "zod"
 
-import { AIProviderBrand } from "@/api"
+import {
+  AIModelInputModality,
+  AIModelType,
+  AIProviderBrand,
+} from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
-/** 判断 AI API 地址是否完整有效。 */
+/** 判断模型服务 API 地址是否完整有效。 */
 function validAPIURL(value: string) {
   try {
     const endpoint = new URL(value)
@@ -20,7 +24,7 @@ function validAPIURL(value: string) {
   }
 }
 
-/** 创建 AI 供应商表单校验。 */
+/** 创建模型服务供应商表单校验。 */
 export function createAIProviderSchema(messages: {
   brandInvalid: string
   nameRequired: string
@@ -33,6 +37,9 @@ export function createAIProviderSchema(messages: {
   modelIdentifierTooLong: string
   modelNameRequired: string
   modelNameTooLong: string
+  modelTypeInvalid: string
+  inputModalityInvalid: string
+  inputModalitiesRequired: string
   contextWindowInvalid: string
   maxOutputTokensInvalid: string
   modelIdentifierDuplicate: string
@@ -56,32 +63,48 @@ export function createAIProviderSchema(messages: {
       .refine(validAPIURL, messages.apiUrlInvalid),
     models: z
       .array(
-        z.object({
-          identifier: z
-            .string()
-            .trim()
-            .min(1, messages.modelIdentifierRequired)
-            .max(200, messages.modelIdentifierTooLong),
-          name: z
-            .string()
-            .trim()
-            .min(1, messages.modelNameRequired)
-            .max(200, messages.modelNameTooLong),
-          contextWindow: z
-            .string()
-            .trim()
-            .refine(
-              (value) => parseTokenCount(value) !== null,
-              messages.contextWindowInvalid,
-            ),
-          maxOutputTokens: z
-            .string()
-            .trim()
-            .refine(
-              (value) => parseTokenCount(value) !== null,
-              messages.maxOutputTokensInvalid,
-            ),
-        }),
+        z
+          .object({
+            identifier: z
+              .string()
+              .trim()
+              .min(1, messages.modelIdentifierRequired)
+              .max(200, messages.modelIdentifierTooLong),
+            name: z
+              .string()
+              .trim()
+              .min(1, messages.modelNameRequired)
+              .max(200, messages.modelNameTooLong),
+            type: requiredWailsEnum(AIModelType, messages.modelTypeInvalid),
+            inputModalities: z
+              .array(
+                requiredWailsEnum(
+                  AIModelInputModality,
+                  messages.inputModalityInvalid,
+                ),
+              )
+              .min(1, messages.inputModalitiesRequired),
+            contextWindow: z
+              .string()
+              .trim()
+              .refine(
+                (value) => parseTokenCount(value) !== null,
+                messages.contextWindowInvalid,
+              ),
+            maxOutputTokens: z.string().trim(),
+          })
+          .superRefine((model, context) => {
+            if (
+              model.type === AIModelType.AIModelTypeChat &&
+              parseTokenCount(model.maxOutputTokens) === null
+            ) {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: messages.maxOutputTokensInvalid,
+                path: ["maxOutputTokens"],
+              })
+            }
+          }),
       )
       .superRefine((models, context) => {
         const identifiers = new Set<string>()

@@ -7,9 +7,10 @@ import { WebsiteChannelFormPage } from "@/features/channels/website/website-chan
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
+import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
+import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
-import { AIProviderFormPage } from "@/features/settings/ai-provider-form-page"
 import { RoleFormPage } from "@/features/settings/role-form-page"
 import {
   PersonalSettingsPage,
@@ -61,26 +62,6 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
           element={<SystemSettingsPage section="organization" />}
         />
         <Route
-          path="/settings/ai-providers"
-          element={<SystemSettingsPage section="aiProviders" />}
-        />
-        <Route
-          path="/settings/ai-providers/new"
-          element={
-            <SystemSettingsPage section="aiProviders">
-              <AIProviderFormPage mode="create" />
-            </SystemSettingsPage>
-          }
-        />
-        <Route
-          path="/settings/ai-providers/:providerId"
-          element={
-            <SystemSettingsPage section="aiProviders">
-              <AIProviderFormPage mode="edit" />
-            </SystemSettingsPage>
-          }
-        />
-        <Route
           path="/settings/roles"
           element={<SystemSettingsPage section="roles" />}
         />
@@ -126,6 +107,60 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
           <Route
             path="channels/:channelId"
             element={<WebsiteChannelFormPage mode="edit" />}
+          />
+          <Route
+            path="model-services"
+            element={
+              <Navigate to="/integrations/model-services/chat" replace />
+            }
+          />
+          <Route
+            path="model-services/chat"
+            element={<ModelProviderListPage section="chat" />}
+          />
+          <Route
+            path="model-services/chat/new"
+            element={
+              <ModelProviderFormPage mode="create" returnSection="chat" />
+            }
+          />
+          <Route
+            path="model-services/chat/:providerId"
+            element={
+              <ModelProviderFormPage mode="edit" returnSection="chat" />
+            }
+          />
+          <Route
+            path="model-services/embedding"
+            element={<ModelProviderListPage section="embedding" />}
+          />
+          <Route
+            path="model-services/embedding/new"
+            element={
+              <ModelProviderFormPage mode="create" returnSection="embedding" />
+            }
+          />
+          <Route
+            path="model-services/embedding/:providerId"
+            element={
+              <ModelProviderFormPage mode="edit" returnSection="embedding" />
+            }
+          />
+          <Route
+            path="model-services/rerank"
+            element={<ModelProviderListPage section="rerank" />}
+          />
+          <Route
+            path="model-services/rerank/new"
+            element={
+              <ModelProviderFormPage mode="create" returnSection="rerank" />
+            }
+          />
+          <Route
+            path="model-services/rerank/:providerId"
+            element={
+              <ModelProviderFormPage mode="edit" returnSection="rerank" />
+            }
           />
         </Route>
       </Route>
