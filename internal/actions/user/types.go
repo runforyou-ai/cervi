@@ -35,6 +35,12 @@ type UpdateInput struct {
 	TeamIDs     []string
 }
 
+// RoleChangeInput 定义一名企业成员的目标角色。
+type RoleChangeInput struct {
+	UserID string
+	RoleID string
+}
+
 // PageInfo 定义企业成员分页信息。
 type PageInfo struct {
 	Number int `json:"number"`

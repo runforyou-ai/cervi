@@ -31,6 +31,7 @@
   "error.user_update_failed": "Could not save the company member.",
   "error.user_status_update_failed": "Could not update the company member status.",
   "error.user_self_deactivate": "You cannot deactivate the account you are using.",
+  "error.user_last_active_administrator": "The administrator role must keep at least one active member.",
   "error.team_not_found": "This team could not be found.",
   "error.team_list_failed": "Could not load teams.",
   "error.team_create_failed": "Could not create the team.",

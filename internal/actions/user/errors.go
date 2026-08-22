@@ -11,4 +11,8 @@ var (
 	ErrQueryInvalid = errors.New("user list query invalid")
 	// ErrSelfDeactivate 表示用户不能停用当前登录账号。
 	ErrSelfDeactivate = errors.New("current user cannot be deactivated")
+	// ErrLastActiveAdministrator 表示企业至少需要保留一名正常状态的管理员。
+	ErrLastActiveAdministrator = errors.New("organization requires an active administrator")
+	// ErrRoleChangesInvalid 表示批量角色调整参数无效。
+	ErrRoleChangesInvalid = errors.New("user role changes invalid")
 )

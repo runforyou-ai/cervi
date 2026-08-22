@@ -31,6 +31,10 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
+		administratorRoleID, err := lockAdministratorRole(ctx, tx, identity.Organization.ID)
+		if err != nil {
+			return err
+		}
 		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {
 			return err
 		}
@@ -54,6 +58,9 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		if rows == 0 {
 			return ErrNotFound
+		}
+		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
+			return err
 		}
 		if err := replaceUserTeams(ctx, tx, identity, userID, input.TeamIDs); err != nil {
 			return err

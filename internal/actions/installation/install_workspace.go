@@ -157,6 +157,18 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			Exec(ctx); err != nil {
 			return err
 		}
+		teamMember := &servermodels.TeamMember{
+			OrganizationID:  organization.ID,
+			TeamID:          team.ID,
+			IdentityType:    string(domain.MemberIdentityTypeUser),
+			IdentityID:      user.ID,
+			CreatedByUserID: user.ID,
+		}
+		if _, err := tx.NewInsert().Model(teamMember).
+			Column("organization_id", "team_id", "identity_type", "identity_id", "created_by_user_id").
+			Exec(ctx); err != nil {
+			return err
+		}
 
 		record := &servermodels.Token{
 			UserID:    user.ID,

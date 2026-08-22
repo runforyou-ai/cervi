@@ -9,6 +9,7 @@ import {
   addTeamMembers,
   isApiError,
   listTeamMemberCandidates,
+  type PageInfo,
   type Team,
   type TeamMemberCandidate,
 } from "@/api"
@@ -19,6 +20,8 @@ import { roleDisplayName } from "@/features/roles/role-labels"
 import { cn } from "@/lib/utils"
 
 type LoadState = "loading" | "ready" | "error"
+
+const memberPageSize = 50
 
 /** 展示成员头像，图片不可用时回退到姓名首字。 */
 function MemberAvatar({ member }: { member: TeamMemberCandidate }) {
@@ -56,6 +59,12 @@ export function TeamMemberPicker({
   const { t: tCommon } = useTranslation("common")
   const [search, setSearch] = useState("")
   const [query, setQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageInfo, setPageInfo] = useState<PageInfo>({
+    number: 1,
+    size: memberPageSize,
+    total: 0,
+  })
   const [members, setMembers] = useState<TeamMemberCandidate[]>([])
   const [selected, setSelected] = useState<Map<string, TeamMemberCandidate>>(
     new Map(),
@@ -65,7 +74,10 @@ export function TeamMemberPicker({
   const requestID = useRef(0)
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setQuery(search.trim()), 300)
+    const timeout = window.setTimeout(() => {
+      setQuery(search.trim())
+      setCurrentPage(1)
+    }, 300)
     return () => window.clearTimeout(timeout)
   }, [search])
 
@@ -77,11 +89,12 @@ export function TeamMemberPicker({
       try {
         const output = await listTeamMemberCandidates(team.id, {
           query,
-          page: 1,
-          pageSize: 100,
+          page: currentPage,
+          pageSize: memberPageSize,
         })
         if (currentRequestID !== requestID.current) return
         setMembers(output.members)
+        setPageInfo(output.page)
         setLoadState("ready")
       } catch (error) {
         if (currentRequestID !== requestID.current) return
@@ -90,7 +103,7 @@ export function TeamMemberPicker({
         setLoadState("error")
       }
     },
-    [query, team.id],
+    [currentPage, query, team.id],
   )
 
   useEffect(() => {
@@ -99,6 +112,8 @@ export function TeamMemberPicker({
       requestID.current += 1
     }
   }, [loadMembers])
+
+  const totalPages = Math.max(1, Math.ceil(pageInfo.total / pageInfo.size))
 
   /** 切换候选成员的选中状态。 */
   function toggleMember(member: TeamMemberCandidate, checked: boolean) {
@@ -219,6 +234,38 @@ export function TeamMemberPicker({
           </div>
         )}
       </div>
+
+      {totalPages > 1 ? (
+        <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>{t("pagination.total", { count: pageInfo.total })}</span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1 || loadState === "loading"}
+              onClick={() => setCurrentPage((page) => page - 1)}
+            >
+              {t("pagination.previous")}
+            </Button>
+            <span>
+              {t("pagination.page", {
+                current: pageInfo.number,
+                total: totalPages,
+              })}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages || loadState === "loading"}
+              onClick={() => setCurrentPage((page) => page + 1)}
+            >
+              {t("pagination.next")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground">

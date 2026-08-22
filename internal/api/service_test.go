@@ -21,6 +21,7 @@ type testBackend struct {
 	lastUserList     appservice.UserListInput
 	lastCreateUser   appservice.CreateUserInput
 	lastUpdateUser   appservice.UpdateDirectoryUserInput
+	lastRoleChanges  appservice.UserRoleChangesInput
 	lastTeamList     appservice.TeamListInput
 	lastTeam         appservice.TeamInput
 	lastTeamMembers  appservice.TeamMemberInput
@@ -122,6 +123,13 @@ func (b *testBackend) UpdateUser(_ context.Context, meta appservice.RequestMeta,
 	b.lastMeta = meta
 	b.lastUpdateUser = input
 	return appservice.DirectoryUser{ID: userID, DisplayName: input.DisplayName, Email: input.Email, Role: appservice.RoleSummary{ID: input.RoleID}, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
+}
+
+// UpdateUserRoles 记录批量角色调整输入。
+func (b *testBackend) UpdateUserRoles(_ context.Context, meta appservice.RequestMeta, input appservice.UserRoleChangesInput) error {
+	b.lastMeta = meta
+	b.lastRoleChanges = input
+	return nil
 }
 
 func (b *testBackend) ListTeams(_ context.Context, meta appservice.RequestMeta, input appservice.TeamListInput) (appservice.TeamList, error) {
@@ -243,6 +251,12 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 	defer memberResponse.Body.Close()
 	if memberResponse.StatusCode != http.StatusCreated || backend.lastCreateUser.DisplayName != "林晓" || len(backend.lastCreateUser.TeamIDs) != 1 {
 		t.Fatalf("status = %d, input = %#v", memberResponse.StatusCode, backend.lastCreateUser)
+	}
+
+	roleResponse := doJSON(t, http.MethodPatch, server.URL+"/users/roles", appservice.UserRoleChangesInput{Changes: []appservice.UserRoleChangeInput{{UserID: "0198ddee-c056-7bc5-a1d9-586f878ee967", RoleID: "0198ddee-c056-7bc5-a1d9-586f878ee966"}}}, "test-token")
+	defer roleResponse.Body.Close()
+	if roleResponse.StatusCode != http.StatusNoContent || len(backend.lastRoleChanges.Changes) != 1 || backend.lastRoleChanges.Changes[0].UserID == "" {
+		t.Fatalf("status = %d, input = %#v", roleResponse.StatusCode, backend.lastRoleChanges)
 	}
 
 	teamResponse := doJSON(t, http.MethodPost, server.URL+"/teams", appservice.TeamInput{Name: "客户成功", Description: "服务客户"}, "test-token")

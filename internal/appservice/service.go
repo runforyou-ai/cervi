@@ -27,6 +27,7 @@ type Backend interface {
 	GetUser(context.Context, RequestMeta, string) (DirectoryUser, error)
 	CreateUser(context.Context, RequestMeta, CreateUserInput) (DirectoryUser, error)
 	UpdateUser(context.Context, RequestMeta, string, UpdateDirectoryUserInput) (DirectoryUser, error)
+	UpdateUserRoles(context.Context, RequestMeta, UserRoleChangesInput) error
 	DeactivateUser(context.Context, RequestMeta, string) (DirectoryUser, error)
 	ReactivateUser(context.Context, RequestMeta, string) (DirectoryUser, error)
 	ListTeams(context.Context, RequestMeta, TeamListInput) (TeamList, error)
@@ -231,6 +232,11 @@ func (s *Service) CreateUser(ctx context.Context, meta RequestMeta, input Create
 // UpdateUser 修改企业成员资料、角色和所属团队。
 func (s *Service) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateDirectoryUserInput) (DirectoryUser, error) {
 	return s.backend.UpdateUser(ctx, meta, userID, input)
+}
+
+// UpdateUserRoles 在一个事务中批量调整企业成员角色。
+func (s *Service) UpdateUserRoles(ctx context.Context, meta RequestMeta, input UserRoleChangesInput) error {
+	return s.backend.UpdateUserRoles(ctx, meta, input)
 }
 
 // DeactivateUser 停用企业成员账号。

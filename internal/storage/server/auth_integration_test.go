@@ -77,12 +77,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if defaultTeam.Name != "Customer Service Team" || defaultTeam.CreatedByUserID != installed.Identity.User.ID {
 		t.Fatalf("unexpected default team: %#v", defaultTeam)
 	}
-	defaultTeamMembers, err := db.NewSelect().Model((*servermodels.TeamMember)(nil)).
+	defaultTeamMember := &servermodels.TeamMember{}
+	err = db.NewSelect().Model(defaultTeamMember).
 		Where("organization_id = ?", installed.Identity.Organization.ID).
 		Where("team_id = ?", defaultTeam.ID).
-		Count(context.Background())
-	if err != nil || defaultTeamMembers != 0 {
-		t.Fatalf("default team member count = %d, error = %v", defaultTeamMembers, err)
+		Scan(context.Background())
+	if err != nil || defaultTeamMember.IdentityType != string(domain.MemberIdentityTypeUser) || defaultTeamMember.IdentityID != installed.Identity.User.ID {
+		t.Fatalf("default team member = %#v, error = %v", defaultTeamMember, err)
 	}
 	currentStatus, err := status.Execute(context.Background())
 	if err != nil {
@@ -255,6 +256,29 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if len(createdMember.Teams) != 1 || createdMember.Teams[0].ID != team.ID {
 		t.Fatalf("created member teams = %#v", createdMember.Teams)
+	}
+	updateRoles := useraction.NewUpdateRolesAction(db)
+	if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []useraction.RoleChangeInput{{UserID: loggedIn.Identity.User.ID, RoleID: memberRole.ID}}); !errors.Is(err, useraction.ErrLastActiveAdministrator) {
+		t.Fatalf("remove last active administrator error = %v", err)
+	}
+	administratorAfterRollback, err := useraction.NewGetUserQuery(db).Execute(context.Background(), loggedIn.Identity, loggedIn.Identity.User.ID)
+	if err != nil || administratorAfterRollback.RoleID != loggedIn.Identity.User.RoleID {
+		t.Fatalf("administrator after rollback = %#v, error = %v", administratorAfterRollback, err)
+	}
+	if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []useraction.RoleChangeInput{
+		{UserID: loggedIn.Identity.User.ID, RoleID: memberRole.ID},
+		{UserID: createdMember.ID, RoleID: loggedIn.Identity.User.RoleID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive); !errors.Is(err, useraction.ErrLastActiveAdministrator) {
+		t.Fatalf("deactivate last active administrator error = %v", err)
+	}
+	if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []useraction.RoleChangeInput{
+		{UserID: loggedIn.Identity.User.ID, RoleID: loggedIn.Identity.User.RoleID},
+		{UserID: createdMember.ID, RoleID: memberRole.ID},
+	}); err != nil {
+		t.Fatal(err)
 	}
 	teamUsers, err := useraction.NewListUsersQuery(db).Execute(context.Background(), loggedIn.Identity, useraction.ListInput{TeamID: team.ID, Page: 1, PageSize: 50})
 	if err != nil || teamUsers.Page.Total != 1 || len(teamUsers.Users) != 1 {

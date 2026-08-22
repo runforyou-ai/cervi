@@ -31,6 +31,10 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
 		}
+		administratorRoleID, err := lockAdministratorRole(ctx, tx, identity.Organization.ID)
+		if err != nil {
+			return err
+		}
 		if status == domain.UserStatusInactive && userID == identity.User.ID {
 			return ErrSelfDeactivate
 		}
@@ -49,6 +53,9 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		}
 		if rows == 0 {
 			return ErrNotFound
+		}
+		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
+			return err
 		}
 		output, err = loadDirectoryUser(ctx, tx, identity.Organization.ID, userID)
 		return err

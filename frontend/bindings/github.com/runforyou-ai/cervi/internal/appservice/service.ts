@@ -407,6 +407,13 @@ export function UpdateUserPreferences(meta: $models.RequestMeta, input: $models.
 }
 
 /**
+ * UpdateUserRoles 在一个事务中批量调整企业成员角色。
+ */
+export function UpdateUserRoles(meta: $models.RequestMeta, input: $models.UserRoleChangesInput): $CancellablePromise<void> {
+    return $Call.ByID(2927672865, meta, input);
+}
+
+/**
  * UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
  */
 export function UpdateUserWorkStatus(meta: $models.RequestMeta, input: $models.UserWorkStatusInput): $CancellablePromise<$models.User> {

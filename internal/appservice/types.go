@@ -478,6 +478,17 @@ type UpdateDirectoryUserInput struct {
 	TeamIDs     []string `json:"teamIds"`
 }
 
+// UserRoleChangeInput 定义一名企业成员的目标角色。
+type UserRoleChangeInput struct {
+	UserID string `json:"userId"`
+	RoleID string `json:"roleId"`
+}
+
+// UserRoleChangesInput 定义一次批量角色调整。
+type UserRoleChangesInput struct {
+	Changes []UserRoleChangeInput `json:"changes"`
+}
+
 // TeamSummary 定义团队选择项和成员所属团队字段。
 type TeamSummary struct {
 	ID   string `json:"id"`

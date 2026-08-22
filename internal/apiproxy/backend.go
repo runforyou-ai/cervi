@@ -241,6 +241,11 @@ func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, u
 	return output, err
 }
 
+// UpdateUserRoles 在远程企业服务器中批量调整成员角色。
+func (b *Backend) UpdateUserRoles(ctx context.Context, meta appservice.RequestMeta, input appservice.UserRoleChangesInput) error {
+	return b.do(ctx, meta, http.MethodPatch, "/users/roles", nil, input, nil)
+}
+
 // DeactivateUser 停用远程企业成员账号。
 func (b *Backend) DeactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.DirectoryUser, error) {
 	var output appservice.DirectoryUser

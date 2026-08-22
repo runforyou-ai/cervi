@@ -48,6 +48,7 @@ type DirectBackend struct {
 	getUser                           *useraction.GetUserQuery
 	createUser                        *useraction.CreateUserAction
 	updateUser                        *useraction.UpdateUserAction
+	updateUserRoles                   *useraction.UpdateRolesAction
 	updateUserStatus                  *useraction.UpdateStatusAction
 	listTeams                         *teamaction.ListTeamsQuery
 	createTeam                        *teamaction.CreateTeamAction
@@ -106,6 +107,7 @@ func NewDirectBackend(db *bun.DB, localFiles *filestore.LocalStore) *DirectBacke
 		getUser:                           useraction.NewGetUserQuery(db),
 		createUser:                        useraction.NewCreateUserAction(db),
 		updateUser:                        useraction.NewUpdateUserAction(db),
+		updateUserRoles:                   useraction.NewUpdateRolesAction(db),
 		updateUserStatus:                  useraction.NewUpdateStatusAction(db),
 		listTeams:                         teamaction.NewListTeamsQuery(db),
 		createTeam:                        teamaction.NewCreateTeamAction(db),
