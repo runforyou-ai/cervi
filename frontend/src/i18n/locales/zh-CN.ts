@@ -363,10 +363,15 @@ const zhCN = {
       restoreError: "恢复联系人失败，请重试。",
     },
   },
-  channels: {
+  integrations: {
     title: "集成",
     navigation: "集成导航",
     messageChannels: "消息渠道",
+    businessSystems: "业务系统",
+    webhooks: "Webhook",
+    openApi: "开放接口",
+  },
+  channels: {
     types: {
       website: "网站",
     },
