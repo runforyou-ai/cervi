@@ -9,7 +9,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// AIProvider 表示 PostgreSQL 中的企业 AI 供应商。
+// AIProvider 表示 PostgreSQL 中的模型服务供应商。
 type AIProvider struct {
 	bun.BaseModel `bun:"table:ai_providers,alias:aip"`
 
@@ -23,7 +23,7 @@ type AIProvider struct {
 	UpdatedAt      time.Time `bun:"updated_at" json:"updatedAt"`
 }
 
-// AIProviderModel 表示 PostgreSQL 中供应商已启用的模型。
+// AIProviderModel 表示 PostgreSQL 中供应商模型目录项。
 type AIProviderModel struct {
 	bun.BaseModel `bun:"table:ai_provider_models,alias:aipm"`
 

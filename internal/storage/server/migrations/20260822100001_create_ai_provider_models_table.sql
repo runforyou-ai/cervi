@@ -1,20 +1,20 @@
 -- +goose Up
--- 创建 AI 供应商模型表。
+-- 创建模型服务供应商模型表。
 CREATE TABLE ai_provider_models (
     provider_id        uuid NOT NULL,
     organization_id    uuid NOT NULL,
     identifier         text NOT NULL,
     name               text NOT NULL,
     model_type         text NOT NULL,
-    input_modalities   jsonb NOT NULL DEFAULT '[]'::jsonb,
+    input_modalities   jsonb NOT NULL,
     context_window     bigint NOT NULL,
-    max_output_tokens  bigint NOT NULL DEFAULT 0,
+    max_output_tokens  bigint NOT NULL,
     created_at         timestamptz NOT NULL DEFAULT now(),
 
     PRIMARY KEY (provider_id, identifier)
 );
 
-COMMENT ON TABLE ai_provider_models IS 'AI 供应商已启用模型';
+COMMENT ON TABLE ai_provider_models IS '模型服务供应商模型目录';
 COMMENT ON COLUMN ai_provider_models.provider_id IS '供应商编号';
 COMMENT ON COLUMN ai_provider_models.organization_id IS '所属企业编号';
 COMMENT ON COLUMN ai_provider_models.identifier IS '模型标识';

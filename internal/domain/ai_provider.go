@@ -1,6 +1,6 @@
 package domain
 
-// AIProviderBrand 定义 AI 供应商品牌。
+// AIProviderBrand 定义模型服务供应商品牌。
 type AIProviderBrand string
 
 const (

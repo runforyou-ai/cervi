@@ -10,7 +10,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// ValidationCode 标识 AI 供应商字段校验结果。
+// ValidationCode 标识模型服务供应商字段校验结果。
 type ValidationCode = common.FieldCode
 
 const (
@@ -25,10 +25,10 @@ const (
 	ValidationModelsInvalid  ValidationCode = "MODELS_INVALID"
 )
 
-// ValidationError 表示 AI 供应商字段校验失败。
+// ValidationError 表示模型服务供应商字段校验失败。
 type ValidationError = common.FieldError
 
-// normalizeInput 规范化 AI 供应商输入并校验所选模型。
+// normalizeInput 规范化模型服务供应商输入并校验模型目录。
 func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	fields := make(map[string]ValidationCode)
 	input.Name = strings.TrimSpace(input.Name)

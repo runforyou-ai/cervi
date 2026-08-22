@@ -1,4 +1,4 @@
-/** 按模型能力筛选并管理共享供应商实例。 */
+/** 模型服务供应商列表页。 */
 import { useCallback, useEffect, useRef, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -6,11 +6,9 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  AIModelType,
   deleteAIProvider,
   isApiError,
   listAIProviders,
-  type AIModelTypeId,
   type AIProviderSummaryData,
 } from "@/api"
 import { PageContent } from "@/components/page-content"
@@ -42,54 +40,17 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getAIProviderBrand } from "@/features/integrations/model-services/model-provider-brands"
-import type { ModelServiceSection } from "@/features/integrations/model-services/model-provider-form-page"
+import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
+import {
+  modelServiceSectionConfigs,
+  modelServiceSectionOrder,
+  modelTypeNameKeys,
+  type ModelServiceSection,
+} from "@/features/integrations/model-services/model-service-options"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-const modelServiceSections: ModelServiceSection[] = [
-  "chat",
-  "embedding",
-  "rerank",
-]
-
-/** 把页面分类转换为模型类型。 */
-function sectionModelType(section: ModelServiceSection): AIModelTypeId {
-  switch (section) {
-    case "chat":
-      return AIModelType.AIModelTypeChat
-    case "embedding":
-      return AIModelType.AIModelTypeEmbedding
-    case "rerank":
-      return AIModelType.AIModelTypeRerank
-  }
-}
-
-/** 返回模型类型的页签文案键。 */
-function sectionNameKey(section: ModelServiceSection) {
-  switch (section) {
-    case "chat":
-      return "modelServices.tabs.chat" as const
-    case "embedding":
-      return "modelServices.tabs.embedding" as const
-    case "rerank":
-      return "modelServices.tabs.rerank" as const
-  }
-}
-
-/** 返回供应商已启用能力的文案键。 */
-function modelTypeNameKey(type: AIModelTypeId) {
-  switch (type) {
-    case AIModelType.AIModelTypeChat:
-      return "modelServices.models.types.chat" as const
-    case AIModelType.AIModelTypeEmbedding:
-      return "modelServices.models.types.embedding" as const
-    case AIModelType.AIModelTypeRerank:
-      return "modelServices.models.types.rerank" as const
-  }
-}
-
-/** 加载并管理指定能力下的模型服务供应商。 */
+/** 显示指定类型的模型服务供应商。 */
 export function ModelProviderListPage({
   section,
 }: {
@@ -105,11 +66,9 @@ export function ModelProviderListPage({
   const [deleting, setDeleting] = useState(false)
   const loadVersion = useRef(0)
   const mounted = useRef(true)
-  const selectedType = sectionModelType(section)
+  const sectionConfig = modelServiceSectionConfigs[section]
   const visibleProviders = providers.filter(
-    (provider) =>
-      provider.modelTypes.includes(selectedType) ||
-      (section === "chat" && provider.modelTypes.length === 0),
+    (provider) => provider.modelTypes.includes(sectionConfig.modelType),
   )
 
   /** 读取模型服务供应商列表。 */
@@ -186,9 +145,9 @@ export function ModelProviderListPage({
           }
         >
           <TabsList>
-            {modelServiceSections.map((item) => (
+            {modelServiceSectionOrder.map((item) => (
               <TabsTrigger key={item} value={item}>
-                {t(sectionNameKey(item))}
+                {t(modelServiceSectionConfigs[item].nameKey)}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -231,7 +190,7 @@ export function ModelProviderListPage({
                         className="h-32 text-center text-muted-foreground"
                       >
                         {t("modelServices.list.empty", {
-                          type: t(sectionNameKey(section)),
+                          type: t(sectionConfig.nameKey),
                         })}
                       </TableCell>
                     </TableRow>
@@ -239,14 +198,14 @@ export function ModelProviderListPage({
                     visibleProviders.map((provider) => (
                       <TableRow key={provider.id}>
                         <TableCell>
-                          {t(getAIProviderBrand(provider.brand).nameKey)}
+                          {t(aiProviderBrandConfigs[provider.brand].nameKey)}
                         </TableCell>
                         <TableCell className="font-medium">
                           <SelectableText>{provider.name}</SelectableText>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {provider.modelTypes
-                            .map((type) => t(modelTypeNameKey(type)))
+                            .map((type) => t(modelTypeNameKeys[type]))
                             .join("、")}
                         </TableCell>
                         <TableCell className="text-muted-foreground">

@@ -11,17 +11,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdateAIProviderAction 修改 AI 供应商。
+// UpdateAIProviderAction 修改模型服务供应商。
 type UpdateAIProviderAction struct {
 	db *bun.DB
 }
 
-// NewUpdateAIProviderAction 创建 AI 供应商修改操作。
+// NewUpdateAIProviderAction 创建模型服务供应商修改操作。
 func NewUpdateAIProviderAction(db *bun.DB) *UpdateAIProviderAction {
 	return &UpdateAIProviderAction{db: db}
 }
 
-// Execute 修改 AI 供应商和模型目录。
+// Execute 修改模型服务供应商和模型目录。
 func (a *UpdateAIProviderAction) Execute(ctx context.Context, identity *servermodels.Identity, providerID string, input Input) (*Record, error) {
 	input, fields := normalizeInput(input)
 	if len(fields) > 0 {

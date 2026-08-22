@@ -4,7 +4,7 @@ package aiprovider
 
 import "github.com/runforyou-ai/cervi/internal/domain"
 
-// AvailableModels 返回指定品牌可选的模型目录。
+// AvailableModels 返回指定品牌的预设模型目录。
 func AvailableModels(brand domain.AIProviderBrand) []Model {
 	text := []domain.AIModelInputModality{domain.AIModelInputModalityText}
 	textAndImage := []domain.AIModelInputModality{domain.AIModelInputModalityText, domain.AIModelInputModalityImage}

@@ -1,4 +1,4 @@
-/** 模型服务供应商新建和编辑页。 */
+/** 模型服务供应商表单页。 */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
@@ -14,13 +14,12 @@ import { toast } from "sonner"
 import {
   AIModelInputModality,
   AIModelType,
-  AIProviderBrand,
   createAIProvider,
   getAIProvider,
   isApiError,
   listAvailableAIModels,
   updateAIProvider,
-  type AIModelInputModalityId,
+  type AIProviderBrandId,
   type AIProviderModelData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
@@ -45,9 +44,16 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  aiProviderBrands,
-  getAIProviderBrand,
+  aiProviderBrandConfigs,
+  aiProviderBrandOrder,
 } from "@/features/integrations/model-services/model-provider-brands"
+import {
+  modelInputModalityNameKeys,
+  modelInputModalityOrder,
+  modelServiceSectionConfigs,
+  modelTypeNameKeys,
+  type ModelServiceSection,
+} from "@/features/integrations/model-services/model-service-options"
 import {
   createAIProviderSchema,
   parseTokenCount,
@@ -56,57 +62,11 @@ import {
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-export type ModelServiceSection = "chat" | "embedding" | "rerank"
-
-const modelInputModalities: AIModelInputModalityId[] = [
-  AIModelInputModality.AIModelInputModalityText,
-  AIModelInputModality.AIModelInputModalityImage,
-  AIModelInputModality.AIModelInputModalityAudio,
-  AIModelInputModality.AIModelInputModalityVideo,
-]
-
-/** 返回从当前模型页签添加供应商时的默认品牌。 */
-function defaultProviderBrand(section: ModelServiceSection) {
-  return section === "chat"
-    ? AIProviderBrand.AIProviderBrandDeepSeek
-    : AIProviderBrand.AIProviderBrandAlibaba
-}
-
 /** 把模型 Token 数转换为紧凑显示值。 */
 function formatTokenCount(value: number) {
   if (value % 1_048_576 === 0) return `${value / 1_048_576}M`
   if (value % 1024 === 0) return `${value / 1024}K`
   return String(value)
-}
-
-/** 返回模型类型的本地化文案键。 */
-function modelTypeNameKey(type: AIModelType) {
-  switch (type) {
-    case AIModelType.AIModelTypeChat:
-      return "modelServices.models.types.chat" as const
-    case AIModelType.AIModelTypeEmbedding:
-      return "modelServices.models.types.embedding" as const
-    case AIModelType.AIModelTypeRerank:
-      return "modelServices.models.types.rerank" as const
-    default:
-      throw new Error(`Unsupported AI model type: ${type}`)
-  }
-}
-
-/** 返回输入模态的本地化文案键。 */
-function modalityNameKey(modality: AIModelInputModality) {
-  switch (modality) {
-    case AIModelInputModality.AIModelInputModalityText:
-      return "modelServices.models.modalities.text" as const
-    case AIModelInputModality.AIModelInputModalityImage:
-      return "modelServices.models.modalities.image" as const
-    case AIModelInputModality.AIModelInputModalityAudio:
-      return "modelServices.models.modalities.audio" as const
-    case AIModelInputModality.AIModelInputModalityVideo:
-      return "modelServices.models.modalities.video" as const
-    default:
-      throw new Error(`Unsupported AI model modality: ${modality}`)
-  }
 }
 
 /** 把模型契约转换为表单值。 */
@@ -122,7 +82,7 @@ function modelFormValue(model: AIProviderModelData) {
   }
 }
 
-/** 显示供应商资料、连接设置和共享模型目录。 */
+/** 编辑供应商连接和模型目录。 */
 export function ModelProviderFormPage({
   mode,
   returnSection,
@@ -144,7 +104,7 @@ export function ModelProviderFormPage({
   const loadVersion = useRef(0)
   const mounted = useRef(true)
   const listPath = `/integrations/model-services/${returnSection}`
-  const initialBrand = defaultProviderBrand(returnSection)
+  const initialBrand = modelServiceSectionConfigs[returnSection].defaultBrand
   const schema = useMemo(
     () =>
       createAIProviderSchema({
@@ -190,7 +150,7 @@ export function ModelProviderFormPage({
       brand: initialBrand,
       name: "",
       apiKey: "",
-      apiUrl: getAIProviderBrand(initialBrand).defaultAPIURL,
+      apiUrl: aiProviderBrandConfigs[initialBrand].defaultAPIURL,
       models: [],
     },
   })
@@ -240,8 +200,9 @@ export function ModelProviderFormPage({
   async function openModelDialog() {
     if (loadingModels) return
     setLoadingModels(true)
+    const brand = form.getValues("brand")
     try {
-      const models = await listAvailableAIModels(form.getValues("brand"))
+      const models = await listAvailableAIModels(brand)
       if (!mounted.current) return
       setAvailableModels(models)
       setDraftModelIDs(new Set(models.map((model) => model.identifier)))
@@ -249,7 +210,7 @@ export function ModelProviderFormPage({
     } catch (requestError) {
       if (!mounted.current) return
       if (recoverSession(requestError, navigate)) return
-      console.warn("预设模型加载失败", requestError)
+      console.warn("预设模型加载失败", { brand, error: requestError })
       toast.error(
         isApiError(requestError)
           ? apiErrorMessage(requestError, ["brand"])
@@ -410,12 +371,12 @@ export function ModelProviderFormPage({
                       required
                       aria-invalid={fieldState.invalid}
                       onChange={(event) => {
-                        const previous = getAIProviderBrand(field.value)
+                        const previousBrand = field.value as AIProviderBrandId
+                        const nextBrand = event.target.value as AIProviderBrandId
+                        const previous = aiProviderBrandConfigs[previousBrand]
                         const currentAPIURL = form.getValues("apiUrl")
-                        field.onChange(event)
-                        const next = getAIProviderBrand(
-                          event.target.value as AIProviderBrand,
-                        )
+                        field.onChange(nextBrand)
+                        const next = aiProviderBrandConfigs[nextBrand]
                         if (
                           currentAPIURL === "" ||
                           currentAPIURL === previous.defaultAPIURL
@@ -426,12 +387,11 @@ export function ModelProviderFormPage({
                           })
                         }
                         modelFields.replace([])
-                        setAvailableModels([])
                       }}
                     >
-                      {aiProviderBrands.map((brand) => (
-                        <option key={brand.id} value={brand.id}>
-                          {t(brand.nameKey)}
+                      {aiProviderBrandOrder.map((brand) => (
+                        <option key={brand} value={brand}>
+                          {t(aiProviderBrandConfigs[brand].nameKey)}
                         </option>
                       ))}
                     </NativeSelect>
@@ -583,7 +543,7 @@ export function ModelProviderFormPage({
                             </TableCell>
                             <TableCell className="min-w-56">
                               <div className="flex flex-wrap gap-x-3 gap-y-2">
-                                {modelInputModalities.map((modality) => (
+                                {modelInputModalityOrder.map((modality) => (
                                   <label
                                     key={modality}
                                     className="inline-flex items-center gap-1.5 text-xs"
@@ -596,7 +556,7 @@ export function ModelProviderFormPage({
                                       value={modality}
                                       className="size-4 accent-primary"
                                     />
-                                    {t(modalityNameKey(modality))}
+                                    {t(modelInputModalityNameKeys[modality])}
                                   </label>
                                 ))}
                               </div>
@@ -722,10 +682,12 @@ export function ModelProviderFormPage({
                     <TableCell className="font-mono text-xs">
                       {model.identifier}
                     </TableCell>
-                    <TableCell>{t(modelTypeNameKey(model.type))}</TableCell>
+                    <TableCell>{t(modelTypeNameKeys[model.type])}</TableCell>
                     <TableCell>
                       {model.inputModalities
-                        .map((modality) => t(modalityNameKey(modality)))
+                        .map((modality) =>
+                          t(modelInputModalityNameKeys[modality]),
+                        )
                         .join("、")}
                     </TableCell>
                   </TableRow>

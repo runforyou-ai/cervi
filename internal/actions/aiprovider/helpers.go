@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -15,7 +16,7 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 )
 
-// loadProvider 读取当前企业中的 AI 供应商。
+// loadProvider 读取当前企业中的模型服务供应商。
 func loadProvider(ctx context.Context, db bun.IDB, organizationID, providerID string, lock bool) (*servermodels.AIProvider, error) {
 	if !common.ValidUUID(providerID) {
 		return nil, ErrNotFound
@@ -51,7 +52,7 @@ func loadModels(ctx context.Context, db bun.IDB, organizationID, providerID stri
 	for _, record := range records {
 		inputModalities := make([]domain.AIModelInputModality, 0)
 		if err := json.Unmarshal(record.InputModalities, &inputModalities); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("decode model %q input modalities: %w", record.Identifier, err)
 		}
 		models = append(models, Model{
 			Identifier: record.Identifier, Name: record.Name, Type: domain.AIModelType(record.Type),
@@ -82,9 +83,6 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 			InputModalities: inputModalities,
 		})
 	}
-	if len(records) == 0 {
-		return nil
-	}
 	_, err := tx.NewInsert().
 		Model(&records).
 		Column(
@@ -95,7 +93,7 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 	return err
 }
 
-// recordFromModel 转换 AI 供应商存储模型。
+// recordFromModel 转换模型服务供应商存储模型。
 func recordFromModel(provider servermodels.AIProvider, models []Model) Record {
 	return Record{
 		ID: provider.ID, Brand: domain.AIProviderBrand(provider.Brand), Name: provider.Name,

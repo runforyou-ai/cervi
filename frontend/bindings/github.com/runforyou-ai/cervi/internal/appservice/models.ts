@@ -31,7 +31,7 @@ export enum AIModelType {
 };
 
 /**
- * AIProvider 定义企业 AI 供应商及其模型目录。
+ * AIProvider 定义企业模型服务供应商及其模型目录。
  */
 export interface AIProvider {
     "id": string;
@@ -43,7 +43,7 @@ export interface AIProvider {
 }
 
 /**
- * AIProviderBrand 表示 AI 供应商品牌。
+ * AIProviderBrand 表示模型服务供应商品牌。
  */
 export enum AIProviderBrand {
     /**
@@ -57,7 +57,7 @@ export enum AIProviderBrand {
 };
 
 /**
- * AIProviderInput 定义 AI 供应商可编辑字段。
+ * AIProviderInput 定义模型服务供应商可编辑字段。
  */
 export interface AIProviderInput {
     "brand": AIProviderBrand;
@@ -68,14 +68,14 @@ export interface AIProviderInput {
 }
 
 /**
- * AIProviderList 定义企业 AI 供应商列表。
+ * AIProviderList 定义模型服务供应商列表。
  */
 export interface AIProviderList {
     "providers": AIProviderSummary[] | null;
 }
 
 /**
- * AIProviderModel 定义 AI 供应商模型目录项。
+ * AIProviderModel 定义模型服务供应商的模型目录项。
  */
 export interface AIProviderModel {
     "identifier": string;
@@ -87,14 +87,14 @@ export interface AIProviderModel {
 }
 
 /**
- * AIProviderModelList 定义指定品牌的可用模型目录。
+ * AIProviderModelList 定义指定品牌的预设模型目录。
  */
 export interface AIProviderModelList {
     "models": AIProviderModel[] | null;
 }
 
 /**
- * AIProviderSummary 定义企业 AI 供应商列表项。
+ * AIProviderSummary 定义模型服务供应商列表项。
  */
 export interface AIProviderSummary {
     "id": string;
