@@ -371,10 +371,15 @@ const enUS = {
       restoreError: "Could not restore the contact. Try again.",
     },
   },
-  channels: {
+  integrations: {
     title: "Integrations",
     navigation: "Integration navigation",
     messageChannels: "Message channels",
+    businessSystems: "Business systems",
+    webhooks: "Webhooks",
+    openApi: "Developer API",
+  },
+  channels: {
     types: {
       website: "Website",
     },

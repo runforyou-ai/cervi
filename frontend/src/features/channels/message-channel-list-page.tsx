@@ -1,4 +1,4 @@
-/** 消息渠道列表页，统一展示并筛选各类渠道。 */
+/** 消息渠道列表页，统一展示当前支持的渠道。 */
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -50,7 +50,7 @@ import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
 
-/** 消息渠道列表中的一行。 */
+/** 网站消息渠道列表中的一行。 */
 function WebsiteChannelRow({
   channel,
   updating,
@@ -114,7 +114,7 @@ function WebsiteChannelRow({
 }
 
 /** 加载并管理消息渠道列表。 */
-export function WebsiteChannelListPage() {
+export function MessageChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
   const [channels, setChannels] = useState<WebsiteChannelSummary[]>([])

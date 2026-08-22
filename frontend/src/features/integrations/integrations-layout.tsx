@@ -10,7 +10,7 @@ import {
 
 /** 显示集成导航和当前功能页面。 */
 export function IntegrationsLayout() {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation("integrations")
 
   return (
     <PageSplit
@@ -21,6 +21,9 @@ export function IntegrationsLayout() {
           <PagePaneLink to="/integrations/channels">
             {t("messageChannels")}
           </PagePaneLink>
+          <PagePaneLink>{t("businessSystems")}</PagePaneLink>
+          <PagePaneLink>{t("webhooks")}</PagePaneLink>
+          <PagePaneLink>{t("openApi")}</PagePaneLink>
         </PagePaneNav>
       }
     >
