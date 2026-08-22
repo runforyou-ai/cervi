@@ -45,8 +45,8 @@ func (a *UpdateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 			Set("name = ?", input.Name).
 			Set("description = NULL").
 			Set("default_locale = ?", input.DefaultLocale).
-			Set("new_conversation_target_type = ?", input.NewConversationTarget.Type).
-			Set("new_conversation_target_id = ?", routingTargetID(input.NewConversationTarget)).
+			Set("initial_routing_target_type = ?", input.NewConversationTarget.Type).
+			Set("initial_routing_target_id = ?", routingTargetID(input.NewConversationTarget)).
 			Set("fallback_target_type = ?", input.FallbackTarget.Type).
 			Set("fallback_target_id = ?", routingTargetID(input.FallbackTarget)).
 			Set("updated_at = now()")

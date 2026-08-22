@@ -13,12 +13,12 @@ import (
 // ResetRoutingTarget 把引用指定对象的渠道路由重置为公共队列。
 func ResetRoutingTarget(ctx context.Context, db bun.IDB, organizationID string, targetType domain.ChannelRoutingTargetType, targetID string) error {
 	if _, err := db.NewUpdate().Model((*servermodels.Channel)(nil)).
-		Set("new_conversation_target_type = ?", domain.ChannelRoutingTargetTypePublicQueue).
-		Set("new_conversation_target_id = NULL").
+		Set("initial_routing_target_type = ?", domain.ChannelRoutingTargetTypePublicQueue).
+		Set("initial_routing_target_id = NULL").
 		Set("updated_at = now()").
 		Where("organization_id = ?", organizationID).
-		Where("new_conversation_target_type = ?", targetType).
-		Where("new_conversation_target_id = ?", targetID).
+		Where("initial_routing_target_type = ?", targetType).
+		Where("initial_routing_target_id = ?", targetID).
 		Exec(ctx); err != nil {
 		return err
 	}

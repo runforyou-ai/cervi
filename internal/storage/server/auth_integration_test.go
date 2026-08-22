@@ -344,7 +344,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.ID},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
-	if err != nil || channel.NewConversationTargetID == nil || *channel.NewConversationTargetID != createdAgent.ID {
+	if err != nil || channel.InitialRoutingTargetID == nil || *channel.InitialRoutingTargetID != createdAgent.ID {
 		t.Fatalf("agent channel routing = %#v, error = %v", channel, err)
 	}
 	updatedAgent, err = agentaction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, domain.UserStatusInactive)
@@ -352,7 +352,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("inactive agent = %#v, error = %v", updatedAgent, err)
 	}
 	detail, err = getChannel.Execute(context.Background(), loggedIn.Identity, channel.ID)
-	if err != nil || detail.NewConversationTargetType != string(domain.ChannelRoutingTargetTypePublicQueue) || detail.NewConversationTargetID != nil {
+	if err != nil || detail.InitialRoutingTargetType != string(domain.ChannelRoutingTargetTypePublicQueue) || detail.InitialRoutingTargetID != nil {
 		t.Fatalf("channel routing after agent deactivation = %#v, error = %v", detail.Channel, err)
 	}
 	if _, err := agentaction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, domain.UserStatusActive); err != nil {
