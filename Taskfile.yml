@@ -12,6 +12,8 @@ vars:
   DATABASE_NAME: '{{.CERVI_DATABASE_NAME | default ""}}'
   INFRA_COMPOSE_PROJECT: '{{.CERVI_INFRA_COMPOSE_PROJECT | default "cervi"}}'
   POSTGRES_USER: '{{.CERVI_POSTGRES_USER | default "cervi"}}'
+  NATS_URL: '{{.CERVI_NATS_URL | default ""}}'
+  NATS_NAMESPACE: '{{.CERVI_NATS_NAMESPACE | default ""}}'
   # GOOS 默认使用当前系统，也可在交叉构建时显式覆盖。
   GOOS: '{{.GOOS | default OS}}'
 
@@ -64,10 +66,16 @@ tasks:
         msg: "请在 .env 中配置 WAILS_MCP_PORT"
       - sh: '{{if .CERVI_PUBLIC_URL}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置 CERVI_PUBLIC_URL"
+      - sh: '{{if .NATS_URL}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 CERVI_NATS_URL"
+      - sh: '{{if regexMatch "^[a-z0-9][a-z0-9_-]*$" .NATS_NAMESPACE}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置有效的 CERVI_NATS_NAMESPACE"
+      - sh: '{{if eq .WORKSPACE .NATS_NAMESPACE}}true{{else}}false{{end}}'
+        msg: "CERVI_NATS_NAMESPACE 必须与 CERVI_WORKSPACE 一致"
       - sh: 'case "{{.DATABASE_URL}}" in */{{.DATABASE_NAME}}\?*|*/{{.DATABASE_NAME}}) true ;; *) false ;; esac'
         msg: "DATABASE_URL 中的数据库名必须与 CERVI_DATABASE_NAME 一致"
     cmds:
-      - 'echo "工作区 {{.WORKSPACE}}：Server {{.WAILS_SERVER_PORT}}，Vite {{.WAILS_VITE_PORT}}，MCP {{.WAILS_MCP_PORT}}，数据库 {{.DATABASE_NAME}}，公网 {{.CERVI_PUBLIC_URL}}"'
+      - 'echo "工作区 {{.WORKSPACE}}：Server {{.WAILS_SERVER_PORT}}，Vite {{.WAILS_VITE_PORT}}，MCP {{.WAILS_MCP_PORT}}，数据库 {{.DATABASE_NAME}}，NATS {{.NATS_NAMESPACE}}，公网 {{.CERVI_PUBLIC_URL}}"'
 
   db:ensure:
     silent: true

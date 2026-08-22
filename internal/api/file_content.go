@@ -1,7 +1,6 @@
 //go:build server
 
-// Package filecontent 提供本地文件内容和对象存储直读跳转。
-package filecontent
+package api
 
 import (
 	"errors"
@@ -16,22 +15,22 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/filestore"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// Service 处理文件内容的上传、读取和对象存储跳转。
-type Service struct {
+// FileContentService 处理文件内容的上传、读取和对象存储跳转。
+type FileContentService struct {
 	resolveIdentity *authaction.ResolveIdentityQuery
 	getFile         *fileaction.GetQuery
 	getS3Setting    *settingaction.GetS3SettingQuery
-	local           *filestore.LocalStore
+	local           *serverfilecontent.LocalStore
 }
 
-// NewService 创建文件内容服务。
-func NewService(db *bun.DB, local *filestore.LocalStore) *Service {
-	return &Service{
+// NewFileContentService 创建文件内容服务。
+func NewFileContentService(db *bun.DB, local *serverfilecontent.LocalStore) *FileContentService {
+	return &FileContentService{
 		resolveIdentity: authaction.NewResolveIdentityQuery(db),
 		getFile:         fileaction.NewGetQuery(db),
 		getS3Setting:    settingaction.NewGetS3SettingQuery(db),
@@ -40,7 +39,7 @@ func NewService(db *bun.DB, local *filestore.LocalStore) *Service {
 }
 
 // ServeHTTP 处理文件内容请求。
-func (s *Service) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (s *FileContentService) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	allowCrossOrigin(writer)
 	if request.Method == http.MethodOptions {
 		writer.WriteHeader(http.StatusNoContent)
@@ -63,7 +62,7 @@ func (s *Service) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 }
 
 // uploadLocalFile 将认证后的请求内容保存到本地最终目录。
-func (s *Service) uploadLocalFile(writer http.ResponseWriter, request *http.Request, fileID string) {
+func (s *FileContentService) uploadLocalFile(writer http.ResponseWriter, request *http.Request, fileID string) {
 	identity, err := s.resolveIdentity.Execute(request.Context(), bearerToken(request.Header.Get("Authorization")))
 	if err != nil {
 		slog.Warn("文件上传认证失败", "error", err)
@@ -96,7 +95,7 @@ func (s *Service) uploadLocalFile(writer http.ResponseWriter, request *http.Requ
 }
 
 // serveFile 输出本地内容或跳转到对象存储预签名地址。
-func (s *Service) serveFile(writer http.ResponseWriter, request *http.Request, fileID string) {
+func (s *FileContentService) serveFile(writer http.ResponseWriter, request *http.Request, fileID string) {
 	record, err := s.getFile.GetActiveByID(request.Context(), fileID)
 	if err != nil {
 		writeFileError(writer, err)
@@ -120,19 +119,19 @@ func (s *Service) serveFile(writer http.ResponseWriter, request *http.Request, f
 }
 
 // serveS3File 返回对象元数据或将客户端直接跳转到对象存储。
-func (s *Service) serveS3File(writer http.ResponseWriter, request *http.Request, record *servermodels.File) {
+func (s *FileContentService) serveS3File(writer http.ResponseWriter, request *http.Request, record *servermodels.File) {
 	setting, err := s.getS3Setting.ExecuteForOrganization(request.Context(), record.OrganizationID)
 	if err != nil {
 		slog.Warn("读取文件对象存储配置失败", "file_id", record.ID, "error", err)
 		http.Error(writer, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 		return
 	}
-	config := filestore.S3Config{
+	config := serverfilecontent.S3Config{
 		Endpoint: setting.Endpoint, Region: setting.Region, Bucket: setting.Bucket,
 		AccessKeyID: setting.AccessKeyID, SecretAccessKey: setting.SecretAccessKey, ForcePathStyle: setting.ForcePathStyle,
 	}
 	if request.Method == http.MethodHead {
-		info, err := filestore.Stat(request.Context(), config, record.StorageKey)
+		info, err := serverfilecontent.Stat(request.Context(), config, record.StorageKey)
 		if err != nil {
 			slog.Warn("读取对象存储文件元数据失败", "file_id", record.ID, "error", err)
 			http.Error(writer, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
@@ -147,7 +146,7 @@ func (s *Service) serveS3File(writer http.ResponseWriter, request *http.Request,
 		writer.WriteHeader(http.StatusOK)
 		return
 	}
-	signed, err := filestore.PresignGet(request.Context(), config, record.StorageKey, record.ContentType, record.OriginalName)
+	signed, err := serverfilecontent.PresignGet(request.Context(), config, record.StorageKey, record.ContentType, record.OriginalName)
 	if err != nil {
 		slog.Warn("生成对象存储读取地址失败", "file_id", record.ID, "error", err)
 		http.Error(writer, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
@@ -163,15 +162,6 @@ func contentFileID(path string) (string, bool) {
 		return "", false
 	}
 	return fileID, true
-}
-
-// bearerToken 读取 Bearer 登录令牌。
-func bearerToken(authorization string) string {
-	scheme, token, found := strings.Cut(strings.TrimSpace(authorization), " ")
-	if !found || !strings.EqualFold(scheme, "Bearer") {
-		return ""
-	}
-	return strings.TrimSpace(token)
 }
 
 // contentDisposition 返回文件在浏览器中的展示方式。
