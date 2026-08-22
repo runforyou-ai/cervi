@@ -34,15 +34,13 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 		return nil, common.ErrIdentityInvalid
 	}
 
-	user := &servermodels.User{}
 	result, err := a.db.NewUpdate().
-		Model(user).
+		Model((*servermodels.User)(nil)).
 		Set("locale = ?", input.Locale).
 		Set("time_zone = ?", input.TimeZone).
 		Set("updated_at = now()").
 		Where("u.id = ?", identity.User.ID).
 		Where("u.organization_id = ?", identity.Organization.ID).
-		Returning("id, organization_id, email, display_name, role_id, status, locale, time_zone, work_status, avatar_file_id").
 		Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("update user preferences: %w", err)
@@ -53,6 +51,10 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 	}
 	if rows == 0 {
 		return nil, common.ErrIdentityInvalid
+	}
+	user, err := loadUser(ctx, a.db, identity.Organization.ID, identity.User.ID)
+	if err != nil {
+		return nil, fmt.Errorf("reload user preferences: %w", err)
 	}
 	return user, nil
 }

@@ -42,30 +42,30 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		return nil, common.ErrIdentityInvalid
 	}
 
-	user := &servermodels.User{}
+	var user *servermodels.User
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var previousAvatarFileID *string
-		query := tx.NewUpdate().
-			Model(user).
+		memberQuery := tx.NewUpdate().
+			Model((*servermodels.OrganizationMember)(nil)).
 			Set("display_name = ?", input.DisplayName).
-			Set("email = ?", input.Email).
 			Set("updated_at = now()")
 		if input.AvatarFileID != "" {
 			if !common.ValidUUID(input.AvatarFileID) {
 				return ErrAvatarFileNotFound
 			}
-			currentUser := &servermodels.User{}
-			if err := tx.NewSelect().Model(currentUser).
+			currentMember := &servermodels.OrganizationMember{}
+			if err := tx.NewSelect().Model(currentMember).
 				Column("avatar_file_id").
-				Where("u.id = ?", identity.User.ID).
-				Where("u.organization_id = ?", identity.Organization.ID).
+				Where("om.id = ?", identity.User.ID).
+				Where("om.organization_id = ?", identity.Organization.ID).
+				Where("om.type = ?", domain.MemberIdentityTypeUser).
 				For("UPDATE").
 				Scan(ctx); errors.Is(err, sql.ErrNoRows) {
 				return common.ErrIdentityInvalid
 			} else if err != nil {
 				return err
 			}
-			previousAvatarFileID = currentUser.AvatarFileID
+			previousAvatarFileID = currentMember.AvatarFileID
 
 			file := &servermodels.File{}
 			if err := tx.NewSelect().Model(file).
@@ -97,17 +97,33 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			} else if file.Status != string(domain.FileStatusActive) || !sameAvatar {
 				return ErrAvatarFileNotFound
 			}
-			query = query.Set("avatar_file_id = ?", file.ID)
+			memberQuery = memberQuery.Set("avatar_file_id = ?", file.ID)
 		}
-		result, err := query.
+		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
+			Set("email = ?", input.Email).
+			Set("updated_at = now()").
 			Where("u.id = ?", identity.User.ID).
 			Where("u.organization_id = ?", identity.Organization.ID).
-			Returning("id, organization_id, email, display_name, role_id, status, locale, time_zone, work_status, avatar_file_id").
 			Exec(ctx)
 		if err != nil {
 			return err
 		}
 		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return common.ErrIdentityInvalid
+		}
+		result, err = memberQuery.
+			Where("om.id = ?", identity.User.ID).
+			Where("om.organization_id = ?", identity.Organization.ID).
+			Where("om.type = ?", domain.MemberIdentityTypeUser).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		rows, err = result.RowsAffected()
 		if err != nil {
 			return err
 		}
@@ -126,7 +142,8 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				return err
 			}
 		}
-		return nil
+		user, err = loadUser(ctx, tx, identity.Organization.ID, identity.User.ID)
+		return err
 	})
 	if isUniqueViolation(err) {
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}

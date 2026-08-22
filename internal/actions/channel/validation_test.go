@@ -15,10 +15,12 @@ import (
 // TestNormalizeWebsiteChannelInput 验证网站渠道字段规范化和长度限制。
 func TestNormalizeWebsiteChannelInput(t *testing.T) {
 	normalized, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
-		Type:          domain.ChannelTypeWebsite,
-		Name:          "  产品官网  ",
-		Description:   "  接收访客咨询  ",
-		DefaultLocale: " zh-CN ",
+		Type:                  domain.ChannelTypeWebsite,
+		Name:                  "  产品官网  ",
+		Description:           "  接收访客咨询  ",
+		DefaultLocale:         " zh-CN ",
+		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
@@ -50,10 +52,12 @@ func TestNormalizeWebsiteChannelInput(t *testing.T) {
 // TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints 验证补充平面字符按码点计数。
 func TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints(t *testing.T) {
 	_, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
-		Type:          domain.ChannelTypeWebsite,
-		Name:          strings.Repeat("😀", 100),
-		Description:   strings.Repeat("😀", 2000),
-		DefaultLocale: domain.LocaleChineseSimplified,
+		Type:                  domain.ChannelTypeWebsite,
+		Name:                  strings.Repeat("😀", 100),
+		Description:           strings.Repeat("😀", 2000),
+		DefaultLocale:         domain.LocaleChineseSimplified,
+		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)

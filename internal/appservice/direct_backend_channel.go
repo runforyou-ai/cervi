@@ -175,7 +175,9 @@ func websiteChannelFromModel(channel *servermodels.Channel) WebsiteChannelSummar
 	return WebsiteChannelSummary{
 		ID: channel.ID, OrganizationID: channel.OrganizationID, CreatedByUserID: channel.CreatedByUserID,
 		Type: ChannelType(channel.Type), Name: channel.Name, Description: channel.Description, DefaultLocale: Locale(channel.DefaultLocale), Enabled: channel.Enabled,
-		CreatedAt: channel.CreatedAt, UpdatedAt: channel.UpdatedAt,
+		NewConversationTarget: channelRoutingTargetFromModel(channel.NewConversationTargetType, channel.NewConversationTargetID),
+		FallbackTarget:        channelRoutingTargetFromModel(channel.FallbackTargetType, channel.FallbackTargetID),
+		CreatedAt:             channel.CreatedAt, UpdatedAt: channel.UpdatedAt,
 	}
 }
 
@@ -184,7 +186,25 @@ func websiteChannelSettingFromModel(setting *servermodels.WebsiteChannelSetting)
 }
 
 func channelInput(input WebsiteChannelInput) channelaction.WebsiteChannelInput {
-	return channelaction.WebsiteChannelInput{Type: domain.ChannelType(input.Type), Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale)}
+	return channelaction.WebsiteChannelInput{
+		Type: domain.ChannelType(input.Type), Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale),
+		NewConversationTarget: channelRoutingTargetInput(input.NewConversationTarget),
+		FallbackTarget:        channelRoutingTargetInput(input.FallbackTarget),
+	}
+}
+
+// channelRoutingTargetInput 转换渠道会话流转目标输入。
+func channelRoutingTargetInput(target ChannelRoutingTarget) channelaction.RoutingTarget {
+	return channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetType(target.Type), ID: target.ID}
+}
+
+// channelRoutingTargetFromModel 转换渠道记录中的会话流转目标。
+func channelRoutingTargetFromModel(targetType string, targetID *string) ChannelRoutingTarget {
+	id := ""
+	if targetID != nil {
+		id = *targetID
+	}
+	return ChannelRoutingTarget{Type: ChannelRoutingTargetType(targetType), ID: id}
 }
 
 func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
@@ -194,6 +214,7 @@ func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 		channelaction.ValidationNameTooLong:          cervii18n.FieldChannelNameTooLong,
 		channelaction.ValidationDescriptionTooLong:   cervii18n.FieldChannelDescriptionTooLong,
 		channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
+		channelaction.ValidationRoutingTargetInvalid: cervii18n.FieldChannelRoutingTargetInvalid,
 		channelaction.ValidationChatTitleRequired:    cervii18n.FieldChannelChatTitleRequired,
 		channelaction.ValidationChatTitleTooLong:     cervii18n.FieldChannelChatTitleTooLong,
 		channelaction.ValidationChatSubtitleTooLong:  cervii18n.FieldChannelChatSubtitleTooLong,

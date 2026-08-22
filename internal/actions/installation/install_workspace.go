@@ -126,20 +126,32 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		user := &servermodels.User{
 			OrganizationID: organization.ID,
 			Email:          input.Email,
-			DisplayName:    input.DisplayName,
 			PasswordHash:   passwordHash,
 			RoleID:         adminRoleID,
-			Status:         "active",
 			Locale:         string(input.Locale),
 			TimeZone:       input.TimeZone,
 		}
+		member := &servermodels.OrganizationMember{
+			OrganizationID: organization.ID,
+			Type:           string(domain.MemberIdentityTypeUser),
+			DisplayName:    input.DisplayName,
+			Status:         string(domain.UserStatusActive),
+		}
+		if _, err := tx.NewInsert().Model(member).
+			Column("organization_id", "type", "display_name", "status").
+			Returning("id").Exec(ctx); err != nil {
+			return err
+		}
+		user.ID = member.ID
 		if _, err := tx.NewInsert().
 			Model(user).
-			Column("organization_id", "email", "display_name", "password_hash", "role_id", "status", "locale", "time_zone").
-			Returning("id, work_status").
+			Column("id", "organization_id", "email", "password_hash", "role_id", "locale", "time_zone").
+			Returning("work_status").
 			Exec(ctx); err != nil {
 			return err
 		}
+		user.DisplayName = member.DisplayName
+		user.Status = member.Status
 
 		teamName := "Customer Service Team"
 		if input.Locale == domain.LocaleChineseSimplified {
@@ -160,12 +172,11 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		teamMember := &servermodels.TeamMember{
 			OrganizationID:  organization.ID,
 			TeamID:          team.ID,
-			IdentityType:    string(domain.MemberIdentityTypeUser),
-			IdentityID:      user.ID,
+			MemberID:        user.ID,
 			CreatedByUserID: user.ID,
 		}
 		if _, err := tx.NewInsert().Model(teamMember).
-			Column("organization_id", "team_id", "identity_type", "identity_id", "created_by_user_id").
+			Column("organization_id", "team_id", "member_id", "created_by_user_id").
 			Exec(ctx); err != nil {
 			return err
 		}

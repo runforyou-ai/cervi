@@ -1,6 +1,6 @@
 package domain
 
-// MemberIdentityType 定义可以加入团队的企业内部身份类型。
+// MemberIdentityType 定义企业成员类型。
 type MemberIdentityType string
 
 const (

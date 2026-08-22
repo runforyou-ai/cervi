@@ -83,7 +83,7 @@ function WorkspaceMenu() {
         active={location.pathname === "/inbox"}
       />
       <WorkspaceRailItem
-        to="/contacts/members"
+        to="/contacts/employees"
         icon={ContactRoundIcon}
         label={t("contacts")}
         active={location.pathname.startsWith("/contacts")}

@@ -23,6 +23,13 @@ type Backend interface {
 	DeactivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
 	ActivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
 	ListChannels(context.Context, RequestMeta) (ChannelList, error)
+	ListMemberOptions(context.Context, RequestMeta, MemberOptionListInput) (MemberOptionList, error)
+	CreateAgent(context.Context, RequestMeta, CreateAgentInput) (DirectoryAgent, error)
+	ListAgents(context.Context, RequestMeta, AgentListInput) (AgentList, error)
+	GetAgent(context.Context, RequestMeta, string) (DirectoryAgent, error)
+	UpdateAgent(context.Context, RequestMeta, string, UpdateAgentInput) (DirectoryAgent, error)
+	DeactivateAgent(context.Context, RequestMeta, string) (DirectoryAgent, error)
+	ReactivateAgent(context.Context, RequestMeta, string) (DirectoryAgent, error)
 	ListUsers(context.Context, RequestMeta, UserListInput) (UserList, error)
 	GetUser(context.Context, RequestMeta, string) (DirectoryUser, error)
 	CreateUser(context.Context, RequestMeta, CreateUserInput) (DirectoryUser, error)
@@ -34,6 +41,7 @@ type Backend interface {
 	CreateTeam(context.Context, RequestMeta, TeamInput) (Team, error)
 	UpdateTeam(context.Context, RequestMeta, string, TeamInput) (Team, error)
 	DeleteTeam(context.Context, RequestMeta, string) error
+	ListTeamMembers(context.Context, RequestMeta, string, TeamDirectoryMemberInput) (TeamDirectoryMemberList, error)
 	ListTeamMemberCandidates(context.Context, RequestMeta, string, TeamMemberCandidateInput) (TeamMemberCandidateList, error)
 	AddTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
 	RemoveTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
@@ -214,6 +222,41 @@ func (s *Service) ListChannels(ctx context.Context, meta RequestMeta) (ChannelLi
 	return s.backend.ListChannels(ctx, meta)
 }
 
+// ListMemberOptions 返回可分配的企业成员和 AI 员工。
+func (s *Service) ListMemberOptions(ctx context.Context, meta RequestMeta, input MemberOptionListInput) (MemberOptionList, error) {
+	return s.backend.ListMemberOptions(ctx, meta, input)
+}
+
+// CreateAgent 创建企业 AI 员工。
+func (s *Service) CreateAgent(ctx context.Context, meta RequestMeta, input CreateAgentInput) (DirectoryAgent, error) {
+	return s.backend.CreateAgent(ctx, meta, input)
+}
+
+// ListAgents 返回企业 AI 员工目录。
+func (s *Service) ListAgents(ctx context.Context, meta RequestMeta, input AgentListInput) (AgentList, error) {
+	return s.backend.ListAgents(ctx, meta, input)
+}
+
+// GetAgent 返回企业 AI 员工详情。
+func (s *Service) GetAgent(ctx context.Context, meta RequestMeta, agentID string) (DirectoryAgent, error) {
+	return s.backend.GetAgent(ctx, meta, agentID)
+}
+
+// UpdateAgent 修改企业 AI 员工。
+func (s *Service) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (DirectoryAgent, error) {
+	return s.backend.UpdateAgent(ctx, meta, agentID, input)
+}
+
+// DeactivateAgent 停用企业 AI 员工。
+func (s *Service) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (DirectoryAgent, error) {
+	return s.backend.DeactivateAgent(ctx, meta, agentID)
+}
+
+// ReactivateAgent 恢复企业 AI 员工。
+func (s *Service) ReactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (DirectoryAgent, error) {
+	return s.backend.ReactivateAgent(ctx, meta, agentID)
+}
+
 // ListUsers 返回企业成员列表。
 func (s *Service) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	return s.backend.ListUsers(ctx, meta, input)
@@ -267,6 +310,11 @@ func (s *Service) UpdateTeam(ctx context.Context, meta RequestMeta, teamID strin
 // DeleteTeam 删除企业团队及其成员关系。
 func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID string) error {
 	return s.backend.DeleteTeam(ctx, meta, teamID)
+}
+
+// ListTeamMembers 返回团队成员共同字段。
+func (s *Service) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamDirectoryMemberInput) (TeamDirectoryMemberList, error) {
+	return s.backend.ListTeamMembers(ctx, meta, teamID, input)
 }
 
 // ListTeamMemberCandidates 返回尚未加入团队的企业成员。

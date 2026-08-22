@@ -20,7 +20,7 @@ import {
   UsersIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate, useSearchParams } from "react-router"
+import { useNavigate, useParams, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -30,17 +30,22 @@ import {
   ContactStage,
   MemberIdentityType,
   UserStatus,
+  deactivateAgent,
   deactivateUser,
   deleteContact,
   getContact,
+  getAgent,
   getUser,
   listChannels,
   listContacts,
   listDeletedContacts,
+  listAgents,
   listRoles,
+  listTeamMembers,
   listTeams,
   listUsers,
   reactivateUser,
+  reactivateAgent,
   deleteTeam,
   removeTeamMembers,
   restoreContact,
@@ -48,10 +53,12 @@ import {
   type ContactDetail,
   type ContactListResponse,
   type ContactSummary,
+  type DirectoryAgentData,
   type DirectoryUserData,
   type PageInfo,
   type RoleData,
   type Team,
+  type TeamDirectoryMember,
   type TeamSummary,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
@@ -119,6 +126,8 @@ import {
 } from "@/components/ui/tooltip"
 import { ContactForm } from "@/features/contacts/contact-form"
 import { ContactDetailView } from "@/features/contacts/contact-detail"
+import { AgentForm } from "@/features/contacts/agent-form"
+import { AgentDetailView } from "@/features/contacts/agent-detail"
 import { MemberDetailView } from "@/features/contacts/member-detail"
 import { MemberForm } from "@/features/contacts/member-form"
 import { TeamForm } from "@/features/contacts/team-form"
@@ -132,7 +141,7 @@ import {
 import { useDateTime } from "@/hooks/use-date-time"
 import { cn } from "@/lib/utils"
 
-type ContactScope = "members" | "external"
+type ContactScope = "employees" | "agents" | "team" | "external"
 
 type LoadState = "loading" | "ready" | "error"
 
@@ -263,11 +272,27 @@ function ContactScopeSidebar({
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start">
             <DropdownMenuItem
-              onSelect={() => navigate("/contacts/members?new=1")}
+              onSelect={() =>
+                navigate(
+                  scope === "team" && teamId
+                    ? `/contacts/teams/${encodeURIComponent(teamId)}?new=1`
+                    : "/contacts/employees?new=1",
+                )
+              }
             >
               {t("add.member")}
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>{t("add.agent")}</DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                navigate(
+                  scope === "team" && teamId
+                    ? `/contacts/teams/${encodeURIComponent(teamId)}?newAgent=1`
+                    : "/contacts/ai-employees?newAgent=1",
+                )
+              }
+            >
+              {t("add.agent")}
+            </DropdownMenuItem>
             <DropdownMenuItem
               disabled={channels.length === 0}
               onSelect={() => navigate("/contacts/external?new=1")}
@@ -275,7 +300,7 @@ function ContactScopeSidebar({
               {t("add.external")}
             </DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={() => navigate("/contacts/members?newTeam=1")}
+              onSelect={() => navigate("/contacts/employees?newTeam=1")}
             >
               {t("teams.create")}
             </DropdownMenuItem>
@@ -290,7 +315,7 @@ function ContactScopeSidebar({
             className={cn(
               "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
               contactNavHoverClass,
-              scope === "members" && contactNavPathActiveClass,
+              scope !== "external" && contactNavPathActiveClass,
             )}
           >
             <UsersIcon className="size-4" />
@@ -300,21 +325,46 @@ function ContactScopeSidebar({
         </CollapsibleTrigger>
         <CollapsibleContent className="flex flex-col gap-0.5">
           <SubscopeButton
-            active={scope === "members" && !teamId}
-            onClick={() => navigate("/contacts/members")}
+            active={scope === "employees"}
+            onClick={() => navigate("/contacts/employees")}
           >
-            {t("all")}
+            {t("scopes.employees")}
           </SubscopeButton>
-          {teams.map((team) => (
-            <SubscopeButton
-              key={team.id}
-              active={scope === "members" && teamId === team.id}
-              icon={PanelsTopLeftIcon}
-              onClick={() => navigate(`/contacts/members?teamId=${team.id}`)}
-            >
-              {team.name}
-            </SubscopeButton>
-          ))}
+          <SubscopeButton
+            active={scope === "agents"}
+            onClick={() => navigate("/contacts/ai-employees")}
+          >
+            {t("scopes.agents")}
+          </SubscopeButton>
+          <Collapsible defaultOpen>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "group pl-8",
+                  contactNavSubitemClass,
+                  contactNavHoverClass,
+                  scope === "team" && contactNavPathActiveClass,
+                )}
+              >
+                <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
+                <span>{t("scopes.teams")}</span>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="flex flex-col gap-0.5">
+              {teams.map((team) => (
+                <SubscopeButton
+                  key={team.id}
+                  active={scope === "team" && teamId === team.id}
+                  icon={PanelsTopLeftIcon}
+                  nested
+                  onClick={() => navigate(`/contacts/teams/${team.id}`)}
+                >
+                  {team.name}
+                </SubscopeButton>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
         </CollapsibleContent>
       </Collapsible>
 
@@ -466,6 +516,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const { t: tCommon } = useTranslation("common")
   const { identity, updateUser: updateWorkspaceUser } = useWorkspace()
   const navigate = useNavigate()
+  const { teamId = "" } = useParams()
   const { formatDateTime } = useDateTime()
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get("q") ?? ""
@@ -473,6 +524,8 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [channels, setChannels] = useState<ChannelSummary[]>([])
   const [contacts, setContacts] = useState<ContactSummary[]>([])
   const [users, setUsers] = useState<DirectoryUserData[]>([])
+  const [agents, setAgents] = useState<DirectoryAgentData[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamDirectoryMember[]>([])
   const [roles, setRoles] = useState<RoleData[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [page, setPage] = useState<PageInfo>({ number: 1, size: 50, total: 0 })
@@ -480,6 +533,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [detail, setDetail] = useState<ContactDetail | null>(null)
   const [detailUser, setDetailUser] = useState<DirectoryUserData | null>(null)
+  const [detailAgent, setDetailAgent] = useState<DirectoryAgentData | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [deletingContact, setDeletingContact] = useState<ContactSummary | null>(
     null,
@@ -488,9 +542,11 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     useState<ContactSummary | null>(null)
   const [changingUserStatus, setChangingUserStatus] =
     useState<DirectoryUserData | null>(null)
+  const [changingAgentStatus, setChangingAgentStatus] =
+    useState<DirectoryAgentData | null>(null)
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
   const [removingTeamMembers, setRemovingTeamMembers] = useState<
-    DirectoryUserData[]
+    TeamDirectoryMember[]
   >([])
   const [selectedTeamMemberIDs, setSelectedTeamMemberIDs] = useState<
     Set<string>
@@ -503,6 +559,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const selected = searchParams.get("selected") ?? ""
   const deleted = scope === "external" && searchParams.get("view") === "trash"
   const creating = searchParams.get("new") === "1"
+  const creatingAgent = searchParams.get("newAgent") === "1"
   const creatingTeam = searchParams.get("newTeam") === "1"
   const editingTeam = searchParams.get("editTeam") === "1"
   const addingTeamMembers = searchParams.get("addMembers") === "1"
@@ -519,9 +576,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     optionalWailsEnum(UserStatus, searchParams.get("status")) ??
     UserStatus.UserStatusActive
   const roleId = searchParams.get("roleId") ?? ""
-  const category =
-    optionalWailsEnum(MemberIdentityType, searchParams.get("category")) ?? ""
-  const teamId = searchParams.get("teamId") ?? ""
   const selectedTeam = teams.find((team) => team.id === teamId)
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
 
@@ -553,7 +607,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   useEffect(() => setSearch(query), [query])
   useEffect(() => {
     setSelectedTeamMemberIDs(new Set())
-  }, [category, currentPage, query, roleId, status, teamId])
+  }, [currentPage, query, roleId, status, teamId])
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       if (search !== query) {
@@ -607,20 +661,36 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         if (requestID !== listRequestID.current) return
         setContacts(response.contacts)
         setPage(response.page)
-      } else if (category === MemberIdentityType.MemberIdentityTypeAgent) {
-        setUsers([])
-        setPage({ number: 1, size: 50, total: 0 })
-      } else {
+      } else if (scope === "employees") {
         const response = await listUsers({
           query,
           status,
           roleId,
-          teamId,
           page: currentPage,
           pageSize: 50,
         })
         if (requestID !== listRequestID.current) return
         setUsers(response.users)
+        setPage(response.page)
+      } else if (scope === "agents") {
+        const response = await listAgents({
+          query,
+          status,
+          page: currentPage,
+          pageSize: 50,
+        })
+        if (requestID !== listRequestID.current) return
+        setAgents(response.agents)
+        setPage(response.page)
+      } else {
+        const response = await listTeamMembers(teamId, {
+          query,
+          status,
+          page: currentPage,
+          pageSize: 50,
+        })
+        if (requestID !== listRequestID.current) return
+        setTeamMembers(response.members)
         setPage(response.page)
       }
       setLoadState("ready")
@@ -632,7 +702,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     }
   }, [
     channelId,
-    category,
     currentPage,
     deleted,
     methodType,
@@ -656,18 +725,22 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   useEffect(() => {
     setDetail(null)
     setDetailUser(null)
-    if (!selected) {
+    setDetailAgent(null)
+    if (!selected || scope === "team") {
       return
     }
     const requestID = ++detailRequestID.current
     setDetailLoading(true)
-    const loader =
-      scope === "external"
-        ? getContact(selected).then((output) => {
-            if (requestID === detailRequestID.current) setDetail(output)
-          })
-        : getUser(selected).then((output) => {
+    const loader = scope === "external"
+      ? getContact(selected).then((output) => {
+          if (requestID === detailRequestID.current) setDetail(output)
+        })
+      : scope === "employees"
+        ? getUser(selected).then((output) => {
             if (requestID === detailRequestID.current) setDetailUser(output)
+          })
+        : getAgent(selected).then((output) => {
+            if (requestID === detailRequestID.current) setDetailAgent(output)
           })
     void loader
       .catch((error: unknown) => {
@@ -689,24 +762,32 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
 
   const selectedChannel = channels.find((channel) => channel.id === channelId)
   const title =
-    scope === "members"
-      ? (selectedTeam?.name ?? t("scopes.members"))
-      : (selectedChannel?.name ?? t("scopes.external"))
+    scope === "employees"
+      ? t("scopes.employees")
+      : scope === "agents"
+        ? t("scopes.agents")
+        : scope === "team"
+          ? (selectedTeam?.name ?? t("scopes.teams"))
+          : (selectedChannel?.name ?? t("scopes.external"))
   const mobileScope =
-    scope === "members"
-      ? teamId
-        ? `team:${teamId}`
-        : "members"
-      : channelId
-        ? `channel:${channelId}`
-        : "external"
+    scope === "employees"
+      ? "employees"
+      : scope === "agents"
+        ? "agents"
+        : scope === "team"
+          ? `team:${teamId}`
+          : channelId
+            ? `channel:${channelId}`
+            : "external"
 
   /** 窄视口下切换联系人范围。 */
   function changeMobileScope(value: string) {
-    if (value === "members") {
-      navigate("/contacts/members")
+    if (value === "employees") {
+      navigate("/contacts/employees")
+    } else if (value === "agents") {
+      navigate("/contacts/ai-employees")
     } else if (value.startsWith("team:")) {
-      navigate(`/contacts/members?teamId=${value.slice("team:".length)}`)
+      navigate(`/contacts/teams/${value.slice("team:".length)}`)
     } else if (value.startsWith("channel:")) {
       navigate(`/contacts/external?channelId=${value.slice("channel:".length)}`)
     } else {
@@ -719,6 +800,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     setParameters({ selected: null, new: null })
     setDetail(null)
     setDetailUser(null)
+    setDetailAgent(null)
   }
 
   /** 刷新列表并关闭详情。 */
@@ -783,6 +865,10 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         changingUserStatus.status === UserStatus.UserStatusActive
           ? await deactivateUser(changingUserStatus.id)
           : await reactivateUser(changingUserStatus.id)
+      console.info("企业成员状态已修改", {
+        user_id: saved.id,
+        status: saved.status,
+      })
       toast.success(
         t(
           changingUserStatus.status === UserStatus.UserStatusActive
@@ -791,7 +877,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         ),
       )
       setChangingUserStatus(null)
-      setDetailUser(saved)
+      if (detailUser?.id === saved.id) {
+        setDetailUser(saved)
+      }
       setRefreshVersion((current) => current + 1)
     } catch (error) {
       if (recoverSession(error, navigate)) return
@@ -802,7 +890,41 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     }
   }
 
-  /** 删除当前团队并返回全部企业成员。 */
+  /** 停用或恢复 AI 员工。 */
+  async function changeAgentStatus() {
+    if (!changingAgentStatus) return
+    setDeleting(true)
+    try {
+      const saved =
+        changingAgentStatus.status === UserStatus.UserStatusActive
+          ? await deactivateAgent(changingAgentStatus.id)
+          : await reactivateAgent(changingAgentStatus.id)
+      console.info("AI 员工状态已修改", {
+        agent_id: saved.id,
+        status: saved.status,
+      })
+      toast.success(
+        t(
+          changingAgentStatus.status === UserStatus.UserStatusActive
+            ? "agents.status.deactivated"
+            : "agents.status.reactivated",
+        ),
+      )
+      setChangingAgentStatus(null)
+      if (detailAgent?.id === saved.id) {
+        setDetailAgent(saved)
+      }
+      setRefreshVersion((current) => current + 1)
+    } catch (error) {
+      if (recoverSession(error, navigate)) return
+      console.warn("修改 AI 员工状态失败", error)
+      toast.error(t("agents.status.error"))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  /** 删除当前团队并返回企业成员目录。 */
   async function removeCurrentTeam() {
     if (!deletingTeam) return
     const deletingTeamID = deletingTeam.id
@@ -815,7 +937,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       setDeletingTeam(null)
       toast.success(t("teams.delete.success"))
       if (teamId === deletingTeamID) {
-        navigate("/contacts/members", { replace: true })
+        navigate("/contacts/employees", { replace: true })
       }
     } catch (error) {
       if (recoverSession(error, navigate)) return
@@ -833,7 +955,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     try {
       const saved = await removeTeamMembers(selectedTeam.id, {
         members: removingTeamMembers.map((member) => ({
-          identityType: MemberIdentityType.MemberIdentityTypeUser,
+          identityType: member.type,
           identityId: member.id,
         })),
       })
@@ -867,17 +989,26 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   }))
   const hasInternalFilters = Boolean(
     status !== UserStatus.UserStatusActive ||
-      roleId ||
-      category === MemberIdentityType.MemberIdentityTypeAgent,
+      (scope === "employees" && roleId),
   )
   const allVisibleTeamMembersSelected =
-    users.length > 0 &&
-    users.every((user) => selectedTeamMemberIDs.has(user.id))
+    teamMembers.length > 0 &&
+    teamMembers.every((member) => selectedTeamMemberIDs.has(member.id))
+  const currentListEmpty =
+    scope === "employees"
+      ? users.length === 0
+      : scope === "agents"
+        ? agents.length === 0
+        : scope === "team"
+          ? teamMembers.length === 0
+          : contacts.length === 0
+  const tableColumnCount =
+    scope === "employees" ? 7 : scope === "agents" ? 5 : scope === "team" ? 6 : 7
 
   /** 切换当前页所有团队成员的选中状态。 */
   function toggleAllVisibleTeamMembers(checked: boolean) {
     setSelectedTeamMemberIDs(
-      checked ? new Set(users.map((user) => user.id)) : new Set(),
+      checked ? new Set(teamMembers.map((member) => member.id)) : new Set(),
     )
   }
 
@@ -920,10 +1051,11 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 value={mobileScope}
                 onChange={(event) => changeMobileScope(event.target.value)}
               >
-                <option value="members">{t("scopes.members")}</option>
+                <option value="employees">{t("scopes.employees")}</option>
+                <option value="agents">{t("scopes.agents")}</option>
                 {teams.map((team) => (
                   <option key={team.id} value={`team:${team.id}`}>
-                    {t("scopes.members")} · {team.name}
+                    {t("scopes.teams")} · {team.name}
                   </option>
                 ))}
                 <option value="external">
@@ -946,8 +1078,8 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                   size="sm"
                   onClick={() =>
                     setRemovingTeamMembers(
-                      users.filter((user) =>
-                        selectedTeamMemberIDs.has(user.id),
+                      teamMembers.filter((member) =>
+                        selectedTeamMemberIDs.has(member.id),
                       ),
                     )
                   }
@@ -996,86 +1128,58 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
           <ListToolbarSearch
             value={search}
             aria-label={
-              scope === "members"
-                ? t(
-                    category === MemberIdentityType.MemberIdentityTypeAgent
-                      ? "search.agents"
-                      : category === MemberIdentityType.MemberIdentityTypeUser
-                        ? "search.members"
-                        : "search.identities",
-                  )
-                : t("search.external")
+              scope === "employees"
+                ? t("search.employees")
+                : scope === "agents"
+                  ? t("search.agents")
+                  : scope === "team"
+                    ? t("search.teamMembers")
+                    : t("search.external")
             }
             placeholder={
               scope === "external" ? t("search.external") : undefined
             }
             onChange={(event) => setSearch(event.target.value)}
           />
-          {scope === "members" ? (
+          {scope !== "external" ? (
             <>
               <ListToolbarFilter
-                label={t("filters.category")}
-                allLabel={t("filters.allCategories")}
-                value={category}
+                label={t("filters.status")}
+                value={status}
                 options={[
                   {
-                    value: MemberIdentityType.MemberIdentityTypeUser,
-                    label: t("identityCategories.user"),
+                    value: UserStatus.UserStatusActive,
+                    label: t("statuses.active"),
                   },
                   {
-                    value: MemberIdentityType.MemberIdentityTypeAgent,
-                    label: t("identityCategories.agent"),
+                    value: UserStatus.UserStatusInactive,
+                    label: t("statuses.inactive"),
                   },
                 ]}
                 onValueChange={(value) =>
                   setParameters({
-                    category: value || null,
-                    status: null,
-                    roleId: null,
+                    status:
+                      value === UserStatus.UserStatusActive ? null : value,
                     page: null,
                     selected: null,
                   })
                 }
               />
-              {category !== MemberIdentityType.MemberIdentityTypeAgent ? (
-                <>
-                  <ListToolbarFilter
-                    label={t("filters.status")}
-                    value={status}
-                    options={[
-                      {
-                        value: UserStatus.UserStatusActive,
-                        label: t("statuses.active"),
-                      },
-                      {
-                        value: UserStatus.UserStatusInactive,
-                        label: t("statuses.inactive"),
-                      },
-                    ]}
-                    onValueChange={(value) =>
-                      setParameters({
-                        status:
-                          value === UserStatus.UserStatusActive ? null : value,
-                        page: null,
-                        selected: null,
-                      })
-                    }
-                  />
-                  <ListToolbarFilter
-                    label={t("filters.role")}
-                    allLabel={t("filters.allRoles")}
-                    value={roleId}
-                    options={roleOptions}
-                    contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
-                    onValueChange={(value) =>
-                      setParameters({
-                        roleId: value || null,
-                        page: null,
-                        selected: null,
-                      })
-                    }
-                  />
-                </>
+              {scope === "employees" ? (
+                <ListToolbarFilter
+                  label={t("filters.role")}
+                  allLabel={t("filters.allRoles")}
+                  value={roleId}
+                  options={roleOptions}
+                  contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
+                  onValueChange={(value) =>
+                    setParameters({
+                      roleId: value || null,
+                      page: null,
+                      selected: null,
+                    })
+                  }
+                />
               ) : null}
               {hasInternalFilters ? (
                 <ListToolbarReset
@@ -1083,7 +1187,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                     setParameters({
                       status: null,
                       roleId: null,
-                      category: null,
                       page: null,
                     })
                   }
@@ -1228,26 +1331,45 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
             <div className="overflow-hidden rounded-lg border bg-card">
               <Table>
                 <TableHeader>
-                  {scope === "members" ? (
+                  {scope === "employees" ? (
                     <TableRow className="hover:bg-transparent">
-                      {selectedTeam ? (
-                        <TableHead className="w-10">
-                          <input
-                            type="checkbox"
-                            className="size-4 accent-primary"
-                            aria-label={t("teams.members.selectAll")}
-                            checked={allVisibleTeamMembersSelected}
-                            onChange={(event) =>
-                              toggleAllVisibleTeamMembers(event.target.checked)
-                            }
-                          />
-                        </TableHead>
-                      ) : null}
-                      <TableHead>{t("columns.name")}</TableHead>
+                      <TableHead>{t("columns.employeeName")}</TableHead>
                       <TableHead>{t("columns.email")}</TableHead>
                       <TableHead>{t("columns.joinedTeams")}</TableHead>
                       <TableHead>{t("columns.role")}</TableHead>
                       <TableHead>{t("columns.status")}</TableHead>
+                      <TableHead>{t("columns.joinedAt")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("columns.actions")}
+                      </TableHead>
+                    </TableRow>
+                  ) : scope === "agents" ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>{t("columns.name")}</TableHead>
+                      <TableHead>{t("columns.joinedTeams")}</TableHead>
+                      <TableHead>{t("columns.status")}</TableHead>
+                      <TableHead>{t("columns.joinedAt")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("columns.actions")}
+                      </TableHead>
+                    </TableRow>
+                  ) : scope === "team" ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-10">
+                        <input
+                          type="checkbox"
+                          className="size-4 accent-primary"
+                          aria-label={t("teams.members.selectAll")}
+                          checked={allVisibleTeamMembersSelected}
+                          onChange={(event) =>
+                            toggleAllVisibleTeamMembers(event.target.checked)
+                          }
+                        />
+                      </TableHead>
+                      <TableHead>{t("columns.memberName")}</TableHead>
+                      <TableHead>{t("columns.type")}</TableHead>
+                      <TableHead>{t("columns.status")}</TableHead>
+                      <TableHead>{t("columns.joinedAt")}</TableHead>
                       <TableHead className="text-right">
                         {t("columns.actions")}
                       </TableHead>
@@ -1271,29 +1393,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                   )}
                 </TableHeader>
                 <TableBody>
-                  {scope === "members" &&
-                  category !== MemberIdentityType.MemberIdentityTypeAgent &&
-                  users.length > 0
+                  {scope === "employees" && users.length > 0
                     ? users.map((user) => (
                         <TableRow key={user.id}>
-                          {selectedTeam ? (
-                            <TableCell>
-                              <input
-                                type="checkbox"
-                                className="size-4 accent-primary"
-                                aria-label={t("teams.members.selectMember", {
-                                  name: user.displayName,
-                                })}
-                                checked={selectedTeamMemberIDs.has(user.id)}
-                                onChange={(event) =>
-                                  toggleTeamMember(
-                                    user.id,
-                                    event.target.checked,
-                                  )
-                                }
-                              />
-                            </TableCell>
-                          ) : null}
                           <TableCell className="font-medium">
                             {user.displayName}
                           </TableCell>
@@ -1311,6 +1413,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                               status={user.status}
                               label={userStatusLabel(user.status, t)}
                             />
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {formatDateTime(user.createdAt)}
                           </TableCell>
                           <TableCell className="text-right whitespace-nowrap">
                             <div className="flex justify-end gap-2">
@@ -1335,22 +1440,14 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  {selectedTeam ? (
-                                    <DropdownMenuItem
-                                      onSelect={() =>
-                                        setRemovingTeamMembers([user])
-                                      }
-                                    >
-                                      {t("teams.members.remove")}
-                                    </DropdownMenuItem>
-                                  ) : null}
                                   <DropdownMenuItem
                                     disabled={user.id === identity.user.id}
                                     destructive={
-                                      user.status ===
-                                      UserStatus.UserStatusActive
+                                      user.status === UserStatus.UserStatusActive
                                     }
-                                    onSelect={() => setChangingUserStatus(user)}
+                                    onSelect={() =>
+                                      setChangingUserStatus(user)
+                                    }
                                   >
                                     {t(
                                       user.status ===
@@ -1362,6 +1459,135 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    : null}
+                  {scope === "agents" && agents.length > 0
+                    ? agents.map((agent) => (
+                        <TableRow key={agent.id}>
+                          <TableCell className="font-medium">
+                            {agent.displayName}
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                            <JoinedTeamsCell teams={agent.teams} />
+                          </TableCell>
+                          <TableCell>
+                            <UserStatusBadge
+                              status={agent.status}
+                              label={userStatusLabel(agent.status, t)}
+                            />
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {formatDateTime(agent.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setParameters({ selected: agent.id })
+                                }
+                              >
+                                {t("detail.action")}
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={t("list.more")}
+                                    title={t("list.more")}
+                                  >
+                                    <MoreHorizontalIcon />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    destructive={
+                                      agent.status ===
+                                      UserStatus.UserStatusActive
+                                    }
+                                    onSelect={() =>
+                                      setChangingAgentStatus(agent)
+                                    }
+                                  >
+                                    {t(
+                                      agent.status ===
+                                        UserStatus.UserStatusActive
+                                        ? "agents.status.deactivate"
+                                        : "agents.status.reactivate",
+                                    )}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    : null}
+                  {scope === "team" && teamMembers.length > 0
+                    ? teamMembers.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell>
+                            <input
+                              type="checkbox"
+                              className="size-4 accent-primary"
+                              aria-label={t("teams.members.selectMember", {
+                                name: member.displayName,
+                              })}
+                              checked={selectedTeamMemberIDs.has(member.id)}
+                              onChange={(event) =>
+                                toggleTeamMember(
+                                  member.id,
+                                  event.target.checked,
+                                )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {member.displayName}
+                          </TableCell>
+                          <TableCell>
+                            {t(
+                              member.type ===
+                                MemberIdentityType.MemberIdentityTypeAgent
+                                ? "identityCategories.agent"
+                                : "identityCategories.user",
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <UserStatusBadge
+                              status={member.status}
+                              label={userStatusLabel(member.status, t)}
+                            />
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {formatDateTime(member.joinedAt)}
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  aria-label={t("list.more")}
+                                  title={t("list.more")}
+                                >
+                                  <MoreHorizontalIcon />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onSelect={() =>
+                                    setRemovingTeamMembers([member])
+                                  }
+                                >
+                                  {t("teams.members.remove")}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       ))
@@ -1439,13 +1665,10 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                         </TableRow>
                       ))
                     : null}
-                  {(scope === "members" && users.length === 0) ||
-                  (scope === "external" && contacts.length === 0) ? (
+                  {currentListEmpty ? (
                     <TableRow className="hover:bg-transparent">
                       <TableCell
-                        colSpan={
-                          scope === "members" ? (selectedTeam ? 7 : 6) : 7
-                        }
+                        colSpan={tableColumnCount}
                         className="h-32 text-center text-muted-foreground"
                       >
                         {deleted ? t("trash.empty") : t("list.empty")}
@@ -1482,13 +1705,17 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
               tabIndex={-1}
               className="outline-none"
             >
-              {scope === "members"
+              {scope === "employees"
                 ? (detailUser?.displayName ?? t("detail.memberTitle"))
+                : scope === "agents"
+                  ? (detailAgent?.displayName ?? t("detail.agentTitle"))
                 : detail?.contact.displayName || t("anonymous")}
             </SheetTitle>
             <SheetDescription>
-              {scope === "members"
+              {scope === "employees"
                 ? t("detail.memberDescription")
+                : scope === "agents"
+                  ? t("detail.agentDescription")
                 : t("detail.contactDescription")}
             </SheetDescription>
           </SheetHeader>
@@ -1499,7 +1726,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                   <LoaderCircleIcon className="size-4 animate-spin" />
                   {t("loading")}
                 </div>
-              ) : scope === "members" && detailUser ? (
+              ) : scope === "employees" && detailUser ? (
                 <MemberDetailView
                   user={detailUser}
                   teams={teams}
@@ -1517,6 +1744,16 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                         status: saved.status,
                       })
                     }
+                  }}
+                  onNotFound={refreshAndClose}
+                />
+              ) : scope === "agents" && detailAgent ? (
+                <AgentDetailView
+                  agent={detailAgent}
+                  teams={teams}
+                  onSaved={(saved) => {
+                    setDetailAgent(saved)
+                    setRefreshVersion((current) => current + 1)
                   }}
                   onNotFound={refreshAndClose}
                 />
@@ -1542,17 +1779,17 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              {t(scope === "members" ? "members.create" : "detail.createTitle")}
+              {t(scope !== "external" ? "members.create" : "detail.createTitle")}
             </DialogTitle>
             <DialogDescription>
               {t(
-                scope === "members"
+                scope !== "external"
                   ? "members.createDescription"
                   : "detail.createDescription",
               )}
             </DialogDescription>
           </DialogHeader>
-          {scope === "members" ? (
+          {scope !== "external" ? (
             <MemberForm
               teams={teams}
               roles={roles}
@@ -1577,20 +1814,41 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       </Dialog>
 
       <Dialog
+        open={creatingAgent}
+        onOpenChange={(open) => !open && setParameters({ newAgent: null })}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t("agents.create")}</DialogTitle>
+            <DialogDescription>
+              {t("agents.createDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <AgentForm
+            teams={teams}
+            defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
+            onSaved={() => {
+              setParameters({ newAgent: null })
+              setRefreshVersion((current) => current + 1)
+            }}
+            onCancel={() => setParameters({ newAgent: null })}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={creatingTeam}
         onOpenChange={(open) => !open && setParameters({ newTeam: null })}
       >
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{t("teams.create")}</DialogTitle>
-            <DialogDescription>
-              {t("teams.editDescription")}
-            </DialogDescription>
+            <DialogDescription>{t("teams.editDescription")}</DialogDescription>
           </DialogHeader>
           <TeamForm
             onSaved={(team) => {
               setTeams((current) => [...current, team])
-              navigate(`/contacts/members?teamId=${team.id}`, {
+              navigate(`/contacts/teams/${team.id}`, {
                 replace: true,
               })
             }}
@@ -1747,6 +2005,42 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
               {deleting
                 ? t("members.status.saving")
                 : t("members.status.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={changingAgentStatus !== null}
+        onOpenChange={(open) => !open && setChangingAgentStatus(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(
+                changingAgentStatus?.status === UserStatus.UserStatusActive
+                  ? "agents.status.deactivateTitle"
+                  : "agents.status.reactivateTitle",
+                { name: changingAgentStatus?.displayName ?? "" },
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                changingAgentStatus?.status === UserStatus.UserStatusActive
+                  ? "agents.status.deactivateDescription"
+                  : "agents.status.reactivateDescription",
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("agents.status.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={() => void changeAgentStatus()}
+            >
+              {deleting
+                ? t("agents.status.saving")
+                : t("agents.status.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

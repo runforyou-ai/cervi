@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -39,7 +40,6 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
-			Set("display_name = ?", input.DisplayName).
 			Set("email = ?", input.Email).
 			Set("role_id = ?", input.RoleID).
 			Set("updated_at = now()").
@@ -53,6 +53,23 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return ErrNotFound
+		}
+		result, err = tx.NewUpdate().Model((*servermodels.OrganizationMember)(nil)).
+			Set("display_name = ?", input.DisplayName).
+			Set("updated_at = now()").
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("id = ?", userID).
+			Where("type = ?", domain.MemberIdentityTypeUser).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		rows, err = result.RowsAffected()
 		if err != nil {
 			return err
 		}

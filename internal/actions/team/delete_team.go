@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -16,7 +18,7 @@ type DeleteTeamAction struct{ db *bun.DB }
 // NewDeleteTeamAction 创建团队删除操作。
 func NewDeleteTeamAction(db *bun.DB) *DeleteTeamAction { return &DeleteTeamAction{db: db} }
 
-// Execute 删除团队及其全部成员关系。
+// Execute 删除团队及其成员关系，并把渠道关联重置到公共队列。
 func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := validateIdentity(ctx, tx, identity); err != nil {
@@ -29,6 +31,9 @@ func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.I
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("team_id = ?", teamID).
 			Exec(ctx); err != nil {
+			return err
+		}
+		if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeTeam, teamID); err != nil {
 			return err
 		}
 		_, err := tx.NewDelete().Model((*servermodels.Team)(nil)).

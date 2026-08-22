@@ -33,8 +33,12 @@ func TestChannelContractConversion(t *testing.T) {
 		t.Fatalf("channel conversion = %#v", channel)
 	}
 
-	input := channelInput(WebsiteChannelInput{Type: ChannelTypeWebsite, Name: "产品官网", Description: description, DefaultLocale: LocaleEnglishUnitedStates})
-	if input.Type != domain.ChannelTypeWebsite || input.DefaultLocale != domain.LocaleEnglishUnitedStates || input.Name != "产品官网" {
+	input := channelInput(WebsiteChannelInput{
+		Type: ChannelTypeWebsite, Name: "产品官网", Description: description, DefaultLocale: LocaleEnglishUnitedStates,
+		NewConversationTarget: ChannelRoutingTarget{Type: ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        ChannelRoutingTarget{Type: ChannelRoutingTargetTypePublicQueue},
+	})
+	if input.Type != domain.ChannelTypeWebsite || input.DefaultLocale != domain.LocaleEnglishUnitedStates || input.Name != "产品官网" || input.NewConversationTarget.Type != domain.ChannelRoutingTargetTypePublicQueue || input.FallbackTarget.Type != domain.ChannelRoutingTargetTypePublicQueue {
 		t.Fatalf("channel input conversion = %#v", input)
 	}
 }

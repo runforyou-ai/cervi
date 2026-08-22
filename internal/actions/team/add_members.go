@@ -28,12 +28,12 @@ func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.I
 		if _, err := loadTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
 			return err
 		}
-		uniqueIDs := make(map[string]struct{}, len(members))
+		uniqueIDs := make(map[string]domain.MemberIdentityType, len(members))
 		for _, member := range members {
-			if member.Type != domain.MemberIdentityTypeUser || !common.ValidUUID(member.ID) {
+			if (member.Type != domain.MemberIdentityTypeUser && member.Type != domain.MemberIdentityTypeAgent) || !common.ValidUUID(member.ID) {
 				return ErrMemberInvalid
 			}
-			uniqueIDs[member.ID] = struct{}{}
+			uniqueIDs[member.ID] = member.Type
 		}
 		if len(uniqueIDs) == 0 {
 			return ErrMemberInvalid
@@ -42,30 +42,36 @@ func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.I
 		for id := range uniqueIDs {
 			ids = append(ids, id)
 		}
-		count, err := tx.NewSelect().Model((*servermodels.User)(nil)).
+		var storedMembers []servermodels.OrganizationMember
+		err := tx.NewSelect().Model(&storedMembers).
+			Column("id", "type").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("status = 'active'").
 			Where("id IN (?)", bun.In(ids)).
-			Count(ctx)
+			Scan(ctx)
 		if err != nil {
 			return err
 		}
-		if count != len(ids) {
+		if len(storedMembers) != len(ids) {
 			return ErrMemberInvalid
+		}
+		for _, storedMember := range storedMembers {
+			if uniqueIDs[storedMember.ID] != domain.MemberIdentityType(storedMember.Type) {
+				return ErrMemberInvalid
+			}
 		}
 		relations := make([]servermodels.TeamMember, 0, len(ids))
 		for _, id := range ids {
 			relations = append(relations, servermodels.TeamMember{
 				OrganizationID:  identity.Organization.ID,
 				TeamID:          teamID,
-				IdentityType:    string(domain.MemberIdentityTypeUser),
-				IdentityID:      id,
+				MemberID:        id,
 				CreatedByUserID: identity.User.ID,
 			})
 		}
 		if _, err := tx.NewInsert().Model(&relations).
-			Column("organization_id", "team_id", "identity_type", "identity_id", "created_by_user_id").
-			On("CONFLICT (organization_id, team_id, identity_type, identity_id) DO NOTHING").
+			Column("organization_id", "team_id", "member_id", "created_by_user_id").
+			On("CONFLICT (organization_id, team_id, member_id) DO NOTHING").
 			Exec(ctx); err != nil {
 			return err
 		}

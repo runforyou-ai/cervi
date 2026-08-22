@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -16,21 +17,20 @@ import (
 
 // validateIdentity 校验当前用户仍是企业的有效成员。
 func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
-	if identity == nil || !common.ValidUUID(identity.Organization.ID) || !common.ValidUUID(identity.User.ID) || identity.User.OrganizationID != identity.Organization.ID {
-		return common.ErrIdentityInvalid
-	}
-	exists, err := db.NewSelect().Model((*servermodels.User)(nil)).
-		Where("organization_id = ?", identity.Organization.ID).
-		Where("id = ?", identity.User.ID).
-		Where("status = 'active'").
-		Exists(ctx)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return common.ErrIdentityInvalid
-	}
-	return nil
+	return identityaction.Validate(ctx, db, identity)
+}
+
+// loadUser 读取用户账号及其企业成员字段。
+func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*servermodels.User, error) {
+	user := &servermodels.User{}
+	err := db.NewSelect().TableExpr("users AS u").
+		ColumnExpr("u.id::text, u.organization_id::text, u.email, u.password_hash, u.role_id::text, u.locale, u.time_zone, u.work_status").
+		ColumnExpr("om.display_name, om.status, om.avatar_file_id::text").
+		Join("JOIN organization_members AS om ON om.id = u.id AND om.organization_id = u.organization_id AND om.type = ?", domain.MemberIdentityTypeUser).
+		Where("u.organization_id = ?", organizationID).
+		Where("u.id = ?", userID).
+		Scan(ctx, user)
+	return user, err
 }
 
 // loadDirectoryUser 读取企业成员、角色和所属团队。
@@ -41,8 +41,9 @@ func loadDirectoryUser(ctx context.Context, db bun.IDB, organizationID, userID s
 	user := &DirectoryUser{}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text AS id").
-		ColumnExpr("u.email, u.display_name, u.status, u.work_status, u.created_at").
+		ColumnExpr("u.email, om.display_name, om.status, u.work_status, om.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
+		Join("JOIN organization_members AS om ON om.id = u.id AND om.organization_id = u.organization_id AND om.type = ?", domain.MemberIdentityTypeUser).
 		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
 		Where("u.id = ?", userID).
 		Where("u.organization_id = ?", organizationID).
@@ -95,10 +96,11 @@ func lockAdministratorRole(ctx context.Context, db bun.IDB, organizationID strin
 
 // ensureActiveAdministratorRemains 校验企业仍有正常状态的管理员。
 func ensureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizationID, administratorRoleID string) error {
-	count, err := db.NewSelect().Model((*servermodels.User)(nil)).
-		Where("organization_id = ?", organizationID).
-		Where("role_id = ?", administratorRoleID).
-		Where("status = ?", domain.UserStatusActive).
+	count, err := db.NewSelect().TableExpr("users AS u").
+		Join("JOIN organization_members AS om ON om.id = u.id AND om.organization_id = u.organization_id AND om.type = ?", domain.MemberIdentityTypeUser).
+		Where("u.organization_id = ?", organizationID).
+		Where("u.role_id = ?", administratorRoleID).
+		Where("om.status = ?", domain.UserStatusActive).
 		Count(ctx)
 	if err != nil {
 		return err
@@ -116,8 +118,7 @@ func loadUserTeams(ctx context.Context, db bun.IDB, organizationID, userID strin
 		ColumnExpr("t.id::text AS id, t.name").
 		Join("JOIN teams AS t ON t.id = tm.team_id AND t.organization_id = tm.organization_id").
 		Where("tm.organization_id = ?", organizationID).
-		Where("tm.identity_type = ?", domain.MemberIdentityTypeUser).
-		Where("tm.identity_id = ?", userID).
+		Where("tm.member_id = ?", userID).
 		OrderExpr("lower(t.name) ASC, t.id ASC").
 		Scan(ctx, &teams)
 	return teams, err
@@ -161,26 +162,24 @@ func replaceUserTeams(ctx context.Context, tx bun.Tx, identity *servermodels.Ide
 	if len(ids) == 0 {
 		_, err = tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
 			Where("organization_id = ?", identity.Organization.ID).
-			Where("identity_type = ?", domain.MemberIdentityTypeUser).
-			Where("identity_id = ?", userID).
+			Where("member_id = ?", userID).
 			Exec(ctx)
 		return err
 	}
 	if _, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
 		Where("organization_id = ?", identity.Organization.ID).
-		Where("identity_type = ?", domain.MemberIdentityTypeUser).
-		Where("identity_id = ?", userID).
+		Where("member_id = ?", userID).
 		Where("team_id NOT IN (?)", bun.In(ids)).
 		Exec(ctx); err != nil {
 		return err
 	}
 	relations := make([]servermodels.TeamMember, 0, len(ids))
 	for _, teamID := range ids {
-		relations = append(relations, servermodels.TeamMember{OrganizationID: identity.Organization.ID, TeamID: teamID, IdentityType: string(domain.MemberIdentityTypeUser), IdentityID: userID, CreatedByUserID: identity.User.ID})
+		relations = append(relations, servermodels.TeamMember{OrganizationID: identity.Organization.ID, TeamID: teamID, MemberID: userID, CreatedByUserID: identity.User.ID})
 	}
 	if _, err := tx.NewInsert().Model(&relations).
-		Column("organization_id", "team_id", "identity_type", "identity_id", "created_by_user_id").
-		On("CONFLICT (organization_id, team_id, identity_type, identity_id) DO NOTHING").
+		Column("organization_id", "team_id", "member_id", "created_by_user_id").
+		On("CONFLICT (organization_id, team_id, member_id) DO NOTHING").
 		Exec(ctx); err != nil {
 		return fmt.Errorf("insert user teams: %w", err)
 	}
