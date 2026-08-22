@@ -248,13 +248,10 @@ func serverPort() int {
 	return port
 }
 
-// httpsModeFromEnv 返回显式模式或与运行环境匹配的默认模式。
+// httpsModeFromEnv 返回配置的 HTTPS 模式，留空时关闭 HTTPS 入口。
 func httpsModeFromEnv() (httpsMode, error) {
 	value := strings.ToLower(strings.TrimSpace(os.Getenv("CERVI_HTTPS_MODE")))
 	if value == "" {
-		if strings.EqualFold(strings.TrimSpace(os.Getenv("CERVI_ENV")), "production") {
-			return modeAuto, nil
-		}
 		return modeOff, nil
 	}
 	mode := httpsMode(value)

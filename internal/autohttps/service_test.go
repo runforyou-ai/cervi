@@ -17,26 +17,23 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// TestHTTPSModeFromEnv 验证显式模式和不同环境的默认模式。
+// TestHTTPSModeFromEnv 验证显式模式和统一默认模式。
 func TestHTTPSModeFromEnv(t *testing.T) {
 	tests := []struct {
-		name        string
-		environment string
-		value       string
-		want        httpsMode
-		wantError   bool
+		name      string
+		value     string
+		want      httpsMode
+		wantError bool
 	}{
-		{name: "production default", environment: "production", want: modeAuto},
-		{name: "development default", environment: "development", want: modeOff},
-		{name: "explicit auto", environment: "development", value: "auto", want: modeAuto},
-		{name: "explicit external", environment: "production", value: "external", want: modeExternal},
-		{name: "explicit off", environment: "production", value: "off", want: modeOff},
-		{name: "case insensitive", environment: "production", value: " EXTERNAL ", want: modeExternal},
-		{name: "invalid", environment: "production", value: "proxy", wantError: true},
+		{name: "empty defaults to off", want: modeOff},
+		{name: "explicit auto", value: "auto", want: modeAuto},
+		{name: "explicit external", value: "external", want: modeExternal},
+		{name: "explicit off", value: "off", want: modeOff},
+		{name: "case insensitive", value: " EXTERNAL ", want: modeExternal},
+		{name: "invalid", value: "proxy", wantError: true},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Setenv("CERVI_ENV", test.environment)
 			t.Setenv("CERVI_HTTPS_MODE", test.value)
 			mode, err := httpsModeFromEnv()
 			if test.wantError {
@@ -97,7 +94,6 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 
 // TestNewServiceExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
 func TestNewServiceExternalDoesNotCreateListeners(t *testing.T) {
-	t.Setenv("CERVI_ENV", "production")
 	t.Setenv("CERVI_HTTPS_MODE", "external")
 	service, err := NewService()
 	if err != nil {
