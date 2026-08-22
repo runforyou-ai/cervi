@@ -176,7 +176,7 @@ func websiteChannelFromModel(channel *servermodels.Channel) WebsiteChannelSummar
 		ID: channel.ID, OrganizationID: channel.OrganizationID, CreatedByUserID: channel.CreatedByUserID,
 		Type: ChannelType(channel.Type), Name: channel.Name, Description: channel.Description, DefaultLocale: Locale(channel.DefaultLocale), Enabled: channel.Enabled,
 		NewConversationTarget: channelRoutingTargetFromModel(channel.InitialRoutingTargetType, channel.InitialRoutingTargetID),
-		FallbackTarget:        channelRoutingTargetFromModel(channel.FallbackTargetType, channel.FallbackTargetID),
+		FallbackTarget:        channelRoutingTargetFromModel(channel.FallbackRoutingTargetType, channel.FallbackRoutingTargetID),
 		CreatedAt:             channel.CreatedAt, UpdatedAt: channel.UpdatedAt,
 	}
 }

@@ -23,12 +23,12 @@ func ResetRoutingTarget(ctx context.Context, db bun.IDB, organizationID string, 
 		return err
 	}
 	_, err := db.NewUpdate().Model((*servermodels.Channel)(nil)).
-		Set("fallback_target_type = ?", domain.ChannelRoutingTargetTypePublicQueue).
-		Set("fallback_target_id = NULL").
+		Set("fallback_routing_target_type = ?", domain.ChannelRoutingTargetTypePublicQueue).
+		Set("fallback_routing_target_id = NULL").
 		Set("updated_at = now()").
 		Where("organization_id = ?", organizationID).
-		Where("fallback_target_type = ?", targetType).
-		Where("fallback_target_id = ?", targetID).
+		Where("fallback_routing_target_type = ?", targetType).
+		Where("fallback_routing_target_id = ?", targetID).
 		Exec(ctx)
 	return err
 }

@@ -38,15 +38,15 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 	}
 
 	channel := &servermodels.Channel{
-		OrganizationID:           identity.Organization.ID,
-		CreatedByUserID:          identity.User.ID,
-		Type:                     string(input.Type),
-		Name:                     input.Name,
-		DefaultLocale:            string(input.DefaultLocale),
-		InitialRoutingTargetType: string(input.NewConversationTarget.Type),
-		InitialRoutingTargetID:   routingTargetID(input.NewConversationTarget),
-		FallbackTargetType:       string(input.FallbackTarget.Type),
-		FallbackTargetID:         routingTargetID(input.FallbackTarget),
+		OrganizationID:            identity.Organization.ID,
+		CreatedByUserID:           identity.User.ID,
+		Type:                      string(input.Type),
+		Name:                      input.Name,
+		DefaultLocale:             string(input.DefaultLocale),
+		InitialRoutingTargetType:  string(input.NewConversationTarget.Type),
+		InitialRoutingTargetID:    routingTargetID(input.NewConversationTarget),
+		FallbackRoutingTargetType: string(input.FallbackTarget.Type),
+		FallbackRoutingTargetID:   routingTargetID(input.FallbackTarget),
 	}
 	if input.Description != "" {
 		channel.Description = &input.Description
@@ -89,7 +89,7 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 
 		_, err := tx.NewInsert().
 			Model(channel).
-			Column("organization_id", "created_by_user_id", "type", "name", "description", "default_locale", "initial_routing_target_type", "initial_routing_target_id", "fallback_target_type", "fallback_target_id").
+			Column("organization_id", "created_by_user_id", "type", "name", "description", "default_locale", "initial_routing_target_type", "initial_routing_target_id", "fallback_routing_target_type", "fallback_routing_target_id").
 			Returning("*").
 			Exec(ctx)
 		if err != nil {
