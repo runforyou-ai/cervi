@@ -53,19 +53,17 @@ FROM ${RUNTIME_IMAGE}
 # Copy the binary
 COPY --from=builder /app/server /server
 
-# Copy frontend assets
-COPY --from=builder /app/frontend/dist /frontend/dist
-
-# Expose the default port
-EXPOSE 8080
+# auto 模式使用 80/443；8080 仅为 WAILS_SERVER_PORT 的默认端口提示。
+EXPOSE 80 443 8080
 
 # Bind to all interfaces (required for Docker)
 # Can be overridden at runtime with -e WAILS_SERVER_HOST=...
 ENV WAILS_SERVER_HOST=0.0.0.0
 ENV FILE_STORAGE_PATH=/data/files
+ENV CERVI_TLS_DATA_DIR=/data/tls
 
-# 持久化对象存储停用期间上传的本地文件。
-VOLUME ["/data/files"]
+# 持久化本地文件和自动签发的证书。
+VOLUME ["/data/files", "/data/tls"]
 
 # Run the server
 ENTRYPOINT ["/server"]
