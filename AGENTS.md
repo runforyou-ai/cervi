@@ -7,10 +7,14 @@ Cervi 是一款开源、以私有化部署为主的 AI 原生企业协作产品�
 ## 运行方式
 
 ```bash
-# 启动本地 PostgreSQL
+# 每个 worktree 复制并调整自己的环境文件
+cp .env.example .env
+
+# 仅在主工作区启动共享 PostgreSQL
 docker compose up -d postgres
 
-# 服务端数据库迁移
+# 创建当前工作区数据库并执行迁移
+wails3 task db:ensure
 wails3 task migrate
 wails3 task migrate:status
 wails3 task migrate:rollback
@@ -21,7 +25,7 @@ wails3 task make:migration NAME=create_example_table
 
 # 先启动服务端，再启动桌面端及 MCP 服务
 wails3 task run:server
-WAILS_MCP=1 wails3 dev
+wails3 task dev
 
 # 移动端
 wails3 task ios:install:deps
@@ -37,7 +41,9 @@ wails3 generate bindings -clean=true -ts -i
 ```
 
 前端要求 Node.js 22.22.0 或更高版本，项目构建使用 Wails v3 和 Task。
-按上述顺序启动后，可通过 Wails MCP 获取桌面端页面信息。
+Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite、MCP 端口和 PostgreSQL 数据库。按上述顺序启动后，可通过 Wails MCP 获取桌面端页面信息。
+
+真机通过 `CERVI_PUBLIC_URL` 连接服务端。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
 
 ## 代码组织
 
@@ -103,7 +109,8 @@ cervi/
 
 ### 数据与迁移
 
-- 本地 PostgreSQL 由所有工作区共享，不为单独工作区创建容器、端口或数据卷。
+- 本地 PostgreSQL 实例由所有工作区共享，不为单独工作区创建容器、端口或数据卷；每个 worktree 必须通过 `.env` 使用独立数据库。
+- 本地不运行 S3 兼容服务；对象存储由管理页面配置，可使用任意客户端可访问的临时 S3 兼容服务。
 - 重建库结构使用 `wails3 task migrate:reset`，或先回滚再 `migrate`；回滚和重建前先停止服务端。
 - 建表迁移按 `YYYYMMDDHHMMSS_create_<table>_table.sql` 命名，每个文件只创建一张表，不创建外键和 `CHECK` 约束。
 - 迁移中使用简洁中文 `COMMENT ON` 说明表和业务字段。
