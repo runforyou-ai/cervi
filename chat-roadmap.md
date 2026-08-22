@@ -99,9 +99,11 @@ Conversation ── ConversationParticipant
     │     ├── 引用消息
     │     └── 话题根消息
     │
-    └── ServiceSession
+    └── CustomerConversation
             │
-            └── 客服排队、分配、转接和响应指标
+            └── ServiceSession
+                    │
+                    └── 客服排队、分配、转接和响应指标
 
 Ticket ── TicketConversationLink ── Conversation / Message 范围
 ```
@@ -125,9 +127,23 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 - 外部渠道连接配置。
 - 用户登录认证。
 
-### 4.2 ConversationParticipant
+### 4.2 CustomerConversation
 
-参与者关系表示某个身份主体可以访问会话，并保存：
+`CustomerConversation` 是 `Conversation` 的客户会话扩展，显式关联产生该会话的渠道身份。
+
+它负责：
+
+- 关联通用会话与 `contact_channel_identities`。
+- 保证同一渠道身份只对应一个长期客户会话。
+- 为客户会话列表提供联系人和来源渠道的可靠查询路径。
+
+它不负责客服接待状态。同一个联系人拥有多个渠道身份时，每个渠道身份保留独立客户会话；跨渠道历史在联系人或工单层聚合，不自动合并消息时间线。
+
+客户会话扩展使用真实关系字段，不解析字符串键获取渠道身份，也不把渠道专属字段直接加入通用 `conversations`。
+
+### 4.3 ConversationParticipant
+
+参与者关系表示某个身份主体参与会话，并保存：
 
 - 身份类型及身份编号。
 - 会话角色。
@@ -137,20 +153,28 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 参与者退出后不物理删除关系，避免历史消息失去发送者上下文。
 
-### 4.3 Message
+参与者关系表达消息发送主体和显式会话成员，不是所有会话类型的唯一访问控制来源：
+
+- 内部单聊和群聊按有效参与者关系授权。
+- “我的内部会话”查询必须显式限定 `type IN (direct, group)`，不能把参与者关系作为所有会话类型的统一列表入口。
+- 客户会话在当前阶段按企业登录身份读取，后续按 `ServiceSession` 的排队、负责人和协作者授权。
+- 未发言、未分配的客服不因能够查看客户收件箱而写入参与者表。
+- 客服实际回复或明确加入协作时，才建立对应的 `user` 参与者关系。
+
+### 4.4 Message
 
 消息属于一个会话，由会话参与者发送。首期只实现文本消息，但模型预留：
 
 - 消息类型。
 - 引用消息。
 - 话题根消息。
-- 客户端幂等编号。
+- 来源或客户端幂等编号。
 - 编辑和删除时间。
 - 联邦来源信息。
 
 文件、语音、消息卡片、表情反应和系统事件后续通过独立关系或消息内容扩展实现，不在首个 PR 中一次性加入。
 
-### 4.4 ServiceSession
+### 4.5 ServiceSession
 
 `ServiceSession` 表示一次客服处理过程，与长期消息容器分离。
 
@@ -163,7 +187,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 一个客户会话可以先后产生多个服务批次。内部单聊和内部群聊不创建服务批次。
 
-### 4.5 Ticket
+### 4.6 Ticket
 
 工单是问题处理与流程对象，不等同于会话。
 
@@ -353,7 +377,9 @@ actor_identity_links
 
 需要长期保持以下边界：
 
-- 本地用户只能访问自己参与或被授权管理的会话。
+- 内部单聊和群聊按有效参与者关系授权。
+- 客户会话当前按已登录和企业边界读取，ServiceSession 落地后按排队、负责人和协作者授权。
+- 能查看客户收件箱不等于成为会话参与者，不把所有企业成员写入客户会话参与者表。
 - 联系人只能通过其来源渠道访问对应客户会话。
 - 受管访客只能访问邀请范围内的资源。
 - 联邦用户只能访问双方共享并仍然有效的资源。
@@ -478,6 +504,8 @@ feat: 建立客户会话与入站文本消息数据底座
 - 同一条渠道消息重试不会重复创建联系人、会话或消息。
 - 自动进入系统的联系人不需要伪造创建用户。
 - 客户消息发送者可以通过参与者关系稳定追溯。
+- 客户渠道关系通过类型扩展表表达，不解析自然键，也不污染通用会话字段。
+- 客户收件箱访问与会话参与者关系保持独立。
 
 ### 10.2 PR 范围
 
@@ -493,7 +521,7 @@ ConversationStatus
 ├── active
 └── archived
 
-ConversationParticipantIdentityType
+ParticipantIdentityType
 ├── user
 ├── guest
 ├── federated_user
@@ -515,9 +543,11 @@ MessageType
 
 - 将 `contacts.created_by_user_id` 改为可空，手工创建联系人时仍记录当前用户，渠道自动创建联系人时保持为空。
 - 将 `servermodels.Contact.CreatedByUserID` 改为 `*string`。
+- 入站自动创建联系人时，`source_channel_id` 使用当前网站渠道，`stage` 使用 `visitor`，显示名称允许为空，不伪造用户、邮箱或其他联系方式。
+- 已有渠道身份收到新的非空渠道显示名称时更新 `contact_channel_identities.display_name`；只有 `contacts.display_name` 为空时才补充联系人名称，不覆盖客服人工维护的名称。
 - 现有手工创建和读取联系人行为保持目标模型下的一致实现，不增加历史数据兼容逻辑。
 
-新增三张表，每个迁移文件只创建一张表：
+新增四张表，每个迁移文件只创建一张表：
 
 #### conversations
 
@@ -527,7 +557,6 @@ organization_id     uuid not null
 type                text not null
 status              text not null default 'active'
 title               text
-conversation_key    text
 created_by_identity_type text
 created_by_identity_id uuid
 last_message_at     timestamptz
@@ -537,13 +566,29 @@ updated_at          timestamptz not null default now()
 
 约束与索引：
 
-- `(organization_id, type, conversation_key)` 在 `conversation_key IS NOT NULL` 时唯一。
-- `(organization_id, status, last_message_at DESC, id DESC)` 用于会话列表。
-- 客户会话键使用 `customer:channel_identity:<渠道身份 UUID>`，保证同一渠道身份复用一个长期会话。
-- 后续内部单聊使用两名参与者的“身份类型 + 身份 UUID”按字典序组成会话键，不需要改变表结构。
+- `(organization_id, type, status, last_message_at DESC NULLS LAST, id DESC)` 用于分类会话列表，查询排序与空值规则必须一致。
 - 创建者身份两个字段必须同时为空或同时有值，由 Action 维护；空值表示系统或集成创建。
 - 渠道联系人首次发消息创建客户会话时，创建者身份为该联系人。
+- 客户会话 `title` 保持为空，展示名称从联系人及渠道身份读取，避免复制过期名称。
 - `direct` 和 `group` 在本 PR 中不创建实例。
+
+#### customer_conversations
+
+```text
+conversation_id              uuid primary key
+organization_id              uuid not null
+contact_channel_identity_id  uuid not null
+created_at                   timestamptz not null default now()
+```
+
+约束与索引：
+
+- 唯一索引命名为 `customer_conversations_organization_channel_identity_unique`，覆盖 `(organization_id, contact_channel_identity_id)`，保证同一渠道身份只对应一个长期客户会话。
+- `(organization_id, conversation_id)` 用于带企业边界读取客户会话扩展。
+- 联系人和渠道通过 `contact_channel_identities` 的真实字段关联，不从字符串键解析。
+- `contact_channel_identities.channel_id`、`contact_id` 及客户会话扩展关系创建后不可被普通更新操作改变。
+- 同一联系人拥有多个渠道身份时保留多个客户会话；跨渠道历史只在联系人或工单层聚合。
+- 该表只表达客户会话类型关系，不保存 ServiceSession 状态和客服负责人。
 
 #### conversation_participants
 
@@ -565,9 +610,14 @@ updated_at          timestamptz not null default now()
 约束与索引：
 
 - `(organization_id, conversation_id, identity_type, identity_id)` 唯一。
+- 唯一索引命名为 `conversation_participants_org_conversation_identity_unique`，供并发写入时精确识别预期冲突；名称保持在 PostgreSQL 的 63 字节标识符限制内。
 - `(organization_id, identity_type, identity_id, left_at, conversation_id)` 用于读取当前身份的会话。
 - 关系退出时设置 `left_at`，不删除记录。
 - `last_read_message_id` 必须由 Action 验证属于同一会话。
+- `identity_type = contact` 时，`identity_id` 必须是 `contacts.id`，不能使用渠道身份编号。
+- 一个客户会话最多存在一个未退出的联系人参与者，由 Action 维护。
+- 身份类型和身份编号插入后不可修改；联系人以后关联访客或联邦身份时使用独立身份关联表，不重写历史参与者和消息发送者。
+- 本 PR 不写客服个人已读状态，也不把能够查看收件箱的全体成员加入参与者表。
 
 #### messages
 
@@ -589,8 +639,11 @@ deleted_at            timestamptz
 约束与索引：
 
 - `(organization_id, conversation_id, created_at DESC, id DESC)` 用于消息分页。
-- `(organization_id, conversation_id, idempotency_key)` 在 `idempotency_key IS NOT NULL` 时唯一，用于发送幂等。
-- 网站入站消息的幂等键由渠道编号和渠道消息编号组成；后续本地客户端发送消息时使用带发送者范围的客户端编号。
+- 部分唯一索引命名为 `messages_organization_idempotency_unique`，覆盖 `(organization_id, idempotency_key)` 且只包含非空幂等键。
+- 网站入站消息的幂等键固定为 `chmsg:<channel_id>:<source_message_id>`。
+- 后续本地客户端消息使用 `client:<participant_id>:<nonce>`，不得与渠道消息共用无前缀编号。
+- 幂等键前缀及其作用域共同组成企业内消息命名空间，使同一来源消息即使被错误地提交到另一个会话也不能重复入库。
+- `created_at` 使用当前服务器接收消息的时间；外部渠道原始发送时间以后作为来源元数据增加，不参与本 PR 的排序正确性。
 - 文本消息必须具有发送参与者；系统消息允许发送参与者为空，由 Action 根据消息类型维护。
 - 引用目标和话题根消息由 Action 显式校验属于同一企业和同一会话。
 - 本 PR 不允许编辑、删除和话题回复，但保留字段以稳定消息结构。
@@ -601,8 +654,15 @@ deleted_at            timestamptz
 
 ```text
 internal/storage/server/models/conversation.go
+internal/storage/server/models/customer_conversation.go
 internal/storage/server/models/conversation_participant.go
 internal/storage/server/models/message.go
+```
+
+联系人包增加可在既有事务中调用的渠道身份能力，集中维护联系人规则：
+
+```text
+internal/actions/contact/ensure_channel_identity.go
 ```
 
 新增 Action 包：
@@ -610,8 +670,10 @@ internal/storage/server/models/message.go
 ```text
 internal/actions/conversation/
 ├── receive_customer_text_message.go
+├── receive_customer_text_message_test.go
 ├── list_customer_conversations.go
 ├── list_customer_messages.go
+├── customer_queries_test.go
 ├── helpers.go
 ├── types.go
 ├── errors.go
@@ -625,23 +687,30 @@ Action 行为：
 - 接收经过渠道适配器验证和归一化的渠道编号、外部身份编号、显示名称、渠道消息编号和文本正文。
 - 该 Action 是可信业务入口，不直接接受浏览器伪造的联系人编号；公开 API 必须先完成访客会话验证。
 - 校验渠道存在、已启用且类型为网站渠道，并从渠道记录取得企业编号。
-- 按 `(channel_id, external_id)` 查找渠道身份；不存在时在同一事务中创建无创建用户的联系人和渠道身份。
-- 已存在渠道身份时复用联系人，并更新渠道显示名称、最后活跃时间和联系人更新时间。
-- 联系人处于回收站时，新的真实渠道消息会将其恢复为可用状态。
-- 按渠道身份生成 `conversation_key`，创建或读取唯一客户会话。
-- 确保联系人以 `contact` 身份成为会话参与者。
+- 渠道编号必须是有效 UUID。
+- `external_id` 和 `source_message_id` 去除首尾空白后必填，首期各不超过 255 个 Unicode 字符。
+- 渠道显示名称可空，非空时不超过 200 个 Unicode 字符，并复用联系人领域的归一化规则。
 - 去除消息正文首尾空白后校验非空，首期长度上限为 10,000 个 Unicode 字符。
-- 按渠道编号和渠道消息编号组成 `idempotency_key`，保证渠道重试不产生重复消息。
-- 在同一事务中写入消息并更新会话 `last_message_at` 和 `updated_at`。
+- `messages.body` 存储校验通过后的规范化正文；幂等比较直接比较已入库正文和本次规范化正文。
+- 通过联系人包能力按 `(channel_id, external_id)` 查找渠道身份；不存在时在当前事务中创建无创建用户的联系人和渠道身份。
+- 已存在渠道身份时复用联系人，仅以非空渠道显示名称更新渠道身份，同时更新最后活跃时间和联系人更新时间；联系人名称只在原值为空时补充。
+- 联系人处于回收站时，新的真实渠道消息将 `deleted_at` 置空；保留原客户阶段和人工资料。
+- 按渠道身份创建或读取唯一 `customer_conversations` 扩展及其通用会话。
+- 客户会话已归档时，新入站消息将其恢复为 `active`；归档只表示暂时从活动列表隐藏，不表示客服结案。
+- 确保联系人以 `contact` 身份、`contacts.id` 编号成为唯一有效联系人参与者。
+- 按固定格式生成 `idempotency_key`，相同消息重试时返回已有结果。
+- 已有幂等消息的渠道身份、发送身份和规范化正文必须与本次输入一致；渠道身份通过已有消息所属的客户会话扩展比较，发送身份通过已有 `sender_participant_id` 关联的身份类型与身份编号比较，不能依赖本次请求临时创建的参与者。
+- 同一幂等键携带不同渠道身份、内容或发送身份时返回冲突错误，不静默覆盖或伪装成成功重试。
+- 在同一事务中写入消息，并以新消息服务器接收时间只向后更新会话 `last_message_at` 和 `updated_at`。
 - 返回联系人、渠道身份、会话和消息编号，供后续接入层触发实时通知。
 - 不在本 PR 中负责访客认证、HTTP 响应或实时推送。
 
 #### ListCustomerConversations
 
 - 校验当前身份仍是当前企业有效用户。
-- 只读取当前企业的客户会话。
-- 按最后消息时间、创建时间倒序分页。
-- 返回联系人、来源渠道和最后一条消息摘要。
+- 通过 `customer_conversations` 只读取当前企业、`type = customer`、`status = active`、`last_message_at IS NOT NULL` 且联系人未删除的客户会话。
+- 使用 `(last_message_at, id)` 倒序游标分页，与会话列表索引一致。
+- 返回能够证明查询模型的联系人、来源渠道和最后消息记录，不在本 PR 固化最终 appservice 或前端 DTO。
 - 本 PR 不计算个人未读数和客服分配状态。
 - 所有统计显式限定 `organization_id`。
 
@@ -662,9 +731,12 @@ Action 使用语言无关错误，至少包括：
 ErrConversationNotFound
 ErrCustomerChannelUnavailable
 ErrCustomerIdentityInvalid
+ErrCustomerIdentityTooLong
 ErrSourceMessageIDRequired
+ErrSourceMessageIDTooLong
 ErrMessageBodyRequired
 ErrMessageBodyTooLong
+ErrMessageIdempotencyConflict
 ```
 
 登录后查询时，组织外资源、无权访问资源和真实不存在资源统一返回 Not Found 语义，避免泄露其他企业中的资源存在性。入站 Action 对不存在、已停用和非网站渠道统一返回渠道不可用语义。
@@ -674,21 +746,33 @@ ErrMessageBodyTooLong
 ### 10.4 事务与并发
 
 - 联系人、渠道身份、客户会话、参与者和首条消息必须在一个事务中完成。
-- 并发收到同一新访客的首条消息时，依靠渠道身份和会话键唯一索引处理冲突；冲突事务整体回滚后重新读取已有记录，不能遗留孤立联系人。
+- 写入 Action 最多执行三次完整事务尝试。
+- 每次事务先执行无副作用预检：渠道校验、读取已有渠道身份（包括已删除联系人对应的身份），并按企业和幂等键读取已有消息及其客户会话扩展、渠道身份和发送参与者。
+- 预检命中已有消息且渠道身份、发送身份和规范化正文一致时，直接返回已有结果，不恢复联系人、不解档会话、不更新渠道显示名称、`last_seen_at`、联系人时间或 `last_message_at`。
+- 预检命中已有消息但当前渠道身份不存在，或渠道身份、发送身份、规范化正文任一项不一致时，返回 `ErrMessageIdempotencyConflict`，同样不得产生任何写入副作用。
+- 只有确认幂等消息不存在后，才依次查找或创建联系人和渠道身份、恢复联系人、查找或创建通用会话与客户扩展、恢复归档会话、确保联系人参与者、插入消息并更新最后消息时间。
+- 未命中幂等消息时，新渠道身份按正常创建流程继续；并发请求通过唯一冲突整体回滚后，下一次事务会读取先提交的消息并按幂等规则返回。
+- 并发收到同一新访客首条消息时，依靠 `contact_channel_identities_channel_external_unique` 和客户扩展唯一索引收敛。
+- 外层只将以下命名约束视为预期竞态：`contact_channel_identities_channel_external_unique`、`customer_conversations_organization_channel_identity_unique`、`conversation_participants_org_conversation_identity_unique`、`messages_organization_idempotency_unique`。
+- 命中上述预期唯一冲突后，当前事务必须整体回滚，再从头执行一次事务并读取已有记录；禁止在失败事务或 savepoint 中改绑后继续提交，不能遗留孤立联系人、通用会话或参与者。
+- 联系人包的渠道身份能力不得捕获唯一冲突后在当前事务中改绑，必须把 PostgreSQL `23505` 及约束名原样交给外层重试判断。
+- 只重试明确识别的预期唯一约束冲突；其他唯一冲突和第三次仍冲突直接返回错误，不降级为重复写入。
 - 消息写入和会话最后消息时间更新必须在一个事务中完成。
 - 渠道重试使用 `idempotency_key` 幂等；相同渠道消息编号重复提交时返回已有消息。
+- 相同幂等键的渠道身份、正文或发送者不一致时返回幂等冲突，既不覆盖已有消息，也不创建新消息。
 - `last_message_at` 只向后推进，延迟到达的消息不能覆盖更新的最后活跃时间。
+- 唯一索引与有限事务重试是正确性机制；首个 PR 不增加咨询锁，确有热点竞争指标后再优化。
 - 页面卸载和网络重试不通过取消数据库操作实现。
 
 ### 10.5 分页与未读
 
 客户会话列表和消息列表不使用不断增大的 offset 作为主要分页方式。
 
-消息游标包含：
+游标定义：
 
 ```text
-created_at
-message_id
+客户会话：(last_message_at, conversation_id)
+消息：    (created_at, message_id)
 ```
 
 本 PR 不实现个人已读状态。客服接待关系确定后，在 ServiceSession PR 中定义负责人、协作者和未读状态，避免为了未分配队列给所有企业成员创建会话参与者。
@@ -710,18 +794,30 @@ message_id
 - 不实现合作方企业、访客邀请和外部协作门户。
 - 不实现工单。
 - 不实现服务器连接、签名或消息联邦同步。
+- 不增加联邦 `global_id`、`origin_server_id` 等未确定语义的空字段。
+- 不把查询结果接到现有 `LoadInbox`，也不扩展现有嵌套全部消息的收件箱 DTO。
+- 不把全部企业成员写入客户会话参与者表。
 - 不增加权限资源；客户会话读取当前只校验已登录和企业边界。
 
 ### 10.7 验收标准
 
+PR 中增加数据库级 Action 测试锁定以下行为。测试和迁移验证在具体实施任务获得运行授权后执行；路线图更新与方案审查本身不运行测试或重建共享数据库。
+
 - 网站渠道收到新外部身份的首条消息时，在同一事务中创建联系人、渠道身份、客户会话、参与者和消息。
 - 自动创建联系人的 `created_by_user_id` 为空，手工创建联系人仍记录当前用户。
 - 同一 `(channel_id, external_id)` 始终复用同一渠道身份和联系人。
-- 同一渠道身份始终复用同一客户会话，不因客服服务结束创建新的消息容器。
+- 同一渠道身份通过客户扩展表始终复用同一客户会话，不因客服服务结束创建新的消息容器。
+- 同一联系人不同渠道身份保持不同客户会话。
 - 相同渠道消息编号重试只产生一条消息。
+- 相同渠道消息编号携带不同正文时明确失败，不覆盖第一次写入。
+- 同一渠道消息编号被提交给另一个外部身份时明确失败，不能在另一个客户会话中重复入库。
 - 并发首条消息不会遗留孤立联系人或重复客户会话。
 - 已停用渠道、非网站渠道和无效外部身份不能创建消息。
-- 渠道消息到达已移入回收站的联系人时恢复该联系人。
+- 渠道消息到达已移入回收站的联系人时恢复该联系人，但不覆盖其阶段和人工维护资料。
+- 已归档客户会话收到新消息时恢复为活动状态并重新出现在列表中。
+- 对已删除联系人或已归档会话重放同一来源消息时，只返回原消息，联系人保持删除、会话保持归档，所有活跃时间保持不变。
+- 客户会话只有联系人发送者参与者，不因全员可查看而批量产生用户参与者。
+- 会话列表和消息列表均按文档定义的双字段游标稳定分页。
 - 消息列表分页稳定，不因同一时间写入多条消息出现重复或遗漏。
 - 所有数据库查询显式限定当前企业。
 - 所有具名 Go 函数和方法使用简洁中文注释。
@@ -732,7 +828,7 @@ message_id
 
 第一个 PR 合并后，建议依次进行：
 
-1. 建立网站访客会话令牌和公开入站消息 API，并防止浏览器伪造其他渠道身份。
+1. 建立网站访客会话令牌和公开入站消息 API；`external_id` 由服务端签发并绑定在访客令牌中，浏览器不能在每次加载或发消息时自造身份。
 2. 建立 ServiceSession、客服接待和回复 Action。
 3. 暴露客服收件箱 appservice 契约、Gin API 和 API Proxy，并生成 Wails 绑定。
 4. 把消息页改成分页客户会话列表和按需加载的消息详情。
@@ -753,7 +849,28 @@ message_id
 - 工单公开字段是否允许合作方联合编辑。
 - 公开群、话题群和独立讨论空间的真实优先级。
 
-## 12. 参考产品与资料
+## 12. 方案审查与取舍
+
+Grok 对整体路线给出 `Go`，认为“统一通用会话 + 客户会话类型扩展”“参与者与客户收件箱访问分离”“先客户单聊、再内部聊天和外部协作”的方向成立。
+
+Grok 对修订前的第一个 PR 给出 `Conditional Go`，指出三个数据正确性问题：
+
+- 幂等重放检查必须发生在恢复联系人、解档会话和更新活跃时间之前，命中重放时不能产生写入副作用。
+- 入库正文与幂等比较必须使用同一份规范化正文。
+- 参与者唯一冲突也要纳入命名约束和完整事务重试；联系人能力不能在已触发 `23505` 的事务内吞掉冲突继续执行。
+
+上述问题均已纳入本方案。独立复核后又补充和明确：
+
+- 消息幂等键在企业内唯一，而不是只在单个会话内唯一；因此同一渠道消息被错误地提交到另一个外部身份或会话时也会冲突。
+- 重放一致性同时比较客户会话渠道身份、历史发送参与者和规范化正文。
+- 命名索引不得超过 PostgreSQL 的 63 字节标识符限制，避免运行时约束名被截断后无法精确分类重试。
+- 客户渠道关系继续使用 `customer_conversations` 类型扩展，不改回字符串会话键，也不把渠道专属可空字段塞进通用会话表。
+- 首个 PR 使用唯一索引和最多三次完整事务重试，不增加咨询锁；只有真实热点指标出现后才考虑更复杂的并发控制。
+- 服务批次、公开访客 API、客服回复、最终前端 DTO、细粒度权限和联邦字段继续留在后续 PR，不扩大首个 PR。
+
+基于以上修订，当前独立结论为：整体路线 `Go`，第一个 PR 方案 `Go`。实施时如偏离第 10.4 节的无副作用幂等预检或第 10.7 节的并发验收标准，应重新降级为 `Conditional Go` 并先修正设计或实现。
+
+## 13. 参考产品与资料
 
 - Rocket.Chat Rooms：<https://docs.rocket.chat/docs/rooms>
 - Rocket.Chat Discussions：<https://docs.rocket.chat/docs/discussions>
