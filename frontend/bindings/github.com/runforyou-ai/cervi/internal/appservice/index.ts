@@ -81,6 +81,8 @@ export type {
     UserList,
     UserListInput,
     UserPreferencesInput,
+    UserRoleChangeInput,
+    UserRoleChangesInput,
     UserWorkStatusInput,
     WebsiteChannel,
     WebsiteChannelChatInterface,

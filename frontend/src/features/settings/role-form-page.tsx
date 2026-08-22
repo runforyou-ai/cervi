@@ -15,7 +15,7 @@ import {
   PermissionLevel,
   RoleKind,
   updateRole,
-  updateUser,
+  updateUserRoles,
   type PermissionCode,
   type PermissionDefinition,
   type PermissionResource,
@@ -214,39 +214,17 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       } else {
         if (!admin) await updateRole(roleId, values)
       }
-      const savedChanges: RoleMemberChange[] = []
-      let memberError: unknown
-      for (const change of memberChanges) {
-        const nextRoleID =
-          change.nextRoleID === newRoleID ? targetRoleID : change.nextRoleID
-        try {
-          await updateUser(change.user.id, {
-            displayName: change.user.displayName,
-            email: change.user.email,
-            roleId: nextRoleID,
-            teamIds: change.user.teams.map((team) => team.id),
-          })
-          savedChanges.push({ ...change, nextRoleID })
-        } catch (requestError) {
-          if (recoverSession(requestError, navigate)) return
-          memberError ??= requestError
-        }
+      if (memberChanges.length > 0) {
+        await updateUserRoles({
+          changes: memberChanges.map((change) => ({
+            userId: change.user.id,
+            roleId:
+              change.nextRoleID === newRoleID
+                ? targetRoleID
+                : change.nextRoleID,
+          })),
+        })
       }
-      if (!mounted.current) return
-      if (savedChanges.length > 0) {
-        const savedUserIDs = new Set(
-          savedChanges.map((change) => change.user.id),
-        )
-        setMemberChanges((current) =>
-          current.filter((change) => !savedUserIDs.has(change.user.id)),
-        )
-        if (mode === "detail") {
-          for (const change of savedChanges) {
-            updateMemberCounts(change.previousRoleID, change.nextRoleID)
-          }
-        }
-      }
-      if (memberError) throw memberError
       if (!mounted.current) return
       toast.success(
         mode === "create"
@@ -298,22 +276,6 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   /** 返回角色列表。 */
   function cancel() {
     navigate("/settings/roles")
-  }
-
-  /** 更新已保存成员调整对应的角色人数。 */
-  function updateMemberCounts(previousRoleID: string, nextRoleID: string) {
-    if (previousRoleID === nextRoleID) return
-    const updateCount = (item: RoleData) => {
-      if (item.id === previousRoleID) {
-        return { ...item, memberCount: item.memberCount - 1 }
-      }
-      if (item.id === nextRoleID) {
-        return { ...item, memberCount: item.memberCount + 1 }
-      }
-      return item
-    }
-    setRoles((current) => current.map(updateCount))
-    setRole((current) => (current ? updateCount(current) : current))
   }
 
   return (

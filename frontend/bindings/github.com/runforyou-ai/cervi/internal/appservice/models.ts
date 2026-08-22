@@ -751,6 +751,21 @@ export interface UserPreferencesInput {
 }
 
 /**
+ * UserRoleChangeInput 定义一名企业成员的目标角色。
+ */
+export interface UserRoleChangeInput {
+    "userId": string;
+    "roleId": string;
+}
+
+/**
+ * UserRoleChangesInput 定义一次批量角色调整。
+ */
+export interface UserRoleChangesInput {
+    "changes": UserRoleChangeInput[] | null;
+}
+
+/**
  * UserStatus 表示企业成员状态。
  */
 export enum UserStatus {

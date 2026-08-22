@@ -44,6 +44,7 @@ const (
 	ErrorUserUpdateFailed                 Key = "error.user_update_failed"
 	ErrorUserStatusUpdateFailed           Key = "error.user_status_update_failed"
 	ErrorUserSelfDeactivate               Key = "error.user_self_deactivate"
+	ErrorUserLastActiveAdministrator      Key = "error.user_last_active_administrator"
 	ErrorTeamNotFound                     Key = "error.team_not_found"
 	ErrorTeamListFailed                   Key = "error.team_list_failed"
 	ErrorTeamCreateFailed                 Key = "error.team_create_failed"

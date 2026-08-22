@@ -61,6 +61,7 @@ func NewService(application *appservice.Service) *Service {
 	router.GET("/channels", service.listChannels)
 	router.GET("/users", service.listUsers)
 	router.POST("/users", service.createUser)
+	router.PATCH("/users/roles", service.updateUserRoles)
 	router.GET("/users/:userID", service.getUser)
 	router.PATCH("/users/:userID", service.updateUser)
 	router.POST("/users/:userID/deactivate", service.deactivateUser)
@@ -296,6 +297,15 @@ func (s *Service) updateUser(c *gin.Context) {
 	}
 	user, err := s.application.UpdateUser(c.Request.Context(), requestMeta(c), c.Param("userID"), input)
 	writeResult(c, http.StatusOK, user, err)
+}
+
+// updateUserRoles 在一个事务中批量调整企业成员角色。
+func (s *Service) updateUserRoles(c *gin.Context) {
+	var input appservice.UserRoleChangesInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.UpdateUserRoles(c.Request.Context(), requestMeta(c), input))
 }
 
 func (s *Service) deactivateUser(c *gin.Context) {

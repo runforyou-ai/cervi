@@ -78,6 +78,37 @@ func validateRoleID(ctx context.Context, db bun.IDB, organizationID, roleID stri
 	return nil
 }
 
+// lockAdministratorRole 锁定管理员角色以串行维护有效管理员数量。
+func lockAdministratorRole(ctx context.Context, db bun.IDB, organizationID string) (string, error) {
+	role := &servermodels.Role{}
+	err := db.NewSelect().Model(role).
+		Column("id").
+		Where("organization_id = ?", organizationID).
+		Where("kind = ?", domain.RoleKindAdmin).
+		For("UPDATE").
+		Scan(ctx)
+	if err != nil {
+		return "", err
+	}
+	return role.ID, nil
+}
+
+// ensureActiveAdministratorRemains 校验企业仍有正常状态的管理员。
+func ensureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizationID, administratorRoleID string) error {
+	count, err := db.NewSelect().Model((*servermodels.User)(nil)).
+		Where("organization_id = ?", organizationID).
+		Where("role_id = ?", administratorRoleID).
+		Where("status = ?", domain.UserStatusActive).
+		Count(ctx)
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrLastActiveAdministrator
+	}
+	return nil
+}
+
 // loadUserTeams 读取成员所属的全部团队。
 func loadUserTeams(ctx context.Context, db bun.IDB, organizationID, userID string) ([]TeamSummary, error) {
 	teams := make([]TeamSummary, 0)

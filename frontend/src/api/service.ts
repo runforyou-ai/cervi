@@ -37,6 +37,7 @@ import {
   UpdateContact,
   UpdateTeam,
   UpdateUser,
+  UpdateUserRoles,
   UpdateOrganization,
   UpdateProfile,
   UpdateRole,
@@ -173,6 +174,8 @@ export const changePassword = bind(ChangePassword)
 export const updateUserPreferences = bind(UpdateUserPreferences)
 /** 修改当前用户主动设置的工作状态。 */
 export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
+/** 在一个事务中批量调整企业成员角色。 */
+export const updateUserRoles = bind(UpdateUserRoles)
 /** 删除自定义角色。 */
 export const deleteRole = bind(DeleteRole)
 
