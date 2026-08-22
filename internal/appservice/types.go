@@ -108,6 +108,13 @@ const (
 	ContactSortDisplayNameAscending ContactSort = ContactSort(domain.ContactSortDisplayNameAscending)
 )
 
+// AIProviderBrand 表示 AI 供应商品牌。
+type AIProviderBrand string
+
+const (
+	AIProviderBrandDeepSeek AIProviderBrand = AIProviderBrand(domain.AIProviderBrandDeepSeek)
+)
+
 // StorageProvider 表示 S3 兼容对象存储提供商。
 type StorageProvider string
 
@@ -643,6 +650,51 @@ type Contact struct {
 type ContactList struct {
 	Contacts []ContactSummary `json:"contacts"`
 	Page     PageInfo         `json:"page"`
+}
+
+// AIProviderInput 定义 AI 供应商可编辑字段。
+type AIProviderInput struct {
+	Brand  AIProviderBrand   `json:"brand"`
+	Name   string            `json:"name"`
+	APIKey string            `json:"apiKey"`
+	APIURL string            `json:"apiUrl"`
+	Models []AIProviderModel `json:"models"`
+}
+
+// AIProviderModel 定义 AI 供应商模型目录项。
+type AIProviderModel struct {
+	Identifier      string `json:"identifier"`
+	Name            string `json:"name"`
+	ContextWindow   int64  `json:"contextWindow"`
+	MaxOutputTokens int64  `json:"maxOutputTokens"`
+}
+
+// AIProvider 定义企业 AI 供应商及其模型目录。
+type AIProvider struct {
+	ID     string            `json:"id"`
+	Brand  AIProviderBrand   `json:"brand"`
+	Name   string            `json:"name"`
+	APIKey string            `json:"apiKey"`
+	APIURL string            `json:"apiUrl"`
+	Models []AIProviderModel `json:"models"`
+}
+
+// AIProviderSummary 定义企业 AI 供应商列表项。
+type AIProviderSummary struct {
+	ID     string          `json:"id"`
+	Brand  AIProviderBrand `json:"brand"`
+	Name   string          `json:"name"`
+	APIURL string          `json:"apiUrl"`
+}
+
+// AIProviderList 定义企业 AI 供应商列表。
+type AIProviderList struct {
+	Providers []AIProviderSummary `json:"providers"`
+}
+
+// AIProviderModelList 定义指定品牌的可用模型目录。
+type AIProviderModelList struct {
+	Models []AIProviderModel `json:"models"`
 }
 
 // S3Setting 定义 S3 兼容对象存储配置。

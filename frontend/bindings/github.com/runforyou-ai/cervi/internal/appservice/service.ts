@@ -50,6 +50,13 @@ export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $Ca
 }
 
 /**
+ * CreateAIProvider 创建 AI 供应商。
+ */
+export function CreateAIProvider(meta: $models.RequestMeta, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
+    return $Call.ByID(3165377185, meta, input);
+}
+
+/**
  * CreateContact 创建联系人。
  */
 export function CreateContact(meta: $models.RequestMeta, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
@@ -106,6 +113,13 @@ export function DeactivateWebsiteChannel(meta: $models.RequestMeta, channelID: s
 }
 
 /**
+ * DeleteAIProvider 删除 AI 供应商。
+ */
+export function DeleteAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<void> {
+    return $Call.ByID(1350701494, meta, providerID);
+}
+
+/**
  * DeleteContact 将联系人移入回收站。
  */
 export function DeleteContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<void> {
@@ -124,6 +138,13 @@ export function DeleteRole(meta: $models.RequestMeta, roleID: string): $Cancella
  */
 export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $CancellablePromise<void> {
     return $Call.ByID(798533364, meta, teamID);
+}
+
+/**
+ * GetAIProvider 返回当前企业中的 AI 供应商详情。
+ */
+export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<$models.AIProvider> {
+    return $Call.ByID(3088524329, meta, providerID);
 }
 
 /**
@@ -173,6 +194,20 @@ export function InstallWorkspace(meta: $models.RequestMeta, input: $models.Insta
  */
 export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromise<$models.InstallationStatus> {
     return $Call.ByID(3480414020, meta);
+}
+
+/**
+ * ListAIProviders 返回当前企业的 AI 供应商列表。
+ */
+export function ListAIProviders(meta: $models.RequestMeta): $CancellablePromise<$models.AIProviderList> {
+    return $Call.ByID(3759328446, meta);
+}
+
+/**
+ * ListAvailableAIModels 返回指定品牌的可用模型目录。
+ */
+export function ListAvailableAIModels(meta: $models.RequestMeta, brand: $models.AIProviderBrand): $CancellablePromise<$models.AIProviderModelList> {
+    return $Call.ByID(3483353293, meta, brand);
 }
 
 /**
@@ -313,6 +348,13 @@ export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string
  */
 export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3Setting): $CancellablePromise<void> {
     return $Call.ByID(944621916, meta, input);
+}
+
+/**
+ * UpdateAIProvider 修改 AI 供应商。
+ */
+export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
+    return $Call.ByID(3982600252, meta, providerID, input);
 }
 
 /**

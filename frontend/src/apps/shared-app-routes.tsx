@@ -9,6 +9,7 @@ import { InboxRoute } from "@/features/inbox/inbox-route"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
+import { AIProviderFormPage } from "@/features/settings/ai-provider-form-page"
 import { RoleFormPage } from "@/features/settings/role-form-page"
 import {
   PersonalSettingsPage,
@@ -62,6 +63,22 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
         <Route
           path="/settings/ai-providers"
           element={<SystemSettingsPage section="aiProviders" />}
+        />
+        <Route
+          path="/settings/ai-providers/new"
+          element={
+            <SystemSettingsPage section="aiProviders">
+              <AIProviderFormPage mode="create" />
+            </SystemSettingsPage>
+          }
+        />
+        <Route
+          path="/settings/ai-providers/:providerId"
+          element={
+            <SystemSettingsPage section="aiProviders">
+              <AIProviderFormPage mode="edit" />
+            </SystemSettingsPage>
+          }
         />
         <Route
           path="/settings/roles"

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -22,7 +23,7 @@ func NewGetRoleQuery(db *bun.DB) *GetRoleQuery {
 
 // Execute 返回指定角色及其权限。
 func (q *GetRoleQuery) Execute(ctx context.Context, identity *servermodels.Identity, roleID string) (*Record, error) {
-	if err := validateIdentity(ctx, q.db, identity); err != nil {
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return nil, err
 	}
 	role, err := loadRole(ctx, q.db, identity.Organization.ID, roleID, false)

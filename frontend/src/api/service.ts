@@ -6,6 +6,7 @@ import {
   CompleteFileUpload,
   CreateContact,
   CreateFileUpload,
+  CreateAIProvider,
   CreateRole,
   CreateTeam,
   CreateUser,
@@ -13,14 +14,18 @@ import {
   DeactivateUser,
   DeactivateWebsiteChannel,
   DeleteContact,
+  DeleteAIProvider,
   DeleteRole,
   DeleteTeam,
   GetContact,
+  GetAIProvider,
   GetRole,
   GetS3Setting,
   GetUser,
   GetWebsiteChannel,
   ListChannels,
+  ListAIProviders,
+  ListAvailableAIModels,
   ListContacts,
   ListRoles,
   ListTeams,
@@ -35,6 +40,7 @@ import {
   SelectProfileImage,
   TestS3Setting,
   UpdateContact,
+  UpdateAIProvider,
   UpdateTeam,
   UpdateUser,
   UpdateOrganization,
@@ -46,8 +52,15 @@ import {
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
+  AIProviderBrand,
   ContactSort,
   StorageProvider,
+  type AIProvider,
+  type AIProviderInput,
+  type AIProviderList,
+  type AIProviderModel,
+  type AIProviderModelList,
+  type AIProviderSummary,
   type Contact,
   type ContactInput,
   type ContactList,
@@ -73,6 +86,17 @@ import { bind } from "@/api/client"
 export * from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 
 export type StorageProviderId = Exclude<StorageProvider, StorageProvider.$zero>
+
+export type AIProviderBrandId = Exclude<AIProviderBrand, AIProviderBrand.$zero>
+
+export type AIProviderData = Omit<AIProvider, "brand" | "models"> & {
+  brand: AIProviderBrandId
+  models: AIProviderModel[]
+}
+
+export type AIProviderListData = Omit<AIProviderList, "providers"> & {
+  providers: AIProviderSummary[]
+}
 
 export type ContactDetail = Omit<Contact, "methods" | "channelIdentities"> & {
   methods: NonNullable<Contact["methods"]>
@@ -176,6 +200,47 @@ export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
 /** 删除自定义角色。 */
 export const deleteRole = bind(DeleteRole)
 
+const listAIProvidersBound = bind(ListAIProviders)
+const getAIProviderBound = bind(GetAIProvider)
+const listAvailableAIModelsBound = bind(ListAvailableAIModels)
+const createAIProviderBound = bind(CreateAIProvider)
+const updateAIProviderBound = bind(UpdateAIProvider)
+
+/** 读取当前企业的 AI 供应商列表。 */
+export function listAIProviders() {
+  return listAIProvidersBound().then(
+    (output): AIProviderListData => ({
+      ...output,
+      providers: asList(output.providers),
+    }),
+  )
+}
+
+/** 读取 AI 供应商详情。 */
+export function getAIProvider(providerId: string) {
+  return getAIProviderBound(providerId).then(normalizeAIProvider)
+}
+
+/** 读取指定品牌的可用模型目录。 */
+export function listAvailableAIModels(brand: AIProviderBrand) {
+  return listAvailableAIModelsBound(brand).then((output: AIProviderModelList) =>
+    asList(output.models),
+  )
+}
+
+/** 创建 AI 供应商。 */
+export function createAIProvider(input: AIProviderInput) {
+  return createAIProviderBound(input).then(normalizeAIProvider)
+}
+
+/** 修改 AI 供应商。 */
+export function updateAIProvider(providerId: string, input: AIProviderInput) {
+  return updateAIProviderBound(providerId, input).then(normalizeAIProvider)
+}
+
+/** 删除 AI 供应商。 */
+export const deleteAIProvider = bind(DeleteAIProvider)
+
 const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)
 const listUsersBound = bind(ListUsers)
@@ -200,6 +265,15 @@ const updateRoleBound = bind(UpdateRole)
 /** 把可空切片转换为空数组。 */
 function asList<T>(value: T[] | null | undefined): T[] {
   return value ?? []
+}
+
+/** 归一化 AI 供应商模型目录。 */
+function normalizeAIProvider(provider: AIProvider): AIProviderData {
+  return {
+    ...provider,
+    brand: provider.brand as AIProviderBrandId,
+    models: asList(provider.models),
+  }
 }
 
 /** 读取尚未加入团队的企业成员。 */

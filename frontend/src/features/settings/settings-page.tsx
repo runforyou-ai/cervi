@@ -3,13 +3,10 @@ import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { PageContent } from "@/components/page-content"
-import {
-  PagePaneLink,
-  PagePaneNav,
-  PageSplit,
-} from "@/components/page-split"
+import { PagePaneLink, PagePaneNav, PageSplit } from "@/components/page-split"
 import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
+import { AIProviderListPage } from "@/features/settings/ai-provider-list-page"
 import { OrganizationSettingsForm } from "@/features/settings/organization-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { RoleListPage } from "@/features/settings/role-list-page"
@@ -98,8 +95,9 @@ export function SystemSettingsPage({
         </PagePaneNav>
       }
     >
-      {section === "roles" ? (
-        children ?? <RoleListPage />
+      {section === "roles" || section === "aiProviders" ? (
+        (children ??
+        (section === "roles" ? <RoleListPage /> : <AIProviderListPage />))
       ) : (
         <>
           <PageHeader title={title} />
@@ -109,10 +107,6 @@ export function SystemSettingsPage({
                 organization={identity.organization}
                 onUpdated={updateOrganization}
               />
-            ) : section === "aiProviders" ? (
-              <p className="text-sm text-muted-foreground">
-                {t("aiProviders.placeholder")}
-              </p>
             ) : (
               <StorageSettingsForm />
             )}

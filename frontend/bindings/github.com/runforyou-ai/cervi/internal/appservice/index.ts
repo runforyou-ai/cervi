@@ -7,6 +7,7 @@ export {
 };
 
 export {
+    AIProviderBrand,
     ChannelType,
     ContactMethodType,
     ContactSort,
@@ -26,6 +27,12 @@ export {
 } from "./models.js";
 
 export type {
+    AIProvider,
+    AIProviderInput,
+    AIProviderList,
+    AIProviderModel,
+    AIProviderModelList,
+    AIProviderSummary,
     Auth,
     ChangePasswordInput,
     ChannelList,

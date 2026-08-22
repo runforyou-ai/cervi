@@ -1,0 +1,67 @@
+//go:build server
+
+package aiprovider
+
+import (
+	"context"
+	"fmt"
+
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
+)
+
+// UpdateAIProviderAction 修改 AI 供应商。
+type UpdateAIProviderAction struct {
+	db *bun.DB
+}
+
+// NewUpdateAIProviderAction 创建 AI 供应商修改操作。
+func NewUpdateAIProviderAction(db *bun.DB) *UpdateAIProviderAction {
+	return &UpdateAIProviderAction{db: db}
+}
+
+// Execute 修改 AI 供应商和模型目录。
+func (a *UpdateAIProviderAction) Execute(ctx context.Context, identity *servermodels.Identity, providerID string, input Input) (*Record, error) {
+	input, fields := normalizeInput(input)
+	if len(fields) > 0 {
+		return nil, &ValidationError{Fields: fields}
+	}
+	var provider *servermodels.AIProvider
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+			return err
+		}
+		current, err := loadProvider(ctx, tx, identity.Organization.ID, providerID, true)
+		if err != nil {
+			return err
+		}
+		current.Brand = string(input.Brand)
+		current.Name = input.Name
+		current.APIKey = input.APIKey
+		current.APIURL = input.APIURL
+		if _, err := tx.NewUpdate().
+			Model(current).
+			Column("brand", "name", "api_key", "api_url").
+			Set("updated_at = now()").
+			Where("organization_id = ?", identity.Organization.ID).
+			WherePK().
+			Returning("*").
+			Exec(ctx); err != nil {
+			return err
+		}
+		if err := replaceModels(ctx, tx, identity.Organization.ID, current.ID, input.Models); err != nil {
+			return err
+		}
+		provider = current
+		return nil
+	})
+	if isNameConflict(err) {
+		return nil, &ValidationError{Fields: map[string]ValidationCode{"name": ValidationNameDuplicate}}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("update AI provider: %w", err)
+	}
+	output := recordFromModel(*provider, input.Models)
+	return &output, nil
+}

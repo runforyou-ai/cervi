@@ -1,0 +1,39 @@
+//go:build server
+
+package aiprovider
+
+import (
+	"context"
+	"fmt"
+
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
+)
+
+// GetAIProviderQuery 查询当前企业中的 AI 供应商。
+type GetAIProviderQuery struct {
+	db *bun.DB
+}
+
+// NewGetAIProviderQuery 创建 AI 供应商详情查询。
+func NewGetAIProviderQuery(db *bun.DB) *GetAIProviderQuery {
+	return &GetAIProviderQuery{db: db}
+}
+
+// Execute 返回指定 AI 供应商及其模型目录。
+func (q *GetAIProviderQuery) Execute(ctx context.Context, identity *servermodels.Identity, providerID string) (*Record, error) {
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
+		return nil, err
+	}
+	provider, err := loadProvider(ctx, q.db, identity.Organization.ID, providerID, false)
+	if err != nil {
+		return nil, fmt.Errorf("get AI provider: %w", err)
+	}
+	models, err := loadModels(ctx, q.db, identity.Organization.ID, provider.ID)
+	if err != nil {
+		return nil, fmt.Errorf("get AI provider models: %w", err)
+	}
+	output := recordFromModel(*provider, models)
+	return &output, nil
+}
