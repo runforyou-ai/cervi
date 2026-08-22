@@ -74,14 +74,16 @@ func (r *Runtime) Start(parent context.Context) error {
 		r.connection.Close()
 		return err
 	}
-	r.waitGroup.Add(2)
+	r.waitGroup.Add(3)
 	go r.runOutbox(ctx)
+	go r.runExpiringMessageRecovery(ctx)
 	go r.runScheduler(ctx)
 	slog.Info("服务端任务运行时已启动",
 		"namespace", r.config.Namespace,
 		"stream", r.config.streamName(),
 		"consumer", r.config.consumerName(),
 		"workers", r.config.Workers,
+		"max_ack_pending", r.config.MaxAckPending,
 		"schedules", len(r.schedules),
 	)
 	return nil
@@ -92,10 +94,10 @@ func (r *Runtime) Stop() error {
 	if r.cancel == nil {
 		return nil
 	}
-	r.cancel()
 	if r.consumeContext != nil {
 		r.consumeContext.Stop()
 	}
+	r.cancel()
 	r.waitGroup.Wait()
 	if r.connection != nil {
 		if err := r.connection.Drain(); err != nil {

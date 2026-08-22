@@ -5,11 +5,9 @@ package server
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"reflect"
 	"strings"
 	"time"
 
@@ -27,16 +25,19 @@ var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month 
 // syncSchedules 校验并同步由代码注册的服务端定时计划。
 func (r *Runtime) syncSchedules(ctx context.Context) error {
 	seen := make(map[string]struct{}, len(r.schedules))
+	keys := make([]string, 0, len(r.schedules))
 	for _, definition := range r.schedules {
+		definition.Key = strings.TrimSpace(definition.Key)
 		if _, exists := seen[definition.Key]; exists {
 			return fmt.Errorf("task schedule %q registered more than once", definition.Key)
 		}
 		seen[definition.Key] = struct{}{}
+		keys = append(keys, definition.Key)
 		if err := r.syncSchedule(ctx, definition); err != nil {
 			return err
 		}
 	}
-	return nil
+	return r.disableMissingSchedules(ctx, keys)
 }
 
 // syncSchedule 同步一个代码定义的定时计划。
@@ -71,18 +72,10 @@ func (r *Runtime) syncSchedule(ctx context.Context, definition taskruntime.Sched
 	}
 
 	now := time.Now().UTC()
-	var existing servermodels.TaskSchedule
-	readErr := r.repository.db.NewSelect().Model(&existing).Where("ts.schedule_key = ?", definition.Key).Scan(ctx)
-	if readErr != nil && !errors.Is(readErr, sql.ErrNoRows) {
-		return fmt.Errorf("read task schedule %q: %w", definition.Key, readErr)
-	}
-	exists := readErr == nil
-	nextRunAt := schedule.Next(now)
-	if !exists && definition.StartImmediately && definition.Enabled {
+	scheduledNextRunAt := schedule.Next(now)
+	nextRunAt := scheduledNextRunAt
+	if definition.StartImmediately && definition.Enabled {
 		nextRunAt = now
-	}
-	if exists && scheduleDefinitionUnchanged(&existing, definition, payload) {
-		nextRunAt = existing.NextRunAt
 	}
 	record := &servermodels.TaskSchedule{
 		ID: uuid.NewString(), ScheduleKey: definition.Key, ActionName: definition.ActionName,
@@ -104,35 +97,56 @@ func (r *Runtime) syncSchedule(ctx context.Context, definition taskruntime.Sched
 			timezone = EXCLUDED.timezone,
 			enabled = EXCLUDED.enabled,
 			max_attempts = EXCLUDED.max_attempts,
-			next_run_at = EXCLUDED.next_run_at,
+			next_run_at = CASE
+				WHEN task_schedules.action_name = EXCLUDED.action_name
+					AND task_schedules.queue_name = EXCLUDED.queue_name
+					AND task_schedules.payload = EXCLUDED.payload
+					AND task_schedules.cron_expression = EXCLUDED.cron_expression
+					AND task_schedules.timezone = EXCLUDED.timezone
+					AND task_schedules.enabled = EXCLUDED.enabled
+					AND task_schedules.max_attempts = EXCLUDED.max_attempts
+				THEN task_schedules.next_run_at
+				ELSE CASE
+					WHEN task_schedules.enabled = FALSE
+						AND EXCLUDED.enabled = TRUE
+						AND ?
+					THEN ?
+					ELSE ?
+				END
+			END,
 			updated_at = EXCLUDED.updated_at
 	`, record.ID, record.ScheduleKey, record.ActionName, record.QueueName, string(record.Payload),
 		record.CronExpression, record.Timezone, record.Enabled, record.MaxAttempts,
-		record.NextRunAt, record.CreatedAt, record.UpdatedAt).Exec(ctx)
+		record.NextRunAt, record.CreatedAt, record.UpdatedAt,
+		definition.StartImmediately, now, scheduledNextRunAt).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("sync task schedule %q: %w", definition.Key, err)
 	}
 	return nil
 }
 
-// scheduleDefinitionUnchanged 判断是否应保留数据库中的下一执行时间。
-func scheduleDefinitionUnchanged(existing *servermodels.TaskSchedule, definition taskruntime.ScheduleDefinition, payload json.RawMessage) bool {
-	return existing.ActionName == definition.ActionName &&
-		existing.QueueName == definition.Queue &&
-		payloadsEqual(existing.Payload, payload) &&
-		existing.CronExpression == definition.CronExpression &&
-		existing.Timezone == definition.Timezone &&
-		existing.Enabled == definition.Enabled &&
-		existing.MaxAttempts == definition.MaxAttempts
-}
-
-// payloadsEqual 比较两个 JSON Action 输入。
-func payloadsEqual(left, right json.RawMessage) bool {
-	var leftValue any
-	var rightValue any
-	return json.Unmarshal(left, &leftValue) == nil &&
-		json.Unmarshal(right, &rightValue) == nil &&
-		reflect.DeepEqual(leftValue, rightValue)
+// disableMissingSchedules 停用已经从代码注册表移除的计划。
+func (r *Runtime) disableMissingSchedules(ctx context.Context, keys []string) error {
+	now := time.Now().UTC()
+	query := r.repository.db.NewUpdate().Table("task_schedules").
+		Set("enabled = FALSE").
+		Set("updated_at = ?", now).
+		Where("enabled = TRUE")
+	if len(keys) > 0 {
+		query = query.Where("schedule_key NOT IN (?)", bun.In(keys))
+	}
+	result, err := query.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("disable unregistered task schedules: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("read disabled task schedule count: %w", err)
+	}
+	if count > 0 {
+		slog.Info("已停用未注册的定时任务", "count", count)
+	}
+	return nil
 }
 
 // parseSchedule 使用指定时区解析五段 Cron 或描述符表达式。

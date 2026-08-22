@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runforyou-ai/cervi/internal/taskruntime"
 )
@@ -66,9 +67,44 @@ func TestExecuteHandlerRecoversPanic(t *testing.T) {
 	}
 }
 
-// TestPayloadsEqualIgnoresJSONFormatting 验证计划输入比较不受 JSONB 格式影响。
-func TestPayloadsEqualIgnoresJSONFormatting(t *testing.T) {
-	if !payloadsEqual([]byte(`{"enabled":true,"count":1}`), []byte(`{ "count": 1, "enabled": true }`)) {
-		t.Fatal("equivalent JSON payloads are different")
+// TestTaskFinalizationContextIgnoresCancellation 验证停机后仍能提交任务终态。
+func TestTaskFinalizationContextIgnoresCancellation(t *testing.T) {
+	parent, cancelParent := context.WithCancel(context.Background())
+	cancelParent()
+	ctx, cancel := taskFinalizationContext(parent)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		t.Fatalf("finalization context is already cancelled: %v", err)
+	}
+}
+
+// TestMessageRecoveryAgeKeepsSafetyWindow 验证消息会在保留期结束前进入补偿窗口。
+func TestMessageRecoveryAgeKeepsSafetyWindow(t *testing.T) {
+	maxAge := 30 * 24 * time.Hour
+	if got, want := messageRecoveryAge(maxAge), maxAge-taskMessageDuplicateWindow; got != want {
+		t.Fatalf("message recovery age = %s, want %s", got, want)
+	}
+	shortMaxAge := 30 * time.Minute
+	if got, want := messageRecoveryAge(shortMaxAge), 27*time.Minute; got != want {
+		t.Fatalf("short message recovery age = %s, want %s", got, want)
+	}
+}
+
+// TestResolveExecutionErrorPreservesHandlerResult 验证心跳错误不会覆盖已经完成的 Action 结果。
+func TestResolveExecutionErrorPreservesHandlerResult(t *testing.T) {
+	heartbeatErr := errors.New("lease lost")
+	if err := resolveExecutionError(nil, heartbeatErr); err != nil {
+		t.Fatalf("successful handler result was replaced: %v", err)
+	}
+	permanentErr := taskruntime.Permanent(errors.New("invalid input"))
+	if err := resolveExecutionError(permanentErr, heartbeatErr); !errors.Is(err, permanentErr) {
+		t.Fatalf("permanent handler result was replaced: %v", err)
+	}
+	permanentCancel := taskruntime.Permanent(context.Canceled)
+	if err := resolveExecutionError(permanentCancel, heartbeatErr); !errors.Is(err, permanentCancel) {
+		t.Fatalf("permanent cancellation was replaced: %v", err)
+	}
+	if err := resolveExecutionError(context.Canceled, heartbeatErr); !errors.Is(err, heartbeatErr) {
+		t.Fatalf("cancelled handler result = %v, want heartbeat error", err)
 	}
 }

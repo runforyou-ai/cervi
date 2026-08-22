@@ -14,6 +14,7 @@ CREATE TABLE task_runs (
     lease_expires_at    timestamptz,
     worker_id           text,
     idempotency_key     text,
+    published_at        timestamptz,
     started_at          timestamptz,
     completed_at        timestamptz,
     last_error          text,
@@ -35,6 +36,7 @@ COMMENT ON COLUMN task_runs.available_at IS '允许下次执行的时间';
 COMMENT ON COLUMN task_runs.lease_expires_at IS '当前 Worker 租约过期时间';
 COMMENT ON COLUMN task_runs.worker_id IS '当前执行 Worker 标识';
 COMMENT ON COLUMN task_runs.idempotency_key IS '活动任务幂等标识';
+COMMENT ON COLUMN task_runs.published_at IS '最近一次发布到消息队列的时间';
 COMMENT ON COLUMN task_runs.started_at IS '首次开始执行时间';
 COMMENT ON COLUMN task_runs.completed_at IS '最终完成时间';
 COMMENT ON COLUMN task_runs.last_error IS '最近一次执行错误';
@@ -47,10 +49,20 @@ CREATE INDEX task_runs_status_available_index
 CREATE INDEX task_runs_action_created_index
     ON task_runs (action_name, created_at DESC);
 
+CREATE INDEX task_runs_published_recovery_index
+    ON task_runs (published_at, created_at)
+    WHERE status IN ('published', 'running', 'retrying');
+
 CREATE UNIQUE INDEX task_runs_active_idempotency_unique
     ON task_runs (action_name, idempotency_key)
     WHERE idempotency_key IS NOT NULL
+        AND schedule_key IS NULL
         AND status IN ('queued', 'published', 'running', 'retrying');
+
+CREATE UNIQUE INDEX task_runs_schedule_occurrence_unique
+    ON task_runs (schedule_key, idempotency_key)
+    WHERE schedule_key IS NOT NULL
+        AND idempotency_key IS NOT NULL;
 
 -- +goose Down
 DROP TABLE task_runs;

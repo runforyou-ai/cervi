@@ -18,6 +18,7 @@ const (
 	defaultMaxBytes       = int64(1 << 30)
 	defaultMaxAge         = 30 * 24 * time.Hour
 	defaultWorkers        = 4
+	defaultMaxAckPending  = 1024
 )
 
 var namespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
@@ -31,6 +32,7 @@ type Config struct {
 	MaxAge         time.Duration
 	Replicas       int
 	Workers        int
+	MaxAckPending  int
 }
 
 // ConfigFromEnv 从环境变量读取服务端任务运行时配置。
@@ -43,6 +45,7 @@ func ConfigFromEnv() (Config, error) {
 		MaxAge:         defaultMaxAge,
 		Replicas:       1,
 		Workers:        defaultWorkers,
+		MaxAckPending:  defaultMaxAckPending,
 	}
 	if config.URL == "" {
 		config.URL = defaultNATSURL
@@ -66,8 +69,14 @@ func ConfigFromEnv() (Config, error) {
 	if config.Workers, err = intEnv("NATS_TASK_WORKERS", config.Workers); err != nil {
 		return Config{}, err
 	}
-	if config.StartupTimeout <= 0 || config.MaxBytes <= 0 || config.MaxAge <= 0 || config.Replicas <= 0 || config.Workers <= 0 {
+	if config.MaxAckPending, err = intEnv("NATS_TASK_MAX_ACK_PENDING", config.MaxAckPending); err != nil {
+		return Config{}, err
+	}
+	if config.StartupTimeout <= 0 || config.MaxBytes <= 0 || config.MaxAge <= 0 || config.Replicas <= 0 || config.Workers <= 0 || config.MaxAckPending <= 0 {
 		return Config{}, fmt.Errorf("NATS task limits and durations must be positive")
+	}
+	if config.MaxAckPending < config.Workers {
+		return Config{}, fmt.Errorf("NATS_TASK_MAX_ACK_PENDING must not be less than NATS_TASK_WORKERS")
 	}
 	return config, nil
 }

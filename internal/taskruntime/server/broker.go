@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime/debug"
@@ -16,7 +17,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/taskruntime"
 )
 
-const outboxPollInterval = 250 * time.Millisecond
+const (
+	outboxPollInterval              = 250 * time.Millisecond
+	expiringMessageRecoveryInterval = time.Minute
+	expiringMessageRecoveryBatch    = 200
+	taskFinalizationTimeout         = 15 * time.Second
+	taskMessageDuplicateWindow      = 10 * time.Minute
+)
 
 type taskMessage struct {
 	RunID string `json:"run_id"`
@@ -56,7 +63,7 @@ func (r *Runtime) connectBroker(ctx context.Context) error {
 		Discard:     jetstream.DiscardNew,
 		Storage:     jetstream.FileStorage,
 		Replicas:    r.config.Replicas,
-		Duplicates:  10 * time.Minute,
+		Duplicates:  taskMessageDuplicateWindow,
 	}); err != nil {
 		connection.Close()
 		return fmt.Errorf("ensure JetStream task stream: %w", err)
@@ -69,7 +76,7 @@ func (r *Runtime) connectBroker(ctx context.Context) error {
 		AckWait:       leaseDuration,
 		MaxDeliver:    -1,
 		FilterSubject: r.config.subjectPrefix() + ".>",
-		MaxAckPending: r.config.Workers * 2,
+		MaxAckPending: r.config.MaxAckPending,
 		Replicas:      r.config.Replicas,
 	})
 	if err != nil {
@@ -141,6 +148,41 @@ func (r *Runtime) runOutbox(ctx context.Context) {
 	}
 }
 
+// runExpiringMessageRecovery 在 JetStream 清理消息前重建非终态任务消息。
+func (r *Runtime) runExpiringMessageRecovery(ctx context.Context) {
+	defer r.waitGroup.Done()
+	ticker := time.NewTicker(expiringMessageRecoveryInterval)
+	defer ticker.Stop()
+	for {
+		recovered, err := r.repository.recoverExpiringMessages(
+			ctx,
+			time.Now().UTC().Add(-messageRecoveryAge(r.config.MaxAge)),
+			expiringMessageRecoveryBatch,
+		)
+		if err != nil {
+			if ctx.Err() == nil {
+				slog.Warn("重建即将过期的任务消息失败", "namespace", r.config.Namespace, "error", err)
+			}
+		} else if recovered > 0 {
+			slog.Warn("已重建即将过期的任务消息", "namespace", r.config.Namespace, "count", recovered)
+			if recovered == expiringMessageRecoveryBatch {
+				continue
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// messageRecoveryAge 在消息保留期结束前留出一次安全重建窗口。
+func messageRecoveryAge(maxAge time.Duration) time.Duration {
+	margin := min(taskMessageDuplicateWindow, maxAge/10)
+	return maxAge - margin
+}
+
 // publishOne 发布一条发件箱消息。
 func (r *Runtime) publishOne(ctx context.Context) (bool, error) {
 	record, err := r.repository.claimOutbox(ctx)
@@ -156,7 +198,7 @@ func (r *Runtime) publishOne(ctx context.Context) (bool, error) {
 		publishCtx,
 		r.config.subjectPrefix()+"."+record.QueueName,
 		payload,
-		jetstream.WithMsgID(record.TaskRunID),
+		jetstream.WithMsgID(record.MessageID),
 	)
 	cancel()
 	if publishErr != nil {
@@ -165,7 +207,7 @@ func (r *Runtime) publishOne(ctx context.Context) (bool, error) {
 		}
 		return true, publishErr
 	}
-	if err := r.repository.markPublished(ctx, record.TaskRunID); err != nil {
+	if err := r.repository.markPublished(ctx, record.TaskRunID, record.MessageID); err != nil {
 		return true, err
 	}
 	return true, nil
@@ -196,19 +238,30 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 		r.finishFailedMessage(ctx, run, workerID, message, taskruntime.Permanent(fmt.Errorf("task action %q is not registered", run.ActionName)))
 		return
 	}
-	done := make(chan struct{})
-	go r.heartbeat(ctx, run.ID, workerID, message, done)
-	runErr := executeHandler(ctx, handler, run.Payload)
-	close(done)
+	handlerCtx, cancelHandler := context.WithCancel(ctx)
+	heartbeatCtx, cancelHeartbeat := context.WithCancel(ctx)
+	heartbeatResult := make(chan error, 1)
+	go func() {
+		heartbeatResult <- r.heartbeat(heartbeatCtx, run.ID, workerID, message, cancelHandler)
+	}()
+	runErr := executeHandler(handlerCtx, handler, run.Payload)
+	cancelHeartbeat()
+	heartbeatErr := <-heartbeatResult
+	cancelHandler()
+	if heartbeatErr != nil {
+		slog.Warn("异步任务心跳中断", "run_id", run.ID, "action", run.ActionName, "error", heartbeatErr)
+	}
+	runErr = resolveExecutionError(runErr, heartbeatErr)
 	if runErr != nil {
 		r.finishFailedMessage(ctx, run, workerID, message, runErr)
 		return
 	}
-	if err := r.repository.completeRun(ctx, run.ID, workerID); err != nil {
-		if ctx.Err() == nil {
-			slog.Warn("提交异步任务成功状态失败", "run_id", run.ID, "action", run.ActionName, "error", err)
-			_ = message.NakWithDelay(15 * time.Second)
-		}
+	finalizeCtx, cancelFinalize := taskFinalizationContext(ctx)
+	err = r.repository.completeRun(finalizeCtx, run.ID, workerID)
+	cancelFinalize()
+	if err != nil {
+		slog.Warn("提交异步任务成功状态失败", "run_id", run.ID, "action", run.ActionName, "error", err)
+		_ = message.NakWithDelay(15 * time.Second)
 		return
 	}
 	ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -218,6 +271,14 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 		return
 	}
 	slog.Info("异步任务执行成功", "run_id", run.ID, "action", run.ActionName, "attempt", run.Attempt)
+}
+
+// resolveExecutionError 保留 Action 结果，仅用心跳原因替换协作取消错误。
+func resolveExecutionError(runErr, heartbeatErr error) error {
+	if heartbeatErr != nil && errors.Is(runErr, context.Canceled) && !taskruntime.IsPermanent(runErr) {
+		return heartbeatErr
+	}
+	return runErr
 }
 
 // executeHandler 把 Action panic 转成可记录和重试的任务错误。
@@ -230,20 +291,33 @@ func executeHandler(ctx context.Context, handler func(context.Context, json.RawM
 	return handler(ctx, payload)
 }
 
-// heartbeat 维持 JetStream 确认期限和数据库任务租约。
-func (r *Runtime) heartbeat(ctx context.Context, runID, workerID string, message jetstream.Msg, done <-chan struct{}) {
+// heartbeat 维持消息确认期限和数据库租约，失去任一所有权时取消 Action。
+func (r *Runtime) heartbeat(ctx context.Context, runID, workerID string, message jetstream.Msg, cancelHandler context.CancelFunc) error {
 	ticker := time.NewTicker(leaseDuration / 3)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-done:
-			return
+			return nil
 		case <-ticker.C:
-			_ = message.InProgress()
-			if err := r.repository.extendLease(ctx, runID, workerID); err != nil && ctx.Err() == nil {
-				slog.Warn("延长异步任务租约失败", "run_id", runID, "error", err)
+			if err := message.InProgress(); err != nil {
+				if ctx.Err() != nil {
+					return nil
+				}
+				cancelHandler()
+				return fmt.Errorf("extend NATS task acknowledgement: %w", err)
+			}
+			held, err := r.repository.extendLease(ctx, runID, workerID)
+			if err != nil {
+				if ctx.Err() != nil {
+					return nil
+				}
+				cancelHandler()
+				return err
+			}
+			if !held {
+				cancelHandler()
+				return fmt.Errorf("task run %s lease lost", runID)
 			}
 		}
 	}
@@ -251,21 +325,31 @@ func (r *Runtime) heartbeat(ctx context.Context, runID, workerID string, message
 
 // finishFailedMessage 提交 Action 错误并安排重试或终止消息。
 func (r *Runtime) finishFailedMessage(ctx context.Context, run *servermodels.TaskRun, workerID string, message jetstream.Msg, runErr error) {
-	retry, delay, err := r.repository.failRun(ctx, run, workerID, runErr, taskruntime.IsPermanent(runErr))
+	finalizeCtx, cancelFinalize := taskFinalizationContext(ctx)
+	retry, err := r.repository.failRun(finalizeCtx, run, workerID, runErr, taskruntime.IsPermanent(runErr))
+	cancelFinalize()
 	if err != nil {
-		if ctx.Err() == nil {
-			slog.Warn("提交异步任务失败状态失败", "run_id", run.ID, "action", run.ActionName, "error", err)
-			_ = message.NakWithDelay(15 * time.Second)
-		}
+		slog.Warn("提交异步任务失败状态失败", "run_id", run.ID, "action", run.ActionName, "error", err)
+		_ = message.NakWithDelay(15 * time.Second)
 		return
 	}
 	if retry {
-		_ = message.NakWithDelay(delay)
+		ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ackErr := message.DoubleAck(ackCtx)
+		cancel()
+		if ackErr != nil {
+			slog.Warn("确认待重试任务消息失败", "run_id", run.ID, "action", run.ActionName, "error", ackErr)
+		}
 		slog.Warn("异步任务等待重试", "run_id", run.ID, "action", run.ActionName, "attempt", run.Attempt, "error", runErr)
 		return
 	}
 	_ = message.TermWithReason(truncateError(runErr))
 	slog.Error("异步任务执行失败", "run_id", run.ID, "action", run.ActionName, "attempt", run.Attempt, "error", runErr)
+}
+
+// taskFinalizationContext 为任务终态写入保留独立的短超时窗口。
+func taskFinalizationContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), taskFinalizationTimeout)
 }
 
 // handleUnclaimedMessage 根据数据库状态处理重复或暂不可执行的消息。

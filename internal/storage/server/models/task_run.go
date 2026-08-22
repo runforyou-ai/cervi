@@ -26,6 +26,7 @@ type TaskRun struct {
 	LeaseExpiresAt *time.Time      `bun:"lease_expires_at"`
 	WorkerID       *string         `bun:"worker_id"`
 	IdempotencyKey *string         `bun:"idempotency_key"`
+	PublishedAt    *time.Time      `bun:"published_at"`
 	StartedAt      *time.Time      `bun:"started_at"`
 	CompletedAt    *time.Time      `bun:"completed_at"`
 	LastError      *string         `bun:"last_error"`

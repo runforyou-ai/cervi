@@ -95,23 +95,32 @@ func enqueueIn(ctx context.Context, db bun.IDB, actionName string, payload json.
 		if options.IdempotencyKey == "" {
 			return "", errors.New("insert task run returned no record")
 		}
-		err = db.NewRaw(`
-			SELECT id
-			FROM task_runs
-			WHERE action_name = ?
-				AND idempotency_key = ?
-				AND status IN (?, ?, ?, ?)
-			ORDER BY created_at DESC
-			LIMIT 1
-		`, actionName, options.IdempotencyKey, statusQueued, statusPublished, statusRunning, statusRetrying).Scan(ctx, &insertedID)
+		if scheduleKey != "" {
+			err = db.NewRaw(`
+				SELECT id
+				FROM task_runs
+				WHERE schedule_key = ? AND idempotency_key = ?
+				LIMIT 1
+			`, scheduleKey, options.IdempotencyKey).Scan(ctx, &insertedID)
+		} else {
+			err = db.NewRaw(`
+				SELECT id
+				FROM task_runs
+				WHERE action_name = ?
+					AND idempotency_key = ?
+					AND status IN (?, ?, ?, ?)
+				ORDER BY created_at DESC
+				LIMIT 1
+			`, actionName, options.IdempotencyKey, statusQueued, statusPublished, statusRunning, statusRetrying).Scan(ctx, &insertedID)
+		}
 		if err != nil {
 			return "", fmt.Errorf("find idempotent task run: %w", err)
 		}
 		return insertedID, nil
 	}
 	outbox := &servermodels.TaskOutbox{
-		TaskRunID: insertedID, QueueName: options.Queue,
-		AvailableAt: now, CreatedAt: now, UpdatedAt: now,
+		TaskRunID: insertedID, MessageID: uuid.NewString(), QueueName: options.Queue,
+		AvailableAt: availableAt, CreatedAt: now, UpdatedAt: now,
 	}
 	if _, err := db.NewInsert().Model(outbox).Exec(ctx); err != nil {
 		return "", fmt.Errorf("insert task outbox: %w", err)
@@ -150,18 +159,22 @@ func (r *repository) claimOutbox(ctx context.Context) (*servermodels.TaskOutbox,
 }
 
 // markPublished 提交消息发布结果并删除发件箱记录。
-func (r *repository) markPublished(ctx context.Context, runID string) error {
+func (r *repository) markPublished(ctx context.Context, runID, messageID string) error {
 	now := time.Now().UTC()
 	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if _, err := tx.NewDelete().Model((*servermodels.TaskOutbox)(nil)).Where("task_run_id = ?", runID).Exec(ctx); err != nil {
+		if _, err := tx.NewDelete().Model((*servermodels.TaskOutbox)(nil)).
+			Where("task_run_id = ?", runID).
+			Where("message_id = ?", messageID).
+			Exec(ctx); err != nil {
 			return fmt.Errorf("delete task outbox: %w", err)
 		}
 		if _, err := tx.NewRaw(`
 			UPDATE task_runs
 			SET status = CASE WHEN status = ? THEN ? ELSE status END,
+				published_at = ?,
 				updated_at = ?
 			WHERE id = ?
-		`, statusQueued, statusPublished, now, runID).Exec(ctx); err != nil {
+		`, statusQueued, statusPublished, now, now, runID).Exec(ctx); err != nil {
 			return fmt.Errorf("mark task published: %w", err)
 		}
 		return nil
@@ -176,8 +189,8 @@ func (r *repository) releaseOutbox(ctx context.Context, record *servermodels.Tas
 	_, err := r.db.NewRaw(`
 		UPDATE task_outbox
 		SET available_at = ?, last_error = ?, updated_at = ?
-		WHERE task_run_id = ?
-	`, now.Add(delay), message, now, record.TaskRunID).Exec(ctx)
+		WHERE task_run_id = ? AND message_id = ?
+	`, now.Add(delay), message, now, record.TaskRunID, record.MessageID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("release task outbox: %w", err)
 	}
@@ -228,15 +241,59 @@ func (r *repository) getRun(ctx context.Context, runID string) (*servermodels.Ta
 	return &record, nil
 }
 
-// extendLease 延长正在运行任务的数据库租约。
-func (r *repository) extendLease(ctx context.Context, runID, workerID string) error {
+// extendLease 延长正在运行任务的数据库租约并返回是否仍持有租约。
+func (r *repository) extendLease(ctx context.Context, runID, workerID string) (bool, error) {
 	now := time.Now().UTC()
-	_, err := r.db.NewRaw(`
+	result, err := r.db.NewRaw(`
 		UPDATE task_runs
 		SET lease_expires_at = ?, updated_at = ?
 		WHERE id = ? AND status = ? AND worker_id = ?
 	`, now.Add(leaseDuration), now, runID, statusRunning, workerID).Exec(ctx)
-	return err
+	if err != nil {
+		return false, fmt.Errorf("extend task lease: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("read extended task lease count: %w", err)
+	}
+	return count == 1, nil
+}
+
+// recoverExpiringMessages 为接近 JetStream 保留期限的非终态任务重建发件箱消息。
+func (r *repository) recoverExpiringMessages(ctx context.Context, publishedBefore time.Time, limit int) (int64, error) {
+	now := time.Now().UTC()
+	result, err := r.db.NewRaw(`
+		WITH candidates AS (
+			SELECT tr.id, tr.queue_name, tr.available_at
+			FROM task_runs AS tr
+			WHERE tr.published_at <= ?
+				AND (
+					tr.status IN (?, ?)
+					OR (tr.status = ? AND tr.lease_expires_at <= ?)
+				)
+				AND NOT EXISTS (
+					SELECT 1
+					FROM task_outbox AS task_outbox
+					WHERE task_outbox.task_run_id = tr.id
+				)
+			ORDER BY tr.published_at, tr.created_at
+			LIMIT ?
+		)
+		INSERT INTO task_outbox (
+			task_run_id, message_id, queue_name, attempts, available_at, created_at, updated_at
+		)
+		SELECT id, uuidv7(), queue_name, 0, GREATEST(available_at, ?), ?, ?
+		FROM candidates
+		ON CONFLICT (task_run_id) DO NOTHING
+	`, publishedBefore, statusPublished, statusRetrying, statusRunning, now, limit, now, now, now).Exec(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("recover expiring task messages: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read recovered expiring task message count: %w", err)
+	}
+	return count, nil
 }
 
 // completeRun 将任务标记为执行成功。
@@ -257,8 +314,8 @@ func (r *repository) completeRun(ctx context.Context, runID, workerID string) er
 	return nil
 }
 
-// failRun 记录失败并返回是否还会重试及退避时长。
-func (r *repository) failRun(ctx context.Context, run *servermodels.TaskRun, workerID string, runErr error, permanent bool) (bool, time.Duration, error) {
+// failRun 记录失败，并在需要重试时原子创建下一次发件箱消息。
+func (r *repository) failRun(ctx context.Context, run *servermodels.TaskRun, workerID string, runErr error, permanent bool) (bool, error) {
 	now := time.Now().UTC()
 	retry := !permanent && run.Attempt < run.MaxAttempts
 	delay := retryDelay(run.Attempt)
@@ -270,19 +327,43 @@ func (r *repository) failRun(ctx context.Context, run *servermodels.TaskRun, wor
 		completedAt = nil
 		availableAt = now.Add(delay)
 	}
-	result, err := r.db.NewRaw(`
-		UPDATE task_runs
-		SET status = ?, available_at = ?, completed_at = ?, last_error = ?,
-			lease_expires_at = NULL, worker_id = NULL, updated_at = ?
-		WHERE id = ? AND status = ? AND worker_id = ?
-	`, nextStatus, availableAt, completedAt, truncateError(runErr), now, run.ID, statusRunning, workerID).Exec(ctx)
+	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		result, err := tx.NewRaw(`
+			UPDATE task_runs
+			SET status = ?, available_at = ?, completed_at = ?, last_error = ?,
+				lease_expires_at = NULL, worker_id = NULL, updated_at = ?
+			WHERE id = ? AND status = ? AND worker_id = ?
+		`, nextStatus, availableAt, completedAt, truncateError(runErr), now, run.ID, statusRunning, workerID).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("fail task run: %w", err)
+		}
+		if count, _ := result.RowsAffected(); count != 1 {
+			return errors.New("task run lease lost before failure update")
+		}
+		if !retry {
+			return nil
+		}
+		if _, err := tx.NewRaw(`
+			INSERT INTO task_outbox (
+				task_run_id, message_id, queue_name, attempts, available_at, created_at, updated_at
+			)
+			VALUES (?, uuidv7(), ?, 0, ?, ?, ?)
+			ON CONFLICT (task_run_id) DO UPDATE SET
+				message_id = EXCLUDED.message_id,
+				queue_name = EXCLUDED.queue_name,
+				attempts = 0,
+				available_at = EXCLUDED.available_at,
+				last_error = NULL,
+				updated_at = EXCLUDED.updated_at
+		`, run.ID, run.QueueName, availableAt, now, now).Exec(ctx); err != nil {
+			return fmt.Errorf("enqueue task retry: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return false, 0, fmt.Errorf("fail task run: %w", err)
+		return false, err
 	}
-	if count, _ := result.RowsAffected(); count != 1 {
-		return false, 0, errors.New("task run lease lost before failure update")
-	}
-	return retry, delay, nil
+	return retry, nil
 }
 
 // failExhaustedRun 终结已经耗尽尝试次数且租约过期的任务。

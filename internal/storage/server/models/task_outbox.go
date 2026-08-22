@@ -13,6 +13,7 @@ type TaskOutbox struct {
 	bun.BaseModel `bun:"table:task_outbox,alias:to"`
 
 	TaskRunID   string    `bun:"task_run_id,pk"`
+	MessageID   string    `bun:"message_id"`
 	QueueName   string    `bun:"queue_name"`
 	Attempts    int       `bun:"attempts"`
 	AvailableAt time.Time `bun:"available_at"`
