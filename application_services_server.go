@@ -19,8 +19,12 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// applicationServices 创建企业服务端绑定服务、HTTP API 和网站渠道公开入口。
+// applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
 func applicationServices(appStorage *serverstorage.Store) ([]application.Service, error) {
+	httpsEntry, err := api.NewHTTPSEntry()
+	if err != nil {
+		return nil, err
+	}
 	localFiles, err := serverfilecontent.NewLocalStoreFromEnv()
 	if err != nil {
 		return nil, err
@@ -49,6 +53,7 @@ func applicationServices(appStorage *serverstorage.Store) ([]application.Service
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
 
 	return []application.Service{
+		application.NewService(&httpsLifecycle{service: httpsEntry}),
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,
 		}),
@@ -82,6 +87,21 @@ func newFileContentDeleter(db *bun.DB, local *serverfilecontent.LocalStore) *ser
 			ForcePathStyle: setting.ForcePathStyle,
 		}, nil
 	})
+}
+
+// httpsLifecycle 将 HTTPS 入口接入 Wails 服务生命周期。
+type httpsLifecycle struct {
+	service *api.HTTPSEntry
+}
+
+// ServiceStartup 启动 HTTPS 入口。
+func (l *httpsLifecycle) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
+	return l.service.Start(ctx)
+}
+
+// ServiceShutdown 关闭 HTTPS 入口。
+func (l *httpsLifecycle) ServiceShutdown() error {
+	return l.service.Shutdown()
 }
 
 // serverTaskLifecycle 将服务端任务运行时接入 Wails 服务生命周期。
