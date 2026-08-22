@@ -7,6 +7,8 @@ export {
 };
 
 export {
+    AIModelInputModality,
+    AIModelType,
     AIProviderBrand,
     ChannelRoutingTargetType,
     ChannelType,

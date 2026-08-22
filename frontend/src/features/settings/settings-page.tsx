@@ -6,7 +6,6 @@ import { PageContent } from "@/components/page-content"
 import { PagePaneLink, PagePaneNav, PageSplit } from "@/components/page-split"
 import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
-import { AIProviderListPage } from "@/features/settings/ai-provider-list-page"
 import { OrganizationSettingsForm } from "@/features/settings/organization-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { RoleListPage } from "@/features/settings/role-list-page"
@@ -64,7 +63,7 @@ export function SystemSettingsPage({
   section,
   children,
 }: {
-  section: "organization" | "aiProviders" | "roles" | "storage"
+  section: "organization" | "roles" | "storage"
   children?: ReactNode
 }) {
   const { t } = useTranslation("settings")
@@ -83,9 +82,6 @@ export function SystemSettingsPage({
           <PagePaneLink to="/settings/organization">
             {t("navigation.organization")}
           </PagePaneLink>
-          <PagePaneLink to="/settings/ai-providers">
-            {t("navigation.aiProviders")}
-          </PagePaneLink>
           <PagePaneLink to="/settings/roles">
             {t("navigation.roles")}
           </PagePaneLink>
@@ -95,9 +91,8 @@ export function SystemSettingsPage({
         </PagePaneNav>
       }
     >
-      {section === "roles" || section === "aiProviders" ? (
-        (children ??
-        (section === "roles" ? <RoleListPage /> : <AIProviderListPage />))
+      {section === "roles" ? (
+        (children ?? <RoleListPage />)
       ) : (
         <>
           <PageHeader title={title} />

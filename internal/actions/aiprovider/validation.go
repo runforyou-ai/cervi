@@ -10,7 +10,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// ValidationCode 标识 AI 供应商字段校验结果。
+// ValidationCode 标识模型服务供应商字段校验结果。
 type ValidationCode = common.FieldCode
 
 const (
@@ -25,17 +25,19 @@ const (
 	ValidationModelsInvalid  ValidationCode = "MODELS_INVALID"
 )
 
-// ValidationError 表示 AI 供应商字段校验失败。
+// ValidationError 表示模型服务供应商字段校验失败。
 type ValidationError = common.FieldError
 
-// normalizeInput 规范化 AI 供应商输入并校验所选模型。
+// normalizeInput 规范化模型服务供应商输入并校验模型目录。
 func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	fields := make(map[string]ValidationCode)
 	input.Name = strings.TrimSpace(input.Name)
 	input.APIKey = strings.TrimSpace(input.APIKey)
 	input.APIURL = strings.TrimSpace(input.APIURL)
 
-	if input.Brand != domain.AIProviderBrandDeepSeek {
+	if input.Brand != domain.AIProviderBrandDeepSeek &&
+		input.Brand != domain.AIProviderBrandAlibaba &&
+		input.Brand != domain.AIProviderBrandOpenAI {
 		fields["brand"] = ValidationBrandInvalid
 	}
 	if input.Name == "" {
@@ -61,7 +63,7 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 		model.Name = strings.TrimSpace(model.Name)
 		if model.Identifier == "" || len([]rune(model.Identifier)) > 200 ||
 			model.Name == "" || len([]rune(model.Name)) > 200 ||
-			model.ContextWindow <= 0 || model.MaxOutputTokens <= 0 {
+			model.ContextWindow <= 0 || !normalizeModel(&model) {
 			fields["models"] = ValidationModelsInvalid
 			continue
 		}
@@ -72,8 +74,53 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 		seen[model.Identifier] = struct{}{}
 		models = append(models, model)
 	}
+	if len(models) == 0 {
+		fields["models"] = ValidationModelsInvalid
+	}
 	input.Models = models
 	return input, fields
+}
+
+// normalizeModel 规范化并校验模型用途与输入模态。
+func normalizeModel(model *Model) bool {
+	if !validInputModalities(model.InputModalities) {
+		return false
+	}
+	switch model.Type {
+	case domain.AIModelTypeChat:
+		return model.MaxOutputTokens > 0
+	case domain.AIModelTypeEmbedding:
+		model.MaxOutputTokens = 0
+		return true
+	case domain.AIModelTypeRerank:
+		model.MaxOutputTokens = 0
+		return true
+	default:
+		return false
+	}
+}
+
+// validInputModalities 校验模型至少声明一种且不重复的输入模态。
+func validInputModalities(modalities []domain.AIModelInputModality) bool {
+	if len(modalities) == 0 {
+		return false
+	}
+	seen := make(map[domain.AIModelInputModality]struct{}, len(modalities))
+	for _, modality := range modalities {
+		switch modality {
+		case domain.AIModelInputModalityText,
+			domain.AIModelInputModalityImage,
+			domain.AIModelInputModalityAudio,
+			domain.AIModelInputModalityVideo:
+		default:
+			return false
+		}
+		if _, exists := seen[modality]; exists {
+			return false
+		}
+		seen[modality] = struct{}{}
+	}
+	return true
 }
 
 // validAPIURL 校验 API 地址为不含认证信息的完整 HTTP 地址。
