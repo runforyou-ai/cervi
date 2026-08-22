@@ -4,6 +4,7 @@ import {
   AddTeamMembers,
   ChangePassword,
   CompleteFileUpload,
+  CreateAgent,
   CreateContact,
   CreateFileUpload,
   CreateAIProvider,
@@ -11,6 +12,7 @@ import {
   CreateTeam,
   CreateUser,
   CreateWebsiteChannel,
+  DeactivateAgent,
   DeactivateUser,
   DeactivateWebsiteChannel,
   DeleteContact,
@@ -19,21 +21,26 @@ import {
   DeleteTeam,
   GetContact,
   GetAIProvider,
+  GetAgent,
   GetRole,
   GetS3Setting,
   GetUser,
   GetWebsiteChannel,
   ListChannels,
+  ListAgents,
+  ListMemberOptions,
   ListAIProviders,
   ListAvailableAIModels,
   ListContacts,
   ListRoles,
   ListTeams,
   ListTeamMemberCandidates,
+  ListTeamMembers,
   ListUsers,
   ListWebsiteChannels,
   LoadInbox,
   ReactivateUser,
+  ReactivateAgent,
   RemoveTeamMembers,
   RestoreContact,
   SaveS3Setting,
@@ -41,6 +48,7 @@ import {
   TestS3Setting,
   UpdateContact,
   UpdateAIProvider,
+  UpdateAgent,
   UpdateTeam,
   UpdateUser,
   UpdateUserRoles,
@@ -64,22 +72,33 @@ import {
   type AIProviderModel,
   type AIProviderModelList,
   type AIProviderSummary,
+  type AgentList,
+  type AgentListInput,
   type Contact,
   type ContactInput,
   type ContactList,
   type ContactListInput,
   type Conversation as GeneratedConversation,
+  type CreateAgentInput,
   type CreateUserInput,
   type DirectoryUser,
+  type DirectoryAgent,
   type Inbox,
+  type MemberOption,
+  type MemberOptionList,
+  type MemberOptionListInput,
   type PermissionDefinition,
   type Role,
   type RoleInput,
   type RoleList,
   type TeamListInput,
+  type TeamDirectoryMember,
+  type TeamDirectoryMemberInput,
+  type TeamDirectoryMemberList,
   type TeamMemberCandidate,
   type TeamMemberCandidateInput,
   type TeamMemberCandidateList,
+  type UpdateAgentInput,
   type UpdateDirectoryUserInput,
   type UserList,
   type UserListInput,
@@ -137,9 +156,34 @@ export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
 
 export type UserListQuery = Partial<UserListInput>
 
+export type AgentListQuery = Partial<AgentListInput>
+
 export type TeamListQuery = Partial<TeamListInput>
 
 export type TeamMemberCandidateQuery = Partial<TeamMemberCandidateInput>
+
+export type TeamDirectoryMemberQuery = Partial<TeamDirectoryMemberInput>
+
+export type MemberOptionListQuery = Partial<MemberOptionListInput>
+
+export type MemberOptionListData = Omit<MemberOptionList, "members"> & {
+  members: MemberOption[]
+}
+
+export type DirectoryAgentData = Omit<DirectoryAgent, "teams"> & {
+  teams: NonNullable<DirectoryAgent["teams"]>
+}
+
+export type AgentListData = Omit<AgentList, "agents"> & {
+  agents: DirectoryAgentData[]
+}
+
+export type TeamDirectoryMemberListData = Omit<
+  TeamDirectoryMemberList,
+  "members"
+> & {
+  members: TeamDirectoryMember[]
+}
 
 export type TeamMemberCandidateListData = Omit<
   TeamMemberCandidateList,
@@ -272,9 +316,17 @@ export const deleteAIProvider = bind(DeleteAIProvider)
 const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)
 const listUsersBound = bind(ListUsers)
+const listAgentsBound = bind(ListAgents)
+const getAgentBound = bind(GetAgent)
+const updateAgentBound = bind(UpdateAgent)
+const deactivateAgentBound = bind(DeactivateAgent)
+const reactivateAgentBound = bind(ReactivateAgent)
 const listTeamsBound = bind(ListTeams)
+const listMemberOptionsBound = bind(ListMemberOptions)
 const listTeamMemberCandidatesBound = bind(ListTeamMemberCandidates)
+const listTeamMembersBound = bind(ListTeamMembers)
 const getUserBound = bind(GetUser)
+const createAgentBound = bind(CreateAgent)
 const createUserBound = bind(CreateUser)
 const updateUserBound = bind(UpdateUser)
 const deactivateUserBound = bind(DeactivateUser)
@@ -351,6 +403,11 @@ function normalizeDirectoryUser(user: DirectoryUser): DirectoryUserData {
   return { ...user, teams: asList(user.teams) }
 }
 
+/** 归一化 AI 员工所属团队。 */
+function normalizeDirectoryAgent(agent: DirectoryAgent): DirectoryAgentData {
+  return { ...agent, teams: asList(agent.teams) }
+}
+
 /** 读取企业成员详情。 */
 export function getUser(userId: string, signal?: AbortSignal) {
   return getUserBound(userId, signal).then(normalizeDirectoryUser)
@@ -359,6 +416,31 @@ export function getUser(userId: string, signal?: AbortSignal) {
 /** 创建企业成员账号。 */
 export function createUser(input: CreateUserInput) {
   return createUserBound(input).then(normalizeDirectoryUser)
+}
+
+/** 创建企业 AI 员工。 */
+export function createAgent(input: CreateAgentInput) {
+  return createAgentBound(input).then(normalizeDirectoryAgent)
+}
+
+/** 读取企业 AI 员工详情。 */
+export function getAgent(agentId: string, signal?: AbortSignal) {
+  return getAgentBound(agentId, signal).then(normalizeDirectoryAgent)
+}
+
+/** 修改企业 AI 员工。 */
+export function updateAgent(agentId: string, input: UpdateAgentInput) {
+  return updateAgentBound(agentId, input).then(normalizeDirectoryAgent)
+}
+
+/** 停用企业 AI 员工。 */
+export function deactivateAgent(agentId: string) {
+  return deactivateAgentBound(agentId).then(normalizeDirectoryAgent)
+}
+
+/** 恢复企业 AI 员工。 */
+export function reactivateAgent(agentId: string) {
+  return reactivateAgentBound(agentId).then(normalizeDirectoryAgent)
 }
 
 /** 修改企业成员资料、角色和所属团队。 */
@@ -437,6 +519,43 @@ export function listUsers(query: UserListQuery, signal?: AbortSignal) {
   }))
 }
 
+/** 读取企业 AI 员工目录。 */
+export function listAgents(query: AgentListQuery, signal?: AbortSignal) {
+  return listAgentsBound(
+    {
+      query: query.query ?? "",
+      status: query.status ?? null,
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 50,
+    },
+    signal,
+  ).then((output) => ({
+    ...output,
+    agents: asList(output.agents).map(normalizeDirectoryAgent),
+  }))
+}
+
+/** 读取团队中的共同成员字段。 */
+export function listTeamMembers(
+  teamId: string,
+  query: TeamDirectoryMemberQuery,
+  signal?: AbortSignal,
+) {
+  return listTeamMembersBound(
+    teamId,
+    {
+      query: query.query ?? "",
+      status: query.status ?? null,
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 50,
+    },
+    signal,
+  ).then((output) => ({
+    ...output,
+    members: asList(output.members),
+  }))
+}
+
 /** 读取企业团队列表。 */
 export function listTeams(query: TeamListQuery = {}, signal?: AbortSignal) {
   return listTeamsBound(
@@ -447,6 +566,21 @@ export function listTeams(query: TeamListQuery = {}, signal?: AbortSignal) {
     },
     signal,
   ).then((output) => ({ ...output, teams: asList(output.teams) }))
+}
+
+/** 读取可分配的企业成员和 AI 员工。 */
+export function listMemberOptions(
+  query: MemberOptionListQuery = {},
+  signal?: AbortSignal,
+): Promise<MemberOptionListData> {
+  return listMemberOptionsBound(
+    {
+      query: query.query ?? "",
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 50,
+    },
+    signal,
+  ).then((output) => ({ ...output, members: asList(output.members) }))
 }
 
 /** 读取统一收件箱。 */

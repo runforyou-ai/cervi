@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -37,12 +38,21 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		user := &servermodels.User{
 			OrganizationID: identity.Organization.ID,
-			Email:          input.Email, DisplayName: input.DisplayName, PasswordHash: passwordHash,
-			RoleID: input.RoleID, Status: "active", Locale: identity.User.Locale, TimeZone: identity.User.TimeZone,
+			Email:          input.Email, PasswordHash: passwordHash,
+			RoleID: input.RoleID, Locale: identity.User.Locale, TimeZone: identity.User.TimeZone,
 		}
-		_, err := tx.NewInsert().Model(user).
-			Column("organization_id", "email", "display_name", "password_hash", "role_id", "status", "locale", "time_zone").
-			Returning("id").Exec(ctx)
+		member := &servermodels.OrganizationMember{
+			OrganizationID: identity.Organization.ID,
+			Type:           string(domain.MemberIdentityTypeUser), DisplayName: input.DisplayName, Status: string(domain.UserStatusActive),
+		}
+		_, err := tx.NewInsert().Model(member).
+			Column("organization_id", "type", "display_name", "status").Returning("id").Exec(ctx)
+		if err != nil {
+			return err
+		}
+		user.ID = member.ID
+		_, err = tx.NewInsert().Model(user).
+			Column("id", "organization_id", "email", "password_hash", "role_id", "locale", "time_zone").Exec(ctx)
 		if isUniqueViolation(err) {
 			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
 		}

@@ -57,6 +57,13 @@ export function CreateAIProvider(meta: $models.RequestMeta, input: $models.AIPro
 }
 
 /**
+ * CreateAgent 创建企业 AI 员工。
+ */
+export function CreateAgent(meta: $models.RequestMeta, input: $models.CreateAgentInput): $CancellablePromise<$models.DirectoryAgent> {
+    return $Call.ByID(3052452131, meta, input);
+}
+
+/**
  * CreateContact 创建联系人。
  */
 export function CreateContact(meta: $models.RequestMeta, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
@@ -96,6 +103,13 @@ export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserI
  */
 export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.WebsiteChannelInput): $CancellablePromise<$models.WebsiteChannelSummary> {
     return $Call.ByID(372928498, meta, input);
+}
+
+/**
+ * DeactivateAgent 停用企业 AI 员工。
+ */
+export function DeactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.DirectoryAgent> {
+    return $Call.ByID(2542842753, meta, agentID);
 }
 
 /**
@@ -145,6 +159,13 @@ export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $Cancella
  */
 export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<$models.AIProvider> {
     return $Call.ByID(3088524329, meta, providerID);
+}
+
+/**
+ * GetAgent 返回企业 AI 员工详情。
+ */
+export function GetAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.DirectoryAgent> {
+    return $Call.ByID(1827547163, meta, agentID);
 }
 
 /**
@@ -204,6 +225,13 @@ export function ListAIProviders(meta: $models.RequestMeta): $CancellablePromise<
 }
 
 /**
+ * ListAgents 返回企业 AI 员工目录。
+ */
+export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListInput): $CancellablePromise<$models.AgentList> {
+    return $Call.ByID(2544201800, meta, input);
+}
+
+/**
  * ListAvailableAIModels 返回指定品牌的预设模型目录。
  */
 export function ListAvailableAIModels(meta: $models.RequestMeta, brand: $models.AIProviderBrand): $CancellablePromise<$models.AIProviderModelList> {
@@ -225,6 +253,13 @@ export function ListContacts(meta: $models.RequestMeta, input: $models.ContactLi
 }
 
 /**
+ * ListMemberOptions 返回可分配的企业成员和 AI 员工。
+ */
+export function ListMemberOptions(meta: $models.RequestMeta, input: $models.MemberOptionListInput): $CancellablePromise<$models.MemberOptionList> {
+    return $Call.ByID(386066486, meta, input);
+}
+
+/**
  * ListRoles 返回当前企业的角色和预定义权限目录。
  */
 export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$models.RoleList> {
@@ -236,6 +271,13 @@ export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$model
  */
 export function ListTeamMemberCandidates(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberCandidateInput): $CancellablePromise<$models.TeamMemberCandidateList> {
     return $Call.ByID(1106825595, meta, teamID, input);
+}
+
+/**
+ * ListTeamMembers 返回团队成员共同字段。
+ */
+export function ListTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamDirectoryMemberInput): $CancellablePromise<$models.TeamDirectoryMemberList> {
+    return $Call.ByID(3371434770, meta, teamID, input);
 }
 
 /**
@@ -302,6 +344,13 @@ export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $Canc
 }
 
 /**
+ * ReactivateAgent 恢复企业 AI 员工。
+ */
+export function ReactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.DirectoryAgent> {
+    return $Call.ByID(2138582847, meta, agentID);
+}
+
+/**
  * ReactivateUser 恢复企业成员账号。
  */
 export function ReactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.DirectoryUser> {
@@ -355,6 +404,13 @@ export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3Settin
  */
 export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
     return $Call.ByID(3982600252, meta, providerID, input);
+}
+
+/**
+ * UpdateAgent 修改企业 AI 员工。
+ */
+export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentInput): $CancellablePromise<$models.DirectoryAgent> {
+    return $Call.ByID(2196616072, meta, agentID, input);
 }
 
 /**

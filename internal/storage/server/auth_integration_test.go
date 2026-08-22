@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
@@ -82,7 +83,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		Where("organization_id = ?", installed.Identity.Organization.ID).
 		Where("team_id = ?", defaultTeam.ID).
 		Scan(context.Background())
-	if err != nil || defaultTeamMember.IdentityType != string(domain.MemberIdentityTypeUser) || defaultTeamMember.IdentityID != installed.Identity.User.ID {
+	if err != nil || defaultTeamMember.MemberID != installed.Identity.User.ID {
 		t.Fatalf("default team member = %#v, error = %v", defaultTeamMember, err)
 	}
 	currentStatus, err := status.Execute(context.Background())
@@ -140,19 +141,23 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	staleIdentity.User = loggedIn.Identity.User
 	staleIdentity.User.ID = "00000000-0000-0000-0000-000000000000"
 	_, err = createChannel.Execute(context.Background(), &staleIdentity, channelaction.WebsiteChannelInput{
-		Type:          domain.ChannelTypeWebsite,
-		Name:          "无效渠道",
-		DefaultLocale: domain.LocaleChineseSimplified,
+		Type:                  domain.ChannelTypeWebsite,
+		Name:                  "无效渠道",
+		DefaultLocale:         domain.LocaleChineseSimplified,
+		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if !errors.Is(err, common.ErrIdentityInvalid) {
 		t.Fatalf("stale identity error = %v, want %v", err, common.ErrIdentityInvalid)
 	}
 
 	channel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.WebsiteChannelInput{
-		Type:          domain.ChannelTypeWebsite,
-		Name:          "产品官网",
-		Description:   "接收官网访客咨询",
-		DefaultLocale: domain.LocaleChineseSimplified,
+		Type:                  domain.ChannelTypeWebsite,
+		Name:                  "产品官网",
+		Description:           "接收官网访客咨询",
+		DefaultLocale:         domain.LocaleChineseSimplified,
+		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -186,9 +191,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	updateChannel := channelaction.NewUpdateWebsiteChannelAction(db)
 	channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelInput{
-		Type:          domain.ChannelTypeWebsite,
-		Name:          "帮助中心",
-		DefaultLocale: domain.LocaleEnglishUnitedStates,
+		Type:                  domain.ChannelTypeWebsite,
+		Name:                  "帮助中心",
+		DefaultLocale:         domain.LocaleEnglishUnitedStates,
+		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -300,6 +307,56 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	team, err = teamaction.NewAddMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{Type: domain.MemberIdentityTypeUser, ID: createdMember.ID}})
 	if err != nil || team.MemberCount != 1 {
 		t.Fatalf("team after adding member = %#v, error = %v", team, err)
+	}
+	createdAgent, err := agentaction.NewCreateAgentAction(db).Execute(context.Background(), loggedIn.Identity, agentaction.CreateInput{
+		DisplayName: "接待智能体",
+		TeamIDs:     []string{team.ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() {
+		t.Fatalf("created agent = %#v", createdAgent)
+	}
+	agents, err := agentaction.NewListAgentsQuery(db).Execute(context.Background(), loggedIn.Identity, agentaction.ListInput{Page: 1, PageSize: 50})
+	if err != nil || agents.Total != 1 || len(agents.Agents) != 1 || agents.Agents[0].ID != createdAgent.ID {
+		t.Fatalf("agent directory = %#v, error = %v", agents, err)
+	}
+	updatedAgent, err := agentaction.NewUpdateAgentAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{
+		DisplayName: "售前智能体",
+		TeamIDs:     []string{team.ID},
+	})
+	if err != nil || updatedAgent.DisplayName != "售前智能体" {
+		t.Fatalf("updated agent = %#v, error = %v", updatedAgent, err)
+	}
+	directoryAgent, err := agentaction.NewGetAgentQuery(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID)
+	if err != nil || directoryAgent.DisplayName != "售前智能体" {
+		t.Fatalf("agent detail = %#v, error = %v", directoryAgent, err)
+	}
+	teamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.DirectoryMemberInput{Page: 1, PageSize: 50})
+	if err != nil || teamMembers.Page.Total != 2 {
+		t.Fatalf("team directory = %#v, error = %v", teamMembers, err)
+	}
+	channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelInput{
+		Type:                  domain.ChannelTypeWebsite,
+		Name:                  channel.Name,
+		DefaultLocale:         domain.LocaleEnglishUnitedStates,
+		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.ID},
+		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+	})
+	if err != nil || channel.InitialRoutingTargetID == nil || *channel.InitialRoutingTargetID != createdAgent.ID {
+		t.Fatalf("agent channel routing = %#v, error = %v", channel, err)
+	}
+	updatedAgent, err = agentaction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, domain.UserStatusInactive)
+	if err != nil || updatedAgent.Status != domain.UserStatusInactive {
+		t.Fatalf("inactive agent = %#v, error = %v", updatedAgent, err)
+	}
+	detail, err = getChannel.Execute(context.Background(), loggedIn.Identity, channel.ID)
+	if err != nil || detail.InitialRoutingTargetType != string(domain.ChannelRoutingTargetTypePublicQueue) || detail.InitialRoutingTargetID != nil {
+		t.Fatalf("channel routing after agent deactivation = %#v, error = %v", detail.Channel, err)
+	}
+	if _, err := agentaction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, domain.UserStatusActive); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := useraction.NewUpdateUserAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
 		DisplayName: createdMember.DisplayName, Email: createdMember.Email, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},
@@ -436,13 +493,20 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	otherUser := &servermodels.User{
 		OrganizationID: loggedIn.Identity.Organization.ID,
 		Email:          "other@example.com",
-		DisplayName:    "其他成员",
 		PasswordHash:   "unused",
 		RoleID:         memberRole.ID,
-		Status:         string(domain.UserStatusActive),
 	}
+	otherMember := &servermodels.OrganizationMember{
+		OrganizationID: loggedIn.Identity.Organization.ID,
+		Type:           string(domain.MemberIdentityTypeUser), DisplayName: "其他成员", Status: string(domain.UserStatusActive),
+	}
+	if _, err := db.NewInsert().Model(otherMember).
+		Column("organization_id", "type", "display_name", "status").Returning("id").Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	otherUser.ID = otherMember.ID
 	if _, err := db.NewInsert().Model(otherUser).
-		Column("organization_id", "email", "display_name", "password_hash", "role_id", "status").
+		Column("id", "organization_id", "email", "password_hash", "role_id").
 		Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -600,13 +664,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected updated contact: %#v", updatedContact)
 	}
 
-	if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
+	if _, err := db.NewUpdate().Table("organization_members").Set("status = 'inactive'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, common.ErrIdentityInvalid) {
 		t.Fatalf("inactive user delete error = %v, want %v", err, common.ErrIdentityInvalid)
 	}
-	if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
+	if _, err := db.NewUpdate().Table("organization_members").Set("status = 'active'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); err != nil {
@@ -619,13 +683,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if deletedContacts.Page.Total != 1 || len(deletedContacts.Contacts) != 1 {
 		t.Fatalf("unexpected deleted contact list: %#v", deletedContacts)
 	}
-	if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
+	if _, err := db.NewUpdate().Table("organization_members").Set("status = 'inactive'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, common.ErrIdentityInvalid) {
 		t.Fatalf("inactive user restore error = %v, want %v", err, common.ErrIdentityInvalid)
 	}
-	if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
+	if _, err := db.NewUpdate().Table("organization_members").Set("status = 'active'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); err != nil {

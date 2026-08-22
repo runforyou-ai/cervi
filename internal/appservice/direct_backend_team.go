@@ -71,6 +71,27 @@ func (b *DirectBackend) DeleteTeam(ctx context.Context, meta RequestMeta, teamID
 	return nil
 }
 
+// ListTeamMembers 返回团队成员共同字段。
+func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamDirectoryMemberInput) (TeamDirectoryMemberList, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return TeamDirectoryMemberList{}, err
+	}
+	output, err := b.listTeamMembers.Execute(ctx, identity, teamID, teamaction.DirectoryMemberInput{
+		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Page: input.Page, PageSize: input.PageSize,
+	})
+	if err != nil {
+		return TeamDirectoryMemberList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
+	}
+	members := make([]TeamDirectoryMember, 0, len(output.Members))
+	for _, member := range output.Members {
+		members = append(members, TeamDirectoryMember{
+			ID: member.ID, Type: MemberIdentityType(member.Type), DisplayName: member.DisplayName, Status: UserStatus(member.Status), JoinedAt: member.JoinedAt,
+		})
+	}
+	return TeamDirectoryMemberList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
+}
+
 // ListTeamMemberCandidates 返回尚未加入团队的企业成员。
 func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
 	identity, err := b.authenticate(ctx, meta)
@@ -86,7 +107,6 @@ func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta Reque
 		members = append(members, TeamMemberCandidate{
 			IdentityType: MemberIdentityType(member.IdentityType), IdentityID: member.IdentityID,
 			DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
-			Role: RoleSummary{ID: member.RoleID, Kind: RoleKind(member.RoleKind), Name: member.RoleName},
 		})
 	}
 	return TeamMemberCandidateList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil

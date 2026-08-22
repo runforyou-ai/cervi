@@ -206,6 +206,67 @@ func (b *Backend) ListChannels(ctx context.Context, meta appservice.RequestMeta)
 	return output, err
 }
 
+// ListMemberOptions 返回远程企业成员选择项。
+func (b *Backend) ListMemberOptions(ctx context.Context, meta appservice.RequestMeta, input appservice.MemberOptionListInput) (appservice.MemberOptionList, error) {
+	query := url.Values{}
+	setQuery(query, "query", input.Query)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	var output appservice.MemberOptionList
+	err := b.do(ctx, meta, http.MethodGet, "/members/options", query, nil, &output)
+	for index := range output.Members {
+		output.Members[index].AvatarURL = b.absoluteContentURL(output.Members[index].AvatarURL)
+	}
+	return output, err
+}
+
+// CreateAgent 在远程企业服务器创建 AI 员工。
+func (b *Backend) CreateAgent(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateAgentInput) (appservice.DirectoryAgent, error) {
+	var output appservice.DirectoryAgent
+	err := b.do(ctx, meta, http.MethodPost, "/agents", nil, input, &output)
+	return output, err
+}
+
+// ListAgents 返回远程企业 AI 员工目录。
+func (b *Backend) ListAgents(ctx context.Context, meta appservice.RequestMeta, input appservice.AgentListInput) (appservice.AgentList, error) {
+	query := url.Values{}
+	setQuery(query, "query", input.Query)
+	setOptionalQuery(query, "status", input.Status)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	var output appservice.AgentList
+	err := b.do(ctx, meta, http.MethodGet, "/agents", query, nil, &output)
+	return output, err
+}
+
+// GetAgent 返回远程企业 AI 员工详情。
+func (b *Backend) GetAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.DirectoryAgent, error) {
+	var output appservice.DirectoryAgent
+	err := b.do(ctx, meta, http.MethodGet, "/agents/"+url.PathEscape(agentID), nil, nil, &output)
+	return output, err
+}
+
+// UpdateAgent 修改远程企业 AI 员工。
+func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.UpdateAgentInput) (appservice.DirectoryAgent, error) {
+	var output appservice.DirectoryAgent
+	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID), nil, input, &output)
+	return output, err
+}
+
+// DeactivateAgent 停用远程企业 AI 员工。
+func (b *Backend) DeactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.DirectoryAgent, error) {
+	var output appservice.DirectoryAgent
+	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/deactivate", nil, nil, &output)
+	return output, err
+}
+
+// ReactivateAgent 恢复远程企业 AI 员工。
+func (b *Backend) ReactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.DirectoryAgent, error) {
+	var output appservice.DirectoryAgent
+	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/reactivate", nil, nil, &output)
+	return output, err
+}
+
 // ListUsers 返回远程企业成员列表。
 func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
 	query := url.Values{}
@@ -288,6 +349,18 @@ func (b *Backend) UpdateTeam(ctx context.Context, meta appservice.RequestMeta, t
 // DeleteTeam 删除远程企业团队。
 func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, teamID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID), nil, nil, nil)
+}
+
+// ListTeamMembers 返回远程团队成员共同字段。
+func (b *Backend) ListTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamDirectoryMemberInput) (appservice.TeamDirectoryMemberList, error) {
+	query := url.Values{}
+	setQuery(query, "query", input.Query)
+	setOptionalQuery(query, "status", input.Status)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	var output appservice.TeamDirectoryMemberList
+	err := b.do(ctx, meta, http.MethodGet, "/teams/"+url.PathEscape(teamID)+"/members", query, nil, &output)
+	return output, err
 }
 
 // ListTeamMemberCandidates 返回远程团队可添加的企业成员。

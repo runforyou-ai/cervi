@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -38,29 +37,28 @@ func (q *ListMemberCandidatesQuery) Execute(ctx context.Context, identity *serve
 
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.
-			Where("u.organization_id = ?", identity.Organization.ID).
-			Where("u.status = 'active'").
-			Where("NOT EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.team_id = ? AND tm.identity_type = ? AND tm.identity_id = u.id)", teamID, domain.MemberIdentityTypeUser)
+			Where("om.organization_id = ?", identity.Organization.ID).
+			Where("om.status = 'active'").
+			Where("NOT EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = om.organization_id AND tm.team_id = ? AND tm.member_id = om.id)", teamID)
 		if input.Query != "" {
 			pattern := "%" + input.Query + "%"
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
-				return group.Where("u.display_name ILIKE ?", pattern).WhereOr("u.email ILIKE ?", pattern)
+				return group.Where("om.display_name ILIKE ?", pattern).WhereOr("u.email ILIKE ?", pattern)
 			})
 		}
 		return query
 	}
 
-	total, err := applyFilters(q.db.NewSelect().Model((*servermodels.User)(nil))).Count(ctx)
+	total, err := applyFilters(q.db.NewSelect().TableExpr("organization_members AS om").Join("LEFT JOIN users AS u ON u.id = om.id AND u.organization_id = om.organization_id")).Count(ctx)
 	if err != nil {
 		return MemberCandidateOutput{}, fmt.Errorf("count team member candidates: %w", err)
 	}
 	members := make([]MemberCandidate, 0)
-	if err := applyFilters(q.db.NewSelect().TableExpr("users AS u")).
-		ColumnExpr("? AS identity_type", domain.MemberIdentityTypeUser).
-		ColumnExpr("u.id::text AS identity_id, u.display_name, u.avatar_file_id::text").
-		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
-		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
-		OrderExpr("lower(u.display_name) ASC, u.id ASC").
+	if err := applyFilters(q.db.NewSelect().TableExpr("organization_members AS om")).
+		ColumnExpr("om.type AS identity_type").
+		ColumnExpr("om.id::text AS identity_id, om.display_name, om.avatar_file_id::text").
+		Join("LEFT JOIN users AS u ON u.id = om.id AND u.organization_id = om.organization_id").
+		OrderExpr("lower(om.display_name) ASC, om.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
 		Scan(ctx, &members); err != nil {

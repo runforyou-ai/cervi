@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -37,11 +38,15 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 	}
 
 	channel := &servermodels.Channel{
-		OrganizationID:  identity.Organization.ID,
-		CreatedByUserID: identity.User.ID,
-		Type:            string(input.Type),
-		Name:            input.Name,
-		DefaultLocale:   string(input.DefaultLocale),
+		OrganizationID:            identity.Organization.ID,
+		CreatedByUserID:           identity.User.ID,
+		Type:                      string(input.Type),
+		Name:                      input.Name,
+		DefaultLocale:             string(input.DefaultLocale),
+		InitialRoutingTargetType:  string(input.NewConversationTarget.Type),
+		InitialRoutingTargetID:    routingTargetID(input.NewConversationTarget),
+		FallbackRoutingTargetType: string(input.FallbackTarget.Type),
+		FallbackRoutingTargetID:   routingTargetID(input.FallbackTarget),
 	}
 	if input.Description != "" {
 		channel.Description = &input.Description
@@ -60,12 +65,14 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 			return err
 		}
 
-		user := &servermodels.User{}
+		user := &servermodels.OrganizationMember{}
 		if err := tx.NewSelect().
 			Model(user).
 			Column("id").
-			Where("u.id = ?", identity.User.ID).
-			Where("u.organization_id = ?", identity.Organization.ID).
+			Where("om.id = ?", identity.User.ID).
+			Where("om.organization_id = ?", identity.Organization.ID).
+			Where("om.type = ?", domain.MemberIdentityTypeUser).
+			Where("om.status = ?", domain.UserStatusActive).
 			For("KEY SHARE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -73,10 +80,16 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 			}
 			return err
 		}
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "newConversationTarget", input.NewConversationTarget); err != nil {
+			return err
+		}
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "fallbackTarget", input.FallbackTarget); err != nil {
+			return err
+		}
 
 		_, err := tx.NewInsert().
 			Model(channel).
-			Column("organization_id", "created_by_user_id", "type", "name", "description", "default_locale").
+			Column("organization_id", "created_by_user_id", "type", "name", "description", "default_locale", "initial_routing_target_type", "initial_routing_target_id", "fallback_routing_target_type", "fallback_routing_target_id").
 			Returning("*").
 			Exec(ctx)
 		if err != nil {

@@ -105,6 +105,24 @@ export interface AIProviderSummary {
 }
 
 /**
+ * AgentList 定义 AI 员工分页结果。
+ */
+export interface AgentList {
+    "agents": DirectoryAgent[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * AgentListInput 定义 AI 员工目录查询条件。
+ */
+export interface AgentListInput {
+    "query": string;
+    "status"?: UserStatus | null;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
  * Auth 包含登录身份和访问令牌。
  */
 export interface Auth {
@@ -127,6 +145,28 @@ export interface ChangePasswordInput {
 export interface ChannelList {
     "channels": ChannelSummary[] | null;
 }
+
+/**
+ * ChannelRoutingTarget 定义渠道会话流转目标。
+ */
+export interface ChannelRoutingTarget {
+    "type": ChannelRoutingTargetType;
+    "id": string;
+}
+
+/**
+ * ChannelRoutingTargetType 表示渠道会话流转目标类型。
+ */
+export enum ChannelRoutingTargetType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ChannelRoutingTargetTypePublicQueue = "public_queue",
+    ChannelRoutingTargetTypeTeam = "team",
+    ChannelRoutingTargetTypeMember = "member",
+};
 
 /**
  * ChannelSummary 定义渠道选择项。
@@ -315,6 +355,14 @@ export interface Conversation {
 }
 
 /**
+ * CreateAgentInput 定义新增 AI 员工字段。
+ */
+export interface CreateAgentInput {
+    "displayName": string;
+    "teamIds": string[] | null;
+}
+
+/**
  * CreateUserInput 定义新增企业成员字段。
  */
 export interface CreateUserInput {
@@ -323,6 +371,17 @@ export interface CreateUserInput {
     "password": string;
     "roleId": string;
     "teamIds": string[] | null;
+}
+
+/**
+ * DirectoryAgent 定义 AI 员工目录字段。
+ */
+export interface DirectoryAgent {
+    "id": string;
+    "displayName": string;
+    "status": UserStatus;
+    "teams": TeamSummary[] | null;
+    "createdAt": string;
 }
 
 /**
@@ -448,7 +507,7 @@ export interface LoginInput {
 }
 
 /**
- * MemberIdentityType 表示可以加入团队的一等身份类型。
+ * MemberIdentityType 表示企业成员类型。
  */
 export enum MemberIdentityType {
     /**
@@ -459,6 +518,33 @@ export enum MemberIdentityType {
     MemberIdentityTypeUser = "user",
     MemberIdentityTypeAgent = "agent",
 };
+
+/**
+ * MemberOption 定义企业成员或 AI 员工选择项。
+ */
+export interface MemberOption {
+    "id": string;
+    "type": MemberIdentityType;
+    "displayName": string;
+    "avatarUrl": string;
+}
+
+/**
+ * MemberOptionList 定义成员选择项分页结果。
+ */
+export interface MemberOptionList {
+    "members": MemberOption[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * MemberOptionListInput 定义成员选择项查询条件。
+ */
+export interface MemberOptionListInput {
+    "query": string;
+    "page": number;
+    "pageSize": number;
+}
 
 /**
  * Message 定义收件箱会话中的消息。
@@ -724,6 +810,35 @@ export interface Team {
 }
 
 /**
+ * TeamDirectoryMember 定义团队视图中的共同成员字段。
+ */
+export interface TeamDirectoryMember {
+    "id": string;
+    "type": MemberIdentityType;
+    "displayName": string;
+    "status": UserStatus;
+    "joinedAt": string;
+}
+
+/**
+ * TeamDirectoryMemberInput 定义团队成员目录查询条件。
+ */
+export interface TeamDirectoryMemberInput {
+    "query": string;
+    "status"?: UserStatus | null;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * TeamDirectoryMemberList 定义团队成员分页结果。
+ */
+export interface TeamDirectoryMemberList {
+    "members": TeamDirectoryMember[] | null;
+    "page": PageInfo;
+}
+
+/**
  * TeamInput 定义团队可编辑字段。
  */
 export interface TeamInput {
@@ -749,14 +864,13 @@ export interface TeamListInput {
 }
 
 /**
- * TeamMemberCandidate 定义可加入团队的企业成员。
+ * TeamMemberCandidate 定义可加入团队的成员。
  */
 export interface TeamMemberCandidate {
     "identityType": MemberIdentityType;
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "role": RoleSummary;
 }
 
 /**
@@ -797,6 +911,14 @@ export interface TeamMemberInput {
 export interface TeamSummary {
     "id": string;
     "name": string;
+}
+
+/**
+ * UpdateAgentInput 定义 AI 员工可编辑字段。
+ */
+export interface UpdateAgentInput {
+    "displayName": string;
+    "teamIds": string[] | null;
 }
 
 /**
@@ -899,6 +1021,8 @@ export interface WebsiteChannel {
     "name": string;
     "description": string | null;
     "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
     "enabled": boolean;
     "createdAt": string;
     "updatedAt": string;
@@ -933,6 +1057,8 @@ export interface WebsiteChannelInput {
     "name": string;
     "description": string;
     "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
 }
 
 /**
@@ -953,6 +1079,8 @@ export interface WebsiteChannelSummary {
     "name": string;
     "description": string | null;
     "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
     "enabled": boolean;
     "createdAt": string;
     "updatedAt": string;

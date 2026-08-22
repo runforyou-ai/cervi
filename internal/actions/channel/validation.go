@@ -27,6 +27,7 @@ const (
 	ValidationNameTooLong          ValidationCode = "NAME_TOO_LONG"
 	ValidationDescriptionTooLong   ValidationCode = "DESCRIPTION_TOO_LONG"
 	ValidationDefaultLocaleInvalid ValidationCode = "DEFAULT_LOCALE_INVALID"
+	ValidationRoutingTargetInvalid ValidationCode = "ROUTING_TARGET_INVALID"
 	ValidationChatTitleRequired    ValidationCode = "CHAT_TITLE_REQUIRED"
 	ValidationChatTitleTooLong     ValidationCode = "CHAT_TITLE_TOO_LONG"
 	ValidationChatSubtitleTooLong  ValidationCode = "CHAT_SUBTITLE_TOO_LONG"
@@ -39,10 +40,18 @@ type ValidationError = common.FieldError
 
 // WebsiteChannelInput 定义网站渠道基础字段。
 type WebsiteChannelInput struct {
-	Type          domain.ChannelType
-	Name          string
-	Description   string
-	DefaultLocale domain.Locale
+	Type                  domain.ChannelType
+	Name                  string
+	Description           string
+	DefaultLocale         domain.Locale
+	NewConversationTarget RoutingTarget
+	FallbackTarget        RoutingTarget
+}
+
+// RoutingTarget 定义渠道会话流转目标。
+type RoutingTarget struct {
+	Type domain.ChannelRoutingTargetType
+	ID   string
 }
 
 // WebsiteChannelChatInterfaceInput 定义网站渠道聊天界面可编辑字段。
@@ -59,6 +68,8 @@ func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInpu
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 	input.DefaultLocale = domain.Locale(strings.TrimSpace(string(input.DefaultLocale)))
+	input.NewConversationTarget = normalizeRoutingTarget(input.NewConversationTarget)
+	input.FallbackTarget = normalizeRoutingTarget(input.FallbackTarget)
 
 	fields := make(map[string]ValidationCode)
 	if input.Type != domain.ChannelTypeWebsite {
@@ -75,7 +86,37 @@ func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInpu
 	if input.DefaultLocale != domain.LocaleChineseSimplified && input.DefaultLocale != domain.LocaleEnglishUnitedStates {
 		fields["defaultLocale"] = ValidationDefaultLocaleInvalid
 	}
+	if !routingTargetShapeValid(input.NewConversationTarget) {
+		fields["newConversationTarget"] = ValidationRoutingTargetInvalid
+	}
+	if !routingTargetShapeValid(input.FallbackTarget) {
+		fields["fallbackTarget"] = ValidationRoutingTargetInvalid
+	}
+	if input.NewConversationTarget.Type != domain.ChannelRoutingTargetTypePublicQueue &&
+		input.NewConversationTarget.Type == input.FallbackTarget.Type &&
+		input.NewConversationTarget.ID == input.FallbackTarget.ID {
+		fields["fallbackTarget"] = ValidationRoutingTargetInvalid
+	}
 	return input, fields
+}
+
+// normalizeRoutingTarget 规范化会话流转目标。
+func normalizeRoutingTarget(target RoutingTarget) RoutingTarget {
+	target.Type = domain.ChannelRoutingTargetType(strings.TrimSpace(string(target.Type)))
+	target.ID = strings.TrimSpace(target.ID)
+	return target
+}
+
+// routingTargetShapeValid 校验会话流转目标的字段组合。
+func routingTargetShapeValid(target RoutingTarget) bool {
+	switch target.Type {
+	case domain.ChannelRoutingTargetTypePublicQueue:
+		return target.ID == ""
+	case domain.ChannelRoutingTargetTypeTeam, domain.ChannelRoutingTargetTypeMember:
+		return common.ValidUUID(target.ID)
+	default:
+		return false
+	}
 }
 
 // normalizeWebsiteChannelChatInterfaceInput 规范化并校验聊天界面输入。

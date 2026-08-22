@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -18,7 +19,7 @@ type UpdateStatusAction struct{ db *bun.DB }
 // NewUpdateStatusAction 创建企业成员状态修改操作。
 func NewUpdateStatusAction(db *bun.DB) *UpdateStatusAction { return &UpdateStatusAction{db: db} }
 
-// Execute 停用或恢复企业成员账号。
+// Execute 停用或恢复人员账号，并在停用时清理渠道分配。
 func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.UserStatus) (*DirectoryUser, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
@@ -38,11 +39,12 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if status == domain.UserStatusInactive && userID == identity.User.ID {
 			return ErrSelfDeactivate
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
+		result, err := tx.NewUpdate().Model((*servermodels.OrganizationMember)(nil)).
 			Set("status = ?", status).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", userID).
+			Where("type = ?", domain.MemberIdentityTypeUser).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -53,6 +55,11 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		}
 		if rows == 0 {
 			return ErrNotFound
+		}
+		if status == domain.UserStatusInactive {
+			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, userID); err != nil {
+				return err
+			}
 		}
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err

@@ -8,6 +8,7 @@ import { toast } from "sonner"
 
 import {
   ChannelType,
+  ChannelRoutingTargetType,
   Locale,
   createWebsiteChannel,
   isApiError,
@@ -18,13 +19,10 @@ import {
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
+import { ChannelReceptionSettingsFields } from "@/features/channels/reception/channel-reception-settings-fields"
 import {
   createWebsiteChannelSchema,
   type WebsiteChannelFormValues,
@@ -47,8 +45,11 @@ export function WebsiteChannelForm({
         nameRequired: t("validation.nameRequired"),
         nameTooLong: t("validation.nameTooLong"),
         descriptionTooLong: t("validation.descriptionTooLong"),
+        teamRequired: t("validation.teamRequired"),
+        memberRequired: t("validation.memberRequired"),
+        fallbackDifferent: t("validation.fallbackDifferent"),
       }),
-    [t]
+    [t],
   )
   const form = useForm<WebsiteChannelFormValues>({
     resolver: zodResolver(schema),
@@ -58,6 +59,14 @@ export function WebsiteChannelForm({
       name: channel?.name ?? "",
       description: channel?.description ?? "",
       defaultLocale: channel?.defaultLocale ?? Locale.LocaleChineseSimplified,
+      newConversationTarget: channel?.newConversationTarget ?? {
+        type: ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue,
+        id: "",
+      },
+      fallbackTarget: channel?.fallbackTarget ?? {
+        type: ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue,
+        id: "",
+      },
     },
   })
 
@@ -65,12 +74,18 @@ export function WebsiteChannelForm({
   async function submit(values: WebsiteChannelFormValues) {
     try {
       if (channel) {
-        const updated = await updateWebsiteChannel(channel.id, values)
+        const updated = await updateWebsiteChannel(channel.id, {
+          ...values,
+          newConversationTarget: channel.newConversationTarget,
+          fallbackTarget: channel.fallbackTarget,
+        })
         form.reset({
           type: updated.type,
           name: updated.name,
           description: updated.description ?? "",
           defaultLocale: updated.defaultLocale,
+          newConversationTarget: updated.newConversationTarget,
+          fallbackTarget: updated.fallbackTarget,
         })
         onUpdated?.(updated)
         console.info("网站渠道已保存", { channel_id: channel.id })
@@ -93,7 +108,14 @@ export function WebsiteChannelForm({
       if (isApiError(error)) {
         console.warn("保存网站渠道失败", error)
         toast.error(
-          apiErrorMessage(error, ["type", "name", "description", "defaultLocale"])
+          apiErrorMessage(error, [
+            "type",
+            "name",
+            "description",
+            "defaultLocale",
+            "newConversationTarget",
+            "fallbackTarget",
+          ]),
         )
         return
       }
@@ -183,6 +205,10 @@ export function WebsiteChannelForm({
             </Field>
           )}
         />
+
+        {!channel ? (
+          <ChannelReceptionSettingsFields control={form.control} />
+        ) : null}
 
         <div className="flex items-center gap-2">
           <Button type="submit" disabled={isSubmitting}>

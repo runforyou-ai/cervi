@@ -15,8 +15,7 @@ type TeamMember struct {
 	ID              string    `bun:"id,pk" json:"id"`
 	OrganizationID  string    `bun:"organization_id" json:"organizationId"`
 	TeamID          string    `bun:"team_id" json:"teamId"`
-	IdentityType    string    `bun:"identity_type" json:"identityType"`
-	IdentityID      string    `bun:"identity_id" json:"identityId"`
+	MemberID        string    `bun:"member_id" json:"memberId"`
 	CreatedByUserID string    `bun:"created_by_user_id" json:"createdByUserId"`
 	CreatedAt       time.Time `bun:"created_at" json:"createdAt"`
 }

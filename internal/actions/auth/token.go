@@ -51,15 +51,16 @@ func resolveIdentity(ctx context.Context, db *bun.DB, value string) (*servermode
 			u.id::text,
 			u.organization_id::text,
 			u.email,
-			u.display_name,
+			om.display_name,
 			u.role_id::text,
-			u.status,
+			om.status,
 			u.locale,
 			u.time_zone,
 			u.work_status,
-			u.avatar_file_id::text
+			om.avatar_file_id::text
 		FROM tokens AS token
 		JOIN users AS u ON u.id = token.user_id
+		JOIN organization_members AS om ON om.id = u.id AND om.organization_id = u.organization_id AND om.type = 'user'
 		JOIN organizations AS o ON o.id = u.organization_id
 		WHERE token.token_hash = ?
 		  AND token.expires_at > now()
