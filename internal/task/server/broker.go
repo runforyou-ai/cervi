@@ -14,7 +14,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
+	"github.com/runforyou-ai/cervi/internal/task"
 )
 
 const (
@@ -235,7 +235,7 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 	}
 	handler, exists := r.registry.lookup(run.ActionName)
 	if !exists {
-		r.finishFailedMessage(ctx, run, workerID, message, taskruntime.Permanent(fmt.Errorf("task action %q is not registered", run.ActionName)))
+		r.finishFailedMessage(ctx, run, workerID, message, task.Permanent(fmt.Errorf("task action %q is not registered", run.ActionName)))
 		return
 	}
 	handlerCtx, cancelHandler := context.WithCancel(ctx)
@@ -275,7 +275,7 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 
 // resolveExecutionError 保留 Action 结果，仅用心跳原因替换协作取消错误。
 func resolveExecutionError(runErr, heartbeatErr error) error {
-	if heartbeatErr != nil && errors.Is(runErr, context.Canceled) && !taskruntime.IsPermanent(runErr) {
+	if heartbeatErr != nil && errors.Is(runErr, context.Canceled) && !task.IsPermanent(runErr) {
 		return heartbeatErr
 	}
 	return runErr
@@ -326,7 +326,7 @@ func (r *Runtime) heartbeat(ctx context.Context, runID, workerID string, message
 // finishFailedMessage 提交 Action 错误并安排重试或终止消息。
 func (r *Runtime) finishFailedMessage(ctx context.Context, run *servermodels.TaskRun, workerID string, message jetstream.Msg, runErr error) {
 	finalizeCtx, cancelFinalize := taskFinalizationContext(ctx)
-	retry, err := r.repository.failRun(finalizeCtx, run, workerID, runErr, taskruntime.IsPermanent(runErr))
+	retry, err := r.repository.failRun(finalizeCtx, run, workerID, runErr, task.IsPermanent(runErr))
 	cancelFinalize()
 	if err != nil {
 		slog.Warn("提交异步任务失败状态失败", "run_id", run.ID, "action", run.ActionName, "error", err)

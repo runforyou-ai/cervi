@@ -62,13 +62,18 @@ cervi/
 │   ├── api/                        # Gin 对外 HTTP API 适配器
 │   ├── apiproxy/                   # 原生端到企业服务端的类型化 API 代理
 │   ├── appservice/                 # 跨平台应用服务、传输契约和平台 Backend
+│   │   └── native/                 # 原生端应用服务平台能力实现
 │   ├── common/                     # 无存储、无传输、无平台依赖的通用能力
 │   ├── domain/                     # 各层共用的领域值
 │   ├── i18n/                       # 后端本地化能力和翻译词条
-│   └── storage/
-│       ├── server/                 # PostgreSQL 连接、迁移和服务端模型
-│       ├── desktop/                # 桌面端 SQLite 存储、迁移和模型
-│       └── mobile/                 # 移动端 SQLite 存储、迁移和模型
+│   ├── storage/
+│   │   ├── server/                 # PostgreSQL 连接、迁移和服务端模型
+│   │   ├── desktop/                # 桌面端 SQLite 存储、迁移和模型
+│   │   └── mobile/                 # 移动端 SQLite 存储、迁移和模型
+│   └── task/                       # 可靠任务能力
+│       ├── task.go                 # 跨平台共享的最小执行语义
+│       ├── client/                 # 客户端 SQLite 可靠任务方案与实现
+│       └── server/                 # 服务端 PostgreSQL、NATS 与 Cron 实现
 ├── frontend/
 │   ├── bindings/                   # Wails 自动生成的 TypeScript 绑定
 │   └── src/
@@ -94,6 +99,7 @@ cervi/
 - `common` 只放无数据库、无传输层、无平台依赖的通用能力。小函数和错误放在包内，完整能力使用子包。
 - `domain` 只放各层共用的领域值，按概念拆文件，不放数据库、传输层和平台逻辑。
 - 数据库模型放在对应平台的 `storage` 目录；桌面端和移动端的 SQLite 迁移保持独立。
+- `task` 根包只放各平台共享的 Action 执行语义；客户端和服务端分别定义自己的投递参数、存储与运行机制，不为形式统一互相复用平台实现。
 
 ### 前端契约
 
