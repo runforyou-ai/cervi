@@ -17,12 +17,12 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// TestHTTPSModeFromEnv 验证显式模式和统一默认模式。
-func TestHTTPSModeFromEnv(t *testing.T) {
+// TestTLSModeFromEnv 验证显式模式和默认模式。
+func TestTLSModeFromEnv(t *testing.T) {
 	tests := []struct {
 		name      string
 		value     string
-		want      httpsMode
+		want      tlsMode
 		wantError bool
 	}{
 		{name: "empty defaults to off", want: modeOff},
@@ -35,7 +35,7 @@ func TestHTTPSModeFromEnv(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Setenv("TLS_MODE", test.value)
-			mode, err := httpsModeFromEnv()
+			mode, err := tlsModeFromEnv()
 			if test.wantError {
 				if err == nil {
 					t.Fatal("expected invalid mode error")
@@ -43,7 +43,7 @@ func TestHTTPSModeFromEnv(t *testing.T) {
 				return
 			}
 			if err != nil || mode != test.want {
-				t.Fatalf("httpsModeFromEnv() = (%q, %v), want (%q, nil)", mode, err, test.want)
+				t.Fatalf("tlsModeFromEnv() = (%q, %v), want (%q, nil)", mode, err, test.want)
 			}
 		})
 	}

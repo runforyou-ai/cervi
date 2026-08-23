@@ -31,7 +31,7 @@ type Runtime struct {
 	waitGroup      sync.WaitGroup
 }
 
-// New 创建仅供企业服务端使用的任务运行时。
+// New 创建服务端任务运行时。
 func New(db *bun.DB, config Config) *Runtime {
 	return &Runtime{
 		config: config, repository: newRepository(db), registry: NewRegistry(),

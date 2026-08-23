@@ -7,7 +7,6 @@ vars:
   APP_NAME: "cervi"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
-  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   # GOOS 默认使用当前系统，也可在交叉构建时显式覆盖。
   GOOS: '{{.GOOS | default OS}}'
 
@@ -40,13 +39,20 @@ tasks:
     deps:
       - env:check:desktop
     cmds:
-      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+      - wails3 dev -config ./build/config.yml -port {{.WAILS_VITE_PORT}}
     env:
       WAILS_MCP: "1"
 
   env:check:
     silent: true
     summary: 校验当前工作区开发环境
+    deps:
+      - env:check:server
+      - env:check:desktop
+
+  env:check:database:
+    silent: true
+    summary: 校验当前工作区数据库环境
     preconditions:
       - sh: '{{if .POSTGRES_HOST}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置 POSTGRES_HOST"
@@ -60,6 +66,15 @@ tasks:
         msg: "请在 .env 中配置有效的 POSTGRES_DB"
       - sh: '{{if regexMatch "^(disable|allow|prefer|require|verify-ca|verify-full)$" .POSTGRES_SSLMODE}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置有效的 POSTGRES_SSLMODE"
+    cmds:
+      - 'echo "PostgreSQL {{.POSTGRES_HOST}}:{{.POSTGRES_PORT}}/{{.POSTGRES_DB}}"'
+
+  env:check:server:
+    silent: true
+    summary: 校验当前工作区服务端环境
+    deps:
+      - env:check:database
+    preconditions:
       - sh: '{{if .WAILS_SERVER_PORT}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置 WAILS_SERVER_PORT"
       - sh: '{{if .NATS_URL}}true{{else}}false{{end}}'
@@ -67,13 +82,11 @@ tasks:
       - sh: '{{if regexMatch "^[a-z0-9][a-z0-9_-]*$" .NATS_NAMESPACE}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置有效的 NATS_NAMESPACE"
     cmds:
-      - 'echo "工作区 {{.NATS_NAMESPACE}}：Server {{.WAILS_SERVER_PORT}}，数据库 {{.POSTGRES_DB}}，NATS {{.NATS_NAMESPACE}}"'
+      - 'echo "Server {{.WAILS_SERVER_PORT}}，NATS {{.NATS_NAMESPACE}}"'
 
   env:check:desktop:
     silent: true
     summary: 校验当前工作区桌面开发环境
-    deps:
-      - env:check
     preconditions:
       - sh: '{{if .WAILS_VITE_PORT}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置 WAILS_VITE_PORT"
@@ -86,10 +99,10 @@ tasks:
     silent: true
     summary: 确保当前工作区数据库已创建
     deps:
-      - env:check
+      - env:check:database
     preconditions:
       - sh: docker info >/dev/null 2>&1
-        msg: "Docker 未运行，无法连接主工作区 PostgreSQL"
+        msg: "Docker 未运行，无法连接 PostgreSQL 容器"
     cmds:
       - |
         set -euo pipefail
@@ -107,9 +120,11 @@ tasks:
   db:list:
     silent: true
     summary: 查看共享 PostgreSQL 中的数据库
+    deps:
+      - env:check:database
     preconditions:
       - sh: docker info >/dev/null 2>&1
-        msg: "Docker 未运行，无法连接主工作区 PostgreSQL"
+        msg: "Docker 未运行，无法连接 PostgreSQL 容器"
     cmds:
       - docker compose exec -T postgres psql -U "{{.POSTGRES_USER}}" -d postgres -c '\l'
 
@@ -129,6 +144,7 @@ tasks:
     summary: Runs the application in server mode
     deps:
       - db:ensure
+      - env:check:server
     cmds:
       - task: common:run:server
     env:
@@ -190,7 +206,6 @@ tasks:
     summary: 回滚全部服务端迁移后重新执行
     desc: |
       使用 Goose reset 回滚全部迁移，再执行 up。
-      使用 .env 中的 PostgreSQL 参数连接当前工作区数据库。
       执行前请先停止服务端。
     deps:
       - db:ensure
