@@ -54,8 +54,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
 
 	return []application.Service{
-		application.NewServiceWithOptions(api.NewLiveness(version), application.ServiceOptions{Route: "/healthz"}),
-		application.NewServiceWithOptions(api.NewReadiness(appStorage.DB(), version), application.ServiceOptions{Route: "/readyz"}),
+		application.NewServiceWithOptions(api.NewLiveness(), application.ServiceOptions{Route: "/healthz"}),
+		application.NewServiceWithOptions(api.NewReadiness(appStorage.DB()), application.ServiceOptions{Route: "/readyz"}),
 		application.NewService(&httpsLifecycle{service: httpsEntry}),
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,

@@ -18,11 +18,10 @@
 2. `-config` 指定的 YAML；
 3. 环境变量。
 
-部署前使用以下命令校验配置和查看版本：
+部署前使用以下命令校验配置：
 
 ```text
 cervi-server -config <配置文件> -check-config
-cervi-server -version
 ```
 
 生产 YAML 基础模板：

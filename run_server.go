@@ -21,7 +21,6 @@ func run(arguments []string) error {
 	flags.SetOutput(os.Stderr)
 	configPath := flags.String("config", "", "显式指定 YAML 配置文件")
 	checkConfig := flags.Bool("check-config", false, "校验配置后退出")
-	showVersion := flags.Bool("version", false, "显示版本后退出")
 	if err := flags.Parse(arguments); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -30,10 +29,6 @@ func run(arguments []string) error {
 	}
 	if flags.NArg() != 0 {
 		return fmt.Errorf("不支持位置参数 %q", flags.Arg(0))
-	}
-	if *showVersion {
-		_, err := fmt.Fprintln(os.Stdout, version)
-		return err
 	}
 
 	config, err := serverconfig.Load(*configPath)
@@ -73,6 +68,6 @@ func run(arguments []string) error {
 		},
 	})
 
-	slog.Info("启动 Cervi 服务端", "version", version, "host", config.Server.Host, "port", config.Server.Port, "environment", config.Environment)
+	slog.Info("启动 Cervi 服务端", "host", config.Server.Host, "port", config.Server.Port, "environment", config.Environment)
 	return app.Run()
 }
