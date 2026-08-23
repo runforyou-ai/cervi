@@ -3,7 +3,7 @@ import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -94,9 +94,12 @@ export function WebsiteChannelReceptionSettingsForm({
     >
       <FieldGroup>
         <ChannelReceptionSettingsFields control={form.control} />
-        <div>
+        <div className="flex items-center gap-2">
           <Button type="submit" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/integrations/channels">{t("form.cancel")}</Link>
           </Button>
         </div>
       </FieldGroup>
