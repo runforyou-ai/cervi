@@ -1,7 +1,7 @@
 //go:build server
 
-// Package filestore 实现本地目录和 S3 兼容对象存储的文件内容访问。
-package filestore
+// Package filecontent 实现服务端本地目录和 S3 兼容对象存储的文件内容访问。
+package filecontent
 
 import (
 	"context"

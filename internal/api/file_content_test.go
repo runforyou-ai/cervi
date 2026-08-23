@@ -1,6 +1,6 @@
 //go:build server
 
-package filecontent
+package api
 
 import "testing"
 
