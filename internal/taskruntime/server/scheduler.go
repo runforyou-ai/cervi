@@ -110,8 +110,8 @@ func (r *Runtime) syncSchedule(ctx context.Context, definition taskruntime.Sched
 					WHEN task_schedules.enabled = FALSE
 						AND EXCLUDED.enabled = TRUE
 						AND ?
-					THEN ?
-					ELSE ?
+					THEN ?::timestamptz
+					ELSE ?::timestamptz
 				END
 			END,
 			updated_at = EXCLUDED.updated_at

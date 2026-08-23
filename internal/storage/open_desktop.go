@@ -17,7 +17,7 @@ const desktopDatabaseName = "cervi-desktop.db"
 
 // Open 初始化桌面端使用的 SQLite 存储。
 func Open(ctx context.Context) (*desktopstorage.Store, error) {
-	dataDirectory := strings.TrimSpace(os.Getenv("CERVI_DESKTOP_DATA_DIR"))
+	dataDirectory := strings.TrimSpace(os.Getenv("DESKTOP_DATA_DIR"))
 	if dataDirectory == "" {
 		dataDirectory = filepath.Join(application.Path(application.PathDataHome), "cervi")
 	}

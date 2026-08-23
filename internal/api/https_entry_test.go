@@ -34,7 +34,7 @@ func TestHTTPSModeFromEnv(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Setenv("CERVI_HTTPS_MODE", test.value)
+			t.Setenv("TLS_MODE", test.value)
 			mode, err := httpsModeFromEnv()
 			if test.wantError {
 				if err == nil {
@@ -94,7 +94,7 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 
 // TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
 func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
-	t.Setenv("CERVI_HTTPS_MODE", "external")
+	t.Setenv("TLS_MODE", "external")
 	service, err := NewHTTPSEntry()
 	if err != nil {
 		t.Fatalf("new external service: %v", err)

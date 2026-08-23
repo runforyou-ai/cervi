@@ -63,7 +63,7 @@ func NewHTTPSEntry() (*HTTPSEntry, error) {
 		http.Error(writer, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 	}
 
-	cachePath := strings.TrimSpace(os.Getenv("CERVI_TLS_DATA_DIR"))
+	cachePath := strings.TrimSpace(os.Getenv("TLS_DATA_DIR"))
 	if cachePath == "" {
 		cachePath = "data/tls"
 	}
@@ -73,7 +73,7 @@ func NewHTTPSEntry() (*HTTPSEntry, error) {
 		Prompt:     autocert.AcceptTOS,
 		Cache:      service.cache,
 		HostPolicy: service.allowCertificate,
-		Email:      strings.TrimSpace(os.Getenv("CERVI_ACME_EMAIL")),
+		Email:      strings.TrimSpace(os.Getenv("TLS_ACME_EMAIL")),
 	}
 	service.httpServer = &http.Server{
 		Addr:              httpAddress,
@@ -249,7 +249,7 @@ func serverPort() int {
 
 // httpsModeFromEnv 返回配置的 HTTPS 模式，留空时关闭 HTTPS 入口。
 func httpsModeFromEnv() (httpsMode, error) {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv("CERVI_HTTPS_MODE")))
+	value := strings.ToLower(strings.TrimSpace(os.Getenv("TLS_MODE")))
 	if value == "" {
 		return modeOff, nil
 	}
@@ -258,6 +258,6 @@ func httpsModeFromEnv() (httpsMode, error) {
 	case modeAuto, modeExternal, modeOff:
 		return mode, nil
 	default:
-		return "", fmt.Errorf("invalid CERVI_HTTPS_MODE %q: expected auto, external, or off", value)
+		return "", fmt.Errorf("invalid TLS_MODE %q: expected auto, external, or off", value)
 	}
 }

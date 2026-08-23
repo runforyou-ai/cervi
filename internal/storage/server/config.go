@@ -4,7 +4,8 @@ package server
 
 import (
 	"fmt"
-	"log/slog"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -12,9 +13,14 @@ import (
 )
 
 const (
-	defaultDSN             = "postgres://cervi:cervi_local_dev@localhost:5432/cervi?sslmode=disable"
-	defaultMaxOpenConns    = 25
-	defaultMaxIdleConns    = 5
+	defaultHost            = "127.0.0.1"
+	defaultPort            = 5432
+	defaultUser            = "cervi"
+	defaultPassword        = "cervi_local_dev"
+	defaultDatabaseName    = "cervi"
+	defaultSSLMode         = "disable"
+	defaultMaxOpenConns    = 8
+	defaultMaxIdleConns    = 2
 	defaultConnMaxLifetime = 30 * time.Minute
 	defaultConnMaxIdleTime = 5 * time.Minute
 	defaultStartupTimeout  = time.Minute
@@ -30,70 +36,44 @@ type Config struct {
 	StartupTimeout  time.Duration // 连接检查和迁移共用的超时时间。
 }
 
-// ConfigFromEnv 从环境变量读取并校验 PostgreSQL 配置。
+// ConfigFromEnv 读取 PostgreSQL 连接参数并应用固定连接配置。
 func ConfigFromEnv() (Config, error) {
-	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
-	if dsn == "" {
-		slog.Warn("未配置 DATABASE_URL，使用本地开发数据库")
-		dsn = defaultDSN
+	host := stringFromEnv("POSTGRES_HOST", defaultHost)
+	portValue := stringFromEnv("POSTGRES_PORT", strconv.Itoa(defaultPort))
+	port, err := strconv.Atoi(portValue)
+	if err != nil || port < 1 || port > 65535 {
+		return Config{}, fmt.Errorf("POSTGRES_PORT must be an integer between 1 and 65535")
 	}
+	user := stringFromEnv("POSTGRES_USER", defaultUser)
+	password := stringFromEnv("POSTGRES_PASSWORD", defaultPassword)
+	databaseName := stringFromEnv("POSTGRES_DB", defaultDatabaseName)
+	sslMode := stringFromEnv("POSTGRES_SSLMODE", defaultSSLMode)
 
-	config := Config{
-		DSN:             dsn,
+	databaseURL := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(user, password),
+		Host:   net.JoinHostPort(host, portValue),
+		Path:   databaseName,
+	}
+	query := databaseURL.Query()
+	query.Set("sslmode", sslMode)
+	databaseURL.RawQuery = query.Encode()
+
+	return Config{
+		DSN:             databaseURL.String(),
 		MaxOpenConns:    defaultMaxOpenConns,
 		MaxIdleConns:    defaultMaxIdleConns,
 		ConnMaxLifetime: defaultConnMaxLifetime,
 		ConnMaxIdleTime: defaultConnMaxIdleTime,
 		StartupTimeout:  defaultStartupTimeout,
-	}
-
-	var err error
-	if config.MaxOpenConns, err = intFromEnv("POSTGRES_MAX_OPEN_CONNS", config.MaxOpenConns); err != nil {
-		return Config{}, err
-	}
-	if config.MaxIdleConns, err = intFromEnv("POSTGRES_MAX_IDLE_CONNS", config.MaxIdleConns); err != nil {
-		return Config{}, err
-	}
-	if config.ConnMaxLifetime, err = durationFromEnv("POSTGRES_CONN_MAX_LIFETIME", config.ConnMaxLifetime); err != nil {
-		return Config{}, err
-	}
-	if config.ConnMaxIdleTime, err = durationFromEnv("POSTGRES_CONN_MAX_IDLE_TIME", config.ConnMaxIdleTime); err != nil {
-		return Config{}, err
-	}
-	if config.StartupTimeout, err = durationFromEnv("POSTGRES_STARTUP_TIMEOUT", config.StartupTimeout); err != nil {
-		return Config{}, err
-	}
-	if config.MaxOpenConns > 0 && config.MaxIdleConns > config.MaxOpenConns {
-		return Config{}, fmt.Errorf("POSTGRES_MAX_IDLE_CONNS must not exceed POSTGRES_MAX_OPEN_CONNS")
-	}
-
-	return config, nil
+	}, nil
 }
 
-// intFromEnv 读取非负整数环境变量。
-func intFromEnv(name string, fallback int) (int, error) {
+// stringFromEnv 读取非空字符串环境变量。
+func stringFromEnv(name string, fallback string) string {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
-		return fallback, nil
+		return fallback
 	}
-
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < 0 {
-		return 0, fmt.Errorf("%s must be a non-negative integer", name)
-	}
-	return parsed, nil
-}
-
-// durationFromEnv 读取正数时长环境变量。
-func durationFromEnv(name string, fallback time.Duration) (time.Duration, error) {
-	value := strings.TrimSpace(os.Getenv(name))
-	if value == "" {
-		return fallback, nil
-	}
-
-	parsed, err := time.ParseDuration(value)
-	if err != nil || parsed <= 0 {
-		return 0, fmt.Errorf("%s must be a positive Go duration (for example 30s or 5m)", name)
-	}
-	return parsed, nil
+	return value
 }
