@@ -585,12 +585,51 @@ const enUS = {
       snippet: "Install code",
       snippetHelp:
         "Add this code to your website. A chat button will appear in the bottom-right corner.",
+      allowedHosts: "Allowed websites",
+      allowedHostsHelp:
+        "Enter one domain per line. Leave this blank or enter * to allow every website.",
       chatUrl: "Chat link",
-      chatUrlHelp: "Share this link with visitors.",
+      chatUrlHelp: "Visitors can open this link to enter the chat.",
+      qrCode: "QR code",
+      qrCodeHelp: "Visitors can scan this code to open the chat link.",
+      qrCodeAlt: "Chat link QR code",
+      qrCodeLoading: "Generating…",
+      qrCodeFailed: "Could not generate the QR code. Try again.",
       copy: "Copy",
       copied: "Copied",
       copyFailed: "Could not copy. Copy the text manually.",
       originError: "Could not generate the public entry. Try again later.",
+      saved: "Allowed websites saved.",
+      validation: {
+        allowedHostsTooMany: "You cannot allow more than 50 websites.",
+        allowedHostInvalid:
+          "Enter one valid domain, HTTP(S) URL, or * per line.",
+      },
+      instructions: {
+        open: "View instructions",
+        embedTitle: "How to add this to a website",
+        embedDescription:
+          "Add the install code to your website so visitors can start a conversation.",
+        addCode: "Add the install code",
+        addCodeHelp:
+          "Copy the code below into every page that needs the chat entry, preferably before </body>.",
+        customButton: "Use your website's button",
+        customButtonHelp:
+          "A button on the page can also open this chat window by using the attribute below.",
+        contactButton: "Contact us",
+        verifyEmbed: "Publish and verify",
+        verifyEmbedHelp:
+          "Publish the website, open the page, and confirm that the bottom-right entry and page button open the chat.",
+        linkTitle: "How to use the chat link",
+        linkDescription:
+          "Share the chat link directly, use it on a website button, or present it as a QR code.",
+        shareLink: "Share the link",
+        shareLinkHelp:
+          "Send the link below to visitors or use it as the destination of a website button.",
+        useQrCode: "Use the QR code",
+        useQrCodeHelp:
+          "Display the QR code on this page so visitors can scan it and enter the chat.",
+      },
     },
     chatInterface: {
       saved: "Chat interface saved.",

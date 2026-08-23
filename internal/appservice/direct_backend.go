@@ -42,6 +42,7 @@ type DirectBackend struct {
 	createWebsiteChannel              *channelaction.CreateWebsiteChannelAction
 	updateWebsiteChannel              *channelaction.UpdateWebsiteChannelAction
 	updateWebsiteChannelChatInterface *channelaction.UpdateWebsiteChannelChatInterfaceAction
+	updateWebsiteChannelAccess        *channelaction.UpdateWebsiteChannelAccessAction
 	updateWebsiteChannelStatus        *channelaction.UpdateWebsiteChannelStatusAction
 	listChannels                      *channelaction.ListChannelsQuery
 	listUsers                         *useraction.ListUsersQuery
@@ -101,6 +102,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		createWebsiteChannel:              channelaction.NewCreateWebsiteChannelAction(db),
 		updateWebsiteChannel:              channelaction.NewUpdateWebsiteChannelAction(db),
 		updateWebsiteChannelChatInterface: channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db),
+		updateWebsiteChannelAccess:        channelaction.NewUpdateWebsiteChannelAccessAction(db),
 		updateWebsiteChannelStatus:        channelaction.NewUpdateWebsiteChannelStatusAction(db),
 		listChannels:                      channelaction.NewListChannelsQuery(db),
 		listUsers:                         useraction.NewListUsersQuery(db),

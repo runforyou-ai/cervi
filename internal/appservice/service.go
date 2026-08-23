@@ -20,6 +20,7 @@ type Backend interface {
 	CreateWebsiteChannel(context.Context, RequestMeta, WebsiteChannelInput) (WebsiteChannelSummary, error)
 	UpdateWebsiteChannel(context.Context, RequestMeta, string, WebsiteChannelInput) (WebsiteChannelSummary, error)
 	UpdateWebsiteChannelChatInterface(context.Context, RequestMeta, string, WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error)
+	UpdateWebsiteChannelAccess(context.Context, RequestMeta, string, WebsiteChannelAccessInput) (WebsiteChannelAccess, error)
 	DeactivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
 	ActivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
 	ListChannels(context.Context, RequestMeta) (ChannelList, error)
@@ -197,6 +198,11 @@ func (s *Service) UpdateWebsiteChannel(ctx context.Context, meta RequestMeta, ch
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
 func (s *Service) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	return s.backend.UpdateWebsiteChannelChatInterface(ctx, meta, channelID, input)
+}
+
+// UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
+func (s *Service) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelAccessInput) (WebsiteChannelAccess, error) {
+	return s.backend.UpdateWebsiteChannelAccess(ctx, meta, channelID, input)
 }
 
 // DeactivateWebsiteChannel 停用网站渠道。

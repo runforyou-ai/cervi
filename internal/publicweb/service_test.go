@@ -97,36 +97,104 @@ func TestEmbedServiceInlinesChannelTheme(t *testing.T) {
 	}
 }
 
-// TestEmbedServiceUnknownChannelUsesDefaultTheme 验证不存在渠道使用默认主题。
-func TestEmbedServiceUnknownChannelUsesDefaultTheme(t *testing.T) {
+// TestEmbedServiceRejectsUnknownChannel 验证不存在渠道不返回挂件脚本。
+func TestEmbedServiceRejectsUnknownChannel(t *testing.T) {
 	channelID := "0191a2b3-c4d5-7890-abcd-ef1234567890"
 	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
 		return nil, channelaction.ErrNotFound
 	})
 	response := httptest.NewRecorder()
 	service.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/widget.js?id="+channelID, nil))
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusNotFound {
 		t.Fatalf("status = %d", response.Code)
 	}
-	if !strings.Contains(response.Body.String(), "--cv-theme:#2563EB") {
-		t.Fatal("unknown channel should use default theme")
+	if !strings.Contains(response.Body.String(), "website channel not found") {
+		t.Fatal("missing not found script response")
 	}
 }
 
-// TestEmbedServiceLookupErrorUsesDefaultTheme 验证读取失败时使用默认主题。
-func TestEmbedServiceLookupErrorUsesDefaultTheme(t *testing.T) {
+// TestEmbedServiceReportsLookupError 验证渠道读取失败不返回挂件脚本。
+func TestEmbedServiceReportsLookupError(t *testing.T) {
 	channelID := "0191a2b3-c4d5-7890-abcd-ef1234567890"
 	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
 		return nil, errors.New("query failed")
 	})
 	response := httptest.NewRecorder()
 	service.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/widget.js?id="+channelID, nil))
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d", response.Code)
 	}
-	if !strings.Contains(response.Body.String(), "--cv-theme:#2563EB") {
-		t.Fatal("lookup error should use default theme")
+	if !strings.Contains(response.Body.String(), "website channel unavailable") {
+		t.Fatal("missing unavailable script response")
 	}
+}
+
+// TestEmbedServiceRestrictsHost 验证安装脚本和聊天框只允许配置的网站加载。
+func TestEmbedServiceRestrictsHost(t *testing.T) {
+	channelID := "0191a2b3-c4d5-7890-abcd-ef1234567890"
+	lookup := func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
+		return &channelaction.PublicWebsiteChannel{
+			ID:                channelID,
+			Title:             "在线咨询",
+			ThemeColor:        "#2563EB",
+			AllowedEmbedHosts: []string{"support.example.com"},
+		}, nil
+	}
+	service := NewEmbedService(lookup)
+
+	t.Run("allowed script", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/widget.js?id="+channelID, nil)
+		request.Header.Set("Referer", "https://support.example.com/help")
+		response := httptest.NewRecorder()
+		service.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("status = %d", response.Code)
+		}
+	})
+
+	t.Run("denied script", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/widget.js?id="+channelID, nil)
+		request.Header.Set("Referer", "https://other.example.com/")
+		response := httptest.NewRecorder()
+		service.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("status = %d", response.Code)
+		}
+	})
+
+	t.Run("allowed frame", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/widget/"+channelID, nil)
+		request.Header.Set("Referer", "https://support.example.com/help")
+		response := httptest.NewRecorder()
+		service.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("status = %d", response.Code)
+		}
+		if response.Header().Get("Content-Security-Policy") != "frame-ancestors support.example.com" {
+			t.Fatalf("csp = %q", response.Header().Get("Content-Security-Policy"))
+		}
+	})
+
+	t.Run("denied frame", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/widget/"+channelID, nil)
+		request.Header.Set("Referer", "https://other.example.com/")
+		response := httptest.NewRecorder()
+		service.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("status = %d", response.Code)
+		}
+		if response.Header().Get("Content-Security-Policy") != "frame-ancestors 'none'" {
+			t.Fatalf("csp = %q", response.Header().Get("Content-Security-Policy"))
+		}
+	})
+
+	t.Run("standalone chat", func(t *testing.T) {
+		response := httptest.NewRecorder()
+		NewChatService(lookup).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/"+channelID, nil))
+		if response.Code != http.StatusOK {
+			t.Fatalf("status = %d", response.Code)
+		}
+	})
 }
 
 // TestPublicChatPages 验证公开聊天页渲染访客界面。

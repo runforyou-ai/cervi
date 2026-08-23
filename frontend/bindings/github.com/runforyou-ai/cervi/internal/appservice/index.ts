@@ -94,6 +94,8 @@ export type {
     UserRoleChangesInput,
     UserWorkStatusInput,
     WebsiteChannel,
+    WebsiteChannelAccess,
+    WebsiteChannelAccessInput,
     WebsiteChannelChatInterface,
     WebsiteChannelChatInterfaceInput,
     WebsiteChannelInput,
