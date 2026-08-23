@@ -20,6 +20,9 @@ server:
 database:
   url: postgres://file
   migrationTimeout: 15m
+nats:
+  url: nats://file:4222
+  namespace: file
 https:
   mode: off
 storage:
@@ -34,6 +37,8 @@ storage:
 	t.Setenv("POSTGRES_PASSWORD", "secret@value")
 	t.Setenv("POSTGRES_DB", "cervi")
 	t.Setenv("POSTGRES_SSLMODE", "require")
+	t.Setenv("NATS_URL", "nats://environment:4222")
+	t.Setenv("NATS_NAMESPACE", "environment")
 	t.Setenv("WAILS_SERVER_PORT", "28080")
 	t.Setenv("TLS_MODE", "external")
 	t.Setenv("TLS_DATA_DIR", "/var/lib/cervi/tls")
@@ -52,6 +57,9 @@ storage:
 	}
 	if config.Database.MigrationTimeout.Value() != 15*time.Minute {
 		t.Fatalf("迁移超时 = %s", config.Database.MigrationTimeout.Value())
+	}
+	if config.NATS.URL != "nats://environment:4222" || config.NATS.Namespace != "environment" {
+		t.Fatalf("NATS 环境变量未覆盖文件配置: %#v", config.NATS)
 	}
 }
 
@@ -84,12 +92,29 @@ func TestDefaultTLSModeIsOff(t *testing.T) {
 	}
 }
 
+// TestValidationRejectsInvalidNATSConfig 验证 NATS 地址和命名空间。
+func TestValidationRejectsInvalidNATSConfig(t *testing.T) {
+	for _, nats := range []NATSConfig{
+		{Namespace: "cervi"},
+		{URL: "nats://127.0.0.1:4222", Namespace: "INVALID"},
+	} {
+		config := defaultConfig()
+		config.Database.URL = "postgres://cervi@localhost/cervi"
+		config.NATS = nats
+		config.normalize()
+		if err := config.validate(); err == nil {
+			t.Fatalf("接受了无效 NATS 配置: %#v", nats)
+		}
+	}
+}
+
 // clearServerEnvironment 清除可能影响配置测试的服务端环境变量。
 func clearServerEnvironment(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
 		"WAILS_SERVER_HOST", "WAILS_SERVER_PORT",
 		"POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "POSTGRES_SSLMODE",
+		"NATS_URL", "NATS_NAMESPACE",
 		"TLS_MODE", "TLS_DATA_DIR", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
 	} {
 		t.Setenv(name, "")

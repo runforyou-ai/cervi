@@ -15,6 +15,12 @@
 2. `-config` 指定的 YAML；
 3. 环境变量。
 
+本地默认由 Task 加载 `.env`，需要叠加 YAML 时运行：
+
+```text
+wails3 task run:server CONFIG=path/to/server.yaml
+```
+
 部署前使用以下命令校验配置：
 
 ```text
@@ -38,6 +44,10 @@ database:
   connectTimeout: 1m
   migrationTimeout: 10m
 
+nats:
+  url: nats://127.0.0.1:4222
+  namespace: cervi
+
 https:
   mode: external
 
@@ -45,7 +55,7 @@ storage:
   localDirectory: /var/lib/cervi/files
 ```
 
-数据库连接和 NATS 配置通过环境变量注入：
+环境变量覆盖 YAML；PostgreSQL 分项配置会合成连接地址：
 
 ```dotenv
 POSTGRES_HOST=127.0.0.1

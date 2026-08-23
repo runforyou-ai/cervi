@@ -15,7 +15,7 @@ import (
 
 // TestConfigNamespaceNames 验证一个命名空间同时隔离所有 JetStream 资源。
 func TestConfigNamespaceNames(t *testing.T) {
-	config := Config{Namespace: "feature_one"}
+	config := runtimeConfig{Namespace: "feature_one"}
 	if config.streamName() != "CERVI_FEATURE_ONE_TASKS" {
 		t.Fatalf("stream name = %q", config.streamName())
 	}
@@ -25,7 +25,7 @@ func TestConfigNamespaceNames(t *testing.T) {
 	if config.subjectPrefix() != "cervi.feature_one.tasks" {
 		t.Fatalf("subject prefix = %q", config.subjectPrefix())
 	}
-	if config.streamName() == (Config{Namespace: "feature-one"}).streamName() {
+	if config.streamName() == (runtimeConfig{Namespace: "feature-one"}).streamName() {
 		t.Fatal("different namespaces share a stream name")
 	}
 }

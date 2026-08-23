@@ -12,7 +12,6 @@ import (
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/storage"
-	servertask "github.com/runforyou-ai/cervi/internal/taskruntime/server"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -36,10 +35,6 @@ func run(arguments []string) error {
 	if err != nil {
 		return fmt.Errorf("加载服务端配置: %w", err)
 	}
-	taskConfig, err := servertask.ConfigFromEnv()
-	if err != nil {
-		return fmt.Errorf("加载任务运行时配置: %w", err)
-	}
 	if *checkConfig {
 		_, err := fmt.Fprintln(os.Stdout, "服务端配置有效")
 		return err
@@ -55,7 +50,7 @@ func run(arguments []string) error {
 		}
 	}()
 
-	services, err := applicationServices(appStorage, config, taskConfig)
+	services, err := applicationServices(appStorage, config)
 	if err != nil {
 		return fmt.Errorf("initialize application services: %w", err)
 	}

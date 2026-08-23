@@ -21,13 +21,13 @@ import (
 )
 
 // applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
-func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config, taskConfig servertask.Config) ([]application.Service, error) {
+func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
 	httpsEntry := api.NewHTTPSEntry(config.HTTPS, config.Server)
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, err
 	}
-	tasks := servertask.New(appStorage.DB(), taskConfig)
+	tasks := servertask.New(appStorage.DB(), config.NATS)
 	scanExpired := fileaction.NewScanExpiredAction(appStorage.DB(), tasks)
 	deleteExpired := fileaction.NewDeleteExpiredAction(appStorage.DB(), newFileContentDeleter(appStorage.DB(), localFiles))
 	if err := servertask.RegisterJSON(tasks.Registry(), fileaction.ScanExpiredActionName, scanExpired.Execute); err != nil {

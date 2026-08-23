@@ -48,7 +48,7 @@ func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 		}
 	})
 
-	runtime := New(db, Config{})
+	runtime := New(db, serverconfig.NATSConfig{})
 	const actionName = "test.schedule.action"
 	if err := runtime.Registry().Register(actionName, func(context.Context, json.RawMessage) error { return nil }); err != nil {
 		t.Fatal(err)

@@ -8,12 +8,15 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/goccy/go-yaml"
 )
+
+var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 // Duration 表示配置文件中的 Go 时长。
 type Duration time.Duration
@@ -41,6 +44,7 @@ func (d Duration) Value() time.Duration {
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
+	NATS     NATSConfig     `yaml:"nats"`
 	HTTPS    HTTPSConfig    `yaml:"https"`
 	Storage  StorageConfig  `yaml:"storage"`
 }
@@ -60,6 +64,12 @@ type DatabaseConfig struct {
 	ConnectionMaxIdleTime Duration `yaml:"connectionMaxIdleTime"`
 	ConnectTimeout        Duration `yaml:"connectTimeout"`
 	MigrationTimeout      Duration `yaml:"migrationTimeout"`
+}
+
+// NATSConfig 定义 NATS 连接和任务命名空间。
+type NATSConfig struct {
+	URL       string `yaml:"url"`
+	Namespace string `yaml:"namespace"`
 }
 
 // HTTPSConfig 定义企业服务端 HTTPS 入口配置。
@@ -100,6 +110,8 @@ func Load(path string) (Config, error) {
 func (config *Config) normalize() {
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Database.URL = strings.TrimSpace(config.Database.URL)
+	config.NATS.URL = strings.TrimSpace(config.NATS.URL)
+	config.NATS.Namespace = strings.TrimSpace(config.NATS.Namespace)
 	config.HTTPS.Mode = strings.ToLower(strings.TrimSpace(config.HTTPS.Mode))
 	config.HTTPS.TLSDataDirectory = strings.TrimSpace(config.HTTPS.TLSDataDirectory)
 	config.HTTPS.ACMEEmail = strings.TrimSpace(config.HTTPS.ACMEEmail)
@@ -135,6 +147,8 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("TLS_DATA_DIR", &config.HTTPS.TLSDataDirectory)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.HTTPS.ACMEEmail)
 	applyStringEnvironment("FILE_STORAGE_PATH", &config.Storage.LocalDirectory)
+	applyStringEnvironment("NATS_URL", &config.NATS.URL)
+	applyStringEnvironment("NATS_NAMESPACE", &config.NATS.Namespace)
 
 	serverPort, err := intEnvironment("WAILS_SERVER_PORT", config.Server.Port)
 	if err != nil {
@@ -245,6 +259,12 @@ func (config Config) validate() error {
 	}
 	if config.Database.ConnectionMaxLifetime.Value() <= 0 || config.Database.ConnectionMaxIdleTime.Value() <= 0 || config.Database.ConnectTimeout.Value() <= 0 || config.Database.MigrationTimeout.Value() <= 0 {
 		return fmt.Errorf("PostgreSQL 时长配置必须为正数")
+	}
+	if config.NATS.URL == "" {
+		return fmt.Errorf("必须配置 NATS 地址")
+	}
+	if !natsNamespacePattern.MatchString(config.NATS.Namespace) {
+		return fmt.Errorf("NATS 命名空间必须匹配 %s", natsNamespacePattern.String())
 	}
 	mode := config.HTTPS.Mode
 	if mode != "auto" && mode != "external" && mode != "off" {

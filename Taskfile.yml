@@ -147,6 +147,9 @@ tasks:
       - env:check:server
     cmds:
       - task: common:run:server
+        vars:
+          CONFIG:
+            ref: .CONFIG
     env:
       WAILS_MCP: "0"
 
