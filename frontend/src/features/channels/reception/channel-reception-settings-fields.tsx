@@ -80,7 +80,7 @@ function ReceptionTargetField({
       </NativeSelect>
       {target.type !==
       ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue ? (
-        <div className="flex w-full flex-col gap-2">
+        <div className="mt-3 flex w-full flex-col gap-2">
           <FieldLabel htmlFor={`${name}-id`} required>
             {isFallback
               ? target.type ===
