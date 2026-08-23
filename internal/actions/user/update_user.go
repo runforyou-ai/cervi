@@ -21,7 +21,7 @@ type UpdateUserAction struct{ db *bun.DB }
 func NewUpdateUserAction(db *bun.DB) *UpdateUserAction { return &UpdateUserAction{db: db} }
 
 // Execute 修改企业成员资料、角色和所属团队。
-func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, input UpdateInput) (*DirectoryUser, error) {
+func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, input UpdateInput) (*User, error) {
 	input, fields := normalizeUpdateInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
@@ -29,7 +29,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
 	}
-	var output *DirectoryUser
+	var output *User
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
@@ -75,7 +75,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := replaceUserTeams(ctx, tx, identity, updatedUser.IdentityID, input.TeamIDs); err != nil {
 			return err
 		}
-		output, err = loadDirectoryUser(ctx, tx, identity.Organization.ID, userID)
+		output, err = loadUser(ctx, tx, identity.Organization.ID, userID)
 		return err
 	})
 	if err != nil {

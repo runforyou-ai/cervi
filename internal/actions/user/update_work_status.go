@@ -43,7 +43,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 	if err != nil {
 		return nil, fmt.Errorf("update user work status: %w", err)
 	}
-	user, err := loadUser(ctx, a.db, identity.Organization.ID, identity.User.ID)
+	user, err := loadCurrentUser(ctx, a.db, identity.Organization.ID, identity.User.ID)
 	if err != nil {
 		return nil, fmt.Errorf("reload user work status: %w", err)
 	}

@@ -22,14 +22,14 @@ type UpdateStatusAction struct{ db *bun.DB }
 func NewUpdateStatusAction(db *bun.DB) *UpdateStatusAction { return &UpdateStatusAction{db: db} }
 
 // Execute 停用或恢复用户账号，并在停用时清理渠道分配。
-func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.UserStatus) (*DirectoryUser, error) {
+func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.UserStatus) (*User, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
 	}
 	if status != domain.UserStatusActive && status != domain.UserStatusInactive {
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"status": ValidationStatusInvalid}}
 	}
-	var output *DirectoryUser
+	var output *User
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
@@ -63,7 +63,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err
 		}
-		output, err = loadDirectoryUser(ctx, tx, identity.Organization.ID, userID)
+		output, err = loadUser(ctx, tx, identity.Organization.ID, userID)
 		return err
 	})
 	if err != nil {

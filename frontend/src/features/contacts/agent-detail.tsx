@@ -11,7 +11,7 @@ import {
   isApiError,
   isNotFoundApiError,
   updateAgent,
-  type DirectoryAgentData,
+  type AgentData,
   type Team,
 } from "@/api"
 import { StatusBadge } from "@/components/status-badge"
@@ -33,7 +33,7 @@ import { recoverSession } from "@/lib/session-navigation"
 type EditingField = "name" | "teams" | null
 
 /** 把 AI 员工详情转换为编辑表单值。 */
-function valuesFromAgent(agent: DirectoryAgentData): AgentFormValues {
+function valuesFromAgent(agent: AgentData): AgentFormValues {
   return {
     displayName: agent.displayName,
     teamIds: agent.teams.map((team) => team.id),
@@ -47,9 +47,9 @@ export function AgentDetailView({
   onSaved,
   onNotFound,
 }: {
-  agent: DirectoryAgentData
+  agent: AgentData
   teams: Team[]
-  onSaved: (agent: DirectoryAgentData) => void
+  onSaved: (agent: AgentData) => void
   onNotFound: () => void
 }) {
   const { t } = useTranslation("contacts")

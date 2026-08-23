@@ -124,7 +124,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				return err
 			}
 		}
-		user, err = loadUser(ctx, tx, identity.Organization.ID, identity.User.ID)
+		user, err = loadCurrentUser(ctx, tx, identity.Organization.ID, identity.User.ID)
 		return err
 	})
 	if isUniqueViolation(err) {

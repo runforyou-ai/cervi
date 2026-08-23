@@ -72,7 +72,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	if err != nil {
 		return ListOutput{}, fmt.Errorf("count users: %w", err)
 	}
-	users := make([]DirectoryUser, 0)
+	users := make([]User, 0)
 	if err := applyFilters(q.db.NewSelect().TableExpr("users AS u")).
 		ColumnExpr("u.id::text AS id, u.identity_id::text AS identity_id").
 		ColumnExpr("u.email, u.status, oi.display_name, oi.work_status, oi.created_at").

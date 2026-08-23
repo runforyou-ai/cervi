@@ -296,8 +296,8 @@ type RoleInput struct {
 	Permissions []PermissionCode `json:"permissions"`
 }
 
-// User 定义当前企业成员信息。
-type User struct {
+// CurrentUser 定义当前登录用户信息。
+type CurrentUser struct {
 	ID             string     `json:"id"`
 	IdentityID     string     `json:"identityId"`
 	OrganizationID string     `json:"organizationId"`
@@ -314,7 +314,7 @@ type User struct {
 // Identity 定义当前用户及其所属企业。
 type Identity struct {
 	Organization Organization `json:"organization"`
-	User         User         `json:"user"`
+	User         CurrentUser  `json:"user"`
 }
 
 // ProfileInput 定义当前用户可编辑的个人资料字段。
@@ -410,7 +410,7 @@ type Message struct {
 // Inbox 定义统一收件箱结果。
 type Inbox struct {
 	Organization  Organization   `json:"organization"`
-	User          User           `json:"user"`
+	User          CurrentUser    `json:"user"`
 	Conversations []Conversation `json:"conversations"`
 }
 
@@ -521,8 +521,8 @@ type AgentListInput struct {
 	PageSize int         `json:"pageSize"`
 }
 
-// DirectoryAgent 定义 AI 员工目录字段。
-type DirectoryAgent struct {
+// Agent 定义 AI 员工信息。
+type Agent struct {
 	ID          string        `json:"id"`
 	IdentityID  string        `json:"identityId"`
 	DisplayName string        `json:"displayName"`
@@ -533,8 +533,8 @@ type DirectoryAgent struct {
 
 // AgentList 定义 AI 员工分页结果。
 type AgentList struct {
-	Agents []DirectoryAgent `json:"agents"`
-	Page   PageInfo         `json:"page"`
+	Agents []Agent  `json:"agents"`
+	Page   PageInfo `json:"page"`
 }
 
 // WebsiteChannelList 定义网站渠道列表。
@@ -568,8 +568,8 @@ type CreateUserInput struct {
 	TeamIDs     []string `json:"teamIds"`
 }
 
-// UpdateDirectoryUserInput 定义企业成员可编辑字段。
-type UpdateDirectoryUserInput struct {
+// UpdateUserInput 定义企业成员可编辑字段。
+type UpdateUserInput struct {
 	DisplayName string   `json:"displayName"`
 	Email       string   `json:"email"`
 	RoleID      string   `json:"roleId"`
@@ -593,8 +593,8 @@ type TeamSummary struct {
 	Name string `json:"name"`
 }
 
-// DirectoryUser 定义企业成员目录字段。
-type DirectoryUser struct {
+// User 定义企业成员信息。
+type User struct {
 	ID          string        `json:"id"`
 	IdentityID  string        `json:"identityId"`
 	Email       string        `json:"email"`
@@ -608,8 +608,8 @@ type DirectoryUser struct {
 
 // UserList 定义企业成员分页结果。
 type UserList struct {
-	Users []DirectoryUser `json:"users"`
-	Page  PageInfo        `json:"page"`
+	Users []User   `json:"users"`
+	Page  PageInfo `json:"page"`
 }
 
 // TeamInput 定义团队可编辑字段。

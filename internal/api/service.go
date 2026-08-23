@@ -375,7 +375,7 @@ func (s *Service) createUser(c *gin.Context) {
 }
 
 func (s *Service) updateUser(c *gin.Context) {
-	var input appservice.UpdateDirectoryUserInput
+	var input appservice.UpdateUserInput
 	if !bindJSON(c, &input) {
 		return
 	}

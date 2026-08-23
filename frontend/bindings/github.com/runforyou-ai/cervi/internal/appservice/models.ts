@@ -105,10 +105,22 @@ export interface AIProviderSummary {
 }
 
 /**
+ * Agent 定义 AI 员工信息。
+ */
+export interface Agent {
+    "id": string;
+    "identityId": string;
+    "displayName": string;
+    "status": UserStatus;
+    "teams": TeamSummary[] | null;
+    "createdAt": string;
+}
+
+/**
  * AgentList 定义 AI 员工分页结果。
  */
 export interface AgentList {
-    "agents": DirectoryAgent[] | null;
+    "agents": Agent[] | null;
     "page": PageInfo;
 }
 
@@ -374,30 +386,20 @@ export interface CreateUserInput {
 }
 
 /**
- * DirectoryAgent 定义 AI 员工目录字段。
+ * CurrentUser 定义当前登录用户信息。
  */
-export interface DirectoryAgent {
+export interface CurrentUser {
     "id": string;
     "identityId": string;
-    "displayName": string;
-    "status": UserStatus;
-    "teams": TeamSummary[] | null;
-    "createdAt": string;
-}
-
-/**
- * DirectoryUser 定义企业成员目录字段。
- */
-export interface DirectoryUser {
-    "id": string;
-    "identityId": string;
+    "organizationId": string;
     "email": string;
     "displayName": string;
-    "role": RoleSummary;
+    "roleId": string;
     "status": UserStatus;
+    "locale": Locale;
+    "timeZone": string;
     "workStatus": WorkStatus;
-    "teams": TeamSummary[] | null;
-    "createdAt": string;
+    "avatarUrl": string;
 }
 
 /**
@@ -455,7 +457,7 @@ export interface FileUploadRequest {
  */
 export interface Identity {
     "organization": Organization;
-    "user": User;
+    "user": CurrentUser;
 }
 
 /**
@@ -463,7 +465,7 @@ export interface Identity {
  */
 export interface Inbox {
     "organization": Organization;
-    "user": User;
+    "user": CurrentUser;
     "conversations": Conversation[] | null;
 }
 
@@ -924,9 +926,9 @@ export interface UpdateAgentInput {
 }
 
 /**
- * UpdateDirectoryUserInput 定义企业成员可编辑字段。
+ * UpdateUserInput 定义企业成员可编辑字段。
  */
-export interface UpdateDirectoryUserInput {
+export interface UpdateUserInput {
     "displayName": string;
     "email": string;
     "roleId": string;
@@ -934,27 +936,25 @@ export interface UpdateDirectoryUserInput {
 }
 
 /**
- * User 定义当前企业成员信息。
+ * User 定义企业成员信息。
  */
 export interface User {
     "id": string;
     "identityId": string;
-    "organizationId": string;
     "email": string;
     "displayName": string;
-    "roleId": string;
+    "role": RoleSummary;
     "status": UserStatus;
-    "locale": Locale;
-    "timeZone": string;
     "workStatus": WorkStatus;
-    "avatarUrl": string;
+    "teams": TeamSummary[] | null;
+    "createdAt": string;
 }
 
 /**
  * UserList 定义企业成员分页结果。
  */
 export interface UserList {
-    "users": DirectoryUser[] | null;
+    "users": User[] | null;
     "page": PageInfo;
 }
 

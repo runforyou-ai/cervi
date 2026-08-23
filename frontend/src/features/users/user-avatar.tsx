@@ -1,7 +1,7 @@
 /** 企业成员头像展示。 */
 import { useEffect, useState } from "react"
 
-import type { User } from "@/api"
+import type { CurrentUser } from "@/api"
 import { cn } from "@/lib/utils"
 
 /** 展示用户头像，图片不可用时回退到姓名首字。 */
@@ -9,7 +9,7 @@ export function UserAvatar({
   user,
   className,
 }: {
-  user: User
+  user: CurrentUser
   className?: string
 }) {
   const [failed, setFailed] = useState(false)

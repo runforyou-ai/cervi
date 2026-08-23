@@ -53,8 +53,8 @@ import {
   type ContactDetail,
   type ContactListResponse,
   type ContactSummary,
-  type DirectoryAgentData,
-  type DirectoryUserData,
+  type AgentData,
+  type UserData,
   type PageInfo,
   type RoleData,
   type Team,
@@ -523,8 +523,8 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [search, setSearch] = useState(query)
   const [channels, setChannels] = useState<ChannelSummary[]>([])
   const [contacts, setContacts] = useState<ContactSummary[]>([])
-  const [users, setUsers] = useState<DirectoryUserData[]>([])
-  const [agents, setAgents] = useState<DirectoryAgentData[]>([])
+  const [users, setUsers] = useState<UserData[]>([])
+  const [agents, setAgents] = useState<AgentData[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamDirectoryMember[]>([])
   const [roles, setRoles] = useState<RoleData[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -532,8 +532,8 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [loadState, setLoadState] = useState<LoadState>("loading")
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [detail, setDetail] = useState<ContactDetail | null>(null)
-  const [detailUser, setDetailUser] = useState<DirectoryUserData | null>(null)
-  const [detailAgent, setDetailAgent] = useState<DirectoryAgentData | null>(null)
+  const [detailUser, setDetailUser] = useState<UserData | null>(null)
+  const [detailAgent, setDetailAgent] = useState<AgentData | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [deletingContact, setDeletingContact] = useState<ContactSummary | null>(
     null,
@@ -541,9 +541,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [restoringContact, setRestoringContact] =
     useState<ContactSummary | null>(null)
   const [changingUserStatus, setChangingUserStatus] =
-    useState<DirectoryUserData | null>(null)
+    useState<UserData | null>(null)
   const [changingAgentStatus, setChangingAgentStatus] =
-    useState<DirectoryAgentData | null>(null)
+    useState<AgentData | null>(null)
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
   const [removingTeamMembers, setRemovingTeamMembers] = useState<
     TeamDirectoryMember[]
@@ -580,7 +580,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
 
   /** 当前用户使用工作台中的即时状态，其他成员使用目录查询结果。 */
-  function memberWorkStatus(user: DirectoryUserData) {
+  function memberWorkStatus(user: UserData) {
     return user.id === identity.user.id
       ? identity.user.workStatus
       : user.workStatus

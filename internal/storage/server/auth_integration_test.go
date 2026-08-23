@@ -250,12 +250,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if users.Page.Total != 1 || len(users.Users) != 1 || users.Users[0].ID != loggedIn.Identity.User.ID || users.Users[0].CreatedAt.IsZero() {
 		t.Fatalf("unexpected user directory: %#v", users)
 	}
-	directoryUser, err := useraction.NewGetUserQuery(db).Execute(context.Background(), loggedIn.Identity, loggedIn.Identity.User.ID)
+	user, err := useraction.NewGetUserQuery(db).Execute(context.Background(), loggedIn.Identity, loggedIn.Identity.User.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if directoryUser.ID != loggedIn.Identity.User.ID || directoryUser.CreatedAt.IsZero() {
-		t.Fatalf("unexpected directory user: %#v", directoryUser)
+	if user.ID != loggedIn.Identity.User.ID || user.CreatedAt.IsZero() {
+		t.Fatalf("unexpected user: %#v", user)
 	}
 
 	team, err := teamaction.NewCreateTeamAction(db).Execute(context.Background(), loggedIn.Identity, teamaction.Input{Name: "客户成功", Description: "服务客户"})
@@ -349,9 +349,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil || updatedAgent.DisplayName != "售前智能体" {
 		t.Fatalf("updated agent = %#v, error = %v", updatedAgent, err)
 	}
-	directoryAgent, err := agentaction.NewGetAgentQuery(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID)
-	if err != nil || directoryAgent.DisplayName != "售前智能体" {
-		t.Fatalf("agent detail = %#v, error = %v", directoryAgent, err)
+	agent, err := agentaction.NewGetAgentQuery(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID)
+	if err != nil || agent.DisplayName != "售前智能体" {
+		t.Fatalf("agent detail = %#v, error = %v", agent, err)
 	}
 	teamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.DirectoryMemberInput{Page: 1, PageSize: 50})
 	if err != nil || teamMembers.Page.Total != 2 {

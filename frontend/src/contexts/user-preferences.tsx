@@ -1,17 +1,17 @@
 /** 同步当前用户语言并提供日期时间显示时区。 */
 import { createContext, useContext, useEffect, type ReactNode } from "react"
 
-import type { User } from "@/api"
+import type { CurrentUser } from "@/api"
 import { i18n } from "@/i18n"
 
-const UserTimeZoneContext = createContext<User["timeZone"] | null>(null)
+const UserTimeZoneContext = createContext<CurrentUser["timeZone"] | null>(null)
 
 /** 同步用户语言并向子页面提供用户时区。 */
 export function UserPreferencesProvider({
   user,
   children,
 }: {
-  user: User
+  user: CurrentUser
   children: ReactNode
 }) {
   useEffect(() => {

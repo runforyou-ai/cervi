@@ -17,7 +17,7 @@ import { toast } from "sonner"
 import {
   updateUserWorkStatus,
   type Identity,
-  type User,
+  type CurrentUser,
   type WorkStatus,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
@@ -114,7 +114,7 @@ export function WorkspaceNavigation({
   loggingOut,
 }: {
   identity: Identity
-  onUserUpdated: (user: User) => void
+  onUserUpdated: (user: CurrentUser) => void
   onLogout: () => void
   loggingOut: boolean
 }) {

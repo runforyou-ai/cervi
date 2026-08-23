@@ -11,7 +11,7 @@ import {
   SessionState,
   type Identity,
   type Organization,
-  type User,
+  type CurrentUser,
 } from "@/api"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import { ServerUnavailableState } from "@/features/session/server-unavailable-state"
@@ -75,7 +75,7 @@ export function WorkspaceLayout({
   }
 
   /** 把保存后的用户资料同步到工作台导航。 */
-  function updateUser(user: User) {
+  function updateUser(user: CurrentUser) {
     setIdentity((current) => (current ? { ...current, user } : current))
   }
 

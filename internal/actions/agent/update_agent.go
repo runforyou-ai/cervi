@@ -29,7 +29,7 @@ type UpdateAgentAction struct{ db *bun.DB }
 func NewUpdateAgentAction(db *bun.DB) *UpdateAgentAction { return &UpdateAgentAction{db: db} }
 
 // Execute 修改 AI 员工名称和所属团队。
-func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input UpdateInput) (*DirectoryAgent, error) {
+func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input UpdateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"displayName": ValidationDisplayNameRequired}}
@@ -37,7 +37,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}
-	var output *DirectoryAgent
+	var output *Agent
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
@@ -71,7 +71,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := replaceAgentTeams(ctx, tx, identity, storedAgent.IdentityID, teamIDs); err != nil {
 			return err
 		}
-		output, err = loadDirectoryAgent(ctx, tx, identity.Organization.ID, agentID)
+		output, err = loadAgent(ctx, tx, identity.Organization.ID, agentID)
 		return err
 	})
 	if err != nil {

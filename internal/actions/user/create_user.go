@@ -19,7 +19,7 @@ type CreateUserAction struct{ db *bun.DB }
 func NewCreateUserAction(db *bun.DB) *CreateUserAction { return &CreateUserAction{db: db} }
 
 // Execute 校验并创建企业成员及其团队关系。
-func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*DirectoryUser, error) {
+func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*User, error) {
 	input, fields := normalizeCreateInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
@@ -28,7 +28,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 	if err != nil {
 		return nil, fmt.Errorf("hash member password: %w", err)
 	}
-	var output *DirectoryUser
+	var output *User
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
@@ -68,7 +68,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := replaceUserTeams(ctx, tx, identity, user.IdentityID, input.TeamIDs); err != nil {
 			return err
 		}
-		output, err = loadDirectoryUser(ctx, tx, identity.Organization.ID, user.ID)
+		output, err = loadUser(ctx, tx, identity.Organization.ID, user.ID)
 		return err
 	})
 	if err != nil {

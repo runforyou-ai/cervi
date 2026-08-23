@@ -67,8 +67,8 @@ func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta)
 }
 
 // UpdateProfile 修改远程当前用户的头像、姓名和邮箱。
-func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.User, error) {
-	var output appservice.User
+func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.CurrentUser, error) {
+	var output appservice.CurrentUser
 	err := b.do(ctx, meta, http.MethodPatch, "/profile", nil, input, &output)
 	b.normalizeUser(&output)
 	return output, err
@@ -97,16 +97,16 @@ func (b *Backend) ChangePassword(ctx context.Context, meta appservice.RequestMet
 }
 
 // UpdateUserPreferences 保存远程当前用户的语言和时区设置。
-func (b *Backend) UpdateUserPreferences(ctx context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.User, error) {
-	var output appservice.User
+func (b *Backend) UpdateUserPreferences(ctx context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.CurrentUser, error) {
+	var output appservice.CurrentUser
 	err := b.do(ctx, meta, http.MethodPatch, "/preferences", nil, input, &output)
 	b.normalizeUser(&output)
 	return output, err
 }
 
 // UpdateUserWorkStatus 保存远程当前用户主动设置的工作状态。
-func (b *Backend) UpdateUserWorkStatus(ctx context.Context, meta appservice.RequestMeta, input appservice.UserWorkStatusInput) (appservice.User, error) {
-	var output appservice.User
+func (b *Backend) UpdateUserWorkStatus(ctx context.Context, meta appservice.RequestMeta, input appservice.UserWorkStatusInput) (appservice.CurrentUser, error) {
+	var output appservice.CurrentUser
 	err := b.do(ctx, meta, http.MethodPatch, "/work-status", nil, input, &output)
 	b.normalizeUser(&output)
 	return output, err
@@ -121,7 +121,7 @@ func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta) (a
 }
 
 // normalizeUser 将服务端相对头像地址转换为企业服务器绝对地址。
-func (b *Backend) normalizeUser(user *appservice.User) {
+func (b *Backend) normalizeUser(user *appservice.CurrentUser) {
 	user.AvatarURL = b.absoluteContentURL(user.AvatarURL)
 }
 
@@ -221,8 +221,8 @@ func (b *Backend) ListMemberOptions(ctx context.Context, meta appservice.Request
 }
 
 // CreateAgent 在远程企业服务器创建 AI 员工。
-func (b *Backend) CreateAgent(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateAgentInput) (appservice.DirectoryAgent, error) {
-	var output appservice.DirectoryAgent
+func (b *Backend) CreateAgent(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateAgentInput) (appservice.Agent, error) {
+	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPost, "/agents", nil, input, &output)
 	return output, err
 }
@@ -240,29 +240,29 @@ func (b *Backend) ListAgents(ctx context.Context, meta appservice.RequestMeta, i
 }
 
 // GetAgent 返回远程企业 AI 员工详情。
-func (b *Backend) GetAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.DirectoryAgent, error) {
-	var output appservice.DirectoryAgent
+func (b *Backend) GetAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
+	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodGet, "/agents/"+url.PathEscape(agentID), nil, nil, &output)
 	return output, err
 }
 
 // UpdateAgent 修改远程企业 AI 员工。
-func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.UpdateAgentInput) (appservice.DirectoryAgent, error) {
-	var output appservice.DirectoryAgent
+func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.UpdateAgentInput) (appservice.Agent, error) {
+	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID), nil, input, &output)
 	return output, err
 }
 
 // DeactivateAgent 停用远程企业 AI 员工。
-func (b *Backend) DeactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.DirectoryAgent, error) {
-	var output appservice.DirectoryAgent
+func (b *Backend) DeactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
+	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/deactivate", nil, nil, &output)
 	return output, err
 }
 
 // ReactivateAgent 恢复远程企业 AI 员工。
-func (b *Backend) ReactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.DirectoryAgent, error) {
-	var output appservice.DirectoryAgent
+func (b *Backend) ReactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
+	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/reactivate", nil, nil, &output)
 	return output, err
 }
@@ -282,22 +282,22 @@ func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, in
 }
 
 // GetUser 返回远程企业成员详情。
-func (b *Backend) GetUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.DirectoryUser, error) {
-	var output appservice.DirectoryUser
+func (b *Backend) GetUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.User, error) {
+	var output appservice.User
 	err := b.do(ctx, meta, http.MethodGet, "/users/"+url.PathEscape(userID), nil, nil, &output)
 	return output, err
 }
 
 // CreateUser 创建远程企业成员账号。
-func (b *Backend) CreateUser(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateUserInput) (appservice.DirectoryUser, error) {
-	var output appservice.DirectoryUser
+func (b *Backend) CreateUser(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateUserInput) (appservice.User, error) {
+	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPost, "/users", nil, input, &output)
 	return output, err
 }
 
 // UpdateUser 修改远程企业成员。
-func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateDirectoryUserInput) (appservice.DirectoryUser, error) {
-	var output appservice.DirectoryUser
+func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateUserInput) (appservice.User, error) {
+	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPatch, "/users/"+url.PathEscape(userID), nil, input, &output)
 	return output, err
 }
@@ -308,15 +308,15 @@ func (b *Backend) UpdateUserRoles(ctx context.Context, meta appservice.RequestMe
 }
 
 // DeactivateUser 停用远程企业成员账号。
-func (b *Backend) DeactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.DirectoryUser, error) {
-	var output appservice.DirectoryUser
+func (b *Backend) DeactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.User, error) {
+	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPost, "/users/"+url.PathEscape(userID)+"/deactivate", nil, nil, &output)
 	return output, err
 }
 
 // ReactivateUser 恢复远程企业成员账号。
-func (b *Backend) ReactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.DirectoryUser, error) {
-	var output appservice.DirectoryUser
+func (b *Backend) ReactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.User, error) {
+	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPost, "/users/"+url.PathEscape(userID)+"/reactivate", nil, nil, &output)
 	return output, err
 }

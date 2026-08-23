@@ -7,7 +7,7 @@ import { useNavigate } from "react-router"
 import {
   listUsers,
   RoleKind,
-  type DirectoryUserData,
+  type UserData,
   type RoleData,
 } from "@/api"
 import { Button } from "@/components/ui/button"
@@ -27,7 +27,7 @@ const memberPageSize = 100
 
 /** 描述待随角色表单保存的成员调整。 */
 export type RoleMemberChange = {
-  user: DirectoryUserData
+  user: UserData
   previousRoleID: string
   nextRoleID: string
 }
@@ -36,7 +36,7 @@ type RoleMemberOption = Pick<RoleData, "id" | "kind" | "name">
 
 /** 读取当前企业的全部成员。 */
 async function listAllMembers() {
-  const users: DirectoryUserData[] = []
+  const users: UserData[] = []
   let page = 1
   let pages = 1
   do {
@@ -49,7 +49,7 @@ async function listAllMembers() {
 }
 
 /** 判断成员姓名或邮箱是否包含搜索内容。 */
-function matchesMember(user: DirectoryUserData, query: string) {
+function matchesMember(user: UserData, query: string) {
   const keyword = query.trim().toLocaleLowerCase()
   if (!keyword) return true
   return `${user.displayName}\n${user.email}`
@@ -66,7 +66,7 @@ function MemberRow({
   disabled = false,
   actionDisabled = false,
 }: {
-  user: DirectoryUserData
+  user: UserData
   assignedRoleName?: string
   action: () => void
   actionLabel: string
@@ -120,7 +120,7 @@ export function RoleMemberDialog({
   const { t } = useTranslation("settings")
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
-  const [users, setUsers] = useState<DirectoryUserData[]>([])
+  const [users, setUsers] = useState<UserData[]>([])
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
@@ -190,7 +190,7 @@ export function RoleMemberDialog({
   )
 
   /** 暂存成员的目标角色。 */
-  function stageUserRole(user: DirectoryUserData, nextRole: RoleMemberOption) {
+  function stageUserRole(user: UserData, nextRole: RoleMemberOption) {
     setDraftRoleIDs((current) => ({ ...current, [user.id]: nextRole.id }))
   }
 

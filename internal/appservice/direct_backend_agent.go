@@ -14,20 +14,20 @@ import (
 )
 
 // CreateAgent 创建企业 AI 员工。
-func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input CreateAgentInput) (DirectoryAgent, error) {
+func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input CreateAgentInput) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return DirectoryAgent{}, err
+		return Agent{}, err
 	}
 	created, err := b.createAgent.Execute(ctx, identity, agentaction.CreateInput{DisplayName: input.DisplayName, TeamIDs: input.TeamIDs})
 	if err != nil {
-		return DirectoryAgent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
+		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired: cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationTeamInvalid:         cervii18n.FieldMemberTeamInvalid,
 		})
 	}
 	slog.Info("AI 员工创建成功", "organization_id", identity.Organization.ID, "identity_id", created.IdentityID, "agent_id", created.ID)
-	return directoryAgentFromAction(*created), nil
+	return agentFromAction(*created), nil
 }
 
 // ListAgents 返回企业 AI 员工目录。
@@ -45,76 +45,76 @@ func (b *DirectBackend) ListAgents(ctx context.Context, meta RequestMeta, input 
 	if err != nil {
 		return AgentList{}, b.agentError(ctx, meta, err, cervii18n.ErrorUserListFailed, identity.Organization.ID, "", nil)
 	}
-	agents := make([]DirectoryAgent, 0, len(output.Agents))
+	agents := make([]Agent, 0, len(output.Agents))
 	for _, agent := range output.Agents {
-		agents = append(agents, directoryAgentFromAction(agent))
+		agents = append(agents, agentFromAction(agent))
 	}
 	return AgentList{Agents: agents, Page: PageInfo{Number: output.Page, Size: output.Size, Total: output.Total}}, nil
 }
 
 // GetAgent 返回企业 AI 员工详情。
-func (b *DirectBackend) GetAgent(ctx context.Context, meta RequestMeta, agentID string) (DirectoryAgent, error) {
+func (b *DirectBackend) GetAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return DirectoryAgent{}, err
+		return Agent{}, err
 	}
 	agent, err := b.getAgent.Execute(ctx, identity, agentID)
 	if err != nil {
-		return DirectoryAgent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentReadFailed, identity.Organization.ID, agentID, nil)
+		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentReadFailed, identity.Organization.ID, agentID, nil)
 	}
-	return directoryAgentFromAction(*agent), nil
+	return agentFromAction(*agent), nil
 }
 
 // UpdateAgent 修改企业 AI 员工名称和所属团队。
-func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (DirectoryAgent, error) {
+func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return DirectoryAgent{}, err
+		return Agent{}, err
 	}
 	agent, err := b.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, TeamIDs: input.TeamIDs})
 	if err != nil {
-		return DirectoryAgent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired: cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationTeamInvalid:         cervii18n.FieldMemberTeamInvalid,
 		})
 	}
 	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID)
-	return directoryAgentFromAction(*agent), nil
+	return agentFromAction(*agent), nil
 }
 
 // DeactivateAgent 停用企业 AI 员工。
-func (b *DirectBackend) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (DirectoryAgent, error) {
-	return b.updateDirectoryAgentStatus(ctx, meta, agentID, domain.UserStatusInactive)
+func (b *DirectBackend) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
+	return b.changeAgentStatus(ctx, meta, agentID, domain.UserStatusInactive)
 }
 
 // ReactivateAgent 恢复企业 AI 员工。
-func (b *DirectBackend) ReactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (DirectoryAgent, error) {
-	return b.updateDirectoryAgentStatus(ctx, meta, agentID, domain.UserStatusActive)
+func (b *DirectBackend) ReactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
+	return b.changeAgentStatus(ctx, meta, agentID, domain.UserStatusActive)
 }
 
-// updateDirectoryAgentStatus 修改企业 AI 员工状态。
-func (b *DirectBackend) updateDirectoryAgentStatus(ctx context.Context, meta RequestMeta, agentID string, status domain.UserStatus) (DirectoryAgent, error) {
+// changeAgentStatus 修改企业 AI 员工状态。
+func (b *DirectBackend) changeAgentStatus(ctx context.Context, meta RequestMeta, agentID string, status domain.UserStatus) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return DirectoryAgent{}, err
+		return Agent{}, err
 	}
 	agent, err := b.updateAgentStatus.Execute(ctx, identity, agentID, status)
 	if err != nil {
-		return DirectoryAgent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationStatusInvalid: cervii18n.FieldUserStatusInvalid,
 		})
 	}
 	slog.Info("AI 员工状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
-	return directoryAgentFromAction(*agent), nil
+	return agentFromAction(*agent), nil
 }
 
-// directoryAgentFromAction 转换 AI 员工目录契约。
-func directoryAgentFromAction(agent agentaction.DirectoryAgent) DirectoryAgent {
+// agentFromAction 转换 AI 员工契约。
+func agentFromAction(agent agentaction.Agent) Agent {
 	teams := make([]TeamSummary, 0, len(agent.Teams))
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return DirectoryAgent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), Teams: teams, CreatedAt: agent.CreatedAt}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), Teams: teams, CreatedAt: agent.CreatedAt}
 }
 
 // agentError 转换 AI 员工领域错误并记录未处理故障。

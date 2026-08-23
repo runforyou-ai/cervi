@@ -59,7 +59,7 @@ export function CreateAIProvider(meta: $models.RequestMeta, input: $models.AIPro
 /**
  * CreateAgent 创建企业 AI 员工。
  */
-export function CreateAgent(meta: $models.RequestMeta, input: $models.CreateAgentInput): $CancellablePromise<$models.DirectoryAgent> {
+export function CreateAgent(meta: $models.RequestMeta, input: $models.CreateAgentInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(3052452131, meta, input);
 }
 
@@ -94,7 +94,7 @@ export function CreateTeam(meta: $models.RequestMeta, input: $models.TeamInput):
 /**
  * CreateUser 创建企业成员账号。
  */
-export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserInput): $CancellablePromise<$models.DirectoryUser> {
+export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserInput): $CancellablePromise<$models.User> {
     return $Call.ByID(2291845417, meta, input);
 }
 
@@ -108,14 +108,14 @@ export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.W
 /**
  * DeactivateAgent 停用企业 AI 员工。
  */
-export function DeactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.DirectoryAgent> {
+export function DeactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2542842753, meta, agentID);
 }
 
 /**
  * DeactivateUser 停用企业成员账号。
  */
-export function DeactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.DirectoryUser> {
+export function DeactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
     return $Call.ByID(3624391107, meta, userID);
 }
 
@@ -164,7 +164,7 @@ export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $C
 /**
  * GetAgent 返回企业 AI 员工详情。
  */
-export function GetAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.DirectoryAgent> {
+export function GetAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(1827547163, meta, agentID);
 }
 
@@ -192,7 +192,7 @@ export function GetS3Setting(meta: $models.RequestMeta): $CancellablePromise<$mo
 /**
  * GetUser 返回企业成员详情。
  */
-export function GetUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.DirectoryUser> {
+export function GetUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
     return $Call.ByID(1862601569, meta, userID);
 }
 
@@ -346,14 +346,14 @@ export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $Canc
 /**
  * ReactivateAgent 恢复企业 AI 员工。
  */
-export function ReactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.DirectoryAgent> {
+export function ReactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2138582847, meta, agentID);
 }
 
 /**
  * ReactivateUser 恢复企业成员账号。
  */
-export function ReactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.DirectoryUser> {
+export function ReactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
     return $Call.ByID(2986051725, meta, userID);
 }
 
@@ -409,7 +409,7 @@ export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, 
 /**
  * UpdateAgent 修改企业 AI 员工。
  */
-export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentInput): $CancellablePromise<$models.DirectoryAgent> {
+export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2196616072, meta, agentID, input);
 }
 
@@ -430,7 +430,7 @@ export function UpdateOrganization(meta: $models.RequestMeta, input: $models.Org
 /**
  * UpdateProfile 修改当前用户的头像、姓名和邮箱。
  */
-export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.User> {
+export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.CurrentUser> {
     return $Call.ByID(1804531972, meta, input);
 }
 
@@ -451,14 +451,14 @@ export function UpdateTeam(meta: $models.RequestMeta, teamID: string, input: $mo
 /**
  * UpdateUser 修改企业成员资料、角色和所属团队。
  */
-export function UpdateUser(meta: $models.RequestMeta, userID: string, input: $models.UpdateDirectoryUserInput): $CancellablePromise<$models.DirectoryUser> {
+export function UpdateUser(meta: $models.RequestMeta, userID: string, input: $models.UpdateUserInput): $CancellablePromise<$models.User> {
     return $Call.ByID(2151183832, meta, userID, input);
 }
 
 /**
  * UpdateUserPreferences 保存当前用户的语言和时区设置。
  */
-export function UpdateUserPreferences(meta: $models.RequestMeta, input: $models.UserPreferencesInput): $CancellablePromise<$models.User> {
+export function UpdateUserPreferences(meta: $models.RequestMeta, input: $models.UserPreferencesInput): $CancellablePromise<$models.CurrentUser> {
     return $Call.ByID(3982988274, meta, input);
 }
 
@@ -472,7 +472,7 @@ export function UpdateUserRoles(meta: $models.RequestMeta, input: $models.UserRo
 /**
  * UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
  */
-export function UpdateUserWorkStatus(meta: $models.RequestMeta, input: $models.UserWorkStatusInput): $CancellablePromise<$models.User> {
+export function UpdateUserWorkStatus(meta: $models.RequestMeta, input: $models.UserWorkStatusInput): $CancellablePromise<$models.CurrentUser> {
     return $Call.ByID(1131036783, meta, input);
 }
 

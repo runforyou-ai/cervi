@@ -23,14 +23,14 @@ type UpdateStatusAction struct{ db *bun.DB }
 func NewUpdateStatusAction(db *bun.DB) *UpdateStatusAction { return &UpdateStatusAction{db: db} }
 
 // Execute 停用或恢复 AI 员工，并在停用时清理渠道分配。
-func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, status domain.UserStatus) (*DirectoryAgent, error) {
+func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, status domain.UserStatus) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}
 	if status != domain.UserStatusActive && status != domain.UserStatusInactive {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"status": ValidationStatusInvalid}}
 	}
-	var output *DirectoryAgent
+	var output *Agent
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
@@ -54,7 +54,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 				return err
 			}
 		}
-		output, err = loadDirectoryAgent(ctx, tx, identity.Organization.ID, agentID)
+		output, err = loadAgent(ctx, tx, identity.Organization.ID, agentID)
 		return err
 	})
 	if err != nil {

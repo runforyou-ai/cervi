@@ -20,8 +20,8 @@ func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Id
 	return identityaction.Validate(ctx, db, identity)
 }
 
-// loadUser 读取用户账号及其企业身份字段。
-func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*servermodels.User, error) {
+// loadCurrentUser 读取当前用户账号及其企业身份字段。
+func loadCurrentUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*servermodels.User, error) {
 	user := &servermodels.User{}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.password_hash, u.role_id::text, u.status, u.locale, u.time_zone").
@@ -33,12 +33,12 @@ func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*
 	return user, err
 }
 
-// loadDirectoryUser 读取企业成员、角色和所属团队。
-func loadDirectoryUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*DirectoryUser, error) {
+// loadUser 读取企业成员、角色和所属团队。
+func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*User, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
 	}
-	user := &DirectoryUser{}
+	user := &User{}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text AS id, u.identity_id::text AS identity_id").
 		ColumnExpr("u.email, u.status, oi.display_name, oi.work_status, oi.created_at").

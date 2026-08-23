@@ -36,12 +36,12 @@ func NewCreateAgentAction(db *bun.DB) *CreateAgentAction {
 }
 
 // Execute 创建企业身份、AI 员工及其团队关系。
-func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*DirectoryAgent, error) {
+func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"displayName": ValidationDisplayNameRequired}}
 	}
-	var output *DirectoryAgent
+	var output *Agent
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
@@ -89,7 +89,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		output = &DirectoryAgent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, Status: domain.UserStatus(agent.Status), Teams: teams, CreatedAt: organizationIdentity.CreatedAt}
+		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, Status: domain.UserStatus(agent.Status), Teams: teams, CreatedAt: organizationIdentity.CreatedAt}
 		return nil
 	})
 	if err != nil {

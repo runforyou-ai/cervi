@@ -81,8 +81,8 @@ import {
   type Conversation as GeneratedConversation,
   type CreateAgentInput,
   type CreateUserInput,
-  type DirectoryUser,
-  type DirectoryAgent,
+  type User,
+  type Agent,
   type Inbox,
   type MemberOption,
   type MemberOptionList,
@@ -99,7 +99,7 @@ import {
   type TeamMemberCandidateInput,
   type TeamMemberCandidateList,
   type UpdateAgentInput,
-  type UpdateDirectoryUserInput,
+  type UpdateUserInput,
   type UserList,
   type UserListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -170,12 +170,12 @@ export type MemberOptionListData = Omit<MemberOptionList, "members"> & {
   members: MemberOption[]
 }
 
-export type DirectoryAgentData = Omit<DirectoryAgent, "teams"> & {
-  teams: NonNullable<DirectoryAgent["teams"]>
+export type AgentData = Omit<Agent, "teams"> & {
+  teams: NonNullable<Agent["teams"]>
 }
 
 export type AgentListData = Omit<AgentList, "agents"> & {
-  agents: DirectoryAgentData[]
+  agents: AgentData[]
 }
 
 export type TeamDirectoryMemberListData = Omit<
@@ -192,12 +192,12 @@ export type TeamMemberCandidateListData = Omit<
   members: TeamMemberCandidate[]
 }
 
-export type DirectoryUserData = Omit<DirectoryUser, "teams"> & {
-  teams: NonNullable<DirectoryUser["teams"]>
+export type UserData = Omit<User, "teams"> & {
+  teams: NonNullable<User["teams"]>
 }
 
 export type UserListResponse = Omit<UserList, "users"> & {
-  users: DirectoryUserData[]
+  users: UserData[]
 }
 
 export type ConversationData = Omit<GeneratedConversation, "messages"> & {
@@ -399,63 +399,63 @@ export function listTeamMemberCandidates(
 }
 
 /** 归一化企业成员所属团队。 */
-function normalizeDirectoryUser(user: DirectoryUser): DirectoryUserData {
+function normalizeUser(user: User): UserData {
   return { ...user, teams: asList(user.teams) }
 }
 
 /** 归一化 AI 员工所属团队。 */
-function normalizeDirectoryAgent(agent: DirectoryAgent): DirectoryAgentData {
+function normalizeAgent(agent: Agent): AgentData {
   return { ...agent, teams: asList(agent.teams) }
 }
 
 /** 读取企业成员详情。 */
 export function getUser(userId: string, signal?: AbortSignal) {
-  return getUserBound(userId, signal).then(normalizeDirectoryUser)
+  return getUserBound(userId, signal).then(normalizeUser)
 }
 
 /** 创建企业成员账号。 */
 export function createUser(input: CreateUserInput) {
-  return createUserBound(input).then(normalizeDirectoryUser)
+  return createUserBound(input).then(normalizeUser)
 }
 
 /** 创建企业 AI 员工。 */
 export function createAgent(input: CreateAgentInput) {
-  return createAgentBound(input).then(normalizeDirectoryAgent)
+  return createAgentBound(input).then(normalizeAgent)
 }
 
 /** 读取企业 AI 员工详情。 */
 export function getAgent(agentId: string, signal?: AbortSignal) {
-  return getAgentBound(agentId, signal).then(normalizeDirectoryAgent)
+  return getAgentBound(agentId, signal).then(normalizeAgent)
 }
 
 /** 修改企业 AI 员工。 */
 export function updateAgent(agentId: string, input: UpdateAgentInput) {
-  return updateAgentBound(agentId, input).then(normalizeDirectoryAgent)
+  return updateAgentBound(agentId, input).then(normalizeAgent)
 }
 
 /** 停用企业 AI 员工。 */
 export function deactivateAgent(agentId: string) {
-  return deactivateAgentBound(agentId).then(normalizeDirectoryAgent)
+  return deactivateAgentBound(agentId).then(normalizeAgent)
 }
 
 /** 恢复企业 AI 员工。 */
 export function reactivateAgent(agentId: string) {
-  return reactivateAgentBound(agentId).then(normalizeDirectoryAgent)
+  return reactivateAgentBound(agentId).then(normalizeAgent)
 }
 
 /** 修改企业成员资料、角色和所属团队。 */
-export function updateUser(userId: string, input: UpdateDirectoryUserInput) {
-  return updateUserBound(userId, input).then(normalizeDirectoryUser)
+export function updateUser(userId: string, input: UpdateUserInput) {
+  return updateUserBound(userId, input).then(normalizeUser)
 }
 
 /** 停用企业成员账号。 */
 export function deactivateUser(userId: string) {
-  return deactivateUserBound(userId).then(normalizeDirectoryUser)
+  return deactivateUserBound(userId).then(normalizeUser)
 }
 
 /** 恢复企业成员账号。 */
 export function reactivateUser(userId: string) {
-  return reactivateUserBound(userId).then(normalizeDirectoryUser)
+  return reactivateUserBound(userId).then(normalizeUser)
 }
 
 /** 读取当前企业的渠道选择项。 */
@@ -515,7 +515,7 @@ export function listUsers(query: UserListQuery, signal?: AbortSignal) {
     signal,
   ).then((output) => ({
     ...output,
-    users: asList(output.users).map(normalizeDirectoryUser),
+    users: asList(output.users).map(normalizeUser),
   }))
 }
 
@@ -531,7 +531,7 @@ export function listAgents(query: AgentListQuery, signal?: AbortSignal) {
     signal,
   ).then((output) => ({
     ...output,
-    agents: asList(output.agents).map(normalizeDirectoryAgent),
+    agents: asList(output.agents).map(normalizeAgent),
   }))
 }
 

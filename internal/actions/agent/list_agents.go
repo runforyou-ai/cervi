@@ -22,8 +22,8 @@ type ListInput struct {
 	PageSize int
 }
 
-// DirectoryAgent 定义 AI 员工目录字段。
-type DirectoryAgent struct {
+// Agent 定义 AI 员工信息。
+type Agent struct {
 	ID          string            `bun:"id"`
 	IdentityID  string            `bun:"identity_id"`
 	DisplayName string            `bun:"display_name"`
@@ -34,7 +34,7 @@ type DirectoryAgent struct {
 
 // ListOutput 定义 AI 员工分页结果。
 type ListOutput struct {
-	Agents []DirectoryAgent
+	Agents []Agent
 	Page   int
 	Size   int
 	Total  int
@@ -84,7 +84,7 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 	if err != nil {
 		return ListOutput{}, fmt.Errorf("count agents: %w", err)
 	}
-	agents := make([]DirectoryAgent, 0)
+	agents := make([]Agent, 0)
 	if err := applyFilters(base()).
 		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, a.status, oi.created_at").
 		OrderExpr("lower(oi.display_name) ASC, a.id ASC").

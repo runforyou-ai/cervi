@@ -52,7 +52,7 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 	if rows == 0 {
 		return nil, common.ErrIdentityInvalid
 	}
-	user, err := loadUser(ctx, a.db, identity.Organization.ID, identity.User.ID)
+	user, err := loadCurrentUser(ctx, a.db, identity.Organization.ID, identity.User.ID)
 	if err != nil {
 		return nil, fmt.Errorf("reload user preferences: %w", err)
 	}

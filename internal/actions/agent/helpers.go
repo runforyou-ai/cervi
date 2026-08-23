@@ -12,12 +12,12 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// loadDirectoryAgent 读取当前企业中的 AI 员工及所属团队。
-func loadDirectoryAgent(ctx context.Context, db bun.IDB, organizationID, agentID string) (*DirectoryAgent, error) {
+// loadAgent 读取当前企业中的 AI 员工及所属团队。
+func loadAgent(ctx context.Context, db bun.IDB, organizationID, agentID string) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}
-	agent := &DirectoryAgent{}
+	agent := &Agent{}
 	err := db.NewSelect().TableExpr("agents AS a").
 		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, a.status, oi.created_at").
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeAgent).
