@@ -3,6 +3,7 @@ name: cervi
 services:
   # 本地开发使用的 PostgreSQL。
   postgres:
+    container_name: cervi-postgres
     image: postgres:18-alpine
     environment:
       POSTGRES_DB: cervi
@@ -20,6 +21,7 @@ services:
 
   # 本地开发共享的 NATS JetStream。
   nats:
+    container_name: cervi-nats
     image: nats:2.14.5-alpine
     command:
       - --name=cervi-local
