@@ -48,6 +48,7 @@ func (b *DirectBackend) GetWebsiteChannel(ctx context.Context, meta RequestMeta,
 	return WebsiteChannel{
 		WebsiteChannelSummary: websiteChannelFromModel(detail.Channel),
 		ChatInterface:         websiteChannelSettingFromModel(&detail.ChatInterface),
+		Access:                websiteChannelAccessFromModel(&detail.ChatInterface),
 	}, nil
 }
 
@@ -93,6 +94,22 @@ func (b *DirectBackend) UpdateWebsiteChannelChatInterface(ctx context.Context, m
 	}
 	slog.Info("网站渠道聊天界面更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
 	return websiteChannelSettingFromModel(setting), nil
+}
+
+// UpdateWebsiteChannelAccess 修改网站渠道接入方式。
+func (b *DirectBackend) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelAccessInput) (WebsiteChannelAccess, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return WebsiteChannelAccess{}, err
+	}
+	setting, err := b.updateWebsiteChannelAccess.Execute(ctx, identity, channelID, channelaction.WebsiteChannelAccessInput{
+		AllowedHosts: input.AllowedHosts,
+	})
+	if err != nil {
+		return WebsiteChannelAccess{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelAccessUpdateFailed)
+	}
+	slog.Info("网站渠道接入方式更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
+	return websiteChannelAccessFromModel(setting), nil
 }
 
 // DeactivateWebsiteChannel 停用网站渠道。
@@ -183,6 +200,15 @@ func websiteChannelSettingFromModel(setting *servermodels.WebsiteChannelSetting)
 	return WebsiteChannelChatInterface{Title: setting.ChatTitle, Subtitle: setting.ChatSubtitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor}
 }
 
+// websiteChannelAccessFromModel 把存储设置转换为接入方式契约。
+func websiteChannelAccessFromModel(setting *servermodels.WebsiteChannelSetting) WebsiteChannelAccess {
+	allowedHosts := setting.AllowedEmbedHosts
+	if allowedHosts == nil {
+		allowedHosts = []string{}
+	}
+	return WebsiteChannelAccess{AllowedHosts: allowedHosts}
+}
+
 func channelInput(input WebsiteChannelInput) channelaction.WebsiteChannelInput {
 	return channelaction.WebsiteChannelInput{Type: domain.ChannelType(input.Type), Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale)}
 }
@@ -199,6 +225,8 @@ func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 		channelaction.ValidationChatSubtitleTooLong:  cervii18n.FieldChannelChatSubtitleTooLong,
 		channelaction.ValidationGreetingTooLong:      cervii18n.FieldChannelGreetingTooLong,
 		channelaction.ValidationThemeColorInvalid:    cervii18n.FieldChannelThemeColorInvalid,
+		channelaction.ValidationAllowedHostsTooMany:  cervii18n.FieldChannelAllowedHostsTooMany,
+		channelaction.ValidationAllowedHostInvalid:   cervii18n.FieldChannelAllowedHostInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

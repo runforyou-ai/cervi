@@ -10,9 +10,11 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/common/embedhost"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -41,6 +43,7 @@ type pageView struct {
 	ThemeCSS       template.CSS
 	ChromeCSS      template.CSS
 	ChatJS         template.JS
+	FrameAncestors string
 }
 
 var pageTemplate = template.Must(template.New("chat").Parse(pageHTML))
@@ -103,28 +106,36 @@ func (s *EmbedService) writeWidgetScript(writer http.ResponseWriter, request *ht
 	theme := defaultTheme()
 	channelID := strings.TrimSpace(request.URL.Query().Get("id"))
 	if channelID != "" {
-		theme = s.lookupWidgetTheme(request.Context(), channelID)
+		channel := s.lookupWidgetChannel(request.Context(), channelID)
+		if channel != nil {
+			if !embedhost.Allows(channel.AllowedEmbedHosts, embedRequestHost(request)) {
+				writeEmbedForbidden(writer)
+				return
+			}
+			theme = parseTheme(channel.ThemeColor)
+		}
 	}
 	writer.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	writer.Header().Set("Cache-Control", "public, max-age=300")
+	writer.Header().Set("Vary", "Origin, Referer")
 	writer.Header().Set("X-Content-Type-Options", "nosniff")
 	if _, err := writer.Write(scriptWithTheme(theme)); err != nil {
 		slog.Warn("写入网站嵌入脚本失败", "channel_id", channelID, "error", err)
 	}
 }
 
-// lookupWidgetTheme 读取挂件主题。
-func (s *EmbedService) lookupWidgetTheme(ctx context.Context, channelID string) theme {
+// lookupWidgetChannel 读取挂件公开设置，失败时返回空值并使用默认脚本。
+func (s *EmbedService) lookupWidgetChannel(ctx context.Context, channelID string) *channelaction.PublicWebsiteChannel {
 	channel, err := s.lookup(ctx, channelID)
 	if errors.Is(err, channelaction.ErrNotFound) {
 		slog.Info("网站嵌入脚本渠道不存在", "channel_id", channelID)
-		return defaultTheme()
+		return nil
 	}
 	if err != nil {
 		slog.Warn("读取网站嵌入脚本渠道失败", "channel_id", channelID, "error", err)
-		return defaultTheme()
+		return nil
 	}
-	return parseTheme(channel.ThemeColor)
+	return channel
 }
 
 // scriptWithTheme 写入挂件主题变量。
@@ -148,6 +159,11 @@ func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Loo
 		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	if entry == "embed" && !embedhost.Allows(channel.AllowedEmbedHosts, embedRequestHost(request)) {
+		writeEmbedFrameForbidden(writer)
+		slog.Info("网站渠道拒绝未允许的嵌入来源", "channel_id", channel.ID, "host", embedRequestHost(request))
+		return
+	}
 	if err := writePage(writer, chatView(channel, entry), http.StatusOK); err != nil {
 		slog.Warn("写入网站渠道聊天页失败", "channel_id", channel.ID, "entry", entry, "error", err)
 		return
@@ -160,7 +176,7 @@ func writePage(writer http.ResponseWriter, page pageView, status int) error {
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("X-Content-Type-Options", "nosniff")
-	writer.Header().Set("Content-Security-Policy", "frame-ancestors *")
+	writer.Header().Set("Content-Security-Policy", "frame-ancestors "+page.FrameAncestors)
 	writer.WriteHeader(status)
 	return pageTemplate.Execute(writer, page)
 }
@@ -174,6 +190,9 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string) pageVie
 	page.Monogram = firstRunes(channel.Title, 1)
 	page.AvatarInitials = firstRunes(channel.Title, 2)
 	page.Greeting = channel.Greeting
+	if entry == "embed" {
+		page.FrameAncestors = embedhost.FrameAncestors(channel.AllowedEmbedHosts)
+	}
 	if english {
 		page.DemoReply = "This is a sample reply."
 	} else {
@@ -202,11 +221,12 @@ func notFoundView(request *http.Request, entry string) pageView {
 // baseView 填充聊天页共用内容。
 func baseView(entry string, theme theme, english bool) pageView {
 	page := pageView{
-		Shell:     entry,
-		ShowClose: entry == "embed",
-		ThemeCSS:  template.CSS(theme.rootCSS()),
-		ChromeCSS: template.CSS(chromeCSS),
-		ChatJS:    template.JS(chatJS),
+		Shell:          entry,
+		ShowClose:      entry == "embed",
+		ThemeCSS:       template.CSS(theme.rootCSS()),
+		ChromeCSS:      template.CSS(chromeCSS),
+		ChatJS:         template.JS(chatJS),
+		FrameAncestors: "*",
 	}
 	if english {
 		page.Lang = "en-US"
@@ -224,6 +244,37 @@ func baseView(entry string, theme theme, english bool) pageView {
 		page.EmojiLabel = "选择表情"
 	}
 	return page
+}
+
+// embedRequestHost 从公开嵌入请求中读取宿主网站主机。
+func embedRequestHost(request *http.Request) string {
+	for _, value := range []string{request.Header.Get("Origin"), request.Referer()} {
+		parsed, err := url.Parse(strings.TrimSpace(value))
+		if err == nil && parsed.Host != "" {
+			return parsed.Host
+		}
+	}
+	return ""
+}
+
+// writeEmbedForbidden 返回不会在宿主页执行出错的拒绝响应。
+func writeEmbedForbidden(writer http.ResponseWriter) {
+	writer.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Vary", "Origin, Referer")
+	writer.Header().Set("X-Content-Type-Options", "nosniff")
+	writer.WriteHeader(http.StatusForbidden)
+	_, _ = writer.Write([]byte("/* Cervi: this website is not allowed to use the channel. */"))
+}
+
+// writeEmbedFrameForbidden 拒绝未允许的网站加载聊天框。
+func writeEmbedFrameForbidden(writer http.ResponseWriter) {
+	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+	writer.Header().Set("Vary", "Origin, Referer")
+	writer.Header().Set("X-Content-Type-Options", "nosniff")
+	writer.WriteHeader(http.StatusForbidden)
 }
 
 // firstRunes 返回标题开头的字标。

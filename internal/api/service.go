@@ -56,6 +56,7 @@ func NewService(application *appservice.Service) *Service {
 	router.GET("/channels/website/:channelID", service.getWebsiteChannel)
 	router.PATCH("/channels/website/:channelID", service.updateWebsiteChannel)
 	router.PATCH("/channels/website/:channelID/chat-interface", service.updateWebsiteChannelChatInterface)
+	router.PATCH("/channels/website/:channelID/access", service.updateWebsiteChannelAccess)
 	router.POST("/channels/website/:channelID/deactivate", service.deactivateWebsiteChannel)
 	router.POST("/channels/website/:channelID/activate", service.activateWebsiteChannel)
 	router.GET("/channels", service.listChannels)
@@ -247,6 +248,16 @@ func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
 	}
 	setting, err := s.application.UpdateWebsiteChannelChatInterface(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
 	writeResult(c, http.StatusOK, setting, err)
+}
+
+// updateWebsiteChannelAccess 修改网站渠道接入方式。
+func (s *Service) updateWebsiteChannelAccess(c *gin.Context) {
+	var input appservice.WebsiteChannelAccessInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	access, err := s.application.UpdateWebsiteChannelAccess(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	writeResult(c, http.StatusOK, access, err)
 }
 
 // deactivateWebsiteChannel 停用网站渠道。

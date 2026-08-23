@@ -50,6 +50,7 @@ import {
   UpdateUserPreferences,
   UpdateUserWorkStatus,
   UpdateWebsiteChannel,
+  UpdateWebsiteChannelAccess,
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
@@ -83,6 +84,8 @@ import {
   type UpdateDirectoryUserInput,
   type UserList,
   type UserListInput,
+  type WebsiteChannel as GeneratedWebsiteChannel,
+  type WebsiteChannelAccess as GeneratedWebsiteChannelAccess,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 
@@ -175,8 +178,22 @@ export type RoleListData = Omit<RoleList, "roles" | "permissions"> & {
   permissions: PermissionDefinition[]
 }
 
+export type WebsiteChannelAccessData = Omit<
+  GeneratedWebsiteChannelAccess,
+  "allowedHosts"
+> & {
+  allowedHosts: string[]
+}
+
+export type WebsiteChannelData = Omit<GeneratedWebsiteChannel, "access"> & {
+  access: WebsiteChannelAccessData
+}
+
+const getWebsiteChannelBound = bind(GetWebsiteChannel)
 /** 读取网站渠道详情。 */
-export const getWebsiteChannel = bind(GetWebsiteChannel)
+export function getWebsiteChannel(channelId: string) {
+  return getWebsiteChannelBound(channelId).then(normalizeWebsiteChannel)
+}
 /** 创建网站渠道。 */
 export const createWebsiteChannel = bind(CreateWebsiteChannel)
 /** 修改网站渠道基础信息。 */
@@ -185,6 +202,16 @@ export const updateWebsiteChannel = bind(UpdateWebsiteChannel)
 export const updateWebsiteChannelChatInterface = bind(
   UpdateWebsiteChannelChatInterface,
 )
+const updateWebsiteChannelAccessBound = bind(UpdateWebsiteChannelAccess)
+/** 修改网站渠道接入方式。 */
+export function updateWebsiteChannelAccess(
+  channelId: string,
+  input: Parameters<typeof updateWebsiteChannelAccessBound>[1],
+) {
+  return updateWebsiteChannelAccessBound(channelId, input).then(
+    normalizeWebsiteChannelAccess,
+  )
+}
 /** 停用网站渠道。 */
 export const deactivateWebsiteChannel = bind(DeactivateWebsiteChannel)
 /** 启用网站渠道。 */
@@ -293,6 +320,20 @@ const updateRoleBound = bind(UpdateRole)
 /** 把可空切片转换为空数组。 */
 function asList<T>(value: T[] | null | undefined): T[] {
   return value ?? []
+}
+
+/** 归一化网站渠道接入方式。 */
+function normalizeWebsiteChannelAccess(
+  access: GeneratedWebsiteChannelAccess,
+): WebsiteChannelAccessData {
+  return { ...access, allowedHosts: asList(access.allowedHosts) }
+}
+
+/** 归一化网站渠道详情。 */
+function normalizeWebsiteChannel(
+  channel: GeneratedWebsiteChannel,
+): WebsiteChannelData {
+  return { ...channel, access: normalizeWebsiteChannelAccess(channel.access) }
 }
 
 /** 归一化模型服务供应商详情。 */

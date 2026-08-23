@@ -903,6 +903,21 @@ export interface WebsiteChannel {
     "createdAt": string;
     "updatedAt": string;
     "chatInterface": WebsiteChannelChatInterface;
+    "access": WebsiteChannelAccess;
+}
+
+/**
+ * WebsiteChannelAccess 定义网站渠道接入方式设置。
+ */
+export interface WebsiteChannelAccess {
+    "allowedHosts": string[] | null;
+}
+
+/**
+ * WebsiteChannelAccessInput 定义网站渠道接入方式输入。
+ */
+export interface WebsiteChannelAccessInput {
+    "allowedHosts": string[] | null;
 }
 
 /**
