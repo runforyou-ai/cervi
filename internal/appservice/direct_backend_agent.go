@@ -26,7 +26,7 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 			agentaction.ValidationTeamInvalid:         cervii18n.FieldMemberTeamInvalid,
 		})
 	}
-	slog.Info("AI 员工创建成功", "organization_id", identity.Organization.ID, "agent_id", created.ID)
+	slog.Info("AI 员工创建成功", "organization_id", identity.Organization.ID, "identity_id", created.IdentityID, "agent_id", created.ID)
 	return directoryAgentFromAction(*created), nil
 }
 
@@ -78,7 +78,7 @@ func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agent
 			agentaction.ValidationTeamInvalid:         cervii18n.FieldMemberTeamInvalid,
 		})
 	}
-	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "agent_id", agentID)
+	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID)
 	return directoryAgentFromAction(*agent), nil
 }
 
@@ -104,7 +104,7 @@ func (b *DirectBackend) updateDirectoryAgentStatus(ctx context.Context, meta Req
 			agentaction.ValidationStatusInvalid: cervii18n.FieldUserStatusInvalid,
 		})
 	}
-	slog.Info("AI 员工状态已修改", "organization_id", identity.Organization.ID, "agent_id", agentID, "status", status)
+	slog.Info("AI 员工状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
 	return directoryAgentFromAction(*agent), nil
 }
 

@@ -509,7 +509,7 @@ export interface LoginInput {
 }
 
 /**
- * MemberOption 定义企业成员或 AI 员工选择项。
+ * MemberOption 定义可分配的企业身份选择项。
  */
 export interface MemberOption {
     "id": string;
@@ -519,7 +519,7 @@ export interface MemberOption {
 }
 
 /**
- * MemberOptionList 定义成员选择项分页结果。
+ * MemberOptionList 定义企业身份选择项分页结果。
  */
 export interface MemberOptionList {
     "members": MemberOption[] | null;
@@ -527,7 +527,7 @@ export interface MemberOptionList {
 }
 
 /**
- * MemberOptionListInput 定义成员选择项查询条件。
+ * MemberOptionListInput 定义企业身份选择项查询条件。
  */
 export interface MemberOptionListInput {
     "query": string;

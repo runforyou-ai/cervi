@@ -48,10 +48,9 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		}
 		storedAgent := &servermodels.Agent{}
 		err = tx.NewSelect().Model(storedAgent).
-			Column("id", "identity_id").
+			Column("identity_id").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", agentID).
-			For("UPDATE").
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
@@ -59,7 +58,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err != nil {
 			return err
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		_, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
@@ -68,13 +67,6 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			Exec(ctx)
 		if err != nil {
 			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return ErrNotFound
 		}
 		if err := replaceAgentTeams(ctx, tx, identity, storedAgent.IdentityID, teamIDs); err != nil {
 			return err

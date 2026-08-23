@@ -15,13 +15,13 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdateStatusAction 修改企业成员账号状态。
+// UpdateStatusAction 修改用户账号状态。
 type UpdateStatusAction struct{ db *bun.DB }
 
-// NewUpdateStatusAction 创建企业成员状态修改操作。
+// NewUpdateStatusAction 创建用户账号状态修改操作。
 func NewUpdateStatusAction(db *bun.DB) *UpdateStatusAction { return &UpdateStatusAction{db: db} }
 
-// Execute 停用或恢复人员账号，并在停用时清理渠道分配。
+// Execute 停用或恢复用户账号，并在停用时清理渠道分配。
 func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.UserStatus) (*DirectoryUser, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
@@ -41,12 +41,13 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if status == domain.UserStatusInactive && userID == identity.User.ID {
 			return ErrSelfDeactivate
 		}
-		storedUser := &servermodels.User{}
-		err = tx.NewSelect().Model(storedUser).
-			Column("id", "identity_id").
+		updatedUser := &servermodels.User{}
+		err = tx.NewUpdate().Model(updatedUser).
+			Set("status = ?", status).
+			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", userID).
-			For("UPDATE").
+			Returning("identity_id").
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
@@ -54,24 +55,8 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err != nil {
 			return err
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
-			Set("status = ?", status).
-			Set("updated_at = now()").
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", userID).
-			Exec(ctx)
-		if err != nil {
-			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return ErrNotFound
-		}
 		if status == domain.UserStatusInactive {
-			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, storedUser.IdentityID); err != nil {
+			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedUser.IdentityID); err != nil {
 				return err
 			}
 		}

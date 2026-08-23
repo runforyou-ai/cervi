@@ -13,7 +13,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// validateIdentity 校验当前用户仍是企业的有效成员。
+// validateIdentity 校验当前企业用户账号仍可用。
 func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
 	return identityaction.Validate(ctx, db, identity)
 }

@@ -7,11 +7,12 @@ import (
 	"context"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// Validate 校验当前用户仍是当前企业的有效成员。
+// Validate 校验当前企业用户账号仍可用。
 func Validate(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
 	if identity == nil ||
 		!common.ValidUUID(identity.Organization.ID) ||
@@ -25,7 +26,7 @@ func Validate(ctx context.Context, db bun.IDB, identity *servermodels.Identity) 
 		Where("id = ?", identity.User.ID).
 		Where("identity_id = ?", identity.User.IdentityID).
 		Where("organization_id = ?", identity.Organization.ID).
-		Where("status = ?", "active").
+		Where("status = ?", domain.UserStatusActive).
 		Exists(ctx)
 	if err != nil {
 		return err

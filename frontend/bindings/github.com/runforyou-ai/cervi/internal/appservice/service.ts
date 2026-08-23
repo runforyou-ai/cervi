@@ -267,7 +267,7 @@ export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
- * ListTeamMemberCandidates 返回尚未加入团队的企业成员。
+ * ListTeamMemberCandidates 返回尚未加入团队的企业身份。
  */
 export function ListTeamMemberCandidates(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberCandidateInput): $CancellablePromise<$models.TeamMemberCandidateList> {
     return $Call.ByID(1106825595, meta, teamID, input);

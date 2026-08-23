@@ -92,7 +92,7 @@ func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, t
 	return TeamDirectoryMemberList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
 
-// ListTeamMemberCandidates 返回尚未加入团队的企业成员。
+// ListTeamMemberCandidates 返回尚未加入团队的企业身份。
 func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

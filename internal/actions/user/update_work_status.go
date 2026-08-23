@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -32,7 +31,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 		return nil, err
 	}
 
-	result, err := a.db.NewUpdate().
+	_, err := a.db.NewUpdate().
 		Model((*servermodels.OrganizationIdentity)(nil)).
 		Set("work_status = ?", input.WorkStatus).
 		Set("work_status_updated_at = now()").
@@ -43,13 +42,6 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 		Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("update user work status: %w", err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("read updated user work status count: %w", err)
-	}
-	if rows == 0 {
-		return nil, common.ErrIdentityInvalid
 	}
 	user, err := loadUser(ctx, a.db, identity.Organization.ID, identity.User.ID)
 	if err != nil {

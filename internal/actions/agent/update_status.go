@@ -35,12 +35,13 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
-		storedAgent := &servermodels.Agent{}
-		err := tx.NewSelect().Model(storedAgent).
-			Column("id", "identity_id").
+		updatedAgent := &servermodels.Agent{}
+		err := tx.NewUpdate().Model(updatedAgent).
+			Set("status = ?", status).
+			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", agentID).
-			For("UPDATE").
+			Returning("identity_id").
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
@@ -48,24 +49,8 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err != nil {
 			return err
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
-			Set("status = ?", status).
-			Set("updated_at = now()").
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", agentID).
-			Exec(ctx)
-		if err != nil {
-			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return ErrNotFound
-		}
 		if status == domain.UserStatusInactive {
-			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, storedAgent.IdentityID); err != nil {
+			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedAgent.IdentityID); err != nil {
 				return err
 			}
 		}

@@ -1,6 +1,6 @@
 //go:build server
 
-// Package member 实现企业成员公共查询。
+// Package member 实现可分配企业身份查询。
 package member
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// Option 定义可选择的企业成员。
+// Option 定义可分配的企业身份。
 type Option struct {
 	ID           string                          `bun:"id"`
 	Type         domain.OrganizationIdentityType `bun:"type"`
@@ -37,13 +37,13 @@ type ListOptionsOutput struct {
 	Total   int
 }
 
-// ListOptionsQuery 读取可被分配的企业成员。
+// ListOptionsQuery 读取可分配的企业身份。
 type ListOptionsQuery struct{ db *bun.DB }
 
-// NewListOptionsQuery 创建企业成员选择项查询。
+// NewListOptionsQuery 创建企业身份选择项查询。
 func NewListOptionsQuery(db *bun.DB) *ListOptionsQuery { return &ListOptionsQuery{db: db} }
 
-// Execute 返回当前企业中可分配的企业成员和 AI 员工。
+// Execute 返回当前企业中可分配的用户和 AI 员工身份。
 func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListOptionsInput) (ListOptionsOutput, error) {
 	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return ListOptionsOutput{}, err

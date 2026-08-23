@@ -480,7 +480,7 @@ type ChannelList struct {
 	Channels []ChannelSummary `json:"channels"`
 }
 
-// MemberOption 定义企业成员或 AI 员工选择项。
+// MemberOption 定义可分配的企业身份选择项。
 type MemberOption struct {
 	ID          string                   `json:"id"`
 	Type        OrganizationIdentityType `json:"type"`
@@ -488,14 +488,14 @@ type MemberOption struct {
 	AvatarURL   string                   `json:"avatarUrl"`
 }
 
-// MemberOptionListInput 定义成员选择项查询条件。
+// MemberOptionListInput 定义企业身份选择项查询条件。
 type MemberOptionListInput struct {
 	Query    string `json:"query"`
 	Page     int    `json:"page"`
 	PageSize int    `json:"pageSize"`
 }
 
-// MemberOptionList 定义成员选择项分页结果。
+// MemberOptionList 定义企业身份选择项分页结果。
 type MemberOptionList struct {
 	Members []MemberOption `json:"members"`
 	Page    PageInfo       `json:"page"`

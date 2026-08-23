@@ -41,60 +41,38 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {
 			return err
 		}
-		storedUser := &servermodels.User{}
-		err = tx.NewSelect().Model(storedUser).
-			Column("id", "identity_id").
+		updatedUser := &servermodels.User{}
+		err = tx.NewUpdate().Model(updatedUser).
+			Set("email = ?", input.Email).
+			Set("role_id = ?", input.RoleID).
+			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", userID).
-			For("UPDATE").
+			Returning("identity_id").
 			Scan(ctx)
+		if isUniqueViolation(err) {
+			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
 		if err != nil {
 			return err
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
-			Set("email = ?", input.Email).
-			Set("role_id = ?", input.RoleID).
-			Set("updated_at = now()").
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", userID).
-			Exec(ctx)
-		if isUniqueViolation(err) {
-			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
-		}
-		if err != nil {
-			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return ErrNotFound
-		}
-		result, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		_, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", storedUser.IdentityID).
+			Where("id = ?", updatedUser.IdentityID).
 			Where("type = ?", domain.OrganizationIdentityTypeUser).
 			Exec(ctx)
 		if err != nil {
 			return err
 		}
-		rows, err = result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return ErrNotFound
-		}
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err
 		}
-		if err := replaceUserTeams(ctx, tx, identity, storedUser.IdentityID, input.TeamIDs); err != nil {
+		if err := replaceUserTeams(ctx, tx, identity, updatedUser.IdentityID, input.TeamIDs); err != nil {
 			return err
 		}
 		output, err = loadDirectoryUser(ctx, tx, identity.Organization.ID, userID)

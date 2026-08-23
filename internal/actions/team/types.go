@@ -65,7 +65,7 @@ type MemberCandidateOutput struct {
 	Page    PageInfo
 }
 
-// MemberIdentity 定义要加入团队的身份。
+// MemberIdentity 定义团队成员身份引用。
 type MemberIdentity struct {
 	Type domain.OrganizationIdentityType
 	ID   string

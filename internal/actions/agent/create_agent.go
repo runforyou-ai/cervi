@@ -35,7 +35,7 @@ func NewCreateAgentAction(db *bun.DB) *CreateAgentAction {
 	return &CreateAgentAction{db: db}
 }
 
-// Execute 创建企业成员、AI 员工及其团队关系。
+// Execute 创建企业身份、AI 员工及其团队关系。
 func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*DirectoryAgent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
@@ -62,7 +62,11 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			Exec(ctx); err != nil {
 			return err
 		}
-		agent := &servermodels.Agent{IdentityID: organizationIdentity.ID, OrganizationID: identity.Organization.ID, Status: string(domain.UserStatusActive)}
+		agent := &servermodels.Agent{
+			IdentityID:     organizationIdentity.ID,
+			OrganizationID: identity.Organization.ID,
+			Status:         string(domain.UserStatusActive),
+		}
 		if _, err := tx.NewInsert().Model(agent).
 			Column("identity_id", "organization_id", "status").
 			Returning("id").

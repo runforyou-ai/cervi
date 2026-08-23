@@ -15,12 +15,12 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// validateIdentity 校验当前用户仍是企业的有效成员。
+// validateIdentity 校验当前企业用户账号仍可用。
 func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
 	return identityaction.Validate(ctx, db, identity)
 }
 
-// loadUser 读取用户账号及其企业成员字段。
+// loadUser 读取用户账号及其企业身份字段。
 func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*servermodels.User, error) {
 	user := &servermodels.User{}
 	err := db.NewSelect().TableExpr("users AS u").

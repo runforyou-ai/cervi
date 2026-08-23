@@ -38,7 +38,9 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: identity.Organization.ID,
-			Type:           string(domain.OrganizationIdentityTypeUser), DisplayName: input.DisplayName, WorkStatus: string(domain.WorkStatusWorking),
+			Type:           string(domain.OrganizationIdentityTypeUser),
+			DisplayName:    input.DisplayName,
+			WorkStatus:     string(domain.WorkStatusWorking),
 		}
 		_, err := tx.NewInsert().Model(organizationIdentity).
 			Column("organization_id", "type", "display_name", "work_status").Returning("id").Exec(ctx)
@@ -46,9 +48,14 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		user := &servermodels.User{
-			IdentityID: organizationIdentity.ID, OrganizationID: identity.Organization.ID,
-			Email: input.Email, PasswordHash: passwordHash, RoleID: input.RoleID,
-			Status: string(domain.UserStatusActive), Locale: identity.User.Locale, TimeZone: identity.User.TimeZone,
+			IdentityID:     organizationIdentity.ID,
+			OrganizationID: identity.Organization.ID,
+			Email:          input.Email,
+			PasswordHash:   passwordHash,
+			RoleID:         input.RoleID,
+			Status:         string(domain.UserStatusActive),
+			Locale:         identity.User.Locale,
+			TimeZone:       identity.User.TimeZone,
 		}
 		_, err = tx.NewInsert().Model(user).
 			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone").Returning("id").Exec(ctx)

@@ -35,15 +35,11 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if identity == nil ||
-		!common.ValidUUID(identity.Organization.ID) ||
-		!common.ValidUUID(identity.User.ID) ||
-		identity.User.OrganizationID != identity.Organization.ID {
-		return nil, common.ErrIdentityInvalid
-	}
-
 	var user *servermodels.User
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := validateIdentity(ctx, tx, identity); err != nil {
+			return err
+		}
 		var previousAvatarFileID *string
 		identityQuery := tx.NewUpdate().
 			Model((*servermodels.OrganizationIdentity)(nil)).
@@ -99,7 +95,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			}
 			identityQuery = identityQuery.Set("avatar_file_id = ?", file.ID)
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
+		_, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
 			Set("email = ?", input.Email).
 			Set("updated_at = now()").
 			Where("u.id = ?", identity.User.ID).
@@ -108,27 +104,13 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		if err != nil {
 			return err
 		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return common.ErrIdentityInvalid
-		}
-		result, err = identityQuery.
+		_, err = identityQuery.
 			Where("oi.id = ?", identity.User.IdentityID).
 			Where("oi.organization_id = ?", identity.Organization.ID).
 			Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 			Exec(ctx)
 		if err != nil {
 			return err
-		}
-		rows, err = result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
-			return common.ErrIdentityInvalid
 		}
 		if previousAvatarFileID != nil && *previousAvatarFileID != input.AvatarFileID {
 			if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).

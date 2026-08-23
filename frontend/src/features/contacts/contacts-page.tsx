@@ -446,7 +446,7 @@ function StageLabel({ stage }: { stage: ContactStage }) {
   )
 }
 
-/** 显示成员状态徽标。 */
+/** 显示启用状态徽标。 */
 function UserStatusBadge({
   status,
   label,
@@ -856,7 +856,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     }
   }
 
-  /** 停用或恢复企业成员账号。 */
+  /** 停用或恢复用户账号。 */
   async function changeUserStatus() {
     if (!changingUserStatus) return
     setDeleting(true)
@@ -865,7 +865,8 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         changingUserStatus.status === UserStatus.UserStatusActive
           ? await deactivateUser(changingUserStatus.id)
           : await reactivateUser(changingUserStatus.id)
-      console.info("企业成员状态已修改", {
+      console.info("用户账号状态已修改", {
+        identity_id: saved.identityId,
         user_id: saved.id,
         status: saved.status,
       })
@@ -883,7 +884,10 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       setRefreshVersion((current) => current + 1)
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      console.warn("修改企业成员状态失败", error)
+      console.warn("修改用户账号状态失败", {
+        user_id: changingUserStatus.id,
+        error,
+      })
       toast.error(t("members.status.error"))
     } finally {
       setDeleting(false)
@@ -900,6 +904,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
           ? await deactivateAgent(changingAgentStatus.id)
           : await reactivateAgent(changingAgentStatus.id)
       console.info("AI 员工状态已修改", {
+        identity_id: saved.identityId,
         agent_id: saved.id,
         status: saved.status,
       })
@@ -917,7 +922,10 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       setRefreshVersion((current) => current + 1)
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      console.warn("修改 AI 员工状态失败", error)
+      console.warn("修改 AI 员工状态失败", {
+        agent_id: changingAgentStatus.id,
+        error,
+      })
       toast.error(t("agents.status.error"))
     } finally {
       setDeleting(false)

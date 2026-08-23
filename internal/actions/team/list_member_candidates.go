@@ -13,7 +13,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// ListMemberCandidatesQuery 读取尚未加入团队的企业成员。
+// ListMemberCandidatesQuery 读取尚未加入团队的企业身份。
 type ListMemberCandidatesQuery struct{ db *bun.DB }
 
 // NewListMemberCandidatesQuery 创建团队成员候选查询。
@@ -21,7 +21,7 @@ func NewListMemberCandidatesQuery(db *bun.DB) *ListMemberCandidatesQuery {
 	return &ListMemberCandidatesQuery{db: db}
 }
 
-// Execute 返回尚未加入指定团队的企业成员分页列表。
+// Execute 返回尚未加入指定团队的企业身份分页列表。
 func (q *ListMemberCandidatesQuery) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, input MemberCandidateInput) (MemberCandidateOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
 	var valid bool

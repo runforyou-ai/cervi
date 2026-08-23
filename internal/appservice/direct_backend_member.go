@@ -10,7 +10,7 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
-// ListMemberOptions 返回可分配的企业成员和 AI 员工。
+// ListMemberOptions 返回可分配的企业身份。
 func (b *DirectBackend) ListMemberOptions(ctx context.Context, meta RequestMeta, input MemberOptionListInput) (MemberOptionList, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -21,7 +21,7 @@ func (b *DirectBackend) ListMemberOptions(ctx context.Context, meta RequestMeta,
 		if ctx.Err() != nil {
 			return MemberOptionList{}, ctx.Err()
 		}
-		slog.Warn("读取企业成员选择项失败", "organization_id", identity.Organization.ID, "error", err)
+		slog.Warn("读取企业身份选择项失败", "organization_id", identity.Organization.ID, "error", err)
 		return MemberOptionList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
 	}
 	members := make([]MemberOption, 0, len(output.Members))

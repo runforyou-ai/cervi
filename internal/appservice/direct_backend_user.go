@@ -38,10 +38,10 @@ func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, inp
 		if errors.Is(err, common.ErrIdentityInvalid) {
 			return User{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
-		slog.Warn("保存个人资料失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		slog.Warn("保存个人资料失败", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "error", err)
 		return User{}, FailedError(meta, cervii18n.ErrorProfileUpdateFailed)
 	}
-	slog.Info("个人资料保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
+	slog.Info("个人资料保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID)
 	return userFromModel(*user), nil
 }
 
@@ -183,7 +183,7 @@ func (b *DirectBackend) CreateUser(ctx context.Context, meta RequestMeta, input 
 	if err != nil {
 		return DirectoryUser{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
 	}
-	slog.Info("企业成员创建成功", "organization_id", identity.Organization.ID, "user_id", user.ID, "role_id", user.RoleID)
+	slog.Info("企业成员创建成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", user.ID, "role_id", user.RoleID)
 	return directoryUserFromAction(*user), nil
 }
 
@@ -197,7 +197,7 @@ func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID
 	if err != nil {
 		return DirectoryUser{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}
-	slog.Info("企业成员更新成功", "organization_id", identity.Organization.ID, "user_id", userID, "role_id", user.RoleID)
+	slog.Info("企业成员更新成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "role_id", user.RoleID)
 	return directoryUserFromAction(*user), nil
 }
 
@@ -238,7 +238,7 @@ func (b *DirectBackend) updateDirectoryUserStatus(ctx context.Context, meta Requ
 	if err != nil {
 		return DirectoryUser{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
 	}
-	slog.Info("企业成员状态更新成功", "organization_id", identity.Organization.ID, "user_id", userID, "status", status)
+	slog.Info("用户账号状态更新成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "status", status)
 	return directoryUserFromAction(*user), nil
 }
 

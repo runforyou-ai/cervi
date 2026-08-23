@@ -317,7 +317,7 @@ func (s *Service) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID 
 	return s.backend.ListTeamMembers(ctx, meta, teamID, input)
 }
 
-// ListTeamMemberCandidates 返回尚未加入团队的企业成员。
+// ListTeamMemberCandidates 返回尚未加入团队的企业身份。
 func (s *Service) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
 	return s.backend.ListTeamMemberCandidates(ctx, meta, teamID, input)
 }

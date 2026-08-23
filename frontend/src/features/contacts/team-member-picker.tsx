@@ -44,7 +44,7 @@ function MemberAvatar({ member }: { member: TeamMemberCandidate }) {
   )
 }
 
-/** 搜索并批量选择尚未加入团队的企业成员。 */
+/** 搜索并批量选择尚未加入团队的企业身份。 */
 export function TeamMemberPicker({
   team,
   onSaved,
