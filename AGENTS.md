@@ -43,7 +43,7 @@ wails3 generate bindings -clean=true -ts -i
 前端要求 Node.js 24.0.0 或更高版本，项目构建使用 Wails v3 和 Task。
 Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite、MCP 端口、PostgreSQL 数据库和 NATS 命名空间。按上述顺序启动后，可通过 Wails MCP 获取桌面端页面信息。
 
-真机通过 `CERVI_PUBLIC_URL` 连接服务端。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
+真机在连接页手动输入可访问的企业服务端地址。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
 
 ### Wails 版本同步
 

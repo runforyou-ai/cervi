@@ -22,10 +22,6 @@ type Store struct {
 func Open(ctx context.Context, config Config) (*Store, error) {
 	startupCtx, cancel := context.WithTimeout(ctx, config.StartupTimeout)
 	defer cancel()
-	if config.MaxOpenConns == 0 {
-		slog.Warn("PostgreSQL 最大连接数未设置限制")
-	}
-
 	sqlDB := sql.OpenDB(pgdriver.NewConnector(
 		pgdriver.WithDSN(config.DSN),
 		pgdriver.WithConnParams(map[string]any{"timezone": "UTC"}),
@@ -40,7 +36,11 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("connect to PostgreSQL: %w", err)
 	}
-	slog.Info("PostgreSQL 连接成功", "timezone", "UTC")
+	slog.Info("PostgreSQL 连接成功",
+		"timezone", "UTC",
+		"max_open_connections", config.MaxOpenConns,
+		"max_idle_connections", config.MaxIdleConns,
+	)
 
 	if err := migrate(startupCtx, sqlDB); err != nil {
 		_ = db.Close()

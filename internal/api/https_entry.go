@@ -26,16 +26,16 @@ const (
 	defaultBackendPort = 8080
 	httpAddress        = ":80"
 	httpsAddress       = ":443"
-	modeAuto           = httpsMode("auto")
-	modeExternal       = httpsMode("external")
-	modeOff            = httpsMode("off")
+	modeAuto           = tlsMode("auto")
+	modeExternal       = tlsMode("external")
+	modeOff            = tlsMode("off")
 )
 
-type httpsMode string
+type tlsMode string
 
-// HTTPSEntry 根据部署模式代理 Wails server 并管理 HTTPS。
+// HTTPSEntry 按 TLS 模式代理 Wails server。
 type HTTPSEntry struct {
-	mode        httpsMode
+	mode        tlsMode
 	cache       autocert.Cache
 	cachePath   string
 	manager     *autocert.Manager
@@ -45,9 +45,9 @@ type HTTPSEntry struct {
 	allowed     sync.Map
 }
 
-// NewHTTPSEntry 根据部署模式创建 HTTPS 入口。
+// NewHTTPSEntry 根据 TLS 模式创建 HTTPS 入口。
 func NewHTTPSEntry() (*HTTPSEntry, error) {
-	mode, err := httpsModeFromEnv()
+	mode, err := tlsModeFromEnv()
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func NewHTTPSEntry() (*HTTPSEntry, error) {
 		http.Error(writer, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 	}
 
-	cachePath := strings.TrimSpace(os.Getenv("CERVI_TLS_DATA_DIR"))
+	cachePath := strings.TrimSpace(os.Getenv("TLS_DATA_DIR"))
 	if cachePath == "" {
 		cachePath = "data/tls"
 	}
@@ -73,7 +73,7 @@ func NewHTTPSEntry() (*HTTPSEntry, error) {
 		Prompt:     autocert.AcceptTOS,
 		Cache:      service.cache,
 		HostPolicy: service.allowCertificate,
-		Email:      strings.TrimSpace(os.Getenv("CERVI_ACME_EMAIL")),
+		Email:      strings.TrimSpace(os.Getenv("TLS_ACME_EMAIL")),
 	}
 	service.httpServer = &http.Server{
 		Addr:              httpAddress,
@@ -91,13 +91,14 @@ func NewHTTPSEntry() (*HTTPSEntry, error) {
 	return service, nil
 }
 
-// Start 根据部署模式启动自动 HTTPS 入口。
+// Start 启动 HTTPS 入口。
 func (s *HTTPSEntry) Start(ctx context.Context) error {
 	if s.mode == modeExternal {
-		slog.Info("HTTPS 由外部入口管理", "server_port", serverPort())
+		slog.Info("TLS 由外部入口终止", "server_port", serverPort())
 		return nil
 	}
-	if s.mode != modeAuto {
+	if s.mode == modeOff {
+		slog.Info("TLS 入口已关闭", "server_port", serverPort())
 		return nil
 	}
 	httpListener, err := net.Listen("tcp", s.httpServer.Addr)
@@ -247,17 +248,17 @@ func serverPort() int {
 	return port
 }
 
-// httpsModeFromEnv 返回配置的 HTTPS 模式，留空时关闭 HTTPS 入口。
-func httpsModeFromEnv() (httpsMode, error) {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv("CERVI_HTTPS_MODE")))
+// tlsModeFromEnv 读取 TLS 模式，留空时关闭 TLS 入口。
+func tlsModeFromEnv() (tlsMode, error) {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv("TLS_MODE")))
 	if value == "" {
 		return modeOff, nil
 	}
-	mode := httpsMode(value)
+	mode := tlsMode(value)
 	switch mode {
 	case modeAuto, modeExternal, modeOff:
 		return mode, nil
 	default:
-		return "", fmt.Errorf("invalid CERVI_HTTPS_MODE %q: expected auto, external, or off", value)
+		return "", fmt.Errorf("invalid TLS_MODE %q: expected auto, external, or off", value)
 	}
 }

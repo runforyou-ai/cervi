@@ -60,7 +60,7 @@ EXPOSE 80 443 8080
 # Can be overridden at runtime with -e WAILS_SERVER_HOST=...
 ENV WAILS_SERVER_HOST=0.0.0.0
 ENV FILE_STORAGE_PATH=/data/files
-ENV CERVI_TLS_DATA_DIR=/data/tls
+ENV TLS_DATA_DIR=/data/tls
 
 # 持久化本地文件和自动签发的证书。
 VOLUME ["/data/files", "/data/tls"]
