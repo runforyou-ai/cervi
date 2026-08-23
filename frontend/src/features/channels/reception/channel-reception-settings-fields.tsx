@@ -26,6 +26,8 @@ import type { ChannelReceptionSettingsFormValues } from "@/features/channels/rec
 
 type ReceptionTargetName = keyof ChannelReceptionSettingsFormValues
 
+const receptionOptionPageSize = 100
+
 const routingChoices = [
   ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue,
   ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam,
@@ -33,100 +35,140 @@ const routingChoices = [
 ] as const
 
 /** 显示一个不带分组边框的接待目标字段。 */
-function ReceptionTargetField({
+function ReceptionTargetField<
+  TValues extends FieldValues & ChannelReceptionSettingsFormValues,
+>({
   name,
-  target,
-  invalid,
+  control,
   teams,
   members,
-  onChange,
-  onBlur,
 }: {
   name: ReceptionTargetName
-  target: ChannelRoutingTarget
-  invalid: boolean
+  control: Control<TValues>
   teams: Team[]
   members: MemberOption[]
-  onChange: (target: ChannelRoutingTarget) => void
-  onBlur: () => void
 }) {
   const { t } = useTranslation("channels")
   const isFallback = name === "fallbackTarget"
 
   return (
-    <Field data-invalid={invalid}>
-      <FieldLabel htmlFor={`${name}-type`}>
-        {t(isFallback ? "routing.fallback" : "routing.newConversation")}
-      </FieldLabel>
-      <NativeSelect
-        id={`${name}-type`}
-        value={target.type}
-        aria-invalid={invalid}
-        onBlur={onBlur}
-        onChange={(event) =>
-          onChange({
-            type: event.target.value as ChannelRoutingTarget["type"],
-            id: "",
-          })
-        }
-      >
-        {routingChoices.map((choice) => (
-          <option key={choice} value={choice}>
-            {t(
-              `routing.${isFallback ? "fallbackTypes" : "newConversationTypes"}.${choice}`,
-            )}
-          </option>
-        ))}
-      </NativeSelect>
-      {target.type !==
-      ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue ? (
-        <div className="mt-3 flex w-full flex-col gap-2">
-          <FieldLabel htmlFor={`${name}-id`} required>
-            {isFallback
-              ? target.type ===
-                ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
-                ? t("routing.targetLabels.fallback.team")
-                : t("routing.targetLabels.fallback.member")
-              : target.type ===
-                  ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
-                ? t("routing.targetLabels.newConversation.team")
-                : t("routing.targetLabels.newConversation.member")}
-          </FieldLabel>
-          <NativeSelect
-            id={`${name}-id`}
-            value={target.id}
-            required
-            aria-invalid={invalid}
-            onBlur={onBlur}
-            onChange={(event) =>
-              onChange({ ...target, id: event.target.value })
-            }
-          >
-            <option value="">{t("routing.select")}</option>
-            {target.type ===
-            ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
-              ? teams.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {team.name}
-                  </option>
-                ))
-              : members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.displayName}（
-                    {t(
-                      member.type ===
-                      OrganizationIdentityType.OrganizationIdentityTypeAgent
-                        ? "routing.agent"
-                        : "routing.person",
-                    )}
-                    ）
-                  </option>
-                ))}
-          </NativeSelect>
-        </div>
-      ) : null}
-    </Field>
+    <Controller
+      name={`${name}.type` as Path<TValues>}
+      control={control}
+      render={({ field: typeField, fieldState: typeFieldState }) => (
+        <Controller
+          name={`${name}.id` as Path<TValues>}
+          control={control}
+          render={({ field: idField, fieldState: idFieldState }) => {
+            const targetType = typeField.value as ChannelRoutingTarget["type"]
+            const invalid = typeFieldState.invalid || idFieldState.invalid
+            return (
+              <Field data-invalid={invalid}>
+                <FieldLabel htmlFor={`${name}-type`}>
+                  {t(
+                    isFallback ? "routing.fallback" : "routing.newConversation",
+                  )}
+                </FieldLabel>
+                <NativeSelect
+                  {...typeField}
+                  id={`${name}-type`}
+                  value={targetType}
+                  aria-invalid={typeFieldState.invalid}
+                  onChange={(event) => {
+                    typeField.onChange(event)
+                    idField.onChange("")
+                  }}
+                >
+                  {routingChoices.map((choice) => (
+                    <option key={choice} value={choice}>
+                      {t(
+                        `routing.${isFallback ? "fallbackTypes" : "newConversationTypes"}.${choice}`,
+                      )}
+                    </option>
+                  ))}
+                </NativeSelect>
+                {targetType !==
+                ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue ? (
+                  <div className="mt-3 flex w-full flex-col gap-2">
+                    <FieldLabel htmlFor={`${name}-id`} required>
+                      {isFallback
+                        ? targetType ===
+                          ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
+                          ? t("routing.targetLabels.fallback.team")
+                          : t("routing.targetLabels.fallback.member")
+                        : targetType ===
+                            ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
+                          ? t("routing.targetLabels.newConversation.team")
+                          : t("routing.targetLabels.newConversation.member")}
+                    </FieldLabel>
+                    <NativeSelect
+                      {...idField}
+                      id={`${name}-id`}
+                      value={idField.value as string}
+                      required
+                      aria-invalid={idFieldState.invalid}
+                    >
+                      <option value="">{t("routing.select")}</option>
+                      {targetType ===
+                      ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
+                        ? teams.map((team) => (
+                            <option key={team.id} value={team.id}>
+                              {team.name}
+                            </option>
+                          ))
+                        : members.map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.displayName}（
+                              {t(
+                                member.type ===
+                                  OrganizationIdentityType.OrganizationIdentityTypeAgent
+                                  ? "routing.agent"
+                                  : "routing.person",
+                              )}
+                              ）
+                            </option>
+                          ))}
+                    </NativeSelect>
+                  </div>
+                ) : null}
+              </Field>
+            )
+          }}
+        />
+      )}
+    />
   )
+}
+
+/** 分页读取全部团队接待候选项。 */
+async function listAllTeams() {
+  const teams: Team[] = []
+  let page = 1
+  let pages = 1
+  do {
+    const output = await listTeams({ page, pageSize: receptionOptionPageSize })
+    teams.push(...output.teams)
+    pages = Math.ceil(output.page.total / receptionOptionPageSize)
+    page += 1
+  } while (page <= pages)
+  return teams
+}
+
+/** 分页读取全部成员接待候选项。 */
+async function listAllMemberOptions() {
+  const members: MemberOption[] = []
+  let page = 1
+  let pages = 1
+  do {
+    const output = await listMemberOptions({
+      page,
+      pageSize: receptionOptionPageSize,
+    })
+    members.push(...output.members)
+    pages = Math.ceil(output.page.total / receptionOptionPageSize)
+    page += 1
+  } while (page <= pages)
+  return members
 }
 
 /** 渲染可被不同渠道表单复用的接待设置字段。 */
@@ -140,14 +182,11 @@ export function ChannelReceptionSettingsFields<
 
   useEffect(() => {
     let active = true
-    void Promise.all([
-      listTeams({ pageSize: 100 }),
-      listMemberOptions({ pageSize: 100 }),
-    ])
+    void Promise.all([listAllTeams(), listAllMemberOptions()])
       .then(([teamList, memberList]) => {
         if (!active) return
-        setTeams(teamList.teams)
-        setMembers(memberList.members)
+        setTeams(teamList)
+        setMembers(memberList)
       })
       .catch((error: unknown) => {
         if (!active) return
@@ -165,21 +204,12 @@ export function ChannelReceptionSettingsFields<
   return (
     <>
       {(["newConversationTarget", "fallbackTarget"] as const).map((name) => (
-        <Controller
+        <ReceptionTargetField
           key={name}
-          name={name as Path<TValues>}
+          name={name}
           control={control}
-          render={({ field, fieldState }) => (
-            <ReceptionTargetField
-              name={name}
-              target={field.value as ChannelRoutingTarget}
-              invalid={fieldState.invalid}
-              teams={teams}
-              members={members}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-            />
-          )}
+          teams={teams}
+          members={members}
         />
       ))}
     </>
