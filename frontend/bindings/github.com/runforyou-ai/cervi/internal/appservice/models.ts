@@ -378,6 +378,7 @@ export interface CreateUserInput {
  */
 export interface DirectoryAgent {
     "id": string;
+    "identityId": string;
     "displayName": string;
     "status": UserStatus;
     "teams": TeamSummary[] | null;
@@ -389,6 +390,7 @@ export interface DirectoryAgent {
  */
 export interface DirectoryUser {
     "id": string;
+    "identityId": string;
     "email": string;
     "displayName": string;
     "role": RoleSummary;
@@ -507,24 +509,11 @@ export interface LoginInput {
 }
 
 /**
- * MemberIdentityType 表示企业成员类型。
- */
-export enum MemberIdentityType {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    MemberIdentityTypeUser = "user",
-    MemberIdentityTypeAgent = "agent",
-};
-
-/**
  * MemberOption 定义企业成员或 AI 员工选择项。
  */
 export interface MemberOption {
     "id": string;
-    "type": MemberIdentityType;
+    "type": OrganizationIdentityType;
     "displayName": string;
     "avatarUrl": string;
 }
@@ -576,6 +565,19 @@ export interface Organization {
     "id": string;
     "name": string;
 }
+
+/**
+ * OrganizationIdentityType 表示企业身份类型。
+ */
+export enum OrganizationIdentityType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    OrganizationIdentityTypeUser = "user",
+    OrganizationIdentityTypeAgent = "agent",
+};
 
 /**
  * OrganizationInput 定义企业名称修改输入。
@@ -814,7 +816,7 @@ export interface Team {
  */
 export interface TeamDirectoryMember {
     "id": string;
-    "type": MemberIdentityType;
+    "type": OrganizationIdentityType;
     "displayName": string;
     "status": UserStatus;
     "joinedAt": string;
@@ -867,7 +869,7 @@ export interface TeamListInput {
  * TeamMemberCandidate 定义可加入团队的成员。
  */
 export interface TeamMemberCandidate {
-    "identityType": MemberIdentityType;
+    "identityType": OrganizationIdentityType;
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
@@ -894,7 +896,7 @@ export interface TeamMemberCandidateList {
  * TeamMemberIdentityInput 定义要变更的团队成员身份。
  */
 export interface TeamMemberIdentityInput {
-    "identityType": MemberIdentityType;
+    "identityType": OrganizationIdentityType;
     "identityId": string;
 }
 
@@ -936,6 +938,7 @@ export interface UpdateDirectoryUserInput {
  */
 export interface User {
     "id": string;
+    "identityId": string;
     "organizationId": string;
     "email": string;
     "displayName": string;
@@ -991,7 +994,7 @@ export interface UserRoleChangesInput {
 }
 
 /**
- * UserStatus 表示企业成员状态。
+ * UserStatus 表示用户账号或 AI 员工的启用状态。
  */
 export enum UserStatus {
     /**
@@ -1087,7 +1090,7 @@ export interface WebsiteChannelSummary {
 }
 
 /**
- * WorkStatus 表示成员主动设置的工作状态。
+ * WorkStatus 表示企业身份主动设置的工作状态。
  */
 export enum WorkStatus {
     /**

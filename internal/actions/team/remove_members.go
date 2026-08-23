@@ -32,7 +32,7 @@ func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodel
 		}
 		unique := make(map[string]MemberIdentity, len(members))
 		for _, member := range members {
-			if (member.Type != domain.MemberIdentityTypeUser && member.Type != domain.MemberIdentityTypeAgent) || !common.ValidUUID(member.ID) {
+			if (member.Type != domain.OrganizationIdentityTypeUser && member.Type != domain.OrganizationIdentityTypeAgent) || !common.ValidUUID(member.ID) {
 				return ErrMemberInvalid
 			}
 			unique[member.ID] = member
@@ -41,7 +41,7 @@ func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodel
 			return ErrMemberInvalid
 		}
 		for _, member := range unique {
-			exists, err := tx.NewSelect().Model((*servermodels.OrganizationMember)(nil)).
+			exists, err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
 				Where("organization_id = ?", identity.Organization.ID).
 				Where("id = ?", member.ID).
 				Where("type = ?", member.Type).
@@ -55,7 +55,7 @@ func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodel
 			result, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
 				Where("organization_id = ?", identity.Organization.ID).
 				Where("team_id = ?", teamID).
-				Where("member_id = ?", member.ID).
+				Where("identity_id = ?", member.ID).
 				Exec(ctx)
 			if err != nil {
 				return err

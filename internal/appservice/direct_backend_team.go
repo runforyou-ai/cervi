@@ -86,7 +86,7 @@ func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, t
 	members := make([]TeamDirectoryMember, 0, len(output.Members))
 	for _, member := range output.Members {
 		members = append(members, TeamDirectoryMember{
-			ID: member.ID, Type: MemberIdentityType(member.Type), DisplayName: member.DisplayName, Status: UserStatus(member.Status), JoinedAt: member.JoinedAt,
+			ID: member.ID, Type: OrganizationIdentityType(member.Type), DisplayName: member.DisplayName, Status: UserStatus(member.Status), JoinedAt: member.JoinedAt,
 		})
 	}
 	return TeamDirectoryMemberList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
@@ -105,7 +105,7 @@ func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta Reque
 	members := make([]TeamMemberCandidate, 0, len(output.Members))
 	for _, member := range output.Members {
 		members = append(members, TeamMemberCandidate{
-			IdentityType: MemberIdentityType(member.IdentityType), IdentityID: member.IdentityID,
+			IdentityType: OrganizationIdentityType(member.IdentityType), IdentityID: member.IdentityID,
 			DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
 		})
 	}
@@ -120,7 +120,7 @@ func (b *DirectBackend) AddTeamMembers(ctx context.Context, meta RequestMeta, te
 	}
 	members := make([]teamaction.MemberIdentity, 0, len(input.Members))
 	for _, member := range input.Members {
-		members = append(members, teamaction.MemberIdentity{Type: domain.MemberIdentityType(member.IdentityType), ID: member.IdentityID})
+		members = append(members, teamaction.MemberIdentity{Type: domain.OrganizationIdentityType(member.IdentityType), ID: member.IdentityID})
 	}
 	team, err := b.addTeamMembers.Execute(ctx, identity, teamID, members)
 	if err != nil {
@@ -138,7 +138,7 @@ func (b *DirectBackend) RemoveTeamMembers(ctx context.Context, meta RequestMeta,
 	}
 	members := make([]teamaction.MemberIdentity, 0, len(input.Members))
 	for _, member := range input.Members {
-		members = append(members, teamaction.MemberIdentity{Type: domain.MemberIdentityType(member.IdentityType), ID: member.IdentityID})
+		members = append(members, teamaction.MemberIdentity{Type: domain.OrganizationIdentityType(member.IdentityType), ID: member.IdentityID})
 	}
 	team, err := b.removeTeamMembers.Execute(ctx, identity, teamID, members)
 	if err != nil {

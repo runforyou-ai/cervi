@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import {
-  MemberIdentityType,
+  OrganizationIdentityType,
   addTeamMembers,
   isApiError,
   listTeamMemberCandidates,
@@ -217,7 +217,7 @@ export function TeamMemberPicker({
                       <span>
                         {t(
                           member.identityType ===
-                            MemberIdentityType.MemberIdentityTypeAgent
+                            OrganizationIdentityType.OrganizationIdentityTypeAgent
                             ? "identityCategories.agent"
                             : "identityCategories.user",
                         )}

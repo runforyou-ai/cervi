@@ -26,12 +26,31 @@ func validateRoutingTarget(ctx context.Context, db bun.IDB, organizationID, fiel
 			Where("id = ?", target.ID).
 			For("KEY SHARE").Scan(ctx)
 	case domain.ChannelRoutingTargetTypeMember:
-		record := &servermodels.OrganizationMember{}
-		err = db.NewSelect().Model(record).Column("id").
+		record := &servermodels.OrganizationIdentity{}
+		err = db.NewSelect().Model(record).Column("id", "type").
 			Where("organization_id = ?", organizationID).
 			Where("id = ?", target.ID).
-			Where("status = ?", domain.UserStatusActive).
 			For("KEY SHARE").Scan(ctx)
+		if err == nil {
+			switch domain.OrganizationIdentityType(record.Type) {
+			case domain.OrganizationIdentityTypeUser:
+				user := &servermodels.User{}
+				err = db.NewSelect().Model(user).Column("id").
+					Where("organization_id = ?", organizationID).
+					Where("identity_id = ?", target.ID).
+					Where("status = ?", domain.UserStatusActive).
+					For("KEY SHARE").Scan(ctx)
+			case domain.OrganizationIdentityTypeAgent:
+				agent := &servermodels.Agent{}
+				err = db.NewSelect().Model(agent).Column("id").
+					Where("organization_id = ?", organizationID).
+					Where("identity_id = ?", target.ID).
+					Where("status = ?", domain.UserStatusActive).
+					For("KEY SHARE").Scan(ctx)
+			default:
+				err = sql.ErrNoRows
+			}
+		}
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return &ValidationError{Fields: map[string]ValidationCode{field: ValidationRoutingTargetInvalid}}

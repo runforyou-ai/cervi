@@ -114,7 +114,7 @@ func directoryAgentFromAction(agent agentaction.DirectoryAgent) DirectoryAgent {
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return DirectoryAgent{ID: agent.ID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), Teams: teams, CreatedAt: agent.CreatedAt}
+	return DirectoryAgent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), Teams: teams, CreatedAt: agent.CreatedAt}
 }
 
 // agentError 转换 AI 员工领域错误并记录未处理故障。

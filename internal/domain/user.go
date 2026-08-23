@@ -1,6 +1,6 @@
 package domain
 
-// UserStatus 定义企业成员状态。
+// UserStatus 定义用户账号或 AI 员工的启用状态。
 type UserStatus string
 
 const (
@@ -8,7 +8,7 @@ const (
 	UserStatusInactive UserStatus = "inactive"
 )
 
-// WorkStatus 定义成员主动设置的工作状态。
+// WorkStatus 定义企业身份主动设置的工作状态。
 type WorkStatus string
 
 const (

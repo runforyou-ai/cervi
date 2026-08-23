@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -27,20 +28,18 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if identity == nil ||
-		!common.ValidUUID(identity.Organization.ID) ||
-		!common.ValidUUID(identity.User.ID) ||
-		identity.User.OrganizationID != identity.Organization.ID {
-		return nil, common.ErrIdentityInvalid
+	if err := validateIdentity(ctx, a.db, identity); err != nil {
+		return nil, err
 	}
 
 	result, err := a.db.NewUpdate().
-		Model((*servermodels.User)(nil)).
+		Model((*servermodels.OrganizationIdentity)(nil)).
 		Set("work_status = ?", input.WorkStatus).
 		Set("work_status_updated_at = now()").
 		Set("updated_at = now()").
-		Where("u.id = ?", identity.User.ID).
-		Where("u.organization_id = ?", identity.Organization.ID).
+		Where("oi.id = ?", identity.User.IdentityID).
+		Where("oi.organization_id = ?", identity.Organization.ID).
+		Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("update user work status: %w", err)

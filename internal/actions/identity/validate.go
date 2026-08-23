@@ -7,7 +7,6 @@ import (
 	"context"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -17,14 +16,15 @@ func Validate(ctx context.Context, db bun.IDB, identity *servermodels.Identity) 
 	if identity == nil ||
 		!common.ValidUUID(identity.Organization.ID) ||
 		!common.ValidUUID(identity.User.ID) ||
+		!common.ValidUUID(identity.User.IdentityID) ||
 		identity.User.OrganizationID != identity.Organization.ID {
 		return common.ErrIdentityInvalid
 	}
 	active, err := db.NewSelect().
-		Model((*servermodels.OrganizationMember)(nil)).
+		Model((*servermodels.User)(nil)).
 		Where("id = ?", identity.User.ID).
+		Where("identity_id = ?", identity.User.IdentityID).
 		Where("organization_id = ?", identity.Organization.ID).
-		Where("type = ?", domain.MemberIdentityTypeUser).
 		Where("status = ?", "active").
 		Exists(ctx)
 	if err != nil {

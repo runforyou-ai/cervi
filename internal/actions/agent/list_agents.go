@@ -25,6 +25,7 @@ type ListInput struct {
 // DirectoryAgent 定义 AI 员工目录字段。
 type DirectoryAgent struct {
 	ID          string            `bun:"id"`
+	IdentityID  string            `bun:"identity_id"`
 	DisplayName string            `bun:"display_name"`
 	Status      domain.UserStatus `bun:"status"`
 	Teams       []TeamSummary
@@ -66,18 +67,18 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.
 			Where("a.organization_id = ?", identity.Organization.ID).
-			Where("om.type = ?", domain.MemberIdentityTypeAgent)
+			Where("oi.type = ?", domain.OrganizationIdentityTypeAgent)
 		if input.Status != "" {
-			query = query.Where("om.status = ?", input.Status)
+			query = query.Where("a.status = ?", input.Status)
 		}
 		if input.Query != "" {
-			query = query.Where("om.display_name ILIKE ?", "%"+input.Query+"%")
+			query = query.Where("oi.display_name ILIKE ?", "%"+input.Query+"%")
 		}
 		return query
 	}
 	base := func() *bun.SelectQuery {
 		return q.db.NewSelect().TableExpr("agents AS a").
-			Join("JOIN organization_members AS om ON om.id = a.id AND om.organization_id = a.organization_id")
+			Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id")
 	}
 	total, err := applyFilters(base()).Count(ctx)
 	if err != nil {
@@ -85,15 +86,15 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 	}
 	agents := make([]DirectoryAgent, 0)
 	if err := applyFilters(base()).
-		ColumnExpr("a.id::text AS id, om.display_name, om.status, om.created_at").
-		OrderExpr("lower(om.display_name) ASC, a.id ASC").
+		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, a.status, oi.created_at").
+		OrderExpr("lower(oi.display_name) ASC, a.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
 		Scan(ctx, &agents); err != nil {
 		return ListOutput{}, fmt.Errorf("list agents: %w", err)
 	}
 	for index := range agents {
-		teams, err := loadAgentTeams(ctx, q.db, identity.Organization.ID, agents[index].ID)
+		teams, err := loadAgentTeams(ctx, q.db, identity.Organization.ID, agents[index].IdentityID)
 		if err != nil {
 			return ListOutput{}, fmt.Errorf("load agent teams: %w", err)
 		}
@@ -103,13 +104,13 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 }
 
 // loadAgentTeams 读取 AI 员工所属团队。
-func loadAgentTeams(ctx context.Context, db bun.IDB, organizationID, agentID string) ([]TeamSummary, error) {
+func loadAgentTeams(ctx context.Context, db bun.IDB, organizationID, organizationIdentityID string) ([]TeamSummary, error) {
 	teams := make([]TeamSummary, 0)
 	err := db.NewSelect().TableExpr("team_members AS tm").
 		ColumnExpr("t.id::text AS id, t.name").
 		Join("JOIN teams AS t ON t.id = tm.team_id AND t.organization_id = tm.organization_id").
 		Where("tm.organization_id = ?", organizationID).
-		Where("tm.member_id = ?", agentID).
+		Where("tm.identity_id = ?", organizationIdentityID).
 		OrderExpr("lower(t.name) ASC, t.id ASC").
 		Scan(ctx, &teams)
 	return teams, err

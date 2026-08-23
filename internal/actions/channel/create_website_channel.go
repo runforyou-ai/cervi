@@ -65,14 +65,13 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 			return err
 		}
 
-		user := &servermodels.OrganizationMember{}
+		user := &servermodels.User{}
 		if err := tx.NewSelect().
 			Model(user).
 			Column("id").
-			Where("om.id = ?", identity.User.ID).
-			Where("om.organization_id = ?", identity.Organization.ID).
-			Where("om.type = ?", domain.MemberIdentityTypeUser).
-			Where("om.status = ?", domain.UserStatusActive).
+			Where("u.id = ?", identity.User.ID).
+			Where("u.organization_id = ?", identity.Organization.ID).
+			Where("u.status = ?", domain.UserStatusActive).
 			For("KEY SHARE").
 			Scan(ctx); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {

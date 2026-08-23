@@ -50,21 +50,22 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err != nil {
 			return err
 		}
-		member := &servermodels.OrganizationMember{
+		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: identity.Organization.ID,
-			Type:           string(domain.MemberIdentityTypeAgent),
+			Type:           string(domain.OrganizationIdentityTypeAgent),
 			DisplayName:    input.DisplayName,
-			Status:         string(domain.UserStatusActive),
+			WorkStatus:     string(domain.WorkStatusWorking),
 		}
-		if _, err := tx.NewInsert().Model(member).
-			Column("organization_id", "type", "display_name", "status").
+		if _, err := tx.NewInsert().Model(organizationIdentity).
+			Column("organization_id", "type", "display_name", "work_status").
 			Returning("id, created_at").
 			Exec(ctx); err != nil {
 			return err
 		}
-		agent := &servermodels.Agent{ID: member.ID, OrganizationID: identity.Organization.ID}
+		agent := &servermodels.Agent{IdentityID: organizationIdentity.ID, OrganizationID: identity.Organization.ID, Status: string(domain.UserStatusActive)}
 		if _, err := tx.NewInsert().Model(agent).
-			Column("id", "organization_id").
+			Column("identity_id", "organization_id", "status").
+			Returning("id").
 			Exec(ctx); err != nil {
 			return err
 		}
@@ -74,17 +75,17 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				relations = append(relations, servermodels.TeamMember{
 					OrganizationID:  identity.Organization.ID,
 					TeamID:          teamID,
-					MemberID:        member.ID,
+					IdentityID:      organizationIdentity.ID,
 					CreatedByUserID: identity.User.ID,
 				})
 			}
 			if _, err := tx.NewInsert().Model(&relations).
-				Column("organization_id", "team_id", "member_id", "created_by_user_id").
+				Column("organization_id", "team_id", "identity_id", "created_by_user_id").
 				Exec(ctx); err != nil {
 				return err
 			}
 		}
-		output = &DirectoryAgent{ID: member.ID, DisplayName: member.DisplayName, Status: domain.UserStatus(member.Status), Teams: teams, CreatedAt: member.CreatedAt}
+		output = &DirectoryAgent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, Status: domain.UserStatus(agent.Status), Teams: teams, CreatedAt: organizationIdentity.CreatedAt}
 		return nil
 	})
 	if err != nil {

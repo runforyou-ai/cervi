@@ -4,6 +4,8 @@ package agent
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
@@ -33,12 +35,24 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.OrganizationMember)(nil)).
+		storedAgent := &servermodels.Agent{}
+		err := tx.NewSelect().Model(storedAgent).
+			Column("id", "identity_id").
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("id = ?", agentID).
+			For("UPDATE").
+			Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		result, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
 			Set("status = ?", status).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", agentID).
-			Where("type = ?", domain.MemberIdentityTypeAgent).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -51,7 +65,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			return ErrNotFound
 		}
 		if status == domain.UserStatusInactive {
-			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, agentID); err != nil {
+			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, storedAgent.IdentityID); err != nil {
 				return err
 			}
 		}

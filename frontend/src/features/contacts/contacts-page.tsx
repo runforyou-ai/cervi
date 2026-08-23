@@ -28,7 +28,7 @@ import {
   ContactMethodType,
   ContactSort,
   ContactStage,
-  MemberIdentityType,
+  OrganizationIdentityType,
   UserStatus,
   deactivateAgent,
   deactivateUser,
@@ -1552,7 +1552,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                           <TableCell>
                             {t(
                               member.type ===
-                                MemberIdentityType.MemberIdentityTypeAgent
+                                OrganizationIdentityType.OrganizationIdentityTypeAgent
                                 ? "identityCategories.agent"
                                 : "identityCategories.user",
                             )}

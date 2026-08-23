@@ -120,10 +120,10 @@ func (b *DirectBackend) UpdateUserWorkStatus(ctx context.Context, meta RequestMe
 		if errors.Is(err, common.ErrIdentityInvalid) {
 			return User{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
-		slog.Warn("保存工作状态失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		slog.Warn("保存工作状态失败", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "error", err)
 		return User{}, FailedError(meta, cervii18n.ErrorWorkStatusUpdateFailed)
 	}
-	slog.Info("工作状态保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "work_status", input.WorkStatus)
+	slog.Info("工作状态保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "work_status", input.WorkStatus)
 	return userFromModel(*user), nil
 }
 
@@ -280,7 +280,7 @@ func directoryUserFromAction(user useraction.DirectoryUser) DirectoryUser {
 	for _, team := range user.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return DirectoryUser{ID: user.ID, Email: user.Email, DisplayName: user.DisplayName, Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
+	return DirectoryUser{ID: user.ID, IdentityID: user.IdentityID, Email: user.Email, DisplayName: user.DisplayName, Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
 }
 
 // userFieldKeys 把企业成员校验错误码映射为本地化文案键。

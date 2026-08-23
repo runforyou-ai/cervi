@@ -34,7 +34,7 @@
   "error.agent_update_failed": "Could not save the AI employee.",
   "error.agent_status_update_failed": "Could not update the AI employee status.",
   "error.user_update_failed": "Could not save the company member.",
-  "error.user_status_update_failed": "Could not update the company member status.",
+  "error.user_status_update_failed": "Could not update the account status.",
   "error.user_self_deactivate": "You cannot deactivate the account you are using.",
   "error.user_last_active_administrator": "The administrator role must keep at least one active member.",
   "error.team_not_found": "This team could not be found.",

@@ -27,7 +27,7 @@ func (b *DirectBackend) ListMemberOptions(ctx context.Context, meta RequestMeta,
 	members := make([]MemberOption, 0, len(output.Members))
 	for _, member := range output.Members {
 		members = append(members, MemberOption{
-			ID: member.ID, Type: MemberIdentityType(member.Type), DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
+			ID: member.ID, Type: OrganizationIdentityType(member.Type), DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
 		})
 	}
 	return MemberOptionList{Members: members, Page: PageInfo{Number: output.Page, Size: output.Size, Total: output.Total}}, nil

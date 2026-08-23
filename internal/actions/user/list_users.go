@@ -49,44 +49,44 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.Where("u.organization_id = ?", identity.Organization.ID)
 		if input.Status != "" {
-			query = query.Where("om.status = ?", input.Status)
+			query = query.Where("u.status = ?", input.Status)
 		}
 		if input.RoleID != "" {
 			query = query.Where("u.role_id = ?", input.RoleID)
 		}
 		if input.TeamID != "" {
-			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.member_id = u.id AND tm.team_id = ?)", input.TeamID)
+			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.identity_id = u.identity_id AND tm.team_id = ?)", input.TeamID)
 		}
 		if input.Query != "" {
 			pattern := "%" + input.Query + "%"
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
 				return group.
-					Where("om.display_name ILIKE ?", pattern).
+					Where("oi.display_name ILIKE ?", pattern).
 					WhereOr("u.email ILIKE ?", pattern)
 			})
 		}
 		return query
 	}
 
-	total, err := applyFilters(q.db.NewSelect().TableExpr("users AS u").Join("JOIN organization_members AS om ON om.id = u.id AND om.organization_id = u.organization_id AND om.type = ?", domain.MemberIdentityTypeUser)).Count(ctx)
+	total, err := applyFilters(q.db.NewSelect().TableExpr("users AS u").Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser)).Count(ctx)
 	if err != nil {
 		return ListOutput{}, fmt.Errorf("count users: %w", err)
 	}
 	users := make([]DirectoryUser, 0)
 	if err := applyFilters(q.db.NewSelect().TableExpr("users AS u")).
-		ColumnExpr("u.id::text AS id").
-		ColumnExpr("u.email, om.display_name, om.status, u.work_status, om.created_at").
+		ColumnExpr("u.id::text AS id, u.identity_id::text AS identity_id").
+		ColumnExpr("u.email, u.status, oi.display_name, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
-		Join("JOIN organization_members AS om ON om.id = u.id AND om.organization_id = u.organization_id AND om.type = ?", domain.MemberIdentityTypeUser).
+		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
-		OrderExpr("lower(om.display_name) ASC, u.id ASC").
+		OrderExpr("lower(oi.display_name) ASC, u.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
 		Scan(ctx, &users); err != nil {
 		return ListOutput{}, fmt.Errorf("list users: %w", err)
 	}
 	for index := range users {
-		teams, err := loadUserTeams(ctx, q.db, identity.Organization.ID, users[index].ID)
+		teams, err := loadUserTeams(ctx, q.db, identity.Organization.ID, users[index].IdentityID)
 		if err != nil {
 			return ListOutput{}, fmt.Errorf("load user teams: %w", err)
 		}

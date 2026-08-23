@@ -24,11 +24,11 @@ type DirectoryMemberInput struct {
 
 // DirectoryMember 定义团队视图中的共同成员字段。
 type DirectoryMember struct {
-	ID          string                    `bun:"id"`
-	Type        domain.MemberIdentityType `bun:"type"`
-	DisplayName string                    `bun:"display_name"`
-	Status      domain.UserStatus         `bun:"status"`
-	JoinedAt    time.Time                 `bun:"joined_at"`
+	ID          string                          `bun:"id"`
+	Type        domain.OrganizationIdentityType `bun:"type"`
+	DisplayName string                          `bun:"display_name"`
+	Status      domain.UserStatus               `bun:"status"`
+	JoinedAt    time.Time                       `bun:"joined_at"`
 }
 
 // DirectoryMemberOutput 定义团队成员分页结果。
@@ -68,18 +68,20 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 		query = query.
 			Where("tm.organization_id = ?", identity.Organization.ID).
 			Where("tm.team_id = ?", teamID).
-			Where("om.type IN (?, ?)", domain.MemberIdentityTypeUser, domain.MemberIdentityTypeAgent)
+			Where("oi.type IN (?, ?)", domain.OrganizationIdentityTypeUser, domain.OrganizationIdentityTypeAgent)
 		if input.Status != "" {
-			query = query.Where("om.status = ?", input.Status)
+			query = query.Where("CASE WHEN oi.type = ? THEN u.status ELSE a.status END = ?", domain.OrganizationIdentityTypeUser, input.Status)
 		}
 		if input.Query != "" {
-			query = query.Where("om.display_name ILIKE ?", "%"+input.Query+"%")
+			query = query.Where("oi.display_name ILIKE ?", "%"+input.Query+"%")
 		}
 		return query
 	}
 	base := func() *bun.SelectQuery {
 		return q.db.NewSelect().TableExpr("team_members AS tm").
-			Join("JOIN organization_members AS om ON om.id = tm.member_id AND om.organization_id = tm.organization_id")
+			Join("JOIN organization_identities AS oi ON oi.id = tm.identity_id AND oi.organization_id = tm.organization_id").
+			Join("LEFT JOIN users AS u ON u.identity_id = oi.id AND u.organization_id = oi.organization_id").
+			Join("LEFT JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id")
 	}
 	total, err := applyFilters(base()).Count(ctx)
 	if err != nil {
@@ -87,8 +89,8 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 	}
 	members := make([]DirectoryMember, 0)
 	if err := applyFilters(base()).
-		ColumnExpr("om.id::text AS id, om.type, om.display_name, om.status, tm.created_at AS joined_at").
-		OrderExpr("lower(om.display_name) ASC, om.id ASC").
+		ColumnExpr("oi.id::text AS id, oi.type, oi.display_name, CASE WHEN oi.type = ? THEN u.status ELSE a.status END AS status, tm.created_at AS joined_at", domain.OrganizationIdentityTypeUser).
+		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
 		Scan(ctx, &members); err != nil {

@@ -42,7 +42,7 @@ type Session struct {
 	OrganizationName string       `json:"organizationName,omitempty"`
 }
 
-// UserStatus 表示企业成员状态。
+// UserStatus 表示用户账号或 AI 员工的启用状态。
 type UserStatus string
 
 const (
@@ -50,12 +50,12 @@ const (
 	UserStatusInactive UserStatus = UserStatus(domain.UserStatusInactive)
 )
 
-// MemberIdentityType 表示企业成员类型。
-type MemberIdentityType string
+// OrganizationIdentityType 表示企业身份类型。
+type OrganizationIdentityType string
 
 const (
-	MemberIdentityTypeUser  MemberIdentityType = MemberIdentityType(domain.MemberIdentityTypeUser)
-	MemberIdentityTypeAgent MemberIdentityType = MemberIdentityType(domain.MemberIdentityTypeAgent)
+	OrganizationIdentityTypeUser  OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeUser)
+	OrganizationIdentityTypeAgent OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeAgent)
 )
 
 // ChannelRoutingTargetType 表示渠道会话流转目标类型。
@@ -67,7 +67,7 @@ const (
 	ChannelRoutingTargetTypeMember      ChannelRoutingTargetType = ChannelRoutingTargetType(domain.ChannelRoutingTargetTypeMember)
 )
 
-// WorkStatus 表示成员主动设置的工作状态。
+// WorkStatus 表示企业身份主动设置的工作状态。
 type WorkStatus string
 
 const (
@@ -299,6 +299,7 @@ type RoleInput struct {
 // User 定义当前企业成员信息。
 type User struct {
 	ID             string     `json:"id"`
+	IdentityID     string     `json:"identityId"`
 	OrganizationID string     `json:"organizationId"`
 	Email          string     `json:"email"`
 	DisplayName    string     `json:"displayName"`
@@ -481,10 +482,10 @@ type ChannelList struct {
 
 // MemberOption 定义企业成员或 AI 员工选择项。
 type MemberOption struct {
-	ID          string             `json:"id"`
-	Type        MemberIdentityType `json:"type"`
-	DisplayName string             `json:"displayName"`
-	AvatarURL   string             `json:"avatarUrl"`
+	ID          string                   `json:"id"`
+	Type        OrganizationIdentityType `json:"type"`
+	DisplayName string                   `json:"displayName"`
+	AvatarURL   string                   `json:"avatarUrl"`
 }
 
 // MemberOptionListInput 定义成员选择项查询条件。
@@ -523,6 +524,7 @@ type AgentListInput struct {
 // DirectoryAgent 定义 AI 员工目录字段。
 type DirectoryAgent struct {
 	ID          string        `json:"id"`
+	IdentityID  string        `json:"identityId"`
 	DisplayName string        `json:"displayName"`
 	Status      UserStatus    `json:"status"`
 	Teams       []TeamSummary `json:"teams"`
@@ -594,6 +596,7 @@ type TeamSummary struct {
 // DirectoryUser 定义企业成员目录字段。
 type DirectoryUser struct {
 	ID          string        `json:"id"`
+	IdentityID  string        `json:"identityId"`
 	Email       string        `json:"email"`
 	DisplayName string        `json:"displayName"`
 	Role        RoleSummary   `json:"role"`
@@ -647,10 +650,10 @@ type TeamMemberCandidateInput struct {
 
 // TeamMemberCandidate 定义可加入团队的成员。
 type TeamMemberCandidate struct {
-	IdentityType MemberIdentityType `json:"identityType"`
-	IdentityID   string             `json:"identityId"`
-	DisplayName  string             `json:"displayName"`
-	AvatarURL    string             `json:"avatarUrl"`
+	IdentityType OrganizationIdentityType `json:"identityType"`
+	IdentityID   string                   `json:"identityId"`
+	DisplayName  string                   `json:"displayName"`
+	AvatarURL    string                   `json:"avatarUrl"`
 }
 
 // TeamMemberCandidateList 定义可加入团队的成员分页结果。
@@ -669,11 +672,11 @@ type TeamDirectoryMemberInput struct {
 
 // TeamDirectoryMember 定义团队视图中的共同成员字段。
 type TeamDirectoryMember struct {
-	ID          string             `json:"id"`
-	Type        MemberIdentityType `json:"type"`
-	DisplayName string             `json:"displayName"`
-	Status      UserStatus         `json:"status"`
-	JoinedAt    time.Time          `json:"joinedAt"`
+	ID          string                   `json:"id"`
+	Type        OrganizationIdentityType `json:"type"`
+	DisplayName string                   `json:"displayName"`
+	Status      UserStatus               `json:"status"`
+	JoinedAt    time.Time                `json:"joinedAt"`
 }
 
 // TeamDirectoryMemberList 定义团队成员分页结果。
@@ -684,8 +687,8 @@ type TeamDirectoryMemberList struct {
 
 // TeamMemberIdentityInput 定义要变更的团队成员身份。
 type TeamMemberIdentityInput struct {
-	IdentityType MemberIdentityType `json:"identityType"`
-	IdentityID   string             `json:"identityId"`
+	IdentityType OrganizationIdentityType `json:"identityType"`
+	IdentityID   string                   `json:"identityId"`
 }
 
 // TeamMemberInput 定义批量变更团队的身份列表。

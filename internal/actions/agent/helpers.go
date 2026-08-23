@@ -19,8 +19,8 @@ func loadDirectoryAgent(ctx context.Context, db bun.IDB, organizationID, agentID
 	}
 	agent := &DirectoryAgent{}
 	err := db.NewSelect().TableExpr("agents AS a").
-		ColumnExpr("a.id::text AS id, om.display_name, om.status, om.created_at").
-		Join("JOIN organization_members AS om ON om.id = a.id AND om.organization_id = a.organization_id AND om.type = ?", domain.MemberIdentityTypeAgent).
+		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, a.status, oi.created_at").
+		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeAgent).
 		Where("a.id = ?", agentID).
 		Where("a.organization_id = ?", organizationID).
 		Scan(ctx, agent)
@@ -30,6 +30,6 @@ func loadDirectoryAgent(ctx context.Context, db bun.IDB, organizationID, agentID
 	if err != nil {
 		return nil, err
 	}
-	agent.Teams, err = loadAgentTeams(ctx, db, organizationID, agentID)
+	agent.Teams, err = loadAgentTeams(ctx, db, organizationID, agent.IdentityID)
 	return agent, err
 }

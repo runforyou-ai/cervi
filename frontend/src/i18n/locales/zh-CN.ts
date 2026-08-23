@@ -242,7 +242,7 @@ const zhCN = {
         saving: "正在处理…",
         deactivated: "企业成员已停用",
         reactivated: "企业成员已恢复",
-        error: "修改企业成员状态失败，请重试。",
+        error: "修改账号状态失败，请重试。",
       },
     },
     agents: {

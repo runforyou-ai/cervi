@@ -51,6 +51,7 @@ type PageInfo struct {
 // DirectoryUser 定义企业成员目录字段。
 type DirectoryUser struct {
 	ID          string            `json:"id"`
+	IdentityID  string            `json:"-" bun:"identity_id"`
 	Email       string            `json:"email"`
 	DisplayName string            `json:"displayName"`
 	RoleID      string            `json:"roleId" bun:"role_id"`

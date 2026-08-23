@@ -246,7 +246,7 @@ const enUS = {
         saving: "Updating…",
         deactivated: "Company member deactivated",
         reactivated: "Company member reactivated",
-        error: "Could not update the company member status. Try again.",
+        error: "Could not update the account status. Try again.",
       },
     },
     agents: {

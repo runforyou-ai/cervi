@@ -23,7 +23,7 @@ func organizationFromModel(organization servermodels.Organization) Organization 
 // userFromModel 把存储用户转换为应用契约。
 func userFromModel(user servermodels.User) User {
 	return User{
-		ID: user.ID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName,
+		ID: user.ID, IdentityID: user.IdentityID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName,
 		RoleID: user.RoleID, Status: UserStatus(user.Status), Locale: Locale(user.Locale), TimeZone: user.TimeZone,
 		WorkStatus: WorkStatus(user.WorkStatus), AvatarURL: avatarContentURL(user.AvatarFileID),
 	}

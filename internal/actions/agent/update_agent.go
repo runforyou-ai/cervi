@@ -4,6 +4,8 @@ package agent
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -44,12 +46,25 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err != nil {
 			return err
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.OrganizationMember)(nil)).
+		storedAgent := &servermodels.Agent{}
+		err = tx.NewSelect().Model(storedAgent).
+			Column("id", "identity_id").
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("id = ?", agentID).
+			For("UPDATE").
+			Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		result, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", agentID).
-			Where("type = ?", domain.MemberIdentityTypeAgent).
+			Where("id = ?", storedAgent.IdentityID).
+			Where("type = ?", domain.OrganizationIdentityTypeAgent).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -61,7 +76,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if rows == 0 {
 			return ErrNotFound
 		}
-		if err := replaceAgentTeams(ctx, tx, identity, agentID, teamIDs); err != nil {
+		if err := replaceAgentTeams(ctx, tx, identity, storedAgent.IdentityID, teamIDs); err != nil {
 			return err
 		}
 		output, err = loadDirectoryAgent(ctx, tx, identity.Organization.ID, agentID)
@@ -74,28 +89,28 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 }
 
 // replaceAgentTeams 按差集修改 AI 员工所属团队。
-func replaceAgentTeams(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, agentID string, teamIDs []string) error {
+func replaceAgentTeams(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, organizationIdentityID string, teamIDs []string) error {
 	if len(teamIDs) == 0 {
 		_, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
 			Where("organization_id = ?", identity.Organization.ID).
-			Where("member_id = ?", agentID).
+			Where("identity_id = ?", organizationIdentityID).
 			Exec(ctx)
 		return err
 	}
 	if _, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
 		Where("organization_id = ?", identity.Organization.ID).
-		Where("member_id = ?", agentID).
+		Where("identity_id = ?", organizationIdentityID).
 		Where("team_id NOT IN (?)", bun.In(teamIDs)).
 		Exec(ctx); err != nil {
 		return err
 	}
 	relations := make([]servermodels.TeamMember, 0, len(teamIDs))
 	for _, teamID := range teamIDs {
-		relations = append(relations, servermodels.TeamMember{OrganizationID: identity.Organization.ID, TeamID: teamID, MemberID: agentID, CreatedByUserID: identity.User.ID})
+		relations = append(relations, servermodels.TeamMember{OrganizationID: identity.Organization.ID, TeamID: teamID, IdentityID: organizationIdentityID, CreatedByUserID: identity.User.ID})
 	}
 	if _, err := tx.NewInsert().Model(&relations).
-		Column("organization_id", "team_id", "member_id", "created_by_user_id").
-		On("CONFLICT (organization_id, team_id, member_id) DO NOTHING").
+		Column("organization_id", "team_id", "identity_id", "created_by_user_id").
+		On("CONFLICT (organization_id, team_id, identity_id) DO NOTHING").
 		Exec(ctx); err != nil {
 		return fmt.Errorf("insert agent teams: %w", err)
 	}

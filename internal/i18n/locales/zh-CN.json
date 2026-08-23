@@ -34,7 +34,7 @@
   "error.agent_update_failed": "保存 AI 员工失败。",
   "error.agent_status_update_failed": "修改 AI 员工状态失败。",
   "error.user_update_failed": "保存企业成员失败。",
-  "error.user_status_update_failed": "修改企业成员状态失败。",
+  "error.user_status_update_failed": "修改账号状态失败。",
   "error.user_self_deactivate": "不能停用当前登录账号。",
   "error.user_last_active_administrator": "管理员角色至少需要保留一名正常状态的成员。",
   "error.team_not_found": "没有找到这个团队。",

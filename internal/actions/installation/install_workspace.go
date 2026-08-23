@@ -123,35 +123,36 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			}
 		}
 
+		organizationIdentity := &servermodels.OrganizationIdentity{
+			OrganizationID: organization.ID,
+			Type:           string(domain.OrganizationIdentityTypeUser),
+			DisplayName:    input.DisplayName,
+			WorkStatus:     string(domain.WorkStatusWorking),
+		}
+		if _, err := tx.NewInsert().Model(organizationIdentity).
+			Column("organization_id", "type", "display_name", "work_status").
+			Returning("id, work_status, work_status_updated_at").Exec(ctx); err != nil {
+			return err
+		}
 		user := &servermodels.User{
+			IdentityID:     organizationIdentity.ID,
 			OrganizationID: organization.ID,
 			Email:          input.Email,
 			PasswordHash:   passwordHash,
 			RoleID:         adminRoleID,
+			Status:         string(domain.UserStatusActive),
 			Locale:         string(input.Locale),
 			TimeZone:       input.TimeZone,
 		}
-		member := &servermodels.OrganizationMember{
-			OrganizationID: organization.ID,
-			Type:           string(domain.MemberIdentityTypeUser),
-			DisplayName:    input.DisplayName,
-			Status:         string(domain.UserStatusActive),
-		}
-		if _, err := tx.NewInsert().Model(member).
-			Column("organization_id", "type", "display_name", "status").
-			Returning("id").Exec(ctx); err != nil {
-			return err
-		}
-		user.ID = member.ID
 		if _, err := tx.NewInsert().
 			Model(user).
-			Column("id", "organization_id", "email", "password_hash", "role_id", "locale", "time_zone").
-			Returning("work_status").
+			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone").
+			Returning("id").
 			Exec(ctx); err != nil {
 			return err
 		}
-		user.DisplayName = member.DisplayName
-		user.Status = member.Status
+		user.DisplayName = organizationIdentity.DisplayName
+		user.WorkStatus = organizationIdentity.WorkStatus
 
 		teamName := "Customer Service Team"
 		if input.Locale == domain.LocaleChineseSimplified {
@@ -172,11 +173,11 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		teamMember := &servermodels.TeamMember{
 			OrganizationID:  organization.ID,
 			TeamID:          team.ID,
-			MemberID:        user.ID,
+			IdentityID:      user.IdentityID,
 			CreatedByUserID: user.ID,
 		}
 		if _, err := tx.NewInsert().Model(teamMember).
-			Column("organization_id", "team_id", "member_id", "created_by_user_id").
+			Column("organization_id", "team_id", "identity_id", "created_by_user_id").
 			Exec(ctx); err != nil {
 			return err
 		}

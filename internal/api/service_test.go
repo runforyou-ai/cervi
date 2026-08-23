@@ -271,15 +271,15 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 		t.Fatalf("status = %d, input = %#v", listResponse.StatusCode, backend.lastTeamList)
 	}
 
-	addResponse := doJSON(t, http.MethodPost, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.MemberIdentityTypeUser, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
+	addResponse := doJSON(t, http.MethodPost, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.OrganizationIdentityTypeUser, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
 	defer addResponse.Body.Close()
-	if addResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.MemberIdentityTypeUser {
+	if addResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.OrganizationIdentityTypeUser {
 		t.Fatalf("status = %d, input = %#v", addResponse.StatusCode, backend.lastTeamMembers)
 	}
 
-	removeResponse := doJSON(t, http.MethodDelete, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.MemberIdentityTypeAgent, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
+	removeResponse := doJSON(t, http.MethodDelete, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.OrganizationIdentityTypeAgent, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
 	defer removeResponse.Body.Close()
-	if removeResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.MemberIdentityTypeAgent {
+	if removeResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.OrganizationIdentityTypeAgent {
 		t.Fatalf("status = %d, input = %#v", removeResponse.StatusCode, backend.lastTeamMembers)
 	}
 }

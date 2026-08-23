@@ -4,6 +4,8 @@ package user
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -39,6 +41,19 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {
 			return err
 		}
+		storedUser := &servermodels.User{}
+		err = tx.NewSelect().Model(storedUser).
+			Column("id", "identity_id").
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("id = ?", userID).
+			For("UPDATE").
+			Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
 		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
 			Set("email = ?", input.Email).
 			Set("role_id = ?", input.RoleID).
@@ -59,12 +74,12 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if rows == 0 {
 			return ErrNotFound
 		}
-		result, err = tx.NewUpdate().Model((*servermodels.OrganizationMember)(nil)).
+		result, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", userID).
-			Where("type = ?", domain.MemberIdentityTypeUser).
+			Where("id = ?", storedUser.IdentityID).
+			Where("type = ?", domain.OrganizationIdentityTypeUser).
 			Exec(ctx)
 		if err != nil {
 			return err
@@ -79,7 +94,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err
 		}
-		if err := replaceUserTeams(ctx, tx, identity, userID, input.TeamIDs); err != nil {
+		if err := replaceUserTeams(ctx, tx, identity, storedUser.IdentityID, input.TeamIDs); err != nil {
 			return err
 		}
 		output, err = loadDirectoryUser(ctx, tx, identity.Organization.ID, userID)

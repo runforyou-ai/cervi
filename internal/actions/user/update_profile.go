@@ -45,27 +45,27 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 	var user *servermodels.User
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var previousAvatarFileID *string
-		memberQuery := tx.NewUpdate().
-			Model((*servermodels.OrganizationMember)(nil)).
+		identityQuery := tx.NewUpdate().
+			Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("updated_at = now()")
 		if input.AvatarFileID != "" {
 			if !common.ValidUUID(input.AvatarFileID) {
 				return ErrAvatarFileNotFound
 			}
-			currentMember := &servermodels.OrganizationMember{}
-			if err := tx.NewSelect().Model(currentMember).
+			currentIdentity := &servermodels.OrganizationIdentity{}
+			if err := tx.NewSelect().Model(currentIdentity).
 				Column("avatar_file_id").
-				Where("om.id = ?", identity.User.ID).
-				Where("om.organization_id = ?", identity.Organization.ID).
-				Where("om.type = ?", domain.MemberIdentityTypeUser).
+				Where("oi.id = ?", identity.User.IdentityID).
+				Where("oi.organization_id = ?", identity.Organization.ID).
+				Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 				For("UPDATE").
 				Scan(ctx); errors.Is(err, sql.ErrNoRows) {
 				return common.ErrIdentityInvalid
 			} else if err != nil {
 				return err
 			}
-			previousAvatarFileID = currentMember.AvatarFileID
+			previousAvatarFileID = currentIdentity.AvatarFileID
 
 			file := &servermodels.File{}
 			if err := tx.NewSelect().Model(file).
@@ -97,7 +97,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			} else if file.Status != string(domain.FileStatusActive) || !sameAvatar {
 				return ErrAvatarFileNotFound
 			}
-			memberQuery = memberQuery.Set("avatar_file_id = ?", file.ID)
+			identityQuery = identityQuery.Set("avatar_file_id = ?", file.ID)
 		}
 		result, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
 			Set("email = ?", input.Email).
@@ -115,10 +115,10 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		if rows == 0 {
 			return common.ErrIdentityInvalid
 		}
-		result, err = memberQuery.
-			Where("om.id = ?", identity.User.ID).
-			Where("om.organization_id = ?", identity.Organization.ID).
-			Where("om.type = ?", domain.MemberIdentityTypeUser).
+		result, err = identityQuery.
+			Where("oi.id = ?", identity.User.IdentityID).
+			Where("oi.organization_id = ?", identity.Organization.ID).
+			Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 			Exec(ctx)
 		if err != nil {
 			return err

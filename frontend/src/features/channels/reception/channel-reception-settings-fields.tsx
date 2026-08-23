@@ -12,7 +12,7 @@ import { toast } from "sonner"
 
 import {
   ChannelRoutingTargetType,
-  MemberIdentityType,
+  OrganizationIdentityType,
   listMemberOptions,
   listTeams,
   type ChannelRoutingTarget,
@@ -109,7 +109,8 @@ function ReceptionTargetField({
                   <option key={member.id} value={member.id}>
                     {member.displayName}（
                     {t(
-                      member.type === MemberIdentityType.MemberIdentityTypeAgent
+                      member.type ===
+                      OrganizationIdentityType.OrganizationIdentityTypeAgent
                         ? "routing.agent"
                         : "routing.person",
                     )}

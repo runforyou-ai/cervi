@@ -16,10 +16,10 @@ import (
 
 // Option 定义可选择的企业成员。
 type Option struct {
-	ID           string                    `bun:"id"`
-	Type         domain.MemberIdentityType `bun:"type"`
-	DisplayName  string                    `bun:"display_name"`
-	AvatarFileID *string                   `bun:"avatar_file_id"`
+	ID           string                          `bun:"id"`
+	Type         domain.OrganizationIdentityType `bun:"type"`
+	DisplayName  string                          `bun:"display_name"`
+	AvatarFileID *string                         `bun:"avatar_file_id"`
 }
 
 // ListOptionsInput 定义成员选择项查询条件。
@@ -59,20 +59,20 @@ func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.I
 		return ListOptionsOutput{}, fmt.Errorf("member options page size invalid")
 	}
 	apply := func(query *bun.SelectQuery) *bun.SelectQuery {
-		query = query.Where("om.organization_id = ?", identity.Organization.ID).
-			Where("om.status = ?", domain.UserStatusActive).
-			Where("om.type IN (?, ?)", domain.MemberIdentityTypeUser, domain.MemberIdentityTypeAgent)
+		query = query.Where("oi.organization_id = ?", identity.Organization.ID).
+			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive)
 		if input.Query != "" {
 			pattern := "%" + input.Query + "%"
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
-				return group.Where("om.display_name ILIKE ?", pattern).WhereOr("u.email ILIKE ?", pattern)
+				return group.Where("oi.display_name ILIKE ?", pattern).WhereOr("u.email ILIKE ?", pattern)
 			})
 		}
 		return query
 	}
 	base := func() *bun.SelectQuery {
-		return q.db.NewSelect().TableExpr("organization_members AS om").
-			Join("LEFT JOIN users AS u ON u.id = om.id AND u.organization_id = om.organization_id")
+		return q.db.NewSelect().TableExpr("organization_identities AS oi").
+			Join("LEFT JOIN users AS u ON u.identity_id = oi.id AND u.organization_id = oi.organization_id").
+			Join("LEFT JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id")
 	}
 	total, err := apply(base()).Count(ctx)
 	if err != nil {
@@ -80,8 +80,8 @@ func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.I
 	}
 	members := make([]Option, 0)
 	if err := apply(base()).
-		ColumnExpr("om.id::text, om.type, om.display_name, om.avatar_file_id::text").
-		OrderExpr("lower(om.display_name) ASC, om.id ASC").
+		ColumnExpr("oi.id::text, oi.type, oi.display_name, oi.avatar_file_id::text").
+		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
 		Scan(ctx, &members); err != nil {
