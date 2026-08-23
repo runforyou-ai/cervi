@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/taskruntime"
@@ -23,13 +24,14 @@ func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	store, err := serverstorage.Open(ctx, serverstorage.Config{
-		DSN:             dsn,
-		MaxOpenConns:    2,
-		MaxIdleConns:    1,
-		ConnMaxLifetime: time.Minute,
-		ConnMaxIdleTime: time.Minute,
-		StartupTimeout:  30 * time.Second,
+	store, err := serverstorage.Open(ctx, serverconfig.DatabaseConfig{
+		URL:                   dsn,
+		MaxOpenConnections:    2,
+		MaxIdleConnections:    1,
+		ConnectionMaxLifetime: serverconfig.Duration(time.Minute),
+		ConnectionMaxIdleTime: serverconfig.Duration(time.Minute),
+		ConnectTimeout:        serverconfig.Duration(30 * time.Second),
+		MigrationTimeout:      serverconfig.Duration(time.Minute),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +48,7 @@ func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 		}
 	})
 
-	runtime := New(db, Config{})
+	runtime := New(db, serverconfig.NATSConfig{})
 	const actionName = "test.schedule.action"
 	if err := runtime.Registry().Register(actionName, func(context.Context, json.RawMessage) error { return nil }); err != nil {
 		t.Fatal(err)

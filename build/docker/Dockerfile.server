@@ -31,14 +31,12 @@ RUN if command -v apk >/dev/null 2>&1; then \
         apt-get update && apt-get install -y --no-install-recommends git $([ "$CGO_ENABLED" = "1" ] && echo gcc libc6-dev) && rm -rf /var/lib/apt/lists/*; \
     fi
 
+COPY go.mod go.sum ./
+# Download dependencies
+RUN go mod download
+
 # Copy source code
 COPY . .
-
-# Remove local replace directive if present (for production builds)
-RUN sed -i '/^replace/d' go.mod || true
-
-# Download dependencies
-RUN go mod tidy
 
 # Build the production server binary.
 # - server,production tags: HTTP server mode with production code paths (no dev
