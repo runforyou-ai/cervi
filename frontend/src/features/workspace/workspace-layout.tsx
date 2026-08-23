@@ -42,6 +42,7 @@ export function WorkspaceLayout({
   const [loggingOut, setLoggingOut] = useState(false)
   const { status, session, retry } = useSessionLoader()
 
+  /** 会话加载完成后同步工作台身份。 */
   useEffect(() => {
     if (status !== "loaded" || !session) {
       return
@@ -51,6 +52,16 @@ export function WorkspaceLayout({
       console.info("工作台身份已加载", {
         organization: session.identity.organization.name,
       })
+    }
+  }, [session, status])
+
+  /** 会话未就绪时跳转到对应入口。 */
+  useEffect(() => {
+    if (
+      status !== "loaded" ||
+      !session ||
+      session.state === SessionState.SessionStateReady
+    ) {
       return
     }
     const path = sessionPath(session.state)
