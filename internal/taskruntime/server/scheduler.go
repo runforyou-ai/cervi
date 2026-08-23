@@ -106,13 +106,11 @@ func (r *Runtime) syncSchedule(ctx context.Context, definition taskruntime.Sched
 					AND task_schedules.enabled = EXCLUDED.enabled
 					AND task_schedules.max_attempts = EXCLUDED.max_attempts
 				THEN task_schedules.next_run_at
-				ELSE CASE
-					WHEN task_schedules.enabled = FALSE
-						AND EXCLUDED.enabled = TRUE
-						AND ?
-					THEN ?
-					ELSE ?
-				END
+				WHEN task_schedules.enabled = FALSE
+					AND EXCLUDED.enabled = TRUE
+					AND ?
+				THEN ?::timestamptz
+				ELSE ?::timestamptz
 			END,
 			updated_at = EXCLUDED.updated_at
 	`, record.ID, record.ScheduleKey, record.ActionName, record.QueueName, string(record.Payload),

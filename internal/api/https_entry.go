@@ -25,16 +25,16 @@ import (
 const (
 	httpAddress  = ":80"
 	httpsAddress = ":443"
-	modeAuto     = httpsMode("auto")
-	modeExternal = httpsMode("external")
-	modeOff      = httpsMode("off")
+	modeAuto     = tlsMode("auto")
+	modeExternal = tlsMode("external")
+	modeOff      = tlsMode("off")
 )
 
-type httpsMode string
+type tlsMode string
 
-// HTTPSEntry 根据部署模式代理 Wails server 并管理 HTTPS。
+// HTTPSEntry 按 TLS 模式代理 Wails server。
 type HTTPSEntry struct {
-	mode        httpsMode
+	mode        tlsMode
 	cache       autocert.Cache
 	cachePath   string
 	manager     *autocert.Manager
@@ -45,9 +45,9 @@ type HTTPSEntry struct {
 	backendPort int
 }
 
-// NewHTTPSEntry 根据部署模式创建 HTTPS 入口。
+// NewHTTPSEntry 根据 TLS 配置创建 HTTPS 入口。
 func NewHTTPSEntry(config serverconfig.HTTPSConfig, backendPort int) (*HTTPSEntry, error) {
-	mode, err := parseHTTPSMode(config.Mode)
+	mode, err := parseTLSMode(config.Mode)
 	if err != nil {
 		return nil, err
 	}
@@ -88,13 +88,14 @@ func NewHTTPSEntry(config serverconfig.HTTPSConfig, backendPort int) (*HTTPSEntr
 	return service, nil
 }
 
-// Start 根据部署模式启动自动 HTTPS 入口。
+// Start 启动 HTTPS 入口。
 func (s *HTTPSEntry) Start(ctx context.Context) error {
 	if s.mode == modeExternal {
-		slog.Info("HTTPS 由外部入口管理", "server_port", s.backendPort)
+		slog.Info("TLS 由外部入口终止", "server_port", s.backendPort)
 		return nil
 	}
-	if s.mode != modeAuto {
+	if s.mode == modeOff {
+		slog.Info("TLS 入口已关闭", "server_port", s.backendPort)
 		return nil
 	}
 	httpListener, err := net.Listen("tcp", s.httpServer.Addr)
@@ -234,10 +235,10 @@ func redirectToHTTPS(writer http.ResponseWriter, request *http.Request, host str
 	http.Redirect(writer, request, target.String(), http.StatusTemporaryRedirect)
 }
 
-// parseHTTPSMode 解析已校验的 HTTPS 模式。
-func parseHTTPSMode(value string) (httpsMode, error) {
+// parseTLSMode 解析已校验的 TLS 模式。
+func parseTLSMode(value string) (tlsMode, error) {
 	value = strings.ToLower(strings.TrimSpace(value))
-	mode := httpsMode(value)
+	mode := tlsMode(value)
 	switch mode {
 	case modeAuto, modeExternal, modeOff:
 		return mode, nil

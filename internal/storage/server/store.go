@@ -42,7 +42,11 @@ func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, erro
 		_ = db.Close()
 		return nil, fmt.Errorf("connect to PostgreSQL: %w", connectErr)
 	}
-	slog.Info("PostgreSQL 连接成功", "timezone", "UTC")
+	slog.Info("PostgreSQL 连接成功",
+		"timezone", "UTC",
+		"max_open_connections", config.MaxOpenConnections,
+		"max_idle_connections", config.MaxIdleConnections,
+	)
 
 	migrationCtx, cancelMigration := context.WithTimeout(ctx, config.MigrationTimeout.Value())
 	migrationErr := migrate(migrationCtx, sqlDB)

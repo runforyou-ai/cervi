@@ -18,12 +18,12 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// TestParseHTTPSMode 验证 HTTPS 模式解析。
-func TestParseHTTPSMode(t *testing.T) {
+// TestParseTLSMode 验证 TLS 模式解析。
+func TestParseTLSMode(t *testing.T) {
 	tests := []struct {
 		name      string
 		value     string
-		want      httpsMode
+		want      tlsMode
 		wantError bool
 	}{
 		{name: "explicit auto", value: "auto", want: modeAuto},
@@ -34,7 +34,7 @@ func TestParseHTTPSMode(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mode, err := parseHTTPSMode(test.value)
+			mode, err := parseTLSMode(test.value)
 			if test.wantError {
 				if err == nil {
 					t.Fatal("expected invalid mode error")
@@ -42,7 +42,7 @@ func TestParseHTTPSMode(t *testing.T) {
 				return
 			}
 			if err != nil || mode != test.want {
-				t.Fatalf("parseHTTPSMode() = (%q, %v), want (%q, nil)", mode, err, test.want)
+				t.Fatalf("parseTLSMode() = (%q, %v), want (%q, nil)", mode, err, test.want)
 			}
 		})
 	}

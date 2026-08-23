@@ -164,7 +164,7 @@ func (r *Runtime) runExpiringMessageRecovery(ctx context.Context) {
 				slog.Warn("重建即将过期的任务消息失败", "namespace", r.config.Namespace, "error", err)
 			}
 		} else if recovered > 0 {
-			slog.Warn("已重建即将过期的任务消息", "namespace", r.config.Namespace, "count", recovered)
+			slog.Info("已重建即将过期的任务消息", "namespace", r.config.Namespace, "count", recovered)
 			if recovered == expiringMessageRecoveryBatch {
 				continue
 			}
