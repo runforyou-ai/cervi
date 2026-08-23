@@ -7,6 +7,8 @@ export {
 };
 
 export {
+    AIModelInputModality,
+    AIModelType,
     AIProviderBrand,
     ChannelType,
     ContactMethodType,
@@ -92,6 +94,8 @@ export type {
     UserRoleChangesInput,
     UserWorkStatusInput,
     WebsiteChannel,
+    WebsiteChannelAccess,
+    WebsiteChannelAccessInput,
     WebsiteChannelChatInterface,
     WebsiteChannelChatInterfaceInput,
     WebsiteChannelInput,

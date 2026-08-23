@@ -56,6 +56,7 @@ func NewService(application *appservice.Service) *Service {
 	router.GET("/channels/website/:channelID", service.getWebsiteChannel)
 	router.PATCH("/channels/website/:channelID", service.updateWebsiteChannel)
 	router.PATCH("/channels/website/:channelID/chat-interface", service.updateWebsiteChannelChatInterface)
+	router.PATCH("/channels/website/:channelID/access", service.updateWebsiteChannelAccess)
 	router.POST("/channels/website/:channelID/deactivate", service.deactivateWebsiteChannel)
 	router.POST("/channels/website/:channelID/activate", service.activateWebsiteChannel)
 	router.GET("/channels", service.listChannels)
@@ -85,12 +86,12 @@ func NewService(application *appservice.Service) *Service {
 	router.GET("/settings/roles/:roleID", service.getRole)
 	router.PUT("/settings/roles/:roleID", service.updateRole)
 	router.DELETE("/settings/roles/:roleID", service.deleteRole)
-	router.GET("/settings/ai-providers/models", service.listAvailableAIModels)
-	router.GET("/settings/ai-providers", service.listAIProviders)
-	router.POST("/settings/ai-providers", service.createAIProvider)
-	router.GET("/settings/ai-providers/:providerID", service.getAIProvider)
-	router.PUT("/settings/ai-providers/:providerID", service.updateAIProvider)
-	router.DELETE("/settings/ai-providers/:providerID", service.deleteAIProvider)
+	router.GET("/integrations/model-services/models", service.listAvailableAIModels)
+	router.GET("/integrations/model-services", service.listAIProviders)
+	router.POST("/integrations/model-services", service.createAIProvider)
+	router.GET("/integrations/model-services/:providerID", service.getAIProvider)
+	router.PUT("/integrations/model-services/:providerID", service.updateAIProvider)
+	router.DELETE("/integrations/model-services/:providerID", service.deleteAIProvider)
 	router.PUT("/settings/organization", service.updateOrganization)
 	router.GET("/settings/storage/s3", service.getS3Setting)
 	router.PUT("/settings/storage/s3", service.saveS3Setting)
@@ -247,6 +248,16 @@ func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
 	}
 	setting, err := s.application.UpdateWebsiteChannelChatInterface(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
 	writeResult(c, http.StatusOK, setting, err)
+}
+
+// updateWebsiteChannelAccess 修改网站渠道允许使用的网站。
+func (s *Service) updateWebsiteChannelAccess(c *gin.Context) {
+	var input appservice.WebsiteChannelAccessInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	access, err := s.application.UpdateWebsiteChannelAccess(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	writeResult(c, http.StatusOK, access, err)
 }
 
 // deactivateWebsiteChannel 停用网站渠道。
@@ -487,25 +498,25 @@ func (s *Service) deleteRole(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteRole(c.Request.Context(), requestMeta(c), c.Param("roleID")))
 }
 
-// listAIProviders 返回企业 AI 供应商列表。
+// listAIProviders 返回模型服务供应商列表。
 func (s *Service) listAIProviders(c *gin.Context) {
 	providers, err := s.application.ListAIProviders(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, providers, err)
 }
 
-// getAIProvider 返回企业 AI 供应商详情。
+// getAIProvider 返回模型服务供应商详情。
 func (s *Service) getAIProvider(c *gin.Context) {
 	provider, err := s.application.GetAIProvider(c.Request.Context(), requestMeta(c), c.Param("providerID"))
 	writeResult(c, http.StatusOK, provider, err)
 }
 
-// listAvailableAIModels 返回指定品牌的可用模型目录。
+// listAvailableAIModels 返回指定品牌的预设模型目录。
 func (s *Service) listAvailableAIModels(c *gin.Context) {
 	models, err := s.application.ListAvailableAIModels(c.Request.Context(), requestMeta(c), appservice.AIProviderBrand(c.Query("brand")))
 	writeResult(c, http.StatusOK, models, err)
 }
 
-// createAIProvider 创建企业 AI 供应商。
+// createAIProvider 创建模型服务供应商。
 func (s *Service) createAIProvider(c *gin.Context) {
 	var input appservice.AIProviderInput
 	if !bindJSON(c, &input) {
@@ -515,7 +526,7 @@ func (s *Service) createAIProvider(c *gin.Context) {
 	writeResult(c, http.StatusCreated, provider, err)
 }
 
-// updateAIProvider 修改企业 AI 供应商。
+// updateAIProvider 修改模型服务供应商。
 func (s *Service) updateAIProvider(c *gin.Context) {
 	var input appservice.AIProviderInput
 	if !bindJSON(c, &input) {
@@ -525,7 +536,7 @@ func (s *Service) updateAIProvider(c *gin.Context) {
 	writeResult(c, http.StatusOK, provider, err)
 }
 
-// deleteAIProvider 删除企业 AI 供应商。
+// deleteAIProvider 删除模型服务供应商。
 func (s *Service) deleteAIProvider(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteAIProvider(c.Request.Context(), requestMeta(c), c.Param("providerID")))
 }

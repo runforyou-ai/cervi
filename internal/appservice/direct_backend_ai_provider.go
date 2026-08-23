@@ -13,7 +13,7 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
-// ListAIProviders 返回当前企业的 AI 供应商列表。
+// ListAIProviders 返回当前企业的模型服务供应商列表。
 func (b *DirectBackend) ListAIProviders(ctx context.Context, meta RequestMeta) (AIProviderList, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -25,14 +25,19 @@ func (b *DirectBackend) ListAIProviders(ctx context.Context, meta RequestMeta) (
 	}
 	output := make([]AIProviderSummary, 0, len(providers))
 	for _, provider := range providers {
+		modelTypes := make([]AIModelType, 0, len(provider.ModelTypes))
+		for _, modelType := range provider.ModelTypes {
+			modelTypes = append(modelTypes, AIModelType(modelType))
+		}
 		output = append(output, AIProviderSummary{
 			ID: provider.ID, Brand: AIProviderBrand(provider.Brand), Name: provider.Name, APIURL: provider.APIURL,
+			ModelTypes: modelTypes,
 		})
 	}
 	return AIProviderList{Providers: output}, nil
 }
 
-// GetAIProvider 返回当前企业中的 AI 供应商详情。
+// GetAIProvider 返回当前企业中的模型服务供应商详情。
 func (b *DirectBackend) GetAIProvider(ctx context.Context, meta RequestMeta, providerID string) (AIProvider, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -45,7 +50,7 @@ func (b *DirectBackend) GetAIProvider(ctx context.Context, meta RequestMeta, pro
 	return aiProviderFromAction(*provider), nil
 }
 
-// ListAvailableAIModels 返回指定品牌的可用模型目录。
+// ListAvailableAIModels 返回指定品牌的预设模型目录。
 func (b *DirectBackend) ListAvailableAIModels(ctx context.Context, meta RequestMeta, brand AIProviderBrand) (AIProviderModelList, error) {
 	if _, err := b.authenticate(ctx, meta); err != nil {
 		return AIProviderModelList{}, err
@@ -58,7 +63,7 @@ func (b *DirectBackend) ListAvailableAIModels(ctx context.Context, meta RequestM
 	return AIProviderModelList{Models: aiProviderModelsFromAction(models)}, nil
 }
 
-// CreateAIProvider 创建 AI 供应商。
+// CreateAIProvider 创建模型服务供应商。
 func (b *DirectBackend) CreateAIProvider(ctx context.Context, meta RequestMeta, input AIProviderInput) (AIProvider, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -68,11 +73,11 @@ func (b *DirectBackend) CreateAIProvider(ctx context.Context, meta RequestMeta, 
 	if err != nil {
 		return AIProvider{}, b.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderCreateFailed, identity.Organization.ID)
 	}
-	slog.Info("AI 供应商创建成功", "organization_id", identity.Organization.ID, "provider_id", provider.ID, "brand", provider.Brand, "model_count", len(provider.Models))
+	slog.Info("模型服务供应商创建成功", "organization_id", identity.Organization.ID, "provider_id", provider.ID, "brand", provider.Brand, "model_count", len(provider.Models))
 	return aiProviderFromAction(*provider), nil
 }
 
-// UpdateAIProvider 修改 AI 供应商。
+// UpdateAIProvider 修改模型服务供应商。
 func (b *DirectBackend) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderInput) (AIProvider, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -82,11 +87,11 @@ func (b *DirectBackend) UpdateAIProvider(ctx context.Context, meta RequestMeta, 
 	if err != nil {
 		return AIProvider{}, b.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderUpdateFailed, identity.Organization.ID, "provider_id", providerID)
 	}
-	slog.Info("AI 供应商保存成功", "organization_id", identity.Organization.ID, "provider_id", provider.ID, "brand", provider.Brand, "model_count", len(provider.Models))
+	slog.Info("模型服务供应商保存成功", "organization_id", identity.Organization.ID, "provider_id", provider.ID, "brand", provider.Brand, "model_count", len(provider.Models))
 	return aiProviderFromAction(*provider), nil
 }
 
-// DeleteAIProvider 删除 AI 供应商。
+// DeleteAIProvider 删除模型服务供应商。
 func (b *DirectBackend) DeleteAIProvider(ctx context.Context, meta RequestMeta, providerID string) error {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -95,11 +100,11 @@ func (b *DirectBackend) DeleteAIProvider(ctx context.Context, meta RequestMeta, 
 	if err := b.deleteAIProvider.Execute(ctx, identity, providerID); err != nil {
 		return b.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderDeleteFailed, identity.Organization.ID, "provider_id", providerID)
 	}
-	slog.Info("AI 供应商删除成功", "organization_id", identity.Organization.ID, "provider_id", providerID)
+	slog.Info("模型服务供应商删除成功", "organization_id", identity.Organization.ID, "provider_id", providerID)
 	return nil
 }
 
-// aiProviderMutationError 转换 AI 供应商写入校验和操作错误。
+// aiProviderMutationError 转换模型服务供应商写入错误。
 func (b *DirectBackend) aiProviderMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	var validationError *common.FieldError
 	if errors.As(err, &validationError) {
@@ -108,7 +113,7 @@ func (b *DirectBackend) aiProviderMutationError(ctx context.Context, meta Reques
 	return b.aiProviderError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
-// aiProviderError 转换 AI 供应商通用操作错误。
+// aiProviderError 转换模型服务供应商操作错误。
 func (b *DirectBackend) aiProviderError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -120,16 +125,18 @@ func (b *DirectBackend) aiProviderError(ctx context.Context, meta RequestMeta, e
 		return NotFoundError(meta, cervii18n.ErrorAIProviderNotFound)
 	}
 	logAttributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
-	slog.Warn("AI 供应商操作失败", append(logAttributes, attributes...)...)
+	slog.Warn("模型服务供应商操作失败", append(logAttributes, attributes...)...)
 	return FailedError(meta, failureKey)
 }
 
-// aiProviderInput 转换 AI 供应商输入。
+// aiProviderInput 转换模型服务供应商输入。
 func aiProviderInput(input AIProviderInput) aiprovideraction.Input {
 	models := make([]aiprovideraction.Model, 0, len(input.Models))
 	for _, model := range input.Models {
 		models = append(models, aiprovideraction.Model{
-			Identifier: model.Identifier, Name: model.Name, ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
+			Identifier: model.Identifier, Name: model.Name, Type: domain.AIModelType(model.Type),
+			InputModalities: aiModelInputModalitiesToDomain(model.InputModalities),
+			ContextWindow:   model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
 		})
 	}
 	return aiprovideraction.Input{
@@ -137,7 +144,7 @@ func aiProviderInput(input AIProviderInput) aiprovideraction.Input {
 	}
 }
 
-// aiProviderFromAction 转换 AI 供应商输出。
+// aiProviderFromAction 转换模型服务供应商输出。
 func aiProviderFromAction(input aiprovideraction.Record) AIProvider {
 	return AIProvider{
 		ID: input.ID, Brand: AIProviderBrand(input.Brand), Name: input.Name, APIKey: input.APIKey, APIURL: input.APIURL,
@@ -150,13 +157,33 @@ func aiProviderModelsFromAction(input []aiprovideraction.Model) []AIProviderMode
 	models := make([]AIProviderModel, 0, len(input))
 	for _, model := range input {
 		models = append(models, AIProviderModel{
-			Identifier: model.Identifier, Name: model.Name, ContextWindow: model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
+			Identifier: model.Identifier, Name: model.Name, Type: AIModelType(model.Type),
+			InputModalities: aiModelInputModalitiesFromDomain(model.InputModalities),
+			ContextWindow:   model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
 		})
 	}
 	return models
 }
 
-// aiProviderFieldKeys 把 AI 供应商校验错误码映射为本地化文案键。
+// aiModelInputModalitiesToDomain 转换模型输入模态到领域值。
+func aiModelInputModalitiesToDomain(input []AIModelInputModality) []domain.AIModelInputModality {
+	output := make([]domain.AIModelInputModality, 0, len(input))
+	for _, modality := range input {
+		output = append(output, domain.AIModelInputModality(modality))
+	}
+	return output
+}
+
+// aiModelInputModalitiesFromDomain 转换领域模型输入模态到应用契约。
+func aiModelInputModalitiesFromDomain(input []domain.AIModelInputModality) []AIModelInputModality {
+	output := make([]AIModelInputModality, 0, len(input))
+	for _, modality := range input {
+		output = append(output, AIModelInputModality(modality))
+	}
+	return output
+}
+
+// aiProviderFieldKeys 映射模型服务供应商校验错误。
 func aiProviderFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
 		aiprovideraction.ValidationBrandInvalid:   cervii18n.FieldAIProviderBrandInvalid,

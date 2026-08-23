@@ -14,8 +14,8 @@ import (
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/filestore"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -94,7 +94,7 @@ func (b *DirectBackend) fileUploadRequest(ctx context.Context, meta RequestMeta,
 			Headers: map[string]string{"Authorization": "Bearer " + meta.Token, "Content-Type": record.ContentType},
 		}, nil
 	}
-	signed, err := filestore.PresignPut(ctx, s3FileConfig(setting), record.StorageKey, record.ContentType)
+	signed, err := serverfilecontent.PresignPut(ctx, s3FileConfig(setting), record.StorageKey, record.ContentType)
 	if err != nil {
 		return FileUploadRequest{}, fmt.Errorf("presign S3 file upload: %w", err)
 	}
@@ -114,7 +114,7 @@ func (b *DirectBackend) statFile(ctx context.Context, identity *servermodels.Ide
 	if err != nil {
 		return "", 0, err
 	}
-	info, err := filestore.Stat(ctx, s3FileConfig(setting), record.StorageKey)
+	info, err := serverfilecontent.Stat(ctx, s3FileConfig(setting), record.StorageKey)
 	if err != nil {
 		return "", 0, fmt.Errorf("stat S3 file: %w", err)
 	}
@@ -157,8 +157,8 @@ func fileFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key 
 }
 
 // s3FileConfig 转换文件存储使用的 S3 配置。
-func s3FileConfig(setting settingaction.S3Setting) filestore.S3Config {
-	return filestore.S3Config{
+func s3FileConfig(setting settingaction.S3Setting) serverfilecontent.S3Config {
+	return serverfilecontent.S3Config{
 		Endpoint: setting.Endpoint, Region: setting.Region, Bucket: setting.Bucket,
 		AccessKeyID: setting.AccessKeyID, SecretAccessKey: setting.SecretAccessKey, ForcePathStyle: setting.ForcePathStyle,
 	}

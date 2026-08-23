@@ -11,17 +11,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// DeleteAIProviderAction 删除 AI 供应商。
+// DeleteAIProviderAction 删除模型服务供应商。
 type DeleteAIProviderAction struct {
 	db *bun.DB
 }
 
-// NewDeleteAIProviderAction 创建 AI 供应商删除操作。
+// NewDeleteAIProviderAction 创建模型服务供应商删除操作。
 func NewDeleteAIProviderAction(db *bun.DB) *DeleteAIProviderAction {
 	return &DeleteAIProviderAction{db: db}
 }
 
-// Execute 删除当前企业中的 AI 供应商及其模型目录。
+// Execute 删除模型服务供应商及其模型目录。
 func (a *DeleteAIProviderAction) Execute(ctx context.Context, identity *servermodels.Identity, providerID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {

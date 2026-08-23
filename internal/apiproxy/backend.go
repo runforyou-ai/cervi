@@ -185,6 +185,13 @@ func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta ap
 	return output, err
 }
 
+// UpdateWebsiteChannelAccess 修改远程网站渠道允许使用的网站。
+func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelAccessInput) (appservice.WebsiteChannelAccess, error) {
+	var output appservice.WebsiteChannelAccess
+	err := b.do(ctx, meta, http.MethodPatch, "/channels/website/"+url.PathEscape(channelID)+"/access", nil, input, &output)
+	return output, err
+}
+
 // DeactivateWebsiteChannel 停用远程网站渠道。
 func (b *Backend) DeactivateWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.WebsiteChannelSummary, error) {
 	var output appservice.WebsiteChannelSummary
@@ -403,46 +410,46 @@ func (b *Backend) DeleteRole(ctx context.Context, meta appservice.RequestMeta, r
 	return b.do(ctx, meta, http.MethodDelete, "/settings/roles/"+url.PathEscape(roleID), nil, nil, nil)
 }
 
-// ListAIProviders 返回远程企业 AI 供应商列表。
+// ListAIProviders 返回远程模型服务供应商列表。
 func (b *Backend) ListAIProviders(ctx context.Context, meta appservice.RequestMeta) (appservice.AIProviderList, error) {
 	var output appservice.AIProviderList
-	err := b.do(ctx, meta, http.MethodGet, "/settings/ai-providers", nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/model-services", nil, nil, &output)
 	return output, err
 }
 
-// GetAIProvider 返回远程企业 AI 供应商详情。
+// GetAIProvider 返回远程模型服务供应商详情。
 func (b *Backend) GetAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
-	err := b.do(ctx, meta, http.MethodGet, "/settings/ai-providers/"+url.PathEscape(providerID), nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/model-services/"+url.PathEscape(providerID), nil, nil, &output)
 	return output, err
 }
 
-// ListAvailableAIModels 返回远程指定品牌的可用模型目录。
+// ListAvailableAIModels 返回远程指定品牌的预设模型目录。
 func (b *Backend) ListAvailableAIModels(ctx context.Context, meta appservice.RequestMeta, brand appservice.AIProviderBrand) (appservice.AIProviderModelList, error) {
 	query := url.Values{}
 	query.Set("brand", string(brand))
 	var output appservice.AIProviderModelList
-	err := b.do(ctx, meta, http.MethodGet, "/settings/ai-providers/models", query, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/model-services/models", query, nil, &output)
 	return output, err
 }
 
-// CreateAIProvider 创建远程企业 AI 供应商。
+// CreateAIProvider 创建远程模型服务供应商。
 func (b *Backend) CreateAIProvider(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderInput) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
-	err := b.do(ctx, meta, http.MethodPost, "/settings/ai-providers", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPost, "/integrations/model-services", nil, input, &output)
 	return output, err
 }
 
-// UpdateAIProvider 修改远程企业 AI 供应商。
+// UpdateAIProvider 修改远程模型服务供应商。
 func (b *Backend) UpdateAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string, input appservice.AIProviderInput) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
-	err := b.do(ctx, meta, http.MethodPut, "/settings/ai-providers/"+url.PathEscape(providerID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/integrations/model-services/"+url.PathEscape(providerID), nil, input, &output)
 	return output, err
 }
 
-// DeleteAIProvider 删除远程企业 AI 供应商。
+// DeleteAIProvider 删除远程模型服务供应商。
 func (b *Backend) DeleteAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/settings/ai-providers/"+url.PathEscape(providerID), nil, nil, nil)
+	return b.do(ctx, meta, http.MethodDelete, "/integrations/model-services/"+url.PathEscape(providerID), nil, nil, nil)
 }
 
 // UpdateOrganization 修改远程企业名称。

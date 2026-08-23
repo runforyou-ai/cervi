@@ -108,11 +108,32 @@ const (
 	ContactSortDisplayNameAscending ContactSort = ContactSort(domain.ContactSortDisplayNameAscending)
 )
 
-// AIProviderBrand 表示 AI 供应商品牌。
+// AIProviderBrand 表示模型服务供应商品牌。
 type AIProviderBrand string
 
 const (
 	AIProviderBrandDeepSeek AIProviderBrand = AIProviderBrand(domain.AIProviderBrandDeepSeek)
+	AIProviderBrandAlibaba  AIProviderBrand = AIProviderBrand(domain.AIProviderBrandAlibaba)
+	AIProviderBrandOpenAI   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOpenAI)
+)
+
+// AIModelType 表示 AI 模型用途。
+type AIModelType string
+
+const (
+	AIModelTypeChat      AIModelType = AIModelType(domain.AIModelTypeChat)
+	AIModelTypeEmbedding AIModelType = AIModelType(domain.AIModelTypeEmbedding)
+	AIModelTypeRerank    AIModelType = AIModelType(domain.AIModelTypeRerank)
+)
+
+// AIModelInputModality 表示模型支持的输入模态。
+type AIModelInputModality string
+
+const (
+	AIModelInputModalityText  AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityText)
+	AIModelInputModalityImage AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityImage)
+	AIModelInputModalityAudio AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityAudio)
+	AIModelInputModalityVideo AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityVideo)
 )
 
 // StorageProvider 表示 S3 兼容对象存储提供商。
@@ -401,6 +422,7 @@ type WebsiteChannelSummary struct {
 type WebsiteChannel struct {
 	WebsiteChannelSummary
 	ChatInterface WebsiteChannelChatInterface `json:"chatInterface"`
+	Access        WebsiteChannelAccess        `json:"access"`
 }
 
 // WebsiteChannelInput 定义网站渠道基础字段。
@@ -425,6 +447,16 @@ type WebsiteChannelChatInterfaceInput struct {
 	Subtitle        string `json:"subtitle"`
 	GreetingMessage string `json:"greetingMessage"`
 	ThemeColor      string `json:"themeColor"`
+}
+
+// WebsiteChannelAccess 定义网站渠道允许使用的网站。
+type WebsiteChannelAccess struct {
+	AllowedHosts []string `json:"allowedHosts"`
+}
+
+// WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
+type WebsiteChannelAccessInput struct {
+	AllowedHosts []string `json:"allowedHosts"`
 }
 
 // ChannelSummary 定义渠道选择项。
@@ -663,7 +695,7 @@ type ContactList struct {
 	Page     PageInfo         `json:"page"`
 }
 
-// AIProviderInput 定义 AI 供应商可编辑字段。
+// AIProviderInput 定义模型服务供应商可编辑字段。
 type AIProviderInput struct {
 	Brand  AIProviderBrand   `json:"brand"`
 	Name   string            `json:"name"`
@@ -672,15 +704,17 @@ type AIProviderInput struct {
 	Models []AIProviderModel `json:"models"`
 }
 
-// AIProviderModel 定义 AI 供应商模型目录项。
+// AIProviderModel 定义模型服务供应商的模型目录项。
 type AIProviderModel struct {
-	Identifier      string `json:"identifier"`
-	Name            string `json:"name"`
-	ContextWindow   int64  `json:"contextWindow"`
-	MaxOutputTokens int64  `json:"maxOutputTokens"`
+	Identifier      string                 `json:"identifier"`
+	Name            string                 `json:"name"`
+	Type            AIModelType            `json:"type"`
+	InputModalities []AIModelInputModality `json:"inputModalities"`
+	ContextWindow   int64                  `json:"contextWindow"`
+	MaxOutputTokens int64                  `json:"maxOutputTokens"`
 }
 
-// AIProvider 定义企业 AI 供应商及其模型目录。
+// AIProvider 定义企业模型服务供应商及其模型目录。
 type AIProvider struct {
 	ID     string            `json:"id"`
 	Brand  AIProviderBrand   `json:"brand"`
@@ -690,20 +724,21 @@ type AIProvider struct {
 	Models []AIProviderModel `json:"models"`
 }
 
-// AIProviderSummary 定义企业 AI 供应商列表项。
+// AIProviderSummary 定义模型服务供应商列表项。
 type AIProviderSummary struct {
-	ID     string          `json:"id"`
-	Brand  AIProviderBrand `json:"brand"`
-	Name   string          `json:"name"`
-	APIURL string          `json:"apiUrl"`
+	ID         string          `json:"id"`
+	Brand      AIProviderBrand `json:"brand"`
+	Name       string          `json:"name"`
+	APIURL     string          `json:"apiUrl"`
+	ModelTypes []AIModelType   `json:"modelTypes"`
 }
 
-// AIProviderList 定义企业 AI 供应商列表。
+// AIProviderList 定义模型服务供应商列表。
 type AIProviderList struct {
 	Providers []AIProviderSummary `json:"providers"`
 }
 
-// AIProviderModelList 定义指定品牌的可用模型目录。
+// AIProviderModelList 定义指定品牌的预设模型目录。
 type AIProviderModelList struct {
 	Models []AIProviderModel `json:"models"`
 }

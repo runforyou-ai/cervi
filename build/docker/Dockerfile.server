@@ -6,14 +6,14 @@
 #
 # If your app needs CGO, override the build args, e.g.:
 #   docker build --build-arg CGO_ENABLED=1 \
-#                --build-arg GO_IMAGE=golang:bookworm \
+#                --build-arg GO_IMAGE=golang:1.27-bookworm \
 #                --build-arg RUNTIME_IMAGE=gcr.io/distroless/base-debian12 \
 #                -f build/docker/Dockerfile.server .
 # CGO needs a C toolchain in the builder and a libc in the runtime image; keep
 # the builder and runtime libc compatible (a glibc builder -> a glibc runtime).
 # The Taskfile passes these through: task build:docker CGO_ENABLED=1 GO_IMAGE=... RUNTIME_IMAGE=...
 
-ARG GO_IMAGE=golang:alpine
+ARG GO_IMAGE=golang:1.27-alpine
 ARG RUNTIME_IMAGE=gcr.io/distroless/static-debian12
 ARG CGO_ENABLED=0
 
@@ -31,14 +31,12 @@ RUN if command -v apk >/dev/null 2>&1; then \
         apt-get update && apt-get install -y --no-install-recommends git $([ "$CGO_ENABLED" = "1" ] && echo gcc libc6-dev) && rm -rf /var/lib/apt/lists/*; \
     fi
 
+COPY go.mod go.sum ./
+# Download dependencies
+RUN go mod download
+
 # Copy source code
 COPY . .
-
-# Remove local replace directive if present (for production builds)
-RUN sed -i '/^replace/d' go.mod || true
-
-# Download dependencies
-RUN go mod tidy
 
 # Build the production server binary.
 # - server,production tags: HTTP server mode with production code paths (no dev
@@ -53,19 +51,17 @@ FROM ${RUNTIME_IMAGE}
 # Copy the binary
 COPY --from=builder /app/server /server
 
-# Copy frontend assets
-COPY --from=builder /app/frontend/dist /frontend/dist
-
-# Expose the default port
-EXPOSE 8080
+# auto 模式使用 80/443；8080 仅为 WAILS_SERVER_PORT 的默认端口提示。
+EXPOSE 80 443 8080
 
 # Bind to all interfaces (required for Docker)
 # Can be overridden at runtime with -e WAILS_SERVER_HOST=...
 ENV WAILS_SERVER_HOST=0.0.0.0
 ENV FILE_STORAGE_PATH=/data/files
+ENV TLS_DATA_DIR=/data/tls
 
-# 持久化对象存储停用期间上传的本地文件。
-VOLUME ["/data/files"]
+# 持久化本地文件和自动签发的证书。
+VOLUME ["/data/files", "/data/tls"]
 
 # Run the server
 ENTRYPOINT ["/server"]

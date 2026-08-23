@@ -241,7 +241,7 @@ tasks:
 
       Usage: task build:docker [TAG=myapp:latest] [CGO_ENABLED=1] [GO_IMAGE=...] [RUNTIME_IMAGE=...]
       For CGO apps, set CGO_ENABLED=1 with libc-compatible builder/runtime images, e.g.:
-        task build:docker CGO_ENABLED=1 GO_IMAGE=golang:bookworm RUNTIME_IMAGE=gcr.io/distroless/base-debian12
+        task build:docker CGO_ENABLED=1 GO_IMAGE=golang:1.27-bookworm RUNTIME_IMAGE=gcr.io/distroless/base-debian12
     deps:
       # Build the production frontend so frontend/dist (embedded by the Go build
       # inside the image) is present and current in the Docker build context.
@@ -254,7 +254,7 @@ tasks:
       - >-
         docker build
         --build-arg CGO_ENABLED={{.CGO_ENABLED | default "0"}}
-        --build-arg GO_IMAGE={{.GO_IMAGE | default "golang:alpine"}}
+        --build-arg GO_IMAGE={{.GO_IMAGE | default "golang:1.27-alpine"}}
         --build-arg RUNTIME_IMAGE={{.RUNTIME_IMAGE | default "gcr.io/distroless/static-debian12"}}
         -t {{.TAG | default (printf "%s:latest" .APP_NAME)}}
         -f build/docker/Dockerfile.server .
@@ -269,21 +269,37 @@ tasks:
   run:docker:
     summary: Builds and runs the Docker image
     desc: |
-      Builds the Docker image and runs it, exposing port 8080.
-      Usage: task run:docker [TAG=myapp:latest] [PORT=8080]
-      Note: The internal container port is always 8080. The PORT variable
-      only changes the host port mapping. Ensure your app uses port 8080
-      or modify the Dockerfile to match your ServerOptions.Port setting.
+      Builds the Docker image and runs it using WAILS_SERVER_PORT for both the
+      container listener and host port mapping. The port defaults to 8080.
+      Usage: task run:docker [TAG=myapp:latest] [WAILS_SERVER_PORT=18080]
     deps:
       - task: build:docker
         vars:
           TAG:
             ref: .TAG
     cmds:
-      - docker run --rm -p {{.PORT | default "8080"}}:8080 {{.TAG | default (printf "%s:latest" .APP_NAME)}}
+      - >-
+        docker run --rm
+        --add-host host.docker.internal:host-gateway
+        -e POSTGRES_HOST=host.docker.internal
+        -e POSTGRES_PORT
+        -e POSTGRES_USER
+        -e POSTGRES_PASSWORD
+        -e POSTGRES_DB
+        -e POSTGRES_SSLMODE
+        -e NATS_URL=nats://host.docker.internal:4222
+        -e NATS_NAMESPACE
+        -e TLS_MODE
+        -e TLS_ACME_EMAIL
+        -e WAILS_SERVER_PORT={{.SERVER_PORT}}
+        -p {{.SERVER_PORT}}:{{.SERVER_PORT}}
+        {{if eq .TLS_MODE "auto"}}-p 80:80 -p 443:443{{end}}
+        -v {{.APP_NAME}}-files:/data/files
+        -v {{.APP_NAME}}-tls:/data/tls
+        {{.TAG | default (printf "%s:latest" .APP_NAME)}}
     vars:
       TAG: "{{.TAG}}"
-      PORT: "{{.PORT}}"
+      SERVER_PORT: '{{.WAILS_SERVER_PORT | default "8080"}}'
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)

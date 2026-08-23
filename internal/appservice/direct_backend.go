@@ -18,8 +18,8 @@ import (
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
-	"github.com/runforyou-ai/cervi/internal/filestore"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -42,6 +42,7 @@ type DirectBackend struct {
 	createWebsiteChannel              *channelaction.CreateWebsiteChannelAction
 	updateWebsiteChannel              *channelaction.UpdateWebsiteChannelAction
 	updateWebsiteChannelChatInterface *channelaction.UpdateWebsiteChannelChatInterfaceAction
+	updateWebsiteChannelAccess        *channelaction.UpdateWebsiteChannelAccessAction
 	updateWebsiteChannelStatus        *channelaction.UpdateWebsiteChannelStatusAction
 	listChannels                      *channelaction.ListChannelsQuery
 	listUsers                         *useraction.ListUsersQuery
@@ -84,11 +85,11 @@ type DirectBackend struct {
 	createFileUpload                  *fileaction.CreateUploadAction
 	getFile                           *fileaction.GetQuery
 	markFileUploaded                  *fileaction.MarkUploadedAction
-	localFiles                        *filestore.LocalStore
+	localFiles                        *serverfilecontent.LocalStore
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *filestore.LocalStore) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *DirectBackend {
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -101,6 +102,7 @@ func NewDirectBackend(db *bun.DB, localFiles *filestore.LocalStore) *DirectBacke
 		createWebsiteChannel:              channelaction.NewCreateWebsiteChannelAction(db),
 		updateWebsiteChannel:              channelaction.NewUpdateWebsiteChannelAction(db),
 		updateWebsiteChannelChatInterface: channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db),
+		updateWebsiteChannelAccess:        channelaction.NewUpdateWebsiteChannelAccessAction(db),
 		updateWebsiteChannelStatus:        channelaction.NewUpdateWebsiteChannelStatusAction(db),
 		listChannels:                      channelaction.NewListChannelsQuery(db),
 		listUsers:                         useraction.NewListUsersQuery(db),

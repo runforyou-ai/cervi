@@ -19,7 +19,9 @@ import (
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -30,13 +32,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Skip("TEST_DATABASE_URL is not set")
 	}
 
-	store, err := Open(context.Background(), Config{
-		DSN:             dsn,
-		MaxOpenConns:    5,
-		MaxIdleConns:    2,
-		ConnMaxLifetime: time.Minute,
-		ConnMaxIdleTime: time.Minute,
-		StartupTimeout:  30 * time.Second,
+	store, err := Open(context.Background(), serverconfig.DatabaseConfig{
+		URL:                   dsn,
+		MaxOpenConnections:    5,
+		MaxIdleConnections:    2,
+		ConnectionMaxLifetime: serverconfig.Duration(time.Minute),
+		ConnectionMaxIdleTime: serverconfig.Duration(time.Minute),
+		ConnectTimeout:        serverconfig.Duration(30 * time.Second),
+		MigrationTimeout:      serverconfig.Duration(time.Minute),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -382,15 +385,18 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if activeAvatar.Status != string(domain.FileStatusDeleting) || activeAvatar.ExpiresAt == nil {
 		t.Fatalf("replaced avatar = %#v", activeAvatar)
 	}
-	cleanup := fileaction.NewCleanupAction(db)
-	claimed, err := cleanup.ClaimDeleting(context.Background(), time.Now().UTC().Add(time.Second), time.Now().UTC().Add(time.Hour), 10)
+	if _, err := db.NewUpdate().Model((*servermodels.File)(nil)).
+		Set("expires_at = ?", time.Now().UTC().Add(-time.Second)).
+		Where("id = ?", avatar.ID).
+		Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	localFiles, err := serverfilecontent.NewLocalStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(claimed) != 1 || claimed[0].ID != avatar.ID {
-		t.Fatalf("claimed files = %#v", claimed)
-	}
-	if err := cleanup.DeleteClaimed(context.Background(), avatar.ID); err != nil {
+	cleanup := fileaction.NewDeleteExpiredAction(db, serverfilecontent.NewDeleter(localFiles, nil))
+	if err := cleanup.Execute(context.Background(), fileaction.DeleteExpiredInput{FileID: avatar.ID}); err != nil {
 		t.Fatal(err)
 	}
 	resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Token)

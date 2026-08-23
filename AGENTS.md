@@ -10,8 +10,8 @@ Cervi 是一款开源、以私有化部署为主的 AI 原生企业协作产品�
 # 每个 worktree 复制并调整自己的环境文件
 cp .env.example .env
 
-# 仅在主工作区启动共享 PostgreSQL
-docker compose up -d postgres
+# 仅在主工作区启动共享 PostgreSQL 和 NATS
+docker compose up -d postgres nats
 
 # 创建当前工作区数据库并执行迁移
 wails3 task db:ensure
@@ -23,7 +23,7 @@ wails3 task migrate:rollback VERSION=20260818032701
 wails3 task migrate:reset
 wails3 task make:migration NAME=create_example_table
 
-# 先启动服务端，再启动桌面端及 MCP 服务
+# 先启动服务端，再启动桌面端；桌面 MCP 随桌面端按 Wails3 默认配置启动
 wails3 task run:server
 wails3 task dev
 
@@ -40,29 +40,40 @@ go test -tags server ./...
 wails3 generate bindings -clean=true -ts -i
 ```
 
-前端要求 Node.js 22.22.0 或更高版本，项目构建使用 Wails v3 和 Task。
-Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite、MCP 端口和 PostgreSQL 数据库。按上述顺序启动后，可通过 Wails MCP 获取桌面端页面信息。
+前端要求 Node.js 24.0.0 或更高版本，项目构建使用 Wails v3 和 Task。
+Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间。桌面 MCP 使用 Wails3 默认配置，启动桌面端后可通过 MCP 获取页面信息。
 
-真机通过 `CERVI_PUBLIC_URL` 连接服务端。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
+真机在连接页手动输入可访问的企业服务端地址。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
+
+### Wails 版本同步
+
+- `go.mod` 中的 `github.com/wailsapp/wails/v3`、`frontend/package.json` 中的 `@wailsio/runtime` 与本机 `wails3` CLI 必须使用同一精确版本；前端运行时禁止使用 `latest`、`^` 或 `~` 范围。按 `go.mod` 安装 CLI：`go install github.com/wailsapp/wails/v3/cmd/wails3@$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)`。
+- 升级 Wails 时先阅读目标版本的官方发布说明，再使用目标版本 CLI 在临时目录生成 React 脚手架，对比官方模板和 `build-assets`。`build/` 已包含服务端、桌面端和移动端定制，不得直接覆盖；只人工合并与当前项目相关的官方变更。
+- Wails 升级后重新生成绑定，并验证前端构建、Go 测试、服务端构建和当前平台原生端构建；涉及移动端脚手架时同时验证 Android 与 iOS 构建配置。
 
 ## 代码组织
 
 ```text
 cervi/
 ├── main.go                         # 应用入口和 Wails 配置
-├── application_services_*.go      # 按原生端和服务端注册服务
+├── application_services_*.go       # 按原生端和服务端注册服务
 ├── internal/
 │   ├── actions/                    # 按领域组织的 Action 与 Query
 │   ├── api/                        # Gin 对外 HTTP API 适配器
 │   ├── apiproxy/                   # 原生端到企业服务端的类型化 API 代理
 │   ├── appservice/                 # 跨平台应用服务、传输契约和平台 Backend
+│   │   └── native/                 # 原生端应用服务平台能力实现
 │   ├── common/                     # 无存储、无传输、无平台依赖的通用能力
 │   ├── domain/                     # 各层共用的领域值
 │   ├── i18n/                       # 后端本地化能力和翻译词条
-│   └── storage/
-│       ├── server/                 # PostgreSQL 连接、迁移和服务端模型
-│       ├── desktop/                # 桌面端 SQLite 存储、迁移和模型
-│       └── mobile/                 # 移动端 SQLite 存储、迁移和模型
+│   ├── storage/
+│   │   ├── server/                 # PostgreSQL 连接、迁移和服务端模型
+│   │   ├── desktop/                # 桌面端 SQLite 存储、迁移和模型
+│   │   └── mobile/                 # 移动端 SQLite 存储、迁移和模型
+│   └── task/                       # 可靠任务能力
+│       ├── task.go                 # 跨平台共享的最小执行语义
+│       ├── client/                 # 客户端 SQLite 可靠任务方案与实现
+│       └── server/                 # 服务端 PostgreSQL、NATS 与 Cron 实现
 ├── frontend/
 │   ├── bindings/                   # Wails 自动生成的 TypeScript 绑定
 │   └── src/
@@ -88,6 +99,7 @@ cervi/
 - `common` 只放无数据库、无传输层、无平台依赖的通用能力。小函数和错误放在包内，完整能力使用子包。
 - `domain` 只放各层共用的领域值，按概念拆文件，不放数据库、传输层和平台逻辑。
 - 数据库模型放在对应平台的 `storage` 目录；桌面端和移动端的 SQLite 迁移保持独立。
+- `task` 根包只放各平台共享的 Action 执行语义；客户端和服务端分别定义自己的投递参数、存储与运行机制，不为形式统一互相复用平台实现。
 
 ### 前端契约
 
@@ -109,7 +121,7 @@ cervi/
 
 ### 数据与迁移
 
-- 本地 PostgreSQL 实例由所有工作区共享，不为单独工作区创建容器、端口或数据卷；每个 worktree 必须通过 `.env` 使用独立数据库。
+- 本地 PostgreSQL 和 NATS 实例由所有工作区共享，不为单独工作区创建容器、端口或数据卷；每个 worktree 必须通过 `.env` 使用独立数据库和 NATS 命名空间。
 - 本地不运行 S3 兼容服务；对象存储由管理页面配置，可使用任意客户端可访问的临时 S3 兼容服务。
 - 重建库结构使用 `wails3 task migrate:reset`，或先回滚再 `migrate`；回滚和重建前先停止服务端。
 - 建表迁移按 `YYYYMMDDHHMMSS_create_<table>_table.sql` 命名，每个文件只创建一张表，不创建外键和 `CHECK` 约束。
@@ -126,11 +138,12 @@ cervi/
 - Go 具名函数和方法使用简洁、直述型中文注释。
 - 前端 `src` 业务代码同样：文件头说明职责，具名函数、组件和导出函数各一行注释。`frontend/bindings` 禁止加注释；`components/ui` 只保留文件头。
 - 代码审查结果、Git 提交信息以及 PR 的标题和描述使用中文。
-- 除非用户明确要求，不运行测试、`go vet` 或构建。
+- 仅当用户明确要求提交代码或提交 PR 时，才在提交前运行与当前任务相关的测试和构建；其他情况不运行测试、`go vet` 或构建。
 
 ### 界面控制
 
-- 未经用户当次明确授权，不得控制浏览器、桌面应用或系统界面；截图和界面问题不视为授权。
+- 当前任务涉及桌面端时，必要时应主动使用 Wails MCP 获取页面信息并完成相关验证，无需另行请求授权。
+- 除桌面端任务中的 Wails MCP 验证外，未经用户当次明确授权，不得控制浏览器、桌面应用或系统界面。
 - 默认使用命令行验证；需要界面验证时，由用户操作并反馈结果，授权不得跨任务沿用。
 
 ### 管理界面设计

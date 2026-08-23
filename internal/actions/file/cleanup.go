@@ -4,84 +4,131 @@ package file
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/task"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
-// CleanupAction 维护过期文件的清理队列。
-type CleanupAction struct {
-	db *bun.DB
+const (
+	ScanExpiredActionName   = "file.scan_expired"
+	DeleteExpiredActionName = "file.delete_expired"
+	CleanupScheduleKey      = "file.cleanup"
+
+	cleanupBatchSize = 200
+)
+
+// ScanExpiredInput 定义扫描过期临时文件的输入。
+type ScanExpiredInput struct{}
+
+// DeleteExpiredInput 定义删除单个过期临时文件的输入。
+type DeleteExpiredInput struct {
+	FileID string `json:"file_id"`
 }
 
-// NewCleanupAction 创建过期文件清理操作。
-func NewCleanupAction(db *bun.DB) *CleanupAction {
-	return &CleanupAction{db: db}
+// ScanExpiredAction 把过期临时文件逐个提交给异步删除 Action。
+type ScanExpiredAction struct {
+	db       *bun.DB
+	enqueuer servertask.Enqueuer
 }
 
-// ScheduleExpired 分批将过期临时文件放入删除队列。
-func (a *CleanupAction) ScheduleExpired(ctx context.Context, now, deleteAt time.Time, limit int) (int64, error) {
-	result, err := a.db.NewRaw(`
-		WITH candidates AS (
-			SELECT id
-			FROM files
-			WHERE status IN (?, ?)
-				AND expires_at <= ?
-			ORDER BY expires_at ASC, id ASC
-			FOR UPDATE SKIP LOCKED
-			LIMIT ?
-		)
-		UPDATE files AS f
-		SET status = ?, expires_at = ?, updated_at = now()
-		FROM candidates AS c
-		WHERE f.id = c.id
-	`, domain.FileStatusPending, domain.FileStatusUploaded, now, limit, domain.FileStatusDeleting, deleteAt).Exec(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("schedule expired files: %w", err)
+// NewScanExpiredAction 创建过期文件扫描 Action。
+func NewScanExpiredAction(db *bun.DB, enqueuer servertask.Enqueuer) *ScanExpiredAction {
+	return &ScanExpiredAction{db: db, enqueuer: enqueuer}
+}
+
+// Execute 扫描所有过期候选并幂等投递删除任务。
+func (a *ScanExpiredAction) Execute(ctx context.Context, _ ScanExpiredInput) error {
+	type candidate struct {
+		ID        string    `bun:"id"`
+		ExpiresAt time.Time `bun:"expires_at"`
 	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("read scheduled file count: %w", err)
+	var cursorExpiresAt time.Time
+	var cursorID string
+	for {
+		records := make([]candidate, 0, cleanupBatchSize)
+		query := a.db.NewSelect().Table("files").
+			Column("id", "expires_at").
+			Where("status IN (?, ?, ?)", domain.FileStatusPending, domain.FileStatusUploaded, domain.FileStatusDeleting).
+			Where("expires_at <= ?", time.Now().UTC()).
+			OrderExpr("expires_at ASC, id ASC").
+			Limit(cleanupBatchSize)
+		if !cursorExpiresAt.IsZero() {
+			query = query.Where("(expires_at, id) > (?, ?)", cursorExpiresAt, cursorID)
+		}
+		if err := query.Scan(ctx, &records); err != nil {
+			return fmt.Errorf("scan expired files: %w", err)
+		}
+		for _, record := range records {
+			if _, err := a.enqueuer.Enqueue(ctx, DeleteExpiredActionName, DeleteExpiredInput{FileID: record.ID}, servertask.EnqueueOptions{
+				Queue: "files", MaxAttempts: 10,
+				IdempotencyKey: "file:" + record.ID,
+				TriggerType:    servertask.TriggerBusiness,
+			}); err != nil {
+				return fmt.Errorf("enqueue expired file %s: %w", record.ID, err)
+			}
+		}
+		if len(records) < cleanupBatchSize {
+			return nil
+		}
+		last := records[len(records)-1]
+		cursorExpiresAt, cursorID = last.ExpiresAt, last.ID
 	}
-	return count, nil
 }
 
-// ClaimDeleting 分批认领到期的删除任务。
-func (a *CleanupAction) ClaimDeleting(ctx context.Context, now, retryAt time.Time, limit int) ([]servermodels.File, error) {
-	records := make([]servermodels.File, 0)
+// ContentDeleter 删除文件记录指向的内容。
+type ContentDeleter interface {
+	Delete(context.Context, *servermodels.File) error
+}
+
+// DeleteExpiredAction 删除一个仍处于过期状态的临时文件。
+type DeleteExpiredAction struct {
+	db      *bun.DB
+	deleter ContentDeleter
+}
+
+// NewDeleteExpiredAction 创建过期文件删除 Action。
+func NewDeleteExpiredAction(db *bun.DB, deleter ContentDeleter) *DeleteExpiredAction {
+	return &DeleteExpiredAction{db: db, deleter: deleter}
+}
+
+// Execute 重新校验文件状态后删除内容和元数据。
+func (a *DeleteExpiredAction) Execute(ctx context.Context, input DeleteExpiredInput) error {
+	if input.FileID == "" {
+		return task.Permanent(errors.New("file id is required"))
+	}
+	var record servermodels.File
 	err := a.db.NewRaw(`
-		WITH candidates AS (
-			SELECT id
-			FROM files
-			WHERE status = ?
-				AND expires_at <= ?
-			ORDER BY expires_at ASC, id ASC
-			FOR UPDATE SKIP LOCKED
-			LIMIT ?
-		)
-		UPDATE files AS f
-		SET status = ?, expires_at = ?, updated_at = now()
-		FROM candidates AS c
-		WHERE f.id = c.id
-		RETURNING f.*
-	`, domain.FileStatusDeleting, now, limit, domain.FileStatusDeleting, retryAt).Scan(ctx, &records)
-	if err != nil {
-		return nil, fmt.Errorf("claim deleting files: %w", err)
+		UPDATE files
+		SET status = ?, updated_at = now()
+		WHERE id = ?
+			AND expires_at <= now()
+			AND status IN (?, ?, ?)
+		RETURNING *
+	`, domain.FileStatusDeleting, input.FileID,
+		domain.FileStatusPending, domain.FileStatusUploaded, domain.FileStatusDeleting).Scan(ctx, &record)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
 	}
-	return records, nil
-}
-
-// DeleteClaimed 删除已清理内容的文件记录。
-func (a *CleanupAction) DeleteClaimed(ctx context.Context, fileID string) error {
-	if _, err := a.db.NewDelete().
-		Model((*servermodels.File)(nil)).
-		Where("id = ?", fileID).
+	if err != nil {
+		return fmt.Errorf("claim expired file: %w", err)
+	}
+	if err := a.deleter.Delete(ctx, &record); err != nil {
+		return err
+	}
+	if _, err := a.db.NewDelete().Model((*servermodels.File)(nil)).
+		Where("id = ?", record.ID).
 		Where("status = ?", domain.FileStatusDeleting).
 		Exec(ctx); err != nil {
-		return fmt.Errorf("delete claimed file: %w", err)
+		return fmt.Errorf("delete expired file record: %w", err)
 	}
+	slog.Info("过期文件已清理", "organization_id", record.OrganizationID, "file_id", record.ID, "storage_backend", record.StorageBackend)
 	return nil
 }

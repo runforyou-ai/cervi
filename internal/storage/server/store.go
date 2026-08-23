@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -19,32 +20,40 @@ type Store struct {
 }
 
 // Open 连接 PostgreSQL 并执行数据库迁移。
-func Open(ctx context.Context, config Config) (*Store, error) {
-	startupCtx, cancel := context.WithTimeout(ctx, config.StartupTimeout)
-	defer cancel()
-	if config.MaxOpenConns == 0 {
+func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, error) {
+	if config.MaxOpenConnections == 0 {
 		slog.Warn("PostgreSQL 最大连接数未设置限制")
 	}
 
 	sqlDB := sql.OpenDB(pgdriver.NewConnector(
-		pgdriver.WithDSN(config.DSN),
+		pgdriver.WithDSN(config.URL),
 		pgdriver.WithConnParams(map[string]any{"timezone": "UTC"}),
 	))
-	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
-	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
-	sqlDB.SetConnMaxLifetime(config.ConnMaxLifetime)
-	sqlDB.SetConnMaxIdleTime(config.ConnMaxIdleTime)
+	sqlDB.SetMaxOpenConns(config.MaxOpenConnections)
+	sqlDB.SetMaxIdleConns(config.MaxIdleConnections)
+	sqlDB.SetConnMaxLifetime(config.ConnectionMaxLifetime.Value())
+	sqlDB.SetConnMaxIdleTime(config.ConnectionMaxIdleTime.Value())
 
 	db := bun.NewDB(sqlDB, pgdialect.New())
-	if err := db.PingContext(startupCtx); err != nil {
+	connectCtx, cancelConnect := context.WithTimeout(ctx, config.ConnectTimeout.Value())
+	connectErr := sqlDB.PingContext(connectCtx)
+	cancelConnect()
+	if connectErr != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("connect to PostgreSQL: %w", err)
+		return nil, fmt.Errorf("connect to PostgreSQL: %w", connectErr)
 	}
-	slog.Info("PostgreSQL 连接成功", "timezone", "UTC")
+	slog.Info("PostgreSQL 连接成功",
+		"timezone", "UTC",
+		"max_open_connections", config.MaxOpenConnections,
+		"max_idle_connections", config.MaxIdleConnections,
+	)
 
-	if err := migrate(startupCtx, sqlDB); err != nil {
+	migrationCtx, cancelMigration := context.WithTimeout(ctx, config.MigrationTimeout.Value())
+	migrationErr := migrate(migrationCtx, sqlDB)
+	cancelMigration()
+	if migrationErr != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("migrate PostgreSQL: %w", err)
+		return nil, fmt.Errorf("migrate PostgreSQL: %w", migrationErr)
 	}
 
 	return &Store{db: db}, nil

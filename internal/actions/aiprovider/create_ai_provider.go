@@ -11,17 +11,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// CreateAIProviderAction 创建 AI 供应商。
+// CreateAIProviderAction 创建模型服务供应商。
 type CreateAIProviderAction struct {
 	db *bun.DB
 }
 
-// NewCreateAIProviderAction 创建 AI 供应商操作。
+// NewCreateAIProviderAction 创建模型服务供应商操作。
 func NewCreateAIProviderAction(db *bun.DB) *CreateAIProviderAction {
 	return &CreateAIProviderAction{db: db}
 }
 
-// Execute 创建 AI 供应商并保存模型目录。
+// Execute 创建模型服务供应商并保存模型目录。
 func (a *CreateAIProviderAction) Execute(ctx context.Context, identity *servermodels.Identity, input Input) (*Record, error) {
 	input, fields := normalizeInput(input)
 	if len(fields) > 0 {

@@ -44,6 +44,17 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
+      - name: Check Wails version alignment
+        shell: bash
+        run: |
+          go_version="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
+          go_version="${go_version#v}"
+          runtime_version="$(node -p "require('./frontend/package.json').dependencies['@wailsio/runtime']")"
+          if [[ "$runtime_version" != "$go_version" ]]; then
+            echo "Wails version mismatch: Go=$go_version, frontend=$runtime_version"
+            exit 1
+          fi
+
       # main.go embeds frontend/dist, which is intentionally not committed.
       # Build it before running any Go command that compiles the main package.
       - name: Install frontend dependencies
