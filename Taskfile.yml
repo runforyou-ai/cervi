@@ -50,6 +50,7 @@ tasks:
 
   env:check:database:
     silent: true
+    run: once
     summary: 校验当前工作区数据库环境
     preconditions:
       - sh: '{{if .POSTGRES_HOST}}true{{else}}false{{end}}'
