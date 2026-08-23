@@ -11,13 +11,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/taskruntime"
 	"github.com/uptrace/bun"
 )
 
 // Runtime 运行服务端异步 Action、定时计划和可靠消息投递。
 type Runtime struct {
-	config     Config
+	config     runtimeConfig
 	repository *repository
 	registry   *Registry
 	schedules  []taskruntime.ScheduleDefinition
@@ -32,9 +33,9 @@ type Runtime struct {
 }
 
 // New 创建服务端任务运行时。
-func New(db *bun.DB, config Config) *Runtime {
+func New(db *bun.DB, nats serverconfig.NATSConfig) *Runtime {
 	return &Runtime{
-		config: config, repository: newRepository(db), registry: NewRegistry(),
+		config: newConfig(nats), repository: newRepository(db), registry: NewRegistry(),
 		instanceID: uuid.NewString(),
 	}
 }
