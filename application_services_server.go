@@ -21,13 +21,9 @@ import (
 )
 
 // applicationServices 创建服务端应用服务。
-func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
-	httpsEntry := api.NewHTTPSEntry(config.HTTPS, config.Server.Port)
+func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config, taskConfig servertask.Config) ([]application.Service, error) {
+	httpsEntry := api.NewHTTPSEntry(config.HTTPS, config.Server)
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
-	if err != nil {
-		return nil, err
-	}
-	taskConfig, err := servertask.ConfigFromEnv()
 	if err != nil {
 		return nil, err
 	}

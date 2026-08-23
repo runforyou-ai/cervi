@@ -257,6 +257,9 @@ func (config Config) validate(production bool) error {
 	if mode != "auto" && mode != "external" && mode != "off" {
 		return fmt.Errorf("HTTPS 模式必须是 auto、external 或 off")
 	}
+	if mode == "auto" && (config.Server.Port == 80 || config.Server.Port == 443) {
+		return fmt.Errorf("自动 HTTPS 模式下服务监听端口不能是 80 或 443")
+	}
 	if config.Storage.LocalDirectory == "" {
 		return fmt.Errorf("必须配置本地文件存储目录")
 	}

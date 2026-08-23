@@ -63,9 +63,27 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 
 // TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
 func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
-	service := NewHTTPSEntry(serverconfig.HTTPSConfig{Mode: "external"}, 8080)
+	service := NewHTTPSEntry(
+		serverconfig.HTTPSConfig{Mode: "external"},
+		serverconfig.ServerConfig{Host: "127.0.0.1", Port: 8080},
+	)
 	if service.mode != modeExternal || service.httpServer != nil || service.httpsServer != nil {
 		t.Fatal("expected external mode without HTTP or HTTPS listeners")
+	}
+}
+
+// TestProxyHostFollowsServerListener 验证 HTTPS 反代使用可访问的监听地址。
+func TestProxyHostFollowsServerListener(t *testing.T) {
+	tests := map[string]string{
+		"0.0.0.0":   "127.0.0.1",
+		"[::]":      "::1",
+		"[::1]":     "::1",
+		"localhost": "localhost",
+	}
+	for host, expected := range tests {
+		if actual := proxyHost(host); actual != expected {
+			t.Errorf("proxyHost(%q) = %q, want %q", host, actual, expected)
+		}
 	}
 }
 

@@ -24,6 +24,8 @@
 cervi-server -config <配置文件> -check-config
 ```
 
+该命令同时校验 YAML、PostgreSQL、NATS 和 TLS 环境变量，不建立外部连接。
+
 生产 YAML 基础模板：
 
 ```yaml
@@ -60,6 +62,8 @@ NATS_URL=nats://127.0.0.1:4222
 NATS_NAMESPACE=cervi
 ```
 
+服务端依赖 PostgreSQL 和启用 JetStream 的 NATS。NATS 可以独立部署，也可以与 Cervi 部署在同一主机；单机部署时使用 `nats://127.0.0.1:4222`。
+
 ## Linux systemd
 
 安装路径：
@@ -81,7 +85,7 @@ sudo install -o root -g cervi -m 0640 cervi.env /etc/cervi/cervi.env
 sudo install -o root -g root -m 0644 cervi.service /etc/systemd/system/cervi.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now cervi
-curl --fail http://127.0.0.1:8080/readyz
+curl --retry 60 --retry-delay 1 --retry-connrefused --fail http://127.0.0.1:8080/readyz
 ```
 
 systemd 模板：
@@ -177,7 +181,7 @@ $env:NATS_NAMESPACE = 'cervi'
 & 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml'
 ```
 
-另一终端使用 `Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8080/readyz'` 检查就绪状态。服务端尚未接入 Windows SCM，首期前台运行或使用服务包装器托管。
+另一终端使用 `Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8080/readyz'` 检查就绪状态。Windows 首期使用 `external` TLS 模式；`auto` 模式需要管理员权限和可用的 80/443 端口。服务端尚未接入 Windows SCM，首期前台运行或使用服务包装器托管。
 
 ## 容器
 
@@ -188,12 +192,15 @@ $env:NATS_NAMESPACE = 'cervi'
 手动升级流程：
 
 1. 校验发布制品的签名或校验和；
-2. 备份 PostgreSQL；
-3. 停止服务；
-4. 原子替换二进制并保留上一版本；
-5. 启动服务并检查 `/readyz`。
+2. 备份 PostgreSQL、YAML 和环境文件；
+3. 更新配置模板和环境变量，确保存储目录以及 `auto` 模式的证书目录使用绝对路径；
+4. 使用待升级二进制执行 `-check-config`；
+5. 停止服务，原子替换二进制并保留上一版本；
+6. 启动服务并检查 `/readyz`。
 
 数据库迁移随服务启动执行，生产和开发环境始终允许乱序迁移，不提供关闭开关。回退二进制不等于回退数据库结构，数据库回退需要单独决策。
+
+`/readyz` 表示 PostgreSQL 可以响应请求。NATS 在服务启动时连接，运行期间断线由客户端自动重连，状态通过服务日志和 NATS 监控检查。
 
 后续自动更新由独立更新器完成：下载带签名的发布清单和制品，校验版本、平台、架构及摘要，再调用平台服务管理器替换并重启，保留旧二进制用于程序回退。服务进程本身不负责自更新。
 
@@ -201,7 +208,8 @@ $env:NATS_NAMESPACE = 'cervi'
 
 - 主机：`ecs-user@47.239.49.135`
 - 域名：`test-https.runforyou.app`
-- 环境：Ubuntu 26.04、x86_64、systemd、PostgreSQL 18
-- 验证结果：生产构建、配置校验、数据库连接和迁移、systemd 启停与重启、HTTP 到 HTTPS 跳转、证书缓存恢复、`/healthz` 和 `/readyz` 均通过。
+- 环境：Ubuntu 26.04、x86_64、systemd、PostgreSQL 18、NATS Server 2.10.27 JetStream
+- 验证结果：Linux AMD64 静态构建、配置校验、数据库连接和迁移、NATS 任务运行时、systemd 启停与重启、HTTP 到 HTTPS 跳转、证书缓存恢复、`/healthz` 和 `/readyz` 均通过。
+- 探针响应只包含状态，GET、HEAD 和方法限制均符合预期。
 - 实测确认：非 root 的 systemd 服务在默认低端口策略下无法绑定 80/443；安装上述 `CAP_NET_BIND_SERVICE` drop-in 后通过。
 - 当前临时服务以 `cervi` 用户运行，8080 仅绑定回环地址，80/443 提供自动 HTTPS。

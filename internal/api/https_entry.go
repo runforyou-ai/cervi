@@ -46,14 +46,14 @@ type HTTPSEntry struct {
 }
 
 // NewHTTPSEntry 根据 TLS 配置创建 HTTPS 入口。
-func NewHTTPSEntry(config serverconfig.HTTPSConfig, backendPort int) *HTTPSEntry {
+func NewHTTPSEntry(config serverconfig.HTTPSConfig, backend serverconfig.ServerConfig) *HTTPSEntry {
 	mode := tlsMode(config.Mode)
-	service := &HTTPSEntry{mode: mode, backendPort: backendPort}
+	service := &HTTPSEntry{mode: mode, backendPort: backend.Port}
 	if mode != modeAuto {
 		return service
 	}
 
-	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(backendPort))}
+	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort(proxyHost(backend.Host), strconv.Itoa(backend.Port))}
 	service.proxy = httputil.NewSingleHostReverseProxy(backendURL)
 	service.proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, err error) {
 		slog.Warn("转发 HTTPS 请求失败", "host", request.Host, "path", request.URL.Path, "error", err)
@@ -83,6 +83,19 @@ func NewHTTPSEntry(config serverconfig.HTTPSConfig, backendPort int) *HTTPSEntry
 		IdleTimeout:       120 * time.Second,
 	}
 	return service
+}
+
+// proxyHost 返回 HTTPS 入口访问服务监听器使用的地址。
+func proxyHost(host string) string {
+	host = strings.Trim(host, "[]")
+	switch host {
+	case "", "0.0.0.0":
+		return "127.0.0.1"
+	case "::":
+		return "::1"
+	default:
+		return host
+	}
 }
 
 // Start 启动 HTTPS 入口。
