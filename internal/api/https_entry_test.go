@@ -14,40 +14,9 @@ import (
 	"testing"
 	"time"
 
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"golang.org/x/crypto/acme/autocert"
 )
-
-// TestTLSModeFromEnv 验证显式模式和默认模式。
-func TestTLSModeFromEnv(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      tlsMode
-		wantError bool
-	}{
-		{name: "empty defaults to off", want: modeOff},
-		{name: "explicit auto", value: "auto", want: modeAuto},
-		{name: "explicit external", value: "external", want: modeExternal},
-		{name: "explicit off", value: "off", want: modeOff},
-		{name: "case insensitive", value: " EXTERNAL ", want: modeExternal},
-		{name: "invalid", value: "proxy", wantError: true},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Setenv("TLS_MODE", test.value)
-			mode, err := tlsModeFromEnv()
-			if test.wantError {
-				if err == nil {
-					t.Fatal("expected invalid mode error")
-				}
-				return
-			}
-			if err != nil || mode != test.want {
-				t.Fatalf("tlsModeFromEnv() = (%q, %v), want (%q, nil)", mode, err, test.want)
-			}
-		})
-	}
-}
 
 // TestRequestHostKeepsLocalAddressesOnHTTP 验证本地和内网地址不会申请公网证书。
 func TestRequestHostKeepsLocalAddressesOnHTTP(t *testing.T) {
@@ -77,7 +46,7 @@ func TestRequestHostKeepsLocalAddressesOnHTTP(t *testing.T) {
 
 // TestAllowCertificateRequiresHTTPEntry 验证无缓存的公网域名必须先通过 HTTP 入口访问。
 func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
-	service := &HTTPSEntry{}
+	service := &HTTPSEntry{cache: autocert.DirCache(t.TempDir())}
 	const host = "test-https.runforyou.app"
 	if err := service.allowCertificate(t.Context(), host); err == nil {
 		t.Fatal("expected unapproved domain to be rejected")
@@ -94,13 +63,27 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 
 // TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
 func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
-	t.Setenv("TLS_MODE", "external")
-	service, err := NewHTTPSEntry()
-	if err != nil {
-		t.Fatalf("new external service: %v", err)
-	}
+	service := NewHTTPSEntry(
+		serverconfig.HTTPSConfig{Mode: "external"},
+		serverconfig.ServerConfig{Host: "127.0.0.1", Port: 8080},
+	)
 	if service.mode != modeExternal || service.httpServer != nil || service.httpsServer != nil {
 		t.Fatal("expected external mode without HTTP or HTTPS listeners")
+	}
+}
+
+// TestProxyHostFollowsServerListener 验证 HTTPS 反代使用可访问的监听地址。
+func TestProxyHostFollowsServerListener(t *testing.T) {
+	tests := map[string]string{
+		"0.0.0.0":   "127.0.0.1",
+		"[::]":      "::1",
+		"[::1]":     "::1",
+		"localhost": "localhost",
+	}
+	for host, expected := range tests {
+		if actual := proxyHost(host); actual != expected {
+			t.Errorf("proxyHost(%q) = %q, want %q", host, actual, expected)
+		}
 	}
 }
 

@@ -280,8 +280,22 @@ tasks:
     cmds:
       - >-
         docker run --rm
+        --add-host host.docker.internal:host-gateway
+        -e POSTGRES_HOST=host.docker.internal
+        -e POSTGRES_PORT
+        -e POSTGRES_USER
+        -e POSTGRES_PASSWORD
+        -e POSTGRES_DB
+        -e POSTGRES_SSLMODE
+        -e NATS_URL=nats://host.docker.internal:4222
+        -e NATS_NAMESPACE
+        -e TLS_MODE
+        -e TLS_ACME_EMAIL
         -e WAILS_SERVER_PORT={{.SERVER_PORT}}
         -p {{.SERVER_PORT}}:{{.SERVER_PORT}}
+        {{if eq .TLS_MODE "auto"}}-p 80:80 -p 443:443{{end}}
+        -v {{.APP_NAME}}-files:/data/files
+        -v {{.APP_NAME}}-tls:/data/tls
         {{.TAG | default (printf "%s:latest" .APP_NAME)}}
     vars:
       TAG: "{{.TAG}}"

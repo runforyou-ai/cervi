@@ -14,19 +14,13 @@ import (
 	"strings"
 )
 
-const defaultLocalDirectory = "data/files"
-
 // LocalStore 管理服务器本地文件目录。
 type LocalStore struct {
 	root string
 }
 
-// NewLocalStoreFromEnv 创建环境变量配置的本地文件存储。
-func NewLocalStoreFromEnv() (*LocalStore, error) {
-	root := strings.TrimSpace(os.Getenv("FILE_STORAGE_PATH"))
-	if root == "" {
-		root = defaultLocalDirectory
-	}
+// NewLocalStore 创建指定目录的本地文件存储。
+func NewLocalStore(root string) (*LocalStore, error) {
 	absolute, err := filepath.Abs(root)
 	if err != nil {
 		return nil, fmt.Errorf("resolve local file storage path: %w", err)

@@ -10,6 +10,7 @@ import (
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -20,20 +21,13 @@ import (
 )
 
 // applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
-func applicationServices(appStorage *serverstorage.Store) ([]application.Service, error) {
-	httpsEntry, err := api.NewHTTPSEntry()
+func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
+	httpsEntry := api.NewHTTPSEntry(config.HTTPS, config.Server)
+	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, err
 	}
-	localFiles, err := serverfilecontent.NewLocalStoreFromEnv()
-	if err != nil {
-		return nil, err
-	}
-	taskConfig, err := servertask.ConfigFromEnv()
-	if err != nil {
-		return nil, err
-	}
-	tasks := servertask.New(appStorage.DB(), taskConfig)
+	tasks := servertask.New(appStorage.DB(), config.NATS)
 	scanExpired := fileaction.NewScanExpiredAction(appStorage.DB(), tasks)
 	deleteExpired := fileaction.NewDeleteExpiredAction(appStorage.DB(), newFileContentDeleter(appStorage.DB(), localFiles))
 	if err := servertask.RegisterJSON(tasks.Registry(), fileaction.ScanExpiredActionName, scanExpired.Execute); err != nil {
@@ -53,6 +47,8 @@ func applicationServices(appStorage *serverstorage.Store) ([]application.Service
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
 
 	return []application.Service{
+		application.NewServiceWithOptions(api.NewLiveness(), application.ServiceOptions{Route: "/healthz"}),
+		application.NewServiceWithOptions(api.NewReadiness(appStorage.DB()), application.ServiceOptions{Route: "/readyz"}),
 		application.NewService(&httpsLifecycle{service: httpsEntry}),
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,

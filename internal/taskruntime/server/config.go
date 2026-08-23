@@ -4,11 +4,10 @@
 package server
 
 import (
-	"fmt"
-	"os"
-	"regexp"
 	"strings"
 	"time"
+
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 )
 
 const (
@@ -20,10 +19,8 @@ const (
 	taskMaxAckPending  = 1024
 )
 
-var namespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
-
-// Config 定义服务端任务运行时配置。
-type Config struct {
+// runtimeConfig 定义服务端任务运行时配置。
+type runtimeConfig struct {
 	URL            string
 	Namespace      string
 	StartupTimeout time.Duration
@@ -34,40 +31,31 @@ type Config struct {
 	MaxAckPending  int
 }
 
-// ConfigFromEnv 读取 NATS 地址和任务命名空间。
-func ConfigFromEnv() (Config, error) {
-	natsURL := strings.TrimSpace(os.Getenv("NATS_URL"))
-	if natsURL == "" {
-		return Config{}, fmt.Errorf("NATS_URL is required")
-	}
-	namespace := strings.TrimSpace(os.Getenv("NATS_NAMESPACE"))
-	if !namespacePattern.MatchString(namespace) {
-		return Config{}, fmt.Errorf("NATS_NAMESPACE must match %s", namespacePattern.String())
-	}
-
-	return Config{
-		URL:            natsURL,
-		Namespace:      namespace,
+// newConfig 补充任务运行时的固定配置。
+func newConfig(nats serverconfig.NATSConfig) runtimeConfig {
+	return runtimeConfig{
+		URL:            nats.URL,
+		Namespace:      nats.Namespace,
 		StartupTimeout: natsStartupTimeout,
 		MaxBytes:       taskStreamMaxBytes,
 		MaxAge:         taskStreamMaxAge,
 		Replicas:       taskReplicas,
 		Workers:        taskWorkers,
 		MaxAckPending:  taskMaxAckPending,
-	}, nil
+	}
 }
 
 // streamName 生成任务 Stream 名称。
-func (c Config) streamName() string {
+func (c runtimeConfig) streamName() string {
 	return "CERVI_" + strings.ToUpper(c.Namespace) + "_TASKS"
 }
 
 // consumerName 生成任务 Consumer 名称。
-func (c Config) consumerName() string {
+func (c runtimeConfig) consumerName() string {
 	return "CERVI_" + strings.ToUpper(c.Namespace) + "_WORKERS"
 }
 
 // subjectPrefix 生成任务 Subject 前缀。
-func (c Config) subjectPrefix() string {
+func (c runtimeConfig) subjectPrefix() string {
 	return "cervi." + c.Namespace + ".tasks"
 }
