@@ -107,7 +107,7 @@ export function UserPreferencesForm({
       onSubmit={form.handleSubmit(save)}
       noValidate
     >
-      <FieldGroup>
+      <FieldGroup className="grid">
         <Controller
           name="theme"
           control={form.control}

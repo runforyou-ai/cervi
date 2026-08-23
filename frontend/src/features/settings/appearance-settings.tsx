@@ -37,7 +37,9 @@ export function AppearanceSettings({
 
   return (
     <FieldSet className="w-full gap-0" aria-invalid={invalid}>
-      <FieldLegend className="mb-0">{t("appearance.theme")}</FieldLegend>
+      <FieldLegend className="mb-0" variant="label">
+        {t("appearance.theme")}
+      </FieldLegend>
       <div
         className="mt-3 flex flex-wrap gap-2"
         data-slot="radio-group"
