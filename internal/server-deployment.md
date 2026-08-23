@@ -3,7 +3,7 @@
 ## 交付范围
 
 - Linux 使用 `tar.gz + systemd`，Windows Server 使用 ZIP，容器使用镜像，不单独维护 DEB、RPM 和 MSI。
-- 生产二进制只读取 `-config` 指定的 YAML 和环境变量，不读取 `.env`。
+- 服务端二进制只读取 `-config` 指定的 YAML 和环境变量，不读取 `.env`。
 - 本地开发仍由 Task 加载当前 worktree 的 `.env`。
 - Windows SCM、`cervi install/start/stop/config` 和自动更新器暂未实现。
 
@@ -23,7 +23,7 @@ cervi-server -config <配置文件> -check-config
 
 该命令校验 YAML 以及 PostgreSQL、NATS 和 TLS 配置，不连接外部服务。
 
-生产 YAML 基础模板：
+部署 YAML 基础模板：
 
 ```yaml
 server:

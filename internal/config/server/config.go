@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -91,7 +90,7 @@ func Load(path string) (Config, error) {
 		return Config{}, err
 	}
 	config.normalize()
-	if err := config.validate(productionBuild); err != nil {
+	if err := config.validate(); err != nil {
 		return Config{}, err
 	}
 	return config, nil
@@ -107,9 +106,9 @@ func (config *Config) normalize() {
 	config.Storage.LocalDirectory = strings.TrimSpace(config.Storage.LocalDirectory)
 }
 
-// defaultConfig 返回当前构建模式的服务端默认配置。
+// defaultConfig 返回服务端默认配置。
 func defaultConfig() Config {
-	config := Config{
+	return Config{
 		Server: ServerConfig{
 			Host: "127.0.0.1",
 			Port: 8080,
@@ -127,10 +126,6 @@ func defaultConfig() Config {
 			LocalDirectory: "data/files",
 		},
 	}
-	if productionBuild {
-		config.Storage.LocalDirectory = ""
-	}
-	return config
 }
 
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
@@ -225,7 +220,7 @@ func requiredEnvironment(name string) (string, error) {
 }
 
 // validate 校验服务端配置。
-func (config Config) validate(production bool) error {
+func (config Config) validate() error {
 	if !validServerHost(config.Server.Host) {
 		return fmt.Errorf("服务监听地址无效")
 	}
@@ -261,15 +256,9 @@ func (config Config) validate(production bool) error {
 	if config.Storage.LocalDirectory == "" {
 		return fmt.Errorf("必须配置本地文件存储目录")
 	}
-	if production && !filepath.IsAbs(config.Storage.LocalDirectory) {
-		return fmt.Errorf("生产环境本地文件存储目录必须是绝对路径")
-	}
 	if mode == "auto" {
 		if config.HTTPS.TLSDataDirectory == "" {
 			return fmt.Errorf("自动 HTTPS 模式必须配置证书数据目录")
-		}
-		if production && !filepath.IsAbs(config.HTTPS.TLSDataDirectory) {
-			return fmt.Errorf("生产环境证书数据目录必须是绝对路径")
 		}
 	}
 	return nil

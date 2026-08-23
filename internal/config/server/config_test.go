@@ -67,17 +67,17 @@ func TestLoadRejectsUnknownFileField(t *testing.T) {
 	}
 }
 
-// TestValidationRequiresDatabaseName 验证所有构建模式都要求指定数据库名称。
+// TestValidationRequiresDatabaseName 验证连接地址必须指定数据库名称。
 func TestValidationRequiresDatabaseName(t *testing.T) {
 	config := defaultConfig()
 	config.Database.URL = "postgres://cervi@localhost"
 	config.normalize()
-	if err := config.validate(false); err == nil {
-		t.Fatal("开发环境接受了未指定数据库名称的连接地址")
+	if err := config.validate(); err == nil {
+		t.Fatal("接受了未指定数据库名称的连接地址")
 	}
 }
 
-// TestDefaultTLSModeIsOff 验证所有构建模式使用相同的 TLS 默认值。
+// TestDefaultTLSModeIsOff 验证 TLS 默认关闭。
 func TestDefaultTLSModeIsOff(t *testing.T) {
 	if mode := defaultConfig().HTTPS.Mode; mode != "off" {
 		t.Fatalf("TLS 默认模式 = %q", mode)
@@ -99,17 +99,6 @@ func clearServerEnvironment(t *testing.T) {
 	}
 }
 
-// TestProductionValidationRejectsRelativeStorage 验证生产配置不接受相对存储目录。
-func TestProductionValidationRejectsRelativeStorage(t *testing.T) {
-	config := defaultConfig()
-	config.Database.URL = "postgres://cervi@localhost/cervi"
-	config.Storage.LocalDirectory = "data/files"
-	config.normalize()
-	if err := config.validate(true); err == nil {
-		t.Fatal("生产环境接受了相对存储目录")
-	}
-}
-
 // TestValidationRejectsAutoHTTPSPortConflict 验证自动 HTTPS 端口不会与服务监听器冲突。
 func TestValidationRejectsAutoHTTPSPortConflict(t *testing.T) {
 	config := defaultConfig()
@@ -119,7 +108,7 @@ func TestValidationRejectsAutoHTTPSPortConflict(t *testing.T) {
 	config.HTTPS.TLSDataDirectory = t.TempDir()
 	config.Storage.LocalDirectory = t.TempDir()
 	config.normalize()
-	if err := config.validate(false); err == nil {
+	if err := config.validate(); err == nil {
 		t.Fatal("自动 HTTPS 接受了 443 服务监听端口")
 	}
 }
