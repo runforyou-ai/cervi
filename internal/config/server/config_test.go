@@ -67,6 +67,23 @@ func TestLoadRejectsUnknownFileField(t *testing.T) {
 	}
 }
 
+// TestValidationRequiresDatabaseName 验证所有构建模式都要求指定数据库名称。
+func TestValidationRequiresDatabaseName(t *testing.T) {
+	config := defaultConfig()
+	config.Database.URL = "postgres://cervi@localhost"
+	config.normalize()
+	if err := config.validate(false); err == nil {
+		t.Fatal("开发环境接受了未指定数据库名称的连接地址")
+	}
+}
+
+// TestDefaultTLSModeIsOff 验证所有构建模式使用相同的 TLS 默认值。
+func TestDefaultTLSModeIsOff(t *testing.T) {
+	if mode := defaultConfig().HTTPS.Mode; mode != "off" {
+		t.Fatalf("TLS 默认模式 = %q", mode)
+	}
+}
+
 // clearServerEnvironment 清除可能影响配置测试的服务端环境变量。
 func clearServerEnvironment(t *testing.T) {
 	t.Helper()

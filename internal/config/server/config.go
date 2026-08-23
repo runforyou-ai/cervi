@@ -128,9 +128,7 @@ func defaultConfig() Config {
 		},
 	}
 	if productionBuild {
-		config.HTTPS.Mode = "external"
 		config.Storage.LocalDirectory = ""
-		return config
 	}
 	return config
 }
@@ -241,8 +239,8 @@ func (config Config) validate(production bool) error {
 	if err != nil || databaseURL.Host == "" || databaseURL.Scheme != "postgres" && databaseURL.Scheme != "postgresql" {
 		return fmt.Errorf("PostgreSQL 连接地址无效")
 	}
-	if production && strings.Trim(databaseURL.Path, "/") == "" {
-		return fmt.Errorf("生产环境必须显式指定 PostgreSQL 数据库名称")
+	if strings.Trim(databaseURL.Path, "/") == "" {
+		return fmt.Errorf("必须显式指定 PostgreSQL 数据库名称")
 	}
 	if config.Database.MaxOpenConnections < 0 || config.Database.MaxIdleConnections < 0 {
 		return fmt.Errorf("PostgreSQL 连接数不能为负数")
