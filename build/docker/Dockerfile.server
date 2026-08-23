@@ -47,18 +47,13 @@ RUN go mod tidy
 #   override with --build-arg CGO_ENABLED=1 (see header) for CGO apps.
 RUN CGO_ENABLED=${CGO_ENABLED} go build -tags server,production -trimpath -buildvcs=false -ldflags="-s -w" -o server .
 
-# 准备非 root 运行账户可写的持久化目录。
-RUN mkdir -p /runtime-data/files /runtime-data/tls
-
 # Runtime stage - minimal image
 FROM ${RUNTIME_IMAGE}
 
 # Copy the binary
 COPY --from=builder /app/server /server
-COPY --from=builder --chown=65532:65532 /runtime-data /data
 
-# auto 模式使用 80/443；不允许非 root 绑定低端口的运行时需要授予
-# NET_BIND_SERVICE。8080 仅为 WAILS_SERVER_PORT 的默认端口提示。
+# auto 模式使用 80/443；8080 仅为 WAILS_SERVER_PORT 的默认端口提示。
 EXPOSE 80 443 8080
 
 # Bind to all interfaces (required for Docker)
@@ -69,8 +64,6 @@ ENV TLS_DATA_DIR=/data/tls
 
 # 持久化本地文件和自动签发的证书。
 VOLUME ["/data/files", "/data/tls"]
-
-USER 65532:65532
 
 # Run the server
 ENTRYPOINT ["/server"]

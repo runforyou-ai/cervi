@@ -189,7 +189,7 @@ $env:NATS_NAMESPACE = 'cervi'
 
 ## 容器
 
-镜像默认以非 root 用户运行。使用 `auto` HTTPS 时需要监听 80/443；若运行时不允许非 root 绑定低端口，应显式授予 `NET_BIND_SERVICE`。常规生产部署优先在宿主机、负载均衡或反向代理上终止 HTTPS，并使用 `external` 模式。
+镜像持久化 `/data/files` 和 `/data/tls`。使用 `auto` HTTPS 时映射 80/443；由宿主机、负载均衡或反向代理终止 HTTPS 时使用 `external` 模式。
 
 ## 升级边界
 
