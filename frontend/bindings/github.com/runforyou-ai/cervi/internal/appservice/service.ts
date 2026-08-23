@@ -428,7 +428,7 @@ export function UpdateWebsiteChannel(meta: $models.RequestMeta, channelID: strin
 }
 
 /**
- * UpdateWebsiteChannelAccess 修改网站渠道接入方式。
+ * UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
  */
 export function UpdateWebsiteChannelAccess(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelAccessInput): $CancellablePromise<$models.WebsiteChannelAccess> {
     return $Call.ByID(1435471417, meta, channelID, input);

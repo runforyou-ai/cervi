@@ -907,14 +907,14 @@ export interface WebsiteChannel {
 }
 
 /**
- * WebsiteChannelAccess 定义网站渠道接入方式设置。
+ * WebsiteChannelAccess 定义网站渠道允许使用的网站。
  */
 export interface WebsiteChannelAccess {
     "allowedHosts": string[] | null;
 }
 
 /**
- * WebsiteChannelAccessInput 定义网站渠道接入方式输入。
+ * WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
  */
 export interface WebsiteChannelAccessInput {
     "allowedHosts": string[] | null;
