@@ -18,31 +18,37 @@ concurrency:
 jobs:
   validate:
     name: Validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    env:
-      # Server mode has no native desktop or SQLite dependencies and matches
-      # the default used by the server Docker build.
-      CGO_ENABLED: "0"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
           cache: true
           cache-dependency-path: go.sum
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            pkg-config \
+            libgtk-4-dev \
+            libwebkitgtk-6.0-dev
 
       - name: Check Wails version alignment
         shell: bash
@@ -55,8 +61,14 @@ jobs:
             exit 1
           fi
 
-      # main.go embeds frontend/dist, which is intentionally not committed.
-      # Build it before running any Go command that compiles the main package.
+      - name: Check generated Wails bindings
+        shell: bash
+        run: |
+          wails_version="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
+          go install "github.com/wailsapp/wails/v3/cmd/wails3@${wails_version}"
+          "$(go env GOPATH)/bin/wails3" generate bindings -clean=true -ts -i
+          git diff --exit-code -- go.mod go.sum frontend/bindings
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -82,12 +94,18 @@ jobs:
           go mod tidy -diff
 
       - name: Vet Go server build
+        env:
+          CGO_ENABLED: "0"
         run: go vet -tags=server ./...
 
       - name: Test Go server build
+        env:
+          CGO_ENABLED: "0"
         run: go test -tags=server ./...
 
       - name: Build production server
+        env:
+          CGO_ENABLED: "0"
         run: >
           go build
           -tags=server,production
@@ -96,3 +114,45 @@ jobs:
           -ldflags="-w -s"
           -o bin/cervi-server
           .
+
+      - name: Test Go Linux desktop build
+        env:
+          CGO_ENABLED: "1"
+        run: go test ./...
+
+  container:
+    name: Container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build server image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: build/docker/Dockerfile.server
+          push: false
+          tags: cervi:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max,ignore-error=true
