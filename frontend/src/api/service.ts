@@ -86,6 +86,7 @@ import {
   type UserListInput,
   type WebsiteChannel as GeneratedWebsiteChannel,
   type WebsiteChannelAccess as GeneratedWebsiteChannelAccess,
+  type WebsiteChannelAccessInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 
@@ -203,10 +204,10 @@ export const updateWebsiteChannelChatInterface = bind(
   UpdateWebsiteChannelChatInterface,
 )
 const updateWebsiteChannelAccessBound = bind(UpdateWebsiteChannelAccess)
-/** 修改网站渠道接入方式。 */
+/** 修改网站渠道允许使用的网站。 */
 export function updateWebsiteChannelAccess(
   channelId: string,
-  input: Parameters<typeof updateWebsiteChannelAccessBound>[1],
+  input: WebsiteChannelAccessInput,
 ) {
   return updateWebsiteChannelAccessBound(channelId, input).then(
     normalizeWebsiteChannelAccess,
@@ -322,7 +323,7 @@ function asList<T>(value: T[] | null | undefined): T[] {
   return value ?? []
 }
 
-/** 归一化网站渠道接入方式。 */
+/** 归一化网站渠道允许使用的网站。 */
 function normalizeWebsiteChannelAccess(
   access: GeneratedWebsiteChannelAccess,
 ): WebsiteChannelAccessData {

@@ -250,7 +250,7 @@ func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
 	writeResult(c, http.StatusOK, setting, err)
 }
 
-// updateWebsiteChannelAccess 修改网站渠道接入方式。
+// updateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 func (s *Service) updateWebsiteChannelAccess(c *gin.Context) {
 	var input appservice.WebsiteChannelAccessInput
 	if !bindJSON(c, &input) {

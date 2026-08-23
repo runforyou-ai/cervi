@@ -17,7 +17,7 @@
   "error.channel_create_failed": "Could not create the website channel.",
   "error.channel_update_failed": "Could not save the website channel.",
   "error.channel_chat_interface_update_failed": "Could not save the chat interface.",
-  "error.channel_access_update_failed": "Could not save how this website channel is used.",
+  "error.channel_access_update_failed": "Could not save the allowed websites.",
   "error.contact_not_found": "This contact could not be found.",
   "error.contact_list_failed": "Could not load contacts.",
   "error.contact_read_failed": "Could not load the contact.",

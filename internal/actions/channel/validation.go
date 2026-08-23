@@ -56,7 +56,7 @@ type WebsiteChannelChatInterfaceInput struct {
 	ThemeColor      string
 }
 
-// WebsiteChannelAccessInput 定义网站渠道接入方式可编辑字段。
+// WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
 type WebsiteChannelAccessInput struct {
 	AllowedHosts []string
 }
@@ -111,7 +111,7 @@ func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterface
 	return input, fields
 }
 
-// normalizeWebsiteChannelAccessInput 规范化并校验接入方式输入。
+// normalizeWebsiteChannelAccessInput 规范化并校验允许使用的网站。
 func normalizeWebsiteChannelAccessInput(input WebsiteChannelAccessInput) (WebsiteChannelAccessInput, map[string]ValidationCode) {
 	fields := make(map[string]ValidationCode)
 	if len(input.AllowedHosts) > embedhost.MaxHosts {

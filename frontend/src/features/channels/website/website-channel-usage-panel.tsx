@@ -179,7 +179,7 @@ export function WebsiteChannelUsagePanel({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: {
-      allowedHosts: (channel.access.allowedHosts ?? []).join("\n"),
+      allowedHosts: channel.access.allowedHosts.join("\n"),
     },
   })
 
@@ -274,7 +274,7 @@ export function WebsiteChannelUsagePanel({
       const updated = await updateWebsiteChannelAccess(channel.id, {
         allowedHosts: allowedHostLines(values.allowedHosts),
       })
-      form.reset({ allowedHosts: (updated.allowedHosts ?? []).join("\n") })
+      form.reset({ allowedHosts: updated.allowedHosts.join("\n") })
       onUpdated(updated)
       console.info("网站渠道允许使用的网站已保存", {
         channel_id: channel.id,
@@ -337,9 +337,9 @@ export function WebsiteChannelUsagePanel({
                 <FieldLabel>{t("usage.snippet")}</FieldLabel>
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2"
+                  variant="link"
+                  size="xs"
+                  className="h-auto px-0 py-0 text-xs font-normal text-muted-foreground"
                   onClick={() => setInstructions("embed")}
                 >
                   {t("usage.instructions.open")}
@@ -405,9 +405,9 @@ export function WebsiteChannelUsagePanel({
                 <FieldLabel>{t("usage.chatUrl")}</FieldLabel>
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2"
+                  variant="link"
+                  size="xs"
+                  className="h-auto px-0 py-0 text-xs font-normal text-muted-foreground"
                   onClick={() => setInstructions("link")}
                 >
                   {t("usage.instructions.open")}
@@ -437,32 +437,34 @@ export function WebsiteChannelUsagePanel({
             <Field>
               <FieldLabel>{t("usage.qrCode")}</FieldLabel>
               <FieldDescription>{t("usage.qrCodeHelp")}</FieldDescription>
-              <div className="flex size-40 items-center justify-center rounded-md border bg-white p-2">
-                {qrCode ? (
-                  <img
-                    src={qrCode}
-                    alt={t("usage.qrCodeAlt")}
-                    className="size-full"
-                  />
-                ) : (
-                  <div className="space-y-2 px-3 text-center text-xs text-muted-foreground">
-                    <p>
-                      {qrCodeFailed
-                        ? t("usage.qrCodeFailed")
-                        : t("usage.qrCodeLoading")}
-                    </p>
-                    {qrCodeFailed ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQrRetryKey((value) => value + 1)}
-                      >
-                        {t("retry")}
-                      </Button>
-                    ) : null}
-                  </div>
-                )}
+              <div>
+                <div className="flex aspect-square w-40 items-center justify-center rounded-md border bg-white p-2">
+                  {qrCode ? (
+                    <img
+                      src={qrCode}
+                      alt={t("usage.qrCodeAlt")}
+                      className="aspect-square w-full object-contain"
+                    />
+                  ) : (
+                    <div className="space-y-2 px-3 text-center text-xs text-muted-foreground">
+                      <p>
+                        {qrCodeFailed
+                          ? t("usage.qrCodeFailed")
+                          : t("usage.qrCodeLoading")}
+                      </p>
+                      {qrCodeFailed ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setQrRetryKey((value) => value + 1)}
+                        >
+                          {t("retry")}
+                        </Button>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
               </div>
             </Field>
           </FieldGroup>

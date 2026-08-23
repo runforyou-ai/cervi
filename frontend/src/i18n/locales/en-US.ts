@@ -589,7 +589,7 @@ const enUS = {
       allowedHostsHelp:
         "Enter one domain per line. Leave this blank or enter * to allow every website.",
       chatUrl: "Chat link",
-      chatUrlHelp: "Share this link with visitors.",
+      chatUrlHelp: "Visitors can open this link to enter the chat.",
       qrCode: "QR code",
       qrCodeHelp: "Visitors can scan this code to open the chat link.",
       qrCodeAlt: "Chat link QR code",

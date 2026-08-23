@@ -185,13 +185,10 @@ func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta ap
 	return output, err
 }
 
-// UpdateWebsiteChannelAccess 修改远程网站渠道接入方式。
+// UpdateWebsiteChannelAccess 修改远程网站渠道允许使用的网站。
 func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelAccessInput) (appservice.WebsiteChannelAccess, error) {
 	var output appservice.WebsiteChannelAccess
 	err := b.do(ctx, meta, http.MethodPatch, "/channels/website/"+url.PathEscape(channelID)+"/access", nil, input, &output)
-	if output.AllowedHosts == nil {
-		output.AllowedHosts = []string{}
-	}
 	return output, err
 }
 

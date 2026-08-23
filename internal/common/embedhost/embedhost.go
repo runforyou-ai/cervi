@@ -76,9 +76,6 @@ func Normalize(value string) (string, bool) {
 
 // NormalizeAll 整理主机列表、去重，并在存在非法值时返回失败。
 func NormalizeAll(values []string) ([]string, bool) {
-	if len(values) > MaxHosts {
-		return nil, false
-	}
 	result := make([]string, 0, len(values))
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {

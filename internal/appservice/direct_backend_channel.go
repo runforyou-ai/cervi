@@ -96,7 +96,7 @@ func (b *DirectBackend) UpdateWebsiteChannelChatInterface(ctx context.Context, m
 	return websiteChannelSettingFromModel(setting), nil
 }
 
-// UpdateWebsiteChannelAccess 修改网站渠道接入方式。
+// UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 func (b *DirectBackend) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelAccessInput) (WebsiteChannelAccess, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -108,7 +108,7 @@ func (b *DirectBackend) UpdateWebsiteChannelAccess(ctx context.Context, meta Req
 	if err != nil {
 		return WebsiteChannelAccess{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelAccessUpdateFailed)
 	}
-	slog.Info("网站渠道接入方式更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
+	slog.Info("网站渠道允许使用的网站更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
 	return websiteChannelAccessFromModel(setting), nil
 }
 
@@ -200,13 +200,9 @@ func websiteChannelSettingFromModel(setting *servermodels.WebsiteChannelSetting)
 	return WebsiteChannelChatInterface{Title: setting.ChatTitle, Subtitle: setting.ChatSubtitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor}
 }
 
-// websiteChannelAccessFromModel 把存储设置转换为接入方式契约。
+// websiteChannelAccessFromModel 转换网站渠道允许使用的网站。
 func websiteChannelAccessFromModel(setting *servermodels.WebsiteChannelSetting) WebsiteChannelAccess {
-	allowedHosts := setting.AllowedEmbedHosts
-	if allowedHosts == nil {
-		allowedHosts = []string{}
-	}
-	return WebsiteChannelAccess{AllowedHosts: allowedHosts}
+	return WebsiteChannelAccess{AllowedHosts: setting.AllowedEmbedHosts}
 }
 
 func channelInput(input WebsiteChannelInput) channelaction.WebsiteChannelInput {

@@ -574,7 +574,7 @@ const zhCN = {
       allowedHosts: "允许使用的网站",
       allowedHostsHelp: "每行填写一个域名。留空或填写 * 表示所有网站都可以使用。",
       chatUrl: "聊天链接",
-      chatUrlHelp: "把这个链接发给访客。",
+      chatUrlHelp: "访客打开链接后会直接进入聊天页。",
       qrCode: "二维码",
       qrCodeHelp: "访客扫码后会打开这个聊天链接。",
       qrCodeAlt: "聊天链接二维码",

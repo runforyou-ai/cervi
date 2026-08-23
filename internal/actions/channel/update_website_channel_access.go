@@ -15,12 +15,12 @@ import (
 	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
-// UpdateWebsiteChannelAccessAction 修改网站渠道接入方式。
+// UpdateWebsiteChannelAccessAction 修改网站渠道允许使用的网站。
 type UpdateWebsiteChannelAccessAction struct {
 	db *bun.DB
 }
 
-// NewUpdateWebsiteChannelAccessAction 创建接入方式修改操作。
+// NewUpdateWebsiteChannelAccessAction 创建允许网站修改操作。
 func NewUpdateWebsiteChannelAccessAction(db *bun.DB) *UpdateWebsiteChannelAccessAction {
 	return &UpdateWebsiteChannelAccessAction{db: db}
 }

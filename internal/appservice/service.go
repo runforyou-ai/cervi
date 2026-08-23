@@ -200,7 +200,7 @@ func (s *Service) UpdateWebsiteChannelChatInterface(ctx context.Context, meta Re
 	return s.backend.UpdateWebsiteChannelChatInterface(ctx, meta, channelID, input)
 }
 
-// UpdateWebsiteChannelAccess 修改网站渠道接入方式。
+// UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 func (s *Service) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelAccessInput) (WebsiteChannelAccess, error) {
 	return s.backend.UpdateWebsiteChannelAccess(ctx, meta, channelID, input)
 }
