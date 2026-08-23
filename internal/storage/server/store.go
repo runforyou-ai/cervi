@@ -10,11 +10,21 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"time"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
+)
+
+const (
+	postgresMaxOpenConnections    = 8
+	postgresMaxIdleConnections    = 2
+	postgresConnectionMaxLifetime = 30 * time.Minute
+	postgresConnectionMaxIdleTime = 5 * time.Minute
+	postgresConnectTimeout        = time.Minute
+	postgresMigrationTimeout      = 10 * time.Minute
 )
 
 // Store 管理 Bun 数据库连接池。
@@ -24,21 +34,17 @@ type Store struct {
 
 // Open 连接 PostgreSQL 并执行数据库迁移。
 func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, error) {
-	if config.MaxOpenConnections == 0 {
-		slog.Warn("PostgreSQL 最大连接数未设置限制")
-	}
-
 	sqlDB := sql.OpenDB(pgdriver.NewConnector(
 		pgdriver.WithDSN(postgresDSN(config)),
 		pgdriver.WithConnParams(map[string]any{"timezone": "UTC"}),
 	))
-	sqlDB.SetMaxOpenConns(config.MaxOpenConnections)
-	sqlDB.SetMaxIdleConns(config.MaxIdleConnections)
-	sqlDB.SetConnMaxLifetime(config.ConnectionMaxLifetime.Value())
-	sqlDB.SetConnMaxIdleTime(config.ConnectionMaxIdleTime.Value())
+	sqlDB.SetMaxOpenConns(postgresMaxOpenConnections)
+	sqlDB.SetMaxIdleConns(postgresMaxIdleConnections)
+	sqlDB.SetConnMaxLifetime(postgresConnectionMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(postgresConnectionMaxIdleTime)
 
 	db := bun.NewDB(sqlDB, pgdialect.New())
-	connectCtx, cancelConnect := context.WithTimeout(ctx, config.ConnectTimeout.Value())
+	connectCtx, cancelConnect := context.WithTimeout(ctx, postgresConnectTimeout)
 	connectErr := sqlDB.PingContext(connectCtx)
 	cancelConnect()
 	if connectErr != nil {
@@ -47,11 +53,11 @@ func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, erro
 	}
 	slog.Info("PostgreSQL 连接成功",
 		"timezone", "UTC",
-		"max_open_connections", config.MaxOpenConnections,
-		"max_idle_connections", config.MaxIdleConnections,
+		"max_open_connections", postgresMaxOpenConnections,
+		"max_idle_connections", postgresMaxIdleConnections,
 	)
 
-	migrationCtx, cancelMigration := context.WithTimeout(ctx, config.MigrationTimeout.Value())
+	migrationCtx, cancelMigration := context.WithTimeout(ctx, postgresMigrationTimeout)
 	migrationErr := migrate(migrationCtx, sqlDB)
 	cancelMigration()
 	if migrationErr != nil {

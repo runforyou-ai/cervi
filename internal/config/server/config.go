@@ -10,41 +10,18 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/goccy/go-yaml"
 )
 
 var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
-// Duration 表示配置文件中的 Go 时长。
-type Duration time.Duration
-
-// UnmarshalYAML 解析配置文件中的时长字符串。
-func (d *Duration) UnmarshalYAML(unmarshal func(any) error) error {
-	var value string
-	if err := unmarshal(&value); err != nil {
-		return err
-	}
-	parsed, err := time.ParseDuration(strings.TrimSpace(value))
-	if err != nil {
-		return fmt.Errorf("时长 %q 无效: %w", value, err)
-	}
-	*d = Duration(parsed)
-	return nil
-}
-
-// Value 返回标准库时长值。
-func (d Duration) Value() time.Duration {
-	return time.Duration(d)
-}
-
 // Config 定义服务端运行配置。
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	NATS     NATSConfig     `yaml:"nats"`
-	HTTPS    HTTPSConfig    `yaml:"https"`
+	TLS      TLSConfig      `yaml:"tls"`
 	Storage  StorageConfig  `yaml:"storage"`
 }
 
@@ -54,20 +31,14 @@ type ServerConfig struct {
 	Port int    `yaml:"port"`
 }
 
-// DatabaseConfig 定义 PostgreSQL 连接、连接池和迁移配置。
+// DatabaseConfig 定义 PostgreSQL 连接配置。
 type DatabaseConfig struct {
-	Host                  string   `yaml:"host"`
-	Port                  int      `yaml:"port"`
-	User                  string   `yaml:"user"`
-	Password              string   `yaml:"password"`
-	Name                  string   `yaml:"name"`
-	SSLMode               string   `yaml:"sslMode"`
-	MaxOpenConnections    int      `yaml:"maxOpenConnections"`
-	MaxIdleConnections    int      `yaml:"maxIdleConnections"`
-	ConnectionMaxLifetime Duration `yaml:"connectionMaxLifetime"`
-	ConnectionMaxIdleTime Duration `yaml:"connectionMaxIdleTime"`
-	ConnectTimeout        Duration `yaml:"connectTimeout"`
-	MigrationTimeout      Duration `yaml:"migrationTimeout"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	Name     string `yaml:"name"`
+	SSLMode  string `yaml:"sslMode"`
 }
 
 // NATSConfig 定义 NATS 连接和任务命名空间。
@@ -76,11 +47,11 @@ type NATSConfig struct {
 	Namespace string `yaml:"namespace"`
 }
 
-// HTTPSConfig 定义企业服务端 HTTPS 入口配置。
-type HTTPSConfig struct {
-	Mode             string `yaml:"mode"`
-	TLSDataDirectory string `yaml:"tlsDataDirectory"`
-	ACMEEmail        string `yaml:"acmeEmail"`
+// TLSConfig 定义企业服务端 TLS 入口配置。
+type TLSConfig struct {
+	Mode          string `yaml:"mode"`
+	DataDirectory string `yaml:"dataDirectory"`
+	ACMEEmail     string `yaml:"acmeEmail"`
 }
 
 // StorageConfig 定义企业服务端本地文件存储配置。
@@ -120,9 +91,9 @@ func (config *Config) normalize() {
 	config.Database.SSLMode = strings.ToLower(strings.TrimSpace(config.Database.SSLMode))
 	config.NATS.URL = strings.TrimSpace(config.NATS.URL)
 	config.NATS.Namespace = strings.TrimSpace(config.NATS.Namespace)
-	config.HTTPS.Mode = strings.ToLower(strings.TrimSpace(config.HTTPS.Mode))
-	config.HTTPS.TLSDataDirectory = strings.TrimSpace(config.HTTPS.TLSDataDirectory)
-	config.HTTPS.ACMEEmail = strings.TrimSpace(config.HTTPS.ACMEEmail)
+	config.TLS.Mode = strings.ToLower(strings.TrimSpace(config.TLS.Mode))
+	config.TLS.DataDirectory = strings.TrimSpace(config.TLS.DataDirectory)
+	config.TLS.ACMEEmail = strings.TrimSpace(config.TLS.ACMEEmail)
 	config.Storage.LocalDirectory = strings.TrimSpace(config.Storage.LocalDirectory)
 }
 
@@ -133,15 +104,7 @@ func defaultConfig() Config {
 			Host: "127.0.0.1",
 			Port: 8080,
 		},
-		Database: DatabaseConfig{
-			MaxOpenConnections:    8,
-			MaxIdleConnections:    2,
-			ConnectionMaxLifetime: Duration(30 * time.Minute),
-			ConnectionMaxIdleTime: Duration(5 * time.Minute),
-			ConnectTimeout:        Duration(time.Minute),
-			MigrationTimeout:      Duration(10 * time.Minute),
-		},
-		HTTPS: HTTPSConfig{Mode: "off"},
+		TLS: TLSConfig{Mode: "off"},
 		Storage: StorageConfig{
 			LocalDirectory: "data/files",
 		},
@@ -151,9 +114,9 @@ func defaultConfig() Config {
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
 func applyEnvironment(config *Config) error {
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
-	applyStringEnvironment("TLS_MODE", &config.HTTPS.Mode)
-	applyStringEnvironment("TLS_DATA_DIR", &config.HTTPS.TLSDataDirectory)
-	applyStringEnvironment("TLS_ACME_EMAIL", &config.HTTPS.ACMEEmail)
+	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
+	applyStringEnvironment("TLS_DATA_DIR", &config.TLS.DataDirectory)
+	applyStringEnvironment("TLS_ACME_EMAIL", &config.TLS.ACMEEmail)
 	applyStringEnvironment("FILE_STORAGE_PATH", &config.Storage.LocalDirectory)
 	applyStringEnvironment("POSTGRES_HOST", &config.Database.Host)
 	applyStringEnvironment("POSTGRES_USER", &config.Database.User)
@@ -204,34 +167,25 @@ func (config Config) validate() error {
 	default:
 		return fmt.Errorf("database.sslMode 必须是 disable、allow、prefer、require、verify-ca 或 verify-full")
 	}
-	if config.Database.MaxOpenConnections < 0 || config.Database.MaxIdleConnections < 0 {
-		return fmt.Errorf("PostgreSQL 连接数不能为负数")
-	}
-	if config.Database.MaxOpenConnections > 0 && config.Database.MaxIdleConnections > config.Database.MaxOpenConnections {
-		return fmt.Errorf("PostgreSQL 最大空闲连接数不能超过最大连接数")
-	}
-	if config.Database.ConnectionMaxLifetime.Value() <= 0 || config.Database.ConnectionMaxIdleTime.Value() <= 0 || config.Database.ConnectTimeout.Value() <= 0 || config.Database.MigrationTimeout.Value() <= 0 {
-		return fmt.Errorf("PostgreSQL 时长配置必须为正数")
-	}
 	if config.NATS.URL == "" {
 		return fmt.Errorf("必须配置 NATS 地址")
 	}
 	if !natsNamespacePattern.MatchString(config.NATS.Namespace) {
 		return fmt.Errorf("NATS 命名空间必须匹配 %s", natsNamespacePattern.String())
 	}
-	mode := config.HTTPS.Mode
+	mode := config.TLS.Mode
 	if mode != "auto" && mode != "external" && mode != "off" {
-		return fmt.Errorf("HTTPS 模式必须是 auto、external 或 off")
+		return fmt.Errorf("TLS 模式必须是 auto、external 或 off")
 	}
 	if mode == "auto" && (config.Server.Port == 80 || config.Server.Port == 443) {
-		return fmt.Errorf("自动 HTTPS 模式下服务监听端口不能是 80 或 443")
+		return fmt.Errorf("TLS 自动模式下服务监听端口不能是 80 或 443")
 	}
 	if config.Storage.LocalDirectory == "" {
 		return fmt.Errorf("必须配置本地文件存储目录")
 	}
 	if mode == "auto" {
-		if config.HTTPS.TLSDataDirectory == "" {
-			return fmt.Errorf("自动 HTTPS 模式必须配置证书数据目录")
+		if config.TLS.DataDirectory == "" {
+			return fmt.Errorf("TLS 自动模式必须配置证书数据目录")
 		}
 	}
 	return nil

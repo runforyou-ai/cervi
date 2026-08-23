@@ -30,12 +30,6 @@ import (
 // TestServerActionsWithPostgreSQL 验证服务端核心操作。
 func TestServerActionsWithPostgreSQL(t *testing.T) {
 	databaseConfig := testDatabaseConfig(t)
-	databaseConfig.MaxOpenConnections = 5
-	databaseConfig.MaxIdleConnections = 2
-	databaseConfig.ConnectionMaxLifetime = serverconfig.Duration(time.Minute)
-	databaseConfig.ConnectionMaxIdleTime = serverconfig.Duration(time.Minute)
-	databaseConfig.ConnectTimeout = serverconfig.Duration(30 * time.Second)
-	databaseConfig.MigrationTimeout = serverconfig.Duration(time.Minute)
 	store, err := Open(context.Background(), databaseConfig)
 	if err != nil {
 		t.Fatal(err)
