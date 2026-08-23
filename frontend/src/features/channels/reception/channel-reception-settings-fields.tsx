@@ -80,7 +80,7 @@ function ReceptionTargetField({
       </NativeSelect>
       {target.type !==
       ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue ? (
-        <div className="mt-1 max-w-md">
+        <div className="flex w-full flex-col gap-2">
           <FieldLabel htmlFor={`${name}-id`} required>
             {target.type ===
             ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
