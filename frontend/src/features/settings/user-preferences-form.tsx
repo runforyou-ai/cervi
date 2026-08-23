@@ -37,7 +37,7 @@ export function UserPreferencesForm({
   user: CurrentUser
   onUpdated: (user: CurrentUser) => void
 }) {
-  const { t } = useTranslation("settings")
+  const { t, i18n } = useTranslation("settings")
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const schema = useMemo(() => createUserPreferencesSchema(t), [t])
@@ -78,6 +78,7 @@ export function UserPreferencesForm({
         theme: values.theme,
       })
       onUpdated(updated)
+      await i18n.changeLanguage(updated.locale)
       console.info("偏好设置已保存", {
         user_id: updated.id,
         locale: updated.locale,
