@@ -64,7 +64,7 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 // TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
 func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
 	service := NewHTTPSEntry(
-		serverconfig.HTTPSConfig{Mode: "external"},
+		serverconfig.TLSConfig{Mode: "external"},
 		serverconfig.ServerConfig{Host: "127.0.0.1", Port: 8080},
 	)
 	if service.mode != modeExternal || service.httpServer != nil || service.httpsServer != nil {

@@ -22,7 +22,7 @@ cervi-server -config <配置文件> -check-config
 
 ```yaml
 server:
-  host: 127.0.0.1
+  host: 0.0.0.0
   port: 8080
 
 database:
@@ -32,19 +32,15 @@ database:
   password: 请替换密码
   name: main
   sslMode: disable
-  maxOpenConnections: 25
-  maxIdleConnections: 5
-  connectionMaxLifetime: 30m
-  connectionMaxIdleTime: 5m
-  connectTimeout: 1m
-  migrationTimeout: 10m
 
 nats:
   url: nats://127.0.0.1:4222
   namespace: main
 
-https:
-  mode: external
+tls:
+  mode: off
+  dataDirectory: /var/lib/cervi/tls
+  acmeEmail: ""
 
 storage:
   localDirectory: /var/lib/cervi/files
@@ -108,11 +104,7 @@ journalctl -u cervi -f
 
 ### Linux 自动 HTTPS
 
-```yaml
-https:
-  mode: auto
-  tlsDataDirectory: /var/lib/cervi/tls
-```
+将基础模板中的 `tls.mode` 改为 `auto`。`tls.dataDirectory` 用于持久化证书，`tls.acmeEmail` 可填写 ACME 联系邮箱。
 
 `auto` 模式需要监听 80/443。将以下 drop-in 保存为 `/etc/systemd/system/cervi.service.d/auto-https.conf`：
 
@@ -162,7 +154,7 @@ Copy-Item .\cervi.yaml 'C:\ProgramData\Cervi\cervi.yaml'
 Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8080/readyz'
 ```
 
-Windows 使用 `external` TLS 模式并以前台进程或服务包装器运行。
+Windows 默认使用 `off` TLS 模式，并以前台进程或服务包装器运行。
 
 ## 容器
 

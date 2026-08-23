@@ -20,12 +20,6 @@ import (
 func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 	ctx := context.Background()
 	databaseConfig := testDatabaseConfig(t)
-	databaseConfig.MaxOpenConnections = 2
-	databaseConfig.MaxIdleConnections = 1
-	databaseConfig.ConnectionMaxLifetime = serverconfig.Duration(time.Minute)
-	databaseConfig.ConnectionMaxIdleTime = serverconfig.Duration(time.Minute)
-	databaseConfig.ConnectTimeout = serverconfig.Duration(30 * time.Second)
-	databaseConfig.MigrationTimeout = serverconfig.Duration(time.Minute)
 	store, err := serverstorage.Open(ctx, databaseConfig)
 	if err != nil {
 		t.Fatal(err)

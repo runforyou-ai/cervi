@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 // TestLoadMergesFileAndEnvironment 验证环境变量覆盖显式配置文件。
@@ -24,11 +23,10 @@ database:
   password: file-secret
   name: file
   sslMode: disable
-  migrationTimeout: 15m
 nats:
   url: nats://file:4222
   namespace: file
-https:
+tls:
   mode: off
 storage:
   localDirectory: data/files
@@ -57,11 +55,8 @@ storage:
 	if config.Database.Host != "database.internal" || config.Database.Port != 5433 || config.Database.User != "environment" || config.Database.Password != "secret@value" || config.Database.Name != "cervi" || config.Database.SSLMode != "require" || config.Server.Port != 28080 {
 		t.Fatalf("环境变量未覆盖文件配置: %#v", config)
 	}
-	if config.HTTPS.Mode != "external" || config.HTTPS.TLSDataDirectory != "/var/lib/cervi/tls" || config.HTTPS.ACMEEmail != "admin@example.com" {
-		t.Fatalf("TLS 环境变量未覆盖文件配置: %#v", config.HTTPS)
-	}
-	if config.Database.MigrationTimeout.Value() != 15*time.Minute {
-		t.Fatalf("迁移超时 = %s", config.Database.MigrationTimeout.Value())
+	if config.TLS.Mode != "external" || config.TLS.DataDirectory != "/var/lib/cervi/tls" || config.TLS.ACMEEmail != "admin@example.com" {
+		t.Fatalf("TLS 环境变量未覆盖文件配置: %#v", config.TLS)
 	}
 	if config.NATS.URL != "nats://environment:4222" || config.NATS.Namespace != "environment" {
 		t.Fatalf("NATS 环境变量未覆盖文件配置: %#v", config.NATS)
@@ -92,7 +87,7 @@ func TestValidationRequiresDatabaseName(t *testing.T) {
 
 // TestDefaultTLSModeIsOff 验证 TLS 默认关闭。
 func TestDefaultTLSModeIsOff(t *testing.T) {
-	if mode := defaultConfig().HTTPS.Mode; mode != "off" {
+	if mode := defaultConfig().TLS.Mode; mode != "off" {
 		t.Fatalf("TLS 默认模式 = %q", mode)
 	}
 }
@@ -128,16 +123,16 @@ func clearServerEnvironment(t *testing.T) {
 	}
 }
 
-// TestValidationRejectsAutoHTTPSPortConflict 验证自动 HTTPS 端口不会与服务监听器冲突。
-func TestValidationRejectsAutoHTTPSPortConflict(t *testing.T) {
+// TestValidationRejectsAutoTLSPortConflict 验证 TLS 自动模式端口不会与服务监听器冲突。
+func TestValidationRejectsAutoTLSPortConflict(t *testing.T) {
 	config := validTestConfig()
 	config.Server.Port = 443
-	config.HTTPS.Mode = "auto"
-	config.HTTPS.TLSDataDirectory = t.TempDir()
+	config.TLS.Mode = "auto"
+	config.TLS.DataDirectory = t.TempDir()
 	config.Storage.LocalDirectory = t.TempDir()
 	config.normalize()
 	if err := config.validate(); err == nil {
-		t.Fatal("自动 HTTPS 接受了 443 服务监听端口")
+		t.Fatal("TLS 自动模式接受了 443 服务监听端口")
 	}
 }
 

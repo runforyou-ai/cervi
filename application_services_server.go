@@ -21,7 +21,7 @@ import (
 
 // applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
 func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
-	httpsEntry := api.NewHTTPSEntry(config.HTTPS, config.Server)
+	httpsEntry := api.NewHTTPSEntry(config.TLS, config.Server)
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, err

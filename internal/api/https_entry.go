@@ -45,7 +45,7 @@ type HTTPSEntry struct {
 }
 
 // NewHTTPSEntry 根据 TLS 配置创建 HTTPS 入口。
-func NewHTTPSEntry(config serverconfig.HTTPSConfig, backend serverconfig.ServerConfig) *HTTPSEntry {
+func NewHTTPSEntry(config serverconfig.TLSConfig, backend serverconfig.ServerConfig) *HTTPSEntry {
 	mode := tlsMode(config.Mode)
 	service := &HTTPSEntry{mode: mode}
 	if mode != modeAuto {
@@ -62,8 +62,8 @@ func NewHTTPSEntry(config serverconfig.HTTPSConfig, backend serverconfig.ServerC
 		http.Error(writer, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 	}
 
-	service.cachePath = config.TLSDataDirectory
-	service.cache = autocert.DirCache(config.TLSDataDirectory)
+	service.cachePath = config.DataDirectory
+	service.cache = autocert.DirCache(config.DataDirectory)
 	service.manager = &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		Cache:      service.cache,
