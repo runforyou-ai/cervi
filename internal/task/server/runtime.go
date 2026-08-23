@@ -12,7 +12,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
 	"github.com/uptrace/bun"
 )
 
@@ -21,7 +20,7 @@ type Runtime struct {
 	config     runtimeConfig
 	repository *repository
 	registry   *Registry
-	schedules  []taskruntime.ScheduleDefinition
+	schedules  []ScheduleDefinition
 	instanceID string
 
 	cancel         context.CancelFunc
@@ -46,12 +45,12 @@ func (r *Runtime) Registry() *Registry {
 }
 
 // RegisterSchedule 注册一个由代码管理的定时 Action。
-func (r *Runtime) RegisterSchedule(definition taskruntime.ScheduleDefinition) {
+func (r *Runtime) RegisterSchedule(definition ScheduleDefinition) {
 	r.schedules = append(r.schedules, definition)
 }
 
 // Enqueue 将 Action 输入持久化并等待可靠发布。
-func (r *Runtime) Enqueue(ctx context.Context, actionName string, payload any, options taskruntime.EnqueueOptions) (string, error) {
+func (r *Runtime) Enqueue(ctx context.Context, actionName string, payload any, options EnqueueOptions) (string, error) {
 	if _, exists := r.registry.lookup(actionName); !exists {
 		return "", fmt.Errorf("task action %q is not registered", actionName)
 	}

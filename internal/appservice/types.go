@@ -440,6 +440,7 @@ type ChannelRoutingTarget struct {
 type WebsiteChannel struct {
 	WebsiteChannelSummary
 	ChatInterface WebsiteChannelChatInterface `json:"chatInterface"`
+	Access        WebsiteChannelAccess        `json:"access"`
 }
 
 // WebsiteChannelInput 定义网站渠道基础字段。
@@ -466,6 +467,16 @@ type WebsiteChannelChatInterfaceInput struct {
 	Subtitle        string `json:"subtitle"`
 	GreetingMessage string `json:"greetingMessage"`
 	ThemeColor      string `json:"themeColor"`
+}
+
+// WebsiteChannelAccess 定义网站渠道允许使用的网站。
+type WebsiteChannelAccess struct {
+	AllowedHosts []string `json:"allowedHosts"`
+}
+
+// WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
+type WebsiteChannelAccessInput struct {
+	AllowedHosts []string `json:"allowedHosts"`
 }
 
 // ChannelSummary 定义渠道选择项。

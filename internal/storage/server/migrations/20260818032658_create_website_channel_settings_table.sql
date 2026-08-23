@@ -7,6 +7,7 @@ CREATE TABLE website_channel_settings (
     chat_subtitle       text,
     greeting_message    text,
     theme_color         text NOT NULL DEFAULT '#2563EB',
+    allowed_embed_hosts text[] NOT NULL DEFAULT '{}'::text[],
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now()
 );
@@ -18,6 +19,7 @@ COMMENT ON COLUMN website_channel_settings.chat_title IS '聊天窗口标题';
 COMMENT ON COLUMN website_channel_settings.chat_subtitle IS '聊天窗口副标题';
 COMMENT ON COLUMN website_channel_settings.greeting_message IS '访客欢迎语';
 COMMENT ON COLUMN website_channel_settings.theme_color IS '界面主题色';
+COMMENT ON COLUMN website_channel_settings.allowed_embed_hosts IS '允许嵌入聊天挂件的网站主机';
 COMMENT ON COLUMN website_channel_settings.created_at IS '创建时间';
 COMMENT ON COLUMN website_channel_settings.updated_at IS '更新时间';
 

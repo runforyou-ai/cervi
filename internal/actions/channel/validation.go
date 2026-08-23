@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/embedhost"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -33,6 +34,8 @@ const (
 	ValidationChatSubtitleTooLong  ValidationCode = "CHAT_SUBTITLE_TOO_LONG"
 	ValidationGreetingTooLong      ValidationCode = "GREETING_MESSAGE_TOO_LONG"
 	ValidationThemeColorInvalid    ValidationCode = "THEME_COLOR_INVALID"
+	ValidationAllowedHostsTooMany  ValidationCode = "ALLOWED_HOSTS_TOO_MANY"
+	ValidationAllowedHostInvalid   ValidationCode = "ALLOWED_HOST_INVALID"
 )
 
 // ValidationError 表示网站渠道字段校验失败。
@@ -60,6 +63,11 @@ type WebsiteChannelChatInterfaceInput struct {
 	Subtitle        string
 	GreetingMessage string
 	ThemeColor      string
+}
+
+// WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
+type WebsiteChannelAccessInput struct {
+	AllowedHosts []string
 }
 
 // normalizeWebsiteChannelInput 规范化并校验网站渠道输入。
@@ -141,5 +149,21 @@ func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterface
 	if !themeColorPattern.MatchString(input.ThemeColor) {
 		fields["themeColor"] = ValidationThemeColorInvalid
 	}
+	return input, fields
+}
+
+// normalizeWebsiteChannelAccessInput 规范化并校验允许使用的网站。
+func normalizeWebsiteChannelAccessInput(input WebsiteChannelAccessInput) (WebsiteChannelAccessInput, map[string]ValidationCode) {
+	fields := make(map[string]ValidationCode)
+	if len(input.AllowedHosts) > embedhost.MaxHosts {
+		fields["allowedHosts"] = ValidationAllowedHostsTooMany
+		return input, fields
+	}
+	normalized, ok := embedhost.NormalizeAll(input.AllowedHosts)
+	if !ok {
+		fields["allowedHosts"] = ValidationAllowedHostInvalid
+		return input, fields
+	}
+	input.AllowedHosts = normalized
 	return input, fields
 }

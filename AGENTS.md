@@ -23,7 +23,7 @@ wails3 task migrate:rollback VERSION=20260818032701
 wails3 task migrate:reset
 wails3 task make:migration NAME=create_example_table
 
-# 先启动服务端，再启动桌面端及 MCP 服务
+# 先启动服务端，再启动桌面端；桌面 MCP 随桌面端按 Wails3 默认配置启动
 wails3 task run:server
 wails3 task dev
 
@@ -41,7 +41,7 @@ wails3 generate bindings -clean=true -ts -i
 ```
 
 前端要求 Node.js 24.0.0 或更高版本，项目构建使用 Wails v3 和 Task。
-Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite、MCP 端口、PostgreSQL 数据库和 NATS 命名空间。按上述顺序启动后，可通过 Wails MCP 获取桌面端页面信息。
+Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间。桌面 MCP 使用 Wails3 默认配置，启动桌面端后可通过 MCP 获取页面信息。
 
 真机在连接页手动输入可访问的企业服务端地址。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
 
@@ -56,19 +56,24 @@ Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server
 ```text
 cervi/
 ├── main.go                         # 应用入口和 Wails 配置
-├── application_services_*.go      # 按原生端和服务端注册服务
+├── application_services_*.go       # 按原生端和服务端注册服务
 ├── internal/
 │   ├── actions/                    # 按领域组织的 Action 与 Query
 │   ├── api/                        # Gin 对外 HTTP API 适配器
 │   ├── apiproxy/                   # 原生端到企业服务端的类型化 API 代理
 │   ├── appservice/                 # 跨平台应用服务、传输契约和平台 Backend
+│   │   └── native/                 # 原生端应用服务平台能力实现
 │   ├── common/                     # 无存储、无传输、无平台依赖的通用能力
 │   ├── domain/                     # 各层共用的领域值
 │   ├── i18n/                       # 后端本地化能力和翻译词条
-│   └── storage/
-│       ├── server/                 # PostgreSQL 连接、迁移和服务端模型
-│       ├── desktop/                # 桌面端 SQLite 存储、迁移和模型
-│       └── mobile/                 # 移动端 SQLite 存储、迁移和模型
+│   ├── storage/
+│   │   ├── server/                 # PostgreSQL 连接、迁移和服务端模型
+│   │   ├── desktop/                # 桌面端 SQLite 存储、迁移和模型
+│   │   └── mobile/                 # 移动端 SQLite 存储、迁移和模型
+│   └── task/                       # 可靠任务能力
+│       ├── task.go                 # 跨平台共享的最小执行语义
+│       ├── client/                 # 客户端 SQLite 可靠任务方案与实现
+│       └── server/                 # 服务端 PostgreSQL、NATS 与 Cron 实现
 ├── frontend/
 │   ├── bindings/                   # Wails 自动生成的 TypeScript 绑定
 │   └── src/
@@ -94,6 +99,7 @@ cervi/
 - `common` 只放无数据库、无传输层、无平台依赖的通用能力。小函数和错误放在包内，完整能力使用子包。
 - `domain` 只放各层共用的领域值，按概念拆文件，不放数据库、传输层和平台逻辑。
 - 数据库模型放在对应平台的 `storage` 目录；桌面端和移动端的 SQLite 迁移保持独立。
+- `task` 根包只放各平台共享的 Action 执行语义；客户端和服务端分别定义自己的投递参数、存储与运行机制，不为形式统一互相复用平台实现。
 
 ### 前端契约
 
@@ -132,11 +138,12 @@ cervi/
 - Go 具名函数和方法使用简洁、直述型中文注释。
 - 前端 `src` 业务代码同样：文件头说明职责，具名函数、组件和导出函数各一行注释。`frontend/bindings` 禁止加注释；`components/ui` 只保留文件头。
 - 代码审查结果、Git 提交信息以及 PR 的标题和描述使用中文。
-- 除非用户明确要求，不运行测试、`go vet` 或构建。
+- 仅当用户明确要求提交代码或提交 PR 时，才在提交前运行与当前任务相关的测试和构建；其他情况不运行测试、`go vet` 或构建。
 
 ### 界面控制
 
-- 未经用户当次明确授权，不得控制浏览器、桌面应用或系统界面；截图和界面问题不视为授权。
+- 当前任务涉及桌面端时，必要时应主动使用 Wails MCP 获取页面信息并完成相关验证，无需另行请求授权。
+- 除桌面端任务中的 Wails MCP 验证外，未经用户当次明确授权，不得控制浏览器、桌面应用或系统界面。
 - 默认使用命令行验证；需要界面验证时，由用户操作并反馈结果，授权不得跨任务沿用。
 
 ### 管理界面设计

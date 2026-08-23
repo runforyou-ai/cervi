@@ -10,7 +10,7 @@ import {
   isApiError,
   isNotFoundApiError,
   updateWebsiteChannelChatInterface,
-  type WebsiteChannel,
+  type WebsiteChannelData,
   type WebsiteChannelChatInterface,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
@@ -41,7 +41,7 @@ export function WebsiteChannelChatInterfaceForm({
   channel,
   onUpdated,
 }: {
-  channel: WebsiteChannel
+  channel: WebsiteChannelData
   onUpdated: (value: WebsiteChannelChatInterface) => void
 }) {
   const { t } = useTranslation("channels")

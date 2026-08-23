@@ -7,7 +7,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router"
 import {
   getWebsiteChannel,
   isNotFoundApiError,
-  type WebsiteChannel,
+  type WebsiteChannelData,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { PageContent } from "@/components/page-content"
@@ -19,7 +19,7 @@ import { WebsiteChannelReceptionSettingsForm } from "@/features/channels/website
 import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
 import {
   WebsiteChannelUsagePanel,
-  type WebsiteChannelAccess,
+  type WebsiteChannelAccessTab,
 } from "@/features/channels/website/website-channel-usage-panel"
 
 const editTabs = ["basic", "reception", "chat-interface", "usage"] as const
@@ -32,7 +32,7 @@ function isEditTab(value: string | null): value is EditTab {
 }
 
 /** 判断值是否为渠道访问方式页签。 */
-function isAccessTab(value: string | null): value is WebsiteChannelAccess {
+function isAccessTab(value: string | null): value is WebsiteChannelAccessTab {
   return value === "embed" || value === "link"
 }
 
@@ -41,15 +41,15 @@ function WebsiteChannelEditTabs({
   channel,
   onChannelChange,
 }: {
-  channel: WebsiteChannel
-  onChannelChange: (channel: WebsiteChannel) => void
+  channel: WebsiteChannelData
+  onChannelChange: (channel: WebsiteChannelData) => void
 }) {
   const { t } = useTranslation("channels")
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get("tab")
   const requestedAccess = searchParams.get("access")
   const activeTab = isEditTab(requestedTab) ? requestedTab : "basic"
-  const activeAccess: WebsiteChannelAccess =
+  const activeAccess: WebsiteChannelAccessTab =
     requestedAccess === "link" ? "link" : "embed"
 
   useEffect(() => {
@@ -79,7 +79,7 @@ function WebsiteChannelEditTabs({
   }
 
   /** 切换渠道访问方式并同步 URL。 */
-  function setAccess(value: WebsiteChannelAccess) {
+  function setAccess(value: WebsiteChannelAccessTab) {
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set("tab", "usage")
     nextParams.set("access", value)
@@ -134,9 +134,10 @@ function WebsiteChannelEditTabs({
         className="mt-6 data-[state=inactive]:hidden"
       >
         <WebsiteChannelUsagePanel
-          channelId={channel.id}
+          channel={channel}
           access={activeAccess}
           onAccessChange={setAccess}
+          onUpdated={(access) => onChannelChange({ ...channel, access })}
         />
       </TabsContent>
     </Tabs>
@@ -148,7 +149,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
   const { channelId = "" } = useParams()
-  const [channel, setChannel] = useState<WebsiteChannel | null>(null)
+  const [channel, setChannel] = useState<WebsiteChannelData | null>(null)
   const [loading, setLoading] = useState(mode === "edit")
   const [error, setError] = useState("")
   const [reloadKey, setReloadKey] = useState(0)

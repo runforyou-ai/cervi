@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
+	"github.com/runforyou-ai/cervi/internal/task"
 )
 
 // TestConfigNamespaceNames 验证一个命名空间同时隔离所有 JetStream 资源。
@@ -44,7 +44,7 @@ func TestRegisterJSONMarksInvalidPayloadPermanent(t *testing.T) {
 		t.Fatal("registered handler not found")
 	}
 	err := handler(context.Background(), []byte(`{"value":`))
-	if !taskruntime.IsPermanent(err) {
+	if !task.IsPermanent(err) {
 		t.Fatalf("invalid payload error = %v, want permanent", err)
 	}
 }
@@ -52,7 +52,7 @@ func TestRegisterJSONMarksInvalidPayloadPermanent(t *testing.T) {
 // TestPermanentPreservesCause 验证永久错误仍支持错误链判断。
 func TestPermanentPreservesCause(t *testing.T) {
 	cause := errors.New("invalid input")
-	if err := taskruntime.Permanent(cause); !errors.Is(err, cause) {
+	if err := task.Permanent(cause); !errors.Is(err, cause) {
 		t.Fatalf("permanent error does not preserve cause: %v", err)
 	}
 }
@@ -96,11 +96,11 @@ func TestResolveExecutionErrorPreservesHandlerResult(t *testing.T) {
 	if err := resolveExecutionError(nil, heartbeatErr); err != nil {
 		t.Fatalf("successful handler result was replaced: %v", err)
 	}
-	permanentErr := taskruntime.Permanent(errors.New("invalid input"))
+	permanentErr := task.Permanent(errors.New("invalid input"))
 	if err := resolveExecutionError(permanentErr, heartbeatErr); !errors.Is(err, permanentErr) {
 		t.Fatalf("permanent handler result was replaced: %v", err)
 	}
-	permanentCancel := taskruntime.Permanent(context.Canceled)
+	permanentCancel := task.Permanent(context.Canceled)
 	if err := resolveExecutionError(permanentCancel, heartbeatErr); !errors.Is(err, permanentCancel) {
 		t.Fatalf("permanent cancellation was replaced: %v", err)
 	}

@@ -14,8 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
-	servertask "github.com/runforyou-ai/cervi/internal/taskruntime/server"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -36,7 +35,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := servertask.RegisterJSON(tasks.Registry(), fileaction.DeleteExpiredActionName, deleteExpired.Execute); err != nil {
 		return nil, err
 	}
-	tasks.RegisterSchedule(taskruntime.ScheduleDefinition{
+	tasks.RegisterSchedule(servertask.ScheduleDefinition{
 		Key: fileaction.CleanupScheduleKey, ActionName: fileaction.ScanExpiredActionName, Queue: "maintenance",
 		Payload: fileaction.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,

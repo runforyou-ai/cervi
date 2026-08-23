@@ -7,6 +7,7 @@ vars:
   APP_NAME: "cervi"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   # GOOS 默认使用当前系统，也可在交叉构建时显式覆盖。
   GOOS: '{{.GOOS | default OS}}'
 
@@ -36,10 +37,8 @@ tasks:
 
   dev:
     summary: Runs the application in development mode
-    deps:
-      - env:check:desktop
     cmds:
-      - wails3 dev -config ./build/config.yml -port {{.WAILS_VITE_PORT}}
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
     env:
       WAILS_MCP: "1"
 
@@ -48,7 +47,6 @@ tasks:
     summary: 校验当前工作区开发环境
     deps:
       - env:check:server
-      - env:check:desktop
 
   env:check:database:
     silent: true
@@ -83,17 +81,6 @@ tasks:
         msg: "请在 .env 中配置有效的 NATS_NAMESPACE"
     cmds:
       - 'echo "Server {{.WAILS_SERVER_PORT}}，NATS {{.NATS_NAMESPACE}}"'
-
-  env:check:desktop:
-    silent: true
-    summary: 校验当前工作区桌面开发环境
-    preconditions:
-      - sh: '{{if .WAILS_VITE_PORT}}true{{else}}false{{end}}'
-        msg: "请在 .env 中配置 WAILS_VITE_PORT"
-      - sh: '{{if .WAILS_MCP_PORT}}true{{else}}false{{end}}'
-        msg: "请在 .env 中配置 WAILS_MCP_PORT"
-    cmds:
-      - 'echo "桌面开发：Vite {{.WAILS_VITE_PORT}}，MCP {{.WAILS_MCP_PORT}}"'
 
   db:ensure:
     silent: true
@@ -137,8 +124,6 @@ tasks:
     summary: Builds the application in server mode (no GUI, HTTP server only)
     cmds:
       - task: common:build:server
-    env:
-      WAILS_MCP: "0"
 
   run:server:
     summary: Runs the application in server mode
@@ -147,8 +132,6 @@ tasks:
       - env:check:server
     cmds:
       - task: common:run:server
-    env:
-      WAILS_MCP: "0"
 
   build:docker:
     summary: Builds a Docker image for server mode deployment

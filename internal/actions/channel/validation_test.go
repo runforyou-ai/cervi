@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/runforyou-ai/cervi/internal/common/embedhost"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -100,6 +101,27 @@ func TestNormalizeWebsiteChannelChatInterfaceInput(t *testing.T) {
 	}
 }
 
+// TestNormalizeWebsiteChannelAccessInput 验证允许网站配置的规范化和数量限制。
+func TestNormalizeWebsiteChannelAccessInput(t *testing.T) {
+	normalized, fields := normalizeWebsiteChannelAccessInput(WebsiteChannelAccessInput{
+		AllowedHosts: []string{" Example.COM ", "*.example.com"},
+	})
+	if len(fields) != 0 || len(normalized.AllowedHosts) != 2 || normalized.AllowedHosts[0] != "example.com" {
+		t.Fatalf("normalized access = %#v, fields = %#v", normalized, fields)
+	}
+
+	_, fields = normalizeWebsiteChannelAccessInput(WebsiteChannelAccessInput{AllowedHosts: []string{"not a host"}})
+	if fields["allowedHosts"] != ValidationAllowedHostInvalid {
+		t.Fatalf("invalid host validation = %#v", fields)
+	}
+
+	tooMany := make([]string, embedhost.MaxHosts+1)
+	_, fields = normalizeWebsiteChannelAccessInput(WebsiteChannelAccessInput{AllowedHosts: tooMany})
+	if fields["allowedHosts"] != ValidationAllowedHostsTooMany {
+		t.Fatalf("host count validation = %#v", fields)
+	}
+}
+
 // TestMalformedChannelIDReturnsNotFound 验证非法 UUID 不会进入数据库查询。
 func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 	identity := &servermodels.Identity{}
@@ -131,6 +153,13 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 			name: "update chat interface",
 			execute: func() error {
 				_, err := NewUpdateWebsiteChannelChatInterfaceAction(nil).Execute(context.Background(), identity, "not-a-uuid", WebsiteChannelChatInterfaceInput{})
+				return err
+			},
+		},
+		{
+			name: "update access",
+			execute: func() error {
+				_, err := NewUpdateWebsiteChannelAccessAction(nil).Execute(context.Background(), identity, "not-a-uuid", WebsiteChannelAccessInput{})
 				return err
 			},
 		},

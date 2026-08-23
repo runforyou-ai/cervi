@@ -1030,6 +1030,21 @@ export interface WebsiteChannel {
     "createdAt": string;
     "updatedAt": string;
     "chatInterface": WebsiteChannelChatInterface;
+    "access": WebsiteChannelAccess;
+}
+
+/**
+ * WebsiteChannelAccess 定义网站渠道允许使用的网站。
+ */
+export interface WebsiteChannelAccess {
+    "allowedHosts": string[] | null;
+}
+
+/**
+ * WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
+ */
+export interface WebsiteChannelAccessInput {
+    "allowedHosts": string[] | null;
 }
 
 /**
