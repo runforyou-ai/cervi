@@ -14,18 +14,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/serverconfig"
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// TestHTTPSModeFromEnv 验证显式模式和统一默认模式。
-func TestHTTPSModeFromEnv(t *testing.T) {
+// TestParseHTTPSMode 验证 HTTPS 模式解析。
+func TestParseHTTPSMode(t *testing.T) {
 	tests := []struct {
 		name      string
 		value     string
 		want      httpsMode
 		wantError bool
 	}{
-		{name: "empty defaults to off", want: modeOff},
 		{name: "explicit auto", value: "auto", want: modeAuto},
 		{name: "explicit external", value: "external", want: modeExternal},
 		{name: "explicit off", value: "off", want: modeOff},
@@ -34,8 +34,7 @@ func TestHTTPSModeFromEnv(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Setenv("CERVI_HTTPS_MODE", test.value)
-			mode, err := httpsModeFromEnv()
+			mode, err := parseHTTPSMode(test.value)
 			if test.wantError {
 				if err == nil {
 					t.Fatal("expected invalid mode error")
@@ -43,7 +42,7 @@ func TestHTTPSModeFromEnv(t *testing.T) {
 				return
 			}
 			if err != nil || mode != test.want {
-				t.Fatalf("httpsModeFromEnv() = (%q, %v), want (%q, nil)", mode, err, test.want)
+				t.Fatalf("parseHTTPSMode() = (%q, %v), want (%q, nil)", mode, err, test.want)
 			}
 		})
 	}
@@ -94,8 +93,7 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 
 // TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
 func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
-	t.Setenv("CERVI_HTTPS_MODE", "external")
-	service, err := NewHTTPSEntry()
+	service, err := NewHTTPSEntry(serverconfig.HTTPSConfig{Mode: "external"}, 8080)
 	if err != nil {
 		t.Fatalf("new external service: %v", err)
 	}

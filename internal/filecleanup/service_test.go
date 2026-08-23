@@ -14,8 +14,7 @@ import (
 
 // TestDeleteLocalFile 验证清理服务删除文件记录指向的本地内容。
 func TestDeleteLocalFile(t *testing.T) {
-	t.Setenv("FILE_STORAGE_PATH", t.TempDir())
-	local, err := filestore.NewLocalStoreFromEnv()
+	local, err := filestore.NewLocalStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

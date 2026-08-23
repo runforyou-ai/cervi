@@ -13,22 +13,21 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/serverconfig"
 	"golang.org/x/crypto/acme/autocert"
 )
 
 const (
-	defaultBackendPort = 8080
-	httpAddress        = ":80"
-	httpsAddress       = ":443"
-	modeAuto           = httpsMode("auto")
-	modeExternal       = httpsMode("external")
-	modeOff            = httpsMode("off")
+	httpAddress  = ":80"
+	httpsAddress = ":443"
+	modeAuto     = httpsMode("auto")
+	modeExternal = httpsMode("external")
+	modeOff      = httpsMode("off")
 )
 
 type httpsMode string
@@ -43,37 +42,35 @@ type HTTPSEntry struct {
 	httpServer  *http.Server
 	httpsServer *http.Server
 	allowed     sync.Map
+	backendPort int
 }
 
 // NewHTTPSEntry 根据部署模式创建 HTTPS 入口。
-func NewHTTPSEntry() (*HTTPSEntry, error) {
-	mode, err := httpsModeFromEnv()
+func NewHTTPSEntry(config serverconfig.HTTPSConfig, backendPort int) (*HTTPSEntry, error) {
+	mode, err := parseHTTPSMode(config.Mode)
 	if err != nil {
 		return nil, err
 	}
-	service := &HTTPSEntry{mode: mode}
+	service := &HTTPSEntry{mode: mode, backendPort: backendPort}
 	if mode != modeAuto {
 		return service, nil
 	}
 
-	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(serverPort()))}
+	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(backendPort))}
 	service.proxy = httputil.NewSingleHostReverseProxy(backendURL)
 	service.proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, err error) {
 		slog.Warn("转发 HTTPS 请求失败", "host", request.Host, "path", request.URL.Path, "error", err)
 		http.Error(writer, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 	}
 
-	cachePath := strings.TrimSpace(os.Getenv("CERVI_TLS_DATA_DIR"))
-	if cachePath == "" {
-		cachePath = "data/tls"
-	}
+	cachePath := config.TLSDataDirectory
 	service.cachePath = cachePath
 	service.cache = autocert.DirCache(cachePath)
 	service.manager = &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		Cache:      service.cache,
 		HostPolicy: service.allowCertificate,
-		Email:      strings.TrimSpace(os.Getenv("CERVI_ACME_EMAIL")),
+		Email:      config.ACMEEmail,
 	}
 	service.httpServer = &http.Server{
 		Addr:              httpAddress,
@@ -94,7 +91,7 @@ func NewHTTPSEntry() (*HTTPSEntry, error) {
 // Start 根据部署模式启动自动 HTTPS 入口。
 func (s *HTTPSEntry) Start(ctx context.Context) error {
 	if s.mode == modeExternal {
-		slog.Info("HTTPS 由外部入口管理", "server_port", serverPort())
+		slog.Info("HTTPS 由外部入口管理", "server_port", s.backendPort)
 		return nil
 	}
 	if s.mode != modeAuto {
@@ -237,22 +234,9 @@ func redirectToHTTPS(writer http.ResponseWriter, request *http.Request, host str
 	http.Redirect(writer, request, target.String(), http.StatusTemporaryRedirect)
 }
 
-// serverPort 返回 Wails server 实际使用的端口。
-func serverPort() int {
-	value := os.Getenv("WAILS_SERVER_PORT")
-	port, err := strconv.Atoi(value)
-	if err != nil || port < 1 || port > 65535 {
-		return defaultBackendPort
-	}
-	return port
-}
-
-// httpsModeFromEnv 返回配置的 HTTPS 模式，留空时关闭 HTTPS 入口。
-func httpsModeFromEnv() (httpsMode, error) {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv("CERVI_HTTPS_MODE")))
-	if value == "" {
-		return modeOff, nil
-	}
+// parseHTTPSMode 解析已校验的 HTTPS 模式。
+func parseHTTPSMode(value string) (httpsMode, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
 	mode := httpsMode(value)
 	switch mode {
 	case modeAuto, modeExternal, modeOff:

@@ -11,18 +11,20 @@ import (
 	"github.com/runforyou-ai/cervi/internal/filecleanup"
 	"github.com/runforyou-ai/cervi/internal/filecontent"
 	"github.com/runforyou-ai/cervi/internal/filestore"
+	"github.com/runforyou-ai/cervi/internal/health"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
+	"github.com/runforyou-ai/cervi/internal/serverconfig"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
-func applicationServices(appStorage *serverstorage.Store) ([]application.Service, error) {
-	httpsEntry, err := api.NewHTTPSEntry()
+func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
+	httpsEntry, err := api.NewHTTPSEntry(config.HTTPS, config.Server.Port)
 	if err != nil {
 		return nil, err
 	}
-	localFiles, err := filestore.NewLocalStoreFromEnv()
+	localFiles, err := filestore.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -33,6 +35,8 @@ func applicationServices(appStorage *serverstorage.Store) ([]application.Service
 	cleanupLifecycle := &fileCleanupLifecycle{service: filecleanup.NewService(appStorage.DB(), localFiles)}
 
 	return []application.Service{
+		application.NewServiceWithOptions(health.NewLiveness(version), application.ServiceOptions{Route: "/healthz"}),
+		application.NewServiceWithOptions(health.NewReadiness(appStorage.DB(), version), application.ServiceOptions{Route: "/readyz"}),
 		application.NewService(&httpsLifecycle{service: httpsEntry}),
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,

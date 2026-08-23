@@ -221,7 +221,7 @@ tasks:
     cmds:
       - '{{if eq .OBFUSCATED "true"}}garble {{.GARBLE_ARGS}} build{{else}}go build{{end}} {{.BUILD_FLAGS}} -o "{{.BIN_DIR}}/{{.APP_NAME}}-server{{exeExt}}"'
     vars:
-      BUILD_FLAGS: '-tags server{{if eq .DEV "true"}}{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -buildvcs=false -gcflags=all="-l"{{else}},production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s"{{end}}'
+      BUILD_FLAGS: '-tags server{{if eq .DEV "true"}}{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -buildvcs=false -gcflags=all="-l"{{else}},production{{if eq .OBFUSCATED "true"}},wails_obfuscated{{end}}{{if .EXTRA_TAGS}},{{.EXTRA_TAGS}}{{end}} -trimpath -buildvcs=false -ldflags="-w -s -X main.version={{.APP_VERSION}}"{{end}}'
 
   run:server:
     summary: Builds and runs a development server (DEV=true)
@@ -254,6 +254,7 @@ tasks:
       - >-
         docker build
         --build-arg CGO_ENABLED={{.CGO_ENABLED | default "0"}}
+        --build-arg APP_VERSION={{.APP_VERSION}}
         --build-arg GO_IMAGE={{.GO_IMAGE | default "golang:1.27-alpine"}}
         --build-arg RUNTIME_IMAGE={{.RUNTIME_IMAGE | default "gcr.io/distroless/static-debian12"}}
         -t {{.TAG | default (printf "%s:latest" .APP_NAME)}}
@@ -270,7 +271,8 @@ tasks:
     summary: Builds and runs the Docker image
     desc: |
       Builds the Docker image and runs it using WAILS_SERVER_PORT for both the
-      container listener and host port mapping. The port defaults to 8080.
+      container listener and host port mapping. DATABASE_URL 必须指向容器可访问的 PostgreSQL。
+      The port defaults to 8080.
       Usage: task run:docker [TAG=myapp:latest] [WAILS_SERVER_PORT=18080]
     deps:
       - task: build:docker
@@ -280,6 +282,7 @@ tasks:
     cmds:
       - >-
         docker run --rm
+        -e DATABASE_URL
         -e WAILS_SERVER_PORT={{.SERVER_PORT}}
         -p {{.SERVER_PORT}}:{{.SERVER_PORT}}
         {{.TAG | default (printf "%s:latest" .APP_NAME)}}
