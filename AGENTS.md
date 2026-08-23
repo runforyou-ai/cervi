@@ -41,7 +41,7 @@ wails3 generate bindings -clean=true -ts -i
 ```
 
 前端要求 Node.js 24.0.0 或更高版本，项目构建使用 Wails v3 和 Task。
-Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite、MCP 端口、PostgreSQL 数据库和 NATS 命名空间。按上述顺序启动后，可通过 Wails MCP 获取桌面端页面信息。
+Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间。启动桌面端后可通过 Wails3 MCP 获取桌面端页面信息。
 
 真机在连接页手动输入可访问的企业服务端地址。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
 
@@ -56,7 +56,7 @@ Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server
 ```text
 cervi/
 ├── main.go                         # 应用入口和 Wails 配置
-├── application_services_*.go      # 按原生端和服务端注册服务
+├── application_services_*.go       # 按原生端和服务端注册服务
 ├── internal/
 │   ├── actions/                    # 按领域组织的 Action 与 Query
 │   ├── api/                        # Gin 对外 HTTP API 适配器
@@ -142,7 +142,8 @@ cervi/
 
 ### 界面控制
 
-- 未经用户当次明确授权，不得控制浏览器、桌面应用或系统界面；截图和界面问题不视为授权。
+- 当前任务涉及桌面端时，必要时应主动使用 Wails MCP 获取页面信息并完成相关验证，无需另行请求授权。
+- 除桌面端任务中的 Wails MCP 验证外，未经用户当次明确授权，不得控制浏览器、桌面应用或系统界面。
 - 默认使用命令行验证；需要界面验证时，由用户操作并反馈结果，授权不得跨任务沿用。
 
 ### 管理界面设计
