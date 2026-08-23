@@ -13,22 +13,21 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"golang.org/x/crypto/acme/autocert"
 )
 
 const (
-	defaultBackendPort = 8080
-	httpAddress        = ":80"
-	httpsAddress       = ":443"
-	modeAuto           = tlsMode("auto")
-	modeExternal       = tlsMode("external")
-	modeOff            = tlsMode("off")
+	httpAddress  = ":80"
+	httpsAddress = ":443"
+	modeAuto     = tlsMode("auto")
+	modeExternal = tlsMode("external")
+	modeOff      = tlsMode("off")
 )
 
 type tlsMode string
@@ -45,35 +44,31 @@ type HTTPSEntry struct {
 	allowed     sync.Map
 }
 
-// NewHTTPSEntry 根据 TLS 模式创建 HTTPS 入口。
-func NewHTTPSEntry() (*HTTPSEntry, error) {
-	mode, err := tlsModeFromEnv()
-	if err != nil {
-		return nil, err
-	}
+// NewHTTPSEntry 根据 TLS 配置创建 HTTPS 入口。
+func NewHTTPSEntry(config serverconfig.HTTPSConfig, backend serverconfig.ServerConfig) *HTTPSEntry {
+	mode := tlsMode(config.Mode)
 	service := &HTTPSEntry{mode: mode}
 	if mode != modeAuto {
-		return service, nil
+		return service
+	}
+	if config.ACMEEmail == "" {
+		slog.Warn("自动 HTTPS 未配置 ACME 联系邮箱")
 	}
 
-	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(serverPort()))}
+	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort(proxyHost(backend.Host), strconv.Itoa(backend.Port))}
 	service.proxy = httputil.NewSingleHostReverseProxy(backendURL)
 	service.proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, err error) {
 		slog.Warn("转发 HTTPS 请求失败", "host", request.Host, "path", request.URL.Path, "error", err)
 		http.Error(writer, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 	}
 
-	cachePath := strings.TrimSpace(os.Getenv("TLS_DATA_DIR"))
-	if cachePath == "" {
-		cachePath = "data/tls"
-	}
-	service.cachePath = cachePath
-	service.cache = autocert.DirCache(cachePath)
+	service.cachePath = config.TLSDataDirectory
+	service.cache = autocert.DirCache(config.TLSDataDirectory)
 	service.manager = &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		Cache:      service.cache,
 		HostPolicy: service.allowCertificate,
-		Email:      strings.TrimSpace(os.Getenv("TLS_ACME_EMAIL")),
+		Email:      config.ACMEEmail,
 	}
 	service.httpServer = &http.Server{
 		Addr:              httpAddress,
@@ -88,17 +83,30 @@ func NewHTTPSEntry() (*HTTPSEntry, error) {
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	return service, nil
+	return service
+}
+
+// proxyHost 返回 HTTPS 入口访问服务监听器使用的地址。
+func proxyHost(host string) string {
+	host = strings.Trim(host, "[]")
+	switch host {
+	case "0.0.0.0":
+		return "127.0.0.1"
+	case "::":
+		return "::1"
+	default:
+		return host
+	}
 }
 
 // Start 启动 HTTPS 入口。
 func (s *HTTPSEntry) Start(ctx context.Context) error {
 	if s.mode == modeExternal {
-		slog.Info("TLS 由外部入口终止", "server_port", serverPort())
+		slog.Info("TLS 由外部入口终止")
 		return nil
 	}
 	if s.mode == modeOff {
-		slog.Info("TLS 入口已关闭", "server_port", serverPort())
+		slog.Info("TLS 入口已关闭")
 		return nil
 	}
 	httpListener, err := net.Listen("tcp", s.httpServer.Addr)
@@ -176,9 +184,6 @@ func (s *HTTPSEntry) allowCertificate(ctx context.Context, host string) error {
 
 // cachedCertificateMatches 判断持久化缓存中是否存在属于该域名的证书。
 func (s *HTTPSEntry) cachedCertificateMatches(ctx context.Context, host string) bool {
-	if s.cache == nil {
-		return false
-	}
 	for _, key := range []string{host, host + "+rsa"} {
 		data, err := s.cache.Get(ctx, key)
 		if errors.Is(err, autocert.ErrCacheMiss) {
@@ -236,29 +241,4 @@ func requestHost(value string) (string, bool) {
 func redirectToHTTPS(writer http.ResponseWriter, request *http.Request, host string) {
 	target := url.URL{Scheme: "https", Host: host, Path: request.URL.Path, RawQuery: request.URL.RawQuery}
 	http.Redirect(writer, request, target.String(), http.StatusTemporaryRedirect)
-}
-
-// serverPort 返回 Wails server 实际使用的端口。
-func serverPort() int {
-	value := os.Getenv("WAILS_SERVER_PORT")
-	port, err := strconv.Atoi(value)
-	if err != nil || port < 1 || port > 65535 {
-		return defaultBackendPort
-	}
-	return port
-}
-
-// tlsModeFromEnv 读取 TLS 模式，留空时关闭 TLS 入口。
-func tlsModeFromEnv() (tlsMode, error) {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv("TLS_MODE")))
-	if value == "" {
-		return modeOff, nil
-	}
-	mode := tlsMode(value)
-	switch mode {
-	case modeAuto, modeExternal, modeOff:
-		return mode, nil
-	default:
-		return "", fmt.Errorf("invalid TLS_MODE %q: expected auto, external, or off", value)
-	}
 }
