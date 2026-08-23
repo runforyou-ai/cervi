@@ -3,17 +3,12 @@
 ## 交付范围
 
 - Linux 使用 `tar.gz + systemd`，Windows Server 使用 ZIP，容器使用镜像，不单独维护 DEB、RPM 和 MSI。
-- 服务端二进制只读取 `-config` 指定的 YAML 和环境变量，不读取 `.env`。
-- 本地开发仍由 Task 加载当前 worktree 的 `.env`。
+- 服务端部署通过 `-config` 指定 YAML 配置文件。
 - Windows SCM、`cervi install/start/stop/config` 和自动更新器暂未实现。
 
 ## 配置与诊断
 
-运行配置按以下优先级加载，后者覆盖前者：
-
-1. 二进制内的默认值；
-2. `-config` 指定的 YAML；
-3. 环境变量。
+YAML 中未显式配置的可选字段使用二进制内的默认值。
 
 部署前使用以下命令校验配置：
 
@@ -31,6 +26,12 @@ server:
   port: 8080
 
 database:
+  host: 127.0.0.1
+  port: 5432
+  user: cervi
+  password: 请替换密码
+  name: main
+  sslMode: disable
   maxOpenConnections: 25
   maxIdleConnections: 5
   connectionMaxLifetime: 30m
@@ -40,26 +41,13 @@ database:
 
 nats:
   url: nats://127.0.0.1:4222
-  namespace: cervi
+  namespace: main
 
 https:
   mode: external
 
 storage:
   localDirectory: /var/lib/cervi/files
-```
-
-环境变量覆盖 YAML；PostgreSQL 分项配置会合成连接地址：
-
-```dotenv
-POSTGRES_HOST=127.0.0.1
-POSTGRES_PORT=5432
-POSTGRES_USER=cervi
-POSTGRES_PASSWORD=请替换密码
-POSTGRES_DB=cervi
-POSTGRES_SSLMODE=require
-NATS_URL=nats://127.0.0.1:4222
-NATS_NAMESPACE=cervi
 ```
 
 服务端依赖 PostgreSQL 和启用 JetStream 的 NATS。
@@ -70,7 +58,6 @@ NATS_NAMESPACE=cervi
 
 - 二进制：`/usr/local/bin/cervi-server`
 - YAML：`/etc/cervi/cervi.yaml`
-- 环境文件：`/etc/cervi/cervi.env`，权限 `root:cervi 0640`
 - 数据目录：`/var/lib/cervi`
 - 服务定义：`/etc/systemd/system/cervi.service`
 
@@ -81,7 +68,6 @@ sudo useradd --system --home-dir /var/lib/cervi --create-home --shell /usr/sbin/
 sudo install -o root -g root -m 0755 cervi-server /usr/local/bin/cervi-server
 sudo install -d -o root -g cervi -m 0750 /etc/cervi
 sudo install -o root -g cervi -m 0640 cervi.yaml /etc/cervi/cervi.yaml
-sudo install -o root -g cervi -m 0640 cervi.env /etc/cervi/cervi.env
 sudo install -o root -g root -m 0644 cervi.service /etc/systemd/system/cervi.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now cervi
@@ -100,7 +86,6 @@ After=network-online.target
 Type=simple
 User=cervi
 Group=cervi
-EnvironmentFile=/etc/cervi/cervi.env
 ExecStartPre=/usr/local/bin/cervi-server -config /etc/cervi/cervi.yaml -check-config
 ExecStart=/usr/local/bin/cervi-server -config /etc/cervi/cervi.yaml
 WorkingDirectory=/var/lib/cervi
@@ -167,14 +152,6 @@ storage:
 New-Item -ItemType Directory -Force 'C:\Program Files\Cervi', 'C:\ProgramData\Cervi\data\files'
 Copy-Item .\cervi-server.exe 'C:\Program Files\Cervi\cervi-server.exe'
 Copy-Item .\cervi.yaml 'C:\ProgramData\Cervi\cervi.yaml'
-$env:POSTGRES_HOST = '127.0.0.1'
-$env:POSTGRES_PORT = '5432'
-$env:POSTGRES_USER = 'cervi'
-$env:POSTGRES_PASSWORD = '请替换密码'
-$env:POSTGRES_DB = 'cervi'
-$env:POSTGRES_SSLMODE = 'require'
-$env:NATS_URL = 'nats://127.0.0.1:4222'
-$env:NATS_NAMESPACE = 'cervi'
 & 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml' -check-config
 & 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml'
 ```
@@ -196,8 +173,8 @@ Windows 使用 `external` TLS 模式并以前台进程或服务包装器运行�
 手动升级流程：
 
 1. 校验发布制品的签名或校验和；
-2. 备份 PostgreSQL、YAML 和环境文件；
-3. 更新配置和环境变量；
+2. 备份 PostgreSQL 和 YAML；
+3. 更新 YAML 配置；
 4. 使用待升级二进制执行 `-check-config`；
 5. 停止服务，原子替换二进制并保留上一版本；
 6. 启动服务并检查 `/readyz`。
