@@ -1,3 +1,5 @@
+name: cervi
+
 services:
   # 本地开发使用的 PostgreSQL。
   postgres:

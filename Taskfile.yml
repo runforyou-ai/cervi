@@ -10,7 +10,6 @@ vars:
   VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
   WORKSPACE: '{{.CERVI_WORKSPACE | default ""}}'
   DATABASE_NAME: '{{.CERVI_DATABASE_NAME | default ""}}'
-  INFRA_COMPOSE_PROJECT: '{{.CERVI_INFRA_COMPOSE_PROJECT | default "cervi"}}'
   POSTGRES_USER: '{{.CERVI_POSTGRES_USER | default "cervi"}}'
   NATS_URL: '{{.CERVI_NATS_URL | default ""}}'
   NATS_NAMESPACE: '{{.CERVI_NATS_NAMESPACE | default ""}}'
@@ -88,14 +87,14 @@ tasks:
     cmds:
       - |
         set -euo pipefail
-        exists=$(docker compose -p "{{.INFRA_COMPOSE_PROJECT}}" exec -T postgres \
+        exists=$(docker compose exec -T postgres \
           psql -U "{{.POSTGRES_USER}}" -d postgres -tAc \
           "SELECT 1 FROM pg_database WHERE datname = '{{.DATABASE_NAME}}'")
         if [ "$exists" = "1" ]; then
           echo "数据库 {{.DATABASE_NAME}} 已存在"
           exit 0
         fi
-        docker compose -p "{{.INFRA_COMPOSE_PROJECT}}" exec -T postgres \
+        docker compose exec -T postgres \
           createdb -U "{{.POSTGRES_USER}}" "{{.DATABASE_NAME}}"
         echo "已创建数据库 {{.DATABASE_NAME}}"
 
@@ -106,7 +105,7 @@ tasks:
       - sh: docker info >/dev/null 2>&1
         msg: "Docker 未运行，无法连接主工作区 PostgreSQL"
     cmds:
-      - docker compose -p "{{.INFRA_COMPOSE_PROJECT}}" exec -T postgres psql -U "{{.POSTGRES_USER}}" -d postgres -c '\l'
+      - docker compose exec -T postgres psql -U "{{.POSTGRES_USER}}" -d postgres -c '\l'
 
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)
