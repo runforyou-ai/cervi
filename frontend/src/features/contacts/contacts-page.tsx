@@ -320,7 +320,7 @@ function ContactScopeSidebar({
           >
             <UsersIcon className="size-4" />
             <span>{t("scopes.members")}</span>
-            <ChevronRightIcon className="ml-auto size-4 transition-transform group-data-[state=open]:rotate-90" />
+            <ChevronRightIcon className="ml-auto size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="flex flex-col gap-0.5">
@@ -347,8 +347,8 @@ function ContactScopeSidebar({
                   scope === "team" && contactNavPathActiveClass,
                 )}
               >
-                <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
                 <span>{t("scopes.teams")}</span>
+                <ChevronRightIcon className="ml-auto size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="flex flex-col gap-0.5">
@@ -380,7 +380,7 @@ function ContactScopeSidebar({
           >
             <ContactRoundIcon className="size-4" />
             <span>{t("scopes.external")}</span>
-            <ChevronRightIcon className="ml-auto size-4 transition-transform group-data-[state=open]:rotate-90" />
+            <ChevronRightIcon className="ml-auto size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="flex flex-col gap-0.5">
@@ -404,8 +404,8 @@ function ContactScopeSidebar({
                       contactNavPathActiveClass,
                   )}
                 >
-                  <ChevronRightIcon className="size-3.5 transition-transform group-data-[state=open]:rotate-90" />
                   <span>{channelTypeLabel(type, t)}</span>
+                  <ChevronRightIcon className="ml-auto size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent className="flex flex-col gap-0.5">
