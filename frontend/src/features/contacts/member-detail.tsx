@@ -11,7 +11,7 @@ import {
   isApiError,
   isNotFoundApiError,
   updateUser,
-  type DirectoryUserData,
+  type UserData,
   type RoleData,
   type Team,
 } from "@/api"
@@ -37,7 +37,7 @@ import { roleDisplayName } from "@/features/roles/role-labels"
 type EditingField = "name" | "email" | "role" | "teams" | null
 
 /** 把企业成员详情转换为编辑表单值。 */
-function valuesFromUser(user: DirectoryUserData): MemberFormValues {
+function valuesFromUser(user: UserData): MemberFormValues {
   return {
     displayName: user.displayName,
     email: user.email,
@@ -72,11 +72,11 @@ export function MemberDetailView({
   onSaved,
   onNotFound,
 }: {
-  user: DirectoryUserData
+  user: UserData
   teams: Team[]
   roles: RoleData[]
-  workStatus: DirectoryUserData["workStatus"]
-  onSaved: (user: DirectoryUserData) => void
+  workStatus: UserData["workStatus"]
+  onSaved: (user: UserData) => void
   onNotFound: () => void
 }) {
   const { t } = useTranslation("contacts")

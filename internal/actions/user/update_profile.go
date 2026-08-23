@@ -30,42 +30,38 @@ func NewUpdateProfileAction(db *bun.DB) *UpdateProfileAction {
 }
 
 // Execute 校验并更新当前用户的姓名、邮箱和头像关联。
-func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodels.Identity, input ProfileInput) (*servermodels.User, error) {
+func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodels.Identity, input ProfileInput) (*servermodels.Identity, error) {
 	input, fields := normalizeProfileInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if identity == nil ||
-		!common.ValidUUID(identity.Organization.ID) ||
-		!common.ValidUUID(identity.User.ID) ||
-		identity.User.OrganizationID != identity.Organization.ID {
-		return nil, common.ErrIdentityInvalid
-	}
-
-	user := &servermodels.User{}
+	var updatedIdentity *servermodels.Identity
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := validateIdentity(ctx, tx, identity); err != nil {
+			return err
+		}
 		var previousAvatarFileID *string
-		query := tx.NewUpdate().
-			Model(user).
+		identityQuery := tx.NewUpdate().
+			Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
-			Set("email = ?", input.Email).
 			Set("updated_at = now()")
 		if input.AvatarFileID != "" {
 			if !common.ValidUUID(input.AvatarFileID) {
 				return ErrAvatarFileNotFound
 			}
-			currentUser := &servermodels.User{}
-			if err := tx.NewSelect().Model(currentUser).
+			currentIdentity := &servermodels.OrganizationIdentity{}
+			if err := tx.NewSelect().Model(currentIdentity).
 				Column("avatar_file_id").
-				Where("u.id = ?", identity.User.ID).
-				Where("u.organization_id = ?", identity.Organization.ID).
+				Where("oi.id = ?", identity.User.IdentityID).
+				Where("oi.organization_id = ?", identity.Organization.ID).
+				Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 				For("UPDATE").
 				Scan(ctx); errors.Is(err, sql.ErrNoRows) {
 				return common.ErrIdentityInvalid
 			} else if err != nil {
 				return err
 			}
-			previousAvatarFileID = currentUser.AvatarFileID
+			previousAvatarFileID = currentIdentity.AvatarFileID
 
 			file := &servermodels.File{}
 			if err := tx.NewSelect().Model(file).
@@ -97,22 +93,24 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			} else if file.Status != string(domain.FileStatusActive) || !sameAvatar {
 				return ErrAvatarFileNotFound
 			}
-			query = query.Set("avatar_file_id = ?", file.ID)
+			identityQuery = identityQuery.Set("avatar_file_id = ?", file.ID)
 		}
-		result, err := query.
+		_, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
+			Set("email = ?", input.Email).
+			Set("updated_at = now()").
 			Where("u.id = ?", identity.User.ID).
 			Where("u.organization_id = ?", identity.Organization.ID).
-			Returning("id, organization_id, email, display_name, role_id, status, locale, time_zone, work_status, avatar_file_id").
 			Exec(ctx)
 		if err != nil {
 			return err
 		}
-		rows, err := result.RowsAffected()
+		_, err = identityQuery.
+			Where("oi.id = ?", identity.User.IdentityID).
+			Where("oi.organization_id = ?", identity.Organization.ID).
+			Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
+			Exec(ctx)
 		if err != nil {
 			return err
-		}
-		if rows == 0 {
-			return common.ErrIdentityInvalid
 		}
 		if previousAvatarFileID != nil && *previousAvatarFileID != input.AvatarFileID {
 			if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
@@ -126,7 +124,8 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				return err
 			}
 		}
-		return nil
+		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)
+		return err
 	})
 	if isUniqueViolation(err) {
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
@@ -134,7 +133,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 	if err != nil {
 		return nil, fmt.Errorf("update profile: %w", err)
 	}
-	return user, nil
+	return updatedIdentity, nil
 }
 
 // isUniqueViolation 判断 PostgreSQL 错误是否为唯一约束冲突。

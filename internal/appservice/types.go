@@ -42,7 +42,7 @@ type Session struct {
 	OrganizationName string       `json:"organizationName,omitempty"`
 }
 
-// UserStatus 表示企业成员状态。
+// UserStatus 表示用户账号或 AI 员工的启用状态。
 type UserStatus string
 
 const (
@@ -50,15 +50,24 @@ const (
 	UserStatusInactive UserStatus = UserStatus(domain.UserStatusInactive)
 )
 
-// MemberIdentityType 表示可以加入团队的一等身份类型。
-type MemberIdentityType string
+// OrganizationIdentityType 表示企业身份类型。
+type OrganizationIdentityType string
 
 const (
-	MemberIdentityTypeUser  MemberIdentityType = MemberIdentityType(domain.MemberIdentityTypeUser)
-	MemberIdentityTypeAgent MemberIdentityType = MemberIdentityType(domain.MemberIdentityTypeAgent)
+	OrganizationIdentityTypeUser  OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeUser)
+	OrganizationIdentityTypeAgent OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeAgent)
 )
 
-// WorkStatus 表示成员主动设置的工作状态。
+// ChannelRoutingTargetType 表示渠道会话流转目标类型。
+type ChannelRoutingTargetType string
+
+const (
+	ChannelRoutingTargetTypePublicQueue ChannelRoutingTargetType = ChannelRoutingTargetType(domain.ChannelRoutingTargetTypePublicQueue)
+	ChannelRoutingTargetTypeTeam        ChannelRoutingTargetType = ChannelRoutingTargetType(domain.ChannelRoutingTargetTypeTeam)
+	ChannelRoutingTargetTypeMember      ChannelRoutingTargetType = ChannelRoutingTargetType(domain.ChannelRoutingTargetTypeMember)
+)
+
+// WorkStatus 表示企业身份主动设置的工作状态。
 type WorkStatus string
 
 const (
@@ -287,9 +296,10 @@ type RoleInput struct {
 	Permissions []PermissionCode `json:"permissions"`
 }
 
-// User 定义当前企业成员信息。
-type User struct {
+// CurrentUser 定义当前登录用户信息。
+type CurrentUser struct {
 	ID             string     `json:"id"`
+	IdentityID     string     `json:"identityId"`
 	OrganizationID string     `json:"organizationId"`
 	Email          string     `json:"email"`
 	DisplayName    string     `json:"displayName"`
@@ -304,7 +314,7 @@ type User struct {
 // Identity 定义当前用户及其所属企业。
 type Identity struct {
 	Organization Organization `json:"organization"`
-	User         User         `json:"user"`
+	User         CurrentUser  `json:"user"`
 }
 
 // ProfileInput 定义当前用户可编辑的个人资料字段。
@@ -400,22 +410,30 @@ type Message struct {
 // Inbox 定义统一收件箱结果。
 type Inbox struct {
 	Organization  Organization   `json:"organization"`
-	User          User           `json:"user"`
+	User          CurrentUser    `json:"user"`
 	Conversations []Conversation `json:"conversations"`
 }
 
 // WebsiteChannelSummary 定义网站渠道列表项。
 type WebsiteChannelSummary struct {
-	ID              string      `json:"id"`
-	OrganizationID  string      `json:"organizationId"`
-	CreatedByUserID string      `json:"createdByUserId"`
-	Type            ChannelType `json:"type"`
-	Name            string      `json:"name"`
-	Description     *string     `json:"description"`
-	DefaultLocale   Locale      `json:"defaultLocale"`
-	Enabled         bool        `json:"enabled"`
-	CreatedAt       time.Time   `json:"createdAt"`
-	UpdatedAt       time.Time   `json:"updatedAt"`
+	ID                    string               `json:"id"`
+	OrganizationID        string               `json:"organizationId"`
+	CreatedByUserID       string               `json:"createdByUserId"`
+	Type                  ChannelType          `json:"type"`
+	Name                  string               `json:"name"`
+	Description           *string              `json:"description"`
+	DefaultLocale         Locale               `json:"defaultLocale"`
+	NewConversationTarget ChannelRoutingTarget `json:"newConversationTarget"`
+	FallbackTarget        ChannelRoutingTarget `json:"fallbackTarget"`
+	Enabled               bool                 `json:"enabled"`
+	CreatedAt             time.Time            `json:"createdAt"`
+	UpdatedAt             time.Time            `json:"updatedAt"`
+}
+
+// ChannelRoutingTarget 定义渠道会话流转目标。
+type ChannelRoutingTarget struct {
+	Type ChannelRoutingTargetType `json:"type"`
+	ID   string                   `json:"id"`
 }
 
 // WebsiteChannel 定义网站渠道详情。
@@ -427,10 +445,12 @@ type WebsiteChannel struct {
 
 // WebsiteChannelInput 定义网站渠道基础字段。
 type WebsiteChannelInput struct {
-	Type          ChannelType `json:"type"`
-	Name          string      `json:"name"`
-	Description   string      `json:"description"`
-	DefaultLocale Locale      `json:"defaultLocale"`
+	Type                  ChannelType          `json:"type"`
+	Name                  string               `json:"name"`
+	Description           string               `json:"description"`
+	DefaultLocale         Locale               `json:"defaultLocale"`
+	NewConversationTarget ChannelRoutingTarget `json:"newConversationTarget"`
+	FallbackTarget        ChannelRoutingTarget `json:"fallbackTarget"`
 }
 
 // WebsiteChannelChatInterface 定义网站渠道访客界面设置。
@@ -471,6 +491,63 @@ type ChannelList struct {
 	Channels []ChannelSummary `json:"channels"`
 }
 
+// MemberOption 定义可分配的企业身份选择项。
+type MemberOption struct {
+	ID          string                   `json:"id"`
+	Type        OrganizationIdentityType `json:"type"`
+	DisplayName string                   `json:"displayName"`
+	AvatarURL   string                   `json:"avatarUrl"`
+}
+
+// MemberOptionListInput 定义企业身份选择项查询条件。
+type MemberOptionListInput struct {
+	Query    string `json:"query"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"pageSize"`
+}
+
+// MemberOptionList 定义企业身份选择项分页结果。
+type MemberOptionList struct {
+	Members []MemberOption `json:"members"`
+	Page    PageInfo       `json:"page"`
+}
+
+// CreateAgentInput 定义新增 AI 员工字段。
+type CreateAgentInput struct {
+	DisplayName string   `json:"displayName"`
+	TeamIDs     []string `json:"teamIds"`
+}
+
+// UpdateAgentInput 定义 AI 员工可编辑字段。
+type UpdateAgentInput struct {
+	DisplayName string   `json:"displayName"`
+	TeamIDs     []string `json:"teamIds"`
+}
+
+// AgentListInput 定义 AI 员工目录查询条件。
+type AgentListInput struct {
+	Query    string      `json:"query"`
+	Status   *UserStatus `json:"status,omitempty"`
+	Page     int         `json:"page"`
+	PageSize int         `json:"pageSize"`
+}
+
+// Agent 定义 AI 员工信息。
+type Agent struct {
+	ID          string        `json:"id"`
+	IdentityID  string        `json:"identityId"`
+	DisplayName string        `json:"displayName"`
+	Status      UserStatus    `json:"status"`
+	Teams       []TeamSummary `json:"teams"`
+	CreatedAt   time.Time     `json:"createdAt"`
+}
+
+// AgentList 定义 AI 员工分页结果。
+type AgentList struct {
+	Agents []Agent  `json:"agents"`
+	Page   PageInfo `json:"page"`
+}
+
 // WebsiteChannelList 定义网站渠道列表。
 type WebsiteChannelList struct {
 	Channels []WebsiteChannelSummary `json:"channels"`
@@ -502,8 +579,8 @@ type CreateUserInput struct {
 	TeamIDs     []string `json:"teamIds"`
 }
 
-// UpdateDirectoryUserInput 定义企业成员可编辑字段。
-type UpdateDirectoryUserInput struct {
+// UpdateUserInput 定义企业成员可编辑字段。
+type UpdateUserInput struct {
 	DisplayName string   `json:"displayName"`
 	Email       string   `json:"email"`
 	RoleID      string   `json:"roleId"`
@@ -527,9 +604,10 @@ type TeamSummary struct {
 	Name string `json:"name"`
 }
 
-// DirectoryUser 定义企业成员目录字段。
-type DirectoryUser struct {
+// User 定义企业成员信息。
+type User struct {
 	ID          string        `json:"id"`
+	IdentityID  string        `json:"identityId"`
 	Email       string        `json:"email"`
 	DisplayName string        `json:"displayName"`
 	Role        RoleSummary   `json:"role"`
@@ -541,8 +619,8 @@ type DirectoryUser struct {
 
 // UserList 定义企业成员分页结果。
 type UserList struct {
-	Users []DirectoryUser `json:"users"`
-	Page  PageInfo        `json:"page"`
+	Users []User   `json:"users"`
+	Page  PageInfo `json:"page"`
 }
 
 // TeamInput 定义团队可编辑字段。
@@ -581,13 +659,12 @@ type TeamMemberCandidateInput struct {
 	PageSize int    `json:"pageSize"`
 }
 
-// TeamMemberCandidate 定义可加入团队的企业成员。
+// TeamMemberCandidate 定义可加入团队的成员。
 type TeamMemberCandidate struct {
-	IdentityType MemberIdentityType `json:"identityType"`
-	IdentityID   string             `json:"identityId"`
-	DisplayName  string             `json:"displayName"`
-	AvatarURL    string             `json:"avatarUrl"`
-	Role         RoleSummary        `json:"role"`
+	IdentityType OrganizationIdentityType `json:"identityType"`
+	IdentityID   string                   `json:"identityId"`
+	DisplayName  string                   `json:"displayName"`
+	AvatarURL    string                   `json:"avatarUrl"`
 }
 
 // TeamMemberCandidateList 定义可加入团队的成员分页结果。
@@ -596,10 +673,33 @@ type TeamMemberCandidateList struct {
 	Page    PageInfo              `json:"page"`
 }
 
+// TeamMemberListInput 定义团队成员列表查询条件。
+type TeamMemberListInput struct {
+	Query    string      `json:"query"`
+	Status   *UserStatus `json:"status,omitempty"`
+	Page     int         `json:"page"`
+	PageSize int         `json:"pageSize"`
+}
+
+// TeamMember 定义团队成员信息。
+type TeamMember struct {
+	IdentityID   string                   `json:"identityId"`
+	IdentityType OrganizationIdentityType `json:"identityType"`
+	DisplayName  string                   `json:"displayName"`
+	Status       UserStatus               `json:"status"`
+	JoinedAt     time.Time                `json:"joinedAt"`
+}
+
+// TeamMemberList 定义团队成员分页结果。
+type TeamMemberList struct {
+	Members []TeamMember `json:"members"`
+	Page    PageInfo     `json:"page"`
+}
+
 // TeamMemberIdentityInput 定义要变更的团队成员身份。
 type TeamMemberIdentityInput struct {
-	IdentityType MemberIdentityType `json:"identityType"`
-	IdentityID   string             `json:"identityId"`
+	IdentityType OrganizationIdentityType `json:"identityType"`
+	IdentityID   string                   `json:"identityId"`
 }
 
 // TeamMemberInput 定义批量变更团队的身份列表。

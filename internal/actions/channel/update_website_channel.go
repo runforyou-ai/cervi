@@ -33,30 +33,46 @@ func (a *UpdateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 	}
 
 	channel := &servermodels.Channel{}
-	query := a.db.NewUpdate().
-		Model(channel).
-		Set("name = ?", input.Name).
-		Set("description = NULL").
-		Set("default_locale = ?", input.DefaultLocale).
-		Set("updated_at = now()")
-	if input.Description != "" {
-		query = query.Set("description = ?", input.Description)
-	}
-	result, err := query.
-		Where("c.id = ?", channelID).
-		Where("c.organization_id = ?", identity.Organization.ID).
-		Where("c.type = ?", domain.ChannelTypeWebsite).
-		Returning("*").
-		Exec(ctx)
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "newConversationTarget", input.NewConversationTarget); err != nil {
+			return err
+		}
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "fallbackTarget", input.FallbackTarget); err != nil {
+			return err
+		}
+		query := tx.NewUpdate().
+			Model(channel).
+			Set("name = ?", input.Name).
+			Set("description = NULL").
+			Set("default_locale = ?", input.DefaultLocale).
+			Set("initial_routing_target_type = ?", input.NewConversationTarget.Type).
+			Set("initial_routing_target_id = ?", routingTargetID(input.NewConversationTarget)).
+			Set("fallback_routing_target_type = ?", input.FallbackTarget.Type).
+			Set("fallback_routing_target_id = ?", routingTargetID(input.FallbackTarget)).
+			Set("updated_at = now()")
+		if input.Description != "" {
+			query = query.Set("description = ?", input.Description)
+		}
+		result, err := query.
+			Where("c.id = ?", channelID).
+			Where("c.organization_id = ?", identity.Organization.ID).
+			Where("c.type = ?", domain.ChannelTypeWebsite).
+			Returning("*").
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, fmt.Errorf("update website channel: %w", err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("read updated website channel count: %w", err)
-	}
-	if rows == 0 {
-		return nil, ErrNotFound
 	}
 	return channel, nil
 }

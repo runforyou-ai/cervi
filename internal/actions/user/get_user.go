@@ -21,11 +21,11 @@ func NewGetUserQuery(db *bun.DB) *GetUserQuery {
 }
 
 // Execute 返回当前企业的指定成员。
-func (q *GetUserQuery) Execute(ctx context.Context, identity *servermodels.Identity, userID string) (*DirectoryUser, error) {
+func (q *GetUserQuery) Execute(ctx context.Context, identity *servermodels.Identity, userID string) (*User, error) {
 	if err := validateIdentity(ctx, q.db, identity); err != nil {
 		return nil, err
 	}
-	user, err := loadDirectoryUser(ctx, q.db, identity.Organization.ID, userID)
+	user, err := loadUser(ctx, q.db, identity.Organization.ID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
 	}

@@ -11,9 +11,10 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox,
 		return Inbox{}, err
 	}
 	output := b.loadInbox.Execute(ctx, identity)
+	currentIdentity := identityFromModel(output.Identity)
 	return Inbox{
-		Organization:  organizationFromModel(output.Organization),
-		User:          userFromModel(output.User),
+		Organization:  currentIdentity.Organization,
+		User:          currentIdentity.User,
 		Conversations: []Conversation{},
 	}, nil
 }

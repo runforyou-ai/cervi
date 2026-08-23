@@ -105,6 +105,36 @@ export interface AIProviderSummary {
 }
 
 /**
+ * Agent 定义 AI 员工信息。
+ */
+export interface Agent {
+    "id": string;
+    "identityId": string;
+    "displayName": string;
+    "status": UserStatus;
+    "teams": TeamSummary[] | null;
+    "createdAt": string;
+}
+
+/**
+ * AgentList 定义 AI 员工分页结果。
+ */
+export interface AgentList {
+    "agents": Agent[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * AgentListInput 定义 AI 员工目录查询条件。
+ */
+export interface AgentListInput {
+    "query": string;
+    "status"?: UserStatus | null;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
  * Auth 包含登录身份和访问令牌。
  */
 export interface Auth {
@@ -127,6 +157,28 @@ export interface ChangePasswordInput {
 export interface ChannelList {
     "channels": ChannelSummary[] | null;
 }
+
+/**
+ * ChannelRoutingTarget 定义渠道会话流转目标。
+ */
+export interface ChannelRoutingTarget {
+    "type": ChannelRoutingTargetType;
+    "id": string;
+}
+
+/**
+ * ChannelRoutingTargetType 表示渠道会话流转目标类型。
+ */
+export enum ChannelRoutingTargetType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ChannelRoutingTargetTypePublicQueue = "public_queue",
+    ChannelRoutingTargetTypeTeam = "team",
+    ChannelRoutingTargetTypeMember = "member",
+};
 
 /**
  * ChannelSummary 定义渠道选择项。
@@ -315,6 +367,14 @@ export interface Conversation {
 }
 
 /**
+ * CreateAgentInput 定义新增 AI 员工字段。
+ */
+export interface CreateAgentInput {
+    "displayName": string;
+    "teamIds": string[] | null;
+}
+
+/**
  * CreateUserInput 定义新增企业成员字段。
  */
 export interface CreateUserInput {
@@ -326,17 +386,20 @@ export interface CreateUserInput {
 }
 
 /**
- * DirectoryUser 定义企业成员目录字段。
+ * CurrentUser 定义当前登录用户信息。
  */
-export interface DirectoryUser {
+export interface CurrentUser {
     "id": string;
+    "identityId": string;
+    "organizationId": string;
     "email": string;
     "displayName": string;
-    "role": RoleSummary;
+    "roleId": string;
     "status": UserStatus;
+    "locale": Locale;
+    "timeZone": string;
     "workStatus": WorkStatus;
-    "teams": TeamSummary[] | null;
-    "createdAt": string;
+    "avatarUrl": string;
 }
 
 /**
@@ -394,7 +457,7 @@ export interface FileUploadRequest {
  */
 export interface Identity {
     "organization": Organization;
-    "user": User;
+    "user": CurrentUser;
 }
 
 /**
@@ -402,7 +465,7 @@ export interface Identity {
  */
 export interface Inbox {
     "organization": Organization;
-    "user": User;
+    "user": CurrentUser;
     "conversations": Conversation[] | null;
 }
 
@@ -448,17 +511,31 @@ export interface LoginInput {
 }
 
 /**
- * MemberIdentityType 表示可以加入团队的一等身份类型。
+ * MemberOption 定义可分配的企业身份选择项。
  */
-export enum MemberIdentityType {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
+export interface MemberOption {
+    "id": string;
+    "type": OrganizationIdentityType;
+    "displayName": string;
+    "avatarUrl": string;
+}
 
-    MemberIdentityTypeUser = "user",
-    MemberIdentityTypeAgent = "agent",
-};
+/**
+ * MemberOptionList 定义企业身份选择项分页结果。
+ */
+export interface MemberOptionList {
+    "members": MemberOption[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * MemberOptionListInput 定义企业身份选择项查询条件。
+ */
+export interface MemberOptionListInput {
+    "query": string;
+    "page": number;
+    "pageSize": number;
+}
 
 /**
  * Message 定义收件箱会话中的消息。
@@ -490,6 +567,19 @@ export interface Organization {
     "id": string;
     "name": string;
 }
+
+/**
+ * OrganizationIdentityType 表示企业身份类型。
+ */
+export enum OrganizationIdentityType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    OrganizationIdentityTypeUser = "user",
+    OrganizationIdentityTypeAgent = "agent",
+};
 
 /**
  * OrganizationInput 定义企业名称修改输入。
@@ -749,14 +839,24 @@ export interface TeamListInput {
 }
 
 /**
- * TeamMemberCandidate 定义可加入团队的企业成员。
+ * TeamMember 定义团队成员信息。
+ */
+export interface TeamMember {
+    "identityId": string;
+    "identityType": OrganizationIdentityType;
+    "displayName": string;
+    "status": UserStatus;
+    "joinedAt": string;
+}
+
+/**
+ * TeamMemberCandidate 定义可加入团队的成员。
  */
 export interface TeamMemberCandidate {
-    "identityType": MemberIdentityType;
+    "identityType": OrganizationIdentityType;
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "role": RoleSummary;
 }
 
 /**
@@ -780,7 +880,7 @@ export interface TeamMemberCandidateList {
  * TeamMemberIdentityInput 定义要变更的团队成员身份。
  */
 export interface TeamMemberIdentityInput {
-    "identityType": MemberIdentityType;
+    "identityType": OrganizationIdentityType;
     "identityId": string;
 }
 
@@ -792,6 +892,24 @@ export interface TeamMemberInput {
 }
 
 /**
+ * TeamMemberList 定义团队成员分页结果。
+ */
+export interface TeamMemberList {
+    "members": TeamMember[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * TeamMemberListInput 定义团队成员列表查询条件。
+ */
+export interface TeamMemberListInput {
+    "query": string;
+    "status"?: UserStatus | null;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
  * TeamSummary 定义团队选择项和成员所属团队字段。
  */
 export interface TeamSummary {
@@ -800,9 +918,17 @@ export interface TeamSummary {
 }
 
 /**
- * UpdateDirectoryUserInput 定义企业成员可编辑字段。
+ * UpdateAgentInput 定义 AI 员工可编辑字段。
  */
-export interface UpdateDirectoryUserInput {
+export interface UpdateAgentInput {
+    "displayName": string;
+    "teamIds": string[] | null;
+}
+
+/**
+ * UpdateUserInput 定义企业成员可编辑字段。
+ */
+export interface UpdateUserInput {
     "displayName": string;
     "email": string;
     "roleId": string;
@@ -810,26 +936,25 @@ export interface UpdateDirectoryUserInput {
 }
 
 /**
- * User 定义当前企业成员信息。
+ * User 定义企业成员信息。
  */
 export interface User {
     "id": string;
-    "organizationId": string;
+    "identityId": string;
     "email": string;
     "displayName": string;
-    "roleId": string;
+    "role": RoleSummary;
     "status": UserStatus;
-    "locale": Locale;
-    "timeZone": string;
     "workStatus": WorkStatus;
-    "avatarUrl": string;
+    "teams": TeamSummary[] | null;
+    "createdAt": string;
 }
 
 /**
  * UserList 定义企业成员分页结果。
  */
 export interface UserList {
-    "users": DirectoryUser[] | null;
+    "users": User[] | null;
     "page": PageInfo;
 }
 
@@ -869,7 +994,7 @@ export interface UserRoleChangesInput {
 }
 
 /**
- * UserStatus 表示企业成员状态。
+ * UserStatus 表示用户账号或 AI 员工的启用状态。
  */
 export enum UserStatus {
     /**
@@ -899,6 +1024,8 @@ export interface WebsiteChannel {
     "name": string;
     "description": string | null;
     "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
     "enabled": boolean;
     "createdAt": string;
     "updatedAt": string;
@@ -948,6 +1075,8 @@ export interface WebsiteChannelInput {
     "name": string;
     "description": string;
     "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
 }
 
 /**
@@ -968,13 +1097,15 @@ export interface WebsiteChannelSummary {
     "name": string;
     "description": string | null;
     "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
     "enabled": boolean;
     "createdAt": string;
     "updatedAt": string;
 }
 
 /**
- * WorkStatus 表示成员主动设置的工作状态。
+ * WorkStatus 表示企业身份主动设置的工作状态。
  */
 export enum WorkStatus {
     /**

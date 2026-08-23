@@ -43,8 +43,9 @@ func NewLoginAction(db *bun.DB) *LoginAction {
 // Execute 校验账号密码并签发登录令牌。
 func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutput, error) {
 	user := &servermodels.User{}
-	err := a.db.NewSelect().
-		Model(user).
+	err := a.db.NewSelect().Model(user).
+		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.password_hash, u.role_id::text, u.status, u.locale, u.time_zone").
+		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = 'user'").
 		Where("lower(u.email) = lower(?)", commonemail.Normalize(input.Email)).
 		Limit(1).
 		Scan(ctx)

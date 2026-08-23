@@ -55,37 +55,38 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			query = query.Where("u.role_id = ?", input.RoleID)
 		}
 		if input.TeamID != "" {
-			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.identity_type = ? AND tm.identity_id = u.id AND tm.team_id = ?)", domain.MemberIdentityTypeUser, input.TeamID)
+			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.identity_id = u.identity_id AND tm.team_id = ?)", input.TeamID)
 		}
 		if input.Query != "" {
 			pattern := "%" + input.Query + "%"
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
 				return group.
-					Where("u.display_name ILIKE ?", pattern).
+					Where("oi.display_name ILIKE ?", pattern).
 					WhereOr("u.email ILIKE ?", pattern)
 			})
 		}
 		return query
 	}
 
-	total, err := applyFilters(q.db.NewSelect().Model((*servermodels.User)(nil))).Count(ctx)
+	total, err := applyFilters(q.db.NewSelect().TableExpr("users AS u").Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser)).Count(ctx)
 	if err != nil {
 		return ListOutput{}, fmt.Errorf("count users: %w", err)
 	}
-	users := make([]DirectoryUser, 0)
+	users := make([]User, 0)
 	if err := applyFilters(q.db.NewSelect().TableExpr("users AS u")).
-		ColumnExpr("u.id::text AS id").
-		ColumnExpr("u.email, u.display_name, u.status, u.work_status, u.created_at").
+		ColumnExpr("u.id::text AS id, u.identity_id::text AS identity_id").
+		ColumnExpr("u.email, u.status, oi.display_name, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
+		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
-		OrderExpr("lower(u.display_name) ASC, u.id ASC").
+		OrderExpr("lower(oi.display_name) ASC, u.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
 		Scan(ctx, &users); err != nil {
 		return ListOutput{}, fmt.Errorf("list users: %w", err)
 	}
 	for index := range users {
-		teams, err := loadUserTeams(ctx, q.db, identity.Organization.ID, users[index].ID)
+		teams, err := loadUserTeams(ctx, q.db, identity.Organization.ID, users[index].IdentityID)
 		if err != nil {
 			return ListOutput{}, fmt.Errorf("load user teams: %w", err)
 		}

@@ -14,8 +14,7 @@ type LoadInboxQuery struct{}
 
 // LoadInboxOutput 定义统一收件箱查询结果。
 type LoadInboxOutput struct {
-	Organization  servermodels.Organization
-	User          servermodels.User
+	Identity      *servermodels.Identity
 	Conversations []any
 }
 
@@ -24,11 +23,10 @@ func NewLoadInboxQuery() *LoadInboxQuery {
 	return &LoadInboxQuery{}
 }
 
-// Execute 返回当前身份所属企业和用户，会话列表暂为空。
+// Execute 返回当前身份和会话列表，会话列表暂为空。
 func (q *LoadInboxQuery) Execute(_ context.Context, identity *servermodels.Identity) LoadInboxOutput {
 	return LoadInboxOutput{
-		Organization:  identity.Organization,
-		User:          identity.User,
+		Identity:      identity,
 		Conversations: []any{},
 	}
 }

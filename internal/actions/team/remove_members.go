@@ -32,20 +32,30 @@ func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodel
 		}
 		unique := make(map[string]MemberIdentity, len(members))
 		for _, member := range members {
-			if (member.Type != domain.MemberIdentityTypeUser && member.Type != domain.MemberIdentityTypeAgent) || !common.ValidUUID(member.ID) {
+			if (member.IdentityType != domain.OrganizationIdentityTypeUser && member.IdentityType != domain.OrganizationIdentityTypeAgent) || !common.ValidUUID(member.IdentityID) {
 				return ErrMemberInvalid
 			}
-			unique[string(member.Type)+":"+member.ID] = member
+			unique[member.IdentityID] = member
 		}
 		if len(unique) == 0 {
 			return ErrMemberInvalid
 		}
 		for _, member := range unique {
+			exists, err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
+				Where("organization_id = ?", identity.Organization.ID).
+				Where("id = ?", member.IdentityID).
+				Where("type = ?", member.IdentityType).
+				Exists(ctx)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return ErrMemberInvalid
+			}
 			result, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
 				Where("organization_id = ?", identity.Organization.ID).
 				Where("team_id = ?", teamID).
-				Where("identity_type = ?", member.Type).
-				Where("identity_id = ?", member.ID).
+				Where("identity_id = ?", member.IdentityID).
 				Exec(ctx)
 			if err != nil {
 				return err

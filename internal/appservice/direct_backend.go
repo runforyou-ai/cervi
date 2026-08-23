@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 
+	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
@@ -13,6 +14,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
@@ -45,6 +47,12 @@ type DirectBackend struct {
 	updateWebsiteChannelAccess        *channelaction.UpdateWebsiteChannelAccessAction
 	updateWebsiteChannelStatus        *channelaction.UpdateWebsiteChannelStatusAction
 	listChannels                      *channelaction.ListChannelsQuery
+	listMemberOptions                 *memberaction.ListOptionsQuery
+	createAgent                       *agentaction.CreateAgentAction
+	listAgents                        *agentaction.ListAgentsQuery
+	getAgent                          *agentaction.GetAgentQuery
+	updateAgent                       *agentaction.UpdateAgentAction
+	updateAgentStatus                 *agentaction.UpdateStatusAction
 	listUsers                         *useraction.ListUsersQuery
 	getUser                           *useraction.GetUserQuery
 	createUser                        *useraction.CreateUserAction
@@ -55,6 +63,7 @@ type DirectBackend struct {
 	createTeam                        *teamaction.CreateTeamAction
 	updateTeam                        *teamaction.UpdateTeamAction
 	deleteTeam                        *teamaction.DeleteTeamAction
+	listTeamMembers                   *teamaction.ListMembersQuery
 	listTeamMemberCandidates          *teamaction.ListMemberCandidatesQuery
 	addTeamMembers                    *teamaction.AddMembersAction
 	removeTeamMembers                 *teamaction.RemoveMembersAction
@@ -105,6 +114,12 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		updateWebsiteChannelAccess:        channelaction.NewUpdateWebsiteChannelAccessAction(db),
 		updateWebsiteChannelStatus:        channelaction.NewUpdateWebsiteChannelStatusAction(db),
 		listChannels:                      channelaction.NewListChannelsQuery(db),
+		listMemberOptions:                 memberaction.NewListOptionsQuery(db),
+		createAgent:                       agentaction.NewCreateAgentAction(db),
+		listAgents:                        agentaction.NewListAgentsQuery(db),
+		getAgent:                          agentaction.NewGetAgentQuery(db),
+		updateAgent:                       agentaction.NewUpdateAgentAction(db),
+		updateAgentStatus:                 agentaction.NewUpdateStatusAction(db),
 		listUsers:                         useraction.NewListUsersQuery(db),
 		getUser:                           useraction.NewGetUserQuery(db),
 		createUser:                        useraction.NewCreateUserAction(db),
@@ -115,6 +130,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		createTeam:                        teamaction.NewCreateTeamAction(db),
 		updateTeam:                        teamaction.NewUpdateTeamAction(db),
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
+		listTeamMembers:                   teamaction.NewListMembersQuery(db),
 		listTeamMemberCandidates:          teamaction.NewListMemberCandidatesQuery(db),
 		addTeamMembers:                    teamaction.NewAddMembersAction(db),
 		removeTeamMembers:                 teamaction.NewRemoveMembersAction(db),

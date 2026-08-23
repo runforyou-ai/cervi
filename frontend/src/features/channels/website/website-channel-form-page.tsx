@@ -15,13 +15,14 @@ import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WebsiteChannelForm } from "@/features/channels/website/website-channel-form"
+import { WebsiteChannelReceptionSettingsForm } from "@/features/channels/website/website-channel-reception-settings-form"
 import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
 import {
   WebsiteChannelUsagePanel,
   type WebsiteChannelAccessTab,
 } from "@/features/channels/website/website-channel-usage-panel"
 
-const editTabs = ["basic", "chat-interface", "usage"] as const
+const editTabs = ["basic", "reception", "chat-interface", "usage"] as const
 
 type EditTab = (typeof editTabs)[number]
 
@@ -89,6 +90,7 @@ function WebsiteChannelEditTabs({
     <Tabs value={activeTab} onValueChange={setTab}>
       <TabsList>
         <TabsTrigger value="basic">{t("tabs.basic")}</TabsTrigger>
+        <TabsTrigger value="reception">{t("tabs.reception")}</TabsTrigger>
         <TabsTrigger value="chat-interface">
           {t("tabs.chatInterface")}
         </TabsTrigger>
@@ -101,9 +103,17 @@ function WebsiteChannelEditTabs({
       >
         <WebsiteChannelForm
           channel={channel}
-          onUpdated={(updated) =>
-            onChannelChange({ ...channel, ...updated })
-          }
+          onUpdated={(updated) => onChannelChange({ ...channel, ...updated })}
+        />
+      </TabsContent>
+      <TabsContent
+        value="reception"
+        forceMount
+        className="mt-6 data-[state=inactive]:hidden"
+      >
+        <WebsiteChannelReceptionSettingsForm
+          channel={channel}
+          onUpdated={(updated) => onChannelChange({ ...channel, ...updated })}
         />
       </TabsContent>
       <TabsContent
@@ -190,7 +200,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
         title={
           mode === "create"
             ? t("create.title")
-            : channel?.name ?? t("edit.title")
+            : (channel?.name ?? t("edit.title"))
         }
       />
       <PageContent>

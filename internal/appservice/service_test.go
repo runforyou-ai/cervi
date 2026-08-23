@@ -78,7 +78,7 @@ func (b *nativeSessionBackend) ConnectServer(context.Context, RequestMeta, strin
 func TestLoadSessionResolvesWebEntry(t *testing.T) {
 	identity := Identity{
 		Organization: Organization{ID: "organization-1", Name: "鹿行"},
-		User:         User{ID: "user-1", DisplayName: "管理员"},
+		User:         CurrentUser{ID: "user-1", DisplayName: "管理员"},
 	}
 	service := New(&sessionBackend{installed: false})
 	session, err := service.LoadSession(context.Background(), RequestMeta{})

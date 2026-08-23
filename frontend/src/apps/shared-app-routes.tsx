@@ -87,11 +87,19 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
         />
         <Route
           path="/contacts"
-          element={<Navigate to="/contacts/members" replace />}
+          element={<Navigate to="/contacts/employees" replace />}
         />
         <Route
-          path="/contacts/members"
-          element={<ContactsPage scope="members" />}
+          path="/contacts/employees"
+          element={<ContactsPage scope="employees" />}
+        />
+        <Route
+          path="/contacts/ai-employees"
+          element={<ContactsPage scope="agents" />}
+        />
+        <Route
+          path="/contacts/teams/:teamId"
+          element={<ContactsPage scope="team" />}
         />
         <Route
           path="/contacts/external"

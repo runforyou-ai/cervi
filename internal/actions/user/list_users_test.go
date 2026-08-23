@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestListUsersRejectsInvalidFilters 验证成员状态和角色编号。
+// TestListUsersRejectsInvalidFilters 验证账号状态和角色编号。
 func TestListUsersRejectsInvalidFilters(t *testing.T) {
 	query := NewListUsersQuery(nil)
 	for _, input := range []ListInput{

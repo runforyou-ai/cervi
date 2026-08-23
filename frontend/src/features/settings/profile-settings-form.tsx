@@ -13,7 +13,7 @@ import {
   selectProfileImage,
   updateProfile,
   uploadFile,
-  type User,
+  type CurrentUser,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
@@ -45,8 +45,8 @@ export function ProfileSettingsForm({
   user,
   onUpdated,
 }: {
-  user: User
-  onUpdated: (user: User) => void
+  user: CurrentUser
+  onUpdated: (user: CurrentUser) => void
 }) {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()

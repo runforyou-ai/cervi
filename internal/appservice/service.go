@@ -8,12 +8,12 @@ type Backend interface {
 	Login(context.Context, RequestMeta, LoginInput) (Auth, error)
 	Logout(context.Context, RequestMeta) error
 	LoadIdentity(context.Context, RequestMeta) (Identity, error)
-	UpdateProfile(context.Context, RequestMeta, ProfileInput) (User, error)
+	UpdateProfile(context.Context, RequestMeta, ProfileInput) (CurrentUser, error)
 	CreateFileUpload(context.Context, RequestMeta, FileUploadInput) (FileUpload, error)
 	CompleteFileUpload(context.Context, RequestMeta, string) (File, error)
 	ChangePassword(context.Context, RequestMeta, ChangePasswordInput) error
-	UpdateUserPreferences(context.Context, RequestMeta, UserPreferencesInput) (User, error)
-	UpdateUserWorkStatus(context.Context, RequestMeta, UserWorkStatusInput) (User, error)
+	UpdateUserPreferences(context.Context, RequestMeta, UserPreferencesInput) (CurrentUser, error)
+	UpdateUserWorkStatus(context.Context, RequestMeta, UserWorkStatusInput) (CurrentUser, error)
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
 	ListWebsiteChannels(context.Context, RequestMeta) (WebsiteChannelList, error)
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
@@ -24,17 +24,25 @@ type Backend interface {
 	DeactivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
 	ActivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
 	ListChannels(context.Context, RequestMeta) (ChannelList, error)
+	ListMemberOptions(context.Context, RequestMeta, MemberOptionListInput) (MemberOptionList, error)
+	CreateAgent(context.Context, RequestMeta, CreateAgentInput) (Agent, error)
+	ListAgents(context.Context, RequestMeta, AgentListInput) (AgentList, error)
+	GetAgent(context.Context, RequestMeta, string) (Agent, error)
+	UpdateAgent(context.Context, RequestMeta, string, UpdateAgentInput) (Agent, error)
+	DeactivateAgent(context.Context, RequestMeta, string) (Agent, error)
+	ReactivateAgent(context.Context, RequestMeta, string) (Agent, error)
 	ListUsers(context.Context, RequestMeta, UserListInput) (UserList, error)
-	GetUser(context.Context, RequestMeta, string) (DirectoryUser, error)
-	CreateUser(context.Context, RequestMeta, CreateUserInput) (DirectoryUser, error)
-	UpdateUser(context.Context, RequestMeta, string, UpdateDirectoryUserInput) (DirectoryUser, error)
+	GetUser(context.Context, RequestMeta, string) (User, error)
+	CreateUser(context.Context, RequestMeta, CreateUserInput) (User, error)
+	UpdateUser(context.Context, RequestMeta, string, UpdateUserInput) (User, error)
 	UpdateUserRoles(context.Context, RequestMeta, UserRoleChangesInput) error
-	DeactivateUser(context.Context, RequestMeta, string) (DirectoryUser, error)
-	ReactivateUser(context.Context, RequestMeta, string) (DirectoryUser, error)
+	DeactivateUser(context.Context, RequestMeta, string) (User, error)
+	ReactivateUser(context.Context, RequestMeta, string) (User, error)
 	ListTeams(context.Context, RequestMeta, TeamListInput) (TeamList, error)
 	CreateTeam(context.Context, RequestMeta, TeamInput) (Team, error)
 	UpdateTeam(context.Context, RequestMeta, string, TeamInput) (Team, error)
 	DeleteTeam(context.Context, RequestMeta, string) error
+	ListTeamMembers(context.Context, RequestMeta, string, TeamMemberListInput) (TeamMemberList, error)
 	ListTeamMemberCandidates(context.Context, RequestMeta, string, TeamMemberCandidateInput) (TeamMemberCandidateList, error)
 	AddTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
 	RemoveTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
@@ -133,7 +141,7 @@ func (s *Service) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity,
 }
 
 // UpdateProfile 修改当前用户的头像、姓名和邮箱。
-func (s *Service) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (User, error) {
+func (s *Service) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (CurrentUser, error) {
 	return s.backend.UpdateProfile(ctx, meta, input)
 }
 
@@ -161,12 +169,12 @@ func (s *Service) ChangePassword(ctx context.Context, meta RequestMeta, input Ch
 }
 
 // UpdateUserPreferences 保存当前用户的语言和时区设置。
-func (s *Service) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (User, error) {
+func (s *Service) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (CurrentUser, error) {
 	return s.backend.UpdateUserPreferences(ctx, meta, input)
 }
 
 // UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
-func (s *Service) UpdateUserWorkStatus(ctx context.Context, meta RequestMeta, input UserWorkStatusInput) (User, error) {
+func (s *Service) UpdateUserWorkStatus(ctx context.Context, meta RequestMeta, input UserWorkStatusInput) (CurrentUser, error) {
 	return s.backend.UpdateUserWorkStatus(ctx, meta, input)
 }
 
@@ -220,23 +228,58 @@ func (s *Service) ListChannels(ctx context.Context, meta RequestMeta) (ChannelLi
 	return s.backend.ListChannels(ctx, meta)
 }
 
+// ListMemberOptions 返回可分配的企业成员和 AI 员工。
+func (s *Service) ListMemberOptions(ctx context.Context, meta RequestMeta, input MemberOptionListInput) (MemberOptionList, error) {
+	return s.backend.ListMemberOptions(ctx, meta, input)
+}
+
+// CreateAgent 创建企业 AI 员工。
+func (s *Service) CreateAgent(ctx context.Context, meta RequestMeta, input CreateAgentInput) (Agent, error) {
+	return s.backend.CreateAgent(ctx, meta, input)
+}
+
+// ListAgents 返回企业 AI 员工目录。
+func (s *Service) ListAgents(ctx context.Context, meta RequestMeta, input AgentListInput) (AgentList, error) {
+	return s.backend.ListAgents(ctx, meta, input)
+}
+
+// GetAgent 返回企业 AI 员工详情。
+func (s *Service) GetAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
+	return s.backend.GetAgent(ctx, meta, agentID)
+}
+
+// UpdateAgent 修改企业 AI 员工。
+func (s *Service) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (Agent, error) {
+	return s.backend.UpdateAgent(ctx, meta, agentID, input)
+}
+
+// DeactivateAgent 停用企业 AI 员工。
+func (s *Service) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
+	return s.backend.DeactivateAgent(ctx, meta, agentID)
+}
+
+// ReactivateAgent 恢复企业 AI 员工。
+func (s *Service) ReactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
+	return s.backend.ReactivateAgent(ctx, meta, agentID)
+}
+
 // ListUsers 返回企业成员列表。
 func (s *Service) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	return s.backend.ListUsers(ctx, meta, input)
 }
 
 // GetUser 返回企业成员详情。
-func (s *Service) GetUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
+func (s *Service) GetUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
 	return s.backend.GetUser(ctx, meta, userID)
 }
 
 // CreateUser 创建企业成员账号。
-func (s *Service) CreateUser(ctx context.Context, meta RequestMeta, input CreateUserInput) (DirectoryUser, error) {
+func (s *Service) CreateUser(ctx context.Context, meta RequestMeta, input CreateUserInput) (User, error) {
 	return s.backend.CreateUser(ctx, meta, input)
 }
 
 // UpdateUser 修改企业成员资料、角色和所属团队。
-func (s *Service) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateDirectoryUserInput) (DirectoryUser, error) {
+func (s *Service) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateUserInput) (User, error) {
 	return s.backend.UpdateUser(ctx, meta, userID, input)
 }
 
@@ -246,12 +289,12 @@ func (s *Service) UpdateUserRoles(ctx context.Context, meta RequestMeta, input U
 }
 
 // DeactivateUser 停用企业成员账号。
-func (s *Service) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
+func (s *Service) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
 	return s.backend.DeactivateUser(ctx, meta, userID)
 }
 
 // ReactivateUser 恢复企业成员账号。
-func (s *Service) ReactivateUser(ctx context.Context, meta RequestMeta, userID string) (DirectoryUser, error) {
+func (s *Service) ReactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
 	return s.backend.ReactivateUser(ctx, meta, userID)
 }
 
@@ -275,17 +318,22 @@ func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID strin
 	return s.backend.DeleteTeam(ctx, meta, teamID)
 }
 
-// ListTeamMemberCandidates 返回尚未加入团队的企业成员。
+// ListTeamMembers 返回团队成员列表。
+func (s *Service) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
+	return s.backend.ListTeamMembers(ctx, meta, teamID, input)
+}
+
+// ListTeamMemberCandidates 返回尚未加入团队的企业身份。
 func (s *Service) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
 	return s.backend.ListTeamMemberCandidates(ctx, meta, teamID, input)
 }
 
-// AddTeamMembers 将企业成员批量加入团队。
+// AddTeamMembers 将企业身份批量加入团队。
 func (s *Service) AddTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
 	return s.backend.AddTeamMembers(ctx, meta, teamID, input)
 }
 
-// RemoveTeamMembers 将企业成员批量移出团队。
+// RemoveTeamMembers 将企业身份批量移出团队。
 func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
 	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
 }

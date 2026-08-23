@@ -20,7 +20,7 @@ type testBackend struct {
 	lastOrganization appservice.OrganizationInput
 	lastUserList     appservice.UserListInput
 	lastCreateUser   appservice.CreateUserInput
-	lastUpdateUser   appservice.UpdateDirectoryUserInput
+	lastUpdateUser   appservice.UpdateUserInput
 	lastRoleChanges  appservice.UserRoleChangesInput
 	lastTeamList     appservice.TeamListInput
 	lastTeam         appservice.TeamInput
@@ -58,7 +58,7 @@ func (b *testBackend) LoadIdentity(_ context.Context, meta appservice.RequestMet
 }
 
 // UpdateProfile 记录个人资料输入并返回更新后的用户。
-func (b *testBackend) UpdateProfile(_ context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.User, error) {
+func (b *testBackend) UpdateProfile(_ context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.CurrentUser, error) {
 	b.lastMeta = meta
 	b.lastProfile = input
 	identity := testIdentity()
@@ -89,7 +89,7 @@ func (b *testBackend) ChangePassword(_ context.Context, meta appservice.RequestM
 }
 
 // UpdateUserPreferences 记录语言和时区输入并返回更新后的用户。
-func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.User, error) {
+func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.CurrentUser, error) {
 	b.lastMeta = meta
 	b.lastPreferences = input
 	identity := testIdentity()
@@ -99,7 +99,7 @@ func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.R
 }
 
 // UpdateUserWorkStatus 记录工作状态输入并返回更新后的用户。
-func (b *testBackend) UpdateUserWorkStatus(_ context.Context, meta appservice.RequestMeta, input appservice.UserWorkStatusInput) (appservice.User, error) {
+func (b *testBackend) UpdateUserWorkStatus(_ context.Context, meta appservice.RequestMeta, input appservice.UserWorkStatusInput) (appservice.CurrentUser, error) {
 	b.lastMeta = meta
 	b.lastWorkStatus = input
 	identity := testIdentity()
@@ -110,19 +110,19 @@ func (b *testBackend) UpdateUserWorkStatus(_ context.Context, meta appservice.Re
 func (b *testBackend) ListUsers(_ context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
 	b.lastMeta = meta
 	b.lastUserList = input
-	return appservice.UserList{Users: []appservice.DirectoryUser{}, Page: appservice.PageInfo{Number: input.Page, Size: input.PageSize}}, nil
+	return appservice.UserList{Users: []appservice.User{}, Page: appservice.PageInfo{Number: input.Page, Size: input.PageSize}}, nil
 }
 
-func (b *testBackend) CreateUser(_ context.Context, meta appservice.RequestMeta, input appservice.CreateUserInput) (appservice.DirectoryUser, error) {
+func (b *testBackend) CreateUser(_ context.Context, meta appservice.RequestMeta, input appservice.CreateUserInput) (appservice.User, error) {
 	b.lastMeta = meta
 	b.lastCreateUser = input
-	return appservice.DirectoryUser{ID: "user-2", DisplayName: input.DisplayName, Email: input.Email, Role: appservice.RoleSummary{ID: input.RoleID}, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
+	return appservice.User{ID: "user-2", DisplayName: input.DisplayName, Email: input.Email, Role: appservice.RoleSummary{ID: input.RoleID}, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
 }
 
-func (b *testBackend) UpdateUser(_ context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateDirectoryUserInput) (appservice.DirectoryUser, error) {
+func (b *testBackend) UpdateUser(_ context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateUserInput) (appservice.User, error) {
 	b.lastMeta = meta
 	b.lastUpdateUser = input
-	return appservice.DirectoryUser{ID: userID, DisplayName: input.DisplayName, Email: input.Email, Role: appservice.RoleSummary{ID: input.RoleID}, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
+	return appservice.User{ID: userID, DisplayName: input.DisplayName, Email: input.Email, Role: appservice.RoleSummary{ID: input.RoleID}, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
 }
 
 // UpdateUserRoles 记录批量角色调整输入。
@@ -271,15 +271,15 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 		t.Fatalf("status = %d, input = %#v", listResponse.StatusCode, backend.lastTeamList)
 	}
 
-	addResponse := doJSON(t, http.MethodPost, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.MemberIdentityTypeUser, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
+	addResponse := doJSON(t, http.MethodPost, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.OrganizationIdentityTypeUser, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
 	defer addResponse.Body.Close()
-	if addResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.MemberIdentityTypeUser {
+	if addResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.OrganizationIdentityTypeUser {
 		t.Fatalf("status = %d, input = %#v", addResponse.StatusCode, backend.lastTeamMembers)
 	}
 
-	removeResponse := doJSON(t, http.MethodDelete, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.MemberIdentityTypeAgent, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
+	removeResponse := doJSON(t, http.MethodDelete, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.OrganizationIdentityTypeAgent, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
 	defer removeResponse.Body.Close()
-	if removeResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.MemberIdentityTypeAgent {
+	if removeResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.OrganizationIdentityTypeAgent {
 		t.Fatalf("status = %d, input = %#v", removeResponse.StatusCode, backend.lastTeamMembers)
 	}
 }
@@ -435,7 +435,7 @@ func TestBearerTokenParsing(t *testing.T) {
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
-		User:         appservice.User{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", WorkStatus: appservice.WorkStatusWorking},
+		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", WorkStatus: appservice.WorkStatusWorking},
 	}
 }
 

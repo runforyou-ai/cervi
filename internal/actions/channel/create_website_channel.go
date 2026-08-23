@@ -4,11 +4,9 @@ package channel
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -29,54 +27,34 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if identity == nil ||
-		!common.ValidUUID(identity.Organization.ID) ||
-		!common.ValidUUID(identity.User.ID) ||
-		identity.User.OrganizationID != identity.Organization.ID {
-		return nil, common.ErrIdentityInvalid
-	}
-
 	channel := &servermodels.Channel{
-		OrganizationID:  identity.Organization.ID,
-		CreatedByUserID: identity.User.ID,
-		Type:            string(input.Type),
-		Name:            input.Name,
-		DefaultLocale:   string(input.DefaultLocale),
+		OrganizationID:            identity.Organization.ID,
+		CreatedByUserID:           identity.User.ID,
+		Type:                      string(input.Type),
+		Name:                      input.Name,
+		DefaultLocale:             string(input.DefaultLocale),
+		InitialRoutingTargetType:  string(input.NewConversationTarget.Type),
+		InitialRoutingTargetID:    routingTargetID(input.NewConversationTarget),
+		FallbackRoutingTargetType: string(input.FallbackTarget.Type),
+		FallbackRoutingTargetID:   routingTargetID(input.FallbackTarget),
 	}
 	if input.Description != "" {
 		channel.Description = &input.Description
 	}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		organization := &servermodels.Organization{}
-		if err := tx.NewSelect().
-			Model(organization).
-			Column("id").
-			Where("o.id = ?", identity.Organization.ID).
-			For("KEY SHARE").
-			Scan(ctx); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return common.ErrIdentityInvalid
-			}
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
-
-		user := &servermodels.User{}
-		if err := tx.NewSelect().
-			Model(user).
-			Column("id").
-			Where("u.id = ?", identity.User.ID).
-			Where("u.organization_id = ?", identity.Organization.ID).
-			For("KEY SHARE").
-			Scan(ctx); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return common.ErrIdentityInvalid
-			}
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "newConversationTarget", input.NewConversationTarget); err != nil {
+			return err
+		}
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "fallbackTarget", input.FallbackTarget); err != nil {
 			return err
 		}
 
 		_, err := tx.NewInsert().
 			Model(channel).
-			Column("organization_id", "created_by_user_id", "type", "name", "description", "default_locale").
+			Column("organization_id", "created_by_user_id", "type", "name", "description", "default_locale", "initial_routing_target_type", "initial_routing_target_id", "fallback_routing_target_type", "fallback_routing_target_id").
 			Returning("*").
 			Exec(ctx)
 		if err != nil {
@@ -95,9 +73,6 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 			Exec(ctx)
 		return err
 	})
-	if errors.Is(err, common.ErrIdentityInvalid) {
-		return nil, common.ErrIdentityInvalid
-	}
 	if err != nil {
 		return nil, fmt.Errorf("create website channel: %w", err)
 	}

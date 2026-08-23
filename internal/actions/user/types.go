@@ -48,9 +48,10 @@ type PageInfo struct {
 	Total  int `json:"total"`
 }
 
-// DirectoryUser 定义企业成员目录字段。
-type DirectoryUser struct {
+// User 定义企业成员信息。
+type User struct {
 	ID          string            `json:"id"`
+	IdentityID  string            `json:"-" bun:"identity_id"`
 	Email       string            `json:"email"`
 	DisplayName string            `json:"displayName"`
 	RoleID      string            `json:"roleId" bun:"role_id"`
@@ -70,6 +71,6 @@ type TeamSummary struct {
 
 // ListOutput 定义企业成员分页结果。
 type ListOutput struct {
-	Users []DirectoryUser `json:"users"`
-	Page  PageInfo        `json:"page"`
+	Users []User   `json:"users"`
+	Page  PageInfo `json:"page"`
 }

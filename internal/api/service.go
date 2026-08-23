@@ -60,6 +60,13 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/channels/website/:channelID/deactivate", service.deactivateWebsiteChannel)
 	router.POST("/channels/website/:channelID/activate", service.activateWebsiteChannel)
 	router.GET("/channels", service.listChannels)
+	router.GET("/members/options", service.listMemberOptions)
+	router.GET("/agents", service.listAgents)
+	router.POST("/agents", service.createAgent)
+	router.GET("/agents/:agentID", service.getAgent)
+	router.PATCH("/agents/:agentID", service.updateAgent)
+	router.POST("/agents/:agentID/deactivate", service.deactivateAgent)
+	router.POST("/agents/:agentID/reactivate", service.reactivateAgent)
 	router.GET("/users", service.listUsers)
 	router.POST("/users", service.createUser)
 	router.PATCH("/users/roles", service.updateUserRoles)
@@ -71,6 +78,7 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/teams", service.createTeam)
 	router.PATCH("/teams/:teamID", service.updateTeam)
 	router.DELETE("/teams/:teamID", service.deleteTeam)
+	router.GET("/teams/:teamID/members", service.listTeamMembers)
 	router.GET("/teams/:teamID/member-candidates", service.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", service.addTeamMembers)
 	router.DELETE("/teams/:teamID/members", service.removeTeamMembers)
@@ -278,6 +286,76 @@ func (s *Service) listChannels(c *gin.Context) {
 	writeResult(c, http.StatusOK, list, err)
 }
 
+// listMemberOptions 返回可分配的企业成员。
+func (s *Service) listMemberOptions(c *gin.Context) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return
+	}
+	list, err := s.application.ListMemberOptions(c.Request.Context(), requestMeta(c), appservice.MemberOptionListInput{
+		Query: c.Query("query"), Page: page, PageSize: pageSize,
+	})
+	writeResult(c, http.StatusOK, list, err)
+}
+
+// createAgent 创建企业 AI 员工。
+func (s *Service) createAgent(c *gin.Context) {
+	var input appservice.CreateAgentInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	agent, err := s.application.CreateAgent(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, agent, err)
+}
+
+// listAgents 返回企业 AI 员工目录。
+func (s *Service) listAgents(c *gin.Context) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return
+	}
+	list, err := s.application.ListAgents(c.Request.Context(), requestMeta(c), appservice.AgentListInput{
+		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Page: page, PageSize: pageSize,
+	})
+	writeResult(c, http.StatusOK, list, err)
+}
+
+// getAgent 返回企业 AI 员工详情。
+func (s *Service) getAgent(c *gin.Context) {
+	agent, err := s.application.GetAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"))
+	writeResult(c, http.StatusOK, agent, err)
+}
+
+// updateAgent 修改企业 AI 员工。
+func (s *Service) updateAgent(c *gin.Context) {
+	var input appservice.UpdateAgentInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	agent, err := s.application.UpdateAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
+	writeResult(c, http.StatusOK, agent, err)
+}
+
+// deactivateAgent 停用企业 AI 员工。
+func (s *Service) deactivateAgent(c *gin.Context) {
+	agent, err := s.application.DeactivateAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"))
+	writeResult(c, http.StatusOK, agent, err)
+}
+
+// reactivateAgent 恢复企业 AI 员工。
+func (s *Service) reactivateAgent(c *gin.Context) {
+	agent, err := s.application.ReactivateAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"))
+	writeResult(c, http.StatusOK, agent, err)
+}
+
 func (s *Service) listUsers(c *gin.Context) {
 	page, ok := positiveQueryInteger(c, "page", 1)
 	if !ok {
@@ -308,7 +386,7 @@ func (s *Service) createUser(c *gin.Context) {
 }
 
 func (s *Service) updateUser(c *gin.Context) {
-	var input appservice.UpdateDirectoryUserInput
+	var input appservice.UpdateUserInput
 	if !bindJSON(c, &input) {
 		return
 	}
@@ -370,6 +448,22 @@ func (s *Service) deleteTeam(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteTeam(c.Request.Context(), requestMeta(c), c.Param("teamID")))
 }
 
+// listTeamMembers 返回团队成员列表。
+func (s *Service) listTeamMembers(c *gin.Context) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return
+	}
+	list, err := s.application.ListTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), appservice.TeamMemberListInput{
+		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Page: page, PageSize: pageSize,
+	})
+	writeResult(c, http.StatusOK, list, err)
+}
+
 // listTeamMemberCandidates 返回尚未加入团队的企业成员。
 func (s *Service) listTeamMemberCandidates(c *gin.Context) {
 	page, ok := positiveQueryInteger(c, "page", 1)
@@ -384,7 +478,7 @@ func (s *Service) listTeamMemberCandidates(c *gin.Context) {
 	writeResult(c, http.StatusOK, members, err)
 }
 
-// addTeamMembers 将企业成员批量加入团队。
+// addTeamMembers 将企业身份批量加入团队。
 func (s *Service) addTeamMembers(c *gin.Context) {
 	var input appservice.TeamMemberInput
 	if !bindJSON(c, &input) {
@@ -394,7 +488,7 @@ func (s *Service) addTeamMembers(c *gin.Context) {
 	writeResult(c, http.StatusOK, team, err)
 }
 
-// removeTeamMembers 将企业成员批量移出团队。
+// removeTeamMembers 将企业身份批量移出团队。
 func (s *Service) removeTeamMembers(c *gin.Context) {
 	var input appservice.TeamMemberInput
 	if !bindJSON(c, &input) {

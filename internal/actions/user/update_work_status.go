@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -22,37 +22,30 @@ func NewUpdateWorkStatusAction(db *bun.DB) *UpdateWorkStatusAction {
 }
 
 // Execute 校验并保存当前用户的工作状态。
-func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkStatusInput) (*servermodels.User, error) {
+func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkStatusInput) (*servermodels.Identity, error) {
 	fields := validateWorkStatusInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if identity == nil ||
-		!common.ValidUUID(identity.Organization.ID) ||
-		!common.ValidUUID(identity.User.ID) ||
-		identity.User.OrganizationID != identity.Organization.ID {
-		return nil, common.ErrIdentityInvalid
+	if err := validateIdentity(ctx, a.db, identity); err != nil {
+		return nil, err
 	}
 
-	user := &servermodels.User{}
-	result, err := a.db.NewUpdate().
-		Model(user).
+	_, err := a.db.NewUpdate().
+		Model((*servermodels.OrganizationIdentity)(nil)).
 		Set("work_status = ?", input.WorkStatus).
 		Set("work_status_updated_at = now()").
 		Set("updated_at = now()").
-		Where("u.id = ?", identity.User.ID).
-		Where("u.organization_id = ?", identity.Organization.ID).
-		Returning("id, organization_id, email, display_name, role_id, status, locale, time_zone, work_status, avatar_file_id").
+		Where("oi.id = ?", identity.User.IdentityID).
+		Where("oi.organization_id = ?", identity.Organization.ID).
+		Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("update user work status: %w", err)
 	}
-	rows, err := result.RowsAffected()
+	updatedIdentity, err := loadCurrentIdentity(ctx, a.db, identity.Organization, identity.User.ID)
 	if err != nil {
-		return nil, fmt.Errorf("read updated user work status count: %w", err)
+		return nil, fmt.Errorf("reload user work status: %w", err)
 	}
-	if rows == 0 {
-		return nil, common.ErrIdentityInvalid
-	}
-	return user, nil
+	return updatedIdentity, nil
 }

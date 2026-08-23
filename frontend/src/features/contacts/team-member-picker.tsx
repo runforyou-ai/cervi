@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import {
-  MemberIdentityType,
+  OrganizationIdentityType,
   addTeamMembers,
   isApiError,
   listTeamMemberCandidates,
@@ -16,7 +16,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { roleDisplayName } from "@/features/roles/role-labels"
 import { cn } from "@/lib/utils"
 
 type LoadState = "loading" | "ready" | "error"
@@ -45,7 +44,7 @@ function MemberAvatar({ member }: { member: TeamMemberCandidate }) {
   )
 }
 
-/** 搜索并批量选择尚未加入团队的企业成员。 */
+/** 搜索并批量选择尚未加入团队的企业身份。 */
 export function TeamMemberPicker({
   team,
   onSaved,
@@ -56,7 +55,6 @@ export function TeamMemberPicker({
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
-  const { t: tCommon } = useTranslation("common")
   const [search, setSearch] = useState("")
   const [query, setQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
@@ -155,9 +153,7 @@ export function TeamMemberPicker({
   return (
     <div className="grid min-h-0 gap-4">
       <div className="grid gap-2">
-        <Label htmlFor="team-member-search">
-          {t("teams.members.search")}
-        </Label>
+        <Label htmlFor="team-member-search">{t("teams.members.search")}</Label>
         <div className="relative">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -188,7 +184,9 @@ export function TeamMemberPicker({
           </div>
         ) : members.length === 0 ? (
           <div className="flex min-h-56 items-center justify-center text-sm text-muted-foreground">
-            {t(query ? "teams.members.noMatches" : "teams.members.noCandidates")}
+            {t(
+              query ? "teams.members.noMatches" : "teams.members.noCandidates",
+            )}
           </div>
         ) : (
           <div className="divide-y">
@@ -216,12 +214,10 @@ export function TeamMemberPicker({
                       {member.displayName}
                     </span>
                     <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
-                      <span>{roleDisplayName(member.role, tCommon)}</span>
-                      <span aria-hidden="true">·</span>
                       <span>
                         {t(
                           member.identityType ===
-                            MemberIdentityType.MemberIdentityTypeAgent
+                            OrganizationIdentityType.OrganizationIdentityTypeAgent
                             ? "identityCategories.agent"
                             : "identityCategories.user",
                         )}

@@ -123,24 +123,34 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			}
 		}
 
+		organizationIdentity := &servermodels.OrganizationIdentity{
+			OrganizationID: organization.ID,
+			Type:           string(domain.OrganizationIdentityTypeUser),
+			DisplayName:    input.DisplayName,
+			WorkStatus:     string(domain.WorkStatusWorking),
+		}
+		if _, err := tx.NewInsert().Model(organizationIdentity).
+			Column("organization_id", "type", "display_name", "work_status").
+			Returning("id, work_status, work_status_updated_at").Exec(ctx); err != nil {
+			return err
+		}
 		user := &servermodels.User{
+			IdentityID:     organizationIdentity.ID,
 			OrganizationID: organization.ID,
 			Email:          input.Email,
-			DisplayName:    input.DisplayName,
 			PasswordHash:   passwordHash,
 			RoleID:         adminRoleID,
-			Status:         "active",
+			Status:         string(domain.UserStatusActive),
 			Locale:         string(input.Locale),
 			TimeZone:       input.TimeZone,
 		}
 		if _, err := tx.NewInsert().
 			Model(user).
-			Column("organization_id", "email", "display_name", "password_hash", "role_id", "status", "locale", "time_zone").
-			Returning("id, work_status").
+			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone").
+			Returning("id").
 			Exec(ctx); err != nil {
 			return err
 		}
-
 		teamName := "Customer Service Team"
 		if input.Locale == domain.LocaleChineseSimplified {
 			teamName = "客户服务团队"
@@ -160,12 +170,11 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		teamMember := &servermodels.TeamMember{
 			OrganizationID:  organization.ID,
 			TeamID:          team.ID,
-			IdentityType:    string(domain.MemberIdentityTypeUser),
-			IdentityID:      user.ID,
+			IdentityID:      user.IdentityID,
 			CreatedByUserID: user.ID,
 		}
 		if _, err := tx.NewInsert().Model(teamMember).
-			Column("organization_id", "team_id", "identity_type", "identity_id", "created_by_user_id").
+			Column("organization_id", "team_id", "identity_id", "created_by_user_id").
 			Exec(ctx); err != nil {
 			return err
 		}
@@ -183,6 +192,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		}
 
 		identity.Organization = *organization
+		identity.OrganizationIdentity = *organizationIdentity
 		identity.User = *user
 		defaultTeamID = team.ID
 		return nil

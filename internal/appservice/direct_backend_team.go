@@ -71,7 +71,29 @@ func (b *DirectBackend) DeleteTeam(ctx context.Context, meta RequestMeta, teamID
 	return nil
 }
 
-// ListTeamMemberCandidates 返回尚未加入团队的企业成员。
+// ListTeamMembers 返回团队成员列表。
+func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return TeamMemberList{}, err
+	}
+	output, err := b.listTeamMembers.Execute(ctx, identity, teamID, teamaction.MemberListInput{
+		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Page: input.Page, PageSize: input.PageSize,
+	})
+	if err != nil {
+		return TeamMemberList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
+	}
+	members := make([]TeamMember, 0, len(output.Members))
+	for _, member := range output.Members {
+		members = append(members, TeamMember{
+			IdentityID: member.IdentityID, IdentityType: OrganizationIdentityType(member.IdentityType),
+			DisplayName: member.DisplayName, Status: UserStatus(member.Status), JoinedAt: member.JoinedAt,
+		})
+	}
+	return TeamMemberList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
+}
+
+// ListTeamMemberCandidates 返回尚未加入团队的企业身份。
 func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -84,15 +106,14 @@ func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta Reque
 	members := make([]TeamMemberCandidate, 0, len(output.Members))
 	for _, member := range output.Members {
 		members = append(members, TeamMemberCandidate{
-			IdentityType: MemberIdentityType(member.IdentityType), IdentityID: member.IdentityID,
+			IdentityType: OrganizationIdentityType(member.IdentityType), IdentityID: member.IdentityID,
 			DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
-			Role: RoleSummary{ID: member.RoleID, Kind: RoleKind(member.RoleKind), Name: member.RoleName},
 		})
 	}
 	return TeamMemberCandidateList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
 
-// AddTeamMembers 将企业成员批量加入团队。
+// AddTeamMembers 将企业身份批量加入团队。
 func (b *DirectBackend) AddTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -100,7 +121,7 @@ func (b *DirectBackend) AddTeamMembers(ctx context.Context, meta RequestMeta, te
 	}
 	members := make([]teamaction.MemberIdentity, 0, len(input.Members))
 	for _, member := range input.Members {
-		members = append(members, teamaction.MemberIdentity{Type: domain.MemberIdentityType(member.IdentityType), ID: member.IdentityID})
+		members = append(members, teamaction.MemberIdentity{IdentityType: domain.OrganizationIdentityType(member.IdentityType), IdentityID: member.IdentityID})
 	}
 	team, err := b.addTeamMembers.Execute(ctx, identity, teamID, members)
 	if err != nil {
@@ -110,7 +131,7 @@ func (b *DirectBackend) AddTeamMembers(ctx context.Context, meta RequestMeta, te
 	return teamFromAction(*team), nil
 }
 
-// RemoveTeamMembers 将企业成员批量移出团队。
+// RemoveTeamMembers 将企业身份批量移出团队。
 func (b *DirectBackend) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -118,7 +139,7 @@ func (b *DirectBackend) RemoveTeamMembers(ctx context.Context, meta RequestMeta,
 	}
 	members := make([]teamaction.MemberIdentity, 0, len(input.Members))
 	for _, member := range input.Members {
-		members = append(members, teamaction.MemberIdentity{Type: domain.MemberIdentityType(member.IdentityType), ID: member.IdentityID})
+		members = append(members, teamaction.MemberIdentity{IdentityType: domain.OrganizationIdentityType(member.IdentityType), IdentityID: member.IdentityID})
 	}
 	team, err := b.removeTeamMembers.Execute(ctx, identity, teamID, members)
 	if err != nil {
