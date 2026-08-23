@@ -603,13 +603,21 @@ const zhCN = {
     routing: {
       newConversation: "新会话进入",
       fallback: "无法处理时",
-      team: "团队",
-      member: "成员",
       select: "请选择",
       person: "企业成员",
       agent: "AI 员工",
       loadError: "团队和成员加载失败，请重试。",
       saved: "接待设置已保存。",
+      targetLabels: {
+        newConversation: {
+          team: "接待团队",
+          member: "接待成员",
+        },
+        fallback: {
+          team: "转交团队",
+          member: "转交成员",
+        },
+      },
       newConversationTypes: {
         public_queue: "公共队列",
         team: "指定团队",

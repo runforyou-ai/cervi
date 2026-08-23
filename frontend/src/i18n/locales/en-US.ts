@@ -618,13 +618,21 @@ const enUS = {
     routing: {
       newConversation: "New conversations go to",
       fallback: "When unavailable",
-      team: "Team",
-      member: "Member",
       select: "Select",
       person: "Company member",
       agent: "AI employee",
       loadError: "Could not load teams and members. Try again.",
       saved: "Reception settings saved.",
+      targetLabels: {
+        newConversation: {
+          team: "Receiving team",
+          member: "Receiving member",
+        },
+        fallback: {
+          team: "Transfer team",
+          member: "Transfer member",
+        },
+      },
       newConversationTypes: {
         public_queue: "Public queue",
         team: "Specific team",

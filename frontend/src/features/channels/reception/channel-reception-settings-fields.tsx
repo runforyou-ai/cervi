@@ -82,10 +82,15 @@ function ReceptionTargetField({
       ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue ? (
         <div className="flex w-full flex-col gap-2">
           <FieldLabel htmlFor={`${name}-id`} required>
-            {target.type ===
-            ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
-              ? t("routing.team")
-              : t("routing.member")}
+            {isFallback
+              ? target.type ===
+                ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
+                ? t("routing.targetLabels.fallback.team")
+                : t("routing.targetLabels.fallback.member")
+              : target.type ===
+                  ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
+                ? t("routing.targetLabels.newConversation.team")
+                : t("routing.targetLabels.newConversation.member")}
           </FieldLabel>
           <NativeSelect
             id={`${name}-id`}

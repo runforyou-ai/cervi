@@ -327,9 +327,11 @@ export function ModelProviderFormPage({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={title}>
-        <Button variant="link" size="sm" asChild>
-          <Link to={listPath}>{t("modelServices.back")}</Link>
-        </Button>
+        {mode === "edit" ? (
+          <Button variant="link" size="sm" asChild>
+            <Link to={listPath}>{t("modelServices.back")}</Link>
+          </Button>
+        ) : null}
       </PageHeader>
       <PageContent>
         {loading ? (
