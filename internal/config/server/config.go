@@ -1,7 +1,7 @@
 //go:build server
 
-// Package serverconfig 统一加载并校验企业服务端运行配置。
-package serverconfig
+// Package server 统一加载并校验企业服务端运行配置。
+package server
 
 import (
 	"fmt"
@@ -15,8 +15,6 @@ import (
 
 	"github.com/goccy/go-yaml"
 )
-
-const defaultDevelopmentDSN = "postgres://cervi:cervi_local_dev@localhost:5432/cervi?sslmode=disable"
 
 // Duration 表示配置文件中的 Go 时长。
 type Duration time.Duration
@@ -138,34 +136,104 @@ func defaultConfig() Config {
 		config.Storage.LocalDirectory = ""
 		return config
 	}
-	config.Database.URL = defaultDevelopmentDSN
 	return config
 }
 
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
 func applyEnvironment(config *Config) error {
-	applyStringEnvironment("CERVI_ENV", &config.Environment)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
-	applyStringEnvironment("DATABASE_URL", &config.Database.URL)
-	applyStringEnvironment("CERVI_HTTPS_MODE", &config.HTTPS.Mode)
-	applyStringEnvironment("CERVI_TLS_DATA_DIR", &config.HTTPS.TLSDataDirectory)
-	applyStringEnvironment("CERVI_ACME_EMAIL", &config.HTTPS.ACMEEmail)
+	applyStringEnvironment("TLS_MODE", &config.HTTPS.Mode)
+	applyStringEnvironment("TLS_DATA_DIR", &config.HTTPS.TLSDataDirectory)
+	applyStringEnvironment("TLS_ACME_EMAIL", &config.HTTPS.ACMEEmail)
 	applyStringEnvironment("FILE_STORAGE_PATH", &config.Storage.LocalDirectory)
 
-	var err error
-	if config.Server.Port, err = intEnvironment("WAILS_SERVER_PORT", config.Server.Port); err != nil {
+	serverPort, err := intEnvironment("WAILS_SERVER_PORT", config.Server.Port)
+	if err != nil {
 		return err
 	}
-	if config.Database.MigrationTimeout, err = durationEnvironment("POSTGRES_MIGRATION_TIMEOUT", config.Database.MigrationTimeout); err != nil {
+	config.Server.Port = serverPort
+	if err := applyPostgreSQLEnvironment(&config.Database); err != nil {
 		return err
 	}
 	return nil
 }
 
+// applyPostgreSQLEnvironment 使用统一的 PostgreSQL 环境变量覆盖连接地址。
+func applyPostgreSQLEnvironment(config *DatabaseConfig) error {
+	names := []string{
+		"POSTGRES_HOST",
+		"POSTGRES_PORT",
+		"POSTGRES_USER",
+		"POSTGRES_PASSWORD",
+		"POSTGRES_DB",
+		"POSTGRES_SSLMODE",
+	}
+	override := false
+	for _, name := range names {
+		if _, ok := os.LookupEnv(name); ok {
+			override = true
+			break
+		}
+	}
+	if !override {
+		return nil
+	}
+
+	host, err := requiredEnvironment("POSTGRES_HOST")
+	if err != nil {
+		return err
+	}
+	portValue, err := requiredEnvironment("POSTGRES_PORT")
+	if err != nil {
+		return err
+	}
+	port, err := strconv.Atoi(portValue)
+	if err != nil || port < 1 || port > 65535 {
+		return fmt.Errorf("POSTGRES_PORT 必须是 1 到 65535 之间的整数")
+	}
+	user, err := requiredEnvironment("POSTGRES_USER")
+	if err != nil {
+		return err
+	}
+	password, err := requiredEnvironment("POSTGRES_PASSWORD")
+	if err != nil {
+		return err
+	}
+	databaseName, err := requiredEnvironment("POSTGRES_DB")
+	if err != nil {
+		return err
+	}
+	sslMode, err := requiredEnvironment("POSTGRES_SSLMODE")
+	if err != nil {
+		return err
+	}
+
+	databaseURL := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(user, password),
+		Host:   net.JoinHostPort(host, portValue),
+		Path:   databaseName,
+	}
+	query := databaseURL.Query()
+	query.Set("sslmode", sslMode)
+	databaseURL.RawQuery = query.Encode()
+	config.URL = databaseURL.String()
+	return nil
+}
+
+// requiredEnvironment 读取已启用的必填环境变量。
+func requiredEnvironment(name string) (string, error) {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return "", fmt.Errorf("必须配置 %s", name)
+	}
+	return value, nil
+}
+
 // validate 校验配置并阻止生产构建使用开发默认值。
 func (config Config) validate(strict bool) error {
 	if config.Environment != "development" && config.Environment != "production" {
-		return fmt.Errorf("CERVI_ENV 必须是 development 或 production")
+		return fmt.Errorf("environment 必须是 development 或 production")
 	}
 	if strict && config.Environment != "production" {
 		return fmt.Errorf("生产构建必须使用 production 环境")
@@ -178,17 +246,14 @@ func (config Config) validate(strict bool) error {
 		return fmt.Errorf("服务监听端口必须在 1 到 65535 之间")
 	}
 	if config.Database.URL == "" {
-		return fmt.Errorf("必须配置 DATABASE_URL")
-	}
-	if production && config.Database.URL == defaultDevelopmentDSN {
-		return fmt.Errorf("生产环境必须配置 DATABASE_URL")
+		return fmt.Errorf("必须通过 database.url 或 POSTGRES_* 配置 PostgreSQL")
 	}
 	databaseURL, err := url.Parse(config.Database.URL)
 	if err != nil || databaseURL.Host == "" || databaseURL.Scheme != "postgres" && databaseURL.Scheme != "postgresql" {
-		return fmt.Errorf("DATABASE_URL 必须是有效的 PostgreSQL 连接地址")
+		return fmt.Errorf("PostgreSQL 连接地址无效")
 	}
 	if production && strings.Trim(databaseURL.Path, "/") == "" {
-		return fmt.Errorf("生产环境 DATABASE_URL 必须显式指定数据库名称")
+		return fmt.Errorf("生产环境必须显式指定 PostgreSQL 数据库名称")
 	}
 	if config.Database.MaxOpenConnections < 0 || config.Database.MaxIdleConnections < 0 {
 		return fmt.Errorf("PostgreSQL 连接数不能为负数")
@@ -253,17 +318,4 @@ func intEnvironment(name string, fallback int) (int, error) {
 		return 0, fmt.Errorf("%s 必须是非负整数", name)
 	}
 	return parsed, nil
-}
-
-// durationEnvironment 读取正数时长环境变量。
-func durationEnvironment(name string, fallback Duration) (Duration, error) {
-	value, ok := os.LookupEnv(name)
-	if !ok || strings.TrimSpace(value) == "" {
-		return fallback, nil
-	}
-	parsed, err := time.ParseDuration(strings.TrimSpace(value))
-	if err != nil || parsed <= 0 {
-		return 0, fmt.Errorf("%s 必须是正数 Go 时长，例如 30s 或 5m", name)
-	}
-	return Duration(parsed), nil
 }

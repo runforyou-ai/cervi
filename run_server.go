@@ -10,7 +10,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/runforyou-ai/cervi/internal/config/server"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )

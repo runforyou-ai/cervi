@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/config/server"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -242,6 +242,6 @@ func parseHTTPSMode(value string) (httpsMode, error) {
 	case modeAuto, modeExternal, modeOff:
 		return mode, nil
 	default:
-		return "", fmt.Errorf("invalid CERVI_HTTPS_MODE %q: expected auto, external, or off", value)
+		return "", fmt.Errorf("invalid TLS_MODE %q: expected auto, external, or off", value)
 	}
 }

@@ -49,10 +49,17 @@ storage:
   localDirectory: /var/lib/cervi/files
 ```
 
-数据库连接等密钥通过受限环境文件或平台密钥管理能力注入，不写入通用 YAML：
+数据库连接和 NATS 身份通过受限环境文件或平台密钥管理能力注入，不写入通用 YAML：
 
 ```dotenv
-DATABASE_URL=postgres://cervi:请替换密码@127.0.0.1:5432/cervi?sslmode=require
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=cervi
+POSTGRES_PASSWORD=请替换密码
+POSTGRES_DB=cervi
+POSTGRES_SSLMODE=require
+NATS_URL=nats://127.0.0.1:4222
+NATS_NAMESPACE=cervi
 ```
 
 ## Linux systemd
@@ -166,7 +173,14 @@ storage:
 New-Item -ItemType Directory -Force 'C:\Program Files\Cervi', 'C:\ProgramData\Cervi\data\files'
 Copy-Item .\cervi-server.exe 'C:\Program Files\Cervi\cervi-server.exe'
 Copy-Item .\cervi.yaml 'C:\ProgramData\Cervi\cervi.yaml'
-$env:DATABASE_URL = 'postgres://cervi:请替换密码@127.0.0.1:5432/cervi?sslmode=require'
+$env:POSTGRES_HOST = '127.0.0.1'
+$env:POSTGRES_PORT = '5432'
+$env:POSTGRES_USER = 'cervi'
+$env:POSTGRES_PASSWORD = '请替换密码'
+$env:POSTGRES_DB = 'cervi'
+$env:POSTGRES_SSLMODE = 'require'
+$env:NATS_URL = 'nats://127.0.0.1:4222'
+$env:NATS_NAMESPACE = 'cervi'
 & 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml' -check-config
 & 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml'
 ```

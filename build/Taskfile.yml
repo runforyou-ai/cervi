@@ -270,7 +270,7 @@ tasks:
     summary: Builds and runs the Docker image
     desc: |
       Builds the Docker image and runs it using WAILS_SERVER_PORT for both the
-      container listener and host port mapping. DATABASE_URL 必须指向容器可访问的 PostgreSQL。
+      container listener and host port mapping. POSTGRES_HOST 必须指向容器可访问的 PostgreSQL。
       The port defaults to 8080.
       Usage: task run:docker [TAG=myapp:latest] [WAILS_SERVER_PORT=18080]
     deps:
@@ -281,7 +281,18 @@ tasks:
     cmds:
       - >-
         docker run --rm
-        -e DATABASE_URL
+        -e POSTGRES_HOST
+        -e POSTGRES_PORT
+        -e POSTGRES_USER
+        -e POSTGRES_PASSWORD
+        -e POSTGRES_DB
+        -e POSTGRES_SSLMODE
+        -e NATS_URL
+        -e NATS_NAMESPACE
+        -e TLS_MODE
+        -e TLS_DATA_DIR
+        -e TLS_ACME_EMAIL
+        -e FILE_STORAGE_PATH
         -e WAILS_SERVER_PORT={{.SERVER_PORT}}
         -p {{.SERVER_PORT}}:{{.SERVER_PORT}}
         {{.TAG | default (printf "%s:latest" .APP_NAME)}}

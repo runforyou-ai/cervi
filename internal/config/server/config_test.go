@@ -1,7 +1,7 @@
 //go:build server
 
 // 本文件验证企业服务端配置的加载、覆盖与生产约束。
-package serverconfig
+package server
 
 import (
 	"os"
@@ -30,15 +30,26 @@ storage:
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("DATABASE_URL", "postgres://environment")
+	t.Setenv("POSTGRES_HOST", "database.internal")
+	t.Setenv("POSTGRES_PORT", "5433")
+	t.Setenv("POSTGRES_USER", "environment")
+	t.Setenv("POSTGRES_PASSWORD", "secret")
+	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_SSLMODE", "require")
 	t.Setenv("WAILS_SERVER_PORT", "28080")
+	t.Setenv("TLS_MODE", "external")
+	t.Setenv("TLS_DATA_DIR", "/var/lib/cervi/tls")
+	t.Setenv("TLS_ACME_EMAIL", "admin@example.com")
 
 	config, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Database.URL != "postgres://environment" || config.Server.Port != 28080 {
+	if config.Database.URL != "postgres://environment:secret@database.internal:5433/cervi?sslmode=require" || config.Server.Port != 28080 {
 		t.Fatalf("环境变量未覆盖文件配置: %#v", config)
+	}
+	if config.HTTPS.Mode != "external" || config.HTTPS.TLSDataDirectory != "/var/lib/cervi/tls" || config.HTTPS.ACMEEmail != "admin@example.com" {
+		t.Fatalf("TLS 环境变量未覆盖文件配置: %#v", config.HTTPS)
 	}
 	if config.Database.MigrationTimeout.Value() != 15*time.Minute {
 		t.Fatalf("迁移超时 = %s", config.Database.MigrationTimeout.Value())
@@ -61,10 +72,9 @@ func TestLoadRejectsUnknownFileField(t *testing.T) {
 func clearServerEnvironment(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
-		"CERVI_ENV", "WAILS_SERVER_HOST", "WAILS_SERVER_PORT", "DATABASE_URL",
-		"POSTGRES_MIGRATION_TIMEOUT",
-		"CERVI_HTTPS_MODE", "CERVI_TLS_DATA_DIR",
-		"CERVI_ACME_EMAIL", "FILE_STORAGE_PATH",
+		"WAILS_SERVER_HOST", "WAILS_SERVER_PORT",
+		"POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "POSTGRES_SSLMODE",
+		"TLS_MODE", "TLS_DATA_DIR", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
 	} {
 		t.Setenv(name, "")
 	}
