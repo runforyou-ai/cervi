@@ -46,14 +46,11 @@ type HTTPSEntry struct {
 }
 
 // NewHTTPSEntry 根据 TLS 配置创建 HTTPS 入口。
-func NewHTTPSEntry(config serverconfig.HTTPSConfig, backendPort int) (*HTTPSEntry, error) {
-	mode, err := parseTLSMode(config.Mode)
-	if err != nil {
-		return nil, err
-	}
+func NewHTTPSEntry(config serverconfig.HTTPSConfig, backendPort int) *HTTPSEntry {
+	mode := tlsMode(config.Mode)
 	service := &HTTPSEntry{mode: mode, backendPort: backendPort}
 	if mode != modeAuto {
-		return service, nil
+		return service
 	}
 
 	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort("127.0.0.1", strconv.Itoa(backendPort))}
@@ -85,7 +82,7 @@ func NewHTTPSEntry(config serverconfig.HTTPSConfig, backendPort int) (*HTTPSEntr
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	return service, nil
+	return service
 }
 
 // Start 启动 HTTPS 入口。
@@ -233,16 +230,4 @@ func requestHost(value string) (string, bool) {
 func redirectToHTTPS(writer http.ResponseWriter, request *http.Request, host string) {
 	target := url.URL{Scheme: "https", Host: host, Path: request.URL.Path, RawQuery: request.URL.RawQuery}
 	http.Redirect(writer, request, target.String(), http.StatusTemporaryRedirect)
-}
-
-// parseTLSMode 解析已校验的 TLS 模式。
-func parseTLSMode(value string) (tlsMode, error) {
-	value = strings.ToLower(strings.TrimSpace(value))
-	mode := tlsMode(value)
-	switch mode {
-	case modeAuto, modeExternal, modeOff:
-		return mode, nil
-	default:
-		return "", fmt.Errorf("invalid TLS_MODE %q: expected auto, external, or off", value)
-	}
 }

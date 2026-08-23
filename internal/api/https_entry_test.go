@@ -18,36 +18,6 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
-// TestParseTLSMode 验证 TLS 模式解析。
-func TestParseTLSMode(t *testing.T) {
-	tests := []struct {
-		name      string
-		value     string
-		want      tlsMode
-		wantError bool
-	}{
-		{name: "explicit auto", value: "auto", want: modeAuto},
-		{name: "explicit external", value: "external", want: modeExternal},
-		{name: "explicit off", value: "off", want: modeOff},
-		{name: "case insensitive", value: " EXTERNAL ", want: modeExternal},
-		{name: "invalid", value: "proxy", wantError: true},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			mode, err := parseTLSMode(test.value)
-			if test.wantError {
-				if err == nil {
-					t.Fatal("expected invalid mode error")
-				}
-				return
-			}
-			if err != nil || mode != test.want {
-				t.Fatalf("parseTLSMode() = (%q, %v), want (%q, nil)", mode, err, test.want)
-			}
-		})
-	}
-}
-
 // TestRequestHostKeepsLocalAddressesOnHTTP 验证本地和内网地址不会申请公网证书。
 func TestRequestHostKeepsLocalAddressesOnHTTP(t *testing.T) {
 	tests := []struct {
@@ -93,10 +63,7 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 
 // TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
 func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
-	service, err := NewHTTPSEntry(serverconfig.HTTPSConfig{Mode: "external"}, 8080)
-	if err != nil {
-		t.Fatalf("new external service: %v", err)
-	}
+	service := NewHTTPSEntry(serverconfig.HTTPSConfig{Mode: "external"}, 8080)
 	if service.mode != modeExternal || service.httpServer != nil || service.httpsServer != nil {
 		t.Fatal("expected external mode without HTTP or HTTPS listeners")
 	}

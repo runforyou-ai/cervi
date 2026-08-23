@@ -1,6 +1,6 @@
 # 服务端部署临时说明
 
-> 本文是当前阶段的内部实施记录，待安装器和升级器方案稳定后再拆分为正式用户文档与发布资源。
+> 本文记录服务端安装和升级方案，安装器稳定后再拆分为用户文档与发布资源。
 
 ## 当前决策
 
@@ -14,7 +14,7 @@
 
 运行配置按以下优先级加载，后者覆盖前者：
 
-1. 二进制内的安全默认值；
+1. 二进制内的默认值；
 2. `-config` 指定的 YAML；
 3. 环境变量。
 
@@ -27,8 +27,6 @@ cervi-server -config <配置文件> -check-config
 生产 YAML 基础模板：
 
 ```yaml
-environment: production
-
 server:
   host: 127.0.0.1
   port: 8080
@@ -64,7 +62,7 @@ NATS_NAMESPACE=cervi
 
 ## Linux systemd
 
-以下路径作为当前约定：
+安装路径：
 
 - 二进制：`/usr/local/bin/cervi-server`
 - YAML：`/etc/cervi/cervi.yaml`
@@ -86,7 +84,7 @@ sudo systemctl enable --now cervi
 curl --fail http://127.0.0.1:8080/readyz
 ```
 
-当前 systemd 模板：
+systemd 模板：
 
 ```systemd
 [Unit]
@@ -105,15 +103,9 @@ WorkingDirectory=/var/lib/cervi
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s
-UMask=0027
 
 StateDirectory=cervi
 StateDirectoryMode=0750
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectHome=true
-ProtectSystem=strict
-ReadWritePaths=/var/lib/cervi
 
 [Install]
 WantedBy=multi-user.target
@@ -127,7 +119,7 @@ journalctl -u cervi -f
 
 ### Linux 自动 HTTPS
 
-默认 `external` 模式不需要额外系统权限。由 Cervi 自动签发证书时使用：
+由 Cervi 自动签发证书时使用：
 
 ```yaml
 https:
@@ -150,7 +142,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart cervi
 ```
 
-公网域名的 80/443 必须转发到当前服务器。切回 `external` 或 `off` 后删除 drop-in 并重新加载 systemd，避免保留不再需要的能力。
+公网域名的 80/443 必须转发到当前服务器。切回 `external` 或 `off` 后删除 drop-in 并重新加载 systemd。
 
 ## Windows Server
 
@@ -185,7 +177,7 @@ $env:NATS_NAMESPACE = 'cervi'
 & 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml'
 ```
 
-另一终端使用 `Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8080/readyz'` 检查就绪状态。当前二进制尚未接入 Windows SCM，不能直接通过 `sc.exe create` 注册为原生服务；正式服务安装前可前台运行或由经过评估的服务包装器托管。
+另一终端使用 `Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8080/readyz'` 检查就绪状态。服务端尚未接入 Windows SCM，首期前台运行或使用服务包装器托管。
 
 ## 容器
 

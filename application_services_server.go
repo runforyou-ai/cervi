@@ -20,12 +20,9 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
+// applicationServices 创建服务端应用服务。
 func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
-	httpsEntry, err := api.NewHTTPSEntry(config.HTTPS, config.Server.Port)
-	if err != nil {
-		return nil, err
-	}
+	httpsEntry := api.NewHTTPSEntry(config.HTTPS, config.Server.Port)
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, err

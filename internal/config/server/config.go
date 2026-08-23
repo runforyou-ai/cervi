@@ -38,13 +38,12 @@ func (d Duration) Value() time.Duration {
 	return time.Duration(d)
 }
 
-// Config 定义企业服务端全部基础设施配置。
+// Config 定义服务端运行配置。
 type Config struct {
-	Environment string         `yaml:"environment"`
-	Server      ServerConfig   `yaml:"server"`
-	Database    DatabaseConfig `yaml:"database"`
-	HTTPS       HTTPSConfig    `yaml:"https"`
-	Storage     StorageConfig  `yaml:"storage"`
+	Server   ServerConfig   `yaml:"server"`
+	Database DatabaseConfig `yaml:"database"`
+	HTTPS    HTTPSConfig    `yaml:"https"`
+	Storage  StorageConfig  `yaml:"storage"`
 }
 
 // ServerConfig 定义 HTTP 服务监听配置。
@@ -100,7 +99,6 @@ func Load(path string) (Config, error) {
 
 // normalize 统一配置中的枚举和空白字符。
 func (config *Config) normalize() {
-	config.Environment = strings.ToLower(strings.TrimSpace(config.Environment))
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Database.URL = strings.TrimSpace(config.Database.URL)
 	config.HTTPS.Mode = strings.ToLower(strings.TrimSpace(config.HTTPS.Mode))
@@ -112,7 +110,6 @@ func (config *Config) normalize() {
 // defaultConfig 返回当前构建模式的服务端默认配置。
 func defaultConfig() Config {
 	config := Config{
-		Environment: "development",
 		Server: ServerConfig{
 			Host: "127.0.0.1",
 			Port: 8080,
@@ -131,7 +128,6 @@ func defaultConfig() Config {
 		},
 	}
 	if productionBuild {
-		config.Environment = "production"
 		config.HTTPS.Mode = "external"
 		config.Storage.LocalDirectory = ""
 		return config
@@ -158,7 +154,7 @@ func applyEnvironment(config *Config) error {
 	return nil
 }
 
-// applyPostgreSQLEnvironment 使用统一的 PostgreSQL 环境变量覆盖连接地址。
+// applyPostgreSQLEnvironment 使用 POSTGRES_* 环境变量覆盖连接地址。
 func applyPostgreSQLEnvironment(config *DatabaseConfig) error {
 	names := []string{
 		"POSTGRES_HOST",
@@ -221,7 +217,7 @@ func applyPostgreSQLEnvironment(config *DatabaseConfig) error {
 	return nil
 }
 
-// requiredEnvironment 读取已启用的必填环境变量。
+// requiredEnvironment 读取必填环境变量。
 func requiredEnvironment(name string) (string, error) {
 	value := strings.TrimSpace(os.Getenv(name))
 	if value == "" {
@@ -230,15 +226,8 @@ func requiredEnvironment(name string) (string, error) {
 	return value, nil
 }
 
-// validate 校验配置并阻止生产构建使用开发默认值。
-func (config Config) validate(strict bool) error {
-	if config.Environment != "development" && config.Environment != "production" {
-		return fmt.Errorf("environment 必须是 development 或 production")
-	}
-	if strict && config.Environment != "production" {
-		return fmt.Errorf("生产构建必须使用 production 环境")
-	}
-	production := strict || config.Environment == "production"
+// validate 校验服务端配置。
+func (config Config) validate(production bool) error {
 	if !validServerHost(config.Server.Host) {
 		return fmt.Errorf("服务监听地址无效")
 	}
@@ -307,15 +296,15 @@ func applyStringEnvironment(name string, target *string) {
 	}
 }
 
-// intEnvironment 读取非负整数环境变量。
+// intEnvironment 读取整数环境变量。
 func intEnvironment(name string, fallback int) (int, error) {
 	value, ok := os.LookupEnv(name)
 	if !ok || strings.TrimSpace(value) == "" {
 		return fallback, nil
 	}
 	parsed, err := strconv.Atoi(strings.TrimSpace(value))
-	if err != nil || parsed < 0 {
-		return 0, fmt.Errorf("%s 必须是非负整数", name)
+	if err != nil {
+		return 0, fmt.Errorf("%s 必须是整数", name)
 	}
 	return parsed, nil
 }

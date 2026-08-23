@@ -1,6 +1,5 @@
 //go:build server
 
-// 本文件验证企业服务端配置的加载、覆盖与生产约束。
 package server
 
 import (
@@ -15,7 +14,6 @@ func TestLoadMergesFileAndEnvironment(t *testing.T) {
 	clearServerEnvironment(t)
 	path := filepath.Join(t.TempDir(), "cervi.yaml")
 	data := []byte(`
-environment: development
 server:
   host: 127.0.0.1
   port: 18080
@@ -80,12 +78,12 @@ func clearServerEnvironment(t *testing.T) {
 	}
 }
 
-// TestProductionValidationRejectsDevelopmentDefaults 验证生产配置不能继承开发数据库和相对目录。
-func TestProductionValidationRejectsDevelopmentDefaults(t *testing.T) {
+// TestProductionValidationRejectsRelativeStorage 验证生产配置不接受相对存储目录。
+func TestProductionValidationRejectsRelativeStorage(t *testing.T) {
 	config := defaultConfig()
-	config.Environment = "production"
+	config.Database.URL = "postgres://cervi@localhost/cervi"
 	config.normalize()
-	if err := config.validate(false); err == nil {
-		t.Fatal("生产环境接受了开发默认配置")
+	if err := config.validate(true); err == nil {
+		t.Fatal("生产环境接受了相对存储目录")
 	}
 }

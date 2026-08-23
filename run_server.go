@@ -68,6 +68,6 @@ func run(arguments []string) error {
 		},
 	})
 
-	slog.Info("启动 Cervi 服务端", "host", config.Server.Host, "port", config.Server.Port, "environment", config.Environment)
+	slog.Info("启动 Cervi 服务端", "host", config.Server.Host, "port", config.Server.Port, "tls_mode", config.HTTPS.Mode)
 	return app.Run()
 }
