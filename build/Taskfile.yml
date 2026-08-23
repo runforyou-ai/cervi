@@ -235,8 +235,18 @@ tasks:
   build:docker:
     summary: Builds a Docker image for server mode deployment
     desc: |
+      Creates a minimal Docker image containing the production server binary.
+      Defaults to a pure-Go static binary on a distroless/static base. The
+      production frontend is built first so the embedded assets are current.
+
       Usage: task build:docker [TAG=myapp:latest] [CGO_ENABLED=1] [GO_IMAGE=...] [RUNTIME_IMAGE=...]
+      For CGO apps, set CGO_ENABLED=1 with libc-compatible builder/runtime images, e.g.:
+        task build:docker CGO_ENABLED=1 GO_IMAGE=golang:1.27-bookworm RUNTIME_IMAGE=gcr.io/distroless/base-debian12
     deps:
+      # Build the production frontend so frontend/dist (embedded by the Go build
+      # inside the image) is present and current in the Docker build context.
+      # Pass the server,production tags so binding generation analyses the same
+      # build the Docker image compiles, not the default-tag build.
       - task: build:frontend
         vars:
           BUILD_FLAGS: "-tags server,production"
@@ -259,6 +269,8 @@ tasks:
   run:docker:
     summary: Builds and runs the Docker image
     desc: |
+      Builds the Docker image and runs it using WAILS_SERVER_PORT for both the
+      container listener and host port mapping. The port defaults to 8080.
       Usage: task run:docker [TAG=myapp:latest] [WAILS_SERVER_PORT=18080]
     deps:
       - task: build:docker
