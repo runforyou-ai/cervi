@@ -12,7 +12,10 @@ import (
 
 // identityFromModel 把存储身份转换为应用契约。
 func identityFromModel(identity *servermodels.Identity) Identity {
-	return Identity{Organization: organizationFromModel(identity.Organization), User: userFromModel(identity.User)}
+	return Identity{
+		Organization: organizationFromModel(identity.Organization),
+		User:         currentUserFromIdentity(identity),
+	}
 }
 
 // organizationFromModel 把存储企业转换为应用契约。
@@ -20,12 +23,14 @@ func organizationFromModel(organization servermodels.Organization) Organization 
 	return Organization{ID: organization.ID, Name: organization.Name}
 }
 
-// userFromModel 把存储用户转换为应用契约。
-func userFromModel(user servermodels.User) CurrentUser {
+// currentUserFromIdentity 把存储身份转换为当前用户契约。
+func currentUserFromIdentity(identity *servermodels.Identity) CurrentUser {
+	user := identity.User
+	organizationIdentity := identity.OrganizationIdentity
 	return CurrentUser{
-		ID: user.ID, IdentityID: user.IdentityID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: user.DisplayName,
+		ID: user.ID, IdentityID: user.IdentityID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: organizationIdentity.DisplayName,
 		RoleID: user.RoleID, Status: UserStatus(user.Status), Locale: Locale(user.Locale), TimeZone: user.TimeZone,
-		WorkStatus: WorkStatus(user.WorkStatus), AvatarURL: avatarContentURL(user.AvatarFileID),
+		WorkStatus: WorkStatus(organizationIdentity.WorkStatus), AvatarURL: avatarContentURL(organizationIdentity.AvatarFileID),
 	}
 }
 

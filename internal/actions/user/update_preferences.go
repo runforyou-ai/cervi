@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -22,19 +21,16 @@ func NewUpdatePreferencesAction(db *bun.DB) *UpdatePreferencesAction {
 }
 
 // Execute 校验并保存当前用户的语言和时区设置。
-func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *servermodels.Identity, input PreferencesInput) (*servermodels.User, error) {
+func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *servermodels.Identity, input PreferencesInput) (*servermodels.Identity, error) {
 	fields := validatePreferencesInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if identity == nil ||
-		!common.ValidUUID(identity.Organization.ID) ||
-		!common.ValidUUID(identity.User.ID) ||
-		identity.User.OrganizationID != identity.Organization.ID {
-		return nil, common.ErrIdentityInvalid
+	if err := validateIdentity(ctx, a.db, identity); err != nil {
+		return nil, err
 	}
 
-	result, err := a.db.NewUpdate().
+	_, err := a.db.NewUpdate().
 		Model((*servermodels.User)(nil)).
 		Set("locale = ?", input.Locale).
 		Set("time_zone = ?", input.TimeZone).
@@ -45,16 +41,9 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 	if err != nil {
 		return nil, fmt.Errorf("update user preferences: %w", err)
 	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("read updated user preferences count: %w", err)
-	}
-	if rows == 0 {
-		return nil, common.ErrIdentityInvalid
-	}
-	user, err := loadCurrentUser(ctx, a.db, identity.Organization.ID, identity.User.ID)
+	updatedIdentity, err := loadCurrentIdentity(ctx, a.db, identity.Organization, identity.User.ID)
 	if err != nil {
 		return nil, fmt.Errorf("reload user preferences: %w", err)
 	}
-	return user, nil
+	return updatedIdentity, nil
 }

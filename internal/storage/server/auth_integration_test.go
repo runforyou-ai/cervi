@@ -67,7 +67,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.User.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	if installed.Identity.User.IdentityID == "" || installed.Identity.User.IdentityID == installed.Identity.User.ID {
@@ -127,8 +127,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updatedWorkStatus.WorkStatus != string(domain.WorkStatusAway) {
-		t.Fatalf("updated work status = %q, want %q", updatedWorkStatus.WorkStatus, domain.WorkStatusAway)
+	if updatedWorkStatus.OrganizationIdentity.WorkStatus != string(domain.WorkStatusAway) {
+		t.Fatalf("updated work status = %q, want %q", updatedWorkStatus.OrganizationIdentity.WorkStatus, domain.WorkStatusAway)
 	}
 	if _, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking}); err != nil {
 		t.Fatal(err)
@@ -409,7 +409,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 
 	updateProfile := useraction.NewUpdateProfileAction(db)
-	updatedUser, err := updateProfile.Execute(context.Background(), loggedIn.Identity, useraction.ProfileInput{
+	updatedIdentity, err := updateProfile.Execute(context.Background(), loggedIn.Identity, useraction.ProfileInput{
 		DisplayName:  "  新姓名  ",
 		Email:        " NEW@Example.com ",
 		AvatarFileID: avatar.ID,
@@ -417,8 +417,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updatedUser.DisplayName != "新姓名" || updatedUser.Email != "new@example.com" || updatedUser.AvatarFileID == nil || *updatedUser.AvatarFileID != avatar.ID {
-		t.Fatalf("updated user = %#v", updatedUser)
+	if updatedIdentity.OrganizationIdentity.DisplayName != "新姓名" || updatedIdentity.User.Email != "new@example.com" || updatedIdentity.OrganizationIdentity.AvatarFileID == nil || *updatedIdentity.OrganizationIdentity.AvatarFileID != avatar.ID {
+		t.Fatalf("updated identity = %#v", updatedIdentity)
 	}
 	activeAvatar := &servermodels.File{}
 	if err := db.NewSelect().Model(activeAvatar).Where("f.id = ?", avatar.ID).Scan(context.Background()); err != nil {
@@ -431,7 +431,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resolvedAfterUpdate == nil || resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.User.DisplayName != "新姓名" {
+	if resolvedAfterUpdate == nil || resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.OrganizationIdentity.DisplayName != "新姓名" {
 		t.Fatalf("identity after profile update = %#v", resolvedAfterUpdate)
 	}
 	replacement, err := fileaction.NewCreateUploadAction(db).Execute(context.Background(), resolvedAfterUpdate, domain.FileStorageBackendLocal, fileaction.UploadInput{
@@ -444,14 +444,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	updatedUser, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
+	updatedIdentity, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
 		DisplayName: "新姓名", Email: "new@example.com", AvatarFileID: replacement.ID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updatedUser.AvatarFileID == nil || *updatedUser.AvatarFileID != replacement.ID {
-		t.Fatalf("replacement avatar user = %#v", updatedUser)
+	if updatedIdentity.OrganizationIdentity.AvatarFileID == nil || *updatedIdentity.OrganizationIdentity.AvatarFileID != replacement.ID {
+		t.Fatalf("replacement avatar identity = %#v", updatedIdentity)
 	}
 	if err := db.NewSelect().Model(activeAvatar).Where("f.id = ?", avatar.ID).Scan(context.Background()); err != nil {
 		t.Fatal(err)
@@ -488,8 +488,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.User.DisplayName != "新姓名" {
-		t.Fatalf("profile changed after invalid avatar: %#v", resolvedAfterUpdate.User)
+	if resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.OrganizationIdentity.DisplayName != "新姓名" {
+		t.Fatalf("profile changed after invalid avatar: %#v", resolvedAfterUpdate)
 	}
 
 	changePassword := useraction.NewChangePasswordAction(db)
@@ -560,14 +560,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if retryAvatar.Status != string(domain.FileStatusUploaded) || retryAvatar.ExpiresAt == nil {
 		t.Fatalf("retry avatar after validation failure = %#v", retryAvatar)
 	}
-	updatedUser, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
+	updatedIdentity, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
 		DisplayName: "新姓名", Email: "new@example.com", AvatarFileID: retryAvatar.ID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updatedUser.AvatarFileID == nil || *updatedUser.AvatarFileID != retryAvatar.ID {
-		t.Fatalf("retried profile avatar = %#v", updatedUser)
+	if updatedIdentity.OrganizationIdentity.AvatarFileID == nil || *updatedIdentity.OrganizationIdentity.AvatarFileID != retryAvatar.ID {
+		t.Fatalf("retried profile avatar = %#v", updatedIdentity)
 	}
 
 	createContact := contactaction.NewCreateContactAction(db)

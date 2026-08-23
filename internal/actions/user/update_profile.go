@@ -30,12 +30,12 @@ func NewUpdateProfileAction(db *bun.DB) *UpdateProfileAction {
 }
 
 // Execute 校验并更新当前用户的姓名、邮箱和头像关联。
-func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodels.Identity, input ProfileInput) (*servermodels.User, error) {
+func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodels.Identity, input ProfileInput) (*servermodels.Identity, error) {
 	input, fields := normalizeProfileInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	var user *servermodels.User
+	var updatedIdentity *servermodels.Identity
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := validateIdentity(ctx, tx, identity); err != nil {
 			return err
@@ -124,7 +124,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				return err
 			}
 		}
-		user, err = loadCurrentUser(ctx, tx, identity.Organization.ID, identity.User.ID)
+		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)
 		return err
 	})
 	if isUniqueViolation(err) {
@@ -133,7 +133,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 	if err != nil {
 		return nil, fmt.Errorf("update profile: %w", err)
 	}
-	return user, nil
+	return updatedIdentity, nil
 }
 
 // isUniqueViolation 判断 PostgreSQL 错误是否为唯一约束冲突。

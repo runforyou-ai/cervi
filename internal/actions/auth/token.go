@@ -52,13 +52,16 @@ func resolveIdentity(ctx context.Context, db *bun.DB, value string) (*servermode
 			u.identity_id::text,
 			u.organization_id::text,
 			u.email,
-			oi.display_name,
 			u.role_id::text,
 			u.status,
 			u.locale,
 			u.time_zone,
-			oi.work_status,
-			oi.avatar_file_id::text
+			oi.id::text,
+			oi.organization_id::text,
+			oi.type,
+			oi.display_name,
+			oi.avatar_file_id::text,
+			oi.work_status
 		FROM tokens AS token
 		JOIN users AS u ON u.id = token.user_id
 		JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = 'user'
@@ -74,13 +77,16 @@ func resolveIdentity(ctx context.Context, db *bun.DB, value string) (*servermode
 		&identity.User.IdentityID,
 		&identity.User.OrganizationID,
 		&identity.User.Email,
-		&identity.User.DisplayName,
 		&identity.User.RoleID,
 		&identity.User.Status,
 		&identity.User.Locale,
 		&identity.User.TimeZone,
-		&identity.User.WorkStatus,
-		&identity.User.AvatarFileID,
+		&identity.OrganizationIdentity.ID,
+		&identity.OrganizationIdentity.OrganizationID,
+		&identity.OrganizationIdentity.Type,
+		&identity.OrganizationIdentity.DisplayName,
+		&identity.OrganizationIdentity.AvatarFileID,
+		&identity.OrganizationIdentity.WorkStatus,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

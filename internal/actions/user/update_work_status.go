@@ -22,7 +22,7 @@ func NewUpdateWorkStatusAction(db *bun.DB) *UpdateWorkStatusAction {
 }
 
 // Execute 校验并保存当前用户的工作状态。
-func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkStatusInput) (*servermodels.User, error) {
+func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkStatusInput) (*servermodels.Identity, error) {
 	fields := validateWorkStatusInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
@@ -43,9 +43,9 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 	if err != nil {
 		return nil, fmt.Errorf("update user work status: %w", err)
 	}
-	user, err := loadCurrentUser(ctx, a.db, identity.Organization.ID, identity.User.ID)
+	updatedIdentity, err := loadCurrentIdentity(ctx, a.db, identity.Organization, identity.User.ID)
 	if err != nil {
 		return nil, fmt.Errorf("reload user work status: %w", err)
 	}
-	return user, nil
+	return updatedIdentity, nil
 }

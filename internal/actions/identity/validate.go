@@ -16,8 +16,12 @@ import (
 func Validate(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
 	if identity == nil ||
 		!common.ValidUUID(identity.Organization.ID) ||
+		!common.ValidUUID(identity.OrganizationIdentity.ID) ||
 		!common.ValidUUID(identity.User.ID) ||
 		!common.ValidUUID(identity.User.IdentityID) ||
+		identity.OrganizationIdentity.ID != identity.User.IdentityID ||
+		identity.OrganizationIdentity.OrganizationID != identity.Organization.ID ||
+		identity.OrganizationIdentity.Type != string(domain.OrganizationIdentityTypeUser) ||
 		identity.User.OrganizationID != identity.Organization.ID {
 		return common.ErrIdentityInvalid
 	}

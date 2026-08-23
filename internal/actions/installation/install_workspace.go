@@ -151,9 +151,6 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			Exec(ctx); err != nil {
 			return err
 		}
-		user.DisplayName = organizationIdentity.DisplayName
-		user.WorkStatus = organizationIdentity.WorkStatus
-
 		teamName := "Customer Service Team"
 		if input.Locale == domain.LocaleChineseSimplified {
 			teamName = "客户服务团队"
@@ -195,6 +192,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		}
 
 		identity.Organization = *organization
+		identity.OrganizationIdentity = *organizationIdentity
 		identity.User = *user
 		defaultTeamID = team.ID
 		return nil

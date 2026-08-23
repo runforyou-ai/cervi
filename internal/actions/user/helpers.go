@@ -20,17 +20,32 @@ func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Id
 	return identityaction.Validate(ctx, db, identity)
 }
 
-// loadCurrentUser 读取当前用户账号及其企业身份字段。
-func loadCurrentUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*servermodels.User, error) {
-	user := &servermodels.User{}
+// loadCurrentIdentity 读取当前用户账号及其企业身份。
+func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermodels.Organization, userID string) (*servermodels.Identity, error) {
+	identity := &servermodels.Identity{Organization: organization}
 	err := db.NewSelect().TableExpr("users AS u").
-		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.password_hash, u.role_id::text, u.status, u.locale, u.time_zone").
-		ColumnExpr("oi.display_name, oi.work_status, oi.avatar_file_id::text").
+		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.role_id::text, u.status, u.locale, u.time_zone").
+		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.display_name, oi.avatar_file_id::text, oi.work_status").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
-		Where("u.organization_id = ?", organizationID).
+		Where("u.organization_id = ?", organization.ID).
 		Where("u.id = ?", userID).
-		Scan(ctx, user)
-	return user, err
+		Scan(ctx,
+			&identity.User.ID,
+			&identity.User.IdentityID,
+			&identity.User.OrganizationID,
+			&identity.User.Email,
+			&identity.User.RoleID,
+			&identity.User.Status,
+			&identity.User.Locale,
+			&identity.User.TimeZone,
+			&identity.OrganizationIdentity.ID,
+			&identity.OrganizationIdentity.OrganizationID,
+			&identity.OrganizationIdentity.Type,
+			&identity.OrganizationIdentity.DisplayName,
+			&identity.OrganizationIdentity.AvatarFileID,
+			&identity.OrganizationIdentity.WorkStatus,
+		)
+	return identity, err
 }
 
 // loadUser 读取企业成员、角色和所属团队。

@@ -45,7 +45,6 @@ func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutpu
 	user := &servermodels.User{}
 	err := a.db.NewSelect().Model(user).
 		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.password_hash, u.role_id::text, u.status, u.locale, u.time_zone").
-		ColumnExpr("oi.display_name, oi.work_status, oi.avatar_file_id::text").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = 'user'").
 		Where("lower(u.email) = lower(?)", commonemail.Normalize(input.Email)).
 		Limit(1).

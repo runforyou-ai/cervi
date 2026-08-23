@@ -19,7 +19,7 @@ func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, inp
 	if err != nil {
 		return CurrentUser{}, err
 	}
-	user, err := b.updateProfile.Execute(ctx, identity, useraction.ProfileInput{
+	updatedIdentity, err := b.updateProfile.Execute(ctx, identity, useraction.ProfileInput{
 		DisplayName:  input.DisplayName,
 		Email:        input.Email,
 		AvatarFileID: input.AvatarFileID,
@@ -42,7 +42,7 @@ func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, inp
 		return CurrentUser{}, FailedError(meta, cervii18n.ErrorProfileUpdateFailed)
 	}
 	slog.Info("个人资料保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID)
-	return userFromModel(*user), nil
+	return currentUserFromIdentity(updatedIdentity), nil
 }
 
 // ChangePassword 核验当前密码并保存新密码。
@@ -79,7 +79,7 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 	if err != nil {
 		return CurrentUser{}, err
 	}
-	user, err := b.updateUserPreferences.Execute(ctx, identity, useraction.PreferencesInput{
+	updatedIdentity, err := b.updateUserPreferences.Execute(ctx, identity, useraction.PreferencesInput{
 		Locale: domain.Locale(input.Locale), TimeZone: input.TimeZone,
 	})
 	if err != nil {
@@ -97,7 +97,7 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 		return CurrentUser{}, FailedError(meta, cervii18n.ErrorPreferencesUpdateFailed)
 	}
 	slog.Info("语言和时区保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "locale", input.Locale, "time_zone", input.TimeZone)
-	return userFromModel(*user), nil
+	return currentUserFromIdentity(updatedIdentity), nil
 }
 
 // UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
@@ -106,7 +106,7 @@ func (b *DirectBackend) UpdateUserWorkStatus(ctx context.Context, meta RequestMe
 	if err != nil {
 		return CurrentUser{}, err
 	}
-	user, err := b.updateUserWorkStatus.Execute(ctx, identity, useraction.WorkStatusInput{
+	updatedIdentity, err := b.updateUserWorkStatus.Execute(ctx, identity, useraction.WorkStatusInput{
 		WorkStatus: domain.WorkStatus(input.WorkStatus),
 	})
 	if err != nil {
@@ -124,7 +124,7 @@ func (b *DirectBackend) UpdateUserWorkStatus(ctx context.Context, meta RequestMe
 		return CurrentUser{}, FailedError(meta, cervii18n.ErrorWorkStatusUpdateFailed)
 	}
 	slog.Info("工作状态保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "work_status", input.WorkStatus)
-	return userFromModel(*user), nil
+	return currentUserFromIdentity(updatedIdentity), nil
 }
 
 // ListUsers 返回企业成员列表。
