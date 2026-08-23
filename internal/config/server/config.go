@@ -6,7 +6,6 @@ package server
 import (
 	"fmt"
 	"net"
-	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -57,7 +56,12 @@ type ServerConfig struct {
 
 // DatabaseConfig 定义 PostgreSQL 连接、连接池和迁移配置。
 type DatabaseConfig struct {
-	URL                   string   `yaml:"url"`
+	Host                  string   `yaml:"host"`
+	Port                  int      `yaml:"port"`
+	User                  string   `yaml:"user"`
+	Password              string   `yaml:"password"`
+	Name                  string   `yaml:"name"`
+	SSLMode               string   `yaml:"sslMode"`
 	MaxOpenConnections    int      `yaml:"maxOpenConnections"`
 	MaxIdleConnections    int      `yaml:"maxIdleConnections"`
 	ConnectionMaxLifetime Duration `yaml:"connectionMaxLifetime"`
@@ -109,7 +113,11 @@ func Load(path string) (Config, error) {
 // normalize 统一配置中的枚举和空白字符。
 func (config *Config) normalize() {
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
-	config.Database.URL = strings.TrimSpace(config.Database.URL)
+	config.Database.Host = strings.TrimSpace(config.Database.Host)
+	config.Database.User = strings.TrimSpace(config.Database.User)
+	config.Database.Password = strings.TrimSpace(config.Database.Password)
+	config.Database.Name = strings.TrimSpace(config.Database.Name)
+	config.Database.SSLMode = strings.ToLower(strings.TrimSpace(config.Database.SSLMode))
 	config.NATS.URL = strings.TrimSpace(config.NATS.URL)
 	config.NATS.Namespace = strings.TrimSpace(config.NATS.Namespace)
 	config.HTTPS.Mode = strings.ToLower(strings.TrimSpace(config.HTTPS.Mode))
@@ -147,6 +155,11 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("TLS_DATA_DIR", &config.HTTPS.TLSDataDirectory)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.HTTPS.ACMEEmail)
 	applyStringEnvironment("FILE_STORAGE_PATH", &config.Storage.LocalDirectory)
+	applyStringEnvironment("POSTGRES_HOST", &config.Database.Host)
+	applyStringEnvironment("POSTGRES_USER", &config.Database.User)
+	applyStringEnvironment("POSTGRES_PASSWORD", &config.Database.Password)
+	applyStringEnvironment("POSTGRES_DB", &config.Database.Name)
+	applyStringEnvironment("POSTGRES_SSLMODE", &config.Database.SSLMode)
 	applyStringEnvironment("NATS_URL", &config.NATS.URL)
 	applyStringEnvironment("NATS_NAMESPACE", &config.NATS.Namespace)
 
@@ -155,82 +168,12 @@ func applyEnvironment(config *Config) error {
 		return err
 	}
 	config.Server.Port = serverPort
-	if err := applyPostgreSQLEnvironment(&config.Database); err != nil {
+	databasePort, err := intEnvironment("POSTGRES_PORT", config.Database.Port)
+	if err != nil {
 		return err
 	}
+	config.Database.Port = databasePort
 	return nil
-}
-
-// applyPostgreSQLEnvironment 使用 POSTGRES_* 环境变量覆盖连接地址。
-func applyPostgreSQLEnvironment(config *DatabaseConfig) error {
-	names := []string{
-		"POSTGRES_HOST",
-		"POSTGRES_PORT",
-		"POSTGRES_USER",
-		"POSTGRES_PASSWORD",
-		"POSTGRES_DB",
-		"POSTGRES_SSLMODE",
-	}
-	override := false
-	for _, name := range names {
-		if _, ok := os.LookupEnv(name); ok {
-			override = true
-			break
-		}
-	}
-	if !override {
-		return nil
-	}
-
-	host, err := requiredEnvironment("POSTGRES_HOST")
-	if err != nil {
-		return err
-	}
-	portValue, err := requiredEnvironment("POSTGRES_PORT")
-	if err != nil {
-		return err
-	}
-	port, err := strconv.Atoi(portValue)
-	if err != nil || port < 1 || port > 65535 {
-		return fmt.Errorf("POSTGRES_PORT 必须是 1 到 65535 之间的整数")
-	}
-	user, err := requiredEnvironment("POSTGRES_USER")
-	if err != nil {
-		return err
-	}
-	password, err := requiredEnvironment("POSTGRES_PASSWORD")
-	if err != nil {
-		return err
-	}
-	databaseName, err := requiredEnvironment("POSTGRES_DB")
-	if err != nil {
-		return err
-	}
-	sslMode, err := requiredEnvironment("POSTGRES_SSLMODE")
-	if err != nil {
-		return err
-	}
-
-	databaseURL := &url.URL{
-		Scheme: "postgres",
-		User:   url.UserPassword(user, password),
-		Host:   net.JoinHostPort(host, portValue),
-		Path:   databaseName,
-	}
-	query := databaseURL.Query()
-	query.Set("sslmode", sslMode)
-	databaseURL.RawQuery = query.Encode()
-	config.URL = databaseURL.String()
-	return nil
-}
-
-// requiredEnvironment 读取必填环境变量。
-func requiredEnvironment(name string) (string, error) {
-	value := strings.TrimSpace(os.Getenv(name))
-	if value == "" {
-		return "", fmt.Errorf("必须配置 %s", name)
-	}
-	return value, nil
 }
 
 // validate 校验服务端配置。
@@ -241,15 +184,25 @@ func (config Config) validate() error {
 	if config.Server.Port < 1 || config.Server.Port > 65535 {
 		return fmt.Errorf("服务监听端口必须在 1 到 65535 之间")
 	}
-	if config.Database.URL == "" {
-		return fmt.Errorf("必须通过 database.url 或 POSTGRES_* 配置 PostgreSQL")
+	if config.Database.Host == "" {
+		return fmt.Errorf("必须配置 database.host 或 POSTGRES_HOST")
 	}
-	databaseURL, err := url.Parse(config.Database.URL)
-	if err != nil || databaseURL.Host == "" || databaseURL.Scheme != "postgres" && databaseURL.Scheme != "postgresql" {
-		return fmt.Errorf("PostgreSQL 连接地址无效")
+	if config.Database.Port < 1 || config.Database.Port > 65535 {
+		return fmt.Errorf("database.port 必须是 1 到 65535 之间的整数")
 	}
-	if strings.Trim(databaseURL.Path, "/") == "" {
-		return fmt.Errorf("必须显式指定 PostgreSQL 数据库名称")
+	if config.Database.User == "" {
+		return fmt.Errorf("必须配置 database.user 或 POSTGRES_USER")
+	}
+	if config.Database.Password == "" {
+		return fmt.Errorf("必须配置 database.password 或 POSTGRES_PASSWORD")
+	}
+	if config.Database.Name == "" {
+		return fmt.Errorf("必须配置 database.name 或 POSTGRES_DB")
+	}
+	switch config.Database.SSLMode {
+	case "disable", "allow", "prefer", "require", "verify-ca", "verify-full":
+	default:
+		return fmt.Errorf("database.sslMode 必须是 disable、allow、prefer、require、verify-ca 或 verify-full")
 	}
 	if config.Database.MaxOpenConnections < 0 || config.Database.MaxIdleConnections < 0 {
 		return fmt.Errorf("PostgreSQL 连接数不能为负数")

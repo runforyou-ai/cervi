@@ -18,7 +18,12 @@ server:
   host: 127.0.0.1
   port: 18080
 database:
-  url: postgres://file
+  host: file.internal
+  port: 5432
+  user: file
+  password: file-secret
+  name: file
+  sslMode: disable
   migrationTimeout: 15m
 nats:
   url: nats://file:4222
@@ -49,7 +54,7 @@ storage:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Database.URL != "postgres://environment:secret%40value@database.internal:5433/cervi?sslmode=require" || config.Server.Port != 28080 {
+	if config.Database.Host != "database.internal" || config.Database.Port != 5433 || config.Database.User != "environment" || config.Database.Password != "secret@value" || config.Database.Name != "cervi" || config.Database.SSLMode != "require" || config.Server.Port != 28080 {
 		t.Fatalf("环境变量未覆盖文件配置: %#v", config)
 	}
 	if config.HTTPS.Mode != "external" || config.HTTPS.TLSDataDirectory != "/var/lib/cervi/tls" || config.HTTPS.ACMEEmail != "admin@example.com" {
@@ -75,13 +80,13 @@ func TestLoadRejectsUnknownFileField(t *testing.T) {
 	}
 }
 
-// TestValidationRequiresDatabaseName 验证连接地址必须指定数据库名称。
+// TestValidationRequiresDatabaseName 验证必须指定数据库名称。
 func TestValidationRequiresDatabaseName(t *testing.T) {
-	config := defaultConfig()
-	config.Database.URL = "postgres://cervi@localhost"
+	config := validTestConfig()
+	config.Database.Name = ""
 	config.normalize()
 	if err := config.validate(); err == nil {
-		t.Fatal("接受了未指定数据库名称的连接地址")
+		t.Fatal("接受了未指定数据库名称的配置")
 	}
 }
 
@@ -98,8 +103,7 @@ func TestValidationRejectsInvalidNATSConfig(t *testing.T) {
 		{Namespace: "cervi"},
 		{URL: "nats://127.0.0.1:4222", Namespace: "INVALID"},
 	} {
-		config := defaultConfig()
-		config.Database.URL = "postgres://cervi@localhost/cervi"
+		config := validTestConfig()
 		config.NATS = nats
 		config.normalize()
 		if err := config.validate(); err == nil {
@@ -126,9 +130,8 @@ func clearServerEnvironment(t *testing.T) {
 
 // TestValidationRejectsAutoHTTPSPortConflict 验证自动 HTTPS 端口不会与服务监听器冲突。
 func TestValidationRejectsAutoHTTPSPortConflict(t *testing.T) {
-	config := defaultConfig()
+	config := validTestConfig()
 	config.Server.Port = 443
-	config.Database.URL = "postgres://cervi@localhost/cervi"
 	config.HTTPS.Mode = "auto"
 	config.HTTPS.TLSDataDirectory = t.TempDir()
 	config.Storage.LocalDirectory = t.TempDir()
@@ -136,4 +139,18 @@ func TestValidationRejectsAutoHTTPSPortConflict(t *testing.T) {
 	if err := config.validate(); err == nil {
 		t.Fatal("自动 HTTPS 接受了 443 服务监听端口")
 	}
+}
+
+// validTestConfig 返回满足基础校验的服务端测试配置。
+func validTestConfig() Config {
+	config := defaultConfig()
+	config.Database.Host = "127.0.0.1"
+	config.Database.Port = 5432
+	config.Database.User = "cervi"
+	config.Database.Password = "secret"
+	config.Database.Name = "cervi"
+	config.Database.SSLMode = "disable"
+	config.NATS.URL = "nats://127.0.0.1:4222"
+	config.NATS.Namespace = "cervi"
+	return config
 }

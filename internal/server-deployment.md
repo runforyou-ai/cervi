@@ -31,6 +31,12 @@ server:
   port: 8080
 
 database:
+  host: 127.0.0.1
+  port: 5432
+  user: cervi
+  password: 请替换密码
+  name: main
+  sslMode: disable
   maxOpenConnections: 25
   maxIdleConnections: 5
   connectionMaxLifetime: 30m
@@ -40,7 +46,7 @@ database:
 
 nats:
   url: nats://127.0.0.1:4222
-  namespace: cervi
+  namespace: main
 
 https:
   mode: external
@@ -49,17 +55,17 @@ storage:
   localDirectory: /var/lib/cervi/files
 ```
 
-环境变量覆盖 YAML；PostgreSQL 分项配置会合成连接地址：
+环境变量逐项覆盖对应的 YAML 字段：
 
 ```dotenv
 POSTGRES_HOST=127.0.0.1
 POSTGRES_PORT=5432
 POSTGRES_USER=cervi
 POSTGRES_PASSWORD=请替换密码
-POSTGRES_DB=cervi
-POSTGRES_SSLMODE=require
+POSTGRES_DB=main
+POSTGRES_SSLMODE=disable
 NATS_URL=nats://127.0.0.1:4222
-NATS_NAMESPACE=cervi
+NATS_NAMESPACE=main
 ```
 
 服务端依赖 PostgreSQL 和启用 JetStream 的 NATS。
@@ -171,10 +177,10 @@ $env:POSTGRES_HOST = '127.0.0.1'
 $env:POSTGRES_PORT = '5432'
 $env:POSTGRES_USER = 'cervi'
 $env:POSTGRES_PASSWORD = '请替换密码'
-$env:POSTGRES_DB = 'cervi'
-$env:POSTGRES_SSLMODE = 'require'
+$env:POSTGRES_DB = 'main'
+$env:POSTGRES_SSLMODE = 'disable'
 $env:NATS_URL = 'nats://127.0.0.1:4222'
-$env:NATS_NAMESPACE = 'cervi'
+$env:NATS_NAMESPACE = 'main'
 & 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml' -check-config
 & 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml'
 ```

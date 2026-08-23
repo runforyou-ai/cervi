@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -17,21 +18,15 @@ import (
 
 // TestSyncScheduleWithPostgreSQL 验证计划同步的时间类型和下一执行时间保留规则。
 func TestSyncScheduleWithPostgreSQL(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL is not set")
-	}
-
 	ctx := context.Background()
-	store, err := serverstorage.Open(ctx, serverconfig.DatabaseConfig{
-		URL:                   dsn,
-		MaxOpenConnections:    2,
-		MaxIdleConnections:    1,
-		ConnectionMaxLifetime: serverconfig.Duration(time.Minute),
-		ConnectionMaxIdleTime: serverconfig.Duration(time.Minute),
-		ConnectTimeout:        serverconfig.Duration(30 * time.Second),
-		MigrationTimeout:      serverconfig.Duration(time.Minute),
-	})
+	databaseConfig := testDatabaseConfig(t)
+	databaseConfig.MaxOpenConnections = 2
+	databaseConfig.MaxIdleConnections = 1
+	databaseConfig.ConnectionMaxLifetime = serverconfig.Duration(time.Minute)
+	databaseConfig.ConnectionMaxIdleTime = serverconfig.Duration(time.Minute)
+	databaseConfig.ConnectTimeout = serverconfig.Duration(30 * time.Second)
+	databaseConfig.MigrationTimeout = serverconfig.Duration(time.Minute)
+	store, err := serverstorage.Open(ctx, databaseConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,5 +93,26 @@ func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 	reenabled := readSchedule()
 	if reenabled.NextRunAt.Before(reenabledAt.Add(-time.Second)) || reenabled.NextRunAt.After(time.Now().UTC().Add(time.Second)) {
 		t.Fatalf("重新启用计划的立即执行时间 = %s", reenabled.NextRunAt)
+	}
+}
+
+// testDatabaseConfig 从测试专用的 PostgreSQL 分项环境变量读取连接配置。
+func testDatabaseConfig(t *testing.T) serverconfig.DatabaseConfig {
+	t.Helper()
+	host := os.Getenv("TEST_POSTGRES_HOST")
+	if host == "" {
+		t.Skip("TEST_POSTGRES_HOST is not set")
+	}
+	port, err := strconv.Atoi(os.Getenv("TEST_POSTGRES_PORT"))
+	if err != nil {
+		t.Fatalf("TEST_POSTGRES_PORT is invalid: %v", err)
+	}
+	return serverconfig.DatabaseConfig{
+		Host:     host,
+		Port:     port,
+		User:     os.Getenv("TEST_POSTGRES_USER"),
+		Password: os.Getenv("TEST_POSTGRES_PASSWORD"),
+		Name:     os.Getenv("TEST_POSTGRES_DB"),
+		SSLMode:  os.Getenv("TEST_POSTGRES_SSLMODE"),
 	}
 }

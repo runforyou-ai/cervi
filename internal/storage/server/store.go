@@ -7,6 +7,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/url"
+	"strconv"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/uptrace/bun"
@@ -26,7 +29,7 @@ func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, erro
 	}
 
 	sqlDB := sql.OpenDB(pgdriver.NewConnector(
-		pgdriver.WithDSN(config.URL),
+		pgdriver.WithDSN(postgresDSN(config)),
 		pgdriver.WithConnParams(map[string]any{"timezone": "UTC"}),
 	))
 	sqlDB.SetMaxOpenConns(config.MaxOpenConnections)
@@ -57,6 +60,20 @@ func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, erro
 	}
 
 	return &Store{db: db}, nil
+}
+
+// postgresDSN 将分项配置编码为 PostgreSQL 驱动连接地址。
+func postgresDSN(config serverconfig.DatabaseConfig) string {
+	databaseURL := &url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(config.User, config.Password),
+		Host:   net.JoinHostPort(config.Host, strconv.Itoa(config.Port)),
+		Path:   config.Name,
+	}
+	query := databaseURL.Query()
+	query.Set("sslmode", config.SSLMode)
+	databaseURL.RawQuery = query.Encode()
+	return databaseURL.String()
 }
 
 // Close 关闭 PostgreSQL 连接池。

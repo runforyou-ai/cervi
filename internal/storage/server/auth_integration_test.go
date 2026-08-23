@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -28,20 +29,14 @@ import (
 
 // TestServerActionsWithPostgreSQL 验证服务端核心操作。
 func TestServerActionsWithPostgreSQL(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL is not set")
-	}
-
-	store, err := Open(context.Background(), serverconfig.DatabaseConfig{
-		URL:                   dsn,
-		MaxOpenConnections:    5,
-		MaxIdleConnections:    2,
-		ConnectionMaxLifetime: serverconfig.Duration(time.Minute),
-		ConnectionMaxIdleTime: serverconfig.Duration(time.Minute),
-		ConnectTimeout:        serverconfig.Duration(30 * time.Second),
-		MigrationTimeout:      serverconfig.Duration(time.Minute),
-	})
+	databaseConfig := testDatabaseConfig(t)
+	databaseConfig.MaxOpenConnections = 5
+	databaseConfig.MaxIdleConnections = 2
+	databaseConfig.ConnectionMaxLifetime = serverconfig.Duration(time.Minute)
+	databaseConfig.ConnectionMaxIdleTime = serverconfig.Duration(time.Minute)
+	databaseConfig.ConnectTimeout = serverconfig.Duration(30 * time.Second)
+	databaseConfig.MigrationTimeout = serverconfig.Duration(time.Minute)
+	store, err := Open(context.Background(), databaseConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -763,5 +758,26 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if loadedS3Setting != disabledS3Setting {
 		t.Fatalf("disabled S3 setting = %#v, want preserved setting %#v", loadedS3Setting, disabledS3Setting)
+	}
+}
+
+// testDatabaseConfig 从测试专用的 PostgreSQL 分项环境变量读取连接配置。
+func testDatabaseConfig(t *testing.T) serverconfig.DatabaseConfig {
+	t.Helper()
+	host := os.Getenv("TEST_POSTGRES_HOST")
+	if host == "" {
+		t.Skip("TEST_POSTGRES_HOST is not set")
+	}
+	port, err := strconv.Atoi(os.Getenv("TEST_POSTGRES_PORT"))
+	if err != nil {
+		t.Fatalf("TEST_POSTGRES_PORT is invalid: %v", err)
+	}
+	return serverconfig.DatabaseConfig{
+		Host:     host,
+		Port:     port,
+		User:     os.Getenv("TEST_POSTGRES_USER"),
+		Password: os.Getenv("TEST_POSTGRES_PASSWORD"),
+		Name:     os.Getenv("TEST_POSTGRES_DB"),
+		SSLMode:  os.Getenv("TEST_POSTGRES_SSLMODE"),
 	}
 }
