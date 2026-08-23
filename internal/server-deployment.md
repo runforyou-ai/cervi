@@ -15,12 +15,6 @@
 2. `-config` 指定的 YAML；
 3. 环境变量。
 
-本地默认由 Task 加载 `.env`，需要叠加 YAML 时运行：
-
-```text
-wails3 task run:server CONFIG=path/to/server.yaml
-```
-
 部署前使用以下命令校验配置：
 
 ```text

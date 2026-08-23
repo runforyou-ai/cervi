@@ -225,16 +225,12 @@ tasks:
 
   run:server:
     summary: Builds and runs a development server (DEV=true)
-    desc: |
-      Usage: task run:server [CONFIG=path/to/server.yaml]
     deps:
       - task: build:server
         vars:
           DEV: "true"
     cmds:
-      - '"./{{.BIN_DIR}}/{{.APP_NAME}}-server{{exeExt}}" {{if .CONFIG}}-config "{{.CONFIG}}"{{end}}'
-    vars:
-      CONFIG: "{{.CONFIG}}"
+      - '"./{{.BIN_DIR}}/{{.APP_NAME}}-server{{exeExt}}"'
 
   build:docker:
     summary: Builds a Docker image for server mode deployment
