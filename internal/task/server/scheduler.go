@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
 	"github.com/uptrace/bun"
 )
 
@@ -41,7 +40,7 @@ func (r *Runtime) syncSchedules(ctx context.Context) error {
 }
 
 // syncSchedule 同步一个代码定义的定时计划。
-func (r *Runtime) syncSchedule(ctx context.Context, definition taskruntime.ScheduleDefinition) error {
+func (r *Runtime) syncSchedule(ctx context.Context, definition ScheduleDefinition) error {
 	definition.Key = strings.TrimSpace(definition.Key)
 	definition.ActionName = strings.TrimSpace(definition.ActionName)
 	definition.Timezone = strings.TrimSpace(definition.Timezone)
@@ -51,8 +50,8 @@ func (r *Runtime) syncSchedule(ctx context.Context, definition taskruntime.Sched
 	if _, exists := r.registry.lookup(definition.ActionName); !exists {
 		return fmt.Errorf("task schedule %q references unregistered action %q", definition.Key, definition.ActionName)
 	}
-	options, err := normalizeEnqueueOptions(taskruntime.EnqueueOptions{
-		Queue: definition.Queue, MaxAttempts: definition.MaxAttempts, TriggerType: taskruntime.TriggerSchedule,
+	options, err := normalizeEnqueueOptions(EnqueueOptions{
+		Queue: definition.Queue, MaxAttempts: definition.MaxAttempts, TriggerType: TriggerSchedule,
 	})
 	if err != nil {
 		return fmt.Errorf("invalid task schedule %q: %w", definition.Key, err)
@@ -205,9 +204,9 @@ func (r *Runtime) triggerOneSchedule(ctx context.Context) (bool, error) {
 			return fmt.Errorf("parse stored task schedule %q: %w", record.ScheduleKey, err)
 		}
 		dueAt := record.NextRunAt.UTC()
-		options := taskruntime.EnqueueOptions{
+		options := EnqueueOptions{
 			Queue: record.QueueName, MaxAttempts: record.MaxAttempts,
-			TriggerType:    taskruntime.TriggerSchedule,
+			TriggerType:    TriggerSchedule,
 			IdempotencyKey: record.ScheduleKey + ":" + dueAt.Format(time.RFC3339Nano),
 		}
 		if _, err := enqueueIn(ctx, tx, record.ActionName, record.Payload, options, record.ScheduleKey); err != nil {

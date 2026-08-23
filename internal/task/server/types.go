@@ -1,0 +1,41 @@
+//go:build server
+
+package server
+
+import (
+	"context"
+	"time"
+)
+
+const (
+	TriggerBusiness = "business"
+	TriggerManual   = "manual"
+	TriggerSchedule = "schedule"
+)
+
+// EnqueueOptions 定义一次服务端异步 Action 投递参数。
+type EnqueueOptions struct {
+	Queue          string
+	MaxAttempts    int
+	IdempotencyKey string
+	TriggerType    string
+	AvailableAt    time.Time
+}
+
+// Enqueuer 将一个 Action 输入提交给服务端任务运行时。
+type Enqueuer interface {
+	Enqueue(ctx context.Context, actionName string, payload any, options EnqueueOptions) (string, error)
+}
+
+// ScheduleDefinition 定义一个由代码管理的服务端定时 Action。
+type ScheduleDefinition struct {
+	Key              string
+	ActionName       string
+	Queue            string
+	Payload          any
+	CronExpression   string
+	Timezone         string
+	Enabled          bool
+	MaxAttempts      int
+	StartImmediately bool
+}

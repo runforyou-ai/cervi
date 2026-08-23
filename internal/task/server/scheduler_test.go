@@ -13,7 +13,6 @@ import (
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
 )
 
 // TestSyncScheduleWithPostgreSQL 验证计划同步的时间类型和下一执行时间保留规则。
@@ -53,7 +52,7 @@ func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 	if err := runtime.Registry().Register(actionName, func(context.Context, json.RawMessage) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	definition := taskruntime.ScheduleDefinition{
+	definition := ScheduleDefinition{
 		Key: scheduleKey, ActionName: actionName, Queue: "maintenance", Payload: struct{}{},
 		CronExpression: "@hourly", Timezone: "UTC", Enabled: true, MaxAttempts: 3, StartImmediately: true,
 	}

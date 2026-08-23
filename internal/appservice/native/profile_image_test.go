@@ -1,6 +1,6 @@
 //go:build !server
 
-package nativefile
+package native
 
 import (
 	"encoding/base64"

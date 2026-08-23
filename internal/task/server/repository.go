@@ -14,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
 	"github.com/uptrace/bun"
 )
 
@@ -48,7 +47,7 @@ func newRepository(db *bun.DB) *repository {
 }
 
 // Enqueue 在同一事务内创建任务运行记录和发件箱消息。
-func (r *repository) Enqueue(ctx context.Context, actionName string, payload any, options taskruntime.EnqueueOptions) (string, error) {
+func (r *repository) Enqueue(ctx context.Context, actionName string, payload any, options EnqueueOptions) (string, error) {
 	encoded, err := encodePayload(payload)
 	if err != nil {
 		return "", err
@@ -70,7 +69,7 @@ func (r *repository) Enqueue(ctx context.Context, actionName string, payload any
 }
 
 // enqueueIn 在已有事务内创建任务运行记录和发件箱消息。
-func enqueueIn(ctx context.Context, db bun.IDB, actionName string, payload json.RawMessage, options taskruntime.EnqueueOptions, scheduleKey string) (string, error) {
+func enqueueIn(ctx context.Context, db bun.IDB, actionName string, payload json.RawMessage, options EnqueueOptions, scheduleKey string) (string, error) {
 	now := time.Now().UTC()
 	availableAt := options.AvailableAt.UTC()
 	if options.AvailableAt.IsZero() {
@@ -390,7 +389,7 @@ func (r *repository) failExhaustedRun(ctx context.Context, runID string) (bool, 
 }
 
 // normalizeEnqueueOptions 补齐并校验任务投递参数。
-func normalizeEnqueueOptions(options taskruntime.EnqueueOptions) (taskruntime.EnqueueOptions, error) {
+func normalizeEnqueueOptions(options EnqueueOptions) (EnqueueOptions, error) {
 	options.Queue = strings.TrimSpace(options.Queue)
 	if options.Queue == "" {
 		options.Queue = defaultQueue
@@ -406,10 +405,10 @@ func normalizeEnqueueOptions(options taskruntime.EnqueueOptions) (taskruntime.En
 	}
 	options.TriggerType = strings.TrimSpace(options.TriggerType)
 	if options.TriggerType == "" {
-		options.TriggerType = taskruntime.TriggerBusiness
+		options.TriggerType = TriggerBusiness
 	}
 	switch options.TriggerType {
-	case taskruntime.TriggerBusiness, taskruntime.TriggerManual, taskruntime.TriggerSchedule:
+	case TriggerBusiness, TriggerManual, TriggerSchedule:
 	default:
 		return options, fmt.Errorf("invalid task trigger type %q", options.TriggerType)
 	}

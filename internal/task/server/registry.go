@@ -7,21 +7,21 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
+	"github.com/runforyou-ai/cervi/internal/task"
 )
 
 // Registry 保存服务端可异步执行的 Action。
 type Registry struct {
-	handlers map[string]taskruntime.Handler
+	handlers map[string]task.Handler
 }
 
 // NewRegistry 创建 Action 注册表。
 func NewRegistry() *Registry {
-	return &Registry{handlers: make(map[string]taskruntime.Handler)}
+	return &Registry{handlers: make(map[string]task.Handler)}
 }
 
 // Register 注册一个原始 JSON Action 处理器。
-func (r *Registry) Register(name string, handler taskruntime.Handler) error {
+func (r *Registry) Register(name string, handler task.Handler) error {
 	if !actionNamePattern.MatchString(name) {
 		return fmt.Errorf("invalid task action name %q", name)
 	}
@@ -36,7 +36,7 @@ func (r *Registry) Register(name string, handler taskruntime.Handler) error {
 }
 
 // lookup 查找已注册的 Action 处理器。
-func (r *Registry) lookup(name string) (taskruntime.Handler, bool) {
+func (r *Registry) lookup(name string) (task.Handler, bool) {
 	handler, exists := r.handlers[name]
 	return handler, exists
 }
@@ -46,7 +46,7 @@ func RegisterJSON[T any](registry *Registry, name string, execute func(context.C
 	return registry.Register(name, func(ctx context.Context, payload json.RawMessage) error {
 		var input T
 		if err := json.Unmarshal(payload, &input); err != nil {
-			return taskruntime.Permanent(fmt.Errorf("decode %s payload: %w", name, err))
+			return task.Permanent(fmt.Errorf("decode %s payload: %w", name, err))
 		}
 		return execute(ctx, input)
 	})

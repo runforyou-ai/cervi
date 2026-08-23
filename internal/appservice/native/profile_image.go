@@ -1,7 +1,7 @@
 //go:build !server
 
-// Package nativefile 提供原生端文件选择和读取能力。
-package nativefile
+// Package native 提供原生端应用服务的平台能力实现。
+package native
 
 import (
 	"context"

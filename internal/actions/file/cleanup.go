@@ -12,7 +12,8 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/taskruntime"
+	"github.com/runforyou-ai/cervi/internal/task"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -35,11 +36,11 @@ type DeleteExpiredInput struct {
 // ScanExpiredAction 把过期临时文件逐个提交给异步删除 Action。
 type ScanExpiredAction struct {
 	db       *bun.DB
-	enqueuer taskruntime.Enqueuer
+	enqueuer servertask.Enqueuer
 }
 
 // NewScanExpiredAction 创建过期文件扫描 Action。
-func NewScanExpiredAction(db *bun.DB, enqueuer taskruntime.Enqueuer) *ScanExpiredAction {
+func NewScanExpiredAction(db *bun.DB, enqueuer servertask.Enqueuer) *ScanExpiredAction {
 	return &ScanExpiredAction{db: db, enqueuer: enqueuer}
 }
 
@@ -66,10 +67,10 @@ func (a *ScanExpiredAction) Execute(ctx context.Context, _ ScanExpiredInput) err
 			return fmt.Errorf("scan expired files: %w", err)
 		}
 		for _, record := range records {
-			if _, err := a.enqueuer.Enqueue(ctx, DeleteExpiredActionName, DeleteExpiredInput{FileID: record.ID}, taskruntime.EnqueueOptions{
+			if _, err := a.enqueuer.Enqueue(ctx, DeleteExpiredActionName, DeleteExpiredInput{FileID: record.ID}, servertask.EnqueueOptions{
 				Queue: "files", MaxAttempts: 10,
 				IdempotencyKey: "file:" + record.ID,
-				TriggerType:    taskruntime.TriggerBusiness,
+				TriggerType:    servertask.TriggerBusiness,
 			}); err != nil {
 				return fmt.Errorf("enqueue expired file %s: %w", record.ID, err)
 			}
@@ -101,7 +102,7 @@ func NewDeleteExpiredAction(db *bun.DB, deleter ContentDeleter) *DeleteExpiredAc
 // Execute 重新校验文件状态后删除内容和元数据。
 func (a *DeleteExpiredAction) Execute(ctx context.Context, input DeleteExpiredInput) error {
 	if input.FileID == "" {
-		return taskruntime.Permanent(errors.New("file id is required"))
+		return task.Permanent(errors.New("file id is required"))
 	}
 	var record servermodels.File
 	err := a.db.NewRaw(`

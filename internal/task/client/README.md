@@ -18,25 +18,25 @@
 
 ## 代码边界
 
-后续实现放在 `internal/clientwork`，不放入 `internal/taskruntime/server`，也不复用服务端 Runtime、仓储或调度模型。
+后续实现放在 `internal/task/client`，不放入 `internal/task/server`，也不复用服务端 Runtime、仓储或调度模型。
 
 ```text
 internal/
-├── clientwork/
-│   ├── runtime.go       # 单进程执行器与 Wake 入口
-│   ├── registry.go      # 客户端 Action 注册
-│   ├── repository.go    # SQLite 状态转换与崩溃恢复
-│   ├── retry.go         # 客户端错误分类与退避
-│   └── options.go       # 分组、去重和执行选项
-├── taskruntime/
+├── task/
 │   ├── task.go          # 平台共享的最小 Action 语义
+│   ├── client/
+│   │   ├── runtime.go   # 单进程执行器与 Wake 入口
+│   │   ├── registry.go  # 客户端 Action 注册
+│   │   ├── repository.go  # SQLite 状态转换与崩溃恢复
+│   │   ├── retry.go     # 客户端错误分类与退避
+│   │   └── options.go   # 分组、去重和执行选项
 │   └── server/          # 服务端 PostgreSQL、NATS 与 Cron 实现
 └── storage/
     ├── desktop/         # 桌面端模型与 SQLite 迁移
     └── mobile/          # 移动端模型与 SQLite 迁移
 ```
 
-`taskruntime` 根包最终只保留确实跨平台的 `Handler`、类型化注册和永久错误等语义。队列、触发来源、Cron 定义和服务端投递选项属于 `taskruntime/server`。客户端定义自己的入队选项，不与服务端结构保持形式上的一致。
+`task` 根包只保留确实跨平台的 `Handler` 和永久错误等语义。队列、触发来源、Cron 定义和服务端投递选项属于 `task/server`。客户端定义自己的注册和入队选项，不与服务端结构保持形式上的一致。
 
 客户端与服务端都采用 Action 模式，但分别注册可在本平台执行的 Action。允许名称或输入契约相同，不共享依赖平台存储的 Handler 实例。
 
