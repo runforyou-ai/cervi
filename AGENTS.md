@@ -23,7 +23,7 @@ wails3 task migrate:rollback VERSION=20260818032701
 wails3 task migrate:reset
 wails3 task make:migration NAME=create_example_table
 
-# 先启动服务端，再启动桌面端及 MCP 服务
+# 先启动服务端，再启动桌面端；桌面 MCP 随桌面端按 Wails3 默认配置启动
 wails3 task run:server
 wails3 task dev
 
@@ -41,7 +41,7 @@ wails3 generate bindings -clean=true -ts -i
 ```
 
 前端要求 Node.js 24.0.0 或更高版本，项目构建使用 Wails v3 和 Task。
-Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间。启动桌面端后可通过 Wails3 MCP 获取桌面端页面信息。
+Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间。桌面 MCP 使用 Wails3 默认配置，启动桌面端后可通过 MCP 获取页面信息。
 
 真机在连接页手动输入可访问的企业服务端地址。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
 
