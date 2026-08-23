@@ -5,7 +5,7 @@ package storage
 import (
 	"context"
 
-	"github.com/runforyou-ai/cervi/internal/serverconfig"
+	"github.com/runforyou-ai/cervi/internal/config/server"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 )
 

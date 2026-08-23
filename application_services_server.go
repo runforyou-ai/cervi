@@ -10,9 +10,8 @@ import (
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	"github.com/runforyou-ai/cervi/internal/health"
+	"github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
-	"github.com/runforyou-ai/cervi/internal/serverconfig"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/taskruntime"
@@ -55,8 +54,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
 
 	return []application.Service{
-		application.NewServiceWithOptions(health.NewLiveness(version), application.ServiceOptions{Route: "/healthz"}),
-		application.NewServiceWithOptions(health.NewReadiness(appStorage.DB(), version), application.ServiceOptions{Route: "/readyz"}),
+		application.NewServiceWithOptions(api.NewLiveness(version), application.ServiceOptions{Route: "/healthz"}),
+		application.NewServiceWithOptions(api.NewReadiness(appStorage.DB(), version), application.ServiceOptions{Route: "/readyz"}),
 		application.NewService(&httpsLifecycle{service: httpsEntry}),
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,

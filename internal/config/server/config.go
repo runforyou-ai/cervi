@@ -120,8 +120,8 @@ func defaultConfig() Config {
 			Port: 8080,
 		},
 		Database: DatabaseConfig{
-			MaxOpenConnections:    25,
-			MaxIdleConnections:    5,
+			MaxOpenConnections:    8,
+			MaxIdleConnections:    2,
 			ConnectionMaxLifetime: Duration(30 * time.Minute),
 			ConnectionMaxIdleTime: Duration(5 * time.Minute),
 			ConnectTimeout:        Duration(time.Minute),
@@ -154,21 +154,6 @@ func applyEnvironment(config *Config) error {
 
 	var err error
 	if config.Server.Port, err = intEnvironment("WAILS_SERVER_PORT", config.Server.Port); err != nil {
-		return err
-	}
-	if config.Database.MaxOpenConnections, err = intEnvironment("POSTGRES_MAX_OPEN_CONNS", config.Database.MaxOpenConnections); err != nil {
-		return err
-	}
-	if config.Database.MaxIdleConnections, err = intEnvironment("POSTGRES_MAX_IDLE_CONNS", config.Database.MaxIdleConnections); err != nil {
-		return err
-	}
-	if config.Database.ConnectionMaxLifetime, err = durationEnvironment("POSTGRES_CONN_MAX_LIFETIME", config.Database.ConnectionMaxLifetime); err != nil {
-		return err
-	}
-	if config.Database.ConnectionMaxIdleTime, err = durationEnvironment("POSTGRES_CONN_MAX_IDLE_TIME", config.Database.ConnectionMaxIdleTime); err != nil {
-		return err
-	}
-	if config.Database.ConnectTimeout, err = durationEnvironment("POSTGRES_STARTUP_TIMEOUT", config.Database.ConnectTimeout); err != nil {
 		return err
 	}
 	if config.Database.MigrationTimeout, err = durationEnvironment("POSTGRES_MIGRATION_TIMEOUT", config.Database.MigrationTimeout); err != nil {

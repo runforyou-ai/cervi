@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/serverconfig"
+	"github.com/runforyou-ai/cervi/internal/config/server"
 	"golang.org/x/crypto/acme/autocert"
 )
 

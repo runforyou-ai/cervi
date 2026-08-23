@@ -1,5 +1,6 @@
 //go:build server
 
+// 本文件验证企业服务端配置的加载、覆盖与生产约束。
 package serverconfig
 
 import (
@@ -61,8 +62,7 @@ func clearServerEnvironment(t *testing.T) {
 	t.Helper()
 	for _, name := range []string{
 		"CERVI_ENV", "WAILS_SERVER_HOST", "WAILS_SERVER_PORT", "DATABASE_URL",
-		"POSTGRES_MAX_OPEN_CONNS", "POSTGRES_MAX_IDLE_CONNS", "POSTGRES_CONN_MAX_LIFETIME",
-		"POSTGRES_CONN_MAX_IDLE_TIME", "POSTGRES_STARTUP_TIMEOUT", "POSTGRES_MIGRATION_TIMEOUT",
+		"POSTGRES_MIGRATION_TIMEOUT",
 		"CERVI_HTTPS_MODE", "CERVI_TLS_DATA_DIR",
 		"CERVI_ACME_EMAIL", "FILE_STORAGE_PATH",
 	} {

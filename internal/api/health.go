@@ -1,7 +1,6 @@
 //go:build server
 
-// Package health 提供企业服务端存活和就绪探针。
-package health
+package api
 
 import (
 	"context"

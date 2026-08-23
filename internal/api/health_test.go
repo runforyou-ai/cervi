@@ -1,6 +1,6 @@
 //go:build server
 
-package health
+package api
 
 import (
 	"net/http"
