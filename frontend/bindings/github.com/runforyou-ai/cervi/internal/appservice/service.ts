@@ -22,7 +22,7 @@ export function ActivateWebsiteChannel(meta: $models.RequestMeta, channelID: str
 }
 
 /**
- * AddTeamMembers 将企业成员批量加入团队。
+ * AddTeamMembers 将企业身份批量加入团队。
  */
 export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
     return $Call.ByID(1201335915, meta, teamID, input);
@@ -274,9 +274,9 @@ export function ListTeamMemberCandidates(meta: $models.RequestMeta, teamID: stri
 }
 
 /**
- * ListTeamMembers 返回团队成员共同字段。
+ * ListTeamMembers 返回团队成员列表。
  */
-export function ListTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamDirectoryMemberInput): $CancellablePromise<$models.TeamDirectoryMemberList> {
+export function ListTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberListInput): $CancellablePromise<$models.TeamMemberList> {
     return $Call.ByID(3371434770, meta, teamID, input);
 }
 
@@ -358,7 +358,7 @@ export function ReactivateUser(meta: $models.RequestMeta, userID: string): $Canc
 }
 
 /**
- * RemoveTeamMembers 将企业成员批量移出团队。
+ * RemoveTeamMembers 将企业身份批量移出团队。
  */
 export function RemoveTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
     return $Call.ByID(3538693274, meta, teamID, input);

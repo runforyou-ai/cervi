@@ -351,19 +351,19 @@ func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, t
 	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID), nil, nil, nil)
 }
 
-// ListTeamMembers 返回远程团队成员共同字段。
-func (b *Backend) ListTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamDirectoryMemberInput) (appservice.TeamDirectoryMemberList, error) {
+// ListTeamMembers 返回远程团队成员列表。
+func (b *Backend) ListTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberListInput) (appservice.TeamMemberList, error) {
 	query := url.Values{}
 	setQuery(query, "query", input.Query)
 	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
-	var output appservice.TeamDirectoryMemberList
+	var output appservice.TeamMemberList
 	err := b.do(ctx, meta, http.MethodGet, "/teams/"+url.PathEscape(teamID)+"/members", query, nil, &output)
 	return output, err
 }
 
-// ListTeamMemberCandidates 返回远程团队可添加的企业成员。
+// ListTeamMemberCandidates 返回远程团队可添加的企业身份。
 func (b *Backend) ListTeamMemberCandidates(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberCandidateInput) (appservice.TeamMemberCandidateList, error) {
 	query := url.Values{}
 	setQuery(query, "query", input.Query)
@@ -377,14 +377,14 @@ func (b *Backend) ListTeamMemberCandidates(ctx context.Context, meta appservice.
 	return output, err
 }
 
-// AddTeamMembers 将远程企业成员批量加入团队。
+// AddTeamMembers 将远程企业身份批量加入团队。
 func (b *Backend) AddTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
 	var output appservice.Team
 	err := b.do(ctx, meta, http.MethodPost, "/teams/"+url.PathEscape(teamID)+"/members", nil, input, &output)
 	return output, err
 }
 
-// RemoveTeamMembers 将远程企业成员批量移出团队。
+// RemoveTeamMembers 将远程企业身份批量移出团队。
 func (b *Backend) RemoveTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
 	var output appservice.Team
 	err := b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID)+"/members", nil, input, &output)

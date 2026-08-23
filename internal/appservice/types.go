@@ -662,27 +662,27 @@ type TeamMemberCandidateList struct {
 	Page    PageInfo              `json:"page"`
 }
 
-// TeamDirectoryMemberInput 定义团队成员目录查询条件。
-type TeamDirectoryMemberInput struct {
+// TeamMemberListInput 定义团队成员列表查询条件。
+type TeamMemberListInput struct {
 	Query    string      `json:"query"`
 	Status   *UserStatus `json:"status,omitempty"`
 	Page     int         `json:"page"`
 	PageSize int         `json:"pageSize"`
 }
 
-// TeamDirectoryMember 定义团队视图中的共同成员字段。
-type TeamDirectoryMember struct {
-	ID          string                   `json:"id"`
-	Type        OrganizationIdentityType `json:"type"`
-	DisplayName string                   `json:"displayName"`
-	Status      UserStatus               `json:"status"`
-	JoinedAt    time.Time                `json:"joinedAt"`
+// TeamMember 定义团队成员信息。
+type TeamMember struct {
+	IdentityID   string                   `json:"identityId"`
+	IdentityType OrganizationIdentityType `json:"identityType"`
+	DisplayName  string                   `json:"displayName"`
+	Status       UserStatus               `json:"status"`
+	JoinedAt     time.Time                `json:"joinedAt"`
 }
 
-// TeamDirectoryMemberList 定义团队成员分页结果。
-type TeamDirectoryMemberList struct {
-	Members []TeamDirectoryMember `json:"members"`
-	Page    PageInfo              `json:"page"`
+// TeamMemberList 定义团队成员分页结果。
+type TeamMemberList struct {
+	Members []TeamMember `json:"members"`
+	Page    PageInfo     `json:"page"`
 }
 
 // TeamMemberIdentityInput 定义要变更的团队成员身份。

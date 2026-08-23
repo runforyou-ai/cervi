@@ -437,7 +437,7 @@ func (s *Service) deleteTeam(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteTeam(c.Request.Context(), requestMeta(c), c.Param("teamID")))
 }
 
-// listTeamMembers 返回团队成员共同字段。
+// listTeamMembers 返回团队成员列表。
 func (s *Service) listTeamMembers(c *gin.Context) {
 	page, ok := positiveQueryInteger(c, "page", 1)
 	if !ok {
@@ -447,7 +447,7 @@ func (s *Service) listTeamMembers(c *gin.Context) {
 	if !ok {
 		return
 	}
-	list, err := s.application.ListTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), appservice.TeamDirectoryMemberInput{
+	list, err := s.application.ListTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), appservice.TeamMemberListInput{
 		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Page: page, PageSize: pageSize,
 	})
 	writeResult(c, http.StatusOK, list, err)
@@ -467,7 +467,7 @@ func (s *Service) listTeamMemberCandidates(c *gin.Context) {
 	writeResult(c, http.StatusOK, members, err)
 }
 
-// addTeamMembers 将企业成员批量加入团队。
+// addTeamMembers 将企业身份批量加入团队。
 func (s *Service) addTeamMembers(c *gin.Context) {
 	var input appservice.TeamMemberInput
 	if !bindJSON(c, &input) {
@@ -477,7 +477,7 @@ func (s *Service) addTeamMembers(c *gin.Context) {
 	writeResult(c, http.StatusOK, team, err)
 }
 
-// removeTeamMembers 将企业成员批量移出团队。
+// removeTeamMembers 将企业身份批量移出团队。
 func (s *Service) removeTeamMembers(c *gin.Context) {
 	var input appservice.TeamMemberInput
 	if !bindJSON(c, &input) {

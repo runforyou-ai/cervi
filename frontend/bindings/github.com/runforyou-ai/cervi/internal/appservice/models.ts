@@ -814,35 +814,6 @@ export interface Team {
 }
 
 /**
- * TeamDirectoryMember 定义团队视图中的共同成员字段。
- */
-export interface TeamDirectoryMember {
-    "id": string;
-    "type": OrganizationIdentityType;
-    "displayName": string;
-    "status": UserStatus;
-    "joinedAt": string;
-}
-
-/**
- * TeamDirectoryMemberInput 定义团队成员目录查询条件。
- */
-export interface TeamDirectoryMemberInput {
-    "query": string;
-    "status"?: UserStatus | null;
-    "page": number;
-    "pageSize": number;
-}
-
-/**
- * TeamDirectoryMemberList 定义团队成员分页结果。
- */
-export interface TeamDirectoryMemberList {
-    "members": TeamDirectoryMember[] | null;
-    "page": PageInfo;
-}
-
-/**
  * TeamInput 定义团队可编辑字段。
  */
 export interface TeamInput {
@@ -865,6 +836,17 @@ export interface TeamListInput {
     "query": string;
     "page": number;
     "pageSize": number;
+}
+
+/**
+ * TeamMember 定义团队成员信息。
+ */
+export interface TeamMember {
+    "identityId": string;
+    "identityType": OrganizationIdentityType;
+    "displayName": string;
+    "status": UserStatus;
+    "joinedAt": string;
 }
 
 /**
@@ -907,6 +889,24 @@ export interface TeamMemberIdentityInput {
  */
 export interface TeamMemberInput {
     "members": TeamMemberIdentityInput[] | null;
+}
+
+/**
+ * TeamMemberList 定义团队成员分页结果。
+ */
+export interface TeamMemberList {
+    "members": TeamMember[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * TeamMemberListInput 定义团队成员列表查询条件。
+ */
+export interface TeamMemberListInput {
+    "query": string;
+    "status"?: UserStatus | null;
+    "page": number;
+    "pageSize": number;
 }
 
 /**

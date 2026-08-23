@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// AddMembersAction 将企业成员批量加入团队。
+// AddMembersAction 将企业身份批量加入团队。
 type AddMembersAction struct{ db *bun.DB }
 
 // NewAddMembersAction 创建团队成员添加操作。
@@ -30,10 +30,10 @@ func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		uniqueIDs := make(map[string]domain.OrganizationIdentityType, len(members))
 		for _, member := range members {
-			if (member.Type != domain.OrganizationIdentityTypeUser && member.Type != domain.OrganizationIdentityTypeAgent) || !common.ValidUUID(member.ID) {
+			if (member.IdentityType != domain.OrganizationIdentityTypeUser && member.IdentityType != domain.OrganizationIdentityTypeAgent) || !common.ValidUUID(member.IdentityID) {
 				return ErrMemberInvalid
 			}
-			uniqueIDs[member.ID] = member.Type
+			uniqueIDs[member.IdentityID] = member.IdentityType
 		}
 		if len(uniqueIDs) == 0 {
 			return ErrMemberInvalid

@@ -58,7 +58,7 @@ import {
   type PageInfo,
   type RoleData,
   type Team,
-  type TeamDirectoryMember,
+  type TeamMember,
   type TeamSummary,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
@@ -525,7 +525,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [contacts, setContacts] = useState<ContactSummary[]>([])
   const [users, setUsers] = useState<UserData[]>([])
   const [agents, setAgents] = useState<AgentData[]>([])
-  const [teamMembers, setTeamMembers] = useState<TeamDirectoryMember[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [roles, setRoles] = useState<RoleData[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [page, setPage] = useState<PageInfo>({ number: 1, size: 50, total: 0 })
@@ -546,11 +546,10 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     useState<AgentData | null>(null)
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
   const [removingTeamMembers, setRemovingTeamMembers] = useState<
-    TeamDirectoryMember[]
+    TeamMember[]
   >([])
-  const [selectedTeamMemberIDs, setSelectedTeamMemberIDs] = useState<
-    Set<string>
-  >(new Set())
+  const [selectedTeamMemberIdentityIDs, setSelectedTeamMemberIdentityIDs] =
+    useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const detailTitleRef = useRef<HTMLHeadingElement>(null)
   const catalogRequestID = useRef(0)
@@ -606,7 +605,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
 
   useEffect(() => setSearch(query), [query])
   useEffect(() => {
-    setSelectedTeamMemberIDs(new Set())
+    setSelectedTeamMemberIdentityIDs(new Set())
   }, [currentPage, query, roleId, status, teamId])
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -932,7 +931,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     }
   }
 
-  /** 删除当前团队并返回企业成员目录。 */
+  /** 删除当前团队并刷新团队列表。 */
   async function removeCurrentTeam() {
     if (!deletingTeam) return
     const deletingTeamID = deletingTeam.id
@@ -956,15 +955,15 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     }
   }
 
-  /** 将选中的企业成员批量移出当前团队。 */
+  /** 将选中的团队成员批量移出当前团队。 */
   async function removeMembersFromCurrentTeam() {
     if (!selectedTeam || removingTeamMembers.length === 0) return
     setDeleting(true)
     try {
       const saved = await removeTeamMembers(selectedTeam.id, {
         members: removingTeamMembers.map((member) => ({
-          identityType: member.type,
-          identityId: member.id,
+          identityType: member.identityType,
+          identityId: member.identityId,
         })),
       })
       setTeams((current) =>
@@ -979,7 +978,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         ),
       )
       setRemovingTeamMembers([])
-      setSelectedTeamMemberIDs(new Set())
+      setSelectedTeamMemberIdentityIDs(new Set())
       setRefreshVersion((current) => current + 1)
     } catch (error) {
       if (recoverSession(error, navigate)) return
@@ -1001,7 +1000,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   )
   const allVisibleTeamMembersSelected =
     teamMembers.length > 0 &&
-    teamMembers.every((member) => selectedTeamMemberIDs.has(member.id))
+    teamMembers.every((member) =>
+      selectedTeamMemberIdentityIDs.has(member.identityId),
+    )
   const currentListEmpty =
     scope === "employees"
       ? users.length === 0
@@ -1015,19 +1016,21 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
 
   /** 切换当前页所有团队成员的选中状态。 */
   function toggleAllVisibleTeamMembers(checked: boolean) {
-    setSelectedTeamMemberIDs(
-      checked ? new Set(teamMembers.map((member) => member.id)) : new Set(),
+    setSelectedTeamMemberIdentityIDs(
+      checked
+        ? new Set(teamMembers.map((member) => member.identityId))
+        : new Set(),
     )
   }
 
   /** 切换单个团队成员的选中状态。 */
-  function toggleTeamMember(userID: string, checked: boolean) {
-    setSelectedTeamMemberIDs((current) => {
+  function toggleTeamMember(identityID: string, checked: boolean) {
+    setSelectedTeamMemberIdentityIDs((current) => {
       const next = new Set(current)
       if (checked) {
-        next.add(userID)
+        next.add(identityID)
       } else {
-        next.delete(userID)
+        next.delete(identityID)
       }
       return next
     })
@@ -1080,20 +1083,20 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         >
           {selectedTeam ? (
             <>
-              {selectedTeamMemberIDs.size > 0 ? (
+              {selectedTeamMemberIdentityIDs.size > 0 ? (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() =>
                     setRemovingTeamMembers(
                       teamMembers.filter((member) =>
-                        selectedTeamMemberIDs.has(member.id),
+                        selectedTeamMemberIdentityIDs.has(member.identityId),
                       ),
                     )
                   }
                 >
                   {t("teams.members.removeSelected", {
-                    count: selectedTeamMemberIDs.size,
+                    count: selectedTeamMemberIdentityIDs.size,
                   })}
                 </Button>
               ) : null}
@@ -1537,7 +1540,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                     : null}
                   {scope === "team" && teamMembers.length > 0
                     ? teamMembers.map((member) => (
-                        <TableRow key={member.id}>
+                        <TableRow key={member.identityId}>
                           <TableCell>
                             <input
                               type="checkbox"
@@ -1545,10 +1548,12 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                               aria-label={t("teams.members.selectMember", {
                                 name: member.displayName,
                               })}
-                              checked={selectedTeamMemberIDs.has(member.id)}
+                              checked={selectedTeamMemberIdentityIDs.has(
+                                member.identityId,
+                              )}
                               onChange={(event) =>
                                 toggleTeamMember(
-                                  member.id,
+                                  member.identityId,
                                   event.target.checked,
                                 )
                               }
@@ -1559,7 +1564,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                           </TableCell>
                           <TableCell>
                             {t(
-                              member.type ===
+                              member.identityType ===
                                 OrganizationIdentityType.OrganizationIdentityTypeAgent
                                 ? "identityCategories.agent"
                                 : "identityCategories.user",

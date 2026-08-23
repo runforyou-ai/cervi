@@ -314,14 +314,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusActive); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := teamaction.NewRemoveMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{Type: domain.OrganizationIdentityTypeUser, ID: createdMember.IdentityID}}); err != nil {
+	if _, err := teamaction.NewRemoveMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: createdMember.IdentityID}}); err != nil {
 		t.Fatal(err)
 	}
 	candidates, err := teamaction.NewListMemberCandidatesQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberCandidateInput{Query: createdMember.DisplayName, Page: 1, PageSize: 50})
 	if err != nil || candidates.Page.Total != 1 || len(candidates.Members) != 1 || candidates.Members[0].IdentityID != createdMember.IdentityID {
 		t.Fatalf("team member candidates = %#v, error = %v", candidates, err)
 	}
-	team, err = teamaction.NewAddMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{Type: domain.OrganizationIdentityTypeUser, ID: createdMember.IdentityID}})
+	team, err = teamaction.NewAddMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: createdMember.IdentityID}})
 	if err != nil || team.MemberCount != 1 {
 		t.Fatalf("team after adding member = %#v, error = %v", team, err)
 	}
@@ -353,7 +353,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil || agent.DisplayName != "售前智能体" {
 		t.Fatalf("agent detail = %#v, error = %v", agent, err)
 	}
-	teamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.DirectoryMemberInput{Page: 1, PageSize: 50})
+	teamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberListInput{Page: 1, PageSize: 50})
 	if err != nil || teamMembers.Page.Total != 2 {
 		t.Fatalf("team directory = %#v, error = %v", teamMembers, err)
 	}

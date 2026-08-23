@@ -14,39 +14,39 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// DirectoryMemberInput 定义团队成员目录查询条件。
-type DirectoryMemberInput struct {
+// MemberListInput 定义团队成员列表查询条件。
+type MemberListInput struct {
 	Query    string
 	Status   domain.UserStatus
 	Page     int
 	PageSize int
 }
 
-// DirectoryMember 定义团队视图中的共同成员字段。
-type DirectoryMember struct {
-	ID          string                          `bun:"id"`
-	Type        domain.OrganizationIdentityType `bun:"type"`
-	DisplayName string                          `bun:"display_name"`
-	Status      domain.UserStatus               `bun:"status"`
-	JoinedAt    time.Time                       `bun:"joined_at"`
+// Member 定义团队成员信息。
+type Member struct {
+	IdentityID   string                          `bun:"identity_id"`
+	IdentityType domain.OrganizationIdentityType `bun:"identity_type"`
+	DisplayName  string                          `bun:"display_name"`
+	Status       domain.UserStatus               `bun:"status"`
+	JoinedAt     time.Time                       `bun:"joined_at"`
 }
 
-// DirectoryMemberOutput 定义团队成员分页结果。
-type DirectoryMemberOutput struct {
-	Members []DirectoryMember
+// MemberListOutput 定义团队成员分页结果。
+type MemberListOutput struct {
+	Members []Member
 	Page    PageInfo
 }
 
 // ListMembersQuery 读取团队成员关系。
 type ListMembersQuery struct{ db *bun.DB }
 
-// NewListMembersQuery 创建团队成员目录查询。
+// NewListMembersQuery 创建团队成员列表查询。
 func NewListMembersQuery(db *bun.DB) *ListMembersQuery {
 	return &ListMembersQuery{db: db}
 }
 
-// Execute 返回团队中的企业成员和 AI 员工公共字段。
-func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, input DirectoryMemberInput) (DirectoryMemberOutput, error) {
+// Execute 返回团队成员分页列表。
+func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, input MemberListInput) (MemberListOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
 	input.Status = domain.UserStatus(strings.TrimSpace(string(input.Status)))
 	if input.Page <= 0 {
@@ -56,13 +56,13 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 		input.PageSize = 50
 	}
 	if input.PageSize > 100 || (input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) {
-		return DirectoryMemberOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
+		return MemberListOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
 	}
 	if err := validateIdentity(ctx, q.db, identity); err != nil {
-		return DirectoryMemberOutput{}, err
+		return MemberListOutput{}, err
 	}
 	if _, err := loadTeam(ctx, q.db, identity.Organization.ID, teamID); err != nil {
-		return DirectoryMemberOutput{}, err
+		return MemberListOutput{}, err
 	}
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.
@@ -85,16 +85,16 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 	}
 	total, err := applyFilters(base()).Count(ctx)
 	if err != nil {
-		return DirectoryMemberOutput{}, fmt.Errorf("count team members: %w", err)
+		return MemberListOutput{}, fmt.Errorf("count team members: %w", err)
 	}
-	members := make([]DirectoryMember, 0)
+	members := make([]Member, 0)
 	if err := applyFilters(base()).
-		ColumnExpr("oi.id::text AS id, oi.type, oi.display_name, CASE WHEN oi.type = ? THEN u.status ELSE a.status END AS status, tm.created_at AS joined_at", domain.OrganizationIdentityTypeUser).
+		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, oi.display_name, CASE WHEN oi.type = ? THEN u.status ELSE a.status END AS status, tm.created_at AS joined_at", domain.OrganizationIdentityTypeUser).
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
 		Scan(ctx, &members); err != nil {
-		return DirectoryMemberOutput{}, fmt.Errorf("list team members: %w", err)
+		return MemberListOutput{}, fmt.Errorf("list team members: %w", err)
 	}
-	return DirectoryMemberOutput{Members: members, Page: PageInfo{Number: input.Page, Size: input.PageSize, Total: total}}, nil
+	return MemberListOutput{Members: members, Page: PageInfo{Number: input.Page, Size: input.PageSize, Total: total}}, nil
 }

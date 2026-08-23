@@ -92,9 +92,9 @@ import {
   type RoleInput,
   type RoleList,
   type TeamListInput,
-  type TeamDirectoryMember,
-  type TeamDirectoryMemberInput,
-  type TeamDirectoryMemberList,
+  type TeamMember,
+  type TeamMemberListInput,
+  type TeamMemberList,
   type TeamMemberCandidate,
   type TeamMemberCandidateInput,
   type TeamMemberCandidateList,
@@ -162,7 +162,7 @@ export type TeamListQuery = Partial<TeamListInput>
 
 export type TeamMemberCandidateQuery = Partial<TeamMemberCandidateInput>
 
-export type TeamDirectoryMemberQuery = Partial<TeamDirectoryMemberInput>
+export type TeamMemberListQuery = Partial<TeamMemberListInput>
 
 export type MemberOptionListQuery = Partial<MemberOptionListInput>
 
@@ -178,11 +178,11 @@ export type AgentListData = Omit<AgentList, "agents"> & {
   agents: AgentData[]
 }
 
-export type TeamDirectoryMemberListData = Omit<
-  TeamDirectoryMemberList,
+export type TeamMemberListData = Omit<
+  TeamMemberList,
   "members"
 > & {
-  members: TeamDirectoryMember[]
+  members: TeamMember[]
 }
 
 export type TeamMemberCandidateListData = Omit<
@@ -241,9 +241,9 @@ export const createTeam = bind(CreateTeam)
 export const updateTeam = bind(UpdateTeam)
 /** 删除企业团队。 */
 export const deleteTeam = bind(DeleteTeam)
-/** 将企业成员批量加入团队。 */
+/** 将企业身份批量加入团队。 */
 export const addTeamMembers = bind(AddTeamMembers)
-/** 将企业成员批量移出团队。 */
+/** 将企业身份批量移出团队。 */
 export const removeTeamMembers = bind(RemoveTeamMembers)
 /** 读取对象存储设置。 */
 export const getS3Setting = bind(GetS3Setting)
@@ -535,10 +535,10 @@ export function listAgents(query: AgentListQuery, signal?: AbortSignal) {
   }))
 }
 
-/** 读取团队中的共同成员字段。 */
+/** 读取团队成员列表。 */
 export function listTeamMembers(
   teamId: string,
-  query: TeamDirectoryMemberQuery,
+  query: TeamMemberListQuery,
   signal?: AbortSignal,
 ) {
   return listTeamMembersBound(

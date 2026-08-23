@@ -67,6 +67,6 @@ type MemberCandidateOutput struct {
 
 // MemberIdentity 定义团队成员身份引用。
 type MemberIdentity struct {
-	Type domain.OrganizationIdentityType
-	ID   string
+	IdentityType domain.OrganizationIdentityType
+	IdentityID   string
 }
