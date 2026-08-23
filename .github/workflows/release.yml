@@ -251,7 +251,13 @@ jobs:
 
       - name: Install NSIS
         shell: pwsh
-        run: choco install nsis --yes --no-progress
+        run: |
+          choco install nsis --yes --no-progress
+          $nsisDirectory = "${env:ProgramFiles(x86)}\NSIS"
+          if (-not (Test-Path "$nsisDirectory\makensis.exe")) {
+            throw "makensis.exe was not found in $nsisDirectory"
+          }
+          $nsisDirectory | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Wails CLI
         shell: bash
@@ -389,6 +395,15 @@ jobs:
           cache-dependency-path: |
             build/android/*.gradle
             build/android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            libgtk-4-dev \
+            libwebkitgtk-6.0-dev \
+            pkg-config
 
       - name: Install Wails CLI
         shell: bash
