@@ -42,15 +42,17 @@ type HTTPSEntry struct {
 	httpServer  *http.Server
 	httpsServer *http.Server
 	allowed     sync.Map
-	backendPort int
 }
 
 // NewHTTPSEntry 根据 TLS 配置创建 HTTPS 入口。
 func NewHTTPSEntry(config serverconfig.HTTPSConfig, backend serverconfig.ServerConfig) *HTTPSEntry {
 	mode := tlsMode(config.Mode)
-	service := &HTTPSEntry{mode: mode, backendPort: backend.Port}
+	service := &HTTPSEntry{mode: mode}
 	if mode != modeAuto {
 		return service
+	}
+	if config.ACMEEmail == "" {
+		slog.Warn("自动 HTTPS 未配置 ACME 联系邮箱")
 	}
 
 	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort(proxyHost(backend.Host), strconv.Itoa(backend.Port))}
@@ -60,9 +62,8 @@ func NewHTTPSEntry(config serverconfig.HTTPSConfig, backend serverconfig.ServerC
 		http.Error(writer, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 	}
 
-	cachePath := config.TLSDataDirectory
-	service.cachePath = cachePath
-	service.cache = autocert.DirCache(cachePath)
+	service.cachePath = config.TLSDataDirectory
+	service.cache = autocert.DirCache(config.TLSDataDirectory)
 	service.manager = &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		Cache:      service.cache,
@@ -89,7 +90,7 @@ func NewHTTPSEntry(config serverconfig.HTTPSConfig, backend serverconfig.ServerC
 func proxyHost(host string) string {
 	host = strings.Trim(host, "[]")
 	switch host {
-	case "", "0.0.0.0":
+	case "0.0.0.0":
 		return "127.0.0.1"
 	case "::":
 		return "::1"
@@ -101,11 +102,11 @@ func proxyHost(host string) string {
 // Start 启动 HTTPS 入口。
 func (s *HTTPSEntry) Start(ctx context.Context) error {
 	if s.mode == modeExternal {
-		slog.Info("TLS 由外部入口终止", "server_port", s.backendPort)
+		slog.Info("TLS 由外部入口终止")
 		return nil
 	}
 	if s.mode == modeOff {
-		slog.Info("TLS 入口已关闭", "server_port", s.backendPort)
+		slog.Info("TLS 入口已关闭")
 		return nil
 	}
 	httpListener, err := net.Listen("tcp", s.httpServer.Addr)
@@ -183,9 +184,6 @@ func (s *HTTPSEntry) allowCertificate(ctx context.Context, host string) error {
 
 // cachedCertificateMatches 判断持久化缓存中是否存在属于该域名的证书。
 func (s *HTTPSEntry) cachedCertificateMatches(ctx context.Context, host string) bool {
-	if s.cache == nil {
-		return false
-	}
 	for _, key := range []string{host, host + "+rsa"} {
 		data, err := s.cache.Get(ctx, key)
 		if errors.Is(err, autocert.ErrCacheMiss) {

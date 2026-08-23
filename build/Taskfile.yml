@@ -235,7 +235,7 @@ tasks:
   build:docker:
     summary: Builds a Docker image for server mode deployment
     desc: |
-      Usage: task build:docker [TAG=myapp:latest] [CGO_ENABLED=1] [GO_IMAGE=...] [RUNTIME_IMAGE=...]
+      Usage: task build:docker [TAG=myapp:latest]
     deps:
       - task: build:frontend
         vars:
@@ -243,9 +243,6 @@ tasks:
     cmds:
       - >-
         docker build
-        --build-arg CGO_ENABLED={{.CGO_ENABLED | default "0"}}
-        --build-arg GO_IMAGE={{.GO_IMAGE | default "golang:1.27-alpine"}}
-        --build-arg RUNTIME_IMAGE={{.RUNTIME_IMAGE | default "gcr.io/distroless/static-debian12"}}
         -t {{.TAG | default (printf "%s:latest" .APP_NAME)}}
         -f build/docker/Dockerfile.server .
     vars:

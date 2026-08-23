@@ -46,7 +46,7 @@ func TestRequestHostKeepsLocalAddressesOnHTTP(t *testing.T) {
 
 // TestAllowCertificateRequiresHTTPEntry 验证无缓存的公网域名必须先通过 HTTP 入口访问。
 func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
-	service := &HTTPSEntry{}
+	service := &HTTPSEntry{cache: autocert.DirCache(t.TempDir())}
 	const host = "test-https.runforyou.app"
 	if err := service.allowCertificate(t.Context(), host); err == nil {
 		t.Fatal("expected unapproved domain to be rejected")

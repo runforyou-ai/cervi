@@ -85,7 +85,7 @@ func newFileContentDeleter(db *bun.DB, local *serverfilecontent.LocalStore) *ser
 	})
 }
 
-// httpsLifecycle 将 HTTPS 入口接入 Wails 服务生命周期。
+// httpsLifecycle 管理 HTTPS 入口生命周期。
 type httpsLifecycle struct {
 	service *api.HTTPSEntry
 }
@@ -100,12 +100,12 @@ func (l *httpsLifecycle) ServiceShutdown() error {
 	return l.service.Shutdown()
 }
 
-// serverTaskLifecycle 将服务端任务运行时接入 Wails 服务生命周期。
+// serverTaskLifecycle 管理服务端任务运行时生命周期。
 type serverTaskLifecycle struct {
 	runtime *servertask.Runtime
 }
 
-// ServiceStartup 在企业服务端启动后运行异步任务和定时计划。
+// ServiceStartup 启动服务端任务运行时。
 func (l *serverTaskLifecycle) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	return l.runtime.Start(ctx)
 }
