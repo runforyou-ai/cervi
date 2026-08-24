@@ -8,6 +8,10 @@
 
 本文档还确定客户端同步和实时传输的长期边界，包括 WebSocket、Protobuf、HTTP、PostgreSQL Outbox、Core NATS 与 JetStream 的分工，避免聊天开发后再用多套协议补洞。
 
+第 7 至第 10 章、第 13 章表字段及后续阶段中的状态机、协议和基础设施设计是已经形成的详细设计资产，应作为进入对应阶段时的验证基线保留，而不是在阶段尚未开始时删除、简化或另起一套方案。进入实现前仍需结合目标平台官方能力、当前代码、容量数据和最小验证进行复核；复核发现假设变化时，在本文或对应 ADR 中做有依据的增量修正，不无条件照搬，也不从零重做。
+
+路线阶段只决定何时验证和实现这些设计，不要求为远期能力提前建表、引入依赖或开放接口。网站匿名访客身份已确定采用一年期、渠道级不透明 Cookie；它只服务网站公开端点，不改变企业成员 Web、桌面端和移动端统一使用 Bearer Token 的认证约定。
+
 ## 2. 产品背景与约束
 
 Cervi 是 AI 原生企业协作产品，以企业独立部署为主，但独立部署不等于只能在内网运行。企业服务器可以通过公网域名服务 Web、桌面端、移动端、外部访客和渠道回调，同时保持企业间的数据边界。
@@ -81,6 +85,8 @@ customer  客户会话
 
 一个 `Conversation` 最多关联一种来源扩展：`customer_conversations`、未来的 `connected_chats` 和联邦扩展互斥。`conversations.type` 创建后不可修改，避免扩展关系与参与者规则失真。
 
+Cervi 原生 `direct` 会话采用“一对允许单聊的 ChatSubject 对应一个长期会话”的产品语义。同一企业内先按主体编号形成规范化主体对，并以数据库唯一约束或等价的并发安全机制保证并发创建收敛；具体约束随企业内部单聊子阶段落地，不在客户会话数据底座中提前建表。
+
 ### 3.4 第三方账号会话按账号视图隔离
 
 一个 Cervi 用户可以绑定多个第三方平台账号，包括同一平台的多个账号，并在同一个聊天列表中同时查看和回复这些账号的消息。每条会话必须清晰展示由哪个账号接收和发送。
@@ -120,7 +126,7 @@ mode       = chat | topic
 
 Cervi 的 Web、桌面端、移动端和网站挂件共用一个版本化 WebSocket 实时协议，使用 Protobuf 二进制帧承载同步水位、临时状态、AI 流和 WebRTC 信令。SSE、Long Polling、Mercure 和 WebTransport 不作为并行主协议；网站挂件如果在统一 Gateway 落地前需要工作，只能暂时使用普通 HTTP 轮询。
 
-WebSocket 不是第二套业务 API。发送、编辑、撤回、回执、成员和设置变更、AI 运行控制等持久命令统一走 HTTP，并复用 `appservice`、Action、事务、错误和幂等体系。音视频媒体走 WebRTC，附件走 HTTP 和对象存储，应用退出后的唤醒走系统推送。
+WebSocket 不是第二套业务 API。发送、编辑、撤回、回执、成员和设置变更、AI 运行控制等持久命令统一经过 `appservice.Service`，并复用 Action、事务、错误和幂等体系。服务端 Web 使用 `DirectBackend`，桌面端和移动端使用 API Proxy，网站挂件和渠道回调由 Gin 做外部 HTTP 适配；具体传输不能绕开统一应用服务。音视频媒体走 WebRTC，附件走 HTTP 和对象存储，应用退出后的唤醒走系统推送。
 
 ## 4. 身份边界
 
@@ -199,6 +205,21 @@ external_sender         第三方平台发送者
 
 需要聚合展示时使用经过验证的独立关联记录，并保留每条历史消息原始发送主体和账号边界。
 
+### 4.5 网站匿名访客使用长期渠道 Cookie
+
+网站独立接待页和嵌入挂件使用服务端生成的不透明访客 token 恢复匿名身份，不要求访客登录，也不把企业成员 Bearer Token 规则套到公开网站端点。首期直接采用已经在 Helmdesk 验证过的简单方案，不增加短期访问票据、恢复密钥或独立 `visitor_sessions` 表：
+
+- Cookie 名称为 `cervi_visitor_<channel_public_code>`，每个网站渠道独立；值为 32 位小写字母数字随机串，不能由联系人、会话、企业或渠道编号推导。
+- Cookie 有效期固定为 365 天，不做滑动续期；`Path=/`、host-only、`HttpOnly`。HTTPS 请求设置 `Secure`；独立页使用 `SameSite=Lax`，HTTPS 嵌入挂件使用 `SameSite=None; Secure`。
+- 公共状态或 bootstrap 请求在没有合法 token 时生成 token、写回 Cookie 并在响应中返回同一个 token，但不创建联系人、渠道身份或会话。第一条有效文本消息才在消息事务中创建这些业务记录，避免仅打开挂件就产生空联系人。
+- 前端只在当前页面内存中保存响应 token，并在需要时通过 `X-Cervi-Visitor-Token` 回传；服务端解析时 Header 优先、Cookie 次之。匿名 token 不写入 `localStorage`，`Authorization: Bearer` 只为以后宿主网站提供的已签名登录用户身份保留。
+- 网站适配器把匿名身份规范化为 `contact_channel_identities.external_id = web-session:<token>`。所有查找仍显式校验 `organization_id + channel_id`；客户端消息编号继续单独承担消息幂等，不能复用访客 token。
+- 首期不做 token 主动轮换、撤销、数据库过期或跨设备匿名恢复。Cookie 自然过期、被清除或不可用时建立新的匿名身份；渠道停用后公共端点直接拒绝访问。
+
+当前页面内的 Header 镜像可以覆盖 Cookie 未及时回传的 iframe 或 WebView 请求，但不能解决浏览器完全阻止第三方 Cookie 后的跨刷新恢复。阶段 1A 先验证主流目标浏览器的独立页与 HTTPS 挂件；只有真实兼容性验证失败时，才评估 Partitioned Cookie 或宿主页桥接，不现在预建第二套凭据系统。
+
+该长期 Cookie 只证明网站访客对自身客户会话的公共访问身份。以后挂件接入统一 Realtime Gateway 时，先用该身份调用公共换票端点，再按第 10.12 节取得短期、一次性 WebSocket 连接票据；长期访客 Cookie 与实时连接票据职责不同，不能互相替代。
+
 ## 5. 核心业务对象
 
 ```text
@@ -255,7 +276,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 网站实时入站没有可信的客户端业务时间，因此使用服务器首次接收时间作为 `originated_at`；Telegram 等能提供稳定来源时间的平台使用远端时间。Telegram 历史补拉不能用补拉入库时间重排历史。
 
-消息分页统一使用 `(originated_at DESC, id DESC)`。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
+消息历史使用 `before` 游标按 `(originated_at DESC, id DESC)` 向更早记录分页；首个网站轮询闭环使用 `after` 游标按同一 `(originated_at, id)` 边界读取更新记录，并按正序返回以便追加。两种游标都由服务端编码方向和元组，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
 
 会话的 `last_message_at` 表示当前已知消息最大的 `originated_at`，只向后更新。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它，删除最后一条消息也不回退它。会话预览跳过已删除消息。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
 
@@ -334,6 +355,8 @@ Telegram 用户账号同步得到的联系人默认不自动创建 CRM `contacts
 
 Agent 配置、运行、工具、审批、设备能力和 Eino 接入的详细边界由 `agent-roadmap.md` 定义。本节只固定 Agent 与聊天事实的关系；AI 实时流、持久命令和断线恢复复用第 10 章的统一 Realtime Gateway，不建立第二套连接或协议。
 
+第 7.2 节保留 Agent Revision、Run、状态和工具调用的跨文档设计摘要，便于校验聊天消息、任务和实时边界。Agent Runtime 的阶段拆分、实施取舍和验收以 `agent-roadmap.md` 为准；这些摘要不作为聊天阶段必须同时交付的对象，两个文档发生差异时应在进入 Agent 阶段前联合复核并增量更新。
+
 ### 7.1 身份与消息路径
 
 AI 智能体继续使用现有 `organization_identities.type = agent` 和 `agents` 子类型。其聊天路径与用户一致：
@@ -357,7 +380,8 @@ AI 调用不能依赖用户已读状态，也不能把模型请求、工具步�
 ```text
 agent_revisions
 ├── agent_id
-├── provider_model_id
+├── provider_id
+├── model_identifier
 ├── system_instruction
 ├── generation_config
 ├── tool_policy
@@ -374,13 +398,23 @@ conversation_agent_policies
 conversation_agent_states
 ├── conversation_id
 ├── agent_identity_id
-├── desired_originated_at
+├── desired_trigger_seq
 ├── desired_message_id
-├── processed_originated_at
+├── processed_trigger_seq
 ├── processed_message_id
 ├── summary_message_id
 ├── paused_at
 └── updated_at
+
+conversation_agent_triggers
+├── id
+├── organization_id
+├── conversation_id
+├── agent_identity_id
+├── trigger_seq
+├── trigger_type
+├── trigger_message_id
+└── created_at
 
 agent_runs
 ├── organization_id
@@ -389,12 +423,16 @@ agent_runs
 ├── agent_revision_id
 ├── trigger_type
 ├── trigger_message_id
+├── trigger_start_seq
+├── trigger_end_seq
+├── initiated_by_user_id
 ├── input_snapshot
 ├── config_snapshot
 ├── output_message_id
 ├── status
 ├── token_and_cost_usage
-├── error
+├── error_code
+├── error_detail
 └── timestamps
 
 agent_run_steps
@@ -415,18 +453,19 @@ agent_tool_invocations
 ├── arguments_hash
 ├── idempotency_key
 ├── status
-├── result_or_file_id
+├── result
+├── result_file_id
 ├── error
 └── timestamps
 ```
 
-`agent_revisions` 是不可变配置版本，Run 同时引用 Revision 并保存本次实际配置快照。`input_snapshot` 保存实际模型输入的有序消息引用、内容版本或哈希和 Schema 版本，不能只用起止消息编号表达可编辑的历史。`agent_run_steps` 只保存模型、工具、审批、交接等有界语义步骤；流式 Token、进度 Tick、框架 Callback 和调试日志不得逐条写入。工具参数、幂等、审批、结果未知和以后增加的设备执行位置由 Tool Invocation 及其扩展事实承担。
+`agent_revisions` 是不可变配置版本，模型由 `(provider_id, model_identifier)` 指向现有同企业 Chat 模型。Run 同时引用 Revision 并保存本次实际配置快照。`input_snapshot` 保存实际模型输入的有序消息引用、内容版本或哈希和 Schema 版本，不能只用起止消息编号表达可编辑的历史。`agent_run_steps` 只保存模型、工具、审批、交接等有界语义步骤；流式 Token、进度 Tick、框架 Callback 和调试日志不得逐条写入。工具参数、幂等、审批、结果未知和以后增加的设备执行位置由 Tool Invocation 及其扩展事实承担。
 
-还需要独立 `message_mentions` 关系触发 @ 智能体。AI 处理游标使用 `(originated_at, message_id)`，与消息时间线顺序一致，不能按 UUIDv7 大小判断新旧。`desired_*` 表示已经观察到的目标水位，`processed_*` 表示成功处理水位；迟到的历史补拉默认不推进自动响应水位，需要时通过独立总结或回放任务处理。
+独立 `message_mentions` 关系记录 @ 事实；符合策略且首次持久化的消息在同一事务写入 `conversation_agent_triggers`。同一“会话 + 智能体”的 `trigger_seq` 由服务端锁定状态后单调分配，`desired_*` 与 `processed_*` 使用该序号；对应 Message 编号只作审计指针。`originated_at` 继续只负责聊天展示排序，不能再决定 Agent 触发资格或水位。迟到的历史补拉默认不创建 Trigger，需要时通过独立总结或人工回放命令处理。
 
-每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run，使用 `(conversation_id, agent_identity_id) WHERE status IN ('queued', 'running')` 的部分唯一索引或等价任务串行机制保证。新消息在已有 Run 执行期间只推进 `desired_*`；Run 结束时原子推进 `processed_*`，仍有差距则在同一事务创建下一 Run 并通过 `TxEnqueuer` 唤醒，不能因活动任务幂等或部分唯一索引丢失后续处理。`agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
+每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run，使用 `(conversation_id, agent_identity_id) WHERE status IN ('queued', 'running')` 的部分唯一索引或等价任务串行机制保证。新消息在已有 Run 执行期间只推进 `desired_*`；Run 结束时原子推进 `processed_*`，仍有差距则在同一事务创建下一 Run 并通过 `TxEnqueuer.EnqueueIn` 唤醒，不能因活动任务幂等或部分唯一索引丢失后续处理。`agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
 
-自动响应必须记录触发消息、精确输入快照、配置版本与快照、语义步骤、工具调用、输出消息、费用、失败、取消和人工接管，保证可审计和可恢复。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
+P1a 和 P1b 先使用这套模型的有界子集：一个 Trigger 对应一个 Run、一次模型调用和一条最终文本 Message，不创建 Step 或 Tool Invocation，也不依赖流式实时能力。最终 Message 使用 `agent:<agent_run_id>` 业务幂等键；输出消息、Run 终态与 `processed_*` 在同一事务提交，保证 Task 重复或崩溃恢复不会产生第二条持久输出。完整 P1 继续保留语义步骤、工具、费用、失败、取消和人工接管设计，保证可审计和可恢复。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
 
 ## 8. 第三方用户消息账号接入预留
 
@@ -990,7 +1029,7 @@ needs_review
 
 ### 10.8 客户端离线增量同步
 
-新消息可以通过 `(originated_at, id)` 游标补拉，但旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
+新消息可以通过 `(originated_at, id)` 的 `after` 游标补拉，更早历史通过同一元组的 `before` 游标读取；但旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
 
 阶段 2 承诺实时消息和离线补拉时使用“用户 Mailbox 指出哪些会话变化，会话 Changelog 描述具体变化”的两层游标。只使用每会话序号时，拥有大量会话、多个设备或多个第三方账号的用户必须扫描全部会话才能发现变化，不能作为目标设计。
 
@@ -1089,25 +1128,27 @@ Cervi 使用一个 WebSocket 连接承载实时下行事件和临时上行控制
 
 | 通道 | 职责 |
 | --- | --- |
-| HTTP / Wails API Proxy | 登录、持久命令、业务查询、Mailbox/会话同步、快照、附件上传下载 |
+| appservice.Service | 登录、持久命令、业务查询、Mailbox/会话同步、快照和附件上传下载；Web 走 DirectBackend，桌面与移动端走 API Proxy，外部请求由 Gin 适配 |
 | WebSocket | 同步水位通知、输入状态、在线状态、当前焦点、AI 流式输出、任务进度和 WebRTC 信令 |
 | WebRTC | 音视频媒体；P2P 优先，TURN/SFU 按网络和群聊需求补充 |
-| APNs / FCM / 厂商推送 / 可选 Web Push | 应用退出或后台时的系统级唤醒，收到后仍按 HTTP 水位同步 |
+| APNs / FCM / 厂商推送 / 可选 Web Push | 应用退出或后台时的系统级唤醒，收到后仍经 appservice 查询权威水位 |
 
-发送消息、编辑、撤回、回执、成员变更、会话设置、发起或取消 AI 运行等持久命令只走 HTTP，并继续进入同一 `appservice`、Action、事务、错误映射和幂等体系。桌面端和移动端以后需要离线可靠发送时，由现有客户端任务能力重试同一个 HTTP 幂等请求，不把任务队列绑定到长连接。
+发送消息、编辑、撤回、回执、成员变更、会话设置、发起或取消 AI 运行等持久命令统一经过 `appservice.Service`，并继续进入同一 Action、事务、错误映射和幂等体系。桌面端和移动端以后需要离线可靠发送时，由现有客户端任务能力重试同一个 appservice 幂等命令；API Proxy 可以使用 HTTP 传输，但业务边界不是“HTTP 唯一”，也不把任务队列绑定到长连接。
 
 WebSocket 上行只接受认证、Hello、Ping/Pong、输入状态、在线状态、焦点会话和 WebRTC 信令等临时控制。此类事件不进入消息表、会话 Changelog、Task Outbox 或 JetStream，允许限流、合并和丢弃。
 
 持久变更的数据流固定为：
 
 ```text
-客户端 HTTP 持久命令或外部平台入站
-  -> appservice / Action
+Web -> appservice.Service(DirectBackend)
+桌面或移动端 -> appservice.Service(API Proxy)
+外部平台 -> Gin 适配 -> appservice.Service(外部 Backend)
+以上入口 -> Action
   -> 同一 PostgreSQL 事务写业务记录、会话 Sync Event、受众 Mailbox/Inbox 水位和 realtime_outbox
-  -> HTTP 成功响应
+  -> appservice 调用成功响应
   -> realtime_outbox 发布 Core NATS
   -> Realtime Gateway 通知本节点连接
-  -> 客户端按 Mailbox 和会话序号经 HTTP 增量同步
+  -> 客户端按 Mailbox 和会话序号经 appservice 增量同步
 ```
 
 WebSocket 可以携带 `message_id`、会话序号等路由提示，但首版不复制完整 `Message`、`Conversation` 或 `Participant` 业务 DTO。客户端收到水位后批量同步业务投影，避免实时协议与 `appservice` 契约长期漂移。
@@ -1214,15 +1255,17 @@ AI 流使用 `stream_id + sequence`，包含开始、增量、完成和失败帧
 
 ### 10.12 连接认证、恢复与背压
 
-浏览器 WebSocket 不能自由设置 Bearer `Authorization` Header。客户端先通过 HTTP Bearer 请求短期、一次性连接票据，再建立 WSS，并在五秒内用首个 Protobuf `Authenticate` 帧提交票据；票据不放入 URL 查询参数，避免进入代理和访问日志。多 Gateway 时，票据摘要通过 PostgreSQL 原子消费，绑定企业、用户、稳定 `device_id`、客户端种类和允许的 Origin。
+浏览器 WebSocket 不能自由设置认证 Header，因此连接认证统一采用 HTTP 换票：企业成员客户端使用 Bearer Token 调用成员换票端点；网站挂件则由公共换票端点先校验第 4.5 节的长期访客 Cookie/Header 及其客户会话访问范围。两者都只返回短期、一次性连接票据，再建立 WSS，并在五秒内用首个 Protobuf `Authenticate` 帧提交票据；票据不放入 URL 查询参数，避免进入代理和访问日志。
 
-认证后 `ClientHello` 携带协议主版本、Web/桌面/移动/挂件客户端种类、应用版本、能力集合、`mailbox_after` 和当前有权使用的共享 Inbox 游标。服务端不允许客户端任意订阅会话编号；连接按已认证身份接收通知，焦点会话只用于提高临时状态和通知密度，不能改变授权。
+多 Gateway 时，票据摘要通过 PostgreSQL 原子消费，并显式保存 Principal 类型。成员票据绑定企业、用户、稳定 `device_id`、客户端种类和允许的 Origin；访客票据绑定企业、网站渠道、`contact_channel_identity_id`、挂件客户端种类和允许的 Origin，不伪造用户或设备。两种票据都不能越过其绑定范围复用。
+
+认证后 `ClientHello` 携带协议主版本、Web/桌面/移动/挂件客户端种类、应用版本和能力集合。成员客户端同时携带 `mailbox_after` 和当前有权使用的共享 Inbox 游标；网站挂件只携带票据已经绑定的客户会话同步游标，并只接收严格白名单内的会话水位和临时事件。服务端不允许任何客户端任意订阅会话编号；连接按已认证身份接收通知，焦点会话只用于提高临时状态和通知密度，不能改变授权。
 
 客户端统一实现：
 
 - 带随机抖动的指数退避重连，不进行固定间隔重试。
-- 重新连接前换取新票据；票据不能跨设备、用户或企业复用。
-- 重连后先比较 Mailbox/Inbox Head，再通过 HTTP 补拉；WebSocket 和 NATS 不提供历史重放。
+- 重新连接前换取新票据；票据不能跨设备、用户、访客身份、渠道或企业复用。
+- 成员重连后先比较 Mailbox/Inbox Head；网站挂件比较已授权客户会话的同步 Head；两者都通过各自的 appservice 或公共 HTTP 查询补拉，WebSocket 和 NATS 不提供历史重放。
 - 多设备分别保存本地游标，同一用户的连接可以同时接收通知。
 - 页面或应用进入后台时不假设长连接持续存活；恢复前台后总是校验 Head。
 
@@ -1230,12 +1273,12 @@ Gateway 为每条连接维护单写协程和有界优先级发送队列：
 
 ```text
 P0 认证结果、错误、Ping/Pong、优雅下线
-P1 Mailbox/Inbox 水位
+P1 Mailbox/Inbox/访客会话水位
 P2 AI 增量和任务进度
 P3 typing、presence 等临时事件
 ```
 
-同一 Mailbox 水位只保留最大值，AI 增量按 Stream 合并，P3 可以丢弃；队列溢出时不能静默丢失 P0/P1，而应以 `slow_consumer` 关闭连接，让客户端重连并按水位同步。调度必须限制 P2 连续占用的字节数，避免长 AI 输出饿死控制帧和新消息通知。浏览器客户端同时观察 `bufferedAmount`。
+同一 Mailbox、Inbox 或访客会话水位只保留最大值，AI 增量按 Stream 合并，P3 可以丢弃；队列溢出时不能静默丢失 P0/P1，而应以 `slow_consumer` 关闭连接，让客户端重连并按水位同步。调度必须限制 P2 连续占用的字节数，避免长 AI 输出饿死控制帧和新消息通知。浏览器客户端同时观察 `bufferedAmount`。
 
 首版单帧上限设为可配置的 64–256KB 范围，不通过 WebSocket 发送附件、历史列表或快照；默认不开启 `permessage-deflate`，验证 CPU 和每连接内存后再决定。服务端和部署文档必须配置反向代理 Upgrade、空闲超时、最大连接数和优雅关闭，并记录连接数、队列深度、慢消费者、认证失败、NATS 发布失败、Outbox 积压、同步追赶条数和各帧类型流量。
 
@@ -1258,7 +1301,7 @@ P3 typing、presence 等临时事件
 - 邀请、成员变化、第三方账号发送、AI 工具调用和跨企业操作进入审计链。
 - `task_runs` 只提供至少一次异步 Action 运行语义，所有 Handler 可重入；消息和外部投递的永久幂等保存在业务表。
 - 外部发送的确定成功、确定失败和结果未知必须显式区分，结果未知时禁止自动重发。
-- 持久业务命令只走 HTTP；WebSocket 是实时事件与临时控制通道，不能形成第二套 Action、错误、幂等或 ACK 语义。
+- 持久业务命令统一经过 `appservice.Service`；WebSocket 是实时事件与临时控制通道，不能形成第二套 Action、错误、幂等或 ACK 语义。
 - WebSocket、Core NATS 和 `realtime_outbox` 都不是业务事实来源。客户端恢复必须使用用户 Mailbox、共享 Inbox、会话同步序号或对应来源协议游标。
 - `appservice` 是业务 DTO 的唯一来源，Protobuf Schema 是实时帧的唯一来源；两者不能重复定义完整消息和会话模型。
 - 客户端不直接连接 NATS，不为用户或设备创建 JetStream Consumer，也不把实时扇出并入任务工作队列。
@@ -1273,28 +1316,81 @@ P3 typing、presence 等临时事件
 
 ### 阶段 1：外部客户单聊
 
-实现网站、微信公众号和 Telegram Bot 私聊等一对一客服渠道的收发、列表、历史、文件消息和 `ServiceSession` 排队接待。Bot 群聊、频道和讨论组不进入客户会话阶段。
+阶段 1 按可独立验收的子阶段交付；网站文本闭环先完成，Telegram Bot 作为第一种第三方客服适配器验证外部投递，再扩展其他客服渠道、文件和 `ServiceSession`。原有能力全部保留在阶段 1，不要求在同一个 PR 同时完成。
 
-可靠性范围：
+#### 阶段 1A：网站客户文本闭环
 
+- 网站访客发送文本后，自动建立 `stage = visitor` 联系人、渠道身份和长期客户会话。
+- 企业成员通过 `appservice.Service` 查看客户会话列表、历史并回复文本；Web 使用 `DirectBackend`，桌面端和移动端使用 API Proxy。
+- 网站公开请求由 Gin 适配到同一 appservice 和 Action，不在 Gin 中定义另一套聊天 DTO 或业务事务。
+- 历史加载使用 `before`，网站与员工页面新增轮询使用 `after`；发送成功后立即合并返回结果。
+- 网站访客直接从 Cervi 消息时间线轮询回复，不创建 Delivery。
+- 访客身份按第 4.5 节由一年期渠道 Cookie 建立和恢复；公共状态请求只签发凭据，第一条有效文本消息才创建业务记录。
+- 同一浏览器携带合法渠道 Cookie 刷新后仍解析到同一渠道身份和长期客户会话；不同渠道、缺失或非法 token 不得串用身份。
+- 本子阶段只实现文本，不包含文件、`ServiceSession`、外部平台投递和统一实时基础设施。
+
+#### 阶段 1B：Telegram Bot 客服私聊
+
+- Telegram Bot 是第一种真正调用外部平台收发消息的客服适配器，首版只接私聊。
+- 到本子阶段再从网站专用入站 Action 中提取共享的客户文本事务能力；网站和 Telegram Adapter 分别保留自己的验签、时间、幂等和平台规则，不在第一个聊天 PR 提前设计通用入站接口。
 - 第一个需要与业务事务原子提交的异步副作用前，先为任务运行时增加 `TxEnqueuer.EnqueueIn`。
-- 网站访客从 Cervi 消息时间线拉取回复，不创建 Delivery。
-- 第一种真正调用外部平台的客服回复落地时，增加 `customer_message_deliveries`、`customer_channel_send_gates`、有序扫描器和 `uncertain/needs_review` 状态机。
+- 增加 `customer_message_deliveries`、`customer_channel_send_gates`、有序扫描器和 `uncertain/needs_review` 状态机。
 - 数据库扫描是外发恢复的正确性来源；以 `delivery_id` 为作用域的任务只作为降低延迟的快路径。
 - 入站 Echo 只更新投递状态，不重复创建客户消息。
-- Webhook 默认同步受理；只有必须先应答后处理时才增加来源专属 `channel_inbound_events`。
+- Telegram Webhook 默认同步受理；只有必须先应答后处理时才增加来源专属 `channel_inbound_events`。
+- Bot 群聊、频道和讨论组不进入客户会话；以后如需接入，使用 `group` 会话能力。
 
-阶段 1 如果要求网站访客在页面前台即时收到客服回复，应把阶段 2 的 Realtime Gateway、会话同步序号、`realtime_outbox` 和 Protobuf 协议最小子集提前落地，并使用访客短期票据与严格事件白名单；不能为挂件另建 SSE、JSON WebSocket 或第二套同步协议。若暂不提前，则网站访客只通过普通 HTTP 轮询读取回复，直到统一实时能力落地。
+#### 阶段 1C：其他客服渠道
+
+在 Telegram Bot 的 Adapter、Delivery、限流和对账边界经过验证后，再接入微信公众号等其他一对一客服渠道。每个平台复用客户会话事实和经验证的外发可靠性边界，但保留来源专属验签、受理、防重、顺序和能力降级；不为尚未接入的平台预建空 Adapter。
+
+#### 阶段 1D：文件与客服处理批次
+
+- 文件消息复用项目既有临时上传流程，保存 Message 关联时在同一事务激活文件；不把文件内容塞入文本正文。
+- 增加 `ServiceSession` 排队、分配、处理和结束的最小闭环，再逐步增加转接、指标和满意度。
+- `ServiceSession` 仍与长期 `CustomerConversation` 分离，文件读取仍按记录中的存储类型处理。
+
+阶段 1A 默认通过普通轮询完成网站收发，直到阶段 2E 的统一实时能力落地。如果产品明确要求提前实现网站前台即时回复，应把阶段 2E 的 Realtime Gateway、会话同步序号、`realtime_outbox` 和 Protobuf 协议最小子集整体前移；访客先通过公共身份凭据证明权限，再按第 10.12 节换取实时连接票据并应用严格事件白名单。不能为挂件另建 SSE、JSON WebSocket 或第二套同步协议。
 
 ### 阶段 2：企业内部聊天与 AI 参与
 
-实现成员单聊、群聊、成员管理、引用、@ 提醒、已读、实时消息、离线补拉和通知。AI 智能体沿统一参与者路径加入，并补充策略、处理游标、Run、工具步骤和审计。
+阶段 2 同样按可用闭环拆分。成员文本单聊不等待群聊、统一实时或 Agent Runtime；后续子阶段继续覆盖原有群聊、引用、@ 提醒、已读、通知、实时消息和离线补拉能力。
 
-阶段 2 同时建设以下能力，不能只实现“按每会话序号推送”的局部方案：
+#### 阶段 2A：成员文本单聊
+
+- 实现成员会话列表、历史和文本发送，首版可沿用 `before/after` 查询与轮询。
+- 同一企业内同一对有效 ChatSubject 只对应一个长期 `direct` 会话；两个并发创建请求必须收敛到同一会话。
+- 单聊严格按有效参与者授权，不包含已读、实时、文件和 Agent 自动响应。
+
+#### 阶段 2B：基础群聊与协作事实
+
+- 实现群聊创建、基础成员管理、引用、@ 提醒和已读持久事实。
+- 增加对应 appservice 契约和页面，不要求统一实时协议已经完成。
+- 通知和临时状态可以先通过刷新降级，阶段 2E 再接入统一实时和离线同步。
+
+#### 阶段 2C：内部 Agent 最小聊天事实与 AI 员工验证
+
+- Agent 沿 `organization_identity -> chat_subject -> conversation_participant -> message` 加入企业内部单聊或群聊。
+- 固定使用显式 @Agent 作为首个触发入口，复用 `agent-roadmap.md` 的 P1a 最小 Runtime，验证内部 AI 员工能在既有会话中产生最终文本 Message。
+- 客户端先通过普通查询和轮询读取最终消息，不要求本子阶段先建设统一实时、AI 流式帧或离线 Mailbox。
+- Chat 只验收 Agent 参与者关系、触发或 @ 事实、最终 Message 和访问边界；Revision、Run、工具步骤、审批与设备执行仍以 `agent-roadmap.md` 为准。
+
+#### 阶段 2D：网站 AI 客服
+
+- 内部 AI 员工验证通过后立即进入本子阶段；依赖阶段 1A 的网站客户文本闭环和 `agent-roadmap.md` 的 P1b 最小 Runtime。
+- Agent 按已明确的参与和路由规则加入客户会话；客户消息与 Agent 最终回复继续写入同一条 Cervi 消息时间线。
+- 网站访客通过 `after` 轮询读取 Agent 回复，不创建外部 Delivery，也不等待统一实时基础设施。
+- 人工接手、暂停和恢复是持久命令；人工状态先于模型完成生效时，最终事务必须阻止迟到的 AI 回复写入时间线。
+- Telegram、微信公众号等平台上的 AI 回复仍复用各自阶段已经验证的 Delivery；本子阶段不提前扩展新的外部平台能力。
+- Chat 只验收参与者、发送者、访问和客户会话边界；运行、工具和审批细节仍由 `agent-roadmap.md` 定义和验收。
+
+#### 阶段 2E：统一实时、通知与离线同步
+
+本子阶段落实第 10 章已经保留的详细设计，不能只实现“按每会话序号推送”的局部方案：
 
 - 增加 `conversation_sync_events`、`conversations.sync_seq`、`user_sync_states`、`user_conversation_wakeups` 和共享收件箱水位。
 - 新消息、编辑、删除、参与者、会话设置、反应和回执变化与会话 Sync Event、变更前后受众 Wakeup、`realtime_outbox` 在同一事务提交。
-- 持久命令统一走 HTTP；WebSocket 使用 Protobuf Edition 2024 承载同步水位、临时状态、AI 流和 WebRTC 信令。
+- 持久命令统一经过 `appservice.Service`；WebSocket 使用 Protobuf Edition 2024 承载同步水位、临时状态、AI 流和 WebRTC 信令。
 - Realtime Gateway 先内嵌 Server，通过专用 Outbox 向 Core NATS 定向发布；客户端不连接 NATS，JetStream 继续只承担可靠任务。
 - 客户端重连或低频校验时先读取 Mailbox/Inbox Head，再按会话序号补拉；超过保留窗口时重新获取快照。
 - 小群先使用经压测设限的每用户 Fanout；大型群和公共收件箱使用 Shared Fanout，不能让消息事务随潜在受众无限写放大。
@@ -1528,7 +1624,7 @@ internal/actions/contact/ensure_channel_identity.go
 
 ```text
 internal/actions/conversation/
-├── receive_customer_text_message.go
+├── receive_website_customer_text_message.go
 ├── list_customer_conversations.go
 ├── list_customer_messages.go
 ├── helpers.go
@@ -1537,9 +1633,9 @@ internal/actions/conversation/
 └── validation.go
 ```
 
-`ReceiveCustomerTextMessage`：
+`ReceiveWebsiteCustomerTextMessage`：
 
-- 接收已经渠道适配器验证和归一化的渠道编号、外部身份编号、显示名称、来源消息编号和正文；网站客户端不提供可参与排序或幂等判断的业务时间。
+- 接收已经由网站公开接口验证和归一化的渠道编号、外部身份编号、显示名称、来源消息编号和正文；网站客户端不提供可参与排序或幂等判断的业务时间。
 - 校验渠道存在、启用、类型为网站渠道，并从渠道记录取得企业编号。
 - 规范化并限制外部编号、来源消息编号、显示名称和正文长度。
 - 在同一事务内查找或创建联系人、渠道身份、联系人 `chat_subject`、客户会话、扩展、参与者和消息。
@@ -1548,6 +1644,8 @@ internal/actions/conversation/
 - 幂等命中时只核对渠道身份、发送主体和规范化正文；网站重试不比较本次接收时间，返回已有行保存的 `originated_at`。以后只有能提供稳定来源时间的平台才把该时间纳入自身幂等等价集。
 - 使用消息 `originated_at` 以 `GREATEST` 语义更新 `last_message_at`，补发旧消息不得回退或错误置顶会话。
 - 返回联系人、渠道身份、主体、会话、参与者和消息编号。
+
+首个 PR 保持该 Action 为网站专用，不提前加入 Telegram 时间、验签或平台幂等参数。阶段 1B 接入 Telegram Bot 时，再从中提取经验证的共享客户文本事务能力，由各 Adapter 保留自己的受理和来源规则。
 
 `ListCustomerConversations`：
 
@@ -1559,7 +1657,7 @@ internal/actions/conversation/
 `ListCustomerMessages`：
 
 - 校验当前企业和客户会话类型。
-- 使用 `(originated_at, id)` 倒序游标分页。
+- 历史加载使用 `(originated_at, id)` 的 `before` 倒序游标；网站和员工页面新增轮询使用同一元组的 `after` 游标并正序返回。
 - 返回发送主体、正文、引用关系、业务发生时间和入库时间。
 - 当前阶段所有已登录企业成员可读取客户收件箱；`ServiceSession` 落地后收紧。
 
@@ -1577,14 +1675,38 @@ internal/actions/conversation/
 
 ### 13.7 首个 PR 验收边界
 
-首个 PR 应证明：
+首个 PR 使用可重复执行的迁移检查、Action 集成测试和现有联系人契约测试验收。
 
-- 现有用户、智能体和联系人业务模型与聊天主体边界不冲突。
-- 自动联系人不需要伪造创建用户，手工联系人不需要伪造来源渠道。
-- 同一渠道身份只产生一个长期客户会话。
-- 客户会话严格保持一对一：恰好一个有效联系人主体；Bot 群聊不进入该扩展。
-- 同一渠道消息重试不重复创建任何记录。
+迁移与模型：
+
+- 五张建表迁移分别包含第 13.4 节列出的全部字段、默认值、中文 `COMMENT ON`、命名唯一索引和查询索引；迁移不创建外键或 `CHECK`。
+- 在空库执行迁移、状态检查和逐步回滚均成功；服务端模型能完整读写相应字段。
+- `contacts.created_by_user_id` 和 `contacts.source_channel_id` 可空；手工联系人无来源渠道时仍能出现在列表和详情，来源查询使用 `LEFT JOIN`。
+- 首个 PR 不创建第 13.1 节明确排除的 Delivery、Task、同步、实时、第三方账号、访客、联邦或 Agent Runtime 表。
+
+网站入站事务：
+
+- 一条新的合法网站消息恰好创建一个 `stage = visitor` 联系人、一个渠道身份、一个 `contact` ChatSubject、一个 `customer` Conversation、一个客户会话扩展、一个有效联系人 Participant 和一条文本 Message。
+- 自动联系人 `created_by_user_id` 为空且 `source_channel_id` 为当前网站渠道；手工联系人不需要伪造来源渠道。
+- 同一渠道身份的后续不同消息复用同一联系人和长期客户会话；客户会话始终恰好有一个有效联系人主体。
+- 相同来源消息重复调用返回相同的联系人、主体、会话、参与者和消息编号，不修改显示名称、活跃时间、归档状态、`originated_at` 或 `last_message_at`。
+- 同一幂等键对应不同正文、渠道身份或发送主体时返回幂等冲突。
+- 并发提交相同首条消息只产生一套关系和一条 Message；并发提交同一渠道身份的不同消息进入同一个客户会话。
+- 禁用渠道、非网站渠道、无效编号、跨企业来源和不合法主体均被拒绝，事务失败后不留下部分联系人、主体、会话、扩展或参与者。
+- 真实新消息恢复回收站联系人和已归档客户会话；只在联系人名称为空时补充渠道显示名称，不覆盖人工名称。
+- `originated_at` 在完整事务重试间保持一致，`created_at` 由当前服务器写入，`last_message_at` 以 `GREATEST` 语义只向后推进。
+
+查询与授权：
+
+- 客户会话列表只返回当前企业中活动、有消息且联系人未删除的记录，并从 `contact_channel_identities.channel_id` 返回实际渠道。
+- 消息历史的 `before` 游标能稳定读取更早记录；新增轮询的 `after` 游标能按正序返回新记录。两者在相同 `originated_at` 下以 `id` 分界，不重不漏已经存在的记录。
+- 跨企业会话和消息查询被拒绝；当前企业中未回复的客服可以读取收件箱，但不会因此创建 Participant。
 - 客户发送者能通过 `message -> participant -> chat_subject -> contact` 稳定追溯。
-- 客服收件箱访问不等于参与者关系。
-- 历史补拉所需的业务时间排序已经在消息底座中成立。
-- 后续第三方平台多账号、访客、联邦用户和 AI 智能体无需改变 `conversations`、`conversation_participants` 与 `messages` 的核心引用方式。
+
+现有契约：
+
+- 联系人 Bun 模型、Action DTO、appservice DTO、DirectBackend 映射和前端表单均支持可空创建用户与来源渠道；可空切片继续在 `frontend/src/api` 边界归一化。
+- 如 appservice 联系人契约发生变化，使用项目固定版本 Wails CLI 重新生成绑定，不手工修改 `frontend/bindings`。
+- 首个 PR 不增加聊天页面或公开聊天接口，客服收件箱访问仍不等同于参与者关系。
+
+除上述可执行验收外，设计评审继续确认现有用户、Agent 和联系人不会形成第二套发送者模型，并确认后续第三方多账号、受管访客、联邦用户和 Agent 仍沿 `Conversation -> Participant -> ChatSubject` 核心引用扩展；该远期兼容性属于路线图评审结论，不冒充当前 PR 的自动化测试结果。

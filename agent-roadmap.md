@@ -12,12 +12,14 @@
 - Agent 继续沿统一聊天路径发送消息，不创建第二套 Agent 会话或消息系统。
 - 本文不提前创建尚未进入开发阶段的表和字段；文中的后续对象只在对应阶段出现首个真实场景时落地。
 
+首轮产品验证顺序已经确定，不再作为开放选择：先交付 P1a 内部 AI 员工验证，再在验证成功后立即交付 P1b 网站 AI 客服。两步都采用一次模型调用、一条最终文本消息、无工具、无流式输出的有界切片；之后才扩展到原 P1 的完整自动策略、实时、工具和审计能力。第 6 章保留不同触发模式的长期设计，但它不改变这两个验证步骤的先后关系。
+
 ## 2. 当前代码事实
 
 以下内容已经存在：
 
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
-- AI Provider 和模型目录已经存在，可以保存企业配置的模型服务。
+- AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - 原生端通过 API Proxy 使用 Bearer Token 调用企业服务端，Token 当前保存在 WebView `localStorage`。
 - 文件模块已有临时上传、激活、过期清理、本地存储和对象存储路径。
@@ -54,7 +56,27 @@ agent
 - Agent 的一次执行由企业策略和触发上下文授权，不继承某名用户的全部本机权限。
 - 不创建 `bot`、`local_agent` 或第二套聊天主体；未来本地运行只改变 Run 的执行位置，不改变业务身份。
 
-### 3.2 前期服务端是大脑，客户端是受控执行器
+### 3.2 Agent 执行授权上下文
+
+服务端为每个 Run 构造内部 `AgentExecutionContext`：
+
+```text
+AgentExecutionContext
+├── organization_id
+├── conversation_id
+├── agent_identity_id
+├── agent_revision_id
+├── agent_run_id
+├── trigger_type
+├── trigger_message_id
+└── initiated_by_user_id
+```
+
+该上下文是后台执行的授权输入，不是登录 Identity，也不携带用户 Bearer Token。`initiated_by_user_id` 只记录内部触发或人工操作的审计来源；P1b 网站客户自动触发时允许为空，任何阶段都不能据此继承该用户的全部权限或伪造用户调用。
+
+P1a 和 P1b 不开放工具，执行上下文只允许读取 Agent 作为有效参与者可见的当前会话输入、读取同企业 Revision 指定的模型，并以 Agent 参与者身份写入最终消息。原服务端工具、审批和设备设计完整保留；进入相应阶段后，Tool Adapter、Gateway 和 Executor 必须在该上下文基础上继续校验组织、会话、Agent、策略、工具、资源和设备范围。
+
+### 3.3 前期服务端是大脑，客户端是受控执行器
 
 前期架构为：
 
@@ -80,7 +102,7 @@ agent
 
 完整本地 Agent 只在离线、隐私、本地模型或高频编码循环形成真实产品需求后引入。
 
-### 3.3 三层事实严格分离
+### 3.4 三层事实严格分离
 
 | 层级 | 事实 | 职责 |
 | --- | --- | --- |
@@ -90,7 +112,9 @@ agent
 
 Eino Session、Checkpoint 和 BackgroundTask 若以后启用，只是某个 Run 的执行附件，不是聊天、审计或计费的事实来源。
 
-### 3.4 数据库是真相，实时连接只负责在线能力
+### 3.5 数据库是真相，实时连接只负责在线能力
+
+以下实时设计保持为完整 P1、设备能力和后续体验的目标边界。P1a 与 P1b 的正确性不依赖 Realtime Gateway、WebSocket、Protobuf、Core NATS 或 AI token 流；客户端先通过现有 HTTP/appservice 业务查询或网站轮询读取最终 Message 和 Run 结果，实时能力未落地不得阻塞首轮验证。
 
 - 全产品只使用 `chat-roadmap.md` 定义的一个版本化 Realtime WebSocket 和 `cervi.realtime.v1` Protobuf 协议，不为设备能力另建连接、JSON WebSocket 或 MCP Transport。
 - 聊天变化通过 Mailbox/Inbox 和会话同步水位通知，客户端经 HTTP 补拉；WebSocket 不复制完整业务 DTO。
@@ -118,6 +142,9 @@ Eino Session、Checkpoint 和 BackgroundTask 若以后启用，只是某个 Run 
 12. 移动端默认是前台确认与选择器，不承担无人值守企业 Worker 职责。
 13. 不为未来本地运行提前创建第二套身份、表或空字段；真实落地时直接调整目标模型。
 14. Device Capability Gateway 复用 Realtime Gateway 的连接、票据、Protobuf、Outbox、NATS 和背压，不建设第二套实时基础设施。
+15. Agent 触发资格来自消息首次持久化时写入的服务端触发事实和单调序号；`originated_at` 只用于聊天展示排序，不能作为 Agent 触发水位。
+16. 同一个 Run 最多持久化一条最终输出消息；Message 使用 `agent:<agent_run_id>` 业务幂等键，Task 幂等键不能替代它。
+17. 后台 Runtime 使用 `AgentExecutionContext` 显式授权，不伪造登录用户；工具、审批和设备能力只在对应阶段按原设计逐层放开。
 
 ## 5. Agent 配置与版本
 
@@ -130,7 +157,8 @@ agent_revisions
 ├── id
 ├── organization_id
 ├── agent_id
-├── provider_model_id
+├── provider_id
+├── model_identifier
 ├── system_instruction
 ├── generation_config
 ├── tool_policy
@@ -139,7 +167,7 @@ agent_revisions
 └── created_at
 ```
 
-并由 `agents.active_revision_id` 指向当前生效版本。项目不创建数据库外键，因此 Action 必须在事务中校验企业、Agent、Provider Model 和配置版本的关联。
+并由 `agents.active_revision_id` 指向当前生效版本。项目不创建数据库外键，因此 Action 必须在事务中校验企业、Agent、Provider、模型和配置版本的关联；`(provider_id, model_identifier)` 必须对应现有模型目录中的同企业 Chat 模型，其中 `model_identifier` 映射目录字段 `identifier`。
 
 规则：
 
@@ -154,7 +182,7 @@ agent_revisions
 每个 Run 同时保存：
 
 - `agent_revision_id`：指向权威配置版本。
-- 规范化配置快照：实际使用的 Provider、模型标识、系统指令哈希、生成参数和允许工具集合。
+- 规范化配置快照：实际使用的 `provider_id + model_identifier`、系统指令哈希、生成参数和允许工具集合。
 
 Revision 负责长期配置历史，Run 快照负责证明本次执行实际使用了什么。快照不得包含 Provider 明文密钥。
 
@@ -162,7 +190,7 @@ Revision 负责长期配置历史，Run 快照负责证明本次执行实际使�
 
 ### 6.1 策略和状态
 
-进入 AI 阶段时增加：
+进入 AI 阶段时按切片逐步形成以下目标对象。P1a 的固定 `mention` 入口只需要 State 和 Trigger，不要求通用 Policy 配置；P1b 增加网站 Agent 绑定、启停和暂停所需的最小 Policy；完整 P1 再补齐 `allowed_tools`、`response_policy` 和其他可配置策略：
 
 ```text
 conversation_agent_policies
@@ -179,33 +207,72 @@ conversation_agent_states
 ├── organization_id
 ├── conversation_id
 ├── agent_identity_id
-├── desired_originated_at
+├── desired_trigger_seq
 ├── desired_message_id
-├── processed_originated_at
+├── processed_trigger_seq
 ├── processed_message_id
 ├── summary_message_id
 ├── paused_at
 └── updated_at
 ```
 
-`desired_*` 表示已经观察到、希望 Agent 处理到的位置；`processed_*` 表示最后一次成功纳入处理范围的位置。两者都使用 `(originated_at, message_id)`，不能使用 UUID 大小推导时间顺序。
+`desired_*` 表示已经持久化、希望 Agent 处理到的最高触发序号；`processed_*` 表示最后一次成功纳入处理范围的触发序号。`desired_message_id` 和 `processed_message_id` 只保留对应触发消息的审计指针，不参与大小比较。序号由服务端在锁定同一“会话 + Agent”状态后单调分配，不能使用 `originated_at`、客户端时间或 UUID 大小推导触发先后。
 
-### 6.2 不丢唤醒的单 Run 模型
+#### D1：长期触发模式
+
+`trigger_mode` 保留以下长期产品模式：
+
+| 模式 | 长期语义 | 首轮安排 |
+| --- | --- | --- |
+| `mention` | 内部单聊或群聊只有显式 @Agent 的新消息触发 | P1a 固定使用，作为内部 AI 员工验证入口 |
+| `agent_direct` | 发给 Agent 的内部单聊自动触发，群聊仍需 @ | P1a/P1b 后保留为可配置模式 |
+| `customer_auto` | 符合客户路由和会话策略的新客户消息自动触发 | P1b 先用于网站客户；第三方渠道仍需对应 Delivery |
+
+D1 仍决定完整 P1 以后不同会话如何配置默认触发模式、短时间连续消息是否合并以及何时启停自动响应，但不再决定首两步先做哪一种：P1a 必须先验证内部显式 @，验证成功后 P1b 必须立即验证网站客户自动响应。首轮不建设通用规则编排器；只登记当前阶段实际启用的固定模式，完整 `response_policy` 仍按原 P1 设计继续演进。
+
+### 6.2 服务端持久触发事实
+
+符合当前固定入口或长期 Policy 的新消息，在消息首次持久化的同一事务写入触发事实：
+
+```text
+conversation_agent_triggers
+├── id
+├── organization_id
+├── conversation_id
+├── agent_identity_id
+├── trigger_seq
+├── trigger_type
+├── trigger_message_id
+└── created_at
+```
+
+约束与规则：
+
+- 同一企业内 `(conversation_id, agent_identity_id, trigger_seq)` 唯一；同一 `(conversation_id, agent_identity_id, trigger_message_id)` 只能产生一个触发事实。
+- 只有本次事务首次写入的 Message 可以创建触发事实；消息业务幂等重放返回原结果，不再次推进序号或唤醒 Agent。
+- `trigger_type` 记录 `mention`、`agent_direct` 或 `customer_auto` 等实际入口，不从消息时间推断。
+- Agent、系统消息和历史补拉默认不创建自动触发事实；人工回放必须使用显式持久命令。
+- `originated_at` 可以早于已经展示的消息，仍不影响本次新触发事实的资格和 `trigger_seq`；它继续只用于消息时间线排序。
+- 触发事实是恢复和审计依据，NATS Delivery、进程内事件和当前 WebSocket 连接都不能代替它。
+
+### 6.3 不丢唤醒的单 Run 模型
 
 每个“会话 + Agent”最多一个 `queued/running` Run，属于上下文执行互斥，不是消息合并机制。
 
 触发流程：
 
-1. 新消息事务锁定对应 `conversation_agent_states`。
-2. 推进 `desired_*`。
+1. 新消息 Action 完成 Message 业务幂等判断，并按固定入口或 Policy 判断触发资格。
+2. 符合条件时锁定对应 `conversation_agent_states`，分配下一 `trigger_seq`，写入 `conversation_agent_triggers` 并推进 `desired_*`。
 3. 若当前没有在途 Run，则创建 `queued` Run，并通过 `TxEnqueuer.EnqueueIn` 在同一事务写入唤醒任务。
 4. 若已有在途 Run，不重复创建；当前 Run 结束时必须再次检查游标差距。
-5. Run 完成事务推进 `processed_*` 到本次输入末尾。
-6. 如果 `desired_* > processed_*`，在同一事务创建下一 Run 并入队。
+5. Run 完成事务推进 `processed_*` 到本次实际纳入输入的 `trigger_end_seq`。
+6. 如果 `desired_* > processed_*`，且当前固定入口仍有效或 Policy 已启用并且未暂停，则在同一事务创建下一 Run 并入队；暂停期间差距保留为数据库事实，不依赖内存等待。
 
 这样可以同时保证单 Agent 上下文串行和运行期间新消息不丢失。
 
-迟到的历史补拉默认只进入消息时间线，不推进自动响应的 `desired_*`；需要时由独立总结或人工回放操作处理。
+P1a 和 P1b 不静默合并触发：一个 Run 只消费最早的一条未处理触发事实，并进行一次模型调用。完整 P1 保留原自动响应策略，可以按 `response_policy` 合并一段连续触发，但必须把实际触发编号写入输入快照，并以明确的 `trigger_start_seq/trigger_end_seq` 推进状态，不能只提高水位而丢失审计关系。
+
+迟到的历史补拉默认只进入消息时间线，不创建触发事实，也不推进自动响应的 `desired_*`；需要时由独立总结或人工回放操作处理。
 
 ## 7. Agent Run 与审计模型
 
@@ -222,6 +289,9 @@ agent_runs
 ├── agent_revision_id
 ├── trigger_type
 ├── trigger_message_id
+├── trigger_start_seq
+├── trigger_end_seq
+├── initiated_by_user_id
 ├── input_snapshot
 ├── config_snapshot
 ├── output_message_id
@@ -238,16 +308,23 @@ agent_runs
 规则：
 
 - 一次 Run 对应一次有界的服务端 Agent 循环，不对应 Conversation 的常驻进程。
+- P1a 和 P1b 的 `trigger_start_seq = trigger_end_seq`，每个 Run 只执行一次模型调用；完整 P1 按显式 `response_policy` 合并触发时，Run 必须保存实际消费的连续序号范围。
+- `initiated_by_user_id` 只用于审计：内部用户触发或发起操作时有值，网站客户和其他非登录主体自动触发时允许为空，不代表继承该用户权限。
 - `input_snapshot` 保存实际传给模型的有序输入、消息编号、内容版本或哈希、摘要引用和 schema 版本，不能只保存起止消息编号。
 - 输入快照按审计需求保存必要内容并限制大小；敏感字段按产品策略处理。
-- Agent 输出仍以 Agent 参与者身份创建 `messages`。
-- 输出消息、Run 终态和 `processed_*` 的推进必须原子提交。
+- Agent 输出仍以 Agent 参与者身份创建 `messages`，并使用 `agent:<agent_run_id>` 作为业务幂等键；同一个 Run 最多持久化一条最终输出。
+- 输出消息、Run 终态和 `processed_*` 的推进必须原子提交；提交前重新锁定 Run 和 `conversation_agent_states`，确认 Run 尚未终结，并复核 Agent、参与者、当前固定入口或 Policy，以及暂停/人工接手状态。
+- 若 P1b 人工接手或暂停先于最终事务生效，迟到的模型结果不得再写入客户时间线；Run 记录为已取消或已被人工接管，再继续检查后续触发事实。
 - 业务失败先写入 `agent_runs`，Task Handler 随后正常结束；只有基础设施级临时失败才触发 `task_runs` 重试，避免任务重试、模型重试和工具重试相乘。
+- 模型拒绝、超时或规范化业务错误形成 Run 终态时，本次 `trigger_end_seq` 同样得到明确处理结果并推进 `processed_*`，不因游标差距自动对同一触发进行无界模型重试；显式“重试回复”以后使用新的持久命令和 Run 表达。
+- `token_and_cost_usage` 在 P1a 和 P1b 只记录模型返回的输入/输出 Token；耗时由 Run 时间字段或既有 usage 结构记录，不计算金额。完整费用设计保留到原 P1 有明确价格快照后使用。
 - P1 不提前增加 `runtime` 或 `device_id`。只有整段 Agent 循环真正迁移到设备时才给 Run 增加运行位置。
 
 ### 7.2 语义步骤
 
 `agent_run_steps` 只保存用户和运维真正需要审计的有界步骤：
+
+P1a 和 P1b 不创建 Step；以下目标结构从完整 P1 首次需要模型、工具、审批或交接的独立语义审计时开始落地。
 
 ```text
 agent_run_steps
@@ -312,7 +389,7 @@ uncertain_at
 
 - `arguments_hash` 使用规范化参数计算，并参与审批和防重放。
 - 大结果只保存摘要和 `result_file_id`。
-- 服务端工具也通过类型化 Tool Adapter 调用 Action，不允许 Eino Tool 绕过组织边界直接拼 SQL。
+- 服务端工具也通过接收 `AgentExecutionContext` 的类型化 Tool Adapter 调用 Action，不允许 Eino Tool 绕过组织边界直接拼 SQL，也不得伪造登录用户复用其完整权限。
 - 一次 Tool Invocation 对应一次业务副作用意图；基础设施重试不能创建新的副作用意图。
 
 ## 8. 服务端任务运行时边界
@@ -338,6 +415,21 @@ uncertain_at
 - Handler 以 `agent_run_id` 幂等领取 Run，不假设一次 Task Delivery 只执行一次。
 - 长 Agent Run 使用独立队列或独立 Worker 配额，不能耗尽文件清理、投递和定时任务的 Worker。
 - 数据库扫描或游标差距是恢复正确性来源，NATS 任务只是降低延迟的快路径。
+
+### 8.1 Run 崩溃与重复执行边界
+
+模型 Provider 调用本身通常不提供 Cervi 业务级 Exactly Once。Task 租约恢复可能再次调用 Provider，但最终 Message 和 Run 终态必须依靠数据库锁与 `agent:<agent_run_id>` 业务幂等键收敛：
+
+| 崩溃或竞争位置 | 必须得到的结果 |
+| --- | --- |
+| Message、Trigger、Run 和 Task 的事务提交前 | 本次触发相关事实全部回滚 |
+| 数据库事务提交后、NATS 发布前 | `task_outbox` 继续发布，触发事实和 Run 不丢失 |
+| 模型调用前或调用中 | Task 租约恢复后可以用同一 Run、Revision 和输入快照重新执行 |
+| Provider 已返回、最终事务提交前 | 可能再次调用 Provider，但只能持久化一条最终 Message |
+| 最终 Message、Run 终态和 `processed_*` 提交后、Task ACK 前 | 重试读取到 Run 终态并正常结束，不再次调用 Provider |
+| 两个执行尝试短暂重叠 | 最终事务锁定 Run 并复核终态；唯一 `agent:<agent_run_id>` 只允许一条输出 |
+
+恢复陈旧 `running` Run 时，只有在对应 Task 租约已失效并超过模型超时安全窗口后，才能重新投递同一 `agent_run_id`；旧执行迟到提交仍必须经过上述最终事务校验。系统承诺“同一 Run 不会持久化两条最终消息”，不承诺 Provider 只被调用一次，额外调用及无法精确归属的成本应进入诊断而不能伪装为 Exactly Once。
 
 ## 9. Eino 接入边界
 
@@ -375,9 +467,22 @@ Eino 不负责：
 - 设备选择、设备连接和本机权限。
 - NATS 调度。
 
-发起、取消和人工接管 Agent Run 都是持久命令，统一经 HTTP、`appservice` 和 Action；Realtime WebSocket 只承载流式展示和进度。
+发起、取消和人工接管 Agent Run 都是持久命令，统一经过 `appservice.Service` 和 Action；服务端 Web 使用 `DirectBackend`，桌面端和移动端使用 API Proxy，Gin 只为网站等外部 HTTP 请求提供适配。Realtime WebSocket 只承载流式展示和进度。
 
-### 9.3 P1 最小接入集
+上述 Tool、Middleware、流式事件投影和 `AIStream*` 是完整 P1 能力，原设计保持不变。P1a 和 P1b 先通过同一适配边界使用下面的有界子集，不要求尚未实现的 Realtime 基础设施。
+
+### 9.3 P1a/P1b 有界接入集
+
+P1a 和 P1b 的 Eino Adapter 只负责：
+
+- 将不可变 Revision 和已保存输入快照转换为一次 Chat Model 请求。
+- 在有超时的 `context` 中执行一次模型调用并返回最终文本，不消费或发布 token delta。
+- 返回输入/输出 Token、耗时和规范化错误；不计算金额。
+- 不注册 Tool，不创建 Tool Invocation，不进入审批、设备、MCP、Session、Checkpoint 或本地 Runtime。
+
+P1b 的人工接手和暂停仍先写持久业务状态，再对正在执行的 `context` 发出尽力取消；是否允许最终消息落库由第 7.1 节的最终事务复核决定，不能依赖取消回调及时到达。
+
+### 9.4 P1 最小接入集
 
 P1 只使用：
 
@@ -398,7 +503,7 @@ P1 默认不使用：
 - DeepAgent 或本地 Filesystem 工具。
 - 默认 CheckpointStore。
 
-### 9.4 按触发条件引入 v0.10 能力
+### 9.5 按触发条件引入 v0.10 能力
 
 | 能力 | 引入条件 | 业务边界 |
 | --- | --- | --- |
@@ -470,6 +575,8 @@ cancel_requested
 Checkpoint 只能恢复模型执行位置，不能证明外部副作用是否发生。
 
 ## 11. Device Capability Gateway
+
+本章完整保留设备阶段的目标设计，但不属于 P1a 或 P1b 前置。进入 P2 时必须根据届时已落地的 Realtime ADR、认证实现、桌面与移动运行约束重新验证表字段、Claim 生命周期、WSS/HTTP 分工、NATS 路由、取消和结果未知边界；验证不通过时先更新本章和对应 ADR，不能因本文已有细节而跳过实测。
 
 ### 11.1 形态
 
@@ -597,6 +704,8 @@ device_invocations
 
 ## 12. MCP 决策
 
+本章完整保留 MCP 的长期接入边界，但不属于 P1a、P1b 或完整 P1 的默认工作。达到第三方本地 MCP 工具生态触发条件时，必须重新核对当时协议版本、完整生命周期、Transport、安全授权和 Executor 隔离，再按下述 Adapter 方案进入实现。
+
 P2 不直接采用 MCP subset 作为设备主协议，优先使用 Cervi 类型化的 HTTP invocation、claim、progress、result 和 cancel 契约；实时提示只扩展现有 Protobuf `ServerFrame`。
 
 原因：
@@ -645,21 +754,50 @@ Cervi Gateway
 
 ## 14. 实施阶段
 
-本节的 P0 至 P4 是 Agent 建设子阶段，不等同于 `chat-roadmap.md` 的聊天阶段编号。Agent P0 表示进入首个 Agent Runtime 前必须完成的聊天和任务前置能力。
+本节的 P0 至 P4 是 Agent 建设子阶段，不等同于 `chat-roadmap.md` 的聊天阶段编号。Agent P0 表示进入首个 Agent Runtime 前必须完成的聊天和任务前置能力。实际交付顺序固定为 `P0 最小门槛 -> P1a 内部 AI 员工验证 -> P1b 网站 AI 客服 -> P1 完整服务端能力 -> P1.5 -> P2 -> P3 -> P4`；P1a 验证成功后立即进入 P1b，不等待完整 Realtime 或工具能力。
 
 ### P0：聊天和任务前置能力
 
 - 完成 `chat_subjects`、Conversation、Participant 和 Message 事实。
 - 落地消息事务、幂等、引用、@ 和双时间顺序。
 - 增加 `TxEnqueuer.EnqueueIn`。
-- 按 `chat-roadmap.md` 落地 Conversation Changelog、用户 Mailbox/共享 Inbox、`realtime_outbox`、Core NATS、Realtime Gateway、Protobuf 协议、连接票据和 HTTP 恢复。
+- 为模型调用提供有界超时、独立队列或 Worker 配额，不能耗尽非 Agent 任务容量。
+- 在进入原 P1 的流式实时体验前，仍按 `chat-roadmap.md` 完整落地 Conversation Changelog、用户 Mailbox/共享 Inbox、`realtime_outbox`、Core NATS、Realtime Gateway、Protobuf 协议、连接票据和 HTTP 恢复；这项完整设计保持不变，但不是 P1a 或 P1b 的前置。
 
-验收边界：聊天事实和断线补拉成立，但不创建 Agent 运行表，不接入 Eino。
+P1a 的 P0 最小验收边界：内部聊天事实、Message 业务幂等、@、事务内 `TxEnqueuer.EnqueueIn` 和 Agent Worker 隔离成立，但不要求 Changelog、Realtime Outbox、Core NATS、Realtime Gateway、Protobuf 或 AI 流式帧已经落地；最终 Message 和 Run 状态可通过 HTTP/appservice 查询恢复。进入 P1b 前再补齐网站客户文本闭环、访客恢复凭据和网站消息轮询。进入原 P1 的流式能力前，完整验收 Conversation Changelog、Mailbox/Inbox、Realtime Outbox、Core NATS、Realtime Gateway、连接票据、Protobuf 和断线后的 HTTP 补拉。P0 本身不创建 Agent 运行表，不接入 Eino。
 
-### P1：纯服务端、只读或强幂等 Agent
+### P1a：内部 AI 员工验证
 
-- 增加不可变 Agent Revision 和当前版本切换。
-- 增加 Policy、State、desired/processed cursor、Run、语义 Step 和 Tool Invocation。
+这是第一个 Agent 产品切片，固定使用内部消息显式 @Agent 作为验证入口：
+
+- 依赖 `chat-roadmap.md` 的内部文本聊天、Agent 参与者和 `message_mentions`；内部单聊和群聊都只有显式 @ 才触发，暂不启用 Agent 单聊自动响应。
+- 增加不可变 Agent Revision，并通过现有 `(provider_id, model_identifier)` 选择同企业 Chat 模型；`tool_policy` 为空。
+- 增加最小 `conversation_agent_states`、`conversation_agent_triggers` 和 `agent_runs`，消息首次持久化时在同一事务写入 `mention` Trigger、Run 和 Task。
+- 一个 Trigger 对应一个 Run；一个 Run 只调用一次模型，只生成一条最终文本 Message，使用 `agent:<agent_run_id>` 业务幂等键。
+- 不创建 Step、Tool Invocation、Approval、Device Invocation、Checkpoint 或本地 Runtime；不注册工具，不流式输出，不依赖 Realtime。
+- 只记录输入/输出 Token、耗时和错误，不计算金额；客户端通过普通业务查询刷新最终消息和 Run 结果。
+
+验收边界：显式 @ 能稳定触发内部 AI 员工以统一参与者身份回复；未 @ 消息、Agent 输出、历史补拉和幂等重放不触发；一次 Task 重复或第 8.1 节任一崩溃窗口不会产生第二条持久输出；阻塞模型调用不会耗尽非 Agent Worker。达到这些条件后立即进入 P1b。
+
+### P1b：网站 AI 客服
+
+P1a 验证成功后立即交付网站客户自动响应，继续复用相同的单次调用 Runtime：
+
+- 依赖 `chat-roadmap.md` 的网站客户文本闭环、网站访客恢复凭据、客户 Conversation 和网站轮询，不依赖 Telegram Bot、微信公众号或其他第三方渠道 Delivery。
+- 为网站渠道或客户 Conversation 建立最小 Agent 绑定，固定使用 `customer_auto`；新网站客户 Message 首次持久化时写入 Trigger、Run 和 Task，首轮不建设通用路由编排、队列、SLA 或复杂分配系统。
+- Agent 最终回复仍是统一 Cervi Message。网站访客通过既有授权轮询直接读取该 Message，因此“写入 Message 并可被网站读取”就是网站路径的交付闭环，不创建外部 Delivery。
+- 提供经过 `appservice.Service` 和 Action 的人工接手、暂停和恢复命令。接手或暂停先锁定并更新 Policy/State，阻止新 Trigger，对在途 Run 发出尽力取消；最终事务必须重新复核状态，人工操作获胜后不得追加迟到的 AI 回复。
+- 人工接手在该切片只表达“停止当前会话的 AI 自动回复并允许成员继续回复”，不提前建设完整客服分配体系。
+- 仍保持一次模型调用、一条最终文本、无工具、无流式、无设备、无审批，只记录 Token、耗时和错误，不计算金额。
+
+验收边界：符合绑定规则的网站客户新消息会自动得到一条可由访客轮询读取的 AI 回复；消息重放和 Task 重复不重复回复；人工接手或暂停与模型完成并发时结果可确定且不会在人工接手后迟到发言；网站闭环在没有 Realtime 和第三方 Delivery 的情况下成立。第三方客户渠道以后启用 `customer_auto` 时，必须先完成对应外部 Delivery 和结果未知处理。
+
+### P1：纯服务端、只读或强幂等 Agent（完整能力）
+
+P1a/P1b 验证完成后，继续交付原 P1 的完整设计；以下能力和范围全部保留：
+
+- 在 P1a 已有不可变 Agent Revision 基础上继续保留当前版本切换和完整配置能力。
+- 在 P1a/P1b 已有事实上扩展并补齐 Policy、State、desired/processed trigger cursor、Run、语义 Step 和 Tool Invocation。
 - 为 Agent 使用独立任务队列或 Worker 配额。
 - 接入 Agent Engine 和精确锁定版本的 Eino。
 - 只使用 ChatModelAgent、Runner、服务端类型化 Tool、流式事件和取消。
@@ -718,7 +856,8 @@ Cervi Gateway
 
 | 暂缓能力 | 触发条件 |
 | --- | --- |
-| Eino 最终版本 | 开始 P1 实施时根据正式发布状态选择并精确锁定 |
+| Eino 最终版本 | 开始 P1a 实施时根据正式发布状态选择并精确锁定 |
+| 完整触发模式默认值与消息合并 | P1a/P1b 验证后进入完整 P1 策略配置 |
 | CheckpointStore | 业务事实无法安全重建 Runner 中间状态 |
 | TurnLoop | 同一 Run 需要 Push、抢占或长期 idle |
 | SessionStore | 单 Run 内存在明确的框架工作集或 Middleware 回放需求 |
@@ -738,12 +877,17 @@ Cervi Gateway
 
 - 当前修改属于聊天事实、Agent 业务事实还是任务基础设施，是否发生混用。
 - 是否显式校验 `organization_id`、会话、Agent、Revision 和工具策略。
+- 是否只以服务端持久 Trigger 和 `trigger_seq` 判断新触发，避免把 `originated_at`、UUID 或历史补拉当作触发水位。
 - 是否可能因 Task 至少一次执行产生重复模型输出或重复副作用。
+- 是否使用 `agent:<agent_run_id>` 收敛最终 Message，并覆盖 Provider 返回后、最终事务前崩溃和重复 Task 的竞争。
+- P1a/P1b 是否仍保持一次模型调用、最终文本、无工具、无流式，且没有把完整 Realtime 误设为前置。
+- 后台执行是否使用 `AgentExecutionContext` 显式授权，而不是伪造用户或继承触发用户的全部权限。
 - 是否把流式事件、日志或 Eino 内部状态误写成永久 Step。
 - 是否能区分确定成功、确定失败、取消请求和结果未知。
 - 是否把大内容改成文件引用并设置大小上限。
 - 是否把客户消息等不可信输入暴露给设备能力。
 - 是否依赖 WSS 帧、内存连接、移动后台或进程常驻维持正确性。
 - 是否绕过统一 Realtime Gateway、连接票据和 Protobuf Schema 建设第二套设备实时协议。
+- 进入设备、MCP 或本地 Runtime 阶段时，是否重新验证了对应字段、协议版本、Claim/WSS/HTTP/NATS 分工和安全不变量。
 - 是否提前创建没有真实场景的表、字段、运行时或协议。
 - 是否能在不改变聊天身份和业务事实的前提下替换或升级 Eino。
