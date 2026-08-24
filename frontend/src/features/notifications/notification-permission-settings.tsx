@@ -6,6 +6,12 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldTitle,
+} from "@/components/ui/field"
 import { recoverSession } from "@/lib/session-navigation"
 import {
   canSendNotification,
@@ -93,22 +99,20 @@ export function NotificationPermissionSettings({
   }
 
   return (
-    <div className="grid gap-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid gap-1">
-          <p className="text-sm font-medium">
-            {t("preferences.notifications.permission.label")}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {permissionStatusDescription(status, t)}
-          </p>
-        </div>
+    <Field orientation="horizontal">
+      <FieldContent>
+        <FieldTitle>
+          {t("preferences.notifications.permission.label")}
+        </FieldTitle>
+        <FieldDescription>
+          {permissionStatusDescription(status, t)}
+        </FieldDescription>
+      </FieldContent>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
           {permissionStatusLabel(status, t)}
         </span>
-      </div>
-      {status === "prompt" ? (
-        <div>
+        {status === "prompt" ? (
           <Button
             type="button"
             size="sm"
@@ -121,8 +125,8 @@ export function NotificationPermissionSettings({
               ? t("preferences.notifications.permission.allowing")
               : t("preferences.notifications.permission.allow")}
           </Button>
-        </div>
-      ) : null}
-    </div>
+        ) : null}
+      </div>
+    </Field>
   )
 }
