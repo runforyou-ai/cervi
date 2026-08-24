@@ -10,6 +10,35 @@ type stubBackend struct {
 	Backend
 }
 
+type stubNativeLocaleUpdater struct {
+	locales []Locale
+}
+
+// SetLocale 记录一次原生界面语言同步。
+func (u *stubNativeLocaleUpdater) SetLocale(locale Locale) {
+	u.locales = append(u.locales, locale)
+}
+
+type localeBackend struct {
+	Backend
+	locale Locale
+}
+
+// Login 返回带指定语言的登录身份。
+func (b *localeBackend) Login(context.Context, RequestMeta, LoginInput) (Auth, error) {
+	return Auth{Identity: Identity{User: CurrentUser{Locale: b.locale}}}, nil
+}
+
+// Logout 接受退出登录。
+func (*localeBackend) Logout(context.Context, RequestMeta) error {
+	return nil
+}
+
+// UpdateUserPreferences 返回保存后的用户语言。
+func (b *localeBackend) UpdateUserPreferences(context.Context, RequestMeta, UserPreferencesInput) (CurrentUser, error) {
+	return CurrentUser{Locale: b.locale}, nil
+}
+
 // TestPlatformMethodsRequireCapability 验证未实现平台能力的 Backend 返回方法不允许。
 func TestPlatformMethodsRequireCapability(t *testing.T) {
 	service := New(&stubBackend{})
@@ -29,6 +58,29 @@ func TestPlatformMethodsRequireCapability(t *testing.T) {
 
 	_, err = service.SelectProfileImage(context.Background(), meta)
 	assertMethodNotAllowed(t, err)
+}
+
+// TestNativeLocaleFollowsAuthenticationAndPreferences 验证原生界面跟随登录和偏好语言。
+func TestNativeLocaleFollowsAuthenticationAndPreferences(t *testing.T) {
+	backend := &localeBackend{locale: LocaleChineseSimplified}
+	updater := &stubNativeLocaleUpdater{}
+	service := New(backend, WithNativeLocaleUpdater(updater))
+
+	if _, err := service.Login(context.Background(), RequestMeta{}, LoginInput{}); err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+	backend.locale = LocaleEnglishUnitedStates
+	if _, err := service.UpdateUserPreferences(context.Background(), RequestMeta{}, UserPreferencesInput{}); err != nil {
+		t.Fatalf("UpdateUserPreferences() error = %v", err)
+	}
+	if err := service.Logout(context.Background(), RequestMeta{}); err != nil {
+		t.Fatalf("Logout() error = %v", err)
+	}
+
+	want := []Locale{LocaleChineseSimplified, LocaleEnglishUnitedStates}
+	if len(updater.locales) != len(want) || updater.locales[0] != want[0] || updater.locales[1] != want[1] {
+		t.Fatalf("locales = %v, want %v", updater.locales, want)
+	}
 }
 
 type sessionBackend struct {

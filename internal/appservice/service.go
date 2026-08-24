@@ -87,10 +87,16 @@ type ProfileImageSelector interface {
 	SelectProfileImage(context.Context, RequestMeta) (ProfileImageFile, error)
 }
 
+// NativeLocaleUpdater 同步当前设备上的原生界面语言。
+type NativeLocaleUpdater interface {
+	SetLocale(Locale)
+}
+
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
 type Service struct {
 	backend              Backend
 	profileImageSelector ProfileImageSelector
+	nativeLocaleUpdater  NativeLocaleUpdater
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -100,6 +106,13 @@ type Option func(*Service)
 func WithProfileImageSelector(selector ProfileImageSelector) Option {
 	return func(service *Service) {
 		service.profileImageSelector = selector
+	}
+}
+
+// WithNativeLocaleUpdater 注入原生界面语言同步能力。
+func WithNativeLocaleUpdater(updater NativeLocaleUpdater) Option {
+	return func(service *Service) {
+		service.nativeLocaleUpdater = updater
 	}
 }
 
@@ -128,7 +141,12 @@ func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input 
 
 // Login 校验账号密码并建立登录会话。
 func (s *Service) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
-	return s.backend.Login(ctx, meta, input)
+	auth, err := s.backend.Login(ctx, meta, input)
+	if err != nil {
+		return Auth{}, err
+	}
+	s.setNativeLocale(auth.Identity.User.Locale)
+	return auth, nil
 }
 
 // Logout 退出当前登录会话。
@@ -138,7 +156,12 @@ func (s *Service) Logout(ctx context.Context, meta RequestMeta) error {
 
 // LoadIdentity 返回当前登录身份。
 func (s *Service) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity, error) {
-	return s.backend.LoadIdentity(ctx, meta)
+	identity, err := s.backend.LoadIdentity(ctx, meta)
+	if err != nil {
+		return Identity{}, err
+	}
+	s.setNativeLocale(identity.User.Locale)
+	return identity, nil
 }
 
 // UpdateProfile 修改当前用户的头像、姓名和邮箱。
@@ -171,7 +194,19 @@ func (s *Service) ChangePassword(ctx context.Context, meta RequestMeta, input Ch
 
 // UpdateUserPreferences 保存当前用户的语言和时区设置。
 func (s *Service) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (CurrentUser, error) {
-	return s.backend.UpdateUserPreferences(ctx, meta, input)
+	user, err := s.backend.UpdateUserPreferences(ctx, meta, input)
+	if err != nil {
+		return CurrentUser{}, err
+	}
+	s.setNativeLocale(user.Locale)
+	return user, nil
+}
+
+// setNativeLocale 在当前平台支持时同步原生界面语言。
+func (s *Service) setNativeLocale(locale Locale) {
+	if s.nativeLocaleUpdater != nil {
+		s.nativeLocaleUpdater.SetLocale(locale)
+	}
 }
 
 // UpdateUserWorkStatus 保存当前用户主动设置的工作状态。

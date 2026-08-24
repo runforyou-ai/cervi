@@ -1,4 +1,7 @@
 {
+  "app.product_name": "鹿行",
+  "app.tray_open": "打开鹿行",
+  "app.tray_quit": "退出鹿行",
   "error.internal": "服务暂时不可用，请稍后重试。",
   "error.method_not_allowed": "不支持此请求方法。",
   "error.installation_status_read_failed": "读取安装状态失败。",

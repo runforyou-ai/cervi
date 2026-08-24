@@ -18,6 +18,9 @@ func (s *Service) LoadSession(ctx context.Context, meta RequestMeta) (Session, e
 	if err != nil {
 		return Session{}, err
 	}
+	if session.State == SessionStateReady && session.Identity != nil {
+		s.setNativeLocale(session.Identity.User.Locale)
+	}
 	slog.Info("解析会话入口", "state", session.State)
 	return session, nil
 }

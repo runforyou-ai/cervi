@@ -1,4 +1,7 @@
 {
+  "app.product_name": "Cervi",
+  "app.tray_open": "Open Cervi",
+  "app.tray_quit": "Quit Cervi",
   "error.internal": "The service is temporarily unavailable. Try again later.",
   "error.method_not_allowed": "This request method is not supported.",
   "error.installation_status_read_failed": "Could not read the installation status.",

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync/atomic"
 
+	nativesystemlocale "github.com/runforyou-ai/cervi/internal/appservice/native/systemlocale"
 	nativesystemtray "github.com/runforyou-ai/cervi/internal/appservice/native/systemtray"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -33,7 +34,9 @@ func run(_ []string) error {
 		}
 	}()
 
-	services, err := applicationServices(appStorage)
+	systemLocale := nativesystemlocale.Detect()
+	trayController := nativesystemtray.New(systemLocale)
+	services, err := applicationServices(appStorage, trayController)
 	if err != nil {
 		return fmt.Errorf("initialize application services: %w", err)
 	}
@@ -67,7 +70,7 @@ func run(_ []string) error {
 	})
 
 	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "Cervi",
+		Title:            nativesystemtray.ProductName(systemLocale),
 		Width:            1440,
 		Height:           900,
 		MinWidth:         1440,
@@ -78,7 +81,7 @@ func run(_ []string) error {
 			TitleBar: application.MacTitleBarHidden,
 		},
 	})
-	nativesystemtray.Setup(nativesystemtray.Options{
+	trayController.Setup(nativesystemtray.Options{
 		App:             app,
 		Window:          mainWindow,
 		Icon:            nativeAppIcon,
