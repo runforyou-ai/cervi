@@ -9,7 +9,6 @@ import { logout, sessionPath, SessionState, type Identity } from "@/api"
 import { Button } from "@/components/ui/button"
 import { LoginPage } from "@/features/auth/login-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
-import { ServerUnavailableState } from "@/features/session/server-unavailable-state"
 import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
 import { useSessionLoader } from "@/features/session/use-session-loader"
 
@@ -48,15 +47,6 @@ function MobileHomePage() {
     }
   }
 
-  if (status === "unavailable" && !identity) {
-    return (
-      <ServerUnavailableState
-        onRetry={retry}
-        onChangeServer={() => navigate("/connect", { replace: true })}
-      />
-    )
-  }
-
   if (
     !identity &&
     (status === "loading" ||
@@ -72,7 +62,12 @@ function MobileHomePage() {
   }
 
   if (!identity) {
-    return <SessionLoadFailedState onRetry={retry} />
+    return (
+      <SessionLoadFailedState
+        onRetry={retry}
+        onChangeServer={() => navigate("/connect", { replace: true })}
+      />
+    )
   }
 
   return (

@@ -9,10 +9,6 @@ const enUS = {
       retry: "Try again",
       changeServer: "Change server",
     },
-    serverUnavailable: {
-      title: "The company server is temporarily unavailable",
-      description: "Please try again later.",
-    },
     sessionLoadFailed: {
       title: "Could not load the login status",
       description: "Please try again.",

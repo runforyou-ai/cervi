@@ -9,10 +9,6 @@ const zhCN = {
       retry: "重试",
       changeServer: "更换服务器",
     },
-    serverUnavailable: {
-      title: "企业服务器暂时不可用",
-      description: "请稍后重试。",
-    },
     sessionLoadFailed: {
       title: "无法读取登录状态",
       description: "请重试。",
