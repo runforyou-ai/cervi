@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, SearchIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { connectServer, getServerURL, isApiError, probeServer } from "@/api"
@@ -22,6 +21,7 @@ import {
   createServerConnectionSchema,
   type ServerConnectionFormValues,
 } from "@/features/server-connection/server-connection-schema"
+import { useSessionController } from "@/features/session/session-context"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 type DetectedServer = {
@@ -32,7 +32,7 @@ type DetectedServer = {
 /** 检测企业服务器后确认连接。 */
 export function ServerConnectionForm() {
   const { t } = useTranslation("connection")
-  const navigate = useNavigate()
+  const controller = useSessionController()
   const [detected, setDetected] = useState<DetectedServer | null>(null)
   const [detecting, setDetecting] = useState(false)
   const [connecting, setConnecting] = useState(false)
@@ -99,7 +99,7 @@ export function ServerConnectionForm() {
     setConnecting(true)
     try {
       await connectServer(detected.serverUrl)
-      navigate("/inbox", { replace: true })
+      await controller.reload("connect")
     } catch (error) {
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["serverUrl"]))

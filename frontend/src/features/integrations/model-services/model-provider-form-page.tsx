@@ -60,7 +60,7 @@ import {
   type AIProviderFormValues,
 } from "@/features/integrations/model-services/model-provider-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 
 /** 把模型 Token 数转换为紧凑显示值。 */
 function formatTokenCount(value: number) {
@@ -92,6 +92,7 @@ export function ModelProviderFormPage({
 }) {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const { providerId = "" } = useParams()
   const [loading, setLoading] = useState(mode === "edit")
   const [loadError, setLoadError] = useState(false)
@@ -176,7 +177,7 @@ export function ModelProviderFormPage({
       })
     } catch (requestError) {
       if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("模型服务供应商详情加载失败", {
         provider_id: providerId,
         error: requestError,
@@ -185,7 +186,7 @@ export function ModelProviderFormPage({
     } finally {
       if (version === loadVersion.current) setLoading(false)
     }
-  }, [form, navigate, providerId])
+  }, [form, providerId, recoverSession])
 
   useEffect(() => {
     mounted.current = true
@@ -209,7 +210,7 @@ export function ModelProviderFormPage({
       setModelDialogOpen(true)
     } catch (requestError) {
       if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("预设模型加载失败", { brand, error: requestError })
       toast.error(
         isApiError(requestError)
@@ -299,7 +300,7 @@ export function ModelProviderFormPage({
       navigate(listPath)
     } catch (requestError) {
       if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("模型服务供应商保存失败", {
         provider_id: providerId,
         error: requestError,

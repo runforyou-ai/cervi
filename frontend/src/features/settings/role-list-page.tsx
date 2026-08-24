@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { Link } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -46,7 +46,7 @@ import {
   roleDescription,
   roleDisplayName,
 } from "@/features/roles/role-labels"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 显示角色已配置的权限名称和总数。 */
@@ -70,7 +70,7 @@ function permissionSummary(
 export function RoleListPage() {
   const { t } = useTranslation("settings")
   const { t: tCommon } = useTranslation("common")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const [roles, setRoles] = useState<RoleData[]>([])
   const [permissions, setPermissions] = useState<PermissionDefinition[]>([])
   const [maximum, setMaximum] = useState<number | null>(null)
@@ -94,13 +94,13 @@ export function RoleListPage() {
       setMaximum(output.maximum)
     } catch (requestError) {
       if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("角色列表加载失败", requestError)
       setError(true)
     } finally {
       if (version === loadVersion.current) setLoading(false)
     }
-  }, [navigate])
+  }, [recoverSession])
 
   useEffect(() => {
     mounted.current = true
@@ -125,7 +125,7 @@ export function RoleListPage() {
       toast.success(t("roles.delete.success"))
     } catch (requestError) {
       if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("删除角色失败", {
         role_id: deletingRole.id,
         error: requestError,

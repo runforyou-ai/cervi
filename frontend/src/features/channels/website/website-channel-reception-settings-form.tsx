@@ -20,7 +20,7 @@ import {
   type ChannelReceptionSettingsFormValues,
 } from "@/features/channels/reception/channel-reception-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 
 /** 修改网站渠道的接待设置。 */
 export function WebsiteChannelReceptionSettingsForm({
@@ -32,6 +32,7 @@ export function WebsiteChannelReceptionSettingsForm({
 }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const schema = useMemo(
     () =>
       createChannelReceptionSchema({
@@ -68,7 +69,7 @@ export function WebsiteChannelReceptionSettingsForm({
       console.info("网站渠道接待设置已保存", { channel_id: channel.id })
       toast.success(t("routing.saved"))
     } catch (error) {
-      if (recoverSession(error, navigate)) return
+      if (recoverSession(error)) return
       if (isNotFoundApiError(error)) {
         console.warn("网站渠道不存在", { channel_id: channel.id })
         navigate("/integrations/channels", { replace: true })

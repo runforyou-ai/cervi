@@ -9,7 +9,7 @@ import {
   isNotFoundApiError,
   type WebsiteChannelData,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -148,6 +148,7 @@ function WebsiteChannelEditTabs({
 export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const { channelId = "" } = useParams()
   const [channel, setChannel] = useState<WebsiteChannelData | null>(null)
   const [loading, setLoading] = useState(mode === "edit")
@@ -172,7 +173,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
         if (!active) {
           return
         }
-        if (recoverSession(requestError, navigate)) {
+        if (recoverSession(requestError)) {
           return
         }
         if (isNotFoundApiError(requestError)) {
@@ -192,7 +193,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
     return () => {
       active = false
     }
-  }, [channelId, mode, navigate, reloadKey, t])
+  }, [channelId, mode, navigate, recoverSession, reloadKey, t])
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -16,7 +15,7 @@ import {
   type ContactInput,
   type ContactMethodInput,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -119,7 +118,7 @@ export function ContactDetailView({
   onNotFound: () => void
 }) {
   const { t } = useTranslation("contacts")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const { formatDateTime } = useDateTime()
   const [editing, setEditing] = useState<EditingSection>(null)
   const [saving, setSaving] = useState(false)
@@ -173,7 +172,7 @@ export function ContactDetailView({
       toast.success(t("form.updated"))
       onSaved(saved)
     } catch (error) {
-      if (recoverSession(error, navigate)) {
+      if (recoverSession(error)) {
         return
       }
       if (isNotFoundApiError(error)) {

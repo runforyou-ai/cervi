@@ -5,7 +5,6 @@ import { LoaderCircleIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -14,7 +13,7 @@ import {
   updateUserPreferences,
   type CurrentUser,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -38,7 +37,7 @@ export function UserPreferencesForm({
   onUpdated: (user: CurrentUser) => void
 }) {
   const { t, i18n } = useTranslation("settings")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const { theme, setTheme } = useTheme()
   const schema = useMemo(() => createUserPreferencesSchema(t), [t])
   const timeZones = useMemo(
@@ -87,7 +86,7 @@ export function UserPreferencesForm({
       })
       toast.success(t("preferences.saveSuccess"))
     } catch (error) {
-      if (recoverSession(error, navigate)) {
+      if (recoverSession(error)) {
         return
       }
       console.warn("保存偏好设置失败", error)

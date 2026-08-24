@@ -50,7 +50,7 @@ import {
   type RoleMemberChange,
 } from "@/features/settings/role-member-dialog"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 
 const newRoleID = "new-role"
 
@@ -73,6 +73,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   const { t } = useTranslation("settings")
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const { roleId = "" } = useParams()
   const [role, setRole] = useState<RoleData | null>(null)
   const [roles, setRoles] = useState<RoleData[]>([])
@@ -152,13 +153,13 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       })
     } catch (requestError) {
       if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("角色详情加载失败", { role_id: roleId, error: requestError })
       setLoadError(true)
     } finally {
       if (version === loadVersion.current) setLoading(false)
     }
-  }, [form, mode, navigate, roleId, t, tCommon])
+  }, [form, mode, recoverSession, roleId, t, tCommon])
 
   useEffect(() => {
     mounted.current = true
@@ -234,7 +235,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       navigate("/settings/roles")
     } catch (requestError) {
       if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("保存角色失败", {
         role_id: targetRoleID,
         error: requestError,

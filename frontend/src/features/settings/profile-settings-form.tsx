@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -15,7 +14,7 @@ import {
   uploadFile,
   type CurrentUser,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -25,7 +24,7 @@ import {
 } from "@/features/settings/profile-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { UserAvatar } from "@/features/users/user-avatar"
-import { resolveAppPlatform } from "@/platform/app-platform"
+import { getAppPlatform } from "@/platform/app-platform"
 
 const avatarContentTypes = new Set(["image/jpeg", "image/png", "image/webp"])
 const maxAvatarByteSize = 5 * 1024 * 1024
@@ -49,7 +48,7 @@ export function ProfileSettingsForm({
   onUpdated: (user: CurrentUser) => void
 }) {
   const { t } = useTranslation("settings")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const avatarRequestID = useRef(0)
   const [pendingAvatar, setPendingAvatar] = useState<PendingAvatar | null>(null)
@@ -105,7 +104,7 @@ export function ProfileSettingsForm({
             : current,
         )
         console.warn("上传用户头像失败", error)
-        if (!recoverSession(error, navigate)) {
+        if (!recoverSession(error)) {
           toast.error(t("profile.avatarUploadError"))
         }
       },
@@ -156,7 +155,7 @@ export function ProfileSettingsForm({
 
   /** 按当前平台打开头像图片选择器。 */
   async function chooseAvatar() {
-    if (resolveAppPlatform() !== "desktop") {
+    if (getAppPlatform() !== "desktop") {
       fileInputRef.current?.click()
       return
     }
@@ -208,7 +207,7 @@ export function ProfileSettingsForm({
       console.info("个人资料已保存", { user_id: updated.id })
       toast.success(t("profile.saveSuccess"))
     } catch (error) {
-      if (recoverSession(error, navigate)) {
+      if (recoverSession(error)) {
         return
       }
       console.warn("保存个人资料失败", error)

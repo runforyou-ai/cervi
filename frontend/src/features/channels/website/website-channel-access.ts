@@ -1,6 +1,6 @@
 /** 网站渠道对外入口地址和安装代码。 */
 import { getServerURL } from "@/api"
-import { resolveAppPlatform } from "@/platform/app-platform"
+import { getAppPlatform } from "@/platform/app-platform"
 
 /** 返回网站渠道独立聊天链接。 */
 export function websiteChannelChatURL(origin: string, channelId: string) {
@@ -14,7 +14,7 @@ export function websiteChannelWidgetSnippet(origin: string, channelId: string) {
 
 /** 返回网站渠道公开入口使用的源站地址。 */
 export async function resolveWebsiteChannelOrigin() {
-  if (resolveAppPlatform() === "web") {
+  if (getAppPlatform() === "web") {
     return window.location.origin
   }
   return trimOrigin(await getServerURL())

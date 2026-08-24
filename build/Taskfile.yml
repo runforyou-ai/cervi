@@ -69,7 +69,7 @@ tasks:
       - yarn install
 
   build:frontend:
-    label: build:frontend (DEV={{.DEV}} RUNNER={{.PACKAGE_MANAGER}})
+    label: build:frontend (TARGET={{.FRONTEND_TARGET}} MODE={{.FRONTEND_MODE}} RUNNER={{.PACKAGE_MANAGER}})
     summary: Build the frontend project
     # 多架构构建共享绑定目录；只运行一次可避免生成器与打包器并发读写。
     run: once
@@ -77,22 +77,29 @@ tasks:
     sources:
       - "**/*"
       - exclude: node_modules/**/*
+      - "../build/frontend-targets/{{.FRONTEND_TARGET}}"
+      - "../build/frontend-modes/{{.FRONTEND_MODE}}"
     generates:
       - dist/**/*
     deps:
       - task: install:frontend:deps
       - task: generate:bindings
         vars:
-          BUILD_FLAGS:
-            ref: .BUILD_FLAGS
           OBFUSCATED:
             ref: .OBFUSCATED
     cmds:
       - task: frontend:run
         vars:
           SCRIPT: '{{if eq .DEV "true"}}build:dev{{else}}build{{end}}'
-    env:
-      PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
+          FRONTEND_TARGET:
+            ref: .FRONTEND_TARGET
+          DEV:
+            ref: .DEV
+    preconditions:
+      - sh: '{{if regexMatch "^(web|desktop|mobile)$" .FRONTEND_TARGET}}true{{else}}false{{end}}'
+        msg: "FRONTEND_TARGET must be web, desktop or mobile"
+    vars:
+      FRONTEND_MODE: '{{if eq .DEV "true"}}development{{else}}production{{end}}'
 
   frontend:run:
     summary: Run a frontend script with selected runner
@@ -100,6 +107,10 @@ tasks:
       - task: frontend:run:{{.PACKAGE_MANAGER}}
         vars:
           SCRIPT: "{{.SCRIPT}}"
+          FRONTEND_TARGET:
+            ref: .FRONTEND_TARGET
+          DEV:
+            ref: .DEV
     vars:
       SCRIPT: "{{.SCRIPT}}"
 
@@ -107,6 +118,9 @@ tasks:
     dir: frontend
     cmds:
       - npm run {{.SCRIPT}} -q
+    env:
+      CERVI_FRONTEND_TARGET: "{{.FRONTEND_TARGET}}"
+      PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
     vars:
       SCRIPT: "{{.SCRIPT}}"
 
@@ -114,6 +128,9 @@ tasks:
     dir: frontend
     cmds:
       - yarn {{.SCRIPT}}
+    env:
+      CERVI_FRONTEND_TARGET: "{{.FRONTEND_TARGET}}"
+      PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
     vars:
       SCRIPT: "{{.SCRIPT}}"
 
@@ -121,6 +138,9 @@ tasks:
     dir: frontend
     cmds:
       - pnpm run {{.SCRIPT}}
+    env:
+      CERVI_FRONTEND_TARGET: "{{.FRONTEND_TARGET}}"
+      PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
     vars:
       SCRIPT: "{{.SCRIPT}}"
 
@@ -128,6 +148,9 @@ tasks:
     dir: frontend
     cmds:
       - bun run {{.SCRIPT}}
+    env:
+      CERVI_FRONTEND_TARGET: "{{.FRONTEND_TARGET}}"
+      PRODUCTION: '{{if eq .DEV "true"}}false{{else}}true{{end}}'
     vars:
       SCRIPT: "{{.SCRIPT}}"
 
@@ -139,7 +162,6 @@ tasks:
     sources:
       - "**/*.[jt]s"
       - exclude: frontend/**/*
-      # 构建标签变化时需要重新生成绑定。
       - frontend/bindings/**/*
       - "**/*.go"
       - go.mod
@@ -147,7 +169,7 @@ tasks:
     generates:
       - frontend/bindings/**/*
     cmds:
-      - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -ts -i
+      - wails3 generate bindings -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -ts -i
 
   generate:icons:
     summary: Generates application icons for Windows and macOS
@@ -168,26 +190,44 @@ tasks:
       - task: install:frontend:deps
     cmds:
       - task: frontend:dev:{{.PACKAGE_MANAGER}}
+        vars:
+          FRONTEND_TARGET:
+            ref: .FRONTEND_TARGET
+    preconditions:
+      - sh: '{{if regexMatch "^(web|desktop|mobile)$" .FRONTEND_TARGET}}true{{else}}false{{end}}'
+        msg: "FRONTEND_TARGET must be web, desktop or mobile"
 
   frontend:dev:npm:
     dir: frontend
     cmds:
       - npm run dev -- --port {{.VITE_PORT}} --strictPort
+    env:
+      CERVI_FRONTEND_TARGET: "{{.FRONTEND_TARGET}}"
+      PRODUCTION: "false"
 
   frontend:dev:yarn:
     dir: frontend
     cmds:
       - yarn dev --port {{.VITE_PORT}} --strictPort
+    env:
+      CERVI_FRONTEND_TARGET: "{{.FRONTEND_TARGET}}"
+      PRODUCTION: "false"
 
   frontend:dev:pnpm:
     dir: frontend
     cmds:
       - pnpm dev --port {{.VITE_PORT}} --strictPort
+    env:
+      CERVI_FRONTEND_TARGET: "{{.FRONTEND_TARGET}}"
+      PRODUCTION: "false"
 
   frontend:dev:bun:
     dir: frontend
     cmds:
       - bun run dev --port {{.VITE_PORT}} --strictPort
+    env:
+      CERVI_FRONTEND_TARGET: "{{.FRONTEND_TARGET}}"
+      PRODUCTION: "false"
 
   update:build-assets:
     summary: Updates the build assets
@@ -209,10 +249,9 @@ tasks:
     deps:
       - task: build:frontend
         vars:
+          FRONTEND_TARGET: web
           DEV:
             ref: .DEV
-          BUILD_FLAGS:
-            ref: .BUILD_FLAGS
           OBFUSCATED:
             ref: .OBFUSCATED
     preconditions:
@@ -245,11 +284,9 @@ tasks:
     deps:
       # Build the production frontend so frontend/dist (embedded by the Go build
       # inside the image) is present and current in the Docker build context.
-      # Pass the server,production tags so binding generation analyses the same
-      # build the Docker image compiles, not the default-tag build.
       - task: build:frontend
         vars:
-          BUILD_FLAGS: "-tags server,production"
+          FRONTEND_TARGET: web
     cmds:
       - >-
         docker build

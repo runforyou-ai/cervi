@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { LoaderCircleIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 
 import {
   listUsers,
@@ -20,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { roleDisplayName } from "@/features/roles/role-labels"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
 const memberPageSize = 100
@@ -119,7 +118,7 @@ export function RoleMemberDialog({
 }) {
   const { t } = useTranslation("settings")
   const { t: tCommon } = useTranslation("common")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const [users, setUsers] = useState<UserData[]>([])
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
@@ -153,7 +152,7 @@ export function RoleMemberDialog({
       })
       .catch((requestError) => {
         if (version !== loadVersion.current) return
-        if (recoverSession(requestError, navigate)) return
+        if (recoverSession(requestError)) return
         console.warn("角色成员加载失败", {
           role_id: role.id,
           error: requestError,
@@ -166,7 +165,7 @@ export function RoleMemberDialog({
     return () => {
       loadVersion.current += 1
     }
-  }, [navigate, pendingRoleIDs, role])
+  }, [pendingRoleIDs, recoverSession, role])
 
   const selectedUsers = role
     ? users.filter(

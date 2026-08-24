@@ -1,6 +1,8 @@
-/** 识别当前运行平台。 */
+/** 提供构建期确定的产品平台。 */
 
 export type AppPlatform = "web" | "desktop" | "mobile"
+
+declare const __CERVI_FRONTEND_TARGET__: AppPlatform
 
 type WailsWindow = Window & {
   _wails?: {
@@ -8,40 +10,11 @@ type WailsWindow = Window & {
       OS?: string
     }
   }
-  webkit?: {
-    messageHandlers?: {
-      external?: {
-        postMessage?: unknown
-      }
-    }
-  }
-  wails?: {
-    invoke?: unknown
-  }
 }
 
-/** 根据 Wails 运行环境识别 Web、桌面端和移动端。 */
-export function resolveAppPlatform(): AppPlatform {
-  const wailsWindow = window as WailsWindow
-  const os = wailsWindow._wails?.environment?.OS
-  if (os === "ios" || os === "android") {
-    return "mobile"
-  }
-  if (os === "darwin" || os === "windows" || os === "linux") {
-    return "desktop"
-  }
-  const userAgent = navigator.userAgent.toLowerCase()
-  const hasIOSBridge =
-    typeof wailsWindow.webkit?.messageHandlers?.external?.postMessage ===
-    "function"
-  const hasAndroidBridge = typeof wailsWindow.wails?.invoke === "function"
-  if (
-    (hasIOSBridge && /iphone|ipad|ipod/.test(userAgent)) ||
-    (hasAndroidBridge && /android/.test(userAgent))
-  ) {
-    return "mobile"
-  }
-  return "web"
+/** 返回当前构建产物的平台。 */
+export function getAppPlatform(): AppPlatform {
+  return __CERVI_FRONTEND_TARGET__
 }
 
 /** 判断桌面端是否运行在 macOS。 */

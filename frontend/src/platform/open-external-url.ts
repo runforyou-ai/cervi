@@ -1,9 +1,9 @@
 /** 在系统浏览器中打开外部链接。 */
-import { resolveAppPlatform } from "@/platform/app-platform"
+import { getAppPlatform } from "@/platform/app-platform"
 
 /** 按平台打开外部 URL。 */
 export async function openExternalURL(url: string) {
-  if (resolveAppPlatform() === "web") {
+  if (getAppPlatform() === "web") {
     window.open(url, "_blank", "noopener,noreferrer")
     return
   }

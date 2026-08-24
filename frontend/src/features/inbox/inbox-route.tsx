@@ -2,17 +2,16 @@
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 
 import { loadInbox, type InboxData } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
 
 /** 校验登录后显示消息页。 */
 export function InboxRoute() {
   const { t } = useTranslation("workspace")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const [data, setData] = useState<InboxData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -28,7 +27,7 @@ export function InboxRoute() {
         conversation_count: inbox.conversations.length,
       })
     } catch (requestError) {
-      if (recoverSession(requestError, navigate)) {
+      if (recoverSession(requestError)) {
         return
       }
       console.warn("消息加载失败", requestError)
@@ -36,7 +35,7 @@ export function InboxRoute() {
     } finally {
       setLoading(false)
     }
-  }, [navigate, t])
+  }, [recoverSession, t])
 
   useEffect(() => {
     void fetchInbox()

@@ -16,7 +16,7 @@ import {
   updateWebsiteChannel,
   type WebsiteChannelSummary,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -39,6 +39,7 @@ export function WebsiteChannelForm({
 }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const schema = useMemo(
     () =>
       createWebsiteChannelSchema({
@@ -97,7 +98,7 @@ export function WebsiteChannelForm({
       console.info("网站渠道已创建", { channel_id: created.id })
       navigate("/integrations/channels", { replace: true })
     } catch (error) {
-      if (recoverSession(error, navigate)) {
+      if (recoverSession(error)) {
         return
       }
       if (channel && isNotFoundApiError(error)) {

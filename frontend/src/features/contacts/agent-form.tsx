@@ -3,7 +3,6 @@ import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { createAgent, isApiError, type Team } from "@/api"
@@ -20,7 +19,7 @@ import {
   type AgentFormValues,
 } from "@/features/contacts/agent-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 
 /** 创建 AI 员工。 */
 export function AgentForm({
@@ -35,7 +34,7 @@ export function AgentForm({
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const schema = useMemo(
     () =>
       createAgentSchema({
@@ -60,7 +59,7 @@ export function AgentForm({
       toast.success(t("agents.form.created"))
       onSaved()
     } catch (error) {
-      if (recoverSession(error, navigate)) return
+      if (recoverSession(error)) return
       console.warn("创建 AI 员工失败", error)
       toast.error(
         isApiError(error)

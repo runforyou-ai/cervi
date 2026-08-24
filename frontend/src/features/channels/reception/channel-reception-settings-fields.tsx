@@ -7,7 +7,6 @@ import {
   type Path,
 } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -19,7 +18,7 @@ import {
   type MemberOption,
   type Team,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import type { ChannelReceptionSettingsFormValues } from "@/features/channels/reception/channel-reception-schema"
@@ -176,7 +175,7 @@ export function ChannelReceptionSettingsFields<
   TValues extends FieldValues & ChannelReceptionSettingsFormValues,
 >({ control }: { control: Control<TValues> }) {
   const { t } = useTranslation("channels")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const [teams, setTeams] = useState<Team[]>([])
   const [members, setMembers] = useState<MemberOption[]>([])
 
@@ -190,7 +189,7 @@ export function ChannelReceptionSettingsFields<
       })
       .catch((error: unknown) => {
         if (!active) return
-        if (recoverSession(error, navigate)) return
+        if (recoverSession(error)) return
         console.warn("渠道接待候选项加载失败", error)
         setTeams([])
         setMembers([])
@@ -199,7 +198,7 @@ export function ChannelReceptionSettingsFields<
     return () => {
       active = false
     }
-  }, [navigate, t])
+  }, [recoverSession, t])
 
   return (
     <>

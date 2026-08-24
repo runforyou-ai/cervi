@@ -20,7 +20,7 @@ import {
   type CurrentUser,
   type WorkStatus,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -121,6 +121,7 @@ export function WorkspaceNavigation({
   const { t } = useTranslation("workspace")
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [changingWorkStatus, setChangingWorkStatus] = useState(false)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
@@ -147,7 +148,7 @@ export function WorkspaceNavigation({
       console.info("工作状态已切换", { work_status: workStatus })
     } catch (error) {
       onUserUpdated(previous)
-      if (!recoverSession(error, navigate)) {
+      if (!recoverSession(error)) {
         console.warn("切换工作状态失败", error)
         toast.error(t("workStatusUpdateError"))
       }

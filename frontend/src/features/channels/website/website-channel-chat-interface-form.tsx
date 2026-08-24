@@ -13,7 +13,7 @@ import {
   type WebsiteChannelData,
   type WebsiteChannelChatInterface,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -46,6 +46,7 @@ export function WebsiteChannelChatInterfaceForm({
 }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const schema = useMemo(
     () =>
       createWebsiteChannelChatInterfaceSchema({
@@ -83,7 +84,7 @@ export function WebsiteChannelChatInterfaceForm({
       console.info("网站渠道聊天界面已保存", { channel_id: channel.id })
       toast.success(t("chatInterface.saved"))
     } catch (error) {
-      if (recoverSession(error, navigate)) {
+      if (recoverSession(error)) {
         return
       }
       if (isNotFoundApiError(error)) {

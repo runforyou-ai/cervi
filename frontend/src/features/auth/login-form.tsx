@@ -4,11 +4,9 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, login } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,12 +21,15 @@ import {
   createLoginSchema,
   type LoginFormValues,
 } from "@/features/auth/login-schema"
+import { useSessionController } from "@/features/session/session-context"
+import { useSessionRecovery } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 校验并提交登录。 */
 export function LoginForm() {
   const { t } = useTranslation("auth")
-  const navigate = useNavigate()
+  const controller = useSessionController()
+  const recoverSession = useSessionRecovery()
   const schema = useMemo(() => createLoginSchema(t), [t])
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(schema),
@@ -39,13 +40,13 @@ export function LoginForm() {
     },
   })
 
-  /** 提交登录并进入收件箱。 */
+  /** 提交登录并重新读取权威会话。 */
   async function submitLogin(values: LoginFormValues) {
     try {
       await login(values)
-      navigate("/inbox", { replace: true })
+      await controller.reload("login")
     } catch (error) {
-      if (recoverSession(error, navigate)) {
+      if (recoverSession(error)) {
         return
       }
       if (isApiError(error)) {

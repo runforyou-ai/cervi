@@ -48,7 +48,7 @@ import {
   type ModelServiceSection,
 } from "@/features/integrations/model-services/model-service-options"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 
 /** 显示指定类型的模型服务供应商。 */
 export function ModelProviderListPage({
@@ -58,6 +58,7 @@ export function ModelProviderListPage({
 }) {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const [providers, setProviders] = useState<AIProviderSummaryData[]>([])
   const [deletingProvider, setDeletingProvider] =
     useState<AIProviderSummaryData | null>(null)
@@ -82,13 +83,13 @@ export function ModelProviderListPage({
       setProviders(output.providers)
     } catch (requestError) {
       if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("模型服务供应商列表加载失败", requestError)
       setError(true)
     } finally {
       if (version === loadVersion.current) setLoading(false)
     }
-  }, [navigate])
+  }, [recoverSession])
 
   useEffect(() => {
     mounted.current = true
@@ -113,7 +114,7 @@ export function ModelProviderListPage({
       toast.success(t("modelServices.delete.success"))
     } catch (requestError) {
       if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
+      if (recoverSession(requestError)) return
       console.warn("模型服务供应商删除失败", {
         provider_id: deletingProvider.id,
         error: requestError,

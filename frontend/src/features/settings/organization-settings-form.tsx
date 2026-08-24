@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, updateOrganization, type Organization } from "@/api"
@@ -16,7 +15,7 @@ import {
   type OrganizationSettingsFormValues,
 } from "@/features/settings/organization-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useSessionRecovery } from "@/lib/session-navigation"
 
 /** 显示并修改当前企业名称。 */
 export function OrganizationSettingsForm({
@@ -27,7 +26,7 @@ export function OrganizationSettingsForm({
   onUpdated: (organization: Organization) => void
 }) {
   const { t } = useTranslation("settings")
-  const navigate = useNavigate()
+  const recoverSession = useSessionRecovery()
   const mounted = useRef(true)
   const schema = useMemo(
     () =>
@@ -63,7 +62,7 @@ export function OrganizationSettingsForm({
       toast.success(t("organization.saveSuccess"))
     } catch (error) {
       if (!mounted.current) return
-      if (recoverSession(error, navigate)) {
+      if (recoverSession(error)) {
         return
       }
       console.warn("企业名称更新失败", {

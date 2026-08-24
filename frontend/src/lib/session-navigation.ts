@@ -1,24 +1,16 @@
-/** 根据应用服务错误恢复会话入口路由。 */
-import type { NavigateFunction } from "react-router"
+/** 根据应用服务错误恢复全局会话入口。 */
+import { useCallback } from "react"
 
-import { isApiError, sessionPath, SessionState } from "@/api"
-import { clearToken } from "@/api/client"
+import { isApiError } from "@/api"
+import { useSessionController } from "@/features/session/session-context"
 
-/** 将带有会话状态的错误导航到对应入口。 */
-export function recoverSession(
-  error: unknown,
-  navigate: NavigateFunction,
-): boolean {
-  if (!isApiError(error)) {
-    return false
-  }
-  const path = sessionPath(error.state)
-  if (!path) {
-    return false
-  }
-  if (error.state === SessionState.SessionStateLogin) {
-    clearToken()
-  }
-  navigate(path, { replace: true })
-  return true
+/** 返回把结构化接口错误提交给会话控制器的函数。 */
+export function useSessionRecovery() {
+  const controller = useSessionController()
+  return useCallback(
+    (error: unknown): boolean => {
+      return isApiError(error) && controller.commitClassified(error.state)
+    },
+    [controller],
+  )
 }

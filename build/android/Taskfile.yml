@@ -42,8 +42,7 @@ tasks:
       - task: generate:android:overlay
       - task: common:build:frontend
         vars:
-          BUILD_FLAGS:
-            ref: .BUILD_FLAGS
+          FRONTEND_TARGET: mobile
           PRODUCTION:
             ref: .PRODUCTION
     cmds:
