@@ -800,24 +800,11 @@ const enUS = {
           "Uses the system default sound, is saved only in this browser or on this device, and is enabled by default.",
         permission: {
           label: "Notifications on this device",
-          statuses: {
-            checking: "Checking",
-            granted: "Allowed",
-            denied: "Blocked",
-            systemManaged: "Managed by system",
-            unsupported: "Unavailable",
-          },
-          descriptions: {
-            checking: "Checking your browser or system permission.",
-            prompt:
-              "Allow notifications before Cervi can show them on this device.",
-            granted: "This device can show new message notifications.",
-            denied:
-              "Allow Cervi notifications in your browser or system settings.",
-            systemManaged: "Your operating system manages notifications.",
-            unsupported:
-              "Notifications are unavailable in this browser, connection, or device.",
-          },
+          authorized: "Authorized",
+          authorizedDescription:
+            "This device can show new message notifications.",
+          unauthorizedDescription:
+            "Authorize notifications before Cervi can show them on this device.",
           allow: "Allow notifications",
           allowing: "Requesting…",
           allowSuccess: "Notification permission enabled.",

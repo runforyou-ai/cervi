@@ -1,5 +1,4 @@
 /** 偏好设置中的当前设备通知权限状态与操作。 */
-import type { TFunction } from "i18next"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -17,52 +16,7 @@ import {
   canSendNotification,
   type NotificationDeviceScope,
 } from "@/platform/notifications"
-import {
-  useNotificationPermission,
-  type NotificationPermissionViewState,
-} from "@/features/notifications/use-notification-permission"
-
-/** 返回通知权限状态的本地化文案。 */
-function permissionStatusLabel(
-  status: Exclude<NotificationPermissionViewState, "prompt">,
-  t: TFunction<"settings">,
-) {
-  switch (status) {
-    case "checking":
-      return t("preferences.notifications.permission.statuses.checking")
-    case "granted":
-      return t("preferences.notifications.permission.statuses.granted")
-    case "denied":
-      return t("preferences.notifications.permission.statuses.denied")
-    case "system-managed":
-      return t("preferences.notifications.permission.statuses.systemManaged")
-    case "unsupported":
-      return t("preferences.notifications.permission.statuses.unsupported")
-  }
-}
-
-/** 返回通知权限状态对应的操作说明。 */
-function permissionStatusDescription(
-  status: NotificationPermissionViewState,
-  t: TFunction<"settings">,
-) {
-  switch (status) {
-    case "checking":
-      return t("preferences.notifications.permission.descriptions.checking")
-    case "prompt":
-      return t("preferences.notifications.permission.descriptions.prompt")
-    case "granted":
-      return t("preferences.notifications.permission.descriptions.granted")
-    case "denied":
-      return t("preferences.notifications.permission.descriptions.denied")
-    case "system-managed":
-      return t(
-        "preferences.notifications.permission.descriptions.systemManaged",
-      )
-    case "unsupported":
-      return t("preferences.notifications.permission.descriptions.unsupported")
-  }
-}
+import { useNotificationPermission } from "@/features/notifications/use-notification-permission"
 
 /** 展示本设备通知权限，并在需要时提供申请操作。 */
 export function NotificationPermissionSettings({
@@ -74,6 +28,7 @@ export function NotificationPermissionSettings({
   const navigate = useNavigate()
   const { status, requesting, requestPermission } =
     useNotificationPermission(scope)
+  const authorized = status !== "checking" && canSendNotification(status)
 
   /** 申请当前设备的通知权限。 */
   async function allowNotifications() {
@@ -103,21 +58,24 @@ export function NotificationPermissionSettings({
           {t("preferences.notifications.permission.label")}
         </FieldTitle>
         <FieldDescription>
-          {permissionStatusDescription(status, t)}
+          {authorized
+            ? t("preferences.notifications.permission.authorizedDescription")
+            : t(
+                "preferences.notifications.permission.unauthorizedDescription",
+              )}
         </FieldDescription>
       </FieldContent>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-        {status !== "prompt" ? (
+        {authorized ? (
           <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-            {permissionStatusLabel(status, t)}
+            {t("preferences.notifications.permission.authorized")}
           </span>
-        ) : null}
-        {status === "prompt" ? (
+        ) : (
           <Button
             type="button"
             size="sm"
             variant="outline"
-            disabled={requesting}
+            disabled={status === "checking" || requesting}
             onClick={() => void allowNotifications()}
           >
             {requesting ? <LoaderCircleIcon className="animate-spin" /> : null}
@@ -125,7 +83,7 @@ export function NotificationPermissionSettings({
               ? t("preferences.notifications.permission.allowing")
               : t("preferences.notifications.permission.allow")}
           </Button>
-        ) : null}
+        )}
       </div>
     </Field>
   )
