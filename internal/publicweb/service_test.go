@@ -297,7 +297,7 @@ func TestPublicChatPages(t *testing.T) {
 		if !strings.Contains(body, "通常几分钟内回复") {
 			t.Fatal("missing subtitle")
 		}
-		if !strings.Contains(body, `class="cv-close"`) {
+		if !strings.Contains(body, `type="button" data-close`) {
 			t.Fatal("embed chrome must include close control")
 		}
 	})
@@ -309,7 +309,7 @@ func TestPublicChatPages(t *testing.T) {
 		chat.ServeHTTP(response, request)
 		body := assertChatPage(t, response, http.StatusOK, "在线咨询")
 		assertMessengerPage(t, body, false)
-		if strings.Contains(body, `class="cv-close"`) {
+		if strings.Contains(body, `type="button" data-close`) {
 			t.Fatal("standalone chrome must not include widget close")
 		}
 	})
