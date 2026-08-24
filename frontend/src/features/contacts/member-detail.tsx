@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -30,7 +31,7 @@ import {
 import { WorkStatusBadge } from "@/features/users/work-status"
 import { useDateTime } from "@/hooks/use-date-time"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 import { roleDisplayName } from "@/features/roles/role-labels"
 
 type EditingField = "name" | "email" | "role" | "teams" | null
@@ -80,7 +81,7 @@ export function MemberDetailView({
 }) {
   const { t } = useTranslation("contacts")
   const { t: tCommon } = useTranslation("common")
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [editing, setEditing] = useState<EditingField>(null)
   const [saving, setSaving] = useState(false)
@@ -135,7 +136,7 @@ export function MemberDetailView({
       toast.success(t("members.form.updated"))
       onSaved(saved)
     } catch (error) {
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         onNotFound()
         return

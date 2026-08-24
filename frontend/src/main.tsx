@@ -5,13 +5,10 @@ import { ThemeProvider } from "next-themes"
 import { HashRouter } from "react-router"
 
 import App from "@/App"
-import { loadSession } from "@/api"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { SessionController } from "@/features/session/session-controller"
-import { SessionProvider } from "@/features/session/session-context"
 import { initializeI18n } from "@/i18n"
 import "@/index.css"
-import { getAppPlatform, type AppPlatform } from "@/platform/app-platform"
+import { resolveAppPlatform, type AppPlatform } from "@/platform/app-platform"
 
 /** Web 端启用浏览器默认右键菜单。 */
 function applyPlatformContextMenu(platform: AppPlatform) {
@@ -23,21 +20,17 @@ function applyPlatformContextMenu(platform: AppPlatform) {
 /** 启动前端应用。 */
 async function bootstrap() {
   await initializeI18n()
-  const platform = getAppPlatform()
-  const sessionController = new SessionController(loadSession)
-  sessionController.start()
+  const platform = resolveAppPlatform()
   applyPlatformContextMenu(platform)
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <SessionProvider controller={sessionController}>
-          <HashRouter>
-            <TooltipProvider>
-              <App platform={platform} />
-            </TooltipProvider>
-          </HashRouter>
-        </SessionProvider>
+        <HashRouter>
+          <TooltipProvider>
+            <App platform={platform} />
+          </TooltipProvider>
+        </HashRouter>
       </ThemeProvider>
     </React.StrictMode>,
   )

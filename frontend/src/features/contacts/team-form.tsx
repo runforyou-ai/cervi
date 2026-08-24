@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { createTeam, isApiError, updateTeam, type Team } from "@/api"
@@ -10,7 +11,7 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 import {
   createTeamSchema,
@@ -28,7 +29,7 @@ export function TeamForm({
   onCancel?: () => void
 }) {
   const { t } = useTranslation("contacts")
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const schema = useMemo(
     () =>
       createTeamSchema({
@@ -60,7 +61,7 @@ export function TeamForm({
       toast.success(t(team ? "teams.form.updated" : "teams.form.created"))
       onSaved(saved)
     } catch (error) {
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       console.warn("保存团队失败", error)
       toast.error(
         isApiError(error)

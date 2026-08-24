@@ -75,8 +75,6 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        env:
-          CERVI_FRONTEND_TARGET: web
         run: npm run build
 
       - name: Check Go formatting
@@ -142,8 +140,6 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        env:
-          CERVI_FRONTEND_TARGET: web
         run: |
           npm ci
           npm run build

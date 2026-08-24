@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -27,7 +28,7 @@ import {
 } from "@/features/contacts/detail-edit-row"
 import { useDateTime } from "@/hooks/use-date-time"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 
 type EditingField = "name" | "teams" | null
 
@@ -52,7 +53,7 @@ export function AgentDetailView({
   onNotFound: () => void
 }) {
   const { t } = useTranslation("contacts")
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [editing, setEditing] = useState<EditingField>(null)
   const [saving, setSaving] = useState(false)
@@ -94,7 +95,7 @@ export function AgentDetailView({
       toast.success(t("agents.form.updated"))
       onSaved(saved)
     } catch (error) {
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         onNotFound()
         return

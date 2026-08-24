@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -46,7 +46,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
 
@@ -116,7 +116,7 @@ function WebsiteChannelRow({
 /** 加载并管理消息渠道列表。 */
 export function MessageChannelListPage() {
   const { t } = useTranslation("channels")
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const [channels, setChannels] = useState<WebsiteChannelSummary[]>([])
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
@@ -135,7 +135,7 @@ export function MessageChannelListPage() {
     try {
       setChannels(await listWebsiteChannels())
     } catch (requestError) {
-      if (recoverSession(requestError)) {
+      if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("网站渠道列表加载失败", requestError)
@@ -143,7 +143,7 @@ export function MessageChannelListPage() {
     } finally {
       setLoading(false)
     }
-  }, [recoverSession, t])
+  }, [navigate, t])
 
   useEffect(() => {
     void loadChannels()
@@ -177,7 +177,7 @@ export function MessageChannelListPage() {
         enabled: updated.enabled,
       })
     } catch (requestError) {
-      if (recoverSession(requestError)) {
+      if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("切换网站渠道状态失败", {

@@ -61,7 +61,7 @@ import {
   type TeamMember,
   type TeamSummary,
 } from "@/api"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 import {
   ListToolbar,
@@ -516,7 +516,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const { t: tCommon } = useTranslation("common")
   const { identity, updateUser: updateWorkspaceUser } = useWorkspace()
   const navigate = useNavigate()
-  const recoverSession = useSessionRecovery()
   const { teamId = "" } = useParams()
   const { formatDateTime } = useDateTime()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -696,7 +695,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       setLoadState("ready")
     } catch (error) {
       if (requestID !== listRequestID.current) return
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       console.warn("联系人列表加载失败", error)
       setLoadState("error")
     }
@@ -707,7 +706,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     methodType,
     navigate,
     query,
-    recoverSession,
     roleId,
     scope,
     sort,
@@ -746,7 +744,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     void loader
       .catch((error: unknown) => {
         if (requestID !== detailRequestID.current) return
-        if (recoverSession(error)) {
+        if (recoverSession(error, navigate)) {
           return
         }
         console.warn("联系人详情加载失败", error)
@@ -759,7 +757,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     return () => {
       detailRequestID.current += 1
     }
-  }, [recoverSession, scope, selected, setParameters, t])
+  }, [navigate, scope, selected, setParameters, t])
 
   const selectedChannel = channels.find((channel) => channel.id === channelId)
   const title =
@@ -826,7 +824,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       }
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (recoverSession(error)) {
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("删除联系人失败", error)
@@ -847,7 +845,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       setRestoringContact(null)
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (recoverSession(error)) {
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("恢复联系人失败", error)
@@ -884,7 +882,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       }
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       console.warn("修改用户账号状态失败", {
         user_id: changingUserStatus.id,
         error,
@@ -922,7 +920,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       }
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       console.warn("修改 AI 员工状态失败", {
         agent_id: changingAgentStatus.id,
         error,
@@ -949,7 +947,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         navigate("/contacts/employees", { replace: true })
       }
     } catch (error) {
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       console.warn("删除团队失败", error)
       toast.error(t("teams.delete.error"))
     } finally {
@@ -983,7 +981,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       setSelectedTeamMemberIdentityIDs(new Set())
       setRefreshVersion((current) => current + 1)
     } catch (error) {
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       console.warn("移出团队成员失败", error)
       toast.error(t("teams.members.removeError"))
     } finally {

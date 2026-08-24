@@ -15,7 +15,7 @@ import {
   type WebsiteChannelAccessData,
   type WebsiteChannelData,
 } from "@/api"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -159,7 +159,6 @@ export function WebsiteChannelUsagePanel({
 }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
-  const recoverSession = useSessionRecovery()
   const [origin, setOrigin] = useState("")
   const [error, setError] = useState("")
   const [copied, setCopied] = useState<"snippet" | "link" | "">("")
@@ -282,7 +281,7 @@ export function WebsiteChannelUsagePanel({
       })
       toast.success(t("usage.saved"))
     } catch (submitError) {
-      if (recoverSession(submitError)) {
+      if (recoverSession(submitError, navigate)) {
         return
       }
       if (isNotFoundApiError(submitError)) {

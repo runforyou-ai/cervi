@@ -3,6 +3,7 @@ import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -14,7 +15,7 @@ import {
   type ContactDetail,
   type ContactInput,
 } from "@/api"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -39,7 +40,7 @@ export function ContactForm({
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const schema = useMemo(
     () =>
       createContactSchema({
@@ -87,7 +88,7 @@ export function ContactForm({
       toast.success(t("form.created"))
       onSaved(saved)
     } catch (error) {
-      if (recoverSession(error)) {
+      if (recoverSession(error, navigate)) {
         return
       }
       if (isApiError(error)) {

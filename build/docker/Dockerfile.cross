@@ -194,10 +194,9 @@ esac
 export CGO_ENABLED=1
 export CGO_CFLAGS="-w"
 
-# Build the desktop frontend when the mounted artifact is absent or belongs to another target.
-if [ -d "frontend" ] && [ -f "frontend/package.json" ] && \
-   ! grep -q '"platform":"desktop"' frontend/dist/cervi-platform.json 2>/dev/null; then
-    (cd frontend && npm install --silent && CERVI_FRONTEND_TARGET=desktop npm run build --silent)
+# Build frontend if exists and not already built (host may have built it)
+if [ -d "frontend" ] && [ -f "frontend/package.json" ] && [ ! -d "frontend/dist" ]; then
+    (cd frontend && npm install --silent && npm run build --silent)
 fi
 
 # Build

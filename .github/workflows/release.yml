@@ -102,8 +102,6 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        env:
-          CERVI_FRONTEND_TARGET: web
         run: |
           npm ci
           npm run build
@@ -541,8 +539,6 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        env:
-          CERVI_FRONTEND_TARGET: web
         run: |
           npm ci
           npm run build

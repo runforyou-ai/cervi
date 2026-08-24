@@ -10,6 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { EyeIcon, EyeOffIcon, LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -20,7 +21,7 @@ import {
   testS3Setting,
   type StorageProviderId,
 } from "@/api"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { StatusBadge } from "@/components/status-badge"
 import {
@@ -91,7 +92,7 @@ function isConfigured(setting: StorageSettingsFormValues) {
 /** 读取、保存和测试对象存储设置。 */
 export function StorageSettingsForm() {
   const { t } = useTranslation("settings")
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState("")
   const [savedSetting, setSavedSetting] =
@@ -180,7 +181,7 @@ export function StorageSettingsForm() {
       setEditing(false)
       form.reset(setting)
     } catch (error) {
-      if (recoverSession(error)) {
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("对象存储设置加载失败", error)
@@ -188,7 +189,7 @@ export function StorageSettingsForm() {
     } finally {
       setLoading(false)
     }
-  }, [form, recoverSession, t])
+  }, [form, navigate, t])
 
   useEffect(() => {
     void loadSetting()
@@ -196,7 +197,7 @@ export function StorageSettingsForm() {
 
   /** 处理对象存储请求错误。 */
   function handleRequestError(error: unknown, message: string) {
-    if (recoverSession(error)) {
+    if (recoverSession(error, navigate)) {
       return
     }
     if (isApiError(error)) {

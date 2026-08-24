@@ -12,6 +12,6 @@ export {
   logout,
   probeServer,
 } from "@/api/auth"
-export { loadSession } from "@/api/session"
+export { loadSession, sessionPath } from "@/api/session"
 export { uploadFile, uploadFileContent } from "@/api/uploads"
 export * from "@/api/service"

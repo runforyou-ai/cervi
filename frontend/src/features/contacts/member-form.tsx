@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 import { roleDisplayName } from "@/features/roles/role-labels"
 import {
   createMemberSchema,
@@ -45,7 +46,7 @@ export function MemberForm({
 }) {
   const { t } = useTranslation("contacts")
   const { t: tCommon } = useTranslation("common")
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const defaultRoleID =
     roles.find((role) => role.kind === RoleKind.RoleKindMember)?.id ??
     roles[0]?.id ??
@@ -97,7 +98,7 @@ export function MemberForm({
       toast.success(t("members.form.created"))
       onSaved()
     } catch (error) {
-      if (recoverSession(error)) return
+      if (recoverSession(error, navigate)) return
       console.warn("保存企业成员失败", error)
       toast.error(
         isApiError(error)

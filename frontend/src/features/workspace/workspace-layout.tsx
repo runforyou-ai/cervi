@@ -1,20 +1,21 @@
 /** Web 与桌面端工作台布局。 */
-import { useLayoutEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useState } from "react"
+import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Outlet, useLocation } from "react-router"
+import { Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
   logout,
+  sessionPath,
+  SessionState,
   type Identity,
   type Organization,
   type CurrentUser,
 } from "@/api"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
-import {
-  useSessionController,
-  useSessionSnapshot,
-} from "@/features/session/session-context"
+import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
+import { useSessionLoader } from "@/features/session/use-session-loader"
 import type { WorkspaceOutletContext } from "@/features/workspace/workspace-context"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
@@ -27,14 +28,46 @@ function useClearSelectionOnNavigation() {
   }, [location.key])
 }
 
-/** 使用 Gate 已确认的身份渲染工作台导航和子页面。 */
-export function WorkspaceLayout() {
+/** 读取会话并渲染工作台导航和子页面。 */
+export function WorkspaceLayout({
+  allowServerChange = false,
+}: {
+  allowServerChange?: boolean
+}) {
   useClearSelectionOnNavigation()
   const { t } = useTranslation("workspace")
-  const controller = useSessionController()
-  const { session } = useSessionSnapshot()
-  const [identity, setIdentity] = useState<Identity>(session!.identity!)
+  const navigate = useNavigate()
+  const [identity, setIdentity] = useState<Identity | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
+  const { status, session, retry } = useSessionLoader()
+
+  /** 会话加载完成后同步工作台身份。 */
+  useEffect(() => {
+    if (status !== "loaded" || !session) {
+      return
+    }
+    if (session.state === SessionState.SessionStateReady && session.identity) {
+      setIdentity(session.identity)
+      console.info("工作台身份已加载", {
+        organization: session.identity.organization.name,
+      })
+    }
+  }, [session, status])
+
+  /** 会话未就绪时跳转到对应入口。 */
+  useEffect(() => {
+    if (
+      status !== "loaded" ||
+      !session ||
+      session.state === SessionState.SessionStateReady
+    ) {
+      return
+    }
+    const path = sessionPath(session.state)
+    if (path) {
+      navigate(path, { replace: true })
+    }
+  }, [navigate, session, status])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -47,7 +80,7 @@ export function WorkspaceLayout() {
       toast.error(t("logoutError"))
     } finally {
       setLoggingOut(false)
-      await controller.reload("logout")
+      navigate("/login", { replace: true })
     }
   }
 
@@ -59,6 +92,33 @@ export function WorkspaceLayout() {
   /** 同步工作台中的最新企业信息。 */
   function updateOrganization(organization: Organization) {
     setIdentity((current) => (current ? { ...current, organization } : current))
+  }
+
+  if (
+    !identity &&
+    (status === "loading" ||
+      (status === "loaded" &&
+        session?.state === SessionState.SessionStateReady))
+  ) {
+    return (
+      <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
+        <LoaderCircleIcon className="size-4 animate-spin" />
+        {t("loading")}
+      </main>
+    )
+  }
+
+  if (!identity) {
+    return (
+      <SessionLoadFailedState
+        onRetry={retry}
+        onChangeServer={
+          allowServerChange
+            ? () => navigate("/connect", { replace: true })
+            : undefined
+        }
+      />
+    )
   }
 
   return (

@@ -4,9 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, install } from "@/api"
+import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,15 +23,12 @@ import {
   createSetupSchema,
   type SetupFormValues,
 } from "@/features/installation/setup-schema"
-import { useSessionController } from "@/features/session/session-context"
-import { useSessionRecovery } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 创建企业和第一个管理员账号。 */
 export function SetupForm() {
   const { t } = useTranslation("setup")
-  const controller = useSessionController()
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const schema = useMemo(() => createSetupSchema(t), [t])
   const form = useForm<SetupFormValues>({
     resolver: zodResolver(schema),
@@ -42,13 +41,13 @@ export function SetupForm() {
     },
   })
 
-  /** 提交企业初始化并重新读取权威会话。 */
+  /** 提交企业初始化并进入收件箱。 */
   async function submitSetup(values: SetupFormValues) {
     try {
       await install(values)
-      await controller.reload("setup")
+      navigate("/inbox", { replace: true })
     } catch (error) {
-      if (recoverSession(error)) {
+      if (recoverSession(error, navigate)) {
         return
       }
       if (isApiError(error)) {

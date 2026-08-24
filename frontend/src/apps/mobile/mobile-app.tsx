@@ -1,26 +1,38 @@
 /** 移动端独立入口、路由和首页。 */
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { LoaderCircleIcon, SmartphoneIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, Route, Routes } from "react-router"
+import { Navigate, Route, Routes, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { logout } from "@/api"
+import { logout, sessionPath, SessionState, type Identity } from "@/api"
 import { Button } from "@/components/ui/button"
 import { LoginPage } from "@/features/auth/login-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
-import {
-  useSessionController,
-  useSessionSnapshot,
-} from "@/features/session/session-context"
+import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
+import { useSessionLoader } from "@/features/session/use-session-loader"
 
 /** 移动端登录后首页。 */
 function MobileHomePage() {
   const { t } = useTranslation("mobile")
-  const controller = useSessionController()
-  const { session } = useSessionSnapshot()
-  const identity = session!.identity!
+  const navigate = useNavigate()
+  const [identity, setIdentity] = useState<Identity | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
+  const { status, session, retry } = useSessionLoader()
+
+  useEffect(() => {
+    if (status !== "loaded" || !session) {
+      return
+    }
+    if (session.state === SessionState.SessionStateReady && session.identity) {
+      setIdentity(session.identity)
+      return
+    }
+    const path = sessionPath(session.state)
+    if (path) {
+      navigate(path, { replace: true })
+    }
+  }, [navigate, session, status])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -31,8 +43,31 @@ function MobileHomePage() {
       toast.error(t("logoutError"))
     } finally {
       setLoggingOut(false)
-      await controller.reload("logout")
+      navigate("/login", { replace: true })
     }
+  }
+
+  if (
+    !identity &&
+    (status === "loading" ||
+      (status === "loaded" &&
+        session?.state === SessionState.SessionStateReady))
+  ) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center gap-2 text-sm text-muted-foreground">
+        <LoaderCircleIcon className="size-4 animate-spin" />
+        {t("loading")}
+      </main>
+    )
+  }
+
+  if (!identity) {
+    return (
+      <SessionLoadFailedState
+        onRetry={retry}
+        onChangeServer={() => navigate("/connect", { replace: true })}
+      />
+    )
   }
 
   return (

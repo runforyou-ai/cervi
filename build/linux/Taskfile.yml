@@ -45,7 +45,8 @@ tasks:
       - task: common:go:mod:tidy
       - task: common:build:frontend
         vars:
-          FRONTEND_TARGET: desktop
+          BUILD_FLAGS:
+            ref: .BUILD_FLAGS
           OBFUSCATED:
             ref: .OBFUSCATED
           DEV:
@@ -72,7 +73,6 @@ tasks:
     deps:
       - task: common:build:frontend
         vars:
-          FRONTEND_TARGET: desktop
           OBFUSCATED:
             ref: .OBFUSCATED
       - task: common:generate:icons

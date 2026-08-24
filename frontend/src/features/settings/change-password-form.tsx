@@ -4,10 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { changePassword, isApiError } from "@/api"
-import { useSessionRecovery } from "@/lib/session-navigation"
+import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -20,7 +21,7 @@ import { apiErrorMessage } from "@/lib/form-errors"
 /** 修改当前用户的登录密码。 */
 export function ChangePasswordForm() {
   const { t } = useTranslation("settings")
-  const recoverSession = useSessionRecovery()
+  const navigate = useNavigate()
   const schema = useMemo(() => createChangePasswordSchema(t), [t])
   const form = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(schema),
@@ -43,7 +44,7 @@ export function ChangePasswordForm() {
       console.info("密码修改成功")
       toast.success(t("password.saveSuccess"))
     } catch (error) {
-      if (recoverSession(error)) {
+      if (recoverSession(error, navigate)) {
         return
       }
       console.warn("修改密码失败", error)
