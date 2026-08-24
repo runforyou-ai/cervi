@@ -24,7 +24,7 @@ func TestPlatformMethodsRequireCapability(t *testing.T) {
 	_, err = service.ProbeServer(context.Background(), meta, "https://cervi.example.com")
 	assertMethodNotAllowed(t, err)
 
-	_, err = service.ConnectServer(context.Background(), meta, "https://cervi.example.com")
+	err = service.ConnectServer(context.Background(), meta, "https://cervi.example.com")
 	assertMethodNotAllowed(t, err)
 
 	_, err = service.SelectProfileImage(context.Background(), meta)
@@ -69,9 +69,9 @@ func (b *nativeSessionBackend) ProbeServer(context.Context, RequestMeta, string)
 	return InstallationStatus{}, nil
 }
 
-// ConnectServer 接受服务器连接并返回地址未变化。
-func (b *nativeSessionBackend) ConnectServer(context.Context, RequestMeta, string) (bool, error) {
-	return false, nil
+// ConnectServer 接受服务器连接。
+func (b *nativeSessionBackend) ConnectServer(context.Context, RequestMeta, string) error {
+	return nil
 }
 
 // TestLoadSessionResolvesWebEntry 验证 Web 端按初始化与登录状态选择入口。
@@ -106,6 +106,28 @@ func TestLoadSessionResolvesWebEntry(t *testing.T) {
 	session, err = service.LoadSession(context.Background(), RequestMeta{Token: "expired"})
 	if err != nil || session.State != SessionStateLogin || session.OrganizationName != "鹿行" {
 		t.Fatalf("expired session = %+v, err = %v", session, err)
+	}
+}
+
+// TestLoadSessionResolvesNativeEntryWithoutRequestToken 验证原生端由 Backend 解析持久化登录态。
+func TestLoadSessionResolvesNativeEntryWithoutRequestToken(t *testing.T) {
+	identity := Identity{
+		Organization: Organization{ID: "organization-1", Name: "鹿行"},
+		User:         CurrentUser{ID: "user-1", DisplayName: "管理员"},
+	}
+	backend := &nativeSessionBackend{
+		sessionBackend: &sessionBackend{installed: true, orgName: "鹿行", identity: identity},
+		serverURL:      "https://cervi.example.com",
+	}
+	session, err := New(backend).LoadSession(context.Background(), RequestMeta{})
+	if err != nil || session.State != SessionStateReady || session.Identity == nil || session.Identity.User.ID != "user-1" {
+		t.Fatalf("ready native session = %+v, err = %v", session, err)
+	}
+
+	backend.identityErr = &Error{State: SessionStateLogin, Message: "请先登录。"}
+	session, err = New(backend).LoadSession(context.Background(), RequestMeta{})
+	if err != nil || session.State != SessionStateLogin || session.OrganizationName != "鹿行" {
+		t.Fatalf("anonymous native session = %+v, err = %v", session, err)
 	}
 }
 

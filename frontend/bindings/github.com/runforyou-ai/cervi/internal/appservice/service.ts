@@ -43,9 +43,9 @@ export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $
 }
 
 /**
- * ConnectServer 验证并保存原生端企业服务器地址，并返回地址是否变化。
+ * ConnectServer 验证并保存原生端企业服务器地址。
  */
-export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<boolean> {
+export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<void> {
     return $Call.ByID(1075777931, meta, serverURL);
 }
 
@@ -323,14 +323,14 @@ export function LoadSession(meta: $models.RequestMeta): $CancellablePromise<$mod
 }
 
 /**
- * Login 校验账号密码并返回登录令牌。
+ * Login 校验账号密码并建立登录会话。
  */
 export function Login(meta: $models.RequestMeta, input: $models.LoginInput): $CancellablePromise<$models.Auth> {
     return $Call.ByID(3058727111, meta, input);
 }
 
 /**
- * Logout 删除当前登录令牌。
+ * Logout 退出当前登录会话。
  */
 export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
     return $Call.ByID(991463980, meta);

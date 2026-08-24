@@ -8,6 +8,7 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { i18n } from "@/i18n"
 import { fallbackLanguage } from "@/i18n/resources"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 const tokenStorageKey = "cervi.token"
 
@@ -91,8 +92,8 @@ export function bind<A extends unknown[], R>(
   }
 }
 
-/** 保存登录令牌并返回当前身份。 */
-export function storeToken(auth: Auth) {
+/** 保存 Web 端登录令牌并返回当前身份。 */
+export function storeWebToken(auth: Auth) {
   window.localStorage.setItem(
     tokenStorageKey,
     JSON.stringify({ token: auth.token, expiresAt: auth.expiresAt }),
@@ -100,15 +101,17 @@ export function storeToken(auth: Auth) {
   return auth.identity
 }
 
-/** 清除本地保存的登录令牌。 */
-export function clearToken() {
-  window.localStorage.removeItem(tokenStorageKey)
+/** 清除 Web 端登录令牌。 */
+export function clearWebToken() {
+  if (resolveAppPlatform() === "web") {
+    window.localStorage.removeItem(tokenStorageKey)
+  }
 }
 
 /** 组装当前请求的令牌和语言。 */
 function requestMeta(): RequestMeta {
   return {
-    token: loadToken(),
+    token: requestToken(),
     locale:
       (i18n.resolvedLanguage ?? fallbackLanguage) === "en-US"
         ? Locale.LocaleEnglishUnitedStates
@@ -116,13 +119,18 @@ function requestMeta(): RequestMeta {
   }
 }
 
+/** 返回 Web 端请求令牌。 */
+function requestToken() {
+  return resolveAppPlatform() === "web" ? loadWebToken() : ""
+}
+
 /** 读取未过期的登录令牌。 */
-function loadToken() {
+function loadWebToken() {
   const value = window.localStorage.getItem(tokenStorageKey)
   if (!value) return ""
   const stored = JSON.parse(value) as StoredToken
   if (Date.parse(stored.expiresAt) <= Date.now()) {
-    clearToken()
+    clearWebToken()
     return ""
   }
   return stored.token

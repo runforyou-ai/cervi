@@ -60,6 +60,10 @@ func openSQLite(ctx context.Context, databasePath string) (*bun.DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("connect to SQLite: %w", err)
 	}
+	if err := os.Chmod(databasePath, 0o600); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("protect SQLite database file: %w", err)
+	}
 	return db, nil
 }
 

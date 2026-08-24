@@ -64,9 +64,6 @@ func (s *Service) loadNativeSession(ctx context.Context, meta RequestMeta) (Sess
 	if !status.Installed || name == "" {
 		return Session{State: SessionStateConnect}, nil
 	}
-	if meta.Token == "" {
-		return Session{State: SessionStateLogin, OrganizationName: name}, nil
-	}
 	identity, err := s.backend.LoadIdentity(ctx, meta)
 	if err != nil {
 		session, convErr := sessionFromError(err, name, true)
