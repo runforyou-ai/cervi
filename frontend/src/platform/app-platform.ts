@@ -15,6 +15,11 @@ type WailsWindow = Window & {
       }
     }
   }
+  chrome?: {
+    webview?: {
+      postMessage?: unknown
+    }
+  }
   wails?: {
     invoke?: unknown
   }
@@ -30,21 +35,35 @@ export function resolveAppPlatform(): AppPlatform {
   if (os === "darwin" || os === "windows" || os === "linux") {
     return "desktop"
   }
+
   const userAgent = navigator.userAgent.toLowerCase()
-  const hasIOSBridge =
+  const hasWebKitBridge =
     typeof wailsWindow.webkit?.messageHandlers?.external?.postMessage ===
     "function"
+  const hasWindowsBridge =
+    typeof wailsWindow.chrome?.webview?.postMessage === "function"
   const hasAndroidBridge = typeof wailsWindow.wails?.invoke === "function"
+
   if (
-    (hasIOSBridge && /iphone|ipad|ipod/.test(userAgent)) ||
-    (hasAndroidBridge && /android/.test(userAgent))
+    hasAndroidBridge ||
+    (hasWebKitBridge && /iphone|ipad|ipod/.test(userAgent))
   ) {
     return "mobile"
+  }
+  if (hasWindowsBridge || hasWebKitBridge) {
+    return "desktop"
   }
   return "web"
 }
 
 /** 判断桌面端是否运行在 macOS。 */
 export function isDesktopMacOS(): boolean {
-  return (window as WailsWindow)._wails?.environment?.OS === "darwin"
+  const wailsWindow = window as WailsWindow
+  if (wailsWindow._wails?.environment?.OS === "darwin") {
+    return true
+  }
+  return (
+    typeof wailsWindow.webkit?.messageHandlers?.external?.postMessage ===
+      "function" && /macintosh|mac os x/i.test(navigator.userAgent)
+  )
 }
