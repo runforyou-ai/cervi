@@ -175,8 +175,13 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				http.Error(writer, err.Error(), http.StatusBadRequest)
 				return
 			}
-			writeTestJSON(writer, http.StatusOK, map[string]string{
+			if !input.MessageNotificationsEnabled {
+				http.Error(writer, "unexpected notification preference", http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, map[string]any{
 				"id": "user-1", "organizationId": "organization-1", "locale": string(input.Locale), "timeZone": input.TimeZone,
+				"messageNotificationsEnabled": input.MessageNotificationsEnabled,
 			})
 		case "/api/work-status":
 			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
@@ -301,12 +306,12 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	preferences, err := backend.UpdateUserPreferences(context.Background(), meta, appservice.UserPreferencesInput{
-		Locale: appservice.LocaleEnglishUnitedStates, TimeZone: "America/New_York",
+		Locale: appservice.LocaleEnglishUnitedStates, TimeZone: "America/New_York", MessageNotificationsEnabled: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if preferences.Locale != appservice.LocaleEnglishUnitedStates || preferences.TimeZone != "America/New_York" {
+	if preferences.Locale != appservice.LocaleEnglishUnitedStates || preferences.TimeZone != "America/New_York" || !preferences.MessageNotificationsEnabled {
 		t.Fatalf("updated preferences = %#v", preferences)
 	}
 	workStatus, err := backend.UpdateUserWorkStatus(context.Background(), meta, appservice.UserWorkStatusInput{

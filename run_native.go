@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"sync/atomic"
 
+	"github.com/runforyou-ai/cervi/internal/appservice"
+	appservicenative "github.com/runforyou-ai/cervi/internal/appservice/native"
 	nativesystemtray "github.com/runforyou-ai/cervi/internal/appservice/native/systemtray"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -33,10 +35,12 @@ func run(_ []string) error {
 		}
 	}()
 
-	services, err := applicationServices(appStorage)
+	notificationProvider, notificationLifecycleServices := appservicenative.NewNotificationProvider()
+	services, err := applicationServices(appStorage, appservice.WithNativeNotification(notificationProvider))
 	if err != nil {
 		return fmt.Errorf("initialize application services: %w", err)
 	}
+	services = append(notificationLifecycleServices, services...)
 
 	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
@@ -78,7 +82,7 @@ func run(_ []string) error {
 			TitleBar: application.MacTitleBarHidden,
 		},
 	})
-	nativesystemtray.Setup(nativesystemtray.Options{
+	unreadIndicator := nativesystemtray.Setup(nativesystemtray.Options{
 		App:             app,
 		Window:          mainWindow,
 		Icon:            nativeAppIcon,
@@ -87,6 +91,7 @@ func run(_ []string) error {
 			trayQuitRequested.Store(true)
 		},
 	})
+	notificationProvider.SetUnreadIndicator(unreadIndicator)
 
 	slog.Info("启动 Cervi")
 	return app.Run()

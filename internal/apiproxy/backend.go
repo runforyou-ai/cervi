@@ -123,7 +123,7 @@ func (b *Backend) ChangePassword(ctx context.Context, meta appservice.RequestMet
 	return b.do(ctx, meta, http.MethodPatch, "/password", nil, input, nil)
 }
 
-// UpdateUserPreferences 保存远程当前用户的语言和时区设置。
+// UpdateUserPreferences 保存远程当前用户的偏好设置。
 func (b *Backend) UpdateUserPreferences(ctx context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.CurrentUser, error) {
 	var output appservice.CurrentUser
 	err := b.do(ctx, meta, http.MethodPatch, "/preferences", nil, input, &output)

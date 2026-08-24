@@ -20,7 +20,7 @@ type nativeStorage interface {
 }
 
 // applicationServices 创建原生端使用的远程应用服务。
-func applicationServices(appStorage nativeStorage) ([]application.Service, error) {
+func applicationServices(appStorage nativeStorage, options ...appservice.Option) ([]application.Service, error) {
 	sessions, err := clientsession.NewManager(context.Background(), appStorage)
 	if err != nil {
 		return nil, fmt.Errorf("initialize client session: %w", err)
@@ -29,7 +29,10 @@ func applicationServices(appStorage nativeStorage) ([]application.Service, error
 	if err != nil {
 		return nil, fmt.Errorf("initialize remote application backend: %w", err)
 	}
-	service := appservice.New(backend, appservice.WithProfileImageSelector(appservicenative.NewProfileImageSelector()))
+	serviceOptions := append([]appservice.Option{
+		appservice.WithProfileImageSelector(appservicenative.NewProfileImageSelector()),
+	}, options...)
+	service := appservice.New(backend, serviceOptions...)
 	return []application.Service{
 		application.NewServiceWithOptions(service, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,

@@ -104,6 +104,18 @@ const enUS = {
     loading: "Loading…",
     inboxLoadError: "Could not load messages.",
     retry: "Try again",
+    notificationPermissionPrompt: {
+      title: "Turn on new message notifications",
+      description:
+        "Allow Cervi to notify you about new messages while you are working. Notifications pause while you are taking a break or off work.",
+      later: "Remind me in 7 days",
+      allow: "Allow notifications",
+      allowing: "Requesting…",
+      allowSuccess: "Notification permission enabled.",
+      allowDenied:
+        "Notifications were not enabled. Allow them in your browser or system settings.",
+      allowError: "Could not request notification permission. Try again.",
+    },
   },
   contacts: {
     title: "Contacts",
@@ -789,6 +801,52 @@ const enUS = {
       languages: {
         zhCN: "简体中文",
         enUS: "English",
+      },
+      notifications: {
+        title: "Notifications",
+        newMessages: "New message notifications",
+        newMessagesDescription:
+          "Web and desktop notify you about new messages while you are working. Notifications pause while you are taking a break or off work.",
+        sound: "Play the system default notification sound",
+        soundDescription:
+          "Uses the system default sound, is saved only in this browser or on this device, and is enabled by default.",
+        permission: {
+          label: "Notifications on this device",
+          statuses: {
+            checking: "Checking",
+            prompt: "Not allowed yet",
+            granted: "Allowed",
+            denied: "Blocked",
+            systemManaged: "Managed by system",
+            unsupported: "Unavailable",
+          },
+          descriptions: {
+            checking: "Checking your browser or system permission.",
+            prompt:
+              "Allow notifications before Cervi can show them on this device.",
+            granted: "This device can show new message notifications.",
+            denied:
+              "Allow Cervi notifications in your browser or system settings.",
+            systemManaged:
+              "Your operating system manages notifications. Send a test notification to confirm them.",
+            unsupported:
+              "Notifications are unavailable in this browser, connection, or device.",
+          },
+          allow: "Allow notifications",
+          allowing: "Requesting…",
+          allowSuccess: "Notification permission enabled.",
+          allowDenied:
+            "Notifications were not enabled. Allow them in your browser or system settings.",
+          allowError: "Could not request notification permission. Try again.",
+        },
+        test: {
+          action: "Send test notification",
+          testing: "Sending…",
+          title: "Cervi notification test",
+          body: "New message notifications are ready.",
+          success: "Test notification sent.",
+          error: "Could not send a test notification. Try again.",
+        },
       },
       save: "Save",
       saving: "Saving…",

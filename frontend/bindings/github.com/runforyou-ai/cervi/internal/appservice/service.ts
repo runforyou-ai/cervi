@@ -36,6 +36,13 @@ export function ChangePassword(meta: $models.RequestMeta, input: $models.ChangeP
 }
 
 /**
+ * CheckNotificationPermission 返回当前设备的系统通知授权状态。
+ */
+export function CheckNotificationPermission(meta: $models.RequestMeta): $CancellablePromise<$models.NotificationPermissionStatus> {
+    return $Call.ByID(64653454, meta);
+}
+
+/**
  * CompleteFileUpload 核验并完成文件上传。
  */
 export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<$models.File> {
@@ -365,6 +372,13 @@ export function RemoveTeamMembers(meta: $models.RequestMeta, teamID: string, inp
 }
 
 /**
+ * RequestNotificationPermission 请求当前设备允许发送系统通知。
+ */
+export function RequestNotificationPermission(meta: $models.RequestMeta): $CancellablePromise<$models.NotificationPermissionStatus> {
+    return $Call.ByID(3018557431, meta);
+}
+
+/**
  * RestoreContact 恢复联系人。
  */
 export function RestoreContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
@@ -383,6 +397,20 @@ export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3Settin
  */
 export function SelectProfileImage(meta: $models.RequestMeta): $CancellablePromise<$models.ProfileImageFile> {
     return $Call.ByID(1937167372, meta);
+}
+
+/**
+ * SendMessageNotification 在当前设备投递一条新消息系统通知。
+ */
+export function SendMessageNotification(meta: $models.RequestMeta, input: $models.MessageNotificationInput): $CancellablePromise<void> {
+    return $Call.ByID(4158811544, meta, input);
+}
+
+/**
+ * SendTestNotification 在当前设备发送一条系统测试通知。
+ */
+export function SendTestNotification(meta: $models.RequestMeta, input: $models.NotificationSoundInput): $CancellablePromise<void> {
+    return $Call.ByID(71691083, meta, input);
 }
 
 /**
@@ -449,6 +477,13 @@ export function UpdateTeam(meta: $models.RequestMeta, teamID: string, input: $mo
 }
 
 /**
+ * UpdateUnreadIndicator 将未读事实和注意力状态同步到当前设备原生界面。
+ */
+export function UpdateUnreadIndicator(meta: $models.RequestMeta, state: $models.UnreadIndicatorState): $CancellablePromise<void> {
+    return $Call.ByID(4142772673, meta, state);
+}
+
+/**
  * UpdateUser 修改企业成员资料、角色和所属团队。
  */
 export function UpdateUser(meta: $models.RequestMeta, userID: string, input: $models.UpdateUserInput): $CancellablePromise<$models.User> {
@@ -456,7 +491,7 @@ export function UpdateUser(meta: $models.RequestMeta, userID: string, input: $mo
 }
 
 /**
- * UpdateUserPreferences 保存当前用户的语言和时区设置。
+ * UpdateUserPreferences 保存当前用户的偏好设置。
  */
 export function UpdateUserPreferences(meta: $models.RequestMeta, input: $models.UserPreferencesInput): $CancellablePromise<$models.CurrentUser> {
     return $Call.ByID(3982988274, meta, input);

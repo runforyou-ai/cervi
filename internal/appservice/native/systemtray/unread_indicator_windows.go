@@ -20,8 +20,8 @@ type windowsUnreadIndicator struct {
 	tray    *application.SystemTray
 	changed chan struct{}
 
-	mu        sync.Mutex
-	hasUnread bool
+	mu          sync.Mutex
+	shouldFlash bool
 }
 
 // newUnreadIndicator 创建 Windows 未读消息指示器并启动状态循环。
@@ -35,10 +35,10 @@ func newUnreadIndicator(app *application.App, tray *application.SystemTray, _ *d
 	return indicator
 }
 
-// SetUnreadCount 根据是否存在未读消息启动或停止托盘图标显隐闪烁。
-func (i *windowsUnreadIndicator) SetUnreadCount(count int) error {
+// SetUnreadState 根据提醒开关和待处理提醒状态启动或停止托盘图标闪烁。
+func (i *windowsUnreadIndicator) SetUnreadState(state appservice.UnreadIndicatorState) error {
 	i.mu.Lock()
-	i.hasUnread = count > 0
+	i.shouldFlash = state.Count > 0 && state.AttentionEnabled && state.AttentionPending
 	i.mu.Unlock()
 
 	select {
@@ -68,10 +68,10 @@ func (i *windowsUnreadIndicator) run() {
 		select {
 		case <-i.changed:
 			i.mu.Lock()
-			hasUnread := i.hasUnread
+			shouldFlash := i.shouldFlash
 			i.mu.Unlock()
 
-			if !hasUnread {
+			if !shouldFlash {
 				stopFlashing()
 				continue
 			}

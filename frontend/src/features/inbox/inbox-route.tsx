@@ -1,5 +1,5 @@
 /** 消息列表路由。 */
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -8,38 +8,63 @@ import { loadInbox, type InboxData } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
+import { useWorkspace } from "@/features/workspace/workspace-context"
 
 /** 校验登录后显示消息页。 */
 export function InboxRoute() {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
+  const { applyUnreadSnapshot, beginUnreadSnapshot } = useWorkspace()
   const [data, setData] = useState<InboxData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const mountedRef = useRef(false)
+  const requestIdRef = useRef(0)
 
   /** 加载消息列表。 */
   const fetchInbox = useCallback(async () => {
+    const requestId = ++requestIdRef.current
+    const unreadRevision = beginUnreadSnapshot()
     setLoading(true)
     setError("")
     try {
       const inbox = await loadInbox()
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
+        return
+      }
       setData(inbox)
+      const unreadCount = inbox.conversations.reduce(
+        (total, conversation) => total + (conversation.unread ?? 0),
+        0,
+      )
+      applyUnreadSnapshot(unreadCount, unreadRevision)
       console.info("消息已加载", {
         conversation_count: inbox.conversations.length,
+        unread_count: unreadCount,
       })
     } catch (requestError) {
+      if (!mountedRef.current || requestId !== requestIdRef.current) {
+        return
+      }
       if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("消息加载失败", requestError)
       setError(t("inboxLoadError"))
     } finally {
-      setLoading(false)
+      if (mountedRef.current && requestId === requestIdRef.current) {
+        setLoading(false)
+      }
     }
-  }, [navigate, t])
+  }, [applyUnreadSnapshot, beginUnreadSnapshot, navigate, t])
 
   useEffect(() => {
+    mountedRef.current = true
     void fetchInbox()
+    return () => {
+      mountedRef.current = false
+      requestIdRef.current += 1
+    }
   }, [fetchInbox])
 
   if (loading) {

@@ -86,10 +86,20 @@ type ProfileImageSelector interface {
 	SelectProfileImage(context.Context, RequestMeta) (ProfileImageFile, error)
 }
 
+// NativeNotification 由原生端实现系统通知权限、消息提醒和未读提示能力。
+type NativeNotification interface {
+	CheckNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)
+	RequestNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)
+	SendMessageNotification(context.Context, RequestMeta, MessageNotificationInput) error
+	SendTestNotification(context.Context, RequestMeta, NotificationSoundInput) error
+	UpdateUnreadIndicator(context.Context, RequestMeta, UnreadIndicatorState) error
+}
+
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
 type Service struct {
 	backend              Backend
 	profileImageSelector ProfileImageSelector
+	nativeNotification   NativeNotification
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -99,6 +109,13 @@ type Option func(*Service)
 func WithProfileImageSelector(selector ProfileImageSelector) Option {
 	return func(service *Service) {
 		service.profileImageSelector = selector
+	}
+}
+
+// WithNativeNotification 注入原生端系统通知和未读提示能力。
+func WithNativeNotification(notification NativeNotification) Option {
+	return func(service *Service) {
+		service.nativeNotification = notification
 	}
 }
 
@@ -168,9 +185,49 @@ func (s *Service) ChangePassword(ctx context.Context, meta RequestMeta, input Ch
 	return s.backend.ChangePassword(ctx, meta, input)
 }
 
-// UpdateUserPreferences 保存当前用户的语言和时区设置。
+// UpdateUserPreferences 保存当前用户的偏好设置。
 func (s *Service) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (CurrentUser, error) {
 	return s.backend.UpdateUserPreferences(ctx, meta, input)
+}
+
+// CheckNotificationPermission 返回当前设备的系统通知授权状态。
+func (s *Service) CheckNotificationPermission(ctx context.Context, meta RequestMeta) (NotificationPermissionStatus, error) {
+	if s.nativeNotification == nil {
+		return NotificationPermissionStatusUnsupported, nil
+	}
+	return s.nativeNotification.CheckNotificationPermission(ctx, meta)
+}
+
+// RequestNotificationPermission 请求当前设备允许发送系统通知。
+func (s *Service) RequestNotificationPermission(ctx context.Context, meta RequestMeta) (NotificationPermissionStatus, error) {
+	if s.nativeNotification == nil {
+		return NotificationPermissionStatusUnsupported, nil
+	}
+	return s.nativeNotification.RequestNotificationPermission(ctx, meta)
+}
+
+// SendMessageNotification 在当前设备投递一条新消息系统通知。
+func (s *Service) SendMessageNotification(ctx context.Context, meta RequestMeta, input MessageNotificationInput) error {
+	if s.nativeNotification == nil {
+		return methodNotAllowedError(meta, "SendMessageNotification")
+	}
+	return s.nativeNotification.SendMessageNotification(ctx, meta, input)
+}
+
+// SendTestNotification 在当前设备发送一条系统测试通知。
+func (s *Service) SendTestNotification(ctx context.Context, meta RequestMeta, input NotificationSoundInput) error {
+	if s.nativeNotification == nil {
+		return methodNotAllowedError(meta, "SendTestNotification")
+	}
+	return s.nativeNotification.SendTestNotification(ctx, meta, input)
+}
+
+// UpdateUnreadIndicator 将未读事实和注意力状态同步到当前设备原生界面。
+func (s *Service) UpdateUnreadIndicator(ctx context.Context, meta RequestMeta, state UnreadIndicatorState) error {
+	if s.nativeNotification == nil {
+		return nil
+	}
+	return s.nativeNotification.UpdateUnreadIndicator(ctx, meta, state)
 }
 
 // UpdateUserWorkStatus 保存当前用户主动设置的工作状态。

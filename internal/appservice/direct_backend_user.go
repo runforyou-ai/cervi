@@ -73,14 +73,14 @@ func (b *DirectBackend) ChangePassword(ctx context.Context, meta RequestMeta, in
 	return nil
 }
 
-// UpdateUserPreferences 保存当前用户的语言和时区设置。
+// UpdateUserPreferences 保存当前用户的偏好设置。
 func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (CurrentUser, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return CurrentUser{}, err
 	}
 	updatedIdentity, err := b.updateUserPreferences.Execute(ctx, identity, useraction.PreferencesInput{
-		Locale: domain.Locale(input.Locale), TimeZone: input.TimeZone,
+		Locale: domain.Locale(input.Locale), TimeZone: input.TimeZone, MessageNotificationsEnabled: input.MessageNotificationsEnabled,
 	})
 	if err != nil {
 		if ctx.Err() != nil {
@@ -93,10 +93,10 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 		if errors.Is(err, common.ErrIdentityInvalid) {
 			return CurrentUser{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
-		slog.Warn("保存语言和时区失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		slog.Warn("保存用户偏好失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "message_notifications_enabled", input.MessageNotificationsEnabled, "error", err)
 		return CurrentUser{}, FailedError(meta, cervii18n.ErrorPreferencesUpdateFailed)
 	}
-	slog.Info("语言和时区保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "locale", input.Locale, "time_zone", input.TimeZone)
+	slog.Info("用户偏好保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "locale", input.Locale, "time_zone", input.TimeZone, "message_notifications_enabled", input.MessageNotificationsEnabled)
 	return currentUserFromIdentity(updatedIdentity), nil
 }
 

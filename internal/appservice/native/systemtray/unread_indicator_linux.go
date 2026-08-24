@@ -1,4 +1,4 @@
-//go:build !server && linux
+//go:build !server && linux && !android
 
 package systemtray
 

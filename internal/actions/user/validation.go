@@ -77,10 +77,11 @@ type ChangePasswordInput struct {
 	NewPassword     string
 }
 
-// PreferencesInput 定义当前用户的语言和时区设置。
+// PreferencesInput 定义当前用户的偏好设置。
 type PreferencesInput struct {
-	Locale   domain.Locale
-	TimeZone string
+	Locale                      domain.Locale
+	TimeZone                    string
+	MessageNotificationsEnabled bool
 }
 
 // WorkStatusInput 定义当前用户主动设置的工作状态。
@@ -116,7 +117,7 @@ func validateChangePasswordInput(input ChangePasswordInput) map[string]Validatio
 	return fields
 }
 
-// validatePreferencesInput 校验语言和时区设置。
+// validatePreferencesInput 校验用户偏好设置。
 func validatePreferencesInput(input PreferencesInput) map[string]ValidationCode {
 	fields := make(map[string]ValidationCode)
 	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {

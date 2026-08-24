@@ -19,9 +19,9 @@ func newUnreadIndicator(_ *application.App, tray *application.SystemTray, dockSe
 	return &darwinUnreadIndicator{tray: tray, dock: dockService}
 }
 
-// SetUnreadCount 设置菜单栏托盘文字和 Dock 角标中的绝对未读消息数。
-func (i *darwinUnreadIndicator) SetUnreadCount(count int) error {
-	label := appservice.FormatUnreadCount(count)
+// SetUnreadState 使用绝对未读消息数更新菜单栏托盘文字和 Dock 角标。
+func (i *darwinUnreadIndicator) SetUnreadState(state appservice.UnreadIndicatorState) error {
+	label := appservice.FormatUnreadCount(state.Count)
 	i.tray.SetLabel(label)
 	if label == "" {
 		return i.dock.RemoveBadge()

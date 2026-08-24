@@ -135,18 +135,19 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			return err
 		}
 		user := &servermodels.User{
-			IdentityID:     organizationIdentity.ID,
-			OrganizationID: organization.ID,
-			Email:          input.Email,
-			PasswordHash:   passwordHash,
-			RoleID:         adminRoleID,
-			Status:         string(domain.UserStatusActive),
-			Locale:         string(input.Locale),
-			TimeZone:       input.TimeZone,
+			IdentityID:                  organizationIdentity.ID,
+			OrganizationID:              organization.ID,
+			Email:                       input.Email,
+			PasswordHash:                passwordHash,
+			RoleID:                      adminRoleID,
+			Status:                      string(domain.UserStatusActive),
+			Locale:                      string(input.Locale),
+			TimeZone:                    input.TimeZone,
+			MessageNotificationsEnabled: true,
 		}
 		if _, err := tx.NewInsert().
 			Model(user).
-			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone").
+			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone", "message_notifications_enabled").
 			Returning("id").
 			Exec(ctx); err != nil {
 			return err

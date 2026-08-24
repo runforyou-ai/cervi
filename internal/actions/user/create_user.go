@@ -48,17 +48,18 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		user := &servermodels.User{
-			IdentityID:     organizationIdentity.ID,
-			OrganizationID: identity.Organization.ID,
-			Email:          input.Email,
-			PasswordHash:   passwordHash,
-			RoleID:         input.RoleID,
-			Status:         string(domain.UserStatusActive),
-			Locale:         identity.User.Locale,
-			TimeZone:       identity.User.TimeZone,
+			IdentityID:                  organizationIdentity.ID,
+			OrganizationID:              identity.Organization.ID,
+			Email:                       input.Email,
+			PasswordHash:                passwordHash,
+			RoleID:                      input.RoleID,
+			Status:                      string(domain.UserStatusActive),
+			Locale:                      identity.User.Locale,
+			TimeZone:                    identity.User.TimeZone,
+			MessageNotificationsEnabled: true,
 		}
 		_, err = tx.NewInsert().Model(user).
-			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone").Returning("id").Exec(ctx)
+			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone", "message_notifications_enabled").Returning("id").Exec(ctx)
 		if isUniqueViolation(err) {
 			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
 		}

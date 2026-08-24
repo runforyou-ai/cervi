@@ -58,7 +58,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	if installed.Identity.User.IdentityID == "" || installed.Identity.User.IdentityID == installed.Identity.User.ID {
@@ -113,6 +113,25 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if loggedIn.Identity.User.ID != installed.Identity.User.ID {
 		t.Fatalf("login user = %q, want %q", loggedIn.Identity.User.ID, installed.Identity.User.ID)
+	}
+	updatedPreferences, err := useraction.NewUpdatePreferencesAction(db).Execute(context.Background(), loggedIn.Identity, useraction.PreferencesInput{
+		Locale:                      domain.LocaleEnglishUnitedStates,
+		TimeZone:                    "America/New_York",
+		MessageNotificationsEnabled: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updatedPreferences.User.MessageNotificationsEnabled {
+		t.Fatal("message notifications enabled = true, want false")
+	}
+	loggedIn.Identity = updatedPreferences
+	resolvedPreferences, err := resolveIdentity.Execute(context.Background(), loggedIn.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolvedPreferences == nil || resolvedPreferences.User.MessageNotificationsEnabled {
+		t.Fatalf("identity after preferences update = %#v", resolvedPreferences)
 	}
 	updatedWorkStatus, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
 	if err != nil {

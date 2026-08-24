@@ -102,6 +102,17 @@ const zhCN = {
     loading: "正在加载…",
     inboxLoadError: "消息加载失败。",
     retry: "重试",
+    notificationPermissionPrompt: {
+      title: "开启新消息通知",
+      description:
+        "允许 Cervi 在你上班时提醒新消息。休息一下或下班后会自动暂停。",
+      later: "7 天后提醒",
+      allow: "允许通知",
+      allowing: "正在申请…",
+      allowSuccess: "通知权限已开启。",
+      allowDenied: "未能开启通知，请在浏览器或系统设置中允许。",
+      allowError: "无法申请通知权限，请重试。",
+    },
   },
   contacts: {
     title: "通讯录",
@@ -762,6 +773,47 @@ const zhCN = {
       languages: {
         zhCN: "简体中文",
         enUS: "English",
+      },
+      notifications: {
+        title: "通知",
+        newMessages: "新消息提醒",
+        newMessagesDescription:
+          "开启后，Web 和桌面端会在你上班时提醒新消息；休息一下或下班后自动暂停。",
+        sound: "播放系统默认通知声音",
+        soundDescription:
+          "使用系统默认声音，仅保存在当前浏览器或设备，默认开启。",
+        permission: {
+          label: "本设备通知权限",
+          statuses: {
+            checking: "正在检查",
+            prompt: "尚未允许",
+            granted: "已允许",
+            denied: "已拒绝",
+            systemManaged: "由系统管理",
+            unsupported: "不支持",
+          },
+          descriptions: {
+            checking: "正在读取浏览器或系统权限。",
+            prompt: "允许后，Cervi 才能在本设备上显示通知。",
+            granted: "本设备可以显示新消息通知。",
+            denied: "请在浏览器或系统设置中允许 Cervi 发送通知。",
+            systemManaged: "通知由操作系统统一管理，可发送测试通知确认。",
+            unsupported: "当前浏览器、连接环境或设备不支持通知。",
+          },
+          allow: "允许通知",
+          allowing: "正在申请…",
+          allowSuccess: "通知权限已开启。",
+          allowDenied: "未能开启通知，请在浏览器或系统设置中允许。",
+          allowError: "无法申请通知权限，请重试。",
+        },
+        test: {
+          action: "发送测试通知",
+          testing: "正在发送…",
+          title: "Cervi 通知测试",
+          body: "新消息提醒已准备好。",
+          success: "测试通知已发送。",
+          error: "无法发送测试通知，请重试。",
+        },
       },
       save: "保存",
       saving: "正在保存…",
