@@ -2,13 +2,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Outlet, useLocation, useNavigate } from "react-router"
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
   logout,
-  sessionPath,
-  SessionState,
   WorkStatus,
   type Identity,
   type Organization,
@@ -20,8 +18,7 @@ import {
   deactivateNotificationPolicy,
   notifyNewMessage as deliverNewMessageNotification,
 } from "@/features/notifications/new-message-notifications"
-import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
-import { useSessionLoader } from "@/features/session/use-session-loader"
+import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import type {
   WorkspaceNewMessageNotification,
   WorkspaceOutletContext,
@@ -44,12 +41,8 @@ function useClearSelectionOnNavigation() {
   }, [location.key])
 }
 
-/** 读取会话并渲染工作台导航和子页面。 */
-export function WorkspaceLayout({
-  allowServerChange = false,
-}: {
-  allowServerChange?: boolean
-}) {
+/** 读取登录身份并渲染工作台导航和子页面。 */
+export function WorkspaceLayout() {
   useClearSelectionOnNavigation()
   const location = useLocation()
   const { t } = useTranslation("workspace")
@@ -61,7 +54,7 @@ export function WorkspaceLayout({
     attentionPending: false,
   })
   const unreadRevisionRef = useRef(0)
-  const { status, session, retry } = useSessionLoader()
+  const { status, identity: loadedIdentity, redirectPath } = useIdentityLoader()
 
   /** 同步当前用户的新消息通知策略。 */
   useLayoutEffect(() => {
@@ -78,33 +71,15 @@ export function WorkspaceLayout({
     )
   }, [identity])
 
-  /** 会话加载完成后同步工作台身份。 */
+  /** 身份加载完成后同步工作台状态。 */
   useEffect(() => {
-    if (status !== "loaded" || !session) {
-      return
-    }
-    if (session.state === SessionState.SessionStateReady && session.identity) {
-      setIdentity(session.identity)
+    if (loadedIdentity) {
+      setIdentity(loadedIdentity)
       console.info("工作台身份已加载", {
-        organization: session.identity.organization.name,
+        organization: loadedIdentity.organization.name,
       })
     }
-  }, [session, status])
-
-  /** 会话未就绪时跳转到对应入口。 */
-  useEffect(() => {
-    if (
-      status !== "loaded" ||
-      !session ||
-      session.state === SessionState.SessionStateReady
-    ) {
-      return
-    }
-    const path = sessionPath(session.state)
-    if (path) {
-      navigate(path, { replace: true })
-    }
-  }, [navigate, session, status])
+  }, [loadedIdentity])
 
   /** 同步桌面端未读数和提醒状态。 */
   useEffect(() => {
@@ -273,30 +248,23 @@ export function WorkspaceLayout({
     })
   }, [identity])
 
-  if (
-    !identity &&
-    (status === "loading" ||
-      (status === "loaded" &&
-        session?.state === SessionState.SessionStateReady))
-  ) {
+  if (status === "anonymous") return <Navigate to="/login" replace />
+  if (status === "redirect" && redirectPath) {
+    return <Navigate to={redirectPath} replace />
+  }
+  if (status === "failed") {
+    return (
+      <main className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+        {t("identityLoadError")}
+      </main>
+    )
+  }
+  if (!identity) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
         {t("loading")}
       </main>
-    )
-  }
-
-  if (!identity) {
-    return (
-      <SessionLoadFailedState
-        onRetry={retry}
-        onChangeServer={
-          allowServerChange
-            ? () => navigate("/connect", { replace: true })
-            : undefined
-        }
-      />
     )
   }
 
@@ -309,7 +277,7 @@ export function WorkspaceLayout({
           onLogout={handleLogout}
           loggingOut={loggingOut}
         />
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
           <Outlet
             context={{
               identity,

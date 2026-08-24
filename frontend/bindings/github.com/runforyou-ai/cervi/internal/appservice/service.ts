@@ -113,14 +113,14 @@ export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.W
 }
 
 /**
- * DeactivateAgent 停用企业 AI 员工。
+ * DeactivateAgent 禁用企业 AI 员工账号。
  */
 export function DeactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2542842753, meta, agentID);
 }
 
 /**
- * DeactivateUser 停用企业成员账号。
+ * DeactivateUser 禁用企业成员账号。
  */
 export function DeactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
     return $Call.ByID(3624391107, meta, userID);
@@ -323,10 +323,10 @@ export function LoadInbox(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
- * LoadSession 返回当前应进入的会话入口。
+ * LoadStartup 返回初始化或服务器连接入口，不读取登录状态。
  */
-export function LoadSession(meta: $models.RequestMeta): $CancellablePromise<$models.Session> {
-    return $Call.ByID(2537050686, meta);
+export function LoadStartup(meta: $models.RequestMeta): $CancellablePromise<$models.Startup> {
+    return $Call.ByID(3512506751, meta);
 }
 
 /**
@@ -432,6 +432,13 @@ export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, 
  */
 export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2196616072, meta, agentID, input);
+}
+
+/**
+ * UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
+ */
+export function UpdateAgentWorkStatus(meta: $models.RequestMeta, agentID: string, input: $models.AgentWorkStatusInput): $CancellablePromise<$models.Agent> {
+    return $Call.ByID(160063679, meta, agentID, input);
 }
 
 /**

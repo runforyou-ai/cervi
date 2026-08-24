@@ -14,7 +14,7 @@ import (
 )
 
 // issueToken 签发登录令牌并返回对应身份。
-func issueToken(ctx context.Context, db *bun.DB, userID string) (token.Issued, *servermodels.Identity, error) {
+func issueToken(ctx context.Context, db bun.IDB, userID string) (token.Issued, *servermodels.Identity, error) {
 	issued, err := token.Issue()
 	if err != nil {
 		return token.Issued{}, nil, fmt.Errorf("issue token: %w", err)
@@ -42,7 +42,7 @@ func issueToken(ctx context.Context, db *bun.DB, userID string) (token.Issued, *
 }
 
 // resolveIdentity 返回有效令牌对应的用户身份。
-func resolveIdentity(ctx context.Context, db *bun.DB, value string) (*servermodels.Identity, error) {
+func resolveIdentity(ctx context.Context, db bun.IDB, value string) (*servermodels.Identity, error) {
 	identity := &servermodels.Identity{}
 	err := db.NewRaw(`
 		SELECT

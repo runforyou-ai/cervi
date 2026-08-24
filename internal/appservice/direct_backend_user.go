@@ -218,7 +218,7 @@ func (b *DirectBackend) UpdateUserRoles(ctx context.Context, meta RequestMeta, i
 	return nil
 }
 
-// DeactivateUser 停用企业成员账号。
+// DeactivateUser 禁用企业成员账号。
 func (b *DirectBackend) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
 	return b.changeUserStatus(ctx, meta, userID, domain.UserStatusInactive)
 }
@@ -238,7 +238,7 @@ func (b *DirectBackend) changeUserStatus(ctx context.Context, meta RequestMeta, 
 	if err != nil {
 		return User{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
 	}
-	slog.Info("用户账号状态更新成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "status", status)
+	slog.Info("企业成员账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "status", status)
 	return userFromAction(*user), nil
 }
 
@@ -256,9 +256,6 @@ func (b *DirectBackend) userMutationError(ctx context.Context, meta RequestMeta,
 	}
 	if errors.Is(err, useraction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorUserNotFound)
-	}
-	if errors.Is(err, useraction.ErrSelfDeactivate) {
-		return InvalidError(meta, cervii18n.ErrorUserSelfDeactivate, nil)
 	}
 	if errors.Is(err, useraction.ErrLastActiveAdministrator) {
 		return InvalidError(meta, cervii18n.ErrorUserLastActiveAdministrator, nil)

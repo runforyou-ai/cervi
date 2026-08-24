@@ -112,6 +112,7 @@ export interface Agent {
     "identityId": string;
     "displayName": string;
     "status": UserStatus;
+    "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
     "createdAt": string;
 }
@@ -132,6 +133,13 @@ export interface AgentListInput {
     "status"?: UserStatus | null;
     "page": number;
     "pageSize": number;
+}
+
+/**
+ * AgentWorkStatusInput 定义 AI 员工工作状态修改字段。
+ */
+export interface AgentWorkStatusInput {
+    "workStatus": WorkStatus;
 }
 
 /**
@@ -782,15 +790,6 @@ export interface S3Setting {
 }
 
 /**
- * Session 表示当前会话。
- */
-export interface Session {
-    "state": SessionState;
-    "identity"?: Identity | null;
-    "organizationName"?: string;
-}
-
-/**
  * SessionState 表示会话入口。
  */
 export enum SessionState {
@@ -804,6 +803,14 @@ export enum SessionState {
     SessionStateSetup = "setup",
     SessionStateConnect = "connect",
 };
+
+/**
+ * Startup 表示应用启动入口和企业名称。
+ */
+export interface Startup {
+    "state": SessionState;
+    "organizationName"?: string;
+}
 
 /**
  * StorageProvider 表示 S3 兼容对象存储提供商。
@@ -871,7 +878,7 @@ export interface TeamMember {
     "identityId": string;
     "identityType": OrganizationIdentityType;
     "displayName": string;
-    "status": UserStatus;
+    "workStatus": WorkStatus;
     "joinedAt": string;
 }
 
@@ -930,7 +937,7 @@ export interface TeamMemberList {
  */
 export interface TeamMemberListInput {
     "query": string;
-    "status"?: UserStatus | null;
+    "workStatus"?: WorkStatus | null;
     "page": number;
     "pageSize": number;
 }
@@ -1030,7 +1037,7 @@ export interface UserRoleChangesInput {
 }
 
 /**
- * UserStatus 表示用户账号或 AI 员工的启用状态。
+ * UserStatus 表示用户账号或 AI 员工的账号状态。
  */
 export enum UserStatus {
     /**

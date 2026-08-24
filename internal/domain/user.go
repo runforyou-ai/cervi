@@ -1,6 +1,6 @@
 package domain
 
-// UserStatus 定义用户账号或 AI 员工的启用状态。
+// UserStatus 定义用户账号或 AI 员工的账号状态。
 type UserStatus string
 
 const (

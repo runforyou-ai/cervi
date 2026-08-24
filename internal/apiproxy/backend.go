@@ -42,11 +42,21 @@ func NewBackend(store Store, sessions *clientsession.Manager) (*Backend, error) 
 	return &Backend{connection: remoteConnection, sessions: sessions}, nil
 }
 
-// InstallationStatus 返回远程服务端初始化状态和公开企业名称。
+// InstallationStatus 不读取登录凭据并返回远程初始化状态。
 func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.RequestMeta) (appservice.InstallationStatus, error) {
-	var output appservice.InstallationStatus
-	err := b.do(ctx, meta, http.MethodGet, "/installation/status", nil, nil, &output)
-	return output, err
+	state := b.connection.currentState()
+	if state == nil {
+		return appservice.InstallationStatus{}, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
+	}
+	status, err := probeServer(ctx, state)
+	if err == nil {
+		return status, nil
+	}
+	if ctx.Err() != nil {
+		return appservice.InstallationStatus{}, ctx.Err()
+	}
+	slog.Warn("检测已连接企业服务器失败", "server_url", state.baseURL.String(), "error", err)
+	return appservice.InstallationStatus{}, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 }
 
 // Login 校验账号密码并建立原生端登录会话。
@@ -287,7 +297,14 @@ func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, 
 	return output, err
 }
 
-// DeactivateAgent 停用远程企业 AI 员工。
+// UpdateAgentWorkStatus 修改远程企业 AI 员工工作状态。
+func (b *Backend) UpdateAgentWorkStatus(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentWorkStatusInput) (appservice.Agent, error) {
+	var output appservice.Agent
+	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID)+"/work-status", nil, input, &output)
+	return output, err
+}
+
+// DeactivateAgent 禁用远程企业 AI 员工账号。
 func (b *Backend) DeactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/deactivate", nil, nil, &output)
@@ -341,7 +358,7 @@ func (b *Backend) UpdateUserRoles(ctx context.Context, meta appservice.RequestMe
 	return b.do(ctx, meta, http.MethodPatch, "/users/roles", nil, input, nil)
 }
 
-// DeactivateUser 停用远程企业成员账号。
+// DeactivateUser 禁用远程企业成员账号。
 func (b *Backend) DeactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPost, "/users/"+url.PathEscape(userID)+"/deactivate", nil, nil, &output)
@@ -389,7 +406,7 @@ func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, t
 func (b *Backend) ListTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberListInput) (appservice.TeamMemberList, error) {
 	query := url.Values{}
 	setQuery(query, "query", input.Query)
-	setOptionalQuery(query, "status", input.Status)
+	setOptionalQuery(query, "workStatus", input.WorkStatus)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	var output appservice.TeamMemberList

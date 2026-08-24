@@ -21,7 +21,7 @@ type UpdateStatusAction struct{ db *bun.DB }
 // NewUpdateStatusAction 创建用户账号状态修改操作。
 func NewUpdateStatusAction(db *bun.DB) *UpdateStatusAction { return &UpdateStatusAction{db: db} }
 
-// Execute 停用或恢复用户账号，并在停用时清理渠道分配。
+// Execute 禁用或恢复用户账号，并在禁用时清理渠道分配。
 func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.UserStatus) (*User, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
@@ -38,9 +38,6 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err != nil {
 			return err
 		}
-		if status == domain.UserStatusInactive && userID == identity.User.ID {
-			return ErrSelfDeactivate
-		}
 		updatedUser := &servermodels.User{}
 		err = tx.NewUpdate().Model(updatedUser).
 			Set("status = ?", status).
@@ -56,6 +53,16 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			return err
 		}
 		if status == domain.UserStatusInactive {
+			if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+				Set("work_status = ?", domain.WorkStatusOffDuty).
+				Set("work_status_updated_at = now()").
+				Set("updated_at = now()").
+				Where("organization_id = ?", identity.Organization.ID).
+				Where("id = ?", updatedUser.IdentityID).
+				Where("type = ?", domain.OrganizationIdentityTypeUser).
+				Exec(ctx); err != nil {
+				return err
+			}
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedUser.IdentityID); err != nil {
 				return err
 			}

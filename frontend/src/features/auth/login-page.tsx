@@ -1,15 +1,13 @@
 /** 登录页。 */
-import { useEffect } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import { Navigate, useNavigate } from "react-router"
 
-import { sessionPath, SessionState } from "@/api"
 import { LoginForm } from "@/features/auth/login-form"
-import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
-import { useSessionLoader } from "@/features/session/use-session-loader"
+import { useIdentityLoader } from "@/features/session/use-identity-loader"
+import { useStartup } from "@/features/startup/startup-context"
 
-/** 解析登录入口，并展示企业登录或服务器错误状态。 */
+/** 检测已有登录身份并展示企业登录。 */
 export function LoginPage({
   allowServerChange = false,
 }: {
@@ -17,49 +15,22 @@ export function LoginPage({
 }) {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
-  const { status, session, retry } = useSessionLoader()
-  const disconnectedPath = allowServerChange ? "/connect" : "/setup"
+  const { organizationName } = useStartup()
+  const { status, redirectPath } = useIdentityLoader()
 
-  useEffect(() => {
-    if (status !== "loaded" || !session) {
-      return
-    }
-    if (session.state === SessionState.SessionStateReady) {
-      navigate("/inbox", { replace: true })
-      return
-    }
-    if (session.state !== SessionState.SessionStateLogin) {
-      navigate(sessionPath(session.state) ?? disconnectedPath, {
-        replace: true,
-      })
-    }
-  }, [disconnectedPath, navigate, session, status])
-
-  if (status === "failed") {
-    return (
-      <SessionLoadFailedState
-        onRetry={retry}
-        onChangeServer={
-          allowServerChange
-            ? () => navigate("/connect", { replace: true })
-            : undefined
-        }
-      />
-    )
+  if (status === "loaded") return <Navigate to="/inbox" replace />
+  if (status === "redirect" && redirectPath) {
+    return <Navigate to={redirectPath} replace />
   }
-
-  const organizationName = session?.organizationName?.trim() ?? ""
-
-  if (
-    status !== "loaded" ||
-    session?.state !== SessionState.SessionStateLogin ||
-    organizationName === ""
-  ) {
+  if (status === "loading") {
     return (
       <main className="flex min-h-dvh items-center justify-center">
         <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
       </main>
     )
+  }
+  if (organizationName.trim() === "") {
+    return <Navigate to={allowServerChange ? "/connect" : "/setup"} replace />
   }
 
   return (

@@ -62,19 +62,12 @@ export function WorkStatusDot({
   )
 }
 
-/** 用带文字的徽标显示工作状态。 */
-export function WorkStatusBadge({
-  status,
-  showDot = true,
-}: {
-  status: WorkStatus
-  showDot?: boolean
-}) {
+/** 用文字徽标显示工作状态。 */
+export function WorkStatusBadge({ status }: { status: WorkStatus }) {
   const { t } = useTranslation("common")
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
-      {showDot ? <WorkStatusDot status={status} className="size-1.5" /> : null}
+    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
       {workStatusLabel(status, t)}
     </span>
   )

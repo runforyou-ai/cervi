@@ -78,7 +78,7 @@ func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, t
 		return TeamMemberList{}, err
 	}
 	output, err := b.listTeamMembers.Execute(ctx, identity, teamID, teamaction.MemberListInput{
-		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Page: input.Page, PageSize: input.PageSize,
+		Query: input.Query, WorkStatus: optionalDomain[WorkStatus, domain.WorkStatus](input.WorkStatus), Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
 		return TeamMemberList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
@@ -87,7 +87,7 @@ func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, t
 	for _, member := range output.Members {
 		members = append(members, TeamMember{
 			IdentityID: member.IdentityID, IdentityType: OrganizationIdentityType(member.IdentityType),
-			DisplayName: member.DisplayName, Status: UserStatus(member.Status), JoinedAt: member.JoinedAt,
+			DisplayName: member.DisplayName, WorkStatus: WorkStatus(member.WorkStatus), JoinedAt: member.JoinedAt,
 		})
 	}
 	return TeamMemberList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
@@ -191,6 +191,7 @@ func teamFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key 
 		teamaction.ValidationNameDuplicate:      cervii18n.FieldTeamNameDuplicate,
 		teamaction.ValidationDescriptionTooLong: cervii18n.FieldTeamDescriptionTooLong,
 		teamaction.ValidationQueryInvalid:       cervii18n.FieldTeamQueryInvalid,
+		teamaction.ValidationWorkStatusInvalid:  cervii18n.FieldWorkStatusInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }
