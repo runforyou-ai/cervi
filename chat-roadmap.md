@@ -332,6 +332,8 @@ Telegram 用户账号同步得到的联系人默认不自动创建 CRM `contacts
 
 ## 7. AI 智能体作为一等聊天主体
 
+Agent 配置、运行、工具、审批、设备能力和 Eino 接入的详细边界由 `agent-roadmap.md` 定义。本节只固定 Agent 与聊天事实的关系；AI 实时流、持久命令和断线恢复复用第 10 章的统一 Realtime Gateway，不建立第二套连接或协议。
+
 ### 7.1 身份与消息路径
 
 AI 智能体继续使用现有 `organization_identities.type = agent` 和 `agents` 子类型。其聊天路径与用户一致：
@@ -353,6 +355,14 @@ agent
 AI 调用不能依赖用户已读状态，也不能把模型请求、工具步骤和令牌消耗塞入消息表。进入 AI 开发阶段时增加：
 
 ```text
+agent_revisions
+├── agent_id
+├── provider_model_id
+├── system_instruction
+├── generation_config
+├── tool_policy
+└── schema_version
+
 conversation_agent_policies
 ├── conversation_id
 ├── agent_identity_id
@@ -364,8 +374,10 @@ conversation_agent_policies
 conversation_agent_states
 ├── conversation_id
 ├── agent_identity_id
-├── last_processed_originated_at
-├── last_processed_message_id
+├── desired_originated_at
+├── desired_message_id
+├── processed_originated_at
+├── processed_message_id
 ├── summary_message_id
 ├── paused_at
 └── updated_at
@@ -374,10 +386,11 @@ agent_runs
 ├── organization_id
 ├── conversation_id
 ├── agent_identity_id
+├── agent_revision_id
+├── trigger_type
 ├── trigger_message_id
-├── input_start_message_id
-├── input_end_message_id
-├── model_and_prompt_snapshot
+├── input_snapshot
+├── config_snapshot
 ├── output_message_id
 ├── status
 ├── token_and_cost_usage
@@ -386,18 +399,34 @@ agent_runs
 
 agent_run_steps
 ├── agent_run_id
+├── position
 ├── type
-├── tool_and_input
-├── output
 ├── status
+├── summary
+├── usage
+├── error
+└── timestamps
+
+agent_tool_invocations
+├── agent_run_id
+├── step_id
+├── tool_name
+├── arguments
+├── arguments_hash
+├── idempotency_key
+├── status
+├── result_or_file_id
+├── error
 └── timestamps
 ```
 
-还需要独立 `message_mentions` 关系触发 @ 智能体。AI 处理游标使用 `(last_processed_originated_at, last_processed_message_id)`，与消息时间线顺序一致，不能按 UUIDv7 大小判断新旧。迟到的历史补拉默认不触发自动回复，需要时通过独立总结或回放任务处理。
+`agent_revisions` 是不可变配置版本，Run 同时引用 Revision 并保存本次实际配置快照。`input_snapshot` 保存实际模型输入的有序消息引用、内容版本或哈希和 Schema 版本，不能只用起止消息编号表达可编辑的历史。`agent_run_steps` 只保存模型、工具、审批、交接等有界语义步骤；流式 Token、进度 Tick、框架 Callback 和调试日志不得逐条写入。工具参数、幂等、审批、结果未知和以后增加的设备执行位置由 Tool Invocation 及其扩展事实承担。
 
-每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run，使用 `(conversation_id, agent_identity_id) WHERE status IN ('queued', 'running')` 的部分唯一索引或等价任务串行机制保证。`agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
+还需要独立 `message_mentions` 关系触发 @ 智能体。AI 处理游标使用 `(originated_at, message_id)`，与消息时间线顺序一致，不能按 UUIDv7 大小判断新旧。`desired_*` 表示已经观察到的目标水位，`processed_*` 表示成功处理水位；迟到的历史补拉默认不推进自动响应水位，需要时通过独立总结或回放任务处理。
 
-自动响应必须记录触发消息、输入范围、模型与提示快照、工具调用、输出消息、失败、取消和人工接管，保证可审计和可恢复。
+每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run，使用 `(conversation_id, agent_identity_id) WHERE status IN ('queued', 'running')` 的部分唯一索引或等价任务串行机制保证。新消息在已有 Run 执行期间只推进 `desired_*`；Run 结束时原子推进 `processed_*`，仍有差距则在同一事务创建下一 Run 并通过 `TxEnqueuer` 唤醒，不能因活动任务幂等或部分唯一索引丢失后续处理。`agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
+
+自动响应必须记录触发消息、精确输入快照、配置版本与快照、语义步骤、工具调用、输出消息、费用、失败、取消和人工接管，保证可审计和可恢复。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
 
 ## 8. 第三方用户消息账号接入预留
 
