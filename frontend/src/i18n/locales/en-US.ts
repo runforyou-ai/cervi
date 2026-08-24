@@ -802,7 +802,6 @@ const enUS = {
           label: "Notifications on this device",
           statuses: {
             checking: "Checking",
-            prompt: "Not allowed yet",
             granted: "Allowed",
             denied: "Blocked",
             systemManaged: "Managed by system",

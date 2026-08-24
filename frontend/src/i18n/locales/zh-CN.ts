@@ -775,7 +775,6 @@ const zhCN = {
           label: "本设备通知权限",
           statuses: {
             checking: "正在检查",
-            prompt: "尚未允许",
             granted: "已允许",
             denied: "已拒绝",
             systemManaged: "由系统管理",

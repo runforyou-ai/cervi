@@ -24,14 +24,12 @@ import {
 
 /** 返回通知权限状态的本地化文案。 */
 function permissionStatusLabel(
-  status: NotificationPermissionViewState,
+  status: Exclude<NotificationPermissionViewState, "prompt">,
   t: TFunction<"settings">,
 ) {
   switch (status) {
     case "checking":
       return t("preferences.notifications.permission.statuses.checking")
-    case "prompt":
-      return t("preferences.notifications.permission.statuses.prompt")
     case "granted":
       return t("preferences.notifications.permission.statuses.granted")
     case "denied":
@@ -109,9 +107,11 @@ export function NotificationPermissionSettings({
         </FieldDescription>
       </FieldContent>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-        <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-          {permissionStatusLabel(status, t)}
-        </span>
+        {status !== "prompt" ? (
+          <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+            {permissionStatusLabel(status, t)}
+          </span>
+        ) : null}
         {status === "prompt" ? (
           <Button
             type="button"
