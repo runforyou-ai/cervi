@@ -1,5 +1,10 @@
 /** AI 员工对话模型选择字段。 */
-import { useEffect, useMemo, useState } from "react"
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEventHandler,
+} from "react"
 import {
   Controller,
   type Control,
@@ -46,10 +51,20 @@ export function AgentModelField<TValues extends FieldValues>({
   control,
   name,
   disabled = false,
+  hideLabel = false,
+  autoFocus = false,
+  onValueChange,
+  onBlur,
+  onKeyDown,
 }: {
   control: Control<TValues>
   name: FieldPathByValue<TValues, string>
   disabled?: boolean
+  hideLabel?: boolean
+  autoFocus?: boolean
+  onValueChange?: (value: string) => void
+  onBlur?: () => void
+  onKeyDown?: KeyboardEventHandler<HTMLSelectElement>
 }) {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
@@ -83,15 +98,28 @@ export function AgentModelField<TValues extends FieldValues>({
       control={control}
       render={({ field, fieldState }) => (
         <Field data-invalid={fieldState.invalid}>
-          <FieldLabel htmlFor={`${name}-select`} required>
-            {t("agents.capability.model")}
-          </FieldLabel>
+          {hideLabel ? null : (
+            <FieldLabel htmlFor={`${name}-select`} required>
+              {t("agents.capability.model")}
+            </FieldLabel>
+          )}
           <NativeSelect
             {...field}
             id={`${name}-select`}
             required
             disabled={disabled || loadState === "loading"}
+            autoFocus={autoFocus}
+            aria-label={t("agents.capability.model")}
             aria-invalid={fieldState.invalid}
+            onChange={(event) => {
+              field.onChange(event.target.value)
+              onValueChange?.(event.target.value)
+            }}
+            onBlur={() => {
+              field.onBlur()
+              onBlur?.()
+            }}
+            onKeyDown={onKeyDown}
           >
             <option value="">
               {loadState === "loading"

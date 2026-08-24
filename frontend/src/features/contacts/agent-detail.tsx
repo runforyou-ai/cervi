@@ -24,13 +24,7 @@ import {
   type Team,
 } from "@/api"
 import { StatusBadge } from "@/components/status-badge"
-import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldDescription } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
@@ -72,7 +66,8 @@ type EditingField =
   | "accountStatus"
   | "workStatus"
   | "teams"
-  | "capability"
+  | "capabilityModel"
+  | "systemInstruction"
   | null
 
 /** 把 AI 员工详情转换为编辑表单值。 */
@@ -226,22 +221,31 @@ export function AgentDetailView({
   }
 
   /** 保存 AI 员工能力配置。 */
-  async function saveCapability(values: AgentCapabilityFormValues) {
-    const current = capabilityValuesFromAgent(agent)
-    if (
-      values.modelSelection === current.modelSelection &&
-      values.systemInstruction === current.systemInstruction
-    ) {
-      setEditing(null)
-      return
-    }
+  async function saveCapability(
+    draft: AgentCapabilityFormValues = capabilityForm.getValues(),
+  ) {
     const request = saveState.begin()
     if (request === null) return
+    const valid = await capabilityForm.trigger()
+    if (!saveState.isCurrent(request)) return
+    if (!valid) {
+      saveState.finish(request)
+      return
+    }
+    const current = capabilityValuesFromAgent(agent)
+    if (
+      draft.modelSelection === current.modelSelection &&
+      draft.systemInstruction === current.systemInstruction
+    ) {
+      setEditing(null)
+      saveState.finish(request)
+      return
+    }
     try {
-      const model = parseAgentModelSelection(values.modelSelection)
+      const model = parseAgentModelSelection(draft.modelSelection)
       const saved = await updateAgentCapability(agent.id, {
         ...model,
-        systemInstruction: values.systemInstruction,
+        systemInstruction: draft.systemInstruction,
       })
       if (!saveState.isCurrent(request)) return
       setEditing(null)
@@ -251,9 +255,9 @@ export function AgentDetailView({
         provider_id: saved.capability.providerId,
         model_identifier: saved.capability.modelIdentifier,
       })
-      toast.success(t("agents.capability.saved"))
     } catch (error) {
       if (!saveState.isCurrent(request)) return
+      cancelEdit()
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         onNotFound()
@@ -380,6 +384,14 @@ export function AgentDetailView({
       event.preventDefault()
       event.currentTarget.blur()
     }
+  }
+
+  /** 处理多行文本字段快捷键。 */
+  function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Escape") return
+    event.preventDefault()
+    event.stopPropagation()
+    cancelEdit()
   }
 
   /** 处理选择字段快捷键。 */
@@ -518,84 +530,68 @@ export function AgentDetailView({
       </section>
 
       <section>
+        <h3 className="mb-2 text-sm font-medium">
+          {t("agents.capability.title")}
+        </h3>
         <div className="divide-y">
           <DetailEditRow
-            label={t("agents.capability.title")}
-            value={
-              <dl className="grid gap-3">
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("agents.capability.model")}
-                  </dt>
-                  <dd>
-                    {agent.capability.providerName} ·{" "}
-                    {agent.capability.modelName}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">
-                    {t("agents.capability.instruction")}
-                  </dt>
-                  <dd className="whitespace-pre-wrap break-words">
-                    {agent.capability.systemInstruction}
-                  </dd>
-                </div>
-              </dl>
-            }
-            editing={editing === "capability"}
+            label={t("agents.capability.model")}
+            value={`${agent.capability.providerName} · ${agent.capability.modelName}`}
+            editing={editing === "capabilityModel"}
             editEnabled={editing === null && !saving}
-            onEdit={() => startEditing("capability")}
+            onEdit={() => startEditing("capabilityModel")}
           >
-            <form
-              onSubmit={capabilityForm.handleSubmit(saveCapability)}
-              noValidate
-            >
-              <FieldGroup>
-                <AgentModelField
-                  control={capabilityForm.control}
-                  name="modelSelection"
-                  disabled={saving}
-                />
-                <Controller
-                  name="systemInstruction"
-                  control={capabilityForm.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel
-                        htmlFor="agent-capability-system-instruction"
-                        required
-                      >
-                        {t("agents.capability.instruction")}
-                      </FieldLabel>
-                      <Textarea
-                        {...field}
-                        id="agent-capability-system-instruction"
-                        rows={8}
-                        required
-                        disabled={saving}
-                        aria-invalid={fieldState.invalid}
-                      />
-                    </Field>
-                  )}
-                />
-                <div className="flex items-center gap-2">
-                  <Button type="submit" size="sm" disabled={saving}>
-                    {saving
-                      ? t("agents.capability.saving")
-                      : t("agents.capability.save")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
+            <AgentModelField
+              control={capabilityForm.control}
+              name="modelSelection"
+              disabled={saving}
+              hideLabel
+              autoFocus
+              onValueChange={(modelSelection) =>
+                void saveCapability({
+                  ...capabilityForm.getValues(),
+                  modelSelection,
+                })
+              }
+              onBlur={() => {
+                if (!saveState.isSaving()) cancelEdit()
+              }}
+              onKeyDown={handleSelectKeyDown}
+            />
+          </DetailEditRow>
+          <DetailEditRow
+            label={t("agents.capability.instruction")}
+            value={
+              <span className="whitespace-pre-wrap">
+                {agent.capability.systemInstruction}
+              </span>
+            }
+            editing={editing === "systemInstruction"}
+            editEnabled={editing === null && !saving}
+            onEdit={() => startEditing("systemInstruction")}
+          >
+            <Controller
+              name="systemInstruction"
+              control={capabilityForm.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <Textarea
+                    {...field}
+                    rows={8}
+                    required
+                    autoFocus
                     disabled={saving}
-                    onClick={cancelEdit}
-                  >
-                    {t("agents.capability.cancel")}
-                  </Button>
-                </div>
-              </FieldGroup>
-            </form>
+                    aria-label={t("agents.capability.instruction")}
+                    aria-invalid={fieldState.invalid}
+                    onBlur={() => {
+                      field.onBlur()
+                      void saveCapability()
+                    }}
+                    onKeyDown={handleTextareaKeyDown}
+                  />
+                </Field>
+              )}
+            />
           </DetailEditRow>
         </div>
       </section>
