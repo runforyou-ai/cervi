@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime"
+	"sync/atomic"
 
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -28,10 +30,17 @@ func run(_ []string) error {
 		return fmt.Errorf("initialize application services: %w", err)
 	}
 
+	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
 		Name:        "Cervi",
 		Description: "Cervi is an open-source AI customer support teammate platform",
 		Services:    services,
+		ShouldQuit: func() bool {
+			if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+				return true
+			}
+			return trayQuitRequested.Load()
+		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
@@ -39,11 +48,17 @@ func run(_ []string) error {
 			Port: 8080,
 		},
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
+		},
+		Windows: application.WindowsOptions{
+			DisableQuitOnLastWindowClosed: true,
+		},
+		Linux: application.LinuxOptions{
+			DisableQuitOnLastWindowClosed: true,
 		},
 	})
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Cervi",
 		Width:            1440,
 		Height:           900,
@@ -55,6 +70,12 @@ func run(_ []string) error {
 			TitleBar: application.MacTitleBarHidden,
 		},
 	})
+	unreadIndicator := setupDesktopSystemTray(app, mainWindow, func() {
+		trayQuitRequested.Store(true)
+	})
+	_ = unreadIndicator
+	// 临时未读角标演示需要平台验证时再启用。
+	// startUnreadIndicatorDemo(app, unreadIndicator)
 
 	slog.Info("启动 Cervi")
 	return app.Run()
