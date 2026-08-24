@@ -2,24 +2,26 @@
 
 ## 1. 文档目的
 
-本文档确定 Cervi 从客户会话、企业内部聊天，逐步扩展到受管外部协作、工单和跨企业联邦通信的产品路线与核心模型。
+本文档确定 Cervi 从客户会话、企业内部聊天、第三方账号接入，逐步扩展到受管外部协作、工单和跨企业联邦通信的产品路线与核心模型。
 
-本文档同时定义第一个开发 PR 的实施边界。后续开发如需改变本文中的核心概念、对象边界或阶段顺序，应先更新本文档并说明原因。
+本文档同时定义第一个聊天开发 PR 的实施边界。后续开发如需改变本文中的核心概念、对象边界或阶段顺序，应先更新本文档并说明原因。
 
 ## 2. 产品背景与约束
 
-Cervi 以私有化部署为主。即使由 Cervi 官方运营 SaaS，也为每个企业分配独立域名，并保持清晰的企业数据边界。
+Cervi 是 AI 原生企业协作产品，以企业独立部署为主，但独立部署不等于只能在内网运行。企业服务器可以通过公网域名服务 Web、桌面端、移动端、外部访客和渠道回调，同时保持企业间的数据边界。
 
 前期重点场景：
 
-- 外部客户通过网站等渠道与企业客服单聊。
-- 企业内部成员单聊。
-- 企业内部成员群聊。
+- 网站、微信公众号、Telegram Bot 私聊等渠道作为客服消息来源；Bot 群、频道和讨论组不进入一对一客户会话。
+- 企业内部成员单聊和群聊。
+- AI 智能体以与成员一致的方式加入单聊、群聊和客户会话。
+- 企业成员将已有 Telegram 用户账号绑定到 Cervi，在 Cervi 中逐步接管联系人、单聊、群聊和消息处理。
 
 中期重点场景：
 
 - 未部署 Cervi 的供应商、承包商或客户，通过企业托管的邀请链接和外部协作门户参与单聊、群聊和工单。
 - 客户会话和供应商协作中的问题可以转成工单持续处理。
+- 在 Telegram 验证成熟后，按第三方平台能力继续接入其他个人消息账号。
 
 长期重点场景：
 
@@ -27,29 +29,36 @@ Cervi 以私有化部署为主。即使由 Cervi 官方运营 SaaS，也为每�
 - 各企业成员使用自己企业中的原生身份进行跨企业单聊和群聊。
 - 各部署在保持本地身份、权限、审计和数据策略的前提下同步共享会话。
 
-当前阶段不为历史接口和历史数据保留兼容逻辑。模型应直接采用目标结构，但不提前实现尚未验证的复杂功能。
+当前阶段不考虑历史接口和历史数据兼容。模型直接采用目标结构，但不提前创建尚未进入开发阶段的第三方账号、联邦和 AI 运行表。
 
 ## 3. 产品设计结论
 
-### 3.1 借鉴统一会话模型，不照搬 Rocket.Chat 的产品概念
+### 3.1 统一消息容器，不堆叠产品概念
 
-Rocket.Chat 将频道、团队、讨论、私信、话题等能力统一在 Room 模型之上。Cervi 应借鉴这种底层统一方式，但不在首期向用户同时暴露频道、私有频道、讨论组、团队和话题等大量概念。
-
-国内企业用户更熟悉“单聊、群聊、客户会话”。因此 Cervi 的首要用户概念保持为：
+Cervi 底层使用统一 `Conversation` 承载消息时间线，但首期只向用户暴露熟悉的概念：
 
 - 单聊
 - 群聊
 - 客户会话
 
-公开群、话题模式和独立讨论空间属于后续增强能力，不作为首期基础分类。
+公开群、话题模式和独立讨论空间属于后续增强能力。普通会话中的引用回复和话题串通过消息关系表达，不创建新的会话类型。
 
-### 3.2 “渠道”只表示外部消息接入源
+### 3.2 “渠道”只表示客服外部消息来源
 
-Cervi 中的“渠道”仅表示网站、微信、邮件等外部消息接入源，不用来表示企业内部聊天室。
+Cervi 中的“渠道”仅表示网站、微信公众号、Telegram Bot 私聊等客服外部消息接入源，不表示企业内部聊天室，也不表示成员绑定的第三方用户账号。
 
-这一约定避免“内部频道”和“外部渠道”在中文界面、接口与代码中产生歧义。
+以 Telegram 为例，同一个平台存在两条必须分开的接入路径；其他平台也按“企业客服入口”和“用户消息账号”分别归类：
 
-### 3.3 跨企业不是新的聊天类型
+| 接入方式 | 身份所有者 | 产品用途 | 归属模型 |
+| --- | --- | --- | --- |
+| Telegram Bot | 企业 | 接收客户私聊咨询、客服回复 | `channels`、渠道身份、客户会话 |
+| 第三方用户账号（Telegram 首个实现） | Cervi 用户 | 在平台授权范围内处理个人联系人、单聊和群聊 | Provider Connection、用户消息账号、连接会话扩展 |
+
+两条路径可以共享通用会话与消息展示能力，但不能共享账号、授权、幂等键或远端会话映射。
+
+首期客服 `customer` 会话只表示企业与一个渠道联系人之间的一对一会话。Telegram Bot 首期只接私聊；Bot 所在群、频道和讨论组不是客户会话。以后如需接入，使用 `group` 会话及多个 `contact` 或 `external_sender` 主体，不复用 `customer_conversations`。
+
+### 3.3 会话形态与来源正交
 
 会话类型只表达沟通形态：
 
@@ -59,16 +68,39 @@ group     群聊
 customer  客户会话
 ```
 
-内部、受管外部和联邦通信由参与者身份及所属企业推导，不增加 `cross_org_direct`、`cross_org_group` 等会话类型。
+内部、受管外部、第三方账号和联邦通信通过参与主体及扩展表表达，不增加 `telegram_group`、`cross_org_direct` 等类型，也不在 `conversations` 上增加不断扩张的 `source_type`。
 
-例如：
+扩展关系示例：
 
-- 两名本地用户参与 `direct`：企业内部单聊。
-- 一名本地用户和一名受管访客参与 `direct`：受管外部单聊。
-- 多个本地用户和受管访客参与 `group`：受管外部群聊。
-- 来自多个 Cervi 部署的原生用户参与 `group`：联邦群聊。
+- 存在 `customer_conversations`：客户会话。
+- 存在未来的 `connected_chats`：某个第三方用户账号下的远端会话视图。
+- 存在未来的联邦会话扩展：跨 Cervi 部署共享的会话。
+- 不存在来源扩展：Cervi 原生会话。
 
-### 3.4 公开性和消息组织方式使用正交属性表达
+一个 `Conversation` 最多关联一种来源扩展：`customer_conversations`、未来的 `connected_chats` 和联邦扩展互斥。`conversations.type` 创建后不可修改，避免扩展关系与参与者规则失真。
+
+### 3.4 第三方账号会话按账号视图隔离
+
+一个 Cervi 用户可以绑定多个第三方平台账号，包括同一平台的多个账号，并在同一个聊天列表中同时查看和回复这些账号的消息。每条会话必须清晰展示由哪个账号接收和发送。
+
+安全默认模型是“一个绑定账号下的一个远端会话，对应一个 Cervi 会话”，不跨账号自动合并：
+
+```text
+(messaging_account_id, provider_chat_id)
+    -> connected_chat
+    -> conversation
+```
+
+即使两个 Telegram 账号都加入了名称相同或远端编号看似相同的群，也保留两个账号视图。原因包括：
+
+- 私聊和基础群的标识及历史可见范围可能随账号不同。
+- 同一群中两个账号的权限、禁言、匿名发送和删除状态可能不同。
+- Telegram 的“为我删除”、草稿、未读、置顶和静音本来就是账号状态。
+- 自动合并会造成用错账号回复或越权展示历史。
+
+前端以后可以提供经过明确校验的聚合展示，但存储和发送路由不能依赖这种聚合。
+
+### 3.5 公开性和消息组织方式使用正交属性
 
 群聊未来可按需增加：
 
@@ -77,131 +109,173 @@ visibility = invite_only | organization_discoverable
 mode       = chat | topic
 ```
 
-- `invite_only` 是符合国内使用习惯的默认方式。
-- `organization_discoverable` 表示企业内可搜索、可申请或主动加入的公开群。
+- `invite_only` 是默认方式。
+- `organization_discoverable` 表示企业内可发现的公开群。
 - `chat` 表示普通时间线。
-- `topic` 表示以话题聚合内容。
+- `topic` 表示按话题聚合内容。
 
-普通会话中的引用回复和话题串通过消息关系实现，不需要创建独立会话。
+## 4. 身份边界
 
-Rocket.Chat 式带名称、成员和独立生命周期的 Discussion 暂不实现。只有在项目协作、事件处理等实际需求无法被群聊和话题串满足时，再通过父子会话关系增加。
+### 4.1 业务身份保持独立
 
-## 4. 核心业务对象
+不同身份模型解决不同业务问题，不创建一个可以同时承担登录、团队成员、CRM 联系人、远端账号和聊天发送者职责的全局 `actors` 表。
+
+- `organization_identities`：企业内部的统一身份，目前只包含 `user` 和 `agent`。
+- `users`：可登录的本地企业成员。
+- `agents`：AI 智能体定义。
+- `contacts`：CRM 外部联系人档案。
+- 未来 `guest_users`：当前企业托管的外部协作者。
+- 未来 `federated_users`：远端 Cervi 身份的本地投影。
+- 未来 `external_senders`：第三方平台中实际发送消息的远端主体。
+
+`organization_identities` 继续服务于企业通讯录、团队成员和工作状态，不加入联系人、访客、联邦用户或 Telegram 远端发送者。
+
+### 4.2 ChatSubject 是聊天边界内的统一主体
+
+聊天需要用一套稳定关系表达参与者、发送者、@ 提醒和表情反应，因此增加仅在聊天域内使用的 `chat_subjects` 注册表：
 
 ```text
-身份主体 Identity
-    │
-    └── 参与会话
-            │
-Conversation ── ConversationParticipant
-    │
-    ├── Message
-    │     ├── 引用消息
-    │     └── 话题根消息
-    │
-    └── CustomerConversation
-            │
-            └── ServiceSession
-                    │
-                    └── 客服排队、分配、转接和响应指标
+chat_subjects
+├── id
+├── organization_id
+├── kind
+├── source_id
+├── created_at
+└── updated_at
+```
+
+首期支持：
+
+```text
+organization_identity   本地用户或 AI 智能体
+contact                 CRM 外部联系人
+```
+
+未来按实际阶段增加：
+
+```text
+guest                   受管访客
+federated_user          远端 Cervi 用户投影
+external_sender         第三方平台发送者
+```
+
+同一企业内 `(kind, source_id)` 唯一。Action 在创建或读取 `chat_subjects` 时，必须按 `kind` 校验来源记录存在、属于同一企业且类型合法。
+
+`ChatSubject` 只表示“这个主体可以出现在聊天关系中”，它本身：
+
+- 不能登录。
+- 不能加入企业团队。
+- 不保存 CRM 字段。
+- 不保存第三方发送路由。
+- 不决定资源访问权。
+
+这种边界既让参与者和消息只有一个稳定外键，又避免污染现有通讯录和联系人模型。
+
+会话形态与主体类型的允许关系由 Action 显式维护：
+
+| 会话场景 | 允许的聊天主体 | 额外规则 |
+| --- | --- | --- |
+| 一对一客户会话 | 恰好一个有效 `contact`；回复后可加入 `organization_identity` | 客服和 AI 未回复、未协作时不自动成为参与者 |
+| Cervi 原生单聊或群聊 | `organization_identity`，以后可增加 `guest`、`federated_user` | `contact` 和 `external_sender` 不直接混入原生内部会话 |
+| 第三方账号会话 | `external_sender` 与账号所有者的 `organization_identity` | 参与者不代表远端 ACL，访问仍校验账号所有权 |
+
+主体类型与会话场景不匹配时拒绝写入。以后新增来源类型时先扩展该矩阵，不通过放宽所有会话的参与者规则实现。
+
+### 4.3 系统消息不是伪造主体
+
+`system` 是逻辑消息来源，不创建 `chat_subject`，也不加入参与者表。系统消息的 `sender_participant_id` 为空，由消息类型和事件载荷表达来源。
+
+### 4.4 同一自然人的多个身份不自动合并
+
+同一个自然人可能同时是企业成员、联系人、受管访客、联邦用户或多个 Telegram 账号中的远端主体。系统不按手机号、邮箱、用户名或显示名称自动合并。
+
+需要聚合展示时使用经过验证的独立关联记录，并保留每条历史消息原始发送主体和账号边界。
+
+## 5. 核心业务对象
+
+```text
+业务身份 ── ChatSubject ── ConversationParticipant ── Conversation
+                                      │                    │
+                                      └── Message.sender ──┤
+                                                           ├── CustomerConversation
+                                                           ├── ConnectedChat（未来）
+                                                           └── FederationConversation（未来）
+
+CustomerConversation ── ServiceSession ── 客服排队、分配和指标
 
 Ticket ── TicketConversationLink ── Conversation / Message 范围
 ```
 
-### 4.1 Conversation
+### 5.1 Conversation
 
-`Conversation` 是稳定的消息容器，负责：
+`Conversation` 是稳定的消息容器，负责会话形态、标题、群聊配置、参与者集合、消息时间线、归档状态和当前企业中的数据归属。
 
-- 会话类型。
-- 标题及群聊配置。
-- 参与者集合。
-- 消息时间线。
-- 归档状态。
-- 本地数据归属。
-- 未来联邦通信所需的全局标识和来源信息。
+它不负责客服排队、工单流程、外部渠道配置、第三方账号授权、用户登录或 AI 模型调用状态。
 
-`Conversation` 不负责：
+### 5.2 ConversationParticipant
 
-- 客服排队和接待状态。
-- 工单优先级、SLA 和解决状态。
-- 外部渠道连接配置。
-- 用户登录认证。
+参与者关系表示一个 `ChatSubject` 显式加入某个会话，并保存会话角色、加入和离开时间。身份来源只通过 `subject_id` 访问，不再保存 `identity_type + identity_id` 多态组合。
 
-### 4.2 CustomerConversation
+参与者采用“一主体在一个会话中一行到底”的模型。退出时只设置 `left_at`；重新加入时复用原行、清空 `left_at`，保留首次 `joined_at`，并把 `role` 更新为当前角色。成员期和角色变更历史进入审计记录，不在参与者表中复制多行。发送新消息要求 `left_at IS NULL`，历史消息始终指向原参与者行。
 
-`CustomerConversation` 是 `Conversation` 的客户会话扩展，显式关联产生该会话的渠道身份。
+参与者和主体来源记录不因退出、停用或远端失联而被物理删除，避免历史消息失去发送者上下文。
 
-它负责：
+参与者不保存个人视图状态。已读、置顶、归档和静音具有不同的所有者：
 
-- 关联通用会话与 `contact_channel_identities`。
-- 保证同一渠道身份只对应一个长期客户会话。
-- 为客户会话列表提供联系人和来源渠道的可靠查询路径。
+- Cervi 原生用户视图：未来使用 `conversation_user_states`。
+- 第三方账号视图：未来使用 `conversation_account_states`。
+- AI 处理进度：未来使用 `conversation_agent_states`。
 
-它不负责客服接待状态。同一个联系人拥有多个渠道身份时，每个渠道身份保留独立客户会话；跨渠道历史在联系人或工单层聚合，不自动合并消息时间线。
+三者不能共用一个 `last_read_message_id`。
 
-客户会话扩展使用真实关系字段，不解析字符串键获取渠道身份，也不把渠道专属字段直接加入通用 `conversations`。
+参与者关系表达显式成员和消息发送主体，不是所有会话的唯一列表授权来源：
 
-### 4.3 ConversationParticipant
+- 原生单聊和群聊按有效参与者授权。
+- 客户会话先按企业边界读取，`ServiceSession` 落地后按排队、负责人和协作者授权。
+- 未发言、未分配的客服不因能查看客户收件箱而写入参与者表。
+- 客服或 AI 实际回复或明确加入协作时，才建立参与者关系。
+- 第三方账号会话还必须校验绑定账号所有权和连接状态。
 
-参与者关系表示某个身份主体参与会话，并保存：
+### 5.3 Message
 
-- 身份类型及身份编号。
-- 会话角色。
-- 加入和离开时间。
-- 最后已读位置。
-- 后续可扩展的提醒设置。
+消息属于一个会话，由该会话中的参与者发送。首期只实现文本消息，但保留引用、话题、编辑和删除关系。
 
-参与者退出后不物理删除关系，避免历史消息失去发送者上下文。
+消息同时保存两个时间：
 
-参与者关系表达消息发送主体和显式会话成员，不是所有会话类型的唯一访问控制来源：
+- `originated_at`：消息在业务来源产生的时间，用于时间线排序和展示。
+- `created_at`：当前 Cervi 服务器入库时间，用于审计、同步诊断和任务处理。
 
-- 内部单聊和群聊按有效参与者关系授权。
-- “我的内部会话”查询必须显式限定 `type IN (direct, group)`，不能把参与者关系作为所有会话类型的统一列表入口。
-- 客户会话在当前阶段按企业登录身份读取，后续按 `ServiceSession` 的排队、负责人和协作者授权。
-- 未发言、未分配的客服不因能够查看客户收件箱而写入参与者表。
-- 客服实际回复或明确加入协作时，才建立对应的 `user` 参与者关系。
+网站实时入站没有可信的客户端业务时间，因此使用服务器首次接收时间作为 `originated_at`；Telegram 等能提供稳定来源时间的平台使用远端时间。Telegram 历史补拉不能用补拉入库时间重排历史。
 
-### 4.4 Message
+消息分页统一使用 `(originated_at DESC, id DESC)`。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
 
-消息属于一个会话，由会话参与者发送。首期只实现文本消息，但模型预留：
+会话的 `last_message_at` 表示当前已知消息最大的 `originated_at`，只向后更新。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它，删除最后一条消息也不回退它。会话预览跳过已删除消息。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
 
-- 消息类型。
-- 引用消息。
-- 话题根消息。
-- 来源或客户端幂等编号。
-- 编辑和删除时间。
-- 联邦来源信息。
+文件、语音、卡片、反应、@ 提醒和系统事件后续使用独立关系或类型化载荷扩展，不把所有结构塞进文本正文。
 
-文件、语音、消息卡片、表情反应和系统事件后续通过独立关系或消息内容扩展实现，不在首个 PR 中一次性加入。
+`messages` 是时间线内容的事实来源，但 `(originated_at, id)` 游标只能发现新插入消息。阶段 2 对旧消息编辑、删除及其他聊天实体变化使用独立 `conversation_sync_events` 补拉，不把消息表改造成领域事件日志。
 
-### 4.5 ServiceSession
+### 5.4 CustomerConversation
 
-`ServiceSession` 表示一次客服处理过程，与长期消息容器分离。
+`CustomerConversation` 是客户会话扩展，关联通用会话与 `contact_channel_identities`。它保证同一渠道身份只对应一个长期客户会话，并为列表提供联系人和来源渠道的可靠查询路径。
 
-它负责：
+客户会话严格表示一对一客服关系，只允许一个有效联系人参与者。群、频道和讨论组不创建 `customer_conversations`。
 
-- 等待、处理中、挂起和结束状态。
-- 当前负责人和负责团队。
-- 排队、首次响应、转接和结束时间。
-- 满意度和客服指标。
+同一联系人拥有多个渠道身份时，每个渠道身份保留独立客户会话；跨渠道历史只在联系人或工单层聚合，不自动合并消息时间线。
 
-一个客户会话可以先后产生多个服务批次。内部单聊和内部群聊不创建服务批次。
+客户会话扩展不保存外发队列、Worker 租约或渠道 FloodWait。需要调用外部客服平台时，投递状态进入独立 `customer_message_deliveries` 和渠道发送 Gate；网站访客直接读取 Cervi 时间线，不创建投递记录。
 
-### 4.6 Ticket
+### 5.5 ServiceSession
 
-工单是问题处理与流程对象，不等同于会话。
+`ServiceSession` 表示一次客服处理过程，与长期消息容器分离。它保存等待、处理中、挂起、结束、负责人、团队、转接、响应指标和满意度等状态。
 
-工单负责：
+一个客户会话可以先后产生多个服务批次。内部单聊、群聊和第三方账号会话不创建服务批次。
 
-- 主题、状态、优先级和分类。
-- 负责人、负责团队和协作者。
-- SLA、截止时间和流转记录。
-- 内部评论与对外回复。
-- 自动化规则。
+### 5.6 Ticket
 
-会话和工单使用多对多关系。一个长期会话可以产生多个工单，一个工单也可以关联多个渠道或内部会话。
+工单是问题处理与流程对象，不等同于会话。会话和工单使用多对多关系：一个长期会话可以产生多个工单，一个工单也可以关联多个客户、第三方或内部会话。
 
-建议关联结构：
+建议关系：
 
 ```text
 ticket_conversation_links
@@ -214,277 +288,781 @@ ticket_conversation_links
 └── created_at
 ```
 
-`source_message_id` 记录从哪条消息创建工单，消息范围用于表达长期会话中与工单相关的上下文。
+跨企业共享会话不表示共享工单。每个企业默认维护自己的工单状态、负责人、SLA 和内部评论。
 
-跨企业共享会话不表示共享工单。每个企业可以为同一个共享会话创建自己的内部工单，工单状态、负责人、SLA 和内部评论默认不向其他企业公开。未来的协作工单必须通过显式共享策略实现。
+## 6. 现有通讯录与联系人调整
 
-## 5. 身份模型
+### 6.1 内部人员
 
-### 5.1 身份类型
+现有内部通讯录结构方向保持不变：
 
-聊天参与者需要支持以下身份：
+- `organization_identities.type = user | agent` 统一企业内部展示身份。
+- `users.identity_id` 和 `agents.identity_id` 分别关联具体身份。
+- `team_members.identity_id` 继续只允许有效用户或智能体加入团队。
 
-```text
-user             本地企业成员
-guest            当前企业托管的外部协作者
-federated_user   其他 Cervi 部署中的原生企业成员
-contact          网站、微信等渠道中的外部联系人
-bot              AI 或自动化机器人
-system           系统身份
-```
+聊天不直接引用 `users.id` 或 `agents.id`，而是为对应 `organization_identities.id` 创建 `kind = organization_identity` 的 `chat_subject`。因此用户和智能体通过完全相同的参与者、消息、提醒和反应路径进入聊天。
 
-业务层统一使用 `ParticipantIdentityType` 表达可加入会话的身份类型。该概念与现有仅面向企业内部团队成员的 `MemberIdentityType` 分开，避免扩大团队成员语义。
+如在聊天迁移中调整现有 `organization_identities`，应把 `work_status_updated_at` 统一改为 `timestamptz`，避免与项目其他时间字段不一致。
 
-`system` 是逻辑消息来源，不加入会话参与者表；系统消息的发送参与者为空，并由消息类型表达来源。
+### 6.2 外部联系人
 
-### 5.2 本地用户、访客、联邦用户和联系人的区别
+现有联系人 CRUD 的业务对象与聊天设计一致，但来源字段当前过于严格，应在第一个 PR 直接改为目标结构：
 
-- 本地用户拥有当前企业的完整登录身份，并按企业权限访问工作台。
-- 受管访客由当前企业托管，只能访问被邀请的外部协作资源。
-- 联邦用户由远端 Cervi 部署认证，当前服务器只保存必要的远端身份投影。
-- 联系人是外部渠道中的客户身份，不自动拥有登录外部协作门户的能力。
+- `contacts.created_by_user_id` 可空。
+- `contacts.source_channel_id` 可空。
+- 手工创建联系人：记录创建用户，来源渠道可选。
+- 渠道自动创建联系人：创建用户为空，来源渠道为当前渠道。
+- 导入或系统同步联系人：两个字段都可以为空，由独立导入或同步记录保留来源审计。
 
-同一个自然人可能同时拥有联系人身份、受管访客身份和联邦身份。系统不按手机号或邮箱自动合并这些身份，只在经过验证后建立身份关联。
+在导入或同步能力及其来源审计表落地前，现有联系人创建 Action 不允许两个字段同时为空。`source_channel_id` 采用只写一次语义：创建时已知则直接写入；创建时未知，可在建立第一条 `contact_channel_identity` 时回填；之后不因新增渠道身份而覆盖。
 
-### 5.3 全局身份与域名
+`source_channel_id` 只是联系人首次或主要来源的可选溯源字段，不表示联系人只能出现在该渠道，也不承担消息发送路由。真实渠道账号关系始终由 `contact_channel_identities` 表达。
 
-未来联邦身份至少由以下信息定位：
+联系人列表和详情查询必须允许无来源渠道记录，使用 `LEFT JOIN`；Bun 模型、Action DTO 和 appservice 中的来源渠道编号、名称及对象都改为可空，不能因 `source_channel_id` 为空漏掉手工、导入或同步联系人。客户会话列表中的实际渠道始终从 `contact_channel_identities.channel_id` 读取，不能用联系人的可选溯源渠道替代。
 
-```text
-home_server_id
-home_organization_id
-remote_identity_id
-```
+Telegram 用户账号同步得到的联系人默认不自动创建 CRM `contacts`。只有用户明确执行“保存为外部联系人”时才建立 CRM 联系人；Bot、网站等客服入站联系人始终走渠道路径，不由 TDLib 写入，避免把成员私人通讯录污染为企业客户数据。
 
-企业独立域名用于发现和路由，但不作为不可变数据库主键。域名可能发生变更，稳定身份由服务器编号与远端身份编号组成。
+## 7. AI 智能体作为一等聊天主体
 
-## 6. 受管外部协作
+### 7.1 身份与消息路径
 
-### 6.1 场景定义
-
-企业 A 部署 Cervi，企业 B 是供应商或合作伙伴但没有部署 Cervi。企业 A 希望沟通、文件和问题处理都沉淀在自己的 Cervi 中，因此邀请企业 B 的人员进入 A 托管的受限协作空间。
-
-该场景命名为“受管外部协作”，不属于联邦通信。
-
-### 6.2 外部组织与访客
-
-企业 A 在本地维护合作方档案：
+AI 智能体继续使用现有 `organization_identities.type = agent` 和 `agents` 子类型。其聊天路径与用户一致：
 
 ```text
-PartnerOrganization
-├── 名称
-├── 合作状态
-├── 备注
-└── GuestUser
+agent
+  -> organization_identity
+  -> chat_subject
+  -> conversation_participant
+  -> message.sender_participant_id
 ```
 
-受管访客可以：
+因此智能体可以加入单聊、群聊和客户会话，被 @ 提醒，发送或引用消息，并被移出、暂停或限制为只读成员。所有消息沿统一审计链追溯。
 
-- 参加被邀请的单聊和群聊。
-- 查看共享给自己的工单。
-- 发送对外消息和工单回复。
-- 按权限上传和下载文件。
-- 查看同一共享空间中必要的参与者信息。
+不创建 `bot` 参与者类型。Cervi AI 是 `agent`；Telegram 等平台中的机器人账号如果作为远端发送者出现，则属于未来的 `external_sender`，两者语义不同。
 
-受管访客默认不能：
+### 7.2 运行状态与聊天状态分离
 
-- 浏览企业 A 的完整通讯录。
-- 搜索或加入未被邀请的内部群。
-- 查看内部工单评论、内部字段和内部知识。
-- 管理渠道、联系人、用户、角色和企业设置。
-- 查看其他供应商的数据。
-
-### 6.3 邀请流程
-
-默认使用定向、一次性、短期有效的邀请：
-
-1. 企业成员选择邀请外部协作者。
-2. 选择或创建合作方企业。
-3. 填写手机号或邮箱。
-4. 选择允许访问的群聊、项目或工单。
-5. 生成带过期时间的一次性链接。
-6. 受邀人通过验证码或授权方式验证身份。
-7. 受邀人成为当前企业托管的访客。
-8. 访客进入独立的外部协作门户。
-
-可转发的多人邀请链接属于增强功能，必须支持有效期、最大使用次数、加入审批、撤销和审计。
-
-### 6.4 外部协作入口
-
-入口优先级：
-
-1. 响应式 Web/PWA 与邀请链接。
-2. 短信、邮件或企业微信通知中的安全链接。
-3. 微信小程序客户端壳。
-4. 企业部署 Cervi 后升级为联邦通信。
-
-小程序不是新的数据源。它只作为客户端访问企业 A 的 Cervi，消息和文件仍写入企业 A 的私有部署。
-
-私有部署如需允许外部访问，应提供独立的外部访问网关，只暴露访客认证、共享会话、对外工单和文件接口，不直接暴露完整内部管理 API。
-
-### 6.5 从访客升级为联邦身份
-
-企业 B 后来部署 Cervi 并与企业 A 建立可信连接时，不重写历史消息发送人。
-
-通过经过双方确认的身份关联，将原受管访客与新的联邦身份关联：
+AI 调用不能依赖用户已读状态，也不能把模型请求、工具步骤和令牌消耗塞入消息表。进入 AI 开发阶段时增加：
 
 ```text
-actor_identity_links
-├── guest_identity_id
-├── federated_identity_id
-├── verified_by
-└── verified_at
+conversation_agent_policies
+├── conversation_id
+├── agent_identity_id
+├── trigger_mode
+├── allowed_tools
+├── response_policy
+└── enabled
+
+conversation_agent_states
+├── conversation_id
+├── agent_identity_id
+├── last_processed_originated_at
+├── last_processed_message_id
+├── summary_message_id
+├── paused_at
+└── updated_at
+
+agent_runs
+├── organization_id
+├── conversation_id
+├── agent_identity_id
+├── trigger_message_id
+├── input_start_message_id
+├── input_end_message_id
+├── model_and_prompt_snapshot
+├── output_message_id
+├── status
+├── token_and_cost_usage
+├── error
+└── timestamps
+
+agent_run_steps
+├── agent_run_id
+├── type
+├── tool_and_input
+├── output
+├── status
+└── timestamps
 ```
 
-升级后：
+还需要独立 `message_mentions` 关系触发 @ 智能体。AI 处理游标使用 `(last_processed_originated_at, last_processed_message_id)`，与消息时间线顺序一致，不能按 UUIDv7 大小判断新旧。迟到的历史补拉默认不触发自动回复，需要时通过独立总结或回放任务处理。
 
-- 历史消息继续保留原受管访客身份。
-- 界面可以将两个身份聚合显示为同一个人。
-- 新消息使用企业 B 的联邦身份。
-- 原受管外部群可以升级为联邦群。
+每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run，使用 `(conversation_id, agent_identity_id) WHERE status IN ('queued', 'running')` 的部分唯一索引或等价任务串行机制保证。`agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
 
-## 7. 联邦通信预留
+自动响应必须记录触发消息、输入范围、模型与提示快照、工具调用、输出消息、失败、取消和人工接管，保证可审计和可恢复。
 
-### 7.1 原则
+## 8. 第三方用户消息账号接入预留
 
-- 不假设所有参与者都存在于同一个数据库。
+### 8.1 接入分类与产品边界
+
+第三方用户消息账号表示 Cervi 用户本人授权、能够以该用户身份读取和发送消息的外部账号。Telegram + TDLib 是第一个实现，但数据模型不以 Telegram 的编号、会话文件或能力范围作为通用假设。
+
+外部平台按授权主体和产品用途分流：
+
+| 类型 | 典型场景 | Cervi 模型 | 规则 |
+| --- | --- | --- | --- |
+| 完整客户端协议 | Telegram TDLib、Matrix Client-Server API、XMPP 用户账号 | Provider Connection + 用户消息账号 | 可以按平台能力逐步替代官方客户端 |
+| Workspace 委托授权 | Slack 用户 OAuth、Teams 委托 Graph | Provider Connection + 用户消息账号 | 只提供官方授权实际允许的范围，不承诺完整客户端能力 |
+| 企业客服 API | 网站、微信公众号、Telegram Bot、WhatsApp Business 等 | `channels` + 客户会话 | 企业拥有的客服入口，不是员工个人账号 |
+| 非官方用户自动化 | 个人微信 Hook、Discord Selfbot、盗用 User Token 等 | 默认拒绝 | 不因技术上可模拟登录就纳入用户账号模型 |
+
+同一平台可以同时拥有 Channel Adapter 和 User Messaging Adapter，但两者属于不同领域。例如 Telegram Bot 继续进入 `channels`，Telegram TDLib 用户会话才进入本章模型。`ChannelType` 不表示个人消息账号，也不与 User Messaging Adapter 共用存储枚举。
+
+### 8.2 Provider、Adapter 与外部命名空间
+
+`provider` 只表示品牌或协议族，例如：
+
+```text
+telegram
+matrix
+slack
+teams
+xmpp
+```
+
+真正决定鉴权方式和理论能力的是代码中的 `adapter_kind` Catalog，例如：
+
+```text
+telegram_tdlib_user
+matrix_client
+slack_user_oauth
+teams_delegated_graph
+xmpp_client
+```
+
+Catalog 必须声明 Adapter 所属领域为 `user_messaging`，防止 Bot、客服 API 或非官方自动化被写入用户账号表。`adapter_kind` 表示稳定协议契约，不表示某个连接器进程或实现版本。
+
+远端账号、会话和发送者编号的唯一作用域不是整个 Provider，而是平台中的稳定外部命名空间。因此阶段 3 增加薄 `messaging_provider_connections`：
+
+```text
+messaging_provider_connections
+├── id
+├── organization_id
+├── provider
+├── adapter_kind
+├── external_scope_id
+├── display_name
+├── endpoint
+├── credential_bundle_ref
+├── status
+├── created_at
+└── updated_at
+```
+
+字段语义：
+
+- `external_scope_id` 是平台规范的稳定身份命名空间，不是当前网络地址。
+- `endpoint` 是可空、可变的连接地址或发现结果，不参与身份唯一性。
+- `credential_bundle_ref` 是可空的安装级密钥引用，不保存密钥正文。
+- `organization_id`、`provider`、`adapter_kind` 和 `external_scope_id` 创建后不可修改。
+- `display_name`、`endpoint`、`credential_bundle_ref` 和 `status` 可以按平台状态更新。
+
+核心唯一性：
+
+```text
+UNIQUE (organization_id, provider, external_scope_id)
+INDEX  (organization_id, adapter_kind, status)
+```
+
+平台映射示例：
+
+| 平台 | `external_scope_id` | 可变 `endpoint` |
+| --- | --- | --- |
+| Telegram 公共网络 | 固定 `telegram` | 空 |
+| Matrix | MXID 中的 `server_name` | 发现得到的 Client-Server API Base URL |
+| Slack | `team_id` | 空 |
+| Teams | Entra ID `tenant_id` | 空或平台发现结果 |
+| XMPP | JID `domainpart` | SRV 解析得到的主机与端口 |
+
+Connection 是外部 ID 命名空间和安装授权边界，不是 Connector Worker、TDLib 进程、数据中心或设备会话。运行时租约不能通过创建更多 Connection 表达。
+
+### 8.3 用户账号、所有权与共享
+
+阶段 3 的用户账号目标结构：
+
+```text
+user_messaging_accounts
+├── id
+├── organization_id
+├── connection_id
+├── owner_user_id
+├── provider_account_id
+├── display_name
+├── status
+├── credential_bundle_ref
+├── projection_cursor
+├── last_projected_at
+├── created_at
+└── updated_at
+```
+
+规则：
+
+- `owner_user_id` 指向 `users.id`，不能指向 `organization_identities.id`，避免 AI 智能体成为外部账号授权主体。
+- 阶段 3 一个账号只有一个 Owner。一个 Cervi 用户可以拥有多个不同外部账号。
+- `provider_account_id` 使用 Adapter 规范化后的稳定 `text` 编号；认证进行中允许为空，账号进入活动状态前必须写入。
+- `projection_cursor` 是账号级、不透明的 `text` 投影进度，不使用 `last_projected_at` 代替协议游标。
+- `credential_bundle_ref` 是账号级会话密钥引用，不保存 Session、Token、密码或 TDLib 数据库密钥正文。
+- `organization_id`、`connection_id` 和已确认的 `provider_account_id` 创建后不可修改。
+
+完成认证后的永久唯一性：
+
+```text
+UNIQUE (organization_id, connection_id, provider_account_id)
+    WHERE provider_account_id IS NOT NULL
+```
+
+该约束防止同一企业内两个 Cervi 用户分别启动同一外部账号的重复运行时。不同企业之间不创建全局唯一或密钥指纹互斥：同一外部账号可以在不同租户中建立独立授权会话，且不能泄露它是否已在其他企业绑定。
+
+账号生命周期：
+
+- 解绑时撤销或销毁凭证，把状态改为 `disconnected`，但保留账号行和历史投影，不释放外部账号唯一性。
+- 只有当前 Owner 可以在原账号行上重新授权；不能通过重新插入账号实现接管。
+- Owner 停用不删除账号或历史消息，但重新授权、销毁凭证和所有权变更需要专用 Action。
+- 所有权转移只允许在同一企业内转给有效用户，不修改外部账号、会话凭证和历史发送者。
+
+未来确有共享账号需求时再增加：
+
+```text
+user_messaging_account_bindings
+├── organization_id
+├── messaging_account_id
+├── user_id
+├── role
+├── created_at
+└── updated_at
+```
+
+Binding 只表示额外查看或代发授权，Owner 仍以 `owner_user_id` 为唯一真相。阶段 3 第一版不创建该表，团队成员或客服角色也不自动获得账号访问权。
+
+### 8.4 会话、发送者、消息和账号状态
+
+进入阶段 3 时按实际能力创建以下扩展表，子表不重复保存 `provider`，统一通过 `messaging_account_id -> connection_id` 解析：
+
+```text
+connected_chats
+├── id
+├── organization_id
+├── conversation_id
+├── messaging_account_id
+├── provider_chat_id
+├── remote_type
+├── title_snapshot
+├── projection_cursor
+├── created_at
+└── updated_at
+
+external_senders
+├── id
+├── organization_id
+├── messaging_account_id
+├── sender_kind
+├── external_id
+├── display_name_snapshot
+├── avatar_snapshot
+├── created_at
+└── updated_at
+
+connected_message_records
+├── id
+├── organization_id
+├── messaging_account_id
+├── connected_chat_id
+├── message_id
+├── provider_message_id
+├── provider_sender_id
+├── direction
+├── delivery_status
+├── client_operation_id
+├── source_order
+├── last_error
+├── provider_payload_reference
+├── created_at
+└── updated_at
+
+conversation_account_states
+├── id
+├── organization_id
+├── conversation_id
+├── messaging_account_id
+├── provider_read_cursor
+├── local_read_message_id
+├── pinned
+├── archived
+├── muted_until
+└── updated_at
+```
+
+核心唯一性：
+
+```text
+connected_chats:
+  UNIQUE (organization_id, messaging_account_id, provider_chat_id)
+  UNIQUE (organization_id, conversation_id)
+
+external_senders:
+  UNIQUE (organization_id, messaging_account_id, sender_kind, external_id)
+
+connected_message_records:
+  UNIQUE (organization_id, messaging_account_id, connected_chat_id, provider_message_id)
+    WHERE provider_message_id IS NOT NULL
+  UNIQUE (organization_id, messaging_account_id, client_operation_id)
+    WHERE client_operation_id IS NOT NULL
+
+conversation_account_states:
+  UNIQUE (organization_id, messaging_account_id, conversation_id)
+```
+
+`connected_chats` 只负责远端会话映射和系统投影进度。`conversation_account_states` 负责已读、置顶、归档和静音等账号视图状态，不能为了少一张表混入映射记录；只有第一种真实账号状态能力落地时才创建物理表。
+
+`external_sender` 创建对应 `chat_subject` 后才能成为参与者和消息发送者。`sender_kind` 是具体 Adapter 的闭集，不建设跨所有平台的全局分类学；Telegram 首期使用 `user | chat`。
+
+### 8.5 外部编号、游标和来源顺序
+
+所有稳定远端标识使用 `text`：
+
+```text
+provider_account_id
+provider_chat_id
+provider_message_id
+external_id
+client_operation_id
+projection_cursor
+provider_read_cursor
+```
+
+Adapter 负责平台规范化，业务 Action 只校验非空、长度和作用域。禁止统一 `lower()`，也不把用户名、手机号、邮箱、工作区名称或 Endpoint 当作稳定账号主键。
+
+`source_order` 是可空 `bigint`，只在平台提供同一远端会话内稳定、可比较的整数顺序时填写：
+
+- Telegram 可以使用整数消息编号。
+- 没有稳定整数顺序的平台保持为空，时间线退回 `(originated_at, id)`。
+- 不得使用时间戳转换、Hash、填零或平台内部不可公开的深度值伪造顺序。
+- 不为 `(connected_chat_id, source_order)` 创建唯一约束。
+- 阶段 0 不在 `messages` 增加该字段；阶段 3 先保存在连接消息映射中。
+
+账号级 `projection_cursor` 表示当前账号投影进度，会话级 `connected_chats.projection_cursor` 表示单个远端会话历史补拉进度，`provider_read_cursor` 表示平台已读位置。三者语义不同，不能共用时间戳或消息编号字段。
+
+### 8.6 Adapter 能力契约
+
+理论能力由代码中的 `adapter_kind` Catalog 定义，不创建数据库能力位图表。至少按需声明：
+
+```text
+contacts
+direct_chats
+group_chats
+history_backfill
+send_text
+edit_message
+delete_message
+reactions
+read_receipts
+files
+channel_identity_send
+```
+
+具体账号可用能力由以下交集决定：
+
+```text
+Adapter 理论能力
+  ∩ Connection 安装授权和 Scope
+  ∩ Account 当前运行状态及限制
+  ∩ 企业策略
+```
+
+统一 Adapter 契约围绕真实能力逐步增加，例如授权或恢复会话、列出和补拉会话、串行投影 Update、发送文本、编辑、删除、已读，以及把平台结果分类为确定成功、确定拒绝、可重试或结果不确定。没有真实需求的能力不预建空接口。
+
+前端根据当前 Connection 和 Account 的实际能力展示操作，不能通过 `provider = telegram` 等条件写死功能。Slack、Teams 等 Workspace 授权即使使用相同表，也只能展示官方 Scope 和 API 实际允许的能力。
+
+### 8.7 凭证、会话与运行时隔离
+
+凭证按作用域分为：
+
+- 部署级配置：例如 Cervi 默认 Telegram 应用的 `api_id/api_hash`，由服务端配置管理，不复制进企业业务表。
+- Connection 级凭证：例如 Workspace App 安装、Bot Token 或企业自带应用配置，通过 `messaging_provider_connections.credential_bundle_ref` 引用。
+- Account 级凭证：例如 TDLib Session 与数据库密钥、委托用户 Token、Matrix Access Token 和设备编号，通过 `user_messaging_accounts.credential_bundle_ref` 引用。
+
+Credential Bundle 存放在独立密钥存储或受管数据卷中，业务表只保存不透明 UUID 引用：
+
+- 存储模型中的引用不序列化，appservice 和前端 DTO 中不存在该字段。
+- 任务 Payload 只携带 `organization_id` 和 Connection、Account 或 Chat 编号，Worker 执行时按引用读取凭证。
+- 普通日志、错误体和 Provider Payload 不记录凭证、TDLib 数据库路径或会话内容。
+- 轮换时先创建新 Bundle，再用短事务切换引用；旧 Bundle 在宽限期后清理，不原地修改密文。
+- Connection 和 Account 的 Bundle 不能复用同一条记录，避免卸载平台安装和解绑个人账号时互相删除密钥。
+
+同一个 `user_messaging_accounts.id` 同时只允许一个 Connector Runtime 持有运行租约，保护账号投影游标和外发对账。租约不跨账号行或企业全局互斥，也不能通过 Connection 表达进程拓扑。
+
+### 8.8 会话映射不变量与平台例外
+
+跨平台保持以下存储和发送路由不变量：
+
+```text
+一个绑定账号下的一个远端会话
+    -> 一个 connected_chat
+    -> 一个 Cervi Conversation
+```
+
+每次发送通过 `conversation_id -> connected_chats.messaging_account_id` 唯一解析账号，禁止使用用户默认账号或跨账号聚合结果猜测发送路由。
+
+平台差异通过 Adapter 规则处理：
+
+- 两个账号加入同一个远端群时保留两个账号视图，不合并存储。
+- 平台把 Thread 表达为父会话内消息关系时使用 `thread_root_message_id`；平台分配独立 Chat ID 时创建新的 `connected_chat`。
+- 群升级、Room Tombstone 等平台迁移使用显式迁移关系，不按标题或成员自动合并。
+- 不允许投影的 Secret Chat、受保护内容或授权范围外资源不创建连接会话。
+- 跨账号统一收件箱只做只读查询聚合，不能改变账号所有权、已读状态或发送路由。
+
+Telegram 首个 Adapter 的特定映射：
+
+- 每个企业确保一条 `provider = telegram`、`adapter_kind = telegram_tdlib_user`、`external_scope_id = telegram` 的薄 Connection，不提供独立 Connection 管理页面。
+- `provider_account_id` 使用认证完成后取得的 Telegram 用户编号十进制字符串，手机号和用户名只作可变别名，不作主键。
+- TDLib Session 目录和数据库密钥属于 Account Credential Bundle；数据中心和设备授权不是新的 Connection。
+- Telegram Bot Token 永不进入用户消息账号，继续走 `channels`。
+- 容器和发送主体分离：讨论组使用自己的 `provider_chat_id`，以频道身份发言和匿名管理员使用 `sender_kind = chat` 的 `external_sender`。
+- Saved Messages 是合法连接会话；频道与讨论组是两个远端会话，不自动合并。
+- 基础群升级超级群时按平台迁移事件建立显式映射；Secret Chat 和受保护内容默认不投影。
+
+### 8.9 发送、同步与生命周期规则
+
+- 一个 Cervi 用户可以绑定多个不同平台或同平台账号，聊天列表必须清晰标识接收和发送账号。
+- 第三方用户账号不能写入 `channels` 或 `customer_conversations`，不能使用 `chmsg:` 幂等键；除用户明确执行“保存为外部联系人”外，也不写入 `contacts` 或 `contact_channel_identities`。
+- 本地发起的远端操作使用稳定 `client_operation_id`，发送状态和远端消息编号保存在 `connected_message_records`，不依赖 `task_runs` 作为业务投递账本。
+- 外发调用出现超时、连接中断或进程崩溃时先标记结果不确定，通过平台本地状态、历史或权威查询对账；只有确认远端未发送后才能重试。
+- Connector 按账号串行推进投影游标，支持断线重连、限流、幂等写入和历史补拉；平台瞬时 Update 不默认全部写入 PostgreSQL。
+- 账号解绑不删除已沉淀消息；保留、脱敏或删除由企业策略和用户授权决定。
+- 编辑、删除、反应、置顶、草稿和已读按 Adapter 能力逐项接入，不承诺所有平台都能双向同步。
+
+## 9. 受管外部协作与联邦预留
+
+### 9.1 受管外部协作
+
+未部署 Cervi 的供应商或合作伙伴由当前企业托管访客账号，只能访问被邀请的会话、工单和文件。受管访客不能浏览完整通讯录、加入未邀请群、查看内部工单字段或管理企业资源。
+
+默认使用定向、一次性、短期有效邀请。入口优先使用响应式 Web/PWA 和安全链接。小程序只是客户端壳，不是新的消息渠道。
+
+访客来源记录创建 `kind = guest` 的 `chat_subject` 后即可使用通用参与者和消息模型，但登录、邀请和访问范围仍由访客域负责。
+
+### 9.2 联邦通信
+
+联邦通信遵循：
+
+- 不假设所有参与者存在于同一数据库。
 - 不使用数据库自增编号作为跨部署标识。
-- 会话、消息和同步事件使用全局唯一编号。
-- 服务器间请求需要认证、签名、幂等和重放保护。
-- 远端成员在本地保存受限身份投影，不创建成本地企业成员。
-- 文件来源和下载授权不能假设文件一定存储在当前服务器。
+- 服务器请求需要认证、签名、幂等和重放保护。
+- 远端成员只保存必要投影，不创建成本地企业成员。
+- 会话、消息、成员和文件同步都显式带协议版本和全局标识。
+- 首期不实现分布式事件图或多主冲突解决。
 
-### 7.2 建议的托管方式
+未来联邦用户投影创建 `kind = federated_user` 的 `chat_subject`。受管访客升级为联邦身份时不重写历史发送者，只新增经过双方确认的身份关联供界面聚合，新消息使用新的联邦主体。
 
-联邦会话拥有明确的发起或托管服务器。参与企业服务器保存本地镜像或查询投影，按全局消息编号幂等同步。
+联邦阶段使用独立的协议入站和出站事件表，以 `(peer_deployment_id, event_id)` 等协议稳定编号永久防重，并保存签名、协议版本、投递确认和重放窗口。联邦协议事件不能复用 `task_runs`、客服投递表或客户端同步日志。
 
-未来协议需要覆盖：
+## 10. 可靠任务、外部投递与客户端同步
 
-- 企业连接申请、审批、停用和拉黑。
-- 服务器身份、公钥和密钥轮换。
-- 成员邀请、加入、退出和移除。
-- 消息投递、确认、失败重试和补拉。
-- 编辑、撤回和删除的权限边界。
-- 文件元数据和跨服务器下载授权。
-- 断开连接后的历史保留策略。
-- 远端不可用时的本地展示和恢复同步。
+### 10.1 三类可靠性对象
 
-首期不实现分布式事件图或多主状态冲突解决。只有联邦需求进入开发阶段时，再确定具体一致性模型和协议版本。
+聊天中的可靠性由三类不同对象承担，不能合并成通用 `chat_inbox` 或 `chat_outbox`：
 
-## 8. 数据隔离与安全边界
+| 对象 | 职责 | 数据性质 | 落地阶段 |
+| --- | --- | --- | --- |
+| `task_runs + task_outbox` | 可靠执行一个已注册的异步 Action | 命令运行与临时发布状态 | 项目已有，聊天复用 |
+| `customer_message_deliveries` 等来源投递表 | 记录一条消息在外部平台上的投递、顺序、回执和不确定结果 | 长期业务记录 | 对应外发能力落地时 |
+| `conversation_sync_events` | 让客户端补拉消息编辑、删除、反应和成员变化 | 有保留期的客户端同步 Changelog | 阶段 2 |
 
-所有查询和写入必须显式带当前 `organization_id`，不能只凭资源 UUID 查询。
+`messages` 是聊天内容和时间线的业务事实来源；它不是外部平台投递状态，也不能单独表达旧记录发生的增量变化。
 
-需要长期保持以下边界：
+现有 `internal/actions/inbox` 表示工作台统一收件箱查询，与分布式系统的 Inbox Pattern 无关。技术接入表不得复用这一业务名称和包职责。
 
-- 内部单聊和群聊按有效参与者关系授权。
-- 客户会话当前按已登录和企业边界读取，ServiceSession 落地后按排队、负责人和协作者授权。
-- 能查看客户收件箱不等于成为会话参与者，不把所有企业成员写入客户会话参与者表。
-- 联系人只能通过其来源渠道访问对应客户会话。
-- 受管访客只能访问邀请范围内的资源。
-- 联邦用户只能访问双方共享并仍然有效的资源。
-- 工单内部评论和内部字段不进入外部消息时间线。
-- 群聊存在外部参与者时必须在界面持续标识。
-- 邀请、成员变更、权限变更和跨企业操作写入审计记录。
+### 10.2 复用现有任务 Outbox
+
+现有服务端任务运行时已经提供：
+
+```text
+业务入队
+  -> task_runs + task_outbox
+  -> PostgreSQL Outbox 发布到 NATS JetStream
+  -> Worker 按数据库租约认领 task_run
+  -> Action 成功、失败或退避重试
+```
+
+它是“请可靠执行某个 Action”的事务型命令 Outbox，不是“某个领域事实已经发生”的广播事件日志：
+
+- `task_outbox` 发布成功后删除，不用于长期重放。
+- JetStream 使用工作队列语义，一个任务由一个 Worker 处理，不提供多消费者事件扇出。
+- `task_runs.idempotency_key` 只避免相同 Action 的活动任务并发重复；任务进入成功或失败终态后，相同键可以再次创建。
+- `task_runs` 的租约可以避免同一个 Run 同时被多个 Worker 执行，但不能提供 Exactly Once。
+- Handler 已完成外部副作用、但尚未提交任务终态时崩溃，任务仍可能再次执行。
+
+因此不创建 `chat_outbox`、通用 `domain_events` 或 NATS 消费 Inbox。聊天 Handler 必须可重入，永久业务幂等由 `messages`、来源映射或投递记录保证，不能依赖 `task_runs` 的活动幂等键。
+
+### 10.3 事务内 Enqueue
+
+现有公开 `Runtime.Enqueue` 会开启独立事务，不能与聊天 Action 正在执行的业务事务原子提交。第一次出现“业务记录和异步副作用必须同时成功或同时失败”的场景前，应在 `internal/task/server` 增加事务内接口：
+
+```go
+type TxEnqueuer interface {
+    EnqueueIn(
+        ctx context.Context,
+        tx bun.IDB,
+        actionName string,
+        payload any,
+        options EnqueueOptions,
+    ) (string, error)
+}
+```
+
+实现规则：
+
+- `Runtime` 继续作为门面，负责 Action 注册校验、Payload 编码和 Options 规范化。
+- 底层只使用传入的 `bun.IDB` 写入 `task_runs + task_outbox`，不再开启嵌套事务。
+- Action 只依赖 `TxEnqueuer`，不直接写任务表，也不接触 NATS。
+- 任务 Payload 只携带企业编号和稳定业务编号，Handler 读取业务记录时重新校验 `organization_id`。
+- 普通 `Enqueue` 继续服务于没有外层业务事务的任务。
+
+首个聊天 PR 没有异步副作用，不需要同时实现该接口；阶段 1 的第一个可靠外发 Action 必须先具备它。
+
+### 10.4 入站消息不使用统一 Inbox 表
+
+不同来源拥有不同的受理、去重、顺序和保留语义，只统一适配器流程，不统一存储表：
+
+| 来源 | 受理和防重方式 |
+| --- | --- |
+| 网站挂件 | 同步调用入站 Action，使用 `messages.idempotency_key` 防重，不创建原始 Inbox 表 |
+| 公众号或 Bot Webhook | 默认验签后同步归一化并写入消息；只有处理明显变慢或必须先返回成功时，才增加来源专属 `channel_inbound_events` |
+| Telegram TDLib | 使用 TDLib 本地状态、账号同步游标和 `connected_message_records`，不把 typing、在线状态等每个 Update 写入 PostgreSQL |
+| NATS 内部任务 | 使用 `task_runs`，不再套一层消费 Inbox |
+| Cervi 联邦 | 阶段 6 建立带签名、协议版本和永久事件编号的协议 Inbox |
+
+可选 `channel_inbound_events` 只保存平台受理所需的原始事件编号、载荷、处理状态和错误，归一化后仍调用通用聊天 Action，不能让 Worker 绕开领域 Action 直接拼装联系人和消息。
+
+### 10.5 客服外部投递记录
+
+网站访客直接从 Cervi 消息时间线读取客服回复，消息行本身就是投递事实，不创建 Delivery。微信公众号、Telegram Bot 等需要调用外部平台的客服回复，在对应能力落地时增加 `customer_message_deliveries`：
+
+```text
+customer_message_deliveries
+├── id
+├── organization_id
+├── conversation_id
+├── message_id
+├── channel_id
+├── contact_channel_identity_id
+├── position
+├── status
+├── attempt
+├── provider_message_id
+├── lease_worker
+├── lease_expires_at
+├── available_at
+├── uncertain_until
+├── last_error
+├── sent_at
+├── created_at
+└── updated_at
+```
+
+阶段 1 的一对一客户会话中，一条本地消息只向一个客户渠道身份投递。核心唯一性和索引：
+
+```text
+UNIQUE (organization_id, message_id)
+UNIQUE (conversation_id, position)
+UNIQUE (channel_id, contact_channel_identity_id, provider_message_id)
+    WHERE provider_message_id IS NOT NULL
+UNIQUE (conversation_id)
+    WHERE status IN ('sending', 'uncertain')
+
+INDEX (available_at, conversation_id, position)
+    WHERE status IN ('pending', 'retry_wait')
+INDEX (lease_expires_at)
+    WHERE status = 'sending'
+INDEX (uncertain_until)
+    WHERE status = 'uncertain'
+```
+
+`position` 是同一客户会话的严格外发顺序。在锁定对应 `customer_conversations` 行后分配 `MAX(position) + 1`，不能使用创建时间或 UUID 推导平台发送顺序。
+
+渠道级 FloodWait 或全局限流不写入客户会话，使用独立状态：
+
+```text
+customer_channel_send_gates
+├── channel_id
+├── organization_id
+├── flood_wait_until
+└── updated_at
+```
+
+`customer_conversations` 继续只表达客户会话与渠道身份的业务关系，不加入 dirty、Worker lease 或 FloodWait 等投递运行字段。TDLib 和联邦也不复用 `customer_message_deliveries`。
+
+### 10.6 外部投递状态机
+
+外部平台调用结果分为确定成功、确定未受理和结果未知。状态机至少包括：
+
+```text
+pending
+  -> sending
+      -> sent
+      -> retry_wait
+      -> failed
+      -> uncertain
+
+uncertain
+  -> sent                 Echo 或权威查询确认成功
+  -> pending              权威查询确认没有发送
+  -> needs_review         等待期结束仍无法确认
+
+needs_review
+  -> pending              人工确认风险后重试，并分配新的队尾 position
+  -> sent                 人工标记已送达
+  -> failed               人工标记失败
+```
+
+规则：
+
+- 只有 `pending` 和到期的 `retry_wait` 可以自动调用平台。
+- `pending/retry_wait/sending/uncertain` 属于队头阻塞状态；`sent/failed/needs_review/cancelled` 属于自动管道终态，不再阻塞同会话后续投递。
+- 2xx 且取得平台消息编号属于确定成功，立即用最小事务写入 `sent + provider_message_id`。
+- 429 或平台明确表示未受理时进入 `retry_wait`；永久业务拒绝进入 `failed`。
+- 超时、连接重置、含义不明的 5xx、进程在平台调用前后崩溃，以及 `sending` 租约过期，都进入 `uncertain`。
+- `sending`、`uncertain` 和 `needs_review` 不能自动重新发送，避免远端成功但本地未记录时产生重复消息。
+- `uncertain` 在配置的等待窗口内阻塞同会话后续外发，为 Echo 或权威查询留出时间；到期后进入 `needs_review` 并放行后续消息。
+- 人工重试必须提示“对方可能已经收到，重试可能产生重复”，并作为新的队尾操作执行。
+- 入站适配器识别由本渠道发出的 Echo 后，只用于补全投递状态和平台消息编号，不能再次作为客户入站消息创建 `messages`。
+
+编辑、撤回等远端操作也必须进入同一路由顺序，但在真正实现相关渠道能力时再增加操作类型或独立操作表，首期不预建空表。
+
+### 10.7 持久有序扫描与丢失唤醒
+
+外发正确性不能依赖进程内 FIFO、JetStream 消息顺序或 `task_runs` 的会话级活动幂等键。服务端有多个 Worker，未来也可能存在多个实例；进程内队列无法跨实例协调，崩溃后也无法恢复。
+
+阶段 1 使用 PostgreSQL Delivery 表作为持久有序队列：
+
+1. 生产事务锁定 `customer_conversations`，写入本地消息和 `pending` Delivery，分配 `position`，并通过 `EnqueueIn` 可选创建以 `delivery_id` 为作用域的快速唤醒任务。
+2. 周期扫描器是正确性来源，持续查找已到期的 `pending/retry_wait`、租约过期的 `sending` 和到期的 `uncertain`。
+3. 多实例扫描时，对候选 `customer_conversations` 行使用 `FOR UPDATE SKIP LOCKED`；选定会话后只处理该会话最小 `position` 的非终态队头，不能对 Delivery 队头使用 `SKIP LOCKED` 后跳到下一条。
+4. 同一事务把队头更新为 `sending` 并写入短租约，提交后才在事务外调用平台。
+5. 平台返回后用新的短事务提交确定成功、重试、永久失败或不确定结果。
+6. Worker 崩溃后，扫描器把过期 `sending` 升级为 `uncertain`，禁止直接重发。
+7. 毒消息最终进入 `failed` 或 `needs_review`，不永久阻塞后续消息。
+
+可选快速任务使用 `cdeliv-item:<delivery_id>` 等每条投递独立的活动幂等键，只负责降低延迟；即使任务丢失或空执行，扫描器仍能恢复。禁止使用 `cdeliv:<conversation_id>` 合并整个会话的 Drain：旧 Run 尚未提交终态时，新投递可能命中旧活动任务而不创建新 Run，随后产生永久丢失唤醒。
+
+渠道限流由 `customer_channel_send_gates` 阻止同一渠道继续认领。首版可以通过 `UNIQUE (channel_id) WHERE status = 'sending'` 限制同一渠道同时只有一个平台调用，验证平台限流语义后再安全增加并发；同会话 FIFO 始终由 `position` 和队头规则保证。
+
+### 10.8 客户端离线增量同步
+
+新消息可以通过 `(originated_at, id)` 游标补拉，但旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
+
+阶段 2 承诺实时消息和离线补拉时增加每会话 Changelog：
+
+```text
+conversation_sync_events
+├── id
+├── organization_id
+├── conversation_id
+├── seq
+├── kind
+├── entity_id
+├── payload
+└── created_at
+```
+
+规则：
+
+- `seq` 在每个会话内严格单调递增。业务变更在锁定会话并推进同步序号的同一事务中写入 Sync Event。
+- 事件类型覆盖消息新增、编辑、删除，参与者变化，会话设置变化，以及以后增加的反应和回执变化。
+- Payload 只保存客户端恢复所需的类型化最小信息；业务实体当前状态仍从对应业务表读取。
+- WebSocket 只作为新序号通知通道，不能作为真相来源。客户端持久化各会话最后同步序号，重连后读取更大的 `seq`。
+- Changelog 按保留策略清理。客户端落后超过保留窗口时，重新获取会话、参与者和消息快照，再从新的同步序号继续。
+- 该表不用于搜索、通知和 AI 的多消费者广播。搜索从业务表回填，AI 继续使用独立消息处理游标和 Run。
+
+`conversation_sync_events` 是客户端同步协议，不是通用领域事件总线，也不能承担 Cervi 联邦传输。
+
+## 11. 数据隔离与长期规则
+
+所有查询和写入必须显式带当前 `organization_id`，不能只凭资源 UUID 查询。由于项目迁移不创建外键和 `CHECK`，Action 必须在事务内显式校验企业边界、来源类型和关联合法性。
+
+长期保持：
+
+- 原生单聊和群聊按有效参与者关系授权。
+- 客户会话访问与参与者关系分离。
+- 第三方账号会话同时校验当前用户、绑定账号和会话映射。
+- 联系人只能通过已验证的渠道会话访问外部渠道。
+- 受管访客只能访问邀请范围内资源。
+- 联邦用户只能访问双方仍然共享的资源。
+- 工单内部评论和字段不进入外部消息时间线。
+- 群聊存在外部参与者时持续标识。
 - 退出或停用成员不物理删除历史发送者关系。
+- 已被聊天主体引用的来源记录采用软删、停用或保留投影，不物理删除后留下悬空 `source_id`。
+- 邀请、成员变化、第三方账号发送、AI 工具调用和跨企业操作进入审计链。
+- `task_runs` 只提供至少一次异步 Action 运行语义，所有 Handler 可重入；消息和外部投递的永久幂等保存在业务表。
+- 外部发送的确定成功、确定失败和结果未知必须显式区分，结果未知时禁止自动重发。
+- 实时连接只是变化通知通道，客户端离线恢复必须使用消息游标、同步序号或对应来源协议游标。
 
-## 9. 路线阶段
+## 12. 路线阶段
 
 ### 阶段 0：客户会话数据底座
 
-目标：以网站渠道的客户入站消息作为第一个落地场景，建立可继续支持内部聊天和联邦通信的统一会话、参与者和消息模型。
+以网站入站消息验证 `chat_subjects`、统一会话、参与者、双时间消息、客户会话扩展和幂等事务闭环。
 
-包括：
-
-- 会话、参与者、文本消息存储。
-- 网站渠道身份查找或创建联系人。
-- 同一渠道身份复用长期客户会话。
-- 客户入站文本消息 Action 最小闭环。
-- 渠道消息重试幂等。
-- 引用与话题关系字段预留。
-
-不包括公开接入 API、客服回复、服务批次、实时推送和界面。
+不包括公开 API、客服回复、实时推送、已读状态、Telegram 和 AI 运行表，也不创建聊天专用 Inbox、Outbox、外部投递或客户端同步表。
 
 ### 阶段 1：外部客户单聊
 
-目标：让网站渠道联系人与客服完成真实消息闭环。
+实现网站、微信公众号和 Telegram Bot 私聊等一对一客服渠道的收发、列表、历史、文件消息和 `ServiceSession` 排队接待。Bot 群聊、频道和讨论组不进入客户会话阶段。
 
-包括：
+可靠性范围：
 
-- 渠道身份进入客户会话。
-- 客户消息接收和客服回复。
-- 客户会话列表和历史消息。
-- ServiceSession 排队、接待、转接、挂起和结束。
-- 首次响应和会话时长等基础指标。
-- 文件消息。
+- 第一个需要与业务事务原子提交的异步副作用前，先为任务运行时增加 `TxEnqueuer.EnqueueIn`。
+- 网站访客从 Cervi 消息时间线拉取回复，不创建 Delivery。
+- 第一种真正调用外部平台的客服回复落地时，增加 `customer_message_deliveries`、`customer_channel_send_gates`、有序扫描器和 `uncertain/needs_review` 状态机。
+- 数据库扫描是外发恢复的正确性来源；以 `delivery_id` 为作用域的任务只作为降低延迟的快路径。
+- 入站 Echo 只更新投递状态，不重复创建客户消息。
+- Webhook 默认同步受理；只有必须先应答后处理时才增加来源专属 `channel_inbound_events`。
 
-### 阶段 2：企业内部单聊与群聊
+### 阶段 2：企业内部聊天与 AI 参与
 
-目标：让 Cervi 成为企业内部日常沟通入口。
+实现成员单聊、群聊、成员管理、引用、@ 提醒、已读、实时消息、离线补拉和通知。AI 智能体沿统一参与者路径加入，并补充策略、处理游标、Run、工具步骤和审计。
 
-包括：
+阶段 2 增加 `conversation_sync_events` 和每会话同步序号。新消息、编辑、删除、参与者、会话设置、反应和回执变化与 Sync Event 在同一事务提交；WebSocket 只推送新序号，客户端断线后按序号补拉，超过保留窗口时重新获取快照。该 Changelog 不作为搜索、通知、AI 或联邦的事件总线。
 
-- 发起单聊。
-- 创建、编辑和归档群聊。
-- 添加和移除群成员。
-- 引用回复、@ 提醒和已读状态。
-- 实时消息、离线补拉和通知。
-- 消息搜索的基础索引。
+### 阶段 3：第三方用户账号接入
 
-公开群和话题模式仍不进入默认范围。
+先落地平台无关的最小账号接入骨架，再以 Telegram + TDLib 作为首个适配器验证。此阶段包括：
 
-### 阶段 3：受管外部协作
+- 创建精简的 `messaging_provider_connections`，使用稳定的 `external_scope_id` 表示远端身份命名空间；连接端点允许为空和变更，不承担账号身份。
+- 在代码适配器目录中登记 `provider`、`adapter_kind`、认证方式和理论能力；实际能力取适配器能力、授权范围、账号观测状态和企业策略的交集，不建立数据库能力矩阵。
+- 创建 `user_messaging_accounts`，明确 `owner_user_id`、连接、授权状态、账号级凭据引用、投影游标和最近投影时间。授权成功后以 `(organization_id, connection_id, provider_account_id)` 唯一识别远端账号。
+- 一个 Cervi 账号可以绑定多个第三方账号；同一聊天列表展示各账号会话并明确标识收发账号。
+- 创建 `connected_chats`、`external_senders` 和 `connected_message_records`，子表通过账号和连接确定平台，不重复保存 `provider`。
+- 第三方标识和游标统一使用文本；仅在平台提供可靠顺序时保存可空 `source_order`，不为缺失顺序制造伪值或唯一约束。
+- 联系人和会话投影、文本收发、编辑、删除、已读、历史补拉、断线恢复、限流、幂等和账号隔离均按适配器声明的实际能力降级。
+- 账号投影游标、远端会话投影游标和平台已读游标分别建模，不能用一个通用 `sync_cursor` 混合表达。
+- `connected_message_records` 保存账号、远端会话、消息映射和外发状态，不复用客服渠道的 `customer_message_deliveries`。
+- 外发结果不确定时先进入 `uncertain`，通过平台历史或远端查询对账；无法确认前禁止直接自动重发。
+- 平台更新使用账号或远端会话投影游标，不进入通用入站 Inbox 表。
+- 凭据只通过连接级或账号级 `credential_bundle_ref` 引用加密密文，不进入 DTO、日志和普通任务载荷；运行时租约只限制同一账号记录的并发连接。
 
-目标：让未部署 Cervi 的供应商和合作伙伴安全参与。
+Telegram 首个实现额外验证 TDLib 会话托管、FloodWait、远端历史对账和明文投影边界。阶段 3 不建设通用 OAuth 产品、连接管理页面、账号共享绑定表或数据库能力矩阵；这些能力应在第二个平台或真实共享需求出现后再提炼。
 
-包括：
+### 阶段 4：受管外部协作
 
-- 合作方企业档案。
-- 受管访客账户。
-- 定向邀请和审批。
-- 外部协作门户。
-- 受管外部单聊和群聊。
-- 对外文件访问和审计。
+实现合作方企业、受管访客、定向邀请、外部协作门户、受管单聊群聊、文件访问和审计。
 
-### 阶段 4：工单
+### 阶段 5：工单
 
-目标：把消息中的问题转成可分派、可跟踪、可度量的工作。
+实现工单状态、优先级、负责人、团队、会话消息关联、内部评论、对外回复、SLA 和自动化。
 
-包括：
+### 阶段 6：Cervi 企业联邦
 
-- 工单状态、优先级、负责人和团队。
-- 会话或指定消息创建工单。
-- 一个工单关联多个会话。
-- 内部评论和对外回复。
-- SLA、流转记录和自动化。
-- 客户与受管访客工单门户。
+实现企业信任连接、联邦身份投影、跨企业单聊群聊、成员与消息事件同步、断线补拉和访客身份升级。同步协议使用独立的联邦 Inbox/Outbox，以对等部署和协议事件编号永久防重；不复用 `task_runs`、客服 Delivery 或客户端 Sync Event。
 
-### 阶段 5：Cervi 企业联邦
+### 阶段 7：结构化大型协作
 
-目标：让多个独立部署保持各自身份和数据边界进行协作。
+根据真实需求选择公开群、公告群、话题模式、独立子讨论空间和显式共享的跨企业工单。
 
-包括：
+## 13. 第一个聊天 PR
 
-- 企业连接与信任管理。
-- 联邦身份投影。
-- 跨企业单聊和群聊。
-- 消息和成员事件同步。
-- 断线重试与历史补拉。
-- 受管访客升级为联邦身份。
-
-### 阶段 6：结构化大型协作
-
-根据实际客户使用验证后选择实现：
-
-- 企业内可发现的公开群。
-- 公告或只读群。
-- 群聊话题模式。
-- 独立子讨论空间。
-- 显式共享的跨企业协作工单。
-
-## 10. 第一个 PR 方案
-
-### 10.1 PR 定位
+### 13.1 PR 定位
 
 建议标题：
 
@@ -492,26 +1070,27 @@ actor_identity_links
 feat: 建立客户会话与入站文本消息数据底座
 ```
 
-目标：
+目标是在不新增聊天前端页面和公开聊天接口的前提下，建立通用聊天存储，并通过 Action 完成网站渠道身份、联系人、客户会话和入站文本消息的事务闭环。现有联系人列表、详情和表单必须同步适配可空来源渠道。
 
-在不暴露新前端页面和公开业务接口的前提下，建立通用会话存储结构，并通过 Action 层完成网站渠道身份、联系人、客户会话和入站文本消息的事务闭环。
-
-该 PR 验证以下不可轻易返工的基础约束：
-
-- 所有数据按企业隔离。
-- 同一渠道外部身份只对应一条渠道身份记录。
-- 同一渠道身份只对应一个长期客户会话。
-- 同一条渠道消息重试不会重复创建联系人、会话或消息。
-- 自动进入系统的联系人不需要伪造创建用户。
-- 客户消息发送者可以通过参与者关系稳定追溯。
-- 客户渠道关系通过类型扩展表表达，不解析自然键，也不污染通用会话字段。
-- 客户收件箱访问与会话参与者关系保持独立。
-
-### 10.2 PR 范围
-
-新增领域值：
+首个 PR 创建五张聊天表：
 
 ```text
+chat_subjects
+conversations
+customer_conversations
+conversation_participants
+messages
+```
+
+不创建第三方用户消息账号、访客、联邦和 AI 运行表，也不创建 `chat_outbox`、通用 Inbox、领域事件、`customer_message_deliveries`、渠道发送 Gate 或 `conversation_sync_events`。首个 PR 没有异步副作用，不调整任务运行时，只以本文件固定后续边界。
+
+### 13.2 领域值
+
+```text
+ChatSubjectKind
+├── organization_identity
+└── contact
+
 ConversationType
 ├── direct
 ├── group
@@ -520,13 +1099,6 @@ ConversationType
 ConversationStatus
 ├── active
 └── archived
-
-ParticipantIdentityType
-├── user
-├── guest
-├── federated_user
-├── contact
-└── bot
 
 ConversationParticipantRole
 ├── owner
@@ -537,350 +1109,206 @@ MessageType
 └── system
 ```
 
-首个 PR 只创建 `customer` 会话，并只允许 `contact` 参与者发送 `text` 消息。其他枚举用于稳定契约，不在 Action 中开放创建路径。
+首个 PR 只创建 `contact` 主体、`customer` 会话、`member` 参与者和 `text` 消息。其他值用于确定契约，不开放对应写入 Action。
 
-调整现有联系人结构：
+聊天消息发送者只通过 `sender_participant_id` 追溯。现有 `internal/domain.MessageAuthor` 的 `visitor | agent` 二元枚举不进入新聊天契约，后续删除或限制在旧占位 DTO 中，不能扩展为第二套发送者模型。
 
-- 将 `contacts.created_by_user_id` 改为可空，手工创建联系人时仍记录当前用户，渠道自动创建联系人时保持为空。
-- 将 `servermodels.Contact.CreatedByUserID` 改为 `*string`。
-- 入站自动创建联系人时，`source_channel_id` 使用当前网站渠道，`stage` 使用 `visitor`，显示名称允许为空，不伪造用户、邮箱或其他联系方式。
-- 已有渠道身份收到新的非空渠道显示名称时更新 `contact_channel_identities.display_name`；只有 `contacts.display_name` 为空时才补充联系人名称，不覆盖客服人工维护的名称。
-- 现有手工创建和读取联系人行为保持目标模型下的一致实现，不增加历史数据兼容逻辑。
+### 13.3 现有联系人调整
 
-新增四张表，每个迁移文件只创建一张表：
+- `contacts.created_by_user_id` 和 `contacts.source_channel_id` 都改为可空，Bun 模型及 Action DTO 同步调整。
+- 手工联系人记录当前用户，来源渠道可选；渠道自动创建联系人不伪造创建用户。
+- 当前创建 Action 不允许创建用户和来源渠道同时为空；以后只有带独立来源审计的导入或同步 Action 可以这样写入。
+- `source_channel_id` 只写一次：创建时已知则写入，否则可由第一条渠道身份回填，之后不覆盖。
+- 列表与详情中的来源渠道改为 `LEFT JOIN`，对应模型、Action DTO、appservice 契约和现有联系人表单全部支持可空来源。
+- 入站自动创建联系人时，`source_channel_id` 使用当前网站渠道，`stage = visitor`，显示名称允许为空。
+- 已有渠道身份收到新的非空显示名称时更新渠道身份；只有联系人名称为空时才补充，不覆盖人工名称。
+- 新增可在既有事务中调用的渠道身份确保能力，集中维护 `(channel_id, external_id)` 唯一性和联系人规则。
+
+### 13.4 表结构
+
+#### chat_subjects
+
+```text
+id                uuid primary key default uuidv7()
+organization_id   uuid not null
+kind              text not null
+source_id         uuid not null
+created_at        timestamptz not null default now()
+updated_at        timestamptz not null default now()
+```
+
+约束与规则：
+
+- 唯一索引 `chat_subjects_org_kind_source_unique` 覆盖 `(organization_id, kind, source_id)`。
+- 首个 PR 只允许 `kind = contact`，且 `source_id = contacts.id`。
+- 来源类型、企业归属和有效性由 Action 在事务内校验。
+- `kind` 和 `source_id` 创建后不可修改。
 
 #### conversations
 
 ```text
-id                  uuid primary key default uuidv7()
-organization_id     uuid not null
-type                text not null
-status              text not null default 'active'
-title               text
-created_by_identity_type text
-created_by_identity_id uuid
-last_message_at     timestamptz
-created_at          timestamptz not null default now()
-updated_at          timestamptz not null default now()
+id                    uuid primary key default uuidv7()
+organization_id       uuid not null
+type                  text not null
+status                text not null default 'active'
+title                 text
+created_by_subject_id uuid
+last_message_at       timestamptz
+created_at            timestamptz not null default now()
+updated_at            timestamptz not null default now()
 ```
 
-约束与索引：
+约束与规则：
 
-- `(organization_id, type, status, last_message_at DESC NULLS LAST, id DESC)` 用于分类会话列表，查询排序与空值规则必须一致。
-- 创建者身份两个字段必须同时为空或同时有值，由 Action 维护；空值表示系统或集成创建。
-- 渠道联系人首次发消息创建客户会话时，创建者身份为该联系人。
-- 客户会话 `title` 保持为空，展示名称从联系人及渠道身份读取，避免复制过期名称。
-- `direct` 和 `group` 在本 PR 中不创建实例。
+- 列表索引 `(organization_id, type, status, last_message_at DESC NULLS LAST, id DESC)`。
+- `created_by_subject_id` 为空表示系统或集成创建；非空时必须是同企业合法主体。
+- `type` 创建后不可修改；一个会话最多只能拥有一种来源扩展。
+- 渠道联系人首条消息创建客户会话时，创建者为联系人主体。
+- 客户会话标题为空，展示名称从联系人和渠道身份读取。
+- `last_message_at` 保存当前最大消息 `originated_at`，只向后更新。
 
 #### customer_conversations
 
 ```text
-conversation_id              uuid primary key
-organization_id              uuid not null
-contact_channel_identity_id  uuid not null
-created_at                   timestamptz not null default now()
+conversation_id             uuid primary key
+organization_id             uuid not null
+contact_channel_identity_id uuid not null
+created_at                  timestamptz not null default now()
 ```
 
-约束与索引：
+约束与规则：
 
-- 唯一索引命名为 `customer_conversations_organization_channel_identity_unique`，覆盖 `(organization_id, contact_channel_identity_id)`，保证同一渠道身份只对应一个长期客户会话。
-- `(organization_id, conversation_id)` 用于带企业边界读取客户会话扩展。
-- 联系人和渠道通过 `contact_channel_identities` 的真实字段关联，不从字符串键解析。
-- `contact_channel_identities.channel_id`、`contact_id` 及客户会话扩展关系创建后不可被普通更新操作改变。
-- 同一联系人拥有多个渠道身份时保留多个客户会话；跨渠道历史只在联系人或工单层聚合。
-- 该表只表达客户会话类型关系，不保存 ServiceSession 状态和客服负责人。
+- 唯一索引 `customer_conversations_org_channel_identity_unique` 覆盖 `(organization_id, contact_channel_identity_id)`，保证一个渠道身份只有一个长期客户会话。
+- 索引 `(organization_id, conversation_id)` 支持企业边界读取。
+- 该表只表达客户会话来源，不保存客服状态、负责人或 Telegram 用户账号关系。
+- 渠道身份关系创建后不可由普通更新改变。
 
 #### conversation_participants
 
 ```text
-id                  uuid primary key default uuidv7()
-organization_id     uuid not null
-conversation_id     uuid not null
-identity_type       text not null
-identity_id         uuid not null
-role                text not null default 'member'
-joined_at           timestamptz not null default now()
-left_at             timestamptz
-last_read_message_id uuid
-last_read_at        timestamptz
-created_at          timestamptz not null default now()
-updated_at          timestamptz not null default now()
+id                uuid primary key default uuidv7()
+organization_id   uuid not null
+conversation_id   uuid not null
+subject_id        uuid not null
+role              text not null default 'member'
+joined_at         timestamptz not null default now()
+left_at           timestamptz
+created_at        timestamptz not null default now()
+updated_at        timestamptz not null default now()
 ```
 
-约束与索引：
+约束与规则：
 
-- `(organization_id, conversation_id, identity_type, identity_id)` 唯一。
-- 唯一索引命名为 `conversation_participants_org_conversation_identity_unique`，供并发写入时精确识别预期冲突；名称保持在 PostgreSQL 的 63 字节标识符限制内。
-- `(organization_id, identity_type, identity_id, left_at, conversation_id)` 用于读取当前身份的会话。
-- 关系退出时设置 `left_at`，不删除记录。
-- `last_read_message_id` 必须由 Action 验证属于同一会话。
-- `identity_type = contact` 时，`identity_id` 必须是 `contacts.id`，不能使用渠道身份编号。
+- 唯一索引 `conversation_participants_org_conversation_subject_unique` 覆盖 `(organization_id, conversation_id, subject_id)`。
+- 索引 `(organization_id, subject_id, left_at, conversation_id)` 支持主体会话查询。
+- 主体必须与会话属于同一企业。
+- 退出时设置 `left_at`；重入时复用原行、清空 `left_at`、保留首次 `joined_at` 并更新当前 `role`，不插入新行或修改 `subject_id`。
+- 只有 `left_at IS NULL` 的参与者可以发送新消息；历史角色和成员期写审计记录。
 - 一个客户会话最多存在一个未退出的联系人参与者，由 Action 维护。
-- 身份类型和身份编号插入后不可修改；联系人以后关联访客或联邦身份时使用独立身份关联表，不重写历史参与者和消息发送者。
-- 本 PR 不写客服个人已读状态，也不把能够查看收件箱的全体成员加入参与者表。
+- 不保存已读、置顶、归档、静音或 AI 处理游标。
 
 #### messages
 
 ```text
-id                    uuid primary key default uuidv7()
-organization_id       uuid not null
-conversation_id       uuid not null
-sender_participant_id uuid
-type                  text not null
-body                  text not null default ''
-reply_to_message_id   uuid
+id                     uuid primary key default uuidv7()
+organization_id        uuid not null
+conversation_id        uuid not null
+sender_participant_id  uuid
+type                   text not null
+body                   text not null default ''
+reply_to_message_id    uuid
 thread_root_message_id uuid
-idempotency_key       text
-created_at            timestamptz not null default now()
-edited_at             timestamptz
-deleted_at            timestamptz
+idempotency_key        text
+originated_at          timestamptz not null
+created_at             timestamptz not null default now()
+edited_at              timestamptz
+deleted_at             timestamptz
 ```
 
-约束与索引：
+约束与规则：
 
-- `(organization_id, conversation_id, created_at DESC, id DESC)` 用于消息分页。
-- 部分唯一索引命名为 `messages_organization_idempotency_unique`，覆盖 `(organization_id, idempotency_key)` 且只包含非空幂等键。
-- 网站入站消息的幂等键固定为 `chmsg:<channel_id>:<source_message_id>`。
-- 后续本地客户端消息使用 `client:<participant_id>:<nonce>`，不得与渠道消息共用无前缀编号。
-- 幂等键前缀及其作用域共同组成企业内消息命名空间，使同一来源消息即使被错误地提交到另一个会话也不能重复入库。
-- `created_at` 使用当前服务器接收消息的时间；外部渠道原始发送时间以后作为来源元数据增加，不参与本 PR 的排序正确性。
-- 文本消息必须具有发送参与者；系统消息允许发送参与者为空，由 Action 根据消息类型维护。
-- 引用目标和话题根消息由 Action 显式校验属于同一企业和同一会话。
-- 本 PR 不允许编辑、删除和话题回复，但保留字段以稳定消息结构。
+- 消息分页索引 `(organization_id, conversation_id, originated_at DESC, id DESC)`。
+- 非空幂等键使用部分唯一索引 `messages_organization_idempotency_unique`，覆盖 `(organization_id, idempotency_key)`。
+- 网站入站幂等键为 `chmsg:<channel_id>:<source_message_id>`。
+- 后续原生客户端消息使用 `client:<participant_id>:<nonce>`。当前只登记 `chmsg:` 和 `client:` 前缀，其他前缀在定义作用域前禁止使用；第三方用户账号消息使用独立映射表且 `idempotency_key` 为空。
+- 文本消息必须有发送参与者，系统消息允许为空。
+- 发送参与者、引用目标和话题根必须与消息属于同一企业和会话。
+- 网站实时入站忽略客户端时间，使用服务器首次接收时间作为 `originated_at`；该时间在进入事务重试前生成一次，同一次 Action 的完整事务重试复用该值。
+- Telegram 等具有稳定来源时间的平台以后才把远端时间写入 `originated_at`，并在连接消息映射中保存来源顺序。
+- `created_at` 始终由当前服务器写入。
+- 编辑不改变 `last_message_at`；删除不回退它，消息列表预览跳过已删除消息。
 
-迁移遵循项目约定：不创建外键和 `CHECK` 约束，使用简洁中文 `COMMENT ON`，所有关联与枚举合法性由 Action 在事务中维护。
+迁移遵循项目约定：每个文件只创建一张表，不创建外键和 `CHECK`，使用简洁中文 `COMMENT ON`。所有枚举、关联和企业边界由 Action 维护。
 
-新增 Bun 模型：
+### 13.5 Action 范围
 
-```text
-internal/storage/server/models/conversation.go
-internal/storage/server/models/customer_conversation.go
-internal/storage/server/models/conversation_participant.go
-internal/storage/server/models/message.go
-```
-
-联系人包增加可在既有事务中调用的渠道身份能力，集中维护联系人规则：
+联系人包新增事务内渠道身份能力：
 
 ```text
 internal/actions/contact/ensure_channel_identity.go
 ```
 
-新增 Action 包：
+聊天 Action 建议：
 
 ```text
 internal/actions/conversation/
 ├── receive_customer_text_message.go
-├── receive_customer_text_message_test.go
 ├── list_customer_conversations.go
 ├── list_customer_messages.go
-├── customer_queries_test.go
 ├── helpers.go
 ├── types.go
 ├── errors.go
 └── validation.go
 ```
 
-Action 行为：
+`ReceiveCustomerTextMessage`：
 
-#### ReceiveCustomerTextMessage
+- 接收已经渠道适配器验证和归一化的渠道编号、外部身份编号、显示名称、来源消息编号和正文；网站客户端不提供可参与排序或幂等判断的业务时间。
+- 校验渠道存在、启用、类型为网站渠道，并从渠道记录取得企业编号。
+- 规范化并限制外部编号、来源消息编号、显示名称和正文长度。
+- 在同一事务内查找或创建联系人、渠道身份、联系人 `chat_subject`、客户会话、扩展、参与者和消息。
+- 联系人在回收站时由新的真实渠道消息恢复；客户会话归档时恢复为活动。
+- 在进入最多三次事务尝试前生成一次服务器接收时间，作为新网站消息的 `originated_at`。
+- 幂等命中时只核对渠道身份、发送主体和规范化正文；网站重试不比较本次接收时间，返回已有行保存的 `originated_at`。以后只有能提供稳定来源时间的平台才把该时间纳入自身幂等等价集。
+- 使用消息 `originated_at` 以 `GREATEST` 语义更新 `last_message_at`，补发旧消息不得回退或错误置顶会话。
+- 返回联系人、渠道身份、主体、会话、参与者和消息编号。
 
-- 接收经过渠道适配器验证和归一化的渠道编号、外部身份编号、显示名称、渠道消息编号和文本正文。
-- 该 Action 是可信业务入口，不直接接受浏览器伪造的联系人编号；公开 API 必须先完成访客会话验证。
-- 校验渠道存在、已启用且类型为网站渠道，并从渠道记录取得企业编号。
-- 渠道编号必须是有效 UUID。
-- `external_id` 和 `source_message_id` 去除首尾空白后必填，首期各不超过 255 个 Unicode 字符。
-- 渠道显示名称可空，非空时不超过 200 个 Unicode 字符，并复用联系人领域的归一化规则。
-- 去除消息正文首尾空白后校验非空，首期长度上限为 10,000 个 Unicode 字符。
-- `messages.body` 存储校验通过后的规范化正文；幂等比较直接比较已入库正文和本次规范化正文。
-- 通过联系人包能力按 `(channel_id, external_id)` 查找渠道身份；不存在时在当前事务中创建无创建用户的联系人和渠道身份。
-- 已存在渠道身份时复用联系人，仅以非空渠道显示名称更新渠道身份，同时更新最后活跃时间和联系人更新时间；联系人名称只在原值为空时补充。
-- 联系人处于回收站时，新的真实渠道消息将 `deleted_at` 置空；保留原客户阶段和人工资料。
-- 按渠道身份创建或读取唯一 `customer_conversations` 扩展及其通用会话。
-- 客户会话已归档时，新入站消息将其恢复为 `active`；归档只表示暂时从活动列表隐藏，不表示客服结案。
-- 确保联系人以 `contact` 身份、`contacts.id` 编号成为唯一有效联系人参与者。
-- 按固定格式生成 `idempotency_key`，相同消息重试时返回已有结果。
-- 已有幂等消息的渠道身份、发送身份和规范化正文必须与本次输入一致；渠道身份通过已有消息所属的客户会话扩展比较，发送身份通过已有 `sender_participant_id` 关联的身份类型与身份编号比较，不能依赖本次请求临时创建的参与者。
-- 同一幂等键携带不同渠道身份、内容或发送身份时返回冲突错误，不静默覆盖或伪装成成功重试。
-- 在同一事务中写入消息，并以新消息服务器接收时间只向后更新会话 `last_message_at` 和 `updated_at`。
-- 返回联系人、渠道身份、会话和消息编号，供后续接入层触发实时通知。
-- 不在本 PR 中负责访客认证、HTTP 响应或实时推送。
+`ListCustomerConversations`：
 
-#### ListCustomerConversations
+- 只读取当前企业中活动、有消息且联系人未删除的客户会话。
+- 使用 `(last_message_at, id)` 倒序游标分页。
+- 返回联系人、客户渠道身份对应的实际渠道和最后消息摘要；联系人自身的可空 `source_channel_id` 只作为溯源字段，不能替代会话渠道。
+- 当前阶段不计算个人未读数和客服分配状态。
 
-- 校验当前身份仍是当前企业有效用户。
-- 通过 `customer_conversations` 只读取当前企业、`type = customer`、`status = active`、`last_message_at IS NOT NULL` 且联系人未删除的客户会话。
-- 使用 `(last_message_at, id)` 倒序游标分页，与会话列表索引一致。
-- 返回能够证明查询模型的联系人、来源渠道和最后消息记录，不在本 PR 固化最终 appservice 或前端 DTO。
-- 本 PR 不计算个人未读数和客服分配状态。
-- 所有统计显式限定 `organization_id`。
+`ListCustomerMessages`：
 
-#### ListCustomerMessages
+- 校验当前企业和客户会话类型。
+- 使用 `(originated_at, id)` 倒序游标分页。
+- 返回发送主体、正文、引用关系、业务发生时间和入库时间。
+- 当前阶段所有已登录企业成员可读取客户收件箱；`ServiceSession` 落地后收紧。
 
-- 校验当前身份仍是当前企业有效用户。
-- 校验目标是当前企业的客户会话。
-- 使用游标按 `(created_at, id)` 倒序分页。
-- 返回发送者身份、正文、引用关系和时间。
-- 当前阶段所有已登录企业成员均可读取客户收件箱；ServiceSession 引入后再按接待关系收紧。
-- 不把所有历史消息嵌套进会话列表结果。
+### 13.6 事务、幂等与并发
 
-### 10.3 错误语义
-
-Action 使用语言无关错误，至少包括：
-
-```text
-ErrConversationNotFound
-ErrCustomerChannelUnavailable
-ErrCustomerIdentityInvalid
-ErrCustomerIdentityTooLong
-ErrSourceMessageIDRequired
-ErrSourceMessageIDTooLong
-ErrMessageBodyRequired
-ErrMessageBodyTooLong
-ErrMessageIdempotencyConflict
-```
-
-登录后查询时，组织外资源、无权访问资源和真实不存在资源统一返回 Not Found 语义，避免泄露其他企业中的资源存在性。入站 Action 对不存在、已停用和非网站渠道统一返回渠道不可用语义。
-
-本 PR 不增加 appservice 本地化映射；该映射随公开服务契约 PR 一起实现。
-
-### 10.4 事务与并发
-
-- 联系人、渠道身份、客户会话、参与者和首条消息必须在一个事务中完成。
+- 联系人、渠道身份、聊天主体、客户会话、参与者和首条消息必须在一个事务中完成。
 - 写入 Action 最多执行三次完整事务尝试。
-- 每次事务先执行无副作用预检：渠道校验、读取已有渠道身份（包括已删除联系人对应的身份），并按企业和幂等键读取已有消息及其客户会话扩展、渠道身份和发送参与者。
-- 预检命中已有消息且渠道身份、发送身份和规范化正文一致时，直接返回已有结果，不恢复联系人、不解档会话、不更新渠道显示名称、`last_seen_at`、联系人时间或 `last_message_at`。
-- 预检命中已有消息但当前渠道身份不存在，或渠道身份、发送身份、规范化正文任一项不一致时，返回 `ErrMessageIdempotencyConflict`，同样不得产生任何写入副作用。
-- 只有确认幂等消息不存在后，才依次查找或创建联系人和渠道身份、恢复联系人、查找或创建通用会话与客户扩展、恢复归档会话、确保联系人参与者、插入消息并更新最后消息时间。
-- 未命中幂等消息时，新渠道身份按正常创建流程继续；并发请求通过唯一冲突整体回滚后，下一次事务会读取先提交的消息并按幂等规则返回。
-- 并发收到同一新访客首条消息时，依靠 `contact_channel_identities_channel_external_unique` 和客户扩展唯一索引收敛。
-- 外层只将以下命名约束视为预期竞态：`contact_channel_identities_channel_external_unique`、`customer_conversations_organization_channel_identity_unique`、`conversation_participants_org_conversation_identity_unique`、`messages_organization_idempotency_unique`。
-- 命中上述预期唯一冲突后，当前事务必须整体回滚，再从头执行一次事务并读取已有记录；禁止在失败事务或 savepoint 中改绑后继续提交，不能遗留孤立联系人、通用会话或参与者。
-- 联系人包的渠道身份能力不得捕获唯一冲突后在当前事务中改绑，必须把 PostgreSQL `23505` 及约束名原样交给外层重试判断。
-- 只重试明确识别的预期唯一约束冲突；其他唯一冲突和第三次仍冲突直接返回错误，不降级为重复写入。
-- 消息写入和会话最后消息时间更新必须在一个事务中完成。
-- 渠道重试使用 `idempotency_key` 幂等；相同渠道消息编号重复提交时返回已有消息。
-- 相同幂等键的渠道身份、正文或发送者不一致时返回幂等冲突，既不覆盖已有消息，也不创建新消息。
-- `last_message_at` 只向后推进，延迟到达的消息不能覆盖更新的最后活跃时间。
-- 唯一索引与有限事务重试是正确性机制；首个 PR 不增加咨询锁，确有热点竞争指标后再优化。
-- 页面卸载和网络重试不通过取消数据库操作实现。
+- 每次先执行无副作用预检，按企业和幂等键读取已有消息及完整来源关系。
+- 幂等消息完全一致时直接返回，不恢复联系人、不解档会话、不更新显示名称、最后活跃或会话时间。
+- 网站幂等键相同但渠道身份、发送主体或正文不同，返回幂等冲突；本次服务器接收时间不参与比较。
+- 并发首条消息依靠 `contact_channel_identities_channel_external_unique`、`chat_subjects_org_kind_source_unique`、`customer_conversations_org_channel_identity_unique`、`conversation_participants_org_conversation_subject_unique` 和 `messages_organization_idempotency_unique` 收敛。
+- 命中预期唯一冲突后整笔事务回滚，再从头执行；不在失败事务中改绑或继续提交。
+- 外层只把上述命名约束的 PostgreSQL `23505` 识别为预期竞态并重试；其他数据库错误直接返回。
+- 消息写入和 `last_message_at` 更新处于同一事务。
 
-### 10.5 分页与未读
+### 13.7 首个 PR 验收边界
 
-客户会话列表和消息列表不使用不断增大的 offset 作为主要分页方式。
+首个 PR 应证明：
 
-游标定义：
-
-```text
-客户会话：(last_message_at, conversation_id)
-消息：    (created_at, message_id)
-```
-
-本 PR 不实现个人已读状态。客服接待关系确定后，在 ServiceSession PR 中定义负责人、协作者和未读状态，避免为了未分配队列给所有企业成员创建会话参与者。
-
-### 10.6 本 PR 明确不做
-
-- 不修改前端消息页面。
-- 不修改或手工生成 `frontend/bindings`。
-- 不增加 appservice、API Proxy 和 Gin 路由。
-- 不开放网站访客会话或消息 HTTP 接口。
-- 不实现访客令牌、验证码或浏览器会话认证。
-- 不实现 WebSocket、SSE、轮询或推送通知。
-- 不实现客服回复和消息外发。
-- 不实现客服分配、个人已读和未读计数。
-- 不实现群聊创建和成员管理。
-- 不实现内部单聊。
-- 不实现 ServiceSession。
-- 不实现文件消息、表情、编辑、撤回和全文搜索。
-- 不实现合作方企业、访客邀请和外部协作门户。
-- 不实现工单。
-- 不实现服务器连接、签名或消息联邦同步。
-- 不增加联邦 `global_id`、`origin_server_id` 等未确定语义的空字段。
-- 不把查询结果接到现有 `LoadInbox`，也不扩展现有嵌套全部消息的收件箱 DTO。
-- 不把全部企业成员写入客户会话参与者表。
-- 不增加权限资源；客户会话读取当前只校验已登录和企业边界。
-
-### 10.7 验收标准
-
-PR 中增加数据库级 Action 测试锁定以下行为。测试和迁移验证在具体实施任务获得运行授权后执行；路线图更新与方案审查本身不运行测试或重建共享数据库。
-
-- 网站渠道收到新外部身份的首条消息时，在同一事务中创建联系人、渠道身份、客户会话、参与者和消息。
-- 自动创建联系人的 `created_by_user_id` 为空，手工创建联系人仍记录当前用户。
-- 同一 `(channel_id, external_id)` 始终复用同一渠道身份和联系人。
-- 同一渠道身份通过客户扩展表始终复用同一客户会话，不因客服服务结束创建新的消息容器。
-- 同一联系人不同渠道身份保持不同客户会话。
-- 相同渠道消息编号重试只产生一条消息。
-- 相同渠道消息编号携带不同正文时明确失败，不覆盖第一次写入。
-- 同一渠道消息编号被提交给另一个外部身份时明确失败，不能在另一个客户会话中重复入库。
-- 并发首条消息不会遗留孤立联系人或重复客户会话。
-- 已停用渠道、非网站渠道和无效外部身份不能创建消息。
-- 渠道消息到达已移入回收站的联系人时恢复该联系人，但不覆盖其阶段和人工维护资料。
-- 已归档客户会话收到新消息时恢复为活动状态并重新出现在列表中。
-- 对已删除联系人或已归档会话重放同一来源消息时，只返回原消息，联系人保持删除、会话保持归档，所有活跃时间保持不变。
-- 客户会话只有联系人发送者参与者，不因全员可查看而批量产生用户参与者。
-- 会话列表和消息列表均按文档定义的双字段游标稳定分页。
-- 消息列表分页稳定，不因同一时间写入多条消息出现重复或遗漏。
-- 所有数据库查询显式限定当前企业。
-- 所有具名 Go 函数和方法使用简洁中文注释。
-- 每个迁移只创建一张表，无外键和 `CHECK` 约束，并包含中文字段注释。
-- 不提交手工修改的 Wails 绑定。
-
-### 10.8 后续 PR 衔接
-
-第一个 PR 合并后，建议依次进行：
-
-1. 建立网站访客会话令牌和公开入站消息 API；`external_id` 由服务端签发并绑定在访客令牌中，浏览器不能在每次加载或发消息时自造身份。
-2. 建立 ServiceSession、客服接待和回复 Action。
-3. 暴露客服收件箱 appservice 契约、Gin API 和 API Proxy，并生成 Wails 绑定。
-4. 把消息页改成分页客户会话列表和按需加载的消息详情。
-5. 接入实时消息通知、断线补拉和客服未读状态。
-6. 增加文件消息及客户端直传。
-7. 在客户会话闭环稳定后，复用统一模型增加内部单聊和群聊。
-
-## 11. 暂缓决策
-
-以下问题在对应阶段开始前再形成 ADR 或方案，不在首个 PR 中提前定死：
-
-- 联邦会话是单一托管服务器权威，还是多个服务器共同维护状态。
-- 消息编辑和删除在跨企业之间的传播与保留规则。
-- 跨企业文件采用源站临时授权还是接收方复制。
-- 端到端加密与企业合规审计之间的取舍。
-- 小程序由 Cervi 官方统一提供，还是每个私有化客户独立配置。
-- 受管访客计费和席位策略。
-- 工单公开字段是否允许合作方联合编辑。
-- 公开群、话题群和独立讨论空间的真实优先级。
-
-## 12. 方案审查与取舍
-
-Grok 对整体路线给出 `Go`，认为“统一通用会话 + 客户会话类型扩展”“参与者与客户收件箱访问分离”“先客户单聊、再内部聊天和外部协作”的方向成立。
-
-Grok 对修订前的第一个 PR 给出 `Conditional Go`，指出三个数据正确性问题：
-
-- 幂等重放检查必须发生在恢复联系人、解档会话和更新活跃时间之前，命中重放时不能产生写入副作用。
-- 入库正文与幂等比较必须使用同一份规范化正文。
-- 参与者唯一冲突也要纳入命名约束和完整事务重试；联系人能力不能在已触发 `23505` 的事务内吞掉冲突继续执行。
-
-上述问题均已纳入本方案。独立复核后又补充和明确：
-
-- 消息幂等键在企业内唯一，而不是只在单个会话内唯一；因此同一渠道消息被错误地提交到另一个外部身份或会话时也会冲突。
-- 重放一致性同时比较客户会话渠道身份、历史发送参与者和规范化正文。
-- 命名索引不得超过 PostgreSQL 的 63 字节标识符限制，避免运行时约束名被截断后无法精确分类重试。
-- 客户渠道关系继续使用 `customer_conversations` 类型扩展，不改回字符串会话键，也不把渠道专属可空字段塞进通用会话表。
-- 首个 PR 使用唯一索引和最多三次完整事务重试，不增加咨询锁；只有真实热点指标出现后才考虑更复杂的并发控制。
-- 服务批次、公开访客 API、客服回复、最终前端 DTO、细粒度权限和联邦字段继续留在后续 PR，不扩大首个 PR。
-
-基于以上修订，当前独立结论为：整体路线 `Go`，第一个 PR 方案 `Go`。实施时如偏离第 10.4 节的无副作用幂等预检或第 10.7 节的并发验收标准，应重新降级为 `Conditional Go` 并先修正设计或实现。
-
-## 13. 参考产品与资料
-
-- Rocket.Chat Rooms：<https://docs.rocket.chat/docs/rooms>
-- Rocket.Chat Discussions：<https://docs.rocket.chat/docs/discussions>
-- Rocket.Chat Threads：<https://docs.rocket.chat/docs/threads>
-- Rocket.Chat Omnichannel Conversations：<https://docs.rocket.chat/docs/omnichannel-conversations>
-- 飞书消息群组类型：<https://www.feishu.cn/hc/zh-CN/articles/552185547397-%E6%B6%88%E6%81%AF%E7%BE%A4%E7%BB%84%E7%B1%BB%E5%9E%8B%E8%AF%B4%E6%98%8E>
-- Slack Guest Roles：<https://slack.com/help/articles/202518103-Understand-guest-roles-in-Slack>
-- Slack Connect：<https://slack.com/help/articles/115004151203-Slack-Connect-guide--Work-with-external-organizations>
-- Microsoft Teams Guest Access：<https://learn.microsoft.com/en-us/microsoftteams/guest-access>
-- Jira Service Management 外部客户与组织：<https://support.atlassian.com/jira-service-management-cloud/docs/what-are-customers-and-organizations-in-your-service-project/>
-- Matrix Server-Server API：<https://spec.matrix.org/latest/server-server-api/>
-- Zendesk 消息工单路由：<https://support.zendesk.com/hc/en-us/articles/4408829019162-Routing-messaging-tickets-and-notifying-agents>
-- Intercom Tickets API：<https://developers.intercom.com/docs/references/rest-api/api.intercom.io/tickets>
+- 现有用户、智能体和联系人业务模型与聊天主体边界不冲突。
+- 自动联系人不需要伪造创建用户，手工联系人不需要伪造来源渠道。
+- 同一渠道身份只产生一个长期客户会话。
+- 客户会话严格保持一对一：恰好一个有效联系人主体；Bot 群聊不进入该扩展。
+- 同一渠道消息重试不重复创建任何记录。
+- 客户发送者能通过 `message -> participant -> chat_subject -> contact` 稳定追溯。
+- 客服收件箱访问不等于参与者关系。
+- 历史补拉所需的业务时间排序已经在消息底座中成立。
+- 后续第三方平台多账号、访客、联邦用户和 AI 智能体无需改变 `conversations`、`conversation_participants` 与 `messages` 的核心引用方式。
