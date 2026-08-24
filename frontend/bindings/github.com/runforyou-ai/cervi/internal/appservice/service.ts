@@ -316,10 +316,10 @@ export function LoadInbox(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
- * LoadSession 返回当前应进入的会话入口。
+ * LoadStartup 返回初始化或服务器连接入口，不读取登录状态。
  */
-export function LoadSession(meta: $models.RequestMeta): $CancellablePromise<$models.Session> {
-    return $Call.ByID(2537050686, meta);
+export function LoadStartup(meta: $models.RequestMeta): $CancellablePromise<$models.Startup> {
+    return $Call.ByID(3512506751, meta);
 }
 
 /**

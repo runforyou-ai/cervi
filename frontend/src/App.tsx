@@ -3,7 +3,7 @@ import { lazy, Suspense } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 
 import { Toaster } from "@/components/ui/sonner"
-import { SessionBootstrap } from "@/features/session/session-bootstrap"
+import { StartupBootstrap } from "@/features/startup/startup-bootstrap"
 import type { AppPlatform } from "@/platform/app-platform"
 
 const WebApp = lazy(() => import("@/apps/web/web-app"))
@@ -26,13 +26,13 @@ function AppLoading() {
 function App({ platform }: { platform: AppPlatform }) {
   return (
     <>
-      <SessionBootstrap platform={platform}>
+      <StartupBootstrap>
         <Suspense fallback={<AppLoading />}>
           {platform === "web" ? <WebApp /> : null}
           {platform === "desktop" ? <DesktopApp /> : null}
           {platform === "mobile" ? <MobileApp /> : null}
         </Suspense>
-      </SessionBootstrap>
+      </StartupBootstrap>
       <Toaster />
     </>
   )

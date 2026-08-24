@@ -68,7 +68,7 @@ func (t theme) rootCSS() string {
 		t.Color,
 	)
 	return fmt.Sprintf(
-		":root{--cv-theme:%s;--cv-on-theme:%s;--cv-focus:%s;--cv-assistant-bubble:#ffffff;--cv-assistant-text:#111827;--cv-page:%s;color-scheme:light}html,body{background:var(--cv-page)}",
+		":root{--cv-theme:%s;--cv-on-theme:%s;--cv-focus:%s;--cv-page:%s;color-scheme:light}",
 		t.Color,
 		t.OnColor,
 		t.Focus,

@@ -42,11 +42,21 @@ func NewBackend(store Store, sessions *clientsession.Manager) (*Backend, error) 
 	return &Backend{connection: remoteConnection, sessions: sessions}, nil
 }
 
-// InstallationStatus 返回远程服务端初始化状态和公开企业名称。
+// InstallationStatus 不读取登录凭据并返回远程初始化状态。
 func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.RequestMeta) (appservice.InstallationStatus, error) {
-	var output appservice.InstallationStatus
-	err := b.do(ctx, meta, http.MethodGet, "/installation/status", nil, nil, &output)
-	return output, err
+	state := b.connection.currentState()
+	if state == nil {
+		return appservice.InstallationStatus{}, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
+	}
+	status, err := probeServer(ctx, state)
+	if err == nil {
+		return status, nil
+	}
+	if ctx.Err() != nil {
+		return appservice.InstallationStatus{}, ctx.Err()
+	}
+	slog.Warn("检测已连接企业服务器失败", "server_url", state.baseURL.String(), "error", err)
+	return appservice.InstallationStatus{}, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 }
 
 // Login 校验账号密码并建立原生端登录会话。

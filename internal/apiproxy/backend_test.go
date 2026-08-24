@@ -119,6 +119,10 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/api/installation/status":
+			if request.Header.Get("Authorization") != "" {
+				http.Error(writer, "installation status must not use login state", http.StatusBadRequest)
+				return
+			}
 			writeTestJSON(writer, http.StatusOK, map[string]any{"installed": true, "organizationName": "鹿行"})
 		case "/api/inbox":
 			if request.Header.Get("Authorization") == "Bearer test-token" {
@@ -286,6 +290,10 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	}
 	if auth.Token != "" || auth.Identity.User.ID != "user-1" {
 		t.Fatalf("native auth = %#v", auth)
+	}
+	status, err = backend.InstallationStatus(context.Background(), meta)
+	if err != nil || !status.Installed {
+		t.Fatalf("authenticated installation status = %#v, err = %v", status, err)
 	}
 	if !store.credentialSet || store.credential.Token != "test-token" || store.credential.UserID != "user-1" || store.credential.OrganizationID != "organization-1" {
 		t.Fatalf("saved client credential = %#v, found = %v", store.credential, store.credentialSet)

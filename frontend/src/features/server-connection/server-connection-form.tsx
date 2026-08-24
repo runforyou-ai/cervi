@@ -22,6 +22,7 @@ import {
   createServerConnectionSchema,
   type ServerConnectionFormValues,
 } from "@/features/server-connection/server-connection-schema"
+import { useStartup } from "@/features/startup/startup-context"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 type DetectedServer = {
@@ -33,6 +34,7 @@ type DetectedServer = {
 export function ServerConnectionForm() {
   const { t } = useTranslation("connection")
   const navigate = useNavigate()
+  const { completeStartup } = useStartup()
   const [detected, setDetected] = useState<DetectedServer | null>(null)
   const [detecting, setDetecting] = useState(false)
   const [connecting, setConnecting] = useState(false)
@@ -52,15 +54,23 @@ export function ServerConnectionForm() {
   }, [detected, serverUrl])
 
   useEffect(() => {
-    let cancelled = false
-    void getServerURL().then((savedUrl) => {
-      if (cancelled || savedUrl === "" || getValues("serverUrl").trim() !== "") {
-        return
-      }
-      reset({ serverUrl: savedUrl })
-    })
+    let stale = false
+    void getServerURL()
+      .then((savedUrl) => {
+        if (
+          stale ||
+          savedUrl === "" ||
+          getValues("serverUrl").trim() !== ""
+        ) {
+          return
+        }
+        reset({ serverUrl: savedUrl })
+      })
+      .catch((error: unknown) => {
+        if (!stale) console.warn("读取企业服务器地址失败", error)
+      })
     return () => {
-      cancelled = true
+      stale = true
     }
   }, [getValues, reset])
 
@@ -91,7 +101,7 @@ export function ServerConnectionForm() {
     }
   }
 
-  /** 保存已检测的企业服务器并重新解析会话入口。 */
+  /** 保存已检测的企业服务器并进入身份检查。 */
   async function connectDetectedServer() {
     if (!detected) {
       return
@@ -99,6 +109,7 @@ export function ServerConnectionForm() {
     setConnecting(true)
     try {
       await connectServer(detected.serverUrl)
+      completeStartup(detected.organizationName)
       navigate("/inbox", { replace: true })
     } catch (error) {
       if (isApiError(error)) {

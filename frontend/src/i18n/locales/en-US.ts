@@ -6,12 +6,6 @@ const enUS = {
     actions: {
       close: "Close",
       back: "Back",
-      retry: "Try again",
-      changeServer: "Change server",
-    },
-    sessionLoadFailed: {
-      title: "Could not load the login status",
-      description: "Please try again.",
     },
     comingSoon: "Soon",
     workStatuses: {
@@ -87,6 +81,7 @@ const enUS = {
     loggingOut: "Logging out…",
     logoutError: "Could not log out. Please try again.",
     loading: "Loading…",
+    identityLoadError: "Could not load the login status.",
   },
   workspace: {
     navigationGroup: "Workspace",
@@ -102,6 +97,7 @@ const enUS = {
     loggingOut: "Logging out…",
     logoutError: "Could not log out. Please try again.",
     loading: "Loading…",
+    identityLoadError: "Could not load the login status.",
     inboxLoadError: "Could not load messages.",
     retry: "Try again",
   },
@@ -562,7 +558,7 @@ const enUS = {
       basic: "Basic information",
       reception: "Reception settings",
       chatInterface: "Chat interface",
-      usage: "How to use",
+      usage: "Integration",
     },
     list: {
       title: "Message channels",
@@ -722,8 +718,10 @@ const enUS = {
       },
       preview: {
         title: "Live preview",
-        visitorMessage: "Hi, I'd like to learn more.",
-        composerPlaceholder: "Type a message…",
+        frameTitle: "Visitor Messenger preview",
+        loading: "Loading visitor Messenger…",
+        loadFailed: "Could not load the visitor Messenger preview.",
+        retry: "Try again",
       },
     },
   },

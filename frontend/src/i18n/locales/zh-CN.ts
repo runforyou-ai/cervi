@@ -6,12 +6,6 @@ const zhCN = {
     actions: {
       close: "关闭",
       back: "返回",
-      retry: "重试",
-      changeServer: "更换服务器",
-    },
-    sessionLoadFailed: {
-      title: "无法读取登录状态",
-      description: "请重试。",
     },
     comingSoon: "即将支持",
     workStatuses: {
@@ -85,6 +79,7 @@ const zhCN = {
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
+    identityLoadError: "无法读取登录状态。",
   },
   workspace: {
     navigationGroup: "工作台",
@@ -100,6 +95,7 @@ const zhCN = {
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
+    identityLoadError: "无法读取登录状态。",
     inboxLoadError: "消息加载失败。",
     retry: "重试",
   },
@@ -549,7 +545,7 @@ const zhCN = {
       basic: "基本信息",
       reception: "接待设置",
       chatInterface: "聊天界面",
-      usage: "使用方式",
+      usage: "接入方式",
     },
     list: {
       title: "消息渠道",
@@ -697,8 +693,10 @@ const zhCN = {
       },
       preview: {
         title: "实时预览",
-        visitorMessage: "你好，我想了解一下。",
-        composerPlaceholder: "输入消息…",
+        frameTitle: "访客 Messenger 预览",
+        loading: "正在加载访客 Messenger…",
+        loadFailed: "无法加载访客 Messenger 预览。",
+        retry: "重试",
       },
     },
   },
