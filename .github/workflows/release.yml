@@ -290,6 +290,10 @@ jobs:
         run: |
           set -euo pipefail
           arch="${{ matrix.arch }}"
+          if [[ "$arch" == "arm64" ]]; then
+            export CC=clang
+            export CXX=clang++
+          fi
           wails3 task windows:package ARCH="$arch" INSTALL_SCOPE=user
 
           mkdir -p release-assets
