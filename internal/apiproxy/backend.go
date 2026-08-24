@@ -14,8 +14,10 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/clientsession"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -27,15 +29,17 @@ var (
 // Backend 将类型化应用服务调用转换为远程 HTTP 请求。
 type Backend struct {
 	connection *connection
+	sessions   *clientsession.Manager
+	sessionMu  sync.Mutex
 }
 
 // NewBackend 创建原生端使用的远程应用后端。
-func NewBackend(store Store) (*Backend, error) {
+func NewBackend(store Store, sessions *clientsession.Manager) (*Backend, error) {
 	remoteConnection, err := newConnection(store)
 	if err != nil {
 		return nil, err
 	}
-	return &Backend{connection: remoteConnection}, nil
+	return &Backend{connection: remoteConnection, sessions: sessions}, nil
 }
 
 // InstallationStatus 返回远程服务端初始化状态和公开企业名称。
@@ -47,15 +51,40 @@ func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.Reques
 
 // Login 校验账号密码并返回登录令牌。
 func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
+	b.sessionMu.Lock()
+	defer b.sessionMu.Unlock()
 	var output appservice.Auth
-	err := b.do(ctx, meta, http.MethodPost, "/auth/login", nil, input, &output)
+	if err := b.do(ctx, meta, http.MethodPost, "/auth/login", nil, input, &output); err != nil {
+		return appservice.Auth{}, err
+	}
 	b.normalizeUser(&output.Identity.User)
-	return output, err
+	state := b.connection.currentState()
+	if state == nil {
+		return appservice.Auth{}, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
+	}
+	if err := b.sessions.Establish(ctx, clientsession.Credential{
+		ServerURL:      state.baseURL.String(),
+		OrganizationID: output.Identity.Organization.ID,
+		UserID:         output.Identity.User.ID,
+		Token:          output.Token,
+		ExpiresAt:      output.ExpiresAt,
+	}); err != nil {
+		slog.Warn("保存原生端登录凭据失败", "server_url", state.baseURL.String(), "user_id", output.Identity.User.ID, "error", err)
+		return appservice.Auth{}, appservice.FailedError(meta, cervii18n.ErrorLoginFailed)
+	}
+	return output, nil
 }
 
 // Logout 删除远程登录令牌。
 func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error {
-	return b.do(ctx, meta, http.MethodPost, "/auth/logout", nil, nil, nil)
+	b.sessionMu.Lock()
+	defer b.sessionMu.Unlock()
+	remoteErr := b.do(ctx, meta, http.MethodPost, "/auth/logout", nil, nil, nil)
+	if err := b.sessions.Clear(context.WithoutCancel(ctx)); err != nil {
+		slog.Warn("清理原生端登录凭据失败", "error", err)
+		return appservice.FailedError(meta, cervii18n.ErrorLogoutFailed)
+	}
+	return remoteErr
 }
 
 // LoadIdentity 返回当前远程登录身份。
@@ -572,9 +601,19 @@ func (b *Backend) ProbeServer(ctx context.Context, meta appservice.RequestMeta, 
 
 // ConnectServer 验证并保存企业服务器地址，并返回地址是否变化。
 func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (bool, error) {
+	b.sessionMu.Lock()
+	defer b.sessionMu.Unlock()
 	state, _, err := b.inspectServer(ctx, meta, serverURL)
 	if err != nil {
 		return false, err
+	}
+	current := b.connection.currentState()
+	changed := current == nil || current.baseURL.String() != state.baseURL.String()
+	if changed {
+		if err := b.sessions.Clear(ctx); err != nil {
+			slog.Warn("切换企业服务器前清理登录凭据失败", "server_url", state.baseURL.String(), "error", err)
+			return false, appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
+		}
 	}
 	if err := b.connection.store.SetServerURL(ctx, state.baseURL.String()); err != nil {
 		if ctx.Err() != nil {
@@ -584,7 +623,6 @@ func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta
 		return false, appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
 	}
 	b.connection.mu.Lock()
-	changed := b.connection.state == nil || b.connection.state.baseURL.String() != state.baseURL.String()
 	b.connection.state = state
 	b.connection.mu.Unlock()
 	slog.Info("企业服务器连接成功", "server_url", state.baseURL.String(), "changed", changed)
@@ -623,6 +661,11 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	if state == nil {
 		return appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
 	}
+	credential, authenticated, err := b.sessions.Current(ctx, state.baseURL.String())
+	if err != nil {
+		slog.Warn("读取原生端登录凭据失败", "server_url", state.baseURL.String(), "error", err)
+		return appservice.FailedError(meta, cervii18n.ErrorAuthenticationStatusFailed)
+	}
 	var body io.Reader
 	if input != nil {
 		payload, err := json.Marshal(input)
@@ -645,8 +688,8 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	if input != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	if meta.Token != "" {
-		request.Header.Set("Authorization", "Bearer "+meta.Token)
+	if authenticated {
+		request.Header.Set("Authorization", "Bearer "+credential.Token)
 	}
 	response, err := state.client.Do(request)
 	if err != nil {
@@ -668,6 +711,11 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 		if sessionState == appservice.SessionStateSetup {
 			slog.Info("远端要求初始化，改为连接企业服务器")
 			sessionState = appservice.SessionStateConnect
+		}
+		if sessionState == appservice.SessionStateLogin && authenticated {
+			if _, err := b.sessions.ClearIfCurrent(ctx, credential); err != nil {
+				slog.Warn("登录凭据失效后清理本地会话失败", "server_url", state.baseURL.String(), "error", err)
+			}
 		}
 		return &appservice.Error{Kind: payload.Error.Kind, State: sessionState, Message: payload.Error.Message, Fields: payload.Error.Fields}
 	}

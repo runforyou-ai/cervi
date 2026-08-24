@@ -109,6 +109,28 @@ func TestLoadSessionResolvesWebEntry(t *testing.T) {
 	}
 }
 
+// TestLoadSessionResolvesNativeEntryWithoutRequestToken 验证原生端由 Backend 解析持久化登录态。
+func TestLoadSessionResolvesNativeEntryWithoutRequestToken(t *testing.T) {
+	identity := Identity{
+		Organization: Organization{ID: "organization-1", Name: "鹿行"},
+		User:         CurrentUser{ID: "user-1", DisplayName: "管理员"},
+	}
+	backend := &nativeSessionBackend{
+		sessionBackend: &sessionBackend{installed: true, orgName: "鹿行", identity: identity},
+		serverURL:      "https://cervi.example.com",
+	}
+	session, err := New(backend).LoadSession(context.Background(), RequestMeta{})
+	if err != nil || session.State != SessionStateReady || session.Identity == nil || session.Identity.User.ID != "user-1" {
+		t.Fatalf("ready native session = %+v, err = %v", session, err)
+	}
+
+	backend.identityErr = &Error{State: SessionStateLogin, Message: "请先登录。"}
+	session, err = New(backend).LoadSession(context.Background(), RequestMeta{})
+	if err != nil || session.State != SessionStateLogin || session.OrganizationName != "鹿行" {
+		t.Fatalf("anonymous native session = %+v, err = %v", session, err)
+	}
+}
+
 // TestLoadSessionPreservesUnavailableNativeConnection 验证原生端服务器暂不可用时不进入连接页。
 func TestLoadSessionPreservesUnavailableNativeConnection(t *testing.T) {
 	backend := &nativeSessionBackend{

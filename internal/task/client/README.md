@@ -92,7 +92,9 @@ SQLite 由客户端存储与 Runtime 共享同一数据库连接。引入后台 
 
 客户端重试写请求前，相关 HTTP 接口必须支持持久化幂等键或等价的业务唯一命令标识。服务端任务自身的幂等不能替代 HTTP 接收入口的幂等。
 
-当前 Bearer Token 由 WebView `localStorage` 保存，Go 后台进程不能独立读取。第一阶段只实现前台恢复；需要在 WebView 未运行时访问企业服务端之前，先把客户端会话接入 iOS Keychain、Android Keystore 和桌面端安全凭据存储，并保证登录、刷新和登出状态一致。
+原生端 Bearer Token 由 Go 会话管理器持有，并暂时持久化到客户端 SQLite；WebView 不再作为原生端登录态来源。客户端 Action 不保存或接收 Token，只按企业服务器、组织和用户范围领取工作，并在执行时通过会话管理器取得当前有效凭据。正式发布前把持久化实现替换为 iOS Keychain、Android Keystore 和桌面端安全凭据存储，不改变 API Proxy 与任务运行时调用边界。
+
+SQLite 过渡实现以明文保存 Token，只依赖应用数据目录和数据库文件权限，不作为正式发布的安全方案。Token 不得写入任务载荷、日志、错误详情或诊断导出。
 
 ## 平台唤醒
 
@@ -108,7 +110,7 @@ Android WorkManager 和 iOS BGTaskScheduler 只负责尽力唤醒应用并提供
 2. 为该 Action 调用的服务端写接口补齐 HTTP 幂等。
 3. 在桌面端和移动端分别增加 SQLite 迁移，实现单 Worker、崩溃恢复、退避和取消。
 4. 先验证前台运行、断网恢复、杀进程恢复、重复提交、登出和换服。
-5. 需要后台网络访问时，再建设 Go 可读取的客户端安全会话存储。
+5. 正式发布前把 Go 会话管理器的 SQLite 凭据存储替换为平台安全存储。
 6. 最后接入 WorkManager、BGTaskScheduler、网络恢复和平台传输能力。
 
 在出现真实需求前，不引入客户端 Cron、数据库租约、outbox、多队列、多 Worker、嵌入式消息代理或第三方服务端任务框架。
