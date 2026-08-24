@@ -48,7 +48,7 @@ tasks:
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
     env:
       GOOS: darwin
-      CGO_ENABLED: 1
+      CGO_ENABLED: '{{.CGO_ENABLED}}'
       GOARCH: '{{.ARCH | default ARCH}}'
       CGO_CFLAGS: "-mmacosx-version-min=12.0"
       CGO_LDFLAGS: "-mmacosx-version-min=12.0"

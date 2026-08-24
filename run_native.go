@@ -4,12 +4,22 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
+	"runtime"
+	"sync/atomic"
 
+	nativesystemtray "github.com/runforyou-ai/cervi/internal/appservice/native/systemtray"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
+
+//go:embed build/appicon.png
+var nativeAppIcon []byte
+
+//go:embed build/appicon.icon/Assets/cervi_icon.png
+var nativeMacTrayTemplateIcon []byte
 
 // run 初始化原生端存储与应用服务，并运行 Wails 应用。
 func run(_ []string) error {
@@ -28,10 +38,17 @@ func run(_ []string) error {
 		return fmt.Errorf("initialize application services: %w", err)
 	}
 
+	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
 		Name:        "Cervi",
 		Description: "Cervi is an open-source AI customer support teammate platform",
 		Services:    services,
+		ShouldQuit: func() bool {
+			if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+				return true
+			}
+			return trayQuitRequested.Load()
+		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
 		},
@@ -39,11 +56,17 @@ func run(_ []string) error {
 			Port: 8080,
 		},
 		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
+		},
+		Windows: application.WindowsOptions{
+			DisableQuitOnLastWindowClosed: true,
+		},
+		Linux: application.LinuxOptions{
+			DisableQuitOnLastWindowClosed: true,
 		},
 	})
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Cervi",
 		Width:            1440,
 		Height:           900,
@@ -53,6 +76,15 @@ func run(_ []string) error {
 		URL:              "/",
 		Mac: application.MacWindow{
 			TitleBar: application.MacTitleBarHidden,
+		},
+	})
+	nativesystemtray.Setup(nativesystemtray.Options{
+		App:             app,
+		Window:          mainWindow,
+		Icon:            nativeAppIcon,
+		MacTemplateIcon: nativeMacTrayTemplateIcon,
+		RequestQuit: func() {
+			trayQuitRequested.Store(true)
 		},
 	})
 

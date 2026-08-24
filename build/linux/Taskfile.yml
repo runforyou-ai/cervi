@@ -64,7 +64,7 @@ tasks:
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
     env:
       GOOS: linux
-      CGO_ENABLED: 1
+      CGO_ENABLED: '{{.CGO_ENABLED}}'
       GOARCH: '{{.ARCH | default ARCH}}'
 
   build:docker:
