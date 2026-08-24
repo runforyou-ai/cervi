@@ -16,6 +16,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/common/embedhost"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 const themePlaceholder = "/*CV_THEME*/"
@@ -172,15 +173,14 @@ func (s *ChatService) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 // writePreviewHost 写入管理端挂件预览宿主页。
 func writePreviewHost(writer http.ResponseWriter, request *http.Request) error {
 	locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
+	messages := cervii18n.LocalizeMap(string(locale), map[string]cervii18n.Key{
+		"title":      cervii18n.MessengerPreviewTitle,
+		"stageLabel": cervii18n.MessengerPreviewStageLabel,
+	})
 	view := previewHostView{
-		Lang:       "en-US",
-		Title:      "Widget preview",
-		StageLabel: "Website widget preview",
-	}
-	if locale == domain.LocaleChineseSimplified {
-		view.Lang = "zh-CN"
-		view.Title = "挂件预览"
-		view.StageLabel = "网站挂件预览"
+		Lang:       string(locale),
+		Title:      messages["title"],
+		StageLabel: messages["stageLabel"],
 	}
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.Header().Set("Cache-Control", "no-store")
@@ -317,10 +317,7 @@ func previewView(request *http.Request) pageView {
 	page.ShowWidgetControls = true
 	// 预览框同时允许管理端顶层和同源预览宿主页。
 	page.FrameAncestors = "* wails:"
-	page.Title = "Support"
-	if locale == domain.LocaleChineseSimplified {
-		page.Title = "在线咨询"
-	}
+	page.Title, _ = cervii18n.Localize(string(locale), cervii18n.MessengerDefaultTitle)
 	page.Subtitle = page.Copy.DefaultResponse
 	page.Greeting = page.Copy.ConversationPrompt
 	return page
@@ -331,13 +328,12 @@ func notFoundView(request *http.Request, entry string) pageView {
 	locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
 	page := baseView(entry, defaultTheme(), locale)
 	page.NotFound = true
-	if locale == domain.LocaleChineseSimplified {
-		page.Title = "无法打开聊天"
-		page.EmptyMessage = "这个聊天入口不可用。"
-	} else {
-		page.Title = "Chat unavailable"
-		page.EmptyMessage = "This chat link is not available."
-	}
+	messages := cervii18n.LocalizeMap(string(locale), map[string]cervii18n.Key{
+		"title":   cervii18n.MessengerUnavailableTitle,
+		"message": cervii18n.MessengerUnavailableMessage,
+	})
+	page.Title = messages["title"]
+	page.EmptyMessage = messages["message"]
 	return page
 }
 
@@ -358,126 +354,122 @@ func baseView(entry string, theme theme, locale domain.Locale) pageView {
 		ComposerEmojis: template.JS(composerEmojisJSON),
 		ChatJS:         template.JS(chatJS),
 		FrameAncestors: "*",
-	}
-	if locale == domain.LocaleChineseSimplified {
-		page.Lang = "zh-CN"
-	} else {
-		page.Lang = "en-US"
+		Lang:           string(locale),
 	}
 	return page
 }
 
+var messengerCopyMessageKeys = map[string]cervii18n.Key{
+	"home":                      cervii18n.MessengerHome,
+	"messages":                  cervii18n.MessengerMessages,
+	"help":                      cervii18n.MessengerHelp,
+	"message":                   cervii18n.MessengerMessage,
+	"close":                     cervii18n.MessengerClose,
+	"attach":                    cervii18n.MessengerAttach,
+	"emoji":                     cervii18n.MessengerEmoji,
+	"defaultAgentName":          cervii18n.MessengerDefaultAgentName,
+	"defaultAgentLastActive":    cervii18n.MessengerDefaultAgentLastActive,
+	"demoReply":                 cervii18n.MessengerDemoReply,
+	"welcome":                   cervii18n.MessengerWelcome,
+	"howCanWeHelp":              cervii18n.MessengerHowCanWeHelp,
+	"startConversation":         cervii18n.MessengerStartConversation,
+	"defaultResponse":           cervii18n.MessengerDefaultResponse,
+	"exploreHelp":               cervii18n.MessengerExploreHelp,
+	"exploreHelpDescription":    cervii18n.MessengerExploreHelpDescription,
+	"viewAll":                   cervii18n.MessengerViewAll,
+	"gettingStarted":            cervii18n.MessengerGettingStarted,
+	"gettingStartedDescription": cervii18n.MessengerGettingStartedDescription,
+	"featuresAndSettings":       cervii18n.MessengerFeaturesAndSettings,
+	"featuresDescription":       cervii18n.MessengerFeaturesDescription,
+	"commonQuestions":           cervii18n.MessengerCommonQuestions,
+	"questionsDescription":      cervii18n.MessengerQuestionsDescription,
+	"noMessages":                cervii18n.MessengerNoMessages,
+	"noMessagesDescription":     cervii18n.MessengerNoMessagesDescription,
+	"searchHelp":                cervii18n.MessengerSearchHelp,
+	"collections":               cervii18n.MessengerCollections,
+	"collectionCount":           cervii18n.MessengerCollectionCount,
+	"threeArticles":             cervii18n.MessengerThreeArticles,
+	"fiveArticles":              cervii18n.MessengerFiveArticles,
+	"sixArticles":               cervii18n.MessengerSixArticles,
+	"noHelpResults":             cervii18n.MessengerNoHelpResults,
+	"back":                      cervii18n.MessengerBack,
+	"articleOneTitle":           cervii18n.MessengerArticleOneTitle,
+	"articleOneBody":            cervii18n.MessengerArticleOneBody,
+	"articleTwoTitle":           cervii18n.MessengerArticleTwoTitle,
+	"articleTwoBody":            cervii18n.MessengerArticleTwoBody,
+	"articleThreeTitle":         cervii18n.MessengerArticleThreeTitle,
+	"articleThreeBody":          cervii18n.MessengerArticleThreeBody,
+	"stillNeedHelp":             cervii18n.MessengerStillNeedHelp,
+	"conversationPrompt":        cervii18n.MessengerConversationPrompt,
+	"more":                      cervii18n.MessengerMore,
+	"expandWindow":              cervii18n.MessengerExpandWindow,
+	"collapseWindow":            cervii18n.MessengerCollapseWindow,
+	"waitingForTeam":            cervii18n.MessengerWaitingForTeam,
+	"recordVoice":               cervii18n.MessengerRecordVoice,
+	"playVoice":                 cervii18n.MessengerPlayVoice,
+	"pauseVoice":                cervii18n.MessengerPauseVoice,
+	"send":                      cervii18n.MessengerSend,
+	"cancelRecording":           cervii18n.MessengerCancelRecording,
+	"stopRecording":             cervii18n.MessengerStopRecording,
+	"messengerNavigation":       cervii18n.MessengerNavigation,
+}
+
 // localizedMessengerCopy 返回 Messenger 固定文案。
 func localizedMessengerCopy(locale domain.Locale) messengerCopy {
-	if locale != domain.LocaleChineseSimplified {
-		return messengerCopy{
-			Home:                      "Home",
-			Messages:                  "Messages",
-			Help:                      "Help",
-			Message:                   "Message",
-			Close:                     "Close chat",
-			Attach:                    "Attach file",
-			Emoji:                     "Choose emoji",
-			DefaultAgentName:          "Support team",
-			DefaultAgentLastActive:    "Last active just now",
-			DemoReply:                 "Thanks, we have your message. A teammate can continue from here.",
-			Welcome:                   "Hi there 👋",
-			HowCanWeHelp:              "How can we help?",
-			StartConversation:         "Start a chat",
-			DefaultResponse:           "We usually reply as soon as we can",
-			ExploreHelp:               "Explore help",
-			ExploreHelpDescription:    "Find a quick answer before you wait",
-			ViewAll:                   "View all",
-			GettingStarted:            "Getting started",
-			GettingStartedDescription: "The essentials for getting up and running",
-			FeaturesAndSettings:       "Features and settings",
-			FeaturesDescription:       "Learn how the product works and make it yours",
-			CommonQuestions:           "Common questions",
-			QuestionsDescription:      "Answers to the questions people ask most",
-			NoMessages:                "No messages",
-			NoMessagesDescription:     "Messages from the team will be shown here",
-			SearchHelp:                "Search help",
-			Collections:               "Help center",
-			CollectionCount:           "3 collections",
-			ThreeArticles:             "3 articles",
-			FiveArticles:              "5 articles",
-			SixArticles:               "6 articles",
-			NoHelpResults:             "No matching help content",
-			Back:                      "Back",
-			ArticleOneTitle:           "Start a conversation",
-			ArticleOneBody:            "Open the Messenger and send a message. You can come back here at any time to continue.",
-			ArticleTwoTitle:           "Find your recent messages",
-			ArticleTwoBody:            "The Messages space keeps your conversations together and makes it easy to pick up where you left off.",
-			ArticleThreeTitle:         "Get more help",
-			ArticleThreeBody:          "Browse the Help space or start a conversation when you need a hand from the team.",
-			StillNeedHelp:             "Still need help?",
-			ConversationPrompt:        "Ask us anything, or share your feedback.",
-			More:                      "More",
-			ExpandWindow:              "Expand window",
-			CollapseWindow:            "Restore window",
-			WaitingForTeam:            "Waiting for a teammate",
-			RecordVoice:               "Record voice message",
-			PlayVoice:                 "Play voice message",
-			PauseVoice:                "Pause voice message",
-			Send:                      "Send",
-			CancelRecording:           "Cancel recording",
-			StopRecording:             "Stop recording",
-			MessengerNavigation:       "Messenger navigation",
-		}
-	}
+	messages := cervii18n.LocalizeMap(string(locale), messengerCopyMessageKeys)
 	return messengerCopy{
-		Home:                      "首页",
-		Messages:                  "消息",
-		Help:                      "帮助",
-		Message:                   "消息",
-		Close:                     "关闭聊天",
-		Attach:                    "添加附件",
-		Emoji:                     "选择表情",
-		DefaultAgentName:          "客服团队",
-		DefaultAgentLastActive:    "上次活跃：刚刚",
-		DemoReply:                 "谢谢，我们已经收到你的消息，接下来可以由团队成员继续回复。",
-		Welcome:                   "你好 👋",
-		HowCanWeHelp:              "需要什么帮助？",
-		StartConversation:         "开始聊天",
-		DefaultResponse:           "我们通常会尽快回复",
-		ExploreHelp:               "自助查找",
-		ExploreHelpDescription:    "也许这里就有你需要的答案",
-		ViewAll:                   "查看全部",
-		GettingStarted:            "开始使用",
-		GettingStartedDescription: "快速了解基本使用方式",
-		FeaturesAndSettings:       "功能与设置",
-		FeaturesDescription:       "了解主要功能并完成个性化设置",
-		CommonQuestions:           "常见问题",
-		QuestionsDescription:      "查看大家最常遇到的问题",
-		NoMessages:                "暂无消息",
-		NoMessagesDescription:     "团队发来的消息会显示在这里",
-		SearchHelp:                "搜索帮助内容",
-		Collections:               "帮助中心",
-		CollectionCount:           "3 个主题",
-		ThreeArticles:             "3 篇文章",
-		FiveArticles:              "5 篇文章",
-		SixArticles:               "6 篇文章",
-		NoHelpResults:             "没有找到匹配的帮助内容",
-		Back:                      "返回",
-		ArticleOneTitle:           "发起一段对话",
-		ArticleOneBody:            "打开 Messenger 并发送消息，你可以随时回到这里继续之前的交流。",
-		ArticleTwoTitle:           "查看最近消息",
-		ArticleTwoBody:            "消息页会集中保存你的对话，方便从上次停下的位置继续。",
-		ArticleThreeTitle:         "获得更多帮助",
-		ArticleThreeBody:          "你可以浏览帮助内容，也可以随时与团队聊聊。",
-		StillNeedHelp:             "仍然需要帮助？",
-		ConversationPrompt:        "有任何问题或建议，都可以告诉我们。",
-		More:                      "更多",
-		ExpandWindow:              "展开窗口",
-		CollapseWindow:            "恢复窗口",
-		WaitingForTeam:            "正在等待团队成员",
-		RecordVoice:               "发送语音消息",
-		PlayVoice:                 "播放语音消息",
-		PauseVoice:                "暂停语音消息",
-		Send:                      "发送",
-		CancelRecording:           "取消录音",
-		StopRecording:             "结束录音",
-		MessengerNavigation:       "Messenger 导航",
+		Home:                      messages["home"],
+		Messages:                  messages["messages"],
+		Help:                      messages["help"],
+		Message:                   messages["message"],
+		Close:                     messages["close"],
+		Attach:                    messages["attach"],
+		Emoji:                     messages["emoji"],
+		DefaultAgentName:          messages["defaultAgentName"],
+		DefaultAgentLastActive:    messages["defaultAgentLastActive"],
+		DemoReply:                 messages["demoReply"],
+		Welcome:                   messages["welcome"],
+		HowCanWeHelp:              messages["howCanWeHelp"],
+		StartConversation:         messages["startConversation"],
+		DefaultResponse:           messages["defaultResponse"],
+		ExploreHelp:               messages["exploreHelp"],
+		ExploreHelpDescription:    messages["exploreHelpDescription"],
+		ViewAll:                   messages["viewAll"],
+		GettingStarted:            messages["gettingStarted"],
+		GettingStartedDescription: messages["gettingStartedDescription"],
+		FeaturesAndSettings:       messages["featuresAndSettings"],
+		FeaturesDescription:       messages["featuresDescription"],
+		CommonQuestions:           messages["commonQuestions"],
+		QuestionsDescription:      messages["questionsDescription"],
+		NoMessages:                messages["noMessages"],
+		NoMessagesDescription:     messages["noMessagesDescription"],
+		SearchHelp:                messages["searchHelp"],
+		Collections:               messages["collections"],
+		CollectionCount:           messages["collectionCount"],
+		ThreeArticles:             messages["threeArticles"],
+		FiveArticles:              messages["fiveArticles"],
+		SixArticles:               messages["sixArticles"],
+		NoHelpResults:             messages["noHelpResults"],
+		Back:                      messages["back"],
+		ArticleOneTitle:           messages["articleOneTitle"],
+		ArticleOneBody:            messages["articleOneBody"],
+		ArticleTwoTitle:           messages["articleTwoTitle"],
+		ArticleTwoBody:            messages["articleTwoBody"],
+		ArticleThreeTitle:         messages["articleThreeTitle"],
+		ArticleThreeBody:          messages["articleThreeBody"],
+		StillNeedHelp:             messages["stillNeedHelp"],
+		ConversationPrompt:        messages["conversationPrompt"],
+		More:                      messages["more"],
+		ExpandWindow:              messages["expandWindow"],
+		CollapseWindow:            messages["collapseWindow"],
+		WaitingForTeam:            messages["waitingForTeam"],
+		RecordVoice:               messages["recordVoice"],
+		PlayVoice:                 messages["playVoice"],
+		PauseVoice:                messages["pauseVoice"],
+		Send:                      messages["send"],
+		CancelRecording:           messages["cancelRecording"],
+		StopRecording:             messages["stopRecording"],
+		MessengerNavigation:       messages["messengerNavigation"],
 	}
 }
 
