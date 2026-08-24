@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	appservicenative "github.com/runforyou-ai/cervi/internal/appservice/native"
+	nativesystemlocale "github.com/runforyou-ai/cervi/internal/appservice/native/systemlocale"
 	nativesystemtray "github.com/runforyou-ai/cervi/internal/appservice/native/systemtray"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -33,7 +34,8 @@ func run(_ []string) error {
 			slog.Warn("关闭存储失败", "error", err)
 		}
 	}()
-
+	systemLocale := nativesystemlocale.Detect()
+	trayController := nativesystemtray.New(systemLocale)
 	notificationProvider, notificationLifecycleServices := appservicenative.NewNotificationProvider()
 	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
@@ -64,7 +66,7 @@ func run(_ []string) error {
 	})
 
 	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "Cervi",
+		Title:            nativesystemtray.ProductName(systemLocale),
 		Width:            1440,
 		Height:           900,
 		MinWidth:         1440,
@@ -75,7 +77,7 @@ func run(_ []string) error {
 			TitleBar: application.MacTitleBarHidden,
 		},
 	})
-	unreadIndicator := nativesystemtray.Setup(nativesystemtray.Options{
+	trayController.Setup(nativesystemtray.Options{
 		App:             app,
 		Window:          mainWindow,
 		Icon:            nativeAppIcon,
@@ -86,8 +88,9 @@ func run(_ []string) error {
 	})
 	services, err := applicationServices(
 		appStorage,
+		trayController,
 		notificationProvider,
-		unreadIndicator,
+		trayController,
 	)
 	if err != nil {
 		return fmt.Errorf("initialize application services: %w", err)

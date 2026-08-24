@@ -4,6 +4,7 @@ package systemtray
 
 import (
 	"runtime"
+	"sync"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -11,8 +12,25 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/services/dock"
 )
 
+// Controller 同步桌面端窗口、托盘语言和未读消息提示。
+type Controller struct {
+	mu             sync.Mutex
+	localeUpdateMu sync.Mutex
+	locale         appservice.Locale
+	window         application.Window
+	tray           *application.SystemTray
+	openItem       *application.MenuItem
+	quitItem       *application.MenuItem
+	unread         appservice.UnreadIndicator
+}
+
+// New 创建使用系统语言作为未登录默认值的托盘控制器。
+func New(systemLocale appservice.Locale) *Controller {
+	return &Controller{locale: systemLocale}
+}
+
 // Setup 配置桌面端托盘、托盘菜单和关闭窗口时隐藏到托盘的行为。
-func Setup(options Options) appservice.UnreadIndicator {
+func (c *Controller) Setup(options Options) {
 	showWindow := func() {
 		if options.Window.IsMinimised() {
 			options.Window.UnMinimise()
@@ -20,11 +38,12 @@ func Setup(options Options) appservice.UnreadIndicator {
 		options.Window.Show().Focus()
 	}
 
+	texts := textsForLocale(c.currentLocale())
 	trayMenu := options.App.Menu.New()
-	trayMenu.Add("打开 Cervi").OnClick(func(_ *application.Context) {
+	openItem := trayMenu.Add(texts.Open).OnClick(func(_ *application.Context) {
 		showWindow()
 	})
-	trayMenu.Add("退出 Cervi").OnClick(func(_ *application.Context) {
+	quitItem := trayMenu.Add(texts.Quit).OnClick(func(_ *application.Context) {
 		options.RequestQuit()
 		options.App.Quit()
 	})
@@ -35,7 +54,7 @@ func Setup(options Options) appservice.UnreadIndicator {
 	} else {
 		tray.SetIcon(options.Icon)
 	}
-	tray.SetTooltip("Cervi")
+	tray.SetTooltip(texts.ProductName)
 	tray.SetMenu(trayMenu)
 	tray.OnClick(showWindow)
 	tray.OnRightClick(tray.OpenMenu)
@@ -47,5 +66,63 @@ func Setup(options Options) appservice.UnreadIndicator {
 
 	dockService := dock.New()
 	options.App.RegisterService(application.NewService(dockService))
-	return newUnreadIndicator(options.App, tray, dockService)
+
+	c.mu.Lock()
+	c.window = options.Window
+	c.tray = tray
+	c.openItem = openItem
+	c.quitItem = quitItem
+	c.unread = newUnreadIndicator(options.App, tray, dockService)
+	c.mu.Unlock()
+	options.Window.SetTitle(texts.ProductName)
+}
+
+// SetLocale 按当前用户偏好更新窗口和托盘文案。
+func (c *Controller) SetLocale(locale appservice.Locale) {
+	c.localeUpdateMu.Lock()
+	defer c.localeUpdateMu.Unlock()
+
+	texts := textsForLocale(locale)
+	c.mu.Lock()
+	c.locale = locale
+	window := c.window
+	tray := c.tray
+	openItem := c.openItem
+	quitItem := c.quitItem
+	c.mu.Unlock()
+
+	if window != nil {
+		window.SetTitle(texts.ProductName)
+	}
+	if tray != nil {
+		tray.SetTooltip(texts.ProductName)
+	}
+	if openItem != nil || quitItem != nil {
+		application.InvokeSync(func() {
+			if openItem != nil {
+				openItem.SetLabel(texts.Open)
+			}
+			if quitItem != nil {
+				quitItem.SetLabel(texts.Quit)
+			}
+		})
+	}
+}
+
+// SetUnreadState 更新当前平台的原生未读消息提示。
+func (c *Controller) SetUnreadState(state appservice.UnreadIndicatorState) error {
+	c.mu.Lock()
+	unread := c.unread
+	c.mu.Unlock()
+	if unread == nil {
+		return nil
+	}
+	return unread.SetUnreadState(state)
+}
+
+// currentLocale 返回控制器当前使用的语言。
+func (c *Controller) currentLocale() appservice.Locale {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.locale
 }
