@@ -1,5 +1,5 @@
 /** 工作台左侧模块轨和用户菜单。 */
-import { useRef, useState, type MouseEvent } from "react"
+import { useRef, useState } from "react"
 import {
   CheckIcon,
   ContactRoundIcon,
@@ -16,9 +16,9 @@ import { toast } from "sonner"
 
 import {
   updateUserWorkStatus,
-  WorkStatus,
-  type Identity,
   type CurrentUser,
+  type Identity,
+  type WorkStatus,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import {
@@ -50,7 +50,7 @@ function WorkspaceRailItem({
   icon: LucideIcon
   label: string
   active: boolean
-  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void
+  onClick?: () => void
 }) {
   return (
     <NavLink
@@ -74,7 +74,7 @@ function WorkspaceRailItem({
 function WorkspaceMenu({
   onInboxClick,
 }: {
-  onInboxClick: (event: MouseEvent<HTMLAnchorElement>) => void
+  onInboxClick: () => void
 }) {
   const { t } = useTranslation("workspace")
   const location = useLocation()
@@ -141,19 +141,9 @@ export function WorkspaceNavigation({
     navigate(path)
   }
 
-  /** 点击消息菜单时按账号提醒策略尝试申请本设备通知权限。 */
-  function requestMessageNotificationPermission(
-    event: MouseEvent<HTMLAnchorElement>,
-  ) {
-    if (
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey ||
-      !identity.user.messageNotificationsEnabled ||
-      identity.user.workStatus !== WorkStatus.WorkStatusWorking
-    ) {
+  /** 点击消息菜单时在通知开关开启后尝试申请本设备权限。 */
+  function requestMessageNotificationPermission() {
+    if (!identity.user.messageNotificationsEnabled) {
       return
     }
 

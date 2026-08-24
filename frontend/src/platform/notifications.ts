@@ -13,7 +13,6 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 const notificationPreferencesChangedEvent =
   "cervi:notification-device-preferences-changed"
 const notificationPreferencesStoragePrefix = "cervi.notifications"
-const notificationPermissionRequestClaims = new Map<string, string>()
 let unreadIndicatorQueue: Promise<void> = Promise.resolve()
 let messageNotificationQueue: Promise<void> = Promise.resolve()
 let notificationRuntimePolicyGeneration = 0
@@ -33,7 +32,7 @@ export type NotificationDeviceScope = {
 export type NotificationDevicePreferences = {
   soundEnabled: boolean
   permissionRequested: boolean
-  permissionAutoRequestedOn: string
+  permissionMenuClickedOn: string
 }
 
 type StoredNotificationDevicePreferences = Partial<
@@ -59,7 +58,7 @@ let activeNotificationRuntimePolicy: NotificationRuntimePolicy | null = null
 const defaultNotificationDevicePreferences: NotificationDevicePreferences = {
   soundEnabled: true,
   permissionRequested: false,
-  permissionAutoRequestedOn: "",
+  permissionMenuClickedOn: "",
 }
 
 /** 返回当前企业用户对应的本机通知偏好存储键。 */
@@ -144,9 +143,9 @@ export function readNotificationDevicePreferences(
       soundEnabled:
         typeof parsed.soundEnabled === "boolean" ? parsed.soundEnabled : true,
       permissionRequested: parsed.permissionRequested === true,
-      permissionAutoRequestedOn:
-        typeof parsed.permissionAutoRequestedOn === "string"
-          ? parsed.permissionAutoRequestedOn
+      permissionMenuClickedOn:
+        typeof parsed.permissionMenuClickedOn === "string"
+          ? parsed.permissionMenuClickedOn
           : "",
     }
   } catch (error) {
@@ -191,30 +190,6 @@ function currentDeviceCalendarDate() {
   const month = String(now.getMonth() + 1).padStart(2, "0")
   const day = String(now.getDate()).padStart(2, "0")
   return `${year}-${month}-${day}`
-}
-
-/** 在系统请求前占用当前企业用户今天的自动授权机会。 */
-function claimNotificationPermissionRequest(
-  scope: NotificationDeviceScope,
-) {
-  const scopeKey = notificationPreferencesStorageKey(scope)
-  const today = currentDeviceCalendarDate()
-  if (notificationPermissionRequestClaims.get(scopeKey) === today) {
-    return false
-  }
-
-  const preferences = readNotificationDevicePreferences(scope)
-  if (preferences.permissionAutoRequestedOn === today) {
-    notificationPermissionRequestClaims.set(scopeKey, today)
-    return false
-  }
-
-  notificationPermissionRequestClaims.set(scopeKey, today)
-  writeNotificationDevicePreferences(scope, {
-    ...preferences,
-    permissionAutoRequestedOn: today,
-  })
-  return true
 }
 
 /** 订阅当前企业用户的本机通知偏好变化。 */
@@ -331,25 +306,20 @@ export async function requestNotificationPermission(
   return state
 }
 
-/** 从消息菜单点击中检查权限，并且每天最多自动申请一次。 */
-export async function requestNotificationPermissionFromMessageMenu(
+/** 点击消息菜单后每天最多直接申请一次通知权限。 */
+export function requestNotificationPermissionFromMessageMenu(
   scope: NotificationDeviceScope,
 ) {
-  if (resolveAppPlatform() === "web") {
-    const state =
-      "Notification" in window && window.isSecureContext
-        ? normalizePermissionState(Notification.permission)
-        : "unsupported"
-    if (state !== "prompt" || !claimNotificationPermissionRequest(scope)) {
-      return state
-    }
-    return requestNotificationPermission(scope)
+  const preferences = readNotificationDevicePreferences(scope)
+  const today = currentDeviceCalendarDate()
+  if (preferences.permissionMenuClickedOn === today) {
+    return Promise.resolve(null)
   }
 
-  const state = await checkNotificationPermission(scope)
-  if (state !== "prompt" || !claimNotificationPermissionRequest(scope)) {
-    return state
-  }
+  writeNotificationDevicePreferences(scope, {
+    ...preferences,
+    permissionMenuClickedOn: today,
+  })
   return requestNotificationPermission(scope)
 }
 
