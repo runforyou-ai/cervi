@@ -73,6 +73,13 @@ export function WorkspaceLayout() {
   if (status === "redirect" && redirectPath) {
     return <Navigate to={redirectPath} replace />
   }
+  if (status === "failed") {
+    return (
+      <main className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+        {t("identityLoadError")}
+      </main>
+    )
+  }
   if (!identity) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">

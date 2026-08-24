@@ -79,6 +79,7 @@ const zhCN = {
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
+    identityLoadError: "无法读取登录状态。",
   },
   workspace: {
     navigationGroup: "工作台",
@@ -94,6 +95,7 @@ const zhCN = {
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
+    identityLoadError: "无法读取登录状态。",
     inboxLoadError: "消息加载失败。",
     retry: "重试",
   },

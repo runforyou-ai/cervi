@@ -37,6 +37,13 @@ function MobileHomePage() {
   if (status === "redirect" && redirectPath) {
     return <Navigate to={redirectPath} replace />
   }
+  if (status === "failed") {
+    return (
+      <main className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-muted-foreground">
+        {t("identityLoadError")}
+      </main>
+    )
+  }
   if (!identity) {
     return (
       <main className="flex min-h-dvh items-center justify-center gap-2 text-sm text-muted-foreground">

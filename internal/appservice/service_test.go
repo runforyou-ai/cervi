@@ -47,7 +47,7 @@ func (b *startupBackend) InstallationStatus(context.Context, RequestMeta) (Insta
 	return InstallationStatus{Installed: b.installed, OrganizationName: b.orgName}, nil
 }
 
-// LoadIdentity 记录启动检测是否错误读取登录身份。
+// LoadIdentity 返回空身份并累计调用次数。
 func (b *startupBackend) LoadIdentity(context.Context, RequestMeta) (Identity, error) {
 	b.identityCalls++
 	return Identity{}, nil

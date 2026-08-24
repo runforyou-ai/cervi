@@ -9,9 +9,12 @@ type StartupLoadState =
 
 let startupRequest: Promise<Startup> | null = null
 
-/** 返回当前前端运行周期唯一的启动检测请求。 */
+/** 复用当前启动检测请求。 */
 function requestStartup() {
-  startupRequest ??= loadStartup()
+  startupRequest ??= loadStartup().catch((error: unknown) => {
+    startupRequest = null
+    throw error
+  })
   return startupRequest
 }
 

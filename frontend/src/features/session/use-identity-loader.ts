@@ -11,7 +11,7 @@ import {
 import { clearWebToken } from "@/api/client"
 
 type IdentityLoadState = {
-  status: "loading" | "loaded" | "anonymous" | "redirect"
+  status: "loading" | "loaded" | "anonymous" | "redirect" | "failed"
   identity: Identity | null
   redirectPath: string | null
 }
@@ -48,7 +48,8 @@ export function useIdentityLoader() {
             return
           }
         }
-        console.warn("读取登录身份失败，忽略本次结果", error)
+        console.warn("读取登录身份失败", error)
+        setState({ status: "failed", identity: null, redirectPath: null })
       },
     )
     return () => {

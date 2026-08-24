@@ -29,6 +29,9 @@ export function LoginPage({
       </main>
     )
   }
+  if (organizationName.trim() === "") {
+    return <Navigate to={allowServerChange ? "/connect" : "/setup"} replace />
+  }
 
   return (
     <main className="flex min-h-dvh w-full items-center justify-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10">

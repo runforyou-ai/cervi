@@ -81,6 +81,7 @@ const enUS = {
     loggingOut: "Logging out…",
     logoutError: "Could not log out. Please try again.",
     loading: "Loading…",
+    identityLoadError: "Could not load the login status.",
   },
   workspace: {
     navigationGroup: "Workspace",
@@ -96,6 +97,7 @@ const enUS = {
     loggingOut: "Logging out…",
     logoutError: "Could not log out. Please try again.",
     loading: "Loading…",
+    identityLoadError: "Could not load the login status.",
     inboxLoadError: "Could not load messages.",
     retry: "Try again",
   },
