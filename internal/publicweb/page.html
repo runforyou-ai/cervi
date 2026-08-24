@@ -10,84 +10,299 @@
     </style>
   </head>
   <body>
-    <div class="cv-chrome" data-avatar="{{.AvatarInitials}}" data-demo-reply="{{.DemoReply}}">
-      <header class="cv-header">
-        <div class="cv-pill">
-          <div class="cv-mono" aria-hidden="true">{{.Monogram}}</div>
-          <div class="cv-header-text">
-            <p class="cv-title" title="{{.Title}}">{{.Title}}</p>
-            {{if .Subtitle}}<p class="cv-subtitle" title="{{.Subtitle}}">{{.Subtitle}}</p>{{end}}
-          </div>
-        </div>
-        {{if .ShowClose}}
-        <button class="cv-close" type="button" id="cv-close" aria-label="{{.CloseLabel}}" title="{{.CloseLabel}}">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-        {{end}}
-      </header>
+    <div
+      class="cv-messenger"
+      id="cv-messenger"
+      data-demo-reply="{{.Copy.DemoReply}}"
+      data-play-voice="{{.Copy.PlayVoice}}"
+      data-pause-voice="{{.Copy.PauseVoice}}"
+      data-expand-window="{{.Copy.ExpandWindow}}"
+      data-collapse-window="{{.Copy.CollapseWindow}}"
+      data-default-greeting="{{.Copy.ConversationPrompt}}"
+      data-default-subtitle="{{.Copy.DefaultResponse}}"
+      data-preview="{{.Preview}}"
+    >
       {{if .NotFound}}
-      <div class="cv-empty">{{.EmptyMessage}}</div>
+      <main class="cv-unavailable">
+        <div class="cv-unavailable-mark" aria-hidden="true">?</div>
+        <h1>{{.Title}}</h1>
+        <p>{{.EmptyMessage}}</p>
+      </main>
       {{else}}
-      <div class="cv-messages" id="cv-messages">
-        {{if .Greeting}}
-        <div class="cv-msg cv-msg-assistant cv-msg-greeting">
-          <div class="cv-msg-body">
-            <div class="cv-avatar cv-avatar-assistant" aria-hidden="true">{{.AvatarInitials}}</div>
-            <div class="cv-msg-main">
-              <div class="cv-sender">{{.Title}}</div>
-              <div class="cv-bubble cv-bubble-assistant"><p class="cv-greeting">{{.Greeting}}</p></div>
+      <div class="cv-route-stack">
+        <section class="cv-screen cv-screen-home" data-screen="home">
+          <header class="cv-home-hero">
+            <div class="cv-home-topbar">
+              <div class="cv-brand-mark" aria-hidden="true">
+                <img src="/favicon.png" alt="" />
+              </div>
+              {{if .ShowWidgetControls}}
+              <div class="cv-home-actions">
+                <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+              {{end}}
+            </div>
+            <div class="cv-home-heading">
+              <p>{{.Copy.Welcome}}</p>
+              <h1 data-route-heading tabindex="-1">{{.Copy.HowCanWeHelp}}</h1>
+            </div>
+          </header>
+
+          <div class="cv-home-content">
+            <button class="cv-recent-card" id="cv-home-recent" type="button" data-resume-conversation hidden>
+              <span class="cv-presence-avatar cv-presence-avatar-small" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></span>
+              <span class="cv-conversation-summary">
+                <span class="cv-conversation-row"><strong data-channel-title>{{.Title}}</strong><time id="cv-home-recent-time"></time></span>
+                <span class="cv-conversation-row"><span id="cv-home-recent-preview">{{.Copy.ConversationPrompt}}</span><i id="cv-home-recent-unread-dot" aria-hidden="true" hidden></i></span>
+              </span>
+            </button>
+
+            <button class="cv-start-card" type="button" data-new-conversation>
+              <span class="cv-start-copy">
+                <strong>{{.Copy.StartConversation}}</strong>
+                <span data-channel-subtitle>{{.Subtitle}}</span>
+              </span>
+              <span class="cv-start-arrow" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
+              </span>
+            </button>
+
+            <section class="cv-home-card" aria-labelledby="cv-home-help-title">
+              <div class="cv-card-heading">
+                <div>
+                  <h2 id="cv-home-help-title">{{.Copy.ExploreHelp}}</h2>
+                  <p>{{.Copy.ExploreHelpDescription}}</p>
+                </div>
+                <a class="cv-text-link" href="#help" data-route-target="help">{{.Copy.ViewAll}}</a>
+              </div>
+              <ul class="cv-link-list">
+                <li class="cv-link-row">
+                  <span class="cv-link-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z" /><path d="m4 7 8 4 8-4M12 11v10" /></svg>
+                  </span>
+                  <span>{{.Copy.GettingStarted}}</span>
+                </li>
+                <li class="cv-link-row">
+                  <span class="cv-link-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
+                  </span>
+                  <span>{{.Copy.FeaturesAndSettings}}</span>
+                </li>
+                <li class="cv-link-row">
+                  <span class="cv-link-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 0 1 4.6.9c0 1.8-2.4 2.1-2.4 3.6M12 17h.01" /></svg>
+                  </span>
+                  <span>{{.Copy.CommonQuestions}}</span>
+                </li>
+              </ul>
+            </section>
+
+          </div>
+        </section>
+
+        <section class="cv-screen" data-screen="messages" hidden>
+          <header class="cv-section-header">
+            <div class="cv-header-spacer" aria-hidden="true"></div>
+            <h1 data-route-heading tabindex="-1">{{.Copy.Messages}}</h1>
+            {{if .ShowWidgetControls}}
+            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+            {{else}}<div class="cv-header-spacer" aria-hidden="true"></div>{{end}}
+          </header>
+          <div class="cv-messages-space">
+            <div class="cv-empty-state" id="cv-messages-empty">
+              <div class="cv-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M20 15a3 3 0 0 1-3 3H8l-4 3v-6a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v8Z" /><path d="M8 9h8M8 13h5" /></svg>
+              </div>
+              <h2>{{.Copy.NoMessages}}</h2>
+              <p>{{.Copy.NoMessagesDescription}}</p>
+            </div>
+            <div class="cv-conversation-list" id="cv-conversation-list" hidden>
+              <button type="button" data-resume-conversation>
+                <span class="cv-presence-avatar" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></span>
+                <span class="cv-conversation-summary">
+                  <span class="cv-conversation-row"><strong data-channel-title>{{.Title}}</strong><time id="cv-list-time"></time></span>
+                  <span class="cv-conversation-row"><span id="cv-list-preview">{{.Copy.ConversationPrompt}}</span><i id="cv-list-unread-dot" aria-hidden="true" hidden></i></span>
+                </span>
+              </button>
+            </div>
+            <button class="cv-primary-action" type="button" data-new-conversation>
+              <span>{{.Copy.StartConversation}}</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="cv-screen" data-screen="help" hidden>
+          <header class="cv-section-header">
+            <div class="cv-header-spacer" aria-hidden="true"></div>
+            <h1 data-route-heading tabindex="-1">{{.Copy.Help}}</h1>
+            {{if .ShowWidgetControls}}
+            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+            {{else}}<div class="cv-header-spacer" aria-hidden="true"></div>{{end}}
+          </header>
+          <div class="cv-help-search">
+            <label for="cv-help-input">{{.Copy.SearchHelp}}</label>
+            <div class="cv-search-well">
+              <input id="cv-help-input" type="search" autocomplete="off" />
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
             </div>
           </div>
-        </div>
-        {{end}}
+          <div class="cv-help-content">
+            <div class="cv-help-heading"><h2>{{.Copy.Collections}}</h2><span>{{.Copy.CollectionCount}}</span></div>
+            <div class="cv-collection-list" id="cv-collection-list">
+              <button type="button" data-help-topic="getting-started" data-search-text="{{.Copy.GettingStarted}} {{.Copy.GettingStartedDescription}}">
+                <span><strong>{{.Copy.GettingStarted}}</strong><span>{{.Copy.GettingStartedDescription}}</span><small>{{.Copy.ThreeArticles}}</small></span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+              </button>
+              <button type="button" data-help-topic="features" data-search-text="{{.Copy.FeaturesAndSettings}} {{.Copy.FeaturesDescription}}">
+                <span><strong>{{.Copy.FeaturesAndSettings}}</strong><span>{{.Copy.FeaturesDescription}}</span><small>{{.Copy.FiveArticles}}</small></span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+              </button>
+              <button type="button" data-help-topic="questions" data-search-text="{{.Copy.CommonQuestions}} {{.Copy.QuestionsDescription}}">
+                <span><strong>{{.Copy.CommonQuestions}}</strong><span>{{.Copy.QuestionsDescription}}</span><small>{{.Copy.SixArticles}}</small></span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+              </button>
+            </div>
+            <div class="cv-help-empty" id="cv-help-empty" hidden>{{.Copy.NoHelpResults}}</div>
+          </div>
+        </section>
+
+        <section class="cv-screen" data-screen="help-detail" hidden>
+          <header class="cv-section-header cv-detail-header">
+            <button class="cv-icon-button" type="button" data-back-to="help" aria-label="{{.Copy.Back}}" title="{{.Copy.Back}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+            </button>
+            <h1 id="cv-help-detail-title" data-route-heading tabindex="-1">{{.Copy.GettingStarted}}</h1>
+            {{if .ShowWidgetControls}}
+            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+            {{else}}<div class="cv-header-spacer" aria-hidden="true"></div>{{end}}
+          </header>
+          <div class="cv-article-list" id="cv-article-list">
+            <details open><summary>{{.Copy.ArticleOneTitle}}</summary><p>{{.Copy.ArticleOneBody}}</p></details>
+            <details><summary>{{.Copy.ArticleTwoTitle}}</summary><p>{{.Copy.ArticleTwoBody}}</p></details>
+            <details><summary>{{.Copy.ArticleThreeTitle}}</summary><p>{{.Copy.ArticleThreeBody}}</p></details>
+          </div>
+          <div class="cv-help-contact">
+            <p>{{.Copy.StillNeedHelp}}</p>
+            <button class="cv-primary-action" type="button" data-new-conversation>{{.Copy.StartConversation}}</button>
+          </div>
+        </section>
+
+        <section class="cv-screen" data-screen="conversation" hidden>
+          <header class="cv-conversation-header">
+            <button class="cv-icon-button" type="button" data-back-to="home" aria-label="{{.Copy.Back}}" title="{{.Copy.Back}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+            </button>
+            <div class="cv-conversation-identity">
+              <div class="cv-presence-avatar" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></div>
+              <div>
+                <h1>{{.Agent.Name}}</h1>
+                <p class="cv-agent-activity">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.5 1.5" /></svg>
+                  <span>{{.Agent.LastActive}}</span>
+                </p>
+              </div>
+            </div>
+            <div class="cv-conversation-actions">
+              <button class="cv-icon-button" type="button" id="cv-more-toggle" aria-label="{{.Copy.More}}" title="{{.Copy.More}}" aria-expanded="false" aria-controls="cv-more-menu">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></svg>
+              </button>
+              {{if .ShowWidgetControls}}
+              <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+              {{end}}
+            </div>
+            <div class="cv-more-menu" id="cv-more-menu" hidden>
+              {{if .ShowWidgetControls}}
+              <button type="button" id="cv-expand">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+                <span>{{.Copy.ExpandWindow}}</span>
+              </button>
+              {{end}}
+            </div>
+          </header>
+
+          <div class="cv-conversation-body" id="cv-messages" aria-live="polite">
+            <div class="cv-conversation-intro" id="cv-conversation-intro">
+              <div class="cv-presence-avatar cv-presence-avatar-large" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></div>
+              <p data-channel-greeting>{{.Greeting}}</p>
+            </div>
+          </div>
+
+          <div class="cv-waiting" id="cv-waiting" hidden>
+            <span class="cv-presence-avatar cv-presence-avatar-tiny" aria-hidden="true"><span>{{.Agent.Initials}}</span></span>
+            <span>{{.Copy.WaitingForTeam}}</span>
+          </div>
+
+          <form class="cv-composer" id="cv-composer" action="#" method="dialog">
+            <div class="cv-composer-main" id="cv-composer-main">
+              <textarea id="cv-input" rows="1" maxlength="4000" aria-label="{{.Copy.Message}}"></textarea>
+              <div class="cv-composer-bar">
+                <div class="cv-composer-tools">
+                  <button class="cv-tool" type="button" id="cv-attach" aria-label="{{.Copy.Attach}}" title="{{.Copy.Attach}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.4 11-9.2 9.2a6 6 0 0 1-8.4-8.4l8.5-8.6A4 4 0 1 1 18 8.8l-8.6 8.6a2 2 0 0 1-2.8-2.8l8.5-8.5" /></svg>
+                  </button>
+                  <div class="cv-emoji-tool">
+                    <button class="cv-tool" type="button" id="cv-emoji-toggle" aria-label="{{.Copy.Emoji}}" title="{{.Copy.Emoji}}" aria-controls="cv-emoji" aria-expanded="false">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg>
+                    </button>
+                    <div class="cv-picker" id="cv-emoji" hidden></div>
+                  </div>
+                  <button class="cv-tool" type="button" id="cv-voice" aria-label="{{.Copy.RecordVoice}}" title="{{.Copy.RecordVoice}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" /></svg>
+                  </button>
+                </div>
+                <button class="cv-send" type="submit" id="cv-send" aria-label="{{.Copy.Send}}" title="{{.Copy.Send}}" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 7-7 7 7M12 19V5" /></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="cv-recording" id="cv-recording" hidden>
+              <button class="cv-record-action" type="button" id="cv-record-cancel" aria-label="{{.Copy.CancelRecording}}" title="{{.Copy.CancelRecording}}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+              <div class="cv-waveform" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <time id="cv-record-time">0:00</time>
+              <button class="cv-record-stop" type="button" id="cv-record-stop" aria-label="{{.Copy.StopRecording}}" title="{{.Copy.StopRecording}}">
+                <span aria-hidden="true"></span>
+              </button>
+            </div>
+            <input id="cv-file-input" type="file" multiple hidden />
+          </form>
+        </section>
       </div>
-      <form class="cv-composer" id="cv-composer" action="#" method="dialog">
-        <div class="cv-emoji" id="cv-emoji" hidden></div>
-        <div class="cv-dock">
-          <div class="cv-tools">
-            <button class="cv-tool" type="button" id="cv-attach" aria-label="{{.AttachLabel}}" title="{{.AttachLabel}}">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-              </svg>
-            </button>
-            <button class="cv-tool" type="button" id="cv-image" aria-label="{{.ImageLabel}}" title="{{.ImageLabel}}">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect width="18" height="18" x="3" y="3" rx="2" />
-                <circle cx="9" cy="9" r="2" />
-                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-              </svg>
-            </button>
-          </div>
-          <div class="cv-well">
-            <label class="cv-sr-only" for="cv-input">{{.MessageLabel}}</label>
-            <textarea id="cv-input" rows="1" maxlength="4000"></textarea>
-          </div>
-          <button class="cv-tool" type="button" id="cv-emoji-toggle" aria-label="{{.EmojiLabel}}" title="{{.EmojiLabel}}" aria-controls="cv-emoji" aria-expanded="false">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-              <line x1="9" x2="9.01" y1="9" y2="9" />
-              <line x1="15" x2="15.01" y1="9" y2="9" />
-            </svg>
-          </button>
-        </div>
-        <input id="cv-file-input" type="file" multiple hidden />
-        <input id="cv-image-input" type="file" multiple accept="image/*" hidden />
-      </form>
+
+      <nav class="cv-navigation" id="cv-navigation" aria-label="{{.Copy.MessengerNavigation}}">
+        <button type="button" data-route-target="home" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" /></svg>
+          <span>{{.Copy.Home}}</span>
+        </button>
+        <button type="button" data-route-target="messages">
+          <span class="cv-nav-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H8l-4 3v-6a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v8Z" /><path d="M8 9h8M8 13h5" /></svg>
+            <i id="cv-unread-dot" hidden></i>
+          </span>
+          <span>{{.Copy.Messages}}</span>
+        </button>
+        <button type="button" data-route-target="help">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 0 1 4.6.9c0 1.8-2.4 2.1-2.4 3.6M12 17h.01" /></svg>
+          <span>{{.Copy.Help}}</span>
+        </button>
+      </nav>
       {{end}}
     </div>
-    {{if not .NotFound}}
-    <script>{{.ChatJS}}</script>
-    {{end}}
-    {{if .ShowClose}}
-    <script>
-      document.getElementById("cv-close").addEventListener("click", function () {
-        window.parent.postMessage({ type: "cervi:close" }, "*");
-      });
-    </script>
-    {{end}}
+    {{if not .NotFound}}<script>window.CERVI_COMPOSER_EMOJIS = Object.freeze({{.ComposerEmojis}});{{.ChatJS}}</script>{{end}}
   </body>
 </html>

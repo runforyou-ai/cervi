@@ -545,7 +545,7 @@ const zhCN = {
       basic: "基本信息",
       reception: "接待设置",
       chatInterface: "聊天界面",
-      usage: "使用方式",
+      usage: "接入方式",
     },
     list: {
       title: "消息渠道",
@@ -693,8 +693,10 @@ const zhCN = {
       },
       preview: {
         title: "实时预览",
-        visitorMessage: "你好，我想了解一下。",
-        composerPlaceholder: "输入消息…",
+        frameTitle: "访客 Messenger 预览",
+        loading: "正在加载访客 Messenger…",
+        loadFailed: "无法加载访客 Messenger 预览。",
+        retry: "重试",
       },
     },
   },

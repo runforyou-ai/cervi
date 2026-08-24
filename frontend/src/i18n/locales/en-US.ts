@@ -558,7 +558,7 @@ const enUS = {
       basic: "Basic information",
       reception: "Reception settings",
       chatInterface: "Chat interface",
-      usage: "How to use",
+      usage: "Integration",
     },
     list: {
       title: "Message channels",
@@ -718,8 +718,10 @@ const enUS = {
       },
       preview: {
         title: "Live preview",
-        visitorMessage: "Hi, I'd like to learn more.",
-        composerPlaceholder: "Type a message…",
+        frameTitle: "Visitor Messenger preview",
+        loading: "Loading visitor Messenger…",
+        loadFailed: "Could not load the visitor Messenger preview.",
+        retry: "Try again",
       },
     },
   },
