@@ -40,6 +40,58 @@ go test -tags server ./...
 wails3 generate bindings -clean=true -ts -i
 ```
 
+### 构建与打包
+
+构建和打包必须从仓库根目录调用 Task。Task 统一处理前端资源、构建标签、图标、目标平台工具链和产物封装，不得绕过 Task 直接拼接 `go build`、`xcodebuild`、Gradle 或 NSIS 命令。
+
+```bash
+# 当前宿主平台的桌面端
+wails3 task build
+wails3 task package
+
+# Web 静态资源校验；正式部署由服务端嵌入 Web 生产资源
+wails3 task common:build:frontend
+wails3 task build:server
+wails3 task build:docker CGO_ENABLED=0
+
+# 首次进行 macOS 或 Linux 桌面端跨平台构建时准备统一工具链镜像
+wails3 task setup:docker
+
+# macOS；DMG 只能在 macOS 上生成
+wails3 task darwin:build ARCH=arm64
+wails3 task darwin:package ARCH=arm64
+wails3 task darwin:package:universal
+wails3 task darwin:package:dmg ARCH=arm64
+
+# Windows amd64；必须在原生 Windows 或 Windows Runner 上执行
+# machine 是默认的管理员安装，user 是当前用户免提权安装
+wails3 task windows:build ARCH=amd64
+wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=machine
+wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=user
+
+# Linux amd64；package 统一生成项目已配置的 Linux 分发包
+wails3 task linux:build ARCH=amd64
+wails3 task linux:package ARCH=amd64
+
+# iOS；模拟器包、已签名真机包与 IPA
+wails3 task ios:package
+wails3 task ios:package IOS_PLATFORM=device CODESIGN_IDENTITY="Apple Development: ..."
+wails3 task ios:package:ipa IOS_PLATFORM=device CODESIGN_IDENTITY="Apple Development: ..."
+wails3 task ios:xcode
+
+# Android；默认 APK/AAB 面向 arm64，fat 产物同时包含 arm64 和 amd64
+wails3 task android:package
+wails3 task android:package:fat
+wails3 task android:bundle
+wails3 task android:bundle:fat
+```
+
+- 根 `Taskfile.yml` 中的 `CGO_ENABLED` 是桌面端和移动端构建的唯一配置来源。客户端 SQLite 依赖 CGO，禁止给客户端构建命令传入 `CGO_ENABLED`，尤其禁止覆盖为 `0`；跨平台工具链缺失时运行 `wails3 task setup:docker`，不要通过关闭 CGO 绕过。服务端不包含客户端 SQLite，`build:docker CGO_ENABLED=0` 是构建纯静态服务端镜像的唯一例外。
+- 目标平台使用对应的命名空间 Task，目标架构只通过 `ARCH` 传入；不要手动设置 `GOOS`、`GOARCH`，也不要把已有二进制手工复制、改名后交给安装器。
+- Windows 安装包只能使用原生 Windows 工具链或项目的 Windows Runner 构建。不得使用 macOS、Linux 或 WSL 的 Linux 工具链交叉生成正式安装包，也不得复用旧的 `bin/cervi.exe` 单独运行 NSIS。
+- iOS 真机分发必须提供真实签名身份，并按需传入 `PROVISIONING_PROFILE`；自动签名使用 `wails3 task ios:xcode` 生成的工程。Android 正式分发前必须配置 `ANDROID_KEYSTORE_FILE`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。
+- Windows 交付前必须对 NSIS 实际打包的 `bin/cervi.exe` 执行 `go version -m bin/cervi.exe`，确认 `GOOS=windows`、目标 `GOARCH` 和 `CGO_ENABLED=1`，再通过安装器完成安装和启动验证；只运行未安装的构建产物不算安装包验证。
+
 前端要求 Node.js 24.0.0 或更高版本，项目构建使用 Wails v3 和 Task。
 Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间。桌面 MCP 使用 Wails3 默认配置，启动桌面端后可通过 MCP 获取页面信息。
 
