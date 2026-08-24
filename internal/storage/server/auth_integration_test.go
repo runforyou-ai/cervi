@@ -98,6 +98,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if identity == nil || identity.User.Email != "admin@example.com" {
 		t.Fatalf("unexpected identity: %#v", identity)
 	}
+	if _, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway}); err != nil {
+		t.Fatal(err)
+	}
 
 	logout := authaction.NewLogoutAction(db)
 	if err := logout.Execute(context.Background(), installed.Token); err != nil {
@@ -114,6 +117,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if loggedIn.Identity.User.ID != installed.Identity.User.ID {
 		t.Fatalf("login user = %q, want %q", loggedIn.Identity.User.ID, installed.Identity.User.ID)
+	}
+	if loggedIn.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
+		t.Fatalf("login work status = %q, want %q", loggedIn.Identity.OrganizationIdentity.WorkStatus, domain.WorkStatusWorking)
 	}
 	updatedWorkStatus, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
 	if err != nil {

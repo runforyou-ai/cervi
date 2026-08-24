@@ -81,7 +81,7 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 		slog.Warn("用户登录失败", "error", err)
 		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
-	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID)
+	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "work_status", domain.WorkStatusWorking)
 	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
