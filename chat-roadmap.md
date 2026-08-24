@@ -6,6 +6,8 @@
 
 本文档同时定义第一个聊天开发 PR 的实施边界。后续开发如需改变本文中的核心概念、对象边界或阶段顺序，应先更新本文档并说明原因。
 
+本文档还确定客户端同步和实时传输的长期边界，包括 WebSocket、Protobuf、HTTP、PostgreSQL Outbox、Core NATS 与 JetStream 的分工，避免聊天开发后再用多套协议补洞。
+
 ## 2. 产品背景与约束
 
 Cervi 是 AI 原生企业协作产品，以企业独立部署为主，但独立部署不等于只能在内网运行。企业服务器可以通过公网域名服务 Web、桌面端、移动端、外部访客和渠道回调，同时保持企业间的数据边界。
@@ -113,6 +115,12 @@ mode       = chat | topic
 - `organization_discoverable` 表示企业内可发现的公开群。
 - `chat` 表示普通时间线。
 - `topic` 表示按话题聚合内容。
+
+### 3.6 实时通道与业务 API 分工
+
+Cervi 的 Web、桌面端、移动端和网站挂件共用一个版本化 WebSocket 实时协议，使用 Protobuf 二进制帧承载同步水位、临时状态、AI 流和 WebRTC 信令。SSE、Long Polling、Mercure 和 WebTransport 不作为并行主协议；网站挂件如果在统一 Gateway 落地前需要工作，只能暂时使用普通 HTTP 轮询。
+
+WebSocket 不是第二套业务 API。发送、编辑、撤回、回执、成员和设置变更、AI 运行控制等持久命令统一走 HTTP，并复用 `appservice`、Action、事务、错误和幂等体系。音视频媒体走 WebRTC，附件走 HTTP 和对象存储，应用退出后的唤醒走系统推送。
 
 ## 4. 身份边界
 
@@ -757,19 +765,22 @@ Telegram 首个 Adapter 的特定映射：
 
 联邦阶段使用独立的协议入站和出站事件表，以 `(peer_deployment_id, event_id)` 等协议稳定编号永久防重，并保存签名、协议版本、投递确认和重放窗口。联邦协议事件不能复用 `task_runs`、客服投递表或客户端同步日志。
 
-## 10. 可靠任务、外部投递与客户端同步
+## 10. 可靠任务、外部投递、客户端同步与实时传输
 
-### 10.1 三类可靠性对象
+### 10.1 四类可靠性对象
 
-聊天中的可靠性由三类不同对象承担，不能合并成通用 `chat_inbox` 或 `chat_outbox`：
+聊天中的可靠性由四类不同对象承担，不能合并成通用 `chat_inbox`、`chat_outbox` 或领域事件总线：
 
 | 对象 | 职责 | 数据性质 | 落地阶段 |
 | --- | --- | --- | --- |
 | `task_runs + task_outbox` | 可靠执行一个已注册的异步 Action | 命令运行与临时发布状态 | 项目已有，聊天复用 |
 | `customer_message_deliveries` 等来源投递表 | 记录一条消息在外部平台上的投递、顺序、回执和不确定结果 | 长期业务记录 | 对应外发能力落地时 |
-| `conversation_sync_events` | 让客户端补拉消息编辑、删除、反应和成员变化 | 有保留期的客户端同步 Changelog | 阶段 2 |
+| `conversation_sync_events + user_sync_states + user_conversation_wakeups` | 告诉客户端哪些会话变化，并补拉会话内编辑、删除、反应和成员变化 | 有保留期的客户端同步 Changelog 与压缩索引 | 阶段 2 |
+| `realtime_outbox` | 把事务内产生的最新同步水位可靠交给 Core NATS，缩短在线客户端感知延迟 | 发布成功后删除、允许重复的临时传输记录 | 阶段 2 |
 
 `messages` 是聊天内容和时间线的业务事实来源；它不是外部平台投递状态，也不能单独表达旧记录发生的增量变化。
+
+`realtime_outbox` 不是聊天业务 Outbox，不保存消息正文、客户端 ACK 或长期事件。它只关闭 PostgreSQL 提交与 Core NATS 发布之间的崩溃窗口；Gateway、NATS 或 WebSocket 丢失通知后，客户端仍以同步水位和 HTTP 补拉恢复。
 
 现有 `internal/actions/inbox` 表示工作台统一收件箱查询，与分布式系统的 Inbox Pattern 无关。技术接入表不得复用这一业务名称和包职责。
 
@@ -793,7 +804,7 @@ Telegram 首个 Adapter 的特定映射：
 - `task_runs` 的租约可以避免同一个 Run 同时被多个 Worker 执行，但不能提供 Exactly Once。
 - Handler 已完成外部副作用、但尚未提交任务终态时崩溃，任务仍可能再次执行。
 
-因此不创建 `chat_outbox`、通用 `domain_events` 或 NATS 消费 Inbox。聊天 Handler 必须可重入，永久业务幂等由 `messages`、来源映射或投递记录保证，不能依赖 `task_runs` 的活动幂等键。
+因此不创建 `chat_outbox`、通用 `domain_events` 或 NATS 消费 Inbox。阶段 2 的专用 `realtime_outbox` 只发布客户端同步水位，不能复用 `task_outbox`，也不能被业务 Handler 当成投递账本。聊天 Handler 必须可重入，永久业务幂等由 `messages`、来源映射或投递记录保证，不能依赖 `task_runs` 的活动幂等键。
 
 ### 10.3 事务内 Enqueue
 
@@ -952,9 +963,13 @@ needs_review
 
 新消息可以通过 `(originated_at, id)` 游标补拉，但旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
 
-阶段 2 承诺实时消息和离线补拉时增加每会话 Changelog：
+阶段 2 承诺实时消息和离线补拉时使用“用户 Mailbox 指出哪些会话变化，会话 Changelog 描述具体变化”的两层游标。只使用每会话序号时，拥有大量会话、多个设备或多个第三方账号的用户必须扫描全部会话才能发现变化，不能作为目标设计。
+
+每会话 Changelog：
 
 ```text
+conversations.sync_seq
+
 conversation_sync_events
 ├── id
 ├── organization_id
@@ -966,16 +981,234 @@ conversation_sync_events
 └── created_at
 ```
 
+核心约束与索引：
+
+```text
+UNIQUE (organization_id, conversation_id, seq)
+INDEX  (organization_id, conversation_id, seq)
+INDEX  (created_at)
+```
+
 规则：
 
-- `seq` 在每个会话内严格单调递增。业务变更在锁定会话并推进同步序号的同一事务中写入 Sync Event。
+- `conversations.sync_seq` 保存会话当前同步水位，`conversation_sync_events.seq` 在每个会话内严格单调递增。业务变更在锁定会话、推进水位和写入 Sync Event 的同一事务中完成。
 - 事件类型覆盖消息新增、编辑、删除，参与者变化，会话设置变化，以及以后增加的反应和回执变化。
 - Payload 只保存客户端恢复所需的类型化最小信息；业务实体当前状态仍从对应业务表读取。
-- WebSocket 只作为新序号通知通道，不能作为真相来源。客户端持久化各会话最后同步序号，重连后读取更大的 `seq`。
 - Changelog 按保留策略清理。客户端落后超过保留窗口时，重新获取会话、参与者和消息快照，再从新的同步序号继续。
 - 该表不用于搜索、通知和 AI 的多消费者广播。搜索从业务表回填，AI 继续使用独立消息处理游标和 Run。
 
 `conversation_sync_events` 是客户端同步协议，不是通用领域事件总线，也不能承担 Cervi 联邦传输。
+
+每用户压缩 Mailbox：
+
+```text
+user_sync_states
+├── organization_id
+├── user_id
+├── mailbox_seq
+├── oldest_retained_mailbox_seq
+└── updated_at
+
+user_conversation_wakeups
+├── organization_id
+├── user_id
+├── conversation_id
+├── mailbox_seq
+├── conversation_seq
+├── kind
+└── updated_at
+```
+
+核心约束与索引：
+
+```text
+UNIQUE (organization_id, user_id)                         -- user_sync_states
+UNIQUE (organization_id, user_id, conversation_id)        -- 当前压缩行
+UNIQUE (organization_id, user_id, mailbox_seq)             -- 当前序号不重复
+INDEX  (organization_id, user_id, mailbox_seq)             -- 增量扫描
+```
+
+规则：
+
+- `mailbox_seq` 按用户严格单调递增。`user_conversation_wakeups` 对每个用户、每个会话只保留当前最新一行，是“哪些会话变了”的压缩索引，不复制会话 Changelog。
+- 一次事务影响同一用户的多个会话时，先按稳定顺序锁定 `user_sync_states`，一次推进所需序号区间，再给每个 Wakeup 分配不同序号。禁止无锁读取后在应用内执行 `+1`。
+- 业务行、会话 Sync Event、变更前与变更后受众的 Wakeup，以及 `realtime_outbox` 在同一事务提交。Gateway 不自行推断受众。
+- 原生单聊和小群通知有效的本地用户参与者；第三方账号会话只通知账号 `owner_user_id`；AI 智能体不消费用户 Mailbox，继续使用独立的 `conversation_agent_states` 和 Run。
+- 用户被移出会话、会话删除时，仍向变更前受众写 `removed/deleted` Tombstone。同步接口只返回其曾经可见的会话编号和删除种类，不能向已无权限用户返回正文或当前成员。
+- 第三方账号解绑使用账号级 `account_unbound` Tombstone，客户端按账号清理本地会话投影，不能为成千上万个会话逐行制造解绑事件。
+- 普通 Wakeup 在关系有效期间可以长期保留；已删除关系和 Tombstone 按离线窗口保留。`after < oldest_retained_mailbox_seq` 时返回 `need_snapshot`，客户端重新拉取有权访问的会话列表和必要快照。
+- 服务端不保存每设备消费游标。Web、桌面端和移动端分别持久化自己的 `mailbox_seq` 与已缓存会话的 `conversation_seq`，避免写入放大到设备数量。
+
+Mailbox 增量读取固定一个 Head 窗口：
+
+```text
+GET /sync/mailbox?after={mailbox_seq}
+  -> head = user_sync_states.mailbox_seq
+  -> 分页读取 after < mailbox_seq <= head
+  -> 返回发生变化的 conversation_id、conversation_seq 和 kind
+```
+
+客户端追到该次响应的 `head` 后重新比较最新 Head；并发 UPSERT 把某行推进到更大的序号时，该行进入下一窗口，不会永久跳过。分页游标使用 `mailbox_seq`，不能使用更新时间。
+
+客服公共收件箱和未来团队队列属于共享广播受众，不能为每名潜在客服写个人 Wakeup。它们分别使用 `customer_inbox_seq`、`team_inbox_seq` 等共享水位和独立同步接口；连接仅在当前用户具有访问权时携带并恢复对应游标。AI、客服收件箱和用户 Mailbox 不能合并成一个全局序号。
+
+小群可以采用每用户 Mailbox 的 Fanout-on-write；大型群、公告群和共享收件箱必须采用会话或收件箱级 Shared Fanout。阶段 2 先为每用户 Fanout 设定经 PostgreSQL 压测确认的成员上限，超过上限前必须实现 Shared Fanout，不能在消息事务中为成千上万成员更新 Mailbox。具体阈值是实现和容量决策，不在领域模型中硬编码为固定产品常量。
+
+### 10.9 实时传输与持久命令边界
+
+Cervi 使用一个 WebSocket 连接承载实时下行事件和临时上行控制，但不把它设计成第二套业务调用总线：
+
+| 通道 | 职责 |
+| --- | --- |
+| HTTP / Wails API Proxy | 登录、持久命令、业务查询、Mailbox/会话同步、快照、附件上传下载 |
+| WebSocket | 同步水位通知、输入状态、在线状态、当前焦点、AI 流式输出、任务进度和 WebRTC 信令 |
+| WebRTC | 音视频媒体；P2P 优先，TURN/SFU 按网络和群聊需求补充 |
+| APNs / FCM / 厂商推送 / 可选 Web Push | 应用退出或后台时的系统级唤醒，收到后仍按 HTTP 水位同步 |
+
+发送消息、编辑、撤回、回执、成员变更、会话设置、发起或取消 AI 运行等持久命令只走 HTTP，并继续进入同一 `appservice`、Action、事务、错误映射和幂等体系。桌面端和移动端以后需要离线可靠发送时，由现有客户端任务能力重试同一个 HTTP 幂等请求，不把任务队列绑定到长连接。
+
+WebSocket 上行只接受认证、Hello、Ping/Pong、输入状态、在线状态、焦点会话和 WebRTC 信令等临时控制。此类事件不进入消息表、会话 Changelog、Task Outbox 或 JetStream，允许限流、合并和丢弃。
+
+持久变更的数据流固定为：
+
+```text
+客户端 HTTP 持久命令或外部平台入站
+  -> appservice / Action
+  -> 同一 PostgreSQL 事务写业务记录、会话 Sync Event、受众 Mailbox/Inbox 水位和 realtime_outbox
+  -> HTTP 成功响应
+  -> realtime_outbox 发布 Core NATS
+  -> Realtime Gateway 通知本节点连接
+  -> 客户端按 Mailbox 和会话序号经 HTTP 增量同步
+```
+
+WebSocket 可以携带 `message_id`、会话序号等路由提示，但首版不复制完整 `Message`、`Conversation` 或 `Participant` 业务 DTO。客户端收到水位后批量同步业务投影，避免实时协议与 `appservice` 契约长期漂移。
+
+### 10.10 Realtime Gateway、Outbox 与 NATS
+
+Realtime Gateway 第一阶段作为 Cervi Server 内的独立模块运行，共用认证和应用生命周期；连接规模或独立扩缩容需求出现后再拆成单独 Go 服务。客户端永远不直接连接 NATS。
+
+`realtime_outbox` 与产生业务变化的事务一起写入，一条业务变化原则上写一行。目标结构至少包括：
+
+```text
+realtime_outbox
+├── id
+├── organization_id
+├── event_id
+├── audience_kind
+├── audience
+├── conversation_id
+├── conversation_seq
+├── attempts
+├── available_at
+├── lease_token
+├── lease_expires_at
+├── last_error
+├── created_at
+└── updated_at
+```
+
+`audience` 只保存发布所需的目标用户与各自 Mailbox 水位，或共享 Inbox/会话目标；小群受众列表受 Fanout 上限约束，大型共享目标只保存一个共享编号。`conversation_id` 和 `conversation_seq` 按通知种类允许为空。`event_id` 全局唯一，用于日志关联和发布端去重，不取代客户端同步序号。
+
+发布器使用短租约认领记录，向 Core NATS 发布后执行 Flush，确认当前连接已经把批次交给 NATS Server 再删除；失败时释放租约并退避重试。一次记录包含多个用户时，发布中途失败可以从头重发整个记录，不能维护逐用户永久 ACK；重复通知由 Gateway 和客户端按 Mailbox/会话序号幂等处理。索引至少覆盖到期可发布记录和过期租约扫描。
+
+`realtime_outbox` 只关闭数据库提交后进程在发布前崩溃的窗口。Core NATS 仍是至多一次实时传输；Gateway 下线、订阅瞬断或 WebSocket 丢失通知时，正确性仍来自 PostgreSQL 同步记录。禁止为了实时扇出创建每用户 JetStream Consumer，也不能把现有工作队列语义的 `task_outbox` 改造成广播事件流。
+
+NATS Subject 按项目现有命名空间隔离，并在实时版本下按企业和受众定向：
+
+```text
+cervi.{namespace}.rt.v1.org.{organization_id}.user.{user_id}
+cervi.{namespace}.rt.v1.org.{organization_id}.inbox.customer
+cervi.{namespace}.rt.v1.org.{organization_id}.inbox.team.{team_id}
+cervi.{namespace}.rt.v1.org.{organization_id}.conversation.{conversation_id}
+```
+
+规则：
+
+- Gateway 只为本节点已连接用户订阅用户 Subject；只有本节点存在有权连接时才订阅共享 Inbox 或未来的大群 Subject。
+- 在线扇出不能使用 Queue Group，否则同一用户连接分布在多个 Gateway 时只有一个节点收到通知。
+- 同一用户的多个标签页和设备在节点内扇出；连接注册、能力和发送队列首版只保存在进程内，不引入 Redis、NATS KV 或粘滞会话。
+- 不订阅企业级 `org.>` 通配 Subject，避免把无关用户和租户流量发送给每个 Gateway。
+- 滚动升级先停止接收新连接，再发送带随机重连延迟的 `server_going_away`，等待发送队列和 NATS 订阅 Drain 后关闭，避免客户端同时重连形成惊群。
+- Ping/Pong 只负责保活，不每隔十几秒查询 PostgreSQL。客户端在窗口重新聚焦和低频周期校验时通过 HTTP 获取权威 Mailbox/Inbox Head，修复网关或权限异常。
+
+### 10.11 Protobuf 实时协议
+
+WebSocket 实时协议从第一版使用 Protobuf 二进制编码，Schema 是该传输层的唯一来源。新文件使用稳定的 Protobuf Edition 2024，不使用 `syntax = "proto3"`，也不同时维护 JSON、ProtoJSON 实时编码或 SSE 主通道。
+
+契约边界：
+
+- `appservice` Go 结构体继续是联系人、用户、会话、消息、收件箱和设置等业务 DTO 的唯一来源，并由 Wails 生成 TypeScript bindings。
+- `proto/cervi/realtime/v1` 只定义连接认证、Hello、同步水位、临时状态、AI 流、WebRTC 信令、错误和优雅下线帧，不重新定义完整业务 DTO。
+- Go 生成代码放入 `internal/realtime/protocol/v1`；TypeScript 生成代码放入 `frontend/src/api/realtime/generated`。两处都禁止手工修改，页面只能通过 `frontend/src/api/realtime` 使用实时能力。
+- 使用 Buf 管理 Schema、Lint、代码生成和 Breaking Change 检查；Go 使用 `google.golang.org/protobuf` 与 `protoc-gen-go`，TypeScript 使用 `@bufbuild/protobuf` 与 `@bufbuild/protoc-gen-es`。CLI、插件和运行时全部固定精确版本。
+- `wails3 generate bindings` 与 `buf generate` 是两条并列的契约生成任务；生成版本必须在 CI 中校验，不能让开发机工具静默覆盖为不同格式。
+
+顶层分别定义 `ClientFrame` 和 `ServerFrame`，使用 `oneof payload` 形成 Go 与 TypeScript 都可收窄的事件联合。V1 至少覆盖：
+
+```text
+ClientFrame
+├── Authenticate
+├── ClientHello
+├── Ping
+├── TypingChanged
+├── PresenceChanged
+├── ConversationFocused
+└── WebRTCSignal
+
+ServerFrame
+├── Authenticated
+├── ServerHello
+├── MailboxAdvanced
+├── InboxAdvanced
+├── AIStreamStarted
+├── AIStreamDelta
+├── AIStreamCompleted
+├── AIStreamFailed
+├── TypingChanged
+├── PresenceChanged
+├── WebRTCSignal
+├── ServerGoingAway
+└── RealtimeError
+```
+
+Schema 演进规则：
+
+- Package 和 WebSocket Subprotocol 使用 `cervi.realtime.v1`；只有破坏性演进才增加 V2，不能在同一 V1 中改变已有字段含义。
+- 已发布字段编号永不修改或复用；删除字段和枚举值后保留编号与名称。
+- 新增字段和 `oneof` Case 必须允许旧客户端忽略。未知服务端事件不能导致旧客户端断开，客户端能力通过 Hello 显式协商。
+- 枚举保留 `UNSPECIFIED = 0`，收到未知数值时按未知能力降级，不能误映射为有效业务状态。
+- 不使用 `Any`、`Struct`、`type + bytes` 或 ProtoJSON 绕开类型约束。
+- Protobuf 解码只保证线格式和生成类型；Gateway 仍需校验帧方向、`oneof` 是否有效、编号格式、长度、序号、连接状态、组织边界和资源权限。
+- Buf Breaking Change 检查以 Git 主线为基准；Schema 和两端生成代码必须在同一个提交更新。
+
+AI 流使用 `stream_id + sequence`，包含开始、增量、完成和失败帧。模型 Token 按几十毫秒合并后发送，不把每个 Token 写入消息表、Changelog 或 Outbox；完成、失败或取消时持久化最终业务状态。断线客户端通过 HTTP 获取已经持久化的消息或可选运行快照，不能要求 Gateway 重放全部 Token。
+
+### 10.12 连接认证、恢复与背压
+
+浏览器 WebSocket 不能自由设置 Bearer `Authorization` Header。客户端先通过 HTTP Bearer 请求短期、一次性连接票据，再建立 WSS，并在五秒内用首个 Protobuf `Authenticate` 帧提交票据；票据不放入 URL 查询参数，避免进入代理和访问日志。多 Gateway 时，票据摘要通过 PostgreSQL 原子消费，绑定企业、用户、稳定 `device_id`、客户端种类和允许的 Origin。
+
+认证后 `ClientHello` 携带协议主版本、Web/桌面/移动/挂件客户端种类、应用版本、能力集合、`mailbox_after` 和当前有权使用的共享 Inbox 游标。服务端不允许客户端任意订阅会话编号；连接按已认证身份接收通知，焦点会话只用于提高临时状态和通知密度，不能改变授权。
+
+客户端统一实现：
+
+- 带随机抖动的指数退避重连，不进行固定间隔重试。
+- 重新连接前换取新票据；票据不能跨设备、用户或企业复用。
+- 重连后先比较 Mailbox/Inbox Head，再通过 HTTP 补拉；WebSocket 和 NATS 不提供历史重放。
+- 多设备分别保存本地游标，同一用户的连接可以同时接收通知。
+- 页面或应用进入后台时不假设长连接持续存活；恢复前台后总是校验 Head。
+
+Gateway 为每条连接维护单写协程和有界优先级发送队列：
+
+```text
+P0 认证结果、错误、Ping/Pong、优雅下线
+P1 Mailbox/Inbox 水位
+P2 AI 增量和任务进度
+P3 typing、presence 等临时事件
+```
+
+同一 Mailbox 水位只保留最大值，AI 增量按 Stream 合并，P3 可以丢弃；队列溢出时不能静默丢失 P0/P1，而应以 `slow_consumer` 关闭连接，让客户端重连并按水位同步。调度必须限制 P2 连续占用的字节数，避免长 AI 输出饿死控制帧和新消息通知。浏览器客户端同时观察 `bufferedAmount`。
+
+首版单帧上限设为可配置的 64–256KB 范围，不通过 WebSocket 发送附件、历史列表或快照；默认不开启 `permessage-deflate`，验证 CPU 和每连接内存后再决定。服务端和部署文档必须配置反向代理 Upgrade、空闲超时、最大连接数和优雅关闭，并记录连接数、队列深度、慢消费者、认证失败、NATS 发布失败、Outbox 积压、同步追赶条数和各帧类型流量。
 
 ## 11. 数据隔离与长期规则
 
@@ -996,7 +1229,10 @@ conversation_sync_events
 - 邀请、成员变化、第三方账号发送、AI 工具调用和跨企业操作进入审计链。
 - `task_runs` 只提供至少一次异步 Action 运行语义，所有 Handler 可重入；消息和外部投递的永久幂等保存在业务表。
 - 外部发送的确定成功、确定失败和结果未知必须显式区分，结果未知时禁止自动重发。
-- 实时连接只是变化通知通道，客户端离线恢复必须使用消息游标、同步序号或对应来源协议游标。
+- 持久业务命令只走 HTTP；WebSocket 是实时事件与临时控制通道，不能形成第二套 Action、错误、幂等或 ACK 语义。
+- WebSocket、Core NATS 和 `realtime_outbox` 都不是业务事实来源。客户端恢复必须使用用户 Mailbox、共享 Inbox、会话同步序号或对应来源协议游标。
+- `appservice` 是业务 DTO 的唯一来源，Protobuf Schema 是实时帧的唯一来源；两者不能重复定义完整消息和会话模型。
+- 客户端不直接连接 NATS，不为用户或设备创建 JetStream Consumer，也不把实时扇出并入任务工作队列。
 
 ## 12. 路线阶段
 
@@ -1004,7 +1240,7 @@ conversation_sync_events
 
 以网站入站消息验证 `chat_subjects`、统一会话、参与者、双时间消息、客户会话扩展和幂等事务闭环。
 
-不包括公开 API、客服回复、实时推送、已读状态、Telegram 和 AI 运行表，也不创建聊天专用 Inbox、Outbox、外部投递或客户端同步表。
+不包括公开 API、客服回复、实时推送、已读状态、Telegram 和 AI 运行表，也不创建阶段 2 的用户 Mailbox、`realtime_outbox`、Protobuf 实时协议、外部投递或客户端同步表。
 
 ### 阶段 1：外部客户单聊
 
@@ -1019,11 +1255,22 @@ conversation_sync_events
 - 入站 Echo 只更新投递状态，不重复创建客户消息。
 - Webhook 默认同步受理；只有必须先应答后处理时才增加来源专属 `channel_inbound_events`。
 
+阶段 1 如果要求网站访客在页面前台即时收到客服回复，应把阶段 2 的 Realtime Gateway、会话同步序号、`realtime_outbox` 和 Protobuf 协议最小子集提前落地，并使用访客短期票据与严格事件白名单；不能为挂件另建 SSE、JSON WebSocket 或第二套同步协议。若暂不提前，则网站访客只通过普通 HTTP 轮询读取回复，直到统一实时能力落地。
+
 ### 阶段 2：企业内部聊天与 AI 参与
 
 实现成员单聊、群聊、成员管理、引用、@ 提醒、已读、实时消息、离线补拉和通知。AI 智能体沿统一参与者路径加入，并补充策略、处理游标、Run、工具步骤和审计。
 
-阶段 2 增加 `conversation_sync_events` 和每会话同步序号。新消息、编辑、删除、参与者、会话设置、反应和回执变化与 Sync Event 在同一事务提交；WebSocket 只推送新序号，客户端断线后按序号补拉，超过保留窗口时重新获取快照。该 Changelog 不作为搜索、通知、AI 或联邦的事件总线。
+阶段 2 同时建设以下能力，不能只实现“按每会话序号推送”的局部方案：
+
+- 增加 `conversation_sync_events`、`conversations.sync_seq`、`user_sync_states`、`user_conversation_wakeups` 和共享收件箱水位。
+- 新消息、编辑、删除、参与者、会话设置、反应和回执变化与会话 Sync Event、变更前后受众 Wakeup、`realtime_outbox` 在同一事务提交。
+- 持久命令统一走 HTTP；WebSocket 使用 Protobuf Edition 2024 承载同步水位、临时状态、AI 流和 WebRTC 信令。
+- Realtime Gateway 先内嵌 Server，通过专用 Outbox 向 Core NATS 定向发布；客户端不连接 NATS，JetStream 继续只承担可靠任务。
+- 客户端重连或低频校验时先读取 Mailbox/Inbox Head，再按会话序号补拉；超过保留窗口时重新获取快照。
+- 小群先使用经压测设限的每用户 Fanout；大型群和公共收件箱使用 Shared Fanout，不能让消息事务随潜在受众无限写放大。
+
+会话 Changelog 不作为搜索、通知、AI 或联邦的事件总线；用户 Mailbox 也只是会话变化索引，不保存消息正文。
 
 ### 阶段 3：第三方用户账号接入
 
@@ -1054,11 +1301,11 @@ Telegram 首个实现额外验证 TDLib 会话托管、FloodWait、远端历史�
 
 ### 阶段 6：Cervi 企业联邦
 
-实现企业信任连接、联邦身份投影、跨企业单聊群聊、成员与消息事件同步、断线补拉和访客身份升级。同步协议使用独立的联邦 Inbox/Outbox，以对等部署和协议事件编号永久防重；不复用 `task_runs`、客服 Delivery 或客户端 Sync Event。
+实现企业信任连接、联邦身份投影、跨企业单聊群聊、成员与消息事件同步、断线补拉和访客身份升级。同步协议使用独立的联邦 Inbox/Outbox，以对等部署和协议事件编号永久防重；不复用 `task_runs`、客服 Delivery、客户端 Sync Event 或客户端实时 Protobuf Schema。联邦编码届时按服务端协议独立确定。
 
 ### 阶段 7：结构化大型协作
 
-根据真实需求选择公开群、公告群、话题模式、独立子讨论空间和显式共享的跨企业工单。
+根据真实需求选择公开群、公告群、话题模式、独立子讨论空间和显式共享的跨企业工单。实现大型群 Shared Fanout、会话级订阅引用计数和容量治理后，才能取消阶段 2 的每用户 Fanout 成员上限。
 
 ## 13. 第一个聊天 PR
 
@@ -1082,7 +1329,7 @@ conversation_participants
 messages
 ```
 
-不创建第三方用户消息账号、访客、联邦和 AI 运行表，也不创建 `chat_outbox`、通用 Inbox、领域事件、`customer_message_deliveries`、渠道发送 Gate 或 `conversation_sync_events`。首个 PR 没有异步副作用，不调整任务运行时，只以本文件固定后续边界。
+不创建第三方用户消息账号、访客、联邦和 AI 运行表，也不创建 `chat_outbox`、通用 Inbox、领域事件、`customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。首个 PR 没有异步副作用，不调整任务运行时，只以本文件固定后续边界。
 
 ### 13.2 领域值
 
