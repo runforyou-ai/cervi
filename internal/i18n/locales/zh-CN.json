@@ -67,7 +67,7 @@
   "error.file_upload_complete_failed": "确认文件上传失败。",
   "error.file_not_found": "没有找到这个文件。",
   "error.password_update_failed": "修改密码失败。",
-  "error.preferences_update_failed": "保存语言和时区失败。",
+  "error.preferences_update_failed": "保存偏好设置失败。",
   "error.work_status_update_failed": "保存工作状态失败。",
   "error.channel_summary_list_failed": "读取渠道列表失败。",
   "error.organization_update_failed": "保存企业名称失败。",

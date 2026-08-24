@@ -40,6 +40,93 @@ go test -tags server ./...
 wails3 generate bindings -clean=true -ts -i
 ```
 
+### 构建与打包
+
+客户端构建和打包必须从仓库根目录调用 Task。Task 统一处理前端资源、构建标签、图标、目标平台工具链和产物封装。客户端不得直接拼接 `go build`、`xcodebuild`、Gradle 或 NSIS 命令。服务端多平台发布归档由 `.github/workflows/release.yml` 的 `server-assets` 作业统一交叉编译。
+
+```bash
+# 桌面端：目标平台与运行 Task 的宿主操作系统一致
+wails3 task build
+wails3 task package
+
+# Web 静态资源校验；正式部署由服务端嵌入 Web 生产资源
+wails3 task common:build:frontend
+wails3 task build:server
+wails3 task build:docker CGO_ENABLED=0
+
+# macOS 原生构建；DMG、签名和公证只能在 macOS 上执行
+wails3 task darwin:build ARCH=arm64
+wails3 task darwin:package ARCH=arm64
+wails3 task darwin:package:universal
+wails3 task darwin:create:dmg
+
+# Windows amd64 原生构建和正式打包；必须在原生 Windows 或 Windows Runner 上执行
+# machine 是默认的管理员安装，user 是当前用户免提权安装
+wails3 task windows:build ARCH=amd64
+wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=machine
+wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=user
+
+# Linux amd64 原生构建；package 生成 AppImage、DEB、RPM 和 AUR 产物
+wails3 task linux:build ARCH=amd64
+wails3 task linux:package ARCH=amd64
+
+# iOS；模拟器包、已签名真机包与 IPA
+wails3 task ios:package
+wails3 task ios:package IOS_PLATFORM=device CODESIGN_IDENTITY="Apple Development: ..."
+wails3 task ios:package:ipa IOS_PLATFORM=device CODESIGN_IDENTITY="Apple Development: ..."
+wails3 task ios:xcode
+
+# Android；默认 APK/AAB 面向 arm64，fat 产物同时包含 arm64 和 amd64
+wails3 task android:package
+wails3 task android:package:fat
+wails3 task android:bundle
+wails3 task android:bundle:fat
+```
+
+#### 交叉编译
+
+`wails3 task setup:docker` 构建桌面端二进制交叉编译镜像。`darwin:build`、`windows:build` 和 `linux:build` 根据宿主平台自动选择原生工具链或 Docker 工具链。
+
+```bash
+wails3 task setup:docker
+
+# Linux 宿主交叉编译 macOS 二进制
+wails3 task darwin:build ARCH=amd64
+wails3 task darwin:build ARCH=arm64
+
+# macOS 或 Linux 宿主交叉编译 Windows 二进制
+wails3 task windows:build ARCH=amd64
+wails3 task windows:build ARCH=arm64
+
+# Apple Silicon macOS 宿主交叉编译 Linux arm64 二进制
+wails3 task linux:build ARCH=arm64
+
+# Intel macOS 宿主交叉编译 Linux amd64 二进制
+wails3 task linux:build ARCH=amd64
+```
+
+| 宿主环境 | 目标平台 | 支持范围 | 正式打包环境 |
+| --- | --- | --- | --- |
+| Linux | macOS amd64、arm64 | Docker 和 Zig 生成未签名二进制；`darwin:package` 只能生成未签名 `.app` | macOS 或 macOS Runner 生成 DMG，并完成签名、公证 |
+| macOS、Linux、WSL | Windows amd64、arm64 | Docker 和 Zig 生成供二进制验证使用的 `.exe` | 原生 Windows 或 Windows Runner 生成并验证 NSIS 安装包 |
+| macOS | Linux | Docker 生成与 Docker 宿主架构一致的 Linux 二进制 | 原生 Linux 或 Linux Runner 生成 AppImage、DEB、RPM 和 AUR 产物 |
+| macOS、Linux x86_64 | Android arm64、amd64 | Android NDK 生成 APK 或 AAB；`package:fat` 和 `bundle:fat` 同时包含两种架构 | macOS、Linux x86_64 或 Ubuntu Android Runner |
+| macOS | iOS arm64 | Xcode 工具链生成模拟器包、真机包或 IPA | macOS 或 macOS Runner |
+| Ubuntu Runner | 服务端 Linux、macOS、Windows 的 amd64、arm64 | `server-assets` 作业使用 `CGO_ENABLED=0` 生成六种服务端归档 | `.github/workflows/release.yml` |
+
+- 桌面端交叉编译只生成目标二进制或未签名应用包。桌面端正式安装包必须在目标操作系统或项目配置的同平台 Runner 上生成。
+- Linux 异架构桌面端交叉编译不受支持。Linux Docker 构建的 `ARCH` 必须与 Docker 宿主架构一致。
+- Windows 宿主不支持交叉构建 macOS、Linux、iOS 或 Android 产物。WSL 使用 Linux 构建规则，不提供原生 Windows 安装包构建环境。
+
+#### 构建约束
+
+- 桌面端和移动端构建固定使用 `CGO_ENABLED=1`，配置由根 `Taskfile.yml` 管理。客户端 SQLite 依赖 CGO，客户端构建命令不得传入 `CGO_ENABLED`。跨平台工具链缺失时运行 `wails3 task setup:docker`。
+- `wails3 task build:docker CGO_ENABLED=0` 构建纯静态服务端镜像。服务端构建标签不包含客户端 SQLite。
+- macOS、Windows、Linux、iOS 和 Android 分别使用 `darwin:`、`windows:`、`linux:`、`ios:` 和 `android:` 命名空间 Task。目标架构只通过 `ARCH` 传入，不得手动设置 `GOOS` 或 `GOARCH`。安装器必须使用同一次 Task 构建生成的二进制，不得手工复制或改名其他二进制。
+- Windows 安装包只能使用原生 Windows 工具链或项目的 Windows Runner 构建。不得使用 macOS、Linux 或 WSL 的 Linux 工具链交叉生成正式安装包，也不得复用旧的 `bin/cervi.exe` 单独运行 NSIS。
+- iOS 真机分发必须提供真实签名身份，并按需传入 `PROVISIONING_PROFILE`；自动签名使用 `wails3 task ios:xcode` 生成的工程。Android 正式分发前必须配置 `ANDROID_KEYSTORE_FILE`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。
+- Windows 交付前必须对 NSIS 实际打包的 `bin/cervi.exe` 执行 `go version -m bin/cervi.exe`，确认 `GOOS=windows`、目标 `GOARCH` 和 `CGO_ENABLED=1`，再通过安装器完成安装和启动验证；只运行未安装的构建产物不算安装包验证。
+
 前端要求 Node.js 24.0.0 或更高版本，项目构建使用 Wails v3 和 Task。
 Task 自动加载当前 worktree 的 `.env`；各工作区使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间。桌面 MCP 使用 Wails3 默认配置，启动桌面端后可通过 MCP 获取页面信息。
 
@@ -98,16 +185,16 @@ cervi/
 - Action 直接使用 Bun，按需调用 `common`；记录关联、组织边界和业务规则在事务中显式校验和维护。
 - `common` 只放无数据库、无传输层、无平台依赖的通用能力。小函数和错误放在包内，完整能力使用子包。
 - `domain` 只放各层共用的领域值，按概念拆文件，不放数据库、传输层和平台逻辑。
-- 数据库模型放在对应平台的 `storage` 目录；桌面端和移动端的 SQLite 迁移保持独立。
+- 服务端 PostgreSQL 模型放在 `storage/server`，桌面端 SQLite 模型放在 `storage/desktop`，移动端 SQLite 模型放在 `storage/mobile`；桌面端和移动端的 SQLite 迁移保持独立。
 - `task` 根包只放各平台共享的 Action 执行语义；客户端和服务端分别定义自己的投递参数、存储与运行机制，不为形式统一互相复用平台实现。
 
 ### 前端契约
 
 - `appservice` 契约是前端业务 DTO 的唯一来源。前端不得重复声明渠道、联系人、用户、收件箱、设置等业务模型和枚举，也不要提交 Wails `$zero`。
-- `frontend/bindings` 由上方绑定命令生成，禁止手工修改，也不得用不同格式覆盖。
+- `frontend/bindings` 使用 `wails3 generate bindings -clean=true -ts -i` 生成，禁止手工修改，也不得用不同格式覆盖。
 - 页面只通过 `src/api` 调用绑定：`client` 注入认证与错误，`service` 绑定方法并归一化可空切片。页面不直接引用 `frontend/bindings`。
 - 前端只保留表单值、组件 Props、页面状态、查询参数派生类型，以及对生成类型中可空切片的边界归一化类型。
-- 表单使用 React Hook Form 和 Zod，并统一启用 `shouldUseNativeValidation`。客户端字段校验只通过浏览器在对应输入控件上提示，不在字段下方渲染 `FieldError`，也不同时弹出 Toast；服务端业务错误通过 Toast 展示，不使用 `setError` 回写字段。
+- 表单使用 React Hook Form 和 Zod，并统一启用 `shouldUseNativeValidation`。客户端字段校验由浏览器显示在校验失败的输入控件上，不在字段下方渲染 `FieldError`，也不同时弹出 Toast；服务端业务错误通过 Toast 展示，不使用 `setError` 回写字段。
 - 桌面端 WebView 中，带 `legend` 的原生 `fieldset`（包括 `FieldSet`）不得作为 flex 容器的直接子项，避免 WebKit 首次布局保留额外高度。此类表单组使用单列 grid，或在 `fieldset` 外增加普通块级容器；不得依赖点击、窗口缩放等重绘行为恢复布局。
 - 输入框不使用 placeholder；字段含义由标签表达，必要说明用字段帮助文案。
 - 页面卸载时忽略过期结果，不要取消 Wails 绑定调用。
@@ -150,6 +237,7 @@ cervi/
 ### 管理界面设计
 
 - 管理页面采用左对齐的可用宽度布局并保持统一留白。工作台一级导航为固定窄轨，二级栏显示模块标题（消息页除外）。不使用面包屑；离开列表的子页在标题行右上角放置文字「返回」。需要扩展的设置页和渠道编辑页使用与 URL 同步的页签，不展示空页签。
+- 设置页同一分组内的字段保持统一的表单行样式；权限状态等字段不得单独使用带边框、圆角和内边距的卡片包裹，应与相邻字段的标签、帮助文案和控件对齐。
 - 数据列表使用带表头的表格，字段独立成列且只展示有管理价值的信息，避免卡片式字段聚合。
 - 操作按主次排序；主要操作直接展示，低频或危险操作收进三点菜单，危险操作执行前确认。
 - 列表操作列中直接展示的详情、编辑、恢复等文字操作统一使用小尺寸描边按钮。

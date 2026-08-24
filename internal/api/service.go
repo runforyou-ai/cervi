@@ -192,7 +192,7 @@ func (s *Service) changePassword(c *gin.Context) {
 	writeEmpty(c, s.application.ChangePassword(c.Request.Context(), requestMeta(c), input))
 }
 
-// updateUserPreferences 保存当前用户的语言和时区设置。
+// updateUserPreferences 保存当前用户的偏好设置。
 func (s *Service) updateUserPreferences(c *gin.Context) {
 	var input appservice.UserPreferencesInput
 	if !bindJSON(c, &input) {

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync/atomic"
 
+	appservicenative "github.com/runforyou-ai/cervi/internal/appservice/native"
 	nativesystemtray "github.com/runforyou-ai/cervi/internal/appservice/native/systemtray"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -33,16 +34,12 @@ func run(_ []string) error {
 		}
 	}()
 
-	services, err := applicationServices(appStorage)
-	if err != nil {
-		return fmt.Errorf("initialize application services: %w", err)
-	}
-
+	notificationProvider, notificationLifecycleServices := appservicenative.NewNotificationProvider()
 	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
 		Name:        "Cervi",
 		Description: "Cervi is an open-source AI customer support teammate platform",
-		Services:    services,
+		Services:    notificationLifecycleServices,
 		ShouldQuit: func() bool {
 			if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
 				return true
@@ -78,7 +75,7 @@ func run(_ []string) error {
 			TitleBar: application.MacTitleBarHidden,
 		},
 	})
-	nativesystemtray.Setup(nativesystemtray.Options{
+	unreadIndicator := nativesystemtray.Setup(nativesystemtray.Options{
 		App:             app,
 		Window:          mainWindow,
 		Icon:            nativeAppIcon,
@@ -87,6 +84,17 @@ func run(_ []string) error {
 			trayQuitRequested.Store(true)
 		},
 	})
+	services, err := applicationServices(
+		appStorage,
+		notificationProvider,
+		unreadIndicator,
+	)
+	if err != nil {
+		return fmt.Errorf("initialize application services: %w", err)
+	}
+	for _, service := range services {
+		app.RegisterService(service)
+	}
 
 	slog.Info("启动 Cervi")
 	return app.Run()

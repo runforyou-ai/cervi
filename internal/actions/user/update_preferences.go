@@ -10,17 +10,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdatePreferencesAction 修改当前用户的语言和时区设置。
+// UpdatePreferencesAction 修改当前用户的偏好设置。
 type UpdatePreferencesAction struct {
 	db *bun.DB
 }
 
-// NewUpdatePreferencesAction 创建语言和时区修改操作。
+// NewUpdatePreferencesAction 创建用户偏好修改操作。
 func NewUpdatePreferencesAction(db *bun.DB) *UpdatePreferencesAction {
 	return &UpdatePreferencesAction{db: db}
 }
 
-// Execute 校验并保存当前用户的语言和时区设置。
+// Execute 校验并保存当前用户的偏好设置。
 func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *servermodels.Identity, input PreferencesInput) (*servermodels.Identity, error) {
 	fields := validatePreferencesInput(input)
 	if len(fields) > 0 {
@@ -34,6 +34,7 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 		Model((*servermodels.User)(nil)).
 		Set("locale = ?", input.Locale).
 		Set("time_zone = ?", input.TimeZone).
+		Set("message_notifications_enabled = ?", input.MessageNotificationsEnabled).
 		Set("updated_at = now()").
 		Where("u.id = ?", identity.User.ID).
 		Where("u.organization_id = ?", identity.Organization.ID).

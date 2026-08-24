@@ -3,6 +3,7 @@ import {
   ActivateWebsiteChannel,
   AddTeamMembers,
   ChangePassword,
+  CheckNotificationPermission,
   CompleteFileUpload,
   CreateAgent,
   CreateContact,
@@ -43,9 +44,11 @@ import {
   ReactivateUser,
   ReactivateAgent,
   RemoveTeamMembers,
+  RequestNotificationPermission,
   RestoreContact,
   SaveS3Setting,
   SelectProfileImage,
+  SendMessageNotification,
   TestS3Setting,
   UpdateContact,
   UpdateAIProvider,
@@ -57,6 +60,7 @@ import {
   UpdateOrganization,
   UpdateProfile,
   UpdateRole,
+  UpdateUnreadIndicator,
   UpdateUserPreferences,
   UpdateUserWorkStatus,
   UpdateWebsiteChannel,
@@ -297,8 +301,18 @@ export const completeFileUpload = bind(CompleteFileUpload)
 export const selectProfileImage = bind(SelectProfileImage)
 /** 修改当前用户的登录密码。 */
 export const changePassword = bind(ChangePassword)
-/** 修改当前用户的语言和时区设置。 */
+/** 修改当前用户的语言、时区和账号级通知设置。 */
 export const updateUserPreferences = bind(UpdateUserPreferences)
+/** 读取当前设备的通知权限状态。 */
+export const checkNotificationPermission = bind(CheckNotificationPermission)
+/** 申请当前设备的通知权限。 */
+export const requestNotificationPermission = bind(
+  RequestNotificationPermission,
+)
+/** 投递一条桌面新消息通知。 */
+export const sendNativeMessageNotification = bind(SendMessageNotification)
+/** 同步当前设备的未读数和托盘提醒状态。 */
+export const updateUnreadIndicator = bind(UpdateUnreadIndicator)
 /** 修改当前用户主动设置的工作状态。 */
 export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
 /** 在一个事务中批量调整企业成员角色。 */

@@ -16,8 +16,8 @@ import { toast } from "sonner"
 
 import {
   updateUserWorkStatus,
-  type Identity,
   type CurrentUser,
+  type Identity,
   type WorkStatus,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
@@ -36,6 +36,7 @@ import {
 } from "@/features/users/work-status"
 import { UserAvatar } from "@/features/users/user-avatar"
 import { cn } from "@/lib/utils"
+import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 
 /** 模块轨导航项。 */
 function WorkspaceRailItem({
@@ -43,15 +44,18 @@ function WorkspaceRailItem({
   icon: Icon,
   label,
   active,
+  onClick,
 }: {
   to: string
   icon: LucideIcon
   label: string
   active: boolean
+  onClick?: () => void
 }) {
   return (
     <NavLink
       to={to}
+      onClick={onClick}
       className={cn(
         "my-0.5 flex h-14 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] leading-tight",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -67,7 +71,11 @@ function WorkspaceRailItem({
 }
 
 /** 模块轨导航。 */
-function WorkspaceMenu() {
+function WorkspaceMenu({
+  onInboxClick,
+}: {
+  onInboxClick: () => void
+}) {
   const { t } = useTranslation("workspace")
   const location = useLocation()
 
@@ -81,6 +89,7 @@ function WorkspaceMenu() {
         icon={InboxIcon}
         label={t("inbox")}
         active={location.pathname === "/inbox"}
+        onClick={onInboxClick}
       />
       <WorkspaceRailItem
         to="/contacts/employees"
@@ -130,6 +139,26 @@ export function WorkspaceNavigation({
   function navigateFromUserMenu(path: string) {
     skipUserMenuFocusRestoreRef.current = true
     navigate(path)
+  }
+
+  /** 点击消息菜单时申请本设备通知权限。 */
+  function requestMessageNotificationPermission() {
+    if (!identity.user.messageNotificationsEnabled) {
+      return
+    }
+
+    void requestNotificationPermissionFromMessageMenu({
+      organizationId: identity.user.organizationId,
+      userId: identity.user.id,
+    })
+      .then((status) => {
+        if (status) {
+          console.info("消息菜单通知权限申请完成", { status })
+        }
+      })
+      .catch((error) => {
+        console.warn("从消息菜单申请通知权限失败", error)
+      })
   }
 
   /** 立即保存工作状态，并在失败时恢复原状态。 */
@@ -260,7 +289,7 @@ export function WorkspaceNavigation({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <WorkspaceMenu />
+      <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
     </aside>
   )
 }

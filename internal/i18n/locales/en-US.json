@@ -67,7 +67,7 @@
   "error.file_upload_complete_failed": "Could not confirm the file upload.",
   "error.file_not_found": "This file could not be found.",
   "error.password_update_failed": "Could not change the password.",
-  "error.preferences_update_failed": "Could not save language and time zone.",
+  "error.preferences_update_failed": "Could not save preferences.",
   "error.work_status_update_failed": "Could not save the work status.",
   "error.channel_summary_list_failed": "Could not load channels.",
   "error.organization_update_failed": "Could not save the company name.",

@@ -24,7 +24,7 @@ func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Id
 func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermodels.Organization, userID string) (*servermodels.Identity, error) {
 	identity := &servermodels.Identity{Organization: organization}
 	err := db.NewSelect().TableExpr("users AS u").
-		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.role_id::text, u.status, u.locale, u.time_zone").
+		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.role_id::text, u.status, u.locale, u.time_zone, u.message_notifications_enabled").
 		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.display_name, oi.avatar_file_id::text, oi.work_status").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Where("u.organization_id = ?", organization.ID).
@@ -38,6 +38,7 @@ func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermod
 			&identity.User.Status,
 			&identity.User.Locale,
 			&identity.User.TimeZone,
+			&identity.User.MessageNotificationsEnabled,
 			&identity.OrganizationIdentity.ID,
 			&identity.OrganizationIdentity.OrganizationID,
 			&identity.OrganizationIdentity.Type,

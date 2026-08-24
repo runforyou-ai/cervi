@@ -145,7 +145,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		if _, err := tx.NewInsert().
 			Model(user).
 			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone").
-			Returning("id").
+			Returning("id, message_notifications_enabled").
 			Exec(ctx); err != nil {
 			return err
 		}

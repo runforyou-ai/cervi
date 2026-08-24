@@ -91,13 +91,14 @@ func (b *testBackend) ChangePassword(_ context.Context, meta appservice.RequestM
 	return nil
 }
 
-// UpdateUserPreferences 记录语言和时区输入并返回更新后的用户。
+// UpdateUserPreferences 记录用户偏好输入并返回更新后的用户。
 func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.CurrentUser, error) {
 	b.lastMeta = meta
 	b.lastPreferences = input
 	identity := testIdentity()
 	identity.User.Locale = input.Locale
 	identity.User.TimeZone = input.TimeZone
+	identity.User.MessageNotificationsEnabled = input.MessageNotificationsEnabled
 	return identity.User, nil
 }
 
@@ -388,21 +389,22 @@ func TestChangePasswordUsesTypedInput(t *testing.T) {
 	}
 }
 
-// TestUpdateUserPreferencesUsesTypedInput 验证语言和时区请求转换为类型化服务输入。
+// TestUpdateUserPreferencesUsesTypedInput 验证用户偏好请求转换为类型化服务输入。
 func TestUpdateUserPreferencesUsesTypedInput(t *testing.T) {
 	backend := &testBackend{}
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 
 	response := doJSON(t, http.MethodPatch, server.URL+"/preferences", appservice.UserPreferencesInput{
-		Locale:   appservice.LocaleEnglishUnitedStates,
-		TimeZone: "America/New_York",
+		Locale:                      appservice.LocaleEnglishUnitedStates,
+		TimeZone:                    "America/New_York",
+		MessageNotificationsEnabled: true,
 	}, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
-	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" {
+	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" || !backend.lastPreferences.MessageNotificationsEnabled {
 		t.Fatalf("preferences input = %#v, meta = %#v", backend.lastPreferences, backend.lastMeta)
 	}
 }
@@ -479,7 +481,7 @@ func TestBearerTokenParsing(t *testing.T) {
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
-		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", WorkStatus: appservice.WorkStatusWorking},
+		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: true, WorkStatus: appservice.WorkStatusWorking},
 	}
 }
 

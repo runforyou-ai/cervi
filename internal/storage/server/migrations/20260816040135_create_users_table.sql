@@ -10,6 +10,7 @@ CREATE TABLE users (
     status                  text NOT NULL DEFAULT 'active',
     locale                  text NOT NULL DEFAULT 'zh-CN',
     time_zone               text NOT NULL DEFAULT 'Asia/Shanghai',
+    message_notifications_enabled boolean NOT NULL DEFAULT true,
     created_at              timestamptz NOT NULL DEFAULT now(),
     updated_at              timestamptz NOT NULL DEFAULT now()
 );
@@ -24,6 +25,7 @@ COMMENT ON COLUMN users.role_id IS '企业角色编号';
 COMMENT ON COLUMN users.status IS '账号状态';
 COMMENT ON COLUMN users.locale IS '界面语言';
 COMMENT ON COLUMN users.time_zone IS '日期时间显示时区';
+COMMENT ON COLUMN users.message_notifications_enabled IS '是否启用新消息提醒';
 COMMENT ON COLUMN users.created_at IS '创建时间';
 COMMENT ON COLUMN users.updated_at IS '更新时间';
 

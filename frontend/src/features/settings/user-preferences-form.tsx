@@ -16,8 +16,16 @@ import {
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
+import { Switch } from "@/components/ui/switch"
+import { NotificationPermissionSettings } from "@/features/notifications/notification-permission-settings"
 import {
   AppearanceSettings,
   type ThemePreference,
@@ -28,8 +36,13 @@ import {
 } from "@/features/settings/user-preferences-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { supportedTimeZones } from "@/lib/time-zones"
+import {
+  readNotificationDevicePreferences,
+  setNotificationSoundEnabled,
+  type NotificationDeviceScope,
+} from "@/platform/notifications"
 
-/** 修改当前用户的界面语言、日期时间显示时区和外观主题。 */
+/** 修改当前用户的界面语言、时区、主题和通知偏好。 */
 export function UserPreferencesForm({
   user,
   onUpdated,
@@ -40,6 +53,10 @@ export function UserPreferencesForm({
   const { t, i18n } = useTranslation("settings")
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
+  const notificationScope = useMemo<NotificationDeviceScope>(
+    () => ({ organizationId: user.organizationId, userId: user.id }),
+    [user.id, user.organizationId],
+  )
   const schema = useMemo(() => createUserPreferencesSchema(t), [t])
   const timeZones = useMemo(
     () => supportedTimeZones(user.timeZone),
@@ -52,9 +69,11 @@ export function UserPreferencesForm({
       locale: user.locale as UserPreferencesFormValues["locale"],
       timeZone: user.timeZone,
       theme: (theme ?? "system") as ThemePreference,
+      messageNotificationsEnabled: user.messageNotificationsEnabled,
+      notificationSoundEnabled:
+        readNotificationDevicePreferences(notificationScope).soundEnabled,
     },
   })
-
   /** next-themes 初始化后同步未编辑的主题字段。 */
   useEffect(() => {
     if (!form.formState.dirtyFields.theme) {
@@ -64,18 +83,25 @@ export function UserPreferencesForm({
     }
   }, [form, theme])
 
-  /** 保存语言、时区和主题设置。 */
+  /** 保存账号与本机偏好设置。 */
   async function save(values: UserPreferencesFormValues) {
     try {
       const updated = await updateUserPreferences({
         locale: values.locale,
         timeZone: values.timeZone,
+        messageNotificationsEnabled: values.messageNotificationsEnabled,
       })
       setTheme(values.theme)
+      setNotificationSoundEnabled(
+        notificationScope,
+        values.notificationSoundEnabled,
+      )
       form.reset({
         locale: values.locale,
         timeZone: updated.timeZone,
         theme: values.theme,
+        messageNotificationsEnabled: updated.messageNotificationsEnabled,
+        notificationSoundEnabled: values.notificationSoundEnabled,
       })
       onUpdated(updated)
       await i18n.changeLanguage(updated.locale)
@@ -84,6 +110,8 @@ export function UserPreferencesForm({
         locale: updated.locale,
         time_zone: updated.timeZone,
         theme: values.theme,
+        message_notifications_enabled: updated.messageNotificationsEnabled,
+        notification_sound_enabled: values.notificationSoundEnabled,
       })
       toast.success(t("preferences.saveSuccess"))
     } catch (error) {
@@ -92,7 +120,13 @@ export function UserPreferencesForm({
       }
       console.warn("保存偏好设置失败", error)
       if (isApiError(error)) {
-        toast.error(apiErrorMessage(error, ["locale", "timeZone"]))
+        toast.error(
+          apiErrorMessage(error, [
+            "locale",
+            "timeZone",
+            "messageNotificationsEnabled",
+          ]),
+        )
         return
       }
       toast.error(t("preferences.saveError"))
@@ -167,6 +201,63 @@ export function UserPreferencesForm({
             </Field>
           )}
         />
+        <section
+          className="grid gap-4 border-t pt-5"
+          aria-labelledby="notification-preferences-title"
+        >
+          <h3 id="notification-preferences-title" className="font-medium">
+            {t("preferences.notifications.title")}
+          </h3>
+          <Controller
+            name="messageNotificationsEnabled"
+            control={form.control}
+            render={({ field }) => (
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor={field.name}>
+                    {t("preferences.notifications.newMessages")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {t("preferences.notifications.newMessagesDescription")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id={field.name}
+                  name={field.name}
+                  checked={field.value}
+                  onBlur={field.onBlur}
+                  onCheckedChange={field.onChange}
+                  ref={field.ref}
+                />
+              </Field>
+            )}
+          />
+          <Controller
+            name="notificationSoundEnabled"
+            control={form.control}
+            render={({ field }) => (
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor={field.name}>
+                    {t("preferences.notifications.sound")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {t("preferences.notifications.soundDescription")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id={field.name}
+                  name={field.name}
+                  checked={field.value}
+                  onBlur={field.onBlur}
+                  onCheckedChange={field.onChange}
+                  ref={field.ref}
+                />
+              </Field>
+            )}
+          />
+          <NotificationPermissionSettings />
+        </section>
         <div>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
