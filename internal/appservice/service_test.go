@@ -31,119 +31,111 @@ func TestPlatformMethodsRequireCapability(t *testing.T) {
 	assertMethodNotAllowed(t, err)
 }
 
-type sessionBackend struct {
+type startupBackend struct {
 	Backend
-	installed   bool
-	orgName     string
-	identity    Identity
-	statusErr   error
-	identityErr error
+	installed     bool
+	orgName       string
+	statusErr     error
+	identityCalls int
 }
 
-func (b *sessionBackend) InstallationStatus(context.Context, RequestMeta) (InstallationStatus, error) {
+// InstallationStatus 返回测试指定的企业初始化状态。
+func (b *startupBackend) InstallationStatus(context.Context, RequestMeta) (InstallationStatus, error) {
 	if b.statusErr != nil {
 		return InstallationStatus{}, b.statusErr
 	}
 	return InstallationStatus{Installed: b.installed, OrganizationName: b.orgName}, nil
 }
 
-func (b *sessionBackend) LoadIdentity(context.Context, RequestMeta) (Identity, error) {
-	if b.identityErr != nil {
-		return Identity{}, b.identityErr
-	}
-	return b.identity, nil
+// LoadIdentity 记录启动检测是否错误读取登录身份。
+func (b *startupBackend) LoadIdentity(context.Context, RequestMeta) (Identity, error) {
+	b.identityCalls++
+	return Identity{}, nil
 }
 
-type nativeSessionBackend struct {
-	*sessionBackend
+type nativeStartupBackend struct {
+	*startupBackend
 	serverURL string
 }
 
 // ServerURL 返回原生端已保存的企业服务器地址。
-func (b *nativeSessionBackend) ServerURL(context.Context, RequestMeta) (string, error) {
+func (b *nativeStartupBackend) ServerURL(context.Context, RequestMeta) (string, error) {
 	return b.serverURL, nil
 }
 
 // ProbeServer 返回空的服务器检测结果。
-func (b *nativeSessionBackend) ProbeServer(context.Context, RequestMeta, string) (InstallationStatus, error) {
+func (b *nativeStartupBackend) ProbeServer(context.Context, RequestMeta, string) (InstallationStatus, error) {
 	return InstallationStatus{}, nil
 }
 
 // ConnectServer 接受服务器连接。
-func (b *nativeSessionBackend) ConnectServer(context.Context, RequestMeta, string) error {
+func (b *nativeStartupBackend) ConnectServer(context.Context, RequestMeta, string) error {
 	return nil
 }
 
-// TestLoadSessionResolvesWebEntry 验证 Web 端按初始化与登录状态选择入口。
-func TestLoadSessionResolvesWebEntry(t *testing.T) {
-	identity := Identity{
-		Organization: Organization{ID: "organization-1", Name: "鹿行"},
-		User:         CurrentUser{ID: "user-1", DisplayName: "管理员"},
-	}
-	service := New(&sessionBackend{installed: false})
-	session, err := service.LoadSession(context.Background(), RequestMeta{})
-	if err != nil || session.State != SessionStateSetup {
-		t.Fatalf("uninstalled session = %+v, err = %v", session, err)
+// TestLoadStartupResolvesWebEntry 验证 Web 端只按初始化状态选择启动入口。
+func TestLoadStartupResolvesWebEntry(t *testing.T) {
+	backend := &startupBackend{installed: false}
+	service := New(backend)
+	startup, err := service.LoadStartup(context.Background(), RequestMeta{})
+	if err != nil || startup.State != SessionStateSetup {
+		t.Fatalf("uninstalled startup = %+v, err = %v", startup, err)
 	}
 
-	service = New(&sessionBackend{installed: true, orgName: "鹿行"})
-	session, err = service.LoadSession(context.Background(), RequestMeta{})
-	if err != nil || session.State != SessionStateLogin || session.OrganizationName != "鹿行" {
-		t.Fatalf("anonymous session = %+v, err = %v", session, err)
+	backend = &startupBackend{installed: true, orgName: "鹿行"}
+	service = New(backend)
+	startup, err = service.LoadStartup(context.Background(), RequestMeta{Token: "ignored"})
+	if err != nil || startup.State != SessionStateReady || startup.OrganizationName != "鹿行" {
+		t.Fatalf("ready startup = %+v, err = %v", startup, err)
 	}
-
-	service = New(&sessionBackend{installed: true, orgName: "鹿行", identity: identity})
-	session, err = service.LoadSession(context.Background(), RequestMeta{Token: "token"})
-	if err != nil || session.State != SessionStateReady || session.Identity == nil || session.Identity.User.ID != "user-1" {
-		t.Fatalf("ready session = %+v, err = %v", session, err)
-	}
-
-	service = New(&sessionBackend{
-		installed:   true,
-		orgName:     "鹿行",
-		identityErr: &Error{State: SessionStateLogin, Message: "请先登录。"},
-	})
-	session, err = service.LoadSession(context.Background(), RequestMeta{Token: "expired"})
-	if err != nil || session.State != SessionStateLogin || session.OrganizationName != "鹿行" {
-		t.Fatalf("expired session = %+v, err = %v", session, err)
+	if calls := backend.identityCalls; calls != 0 {
+		t.Fatalf("web startup identity calls = %d, want 0", calls)
 	}
 }
 
-// TestLoadSessionResolvesNativeEntryWithoutRequestToken 验证原生端由 Backend 解析持久化登录态。
-func TestLoadSessionResolvesNativeEntryWithoutRequestToken(t *testing.T) {
-	identity := Identity{
-		Organization: Organization{ID: "organization-1", Name: "鹿行"},
-		User:         CurrentUser{ID: "user-1", DisplayName: "管理员"},
-	}
-	backend := &nativeSessionBackend{
-		sessionBackend: &sessionBackend{installed: true, orgName: "鹿行", identity: identity},
+// TestLoadStartupResolvesNativeEntry 验证原生端只检测服务器地址和初始化状态。
+func TestLoadStartupResolvesNativeEntry(t *testing.T) {
+	backend := &nativeStartupBackend{
+		startupBackend: &startupBackend{installed: true, orgName: "鹿行"},
 		serverURL:      "https://cervi.example.com",
 	}
-	session, err := New(backend).LoadSession(context.Background(), RequestMeta{})
-	if err != nil || session.State != SessionStateReady || session.Identity == nil || session.Identity.User.ID != "user-1" {
-		t.Fatalf("ready native session = %+v, err = %v", session, err)
+	startup, err := New(backend).LoadStartup(context.Background(), RequestMeta{})
+	if err != nil || startup.State != SessionStateReady || startup.OrganizationName != "鹿行" {
+		t.Fatalf("ready native startup = %+v, err = %v", startup, err)
 	}
 
-	backend.identityErr = &Error{State: SessionStateLogin, Message: "请先登录。"}
-	session, err = New(backend).LoadSession(context.Background(), RequestMeta{})
-	if err != nil || session.State != SessionStateLogin || session.OrganizationName != "鹿行" {
-		t.Fatalf("anonymous native session = %+v, err = %v", session, err)
+	backend.serverURL = ""
+	startup, err = New(backend).LoadStartup(context.Background(), RequestMeta{})
+	if err != nil || startup.State != SessionStateConnect {
+		t.Fatalf("unconnected native startup = %+v, err = %v", startup, err)
+	}
+
+	backend.serverURL = "https://cervi.example.com"
+	backend.installed = false
+	startup, err = New(backend).LoadStartup(context.Background(), RequestMeta{})
+	if err != nil || startup.State != SessionStateConnect {
+		t.Fatalf("uninitialized native startup = %+v, err = %v", startup, err)
+	}
+	if backend.identityCalls != 0 {
+		t.Fatalf("native startup identity calls = %d, want 0", backend.identityCalls)
 	}
 }
 
-// TestLoadSessionPreservesUnavailableNativeConnection 验证原生端服务器暂不可用时不进入连接页。
-func TestLoadSessionPreservesUnavailableNativeConnection(t *testing.T) {
-	backend := &nativeSessionBackend{
-		sessionBackend: &sessionBackend{
+// TestLoadStartupRoutesUnavailableNativeServerToConnect 验证原生端服务器不可用时进入连接页。
+func TestLoadStartupRoutesUnavailableNativeServerToConnect(t *testing.T) {
+	backend := &nativeStartupBackend{
+		startupBackend: &startupBackend{
 			statusErr: &Error{Kind: ErrorKindUnavailable, Message: "暂时无法连接服务器。"},
 		},
 		serverURL: "https://cervi.example.com",
 	}
 
-	session, err := New(backend).LoadSession(context.Background(), RequestMeta{Token: "token"})
-	var apiError *Error
-	if !errors.As(err, &apiError) || apiError.Kind != ErrorKindUnavailable || session.State != "" {
-		t.Fatalf("session = %+v, error = %#v, want unavailable error", session, err)
+	startup, err := New(backend).LoadStartup(context.Background(), RequestMeta{})
+	if err != nil || startup.State != SessionStateConnect {
+		t.Fatalf("unavailable native startup = %+v, err = %v", startup, err)
+	}
+	if backend.identityCalls != 0 {
+		t.Fatalf("unavailable native startup identity calls = %d, want 0", backend.identityCalls)
 	}
 }
 

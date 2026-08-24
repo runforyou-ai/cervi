@@ -38,6 +38,7 @@ import {
   ListTeamMembers,
   ListUsers,
   ListWebsiteChannels,
+  LoadIdentity,
   LoadInbox,
   ReactivateUser,
   ReactivateAgent,
@@ -233,6 +234,9 @@ export type WebsiteChannelAccessData = Omit<
 export type WebsiteChannelData = Omit<GeneratedWebsiteChannel, "access"> & {
   access: WebsiteChannelAccessData
 }
+
+/** 读取当前登录身份。 */
+export const loadIdentity = bind(LoadIdentity)
 
 const getWebsiteChannelBound = bind(GetWebsiteChannel)
 /** 读取网站渠道详情。 */

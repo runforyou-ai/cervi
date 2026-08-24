@@ -23,12 +23,14 @@ import {
   createSetupSchema,
   type SetupFormValues,
 } from "@/features/installation/setup-schema"
+import { useStartup } from "@/features/startup/startup-context"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 创建企业和第一个管理员账号。 */
 export function SetupForm() {
   const { t } = useTranslation("setup")
   const navigate = useNavigate()
+  const { completeStartup } = useStartup()
   const schema = useMemo(() => createSetupSchema(t), [t])
   const form = useForm<SetupFormValues>({
     resolver: zodResolver(schema),
@@ -44,7 +46,8 @@ export function SetupForm() {
   /** 提交企业初始化并进入收件箱。 */
   async function submitSetup(values: SetupFormValues) {
     try {
-      await install(values)
+      const identity = await install(values)
+      completeStartup(identity.organization.name)
       navigate("/inbox", { replace: true })
     } catch (error) {
       if (recoverSession(error, navigate)) {

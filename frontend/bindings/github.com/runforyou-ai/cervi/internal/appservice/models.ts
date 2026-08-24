@@ -756,15 +756,6 @@ export interface S3Setting {
 }
 
 /**
- * Session 表示当前会话。
- */
-export interface Session {
-    "state": SessionState;
-    "identity"?: Identity | null;
-    "organizationName"?: string;
-}
-
-/**
  * SessionState 表示会话入口。
  */
 export enum SessionState {
@@ -778,6 +769,14 @@ export enum SessionState {
     SessionStateSetup = "setup",
     SessionStateConnect = "connect",
 };
+
+/**
+ * Startup 表示应用启动入口和企业名称。
+ */
+export interface Startup {
+    "state": SessionState;
+    "organizationName"?: string;
+}
 
 /**
  * StorageProvider 表示 S3 兼容对象存储提供商。

@@ -6,12 +6,6 @@ const enUS = {
     actions: {
       close: "Close",
       back: "Back",
-      retry: "Try again",
-      changeServer: "Change server",
-    },
-    sessionLoadFailed: {
-      title: "Could not load the login status",
-      description: "Please try again.",
     },
     comingSoon: "Soon",
     workStatuses: {

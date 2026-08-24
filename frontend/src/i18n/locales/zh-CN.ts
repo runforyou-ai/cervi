@@ -6,12 +6,6 @@ const zhCN = {
     actions: {
       close: "关闭",
       back: "返回",
-      retry: "重试",
-      changeServer: "更换服务器",
-    },
-    sessionLoadFailed: {
-      title: "无法读取登录状态",
-      description: "请重试。",
     },
     comingSoon: "即将支持",
     workStatuses: {
