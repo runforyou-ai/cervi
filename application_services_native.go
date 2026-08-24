@@ -20,7 +20,12 @@ type nativeStorage interface {
 }
 
 // applicationServices 创建原生端使用的远程应用服务。
-func applicationServices(appStorage nativeStorage, nativeLocaleUpdater appservice.NativeLocaleUpdater) ([]application.Service, error) {
+func applicationServices(
+	appStorage nativeStorage,
+	nativeLocaleUpdater appservice.NativeLocaleUpdater,
+	notification appservice.NativeNotification,
+	unreadIndicator appservice.UnreadIndicator,
+) ([]application.Service, error) {
 	sessions, err := clientsession.NewManager(context.Background(), appStorage)
 	if err != nil {
 		return nil, fmt.Errorf("initialize client session: %w", err)
@@ -33,6 +38,8 @@ func applicationServices(appStorage nativeStorage, nativeLocaleUpdater appservic
 		backend,
 		appservice.WithProfileImageSelector(appservicenative.NewProfileImageSelector()),
 		appservice.WithNativeLocaleUpdater(nativeLocaleUpdater),
+		appservice.WithNativeNotification(notification),
+		appservice.WithUnreadIndicator(unreadIndicator),
 	)
 	return []application.Service{
 		application.NewServiceWithOptions(service, application.ServiceOptions{

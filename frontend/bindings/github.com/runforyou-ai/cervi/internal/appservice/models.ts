@@ -406,6 +406,7 @@ export interface CurrentUser {
     "status": UserStatus;
     "locale": Locale;
     "timeZone": string;
+    "messageNotificationsEnabled": boolean;
     "workStatus": WorkStatus;
     "avatarUrl": string;
 }
@@ -566,6 +567,31 @@ export enum MessageAuthor {
 
     MessageAuthorVisitor = "visitor",
     MessageAuthorAgent = "agent",
+};
+
+/**
+ * MessageNotificationInput 定义当前设备的新消息通知内容。
+ */
+export interface MessageNotificationInput {
+    "id": string;
+    "title": string;
+    "body": string;
+    "soundEnabled": boolean;
+}
+
+/**
+ * NotificationPermissionStatus 表示当前设备的系统通知授权状态。
+ */
+export enum NotificationPermissionStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    NotificationPermissionStatusPrompt = "prompt",
+    NotificationPermissionStatusGranted = "granted",
+    NotificationPermissionStatusDenied = "denied",
+    NotificationPermissionStatusUnsupported = "unsupported",
 };
 
 /**
@@ -925,6 +951,15 @@ export interface TeamSummary {
 }
 
 /**
+ * UnreadIndicatorState 定义未读数量和托盘提醒条件。
+ */
+export interface UnreadIndicatorState {
+    "count": number;
+    "attentionEnabled": boolean;
+    "attentionPending": boolean;
+}
+
+/**
  * UpdateAgentInput 定义 AI 员工可编辑字段。
  */
 export interface UpdateAgentInput {
@@ -978,11 +1013,12 @@ export interface UserListInput {
 }
 
 /**
- * UserPreferencesInput 定义当前用户的语言和时区设置。
+ * UserPreferencesInput 定义当前用户的偏好设置。
  */
 export interface UserPreferencesInput {
     "locale": Locale;
     "timeZone": string;
+    "messageNotificationsEnabled": boolean;
 }
 
 /**

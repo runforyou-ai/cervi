@@ -75,6 +75,16 @@ const (
 	WorkStatusOffDuty WorkStatus = WorkStatus(domain.WorkStatusOffDuty)
 )
 
+// NotificationPermissionStatus 表示当前设备的系统通知授权状态。
+type NotificationPermissionStatus string
+
+const (
+	NotificationPermissionStatusPrompt      NotificationPermissionStatus = "prompt"
+	NotificationPermissionStatusGranted     NotificationPermissionStatus = "granted"
+	NotificationPermissionStatusDenied      NotificationPermissionStatus = "denied"
+	NotificationPermissionStatusUnsupported NotificationPermissionStatus = "unsupported"
+)
+
 // ChannelType 表示渠道类型。
 type ChannelType string
 
@@ -297,17 +307,18 @@ type RoleInput struct {
 
 // CurrentUser 定义当前登录用户信息。
 type CurrentUser struct {
-	ID             string     `json:"id"`
-	IdentityID     string     `json:"identityId"`
-	OrganizationID string     `json:"organizationId"`
-	Email          string     `json:"email"`
-	DisplayName    string     `json:"displayName"`
-	RoleID         string     `json:"roleId"`
-	Status         UserStatus `json:"status"`
-	Locale         Locale     `json:"locale"`
-	TimeZone       string     `json:"timeZone"`
-	WorkStatus     WorkStatus `json:"workStatus"`
-	AvatarURL      string     `json:"avatarUrl"`
+	ID                          string     `json:"id"`
+	IdentityID                  string     `json:"identityId"`
+	OrganizationID              string     `json:"organizationId"`
+	Email                       string     `json:"email"`
+	DisplayName                 string     `json:"displayName"`
+	RoleID                      string     `json:"roleId"`
+	Status                      UserStatus `json:"status"`
+	Locale                      Locale     `json:"locale"`
+	TimeZone                    string     `json:"timeZone"`
+	MessageNotificationsEnabled bool       `json:"messageNotificationsEnabled"`
+	WorkStatus                  WorkStatus `json:"workStatus"`
+	AvatarURL                   string     `json:"avatarUrl"`
 }
 
 // Identity 定义当前用户及其所属企业。
@@ -373,10 +384,19 @@ type ChangePasswordInput struct {
 	NewPassword     string `json:"newPassword"`
 }
 
-// UserPreferencesInput 定义当前用户的语言和时区设置。
+// UserPreferencesInput 定义当前用户的偏好设置。
 type UserPreferencesInput struct {
-	Locale   Locale `json:"locale"`
-	TimeZone string `json:"timeZone"`
+	Locale                      Locale `json:"locale"`
+	TimeZone                    string `json:"timeZone"`
+	MessageNotificationsEnabled bool   `json:"messageNotificationsEnabled"`
+}
+
+// MessageNotificationInput 定义当前设备的新消息通知内容。
+type MessageNotificationInput struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Body         string `json:"body"`
+	SoundEnabled bool   `json:"soundEnabled"`
 }
 
 // UserWorkStatusInput 定义当前用户主动设置的工作状态。

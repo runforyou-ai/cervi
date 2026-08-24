@@ -20,7 +20,7 @@ func (*Controller) Setup(_ Options) {}
 // SetLocale 保持移动端由前端和系统资源管理界面语言。
 func (*Controller) SetLocale(_ appservice.Locale) {}
 
-// SetUnreadCount 保持移动端不启用桌面未读提示。
-func (*Controller) SetUnreadCount(_ int) error {
+// SetUnreadState 保持移动端不启用桌面未读提示。
+func (*Controller) SetUnreadState(_ appservice.UnreadIndicatorState) error {
 	return nil
 }

@@ -109,15 +109,15 @@ func (c *Controller) SetLocale(locale appservice.Locale) {
 	}
 }
 
-// SetUnreadCount 更新当前平台的原生未读消息提示。
-func (c *Controller) SetUnreadCount(count int) error {
+// SetUnreadState 更新当前平台的原生未读消息提示。
+func (c *Controller) SetUnreadState(state appservice.UnreadIndicatorState) error {
 	c.mu.Lock()
 	unread := c.unread
 	c.mu.Unlock()
 	if unread == nil {
 		return nil
 	}
-	return unread.SetUnreadCount(count)
+	return unread.SetUnreadState(state)
 }
 
 // currentLocale 返回控制器当前使用的语言。

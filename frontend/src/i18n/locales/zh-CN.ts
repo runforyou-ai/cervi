@@ -765,6 +765,27 @@ const zhCN = {
         zhCN: "简体中文",
         enUS: "English",
       },
+      notifications: {
+        title: "通知",
+        newMessages: "新消息提醒",
+        newMessagesDescription:
+          "开启后，Web 和桌面端会在你上班时提醒新消息；休息一下或下班后自动暂停。",
+        sound: "播放系统默认通知声音",
+        soundDescription:
+          "仅影响当前设备，有新消息时播放系统默认通知声音。",
+        permission: {
+          label: "本设备通知权限",
+          authorized: "已授权",
+          authorizedDescription: "本设备可以显示新消息通知。",
+          unauthorizedDescription: "授权后，Cervi 才能在本设备上显示通知。",
+          allow: "允许通知",
+          allowing: "正在申请…",
+          allowSuccess: "通知权限已开启。",
+          allowDenied: "未能开启通知，请在浏览器或系统设置中允许。",
+          allowError: "无法申请通知权限，请重试。",
+          settingsOpenError: "无法打开系统通知设置，请手动前往系统设置。",
+        },
+      },
       save: "保存",
       saving: "正在保存…",
       saveSuccess: "偏好设置已保存。",
