@@ -258,11 +258,12 @@
         bottomInset > 0 ? "calc(100% - " + bottomInset + "px)" : "";
       button.style.display = open && frameReady ? "none" : "inline-flex";
     } else if (expanded) {
-      var expandedSize = fittedDesktopPanelSize(1.15, 24, 24);
+      // 固定面板右下角，展开时等比例向左和上方增长。
+      var expandedSize = fittedDesktopPanelSize(1.15, 24, 96);
       panel.style.left = "";
       panel.style.right = "24px";
       panel.style.top = "";
-      panel.style.bottom = "24px";
+      panel.style.bottom = "96px";
       panel.style.width = expandedSize.width;
       panel.style.height = expandedSize.height;
       panel.style.maxWidth = "none";
@@ -271,7 +272,7 @@
       panel.style.border = "1px solid rgba(24,24,27,.10)";
       panel.style.boxShadow = "0 28px 90px rgba(15,23,42,.24)";
       frame.style.height = "";
-      button.style.display = open ? "none" : "inline-flex";
+      button.style.display = "inline-flex";
     } else {
       var defaultSize = fittedDesktopPanelSize(1, 48, 96);
       panel.style.left = "";
