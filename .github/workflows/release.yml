@@ -224,10 +224,18 @@ jobs:
           retention-days: 7
 
   windows-desktop-assets:
-    name: Windows desktop assets
+    name: Windows ${{ matrix.arch }} desktop assets
     needs: prepare
-    runs-on: windows-2025
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
 
     steps:
       - name: Checkout
@@ -252,8 +260,10 @@ jobs:
       - name: Install NSIS
         shell: pwsh
         run: |
-          choco install nsis --yes --no-progress
           $nsisDirectory = "${env:ProgramFiles(x86)}\NSIS"
+          if (-not (Test-Path "$nsisDirectory\makensis.exe")) {
+            choco install nsis --yes --no-progress
+          }
           if (-not (Test-Path "$nsisDirectory\makensis.exe")) {
             throw "makensis.exe was not found in $nsisDirectory"
           }
@@ -279,17 +289,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=user
-          wails3 task windows:package ARCH=arm64 INSTALL_SCOPE=user
+          arch="${{ matrix.arch }}"
+          wails3 task windows:package ARCH="$arch" INSTALL_SCOPE=user
 
           mkdir -p release-assets
-          cp bin/cervi-amd64-installer.exe "release-assets/cervi_${VERSION}_windows_amd64-installer.exe"
-          cp bin/cervi-arm64-installer.exe "release-assets/cervi_${VERSION}_windows_arm64-installer.exe"
+          cp "bin/cervi-${arch}-installer.exe" "release-assets/cervi_${VERSION}_windows_${arch}-installer.exe"
 
       - name: Upload Windows desktop assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: windows-desktop-assets
+          name: windows-${{ matrix.arch }}-desktop-assets
           path: release-assets/*
           if-no-files-found: error
           retention-days: 7
