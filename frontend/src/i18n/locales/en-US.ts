@@ -558,7 +558,7 @@ const enUS = {
       basic: "Basic information",
       reception: "Reception settings",
       chatInterface: "Chat interface",
-      usage: "How to use",
+      usage: "Integration",
     },
     list: {
       title: "Message channels",

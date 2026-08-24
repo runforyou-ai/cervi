@@ -1,4 +1,4 @@
-/** 网站渠道使用方式页签。 */
+/** 网站渠道接入方式页签。 */
 import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
@@ -45,7 +45,7 @@ import {
 import { apiErrorMessage } from "@/lib/form-errors"
 import { openExternalURL } from "@/platform/open-external-url"
 
-/** 网站渠道使用方式子页签。 */
+/** 网站渠道接入方式子页签。 */
 export type WebsiteChannelAccessTab = "embed" | "link"
 
 /** 展示安装代码或聊天链接的使用说明。 */

@@ -545,7 +545,7 @@ const zhCN = {
       basic: "基本信息",
       reception: "接待设置",
       chatInterface: "聊天界面",
-      usage: "使用方式",
+      usage: "接入方式",
     },
     list: {
       title: "消息渠道",
