@@ -42,7 +42,7 @@ wails3 generate bindings -clean=true -ts -i
 
 ### 构建与打包
 
-构建和打包必须从仓库根目录调用 Task。Task 统一处理前端资源、构建标签、图标、目标平台工具链和产物封装，不得绕过 Task 直接拼接 `go build`、`xcodebuild`、Gradle 或 NSIS 命令。
+客户端构建和打包必须从仓库根目录调用 Task。Task 统一处理前端资源、构建标签、图标、目标平台工具链和产物封装。客户端不得直接拼接 `go build`、`xcodebuild`、Gradle 或 NSIS 命令。服务端多平台发布归档由 `.github/workflows/release.yml` 的 `server-assets` 作业统一交叉编译。
 
 ```bash
 # 桌面端：目标平台与运行 Task 的宿主操作系统一致
@@ -54,22 +54,19 @@ wails3 task common:build:frontend
 wails3 task build:server
 wails3 task build:docker CGO_ENABLED=0
 
-# 首次进行 macOS 或 Linux 桌面端跨平台构建时准备统一工具链镜像
-wails3 task setup:docker
-
-# macOS；DMG 只能在 macOS 上生成
+# macOS 原生构建；DMG、签名和公证只能在 macOS 上执行
 wails3 task darwin:build ARCH=arm64
 wails3 task darwin:package ARCH=arm64
 wails3 task darwin:package:universal
-wails3 task darwin:package:dmg ARCH=arm64
+wails3 task darwin:create:dmg
 
-# Windows amd64；必须在原生 Windows 或 Windows Runner 上执行
+# Windows amd64 原生构建和正式打包；必须在原生 Windows 或 Windows Runner 上执行
 # machine 是默认的管理员安装，user 是当前用户免提权安装
 wails3 task windows:build ARCH=amd64
 wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=machine
 wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=user
 
-# Linux amd64；package 生成 AppImage、DEB、RPM 和 AUR 产物
+# Linux amd64 原生构建；package 生成 AppImage、DEB、RPM 和 AUR 产物
 wails3 task linux:build ARCH=amd64
 wails3 task linux:package ARCH=amd64
 
@@ -85,6 +82,43 @@ wails3 task android:package:fat
 wails3 task android:bundle
 wails3 task android:bundle:fat
 ```
+
+#### 交叉编译
+
+`wails3 task setup:docker` 构建桌面端二进制交叉编译镜像。`darwin:build`、`windows:build` 和 `linux:build` 根据宿主平台自动选择原生工具链或 Docker 工具链。
+
+```bash
+wails3 task setup:docker
+
+# Linux 宿主交叉编译 macOS 二进制
+wails3 task darwin:build ARCH=amd64
+wails3 task darwin:build ARCH=arm64
+
+# macOS 或 Linux 宿主交叉编译 Windows 二进制
+wails3 task windows:build ARCH=amd64
+wails3 task windows:build ARCH=arm64
+
+# Apple Silicon macOS 宿主交叉编译 Linux arm64 二进制
+wails3 task linux:build ARCH=arm64
+
+# Intel macOS 宿主交叉编译 Linux amd64 二进制
+wails3 task linux:build ARCH=amd64
+```
+
+| 宿主环境 | 目标平台 | 支持范围 | 正式打包环境 |
+| --- | --- | --- | --- |
+| Linux | macOS amd64、arm64 | Docker 和 Zig 生成未签名二进制；`darwin:package` 只能生成未签名 `.app` | macOS 或 macOS Runner 生成 DMG，并完成签名、公证 |
+| macOS、Linux、WSL | Windows amd64、arm64 | Docker 和 Zig 生成供二进制验证使用的 `.exe` | 原生 Windows 或 Windows Runner 生成并验证 NSIS 安装包 |
+| macOS | Linux | Docker 生成与 Docker 宿主架构一致的 Linux 二进制 | 原生 Linux 或 Linux Runner 生成 AppImage、DEB、RPM 和 AUR 产物 |
+| macOS、Linux x86_64 | Android arm64、amd64 | Android NDK 生成 APK 或 AAB；`package:fat` 和 `bundle:fat` 同时包含两种架构 | macOS、Linux x86_64 或 Ubuntu Android Runner |
+| macOS | iOS arm64 | Xcode 工具链生成模拟器包、真机包或 IPA | macOS 或 macOS Runner |
+| Ubuntu Runner | 服务端 Linux、macOS、Windows 的 amd64、arm64 | `server-assets` 作业使用 `CGO_ENABLED=0` 生成六种服务端归档 | `.github/workflows/release.yml` |
+
+- 桌面端交叉编译只生成目标二进制或未签名应用包。桌面端正式安装包必须在目标操作系统或项目配置的同平台 Runner 上生成。
+- Linux 异架构桌面端交叉编译不受支持。Linux Docker 构建的 `ARCH` 必须与 Docker 宿主架构一致。
+- Windows 宿主不支持交叉构建 macOS、Linux、iOS 或 Android 产物。WSL 使用 Linux 构建规则，不提供原生 Windows 安装包构建环境。
+
+#### 构建约束
 
 - 桌面端和移动端构建固定使用 `CGO_ENABLED=1`，配置由根 `Taskfile.yml` 管理。客户端 SQLite 依赖 CGO，客户端构建命令不得传入 `CGO_ENABLED`。跨平台工具链缺失时运行 `wails3 task setup:docker`。
 - `wails3 task build:docker CGO_ENABLED=0` 构建纯静态服务端镜像。服务端构建标签不包含客户端 SQLite。
