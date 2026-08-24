@@ -16,11 +16,9 @@ import (
 )
 
 type memoryStore struct {
-	serverURL      string
-	credential     clientsession.Credential
-	credentialSet  bool
-	credentialSave int
-	credentialDrop int
+	serverURL     string
+	credential    clientsession.Credential
+	credentialSet bool
 }
 
 // GetServerURL 返回内存中保存的企业服务器地址。
@@ -43,7 +41,6 @@ func (s *memoryStore) LoadClientSession(context.Context) (clientsession.Credenti
 func (s *memoryStore) SaveClientSession(_ context.Context, credential clientsession.Credential) error {
 	s.credential = credential
 	s.credentialSet = true
-	s.credentialSave++
 	return nil
 }
 
@@ -51,7 +48,6 @@ func (s *memoryStore) SaveClientSession(_ context.Context, credential clientsess
 func (s *memoryStore) DeleteClientSession(context.Context) error {
 	s.credential = clientsession.Credential{}
 	s.credentialSet = false
-	s.credentialDrop++
 	return nil
 }
 
@@ -244,22 +240,14 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if store.serverURL != "" {
 		t.Fatalf("probe should not save server URL, got %q", store.serverURL)
 	}
-	changed, err := backend.ConnectServer(context.Background(), meta, remote.URL)
-	if err != nil {
+	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil {
 		t.Fatal(err)
-	}
-	if !changed {
-		t.Fatal("first server connection should be marked as changed")
 	}
 	if store.serverURL != remote.URL {
 		t.Fatalf("server URL = %q, want %q", store.serverURL, remote.URL)
 	}
-	changed, err = backend.ConnectServer(context.Background(), meta, remote.URL)
-	if err != nil {
+	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil {
 		t.Fatal(err)
-	}
-	if changed {
-		t.Fatal("same server connection should not be marked as changed")
 	}
 	status, err = backend.InstallationStatus(context.Background(), meta)
 	if err != nil {
@@ -279,15 +267,14 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if auth.Token != "test-token" {
-		t.Fatalf("native auth token = %q, want test-token", auth.Token)
+	if auth.Token != "" || auth.Identity.User.ID != "user-1" {
+		t.Fatalf("native auth = %#v", auth)
 	}
 	if !store.credentialSet || store.credential.Token != "test-token" || store.credential.UserID != "user-1" || store.credential.OrganizationID != "organization-1" {
 		t.Fatalf("saved client credential = %#v, found = %v", store.credential, store.credentialSet)
 	}
-	changed, err = backend.ConnectServer(context.Background(), meta, remote.URL)
-	if err != nil || changed || !store.credentialSet {
-		t.Fatalf("same server changed = %v, credential found = %v, error = %v", changed, store.credentialSet, err)
+	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil || !store.credentialSet {
+		t.Fatalf("same server credential found = %v, error = %v", store.credentialSet, err)
 	}
 	backend, err = newTestBackend(store)
 	if err != nil {
@@ -411,9 +398,8 @@ func TestBackendClearsCredentialWhenChangingServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	changed, err := backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
-	if err != nil || !changed {
-		t.Fatalf("changed = %v, error = %v", changed, err)
+	if err := backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL); err != nil {
+		t.Fatal(err)
 	}
 	if store.credentialSet {
 		t.Fatalf("old credential was not deleted: %#v", store.credential)
@@ -436,7 +422,7 @@ func TestBackendRejectsUninitializedServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
+	err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
 	var apiError *appservice.Error
 	if !errors.As(err, &apiError) || apiError.Kind != appservice.ErrorKindInvalid {
 		t.Fatalf("error = %#v, want invalid", err)
@@ -457,7 +443,7 @@ func TestBackendRejectsNonCerviServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
+	err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
 	var apiError *appservice.Error
 	if !errors.As(err, &apiError) || apiError.Kind != appservice.ErrorKindUnavailable || apiError.State != "" {
 		t.Fatalf("error = %#v, want unavailable without session state", err)

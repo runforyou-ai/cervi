@@ -92,12 +92,8 @@ export function bind<A extends unknown[], R>(
   }
 }
 
-/** Web 端保存登录令牌，原生端只返回当前身份。 */
-export function storeToken(auth: Auth) {
-  if (resolveAppPlatform() !== "web") {
-    clearToken()
-    return auth.identity
-  }
+/** 保存 Web 端登录令牌并返回当前身份。 */
+export function storeWebToken(auth: Auth) {
   window.localStorage.setItem(
     tokenStorageKey,
     JSON.stringify({ token: auth.token, expiresAt: auth.expiresAt }),
@@ -105,9 +101,11 @@ export function storeToken(auth: Auth) {
   return auth.identity
 }
 
-/** 清除本地保存的登录令牌。 */
-export function clearToken() {
-  window.localStorage.removeItem(tokenStorageKey)
+/** 清除 Web 端登录令牌。 */
+export function clearWebToken() {
+  if (resolveAppPlatform() === "web") {
+    window.localStorage.removeItem(tokenStorageKey)
+  }
 }
 
 /** 组装当前请求的令牌和语言。 */
@@ -121,22 +119,18 @@ function requestMeta(): RequestMeta {
   }
 }
 
-/** Web 端读取令牌，原生端清理旧版浏览器登录态。 */
+/** 返回 Web 端请求令牌。 */
 function requestToken() {
-  if (resolveAppPlatform() !== "web") {
-    clearToken()
-    return ""
-  }
-  return loadToken()
+  return resolveAppPlatform() === "web" ? loadWebToken() : ""
 }
 
 /** 读取未过期的登录令牌。 */
-function loadToken() {
+function loadWebToken() {
   const value = window.localStorage.getItem(tokenStorageKey)
   if (!value) return ""
   const stored = JSON.parse(value) as StoredToken
   if (Date.parse(stored.expiresAt) <= Date.now()) {
-    clearToken()
+    clearWebToken()
     return ""
   }
   return stored.token

@@ -78,7 +78,7 @@ type WorkspaceInstaller interface {
 type ServerConnector interface {
 	ServerURL(context.Context, RequestMeta) (string, error)
 	ProbeServer(context.Context, RequestMeta, string) (InstallationStatus, error)
-	ConnectServer(context.Context, RequestMeta, string) (bool, error)
+	ConnectServer(context.Context, RequestMeta, string) error
 }
 
 // ProfileImageSelector 由支持原生文件对话框的平台实现。
@@ -125,12 +125,12 @@ func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input 
 	return installer.InstallWorkspace(ctx, meta, input)
 }
 
-// Login 校验账号密码并返回登录令牌。
+// Login 校验账号密码并建立登录会话。
 func (s *Service) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
 	return s.backend.Login(ctx, meta, input)
 }
 
-// Logout 删除当前登录令牌。
+// Logout 退出当前登录会话。
 func (s *Service) Logout(ctx context.Context, meta RequestMeta) error {
 	return s.backend.Logout(ctx, meta)
 }
@@ -461,11 +461,11 @@ func (s *Service) ProbeServer(ctx context.Context, meta RequestMeta, serverURL s
 	return connector.ProbeServer(ctx, meta, serverURL)
 }
 
-// ConnectServer 验证并保存原生端企业服务器地址，并返回地址是否变化。
-func (s *Service) ConnectServer(ctx context.Context, meta RequestMeta, serverURL string) (bool, error) {
+// ConnectServer 验证并保存原生端企业服务器地址。
+func (s *Service) ConnectServer(ctx context.Context, meta RequestMeta, serverURL string) error {
 	connector, ok := s.backend.(ServerConnector)
 	if !ok {
-		return false, methodNotAllowedError(meta, "ConnectServer")
+		return methodNotAllowedError(meta, "ConnectServer")
 	}
 	return connector.ConnectServer(ctx, meta, serverURL)
 }

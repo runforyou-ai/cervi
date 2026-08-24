@@ -14,5 +14,4 @@ type ClientSession struct {
 	UserID         string `bun:"user_id"`
 	Token          string `bun:"token"`
 	ExpiresAt      string `bun:"expires_at"`
-	UpdatedAt      string `bun:"updated_at"`
 }

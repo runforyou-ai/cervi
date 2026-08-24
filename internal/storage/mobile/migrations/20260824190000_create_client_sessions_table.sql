@@ -6,8 +6,7 @@ CREATE TABLE client_sessions (
     organization_id text NOT NULL,
     user_id         text NOT NULL,
     token           text NOT NULL,
-    expires_at      text NOT NULL,
-    updated_at      text NOT NULL DEFAULT CURRENT_TIMESTAMP
+    expires_at      text NOT NULL
 );
 
 -- +goose Down

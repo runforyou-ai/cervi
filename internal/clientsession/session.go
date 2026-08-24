@@ -3,9 +3,8 @@ package clientsession
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"strings"
+	"log/slog"
 	"sync"
 	"time"
 )
@@ -46,48 +45,48 @@ func NewManager(ctx context.Context, store Store) (*Manager, error) {
 	if !found {
 		return manager, nil
 	}
-	if err := validateCredential(credential); err != nil {
-		return nil, fmt.Errorf("validate saved client session: %w", err)
-	}
 	if !credential.ExpiresAt.After(time.Now()) {
 		if err := store.DeleteClientSession(ctx); err != nil {
-			return nil, fmt.Errorf("delete expired client session: %w", err)
+			slog.Warn("删除过期的原生端登录会话失败", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "error", err)
+			return manager, nil
 		}
+		slog.Info("已删除过期的原生端登录会话", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID)
 		return manager, nil
 	}
 	manager.current = &credential
+	slog.Info("已恢复原生端登录会话", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "expires_at", credential.ExpiresAt)
 	return manager, nil
 }
 
 // Current 返回指定企业服务器当前有效的登录凭据。
-func (m *Manager) Current(ctx context.Context, serverURL string) (Credential, bool, error) {
+func (m *Manager) Current(ctx context.Context, serverURL string) (Credential, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.current == nil || m.current.ServerURL != strings.TrimSpace(serverURL) {
-		return Credential{}, false, nil
+	if m.current == nil || m.current.ServerURL != serverURL {
+		return Credential{}, false
 	}
 	if m.current.ExpiresAt.After(time.Now()) {
-		return *m.current, true, nil
+		return *m.current, true
 	}
+	expired := *m.current
 	m.current = nil
 	if err := m.store.DeleteClientSession(ctx); err != nil {
-		return Credential{}, false, fmt.Errorf("delete expired client session: %w", err)
+		slog.Warn("删除过期的原生端登录会话失败", "server_url", expired.ServerURL, "organization_id", expired.OrganizationID, "user_id", expired.UserID, "error", err)
+		return Credential{}, false
 	}
-	return Credential{}, false, nil
+	slog.Info("已删除过期的原生端登录会话", "server_url", expired.ServerURL, "organization_id", expired.OrganizationID, "user_id", expired.UserID)
+	return Credential{}, false
 }
 
 // Establish 保存并启用新的原生端登录凭据。
 func (m *Manager) Establish(ctx context.Context, credential Credential) error {
-	credential.ServerURL = strings.TrimSpace(credential.ServerURL)
-	if err := validateCredential(credential); err != nil {
-		return err
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err := m.store.SaveClientSession(ctx, credential); err != nil {
 		return fmt.Errorf("save client session: %w", err)
 	}
 	m.current = &credential
+	slog.Info("原生端登录会话已建立", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "expires_at", credential.ExpiresAt)
 	return nil
 }
 
@@ -95,47 +94,30 @@ func (m *Manager) Establish(ctx context.Context, credential Credential) error {
 func (m *Manager) Clear(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	err := m.store.DeleteClientSession(ctx)
-	m.current = nil
-	if err != nil {
+	credential := m.current
+	if err := m.store.DeleteClientSession(ctx); err != nil {
 		return fmt.Errorf("delete client session: %w", err)
+	}
+	m.current = nil
+	if credential != nil {
+		slog.Info("原生端登录会话已清除", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID)
 	}
 	return nil
 }
 
 // ClearIfCurrent 仅在被拒绝的凭据仍是当前会话时删除它。
-func (m *Manager) ClearIfCurrent(ctx context.Context, rejected Credential) (bool, error) {
+func (m *Manager) ClearIfCurrent(ctx context.Context, rejected Credential) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.current == nil ||
 		m.current.ServerURL != rejected.ServerURL ||
-		m.current.OrganizationID != rejected.OrganizationID ||
-		m.current.UserID != rejected.UserID ||
 		m.current.Token != rejected.Token {
-		return false, nil
-	}
-	err := m.store.DeleteClientSession(ctx)
-	m.current = nil
-	if err != nil {
-		return false, fmt.Errorf("delete rejected client session: %w", err)
-	}
-	return true, nil
-}
-
-// validateCredential 校验登录凭据包含完整的持久化字段。
-func validateCredential(credential Credential) error {
-	switch {
-	case strings.TrimSpace(credential.ServerURL) == "":
-		return errors.New("client session server URL is empty")
-	case strings.TrimSpace(credential.OrganizationID) == "":
-		return errors.New("client session organization ID is empty")
-	case strings.TrimSpace(credential.UserID) == "":
-		return errors.New("client session user ID is empty")
-	case strings.TrimSpace(credential.Token) == "":
-		return errors.New("client session token is empty")
-	case credential.ExpiresAt.IsZero():
-		return errors.New("client session expiration is empty")
-	default:
 		return nil
 	}
+	if err := m.store.DeleteClientSession(ctx); err != nil {
+		return fmt.Errorf("delete rejected client session: %w", err)
+	}
+	m.current = nil
+	slog.Info("服务端拒绝原生端登录凭据，已清除会话", "server_url", rejected.ServerURL, "organization_id", rejected.OrganizationID, "user_id", rejected.UserID)
+	return nil
 }

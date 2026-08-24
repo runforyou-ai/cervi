@@ -21,7 +21,6 @@ func (s *Store) LoadClientSession(ctx context.Context) (clientsession.Credential
 	err := s.db.NewSelect().
 		Model(record).
 		Where("id = ?", currentClientSessionID).
-		Limit(1).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return clientsession.Credential{}, false, nil
@@ -33,7 +32,13 @@ func (s *Store) LoadClientSession(ctx context.Context) (clientsession.Credential
 	if err != nil {
 		return clientsession.Credential{}, false, fmt.Errorf("parse client session expiration: %w", err)
 	}
-	return clientSessionCredential(record.ServerURL, record.OrganizationID, record.UserID, record.Token, expiresAt), true, nil
+	return clientsession.Credential{
+		ServerURL:      record.ServerURL,
+		OrganizationID: record.OrganizationID,
+		UserID:         record.UserID,
+		Token:          record.Token,
+		ExpiresAt:      expiresAt,
+	}, true, nil
 }
 
 // SaveClientSession 保存移动端当前登录凭据。
@@ -55,7 +60,6 @@ func (s *Store) SaveClientSession(ctx context.Context, credential clientsession.
 		Set("user_id = EXCLUDED.user_id").
 		Set("token = EXCLUDED.token").
 		Set("expires_at = EXCLUDED.expires_at").
-		Set("updated_at = CURRENT_TIMESTAMP").
 		Exec(ctx)
 	return err
 }
@@ -67,15 +71,4 @@ func (s *Store) DeleteClientSession(ctx context.Context) error {
 		Where("id = ?", currentClientSessionID).
 		Exec(ctx)
 	return err
-}
-
-// clientSessionCredential 把移动端存储记录转换成登录凭据。
-func clientSessionCredential(serverURL, organizationID, userID, token string, expiresAt time.Time) clientsession.Credential {
-	return clientsession.Credential{
-		ServerURL:      serverURL,
-		OrganizationID: organizationID,
-		UserID:         userID,
-		Token:          token,
-		ExpiresAt:      expiresAt,
-	}
 }

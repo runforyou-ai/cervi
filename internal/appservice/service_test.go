@@ -24,7 +24,7 @@ func TestPlatformMethodsRequireCapability(t *testing.T) {
 	_, err = service.ProbeServer(context.Background(), meta, "https://cervi.example.com")
 	assertMethodNotAllowed(t, err)
 
-	_, err = service.ConnectServer(context.Background(), meta, "https://cervi.example.com")
+	err = service.ConnectServer(context.Background(), meta, "https://cervi.example.com")
 	assertMethodNotAllowed(t, err)
 
 	_, err = service.SelectProfileImage(context.Background(), meta)
@@ -69,9 +69,9 @@ func (b *nativeSessionBackend) ProbeServer(context.Context, RequestMeta, string)
 	return InstallationStatus{}, nil
 }
 
-// ConnectServer 接受服务器连接并返回地址未变化。
-func (b *nativeSessionBackend) ConnectServer(context.Context, RequestMeta, string) (bool, error) {
-	return false, nil
+// ConnectServer 接受服务器连接。
+func (b *nativeSessionBackend) ConnectServer(context.Context, RequestMeta, string) error {
+	return nil
 }
 
 // TestLoadSessionResolvesWebEntry 验证 Web 端按初始化与登录状态选择入口。

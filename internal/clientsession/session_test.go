@@ -51,12 +51,12 @@ func TestManagerRestoresScopesAndClearsCredential(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	credential, found, err := manager.Current(context.Background(), "https://cervi.example.com")
-	if err != nil || !found || credential.Token != "token-1" || !credential.ExpiresAt.Equal(expiresAt) {
-		t.Fatalf("credential = %#v, found = %v, error = %v", credential, found, err)
+	credential, found := manager.Current(context.Background(), "https://cervi.example.com")
+	if !found || credential.Token != "token-1" || !credential.ExpiresAt.Equal(expiresAt) {
+		t.Fatalf("credential = %#v, found = %v", credential, found)
 	}
-	if _, found, err := manager.Current(context.Background(), "https://other.example.com"); err != nil || found {
-		t.Fatalf("other server credential found = %v, error = %v", found, err)
+	if _, found := manager.Current(context.Background(), "https://other.example.com"); found {
+		t.Fatal("other server credential was returned")
 	}
 	if err := manager.Clear(context.Background()); err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func TestManagerEstablishesCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	credential := Credential{
-		ServerURL:      " https://cervi.example.com ",
+		ServerURL:      "https://cervi.example.com",
 		OrganizationID: "organization-1",
 		UserID:         "user-1",
 		Token:          "token-1",
@@ -92,13 +92,17 @@ func TestManagerEstablishesCredential(t *testing.T) {
 	if err := manager.Establish(context.Background(), replacement); err != nil {
 		t.Fatal(err)
 	}
-	cleared, err := manager.ClearIfCurrent(context.Background(), rejected)
-	if err != nil || cleared || !store.found || store.credential.Token != "token-2" {
-		t.Fatalf("stale credential cleared = %v, saved = %#v, error = %v", cleared, store.credential, err)
+	if err := manager.ClearIfCurrent(context.Background(), rejected); err != nil {
+		t.Fatal(err)
 	}
-	cleared, err = manager.ClearIfCurrent(context.Background(), replacement)
-	if err != nil || !cleared || store.found {
-		t.Fatalf("current credential cleared = %v, found = %v, error = %v", cleared, store.found, err)
+	if !store.found || store.credential.Token != "token-2" {
+		t.Fatalf("stale credential cleared saved session: %#v", store.credential)
+	}
+	if err := manager.ClearIfCurrent(context.Background(), replacement); err != nil {
+		t.Fatal(err)
+	}
+	if store.found {
+		t.Fatal("rejected current credential was not cleared")
 	}
 }
 
@@ -118,8 +122,8 @@ func TestManagerDeletesExpiredCredential(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, found, err := manager.Current(context.Background(), "https://cervi.example.com"); err != nil || found {
-		t.Fatalf("expired credential found = %v, error = %v", found, err)
+	if _, found := manager.Current(context.Background(), "https://cervi.example.com"); found {
+		t.Fatal("expired credential was returned")
 	}
 	if store.found || store.deletes != 1 {
 		t.Fatalf("store found = %v, deletes = %d", store.found, store.deletes)

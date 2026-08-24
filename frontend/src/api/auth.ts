@@ -11,16 +11,18 @@ import type {
   InstallWorkspaceInput,
   LoginInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
-import { bind, call, clearToken, storeToken } from "@/api/client"
+import { bind, call, clearWebToken, storeWebToken } from "@/api/client"
 import { resolveBrowserLanguage } from "@/i18n"
 import { resolveBrowserTimeZone } from "@/lib/time-zones"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 读取已保存的企业服务器地址。 */
 export const getServerURL = bind(ServerURL)
 
-/** 登录并按当前平台保存会话。 */
+/** 登录并建立当前平台会话。 */
 export async function login(input: LoginInput) {
-  return storeToken(await call((meta) => Login(meta, input)))
+  const auth = await call((meta) => Login(meta, input))
+  return resolveAppPlatform() === "web" ? storeWebToken(auth) : auth.identity
 }
 
 /** 退出登录并清除 Web 端令牌。 */
@@ -28,7 +30,7 @@ export async function logout() {
   try {
     await call((meta) => Logout(meta))
   } finally {
-    clearToken()
+    clearWebToken()
   }
 }
 
@@ -36,7 +38,7 @@ export async function logout() {
 export async function install(
   input: Omit<InstallWorkspaceInput, "locale" | "timeZone">,
 ) {
-  return storeToken(
+  return storeWebToken(
     await call((meta) =>
       InstallWorkspace(meta, {
         ...input,
@@ -50,10 +52,5 @@ export async function install(
 /** 检测企业服务器并返回公开企业名称，不保存地址。 */
 export const probeServer = bind(ProbeServer)
 
-/** 保存企业服务器地址，仅在实际切换服务器时清除 WebView 旧令牌。 */
-export async function connectServer(serverUrl: string) {
-  const changed = await call((meta) => ConnectServer(meta, serverUrl))
-  if (changed) {
-    clearToken()
-  }
-}
+/** 验证并保存企业服务器地址。 */
+export const connectServer = bind(ConnectServer)

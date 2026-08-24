@@ -49,7 +49,7 @@ func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
-// Login 校验账号密码并返回登录令牌。
+// Login 校验账号密码并建立原生端登录会话。
 func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
 	b.sessionMu.Lock()
 	defer b.sessionMu.Unlock()
@@ -59,9 +59,6 @@ func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input 
 	}
 	b.normalizeUser(&output.Identity.User)
 	state := b.connection.currentState()
-	if state == nil {
-		return appservice.Auth{}, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
-	}
 	if err := b.sessions.Establish(ctx, clientsession.Credential{
 		ServerURL:      state.baseURL.String(),
 		OrganizationID: output.Identity.Organization.ID,
@@ -72,14 +69,15 @@ func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input 
 		slog.Warn("保存原生端登录凭据失败", "server_url", state.baseURL.String(), "user_id", output.Identity.User.ID, "error", err)
 		return appservice.Auth{}, appservice.FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
-	return output, nil
+	return appservice.Auth{Identity: output.Identity}, nil
 }
 
-// Logout 删除远程登录令牌。
+// Logout 退出远程会话并清除原生端登录凭据。
 func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error {
 	b.sessionMu.Lock()
 	defer b.sessionMu.Unlock()
 	remoteErr := b.do(ctx, meta, http.MethodPost, "/auth/logout", nil, nil, nil)
+	// 远程请求取消后仍清除本地凭据。
 	if err := b.sessions.Clear(context.WithoutCancel(ctx)); err != nil {
 		slog.Warn("清理原生端登录凭据失败", "error", err)
 		return appservice.FailedError(meta, cervii18n.ErrorLogoutFailed)
@@ -599,34 +597,34 @@ func (b *Backend) ProbeServer(ctx context.Context, meta appservice.RequestMeta, 
 	return status, nil
 }
 
-// ConnectServer 验证并保存企业服务器地址，并返回地址是否变化。
-func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (bool, error) {
+// ConnectServer 验证并保存企业服务器地址。
+func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) error {
 	b.sessionMu.Lock()
 	defer b.sessionMu.Unlock()
 	state, _, err := b.inspectServer(ctx, meta, serverURL)
 	if err != nil {
-		return false, err
+		return err
 	}
 	current := b.connection.currentState()
 	changed := current == nil || current.baseURL.String() != state.baseURL.String()
 	if changed {
 		if err := b.sessions.Clear(ctx); err != nil {
 			slog.Warn("切换企业服务器前清理登录凭据失败", "server_url", state.baseURL.String(), "error", err)
-			return false, appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
+			return appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
 		}
 	}
 	if err := b.connection.store.SetServerURL(ctx, state.baseURL.String()); err != nil {
 		if ctx.Err() != nil {
-			return false, ctx.Err()
+			return ctx.Err()
 		}
 		slog.Warn("保存企业服务器配置失败", "server_url", state.baseURL.String(), "error", err)
-		return false, appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
+		return appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
 	}
 	b.connection.mu.Lock()
 	b.connection.state = state
 	b.connection.mu.Unlock()
 	slog.Info("企业服务器连接成功", "server_url", state.baseURL.String(), "changed", changed)
-	return changed, nil
+	return nil
 }
 
 // inspectServer 校验地址并读取远程初始化状态，不保存配置。
@@ -661,11 +659,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	if state == nil {
 		return appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
 	}
-	credential, authenticated, err := b.sessions.Current(ctx, state.baseURL.String())
-	if err != nil {
-		slog.Warn("读取原生端登录凭据失败", "server_url", state.baseURL.String(), "error", err)
-		return appservice.FailedError(meta, cervii18n.ErrorAuthenticationStatusFailed)
-	}
+	credential, authenticated := b.sessions.Current(ctx, state.baseURL.String())
 	var body io.Reader
 	if input != nil {
 		payload, err := json.Marshal(input)
@@ -713,7 +707,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 			sessionState = appservice.SessionStateConnect
 		}
 		if sessionState == appservice.SessionStateLogin && authenticated {
-			if _, err := b.sessions.ClearIfCurrent(ctx, credential); err != nil {
+			if err := b.sessions.ClearIfCurrent(ctx, credential); err != nil {
 				slog.Warn("登录凭据失效后清理本地会话失败", "server_url", state.baseURL.String(), "error", err)
 			}
 		}
