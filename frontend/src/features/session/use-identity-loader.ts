@@ -40,11 +40,13 @@ export function useIdentityLoader() {
           setState({ status: "anonymous", identity: null, redirectPath: null })
           return
         }
-        const redirectPath = isApiError(error) ? sessionPath(error.state) : null
-        if (redirectPath) {
-          console.info("身份接口要求切换入口", { state: error.state })
-          setState({ status: "redirect", identity: null, redirectPath })
-          return
+        if (isApiError(error)) {
+          const redirectPath = sessionPath(error.state)
+          if (redirectPath) {
+            console.info("身份接口要求切换入口", { state: error.state })
+            setState({ status: "redirect", identity: null, redirectPath })
+            return
+          }
         }
         console.warn("读取登录身份失败，忽略本次结果", error)
       },
