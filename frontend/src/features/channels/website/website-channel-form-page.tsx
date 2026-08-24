@@ -8,6 +8,7 @@ import {
   getWebsiteChannel,
   isNotFoundApiError,
   type WebsiteChannelData,
+  type WebsiteChannelChatInterfaceInput,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { PageContent } from "@/components/page-content"
@@ -17,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WebsiteChannelForm } from "@/features/channels/website/website-channel-form"
 import { WebsiteChannelReceptionSettingsForm } from "@/features/channels/website/website-channel-reception-settings-form"
 import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
+import { WebsiteChatPreview } from "@/features/channels/website/website-chat-preview"
 import {
   WebsiteChannelUsagePanel,
   type WebsiteChannelAccessTab,
@@ -36,6 +38,18 @@ function isAccessTab(value: string | null): value is WebsiteChannelAccessTab {
   return value === "embed" || value === "link"
 }
 
+/** 把已保存的聊天界面设置归一化为实时预览值。 */
+function savedPreviewValue(
+  channel: WebsiteChannelData,
+): WebsiteChannelChatInterfaceInput {
+  return {
+    title: channel.chatInterface.title,
+    subtitle: channel.chatInterface.subtitle ?? "",
+    greetingMessage: channel.chatInterface.greetingMessage ?? "",
+    themeColor: channel.chatInterface.themeColor,
+  }
+}
+
 /** 网站渠道编辑页签，与 URL 同步。 */
 function WebsiteChannelEditTabs({
   channel,
@@ -51,6 +65,8 @@ function WebsiteChannelEditTabs({
   const activeTab = isEditTab(requestedTab) ? requestedTab : "basic"
   const activeAccess: WebsiteChannelAccessTab =
     requestedAccess === "link" ? "link" : "embed"
+  const [previewValue, setPreviewValue] =
+    useState<WebsiteChannelChatInterfaceInput>(() => savedPreviewValue(channel))
 
   useEffect(() => {
     const tabValid = isEditTab(requestedTab)
@@ -87,7 +103,11 @@ function WebsiteChannelEditTabs({
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={setTab}>
+    <Tabs
+      value={activeTab}
+      onValueChange={setTab}
+      className="max-w-[1240px]"
+    >
       <TabsList>
         <TabsTrigger value="basic">{t("tabs.basic")}</TabsTrigger>
         <TabsTrigger value="reception">{t("tabs.reception")}</TabsTrigger>
@@ -96,50 +116,61 @@ function WebsiteChannelEditTabs({
         </TabsTrigger>
         <TabsTrigger value="usage">{t("tabs.usage")}</TabsTrigger>
       </TabsList>
-      <TabsContent
-        value="basic"
-        forceMount
-        className="mt-6 data-[state=inactive]:hidden"
-      >
-        <WebsiteChannelForm
-          channel={channel}
-          onUpdated={(updated) => onChannelChange({ ...channel, ...updated })}
-        />
-      </TabsContent>
-      <TabsContent
-        value="reception"
-        forceMount
-        className="mt-6 data-[state=inactive]:hidden"
-      >
-        <WebsiteChannelReceptionSettingsForm
-          channel={channel}
-          onUpdated={(updated) => onChannelChange({ ...channel, ...updated })}
-        />
-      </TabsContent>
-      <TabsContent
-        value="chat-interface"
-        forceMount
-        className="mt-6 data-[state=inactive]:hidden"
-      >
-        <WebsiteChannelChatInterfaceForm
-          channel={channel}
-          onUpdated={(chatInterface) =>
-            onChannelChange({ ...channel, chatInterface })
-          }
-        />
-      </TabsContent>
-      <TabsContent
-        value="usage"
-        forceMount
-        className="mt-6 data-[state=inactive]:hidden"
-      >
-        <WebsiteChannelUsagePanel
-          channel={channel}
-          access={activeAccess}
-          onAccessChange={setAccess}
-          onUpdated={(access) => onChannelChange({ ...channel, access })}
-        />
-      </TabsContent>
+      <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_480px]">
+        <div className="min-w-0">
+          <TabsContent
+            value="basic"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <WebsiteChannelForm
+              channel={channel}
+              onUpdated={(updated) =>
+                onChannelChange({ ...channel, ...updated })
+              }
+            />
+          </TabsContent>
+          <TabsContent
+            value="reception"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <WebsiteChannelReceptionSettingsForm
+              channel={channel}
+              onUpdated={(updated) =>
+                onChannelChange({ ...channel, ...updated })
+              }
+            />
+          </TabsContent>
+          <TabsContent
+            value="chat-interface"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <WebsiteChannelChatInterfaceForm
+              channel={channel}
+              onPreviewChange={setPreviewValue}
+              onUpdated={(chatInterface) =>
+                onChannelChange({ ...channel, chatInterface })
+              }
+            />
+          </TabsContent>
+          <TabsContent
+            value="usage"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <WebsiteChannelUsagePanel
+              channel={channel}
+              access={activeAccess}
+              onAccessChange={setAccess}
+              onUpdated={(access) => onChannelChange({ ...channel, access })}
+            />
+          </TabsContent>
+        </div>
+
+        <WebsiteChatPreview value={previewValue} />
+      </div>
     </Tabs>
   )
 }
@@ -224,6 +255,7 @@ export function WebsiteChannelFormPage({ mode }: { mode: "create" | "edit" }) {
           </div>
         ) : mode === "edit" && channel ? (
           <WebsiteChannelEditTabs
+            key={channel.id}
             channel={channel}
             onChannelChange={setChannel}
           />

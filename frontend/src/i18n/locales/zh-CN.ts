@@ -693,8 +693,10 @@ const zhCN = {
       },
       preview: {
         title: "实时预览",
-        visitorMessage: "你好，我想了解一下。",
-        composerPlaceholder: "输入消息…",
+        frameTitle: "访客 Messenger 预览",
+        loading: "正在加载访客 Messenger…",
+        loadFailed: "无法加载访客 Messenger 预览。",
+        retry: "重试",
       },
     },
   },
