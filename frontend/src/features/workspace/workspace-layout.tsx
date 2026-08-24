@@ -14,7 +14,6 @@ import {
   type CurrentUser,
 } from "@/api"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
-import { ServerUnavailableState } from "@/features/session/server-unavailable-state"
 import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
 import { useSessionLoader } from "@/features/session/use-session-loader"
 import type { WorkspaceOutletContext } from "@/features/workspace/workspace-context"
@@ -95,19 +94,6 @@ export function WorkspaceLayout({
     setIdentity((current) => (current ? { ...current, organization } : current))
   }
 
-  if (status === "unavailable" && !identity) {
-    return (
-      <ServerUnavailableState
-        onRetry={retry}
-        onChangeServer={
-          allowServerChange
-            ? () => navigate("/connect", { replace: true })
-            : undefined
-        }
-      />
-    )
-  }
-
   if (
     !identity &&
     (status === "loading" ||
@@ -123,7 +109,16 @@ export function WorkspaceLayout({
   }
 
   if (!identity) {
-    return <SessionLoadFailedState onRetry={retry} />
+    return (
+      <SessionLoadFailedState
+        onRetry={retry}
+        onChangeServer={
+          allowServerChange
+            ? () => navigate("/connect", { replace: true })
+            : undefined
+        }
+      />
+    )
   }
 
   return (

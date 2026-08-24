@@ -46,11 +46,6 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError
 }
 
-/** 判断是否为依赖服务暂时不可用错误。 */
-export function isUnavailableApiError(error: unknown): error is ApiError {
-  return isApiError(error) && error.kind === "unavailable"
-}
-
 /** 判断是否为资源不存在错误。 */
 export function isNotFoundApiError(error: unknown): error is ApiError {
   return isApiError(error) && error.kind === "not_found"

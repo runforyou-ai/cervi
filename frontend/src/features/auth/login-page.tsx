@@ -6,7 +6,6 @@ import { useNavigate } from "react-router"
 
 import { sessionPath, SessionState } from "@/api"
 import { LoginForm } from "@/features/auth/login-form"
-import { ServerUnavailableState } from "@/features/session/server-unavailable-state"
 import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
 import { useSessionLoader } from "@/features/session/use-session-loader"
 
@@ -36,9 +35,9 @@ export function LoginPage({
     }
   }, [disconnectedPath, navigate, session, status])
 
-  if (status === "unavailable") {
+  if (status === "failed") {
     return (
-      <ServerUnavailableState
+      <SessionLoadFailedState
         onRetry={retry}
         onChangeServer={
           allowServerChange
@@ -47,10 +46,6 @@ export function LoginPage({
         }
       />
     )
-  }
-
-  if (status === "failed") {
-    return <SessionLoadFailedState onRetry={retry} />
   }
 
   const organizationName = session?.organizationName?.trim() ?? ""

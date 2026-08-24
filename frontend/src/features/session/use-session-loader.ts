@@ -1,14 +1,14 @@
-/** 会话加载和暂时不可用识别。 */
+/** 会话加载状态管理。 */
 import { useCallback, useEffect, useRef, useState } from "react"
 
-import { isUnavailableApiError, loadSession, type Session } from "@/api"
+import { loadSession, type Session } from "@/api"
 
 type SessionLoadState = {
-  status: "loading" | "loaded" | "unavailable" | "failed"
+  status: "loading" | "loaded" | "failed"
   session: Session | null
 }
 
-/** 加载会话，并识别企业服务器暂时不可用状态。 */
+/** 加载会话，并在无法取得明确会话状态时提供重试入口。 */
 export function useSessionLoader() {
   const requestId = useRef(0)
   const [state, setState] = useState<SessionLoadState>({
@@ -31,14 +31,6 @@ export function useSessionLoader() {
       })
     } catch (error) {
       if (currentRequestId !== requestId.current) {
-        return
-      }
-      if (isUnavailableApiError(error)) {
-        console.warn("企业服务器暂时不可用", error)
-        setState({
-          status: "unavailable",
-          session: null,
-        })
         return
       }
       console.warn("读取会话失败", error)

@@ -3,7 +3,6 @@ export {
   ApiError,
   isApiError,
   isNotFoundApiError,
-  isUnavailableApiError,
 } from "@/api/client"
 export {
   connectServer,
