@@ -288,27 +288,29 @@ export async function requestNotificationPermission(
 ): Promise<NotificationPermissionState> {
   const platform = resolveAppPlatform()
   let state: NotificationPermissionState
-  if (platform === "mobile") {
-    state = "unsupported"
-  } else if (platform === "web") {
-    if (!("Notification" in window) || !window.isSecureContext) {
+  try {
+    if (platform === "mobile") {
       state = "unsupported"
+    } else if (platform === "web") {
+      if (!("Notification" in window) || !window.isSecureContext) {
+        state = "unsupported"
+      } else {
+        state = normalizePermissionState(await Notification.requestPermission())
+      }
     } else {
-      state = normalizePermissionState(await Notification.requestPermission())
+      state = normalizePermissionState(
+        await requestDesktopNotificationPermission(),
+      )
+      if (state === "prompt") {
+        state = "denied"
+      }
     }
-  } else {
-    state = normalizePermissionState(
-      await requestDesktopNotificationPermission(),
-    )
-    if (state === "prompt") {
-      state = "denied"
-    }
+  } finally {
+    writeNotificationDevicePreferences(scope, {
+      ...readNotificationDevicePreferences(scope),
+      permissionRequested: true,
+    })
   }
-
-  writeNotificationDevicePreferences(scope, {
-    ...readNotificationDevicePreferences(scope),
-    permissionRequested: true,
-  })
   return state
 }
 

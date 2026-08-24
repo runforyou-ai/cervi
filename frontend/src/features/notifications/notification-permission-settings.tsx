@@ -53,6 +53,13 @@ export function NotificationPermissionSettings({
       if (recoverSession(error, navigate)) {
         return
       }
+      try {
+        if (await openNotificationPermissionSettings()) {
+          return
+        }
+      } catch (openError) {
+        console.warn("打开系统通知设置失败", openError)
+      }
       console.warn("申请通知权限失败", error)
       toast.error(t("preferences.notifications.permission.allowError"))
     }
