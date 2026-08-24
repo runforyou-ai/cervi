@@ -50,6 +50,16 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			return err
 		}
 		if status == domain.UserStatusInactive {
+			if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+				Set("work_status = ?", domain.WorkStatusOffDuty).
+				Set("work_status_updated_at = now()").
+				Set("updated_at = now()").
+				Where("organization_id = ?", identity.Organization.ID).
+				Where("id = ?", updatedAgent.IdentityID).
+				Where("type = ?", domain.OrganizationIdentityTypeAgent).
+				Exec(ctx); err != nil {
+				return err
+			}
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedAgent.IdentityID); err != nil {
 				return err
 			}

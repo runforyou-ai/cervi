@@ -28,6 +28,7 @@ type Agent struct {
 	IdentityID  string            `bun:"identity_id"`
 	DisplayName string            `bun:"display_name"`
 	Status      domain.UserStatus `bun:"status"`
+	WorkStatus  domain.WorkStatus `bun:"work_status"`
 	Teams       []TeamSummary
 	CreatedAt   time.Time `bun:"created_at"`
 }
@@ -86,7 +87,7 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 	}
 	agents := make([]Agent, 0)
 	if err := applyFilters(base()).
-		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, a.status, oi.created_at").
+		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, a.status, oi.work_status, oi.created_at").
 		OrderExpr("lower(oi.display_name) ASC, a.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).

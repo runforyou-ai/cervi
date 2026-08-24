@@ -257,9 +257,6 @@ func (b *DirectBackend) userMutationError(ctx context.Context, meta RequestMeta,
 	if errors.Is(err, useraction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorUserNotFound)
 	}
-	if errors.Is(err, useraction.ErrSelfDeactivate) {
-		return InvalidError(meta, cervii18n.ErrorUserSelfDeactivate, nil)
-	}
 	if errors.Is(err, useraction.ErrLastActiveAdministrator) {
 		return InvalidError(meta, cervii18n.ErrorUserLastActiveAdministrator, nil)
 	}

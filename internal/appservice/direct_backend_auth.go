@@ -61,7 +61,7 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		slog.Warn("初始化企业失败", "error", err)
 		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
 	}
-	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "admin_id", output.Identity.User.ID, "default_team_id", output.DefaultTeamID)
+	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "admin_id", output.Identity.User.ID)
 	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 

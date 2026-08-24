@@ -17,7 +17,7 @@ export function channelTypeLabel(
   }
 }
 
-/** 启用状态文案。 */
+/** 账号状态文案。 */
 export function userStatusLabel(status: UserStatus, t: TFunction<"contacts">) {
   switch (status) {
     case UserStatus.UserStatusActive:
@@ -25,7 +25,7 @@ export function userStatusLabel(status: UserStatus, t: TFunction<"contacts">) {
     case UserStatus.UserStatusInactive:
       return t("statuses.inactive")
     default:
-      console.warn("未知的启用状态", status)
+      console.warn("未知的账号状态", status)
       return ""
   }
 }

@@ -191,6 +191,23 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			writeTestJSON(writer, http.StatusOK, map[string]string{
 				"id": "user-1", "organizationId": "organization-1", "workStatus": string(input.WorkStatus),
 			})
+		case "/api/agents/agent-1/work-status":
+			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected agent work status request", http.StatusBadRequest)
+				return
+			}
+			var input appservice.AgentWorkStatusInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, appservice.Agent{ID: "agent-1", WorkStatus: input.WorkStatus, Teams: []appservice.TeamSummary{}})
+		case "/api/teams/team-1/members":
+			if request.Method != http.MethodGet || request.URL.Query().Get("workStatus") != string(appservice.WorkStatusOffDuty) {
+				http.Error(writer, "unexpected team member query", http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, appservice.TeamMemberList{Members: []appservice.TeamMember{}, Page: appservice.PageInfo{Number: 1, Size: 50}})
 		case "/api/auth/login":
 			writeTestJSON(writer, http.StatusOK, map[string]any{
 				"identity": map[string]any{
@@ -317,6 +334,15 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	}
 	if workStatus.WorkStatus != appservice.WorkStatusAway {
 		t.Fatalf("updated work status = %#v", workStatus)
+	}
+	agent, err := backend.UpdateAgentWorkStatus(context.Background(), meta, "agent-1", appservice.AgentWorkStatusInput{WorkStatus: appservice.WorkStatusAway})
+	if err != nil || agent.WorkStatus != appservice.WorkStatusAway {
+		t.Fatalf("updated agent work status = %#v, error = %v", agent, err)
+	}
+	offDuty := appservice.WorkStatusOffDuty
+	teamMembers, err := backend.ListTeamMembers(context.Background(), meta, "team-1", appservice.TeamMemberListInput{WorkStatus: &offDuty, Page: 1, PageSize: 50})
+	if err != nil || teamMembers.Page.Number != 1 || teamMembers.Page.Size != 50 {
+		t.Fatalf("team members = %#v, error = %v", teamMembers, err)
 	}
 	organization, err := backend.UpdateOrganization(context.Background(), meta, appservice.OrganizationInput{Name: "鹿行协作"})
 	if err != nil || organization.Name != "鹿行协作" {

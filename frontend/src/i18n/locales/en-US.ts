@@ -16,7 +16,7 @@ const enUS = {
     comingSoon: "Soon",
     workStatuses: {
       working: "Working",
-      away: "Taking a break",
+      away: "On break",
       offDuty: "Off work",
     },
     roles: {
@@ -148,7 +148,7 @@ const enUS = {
       email: "Email",
       phone: "Phone",
       role: "Role",
-      status: "Status",
+      accountStatus: "Account status",
       workStatus: "Work status",
       teams: "Teams",
       joinedTeams: "Joined teams",
@@ -174,13 +174,15 @@ const enUS = {
       stage: "Contact stage",
       method: "Contact method",
       sort: "Sort",
-      status: "Status",
+      accountStatus: "Account status",
+      workStatus: "Work status",
       role: "Member role",
       view: "Show",
       activeContacts: "Current contacts",
       allStages: "All stages",
       allMethods: "All contact methods",
       allRoles: "All roles",
+      allWorkStatuses: "All work statuses",
       clear: "Clear all",
     },
     identityCategories: {
@@ -199,8 +201,8 @@ const enUS = {
       page: "Page {{current}} of {{total}}",
     },
     statuses: {
-      active: "Active",
-      inactive: "Inactive",
+      active: "Normal",
+      inactive: "Disabled",
     },
     members: {
       create: "Add company member",
@@ -216,7 +218,6 @@ const enUS = {
         saving: "Saving…",
         cancel: "Cancel",
         created: "Company member added",
-        updated: "Company member saved",
         networkError: "Could not connect to the server. Try again later.",
       },
       validation: {
@@ -229,10 +230,10 @@ const enUS = {
         roleRequired: "Select a company role.",
       },
       status: {
-        deactivate: "Deactivate",
-        reactivate: "Reactivate",
-        deactivateTitle: "Deactivate “{{name}}”?",
-        reactivateTitle: "Reactivate “{{name}}”?",
+        deactivate: "Disable",
+        reactivate: "Restore",
+        deactivateTitle: "Disable “{{name}}”?",
+        reactivateTitle: "Restore “{{name}}”?",
         deactivateDescription:
           "This member will no longer be able to sign in. Team memberships will be kept.",
         reactivateDescription:
@@ -240,15 +241,15 @@ const enUS = {
         cancel: "Cancel",
         confirm: "Confirm",
         saving: "Updating…",
-        deactivated: "Company member deactivated",
-        reactivated: "Company member reactivated",
+        deactivated: "Company member disabled",
+        reactivated: "Company member restored",
         error: "Could not update the account status. Try again.",
       },
     },
     agents: {
       create: "Add AI employee",
       createDescription:
-        "Create an AI employee that can receive conversations.",
+        "Create an AI employee that can participate in company work.",
       form: {
         name: "AI employee name",
         teams: "Teams",
@@ -257,27 +258,29 @@ const enUS = {
         saving: "Saving…",
         cancel: "Cancel",
         created: "AI employee added",
-        updated: "AI employee saved",
         networkError: "Could not connect to the server. Try again later.",
       },
       validation: {
         nameRequired: "Enter an AI employee name.",
       },
       status: {
-        deactivate: "Deactivate",
-        reactivate: "Reactivate",
-        deactivateTitle: "Deactivate “{{name}}”?",
-        reactivateTitle: "Reactivate “{{name}}”?",
+        deactivate: "Disable",
+        reactivate: "Restore",
+        deactivateTitle: "Disable “{{name}}”?",
+        reactivateTitle: "Restore “{{name}}”?",
         deactivateDescription:
-          "This AI employee will stop receiving conversations. Team memberships will be kept.",
+          "This AI employee will no longer be able to work. Team memberships will be kept.",
         reactivateDescription:
-          "This AI employee can receive conversations again with the same team memberships.",
+          "Restoring the account keeps the work status Off duty and preserves team memberships. Change it to Working when needed.",
         cancel: "Cancel",
         confirm: "Confirm",
         saving: "Updating…",
-        deactivated: "AI employee deactivated",
-        reactivated: "AI employee reactivated",
-        error: "Could not update the AI employee status. Try again.",
+        deactivated: "AI employee disabled",
+        reactivated: "AI employee restored",
+        error: "Could not update the AI employee account status. Try again.",
+      },
+      workStatus: {
+        error: "Could not update the AI employee work status. Try again.",
       },
     },
     teams: {
@@ -320,10 +323,10 @@ const enUS = {
         removeSelected: "Remove from team ({{count}})",
         remove: "Remove from team",
         removeTitle: "Remove “{{name}}” from the team?",
-        removeDescription: "The member account will not be deactivated.",
+        removeDescription: "The member account will not be disabled.",
         removeMultipleTitle: "Remove {{count}} members from the team?",
         removeMultipleDescription:
-          "These member accounts will not be deactivated.",
+          "These member accounts will not be disabled.",
         removed: "Member removed from team",
         removedMultiple: "{{count}} members removed from the team",
         removeError: "Could not remove team members. Try again.",

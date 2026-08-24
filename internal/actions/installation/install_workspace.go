@@ -35,12 +35,11 @@ type InstallWorkspaceInput struct {
 	TimeZone         string
 }
 
-// InstallWorkspaceOutput 返回企业管理员、默认团队和初始令牌。
+// InstallWorkspaceOutput 返回企业管理员和初始令牌。
 type InstallWorkspaceOutput struct {
-	Identity      *servermodels.Identity
-	DefaultTeamID string
-	Token         string
-	ExpiresAt     time.Time
+	Identity  *servermodels.Identity
+	Token     string
+	ExpiresAt time.Time
 }
 
 // NewInstallWorkspaceAction 创建企业初始化操作。
@@ -48,7 +47,7 @@ func NewInstallWorkspaceAction(db *bun.DB) *InstallWorkspaceAction {
 	return &InstallWorkspaceAction{db: db}
 }
 
-// Execute 校验初始化信息并创建企业管理员、默认团队和登录令牌。
+// Execute 校验初始化信息并创建企业管理员和登录令牌。
 func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorkspaceInput) (InstallWorkspaceOutput, error) {
 	input.OrganizationName = strings.TrimSpace(input.OrganizationName)
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
@@ -67,7 +66,6 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 	}
 
 	identity := &servermodels.Identity{}
-	var defaultTeamID string
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if _, err := tx.ExecContext(ctx, "LOCK TABLE organizations IN EXCLUSIVE MODE"); err != nil {
 			return err
@@ -151,34 +149,6 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			Exec(ctx); err != nil {
 			return err
 		}
-		teamName := "Customer Service Team"
-		if input.Locale == domain.LocaleChineseSimplified {
-			teamName = "客户服务团队"
-		}
-		team := &servermodels.Team{
-			OrganizationID:  organization.ID,
-			Name:            teamName,
-			CreatedByUserID: user.ID,
-		}
-		if _, err := tx.NewInsert().
-			Model(team).
-			Column("organization_id", "name", "created_by_user_id").
-			Returning("id").
-			Exec(ctx); err != nil {
-			return err
-		}
-		teamMember := &servermodels.TeamMember{
-			OrganizationID:  organization.ID,
-			TeamID:          team.ID,
-			IdentityID:      user.IdentityID,
-			CreatedByUserID: user.ID,
-		}
-		if _, err := tx.NewInsert().Model(teamMember).
-			Column("organization_id", "team_id", "identity_id", "created_by_user_id").
-			Exec(ctx); err != nil {
-			return err
-		}
-
 		record := &servermodels.Token{
 			UserID:    user.ID,
 			TokenHash: issued.TokenHash,
@@ -194,12 +164,11 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		identity.Organization = *organization
 		identity.OrganizationIdentity = *organizationIdentity
 		identity.User = *user
-		defaultTeamID = team.ID
 		return nil
 	})
 	if err != nil {
 		return InstallWorkspaceOutput{}, fmt.Errorf("install workspace: %w", err)
 	}
 
-	return InstallWorkspaceOutput{Identity: identity, DefaultTeamID: defaultTeamID, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
+	return InstallWorkspaceOutput{Identity: identity, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
 }

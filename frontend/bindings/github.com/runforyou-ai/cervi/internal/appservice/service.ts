@@ -414,6 +414,13 @@ export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $
 }
 
 /**
+ * UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
+ */
+export function UpdateAgentWorkStatus(meta: $models.RequestMeta, agentID: string, input: $models.AgentWorkStatusInput): $CancellablePromise<$models.Agent> {
+    return $Call.ByID(160063679, meta, agentID, input);
+}
+
+/**
  * UpdateContact 修改联系人。
  */
 export function UpdateContact(meta: $models.RequestMeta, contactID: string, input: $models.ContactInput): $CancellablePromise<$models.Contact> {

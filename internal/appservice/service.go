@@ -29,6 +29,7 @@ type Backend interface {
 	ListAgents(context.Context, RequestMeta, AgentListInput) (AgentList, error)
 	GetAgent(context.Context, RequestMeta, string) (Agent, error)
 	UpdateAgent(context.Context, RequestMeta, string, UpdateAgentInput) (Agent, error)
+	UpdateAgentWorkStatus(context.Context, RequestMeta, string, AgentWorkStatusInput) (Agent, error)
 	DeactivateAgent(context.Context, RequestMeta, string) (Agent, error)
 	ReactivateAgent(context.Context, RequestMeta, string) (Agent, error)
 	ListUsers(context.Context, RequestMeta, UserListInput) (UserList, error)
@@ -251,6 +252,11 @@ func (s *Service) GetAgent(ctx context.Context, meta RequestMeta, agentID string
 // UpdateAgent 修改企业 AI 员工。
 func (s *Service) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (Agent, error) {
 	return s.backend.UpdateAgent(ctx, meta, agentID, input)
+}
+
+// UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
+func (s *Service) UpdateAgentWorkStatus(ctx context.Context, meta RequestMeta, agentID string, input AgentWorkStatusInput) (Agent, error) {
+	return s.backend.UpdateAgentWorkStatus(ctx, meta, agentID, input)
 }
 
 // DeactivateAgent 停用企业 AI 员工。

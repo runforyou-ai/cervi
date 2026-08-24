@@ -64,22 +64,23 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if installed.Identity.User.IdentityID == "" || installed.Identity.User.IdentityID == installed.Identity.User.ID {
 		t.Fatalf("user identity id = %q, user id = %q", installed.Identity.User.IdentityID, installed.Identity.User.ID)
 	}
-	defaultTeam := &servermodels.Team{}
-	if err := db.NewSelect().Model(defaultTeam).
+	teamCount, err := db.NewSelect().Model((*servermodels.Team)(nil)).
 		Where("organization_id = ?", installed.Identity.Organization.ID).
-		Scan(context.Background()); err != nil {
+		Count(context.Background())
+	if err != nil {
 		t.Fatal(err)
 	}
-	if defaultTeam.Name != "Customer Service Team" || defaultTeam.CreatedByUserID != installed.Identity.User.ID {
-		t.Fatalf("unexpected default team: %#v", defaultTeam)
+	if teamCount != 0 {
+		t.Fatalf("team count after installation = %d, want 0", teamCount)
 	}
-	defaultTeamMember := &servermodels.TeamMember{}
-	err = db.NewSelect().Model(defaultTeamMember).
+	teamMemberCount, err := db.NewSelect().Model((*servermodels.TeamMember)(nil)).
 		Where("organization_id = ?", installed.Identity.Organization.ID).
-		Where("team_id = ?", defaultTeam.ID).
-		Scan(context.Background())
-	if err != nil || defaultTeamMember.IdentityID != installed.Identity.User.IdentityID {
-		t.Fatalf("default team member = %#v, error = %v", defaultTeamMember, err)
+		Count(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if teamMemberCount != 0 {
+		t.Fatalf("team member count after installation = %d, want 0", teamMemberCount)
 	}
 	currentStatus, err := status.Execute(context.Background())
 	if err != nil {
@@ -299,11 +300,35 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil || teamUsers.Page.Total != 1 || len(teamUsers.Users) != 1 {
 		t.Fatalf("team users = %#v, error = %v", teamUsers, err)
 	}
-	if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive); err != nil {
+	inactiveMember, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusActive); err != nil {
+	if inactiveMember.WorkStatus != domain.WorkStatusOffDuty {
+		t.Fatalf("inactive member work status = %q, want %q", inactiveMember.WorkStatus, domain.WorkStatusOffDuty)
+	}
+	inactiveTeamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberListInput{Page: 1, PageSize: 50})
+	if err != nil || inactiveTeamMembers.Page.Total != 0 || len(inactiveTeamMembers.Members) != 0 {
+		t.Fatalf("team members after user deactivation = %#v, error = %v", inactiveTeamMembers, err)
+	}
+	teamAfterUserDeactivation, err := teamaction.NewListTeamsQuery(db).Execute(context.Background(), loggedIn.Identity, teamaction.ListInput{Page: 1, PageSize: 50})
+	if err != nil || len(teamAfterUserDeactivation.Teams) != 1 || teamAfterUserDeactivation.Teams[0].MemberCount != 0 {
+		t.Fatalf("team after user deactivation = %#v, error = %v", teamAfterUserDeactivation, err)
+	}
+	reactivatedMember, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusActive)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if reactivatedMember.WorkStatus != domain.WorkStatusOffDuty {
+		t.Fatalf("reactivated member work status = %q, want %q", reactivatedMember.WorkStatus, domain.WorkStatusOffDuty)
+	}
+	reactivatedTeamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberListInput{Page: 1, PageSize: 50})
+	if err != nil || reactivatedTeamMembers.Page.Total != 1 || len(reactivatedTeamMembers.Members) != 1 || reactivatedTeamMembers.Members[0].IdentityID != createdMember.IdentityID {
+		t.Fatalf("team members after user reactivation = %#v, error = %v", reactivatedTeamMembers, err)
+	}
+	teamAfterUserReactivation, err := teamaction.NewListTeamsQuery(db).Execute(context.Background(), loggedIn.Identity, teamaction.ListInput{Page: 1, PageSize: 50})
+	if err != nil || len(teamAfterUserReactivation.Teams) != 1 || teamAfterUserReactivation.Teams[0].MemberCount != 1 {
+		t.Fatalf("team after user reactivation = %#v, error = %v", teamAfterUserReactivation, err)
 	}
 	if _, err := teamaction.NewRemoveMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: createdMember.IdentityID}}); err != nil {
 		t.Fatal(err)
@@ -344,8 +369,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil || agent.DisplayName != "售前智能体" {
 		t.Fatalf("agent detail = %#v, error = %v", agent, err)
 	}
-	teamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberListInput{Page: 1, PageSize: 50})
-	if err != nil || teamMembers.Page.Total != 2 {
+	updatedAgent, err = agentaction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
+	if err != nil || updatedAgent.WorkStatus != domain.WorkStatusAway {
+		t.Fatalf("away agent = %#v, error = %v", updatedAgent, err)
+	}
+	teamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberListInput{WorkStatus: domain.WorkStatusAway, Page: 1, PageSize: 50})
+	if err != nil || teamMembers.Page.Total != 1 || len(teamMembers.Members) != 1 || teamMembers.Members[0].IdentityID != createdAgent.IdentityID || teamMembers.Members[0].WorkStatus != domain.WorkStatusAway {
 		t.Fatalf("team directory = %#v, error = %v", teamMembers, err)
 	}
 	channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelInput{
@@ -359,15 +388,43 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("agent channel routing = %#v, error = %v", channel, err)
 	}
 	updatedAgent, err = agentaction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, domain.UserStatusInactive)
-	if err != nil || updatedAgent.Status != domain.UserStatusInactive {
+	if err != nil || updatedAgent.Status != domain.UserStatusInactive || updatedAgent.WorkStatus != domain.WorkStatusOffDuty {
 		t.Fatalf("inactive agent = %#v, error = %v", updatedAgent, err)
+	}
+	teamMembersAfterAgentDeactivation, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberListInput{Page: 1, PageSize: 50})
+	if err != nil || teamMembersAfterAgentDeactivation.Page.Total != 1 || len(teamMembersAfterAgentDeactivation.Members) != 1 || teamMembersAfterAgentDeactivation.Members[0].IdentityID != createdMember.IdentityID {
+		t.Fatalf("team members after agent deactivation = %#v, error = %v", teamMembersAfterAgentDeactivation, err)
+	}
+	teamAfterAgentDeactivation, err := teamaction.NewUpdateTeamAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.Input{Name: team.Name, Description: team.Description})
+	if err != nil || teamAfterAgentDeactivation.MemberCount != 1 {
+		t.Fatalf("team after agent deactivation = %#v, error = %v", teamAfterAgentDeactivation, err)
+	}
+	if _, err := agentaction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking}); err == nil {
+		t.Fatal("inactive agent work status update succeeded")
+	} else {
+		var fieldError *common.FieldError
+		if !errors.As(err, &fieldError) || fieldError.Fields["workStatus"] != agentaction.ValidationWorkStatusUnavailable {
+			t.Fatalf("inactive agent work status error = %#v", err)
+		}
 	}
 	detail, err = getChannel.Execute(context.Background(), loggedIn.Identity, channel.ID)
 	if err != nil || detail.InitialRoutingTargetType != string(domain.ChannelRoutingTargetTypePublicQueue) || detail.InitialRoutingTargetID != nil {
 		t.Fatalf("channel routing after agent deactivation = %#v, error = %v", detail.Channel, err)
 	}
-	if _, err := agentaction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, domain.UserStatusActive); err != nil {
+	updatedAgent, err = agentaction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, domain.UserStatusActive)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if updatedAgent.WorkStatus != domain.WorkStatusOffDuty {
+		t.Fatalf("reactivated agent work status = %q, want %q", updatedAgent.WorkStatus, domain.WorkStatusOffDuty)
+	}
+	teamAfterAgentReactivation, err := teamaction.NewListTeamsQuery(db).Execute(context.Background(), loggedIn.Identity, teamaction.ListInput{Page: 1, PageSize: 50})
+	if err != nil || len(teamAfterAgentReactivation.Teams) != 1 || teamAfterAgentReactivation.Teams[0].MemberCount != 2 {
+		t.Fatalf("team after agent reactivation = %#v, error = %v", teamAfterAgentReactivation, err)
+	}
+	updatedAgent, err = agentaction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking})
+	if err != nil || updatedAgent.WorkStatus != domain.WorkStatusWorking {
+		t.Fatalf("working agent = %#v, error = %v", updatedAgent, err)
 	}
 	if _, err := useraction.NewUpdateUserAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
 		DisplayName: createdMember.DisplayName, Email: createdMember.Email, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},

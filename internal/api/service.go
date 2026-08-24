@@ -65,6 +65,7 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/agents", service.createAgent)
 	router.GET("/agents/:agentID", service.getAgent)
 	router.PATCH("/agents/:agentID", service.updateAgent)
+	router.PATCH("/agents/:agentID/work-status", service.updateAgentWorkStatus)
 	router.POST("/agents/:agentID/deactivate", service.deactivateAgent)
 	router.POST("/agents/:agentID/reactivate", service.reactivateAgent)
 	router.GET("/users", service.listUsers)
@@ -344,6 +345,16 @@ func (s *Service) updateAgent(c *gin.Context) {
 	writeResult(c, http.StatusOK, agent, err)
 }
 
+// updateAgentWorkStatus 修改企业 AI 员工工作状态。
+func (s *Service) updateAgentWorkStatus(c *gin.Context) {
+	var input appservice.AgentWorkStatusInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	agent, err := s.application.UpdateAgentWorkStatus(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
+	writeResult(c, http.StatusOK, agent, err)
+}
+
 // deactivateAgent 停用企业 AI 员工。
 func (s *Service) deactivateAgent(c *gin.Context) {
 	agent, err := s.application.DeactivateAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"))
@@ -459,7 +470,7 @@ func (s *Service) listTeamMembers(c *gin.Context) {
 		return
 	}
 	list, err := s.application.ListTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), appservice.TeamMemberListInput{
-		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Page: page, PageSize: pageSize,
+		Query: c.Query("query"), WorkStatus: optionalEnum[appservice.WorkStatus](c.Query("workStatus")), Page: page, PageSize: pageSize,
 	})
 	writeResult(c, http.StatusOK, list, err)
 }

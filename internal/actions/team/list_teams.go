@@ -42,10 +42,10 @@ func (q *ListTeamsQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		return ListOutput{}, fmt.Errorf("count teams: %w", err)
 	}
 	teams := make([]TeamRecord, 0)
-	err = apply(q.db.NewSelect().TableExpr("teams AS t")).
+	query := apply(q.db.NewSelect().TableExpr("teams AS t")).
 		ColumnExpr("t.id::text AS id").
-		Column("name", "description", "created_at", "updated_at").
-		ColumnExpr("(SELECT count(*) FROM team_members AS tm WHERE tm.organization_id = t.organization_id AND tm.team_id = t.id) AS member_count").
+		Column("name", "description", "created_at", "updated_at")
+	err = withActiveMemberCount(query).
 		OrderExpr("lower(t.name) ASC, t.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
