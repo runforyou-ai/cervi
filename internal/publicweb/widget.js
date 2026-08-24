@@ -39,6 +39,8 @@
   var previewParentOrigin = "";
   var desktopPanelWidth = 400;
   var desktopPanelHeight = 640;
+  var expandedPanelMaxWidth = 480;
+  var expandedPanelMaxHeight = 720;
   var widgetCopies = {
     "zh-CN": {
       dialog: "Cervi 聊天",
@@ -146,23 +148,13 @@
     return /^zh(?:-|$)/i.test(first.trim()) ? "zh-CN" : "en-US";
   }
 
-  function fittedDesktopPanelSize(maxScale, topGap, bottomGap) {
+  // 按浏览器可用宽高分别限制桌面面板尺寸。
+  function responsiveDesktopPanelSize(maxWidth, maxHeight) {
     var availableWidth = Math.max(0, window.innerWidth - 48);
-    var availableHeight = Math.max(
-      0,
-      window.innerHeight - topGap - bottomGap,
-    );
-    var scale = Math.max(
-      0,
-      Math.min(
-        maxScale,
-        availableWidth / desktopPanelWidth,
-        availableHeight / desktopPanelHeight,
-      ),
-    );
+    var availableHeight = Math.max(0, window.innerHeight - 144);
     return {
-      width: desktopPanelWidth * scale + "px",
-      height: desktopPanelHeight * scale + "px",
+      width: Math.min(maxWidth, availableWidth) + "px",
+      height: Math.min(maxHeight, availableHeight) + "px",
     };
   }
 
@@ -258,8 +250,11 @@
         bottomInset > 0 ? "calc(100% - " + bottomInset + "px)" : "";
       button.style.display = open && frameReady ? "none" : "inline-flex";
     } else if (expanded) {
-      // 固定面板右下角，展开时等比例向左和上方增长。
-      var expandedSize = fittedDesktopPanelSize(1.15, 24, 96);
+      // 固定面板右下角，宽高按各自可用空间向左和上方增长。
+      var expandedSize = responsiveDesktopPanelSize(
+        expandedPanelMaxWidth,
+        expandedPanelMaxHeight,
+      );
       panel.style.left = "";
       panel.style.right = "24px";
       panel.style.top = "";
@@ -274,7 +269,10 @@
       frame.style.height = "";
       button.style.display = "inline-flex";
     } else {
-      var defaultSize = fittedDesktopPanelSize(1, 48, 96);
+      var defaultSize = responsiveDesktopPanelSize(
+        desktopPanelWidth,
+        desktopPanelHeight,
+      );
       panel.style.left = "";
       panel.style.right = "";
       panel.style.top = "";
