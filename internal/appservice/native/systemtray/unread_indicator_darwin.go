@@ -1,6 +1,6 @@
 //go:build !server && darwin && !ios
 
-package main
+package systemtray
 
 import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -14,8 +14,8 @@ type darwinUnreadIndicator struct {
 	dock *dock.DockService
 }
 
-// newPlatformUnreadIndicator 创建 macOS 未读消息指示器并注册 Dock 服务。
-func newPlatformUnreadIndicator(app *application.App, tray *application.SystemTray, _ []byte) appservice.UnreadIndicator {
+// newUnreadIndicator 创建 macOS 未读消息指示器并注册 Dock 服务。
+func newUnreadIndicator(app *application.App, tray *application.SystemTray) appservice.UnreadIndicator {
 	dockService := dock.New()
 	app.RegisterService(application.NewService(dockService))
 	return &darwinUnreadIndicator{tray: tray, dock: dockService}

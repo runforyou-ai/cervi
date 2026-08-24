@@ -4,14 +4,22 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"runtime"
 	"sync/atomic"
 
+	nativesystemtray "github.com/runforyou-ai/cervi/internal/appservice/native/systemtray"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
+
+//go:embed build/appicon.png
+var nativeAppIcon []byte
+
+//go:embed build/appicon.icon/Assets/cervi_icon.png
+var nativeMacTrayTemplateIcon []byte
 
 // run 初始化原生端存储与应用服务，并运行 Wails 应用。
 func run(_ []string) error {
@@ -70,12 +78,15 @@ func run(_ []string) error {
 			TitleBar: application.MacTitleBarHidden,
 		},
 	})
-	unreadIndicator := setupDesktopSystemTray(app, mainWindow, func() {
-		trayQuitRequested.Store(true)
+	nativesystemtray.Setup(nativesystemtray.Options{
+		App:             app,
+		Window:          mainWindow,
+		Icon:            nativeAppIcon,
+		MacTemplateIcon: nativeMacTrayTemplateIcon,
+		RequestQuit: func() {
+			trayQuitRequested.Store(true)
+		},
 	})
-	_ = unreadIndicator
-	// 临时未读角标演示需要平台验证时再启用。
-	// startUnreadIndicatorDemo(app, unreadIndicator)
 
 	slog.Info("启动 Cervi")
 	return app.Run()
