@@ -45,7 +45,7 @@ wails3 generate bindings -clean=true -ts -i
 构建和打包必须从仓库根目录调用 Task。Task 统一处理前端资源、构建标签、图标、目标平台工具链和产物封装，不得绕过 Task 直接拼接 `go build`、`xcodebuild`、Gradle 或 NSIS 命令。
 
 ```bash
-# 当前宿主平台的桌面端
+# 桌面端：目标平台与运行 Task 的宿主操作系统一致
 wails3 task build
 wails3 task package
 
@@ -69,7 +69,7 @@ wails3 task windows:build ARCH=amd64
 wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=machine
 wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=user
 
-# Linux amd64；package 统一生成项目已配置的 Linux 分发包
+# Linux amd64；package 生成 AppImage、DEB、RPM 和 AUR 产物
 wails3 task linux:build ARCH=amd64
 wails3 task linux:package ARCH=amd64
 
@@ -86,8 +86,9 @@ wails3 task android:bundle
 wails3 task android:bundle:fat
 ```
 
-- 根 `Taskfile.yml` 中的 `CGO_ENABLED` 是桌面端和移动端构建的唯一配置来源。客户端 SQLite 依赖 CGO，禁止给客户端构建命令传入 `CGO_ENABLED`，尤其禁止覆盖为 `0`；跨平台工具链缺失时运行 `wails3 task setup:docker`，不要通过关闭 CGO 绕过。服务端不包含客户端 SQLite，`build:docker CGO_ENABLED=0` 是构建纯静态服务端镜像的唯一例外。
-- 目标平台使用对应的命名空间 Task，目标架构只通过 `ARCH` 传入；不要手动设置 `GOOS`、`GOARCH`，也不要把已有二进制手工复制、改名后交给安装器。
+- 桌面端和移动端构建固定使用 `CGO_ENABLED=1`，配置由根 `Taskfile.yml` 管理。客户端 SQLite 依赖 CGO，客户端构建命令不得传入 `CGO_ENABLED`。跨平台工具链缺失时运行 `wails3 task setup:docker`。
+- `wails3 task build:docker CGO_ENABLED=0` 构建纯静态服务端镜像。服务端构建标签不包含客户端 SQLite。
+- macOS、Windows、Linux、iOS 和 Android 分别使用 `darwin:`、`windows:`、`linux:`、`ios:` 和 `android:` 命名空间 Task。目标架构只通过 `ARCH` 传入，不得手动设置 `GOOS` 或 `GOARCH`。安装器必须使用同一次 Task 构建生成的二进制，不得手工复制或改名其他二进制。
 - Windows 安装包只能使用原生 Windows 工具链或项目的 Windows Runner 构建。不得使用 macOS、Linux 或 WSL 的 Linux 工具链交叉生成正式安装包，也不得复用旧的 `bin/cervi.exe` 单独运行 NSIS。
 - iOS 真机分发必须提供真实签名身份，并按需传入 `PROVISIONING_PROFILE`；自动签名使用 `wails3 task ios:xcode` 生成的工程。Android 正式分发前必须配置 `ANDROID_KEYSTORE_FILE`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。
 - Windows 交付前必须对 NSIS 实际打包的 `bin/cervi.exe` 执行 `go version -m bin/cervi.exe`，确认 `GOOS=windows`、目标 `GOARCH` 和 `CGO_ENABLED=1`，再通过安装器完成安装和启动验证；只运行未安装的构建产物不算安装包验证。
@@ -150,16 +151,16 @@ cervi/
 - Action 直接使用 Bun，按需调用 `common`；记录关联、组织边界和业务规则在事务中显式校验和维护。
 - `common` 只放无数据库、无传输层、无平台依赖的通用能力。小函数和错误放在包内，完整能力使用子包。
 - `domain` 只放各层共用的领域值，按概念拆文件，不放数据库、传输层和平台逻辑。
-- 数据库模型放在对应平台的 `storage` 目录；桌面端和移动端的 SQLite 迁移保持独立。
+- 服务端 PostgreSQL 模型放在 `storage/server`，桌面端 SQLite 模型放在 `storage/desktop`，移动端 SQLite 模型放在 `storage/mobile`；桌面端和移动端的 SQLite 迁移保持独立。
 - `task` 根包只放各平台共享的 Action 执行语义；客户端和服务端分别定义自己的投递参数、存储与运行机制，不为形式统一互相复用平台实现。
 
 ### 前端契约
 
 - `appservice` 契约是前端业务 DTO 的唯一来源。前端不得重复声明渠道、联系人、用户、收件箱、设置等业务模型和枚举，也不要提交 Wails `$zero`。
-- `frontend/bindings` 由上方绑定命令生成，禁止手工修改，也不得用不同格式覆盖。
+- `frontend/bindings` 使用 `wails3 generate bindings -clean=true -ts -i` 生成，禁止手工修改，也不得用不同格式覆盖。
 - 页面只通过 `src/api` 调用绑定：`client` 注入认证与错误，`service` 绑定方法并归一化可空切片。页面不直接引用 `frontend/bindings`。
 - 前端只保留表单值、组件 Props、页面状态、查询参数派生类型，以及对生成类型中可空切片的边界归一化类型。
-- 表单使用 React Hook Form 和 Zod，并统一启用 `shouldUseNativeValidation`。客户端字段校验只通过浏览器在对应输入控件上提示，不在字段下方渲染 `FieldError`，也不同时弹出 Toast；服务端业务错误通过 Toast 展示，不使用 `setError` 回写字段。
+- 表单使用 React Hook Form 和 Zod，并统一启用 `shouldUseNativeValidation`。客户端字段校验由浏览器显示在校验失败的输入控件上，不在字段下方渲染 `FieldError`，也不同时弹出 Toast；服务端业务错误通过 Toast 展示，不使用 `setError` 回写字段。
 - 桌面端 WebView 中，带 `legend` 的原生 `fieldset`（包括 `FieldSet`）不得作为 flex 容器的直接子项，避免 WebKit 首次布局保留额外高度。此类表单组使用单列 grid，或在 `fieldset` 外增加普通块级容器；不得依赖点击、窗口缩放等重绘行为恢复布局。
 - 输入框不使用 placeholder；字段含义由标签表达，必要说明用字段帮助文案。
 - 页面卸载时忽略过期结果，不要取消 Wails 绑定调用。
