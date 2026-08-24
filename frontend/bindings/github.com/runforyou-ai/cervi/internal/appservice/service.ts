@@ -43,9 +43,9 @@ export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $
 }
 
 /**
- * ConnectServer 验证并保存原生端企业服务器地址，并返回地址是否变化。
+ * ConnectServer 验证并保存原生端企业服务器地址。
  */
-export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<boolean> {
+export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<void> {
     return $Call.ByID(1075777931, meta, serverURL);
 }
 
@@ -106,14 +106,14 @@ export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.W
 }
 
 /**
- * DeactivateAgent 停用企业 AI 员工。
+ * DeactivateAgent 禁用企业 AI 员工账号。
  */
 export function DeactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2542842753, meta, agentID);
 }
 
 /**
- * DeactivateUser 停用企业成员账号。
+ * DeactivateUser 禁用企业成员账号。
  */
 export function DeactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
     return $Call.ByID(3624391107, meta, userID);
@@ -316,21 +316,21 @@ export function LoadInbox(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
- * LoadSession 返回当前应进入的会话入口。
+ * LoadStartup 返回初始化或服务器连接入口，不读取登录状态。
  */
-export function LoadSession(meta: $models.RequestMeta): $CancellablePromise<$models.Session> {
-    return $Call.ByID(2537050686, meta);
+export function LoadStartup(meta: $models.RequestMeta): $CancellablePromise<$models.Startup> {
+    return $Call.ByID(3512506751, meta);
 }
 
 /**
- * Login 校验账号密码并返回登录令牌。
+ * Login 校验账号密码并建立登录会话。
  */
 export function Login(meta: $models.RequestMeta, input: $models.LoginInput): $CancellablePromise<$models.Auth> {
     return $Call.ByID(3058727111, meta, input);
 }
 
 /**
- * Logout 删除当前登录令牌。
+ * Logout 退出当前登录会话。
  */
 export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
     return $Call.ByID(991463980, meta);
@@ -411,6 +411,13 @@ export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, 
  */
 export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2196616072, meta, agentID, input);
+}
+
+/**
+ * UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
+ */
+export function UpdateAgentWorkStatus(meta: $models.RequestMeta, agentID: string, input: $models.AgentWorkStatusInput): $CancellablePromise<$models.Agent> {
+    return $Call.ByID(160063679, meta, agentID, input);
 }
 
 /**

@@ -12,10 +12,13 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/clientsession"
 )
 
 type memoryStore struct {
-	serverURL string
+	serverURL     string
+	credential    clientsession.Credential
+	credentialSet bool
 }
 
 // GetServerURL 返回内存中保存的企业服务器地址。
@@ -29,9 +32,37 @@ func (s *memoryStore) SetServerURL(_ context.Context, serverURL string) error {
 	return nil
 }
 
+// LoadClientSession 返回内存中保存的原生端登录凭据。
+func (s *memoryStore) LoadClientSession(context.Context) (clientsession.Credential, bool, error) {
+	return s.credential, s.credentialSet, nil
+}
+
+// SaveClientSession 在内存中保存原生端登录凭据。
+func (s *memoryStore) SaveClientSession(_ context.Context, credential clientsession.Credential) error {
+	s.credential = credential
+	s.credentialSet = true
+	return nil
+}
+
+// DeleteClientSession 删除内存中的原生端登录凭据。
+func (s *memoryStore) DeleteClientSession(context.Context) error {
+	s.credential = clientsession.Credential{}
+	s.credentialSet = false
+	return nil
+}
+
+// newTestBackend 创建使用内存连接和会话存储的 API Proxy。
+func newTestBackend(store *memoryStore) (*Backend, error) {
+	sessions, err := clientsession.NewManager(context.Background(), store)
+	if err != nil {
+		return nil, err
+	}
+	return NewBackend(store, sessions)
+}
+
 // TestBackendRequiresEnterpriseServer 验证未配置企业服务器时拒绝远程调用。
 func TestBackendRequiresEnterpriseServer(t *testing.T) {
-	backend, err := NewBackend(&memoryStore{})
+	backend, err := newTestBackend(&memoryStore{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +75,7 @@ func TestBackendRequiresEnterpriseServer(t *testing.T) {
 
 // TestAbsoluteContentURL 验证原生端文件地址指向已连接的企业服务器。
 func TestAbsoluteContentURL(t *testing.T) {
-	backend, err := NewBackend(&memoryStore{serverURL: "https://cervi.example.com/company"})
+	backend, err := newTestBackend(&memoryStore{serverURL: "https://cervi.example.com/company"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +89,7 @@ func TestAbsoluteContentURL(t *testing.T) {
 
 // TestBackendPreservesCancellation 验证远程请求取消不会转换为连接错误。
 func TestBackendPreservesCancellation(t *testing.T) {
-	backend, err := NewBackend(&memoryStore{serverURL: "http://127.0.0.1:1"})
+	backend, err := newTestBackend(&memoryStore{serverURL: "http://127.0.0.1:1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +103,7 @@ func TestBackendPreservesCancellation(t *testing.T) {
 
 // TestBackendUnavailablePreservesConnection 验证企业服务器不可用时保留已有连接配置。
 func TestBackendUnavailablePreservesConnection(t *testing.T) {
-	backend, err := NewBackend(&memoryStore{serverURL: "http://127.0.0.1:1"})
+	backend, err := newTestBackend(&memoryStore{serverURL: "http://127.0.0.1:1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,6 +119,10 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/api/installation/status":
+			if request.Header.Get("Authorization") != "" {
+				http.Error(writer, "installation status must not use login state", http.StatusBadRequest)
+				return
+			}
 			writeTestJSON(writer, http.StatusOK, map[string]any{"installed": true, "organizationName": "鹿行"})
 		case "/api/inbox":
 			if request.Header.Get("Authorization") == "Bearer test-token" {
@@ -160,6 +195,23 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			writeTestJSON(writer, http.StatusOK, map[string]string{
 				"id": "user-1", "organizationId": "organization-1", "workStatus": string(input.WorkStatus),
 			})
+		case "/api/agents/agent-1/work-status":
+			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected agent work status request", http.StatusBadRequest)
+				return
+			}
+			var input appservice.AgentWorkStatusInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, appservice.Agent{ID: "agent-1", WorkStatus: input.WorkStatus, Teams: []appservice.TeamSummary{}})
+		case "/api/teams/team-1/members":
+			if request.Method != http.MethodGet || request.URL.Query().Get("workStatus") != string(appservice.WorkStatusOffDuty) {
+				http.Error(writer, "unexpected team member query", http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, appservice.TeamMemberList{Members: []appservice.TeamMember{}, Page: appservice.PageInfo{Number: 1, Size: 50}})
 		case "/api/auth/login":
 			writeTestJSON(writer, http.StatusOK, map[string]any{
 				"identity": map[string]any{
@@ -168,6 +220,12 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				},
 				"token": "test-token", "expiresAt": time.Now().Add(time.Hour),
 			})
+		case "/api/auth/logout":
+			if request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected logout request", http.StatusBadRequest)
+				return
+			}
+			writer.WriteHeader(http.StatusNoContent)
 		case "/api/settings/organization":
 			if request.Method != http.MethodPut || request.Header.Get("Authorization") != "Bearer test-token" {
 				writeTestJSON(writer, http.StatusUnauthorized, map[string]any{"error": map[string]string{
@@ -188,7 +246,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	defer remote.Close()
 
 	store := &memoryStore{}
-	backend, err := NewBackend(store)
+	backend, err := newTestBackend(store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,22 +261,14 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if store.serverURL != "" {
 		t.Fatalf("probe should not save server URL, got %q", store.serverURL)
 	}
-	changed, err := backend.ConnectServer(context.Background(), meta, remote.URL)
-	if err != nil {
+	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil {
 		t.Fatal(err)
-	}
-	if !changed {
-		t.Fatal("first server connection should be marked as changed")
 	}
 	if store.serverURL != remote.URL {
 		t.Fatalf("server URL = %q, want %q", store.serverURL, remote.URL)
 	}
-	changed, err = backend.ConnectServer(context.Background(), meta, remote.URL)
-	if err != nil {
+	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil {
 		t.Fatal(err)
-	}
-	if changed {
-		t.Fatal("same server connection should not be marked as changed")
 	}
 	status, err = backend.InstallationStatus(context.Background(), meta)
 	if err != nil {
@@ -238,10 +288,23 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if auth.Token != "test-token" {
-		t.Fatalf("token = %q, want test-token", auth.Token)
+	if auth.Token != "" || auth.Identity.User.ID != "user-1" {
+		t.Fatalf("native auth = %#v", auth)
 	}
-	meta.Token = auth.Token
+	status, err = backend.InstallationStatus(context.Background(), meta)
+	if err != nil || !status.Installed {
+		t.Fatalf("authenticated installation status = %#v, err = %v", status, err)
+	}
+	if !store.credentialSet || store.credential.Token != "test-token" || store.credential.UserID != "user-1" || store.credential.OrganizationID != "organization-1" {
+		t.Fatalf("saved client credential = %#v, found = %v", store.credential, store.credentialSet)
+	}
+	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil || !store.credentialSet {
+		t.Fatalf("same server credential found = %v, error = %v", store.credentialSet, err)
+	}
+	backend, err = newTestBackend(store)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := backend.LoadInbox(context.Background(), meta); err != nil {
 		t.Fatal(err)
 	}
@@ -280,9 +343,100 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if workStatus.WorkStatus != appservice.WorkStatusAway {
 		t.Fatalf("updated work status = %#v", workStatus)
 	}
+	agent, err := backend.UpdateAgentWorkStatus(context.Background(), meta, "agent-1", appservice.AgentWorkStatusInput{WorkStatus: appservice.WorkStatusAway})
+	if err != nil || agent.WorkStatus != appservice.WorkStatusAway {
+		t.Fatalf("updated agent work status = %#v, error = %v", agent, err)
+	}
+	offDuty := appservice.WorkStatusOffDuty
+	teamMembers, err := backend.ListTeamMembers(context.Background(), meta, "team-1", appservice.TeamMemberListInput{WorkStatus: &offDuty, Page: 1, PageSize: 50})
+	if err != nil || teamMembers.Page.Number != 1 || teamMembers.Page.Size != 50 {
+		t.Fatalf("team members = %#v, error = %v", teamMembers, err)
+	}
 	organization, err := backend.UpdateOrganization(context.Background(), meta, appservice.OrganizationInput{Name: "鹿行协作"})
 	if err != nil || organization.Name != "鹿行协作" {
 		t.Fatalf("updated organization = %#v, error = %v", organization, err)
+	}
+	if err := backend.Logout(context.Background(), meta); err != nil {
+		t.Fatal(err)
+	}
+	if store.credentialSet {
+		t.Fatalf("client credential was not deleted: %#v", store.credential)
+	}
+}
+
+// TestBackendClearsRejectedCredential 验证服务端拒绝认证后删除原生端登录凭据。
+func TestBackendClearsRejectedCredential(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/inbox" {
+			http.NotFound(writer, request)
+			return
+		}
+		if request.Header.Get("Authorization") != "Bearer rejected-token" {
+			http.Error(writer, "unexpected authorization", http.StatusBadRequest)
+			return
+		}
+		writeTestJSON(writer, http.StatusUnauthorized, map[string]any{"error": map[string]string{
+			"state": "login", "message": "Authentication required.",
+		}})
+	}))
+	defer remote.Close()
+
+	store := &memoryStore{
+		serverURL: remote.URL,
+		credential: clientsession.Credential{
+			ServerURL:      remote.URL,
+			OrganizationID: "organization-1",
+			UserID:         "user-1",
+			Token:          "rejected-token",
+			ExpiresAt:      time.Now().Add(time.Hour),
+		},
+		credentialSet: true,
+	}
+	backend, err := newTestBackend(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"})
+	var apiError *appservice.Error
+	if !errors.As(err, &apiError) || apiError.State != appservice.SessionStateLogin {
+		t.Fatalf("error = %#v, want login session", err)
+	}
+	if store.credentialSet {
+		t.Fatalf("rejected credential was not deleted: %#v", store.credential)
+	}
+}
+
+// TestBackendClearsCredentialWhenChangingServer 验证切换企业服务器时删除旧登录凭据。
+func TestBackendClearsCredentialWhenChangingServer(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/installation/status" {
+			http.NotFound(writer, request)
+			return
+		}
+		writeTestJSON(writer, http.StatusOK, map[string]any{"installed": true, "organizationName": "新企业"})
+	}))
+	defer remote.Close()
+
+	store := &memoryStore{
+		serverURL: "https://old.example.com",
+		credential: clientsession.Credential{
+			ServerURL:      "https://old.example.com",
+			OrganizationID: "organization-1",
+			UserID:         "user-1",
+			Token:          "old-token",
+			ExpiresAt:      time.Now().Add(time.Hour),
+		},
+		credentialSet: true,
+	}
+	backend, err := newTestBackend(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL); err != nil {
+		t.Fatal(err)
+	}
+	if store.credentialSet {
+		t.Fatalf("old credential was not deleted: %#v", store.credential)
 	}
 }
 
@@ -298,11 +452,11 @@ func TestBackendRejectsUninitializedServer(t *testing.T) {
 	defer remote.Close()
 
 	store := &memoryStore{}
-	backend, err := NewBackend(store)
+	backend, err := newTestBackend(store)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
+	err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
 	var apiError *appservice.Error
 	if !errors.As(err, &apiError) || apiError.Kind != appservice.ErrorKindInvalid {
 		t.Fatalf("error = %#v, want invalid", err)
@@ -319,11 +473,11 @@ func TestBackendRejectsNonCerviServer(t *testing.T) {
 	}))
 	defer remote.Close()
 
-	backend, err := NewBackend(&memoryStore{})
+	backend, err := newTestBackend(&memoryStore{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
+	err = backend.ConnectServer(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, remote.URL)
 	var apiError *appservice.Error
 	if !errors.As(err, &apiError) || apiError.Kind != appservice.ErrorKindUnavailable || apiError.State != "" {
 		t.Fatalf("error = %#v, want unavailable without session state", err)

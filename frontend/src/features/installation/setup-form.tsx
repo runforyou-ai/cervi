@@ -7,7 +7,12 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { isApiError, install } from "@/api"
+import {
+  isApiError,
+  install,
+  loadStartup,
+  SessionState,
+} from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
@@ -23,12 +28,14 @@ import {
   createSetupSchema,
   type SetupFormValues,
 } from "@/features/installation/setup-schema"
+import { useStartup } from "@/features/startup/startup-context"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 创建企业和第一个管理员账号。 */
 export function SetupForm() {
   const { t } = useTranslation("setup")
   const navigate = useNavigate()
+  const { completeStartup } = useStartup()
   const schema = useMemo(() => createSetupSchema(t), [t])
   const form = useForm<SetupFormValues>({
     resolver: zodResolver(schema),
@@ -44,9 +51,35 @@ export function SetupForm() {
   /** 提交企业初始化并进入收件箱。 */
   async function submitSetup(values: SetupFormValues) {
     try {
-      await install(values)
+      const identity = await install(values)
+      completeStartup(identity.organization.name)
       navigate("/inbox", { replace: true })
     } catch (error) {
+      if (
+        isApiError(error) &&
+        error.state === SessionState.SessionStateLogin
+      ) {
+        try {
+          const startup = await loadStartup()
+          if (
+            startup.state === SessionState.SessionStateReady &&
+            startup.organizationName
+          ) {
+            console.info("企业已完成初始化，进入登录页")
+            completeStartup(startup.organizationName)
+            navigate("/login", { replace: true })
+            return
+          }
+          console.warn("企业初始化错误与启动状态不一致", {
+            state: startup.state,
+          })
+          toast.error(apiErrorMessage(error))
+        } catch (startupError) {
+          console.warn("同步企业初始化状态失败", startupError)
+          toast.error(t("networkError"))
+        }
+        return
+      }
       if (recoverSession(error, navigate)) {
         return
       }

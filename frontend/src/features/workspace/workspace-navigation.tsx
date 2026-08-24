@@ -122,7 +122,7 @@ export function WorkspaceNavigation({
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [changingWorkStatus, setChangingWorkStatus] = useState(false)
+  const changingWorkStatusRef = useRef(false)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
 
@@ -134,12 +134,15 @@ export function WorkspaceNavigation({
 
   /** 立即保存工作状态，并在失败时恢复原状态。 */
   async function changeWorkStatus(workStatus: WorkStatus) {
-    if (workStatus === identity.user.workStatus || changingWorkStatus) {
+    if (
+      workStatus === identity.user.workStatus ||
+      changingWorkStatusRef.current
+    ) {
       return
     }
 
     const previous = identity.user
-    setChangingWorkStatus(true)
+    changingWorkStatusRef.current = true
     onUserUpdated({ ...previous, workStatus })
     try {
       const updated = await updateUserWorkStatus({ workStatus })
@@ -152,7 +155,7 @@ export function WorkspaceNavigation({
         toast.error(t("workStatusUpdateError"))
       }
     } finally {
-      setChangingWorkStatus(false)
+      changingWorkStatusRef.current = false
     }
   }
 
@@ -225,8 +228,10 @@ export function WorkspaceNavigation({
                 <DropdownMenuItem
                   key={workStatus}
                   className="text-xs"
-                  disabled={changingWorkStatus}
-                  onSelect={() => void changeWorkStatus(workStatus)}
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    void changeWorkStatus(workStatus)
+                  }}
                 >
                   <WorkStatusDot status={workStatus} className="size-2" />
                   <span className="flex-1">

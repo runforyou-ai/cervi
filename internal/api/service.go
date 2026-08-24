@@ -65,6 +65,7 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/agents", service.createAgent)
 	router.GET("/agents/:agentID", service.getAgent)
 	router.PATCH("/agents/:agentID", service.updateAgent)
+	router.PATCH("/agents/:agentID/work-status", service.updateAgentWorkStatus)
 	router.POST("/agents/:agentID/deactivate", service.deactivateAgent)
 	router.POST("/agents/:agentID/reactivate", service.reactivateAgent)
 	router.GET("/users", service.listUsers)
@@ -344,7 +345,17 @@ func (s *Service) updateAgent(c *gin.Context) {
 	writeResult(c, http.StatusOK, agent, err)
 }
 
-// deactivateAgent 停用企业 AI 员工。
+// updateAgentWorkStatus 修改企业 AI 员工工作状态。
+func (s *Service) updateAgentWorkStatus(c *gin.Context) {
+	var input appservice.AgentWorkStatusInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	agent, err := s.application.UpdateAgentWorkStatus(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
+	writeResult(c, http.StatusOK, agent, err)
+}
+
+// deactivateAgent 禁用企业 AI 员工账号。
 func (s *Service) deactivateAgent(c *gin.Context) {
 	agent, err := s.application.DeactivateAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"))
 	writeResult(c, http.StatusOK, agent, err)
@@ -403,11 +414,13 @@ func (s *Service) updateUserRoles(c *gin.Context) {
 	writeEmpty(c, s.application.UpdateUserRoles(c.Request.Context(), requestMeta(c), input))
 }
 
+// deactivateUser 禁用企业成员账号。
 func (s *Service) deactivateUser(c *gin.Context) {
 	user, err := s.application.DeactivateUser(c.Request.Context(), requestMeta(c), c.Param("userID"))
 	writeResult(c, http.StatusOK, user, err)
 }
 
+// reactivateUser 恢复企业成员账号。
 func (s *Service) reactivateUser(c *gin.Context) {
 	user, err := s.application.ReactivateUser(c.Request.Context(), requestMeta(c), c.Param("userID"))
 	writeResult(c, http.StatusOK, user, err)
@@ -459,7 +472,7 @@ func (s *Service) listTeamMembers(c *gin.Context) {
 		return
 	}
 	list, err := s.application.ListTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), appservice.TeamMemberListInput{
-		Query: c.Query("query"), Status: optionalEnum[appservice.UserStatus](c.Query("status")), Page: page, PageSize: pageSize,
+		Query: c.Query("query"), WorkStatus: optionalEnum[appservice.WorkStatus](c.Query("workStatus")), Page: page, PageSize: pageSize,
 	})
 	writeResult(c, http.StatusOK, list, err)
 }
