@@ -1,5 +1,4 @@
 /** 偏好设置中的当前设备通知权限状态与操作。 */
-import { useEffect, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -10,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { recoverSession } from "@/lib/session-navigation"
 import {
   canSendNotification,
-  sendNotificationTest,
   type NotificationDeviceScope,
 } from "@/platform/notifications"
 import {
@@ -62,28 +60,16 @@ function permissionStatusDescription(
   }
 }
 
-/** 展示本设备权限，并提供申请权限和发送测试通知的操作。 */
+/** 展示本设备通知权限，并在需要时提供申请操作。 */
 export function NotificationPermissionSettings({
   scope,
-  soundEnabled,
 }: {
   scope: NotificationDeviceScope
-  soundEnabled: boolean
 }) {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
   const { status, requesting, requestPermission } =
     useNotificationPermission(scope)
-  const [testing, setTesting] = useState(false)
-  const mountedRef = useRef(false)
-  const usable = status !== "checking" && canSendNotification(status)
-
-  useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
 
   /** 申请当前设备的通知权限。 */
   async function allowNotifications() {
@@ -103,35 +89,6 @@ export function NotificationPermissionSettings({
       }
       console.warn("申请通知权限失败", error)
       toast.error(t("preferences.notifications.permission.allowError"))
-    }
-  }
-
-  /** 使用表单中的声音设置发送一条测试通知。 */
-  async function testNotification() {
-    setTesting(true)
-    try {
-      await sendNotificationTest({
-        title: t("preferences.notifications.test.title"),
-        body: t("preferences.notifications.test.body"),
-        soundEnabled,
-      })
-      if (!mountedRef.current) {
-        return
-      }
-      toast.success(t("preferences.notifications.test.success"))
-    } catch (error) {
-      if (!mountedRef.current) {
-        return
-      }
-      if (recoverSession(error, navigate)) {
-        return
-      }
-      console.warn("发送测试通知失败", error)
-      toast.error(t("preferences.notifications.test.error"))
-    } finally {
-      if (mountedRef.current) {
-        setTesting(false)
-      }
     }
   }
 
@@ -163,22 +120,6 @@ export function NotificationPermissionSettings({
             {requesting
               ? t("preferences.notifications.permission.allowing")
               : t("preferences.notifications.permission.allow")}
-          </Button>
-        </div>
-      ) : null}
-      {usable ? (
-        <div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={testing}
-            onClick={() => void testNotification()}
-          >
-            {testing ? <LoaderCircleIcon className="animate-spin" /> : null}
-            {testing
-              ? t("preferences.notifications.test.testing")
-              : t("preferences.notifications.test.action")}
           </Button>
         </div>
       ) : null}

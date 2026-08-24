@@ -1,5 +1,5 @@
 /** 工作台左侧模块轨和用户菜单。 */
-import { useRef, useState } from "react"
+import { useRef, useState, type MouseEvent } from "react"
 import {
   CheckIcon,
   ContactRoundIcon,
@@ -16,9 +16,9 @@ import { toast } from "sonner"
 
 import {
   updateUserWorkStatus,
+  WorkStatus,
   type Identity,
   type CurrentUser,
-  type WorkStatus,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import {
@@ -36,6 +36,7 @@ import {
 } from "@/features/users/work-status"
 import { UserAvatar } from "@/features/users/user-avatar"
 import { cn } from "@/lib/utils"
+import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 
 /** 模块轨导航项。 */
 function WorkspaceRailItem({
@@ -43,15 +44,18 @@ function WorkspaceRailItem({
   icon: Icon,
   label,
   active,
+  onClick,
 }: {
   to: string
   icon: LucideIcon
   label: string
   active: boolean
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void
 }) {
   return (
     <NavLink
       to={to}
+      onClick={onClick}
       className={cn(
         "my-0.5 flex h-14 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] leading-tight",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -67,7 +71,11 @@ function WorkspaceRailItem({
 }
 
 /** 模块轨导航。 */
-function WorkspaceMenu() {
+function WorkspaceMenu({
+  onInboxClick,
+}: {
+  onInboxClick: (event: MouseEvent<HTMLAnchorElement>) => void
+}) {
   const { t } = useTranslation("workspace")
   const location = useLocation()
 
@@ -81,6 +89,7 @@ function WorkspaceMenu() {
         icon={InboxIcon}
         label={t("inbox")}
         active={location.pathname === "/inbox"}
+        onClick={onInboxClick}
       />
       <WorkspaceRailItem
         to="/contacts/employees"
@@ -130,6 +139,30 @@ export function WorkspaceNavigation({
   function navigateFromUserMenu(path: string) {
     skipUserMenuFocusRestoreRef.current = true
     navigate(path)
+  }
+
+  /** 点击消息菜单时按账号提醒策略尝试申请本设备通知权限。 */
+  function requestMessageNotificationPermission(
+    event: MouseEvent<HTMLAnchorElement>,
+  ) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      !identity.user.messageNotificationsEnabled ||
+      identity.user.workStatus !== WorkStatus.WorkStatusWorking
+    ) {
+      return
+    }
+
+    void requestNotificationPermissionFromMessageMenu({
+      organizationId: identity.user.organizationId,
+      userId: identity.user.id,
+    }).catch((error) => {
+      console.warn("从消息菜单申请通知权限失败", error)
+    })
   }
 
   /** 立即保存工作状态，并在失败时恢复原状态。 */
@@ -255,7 +288,7 @@ export function WorkspaceNavigation({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <WorkspaceMenu />
+      <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
     </aside>
   )
 }

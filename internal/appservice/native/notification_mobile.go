@@ -32,11 +32,6 @@ func (*NotificationProvider) SendMessageNotification(_ context.Context, _ appser
 	return nil
 }
 
-// SendTestNotification 在移动端本期保持为空操作。
-func (*NotificationProvider) SendTestNotification(_ context.Context, _ appservice.RequestMeta, _ appservice.NotificationSoundInput) error {
-	return nil
-}
-
 // SetUnreadIndicator 在移动端本期保持为空操作。
 func (*NotificationProvider) SetUnreadIndicator(_ appservice.UnreadIndicator) {}
 

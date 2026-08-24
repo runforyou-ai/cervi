@@ -588,13 +588,6 @@ export enum NotificationPermissionStatus {
 };
 
 /**
- * NotificationSoundInput 定义当前设备发送通知时是否播放系统默认声音。
- */
-export interface NotificationSoundInput {
-    "soundEnabled": boolean;
-}
-
-/**
  * Organization 定义当前企业信息。
  */
 export interface Organization {

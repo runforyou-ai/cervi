@@ -3,7 +3,6 @@ import {
   checkNotificationPermission as checkDesktopNotificationPermission,
   requestNotificationPermission as requestDesktopNotificationPermission,
   sendNativeMessageNotification,
-  sendTestNotification as sendDesktopTestNotification,
   updateUnreadIndicator as updateDesktopUnreadIndicator,
   WorkStatus,
   type MessageNotificationInput,
@@ -14,7 +13,7 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 const notificationPreferencesChangedEvent =
   "cervi:notification-device-preferences-changed"
 const notificationPreferencesStoragePrefix = "cervi.notifications"
-const notificationPromptDismissDurationMs = 7 * 24 * 60 * 60 * 1000
+const notificationPermissionRequestClaims = new Map<string, string>()
 let unreadIndicatorQueue: Promise<void> = Promise.resolve()
 let messageNotificationQueue: Promise<void> = Promise.resolve()
 let notificationRuntimePolicyGeneration = 0
@@ -34,18 +33,12 @@ export type NotificationDeviceScope = {
 export type NotificationDevicePreferences = {
   soundEnabled: boolean
   permissionRequested: boolean
-  promptDismissedUntil: number
+  permissionAutoRequestedOn: string
 }
 
 type StoredNotificationDevicePreferences = Partial<
   NotificationDevicePreferences
 >
-
-export type NotificationTestOptions = {
-  title: string
-  body: string
-  soundEnabled: boolean
-}
 
 export type NewMessageNotificationOptions = Omit<
   MessageNotificationInput,
@@ -66,7 +59,7 @@ let activeNotificationRuntimePolicy: NotificationRuntimePolicy | null = null
 const defaultNotificationDevicePreferences: NotificationDevicePreferences = {
   soundEnabled: true,
   permissionRequested: false,
-  promptDismissedUntil: 0,
+  permissionAutoRequestedOn: "",
 }
 
 /** 返回当前企业用户对应的本机通知偏好存储键。 */
@@ -151,10 +144,10 @@ export function readNotificationDevicePreferences(
       soundEnabled:
         typeof parsed.soundEnabled === "boolean" ? parsed.soundEnabled : true,
       permissionRequested: parsed.permissionRequested === true,
-      promptDismissedUntil:
-        typeof parsed.promptDismissedUntil === "number"
-          ? parsed.promptDismissedUntil
-          : 0,
+      permissionAutoRequestedOn:
+        typeof parsed.permissionAutoRequestedOn === "string"
+          ? parsed.permissionAutoRequestedOn
+          : "",
     }
   } catch (error) {
     console.warn("读取本机通知偏好失败", error)
@@ -191,25 +184,37 @@ export function setNotificationSoundEnabled(
   })
 }
 
-/** 记录用户选择在七天后再次处理通知授权。 */
-export function dismissNotificationPermissionPrompt(
-  scope: NotificationDeviceScope,
-) {
-  writeNotificationDevicePreferences(scope, {
-    ...readNotificationDevicePreferences(scope),
-    promptDismissedUntil: Date.now() + notificationPromptDismissDurationMs,
-  })
+/** 返回当前设备所在时区的自然日。 */
+function currentDeviceCalendarDate() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
-/** 判断当前设备的首次通知授权引导是否已经处理。 */
-export function isNotificationPermissionPromptHandled(
+/** 在系统请求前占用当前企业用户今天的自动授权机会。 */
+function claimNotificationPermissionRequest(
   scope: NotificationDeviceScope,
 ) {
+  const scopeKey = notificationPreferencesStorageKey(scope)
+  const today = currentDeviceCalendarDate()
+  if (notificationPermissionRequestClaims.get(scopeKey) === today) {
+    return false
+  }
+
   const preferences = readNotificationDevicePreferences(scope)
-  return (
-    preferences.permissionRequested ||
-    preferences.promptDismissedUntil > Date.now()
-  )
+  if (preferences.permissionAutoRequestedOn === today) {
+    notificationPermissionRequestClaims.set(scopeKey, today)
+    return false
+  }
+
+  notificationPermissionRequestClaims.set(scopeKey, today)
+  writeNotificationDevicePreferences(scope, {
+    ...preferences,
+    permissionAutoRequestedOn: today,
+  })
+  return true
 }
 
 /** 订阅当前企业用户的本机通知偏好变化。 */
@@ -326,29 +331,31 @@ export async function requestNotificationPermission(
   return state
 }
 
+/** 从消息菜单点击中检查权限，并且每天最多自动申请一次。 */
+export async function requestNotificationPermissionFromMessageMenu(
+  scope: NotificationDeviceScope,
+) {
+  if (resolveAppPlatform() === "web") {
+    const state =
+      "Notification" in window && window.isSecureContext
+        ? normalizePermissionState(Notification.permission)
+        : "unsupported"
+    if (state !== "prompt" || !claimNotificationPermissionRequest(scope)) {
+      return state
+    }
+    return requestNotificationPermission(scope)
+  }
+
+  const state = await checkNotificationPermission(scope)
+  if (state !== "prompt" || !claimNotificationPermissionRequest(scope)) {
+    return state
+  }
+  return requestNotificationPermission(scope)
+}
+
 /** 判断当前权限状态是否允许发送通知。 */
 export function canSendNotification(state: NotificationPermissionState) {
   return state === "granted" || state === "system-managed"
-}
-
-/** 使用当前端发送一条测试通知。 */
-export async function sendNotificationTest(options: NotificationTestOptions) {
-  const platform = resolveAppPlatform()
-  if (platform === "mobile") {
-    throw new Error("移动端暂不支持通知测试")
-  }
-  if (platform === "desktop") {
-    await sendDesktopTestNotification({ soundEnabled: options.soundEnabled })
-    return
-  }
-  if (!("Notification" in window) || Notification.permission !== "granted") {
-    throw new Error("浏览器尚未允许通知")
-  }
-
-  new Notification(options.title, {
-    body: options.body,
-    silent: !options.soundEnabled,
-  })
 }
 
 /** 使用当前端执行已经通过提醒策略判断的新消息通知投递。 */

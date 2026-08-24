@@ -73,7 +73,6 @@ export type {
     MemberOptionListInput,
     Message,
     MessageNotificationInput,
-    NotificationSoundInput,
     Organization,
     OrganizationInput,
     PageInfo,

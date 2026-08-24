@@ -48,7 +48,6 @@ import {
   SaveS3Setting,
   SelectProfileImage,
   SendMessageNotification,
-  SendTestNotification,
   TestS3Setting,
   UpdateContact,
   UpdateAIProvider,
@@ -304,8 +303,6 @@ export const checkNotificationPermission = bind(CheckNotificationPermission)
 export const requestNotificationPermission = bind(
   RequestNotificationPermission,
 )
-/** 发送一条当前设备通知用于测试设置。 */
-export const sendTestNotification = bind(SendTestNotification)
 /** 在桌面原生层投递一条已完成策略判断的新消息通知。 */
 export const sendNativeMessageNotification = bind(SendMessageNotification)
 /** 同步当前设备的未读数和注意力状态。 */

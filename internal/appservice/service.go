@@ -91,7 +91,6 @@ type NativeNotification interface {
 	CheckNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)
 	RequestNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)
 	SendMessageNotification(context.Context, RequestMeta, MessageNotificationInput) error
-	SendTestNotification(context.Context, RequestMeta, NotificationSoundInput) error
 	UpdateUnreadIndicator(context.Context, RequestMeta, UnreadIndicatorState) error
 }
 
@@ -212,14 +211,6 @@ func (s *Service) SendMessageNotification(ctx context.Context, meta RequestMeta,
 		return methodNotAllowedError(meta, "SendMessageNotification")
 	}
 	return s.nativeNotification.SendMessageNotification(ctx, meta, input)
-}
-
-// SendTestNotification 在当前设备发送一条系统测试通知。
-func (s *Service) SendTestNotification(ctx context.Context, meta RequestMeta, input NotificationSoundInput) error {
-	if s.nativeNotification == nil {
-		return methodNotAllowedError(meta, "SendTestNotification")
-	}
-	return s.nativeNotification.SendTestNotification(ctx, meta, input)
 }
 
 // UpdateUnreadIndicator 将未读事实和注意力状态同步到当前设备原生界面。

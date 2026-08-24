@@ -15,7 +15,6 @@ import {
   type CurrentUser,
 } from "@/api"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
-import { NotificationPermissionPrompt } from "@/features/notifications/notification-permission-prompt"
 import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
 import { useSessionLoader } from "@/features/session/use-session-loader"
 import type {
@@ -307,7 +306,6 @@ export function WorkspaceLayout({
           loggingOut={loggingOut}
         />
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <NotificationPermissionPrompt user={identity.user} />
           <Outlet
             context={{
               identity,

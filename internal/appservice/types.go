@@ -393,11 +393,6 @@ type UserPreferencesInput struct {
 	MessageNotificationsEnabled bool   `json:"messageNotificationsEnabled"`
 }
 
-// NotificationSoundInput 定义当前设备发送通知时是否播放系统默认声音。
-type NotificationSoundInput struct {
-	SoundEnabled bool `json:"soundEnabled"`
-}
-
 // MessageNotificationInput 定义一条准备投递到当前设备的新消息通知。
 type MessageNotificationInput struct {
 	ID           string `json:"id"`

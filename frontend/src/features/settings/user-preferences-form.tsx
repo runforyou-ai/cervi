@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTheme } from "next-themes"
-import { Controller, useForm, useWatch } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -74,11 +74,6 @@ export function UserPreferencesForm({
         readNotificationDevicePreferences(notificationScope).soundEnabled,
     },
   })
-  const notificationSoundEnabled = useWatch({
-    control: form.control,
-    name: "notificationSoundEnabled",
-  })
-
   /** next-themes 初始化后同步未编辑的主题字段。 */
   useEffect(() => {
     if (!form.formState.dirtyFields.theme) {
@@ -261,10 +256,7 @@ export function UserPreferencesForm({
               </Field>
             )}
           />
-          <NotificationPermissionSettings
-            scope={notificationScope}
-            soundEnabled={notificationSoundEnabled}
-          />
+          <NotificationPermissionSettings scope={notificationScope} />
         </section>
         <div>
           <Button type="submit" disabled={isSubmitting}>

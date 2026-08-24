@@ -14,8 +14,6 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
 
-const testNotificationID = "cervi-notification-test"
-
 // NotificationProvider 使用 Wails 通知服务提供桌面端原生消息提醒。
 type NotificationProvider struct {
 	service *notifications.NotificationService
@@ -98,26 +96,6 @@ func (p *NotificationProvider) SendMessageNotification(_ context.Context, _ apps
 		input.ID,
 		input.Title,
 		input.Body,
-		input.SoundEnabled,
-	))
-}
-
-// SendTestNotification 发送一条使用系统默认声音或静音的测试通知。
-func (p *NotificationProvider) SendTestNotification(_ context.Context, meta appservice.RequestMeta, input appservice.NotificationSoundInput) error {
-	if err := p.availabilityError(); err != nil {
-		return err
-	}
-	title := "Cervi 通知"
-	body := "通知已开启，你会在这里收到新消息提醒。"
-	if meta.Locale == appservice.LocaleEnglishUnitedStates {
-		title = "Cervi notifications"
-		body = "Notifications are enabled. New message alerts will appear here."
-	}
-
-	return p.service.SendNotification(notificationOptions(
-		testNotificationID,
-		title,
-		body,
 		input.SoundEnabled,
 	))
 }

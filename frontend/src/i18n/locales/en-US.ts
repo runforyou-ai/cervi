@@ -104,18 +104,6 @@ const enUS = {
     loading: "Loading…",
     inboxLoadError: "Could not load messages.",
     retry: "Try again",
-    notificationPermissionPrompt: {
-      title: "Turn on new message notifications",
-      description:
-        "Allow Cervi to notify you about new messages while you are working. Notifications pause while you are taking a break or off work.",
-      later: "Remind me in 7 days",
-      allow: "Allow notifications",
-      allowing: "Requesting…",
-      allowSuccess: "Notification permission enabled.",
-      allowDenied:
-        "Notifications were not enabled. Allow them in your browser or system settings.",
-      allowError: "Could not request notification permission. Try again.",
-    },
   },
   contacts: {
     title: "Contacts",
@@ -827,8 +815,7 @@ const enUS = {
             granted: "This device can show new message notifications.",
             denied:
               "Allow Cervi notifications in your browser or system settings.",
-            systemManaged:
-              "Your operating system manages notifications. Send a test notification to confirm them.",
+            systemManaged: "Your operating system manages notifications.",
             unsupported:
               "Notifications are unavailable in this browser, connection, or device.",
           },
@@ -838,14 +825,6 @@ const enUS = {
           allowDenied:
             "Notifications were not enabled. Allow them in your browser or system settings.",
           allowError: "Could not request notification permission. Try again.",
-        },
-        test: {
-          action: "Send test notification",
-          testing: "Sending…",
-          title: "Cervi notification test",
-          body: "New message notifications are ready.",
-          success: "Test notification sent.",
-          error: "Could not send a test notification. Try again.",
         },
       },
       save: "Save",

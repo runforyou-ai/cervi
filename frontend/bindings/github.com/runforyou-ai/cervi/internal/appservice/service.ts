@@ -407,13 +407,6 @@ export function SendMessageNotification(meta: $models.RequestMeta, input: $model
 }
 
 /**
- * SendTestNotification 在当前设备发送一条系统测试通知。
- */
-export function SendTestNotification(meta: $models.RequestMeta, input: $models.NotificationSoundInput): $CancellablePromise<void> {
-    return $Call.ByID(71691083, meta, input);
-}
-
-/**
  * ServerURL 返回原生端当前配置的企业服务器地址。
  */
 export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string> {
