@@ -8,11 +8,17 @@ import {
   type MessageNotificationInput,
   type UnreadIndicatorState,
 } from "@/api"
-import { resolveAppPlatform } from "@/platform/app-platform"
+import {
+  isDesktopMacOS,
+  resolveAppPlatform,
+} from "@/platform/app-platform"
+import { openExternalURL } from "@/platform/open-external-url"
 
 const notificationPreferencesChangedEvent =
   "cervi:notification-device-preferences-changed"
 const notificationPreferencesStoragePrefix = "cervi.notifications"
+const macOSNotificationSettingsURL =
+  "x-apple.systempreferences:com.apple.preference.notifications"
 let unreadIndicatorQueue: Promise<void> = Promise.resolve()
 let messageNotificationQueue: Promise<void> = Promise.resolve()
 let notificationRuntimePolicyGeneration = 0
@@ -304,6 +310,15 @@ export async function requestNotificationPermission(
     permissionRequested: true,
   })
   return state
+}
+
+/** 在支持的桌面系统中打开通知权限设置。 */
+export async function openNotificationPermissionSettings() {
+  if (!isDesktopMacOS()) {
+    return false
+  }
+  await openExternalURL(macOSNotificationSettingsURL)
+  return true
 }
 
 /** 点击消息菜单后每天最多直接申请一次通知权限。 */

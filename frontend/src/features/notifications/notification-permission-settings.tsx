@@ -14,6 +14,7 @@ import {
 import { recoverSession } from "@/lib/session-navigation"
 import {
   canSendNotification,
+  openNotificationPermissionSettings,
   type NotificationDeviceScope,
 } from "@/platform/notifications"
 import { useNotificationPermission } from "@/features/notifications/use-notification-permission"
@@ -33,6 +34,12 @@ export function NotificationPermissionSettings({
   /** 申请当前设备的通知权限。 */
   async function allowNotifications() {
     try {
+      if (
+        status === "denied" &&
+        (await openNotificationPermissionSettings())
+      ) {
+        return
+      }
       const nextStatus = await requestPermission()
       if (!nextStatus) {
         return
