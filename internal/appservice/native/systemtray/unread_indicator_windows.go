@@ -9,6 +9,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/services/dock"
 )
 
 const windowsTrayFlashInterval = 500 * time.Millisecond
@@ -24,7 +25,7 @@ type windowsUnreadIndicator struct {
 }
 
 // newUnreadIndicator 创建 Windows 未读消息指示器并启动状态循环。
-func newUnreadIndicator(app *application.App, tray *application.SystemTray) appservice.UnreadIndicator {
+func newUnreadIndicator(app *application.App, tray *application.SystemTray, _ *dock.DockService) appservice.UnreadIndicator {
 	indicator := &windowsUnreadIndicator{
 		ctx:     app.Context(),
 		tray:    tray,

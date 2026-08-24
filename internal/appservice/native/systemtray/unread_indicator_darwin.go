@@ -14,10 +14,8 @@ type darwinUnreadIndicator struct {
 	dock *dock.DockService
 }
 
-// newUnreadIndicator 创建 macOS 未读消息指示器并注册 Dock 服务。
-func newUnreadIndicator(app *application.App, tray *application.SystemTray) appservice.UnreadIndicator {
-	dockService := dock.New()
-	app.RegisterService(application.NewService(dockService))
+// newUnreadIndicator 创建 macOS 未读消息指示器。
+func newUnreadIndicator(_ *application.App, tray *application.SystemTray, dockService *dock.DockService) appservice.UnreadIndicator {
 	return &darwinUnreadIndicator{tray: tray, dock: dockService}
 }
 

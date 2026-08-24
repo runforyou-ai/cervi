@@ -8,6 +8,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
+	"github.com/wailsapp/wails/v3/pkg/services/dock"
 )
 
 // Setup 配置桌面端托盘、托盘菜单和关闭窗口时隐藏到托盘的行为。
@@ -44,5 +45,7 @@ func Setup(options Options) appservice.UnreadIndicator {
 		options.Window.Hide()
 	})
 
-	return newUnreadIndicator(options.App, tray)
+	dockService := dock.New()
+	options.App.RegisterService(application.NewService(dockService))
+	return newUnreadIndicator(options.App, tray, dockService)
 }
