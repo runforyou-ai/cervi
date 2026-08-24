@@ -12,6 +12,9 @@ import (
 type Key string
 
 const (
+	AppProductName                        Key = "app.product_name"
+	AppTrayOpen                           Key = "app.tray_open"
+	AppTrayQuit                           Key = "app.tray_quit"
 	ErrorInternal                         Key = "error.internal"
 	ErrorMethodNotAllowed                 Key = "error.method_not_allowed"
 	ErrorInstallationStatusReadFailed     Key = "error.installation_status_read_failed"

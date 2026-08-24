@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -42,10 +43,11 @@ func (*ProfileImageSelector) SelectProfileImage(_ context.Context, meta appservi
 		return appservice.ProfileImageFile{}, errors.New("application is not initialized")
 	}
 
-	title, buttonText := "选择头像图片", "选择"
-	if meta.Locale == appservice.LocaleEnglishUnitedStates {
-		title, buttonText = "Choose profile image", "Choose"
-	}
+	messages := cervii18n.LocalizeMap(string(meta.Locale), map[string]cervii18n.Key{
+		"title":  cervii18n.DialogProfileImageTitle,
+		"choose": cervii18n.DialogProfileImageChoose,
+	})
+	title, buttonText := messages["title"], messages["choose"]
 	path, err := app.Dialog.OpenFile().
 		CanChooseFiles(true).
 		CanChooseDirectories(false).

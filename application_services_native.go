@@ -22,6 +22,7 @@ type nativeStorage interface {
 // applicationServices 创建原生端使用的远程应用服务。
 func applicationServices(
 	appStorage nativeStorage,
+	nativeLocaleUpdater appservice.NativeLocaleUpdater,
 	notification appservice.NativeNotification,
 	unreadIndicator appservice.UnreadIndicator,
 ) ([]application.Service, error) {
@@ -36,6 +37,7 @@ func applicationServices(
 	service := appservice.New(
 		backend,
 		appservice.WithProfileImageSelector(appservicenative.NewProfileImageSelector()),
+		appservice.WithNativeLocaleUpdater(nativeLocaleUpdater),
 		appservice.WithNativeNotification(notification),
 		appservice.WithUnreadIndicator(unreadIndicator),
 	)
