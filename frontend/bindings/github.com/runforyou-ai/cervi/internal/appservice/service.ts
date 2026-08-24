@@ -470,7 +470,7 @@ export function UpdateTeam(meta: $models.RequestMeta, teamID: string, input: $mo
 }
 
 /**
- * UpdateUnreadIndicator 将未读事实和注意力状态同步到当前设备原生界面。
+ * UpdateUnreadIndicator 更新当前设备的未读提示。
  */
 export function UpdateUnreadIndicator(meta: $models.RequestMeta, state: $models.UnreadIndicatorState): $CancellablePromise<void> {
     return $Call.ByID(4142772673, meta, state);

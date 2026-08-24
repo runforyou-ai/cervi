@@ -15,6 +15,11 @@ import {
   type CurrentUser,
 } from "@/api"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
+import {
+  activateNotificationPolicy,
+  deactivateNotificationPolicy,
+  notifyNewMessage as deliverNewMessageNotification,
+} from "@/features/notifications/new-message-notifications"
 import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
 import { useSessionLoader } from "@/features/session/use-session-loader"
 import type {
@@ -23,12 +28,7 @@ import type {
 } from "@/features/workspace/workspace-context"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import { resolveAppPlatform } from "@/platform/app-platform"
-import {
-  activateNotificationRuntimePolicy,
-  deactivateNotificationRuntimePolicy,
-  notifyNewMessage as deliverNewMessageNotification,
-  updateNotificationUnreadIndicator,
-} from "@/platform/notifications"
+import { updateNotificationUnreadIndicator } from "@/platform/notifications"
 
 type WorkspaceUnreadState = {
   count: number
@@ -42,8 +42,6 @@ function useClearSelectionOnNavigation() {
   useLayoutEffect(() => {
     window.getSelection()?.removeAllRanges()
   }, [location.key])
-
-  return location
 }
 
 /** 读取会话并渲染工作台导航和子页面。 */
@@ -52,7 +50,8 @@ export function WorkspaceLayout({
 }: {
   allowServerChange?: boolean
 }) {
-  const location = useClearSelectionOnNavigation()
+  useClearSelectionOnNavigation()
+  const location = useLocation()
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const [identity, setIdentity] = useState<Identity | null>(null)
@@ -64,12 +63,12 @@ export function WorkspaceLayout({
   const unreadRevisionRef = useRef(0)
   const { status, session, retry } = useSessionLoader()
 
-  /** 激活当前身份、账号开关和工作状态对应的通知策略。 */
+  /** 同步当前用户的新消息通知策略。 */
   useLayoutEffect(() => {
     if (!identity) {
       return
     }
-    return activateNotificationRuntimePolicy(
+    return activateNotificationPolicy(
       {
         organizationId: identity.user.organizationId,
         userId: identity.user.id,
@@ -107,7 +106,7 @@ export function WorkspaceLayout({
     }
   }, [navigate, session, status])
 
-  /** 根据账号开关和工作状态同步桌面端未读指示器。 */
+  /** 同步桌面端未读数和提醒状态。 */
   useEffect(() => {
     if (!identity || resolveAppPlatform() !== "desktop") {
       return
@@ -121,24 +120,29 @@ export function WorkspaceLayout({
         ...current,
         attentionPending: false,
       }))
+      return
     }
-    const nextState = {
+    void updateNotificationUnreadIndicator({
       count: unreadState.count,
       attentionEnabled,
-      attentionPending: attentionEnabled && unreadState.attentionPending,
-    }
-    void updateNotificationUnreadIndicator(nextState).catch((error) => {
-      console.warn("同步桌面端未读状态失败", error)
+      attentionPending: unreadState.attentionPending,
+    }).catch((error) => {
+      console.warn("同步桌面端未读状态失败", {
+        count: unreadState.count,
+        attention_enabled: attentionEnabled,
+        attention_pending: unreadState.attentionPending,
+        error,
+      })
     })
   }, [identity, unreadState])
 
-  /** 用户重新查看应用时停止主动吸引注意，但保留未读事实。 */
+  /** 用户重新查看应用时停止托盘闪烁。 */
   useEffect(() => {
     if (resolveAppPlatform() !== "desktop") {
       return
     }
 
-    /** 清除已经被当前用户看到的待处理提醒。 */
+    /** 清除待处理的托盘提醒。 */
     function clearAttention() {
       if (
         document.visibilityState !== "visible" ||
@@ -168,7 +172,7 @@ export function WorkspaceLayout({
     }
   }, [])
 
-  /** 用户正在查看消息页时不保留待处理提醒。 */
+  /** 用户查看消息页时停止托盘闪烁。 */
   useEffect(() => {
     if (
       location.pathname !== "/inbox" ||
@@ -187,7 +191,7 @@ export function WorkspaceLayout({
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
     setLoggingOut(true)
-    deactivateNotificationRuntimePolicy()
+    deactivateNotificationPolicy()
     unreadRevisionRef.current += 1
     setUnreadState({ count: 0, attentionPending: false })
     try {
@@ -212,12 +216,12 @@ export function WorkspaceLayout({
     setIdentity((current) => (current ? { ...current, organization } : current))
   }
 
-  /** 返回发起未读快照请求时的实时消息修订号。 */
+  /** 返回当前未读状态修订号。 */
   const beginUnreadSnapshot = useCallback(function beginUnreadSnapshot() {
     return unreadRevisionRef.current
   }, [])
 
-  /** 仅在没有更新实时消息时应用未读快照，并保留待处理提醒。 */
+  /** 应用未被实时消息覆盖的未读快照。 */
   const applyUnreadSnapshot = useCallback(function applyUnreadSnapshot(
     count: number,
     revision: number,
@@ -233,7 +237,7 @@ export function WorkspaceLayout({
     }))
   }, [])
 
-  /** 记录一条实时新消息，并统一执行通知和注意力策略。 */
+  /** 更新实时未读数并处理新消息提醒。 */
   const notifyNewMessage = useCallback(async function notifyNewMessage(
     notification: WorkspaceNewMessageNotification,
   ) {
@@ -254,7 +258,7 @@ export function WorkspaceLayout({
         unreadCount > 0 && attentionEnabled && !alreadyVisible,
     })
 
-    if (unreadCount === 0 || !attentionEnabled || alreadyVisible) {
+    if (unreadCount === 0) {
       return false
     }
 

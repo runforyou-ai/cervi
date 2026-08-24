@@ -562,7 +562,7 @@ export enum MessageAuthor {
 };
 
 /**
- * MessageNotificationInput 定义一条准备投递到当前设备的新消息通知。
+ * MessageNotificationInput 定义当前设备的新消息通知内容。
  */
 export interface MessageNotificationInput {
     "id": string;
@@ -583,7 +583,6 @@ export enum NotificationPermissionStatus {
     NotificationPermissionStatusPrompt = "prompt",
     NotificationPermissionStatusGranted = "granted",
     NotificationPermissionStatusDenied = "denied",
-    NotificationPermissionStatusSystemManaged = "system_managed",
     NotificationPermissionStatusUnsupported = "unsupported",
 };
 
@@ -945,7 +944,7 @@ export interface TeamSummary {
 }
 
 /**
- * UnreadIndicatorState 定义未读事实与当前是否需要吸引用户注意。
+ * UnreadIndicatorState 定义未读数量和托盘提醒条件。
  */
 export interface UnreadIndicatorState {
     "count": number;

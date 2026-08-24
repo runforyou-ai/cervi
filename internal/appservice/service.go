@@ -86,12 +86,11 @@ type ProfileImageSelector interface {
 	SelectProfileImage(context.Context, RequestMeta) (ProfileImageFile, error)
 }
 
-// NativeNotification 由原生端实现系统通知权限、消息提醒和未读提示能力。
+// NativeNotification 由原生端实现系统通知权限和消息投递。
 type NativeNotification interface {
 	CheckNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)
 	RequestNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)
 	SendMessageNotification(context.Context, RequestMeta, MessageNotificationInput) error
-	UpdateUnreadIndicator(context.Context, RequestMeta, UnreadIndicatorState) error
 }
 
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
@@ -99,6 +98,7 @@ type Service struct {
 	backend              Backend
 	profileImageSelector ProfileImageSelector
 	nativeNotification   NativeNotification
+	unreadIndicator      UnreadIndicator
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -111,10 +111,17 @@ func WithProfileImageSelector(selector ProfileImageSelector) Option {
 	}
 }
 
-// WithNativeNotification 注入原生端系统通知和未读提示能力。
+// WithNativeNotification 注入原生端系统通知能力。
 func WithNativeNotification(notification NativeNotification) Option {
 	return func(service *Service) {
 		service.nativeNotification = notification
+	}
+}
+
+// WithUnreadIndicator 注入原生端未读提示能力。
+func WithUnreadIndicator(indicator UnreadIndicator) Option {
+	return func(service *Service) {
+		service.unreadIndicator = indicator
 	}
 }
 
@@ -213,12 +220,12 @@ func (s *Service) SendMessageNotification(ctx context.Context, meta RequestMeta,
 	return s.nativeNotification.SendMessageNotification(ctx, meta, input)
 }
 
-// UpdateUnreadIndicator 将未读事实和注意力状态同步到当前设备原生界面。
-func (s *Service) UpdateUnreadIndicator(ctx context.Context, meta RequestMeta, state UnreadIndicatorState) error {
-	if s.nativeNotification == nil {
-		return nil
+// UpdateUnreadIndicator 更新当前设备的未读提示。
+func (s *Service) UpdateUnreadIndicator(_ context.Context, meta RequestMeta, state UnreadIndicatorState) error {
+	if s.unreadIndicator == nil {
+		return methodNotAllowedError(meta, "UpdateUnreadIndicator")
 	}
-	return s.nativeNotification.UpdateUnreadIndicator(ctx, meta, state)
+	return s.unreadIndicator.SetUnreadState(state)
 }
 
 // UpdateUserWorkStatus 保存当前用户主动设置的工作状态。

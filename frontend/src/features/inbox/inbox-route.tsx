@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
 import { useWorkspace } from "@/features/workspace/workspace-context"
 
-/** 校验登录后显示消息页。 */
+/** 加载并显示消息页。 */
 export function InboxRoute() {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()

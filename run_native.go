@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"sync/atomic"
 
-	"github.com/runforyou-ai/cervi/internal/appservice"
 	appservicenative "github.com/runforyou-ai/cervi/internal/appservice/native"
 	nativesystemtray "github.com/runforyou-ai/cervi/internal/appservice/native/systemtray"
 	"github.com/runforyou-ai/cervi/internal/storage"
@@ -36,17 +35,11 @@ func run(_ []string) error {
 	}()
 
 	notificationProvider, notificationLifecycleServices := appservicenative.NewNotificationProvider()
-	services, err := applicationServices(appStorage, appservice.WithNativeNotification(notificationProvider))
-	if err != nil {
-		return fmt.Errorf("initialize application services: %w", err)
-	}
-	services = append(notificationLifecycleServices, services...)
-
 	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
 		Name:        "Cervi",
 		Description: "Cervi is an open-source AI customer support teammate platform",
-		Services:    services,
+		Services:    notificationLifecycleServices,
 		ShouldQuit: func() bool {
 			if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
 				return true
@@ -91,7 +84,17 @@ func run(_ []string) error {
 			trayQuitRequested.Store(true)
 		},
 	})
-	notificationProvider.SetUnreadIndicator(unreadIndicator)
+	services, err := applicationServices(
+		appStorage,
+		notificationProvider,
+		unreadIndicator,
+	)
+	if err != nil {
+		return fmt.Errorf("initialize application services: %w", err)
+	}
+	for _, service := range services {
+		app.RegisterService(service)
+	}
 
 	slog.Info("启动 Cervi")
 	return app.Run()

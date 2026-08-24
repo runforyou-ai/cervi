@@ -141,7 +141,7 @@ export function WorkspaceNavigation({
     navigate(path)
   }
 
-  /** 点击消息菜单时在通知开关开启后尝试申请本设备权限。 */
+  /** 点击消息菜单时申请本设备通知权限。 */
   function requestMessageNotificationPermission() {
     if (!identity.user.messageNotificationsEnabled) {
       return
@@ -150,9 +150,15 @@ export function WorkspaceNavigation({
     void requestNotificationPermissionFromMessageMenu({
       organizationId: identity.user.organizationId,
       userId: identity.user.id,
-    }).catch((error) => {
-      console.warn("从消息菜单申请通知权限失败", error)
     })
+      .then((status) => {
+        if (status) {
+          console.info("消息菜单通知权限申请完成", { status })
+        }
+      })
+      .catch((error) => {
+        console.warn("从消息菜单申请通知权限失败", error)
+      })
   }
 
   /** 立即保存工作状态，并在失败时恢复原状态。 */

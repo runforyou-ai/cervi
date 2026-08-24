@@ -83,7 +83,7 @@ export function UserPreferencesForm({
     }
   }, [form, theme])
 
-  /** 保存语言、时区和主题设置。 */
+  /** 保存账号与本机偏好设置。 */
   async function save(values: UserPreferencesFormValues) {
     try {
       const updated = await updateUserPreferences({
@@ -256,7 +256,7 @@ export function UserPreferencesForm({
               </Field>
             )}
           />
-          <NotificationPermissionSettings scope={notificationScope} />
+          <NotificationPermissionSettings />
         </section>
         <div>
           <Button type="submit" disabled={isSubmitting}>

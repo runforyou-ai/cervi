@@ -8,7 +8,7 @@ import type {
   CurrentUser,
 } from "@/api"
 
-/** 工作台实时消息入口需要的通知内容和最新绝对未读数。 */
+/** 工作台实时消息入口需要的通知内容和最新未读数。 */
 export type WorkspaceNewMessageNotification = Omit<
   MessageNotificationInput,
   "soundEnabled"

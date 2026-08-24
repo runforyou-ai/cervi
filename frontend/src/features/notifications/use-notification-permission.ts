@@ -1,11 +1,10 @@
 /** 在 React 页面中同步当前设备的通知权限状态。 */
 import { useEffect, useRef, useState } from "react"
 
+import { NotificationPermissionStatus } from "@/api"
 import {
   checkNotificationPermission,
   requestNotificationPermission,
-  subscribeNotificationDevicePreferences,
-  type NotificationDeviceScope,
   type NotificationPermissionState,
 } from "@/platform/notifications"
 
@@ -13,33 +12,30 @@ export type NotificationPermissionViewState =
   | NotificationPermissionState
   | "checking"
 
-/** 读取、刷新并申请当前企业用户在本设备上的通知权限。 */
-export function useNotificationPermission(scope: NotificationDeviceScope) {
+/** 读取、刷新并申请当前设备的通知权限。 */
+export function useNotificationPermission() {
   const [status, setStatus] =
     useState<NotificationPermissionViewState>("checking")
   const [requesting, setRequesting] = useState(false)
-  const activeScopeRef = useRef("")
-  const scopeKey = `${scope.organizationId}:${scope.userId}`
+  const mountedRef = useRef(false)
 
   useEffect(() => {
     let active = true
-    const currentScope = {
-      organizationId: scope.organizationId,
-      userId: scope.userId,
-    }
-    activeScopeRef.current = scopeKey
+    mountedRef.current = true
 
-    /** 重新读取当前设备的通知权限。 */
+    /** 刷新当前设备的通知权限。 */
     async function refreshPermission() {
       try {
-        const nextStatus = await checkNotificationPermission(currentScope)
+        const nextStatus = await checkNotificationPermission()
         if (active) {
           setStatus(nextStatus)
         }
       } catch (error) {
         if (active) {
           console.warn("读取通知权限失败", error)
-          setStatus("unsupported")
+          setStatus(
+            NotificationPermissionStatus.NotificationPermissionStatusUnsupported,
+          )
         }
       }
     }
@@ -47,43 +43,31 @@ export function useNotificationPermission(scope: NotificationDeviceScope) {
     setStatus("checking")
     setRequesting(false)
     void refreshPermission()
-    const unsubscribe = subscribeNotificationDevicePreferences(
-      currentScope,
-      () => void refreshPermission(),
-    )
     window.addEventListener("focus", refreshPermission)
     return () => {
       active = false
-      if (activeScopeRef.current === scopeKey) {
-        activeScopeRef.current = ""
-      }
-      unsubscribe()
+      mountedRef.current = false
       window.removeEventListener("focus", refreshPermission)
     }
-  }, [scope.organizationId, scope.userId, scopeKey])
+  }, [])
 
-  /** 从当前用户操作中申请通知权限并同步最新状态。 */
+  /** 申请通知权限并同步状态。 */
   async function requestPermission() {
-    const requestedScope = {
-      organizationId: scope.organizationId,
-      userId: scope.userId,
-    }
-    const requestedScopeKey = scopeKey
     setRequesting(true)
     try {
-      const nextStatus = await requestNotificationPermission(requestedScope)
-      if (activeScopeRef.current !== requestedScopeKey) {
+      const nextStatus = await requestNotificationPermission()
+      if (!mountedRef.current) {
         return null
       }
       setStatus(nextStatus)
       return nextStatus
     } catch (error) {
-      if (activeScopeRef.current !== requestedScopeKey) {
+      if (!mountedRef.current) {
         return null
       }
       throw error
     } finally {
-      if (activeScopeRef.current === requestedScopeKey) {
+      if (mountedRef.current) {
         setRequesting(false)
       }
     }

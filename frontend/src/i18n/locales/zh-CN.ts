@@ -770,7 +770,7 @@ const zhCN = {
           "开启后，Web 和桌面端会在你上班时提醒新消息；休息一下或下班后自动暂停。",
         sound: "播放系统默认通知声音",
         soundDescription:
-          "使用系统默认声音，仅保存在当前浏览器或设备，默认开启。",
+          "仅影响当前设备，有新消息时播放系统默认通知声音。",
         permission: {
           label: "本设备通知权限",
           authorized: "已授权",
@@ -781,6 +781,7 @@ const zhCN = {
           allowSuccess: "通知权限已开启。",
           allowDenied: "未能开启通知，请在浏览器或系统设置中允许。",
           allowError: "无法申请通知权限，请重试。",
+          settingsOpenError: "无法打开系统通知设置，请手动前往系统设置。",
         },
       },
       save: "保存",

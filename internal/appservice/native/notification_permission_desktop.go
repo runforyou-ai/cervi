@@ -1,10 +1,10 @@
-//go:build !server && darwin && !ios
+//go:build !server && ((darwin && !ios) || windows || (linux && !android))
 
 package native
 
 import "github.com/runforyou-ai/cervi/internal/appservice"
 
-// checkedNotificationPermission 将 macOS 当前授权结果转换为应用状态。
+// checkedNotificationPermission 转换桌面通知授权状态。
 func checkedNotificationPermission(authorized bool) appservice.NotificationPermissionStatus {
 	if authorized {
 		return appservice.NotificationPermissionStatusGranted
@@ -12,7 +12,7 @@ func checkedNotificationPermission(authorized bool) appservice.NotificationPermi
 	return appservice.NotificationPermissionStatusPrompt
 }
 
-// requestedNotificationPermission 将 macOS 授权请求结果转换为应用状态。
+// requestedNotificationPermission 转换桌面通知授权结果。
 func requestedNotificationPermission(authorized bool) appservice.NotificationPermissionStatus {
 	if authorized {
 		return appservice.NotificationPermissionStatusGranted

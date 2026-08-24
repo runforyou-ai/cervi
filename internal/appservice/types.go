@@ -80,11 +80,10 @@ const (
 type NotificationPermissionStatus string
 
 const (
-	NotificationPermissionStatusPrompt        NotificationPermissionStatus = "prompt"
-	NotificationPermissionStatusGranted       NotificationPermissionStatus = "granted"
-	NotificationPermissionStatusDenied        NotificationPermissionStatus = "denied"
-	NotificationPermissionStatusSystemManaged NotificationPermissionStatus = "system_managed"
-	NotificationPermissionStatusUnsupported   NotificationPermissionStatus = "unsupported"
+	NotificationPermissionStatusPrompt      NotificationPermissionStatus = "prompt"
+	NotificationPermissionStatusGranted     NotificationPermissionStatus = "granted"
+	NotificationPermissionStatusDenied      NotificationPermissionStatus = "denied"
+	NotificationPermissionStatusUnsupported NotificationPermissionStatus = "unsupported"
 )
 
 // ChannelType 表示渠道类型。
@@ -393,7 +392,7 @@ type UserPreferencesInput struct {
 	MessageNotificationsEnabled bool   `json:"messageNotificationsEnabled"`
 }
 
-// MessageNotificationInput 定义一条准备投递到当前设备的新消息通知。
+// MessageNotificationInput 定义当前设备的新消息通知内容。
 type MessageNotificationInput struct {
 	ID           string `json:"id"`
 	Title        string `json:"title"`

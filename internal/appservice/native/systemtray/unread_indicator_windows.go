@@ -48,7 +48,7 @@ func (i *windowsUnreadIndicator) SetUnreadState(state appservice.UnreadIndicator
 	return nil
 }
 
-// run 串行更新托盘图标，保证未读状态切换不会创建重复闪烁循环。
+// run 根据最新提醒状态更新托盘图标。
 func (i *windowsUnreadIndicator) run() {
 	var ticker *time.Ticker
 	var ticks <-chan time.Time

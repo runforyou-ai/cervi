@@ -797,7 +797,7 @@ const enUS = {
           "Web and desktop notify you about new messages while you are working. Notifications pause while you are taking a break or off work.",
         sound: "Play the system default notification sound",
         soundDescription:
-          "Uses the system default sound, is saved only in this browser or on this device, and is enabled by default.",
+          "Only affects this device and plays the system default sound for new messages.",
         permission: {
           label: "Notifications on this device",
           authorized: "Authorized",
@@ -811,6 +811,8 @@ const enUS = {
           allowDenied:
             "Notifications were not enabled. Allow them in your browser or system settings.",
           allowError: "Could not request notification permission. Try again.",
+          settingsOpenError:
+            "Could not open notification settings. Open them manually in system settings.",
         },
       },
       save: "Save",

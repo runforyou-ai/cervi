@@ -1,9 +1,9 @@
 /** 偏好设置中的当前设备通知权限状态与操作。 */
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
+import { NotificationPermissionStatus } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -11,58 +11,60 @@ import {
   FieldDescription,
   FieldTitle,
 } from "@/components/ui/field"
-import { recoverSession } from "@/lib/session-navigation"
 import {
   canSendNotification,
   openNotificationPermissionSettings,
-  type NotificationDeviceScope,
 } from "@/platform/notifications"
 import { useNotificationPermission } from "@/features/notifications/use-notification-permission"
 
 /** 展示本设备通知权限，并在需要时提供申请操作。 */
-export function NotificationPermissionSettings({
-  scope,
-}: {
-  scope: NotificationDeviceScope
-}) {
+export function NotificationPermissionSettings() {
   const { t } = useTranslation("settings")
-  const navigate = useNavigate()
-  const { status, requesting, requestPermission } =
-    useNotificationPermission(scope)
+  const { status, requesting, requestPermission } = useNotificationPermission()
   const authorized = status !== "checking" && canSendNotification(status)
 
-  /** 申请当前设备的通知权限。 */
+  /** 处理当前设备的通知授权操作。 */
   async function allowNotifications() {
+    let requestFailed = false
     try {
-      if (
-        status === "denied" &&
-        (await openNotificationPermissionSettings())
-      ) {
-        return
-      }
       const nextStatus = await requestPermission()
       if (!nextStatus) {
         return
       }
+      console.info("通知权限申请完成", { status: nextStatus })
       if (canSendNotification(nextStatus)) {
         toast.success(t("preferences.notifications.permission.allowSuccess"))
         return
       }
-      toast.error(t("preferences.notifications.permission.allowDenied"))
-    } catch (error) {
-      if (recoverSession(error, navigate)) {
+      if (
+        nextStatus !==
+        NotificationPermissionStatus.NotificationPermissionStatusDenied
+      ) {
+        toast.error(t("preferences.notifications.permission.allowDenied"))
         return
       }
-      try {
-        if (await openNotificationPermissionSettings()) {
-          return
-        }
-      } catch (openError) {
-        console.warn("打开系统通知设置失败", openError)
-      }
+    } catch (error) {
+      requestFailed = true
       console.warn("申请通知权限失败", error)
-      toast.error(t("preferences.notifications.permission.allowError"))
     }
+
+    try {
+      if (await openNotificationPermissionSettings()) {
+        console.info("已打开 macOS 通知设置")
+        return
+      }
+    } catch (error) {
+      console.warn("打开 macOS 通知设置失败", error)
+      toast.error(t("preferences.notifications.permission.settingsOpenError"))
+      return
+    }
+    toast.error(
+      t(
+        requestFailed
+          ? "preferences.notifications.permission.allowError"
+          : "preferences.notifications.permission.allowDenied",
+      ),
+    )
   }
 
   return (

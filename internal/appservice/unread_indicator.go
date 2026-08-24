@@ -4,14 +4,14 @@ import "strconv"
 
 const maxDisplayedUnreadCount = 99
 
-// UnreadIndicatorState 定义未读事实与当前是否需要吸引用户注意。
+// UnreadIndicatorState 定义未读数量和托盘提醒条件。
 type UnreadIndicatorState struct {
 	Count            int  `json:"count"`
 	AttentionEnabled bool `json:"attentionEnabled"`
 	AttentionPending bool `json:"attentionPending"`
 }
 
-// UnreadIndicator 将未读状态投射到当前平台的原生界面。
+// UnreadIndicator 更新当前平台的未读提示。
 type UnreadIndicator interface {
 	SetUnreadState(state UnreadIndicatorState) error
 }

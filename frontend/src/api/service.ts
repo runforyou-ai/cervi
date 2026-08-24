@@ -303,9 +303,9 @@ export const checkNotificationPermission = bind(CheckNotificationPermission)
 export const requestNotificationPermission = bind(
   RequestNotificationPermission,
 )
-/** 在桌面原生层投递一条已完成策略判断的新消息通知。 */
+/** 投递一条桌面新消息通知。 */
 export const sendNativeMessageNotification = bind(SendMessageNotification)
-/** 同步当前设备的未读数和注意力状态。 */
+/** 同步当前设备的未读数和托盘提醒状态。 */
 export const updateUnreadIndicator = bind(UpdateUnreadIndicator)
 /** 修改当前用户主动设置的工作状态。 */
 export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
