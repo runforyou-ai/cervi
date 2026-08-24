@@ -2,20 +2,17 @@
 import { useEffect, useLayoutEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Outlet, useLocation, useNavigate } from "react-router"
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
   logout,
-  sessionPath,
-  SessionState,
   type Identity,
   type Organization,
   type CurrentUser,
 } from "@/api"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
-import { SessionLoadFailedState } from "@/features/session/session-load-failed-state"
-import { useSessionLoader } from "@/features/session/use-session-loader"
+import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import type { WorkspaceOutletContext } from "@/features/workspace/workspace-context"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 
@@ -28,46 +25,24 @@ function useClearSelectionOnNavigation() {
   }, [location.key])
 }
 
-/** 读取会话并渲染工作台导航和子页面。 */
-export function WorkspaceLayout({
-  allowServerChange = false,
-}: {
-  allowServerChange?: boolean
-}) {
+/** 读取登录身份并渲染工作台导航和子页面。 */
+export function WorkspaceLayout() {
   useClearSelectionOnNavigation()
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
-  const { status, session, retry } = useSessionLoader()
+  const { status, identity: loadedIdentity, redirectPath } = useIdentityLoader()
 
-  /** 会话加载完成后同步工作台身份。 */
+  /** 身份加载完成后同步工作台状态。 */
   useEffect(() => {
-    if (status !== "loaded" || !session) {
-      return
-    }
-    if (session.state === SessionState.SessionStateReady && session.identity) {
-      setIdentity(session.identity)
+    if (loadedIdentity) {
+      setIdentity(loadedIdentity)
       console.info("工作台身份已加载", {
-        organization: session.identity.organization.name,
+        organization: loadedIdentity.organization.name,
       })
     }
-  }, [session, status])
-
-  /** 会话未就绪时跳转到对应入口。 */
-  useEffect(() => {
-    if (
-      status !== "loaded" ||
-      !session ||
-      session.state === SessionState.SessionStateReady
-    ) {
-      return
-    }
-    const path = sessionPath(session.state)
-    if (path) {
-      navigate(path, { replace: true })
-    }
-  }, [navigate, session, status])
+  }, [loadedIdentity])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -94,30 +69,23 @@ export function WorkspaceLayout({
     setIdentity((current) => (current ? { ...current, organization } : current))
   }
 
-  if (
-    !identity &&
-    (status === "loading" ||
-      (status === "loaded" &&
-        session?.state === SessionState.SessionStateReady))
-  ) {
+  if (status === "anonymous") return <Navigate to="/login" replace />
+  if (status === "redirect" && redirectPath) {
+    return <Navigate to={redirectPath} replace />
+  }
+  if (status === "failed") {
+    return (
+      <main className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+        {t("identityLoadError")}
+      </main>
+    )
+  }
+  if (!identity) {
     return (
       <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
         {t("loading")}
       </main>
-    )
-  }
-
-  if (!identity) {
-    return (
-      <SessionLoadFailedState
-        onRetry={retry}
-        onChangeServer={
-          allowServerChange
-            ? () => navigate("/connect", { replace: true })
-            : undefined
-        }
-      />
     )
   }
 

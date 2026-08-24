@@ -6,12 +6,6 @@ const zhCN = {
     actions: {
       close: "关闭",
       back: "返回",
-      retry: "重试",
-      changeServer: "更换服务器",
-    },
-    sessionLoadFailed: {
-      title: "无法读取登录状态",
-      description: "请重试。",
     },
     comingSoon: "即将支持",
     workStatuses: {
@@ -85,6 +79,7 @@ const zhCN = {
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
+    identityLoadError: "无法读取登录状态。",
   },
   workspace: {
     navigationGroup: "工作台",
@@ -100,6 +95,7 @@ const zhCN = {
     loggingOut: "正在退出…",
     logoutError: "退出登录失败，请重试。",
     loading: "正在加载…",
+    identityLoadError: "无法读取登录状态。",
     inboxLoadError: "消息加载失败。",
     retry: "重试",
   },

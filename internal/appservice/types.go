@@ -35,10 +35,9 @@ const (
 	ErrorKindFailed      ErrorKind = "failed"
 )
 
-// Session 表示当前会话。
-type Session struct {
+// Startup 表示应用启动入口和企业名称。
+type Startup struct {
 	State            SessionState `json:"state"`
-	Identity         *Identity    `json:"identity,omitempty"`
 	OrganizationName string       `json:"organizationName,omitempty"`
 }
 

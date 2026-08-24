@@ -83,7 +83,7 @@ export type {
     RoleList,
     RoleSummary,
     S3Setting,
-    Session,
+    Startup,
     Team,
     TeamInput,
     TeamList,
