@@ -4,8 +4,11 @@ package user
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -27,25 +30,42 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	if err := validateIdentity(ctx, a.db, identity); err != nil {
-		return nil, err
-	}
-
-	_, err := a.db.NewUpdate().
-		Model((*servermodels.OrganizationIdentity)(nil)).
-		Set("work_status = ?", input.WorkStatus).
-		Set("work_status_updated_at = now()").
-		Set("updated_at = now()").
-		Where("oi.id = ?", identity.User.IdentityID).
-		Where("oi.organization_id = ?", identity.Organization.ID).
-		Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
-		Exec(ctx)
+	var updatedIdentity *servermodels.Identity
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := validateIdentity(ctx, tx, identity); err != nil {
+			return err
+		}
+		storedUser := &servermodels.User{}
+		err := tx.NewSelect().Model(storedUser).
+			Column("identity_id").
+			Where("id = ?", identity.User.ID).
+			Where("identity_id = ?", identity.User.IdentityID).
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("status = ?", domain.UserStatusActive).
+			For("UPDATE").
+			Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return common.ErrIdentityInvalid
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := tx.NewUpdate().
+			Model((*servermodels.OrganizationIdentity)(nil)).
+			Set("work_status = ?", input.WorkStatus).
+			Set("work_status_updated_at = now()").
+			Set("updated_at = now()").
+			Where("oi.id = ?", storedUser.IdentityID).
+			Where("oi.organization_id = ?", identity.Organization.ID).
+			Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
+			Exec(ctx); err != nil {
+			return err
+		}
+		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)
+		return err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("update user work status: %w", err)
-	}
-	updatedIdentity, err := loadCurrentIdentity(ctx, a.db, identity.Organization, identity.User.ID)
-	if err != nil {
-		return nil, fmt.Errorf("reload user work status: %w", err)
 	}
 	return updatedIdentity, nil
 }

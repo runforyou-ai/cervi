@@ -16,10 +16,10 @@ import (
 
 // MemberListInput 定义团队成员列表查询条件。
 type MemberListInput struct {
-	Query    string
-	Status   domain.UserStatus
-	Page     int
-	PageSize int
+	Query      string
+	WorkStatus domain.WorkStatus
+	Page       int
+	PageSize   int
 }
 
 // Member 定义团队成员信息。
@@ -27,7 +27,7 @@ type Member struct {
 	IdentityID   string                          `bun:"identity_id"`
 	IdentityType domain.OrganizationIdentityType `bun:"identity_type"`
 	DisplayName  string                          `bun:"display_name"`
-	Status       domain.UserStatus               `bun:"status"`
+	WorkStatus   domain.WorkStatus               `bun:"work_status"`
 	JoinedAt     time.Time                       `bun:"joined_at"`
 }
 
@@ -48,15 +48,18 @@ func NewListMembersQuery(db *bun.DB) *ListMembersQuery {
 // Execute 返回团队成员分页列表。
 func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, input MemberListInput) (MemberListOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
-	input.Status = domain.UserStatus(strings.TrimSpace(string(input.Status)))
+	input.WorkStatus = domain.WorkStatus(strings.TrimSpace(string(input.WorkStatus)))
 	if input.Page <= 0 {
 		input.Page = 1
 	}
 	if input.PageSize <= 0 {
 		input.PageSize = 50
 	}
-	if input.PageSize > 100 || (input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) {
+	if input.PageSize > 100 {
 		return MemberListOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
+	}
+	if input.WorkStatus != "" && input.WorkStatus != domain.WorkStatusWorking && input.WorkStatus != domain.WorkStatusAway && input.WorkStatus != domain.WorkStatusOffDuty {
+		return MemberListOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusInvalid}}
 	}
 	if err := validateIdentity(ctx, q.db, identity); err != nil {
 		return MemberListOutput{}, err
@@ -68,9 +71,10 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 		query = query.
 			Where("tm.organization_id = ?", identity.Organization.ID).
 			Where("tm.team_id = ?", teamID).
-			Where("oi.type IN (?, ?)", domain.OrganizationIdentityTypeUser, domain.OrganizationIdentityTypeAgent)
-		if input.Status != "" {
-			query = query.Where("CASE WHEN oi.type = ? THEN u.status ELSE a.status END = ?", domain.OrganizationIdentityTypeUser, input.Status)
+			Where("oi.type IN (?, ?)", domain.OrganizationIdentityTypeUser, domain.OrganizationIdentityTypeAgent).
+			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive)
+		if input.WorkStatus != "" {
+			query = query.Where("oi.work_status = ?", input.WorkStatus)
 		}
 		if input.Query != "" {
 			query = query.Where("oi.display_name ILIKE ?", "%"+input.Query+"%")
@@ -89,7 +93,7 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 	}
 	members := make([]Member, 0)
 	if err := applyFilters(base()).
-		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, oi.display_name, CASE WHEN oi.type = ? THEN u.status ELSE a.status END AS status, tm.created_at AS joined_at", domain.OrganizationIdentityTypeUser).
+		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, oi.display_name, oi.work_status, tm.created_at AS joined_at").
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).

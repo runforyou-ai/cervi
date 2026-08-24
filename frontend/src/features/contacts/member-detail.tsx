@@ -1,5 +1,11 @@
 /** 企业成员详情和字段级编辑。 */
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -8,8 +14,10 @@ import { toast } from "sonner"
 
 import {
   UserStatus,
+  deactivateUser,
   isApiError,
   isNotFoundApiError,
+  reactivateUser,
   updateUser,
   type UserData,
   type RoleData,
@@ -19,22 +27,34 @@ import { Field, FieldDescription } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { StatusBadge } from "@/components/status-badge"
-import { userStatusLabel } from "@/features/contacts/contact-labels"
 import {
-  DetailEditActions,
-  DetailEditRow,
-} from "@/features/contacts/detail-edit-row"
+  accountStatuses,
+  accountStatusSchema,
+  type AccountStatusFormValues,
+} from "@/features/contacts/account-status-schema"
+import { userStatusLabel } from "@/features/contacts/contact-labels"
+import { DetailEditRow } from "@/features/contacts/detail-edit-row"
 import {
   createMemberSchema,
   type MemberFormValues,
 } from "@/features/contacts/member-schema"
+import {
+  sameIDs,
+  useImmediateSave,
+} from "@/features/contacts/use-immediate-save"
+import { roleDisplayName } from "@/features/roles/role-labels"
 import { WorkStatusBadge } from "@/features/users/work-status"
 import { useDateTime } from "@/hooks/use-date-time"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { roleDisplayName } from "@/features/roles/role-labels"
 
-type EditingField = "name" | "email" | "role" | "teams" | null
+type EditingField =
+  | "name"
+  | "email"
+  | "role"
+  | "accountStatus"
+  | "teams"
+  | null
 
 /** 把企业成员详情转换为编辑表单值。 */
 function valuesFromUser(user: UserData): MemberFormValues {
@@ -84,7 +104,8 @@ export function MemberDetailView({
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [editing, setEditing] = useState<EditingField>(null)
-  const [saving, setSaving] = useState(false)
+  const saveState = useImmediateSave()
+  const { saving } = saveState
   const schema = useMemo(
     () =>
       createMemberSchema(
@@ -106,36 +127,70 @@ export function MemberDetailView({
     shouldUseNativeValidation: true,
     defaultValues: valuesFromUser(user),
   })
+  const accountStatusForm = useForm<AccountStatusFormValues>({
+    resolver: zodResolver(accountStatusSchema),
+    shouldUseNativeValidation: true,
+    defaultValues: { status: user.status },
+  })
 
   useEffect(() => {
     form.reset(valuesFromUser(user))
-    setEditing(null)
-  }, [form, user])
+    accountStatusForm.reset({ status: user.status })
+  }, [accountStatusForm, form, user])
 
-  /** 取消当前字段编辑。 */
+  /** 放弃尚未提交的修改并退出编辑。 */
   function cancelEdit() {
     form.reset(valuesFromUser(user))
+    accountStatusForm.reset({ status: user.status })
     setEditing(null)
   }
 
   /** 开始编辑指定成员字段。 */
   function startEditing(field: Exclude<EditingField, null>) {
     form.reset(valuesFromUser(user))
+    accountStatusForm.reset({ status: user.status })
     setEditing(field)
   }
 
-  const save = form.handleSubmit(async (values) => {
-    setSaving(true)
+  /** 保存成员字段。 */
+  async function saveMember(
+    draft: MemberFormValues = form.getValues(),
+    closeAfterSave = true,
+  ) {
+    const userID = user.id
+    const request = saveState.begin()
+    if (request === null) return
+    const valid = await form.trigger()
+    if (!saveState.isCurrent(request)) return
+    if (!valid) {
+      saveState.finish(request)
+      return
+    }
+    const current = valuesFromUser(user)
+    if (
+      draft.displayName === current.displayName &&
+      draft.email === current.email &&
+      draft.roleId === current.roleId &&
+      sameIDs(draft.teamIds, current.teamIds)
+    ) {
+      setEditing(null)
+      saveState.finish(request)
+      return
+    }
+
     try {
-      const saved = await updateUser(user.id, {
-        displayName: values.displayName,
-        email: values.email,
-        roleId: values.roleId,
-        teamIds: values.teamIds,
+      const saved = await updateUser(userID, {
+        displayName: draft.displayName,
+        email: draft.email,
+        roleId: draft.roleId,
+        teamIds: draft.teamIds,
       })
-      toast.success(t("members.form.updated"))
+      if (!saveState.isCurrent(request)) return
+      if (closeAfterSave) setEditing(null)
       onSaved(saved)
     } catch (error) {
+      if (!saveState.isCurrent(request)) return
+      cancelEdit()
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         onNotFound()
@@ -153,9 +208,76 @@ export function MemberDetailView({
           : t("members.form.networkError"),
       )
     } finally {
-      setSaving(false)
+      saveState.finish(request)
     }
-  })
+  }
+
+  /** 修改企业成员账号状态。 */
+  async function saveAccountStatus(
+    status: AccountStatusFormValues["status"],
+  ) {
+    if (status === user.status) {
+      setEditing(null)
+      return
+    }
+    const userID = user.id
+    const request = saveState.begin()
+    if (request === null) return
+    const valid = await accountStatusForm.trigger()
+    if (!saveState.isCurrent(request)) return
+    if (!valid) {
+      saveState.finish(request)
+      return
+    }
+
+    try {
+      const saved =
+        status === UserStatus.UserStatusInactive
+          ? await deactivateUser(userID)
+          : await reactivateUser(userID)
+      if (!saveState.isCurrent(request)) return
+      setEditing(null)
+      onSaved(saved)
+    } catch (error) {
+      if (!saveState.isCurrent(request)) return
+      cancelEdit()
+      if (recoverSession(error, navigate)) return
+      if (isNotFoundApiError(error)) {
+        onNotFound()
+        return
+      }
+      console.warn("修改企业成员账号状态失败", error)
+      toast.error(
+        isApiError(error)
+          ? apiErrorMessage(error)
+          : t("members.status.error"),
+      )
+    } finally {
+      saveState.finish(request)
+    }
+  }
+
+  /** 处理文本字段快捷键。 */
+  function handleTextKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault()
+      event.stopPropagation()
+      cancelEdit()
+      return
+    }
+    if (event.key === "Enter") {
+      event.preventDefault()
+      event.currentTarget.blur()
+    }
+  }
+
+  /** 处理选择字段快捷键。 */
+  function handleSelectKeyDown(event: KeyboardEvent<HTMLSelectElement>) {
+    if (event.key !== "Escape") return
+    event.preventDefault()
+    event.stopPropagation()
+    cancelEdit()
+  }
 
   const empty = (
     <span className="text-muted-foreground">{t("detail.empty")}</span>
@@ -175,11 +297,21 @@ export function MemberDetailView({
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("name")}
           >
-            <Input {...form.register("displayName")} autoFocus />
-            <DetailEditActions
-              saving={saving}
-              onSave={() => void save()}
-              onCancel={cancelEdit}
+            <Controller
+              name="displayName"
+              control={form.control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  autoFocus
+                  disabled={saving}
+                  onBlur={() => {
+                    field.onBlur()
+                    void saveMember()
+                  }}
+                  onKeyDown={handleTextKeyDown}
+                />
+              )}
             />
           </DetailEditRow>
 
@@ -190,11 +322,22 @@ export function MemberDetailView({
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("email")}
           >
-            <Input {...form.register("email")} type="email" autoFocus />
-            <DetailEditActions
-              saving={saving}
-              onSave={() => void save()}
-              onCancel={cancelEdit}
+            <Controller
+              name="email"
+              control={form.control}
+              render={({ field }) => (
+                <Input
+                  {...field}
+                  type="email"
+                  autoFocus
+                  disabled={saving}
+                  onBlur={() => {
+                    field.onBlur()
+                    void saveMember()
+                  }}
+                  onKeyDown={handleTextKeyDown}
+                />
+              )}
             />
           </DetailEditRow>
 
@@ -205,35 +348,88 @@ export function MemberDetailView({
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("role")}
           >
-            <NativeSelect {...form.register("roleId")} autoFocus>
-              {roles.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {roleDisplayName(role, tCommon)}
-                </option>
-              ))}
-            </NativeSelect>
-            <DetailEditActions
-              saving={saving}
-              onSave={() => void save()}
-              onCancel={cancelEdit}
+            <Controller
+              name="roleId"
+              control={form.control}
+              render={({ field }) => (
+                <NativeSelect
+                  {...field}
+                  autoFocus
+                  disabled={saving}
+                  onChange={(event) => {
+                    const roleId = event.target.value
+                    field.onChange(roleId)
+                    void saveMember({
+                      ...form.getValues(),
+                      roleId,
+                    })
+                  }}
+                  onBlur={() => {
+                    field.onBlur()
+                    if (!saveState.isSaving()) cancelEdit()
+                  }}
+                  onKeyDown={handleSelectKeyDown}
+                >
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {roleDisplayName(role, tCommon)}
+                    </option>
+                  ))}
+                </NativeSelect>
+              )}
             />
           </DetailEditRow>
 
-          <ReadonlyDetailRow label={t("columns.status")}>
-            <StatusBadge
-              showDot={false}
-              variant={
-                user.status === UserStatus.UserStatusActive
-                  ? "success"
-                  : "muted"
-              }
-            >
-              {userStatusLabel(user.status, t)}
-            </StatusBadge>
-          </ReadonlyDetailRow>
+          <DetailEditRow
+            label={t("columns.accountStatus")}
+            value={
+              <StatusBadge
+                showDot={false}
+                variant={
+                  user.status === UserStatus.UserStatusActive
+                    ? "success"
+                    : "muted"
+                }
+              >
+                {userStatusLabel(user.status, t)}
+              </StatusBadge>
+            }
+            editing={editing === "accountStatus"}
+            editEnabled={editing === null && !saving}
+            onEdit={() => startEditing("accountStatus")}
+          >
+            <Controller
+              name="status"
+              control={accountStatusForm.control}
+              render={({ field }) => (
+                <NativeSelect
+                  {...field}
+                  autoFocus
+                  disabled={saving}
+                  onChange={(event) => {
+                    const status = event.target
+                      .value as AccountStatusFormValues["status"]
+                    field.onChange(status)
+                    void saveAccountStatus(status)
+                  }}
+                  onBlur={() => {
+                    field.onBlur()
+                    if (!saveState.isSaving()) cancelEdit()
+                  }}
+                  onKeyDown={handleSelectKeyDown}
+                >
+                  {accountStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {userStatusLabel(status, t)}
+                    </option>
+                  ))}
+                </NativeSelect>
+              )}
+            />
+          </DetailEditRow>
 
           <ReadonlyDetailRow label={t("columns.workStatus")}>
-            <WorkStatusBadge status={workStatus} showDot={false} />
+            <WorkStatusBadge status={workStatus} />
           </ReadonlyDetailRow>
         </div>
       </section>
@@ -246,7 +442,7 @@ export function MemberDetailView({
             user.teams.map((team) => team.name).join("、") || empty
           }
           editing={editing === "teams"}
-          editEnabled={editing === null && !saving}
+          editEnabled={editing === null && !saving && teams.length > 0}
           onEdit={() => startEditing("teams")}
         >
           <Controller
@@ -259,7 +455,25 @@ export function MemberDetailView({
                     {t("members.form.noTeams")}
                   </FieldDescription>
                 ) : (
-                  <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
+                  <div
+                    className="grid gap-2 rounded-md border p-3 sm:grid-cols-2"
+                    onBlur={(event) => {
+                      if (event.currentTarget.contains(event.relatedTarget)) {
+                        return
+                      }
+                      if (saveState.isSaving()) {
+                        setEditing(null)
+                        return
+                      }
+                      cancelEdit()
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Escape") return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      cancelEdit()
+                    }}
+                  >
                     {teams.map((team) => (
                       <label
                         key={team.id}
@@ -267,15 +481,22 @@ export function MemberDetailView({
                       >
                         <input
                           type="checkbox"
-                          className="size-4 accent-primary"
+                          className="size-4 accent-primary disabled:cursor-wait disabled:opacity-60"
+                          disabled={saving}
                           checked={field.value.includes(team.id)}
-                          onChange={(event) =>
-                            field.onChange(
-                              event.target.checked
-                                ? [...field.value, team.id]
-                                : field.value.filter((id) => id !== team.id),
+                          onChange={(event) => {
+                            const teamIds = event.target.checked
+                              ? [...field.value, team.id]
+                              : field.value.filter((id) => id !== team.id)
+                            field.onChange(teamIds)
+                            void saveMember(
+                              {
+                                ...form.getValues(),
+                                teamIds,
+                              },
+                              false,
                             )
-                          }
+                          }}
                         />
                         <span>{team.name}</span>
                       </label>
@@ -284,11 +505,6 @@ export function MemberDetailView({
                 )}
               </Field>
             )}
-          />
-          <DetailEditActions
-            saving={saving}
-            onSave={() => void save()}
-            onCancel={cancelEdit}
           />
         </DetailEditRow>
       </section>

@@ -16,6 +16,7 @@ const (
 	ValidationNameDuplicate      common.FieldCode = "TEAM_NAME_DUPLICATE"
 	ValidationDescriptionTooLong common.FieldCode = "TEAM_DESCRIPTION_TOO_LONG"
 	ValidationQueryInvalid       common.FieldCode = "TEAM_QUERY_INVALID"
+	ValidationWorkStatusInvalid  common.FieldCode = "WORK_STATUS_INVALID"
 )
 
 // normalizeInput 规范化并校验团队字段。

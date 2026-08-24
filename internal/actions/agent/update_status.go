@@ -22,7 +22,7 @@ type UpdateStatusAction struct{ db *bun.DB }
 // NewUpdateStatusAction 创建 AI 员工状态修改操作。
 func NewUpdateStatusAction(db *bun.DB) *UpdateStatusAction { return &UpdateStatusAction{db: db} }
 
-// Execute 停用或恢复 AI 员工，并在停用时清理渠道分配。
+// Execute 禁用或恢复 AI 员工账号，并在禁用时清理渠道分配。
 func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, status domain.UserStatus) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
@@ -50,6 +50,16 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			return err
 		}
 		if status == domain.UserStatusInactive {
+			if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+				Set("work_status = ?", domain.WorkStatusOffDuty).
+				Set("work_status_updated_at = now()").
+				Set("updated_at = now()").
+				Where("organization_id = ?", identity.Organization.ID).
+				Where("id = ?", updatedAgent.IdentityID).
+				Where("type = ?", domain.OrganizationIdentityTypeAgent).
+				Exec(ctx); err != nil {
+				return err
+			}
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedAgent.IdentityID); err != nil {
 				return err
 			}

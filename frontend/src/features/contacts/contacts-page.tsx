@@ -30,6 +30,7 @@ import {
   ContactStage,
   OrganizationIdentityType,
   UserStatus,
+  WorkStatus,
   deactivateAgent,
   deactivateUser,
   deleteContact,
@@ -138,6 +139,7 @@ import {
   channelTypeLabel,
   userStatusLabel,
 } from "@/features/contacts/contact-labels"
+import { WorkStatusBadge, workStatusLabel } from "@/features/users/work-status"
 import { useDateTime } from "@/hooks/use-date-time"
 import { cn } from "@/lib/utils"
 
@@ -446,7 +448,7 @@ function StageLabel({ stage }: { stage: ContactStage }) {
   )
 }
 
-/** 显示启用状态徽标。 */
+/** 显示账号状态徽标。 */
 function UserStatusBadge({
   status,
   label,
@@ -574,6 +576,10 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const status =
     optionalWailsEnum(UserStatus, searchParams.get("status")) ??
     UserStatus.UserStatusActive
+  const workStatus = optionalWailsEnum(
+    WorkStatus,
+    searchParams.get("workStatus"),
+  )
   const roleId = searchParams.get("roleId") ?? ""
   const selectedTeam = teams.find((team) => team.id === teamId)
   const currentPage = Number(searchParams.get("page") ?? "1") || 1
@@ -583,6 +589,15 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     return user.id === identity.user.id
       ? identity.user.workStatus
       : user.workStatus
+  }
+
+  /** 当前用户使用工作台中的即时状态，其他团队成员使用列表结果。 */
+  function identityWorkStatus(member: TeamMember) {
+    return member.identityType ===
+      OrganizationIdentityType.OrganizationIdentityTypeUser &&
+      member.identityId === identity.user.identityId
+      ? identity.user.workStatus
+      : member.workStatus
   }
 
   /** 更新列表查询参数。 */
@@ -606,7 +621,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   useEffect(() => setSearch(query), [query])
   useEffect(() => {
     setSelectedTeamMemberIdentityIDs(new Set())
-  }, [currentPage, query, roleId, status, teamId])
+  }, [currentPage, query, roleId, status, teamId, workStatus])
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       if (search !== query) {
@@ -684,7 +699,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       } else {
         const response = await listTeamMembers(teamId, {
           query,
-          status,
+          workStatus,
           page: currentPage,
           pageSize: 50,
         })
@@ -712,6 +727,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     stage,
     status,
     teamId,
+    workStatus,
   ])
 
   useEffect(() => {
@@ -855,7 +871,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     }
   }
 
-  /** 停用或恢复用户账号。 */
+  /** 禁用用户账号或恢复为正常状态。 */
   async function changeUserStatus() {
     if (!changingUserStatus) return
     setDeleting(true)
@@ -864,7 +880,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         changingUserStatus.status === UserStatus.UserStatusActive
           ? await deactivateUser(changingUserStatus.id)
           : await reactivateUser(changingUserStatus.id)
-      console.info("用户账号状态已修改", {
+      console.info("企业成员账号状态已修改", {
         identity_id: saved.identityId,
         user_id: saved.id,
         status: saved.status,
@@ -883,7 +899,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       setRefreshVersion((current) => current + 1)
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      console.warn("修改用户账号状态失败", {
+      console.warn("修改企业成员账号状态失败", {
         user_id: changingUserStatus.id,
         error,
       })
@@ -893,7 +909,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     }
   }
 
-  /** 停用或恢复 AI 员工。 */
+  /** 禁用 AI 员工账号或恢复为正常状态。 */
   async function changeAgentStatus() {
     if (!changingAgentStatus) return
     setDeleting(true)
@@ -902,7 +918,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         changingAgentStatus.status === UserStatus.UserStatusActive
           ? await deactivateAgent(changingAgentStatus.id)
           : await reactivateAgent(changingAgentStatus.id)
-      console.info("AI 员工状态已修改", {
+      console.info("AI 员工账号状态已修改", {
         identity_id: saved.identityId,
         agent_id: saved.id,
         status: saved.status,
@@ -994,10 +1010,13 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     value: item.id,
     label: roleDisplayName(item, tCommon),
   }))
-  const hasInternalFilters = Boolean(
-    status !== UserStatus.UserStatusActive ||
-      (scope === "employees" && roleId),
-  )
+  const usesWorkStatusFilter = scope === "team"
+  const hasInternalFilters = usesWorkStatusFilter
+    ? Boolean(workStatus)
+    : Boolean(
+        status !== UserStatus.UserStatusActive ||
+          (scope === "employees" && roleId),
+      )
   const allVisibleTeamMembersSelected =
     teamMembers.length > 0 &&
     teamMembers.every((member) =>
@@ -1012,7 +1031,13 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
           ? teamMembers.length === 0
           : contacts.length === 0
   const tableColumnCount =
-    scope === "employees" ? 7 : scope === "agents" ? 5 : scope === "team" ? 6 : 7
+    scope === "employees"
+      ? 8
+      : scope === "agents"
+        ? 6
+        : scope === "team"
+          ? 6
+          : 7
 
   /** 切换当前页所有团队成员的选中状态。 */
   function toggleAllVisibleTeamMembers(checked: boolean) {
@@ -1085,7 +1110,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
             <>
               {selectedTeamMemberIdentityIDs.size > 0 ? (
                 <Button
-                  variant="outline"
+                  variant="destructive"
                   size="sm"
                   onClick={() =>
                     setRemovingTeamMembers(
@@ -1152,10 +1177,10 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
             }
             onChange={(event) => setSearch(event.target.value)}
           />
-          {scope !== "external" ? (
+          {scope === "employees" || scope === "agents" ? (
             <>
               <ListToolbarFilter
-                label={t("filters.status")}
+                label={t("filters.accountStatus")}
                 value={status}
                 options={[
                   {
@@ -1198,6 +1223,54 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                     setParameters({
                       status: null,
                       roleId: null,
+                      page: null,
+                    })
+                  }
+                >
+                  {t("filters.clear")}
+                </ListToolbarReset>
+              ) : null}
+            </>
+          ) : null}
+          {usesWorkStatusFilter ? (
+            <>
+              <ListToolbarFilter
+                label={t("filters.workStatus")}
+                allLabel={t("filters.allWorkStatuses")}
+                value={workStatus ?? ""}
+                options={[
+                  {
+                    value: WorkStatus.WorkStatusWorking,
+                    label: workStatusLabel(
+                      WorkStatus.WorkStatusWorking,
+                      tCommon,
+                    ),
+                  },
+                  {
+                    value: WorkStatus.WorkStatusAway,
+                    label: workStatusLabel(WorkStatus.WorkStatusAway, tCommon),
+                  },
+                  {
+                    value: WorkStatus.WorkStatusOffDuty,
+                    label: workStatusLabel(
+                      WorkStatus.WorkStatusOffDuty,
+                      tCommon,
+                    ),
+                  },
+                ]}
+                onValueChange={(value) =>
+                  setParameters({
+                    workStatus: value || null,
+                    page: null,
+                    selected: null,
+                  })
+                }
+              />
+              {hasInternalFilters ? (
+                <ListToolbarReset
+                  onClick={() =>
+                    setParameters({
+                      workStatus: null,
                       page: null,
                     })
                   }
@@ -1348,8 +1421,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                       <TableHead>{t("columns.email")}</TableHead>
                       <TableHead>{t("columns.joinedTeams")}</TableHead>
                       <TableHead>{t("columns.role")}</TableHead>
-                      <TableHead>{t("columns.status")}</TableHead>
-                      <TableHead>{t("columns.joinedAt")}</TableHead>
+                      <TableHead>{t("columns.accountStatus")}</TableHead>
+                      <TableHead>{t("columns.workStatus")}</TableHead>
+                      <TableHead>{t("columns.createdAt")}</TableHead>
                       <TableHead className="text-right">
                         {t("columns.actions")}
                       </TableHead>
@@ -1358,8 +1432,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                     <TableRow className="hover:bg-transparent">
                       <TableHead>{t("columns.name")}</TableHead>
                       <TableHead>{t("columns.joinedTeams")}</TableHead>
-                      <TableHead>{t("columns.status")}</TableHead>
-                      <TableHead>{t("columns.joinedAt")}</TableHead>
+                      <TableHead>{t("columns.accountStatus")}</TableHead>
+                      <TableHead>{t("columns.workStatus")}</TableHead>
+                      <TableHead>{t("columns.createdAt")}</TableHead>
                       <TableHead className="text-right">
                         {t("columns.actions")}
                       </TableHead>
@@ -1379,7 +1454,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                       </TableHead>
                       <TableHead>{t("columns.memberName")}</TableHead>
                       <TableHead>{t("columns.type")}</TableHead>
-                      <TableHead>{t("columns.status")}</TableHead>
+                      <TableHead>{t("columns.workStatus")}</TableHead>
                       <TableHead>{t("columns.joinedAt")}</TableHead>
                       <TableHead className="text-right">
                         {t("columns.actions")}
@@ -1425,6 +1500,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                               label={userStatusLabel(user.status, t)}
                             />
                           </TableCell>
+                          <TableCell>
+                            <WorkStatusBadge status={memberWorkStatus(user)} />
+                          </TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
                             {formatDateTime(user.createdAt)}
                           </TableCell>
@@ -1452,7 +1530,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
-                                    disabled={user.id === identity.user.id}
                                     destructive={
                                       user.status === UserStatus.UserStatusActive
                                     }
@@ -1488,6 +1565,9 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                               status={agent.status}
                               label={userStatusLabel(agent.status, t)}
                             />
+                          </TableCell>
+                          <TableCell>
+                            <WorkStatusBadge status={agent.workStatus} />
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
                             {formatDateTime(agent.createdAt)}
@@ -1571,9 +1651,8 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                             )}
                           </TableCell>
                           <TableCell>
-                            <UserStatusBadge
-                              status={member.status}
-                              label={userStatusLabel(member.status, t)}
+                            <WorkStatusBadge
+                              status={identityWorkStatus(member)}
                             />
                           </TableCell>
                           <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -1593,6 +1672,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
+                                  destructive
                                   onSelect={() =>
                                     setRemovingTeamMembers([member])
                                   }
@@ -1741,6 +1821,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 </div>
               ) : scope === "employees" && detailUser ? (
                 <MemberDetailView
+                  key={detailUser.id}
                   user={detailUser}
                   teams={teams}
                   roles={roles}
@@ -1762,6 +1843,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 />
               ) : scope === "agents" && detailAgent ? (
                 <AgentDetailView
+                  key={detailAgent.id}
                   agent={detailAgent}
                   teams={teams}
                   onSaved={(saved) => {

@@ -39,6 +39,7 @@ export type {
     Agent,
     AgentList,
     AgentListInput,
+    AgentWorkStatusInput,
     Auth,
     ChangePasswordInput,
     ChannelList,

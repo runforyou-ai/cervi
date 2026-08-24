@@ -41,7 +41,7 @@ type Startup struct {
 	OrganizationName string       `json:"organizationName,omitempty"`
 }
 
-// UserStatus 表示用户账号或 AI 员工的启用状态。
+// UserStatus 表示用户账号或 AI 员工的账号状态。
 type UserStatus string
 
 const (
@@ -523,6 +523,11 @@ type UpdateAgentInput struct {
 	TeamIDs     []string `json:"teamIds"`
 }
 
+// AgentWorkStatusInput 定义 AI 员工工作状态修改字段。
+type AgentWorkStatusInput struct {
+	WorkStatus WorkStatus `json:"workStatus"`
+}
+
 // AgentListInput 定义 AI 员工目录查询条件。
 type AgentListInput struct {
 	Query    string      `json:"query"`
@@ -537,6 +542,7 @@ type Agent struct {
 	IdentityID  string        `json:"identityId"`
 	DisplayName string        `json:"displayName"`
 	Status      UserStatus    `json:"status"`
+	WorkStatus  WorkStatus    `json:"workStatus"`
 	Teams       []TeamSummary `json:"teams"`
 	CreatedAt   time.Time     `json:"createdAt"`
 }
@@ -674,10 +680,10 @@ type TeamMemberCandidateList struct {
 
 // TeamMemberListInput 定义团队成员列表查询条件。
 type TeamMemberListInput struct {
-	Query    string      `json:"query"`
-	Status   *UserStatus `json:"status,omitempty"`
-	Page     int         `json:"page"`
-	PageSize int         `json:"pageSize"`
+	Query      string      `json:"query"`
+	WorkStatus *WorkStatus `json:"workStatus,omitempty"`
+	Page       int         `json:"page"`
+	PageSize   int         `json:"pageSize"`
 }
 
 // TeamMember 定义团队成员信息。
@@ -685,7 +691,7 @@ type TeamMember struct {
 	IdentityID   string                   `json:"identityId"`
 	IdentityType OrganizationIdentityType `json:"identityType"`
 	DisplayName  string                   `json:"displayName"`
-	Status       UserStatus               `json:"status"`
+	WorkStatus   WorkStatus               `json:"workStatus"`
 	JoinedAt     time.Time                `json:"joinedAt"`
 }
 

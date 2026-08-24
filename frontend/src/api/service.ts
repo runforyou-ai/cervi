@@ -50,6 +50,7 @@ import {
   UpdateContact,
   UpdateAIProvider,
   UpdateAgent,
+  UpdateAgentWorkStatus,
   UpdateTeam,
   UpdateUser,
   UpdateUserRoles,
@@ -100,6 +101,7 @@ import {
   type TeamMemberCandidate,
   type TeamMemberCandidateInput,
   type TeamMemberCandidateList,
+  type AgentWorkStatusInput,
   type UpdateAgentInput,
   type UpdateUserInput,
   type UserList,
@@ -351,6 +353,7 @@ const listUsersBound = bind(ListUsers)
 const listAgentsBound = bind(ListAgents)
 const getAgentBound = bind(GetAgent)
 const updateAgentBound = bind(UpdateAgent)
+const updateAgentWorkStatusBound = bind(UpdateAgentWorkStatus)
 const deactivateAgentBound = bind(DeactivateAgent)
 const reactivateAgentBound = bind(ReactivateAgent)
 const listTeamsBound = bind(ListTeams)
@@ -479,12 +482,20 @@ export function updateAgent(agentId: string, input: UpdateAgentInput) {
   return updateAgentBound(agentId, input).then(normalizeAgent)
 }
 
-/** 停用企业 AI 员工。 */
+/** 修改企业 AI 员工的工作状态。 */
+export function updateAgentWorkStatus(
+  agentId: string,
+  input: AgentWorkStatusInput,
+) {
+  return updateAgentWorkStatusBound(agentId, input).then(normalizeAgent)
+}
+
+/** 禁用企业 AI 员工账号。 */
 export function deactivateAgent(agentId: string) {
   return deactivateAgentBound(agentId).then(normalizeAgent)
 }
 
-/** 恢复企业 AI 员工。 */
+/** 将企业 AI 员工恢复为正常状态。 */
 export function reactivateAgent(agentId: string) {
   return reactivateAgentBound(agentId).then(normalizeAgent)
 }
@@ -494,12 +505,12 @@ export function updateUser(userId: string, input: UpdateUserInput) {
   return updateUserBound(userId, input).then(normalizeUser)
 }
 
-/** 停用企业成员账号。 */
+/** 禁用企业成员账号。 */
 export function deactivateUser(userId: string) {
   return deactivateUserBound(userId).then(normalizeUser)
 }
 
-/** 恢复企业成员账号。 */
+/** 将企业成员账号恢复为正常状态。 */
 export function reactivateUser(userId: string) {
   return reactivateUserBound(userId).then(normalizeUser)
 }
@@ -591,7 +602,7 @@ export function listTeamMembers(
     teamId,
     {
       query: query.query ?? "",
-      status: query.status ?? null,
+      workStatus: query.workStatus ?? null,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 50,
     },

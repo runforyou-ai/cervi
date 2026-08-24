@@ -13,7 +13,7 @@ COMMENT ON TABLE agents IS 'AI 员工';
 COMMENT ON COLUMN agents.id IS 'AI 员工编号';
 COMMENT ON COLUMN agents.identity_id IS '企业身份编号';
 COMMENT ON COLUMN agents.organization_id IS '所属企业编号';
-COMMENT ON COLUMN agents.status IS '启用状态';
+COMMENT ON COLUMN agents.status IS '账号状态';
 COMMENT ON COLUMN agents.created_at IS '创建时间';
 COMMENT ON COLUMN agents.updated_at IS '更新时间';
 

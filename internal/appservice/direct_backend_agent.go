@@ -82,7 +82,24 @@ func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agent
 	return agentFromAction(*agent), nil
 }
 
-// DeactivateAgent 停用企业 AI 员工。
+// UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
+func (b *DirectBackend) UpdateAgentWorkStatus(ctx context.Context, meta RequestMeta, agentID string, input AgentWorkStatusInput) (Agent, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return Agent{}, err
+	}
+	agent, err := b.updateAgentWorkStatus.Execute(ctx, identity, agentID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatus(input.WorkStatus)})
+	if err != nil {
+		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+			agentaction.ValidationWorkStatusInvalid:     cervii18n.FieldWorkStatusInvalid,
+			agentaction.ValidationWorkStatusUnavailable: cervii18n.FieldAgentWorkStatusUnavailable,
+		})
+	}
+	slog.Info("AI 员工工作状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "work_status", input.WorkStatus)
+	return agentFromAction(*agent), nil
+}
+
+// DeactivateAgent 禁用企业 AI 员工账号。
 func (b *DirectBackend) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
 	return b.changeAgentStatus(ctx, meta, agentID, domain.UserStatusInactive)
 }
@@ -92,7 +109,7 @@ func (b *DirectBackend) ReactivateAgent(ctx context.Context, meta RequestMeta, a
 	return b.changeAgentStatus(ctx, meta, agentID, domain.UserStatusActive)
 }
 
-// changeAgentStatus 修改企业 AI 员工状态。
+// changeAgentStatus 修改企业 AI 员工账号状态。
 func (b *DirectBackend) changeAgentStatus(ctx context.Context, meta RequestMeta, agentID string, status domain.UserStatus) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -104,7 +121,7 @@ func (b *DirectBackend) changeAgentStatus(ctx context.Context, meta RequestMeta,
 			agentaction.ValidationStatusInvalid: cervii18n.FieldUserStatusInvalid,
 		})
 	}
-	slog.Info("AI 员工状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
+	slog.Info("AI 员工账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
 	return agentFromAction(*agent), nil
 }
 
@@ -114,7 +131,7 @@ func agentFromAction(agent agentaction.Agent) Agent {
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), Teams: teams, CreatedAt: agent.CreatedAt}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, CreatedAt: agent.CreatedAt}
 }
 
 // agentError 转换 AI 员工领域错误并记录未处理故障。

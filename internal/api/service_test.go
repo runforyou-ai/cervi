@@ -16,21 +16,24 @@ import (
 
 type testBackend struct {
 	appservice.Backend
-	lastMeta         appservice.RequestMeta
-	lastOrganization appservice.OrganizationInput
-	lastUserList     appservice.UserListInput
-	lastCreateUser   appservice.CreateUserInput
-	lastUpdateUser   appservice.UpdateUserInput
-	lastRoleChanges  appservice.UserRoleChangesInput
-	lastTeamList     appservice.TeamListInput
-	lastTeam         appservice.TeamInput
-	lastTeamMembers  appservice.TeamMemberInput
-	lastProfile      appservice.ProfileInput
-	lastFileUpload   appservice.FileUploadInput
-	lastFileID       string
-	lastPassword     appservice.ChangePasswordInput
-	lastPreferences  appservice.UserPreferencesInput
-	lastWorkStatus   appservice.UserWorkStatusInput
+	lastMeta            appservice.RequestMeta
+	lastOrganization    appservice.OrganizationInput
+	lastUserList        appservice.UserListInput
+	lastCreateUser      appservice.CreateUserInput
+	lastUpdateUser      appservice.UpdateUserInput
+	lastRoleChanges     appservice.UserRoleChangesInput
+	lastTeamList        appservice.TeamListInput
+	lastTeamMemberList  appservice.TeamMemberListInput
+	lastTeam            appservice.TeamInput
+	lastTeamMembers     appservice.TeamMemberInput
+	lastAgentID         string
+	lastAgentWorkStatus appservice.AgentWorkStatusInput
+	lastProfile         appservice.ProfileInput
+	lastFileUpload      appservice.FileUploadInput
+	lastFileID          string
+	lastPassword        appservice.ChangePasswordInput
+	lastPreferences     appservice.UserPreferencesInput
+	lastWorkStatus      appservice.UserWorkStatusInput
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
@@ -142,6 +145,21 @@ func (b *testBackend) CreateTeam(_ context.Context, meta appservice.RequestMeta,
 	b.lastMeta = meta
 	b.lastTeam = input
 	return appservice.Team{ID: "team-1", Name: input.Name, Description: input.Description}, nil
+}
+
+// ListTeamMembers 记录团队成员查询条件。
+func (b *testBackend) ListTeamMembers(_ context.Context, meta appservice.RequestMeta, _ string, input appservice.TeamMemberListInput) (appservice.TeamMemberList, error) {
+	b.lastMeta = meta
+	b.lastTeamMemberList = input
+	return appservice.TeamMemberList{Members: []appservice.TeamMember{}, Page: appservice.PageInfo{Number: input.Page, Size: input.PageSize}}, nil
+}
+
+// UpdateAgentWorkStatus 记录 AI 员工工作状态输入。
+func (b *testBackend) UpdateAgentWorkStatus(_ context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentWorkStatusInput) (appservice.Agent, error) {
+	b.lastMeta = meta
+	b.lastAgentID = agentID
+	b.lastAgentWorkStatus = input
+	return appservice.Agent{ID: agentID, WorkStatus: input.WorkStatus, Teams: []appservice.TeamSummary{}}, nil
 }
 
 // ListTeamMemberCandidates 返回测试中的空候选列表。
@@ -281,6 +299,32 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 	defer removeResponse.Body.Close()
 	if removeResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.OrganizationIdentityTypeAgent {
 		t.Fatalf("status = %d, input = %#v", removeResponse.StatusCode, backend.lastTeamMembers)
+	}
+}
+
+// TestTeamMemberWorkStatusQueryUsesTypedContract 验证团队成员列表按工作状态查询。
+func TestTeamMemberWorkStatusQueryUsesTypedContract(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	teamResponse := doJSON(t, http.MethodGet, server.URL+"/teams/team-1/members?workStatus=off_duty&page=3&pageSize=10", nil, "test-token")
+	defer teamResponse.Body.Close()
+	if teamResponse.StatusCode != http.StatusOK || backend.lastTeamMemberList.WorkStatus == nil || *backend.lastTeamMemberList.WorkStatus != appservice.WorkStatusOffDuty || backend.lastTeamMemberList.Page != 3 || backend.lastTeamMemberList.PageSize != 10 {
+		t.Fatalf("team status = %d, input = %#v", teamResponse.StatusCode, backend.lastTeamMemberList)
+	}
+}
+
+// TestUpdateAgentWorkStatusUsesTypedInput 验证 AI 员工工作状态请求转换为类型化服务输入。
+func TestUpdateAgentWorkStatusUsesTypedInput(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	response := doJSON(t, http.MethodPatch, server.URL+"/agents/agent-1/work-status", appservice.AgentWorkStatusInput{WorkStatus: appservice.WorkStatusAway}, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || backend.lastAgentID != "agent-1" || backend.lastAgentWorkStatus.WorkStatus != appservice.WorkStatusAway {
+		t.Fatalf("status = %d, agent = %q, input = %#v", response.StatusCode, backend.lastAgentID, backend.lastAgentWorkStatus)
 	}
 }
 
