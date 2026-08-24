@@ -48,10 +48,12 @@ type DirectBackend struct {
 	updateWebsiteChannelStatus        *channelaction.UpdateWebsiteChannelStatusAction
 	listChannels                      *channelaction.ListChannelsQuery
 	listMemberOptions                 *memberaction.ListOptionsQuery
+	listAgentModelOptions             *agentaction.ListModelOptionsQuery
 	createAgent                       *agentaction.CreateAgentAction
 	listAgents                        *agentaction.ListAgentsQuery
 	getAgent                          *agentaction.GetAgentQuery
 	updateAgent                       *agentaction.UpdateAgentAction
+	updateAgentCapability             *agentaction.UpdateCapabilityAction
 	updateAgentStatus                 *agentaction.UpdateStatusAction
 	updateAgentWorkStatus             *agentaction.UpdateWorkStatusAction
 	listUsers                         *useraction.ListUsersQuery
@@ -116,10 +118,12 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		updateWebsiteChannelStatus:        channelaction.NewUpdateWebsiteChannelStatusAction(db),
 		listChannels:                      channelaction.NewListChannelsQuery(db),
 		listMemberOptions:                 memberaction.NewListOptionsQuery(db),
+		listAgentModelOptions:             agentaction.NewListModelOptionsQuery(db),
 		createAgent:                       agentaction.NewCreateAgentAction(db),
 		listAgents:                        agentaction.NewListAgentsQuery(db),
 		getAgent:                          agentaction.NewGetAgentQuery(db),
 		updateAgent:                       agentaction.NewUpdateAgentAction(db),
+		updateAgentCapability:             agentaction.NewUpdateCapabilityAction(db),
 		updateAgentStatus:                 agentaction.NewUpdateStatusAction(db),
 		updateAgentWorkStatus:             agentaction.NewUpdateWorkStatusAction(db),
 		listUsers:                         useraction.NewListUsersQuery(db),

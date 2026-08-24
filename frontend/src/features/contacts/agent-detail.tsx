@@ -18,20 +18,35 @@ import {
   isNotFoundApiError,
   reactivateAgent,
   updateAgent,
+  updateAgentCapability,
   updateAgentWorkStatus,
   type AgentData,
   type Team,
 } from "@/api"
 import { StatusBadge } from "@/components/status-badge"
-import { Field, FieldDescription } from "@/components/ui/field"
+import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   agentWorkStatusSchema,
-  createAgentSchema,
+  createAgentCapabilitySchema,
+  createAgentProfileSchema,
+  type AgentCapabilityFormValues,
+  type AgentProfileFormValues,
   type AgentWorkStatusFormValues,
-  type AgentFormValues,
 } from "@/features/contacts/agent-schema"
+import { AgentModelField } from "@/features/contacts/agent-model-field"
+import {
+  agentModelSelection,
+  parseAgentModelSelection,
+} from "@/features/contacts/agent-model-selection"
 import {
   accountStatuses,
   accountStatusSchema,
@@ -57,17 +72,31 @@ type EditingField =
   | "accountStatus"
   | "workStatus"
   | "teams"
+  | "capability"
   | null
 
 /** 把 AI 员工详情转换为编辑表单值。 */
-function valuesFromAgent(agent: AgentData): AgentFormValues {
+function valuesFromAgent(agent: AgentData): AgentProfileFormValues {
   return {
     displayName: agent.displayName,
     teamIds: agent.teams.map((team) => team.id),
   }
 }
 
-/** 展示并逐字段编辑 AI 员工资料。 */
+/** 把 AI 员工能力配置转换为表单值。 */
+function capabilityValuesFromAgent(
+  agent: AgentData,
+): AgentCapabilityFormValues {
+  return {
+    modelSelection: agentModelSelection(
+      agent.capability.providerId,
+      agent.capability.modelIdentifier,
+    ),
+    systemInstruction: agent.capability.systemInstruction,
+  }
+}
+
+/** 展示并编辑 AI 员工。 */
 export function AgentDetailView({
   agent,
   teams,
@@ -88,15 +117,29 @@ export function AgentDetailView({
   const { saving } = saveState
   const schema = useMemo(
     () =>
-      createAgentSchema({
+      createAgentProfileSchema({
         nameRequired: t("agents.validation.nameRequired"),
       }),
     [t],
   )
-  const form = useForm<AgentFormValues>({
+  const capabilitySchema = useMemo(
+    () =>
+      createAgentCapabilitySchema({
+        modelRequired: t("agents.validation.modelRequired"),
+        instructionRequired: t("agents.validation.instructionRequired"),
+        instructionTooLong: t("agents.validation.instructionTooLong"),
+      }),
+    [t],
+  )
+  const form = useForm<AgentProfileFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: valuesFromAgent(agent),
+  })
+  const capabilityForm = useForm<AgentCapabilityFormValues>({
+    resolver: zodResolver(capabilitySchema),
+    shouldUseNativeValidation: true,
+    defaultValues: capabilityValuesFromAgent(agent),
   })
   const accountStatusForm = useForm<AccountStatusFormValues>({
     resolver: zodResolver(accountStatusSchema),
@@ -111,13 +154,15 @@ export function AgentDetailView({
 
   useEffect(() => {
     form.reset(valuesFromAgent(agent))
+    capabilityForm.reset(capabilityValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
-  }, [accountStatusForm, agent, form, workStatusForm])
+  }, [accountStatusForm, agent, capabilityForm, form, workStatusForm])
 
   /** 放弃尚未提交的修改并退出编辑。 */
   function cancelEdit() {
     form.reset(valuesFromAgent(agent))
+    capabilityForm.reset(capabilityValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
     setEditing(null)
@@ -126,14 +171,15 @@ export function AgentDetailView({
   /** 开始编辑指定 AI 员工字段。 */
   function startEditing(field: Exclude<EditingField, null>) {
     form.reset(valuesFromAgent(agent))
+    capabilityForm.reset(capabilityValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
     setEditing(field)
   }
 
-  /** 保存 AI 员工字段。 */
+  /** 保存 AI 员工资料。 */
   async function saveAgent(
-    draft: AgentFormValues = form.getValues(),
+    draft: AgentProfileFormValues = form.getValues(),
     closeAfterSave = true,
   ) {
     const agentID = agent.id
@@ -168,11 +214,63 @@ export function AgentDetailView({
         onNotFound()
         return
       }
-      console.warn("保存 AI 员工失败", error)
+      console.warn("保存 AI 员工失败", { agent_id: agentID, error })
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error, ["displayName", "teamIds"])
           : t("agents.form.networkError"),
+      )
+    } finally {
+      saveState.finish(request)
+    }
+  }
+
+  /** 保存 AI 员工能力配置。 */
+  async function saveCapability(values: AgentCapabilityFormValues) {
+    const current = capabilityValuesFromAgent(agent)
+    if (
+      values.modelSelection === current.modelSelection &&
+      values.systemInstruction === current.systemInstruction
+    ) {
+      setEditing(null)
+      return
+    }
+    const request = saveState.begin()
+    if (request === null) return
+    try {
+      const model = parseAgentModelSelection(values.modelSelection)
+      const saved = await updateAgentCapability(agent.id, {
+        ...model,
+        systemInstruction: values.systemInstruction,
+      })
+      if (!saveState.isCurrent(request)) return
+      setEditing(null)
+      onSaved(saved)
+      console.info("AI 员工能力配置已保存", {
+        agent_id: saved.id,
+        provider_id: saved.capability.providerId,
+        model_identifier: saved.capability.modelIdentifier,
+      })
+      toast.success(t("agents.capability.saved"))
+    } catch (error) {
+      if (!saveState.isCurrent(request)) return
+      if (recoverSession(error, navigate)) return
+      if (isNotFoundApiError(error)) {
+        onNotFound()
+        return
+      }
+      console.warn("保存 AI 员工能力配置失败", {
+        agent_id: agent.id,
+        error,
+      })
+      toast.error(
+        isApiError(error)
+          ? apiErrorMessage(error, [
+              "providerId",
+              "modelIdentifier",
+              "systemInstruction",
+            ])
+          : t("agents.capability.saveError"),
       )
     } finally {
       saveState.finish(request)
@@ -213,7 +311,11 @@ export function AgentDetailView({
         onNotFound()
         return
       }
-      console.warn("修改 AI 员工账号状态失败", error)
+      console.warn("修改 AI 员工账号状态失败", {
+        agent_id: agentID,
+        status,
+        error,
+      })
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error)
@@ -251,7 +353,11 @@ export function AgentDetailView({
         onNotFound()
         return
       }
-      console.warn("修改 AI 员工工作状态失败", error)
+      console.warn("修改 AI 员工工作状态失败", {
+        agent_id: agentID,
+        work_status: draft.workStatus,
+        error,
+      })
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error, ["workStatus"])
@@ -407,6 +513,89 @@ export function AgentDetailView({
                 </NativeSelect>
               )}
             />
+          </DetailEditRow>
+        </div>
+      </section>
+
+      <section>
+        <div className="divide-y">
+          <DetailEditRow
+            label={t("agents.capability.title")}
+            value={
+              <dl className="grid gap-3">
+                <div>
+                  <dt className="text-muted-foreground">
+                    {t("agents.capability.model")}
+                  </dt>
+                  <dd>
+                    {agent.capability.providerName} ·{" "}
+                    {agent.capability.modelName}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">
+                    {t("agents.capability.instruction")}
+                  </dt>
+                  <dd className="whitespace-pre-wrap break-words">
+                    {agent.capability.systemInstruction}
+                  </dd>
+                </div>
+              </dl>
+            }
+            editing={editing === "capability"}
+            editEnabled={editing === null && !saving}
+            onEdit={() => startEditing("capability")}
+          >
+            <form
+              onSubmit={capabilityForm.handleSubmit(saveCapability)}
+              noValidate
+            >
+              <FieldGroup>
+                <AgentModelField
+                  control={capabilityForm.control}
+                  name="modelSelection"
+                  disabled={saving}
+                />
+                <Controller
+                  name="systemInstruction"
+                  control={capabilityForm.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel
+                        htmlFor="agent-capability-system-instruction"
+                        required
+                      >
+                        {t("agents.capability.instruction")}
+                      </FieldLabel>
+                      <Textarea
+                        {...field}
+                        id="agent-capability-system-instruction"
+                        rows={8}
+                        required
+                        disabled={saving}
+                        aria-invalid={fieldState.invalid}
+                      />
+                    </Field>
+                  )}
+                />
+                <div className="flex items-center gap-2">
+                  <Button type="submit" size="sm" disabled={saving}>
+                    {saving
+                      ? t("agents.capability.saving")
+                      : t("agents.capability.save")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={cancelEdit}
+                  >
+                    {t("agents.capability.cancel")}
+                  </Button>
+                </div>
+              </FieldGroup>
+            </form>
           </DetailEditRow>
         </div>
       </section>

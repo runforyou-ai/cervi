@@ -93,6 +93,50 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 	return err
 }
 
+// validateReferencedModels 校验新目录保留 AI 员工正在使用的文本对话模型。
+func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, providerID string, models []Model) error {
+	activeIdentifiers := make([]string, 0)
+	if err := db.NewSelect().TableExpr("agents AS a").
+		ColumnExpr("DISTINCT ar.model_identifier").
+		Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.organization_id = a.organization_id AND ar.agent_id = a.id").
+		Where("a.organization_id = ?", organizationID).
+		Where("ar.provider_id = ?", providerID).
+		Scan(ctx, &activeIdentifiers); err != nil {
+		return err
+	}
+	available := make(map[string]struct{}, len(models))
+	for _, model := range models {
+		if model.Type == domain.AIModelTypeChat && modelSupportsText(model) {
+			available[model.Identifier] = struct{}{}
+		}
+	}
+	for _, identifier := range activeIdentifiers {
+		if _, exists := available[identifier]; !exists {
+			return &ValidationError{Fields: map[string]ValidationCode{"models": ValidationModelsInUse}}
+		}
+	}
+	return nil
+}
+
+// modelSupportsText 判断模型是否支持文本输入。
+func modelSupportsText(model Model) bool {
+	for _, modality := range model.InputModalities {
+		if modality == domain.AIModelInputModalityText {
+			return true
+		}
+	}
+	return false
+}
+
+// providerInUse 判断供应商是否被 AI 员工使用。
+func providerInUse(ctx context.Context, db bun.IDB, organizationID, providerID string) (bool, error) {
+	return db.NewSelect().TableExpr("agents AS a").
+		Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.organization_id = a.organization_id AND ar.agent_id = a.id").
+		Where("a.organization_id = ?", organizationID).
+		Where("ar.provider_id = ?", providerID).
+		Exists(ctx)
+}
+
 // recordFromModel 转换模型服务供应商存储模型。
 func recordFromModel(provider servermodels.AIProvider, models []Model) Record {
 	return Record{

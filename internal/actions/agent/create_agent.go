@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -19,6 +20,7 @@ import (
 type CreateInput struct {
 	DisplayName string
 	TeamIDs     []string
+	Capability  CapabilityInput
 }
 
 // TeamSummary 定义 AI 员工所属团队摘要。
@@ -35,18 +37,30 @@ func NewCreateAgentAction(db *bun.DB) *CreateAgentAction {
 	return &CreateAgentAction{db: db}
 }
 
-// Execute 创建企业身份、AI 员工及其团队关系。
+// Execute 创建 AI 员工、当前配置和团队关系。
 func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"displayName": ValidationDisplayNameRequired}}
 	}
+	capabilityInput, err := normalizeCapabilityInput(input.Capability)
+	if err != nil {
+		return nil, err
+	}
 	var output *Agent
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		teamIDs, teams, err := validateAndLoadTeams(ctx, tx, identity.Organization.ID, input.TeamIDs)
+		if err != nil {
+			return err
+		}
+		model, err := loadCapabilityModel(ctx, tx, identity.Organization.ID, capabilityInput)
+		if err != nil {
+			return err
+		}
+		revisionID, err := uuid.NewV7()
 		if err != nil {
 			return err
 		}
@@ -63,14 +77,19 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			return err
 		}
 		agent := &servermodels.Agent{
-			IdentityID:     organizationIdentity.ID,
-			OrganizationID: identity.Organization.ID,
-			Status:         string(domain.UserStatusActive),
+			IdentityID:       organizationIdentity.ID,
+			OrganizationID:   identity.Organization.ID,
+			ActiveRevisionID: revisionID.String(),
+			Status:           string(domain.UserStatusActive),
 		}
 		if _, err := tx.NewInsert().Model(agent).
-			Column("identity_id", "organization_id", "status").
+			Column("identity_id", "organization_id", "active_revision_id", "status").
 			Returning("id").
 			Exec(ctx); err != nil {
+			return err
+		}
+		capability, err := insertCapabilityRevision(ctx, tx, identity, agent.ID, revisionID.String(), capabilityInput, model)
+		if err != nil {
 			return err
 		}
 		if len(teamIDs) > 0 {
@@ -89,7 +108,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, CreatedAt: organizationIdentity.CreatedAt}
+		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Capability: capability, CreatedAt: organizationIdentity.CreatedAt}
 		return nil
 	})
 	if err != nil {

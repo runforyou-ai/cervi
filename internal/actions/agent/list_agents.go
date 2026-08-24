@@ -30,12 +30,25 @@ type Agent struct {
 	Status      domain.UserStatus `bun:"status"`
 	WorkStatus  domain.WorkStatus `bun:"work_status"`
 	Teams       []TeamSummary
+	Capability  Capability
+	CreatedAt   time.Time `bun:"created_at"`
+}
+
+// ListItem 定义 AI 员工目录项。
+type ListItem struct {
+	ID          string            `bun:"id"`
+	IdentityID  string            `bun:"identity_id"`
+	DisplayName string            `bun:"display_name"`
+	Status      domain.UserStatus `bun:"status"`
+	WorkStatus  domain.WorkStatus `bun:"work_status"`
+	Teams       []TeamSummary
+	Capability  CapabilitySummary
 	CreatedAt   time.Time `bun:"created_at"`
 }
 
 // ListOutput 定义 AI 员工分页结果。
 type ListOutput struct {
-	Agents []Agent
+	Agents []ListItem
 	Page   int
 	Size   int
 	Total  int
@@ -85,7 +98,7 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 	if err != nil {
 		return ListOutput{}, fmt.Errorf("count agents: %w", err)
 	}
-	agents := make([]Agent, 0)
+	agents := make([]ListItem, 0)
 	if err := applyFilters(base()).
 		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, a.status, oi.work_status, oi.created_at").
 		OrderExpr("lower(oi.display_name) ASC, a.id ASC").
@@ -94,12 +107,21 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 		Scan(ctx, &agents); err != nil {
 		return ListOutput{}, fmt.Errorf("list agents: %w", err)
 	}
+	agentIDs := make([]string, 0, len(agents))
+	for _, agent := range agents {
+		agentIDs = append(agentIDs, agent.ID)
+	}
+	capabilities, err := loadAgentCapabilitySummaries(ctx, q.db, identity.Organization.ID, agentIDs)
+	if err != nil {
+		return ListOutput{}, fmt.Errorf("load agent capability summaries: %w", err)
+	}
 	for index := range agents {
 		teams, err := loadAgentTeams(ctx, q.db, identity.Organization.ID, agents[index].IdentityID)
 		if err != nil {
 			return ListOutput{}, fmt.Errorf("load agent teams: %w", err)
 		}
 		agents[index].Teams = teams
+		agents[index].Capability = capabilities[agents[index].ID]
 	}
 	return ListOutput{Agents: agents, Page: input.Page, Size: input.PageSize, Total: total}, nil
 }

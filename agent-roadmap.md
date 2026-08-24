@@ -19,6 +19,7 @@
 以下内容已经存在：
 
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
+- Agent 已保存模型选择、系统指令和不可变配置版本，`agents.active_revision_id` 指向当前版本。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web 端 Bearer Token 保存在 `localStorage`；桌面端和移动端由 Go `clientsession` 持久化当前凭据，API Proxy 调用时注入 Bearer Token。
@@ -27,7 +28,7 @@
 以下内容尚未实现，仍属于路线图决策：
 
 - `chat_subjects`、`conversations`、`messages` 等聊天事实表。
-- Agent 的模型选择、系统指令、工具策略和不可变配置版本。
+- Agent 工具策略。
 - `conversation_agent_policies`、`conversation_agent_states`、`agent_runs` 和运行审计。
 - 产品级 WebSocket 尚未实现，但 `chat-roadmap.md` 已确定统一 Realtime Gateway、Protobuf 协议、连接认证、同步恢复和背压方案；设备注册和 Capability Executor 仍未设计落地。
 - 客户端可靠任务 Runtime；当前只有按真实场景落地的书面方案。
@@ -150,7 +151,7 @@ Realtime 不参与 P1a/P1b 的正确性闭环；两阶段分别通过 appservice
 
 ### 5.1 配置权威源
 
-现有 `agents` 只保存身份和启停状态。进入首个 Agent 运行阶段前，需要增加不可变的 Agent 配置版本，例如：
+现有 `agents` 保存身份、启停状态和当前配置版本。当前不可变配置版本包含：
 
 ```text
 agent_revisions
@@ -160,14 +161,11 @@ agent_revisions
 ├── provider_id
 ├── model_identifier
 ├── system_instruction
-├── generation_config
-├── tool_policy
-├── schema_version
 ├── created_by_user_id
 └── created_at
 ```
 
-并由 `agents.active_revision_id` 指向当前生效版本。项目不创建数据库外键，因此 Action 必须在事务中校验企业、Agent、Provider、模型和配置版本的关联；`(provider_id, model_identifier)` 必须对应现有模型目录中的同企业 Chat 模型，其中 `model_identifier` 映射目录字段 `identifier`。
+`generation_config`、`tool_policy` 和 `schema_version` 在进入对应真实场景时增加。项目不创建数据库外键，因此 Action 必须在事务中校验企业、Agent、Provider、模型和配置版本的关联；`(provider_id, model_identifier)` 必须对应现有模型目录中的同企业 Chat 模型，其中 `model_identifier` 映射目录字段 `identifier`。
 
 规则：
 
@@ -774,7 +772,7 @@ Cervi Gateway
 固定使用内部消息显式 @Agent 作为验证入口：
 
 - 依赖 `chat-roadmap.md` 的内部文本聊天、Agent 参与者和 `message_mentions`；内部单聊和群聊都只有显式 @ 才触发，暂不启用 Agent 单聊自动响应。
-- 增加不可变 Agent Revision，并通过现有 `(provider_id, model_identifier)` 选择同企业 Chat 模型；`tool_policy` 为空。
+- 使用已落地的不可变 Agent Revision，并通过现有 `(provider_id, model_identifier)` 选择同企业 Chat 模型；不配置工具策略。
 - 增加最小 `conversation_agent_states`、`conversation_agent_triggers` 和 `agent_runs`，消息首次持久化时在同一事务写入 `mention` Trigger、Run 和 Task。
 - 通过 Agent Engine 的 Eino Adapter 执行一次有超时的模型调用。
 - 一个 Trigger 对应一个 Run；一个 Run 只调用一次模型，只生成一条最终文本 Message，使用 `agent:<agent_run_id>` 业务幂等键。
@@ -800,7 +798,7 @@ P1a 验证成功后立即交付网站客户自动响应：
 
 P1a/P1b 完成后扩展为完整服务端 Agent：
 
-- 补齐 Revision 版本切换、Policy、State、Trigger 游标、Run、Step 和 Tool Invocation。
+- 补齐 Policy、State、Trigger 游标、Run、Step 和 Tool Invocation。
 - 为 Agent 使用独立任务队列或 Worker 配额。
 - 扩展既有 Eino Adapter，接入 ChatModelAgent、Runner、服务端类型化 Tool、流式事件和取消。
 - 完整落地 Conversation Changelog、Mailbox/Inbox、Realtime Outbox、Core NATS、Realtime Gateway、连接票据、Protobuf 和断线后的业务补拉。

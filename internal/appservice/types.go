@@ -533,8 +533,9 @@ type MemberOptionList struct {
 
 // CreateAgentInput 定义新增 AI 员工字段。
 type CreateAgentInput struct {
-	DisplayName string   `json:"displayName"`
-	TeamIDs     []string `json:"teamIds"`
+	DisplayName string               `json:"displayName"`
+	TeamIDs     []string             `json:"teamIds"`
+	Capability  AgentCapabilityInput `json:"capability"`
 }
 
 // UpdateAgentInput 定义 AI 员工可编辑字段。
@@ -548,6 +549,13 @@ type AgentWorkStatusInput struct {
 	WorkStatus WorkStatus `json:"workStatus"`
 }
 
+// AgentCapabilityInput 定义 AI 员工能力配置字段。
+type AgentCapabilityInput struct {
+	ProviderID        string `json:"providerId"`
+	ModelIdentifier   string `json:"modelIdentifier"`
+	SystemInstruction string `json:"systemInstruction"`
+}
+
 // AgentListInput 定义 AI 员工目录查询条件。
 type AgentListInput struct {
 	Query    string      `json:"query"`
@@ -558,19 +566,62 @@ type AgentListInput struct {
 
 // Agent 定义 AI 员工信息。
 type Agent struct {
-	ID          string        `json:"id"`
-	IdentityID  string        `json:"identityId"`
-	DisplayName string        `json:"displayName"`
-	Status      UserStatus    `json:"status"`
-	WorkStatus  WorkStatus    `json:"workStatus"`
-	Teams       []TeamSummary `json:"teams"`
-	CreatedAt   time.Time     `json:"createdAt"`
+	ID          string          `json:"id"`
+	IdentityID  string          `json:"identityId"`
+	DisplayName string          `json:"displayName"`
+	Status      UserStatus      `json:"status"`
+	WorkStatus  WorkStatus      `json:"workStatus"`
+	Teams       []TeamSummary   `json:"teams"`
+	Capability  AgentCapability `json:"capability"`
+	CreatedAt   time.Time       `json:"createdAt"`
+}
+
+// AgentListItem 定义 AI 员工目录项。
+type AgentListItem struct {
+	ID          string                 `json:"id"`
+	IdentityID  string                 `json:"identityId"`
+	DisplayName string                 `json:"displayName"`
+	Status      UserStatus             `json:"status"`
+	WorkStatus  WorkStatus             `json:"workStatus"`
+	Teams       []TeamSummary          `json:"teams"`
+	Capability  AgentCapabilitySummary `json:"capability"`
+	CreatedAt   time.Time              `json:"createdAt"`
+}
+
+// AgentCapability 定义 AI 员工当前生效的能力配置。
+type AgentCapability struct {
+	ProviderID        string `json:"providerId"`
+	ProviderName      string `json:"providerName"`
+	ModelIdentifier   string `json:"modelIdentifier"`
+	ModelName         string `json:"modelName"`
+	SystemInstruction string `json:"systemInstruction"`
+}
+
+// AgentCapabilitySummary 定义 AI 员工当前模型摘要。
+type AgentCapabilitySummary struct {
+	ProviderID      string `json:"providerId"`
+	ProviderName    string `json:"providerName"`
+	ModelIdentifier string `json:"modelIdentifier"`
+	ModelName       string `json:"modelName"`
+}
+
+// AgentModelOption 定义 AI 员工可使用的对话模型选项。
+type AgentModelOption struct {
+	ProviderID      string `json:"providerId"`
+	ProviderName    string `json:"providerName"`
+	ModelIdentifier string `json:"modelIdentifier"`
+	ModelName       string `json:"modelName"`
+}
+
+// AgentModelOptionList 定义 AI 员工对话模型选项列表。
+type AgentModelOptionList struct {
+	Models []AgentModelOption `json:"models"`
 }
 
 // AgentList 定义 AI 员工分页结果。
 type AgentList struct {
-	Agents []Agent  `json:"agents"`
-	Page   PageInfo `json:"page"`
+	Agents []AgentListItem `json:"agents"`
+	Page   PageInfo        `json:"page"`
 }
 
 // WebsiteChannelList 定义网站渠道列表。

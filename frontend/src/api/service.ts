@@ -29,6 +29,7 @@ import {
   GetWebsiteChannel,
   ListChannels,
   ListAgents,
+  ListAgentModelOptions,
   ListMemberOptions,
   ListAIProviders,
   ListAvailableAIModels,
@@ -53,6 +54,7 @@ import {
   UpdateContact,
   UpdateAIProvider,
   UpdateAgent,
+  UpdateAgentCapability,
   UpdateAgentWorkStatus,
   UpdateTeam,
   UpdateUser,
@@ -80,7 +82,9 @@ import {
   type AIProviderModelList,
   type AIProviderSummary,
   type AgentList,
+  type AgentListItem,
   type AgentListInput,
+  type AgentCapabilityInput,
   type Contact,
   type ContactInput,
   type ContactList,
@@ -185,8 +189,12 @@ export type AgentData = Omit<Agent, "teams"> & {
   teams: NonNullable<Agent["teams"]>
 }
 
+export type AgentListItemData = Omit<AgentListItem, "teams"> & {
+  teams: NonNullable<AgentListItem["teams"]>
+}
+
 export type AgentListData = Omit<AgentList, "agents"> & {
-  agents: AgentData[]
+  agents: AgentListItemData[]
 }
 
 export type TeamMemberListData = Omit<
@@ -365,8 +373,10 @@ const listChannelsBound = bind(ListChannels)
 const listWebsiteChannelsBound = bind(ListWebsiteChannels)
 const listUsersBound = bind(ListUsers)
 const listAgentsBound = bind(ListAgents)
+const listAgentModelOptionsBound = bind(ListAgentModelOptions)
 const getAgentBound = bind(GetAgent)
 const updateAgentBound = bind(UpdateAgent)
+const updateAgentCapabilityBound = bind(UpdateAgentCapability)
 const updateAgentWorkStatusBound = bind(UpdateAgentWorkStatus)
 const deactivateAgentBound = bind(DeactivateAgent)
 const reactivateAgentBound = bind(ReactivateAgent)
@@ -471,6 +481,11 @@ function normalizeAgent(agent: Agent): AgentData {
   return { ...agent, teams: asList(agent.teams) }
 }
 
+/** 归一化 AI 员工目录项所属团队。 */
+function normalizeAgentListItem(agent: AgentListItem): AgentListItemData {
+  return { ...agent, teams: asList(agent.teams) }
+}
+
 /** 读取企业成员详情。 */
 export function getUser(userId: string, signal?: AbortSignal) {
   return getUserBound(userId, signal).then(normalizeUser)
@@ -486,6 +501,11 @@ export function createAgent(input: CreateAgentInput) {
   return createAgentBound(input).then(normalizeAgent)
 }
 
+/** 读取企业 AI 员工可使用的对话模型。 */
+export function listAgentModelOptions() {
+  return listAgentModelOptionsBound().then((output) => asList(output.models))
+}
+
 /** 读取企业 AI 员工详情。 */
 export function getAgent(agentId: string, signal?: AbortSignal) {
   return getAgentBound(agentId, signal).then(normalizeAgent)
@@ -494,6 +514,14 @@ export function getAgent(agentId: string, signal?: AbortSignal) {
 /** 修改企业 AI 员工。 */
 export function updateAgent(agentId: string, input: UpdateAgentInput) {
   return updateAgentBound(agentId, input).then(normalizeAgent)
+}
+
+/** 修改企业 AI 员工的能力配置。 */
+export function updateAgentCapability(
+  agentId: string,
+  input: AgentCapabilityInput,
+) {
+  return updateAgentCapabilityBound(agentId, input).then(normalizeAgent)
 }
 
 /** 修改企业 AI 员工的工作状态。 */
@@ -602,7 +630,7 @@ export function listAgents(query: AgentListQuery, signal?: AbortSignal) {
     signal,
   ).then((output) => ({
     ...output,
-    agents: asList(output.agents).map(normalizeAgent),
+    agents: asList(output.agents).map(normalizeAgentListItem),
   }))
 }
 

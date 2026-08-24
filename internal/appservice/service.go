@@ -25,10 +25,12 @@ type Backend interface {
 	ActivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
 	ListChannels(context.Context, RequestMeta) (ChannelList, error)
 	ListMemberOptions(context.Context, RequestMeta, MemberOptionListInput) (MemberOptionList, error)
+	ListAgentModelOptions(context.Context, RequestMeta) (AgentModelOptionList, error)
 	CreateAgent(context.Context, RequestMeta, CreateAgentInput) (Agent, error)
 	ListAgents(context.Context, RequestMeta, AgentListInput) (AgentList, error)
 	GetAgent(context.Context, RequestMeta, string) (Agent, error)
 	UpdateAgent(context.Context, RequestMeta, string, UpdateAgentInput) (Agent, error)
+	UpdateAgentCapability(context.Context, RequestMeta, string, AgentCapabilityInput) (Agent, error)
 	UpdateAgentWorkStatus(context.Context, RequestMeta, string, AgentWorkStatusInput) (Agent, error)
 	DeactivateAgent(context.Context, RequestMeta, string) (Agent, error)
 	ReactivateAgent(context.Context, RequestMeta, string) (Agent, error)
@@ -329,6 +331,11 @@ func (s *Service) CreateAgent(ctx context.Context, meta RequestMeta, input Creat
 	return s.backend.CreateAgent(ctx, meta, input)
 }
 
+// ListAgentModelOptions 返回 AI 员工可使用的对话模型。
+func (s *Service) ListAgentModelOptions(ctx context.Context, meta RequestMeta) (AgentModelOptionList, error) {
+	return s.backend.ListAgentModelOptions(ctx, meta)
+}
+
 // ListAgents 返回企业 AI 员工目录。
 func (s *Service) ListAgents(ctx context.Context, meta RequestMeta, input AgentListInput) (AgentList, error) {
 	return s.backend.ListAgents(ctx, meta, input)
@@ -342,6 +349,11 @@ func (s *Service) GetAgent(ctx context.Context, meta RequestMeta, agentID string
 // UpdateAgent 修改企业 AI 员工。
 func (s *Service) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (Agent, error) {
 	return s.backend.UpdateAgent(ctx, meta, agentID, input)
+}
+
+// UpdateAgentCapability 修改企业 AI 员工的能力配置。
+func (s *Service) UpdateAgentCapability(ctx context.Context, meta RequestMeta, agentID string, input AgentCapabilityInput) (Agent, error) {
+	return s.backend.UpdateAgentCapability(ctx, meta, agentID, input)
 }
 
 // UpdateAgentWorkStatus 修改企业 AI 员工工作状态。

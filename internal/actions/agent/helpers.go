@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// loadAgent 读取当前企业中的 AI 员工及所属团队。
+// loadAgent 读取当前企业中的 AI 员工详情。
 func loadAgent(ctx context.Context, db bun.IDB, organizationID, agentID string) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
@@ -31,5 +31,9 @@ func loadAgent(ctx context.Context, db bun.IDB, organizationID, agentID string) 
 		return nil, err
 	}
 	agent.Teams, err = loadAgentTeams(ctx, db, organizationID, agent.IdentityID)
+	if err != nil {
+		return nil, err
+	}
+	agent.Capability, err = loadAgentCapability(ctx, db, organizationID, agentID)
 	return agent, err
 }

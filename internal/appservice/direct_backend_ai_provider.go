@@ -124,6 +124,9 @@ func (b *DirectBackend) aiProviderError(ctx context.Context, meta RequestMeta, e
 	if errors.Is(err, aiprovideraction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorAIProviderNotFound)
 	}
+	if errors.Is(err, aiprovideraction.ErrInUse) {
+		return InvalidError(meta, cervii18n.ErrorAIProviderInUse, nil)
+	}
 	logAttributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	slog.Warn("模型服务供应商操作失败", append(logAttributes, attributes...)...)
 	return FailedError(meta, failureKey)
@@ -195,6 +198,7 @@ func aiProviderFieldKeys(fields map[string]common.FieldCode) map[string]cervii18
 		aiprovideraction.ValidationAPIURLRequired: cervii18n.FieldAIProviderAPIURLRequired,
 		aiprovideraction.ValidationAPIURLInvalid:  cervii18n.FieldAIProviderAPIURLInvalid,
 		aiprovideraction.ValidationModelsInvalid:  cervii18n.FieldAIProviderModelsInvalid,
+		aiprovideraction.ValidationModelsInUse:    cervii18n.FieldAIProviderModelsInUse,
 	}
 	return translateValidationFields(fields, keys)
 }

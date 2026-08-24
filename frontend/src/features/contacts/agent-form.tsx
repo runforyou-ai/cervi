@@ -15,6 +15,9 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { Textarea } from "@/components/ui/textarea"
+import { AgentModelField } from "@/features/contacts/agent-model-field"
+import { parseAgentModelSelection } from "@/features/contacts/agent-model-selection"
 import {
   createAgentSchema,
   type AgentFormValues,
@@ -40,6 +43,9 @@ export function AgentForm({
     () =>
       createAgentSchema({
         nameRequired: t("agents.validation.nameRequired"),
+        modelRequired: t("agents.validation.modelRequired"),
+        instructionRequired: t("agents.validation.instructionRequired"),
+        instructionTooLong: t("agents.validation.instructionTooLong"),
       }),
     [t],
   )
@@ -49,22 +55,42 @@ export function AgentForm({
     defaultValues: {
       displayName: "",
       teamIds: defaultTeamIds,
+      modelSelection: "",
+      systemInstruction: "",
     },
   })
 
   /** 提交 AI 员工表单。 */
   async function submit(values: AgentFormValues) {
     try {
-      const created = await createAgent(values)
-      console.info("AI 员工已创建", { agent_id: created.id })
+      const model = parseAgentModelSelection(values.modelSelection)
+      const created = await createAgent({
+        displayName: values.displayName,
+        teamIds: values.teamIds,
+        capability: {
+          ...model,
+          systemInstruction: values.systemInstruction,
+        },
+      })
+      console.info("AI 员工已创建", {
+        agent_id: created.id,
+        provider_id: created.capability.providerId,
+        model_identifier: created.capability.modelIdentifier,
+      })
       toast.success(t("agents.form.created"))
       onSaved()
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      console.warn("创建 AI 员工失败", error)
+      console.warn("创建 AI 员工失败", { error })
       toast.error(
         isApiError(error)
-          ? apiErrorMessage(error, ["displayName", "teamIds"])
+          ? apiErrorMessage(error, [
+              "displayName",
+              "providerId",
+              "modelIdentifier",
+              "systemInstruction",
+              "teamIds",
+            ])
           : t("agents.form.networkError"),
       )
     }
@@ -78,6 +104,25 @@ export function AgentForm({
           control={form.control}
           label={t("agents.form.name")}
           autoFocus
+        />
+        <AgentModelField control={form.control} name="modelSelection" />
+        <Controller
+          name="systemInstruction"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor="agent-system-instruction" required>
+                {t("agents.capability.instruction")}
+              </FieldLabel>
+              <Textarea
+                {...field}
+                id="agent-system-instruction"
+                rows={6}
+                required
+                aria-invalid={fieldState.invalid}
+              />
+            </Field>
+          )}
         />
         <Controller
           name="teamIds"
