@@ -77,10 +77,15 @@ tasks:
     sources:
       - "**/*"
       - exclude: node_modules/**/*
-      - "../build/frontend-targets/{{.FRONTEND_TARGET}}"
-      - "../build/frontend-modes/{{.FRONTEND_MODE}}"
+      - exclude: dist/**/*
     generates:
       - dist/**/*
+    status:
+      - >-
+        node -e
+        "const manifest = require('./dist/cervi-platform.json');
+        process.exit(manifest.platform === '{{.FRONTEND_TARGET}}' &&
+        manifest.mode === '{{.FRONTEND_MODE}}' ? 0 : 1)"
     deps:
       - task: install:frontend:deps
       - task: generate:bindings
