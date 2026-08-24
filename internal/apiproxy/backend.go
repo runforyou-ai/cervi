@@ -294,7 +294,7 @@ func (b *Backend) UpdateAgentWorkStatus(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
-// DeactivateAgent 停用远程企业 AI 员工。
+// DeactivateAgent 禁用远程企业 AI 员工账号。
 func (b *Backend) DeactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/deactivate", nil, nil, &output)
@@ -348,7 +348,7 @@ func (b *Backend) UpdateUserRoles(ctx context.Context, meta appservice.RequestMe
 	return b.do(ctx, meta, http.MethodPatch, "/users/roles", nil, input, nil)
 }
 
-// DeactivateUser 停用远程企业成员账号。
+// DeactivateUser 禁用远程企业成员账号。
 func (b *Backend) DeactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPost, "/users/"+url.PathEscape(userID)+"/deactivate", nil, nil, &output)

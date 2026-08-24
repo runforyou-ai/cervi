@@ -33,7 +33,7 @@
   "error.agent_not_found": "This AI employee could not be found.",
   "error.agent_read_failed": "Could not load the AI employee.",
   "error.agent_update_failed": "Could not save the AI employee.",
-  "error.agent_status_update_failed": "Could not update the AI employee status.",
+  "error.agent_status_update_failed": "Could not update the AI employee account status.",
   "error.user_update_failed": "Could not save the company member.",
   "error.user_status_update_failed": "Could not update the account status.",
   "error.user_last_active_administrator": "The administrator role must keep at least one active member.",

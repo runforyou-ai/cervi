@@ -20,7 +20,7 @@ type WorkStatusInput struct {
 	WorkStatus domain.WorkStatus
 }
 
-// UpdateWorkStatusAction 修改 AI 员工主动设置的工作状态。
+// UpdateWorkStatusAction 修改 AI 员工工作状态。
 type UpdateWorkStatusAction struct{ db *bun.DB }
 
 // NewUpdateWorkStatusAction 创建 AI 员工工作状态修改操作。
@@ -58,7 +58,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 		if domain.UserStatus(storedAgent.Status) == domain.UserStatusInactive && input.WorkStatus != domain.WorkStatusOffDuty {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusUnavailable}}
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		_, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("work_status = ?", input.WorkStatus).
 			Set("work_status_updated_at = now()").
 			Set("updated_at = now()").
@@ -68,11 +68,6 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 			Exec(ctx)
 		if err != nil {
 			return err
-		}
-		if affected, err := result.RowsAffected(); err != nil {
-			return err
-		} else if affected == 0 {
-			return ErrNotFound
 		}
 		output, err = loadAgent(ctx, tx, identity.Organization.ID, agentID)
 		return err

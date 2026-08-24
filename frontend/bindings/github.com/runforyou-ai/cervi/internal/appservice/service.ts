@@ -106,14 +106,14 @@ export function CreateWebsiteChannel(meta: $models.RequestMeta, input: $models.W
 }
 
 /**
- * DeactivateAgent 停用企业 AI 员工。
+ * DeactivateAgent 禁用企业 AI 员工账号。
  */
 export function DeactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2542842753, meta, agentID);
 }
 
 /**
- * DeactivateUser 停用企业成员账号。
+ * DeactivateUser 禁用企业成员账号。
  */
 export function DeactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
     return $Call.ByID(3624391107, meta, userID);

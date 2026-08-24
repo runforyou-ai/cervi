@@ -99,7 +99,7 @@ func (b *DirectBackend) UpdateAgentWorkStatus(ctx context.Context, meta RequestM
 	return agentFromAction(*agent), nil
 }
 
-// DeactivateAgent 停用企业 AI 员工。
+// DeactivateAgent 禁用企业 AI 员工账号。
 func (b *DirectBackend) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
 	return b.changeAgentStatus(ctx, meta, agentID, domain.UserStatusInactive)
 }
@@ -109,7 +109,7 @@ func (b *DirectBackend) ReactivateAgent(ctx context.Context, meta RequestMeta, a
 	return b.changeAgentStatus(ctx, meta, agentID, domain.UserStatusActive)
 }
 
-// changeAgentStatus 修改企业 AI 员工状态。
+// changeAgentStatus 修改企业 AI 员工账号状态。
 func (b *DirectBackend) changeAgentStatus(ctx context.Context, meta RequestMeta, agentID string, status domain.UserStatus) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -121,7 +121,7 @@ func (b *DirectBackend) changeAgentStatus(ctx context.Context, meta RequestMeta,
 			agentaction.ValidationStatusInvalid: cervii18n.FieldUserStatusInvalid,
 		})
 	}
-	slog.Info("AI 员工状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
+	slog.Info("AI 员工账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
 	return agentFromAction(*agent), nil
 }
 

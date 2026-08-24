@@ -557,7 +557,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const catalogRequestID = useRef(0)
   const listRequestID = useRef(0)
   const detailRequestID = useRef(0)
-  const workspaceUserRef = useRef(identity.user)
   const selected = searchParams.get("selected") ?? ""
   const deleted = scope === "external" && searchParams.get("view") === "trash"
   const creating = searchParams.get("new") === "1"
@@ -620,13 +619,6 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   )
 
   useEffect(() => setSearch(query), [query])
-  useEffect(() => {
-    if (workspaceUserRef.current === identity.user) return
-    workspaceUserRef.current = identity.user
-    if (scope === "team") {
-      setRefreshVersion((current) => current + 1)
-    }
-  }, [identity.user, scope])
   useEffect(() => {
     setSelectedTeamMemberIdentityIDs(new Set())
   }, [currentPage, query, roleId, status, teamId, workStatus])
@@ -888,7 +880,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         changingUserStatus.status === UserStatus.UserStatusActive
           ? await deactivateUser(changingUserStatus.id)
           : await reactivateUser(changingUserStatus.id)
-      console.info("用户账号状态已修改", {
+      console.info("企业成员账号状态已修改", {
         identity_id: saved.identityId,
         user_id: saved.id,
         status: saved.status,
@@ -907,7 +899,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
       setRefreshVersion((current) => current + 1)
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      console.warn("修改用户账号状态失败", {
+      console.warn("修改企业成员账号状态失败", {
         user_id: changingUserStatus.id,
         error,
       })
@@ -926,7 +918,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         changingAgentStatus.status === UserStatus.UserStatusActive
           ? await deactivateAgent(changingAgentStatus.id)
           : await reactivateAgent(changingAgentStatus.id)
-      console.info("AI 员工状态已修改", {
+      console.info("AI 员工账号状态已修改", {
         identity_id: saved.identityId,
         agent_id: saved.id,
         status: saved.status,
@@ -1829,6 +1821,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 </div>
               ) : scope === "employees" && detailUser ? (
                 <MemberDetailView
+                  key={detailUser.id}
                   user={detailUser}
                   teams={teams}
                   roles={roles}
@@ -1850,6 +1843,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                 />
               ) : scope === "agents" && detailAgent ? (
                 <AgentDetailView
+                  key={detailAgent.id}
                   agent={detailAgent}
                   teams={teams}
                   onSaved={(saved) => {

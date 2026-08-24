@@ -2,7 +2,6 @@
 import {
   useEffect,
   useMemo,
-  useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
@@ -29,6 +28,7 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { StatusBadge } from "@/components/status-badge"
 import {
+  accountStatuses,
   accountStatusSchema,
   type AccountStatusFormValues,
 } from "@/features/contacts/account-status-schema"
@@ -38,11 +38,15 @@ import {
   createMemberSchema,
   type MemberFormValues,
 } from "@/features/contacts/member-schema"
+import {
+  sameIDs,
+  useImmediateSave,
+} from "@/features/contacts/use-immediate-save"
+import { roleDisplayName } from "@/features/roles/role-labels"
 import { WorkStatusBadge } from "@/features/users/work-status"
 import { useDateTime } from "@/hooks/use-date-time"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { roleDisplayName } from "@/features/roles/role-labels"
 
 type EditingField =
   | "name"
@@ -51,11 +55,6 @@ type EditingField =
   | "accountStatus"
   | "teams"
   | null
-
-const accountStatuses = [
-  UserStatus.UserStatusActive,
-  UserStatus.UserStatusInactive,
-] as const
 
 /** 把企业成员详情转换为编辑表单值。 */
 function valuesFromUser(user: UserData): MemberFormValues {
@@ -66,14 +65,6 @@ function valuesFromUser(user: UserData): MemberFormValues {
     roleId: user.role.id,
     teamIds: user.teams.map((team) => team.id),
   }
-}
-
-/** 按当前顺序判断两个团队编号列表是否一致。 */
-function sameTeamIDs(left: string[], right: string[]) {
-  return (
-    left.length === right.length &&
-    left.every((teamID, index) => teamID === right[index])
-  )
 }
 
 /** 显示企业成员只读字段。 */
@@ -113,12 +104,8 @@ export function MemberDetailView({
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [editing, setEditing] = useState<EditingField>(null)
-  const [saving, setSaving] = useState(false)
-  const savingRef = useRef(false)
-  const requestVersionRef = useRef(0)
-  const previousUserIDRef = useRef(user.id)
-  const currentUserIDRef = useRef(user.id)
-  currentUserIDRef.current = user.id
+  const saveState = useImmediateSave()
+  const { saving } = saveState
   const schema = useMemo(
     () =>
       createMemberSchema(
@@ -149,22 +136,7 @@ export function MemberDetailView({
   useEffect(() => {
     form.reset(valuesFromUser(user))
     accountStatusForm.reset({ status: user.status })
-    if (previousUserIDRef.current !== user.id) {
-      requestVersionRef.current += 1
-      savingRef.current = false
-      setSaving(false)
-      setEditing(null)
-    }
-    previousUserIDRef.current = user.id
   }, [accountStatusForm, form, user])
-
-  useEffect(
-    () => () => {
-      requestVersionRef.current += 1
-      savingRef.current = false
-    },
-    [],
-  )
 
   /** 放弃尚未提交的修改并退出编辑。 */
   function cancelEdit() {
@@ -180,88 +152,45 @@ export function MemberDetailView({
     setEditing(field)
   }
 
-  /** 标记一次保存开始并返回用于忽略过期结果的版本号。 */
-  function beginSaving() {
-    if (savingRef.current) return null
-    savingRef.current = true
-    setSaving(true)
-    requestVersionRef.current += 1
-    return requestVersionRef.current
-  }
-
-  /** 判断保存结果是否仍属于当前详情。 */
-  function isCurrentRequest(
-    version: number,
-    userID = currentUserIDRef.current,
-  ) {
-    return (
-      requestVersionRef.current === version &&
-      currentUserIDRef.current === userID
-    )
-  }
-
-  /** 结束仍有效的保存状态。 */
-  function finishSaving(
-    version: number,
-    userID = currentUserIDRef.current,
-  ) {
-    if (!isCurrentRequest(version, userID)) return
-    savingRef.current = false
-    setSaving(false)
-  }
-
-  /** 保存失败时恢复服务端返回的成员资料。 */
-  function rollbackEdit() {
-    form.reset(valuesFromUser(user))
-    accountStatusForm.reset({ status: user.status })
-    setEditing(null)
-  }
-
-  /** 保存当前字段修改，并按字段交互决定是否退出编辑。 */
+  /** 保存成员字段。 */
   async function saveMember(
     draft: MemberFormValues = form.getValues(),
     closeAfterSave = true,
   ) {
-    if (savingRef.current) return
     const userID = user.id
-    const requestVersion = beginSaving()
-    if (requestVersion === null) return
+    const request = saveState.begin()
+    if (request === null) return
     const valid = await form.trigger()
-    if (!isCurrentRequest(requestVersion, userID)) return
+    if (!saveState.isCurrent(request)) return
     if (!valid) {
-      finishSaving(requestVersion, userID)
-      return
-    }
-    const parsed = schema.safeParse(draft)
-    if (!parsed.success) {
-      finishSaving(requestVersion, userID)
+      saveState.finish(request)
       return
     }
     const current = valuesFromUser(user)
     if (
-      parsed.data.displayName === current.displayName &&
-      parsed.data.email === current.email &&
-      parsed.data.roleId === current.roleId &&
-      sameTeamIDs(parsed.data.teamIds, current.teamIds)
+      draft.displayName === current.displayName &&
+      draft.email === current.email &&
+      draft.roleId === current.roleId &&
+      sameIDs(draft.teamIds, current.teamIds)
     ) {
       setEditing(null)
-      finishSaving(requestVersion, userID)
+      saveState.finish(request)
       return
     }
 
     try {
       const saved = await updateUser(userID, {
-        displayName: parsed.data.displayName,
-        email: parsed.data.email,
-        roleId: parsed.data.roleId,
-        teamIds: parsed.data.teamIds,
+        displayName: draft.displayName,
+        email: draft.email,
+        roleId: draft.roleId,
+        teamIds: draft.teamIds,
       })
-      if (!isCurrentRequest(requestVersion, userID)) return
+      if (!saveState.isCurrent(request)) return
       if (closeAfterSave) setEditing(null)
       onSaved(saved)
     } catch (error) {
-      if (!isCurrentRequest(requestVersion, userID)) return
-      rollbackEdit()
+      if (!saveState.isCurrent(request)) return
+      cancelEdit()
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         onNotFound()
@@ -279,11 +208,11 @@ export function MemberDetailView({
           : t("members.form.networkError"),
       )
     } finally {
-      finishSaving(requestVersion, userID)
+      saveState.finish(request)
     }
   }
 
-  /** 立即修改企业成员的账号状态。 */
+  /** 修改企业成员账号状态。 */
   async function saveAccountStatus(
     status: AccountStatusFormValues["status"],
   ) {
@@ -292,31 +221,26 @@ export function MemberDetailView({
       return
     }
     const userID = user.id
-    const requestVersion = beginSaving()
-    if (requestVersion === null) return
+    const request = saveState.begin()
+    if (request === null) return
     const valid = await accountStatusForm.trigger()
-    if (!isCurrentRequest(requestVersion, userID)) return
+    if (!saveState.isCurrent(request)) return
     if (!valid) {
-      finishSaving(requestVersion, userID)
-      return
-    }
-    const parsed = accountStatusSchema.safeParse({ status })
-    if (!parsed.success) {
-      finishSaving(requestVersion, userID)
+      saveState.finish(request)
       return
     }
 
     try {
       const saved =
-        parsed.data.status === UserStatus.UserStatusInactive
+        status === UserStatus.UserStatusInactive
           ? await deactivateUser(userID)
           : await reactivateUser(userID)
-      if (!isCurrentRequest(requestVersion, userID)) return
+      if (!saveState.isCurrent(request)) return
       setEditing(null)
       onSaved(saved)
     } catch (error) {
-      if (!isCurrentRequest(requestVersion, userID)) return
-      rollbackEdit()
+      if (!saveState.isCurrent(request)) return
+      cancelEdit()
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         onNotFound()
@@ -329,11 +253,11 @@ export function MemberDetailView({
           : t("members.status.error"),
       )
     } finally {
-      finishSaving(requestVersion, userID)
+      saveState.finish(request)
     }
   }
 
-  /** 处理文本字段的回车保存和退出编辑。 */
+  /** 处理文本字段快捷键。 */
   function handleTextKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault()
@@ -347,7 +271,7 @@ export function MemberDetailView({
     }
   }
 
-  /** 允许选择字段通过 Escape 放弃本次编辑。 */
+  /** 处理选择字段快捷键。 */
   function handleSelectKeyDown(event: KeyboardEvent<HTMLSelectElement>) {
     if (event.key !== "Escape") return
     event.preventDefault()
@@ -442,7 +366,7 @@ export function MemberDetailView({
                   }}
                   onBlur={() => {
                     field.onBlur()
-                    if (!savingRef.current) cancelEdit()
+                    if (!saveState.isSaving()) cancelEdit()
                   }}
                   onKeyDown={handleSelectKeyDown}
                 >
@@ -490,7 +414,7 @@ export function MemberDetailView({
                   }}
                   onBlur={() => {
                     field.onBlur()
-                    if (!savingRef.current) cancelEdit()
+                    if (!saveState.isSaving()) cancelEdit()
                   }}
                   onKeyDown={handleSelectKeyDown}
                 >
@@ -537,7 +461,7 @@ export function MemberDetailView({
                       if (event.currentTarget.contains(event.relatedTarget)) {
                         return
                       }
-                      if (savingRef.current) {
+                      if (saveState.isSaving()) {
                         setEditing(null)
                         return
                       }
@@ -557,14 +481,10 @@ export function MemberDetailView({
                       >
                         <input
                           type="checkbox"
-                          className="size-4 accent-primary aria-disabled:cursor-wait aria-disabled:opacity-60"
-                          aria-disabled={saving}
+                          className="size-4 accent-primary disabled:cursor-wait disabled:opacity-60"
+                          disabled={saving}
                           checked={field.value.includes(team.id)}
-                          onClick={(event) => {
-                            if (savingRef.current) event.preventDefault()
-                          }}
                           onChange={(event) => {
-                            if (savingRef.current) return
                             const teamIds = event.target.checked
                               ? [...field.value, team.id]
                               : field.value.filter((id) => id !== team.id)

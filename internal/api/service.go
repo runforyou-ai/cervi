@@ -355,7 +355,7 @@ func (s *Service) updateAgentWorkStatus(c *gin.Context) {
 	writeResult(c, http.StatusOK, agent, err)
 }
 
-// deactivateAgent 停用企业 AI 员工。
+// deactivateAgent 禁用企业 AI 员工账号。
 func (s *Service) deactivateAgent(c *gin.Context) {
 	agent, err := s.application.DeactivateAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"))
 	writeResult(c, http.StatusOK, agent, err)
@@ -414,11 +414,13 @@ func (s *Service) updateUserRoles(c *gin.Context) {
 	writeEmpty(c, s.application.UpdateUserRoles(c.Request.Context(), requestMeta(c), input))
 }
 
+// deactivateUser 禁用企业成员账号。
 func (s *Service) deactivateUser(c *gin.Context) {
 	user, err := s.application.DeactivateUser(c.Request.Context(), requestMeta(c), c.Param("userID"))
 	writeResult(c, http.StatusOK, user, err)
 }
 
+// reactivateUser 恢复企业成员账号。
 func (s *Service) reactivateUser(c *gin.Context) {
 	user, err := s.application.ReactivateUser(c.Request.Context(), requestMeta(c), c.Param("userID"))
 	writeResult(c, http.StatusOK, user, err)

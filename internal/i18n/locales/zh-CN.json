@@ -33,7 +33,7 @@
   "error.agent_not_found": "没有找到这个 AI 员工。",
   "error.agent_read_failed": "读取 AI 员工详情失败。",
   "error.agent_update_failed": "保存 AI 员工失败。",
-  "error.agent_status_update_failed": "修改 AI 员工状态失败。",
+  "error.agent_status_update_failed": "修改 AI 员工账号状态失败。",
   "error.user_update_failed": "保存企业成员失败。",
   "error.user_status_update_failed": "修改账号状态失败。",
   "error.user_last_active_administrator": "管理员角色至少需要保留一名正常状态的成员。",

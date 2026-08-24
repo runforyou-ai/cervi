@@ -259,7 +259,7 @@ func (s *Service) UpdateAgentWorkStatus(ctx context.Context, meta RequestMeta, a
 	return s.backend.UpdateAgentWorkStatus(ctx, meta, agentID, input)
 }
 
-// DeactivateAgent 停用企业 AI 员工。
+// DeactivateAgent 禁用企业 AI 员工账号。
 func (s *Service) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
 	return s.backend.DeactivateAgent(ctx, meta, agentID)
 }
@@ -294,7 +294,7 @@ func (s *Service) UpdateUserRoles(ctx context.Context, meta RequestMeta, input U
 	return s.backend.UpdateUserRoles(ctx, meta, input)
 }
 
-// DeactivateUser 停用企业成员账号。
+// DeactivateUser 禁用企业成员账号。
 func (s *Service) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
 	return s.backend.DeactivateUser(ctx, meta, userID)
 }

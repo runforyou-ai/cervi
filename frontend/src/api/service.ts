@@ -486,7 +486,7 @@ export function updateAgentWorkStatus(
   return updateAgentWorkStatusBound(agentId, input).then(normalizeAgent)
 }
 
-/** 禁用企业 AI 员工。 */
+/** 禁用企业 AI 员工账号。 */
 export function deactivateAgent(agentId: string) {
   return deactivateAgentBound(agentId).then(normalizeAgent)
 }
