@@ -156,6 +156,13 @@ const (
 	AIModelInputModalityVideo AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityVideo)
 )
 
+// AgentExecutionMode 表示 AI 员工的执行方式。
+type AgentExecutionMode string
+
+const (
+	AgentExecutionModeManaged AgentExecutionMode = AgentExecutionMode(domain.AgentExecutionModeManaged)
+)
+
 // StorageProvider 表示 S3 兼容对象存储提供商。
 type StorageProvider string
 
@@ -540,9 +547,9 @@ type MemberOptionList struct {
 
 // CreateAgentInput 定义新增 AI 员工字段。
 type CreateAgentInput struct {
-	DisplayName string               `json:"displayName"`
-	TeamIDs     []string             `json:"teamIds"`
-	Capability  AgentCapabilityInput `json:"capability"`
+	DisplayName string              `json:"displayName"`
+	TeamIDs     []string            `json:"teamIds"`
+	Execution   AgentExecutionInput `json:"execution"`
 }
 
 // UpdateAgentInput 定义 AI 员工可编辑字段。
@@ -556,8 +563,14 @@ type AgentWorkStatusInput struct {
 	WorkStatus WorkStatus `json:"workStatus"`
 }
 
-// AgentCapabilityInput 定义 AI 员工能力配置字段。
-type AgentCapabilityInput struct {
+// AgentExecutionInput 定义 AI 员工执行配置输入。
+type AgentExecutionInput struct {
+	Mode    AgentExecutionMode          `json:"mode"`
+	Managed *AgentManagedExecutionInput `json:"managed,omitempty"`
+}
+
+// AgentManagedExecutionInput 定义平台托管执行配置输入。
+type AgentManagedExecutionInput struct {
 	ProviderID        string `json:"providerId"`
 	ModelIdentifier   string `json:"modelIdentifier"`
 	SystemInstruction string `json:"systemInstruction"`
@@ -573,30 +586,37 @@ type AgentListInput struct {
 
 // Agent 定义 AI 员工信息。
 type Agent struct {
-	ID          string          `json:"id"`
-	IdentityID  string          `json:"identityId"`
-	DisplayName string          `json:"displayName"`
-	Status      UserStatus      `json:"status"`
-	WorkStatus  WorkStatus      `json:"workStatus"`
-	Teams       []TeamSummary   `json:"teams"`
-	Capability  AgentCapability `json:"capability"`
-	CreatedAt   time.Time       `json:"createdAt"`
+	ID          string         `json:"id"`
+	IdentityID  string         `json:"identityId"`
+	DisplayName string         `json:"displayName"`
+	Status      UserStatus     `json:"status"`
+	WorkStatus  WorkStatus     `json:"workStatus"`
+	Teams       []TeamSummary  `json:"teams"`
+	Execution   AgentExecution `json:"execution"`
+	CreatedAt   time.Time      `json:"createdAt"`
 }
 
 // AgentListItem 定义 AI 员工目录项。
 type AgentListItem struct {
-	ID          string                 `json:"id"`
-	IdentityID  string                 `json:"identityId"`
-	DisplayName string                 `json:"displayName"`
-	Status      UserStatus             `json:"status"`
-	WorkStatus  WorkStatus             `json:"workStatus"`
-	Teams       []TeamSummary          `json:"teams"`
-	Capability  AgentCapabilitySummary `json:"capability"`
-	CreatedAt   time.Time              `json:"createdAt"`
+	ID          string                `json:"id"`
+	IdentityID  string                `json:"identityId"`
+	DisplayName string                `json:"displayName"`
+	Status      UserStatus            `json:"status"`
+	WorkStatus  WorkStatus            `json:"workStatus"`
+	Teams       []TeamSummary         `json:"teams"`
+	Execution   AgentExecutionSummary `json:"execution"`
+	CreatedAt   time.Time             `json:"createdAt"`
 }
 
-// AgentCapability 定义 AI 员工当前生效的能力配置。
-type AgentCapability struct {
+// AgentExecution 定义 AI 员工当前生效的执行配置。
+type AgentExecution struct {
+	RevisionID string                 `json:"revisionId"`
+	Mode       AgentExecutionMode     `json:"mode"`
+	Managed    *AgentManagedExecution `json:"managed,omitempty"`
+}
+
+// AgentManagedExecution 定义平台托管执行配置。
+type AgentManagedExecution struct {
 	ProviderID        string `json:"providerId"`
 	ProviderName      string `json:"providerName"`
 	ModelIdentifier   string `json:"modelIdentifier"`
@@ -604,8 +624,15 @@ type AgentCapability struct {
 	SystemInstruction string `json:"systemInstruction"`
 }
 
-// AgentCapabilitySummary 定义 AI 员工当前模型摘要。
-type AgentCapabilitySummary struct {
+// AgentExecutionSummary 定义 AI 员工当前执行配置摘要。
+type AgentExecutionSummary struct {
+	RevisionID string                        `json:"revisionId"`
+	Mode       AgentExecutionMode            `json:"mode"`
+	Managed    *AgentManagedExecutionSummary `json:"managed,omitempty"`
+}
+
+// AgentManagedExecutionSummary 定义平台托管执行配置摘要。
+type AgentManagedExecutionSummary struct {
 	ProviderID      string `json:"providerId"`
 	ProviderName    string `json:"providerName"`
 	ModelIdentifier string `json:"modelIdentifier"`

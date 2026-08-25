@@ -34,6 +34,6 @@ func loadAgent(ctx context.Context, db bun.IDB, organizationID, agentID string) 
 	if err != nil {
 		return nil, err
 	}
-	agent.Capability, err = loadAgentCapability(ctx, db, organizationID, agentID)
+	agent.Execution, err = loadAgentExecution(ctx, db, organizationID, agentID)
 	return agent, err
 }

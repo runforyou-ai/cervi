@@ -18,7 +18,7 @@ import {
   isNotFoundApiError,
   reactivateAgent,
   updateAgent,
-  updateAgentCapability,
+  updateAgentExecution,
   updateAgentWorkStatus,
   type AgentData,
   type Team,
@@ -30,9 +30,9 @@ import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import {
   agentWorkStatusSchema,
-  createAgentCapabilitySchema,
+  createAgentManagedExecutionSchema,
   createAgentProfileSchema,
-  type AgentCapabilityFormValues,
+  type AgentManagedExecutionFormValues,
   type AgentProfileFormValues,
   type AgentWorkStatusFormValues,
 } from "@/features/contacts/agent-schema"
@@ -66,7 +66,7 @@ type EditingField =
   | "accountStatus"
   | "workStatus"
   | "teams"
-  | "capabilityModel"
+  | "executionModel"
   | "systemInstruction"
   | null
 
@@ -78,16 +78,16 @@ function valuesFromAgent(agent: AgentData): AgentProfileFormValues {
   }
 }
 
-/** 把 AI 员工能力配置转换为表单值。 */
-function capabilityValuesFromAgent(
+/** 把 AI 员工平台托管执行配置转换为表单值。 */
+function managedExecutionValuesFromAgent(
   agent: AgentData,
-): AgentCapabilityFormValues {
+): AgentManagedExecutionFormValues {
   return {
     modelSelection: agentModelSelection(
-      agent.capability.providerId,
-      agent.capability.modelIdentifier,
+      agent.execution.managed.providerId,
+      agent.execution.managed.modelIdentifier,
     ),
-    systemInstruction: agent.capability.systemInstruction,
+    systemInstruction: agent.execution.managed.systemInstruction,
   }
 }
 
@@ -117,9 +117,9 @@ export function AgentDetailView({
       }),
     [t],
   )
-  const capabilitySchema = useMemo(
+  const managedExecutionSchema = useMemo(
     () =>
-      createAgentCapabilitySchema({
+      createAgentManagedExecutionSchema({
         modelRequired: t("agents.validation.modelRequired"),
         instructionRequired: t("agents.validation.instructionRequired"),
         instructionTooLong: t("agents.validation.instructionTooLong"),
@@ -131,10 +131,10 @@ export function AgentDetailView({
     shouldUseNativeValidation: true,
     defaultValues: valuesFromAgent(agent),
   })
-  const capabilityForm = useForm<AgentCapabilityFormValues>({
-    resolver: zodResolver(capabilitySchema),
+  const managedExecutionForm = useForm<AgentManagedExecutionFormValues>({
+    resolver: zodResolver(managedExecutionSchema),
     shouldUseNativeValidation: true,
-    defaultValues: capabilityValuesFromAgent(agent),
+    defaultValues: managedExecutionValuesFromAgent(agent),
   })
   const accountStatusForm = useForm<AccountStatusFormValues>({
     resolver: zodResolver(accountStatusSchema),
@@ -149,15 +149,15 @@ export function AgentDetailView({
 
   useEffect(() => {
     form.reset(valuesFromAgent(agent))
-    capabilityForm.reset(capabilityValuesFromAgent(agent))
+    managedExecutionForm.reset(managedExecutionValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
-  }, [accountStatusForm, agent, capabilityForm, form, workStatusForm])
+  }, [accountStatusForm, agent, form, managedExecutionForm, workStatusForm])
 
   /** 放弃尚未提交的修改并退出编辑。 */
   function cancelEdit() {
     form.reset(valuesFromAgent(agent))
-    capabilityForm.reset(capabilityValuesFromAgent(agent))
+    managedExecutionForm.reset(managedExecutionValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
     setEditing(null)
@@ -166,7 +166,7 @@ export function AgentDetailView({
   /** 开始编辑指定 AI 员工字段。 */
   function startEditing(field: Exclude<EditingField, null>) {
     form.reset(valuesFromAgent(agent))
-    capabilityForm.reset(capabilityValuesFromAgent(agent))
+    managedExecutionForm.reset(managedExecutionValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
     setEditing(field)
@@ -220,19 +220,19 @@ export function AgentDetailView({
     }
   }
 
-  /** 保存 AI 员工能力配置。 */
-  async function saveCapability(
-    draft: AgentCapabilityFormValues = capabilityForm.getValues(),
+  /** 保存 AI 员工平台托管执行配置。 */
+  async function saveManagedExecution(
+    draft: AgentManagedExecutionFormValues = managedExecutionForm.getValues(),
   ) {
     const request = saveState.begin()
     if (request === null) return
-    const valid = await capabilityForm.trigger()
+    const valid = await managedExecutionForm.trigger()
     if (!saveState.isCurrent(request)) return
     if (!valid) {
       saveState.finish(request)
       return
     }
-    const current = capabilityValuesFromAgent(agent)
+    const current = managedExecutionValuesFromAgent(agent)
     if (
       draft.modelSelection === current.modelSelection &&
       draft.systemInstruction === current.systemInstruction
@@ -243,17 +243,22 @@ export function AgentDetailView({
     }
     try {
       const model = parseAgentModelSelection(draft.modelSelection)
-      const saved = await updateAgentCapability(agent.id, {
-        ...model,
-        systemInstruction: draft.systemInstruction,
+      const saved = await updateAgentExecution(agent.id, {
+        mode: agent.execution.mode,
+        managed: {
+          ...model,
+          systemInstruction: draft.systemInstruction,
+        },
       })
       if (!saveState.isCurrent(request)) return
       setEditing(null)
       onSaved(saved)
-      console.info("AI 员工能力配置已保存", {
+      console.info("AI 员工运行配置已保存", {
         agent_id: saved.id,
-        provider_id: saved.capability.providerId,
-        model_identifier: saved.capability.modelIdentifier,
+        execution_mode: saved.execution.mode,
+        revision_id: saved.execution.revisionId,
+        provider_id: saved.execution.managed.providerId,
+        model_identifier: saved.execution.managed.modelIdentifier,
       })
     } catch (error) {
       if (!saveState.isCurrent(request)) return
@@ -263,13 +268,14 @@ export function AgentDetailView({
         onNotFound()
         return
       }
-      console.warn("保存 AI 员工能力配置失败", {
+      console.warn("保存 AI 员工运行配置失败", {
         agent_id: agent.id,
         error,
       })
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error, [
+              "execution",
               "providerId",
               "modelIdentifier",
               "systemInstruction",
@@ -536,20 +542,20 @@ export function AgentDetailView({
         <div className="divide-y">
           <DetailEditRow
             label={t("agents.capability.model")}
-            value={`${agent.capability.providerName} · ${agent.capability.modelName}`}
-            editing={editing === "capabilityModel"}
+            value={`${agent.execution.managed.providerName} · ${agent.execution.managed.modelName}`}
+            editing={editing === "executionModel"}
             editEnabled={editing === null && !saving}
-            onEdit={() => startEditing("capabilityModel")}
+            onEdit={() => startEditing("executionModel")}
           >
             <AgentModelField
-              control={capabilityForm.control}
+              control={managedExecutionForm.control}
               name="modelSelection"
               disabled={saving}
               hideLabel
               autoFocus
               onValueChange={(modelSelection) =>
-                void saveCapability({
-                  ...capabilityForm.getValues(),
+                void saveManagedExecution({
+                  ...managedExecutionForm.getValues(),
                   modelSelection,
                 })
               }
@@ -563,7 +569,7 @@ export function AgentDetailView({
             label={t("agents.capability.instruction")}
             value={
               <span className="whitespace-pre-wrap">
-                {agent.capability.systemInstruction}
+                {agent.execution.managed.systemInstruction}
               </span>
             }
             editing={editing === "systemInstruction"}
@@ -572,7 +578,7 @@ export function AgentDetailView({
           >
             <Controller
               name="systemInstruction"
-              control={capabilityForm.control}
+              control={managedExecutionForm.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <Textarea
@@ -585,7 +591,7 @@ export function AgentDetailView({
                     aria-invalid={fieldState.invalid}
                     onBlur={() => {
                       field.onBlur()
-                      void saveCapability()
+                      void saveManagedExecution()
                     }}
                     onKeyDown={handleTextareaKeyDown}
                   />

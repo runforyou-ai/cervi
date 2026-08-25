@@ -97,10 +97,11 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, providerID string, models []Model) error {
 	activeIdentifiers := make([]string, 0)
 	if err := db.NewSelect().TableExpr("agents AS a").
-		ColumnExpr("DISTINCT ar.model_identifier").
+		ColumnExpr("DISTINCT ar.configuration #>> '{model,identifier}'").
 		Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.organization_id = a.organization_id AND ar.agent_id = a.id").
 		Where("a.organization_id = ?", organizationID).
-		Where("ar.provider_id = ?", providerID).
+		Where("ar.execution_mode = ?", domain.AgentExecutionModeManaged).
+		Where("ar.configuration #>> '{model,providerId}' = ?", providerID).
 		Scan(ctx, &activeIdentifiers); err != nil {
 		return err
 	}
@@ -133,7 +134,8 @@ func providerInUse(ctx context.Context, db bun.IDB, organizationID, providerID s
 	return db.NewSelect().TableExpr("agents AS a").
 		Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.organization_id = a.organization_id AND ar.agent_id = a.id").
 		Where("a.organization_id = ?", organizationID).
-		Where("ar.provider_id = ?", providerID).
+		Where("ar.execution_mode = ?", domain.AgentExecutionModeManaged).
+		Where("ar.configuration #>> '{model,providerId}' = ?", providerID).
 		Exists(ctx)
 }
 

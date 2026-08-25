@@ -114,38 +114,46 @@ export interface Agent {
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
-    "capability": AgentCapability;
+    "execution": AgentExecution;
     "createdAt": string;
 }
 
 /**
- * AgentCapability 定义 AI 员工当前生效的能力配置。
+ * AgentExecution 定义 AI 员工当前生效的执行配置。
  */
-export interface AgentCapability {
-    "providerId": string;
-    "providerName": string;
-    "modelIdentifier": string;
-    "modelName": string;
-    "systemInstruction": string;
+export interface AgentExecution {
+    "revisionId": string;
+    "mode": AgentExecutionMode;
+    "managed"?: AgentManagedExecution | null;
 }
 
 /**
- * AgentCapabilityInput 定义 AI 员工能力配置字段。
+ * AgentExecutionInput 定义 AI 员工执行配置输入。
  */
-export interface AgentCapabilityInput {
-    "providerId": string;
-    "modelIdentifier": string;
-    "systemInstruction": string;
+export interface AgentExecutionInput {
+    "mode": AgentExecutionMode;
+    "managed"?: AgentManagedExecutionInput | null;
 }
 
 /**
- * AgentCapabilitySummary 定义 AI 员工当前模型摘要。
+ * AgentExecutionMode 表示 AI 员工的执行方式。
  */
-export interface AgentCapabilitySummary {
-    "providerId": string;
-    "providerName": string;
-    "modelIdentifier": string;
-    "modelName": string;
+export enum AgentExecutionMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentExecutionModeManaged = "managed",
+};
+
+/**
+ * AgentExecutionSummary 定义 AI 员工当前执行配置摘要。
+ */
+export interface AgentExecutionSummary {
+    "revisionId": string;
+    "mode": AgentExecutionMode;
+    "managed"?: AgentManagedExecutionSummary | null;
 }
 
 /**
@@ -176,8 +184,38 @@ export interface AgentListItem {
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
-    "capability": AgentCapabilitySummary;
+    "execution": AgentExecutionSummary;
     "createdAt": string;
+}
+
+/**
+ * AgentManagedExecution 定义平台托管执行配置。
+ */
+export interface AgentManagedExecution {
+    "providerId": string;
+    "providerName": string;
+    "modelIdentifier": string;
+    "modelName": string;
+    "systemInstruction": string;
+}
+
+/**
+ * AgentManagedExecutionInput 定义平台托管执行配置输入。
+ */
+export interface AgentManagedExecutionInput {
+    "providerId": string;
+    "modelIdentifier": string;
+    "systemInstruction": string;
+}
+
+/**
+ * AgentManagedExecutionSummary 定义平台托管执行配置摘要。
+ */
+export interface AgentManagedExecutionSummary {
+    "providerId": string;
+    "providerName": string;
+    "modelIdentifier": string;
+    "modelName": string;
 }
 
 /**
@@ -444,7 +482,7 @@ export interface Conversation {
 export interface CreateAgentInput {
     "displayName": string;
     "teamIds": string[] | null;
-    "capability": AgentCapabilityInput;
+    "execution": AgentExecutionInput;
 }
 
 /**

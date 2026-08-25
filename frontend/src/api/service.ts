@@ -55,7 +55,7 @@ import {
   UpdateContact,
   UpdateAIProvider,
   UpdateAgent,
-  UpdateAgentCapability,
+  UpdateAgentExecution,
   UpdateAgentWorkStatus,
   UpdateTeam,
   UpdateUser,
@@ -74,6 +74,7 @@ import {
   AIModelInputModality,
   AIModelType,
   AIProviderBrand,
+  AgentExecutionMode,
   ContactSort,
   StorageProvider,
   type AIProvider,
@@ -85,7 +86,7 @@ import {
   type AgentList,
   type AgentListItem,
   type AgentListInput,
-  type AgentCapabilityInput,
+  type AgentExecutionInput,
   type Contact,
   type ContactInput,
   type ContactList,
@@ -186,12 +187,33 @@ export type MemberOptionListData = Omit<MemberOptionList, "members"> & {
   members: MemberOption[]
 }
 
-export type AgentData = Omit<Agent, "teams"> & {
-  teams: NonNullable<Agent["teams"]>
+export type ManagedAgentExecutionData = Omit<
+  Agent["execution"],
+  "mode" | "managed"
+> & {
+  mode: AgentExecutionMode.AgentExecutionModeManaged
+  managed: NonNullable<Agent["execution"]["managed"]>
 }
 
-export type AgentListItemData = Omit<AgentListItem, "teams"> & {
+export type ManagedAgentExecutionSummaryData = Omit<
+  AgentListItem["execution"],
+  "mode" | "managed"
+> & {
+  mode: AgentExecutionMode.AgentExecutionModeManaged
+  managed: NonNullable<AgentListItem["execution"]["managed"]>
+}
+
+export type AgentData = Omit<Agent, "teams" | "execution"> & {
+  teams: NonNullable<Agent["teams"]>
+  execution: ManagedAgentExecutionData
+}
+
+export type AgentListItemData = Omit<
+  AgentListItem,
+  "teams" | "execution"
+> & {
   teams: NonNullable<AgentListItem["teams"]>
+  execution: ManagedAgentExecutionSummaryData
 }
 
 export type AgentListData = Omit<AgentList, "agents"> & {
@@ -382,7 +404,7 @@ const listAgentsBound = bind(ListAgents)
 const listAgentModelOptionsBound = bind(ListAgentModelOptions)
 const getAgentBound = bind(GetAgent)
 const updateAgentBound = bind(UpdateAgent)
-const updateAgentCapabilityBound = bind(UpdateAgentCapability)
+const updateAgentExecutionBound = bind(UpdateAgentExecution)
 const updateAgentWorkStatusBound = bind(UpdateAgentWorkStatus)
 const deactivateAgentBound = bind(DeactivateAgent)
 const reactivateAgentBound = bind(ReactivateAgent)
@@ -482,14 +504,50 @@ function normalizeUser(user: User): UserData {
   return { ...user, teams: asList(user.teams) }
 }
 
-/** 归一化 AI 员工所属团队。 */
-function normalizeAgent(agent: Agent): AgentData {
-  return { ...agent, teams: asList(agent.teams) }
+/** 归一化 AI 员工平台托管执行配置。 */
+function normalizeAgentExecution(
+  execution: Agent["execution"],
+): ManagedAgentExecutionData {
+  if (
+    execution.mode !== AgentExecutionMode.AgentExecutionModeManaged ||
+    execution.managed === undefined ||
+    execution.managed === null
+  ) {
+    throw new Error(`Unsupported agent execution mode: ${execution.mode}`)
+  }
+  return { ...execution, mode: execution.mode, managed: execution.managed }
 }
 
-/** 归一化 AI 员工目录项所属团队。 */
+/** 归一化 AI 员工平台托管执行配置摘要。 */
+function normalizeAgentExecutionSummary(
+  execution: AgentListItem["execution"],
+): ManagedAgentExecutionSummaryData {
+  if (
+    execution.mode !== AgentExecutionMode.AgentExecutionModeManaged ||
+    execution.managed === undefined ||
+    execution.managed === null
+  ) {
+    throw new Error(`Unsupported agent execution mode: ${execution.mode}`)
+  }
+  return { ...execution, mode: execution.mode, managed: execution.managed }
+}
+
+/** 归一化 AI 员工所属团队和执行配置。 */
+function normalizeAgent(agent: Agent): AgentData {
+  return {
+    ...agent,
+    teams: asList(agent.teams),
+    execution: normalizeAgentExecution(agent.execution),
+  }
+}
+
+/** 归一化 AI 员工目录项所属团队和执行配置。 */
 function normalizeAgentListItem(agent: AgentListItem): AgentListItemData {
-  return { ...agent, teams: asList(agent.teams) }
+  return {
+    ...agent,
+    teams: asList(agent.teams),
+    execution: normalizeAgentExecutionSummary(agent.execution),
+  }
 }
 
 /** 读取企业成员详情。 */
@@ -522,12 +580,12 @@ export function updateAgent(agentId: string, input: UpdateAgentInput) {
   return updateAgentBound(agentId, input).then(normalizeAgent)
 }
 
-/** 修改企业 AI 员工的能力配置。 */
-export function updateAgentCapability(
+/** 修改企业 AI 员工的执行配置。 */
+export function updateAgentExecution(
   agentId: string,
-  input: AgentCapabilityInput,
+  input: AgentExecutionInput,
 ) {
-  return updateAgentCapabilityBound(agentId, input).then(normalizeAgent)
+  return updateAgentExecutionBound(agentId, input).then(normalizeAgent)
 }
 
 /** 修改企业 AI 员工的工作状态。 */

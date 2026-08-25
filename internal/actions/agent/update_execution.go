@@ -15,20 +15,20 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdateCapabilityAction 修改 AI 员工当前生效的能力配置。
-type UpdateCapabilityAction struct{ db *bun.DB }
+// UpdateExecutionAction 修改 AI 员工当前生效的执行配置。
+type UpdateExecutionAction struct{ db *bun.DB }
 
-// NewUpdateCapabilityAction 创建 AI 员工能力配置修改操作。
-func NewUpdateCapabilityAction(db *bun.DB) *UpdateCapabilityAction {
-	return &UpdateCapabilityAction{db: db}
+// NewUpdateExecutionAction 创建 AI 员工执行配置修改操作。
+func NewUpdateExecutionAction(db *bun.DB) *UpdateExecutionAction {
+	return &UpdateExecutionAction{db: db}
 }
 
-// Execute 创建新配置版本并切换 AI 员工的当前版本。
-func (a *UpdateCapabilityAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input CapabilityInput) (*Agent, error) {
+// Execute 创建新执行配置版本并切换 AI 员工的当前版本。
+func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input ExecutionInput) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}
-	input, err := normalizeCapabilityInput(input)
+	input, err := normalizeExecutionInput(input)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (a *UpdateCapabilityAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
-		model, err := loadCapabilityModel(ctx, tx, identity.Organization.ID, input)
+		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *input.Managed)
 		if err != nil {
 			return err
 		}
@@ -58,12 +58,12 @@ func (a *UpdateCapabilityAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
-		capability, err := insertCapabilityRevision(ctx, tx, identity, agentID, revisionID.String(), input, model)
+		execution, err := insertExecutionRevision(ctx, tx, identity, agentID, revisionID.String(), input, model)
 		if err != nil {
 			return err
 		}
 		if _, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
-			Set("active_revision_id = ?", capability.RevisionID).
+			Set("active_revision_id = ?", execution.RevisionID).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", agentID).
@@ -74,7 +74,7 @@ func (a *UpdateCapabilityAction) Execute(ctx context.Context, identity *servermo
 		return err
 	})
 	if err != nil {
-		return nil, fmt.Errorf("update agent capability: %w", err)
+		return nil, fmt.Errorf("update agent execution: %w", err)
 	}
 	return output, nil
 }

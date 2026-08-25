@@ -311,10 +311,10 @@ func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, 
 	return output, err
 }
 
-// UpdateAgentCapability 修改远程企业 AI 员工能力配置。
-func (b *Backend) UpdateAgentCapability(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentCapabilityInput) (appservice.Agent, error) {
+// UpdateAgentExecution 修改远程企业 AI 员工执行配置。
+func (b *Backend) UpdateAgentExecution(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentExecutionInput) (appservice.Agent, error) {
 	var output appservice.Agent
-	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID)+"/capability", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID)+"/execution", nil, input, &output)
 	return output, err
 }
 

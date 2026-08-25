@@ -31,7 +31,7 @@ type Backend interface {
 	ListAgents(context.Context, RequestMeta, AgentListInput) (AgentList, error)
 	GetAgent(context.Context, RequestMeta, string) (Agent, error)
 	UpdateAgent(context.Context, RequestMeta, string, UpdateAgentInput) (Agent, error)
-	UpdateAgentCapability(context.Context, RequestMeta, string, AgentCapabilityInput) (Agent, error)
+	UpdateAgentExecution(context.Context, RequestMeta, string, AgentExecutionInput) (Agent, error)
 	UpdateAgentWorkStatus(context.Context, RequestMeta, string, AgentWorkStatusInput) (Agent, error)
 	DeactivateAgent(context.Context, RequestMeta, string) (Agent, error)
 	ReactivateAgent(context.Context, RequestMeta, string) (Agent, error)
@@ -357,9 +357,9 @@ func (s *Service) UpdateAgent(ctx context.Context, meta RequestMeta, agentID str
 	return s.backend.UpdateAgent(ctx, meta, agentID, input)
 }
 
-// UpdateAgentCapability 修改企业 AI 员工的能力配置。
-func (s *Service) UpdateAgentCapability(ctx context.Context, meta RequestMeta, agentID string, input AgentCapabilityInput) (Agent, error) {
-	return s.backend.UpdateAgentCapability(ctx, meta, agentID, input)
+// UpdateAgentExecution 修改企业 AI 员工的执行配置。
+func (s *Service) UpdateAgentExecution(ctx context.Context, meta RequestMeta, agentID string, input AgentExecutionInput) (Agent, error) {
+	return s.backend.UpdateAgentExecution(ctx, meta, agentID, input)
 }
 
 // UpdateAgentWorkStatus 修改企业 AI 员工工作状态。

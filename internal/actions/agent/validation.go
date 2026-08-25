@@ -10,6 +10,7 @@ const (
 	ValidationStatusInvalid             common.FieldCode = "USER_STATUS_INVALID"
 	ValidationWorkStatusInvalid         common.FieldCode = "WORK_STATUS_INVALID"
 	ValidationWorkStatusUnavailable     common.FieldCode = "AGENT_WORK_STATUS_UNAVAILABLE"
+	ValidationExecutionInvalid          common.FieldCode = "AGENT_EXECUTION_INVALID"
 	ValidationModelInvalid              common.FieldCode = "AGENT_MODEL_INVALID"
 	ValidationSystemInstructionRequired common.FieldCode = "AGENT_SYSTEM_INSTRUCTION_REQUIRED"
 	ValidationSystemInstructionTooLong  common.FieldCode = "AGENT_SYSTEM_INSTRUCTION_TOO_LONG"
