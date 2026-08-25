@@ -8,6 +8,8 @@ import {
   CreateAgent,
   CreateContact,
   CreateFileUpload,
+  CreateKnowledgeBase,
+  CreateKnowledgeGroup,
   CreateAIProvider,
   CreateRole,
   CreateTeam,
@@ -17,10 +19,13 @@ import {
   DeactivateUser,
   DeactivateMessageChannel,
   DeleteContact,
+  DeleteKnowledgeBase,
+  DeleteKnowledgeGroup,
   DeleteAIProvider,
   DeleteRole,
   DeleteTeam,
   GetContact,
+  GetKnowledgeBase,
   GetAIProvider,
   GetAgent,
   GetRole,
@@ -35,6 +40,7 @@ import {
   ListAIProviders,
   ListAvailableAIModels,
   ListContacts,
+  ListKnowledgeBases,
   ListRoles,
   ListTeams,
   ListTeamMemberCandidates,
@@ -53,6 +59,8 @@ import {
   SendMessageNotification,
   TestS3Setting,
   UpdateContact,
+  UpdateKnowledgeBase,
+  UpdateKnowledgeGroup,
   UpdateAIProvider,
   UpdateAgent,
   UpdateAgentCapability,
@@ -75,6 +83,7 @@ import {
   AIModelType,
   AIProviderBrand,
   ContactSort,
+  KnowledgeBaseCategory,
   StorageProvider,
   type AIProvider,
   type AIProviderInput,
@@ -91,6 +100,11 @@ import {
   type ContactInput,
   type ContactList,
   type ContactListInput,
+  type KnowledgeBase,
+  type KnowledgeBaseInput,
+  type KnowledgeBaseList,
+  type KnowledgeGroup,
+  type KnowledgeGroupInput,
   type Conversation as GeneratedConversation,
   type CreateAgentInput,
   type CreateUserInput,
@@ -177,6 +191,27 @@ export type ContactListResponse = Omit<ContactList, "contacts"> & {
 }
 
 export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
+
+export type KnowledgeBaseCategoryId = Exclude<
+  KnowledgeBaseCategory,
+  KnowledgeBaseCategory.$zero
+>
+
+export type KnowledgeGroupData = Omit<KnowledgeGroup, "children"> & {
+  children: KnowledgeGroupData[]
+}
+
+export type KnowledgeBaseData = Omit<KnowledgeBase, "category" | "groups"> & {
+  category: KnowledgeBaseCategoryId
+  groups: KnowledgeGroupData[]
+}
+
+export type KnowledgeBaseListData = Omit<
+  KnowledgeBaseList,
+  "knowledgeBases"
+> & {
+  knowledgeBases: KnowledgeBaseData[]
+}
 
 export type UserListQuery = Partial<UserListInput>
 
@@ -301,6 +336,63 @@ export const createTeam = bind(CreateTeam)
 export const updateTeam = bind(UpdateTeam)
 /** 删除企业团队。 */
 export const deleteTeam = bind(DeleteTeam)
+const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
+/** 创建企业知识库。 */
+export function createKnowledgeBase(
+  input: KnowledgeBaseInput,
+): Promise<KnowledgeBaseData> {
+  return createKnowledgeBaseBound(input).then(normalizeKnowledgeBase)
+}
+const getKnowledgeBaseBound = bind(GetKnowledgeBase)
+/** 读取企业知识库详情。 */
+export function getKnowledgeBase(
+  knowledgeBaseId: string,
+): Promise<KnowledgeBaseData> {
+  return getKnowledgeBaseBound(knowledgeBaseId).then(normalizeKnowledgeBase)
+}
+const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
+/** 修改企业知识库。 */
+export function updateKnowledgeBase(
+  knowledgeBaseId: string,
+  input: KnowledgeBaseInput,
+): Promise<KnowledgeBaseData> {
+  return updateKnowledgeBaseBound(knowledgeBaseId, input).then(
+    normalizeKnowledgeBase,
+  )
+}
+/** 删除企业知识库。 */
+export const deleteKnowledgeBase = bind(DeleteKnowledgeBase)
+const createKnowledgeGroupBound = bind(CreateKnowledgeGroup)
+/** 创建知识库分组。 */
+export function createKnowledgeGroup(
+  knowledgeBaseId: string,
+  input: KnowledgeGroupInput,
+): Promise<KnowledgeBaseData> {
+  return createKnowledgeGroupBound(knowledgeBaseId, input).then(
+    normalizeKnowledgeBase,
+  )
+}
+const updateKnowledgeGroupBound = bind(UpdateKnowledgeGroup)
+/** 修改知识库分组。 */
+export function updateKnowledgeGroup(
+  knowledgeBaseId: string,
+  groupId: string,
+  input: KnowledgeGroupInput,
+): Promise<KnowledgeBaseData> {
+  return updateKnowledgeGroupBound(knowledgeBaseId, groupId, input).then(
+    normalizeKnowledgeBase,
+  )
+}
+const deleteKnowledgeGroupBound = bind(DeleteKnowledgeGroup)
+/** 删除空知识库分组。 */
+export function deleteKnowledgeGroup(
+  knowledgeBaseId: string,
+  groupId: string,
+): Promise<KnowledgeBaseData> {
+  return deleteKnowledgeGroupBound(knowledgeBaseId, groupId).then(
+    normalizeKnowledgeBase,
+  )
+}
 /** 将企业身份批量加入团队。 */
 export const addTeamMembers = bind(AddTeamMembers)
 /** 将企业身份批量移出团队。 */
@@ -395,6 +487,7 @@ const updateAgentWorkStatusBound = bind(UpdateAgentWorkStatus)
 const deactivateAgentBound = bind(DeactivateAgent)
 const reactivateAgentBound = bind(ReactivateAgent)
 const listTeamsBound = bind(ListTeams)
+const listKnowledgeBasesBound = bind(ListKnowledgeBases)
 const listMemberOptionsBound = bind(ListMemberOptions)
 const listTeamMemberCandidatesBound = bind(ListTeamMemberCandidates)
 const listTeamMembersBound = bind(ListTeamMembers)
@@ -470,6 +563,33 @@ function normalizeAIProviderModel(model: AIProviderModel): AIProviderModelData {
       model.inputModalities,
     ) as AIModelInputModalityId[],
   }
+}
+
+/** 归一化知识库分组树。 */
+function normalizeKnowledgeGroup(group: KnowledgeGroup): KnowledgeGroupData {
+  return {
+    ...group,
+    children: asList(group.children).map(normalizeKnowledgeGroup),
+  }
+}
+
+/** 归一化知识库详情。 */
+function normalizeKnowledgeBase(
+  knowledgeBase: KnowledgeBase,
+): KnowledgeBaseData {
+  return {
+    ...knowledgeBase,
+    category: knowledgeBase.category as KnowledgeBaseCategoryId,
+    groups: asList(knowledgeBase.groups).map(normalizeKnowledgeGroup),
+  }
+}
+
+/** 读取当前企业的知识库列表。 */
+export function listKnowledgeBases(): Promise<KnowledgeBaseListData> {
+  return listKnowledgeBasesBound().then((output) => ({
+    ...output,
+    knowledgeBases: asList(output.knowledgeBases).map(normalizeKnowledgeBase),
+  }))
 }
 
 /** 读取尚未加入团队的企业成员。 */

@@ -46,6 +46,14 @@ type Backend interface {
 	CreateTeam(context.Context, RequestMeta, TeamInput) (Team, error)
 	UpdateTeam(context.Context, RequestMeta, string, TeamInput) (Team, error)
 	DeleteTeam(context.Context, RequestMeta, string) error
+	ListKnowledgeBases(context.Context, RequestMeta) (KnowledgeBaseList, error)
+	GetKnowledgeBase(context.Context, RequestMeta, string) (KnowledgeBase, error)
+	CreateKnowledgeBase(context.Context, RequestMeta, KnowledgeBaseInput) (KnowledgeBase, error)
+	UpdateKnowledgeBase(context.Context, RequestMeta, string, KnowledgeBaseInput) (KnowledgeBase, error)
+	DeleteKnowledgeBase(context.Context, RequestMeta, string) error
+	CreateKnowledgeGroup(context.Context, RequestMeta, string, KnowledgeGroupInput) (KnowledgeBase, error)
+	UpdateKnowledgeGroup(context.Context, RequestMeta, string, string, KnowledgeGroupInput) (KnowledgeBase, error)
+	DeleteKnowledgeGroup(context.Context, RequestMeta, string, string) (KnowledgeBase, error)
 	ListTeamMembers(context.Context, RequestMeta, string, TeamMemberListInput) (TeamMemberList, error)
 	ListTeamMemberCandidates(context.Context, RequestMeta, string, TeamMemberCandidateInput) (TeamMemberCandidateList, error)
 	AddTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
@@ -430,6 +438,46 @@ func (s *Service) UpdateTeam(ctx context.Context, meta RequestMeta, teamID strin
 // DeleteTeam 删除企业团队及其成员关系。
 func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID string) error {
 	return s.backend.DeleteTeam(ctx, meta, teamID)
+}
+
+// ListKnowledgeBases 返回当前企业的知识库列表。
+func (s *Service) ListKnowledgeBases(ctx context.Context, meta RequestMeta) (KnowledgeBaseList, error) {
+	return s.backend.ListKnowledgeBases(ctx, meta)
+}
+
+// GetKnowledgeBase 返回当前企业中的知识库详情。
+func (s *Service) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBase, error) {
+	return s.backend.GetKnowledgeBase(ctx, meta, knowledgeBaseID)
+}
+
+// CreateKnowledgeBase 创建企业知识库。
+func (s *Service) CreateKnowledgeBase(ctx context.Context, meta RequestMeta, input KnowledgeBaseInput) (KnowledgeBase, error) {
+	return s.backend.CreateKnowledgeBase(ctx, meta, input)
+}
+
+// UpdateKnowledgeBase 修改企业知识库。
+func (s *Service) UpdateKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeBaseInput) (KnowledgeBase, error) {
+	return s.backend.UpdateKnowledgeBase(ctx, meta, knowledgeBaseID, input)
+}
+
+// DeleteKnowledgeBase 删除企业知识库。
+func (s *Service) DeleteKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) error {
+	return s.backend.DeleteKnowledgeBase(ctx, meta, knowledgeBaseID)
+}
+
+// CreateKnowledgeGroup 创建知识库分组。
+func (s *Service) CreateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
+	return s.backend.CreateKnowledgeGroup(ctx, meta, knowledgeBaseID, input)
+}
+
+// UpdateKnowledgeGroup 修改知识库分组。
+func (s *Service) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID, groupID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
+	return s.backend.UpdateKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID, input)
+}
+
+// DeleteKnowledgeGroup 删除空知识库分组。
+func (s *Service) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID, groupID string) (KnowledgeBase, error) {
+	return s.backend.DeleteKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID)
 }
 
 // ListTeamMembers 返回团队成员列表。

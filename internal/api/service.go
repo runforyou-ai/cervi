@@ -82,6 +82,14 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/teams", service.createTeam)
 	router.PATCH("/teams/:teamID", service.updateTeam)
 	router.DELETE("/teams/:teamID", service.deleteTeam)
+	router.GET("/knowledge-bases", service.listKnowledgeBases)
+	router.POST("/knowledge-bases", service.createKnowledgeBase)
+	router.GET("/knowledge-bases/:knowledgeBaseID", service.getKnowledgeBase)
+	router.PATCH("/knowledge-bases/:knowledgeBaseID", service.updateKnowledgeBase)
+	router.DELETE("/knowledge-bases/:knowledgeBaseID", service.deleteKnowledgeBase)
+	router.POST("/knowledge-bases/:knowledgeBaseID/groups", service.createKnowledgeGroup)
+	router.PATCH("/knowledge-bases/:knowledgeBaseID/groups/:groupID", service.updateKnowledgeGroup)
+	router.DELETE("/knowledge-bases/:knowledgeBaseID/groups/:groupID", service.deleteKnowledgeGroup)
 	router.GET("/teams/:teamID/members", service.listTeamMembers)
 	router.GET("/teams/:teamID/member-candidates", service.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", service.addTeamMembers)
@@ -484,6 +492,69 @@ func (s *Service) updateTeam(c *gin.Context) {
 
 func (s *Service) deleteTeam(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteTeam(c.Request.Context(), requestMeta(c), c.Param("teamID")))
+}
+
+// listKnowledgeBases 返回企业知识库列表。
+func (s *Service) listKnowledgeBases(c *gin.Context) {
+	knowledgeBases, err := s.application.ListKnowledgeBases(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, knowledgeBases, err)
+}
+
+// getKnowledgeBase 返回企业知识库详情。
+func (s *Service) getKnowledgeBase(c *gin.Context) {
+	knowledgeBase, err := s.application.GetKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"))
+	writeResult(c, http.StatusOK, knowledgeBase, err)
+}
+
+// createKnowledgeBase 创建企业知识库。
+func (s *Service) createKnowledgeBase(c *gin.Context) {
+	var input appservice.KnowledgeBaseInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	knowledgeBase, err := s.application.CreateKnowledgeBase(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, knowledgeBase, err)
+}
+
+// updateKnowledgeBase 修改企业知识库。
+func (s *Service) updateKnowledgeBase(c *gin.Context) {
+	var input appservice.KnowledgeBaseInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	knowledgeBase, err := s.application.UpdateKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusOK, knowledgeBase, err)
+}
+
+// deleteKnowledgeBase 删除企业知识库。
+func (s *Service) deleteKnowledgeBase(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID")))
+}
+
+// createKnowledgeGroup 创建知识库分组。
+func (s *Service) createKnowledgeGroup(c *gin.Context) {
+	var input appservice.KnowledgeGroupInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	knowledgeBase, err := s.application.CreateKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusCreated, knowledgeBase, err)
+}
+
+// updateKnowledgeGroup 修改知识库分组。
+func (s *Service) updateKnowledgeGroup(c *gin.Context) {
+	var input appservice.KnowledgeGroupInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	knowledgeBase, err := s.application.UpdateKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("groupID"), input)
+	writeResult(c, http.StatusOK, knowledgeBase, err)
+}
+
+// deleteKnowledgeGroup 删除空知识库分组。
+func (s *Service) deleteKnowledgeGroup(c *gin.Context) {
+	knowledgeBase, err := s.application.DeleteKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("groupID"))
+	writeResult(c, http.StatusOK, knowledgeBase, err)
 }
 
 // listTeamMembers 返回团队成员列表。

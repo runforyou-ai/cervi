@@ -9,6 +9,9 @@ import { InboxRoute } from "@/features/inbox/inbox-route"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
+import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
+import { KnowledgeBaseIndexPage } from "@/features/knowledge-base/knowledge-base-index-page"
+import { KnowledgeBaseLayout } from "@/features/knowledge-base/knowledge-base-layout"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
 import { RoleFormPage } from "@/features/settings/role-form-page"
@@ -103,6 +106,17 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
           path="/contacts/external"
           element={<ContactsPage scope="external" />}
         />
+        <Route path="/knowledge-bases" element={<KnowledgeBaseLayout />}>
+          <Route index element={<KnowledgeBaseIndexPage />} />
+          <Route
+            path="new"
+            element={<KnowledgeBaseFormPage mode="create" />}
+          />
+          <Route
+            path=":knowledgeBaseId"
+            element={<KnowledgeBaseFormPage mode="edit" />}
+          />
+        </Route>
         <Route path="/integrations" element={<IntegrationsLayout />}>
           <Route index element={<Navigate to="channels" replace />} />
           <Route path="channels" element={<MessageChannelListPage />} />

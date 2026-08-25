@@ -219,6 +219,35 @@ const (
 	FieldServerURLNotCervi              Key = "field.server_url_not_cervi"
 )
 
+const (
+	ErrorKnowledgeBaseNotFound                     Key = "error.knowledge_base_not_found"
+	ErrorKnowledgeBaseListFailed                   Key = "error.knowledge_base_list_failed"
+	ErrorKnowledgeBaseReadFailed                   Key = "error.knowledge_base_read_failed"
+	ErrorKnowledgeBaseCreateFailed                 Key = "error.knowledge_base_create_failed"
+	ErrorKnowledgeBaseUpdateFailed                 Key = "error.knowledge_base_update_failed"
+	ErrorKnowledgeBaseDeleteFailed                 Key = "error.knowledge_base_delete_failed"
+	ErrorKnowledgeGroupNotFound                    Key = "error.knowledge_group_not_found"
+	ErrorKnowledgeGroupInvalid                     Key = "error.knowledge_group_invalid"
+	ErrorKnowledgeGroupNotEmpty                    Key = "error.knowledge_group_not_empty"
+	ErrorKnowledgeGroupExternalUnsupported         Key = "error.knowledge_group_external_unsupported"
+	ErrorKnowledgeGroupCreateFailed                Key = "error.knowledge_group_create_failed"
+	ErrorKnowledgeGroupUpdateFailed                Key = "error.knowledge_group_update_failed"
+	ErrorKnowledgeGroupDeleteFailed                Key = "error.knowledge_group_delete_failed"
+	FieldKnowledgeBaseNameRequired                 Key = "field.knowledge_base_name_required"
+	FieldKnowledgeBaseNameTooLong                  Key = "field.knowledge_base_name_too_long"
+	FieldKnowledgeBaseNameDuplicate                Key = "field.knowledge_base_name_duplicate"
+	FieldKnowledgeBaseCategoryInvalid              Key = "field.knowledge_base_category_invalid"
+	FieldKnowledgeBaseDescriptionTooLong           Key = "field.knowledge_base_description_too_long"
+	FieldKnowledgeBaseIntegrationConnectionInvalid Key = "field.knowledge_base_integration_connection_invalid"
+	FieldKnowledgeBaseExternalResourceRequired     Key = "field.knowledge_base_external_resource_required"
+	FieldKnowledgeBaseExternalResourceTooLong      Key = "field.knowledge_base_external_resource_too_long"
+	FieldKnowledgeBaseExternalResourceDuplicate    Key = "field.knowledge_base_external_resource_duplicate"
+	FieldKnowledgeGroupNameRequired                Key = "field.knowledge_group_name_required"
+	FieldKnowledgeGroupNameTooLong                 Key = "field.knowledge_group_name_too_long"
+	FieldKnowledgeGroupNameDuplicate               Key = "field.knowledge_group_name_duplicate"
+	FieldKnowledgeGroupParentInvalid               Key = "field.knowledge_group_parent_invalid"
+)
+
 //go:embed locales/*.json
 var localeFiles embed.FS
 
