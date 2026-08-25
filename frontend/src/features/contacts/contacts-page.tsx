@@ -295,12 +295,15 @@ function ContactScopeSidebar({
             >
               {t("add.agent")}
             </DropdownMenuItem>
+            {/* TODO: 等手工联系人身份和可发送渠道关系明确后再恢复添加外部联系人入口。 */}
+            {/*
             <DropdownMenuItem
               disabled={channels.length === 0}
               onSelect={() => navigate("/contacts/external?new=1")}
             >
               {t("add.external")}
             </DropdownMenuItem>
+            */}
             <DropdownMenuItem
               onSelect={() => navigate("/contacts/employees?newTeam=1")}
             >

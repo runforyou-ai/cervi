@@ -299,12 +299,6 @@ CREATE INDEX customer_conversations_org_channel_identity_created_index
 
 COMMENT ON INDEX customer_conversations_org_channel_identity_created_index
     IS '企业内渠道身份的客户会话创建时间索引';
-
-CREATE INDEX customer_conversations_org_conversation_index
-    ON customer_conversations (organization_id, conversation_id);
-
-COMMENT ON INDEX customer_conversations_org_conversation_index
-    IS '企业客户会话查询索引';
 ```
 
 这里不再创建 `(organization_id, contact_channel_identity_id)` 唯一索引。同一渠道身份可以拥有多条 Conversation；一条 Conversation 仍只能通过主键关联一条客户会话扩展。

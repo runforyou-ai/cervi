@@ -14,7 +14,7 @@ type Contact struct {
 
 	ID              string     `bun:"id,pk" json:"id"`
 	OrganizationID  string     `bun:"organization_id" json:"organizationId"`
-	CreatedByUserID string     `bun:"created_by_user_id" json:"createdByUserId"`
+	CreatedByUserID *string    `bun:"created_by_user_id" json:"createdByUserId"`
 	SourceChannelID string     `bun:"source_channel_id" json:"sourceChannelId"`
 	DisplayName     *string    `bun:"display_name" json:"displayName"`
 	Stage           string     `bun:"stage" json:"stage"`
