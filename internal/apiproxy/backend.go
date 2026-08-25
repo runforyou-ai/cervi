@@ -187,10 +187,10 @@ func (b *Backend) absoluteContentURL(value string) string {
 	return endpoint.String()
 }
 
-// ListWebsiteChannels 返回远程网站渠道列表。
-func (b *Backend) ListWebsiteChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.WebsiteChannelList, error) {
-	var output appservice.WebsiteChannelList
-	err := b.do(ctx, meta, http.MethodGet, "/channels/website", nil, nil, &output)
+// ListMessageChannels 返回远程消息渠道列表。
+func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
+	var output appservice.MessageChannelList
+	err := b.do(ctx, meta, http.MethodGet, "/channels", nil, nil, &output)
 	return output, err
 }
 
@@ -201,17 +201,24 @@ func (b *Backend) GetWebsiteChannel(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
-// CreateWebsiteChannel 创建远程网站渠道。
-func (b *Backend) CreateWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, input appservice.WebsiteChannelInput) (appservice.WebsiteChannelSummary, error) {
-	var output appservice.WebsiteChannelSummary
-	err := b.do(ctx, meta, http.MethodPost, "/channels/website", nil, input, &output)
+// GetMessageChannel 返回远程消息渠道基础信息。
+func (b *Backend) GetMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.MessageChannelSummary, error) {
+	var output appservice.MessageChannelSummary
+	err := b.do(ctx, meta, http.MethodGet, "/channels/"+url.PathEscape(channelID), nil, nil, &output)
 	return output, err
 }
 
-// UpdateWebsiteChannel 修改远程网站渠道基础信息。
-func (b *Backend) UpdateWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelInput) (appservice.WebsiteChannelSummary, error) {
-	var output appservice.WebsiteChannelSummary
-	err := b.do(ctx, meta, http.MethodPatch, "/channels/website/"+url.PathEscape(channelID), nil, input, &output)
+// CreateMessageChannel 创建远程消息渠道。
+func (b *Backend) CreateMessageChannel(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateMessageChannelInput) (appservice.MessageChannelSummary, error) {
+	var output appservice.MessageChannelSummary
+	err := b.do(ctx, meta, http.MethodPost, "/channels", nil, input, &output)
+	return output, err
+}
+
+// UpdateMessageChannel 修改远程消息渠道基础信息。
+func (b *Backend) UpdateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.MessageChannelInput) (appservice.MessageChannelSummary, error) {
+	var output appservice.MessageChannelSummary
+	err := b.do(ctx, meta, http.MethodPatch, "/channels/"+url.PathEscape(channelID), nil, input, &output)
 	return output, err
 }
 
@@ -229,24 +236,24 @@ func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservic
 	return output, err
 }
 
-// DeactivateWebsiteChannel 停用远程网站渠道。
-func (b *Backend) DeactivateWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.WebsiteChannelSummary, error) {
-	var output appservice.WebsiteChannelSummary
-	err := b.do(ctx, meta, http.MethodPost, "/channels/website/"+url.PathEscape(channelID)+"/deactivate", nil, nil, &output)
+// DeactivateMessageChannel 停用远程消息渠道。
+func (b *Backend) DeactivateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.MessageChannelSummary, error) {
+	var output appservice.MessageChannelSummary
+	err := b.do(ctx, meta, http.MethodPost, "/channels/"+url.PathEscape(channelID)+"/deactivate", nil, nil, &output)
 	return output, err
 }
 
-// ActivateWebsiteChannel 启用远程网站渠道。
-func (b *Backend) ActivateWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.WebsiteChannelSummary, error) {
-	var output appservice.WebsiteChannelSummary
-	err := b.do(ctx, meta, http.MethodPost, "/channels/website/"+url.PathEscape(channelID)+"/activate", nil, nil, &output)
+// ActivateMessageChannel 启用远程消息渠道。
+func (b *Backend) ActivateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.MessageChannelSummary, error) {
+	var output appservice.MessageChannelSummary
+	err := b.do(ctx, meta, http.MethodPost, "/channels/"+url.PathEscape(channelID)+"/activate", nil, nil, &output)
 	return output, err
 }
 
-// ListChannels 返回远程渠道选择项。
-func (b *Backend) ListChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.ChannelList, error) {
-	var output appservice.ChannelList
-	err := b.do(ctx, meta, http.MethodGet, "/channels", nil, nil, &output)
+// ListChannelOptions 返回远程渠道选择项。
+func (b *Backend) ListChannelOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.ChannelOptionList, error) {
+	var output appservice.ChannelOptionList
+	err := b.do(ctx, meta, http.MethodGet, "/channel-options", nil, nil, &output)
 	return output, err
 }
 

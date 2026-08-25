@@ -1,20 +1,20 @@
 /** 联系人界面的枚举文案。 */
 import type { TFunction } from "i18next"
 
-import { ChannelType, UserStatus } from "@/api"
+import { UserStatus, type ChannelType } from "@/api"
+import { messageChannelTypeDefinition } from "@/features/channels/message-channel-types"
 
 /** 渠道类型文案。 */
 export function channelTypeLabel(
   type: ChannelType,
   t: TFunction<"contacts">,
 ) {
-  switch (type) {
-    case ChannelType.ChannelTypeWebsite:
-      return t("channelTypes.website")
-    default:
-      console.warn("未知的渠道类型", type)
-      return ""
+  const definition = messageChannelTypeDefinition(type)
+  if (!definition) {
+    console.warn("未知的渠道类型", type)
+    return ""
   }
+  return t(`channelTypes.${definition.translationKey}`)
 }
 
 /** 账号状态文案。 */

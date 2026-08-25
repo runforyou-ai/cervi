@@ -160,10 +160,19 @@ export interface ChangePasswordInput {
 }
 
 /**
- * ChannelList 定义渠道选择项列表。
+ * ChannelOption 定义渠道选择项。
  */
-export interface ChannelList {
-    "channels": ChannelSummary[] | null;
+export interface ChannelOption {
+    "id": string;
+    "type": ChannelType;
+    "name": string;
+}
+
+/**
+ * ChannelOptionList 定义渠道选择项列表。
+ */
+export interface ChannelOptionList {
+    "channels": ChannelOption[] | null;
 }
 
 /**
@@ -189,15 +198,6 @@ export enum ChannelRoutingTargetType {
 };
 
 /**
- * ChannelSummary 定义渠道选择项。
- */
-export interface ChannelSummary {
-    "id": string;
-    "type": ChannelType;
-    "name": string;
-}
-
-/**
  * ChannelType 表示渠道类型。
  */
 export enum ChannelType {
@@ -207,6 +207,7 @@ export enum ChannelType {
     $zero = "",
 
     ChannelTypeWebsite = "website",
+    ChannelTypeTelegram = "telegram",
 };
 
 /**
@@ -380,6 +381,18 @@ export interface Conversation {
 export interface CreateAgentInput {
     "displayName": string;
     "teamIds": string[] | null;
+}
+
+/**
+ * CreateMessageChannelInput 定义创建消息渠道所需字段。
+ */
+export interface CreateMessageChannelInput {
+    "name": string;
+    "description": string;
+    "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
+    "type": ChannelType;
 }
 
 /**
@@ -568,6 +581,42 @@ export enum MessageAuthor {
     MessageAuthorVisitor = "visitor",
     MessageAuthorAgent = "agent",
 };
+
+/**
+ * MessageChannelInput 定义消息渠道可编辑的通用字段。
+ */
+export interface MessageChannelInput {
+    "name": string;
+    "description": string;
+    "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
+}
+
+/**
+ * MessageChannelList 定义消息渠道列表。
+ */
+export interface MessageChannelList {
+    "channels": MessageChannelSummary[] | null;
+}
+
+/**
+ * MessageChannelSummary 定义消息渠道列表项和基础信息。
+ */
+export interface MessageChannelSummary {
+    "id": string;
+    "organizationId": string;
+    "createdByUserId": string;
+    "type": ChannelType;
+    "name": string;
+    "description": string | null;
+    "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
+    "enabled": boolean;
+    "createdAt": string;
+    "updatedAt": string;
+}
 
 /**
  * MessageNotificationInput 定义当前设备的新消息通知内容。
@@ -1108,43 +1157,6 @@ export interface WebsiteChannelChatInterfaceInput {
     "subtitle": string;
     "greetingMessage": string;
     "themeColor": string;
-}
-
-/**
- * WebsiteChannelInput 定义网站渠道基础字段。
- */
-export interface WebsiteChannelInput {
-    "type": ChannelType;
-    "name": string;
-    "description": string;
-    "defaultLocale": Locale;
-    "newConversationTarget": ChannelRoutingTarget;
-    "fallbackTarget": ChannelRoutingTarget;
-}
-
-/**
- * WebsiteChannelList 定义网站渠道列表。
- */
-export interface WebsiteChannelList {
-    "channels": WebsiteChannelSummary[] | null;
-}
-
-/**
- * WebsiteChannelSummary 定义网站渠道列表项。
- */
-export interface WebsiteChannelSummary {
-    "id": string;
-    "organizationId": string;
-    "createdByUserId": string;
-    "type": ChannelType;
-    "name": string;
-    "description": string | null;
-    "defaultLocale": Locale;
-    "newConversationTarget": ChannelRoutingTarget;
-    "fallbackTarget": ChannelRoutingTarget;
-    "enabled": boolean;
-    "createdAt": string;
-    "updatedAt": string;
 }
 
 /**

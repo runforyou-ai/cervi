@@ -13,15 +13,17 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// TestNormalizeWebsiteChannelInput 验证网站渠道字段规范化和长度限制。
-func TestNormalizeWebsiteChannelInput(t *testing.T) {
-	normalized, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
-		Type:                  domain.ChannelTypeWebsite,
-		Name:                  "  产品官网  ",
-		Description:           "  接收访客咨询  ",
-		DefaultLocale:         " zh-CN ",
-		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+// TestNormalizeCreateMessageChannelInput 验证消息渠道创建字段规范化和长度限制。
+func TestNormalizeCreateMessageChannelInput(t *testing.T) {
+	normalized, fields := normalizeCreateMessageChannelInput(CreateMessageChannelInput{
+		Type: domain.ChannelTypeWebsite,
+		MessageChannelInput: MessageChannelInput{
+			Name:                  "  产品官网  ",
+			Description:           "  接收访客咨询  ",
+			DefaultLocale:         " zh-CN ",
+			NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		},
 	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
@@ -30,11 +32,26 @@ func TestNormalizeWebsiteChannelInput(t *testing.T) {
 		t.Fatalf("unexpected normalized input: %#v", normalized)
 	}
 
-	_, fields = normalizeWebsiteChannelInput(WebsiteChannelInput{
-		Type:          "email",
-		Name:          strings.Repeat("鹿", 101),
-		Description:   strings.Repeat("行", 2001),
-		DefaultLocale: "fr-FR",
+	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
+		Type: domain.ChannelTypeTelegram,
+		MessageChannelInput: MessageChannelInput{
+			Name:                  "Telegram 客服",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		},
+	})
+	if len(fields) != 0 {
+		t.Fatalf("telegram validation fields = %#v, want empty", fields)
+	}
+
+	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
+		Type: "email",
+		MessageChannelInput: MessageChannelInput{
+			Name:          strings.Repeat("鹿", 101),
+			Description:   strings.Repeat("行", 2001),
+			DefaultLocale: "fr-FR",
+		},
 	})
 	if fields["type"] != ValidationTypeInvalid {
 		t.Fatalf("type validation = %q, want %q", fields["type"], ValidationTypeInvalid)
@@ -50,10 +67,9 @@ func TestNormalizeWebsiteChannelInput(t *testing.T) {
 	}
 }
 
-// TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints 验证补充平面字符按码点计数。
-func TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints(t *testing.T) {
-	_, fields := normalizeWebsiteChannelInput(WebsiteChannelInput{
-		Type:                  domain.ChannelTypeWebsite,
+// TestNormalizeMessageChannelInputCountsUnicodeCodePoints 验证补充平面字符按码点计数。
+func TestNormalizeMessageChannelInputCountsUnicodeCodePoints(t *testing.T) {
+	_, fields := normalizeMessageChannelInput(MessageChannelInput{
 		Name:                  strings.Repeat("😀", 100),
 		Description:           strings.Repeat("😀", 2000),
 		DefaultLocale:         domain.LocaleChineseSimplified,
@@ -64,8 +80,7 @@ func TestNormalizeWebsiteChannelInputCountsUnicodeCodePoints(t *testing.T) {
 		t.Fatalf("validation fields = %#v, want empty", fields)
 	}
 
-	_, fields = normalizeWebsiteChannelInput(WebsiteChannelInput{
-		Type:          domain.ChannelTypeWebsite,
+	_, fields = normalizeMessageChannelInput(MessageChannelInput{
 		Name:          strings.Repeat("😀", 101),
 		Description:   strings.Repeat("😀", 2001),
 		DefaultLocale: domain.LocaleChineseSimplified,
@@ -125,8 +140,7 @@ func TestNormalizeWebsiteChannelAccessInput(t *testing.T) {
 // TestMalformedChannelIDReturnsNotFound 验证非法 UUID 不会进入数据库查询。
 func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 	identity := &servermodels.Identity{}
-	input := WebsiteChannelInput{
-		Type:          domain.ChannelTypeWebsite,
+	input := MessageChannelInput{
 		Name:          "产品官网",
 		DefaultLocale: domain.LocaleChineseSimplified,
 	}
@@ -135,6 +149,13 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 		name    string
 		execute func() error
 	}{
+		{
+			name: "get message channel",
+			execute: func() error {
+				_, err := NewGetMessageChannelQuery(nil).Execute(context.Background(), identity, "not-a-uuid")
+				return err
+			},
+		},
 		{
 			name: "get",
 			execute: func() error {
@@ -145,7 +166,7 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 		{
 			name: "update",
 			execute: func() error {
-				_, err := NewUpdateWebsiteChannelAction(nil).Execute(context.Background(), identity, "not-a-uuid", input)
+				_, err := NewUpdateMessageChannelAction(nil).Execute(context.Background(), identity, "not-a-uuid", input)
 				return err
 			},
 		},
@@ -166,7 +187,7 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 		{
 			name: "update status",
 			execute: func() error {
-				_, err := NewUpdateWebsiteChannelStatusAction(nil).Execute(context.Background(), identity, "not-a-uuid", false)
+				_, err := NewUpdateMessageChannelStatusAction(nil).Execute(context.Background(), identity, "not-a-uuid", false)
 				return err
 			},
 		},

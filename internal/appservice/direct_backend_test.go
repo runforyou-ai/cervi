@@ -24,7 +24,7 @@ import (
 func TestChannelContractConversion(t *testing.T) {
 	now := time.Now().UTC()
 	description := "官网咨询"
-	channel := websiteChannelFromModel(&servermodels.Channel{
+	channel := messageChannelFromModel(&servermodels.Channel{
 		ID: "channel-1", OrganizationID: "organization-1", CreatedByUserID: "user-1",
 		Type: string(ChannelTypeWebsite), Name: "产品官网", Description: &description,
 		DefaultLocale: string(LocaleChineseSimplified), Enabled: true, CreatedAt: now, UpdatedAt: now,
@@ -33,13 +33,17 @@ func TestChannelContractConversion(t *testing.T) {
 		t.Fatalf("channel conversion = %#v", channel)
 	}
 
-	input := channelInput(WebsiteChannelInput{
-		Type: ChannelTypeWebsite, Name: "产品官网", Description: description, DefaultLocale: LocaleEnglishUnitedStates,
+	input := channelInput(MessageChannelInput{
+		Name: "产品官网", Description: description, DefaultLocale: LocaleEnglishUnitedStates,
 		NewConversationTarget: ChannelRoutingTarget{Type: ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        ChannelRoutingTarget{Type: ChannelRoutingTargetTypePublicQueue},
 	})
-	if input.Type != domain.ChannelTypeWebsite || input.DefaultLocale != domain.LocaleEnglishUnitedStates || input.Name != "产品官网" || input.NewConversationTarget.Type != domain.ChannelRoutingTargetTypePublicQueue || input.FallbackTarget.Type != domain.ChannelRoutingTargetTypePublicQueue {
+	if input.DefaultLocale != domain.LocaleEnglishUnitedStates || input.Name != "产品官网" || input.NewConversationTarget.Type != domain.ChannelRoutingTargetTypePublicQueue || input.FallbackTarget.Type != domain.ChannelRoutingTargetTypePublicQueue {
 		t.Fatalf("channel input conversion = %#v", input)
+	}
+	createInput := createChannelInput(CreateMessageChannelInput{MessageChannelInput: MessageChannelInput{Name: "Telegram 客服"}, Type: ChannelTypeTelegram})
+	if createInput.Type != domain.ChannelTypeTelegram || createInput.Name != "Telegram 客服" {
+		t.Fatalf("channel create input conversion = %#v", createInput)
 	}
 }
 

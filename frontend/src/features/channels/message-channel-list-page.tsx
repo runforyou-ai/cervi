@@ -6,11 +6,10 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ChannelType,
-  activateWebsiteChannel,
-  deactivateWebsiteChannel,
-  listWebsiteChannels,
-  type WebsiteChannelSummary,
+  activateMessageChannel,
+  deactivateMessageChannel,
+  listMessageChannels,
+  type MessageChannelSummary,
 } from "@/api"
 import {
   ListToolbar,
@@ -46,21 +45,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  messageChannelTypeDefinition,
+  messageChannelTypeDefinitions,
+} from "@/features/channels/message-channel-types"
 import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
 
-/** 网站消息渠道列表中的一行。 */
-function WebsiteChannelRow({
+/** 消息渠道列表中的一行。 */
+function MessageChannelRow({
   channel,
   updating,
   onStatusChange,
 }: {
-  channel: WebsiteChannelSummary
+  channel: MessageChannelSummary
   updating: boolean
-  onStatusChange: (channel: WebsiteChannelSummary) => void
+  onStatusChange: (channel: MessageChannelSummary) => void
 }) {
   const { t } = useTranslation("channels")
+  const typeDefinition = messageChannelTypeDefinition(channel.type)
+  if (!typeDefinition) {
+    console.warn("未知的消息渠道类型", channel.type)
+  }
 
   return (
     <TableRow>
@@ -68,7 +75,7 @@ function WebsiteChannelRow({
         <SelectableText>{channel.name}</SelectableText>
       </TableCell>
       <TableCell className="whitespace-nowrap">
-        {t("types.website")}
+        {typeDefinition ? t(`types.${typeDefinition.translationKey}`) : ""}
       </TableCell>
       <TableCell className="whitespace-nowrap">
         {t(
@@ -78,7 +85,7 @@ function WebsiteChannelRow({
       <TableCell className="text-right whitespace-nowrap">
         <div className="flex justify-end gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/integrations/channels/${channel.id}`}>
+            <Link to={`/integrations/channels/${channel.type}/${channel.id}`}>
               {t("list.edit")}
             </Link>
           </Button>
@@ -117,28 +124,28 @@ function WebsiteChannelRow({
 export function MessageChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
-  const [channels, setChannels] = useState<WebsiteChannelSummary[]>([])
+  const [channels, setChannels] = useState<MessageChannelSummary[]>([])
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
   const [enabledStatus, setEnabledStatus] =
     useState<ChannelEnabledStatus>("enabled")
   const [updatingChannelId, setUpdatingChannelId] = useState("")
   const [confirmingChannel, setConfirmingChannel] =
-    useState<WebsiteChannelSummary | null>(null)
+    useState<MessageChannelSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
-  /** 加载网站渠道列表。 */
+  /** 加载消息渠道列表。 */
   const loadChannels = useCallback(async () => {
     setLoading(true)
     setError("")
     try {
-      setChannels(await listWebsiteChannels())
+      setChannels(await listMessageChannels())
     } catch (requestError) {
       if (recoverSession(requestError, navigate)) {
         return
       }
-      console.warn("网站渠道列表加载失败", requestError)
+      console.warn("消息渠道列表加载失败", requestError)
       setError(t("list.loadError"))
     } finally {
       setLoading(false)
@@ -162,26 +169,28 @@ export function MessageChannelListPage() {
     [category, channels, enabledStatus, search],
   )
 
-  /** 切换网站渠道的启用状态。 */
-  async function handleStatusChange(channel: WebsiteChannelSummary) {
+  /** 切换消息渠道的启用状态。 */
+  async function handleStatusChange(channel: MessageChannelSummary) {
     setUpdatingChannelId(channel.id)
     try {
       const updated = channel.enabled
-        ? await deactivateWebsiteChannel(channel.id)
-        : await activateWebsiteChannel(channel.id)
+        ? await deactivateMessageChannel(channel.id)
+        : await activateMessageChannel(channel.id)
       setChannels((current) =>
         current.map((item) => (item.id === updated.id ? updated : item)),
       )
-      console.info("网站渠道状态已更新", {
+      console.info("消息渠道状态已更新", {
         channel_id: channel.id,
+        channel_type: channel.type,
         enabled: updated.enabled,
       })
     } catch (requestError) {
       if (recoverSession(requestError, navigate)) {
         return
       }
-      console.warn("切换网站渠道状态失败", {
+      console.warn("切换消息渠道状态失败", {
         channel_id: channel.id,
+        channel_type: channel.type,
         enabled: !channel.enabled,
         error: requestError,
       })
@@ -193,7 +202,7 @@ export function MessageChannelListPage() {
   }
 
   /** 切换渠道状态前请求确认。 */
-  function requestStatusChange(channel: WebsiteChannelSummary) {
+  function requestStatusChange(channel: MessageChannelSummary) {
     setConfirmingChannel(channel)
   }
 
@@ -215,12 +224,10 @@ export function MessageChannelListPage() {
           label={t("filters.category")}
           allLabel={t("filters.allCategories")}
           value={category}
-          options={[
-            {
-              value: ChannelType.ChannelTypeWebsite,
-              label: t("types.website"),
-            },
-          ]}
+          options={messageChannelTypeDefinitions.map((definition) => ({
+            value: definition.type,
+            label: t(`types.${definition.translationKey}`),
+          }))}
           onValueChange={setCategory}
         />
         <ListToolbarFilter
@@ -287,7 +294,7 @@ export function MessageChannelListPage() {
                   </TableRow>
                 ) : (
                   filteredChannels.map((channel) => (
-                    <WebsiteChannelRow
+                    <MessageChannelRow
                       key={channel.id}
                       channel={channel}
                       updating={updatingChannelId === channel.id}

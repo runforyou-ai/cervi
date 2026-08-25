@@ -2,8 +2,8 @@
 import { Navigate, Route, Routes } from "react-router"
 
 import { LoginPage } from "@/features/auth/login-page"
+import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
-import { WebsiteChannelFormPage } from "@/features/channels/website/website-channel-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
@@ -108,11 +108,11 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
           <Route path="channels" element={<MessageChannelListPage />} />
           <Route
             path="channels/new"
-            element={<WebsiteChannelFormPage mode="create" />}
+            element={<MessageChannelFormPage mode="create" />}
           />
           <Route
-            path="channels/:channelId"
-            element={<WebsiteChannelFormPage mode="edit" />}
+            path="channels/:channelType/:channelId"
+            element={<MessageChannelFormPage mode="edit" />}
           />
           <Route
             path="model-services"

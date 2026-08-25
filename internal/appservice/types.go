@@ -89,7 +89,8 @@ const (
 type ChannelType string
 
 const (
-	ChannelTypeWebsite ChannelType = ChannelType(domain.ChannelTypeWebsite)
+	ChannelTypeWebsite  ChannelType = ChannelType(domain.ChannelTypeWebsite)
+	ChannelTypeTelegram ChannelType = ChannelType(domain.ChannelTypeTelegram)
 )
 
 // MessageAuthor 表示消息发送方。
@@ -433,8 +434,8 @@ type Inbox struct {
 	Conversations []Conversation `json:"conversations"`
 }
 
-// WebsiteChannelSummary 定义网站渠道列表项。
-type WebsiteChannelSummary struct {
+// MessageChannelSummary 定义消息渠道列表项和基础信息。
+type MessageChannelSummary struct {
 	ID                    string               `json:"id"`
 	OrganizationID        string               `json:"organizationId"`
 	CreatedByUserID       string               `json:"createdByUserId"`
@@ -457,19 +458,24 @@ type ChannelRoutingTarget struct {
 
 // WebsiteChannel 定义网站渠道详情。
 type WebsiteChannel struct {
-	WebsiteChannelSummary
+	MessageChannelSummary
 	ChatInterface WebsiteChannelChatInterface `json:"chatInterface"`
 	Access        WebsiteChannelAccess        `json:"access"`
 }
 
-// WebsiteChannelInput 定义网站渠道基础字段。
-type WebsiteChannelInput struct {
-	Type                  ChannelType          `json:"type"`
+// MessageChannelInput 定义消息渠道可编辑的通用字段。
+type MessageChannelInput struct {
 	Name                  string               `json:"name"`
 	Description           string               `json:"description"`
 	DefaultLocale         Locale               `json:"defaultLocale"`
 	NewConversationTarget ChannelRoutingTarget `json:"newConversationTarget"`
 	FallbackTarget        ChannelRoutingTarget `json:"fallbackTarget"`
+}
+
+// CreateMessageChannelInput 定义创建消息渠道所需字段。
+type CreateMessageChannelInput struct {
+	MessageChannelInput
+	Type ChannelType `json:"type"`
 }
 
 // WebsiteChannelChatInterface 定义网站渠道访客界面设置。
@@ -498,16 +504,16 @@ type WebsiteChannelAccessInput struct {
 	AllowedHosts []string `json:"allowedHosts"`
 }
 
-// ChannelSummary 定义渠道选择项。
-type ChannelSummary struct {
+// ChannelOption 定义渠道选择项。
+type ChannelOption struct {
 	ID   string      `json:"id"`
 	Type ChannelType `json:"type"`
 	Name string      `json:"name"`
 }
 
-// ChannelList 定义渠道选择项列表。
-type ChannelList struct {
-	Channels []ChannelSummary `json:"channels"`
+// ChannelOptionList 定义渠道选择项列表。
+type ChannelOptionList struct {
+	Channels []ChannelOption `json:"channels"`
 }
 
 // MemberOption 定义可分配的企业身份选择项。
@@ -573,9 +579,9 @@ type AgentList struct {
 	Page   PageInfo `json:"page"`
 }
 
-// WebsiteChannelList 定义网站渠道列表。
-type WebsiteChannelList struct {
-	Channels []WebsiteChannelSummary `json:"channels"`
+// MessageChannelList 定义消息渠道列表。
+type MessageChannelList struct {
+	Channels []MessageChannelSummary `json:"channels"`
 }
 
 // PageInfo 定义分页信息。

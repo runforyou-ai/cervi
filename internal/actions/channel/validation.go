@@ -19,7 +19,7 @@ const (
 
 var themeColorPattern = regexp.MustCompile(`^#[0-9A-F]{6}$`)
 
-// ValidationCode 标识网站渠道字段校验结果。
+// ValidationCode 标识渠道字段校验结果。
 type ValidationCode = common.FieldCode
 
 const (
@@ -38,17 +38,22 @@ const (
 	ValidationAllowedHostInvalid   ValidationCode = "ALLOWED_HOST_INVALID"
 )
 
-// ValidationError 表示网站渠道字段校验失败。
+// ValidationError 表示渠道字段校验失败。
 type ValidationError = common.FieldError
 
-// WebsiteChannelInput 定义网站渠道基础字段。
-type WebsiteChannelInput struct {
-	Type                  domain.ChannelType
+// MessageChannelInput 定义消息渠道可编辑的通用字段。
+type MessageChannelInput struct {
 	Name                  string
 	Description           string
 	DefaultLocale         domain.Locale
 	NewConversationTarget RoutingTarget
 	FallbackTarget        RoutingTarget
+}
+
+// CreateMessageChannelInput 定义创建消息渠道所需字段。
+type CreateMessageChannelInput struct {
+	MessageChannelInput
+	Type domain.ChannelType
 }
 
 // RoutingTarget 定义渠道会话流转目标。
@@ -70,9 +75,19 @@ type WebsiteChannelAccessInput struct {
 	AllowedHosts []string
 }
 
-// normalizeWebsiteChannelInput 规范化并校验网站渠道输入。
-func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInput, map[string]ValidationCode) {
+// normalizeCreateMessageChannelInput 规范化并校验消息渠道创建输入。
+func normalizeCreateMessageChannelInput(input CreateMessageChannelInput) (CreateMessageChannelInput, map[string]ValidationCode) {
 	input.Type = domain.ChannelType(strings.TrimSpace(string(input.Type)))
+	normalized, fields := normalizeMessageChannelInput(input.MessageChannelInput)
+	input.MessageChannelInput = normalized
+	if !domain.SupportedMessageChannelType(input.Type) {
+		fields["type"] = ValidationTypeInvalid
+	}
+	return input, fields
+}
+
+// normalizeMessageChannelInput 规范化并校验消息渠道通用输入。
+func normalizeMessageChannelInput(input MessageChannelInput) (MessageChannelInput, map[string]ValidationCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 	input.DefaultLocale = domain.Locale(strings.TrimSpace(string(input.DefaultLocale)))
@@ -80,9 +95,6 @@ func normalizeWebsiteChannelInput(input WebsiteChannelInput) (WebsiteChannelInpu
 	input.FallbackTarget = normalizeRoutingTarget(input.FallbackTarget)
 
 	fields := make(map[string]ValidationCode)
-	if input.Type != domain.ChannelTypeWebsite {
-		fields["type"] = ValidationTypeInvalid
-	}
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
 	} else if len([]rune(input.Name)) > 100 {

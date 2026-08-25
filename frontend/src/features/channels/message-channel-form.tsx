@@ -1,4 +1,4 @@
-/** 网站渠道基础信息表单。 */
+/** 消息渠道基础信息表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
@@ -10,13 +10,12 @@ import {
   ChannelType,
   ChannelRoutingTargetType,
   Locale,
-  createWebsiteChannel,
+  createMessageChannel,
   isApiError,
   isNotFoundApiError,
-  updateWebsiteChannel,
-  type WebsiteChannelSummary,
+  updateMessageChannel,
+  type MessageChannelSummary,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -24,24 +23,26 @@ import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import { ChannelReceptionSettingsFields } from "@/features/channels/reception/channel-reception-settings-fields"
 import {
-  createWebsiteChannelSchema,
-  type WebsiteChannelFormValues,
-} from "@/features/channels/website/website-channel-schema"
+  createMessageChannelSchema,
+  type MessageChannelFormValues,
+} from "@/features/channels/message-channel-schema"
+import { messageChannelTypeDefinitions } from "@/features/channels/message-channel-types"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { recoverSession } from "@/lib/session-navigation"
 
-/** 创建或修改网站渠道基础信息。 */
-export function WebsiteChannelForm({
+/** 创建或修改消息渠道基础信息。 */
+export function MessageChannelForm({
   channel,
   onUpdated,
 }: {
-  channel?: WebsiteChannelSummary
-  onUpdated?: (value: WebsiteChannelSummary) => void
+  channel?: MessageChannelSummary
+  onUpdated?: (value: MessageChannelSummary) => void
 }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
-      createWebsiteChannelSchema({
+      createMessageChannelSchema({
         nameRequired: t("validation.nameRequired"),
         nameTooLong: t("validation.nameTooLong"),
         descriptionTooLong: t("validation.descriptionTooLong"),
@@ -51,7 +52,7 @@ export function WebsiteChannelForm({
       }),
     [t],
   )
-  const form = useForm<WebsiteChannelFormValues>({
+  const form = useForm<MessageChannelFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: {
@@ -70,12 +71,14 @@ export function WebsiteChannelForm({
     },
   })
 
-  /** 提交网站渠道基础信息。 */
-  async function submit(values: WebsiteChannelFormValues) {
+  /** 提交消息渠道基础信息。 */
+  async function submit(values: MessageChannelFormValues) {
     try {
       if (channel) {
-        const updated = await updateWebsiteChannel(channel.id, {
-          ...values,
+        const updated = await updateMessageChannel(channel.id, {
+          name: values.name,
+          description: values.description,
+          defaultLocale: values.defaultLocale,
           newConversationTarget: channel.newConversationTarget,
           fallbackTarget: channel.fallbackTarget,
         })
@@ -88,25 +91,31 @@ export function WebsiteChannelForm({
           fallbackTarget: updated.fallbackTarget,
         })
         onUpdated?.(updated)
-        console.info("网站渠道已保存", { channel_id: channel.id })
+        console.info("消息渠道已保存", {
+          channel_id: channel.id,
+          channel_type: channel.type,
+        })
         toast.success(t("form.saved"))
         return
       }
 
-      const created = await createWebsiteChannel(values)
-      console.info("网站渠道已创建", { channel_id: created.id })
+      const created = await createMessageChannel(values)
+      console.info("消息渠道已创建", {
+        channel_id: created.id,
+        channel_type: created.type,
+      })
       navigate("/integrations/channels", { replace: true })
     } catch (error) {
       if (recoverSession(error, navigate)) {
         return
       }
       if (channel && isNotFoundApiError(error)) {
-        console.warn("网站渠道不存在", { channel_id: channel.id })
+        console.warn("消息渠道不存在", { channel_id: channel.id })
         navigate("/integrations/channels", { replace: true })
         return
       }
       if (isApiError(error)) {
-        console.warn("保存网站渠道失败", error)
+        console.warn("保存消息渠道失败", error)
         toast.error(
           apiErrorMessage(error, [
             "type",
@@ -119,7 +128,7 @@ export function WebsiteChannelForm({
         )
         return
       }
-      console.warn("保存网站渠道失败", error)
+      console.warn("保存消息渠道失败", error)
       toast.error(t("form.networkError"))
     }
   }
@@ -148,9 +157,11 @@ export function WebsiteChannelForm({
                   required
                   aria-invalid={fieldState.invalid}
                 >
-                  <option value={ChannelType.ChannelTypeWebsite}>
-                    {t("types.website")}
-                  </option>
+                  {messageChannelTypeDefinitions.map((definition) => (
+                    <option key={definition.type} value={definition.type}>
+                      {t(`types.${definition.translationKey}`)}
+                    </option>
+                  ))}
                 </NativeSelect>
               </Field>
             )}

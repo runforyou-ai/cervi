@@ -1,4 +1,4 @@
-/** 网站渠道基础信息表单校验规则。 */
+/** 消息渠道基础信息表单校验规则。 */
 import { z } from "zod"
 
 import { ChannelType, Locale } from "@/api"
@@ -13,8 +13,8 @@ function unicodeLength(value: string) {
   return Array.from(value).length
 }
 
-/** 创建网站渠道基础信息校验。 */
-export function createWebsiteChannelSchema(messages: {
+/** 创建消息渠道基础信息校验。 */
+export function createMessageChannelSchema(messages: {
   nameRequired: string
   nameTooLong: string
   descriptionTooLong: string
@@ -50,6 +50,6 @@ export function createWebsiteChannelSchema(messages: {
     )
 }
 
-export type WebsiteChannelFormValues = z.infer<
-  ReturnType<typeof createWebsiteChannelSchema>
+export type MessageChannelFormValues = z.infer<
+  ReturnType<typeof createMessageChannelSchema>
 >

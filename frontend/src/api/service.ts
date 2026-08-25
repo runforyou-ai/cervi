@@ -1,6 +1,6 @@
 /** 绑定应用服务方法，并归一化可空切片。 */
 import {
-  ActivateWebsiteChannel,
+  ActivateMessageChannel,
   AddTeamMembers,
   ChangePassword,
   CheckNotificationPermission,
@@ -12,10 +12,10 @@ import {
   CreateRole,
   CreateTeam,
   CreateUser,
-  CreateWebsiteChannel,
+  CreateMessageChannel,
   DeactivateAgent,
   DeactivateUser,
-  DeactivateWebsiteChannel,
+  DeactivateMessageChannel,
   DeleteContact,
   DeleteAIProvider,
   DeleteRole,
@@ -26,8 +26,9 @@ import {
   GetRole,
   GetS3Setting,
   GetUser,
+  GetMessageChannel,
   GetWebsiteChannel,
-  ListChannels,
+  ListChannelOptions,
   ListAgents,
   ListMemberOptions,
   ListAIProviders,
@@ -38,7 +39,7 @@ import {
   ListTeamMemberCandidates,
   ListTeamMembers,
   ListUsers,
-  ListWebsiteChannels,
+  ListMessageChannels,
   LoadIdentity,
   LoadInbox,
   ReactivateUser,
@@ -63,7 +64,7 @@ import {
   UpdateUnreadIndicator,
   UpdateUserPreferences,
   UpdateUserWorkStatus,
-  UpdateWebsiteChannel,
+  UpdateMessageChannel,
   UpdateWebsiteChannelAccess,
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -245,14 +246,19 @@ export type WebsiteChannelData = Omit<GeneratedWebsiteChannel, "access"> & {
 export const loadIdentity = bind(LoadIdentity)
 
 const getWebsiteChannelBound = bind(GetWebsiteChannel)
+const getMessageChannelBound = bind(GetMessageChannel)
 /** 读取网站渠道详情。 */
 export function getWebsiteChannel(channelId: string) {
   return getWebsiteChannelBound(channelId).then(normalizeWebsiteChannel)
 }
-/** 创建网站渠道。 */
-export const createWebsiteChannel = bind(CreateWebsiteChannel)
-/** 修改网站渠道基础信息。 */
-export const updateWebsiteChannel = bind(UpdateWebsiteChannel)
+/** 读取消息渠道基础信息。 */
+export function getMessageChannel(channelId: string) {
+  return getMessageChannelBound(channelId)
+}
+/** 创建消息渠道。 */
+export const createMessageChannel = bind(CreateMessageChannel)
+/** 修改消息渠道基础信息。 */
+export const updateMessageChannel = bind(UpdateMessageChannel)
 /** 修改网站渠道聊天界面。 */
 export const updateWebsiteChannelChatInterface = bind(
   UpdateWebsiteChannelChatInterface,
@@ -267,10 +273,10 @@ export function updateWebsiteChannelAccess(
     normalizeWebsiteChannelAccess,
   )
 }
-/** 停用网站渠道。 */
-export const deactivateWebsiteChannel = bind(DeactivateWebsiteChannel)
-/** 启用网站渠道。 */
-export const activateWebsiteChannel = bind(ActivateWebsiteChannel)
+/** 停用消息渠道。 */
+export const deactivateMessageChannel = bind(DeactivateMessageChannel)
+/** 启用消息渠道。 */
+export const activateMessageChannel = bind(ActivateMessageChannel)
 /** 将联系人移入回收站。 */
 export const deleteContact = bind(DeleteContact)
 /** 创建企业团队。 */
@@ -361,8 +367,8 @@ export function updateAIProvider(providerId: string, input: AIProviderInput) {
 /** 删除模型服务供应商。 */
 export const deleteAIProvider = bind(DeleteAIProvider)
 
-const listChannelsBound = bind(ListChannels)
-const listWebsiteChannelsBound = bind(ListWebsiteChannels)
+const listChannelOptionsBound = bind(ListChannelOptions)
+const listMessageChannelsBound = bind(ListMessageChannels)
 const listUsersBound = bind(ListUsers)
 const listAgentsBound = bind(ListAgents)
 const getAgentBound = bind(GetAgent)
@@ -530,13 +536,13 @@ export function reactivateUser(userId: string) {
 }
 
 /** 读取当前企业的渠道选择项。 */
-export function listChannels(signal?: AbortSignal) {
-  return listChannelsBound(signal).then((list) => asList(list.channels))
+export function listChannelOptions(signal?: AbortSignal) {
+  return listChannelOptionsBound(signal).then((list) => asList(list.channels))
 }
 
-/** 读取网站渠道列表。 */
-export function listWebsiteChannels() {
-  return listWebsiteChannelsBound().then((list) => asList(list.channels))
+/** 读取消息渠道列表。 */
+export function listMessageChannels() {
+  return listMessageChannelsBound().then((list) => asList(list.channels))
 }
 
 /** 读取联系人详情。 */
