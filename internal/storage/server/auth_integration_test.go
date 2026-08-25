@@ -167,28 +167,32 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("status organization name = %q, want 鹿行协作", currentStatus.OrganizationName)
 	}
 
-	createChannel := channelaction.NewCreateWebsiteChannelAction(db)
+	createChannel := channelaction.NewCreateMessageChannelAction(db)
 	staleIdentity := *loggedIn.Identity
 	staleIdentity.User = loggedIn.Identity.User
 	staleIdentity.User.ID = "00000000-0000-0000-0000-000000000000"
-	_, err = createChannel.Execute(context.Background(), &staleIdentity, channelaction.WebsiteChannelInput{
-		Type:                  domain.ChannelTypeWebsite,
-		Name:                  "无效渠道",
-		DefaultLocale:         domain.LocaleChineseSimplified,
-		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+	_, err = createChannel.Execute(context.Background(), &staleIdentity, channelaction.CreateMessageChannelInput{
+		Type: domain.ChannelTypeWebsite,
+		MessageChannelInput: channelaction.MessageChannelInput{
+			Name:                  "无效渠道",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		},
 	})
 	if !errors.Is(err, common.ErrIdentityInvalid) {
 		t.Fatalf("stale identity error = %v, want %v", err, common.ErrIdentityInvalid)
 	}
 
-	channel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.WebsiteChannelInput{
-		Type:                  domain.ChannelTypeWebsite,
-		Name:                  "产品官网",
-		Description:           "接收官网访客咨询",
-		DefaultLocale:         domain.LocaleChineseSimplified,
-		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+	channel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
+		Type: domain.ChannelTypeWebsite,
+		MessageChannelInput: channelaction.MessageChannelInput{
+			Name:                  "产品官网",
+			Description:           "接收官网访客咨询",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -206,6 +210,36 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected default chat interface: %#v", detail.ChatInterface)
 	}
 
+	telegramChannel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
+		Type: domain.ChannelTypeTelegram,
+		MessageChannelInput: channelaction.MessageChannelInput{
+			Name:                  "Telegram 客服",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	telegramDetail, err := channelaction.NewGetMessageChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if telegramDetail.Type != string(domain.ChannelTypeTelegram) {
+		t.Fatalf("unexpected telegram channel: %#v", telegramDetail)
+	}
+	settingCount, err := db.NewSelect().
+		Model((*servermodels.WebsiteChannelSetting)(nil)).
+		Where("wcs.channel_id = ?", telegramChannel.ID).
+		Count(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if settingCount != 0 {
+		t.Fatalf("telegram website setting count = %d, want 0", settingCount)
+	}
+
 	updateChatInterface := channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db)
 	chatInterface, err := updateChatInterface.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelChatInterfaceInput{
 		Title:           "在线咨询",
@@ -220,9 +254,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		t.Fatalf("unexpected updated chat interface: %#v", chatInterface)
 	}
 
-	updateChannel := channelaction.NewUpdateWebsiteChannelAction(db)
-	channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelInput{
-		Type:                  domain.ChannelTypeWebsite,
+	updateChannel := channelaction.NewUpdateMessageChannelAction(db)
+	channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
 		Name:                  "帮助中心",
 		DefaultLocale:         domain.LocaleEnglishUnitedStates,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
@@ -234,8 +267,20 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if channel.Name != "帮助中心" || channel.Description != nil || channel.DefaultLocale != string(domain.LocaleEnglishUnitedStates) {
 		t.Fatalf("unexpected updated channel: %#v", channel)
 	}
+	telegramChannel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.MessageChannelInput{
+		Name:                  "Telegram 支持",
+		DefaultLocale:         domain.LocaleEnglishUnitedStates,
+		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if telegramChannel.Type != string(domain.ChannelTypeTelegram) || telegramChannel.Name != "Telegram 支持" || telegramChannel.DefaultLocale != string(domain.LocaleEnglishUnitedStates) {
+		t.Fatalf("unexpected updated telegram channel: %#v", telegramChannel)
+	}
 
-	updateChannelStatus := channelaction.NewUpdateWebsiteChannelStatusAction(db)
+	updateChannelStatus := channelaction.NewUpdateMessageChannelStatusAction(db)
 	channel, err = updateChannelStatus.Execute(context.Background(), loggedIn.Identity, channel.ID, false)
 	if err != nil {
 		t.Fatal(err)
@@ -243,13 +288,23 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if channel.Enabled {
 		t.Fatal("channel enabled = true, want false")
 	}
-	listChannels := channelaction.NewListWebsiteChannelsQuery(db)
+	listChannels := channelaction.NewListMessageChannelsQuery(db)
 	channels, err := listChannels.Execute(context.Background(), loggedIn.Identity)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(channels) != 1 || channels[0].Enabled {
+	if len(channels) != 2 || channels[0].ID != channel.ID || channels[0].Enabled {
 		t.Fatalf("unexpected disabled channels: %#v", channels)
+	}
+	telegramListed := false
+	for _, listedChannel := range channels {
+		if listedChannel.ID == telegramChannel.ID && listedChannel.Type == string(domain.ChannelTypeTelegram) {
+			telegramListed = true
+			break
+		}
+	}
+	if !telegramListed {
+		t.Fatalf("telegram channel missing from list: %#v", channels)
 	}
 
 	channel, err = updateChannelStatus.Execute(context.Background(), loggedIn.Identity, channel.ID, true)
@@ -402,8 +457,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil || teamMembers.Page.Total != 1 || len(teamMembers.Members) != 1 || teamMembers.Members[0].IdentityID != createdAgent.IdentityID || teamMembers.Members[0].WorkStatus != domain.WorkStatusAway {
 		t.Fatalf("team directory = %#v, error = %v", teamMembers, err)
 	}
-	channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelInput{
-		Type:                  domain.ChannelTypeWebsite,
+	channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
 		Name:                  channel.Name,
 		DefaultLocale:         domain.LocaleEnglishUnitedStates,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.IdentityID},

@@ -122,6 +122,7 @@ const zhCN = {
     },
     channelTypes: {
       website: "网站",
+      telegram: "Telegram",
     },
     search: {
       employees: "搜索企业成员",
@@ -523,6 +524,7 @@ const zhCN = {
   channels: {
     types: {
       website: "网站",
+      telegram: "Telegram",
     },
     loading: "正在加载…",
     retry: "重试",
@@ -555,8 +557,8 @@ const zhCN = {
       activate: "启用",
       deactivate: "停用",
       statusUpdateError: "切换渠道状态失败，请重试。",
-      loadError: "网站渠道加载失败。",
-      emptyTitle: "还没有网站渠道",
+      loadError: "消息渠道加载失败。",
+      emptyTitle: "还没有消息渠道",
       emptyFiltered: "没有符合筛选条件的渠道",
       columns: {
         name: "名称",
@@ -567,12 +569,12 @@ const zhCN = {
     },
     deactivation: {
       title: "停用“{{name}}”？",
-      description: "停用后，该渠道将无法接收新消息，之后可以重新启用。",
+      description: "停用后仍可重新启用。",
       confirm: "停用",
     },
     activation: {
       title: "启用“{{name}}”？",
-      description: "启用后，该渠道将恢复接收新消息。",
+      description: "渠道状态将变为已启用。",
       confirm: "启用",
     },
     statusConfirmation: {
@@ -582,18 +584,21 @@ const zhCN = {
       title: "添加渠道",
     },
     edit: {
-      title: "网站渠道设置",
+      title: "{{type}}渠道设置",
+      fallbackTitle: "消息渠道设置",
+      namedTitle: "{{type}} · {{name}}",
     },
     form: {
       type: "渠道类别",
       name: "渠道名称",
-      description: "说明（选填）",
+      description: "说明",
       defaultLocale: "默认接待语言",
       save: "保存",
       saving: "正在保存…",
       saved: "基本信息已保存。",
       cancel: "取消",
-      loadError: "网站渠道详情加载失败。",
+      back: "返回",
+      loadError: "消息渠道详情加载失败。",
       networkError: "无法连接服务器，请稍后重试。",
     },
     routing: {

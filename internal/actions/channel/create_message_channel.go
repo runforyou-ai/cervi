@@ -7,23 +7,24 @@ import (
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// CreateWebsiteChannelAction 创建网站消息渠道。
-type CreateWebsiteChannelAction struct {
+// CreateMessageChannelAction 创建消息渠道。
+type CreateMessageChannelAction struct {
 	db *bun.DB
 }
 
-// NewCreateWebsiteChannelAction 创建网站渠道操作。
-func NewCreateWebsiteChannelAction(db *bun.DB) *CreateWebsiteChannelAction {
-	return &CreateWebsiteChannelAction{db: db}
+// NewCreateMessageChannelAction 创建消息渠道操作。
+func NewCreateMessageChannelAction(db *bun.DB) *CreateMessageChannelAction {
+	return &CreateMessageChannelAction{db: db}
 }
 
-// Execute 创建网站渠道及默认聊天界面。
-func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, input WebsiteChannelInput) (*servermodels.Channel, error) {
-	input, fields := normalizeWebsiteChannelInput(input)
+// Execute 创建消息渠道，并初始化当前渠道类型需要的设置。
+func (a *CreateMessageChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateMessageChannelInput) (*servermodels.Channel, error) {
+	input, fields := normalizeCreateMessageChannelInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
@@ -60,6 +61,9 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 		if err != nil {
 			return err
 		}
+		if input.Type != domain.ChannelTypeWebsite {
+			return nil
+		}
 
 		setting := &servermodels.WebsiteChannelSetting{
 			ChannelID:      channel.ID,
@@ -74,7 +78,7 @@ func (a *CreateWebsiteChannelAction) Execute(ctx context.Context, identity *serv
 		return err
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create website channel: %w", err)
+		return nil, fmt.Errorf("create message channel: %w", err)
 	}
 	return channel, nil
 }

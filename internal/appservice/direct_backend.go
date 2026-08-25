@@ -39,14 +39,15 @@ type DirectBackend struct {
 	resolveIdentity                   *authaction.ResolveIdentityQuery
 	installation                      *installationaction.StatusQuery
 	loadInbox                         *inboxaction.LoadInboxQuery
-	listWebsiteChannels               *channelaction.ListWebsiteChannelsQuery
+	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
-	createWebsiteChannel              *channelaction.CreateWebsiteChannelAction
-	updateWebsiteChannel              *channelaction.UpdateWebsiteChannelAction
+	getMessageChannel                 *channelaction.GetMessageChannelQuery
+	createMessageChannel              *channelaction.CreateMessageChannelAction
+	updateMessageChannel              *channelaction.UpdateMessageChannelAction
 	updateWebsiteChannelChatInterface *channelaction.UpdateWebsiteChannelChatInterfaceAction
 	updateWebsiteChannelAccess        *channelaction.UpdateWebsiteChannelAccessAction
-	updateWebsiteChannelStatus        *channelaction.UpdateWebsiteChannelStatusAction
-	listChannels                      *channelaction.ListChannelsQuery
+	updateMessageChannelStatus        *channelaction.UpdateMessageChannelStatusAction
+	listChannelOptions                *channelaction.ListChannelOptionsQuery
 	listMemberOptions                 *memberaction.ListOptionsQuery
 	createAgent                       *agentaction.CreateAgentAction
 	listAgents                        *agentaction.ListAgentsQuery
@@ -107,14 +108,15 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		resolveIdentity:                   authaction.NewResolveIdentityQuery(db),
 		installation:                      installationaction.NewStatusQuery(db),
 		loadInbox:                         inboxaction.NewLoadInboxQuery(),
-		listWebsiteChannels:               channelaction.NewListWebsiteChannelsQuery(db),
+		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
-		createWebsiteChannel:              channelaction.NewCreateWebsiteChannelAction(db),
-		updateWebsiteChannel:              channelaction.NewUpdateWebsiteChannelAction(db),
+		getMessageChannel:                 channelaction.NewGetMessageChannelQuery(db),
+		createMessageChannel:              channelaction.NewCreateMessageChannelAction(db),
+		updateMessageChannel:              channelaction.NewUpdateMessageChannelAction(db),
 		updateWebsiteChannelChatInterface: channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db),
 		updateWebsiteChannelAccess:        channelaction.NewUpdateWebsiteChannelAccessAction(db),
-		updateWebsiteChannelStatus:        channelaction.NewUpdateWebsiteChannelStatusAction(db),
-		listChannels:                      channelaction.NewListChannelsQuery(db),
+		updateMessageChannelStatus:        channelaction.NewUpdateMessageChannelStatusAction(db),
+		listChannelOptions:                channelaction.NewListChannelOptionsQuery(db),
 		listMemberOptions:                 memberaction.NewListOptionsQuery(db),
 		createAgent:                       agentaction.NewCreateAgentAction(db),
 		listAgents:                        agentaction.NewListAgentsQuery(db),

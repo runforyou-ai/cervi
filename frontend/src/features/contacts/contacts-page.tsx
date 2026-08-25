@@ -12,12 +12,12 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ContactRoundIcon,
-  GlobeIcon,
   LoaderCircleIcon,
   MoreHorizontalIcon,
   PanelsTopLeftIcon,
   PlusIcon,
   UsersIcon,
+  type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams, useSearchParams } from "react-router"
@@ -37,7 +37,7 @@ import {
   getContact,
   getAgent,
   getUser,
-  listChannels,
+  listChannelOptions,
   listContacts,
   listDeletedContacts,
   listAgents,
@@ -50,7 +50,7 @@ import {
   deleteTeam,
   removeTeamMembers,
   restoreContact,
-  type ChannelSummary,
+  type ChannelOption,
   type ContactDetail,
   type ContactListResponse,
   type ContactSummary,
@@ -64,6 +64,7 @@ import {
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
+import { messageChannelTypeDefinition } from "@/features/channels/message-channel-types"
 import {
   ListToolbar,
   ListToolbarFilter,
@@ -204,7 +205,7 @@ const SubscopeButton = forwardRef<
   {
     active: boolean
     nested?: boolean
-    icon?: typeof GlobeIcon
+    icon?: LucideIcon
   } & ButtonHTMLAttributes<HTMLButtonElement>
 >(function SubscopeButton(
   { active, children, nested = false, icon: Icon, className, ...props },
@@ -241,14 +242,14 @@ function ContactScopeSidebar({
   scope: ContactScope
   deleted: boolean
   channelId: string
-  channels: ChannelSummary[]
+  channels: ChannelOption[]
   teamId: string
   teams: Team[]
 }) {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
   const groupedChannels = useMemo(() => {
-    const groups = new Map<ChannelType, ChannelSummary[]>()
+    const groups = new Map<ChannelType, ChannelOption[]>()
     for (const channel of channels) {
       groups.set(channel.type, [...(groups.get(channel.type) ?? []), channel])
     }
@@ -415,11 +416,7 @@ function ContactScopeSidebar({
                   <SubscopeButton
                     key={channel.id}
                     active={scope === "external" && channelId === channel.id}
-                    icon={
-                      type === ChannelType.ChannelTypeWebsite
-                        ? GlobeIcon
-                        : undefined
-                    }
+                    icon={messageChannelTypeDefinition(type)?.icon}
                     nested
                     onClick={() =>
                       navigate(`/contacts/external?channelId=${channel.id}`)
@@ -523,7 +520,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const query = searchParams.get("q") ?? ""
   const [search, setSearch] = useState(query)
-  const [channels, setChannels] = useState<ChannelSummary[]>([])
+  const [channels, setChannels] = useState<ChannelOption[]>([])
   const [contacts, setContacts] = useState<ContactSummary[]>([])
   const [users, setUsers] = useState<UserData[]>([])
   const [agents, setAgents] = useState<AgentData[]>([])
@@ -634,7 +631,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   useEffect(() => {
     const requestID = ++catalogRequestID.current
     void Promise.all([
-      listChannels(),
+      listChannelOptions(),
       listRoles(),
       listTeams({ pageSize: 100 }),
     ])

@@ -124,6 +124,7 @@ const enUS = {
     },
     channelTypes: {
       website: "Websites",
+      telegram: "Telegram",
     },
     search: {
       employees: "Search company members",
@@ -536,6 +537,7 @@ const enUS = {
   channels: {
     types: {
       website: "Website",
+      telegram: "Telegram",
     },
     loading: "Loading…",
     retry: "Try again",
@@ -568,8 +570,8 @@ const enUS = {
       activate: "Activate",
       deactivate: "Deactivate",
       statusUpdateError: "Could not change the channel status. Try again.",
-      loadError: "Could not load website channels.",
-      emptyTitle: "No website channels yet",
+      loadError: "Could not load message channels.",
+      emptyTitle: "No message channels yet",
       emptyFiltered: "No channels match these filters",
       columns: {
         name: "Name",
@@ -580,13 +582,12 @@ const enUS = {
     },
     deactivation: {
       title: "Deactivate “{{name}}”?",
-      description:
-        "The channel will stop receiving new messages. You can activate it again later.",
+      description: "You can activate it again later.",
       confirm: "Deactivate",
     },
     activation: {
       title: "Activate “{{name}}”?",
-      description: "The channel will resume receiving new messages.",
+      description: "The channel status will change to enabled.",
       confirm: "Activate",
     },
     statusConfirmation: {
@@ -596,18 +597,21 @@ const enUS = {
       title: "Add channel",
     },
     edit: {
-      title: "Website channel settings",
+      title: "{{type}} channel settings",
+      fallbackTitle: "Message channel settings",
+      namedTitle: "{{type}} · {{name}}",
     },
     form: {
       type: "Channel category",
       name: "Channel name",
-      description: "Description (optional)",
+      description: "Description",
       defaultLocale: "Default service language",
       save: "Save",
       saving: "Saving…",
       saved: "Basic information saved.",
       cancel: "Cancel",
-      loadError: "Could not load the website channel.",
+      back: "Back",
+      loadError: "Could not load the message channel.",
       networkError: "Could not connect to the server. Try again later.",
     },
     routing: {

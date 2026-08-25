@@ -51,15 +51,16 @@ func NewService(application *appservice.Service) *Service {
 	router.PATCH("/preferences", service.updateUserPreferences)
 	router.PATCH("/work-status", service.updateUserWorkStatus)
 	router.GET("/inbox", service.loadInbox)
-	router.GET("/channels/website", service.listWebsiteChannels)
-	router.POST("/channels/website", service.createWebsiteChannel)
+	router.GET("/channels", service.listMessageChannels)
+	router.POST("/channels", service.createMessageChannel)
+	router.GET("/channels/:channelID", service.getMessageChannel)
+	router.PATCH("/channels/:channelID", service.updateMessageChannel)
+	router.POST("/channels/:channelID/deactivate", service.deactivateMessageChannel)
+	router.POST("/channels/:channelID/activate", service.activateMessageChannel)
 	router.GET("/channels/website/:channelID", service.getWebsiteChannel)
-	router.PATCH("/channels/website/:channelID", service.updateWebsiteChannel)
 	router.PATCH("/channels/website/:channelID/chat-interface", service.updateWebsiteChannelChatInterface)
 	router.PATCH("/channels/website/:channelID/access", service.updateWebsiteChannelAccess)
-	router.POST("/channels/website/:channelID/deactivate", service.deactivateWebsiteChannel)
-	router.POST("/channels/website/:channelID/activate", service.activateWebsiteChannel)
-	router.GET("/channels", service.listChannels)
+	router.GET("/channel-options", service.listChannelOptions)
 	router.GET("/members/options", service.listMemberOptions)
 	router.GET("/agents", service.listAgents)
 	router.POST("/agents", service.createAgent)
@@ -217,9 +218,9 @@ func (s *Service) loadInbox(c *gin.Context) {
 	writeResult(c, http.StatusOK, inbox, err)
 }
 
-// listWebsiteChannels 返回网站渠道列表。
-func (s *Service) listWebsiteChannels(c *gin.Context) {
-	list, err := s.application.ListWebsiteChannels(c.Request.Context(), requestMeta(c))
+// listMessageChannels 返回消息渠道列表。
+func (s *Service) listMessageChannels(c *gin.Context) {
+	list, err := s.application.ListMessageChannels(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, list, err)
 }
 
@@ -229,23 +230,29 @@ func (s *Service) getWebsiteChannel(c *gin.Context) {
 	writeResult(c, http.StatusOK, channel, err)
 }
 
-// createWebsiteChannel 创建网站渠道。
-func (s *Service) createWebsiteChannel(c *gin.Context) {
-	var input appservice.WebsiteChannelInput
+// getMessageChannel 返回消息渠道基础信息。
+func (s *Service) getMessageChannel(c *gin.Context) {
+	channel, err := s.application.GetMessageChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
+	writeResult(c, http.StatusOK, channel, err)
+}
+
+// createMessageChannel 创建消息渠道。
+func (s *Service) createMessageChannel(c *gin.Context) {
+	var input appservice.CreateMessageChannelInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	channel, err := s.application.CreateWebsiteChannel(c.Request.Context(), requestMeta(c), input)
+	channel, err := s.application.CreateMessageChannel(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusCreated, channel, err)
 }
 
-// updateWebsiteChannel 修改网站渠道基础信息。
-func (s *Service) updateWebsiteChannel(c *gin.Context) {
-	var input appservice.WebsiteChannelInput
+// updateMessageChannel 修改消息渠道基础信息。
+func (s *Service) updateMessageChannel(c *gin.Context) {
+	var input appservice.MessageChannelInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	channel, err := s.application.UpdateWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	channel, err := s.application.UpdateMessageChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
 	writeResult(c, http.StatusOK, channel, err)
 }
 
@@ -269,21 +276,21 @@ func (s *Service) updateWebsiteChannelAccess(c *gin.Context) {
 	writeResult(c, http.StatusOK, access, err)
 }
 
-// deactivateWebsiteChannel 停用网站渠道。
-func (s *Service) deactivateWebsiteChannel(c *gin.Context) {
-	channel, err := s.application.DeactivateWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
+// deactivateMessageChannel 停用消息渠道。
+func (s *Service) deactivateMessageChannel(c *gin.Context) {
+	channel, err := s.application.DeactivateMessageChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
 	writeResult(c, http.StatusOK, channel, err)
 }
 
-// activateWebsiteChannel 启用网站渠道。
-func (s *Service) activateWebsiteChannel(c *gin.Context) {
-	channel, err := s.application.ActivateWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
+// activateMessageChannel 启用消息渠道。
+func (s *Service) activateMessageChannel(c *gin.Context) {
+	channel, err := s.application.ActivateMessageChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
 	writeResult(c, http.StatusOK, channel, err)
 }
 
-// listChannels 返回可用渠道选项。
-func (s *Service) listChannels(c *gin.Context) {
-	list, err := s.application.ListChannels(c.Request.Context(), requestMeta(c))
+// listChannelOptions 返回可用渠道选项。
+func (s *Service) listChannelOptions(c *gin.Context) {
+	list, err := s.application.ListChannelOptions(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, list, err)
 }
 

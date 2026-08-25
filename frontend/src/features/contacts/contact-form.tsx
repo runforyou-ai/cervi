@@ -11,7 +11,7 @@ import {
   ContactStage,
   createContact,
   isApiError,
-  type ChannelSummary,
+  type ChannelOption,
   type ContactDetail,
   type ContactInput,
 } from "@/api"
@@ -35,7 +35,7 @@ export function ContactForm({
   onSaved,
   onCancel,
 }: {
-  channels: ChannelSummary[]
+  channels: ChannelOption[]
   onSaved: (detail: ContactDetail) => void
   onCancel: () => void
 }) {

@@ -15,15 +15,16 @@ type Backend interface {
 	UpdateUserPreferences(context.Context, RequestMeta, UserPreferencesInput) (CurrentUser, error)
 	UpdateUserWorkStatus(context.Context, RequestMeta, UserWorkStatusInput) (CurrentUser, error)
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
-	ListWebsiteChannels(context.Context, RequestMeta) (WebsiteChannelList, error)
+	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
-	CreateWebsiteChannel(context.Context, RequestMeta, WebsiteChannelInput) (WebsiteChannelSummary, error)
-	UpdateWebsiteChannel(context.Context, RequestMeta, string, WebsiteChannelInput) (WebsiteChannelSummary, error)
+	GetMessageChannel(context.Context, RequestMeta, string) (MessageChannelSummary, error)
+	CreateMessageChannel(context.Context, RequestMeta, CreateMessageChannelInput) (MessageChannelSummary, error)
+	UpdateMessageChannel(context.Context, RequestMeta, string, MessageChannelInput) (MessageChannelSummary, error)
 	UpdateWebsiteChannelChatInterface(context.Context, RequestMeta, string, WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error)
 	UpdateWebsiteChannelAccess(context.Context, RequestMeta, string, WebsiteChannelAccessInput) (WebsiteChannelAccess, error)
-	DeactivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
-	ActivateWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannelSummary, error)
-	ListChannels(context.Context, RequestMeta) (ChannelList, error)
+	DeactivateMessageChannel(context.Context, RequestMeta, string) (MessageChannelSummary, error)
+	ActivateMessageChannel(context.Context, RequestMeta, string) (MessageChannelSummary, error)
+	ListChannelOptions(context.Context, RequestMeta) (ChannelOptionList, error)
 	ListMemberOptions(context.Context, RequestMeta, MemberOptionListInput) (MemberOptionList, error)
 	CreateAgent(context.Context, RequestMeta, CreateAgentInput) (Agent, error)
 	ListAgents(context.Context, RequestMeta, AgentListInput) (AgentList, error)
@@ -274,9 +275,9 @@ func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error
 	return s.backend.LoadInbox(ctx, meta)
 }
 
-// ListWebsiteChannels 返回网站渠道列表。
-func (s *Service) ListWebsiteChannels(ctx context.Context, meta RequestMeta) (WebsiteChannelList, error) {
-	return s.backend.ListWebsiteChannels(ctx, meta)
+// ListMessageChannels 返回消息渠道列表。
+func (s *Service) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
+	return s.backend.ListMessageChannels(ctx, meta)
 }
 
 // GetWebsiteChannel 返回网站渠道详情。
@@ -284,14 +285,19 @@ func (s *Service) GetWebsiteChannel(ctx context.Context, meta RequestMeta, chann
 	return s.backend.GetWebsiteChannel(ctx, meta, channelID)
 }
 
-// CreateWebsiteChannel 创建网站渠道。
-func (s *Service) CreateWebsiteChannel(ctx context.Context, meta RequestMeta, input WebsiteChannelInput) (WebsiteChannelSummary, error) {
-	return s.backend.CreateWebsiteChannel(ctx, meta, input)
+// GetMessageChannel 返回消息渠道基础信息。
+func (s *Service) GetMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
+	return s.backend.GetMessageChannel(ctx, meta, channelID)
 }
 
-// UpdateWebsiteChannel 修改网站渠道基础信息。
-func (s *Service) UpdateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelInput) (WebsiteChannelSummary, error) {
-	return s.backend.UpdateWebsiteChannel(ctx, meta, channelID, input)
+// CreateMessageChannel 创建消息渠道。
+func (s *Service) CreateMessageChannel(ctx context.Context, meta RequestMeta, input CreateMessageChannelInput) (MessageChannelSummary, error) {
+	return s.backend.CreateMessageChannel(ctx, meta, input)
+}
+
+// UpdateMessageChannel 修改消息渠道基础信息。
+func (s *Service) UpdateMessageChannel(ctx context.Context, meta RequestMeta, channelID string, input MessageChannelInput) (MessageChannelSummary, error) {
+	return s.backend.UpdateMessageChannel(ctx, meta, channelID, input)
 }
 
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
@@ -304,19 +310,19 @@ func (s *Service) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMe
 	return s.backend.UpdateWebsiteChannelAccess(ctx, meta, channelID, input)
 }
 
-// DeactivateWebsiteChannel 停用网站渠道。
-func (s *Service) DeactivateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
-	return s.backend.DeactivateWebsiteChannel(ctx, meta, channelID)
+// DeactivateMessageChannel 停用消息渠道。
+func (s *Service) DeactivateMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
+	return s.backend.DeactivateMessageChannel(ctx, meta, channelID)
 }
 
-// ActivateWebsiteChannel 启用网站渠道。
-func (s *Service) ActivateWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannelSummary, error) {
-	return s.backend.ActivateWebsiteChannel(ctx, meta, channelID)
+// ActivateMessageChannel 启用消息渠道。
+func (s *Service) ActivateMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
+	return s.backend.ActivateMessageChannel(ctx, meta, channelID)
 }
 
-// ListChannels 返回当前企业的渠道选择项。
-func (s *Service) ListChannels(ctx context.Context, meta RequestMeta) (ChannelList, error) {
-	return s.backend.ListChannels(ctx, meta)
+// ListChannelOptions 返回当前企业的渠道选择项。
+func (s *Service) ListChannelOptions(ctx context.Context, meta RequestMeta) (ChannelOptionList, error) {
+	return s.backend.ListChannelOptions(ctx, meta)
 }
 
 // ListMemberOptions 返回可分配的企业成员和 AI 员工。
