@@ -23,6 +23,7 @@ const (
 	ValidationAPIURLRequired ValidationCode = "API_URL_REQUIRED"
 	ValidationAPIURLInvalid  ValidationCode = "API_URL_INVALID"
 	ValidationModelsInvalid  ValidationCode = "MODELS_INVALID"
+	ValidationModelsInUse    ValidationCode = "MODELS_IN_USE"
 )
 
 // ValidationError 表示模型服务供应商字段校验失败。

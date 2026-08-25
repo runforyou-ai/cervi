@@ -18,6 +18,7 @@ import {
   isNotFoundApiError,
   reactivateAgent,
   updateAgent,
+  updateAgentCapability,
   updateAgentWorkStatus,
   type AgentData,
   type Team,
@@ -26,12 +27,20 @@ import { StatusBadge } from "@/components/status-badge"
 import { Field, FieldDescription } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   agentWorkStatusSchema,
-  createAgentSchema,
+  createAgentCapabilitySchema,
+  createAgentProfileSchema,
+  type AgentCapabilityFormValues,
+  type AgentProfileFormValues,
   type AgentWorkStatusFormValues,
-  type AgentFormValues,
 } from "@/features/contacts/agent-schema"
+import { AgentModelField } from "@/features/contacts/agent-model-field"
+import {
+  agentModelSelection,
+  parseAgentModelSelection,
+} from "@/features/contacts/agent-model-selection"
 import {
   accountStatuses,
   accountStatusSchema,
@@ -57,17 +66,32 @@ type EditingField =
   | "accountStatus"
   | "workStatus"
   | "teams"
+  | "capabilityModel"
+  | "systemInstruction"
   | null
 
 /** 把 AI 员工详情转换为编辑表单值。 */
-function valuesFromAgent(agent: AgentData): AgentFormValues {
+function valuesFromAgent(agent: AgentData): AgentProfileFormValues {
   return {
     displayName: agent.displayName,
     teamIds: agent.teams.map((team) => team.id),
   }
 }
 
-/** 展示并逐字段编辑 AI 员工资料。 */
+/** 把 AI 员工能力配置转换为表单值。 */
+function capabilityValuesFromAgent(
+  agent: AgentData,
+): AgentCapabilityFormValues {
+  return {
+    modelSelection: agentModelSelection(
+      agent.capability.providerId,
+      agent.capability.modelIdentifier,
+    ),
+    systemInstruction: agent.capability.systemInstruction,
+  }
+}
+
+/** 展示并编辑 AI 员工。 */
 export function AgentDetailView({
   agent,
   teams,
@@ -88,15 +112,29 @@ export function AgentDetailView({
   const { saving } = saveState
   const schema = useMemo(
     () =>
-      createAgentSchema({
+      createAgentProfileSchema({
         nameRequired: t("agents.validation.nameRequired"),
       }),
     [t],
   )
-  const form = useForm<AgentFormValues>({
+  const capabilitySchema = useMemo(
+    () =>
+      createAgentCapabilitySchema({
+        modelRequired: t("agents.validation.modelRequired"),
+        instructionRequired: t("agents.validation.instructionRequired"),
+        instructionTooLong: t("agents.validation.instructionTooLong"),
+      }),
+    [t],
+  )
+  const form = useForm<AgentProfileFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: valuesFromAgent(agent),
+  })
+  const capabilityForm = useForm<AgentCapabilityFormValues>({
+    resolver: zodResolver(capabilitySchema),
+    shouldUseNativeValidation: true,
+    defaultValues: capabilityValuesFromAgent(agent),
   })
   const accountStatusForm = useForm<AccountStatusFormValues>({
     resolver: zodResolver(accountStatusSchema),
@@ -111,13 +149,15 @@ export function AgentDetailView({
 
   useEffect(() => {
     form.reset(valuesFromAgent(agent))
+    capabilityForm.reset(capabilityValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
-  }, [accountStatusForm, agent, form, workStatusForm])
+  }, [accountStatusForm, agent, capabilityForm, form, workStatusForm])
 
   /** 放弃尚未提交的修改并退出编辑。 */
   function cancelEdit() {
     form.reset(valuesFromAgent(agent))
+    capabilityForm.reset(capabilityValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
     setEditing(null)
@@ -126,14 +166,15 @@ export function AgentDetailView({
   /** 开始编辑指定 AI 员工字段。 */
   function startEditing(field: Exclude<EditingField, null>) {
     form.reset(valuesFromAgent(agent))
+    capabilityForm.reset(capabilityValuesFromAgent(agent))
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
     setEditing(field)
   }
 
-  /** 保存 AI 员工字段。 */
+  /** 保存 AI 员工资料。 */
   async function saveAgent(
-    draft: AgentFormValues = form.getValues(),
+    draft: AgentProfileFormValues = form.getValues(),
     closeAfterSave = true,
   ) {
     const agentID = agent.id
@@ -168,11 +209,72 @@ export function AgentDetailView({
         onNotFound()
         return
       }
-      console.warn("保存 AI 员工失败", error)
+      console.warn("保存 AI 员工失败", { agent_id: agentID, error })
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error, ["displayName", "teamIds"])
           : t("agents.form.networkError"),
+      )
+    } finally {
+      saveState.finish(request)
+    }
+  }
+
+  /** 保存 AI 员工能力配置。 */
+  async function saveCapability(
+    draft: AgentCapabilityFormValues = capabilityForm.getValues(),
+  ) {
+    const request = saveState.begin()
+    if (request === null) return
+    const valid = await capabilityForm.trigger()
+    if (!saveState.isCurrent(request)) return
+    if (!valid) {
+      saveState.finish(request)
+      return
+    }
+    const current = capabilityValuesFromAgent(agent)
+    if (
+      draft.modelSelection === current.modelSelection &&
+      draft.systemInstruction === current.systemInstruction
+    ) {
+      setEditing(null)
+      saveState.finish(request)
+      return
+    }
+    try {
+      const model = parseAgentModelSelection(draft.modelSelection)
+      const saved = await updateAgentCapability(agent.id, {
+        ...model,
+        systemInstruction: draft.systemInstruction,
+      })
+      if (!saveState.isCurrent(request)) return
+      setEditing(null)
+      onSaved(saved)
+      console.info("AI 员工能力配置已保存", {
+        agent_id: saved.id,
+        provider_id: saved.capability.providerId,
+        model_identifier: saved.capability.modelIdentifier,
+      })
+    } catch (error) {
+      if (!saveState.isCurrent(request)) return
+      cancelEdit()
+      if (recoverSession(error, navigate)) return
+      if (isNotFoundApiError(error)) {
+        onNotFound()
+        return
+      }
+      console.warn("保存 AI 员工能力配置失败", {
+        agent_id: agent.id,
+        error,
+      })
+      toast.error(
+        isApiError(error)
+          ? apiErrorMessage(error, [
+              "providerId",
+              "modelIdentifier",
+              "systemInstruction",
+            ])
+          : t("agents.capability.saveError"),
       )
     } finally {
       saveState.finish(request)
@@ -213,7 +315,11 @@ export function AgentDetailView({
         onNotFound()
         return
       }
-      console.warn("修改 AI 员工账号状态失败", error)
+      console.warn("修改 AI 员工账号状态失败", {
+        agent_id: agentID,
+        status,
+        error,
+      })
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error)
@@ -251,7 +357,11 @@ export function AgentDetailView({
         onNotFound()
         return
       }
-      console.warn("修改 AI 员工工作状态失败", error)
+      console.warn("修改 AI 员工工作状态失败", {
+        agent_id: agentID,
+        work_status: draft.workStatus,
+        error,
+      })
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error, ["workStatus"])
@@ -274,6 +384,14 @@ export function AgentDetailView({
       event.preventDefault()
       event.currentTarget.blur()
     }
+  }
+
+  /** 处理多行文本字段快捷键。 */
+  function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Escape") return
+    event.preventDefault()
+    event.stopPropagation()
+    cancelEdit()
   }
 
   /** 处理选择字段快捷键。 */
@@ -405,6 +523,73 @@ export function AgentDetailView({
                     </option>
                   ))}
                 </NativeSelect>
+              )}
+            />
+          </DetailEditRow>
+        </div>
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-sm font-medium">
+          {t("agents.capability.title")}
+        </h3>
+        <div className="divide-y">
+          <DetailEditRow
+            label={t("agents.capability.model")}
+            value={`${agent.capability.providerName} · ${agent.capability.modelName}`}
+            editing={editing === "capabilityModel"}
+            editEnabled={editing === null && !saving}
+            onEdit={() => startEditing("capabilityModel")}
+          >
+            <AgentModelField
+              control={capabilityForm.control}
+              name="modelSelection"
+              disabled={saving}
+              hideLabel
+              autoFocus
+              onValueChange={(modelSelection) =>
+                void saveCapability({
+                  ...capabilityForm.getValues(),
+                  modelSelection,
+                })
+              }
+              onBlur={() => {
+                if (!saveState.isSaving()) cancelEdit()
+              }}
+              onKeyDown={handleSelectKeyDown}
+            />
+          </DetailEditRow>
+          <DetailEditRow
+            label={t("agents.capability.instruction")}
+            value={
+              <span className="whitespace-pre-wrap">
+                {agent.capability.systemInstruction}
+              </span>
+            }
+            editing={editing === "systemInstruction"}
+            editEnabled={editing === null && !saving}
+            onEdit={() => startEditing("systemInstruction")}
+          >
+            <Controller
+              name="systemInstruction"
+              control={capabilityForm.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <Textarea
+                    {...field}
+                    rows={8}
+                    required
+                    autoFocus
+                    disabled={saving}
+                    aria-label={t("agents.capability.instruction")}
+                    aria-invalid={fieldState.invalid}
+                    onBlur={() => {
+                      field.onBlur()
+                      void saveCapability()
+                    }}
+                    onKeyDown={handleTextareaKeyDown}
+                  />
+                </Field>
               )}
             />
           </DetailEditRow>

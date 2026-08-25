@@ -55,6 +55,7 @@ import {
   type ContactListResponse,
   type ContactSummary,
   type AgentData,
+  type AgentListItemData,
   type UserData,
   type PageInfo,
   type RoleData,
@@ -523,7 +524,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [channels, setChannels] = useState<ChannelOption[]>([])
   const [contacts, setContacts] = useState<ContactSummary[]>([])
   const [users, setUsers] = useState<UserData[]>([])
-  const [agents, setAgents] = useState<AgentData[]>([])
+  const [agents, setAgents] = useState<AgentListItemData[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [roles, setRoles] = useState<RoleData[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -542,7 +543,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const [changingUserStatus, setChangingUserStatus] =
     useState<UserData | null>(null)
   const [changingAgentStatus, setChangingAgentStatus] =
-    useState<AgentData | null>(null)
+    useState<AgentListItemData | null>(null)
   const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
   const [removingTeamMembers, setRemovingTeamMembers] = useState<
     TeamMember[]
@@ -1031,7 +1032,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     scope === "employees"
       ? 8
       : scope === "agents"
-        ? 6
+        ? 7
         : scope === "team"
           ? 6
           : 7
@@ -1429,6 +1430,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                     <TableRow className="hover:bg-transparent">
                       <TableHead>{t("columns.name")}</TableHead>
                       <TableHead>{t("columns.joinedTeams")}</TableHead>
+                      <TableHead>{t("columns.model")}</TableHead>
                       <TableHead>{t("columns.accountStatus")}</TableHead>
                       <TableHead>{t("columns.workStatus")}</TableHead>
                       <TableHead>{t("columns.createdAt")}</TableHead>
@@ -1556,6 +1558,12 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                           </TableCell>
                           <TableCell className="max-w-xs">
                             <JoinedTeamsCell teams={agent.teams} />
+                          </TableCell>
+                          <TableCell className="max-w-xs">
+                            <span className="block truncate">
+                              {agent.capability.providerName} ·{" "}
+                              {agent.capability.modelName}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <UserStatusBadge

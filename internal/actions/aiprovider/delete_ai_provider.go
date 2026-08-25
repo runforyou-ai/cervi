@@ -31,6 +31,13 @@ func (a *DeleteAIProviderAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
+		inUse, err := providerInUse(ctx, tx, identity.Organization.ID, provider.ID)
+		if err != nil {
+			return err
+		}
+		if inUse {
+			return ErrInUse
+		}
 		if _, err := tx.NewDelete().
 			Model((*servermodels.AIProviderModel)(nil)).
 			Where("organization_id = ?", identity.Organization.ID).

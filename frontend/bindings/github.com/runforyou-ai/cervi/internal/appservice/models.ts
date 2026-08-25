@@ -114,14 +114,45 @@ export interface Agent {
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
+    "capability": AgentCapability;
     "createdAt": string;
+}
+
+/**
+ * AgentCapability 定义 AI 员工当前生效的能力配置。
+ */
+export interface AgentCapability {
+    "providerId": string;
+    "providerName": string;
+    "modelIdentifier": string;
+    "modelName": string;
+    "systemInstruction": string;
+}
+
+/**
+ * AgentCapabilityInput 定义 AI 员工能力配置字段。
+ */
+export interface AgentCapabilityInput {
+    "providerId": string;
+    "modelIdentifier": string;
+    "systemInstruction": string;
+}
+
+/**
+ * AgentCapabilitySummary 定义 AI 员工当前模型摘要。
+ */
+export interface AgentCapabilitySummary {
+    "providerId": string;
+    "providerName": string;
+    "modelIdentifier": string;
+    "modelName": string;
 }
 
 /**
  * AgentList 定义 AI 员工分页结果。
  */
 export interface AgentList {
-    "agents": Agent[] | null;
+    "agents": AgentListItem[] | null;
     "page": PageInfo;
 }
 
@@ -133,6 +164,37 @@ export interface AgentListInput {
     "status"?: UserStatus | null;
     "page": number;
     "pageSize": number;
+}
+
+/**
+ * AgentListItem 定义 AI 员工目录项。
+ */
+export interface AgentListItem {
+    "id": string;
+    "identityId": string;
+    "displayName": string;
+    "status": UserStatus;
+    "workStatus": WorkStatus;
+    "teams": TeamSummary[] | null;
+    "capability": AgentCapabilitySummary;
+    "createdAt": string;
+}
+
+/**
+ * AgentModelOption 定义 AI 员工可使用的对话模型选项。
+ */
+export interface AgentModelOption {
+    "providerId": string;
+    "providerName": string;
+    "modelIdentifier": string;
+    "modelName": string;
+}
+
+/**
+ * AgentModelOptionList 定义 AI 员工对话模型选项列表。
+ */
+export interface AgentModelOptionList {
+    "models": AgentModelOption[] | null;
 }
 
 /**
@@ -381,6 +443,7 @@ export interface Conversation {
 export interface CreateAgentInput {
     "displayName": string;
     "teamIds": string[] | null;
+    "capability": AgentCapabilityInput;
 }
 
 /**

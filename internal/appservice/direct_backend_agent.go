@@ -19,15 +19,48 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 	if err != nil {
 		return Agent{}, err
 	}
-	created, err := b.createAgent.Execute(ctx, identity, agentaction.CreateInput{DisplayName: input.DisplayName, TeamIDs: input.TeamIDs})
+	created, err := b.createAgent.Execute(ctx, identity, agentaction.CreateInput{
+		DisplayName: input.DisplayName, TeamIDs: input.TeamIDs,
+		Capability: agentCapabilityInput(input.Capability),
+	})
 	if err != nil {
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationDisplayNameRequired: cervii18n.FieldAgentNameRequired,
-			agentaction.ValidationTeamInvalid:         cervii18n.FieldMemberTeamInvalid,
+			agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAgentNameRequired,
+			agentaction.ValidationTeamInvalid:               cervii18n.FieldMemberTeamInvalid,
+			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
+			agentaction.ValidationSystemInstructionRequired: cervii18n.FieldAgentSystemInstructionRequired,
+			agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
 		})
 	}
-	slog.Info("AI 员工创建成功", "organization_id", identity.Organization.ID, "identity_id", created.IdentityID, "agent_id", created.ID)
+	slog.Info("AI 员工创建成功",
+		"organization_id", identity.Organization.ID,
+		"identity_id", created.IdentityID,
+		"agent_id", created.ID,
+		"revision_id", created.Capability.RevisionID,
+		"provider_id", created.Capability.ProviderID,
+		"model_identifier", created.Capability.ModelIdentifier,
+	)
 	return agentFromAction(*created), nil
+}
+
+// ListAgentModelOptions 返回企业 AI 员工可使用的对话模型。
+func (b *DirectBackend) ListAgentModelOptions(ctx context.Context, meta RequestMeta) (AgentModelOptionList, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return AgentModelOptionList{}, err
+	}
+	models, err := b.listAgentModelOptions.Execute(ctx, identity)
+	if err != nil {
+		return AgentModelOptionList{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentModelListFailed, identity.Organization.ID, "", nil)
+	}
+	output := make([]AgentModelOption, 0, len(models))
+	for _, model := range models {
+		output = append(output, AgentModelOption{
+			ProviderID: model.ProviderID, ProviderName: model.ProviderName,
+			ModelIdentifier: model.ModelIdentifier, ModelName: model.ModelName,
+		})
+	}
+	return AgentModelOptionList{Models: output}, nil
 }
 
 // ListAgents 返回企业 AI 员工目录。
@@ -43,11 +76,11 @@ func (b *DirectBackend) ListAgents(ctx context.Context, meta RequestMeta, input 
 		return AgentList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 	}
 	if err != nil {
-		return AgentList{}, b.agentError(ctx, meta, err, cervii18n.ErrorUserListFailed, identity.Organization.ID, "", nil)
+		return AgentList{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
 	}
-	agents := make([]Agent, 0, len(output.Agents))
+	agents := make([]AgentListItem, 0, len(output.Agents))
 	for _, agent := range output.Agents {
-		agents = append(agents, agentFromAction(agent))
+		agents = append(agents, agentListItemFromAction(agent))
 	}
 	return AgentList{Agents: agents, Page: PageInfo{Number: output.Page, Size: output.Size, Total: output.Total}}, nil
 }
@@ -79,6 +112,31 @@ func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agent
 		})
 	}
 	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID)
+	return agentFromAction(*agent), nil
+}
+
+// UpdateAgentCapability 修改企业 AI 员工的能力配置。
+func (b *DirectBackend) UpdateAgentCapability(ctx context.Context, meta RequestMeta, agentID string, input AgentCapabilityInput) (Agent, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return Agent{}, err
+	}
+	agent, err := b.updateAgentCapability.Execute(ctx, identity, agentID, agentCapabilityInput(input))
+	if err != nil {
+		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCapabilityUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
+			agentaction.ValidationSystemInstructionRequired: cervii18n.FieldAgentSystemInstructionRequired,
+			agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
+		})
+	}
+	slog.Info("AI 员工能力配置已保存",
+		"organization_id", identity.Organization.ID,
+		"identity_id", agent.IdentityID,
+		"agent_id", agentID,
+		"revision_id", agent.Capability.RevisionID,
+		"provider_id", agent.Capability.ProviderID,
+		"model_identifier", agent.Capability.ModelIdentifier,
+	)
 	return agentFromAction(*agent), nil
 }
 
@@ -131,7 +189,33 @@ func agentFromAction(agent agentaction.Agent) Agent {
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, CreatedAt: agent.CreatedAt}
+	capability := AgentCapability{
+		ProviderID: agent.Capability.ProviderID, ProviderName: agent.Capability.ProviderName,
+		ModelIdentifier: agent.Capability.ModelIdentifier, ModelName: agent.Capability.ModelName,
+		SystemInstruction: agent.Capability.SystemInstruction,
+	}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Capability: capability, CreatedAt: agent.CreatedAt}
+}
+
+// agentListItemFromAction 转换 AI 员工目录项契约。
+func agentListItemFromAction(agent agentaction.ListItem) AgentListItem {
+	teams := make([]TeamSummary, 0, len(agent.Teams))
+	for _, team := range agent.Teams {
+		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
+	}
+	capability := AgentCapabilitySummary{
+		ProviderID: agent.Capability.ProviderID, ProviderName: agent.Capability.ProviderName,
+		ModelIdentifier: agent.Capability.ModelIdentifier, ModelName: agent.Capability.ModelName,
+	}
+	return AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Capability: capability, CreatedAt: agent.CreatedAt}
+}
+
+// agentCapabilityInput 转换 AI 员工能力配置输入。
+func agentCapabilityInput(input AgentCapabilityInput) agentaction.CapabilityInput {
+	return agentaction.CapabilityInput{
+		ProviderID: input.ProviderID, ModelIdentifier: input.ModelIdentifier,
+		SystemInstruction: input.SystemInstruction,
+	}
 }
 
 // agentError 转换 AI 员工领域错误并记录未处理故障。

@@ -145,6 +145,7 @@ const zhCN = {
       role: "角色",
       accountStatus: "账号状态",
       workStatus: "工作状态",
+      model: "对话模型",
       teams: "所属团队",
       joinedTeams: "加入的团队",
       joinedAt: "加入时间",
@@ -241,7 +242,7 @@ const zhCN = {
     },
     agents: {
       create: "添加 AI 员工",
-      createDescription: "创建一个可以参与企业工作的 AI 员工。",
+      createDescription: "设置 AI 员工的名称、对话模型和工作指令。",
       form: {
         name: "AI 员工名称",
         teams: "所属团队",
@@ -254,6 +255,20 @@ const zhCN = {
       },
       validation: {
         nameRequired: "请输入 AI 员工名称。",
+        modelRequired: "请选择对话模型。",
+        instructionRequired: "请输入工作指令。",
+        instructionTooLong: "工作指令不能超过 20000 个字符。",
+      },
+      capability: {
+        title: "能力设置",
+        model: "对话模型",
+        instruction: "工作指令",
+        saveError: "保存能力设置失败，请重试。",
+        modelSelect: "选择对话模型",
+        modelLoading: "正在加载模型…",
+        modelLoadError: "读取对话模型失败。",
+        noModels: "还没有可用的对话模型。",
+        configureModels: "前往配置模型服务",
       },
       status: {
         deactivate: "禁用",

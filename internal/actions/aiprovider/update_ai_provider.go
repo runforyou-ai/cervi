@@ -36,6 +36,9 @@ func (a *UpdateAIProviderAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
+		if err := validateReferencedModels(ctx, tx, identity.Organization.ID, current.ID, input.Models); err != nil {
+			return err
+		}
 		current.Brand = string(input.Brand)
 		current.Name = input.Name
 		current.APIKey = input.APIKey

@@ -147,6 +147,7 @@ const enUS = {
       role: "Role",
       accountStatus: "Account status",
       workStatus: "Work status",
+      model: "Chat model",
       teams: "Teams",
       joinedTeams: "Joined teams",
       joinedAt: "Joined",
@@ -245,8 +246,7 @@ const enUS = {
     },
     agents: {
       create: "Add AI employee",
-      createDescription:
-        "Create an AI employee that can participate in company work.",
+      createDescription: "Set the AI employee name, chat model, and work instructions.",
       form: {
         name: "AI employee name",
         teams: "Teams",
@@ -259,6 +259,20 @@ const enUS = {
       },
       validation: {
         nameRequired: "Enter an AI employee name.",
+        modelRequired: "Select a chat model.",
+        instructionRequired: "Enter work instructions.",
+        instructionTooLong: "Work instructions cannot exceed 20,000 characters.",
+      },
+      capability: {
+        title: "Capabilities",
+        model: "Chat model",
+        instruction: "Work instructions",
+        saveError: "Could not save capabilities. Try again.",
+        modelSelect: "Select a chat model",
+        modelLoading: "Loading models…",
+        modelLoadError: "Could not load chat models.",
+        noModels: "No chat models are available yet.",
+        configureModels: "Configure model services",
       },
       status: {
         deactivate: "Disable",

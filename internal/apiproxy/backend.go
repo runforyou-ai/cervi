@@ -278,6 +278,13 @@ func (b *Backend) CreateAgent(ctx context.Context, meta appservice.RequestMeta, 
 	return output, err
 }
 
+// ListAgentModelOptions 返回远程企业 AI 员工可使用的对话模型。
+func (b *Backend) ListAgentModelOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.AgentModelOptionList, error) {
+	var output appservice.AgentModelOptionList
+	err := b.do(ctx, meta, http.MethodGet, "/agents/model-options", nil, nil, &output)
+	return output, err
+}
+
 // ListAgents 返回远程企业 AI 员工目录。
 func (b *Backend) ListAgents(ctx context.Context, meta appservice.RequestMeta, input appservice.AgentListInput) (appservice.AgentList, error) {
 	query := url.Values{}
@@ -301,6 +308,13 @@ func (b *Backend) GetAgent(ctx context.Context, meta appservice.RequestMeta, age
 func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.UpdateAgentInput) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID), nil, input, &output)
+	return output, err
+}
+
+// UpdateAgentCapability 修改远程企业 AI 员工能力配置。
+func (b *Backend) UpdateAgentCapability(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentCapabilityInput) (appservice.Agent, error) {
+	var output appservice.Agent
+	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID)+"/capability", nil, input, &output)
 	return output, err
 }
 

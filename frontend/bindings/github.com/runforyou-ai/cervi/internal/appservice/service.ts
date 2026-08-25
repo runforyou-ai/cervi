@@ -239,6 +239,13 @@ export function ListAIProviders(meta: $models.RequestMeta): $CancellablePromise<
 }
 
 /**
+ * ListAgentModelOptions 返回 AI 员工可使用的对话模型。
+ */
+export function ListAgentModelOptions(meta: $models.RequestMeta): $CancellablePromise<$models.AgentModelOptionList> {
+    return $Call.ByID(968800310, meta);
+}
+
+/**
  * ListAgents 返回企业 AI 员工目录。
  */
 export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListInput): $CancellablePromise<$models.AgentList> {
@@ -439,6 +446,13 @@ export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, 
  */
 export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2196616072, meta, agentID, input);
+}
+
+/**
+ * UpdateAgentCapability 修改企业 AI 员工的能力配置。
+ */
+export function UpdateAgentCapability(meta: $models.RequestMeta, agentID: string, input: $models.AgentCapabilityInput): $CancellablePromise<$models.Agent> {
+    return $Call.ByID(4134547974, meta, agentID, input);
 }
 
 /**

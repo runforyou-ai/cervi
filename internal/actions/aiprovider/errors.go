@@ -4,5 +4,9 @@ package aiprovider
 
 import "errors"
 
-// ErrNotFound 表示当前企业中不存在指定模型服务供应商。
-var ErrNotFound = errors.New("AI provider not found")
+var (
+	// ErrNotFound 表示当前企业中不存在指定模型服务供应商。
+	ErrNotFound = errors.New("AI provider not found")
+	// ErrInUse 表示模型服务供应商仍被 AI 员工使用。
+	ErrInUse = errors.New("AI provider is in use")
+)

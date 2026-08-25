@@ -62,10 +62,12 @@ func NewService(application *appservice.Service) *Service {
 	router.PATCH("/channels/website/:channelID/access", service.updateWebsiteChannelAccess)
 	router.GET("/channel-options", service.listChannelOptions)
 	router.GET("/members/options", service.listMemberOptions)
+	router.GET("/agents/model-options", service.listAgentModelOptions)
 	router.GET("/agents", service.listAgents)
 	router.POST("/agents", service.createAgent)
 	router.GET("/agents/:agentID", service.getAgent)
 	router.PATCH("/agents/:agentID", service.updateAgent)
+	router.PATCH("/agents/:agentID/capability", service.updateAgentCapability)
 	router.PATCH("/agents/:agentID/work-status", service.updateAgentWorkStatus)
 	router.POST("/agents/:agentID/deactivate", service.deactivateAgent)
 	router.POST("/agents/:agentID/reactivate", service.reactivateAgent)
@@ -320,6 +322,12 @@ func (s *Service) createAgent(c *gin.Context) {
 	writeResult(c, http.StatusCreated, agent, err)
 }
 
+// listAgentModelOptions 返回 AI 员工可使用的对话模型。
+func (s *Service) listAgentModelOptions(c *gin.Context) {
+	models, err := s.application.ListAgentModelOptions(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, models, err)
+}
+
 // listAgents 返回企业 AI 员工目录。
 func (s *Service) listAgents(c *gin.Context) {
 	page, ok := positiveQueryInteger(c, "page", 1)
@@ -349,6 +357,16 @@ func (s *Service) updateAgent(c *gin.Context) {
 		return
 	}
 	agent, err := s.application.UpdateAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
+	writeResult(c, http.StatusOK, agent, err)
+}
+
+// updateAgentCapability 修改企业 AI 员工能力配置。
+func (s *Service) updateAgentCapability(c *gin.Context) {
+	var input appservice.AgentCapabilityInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	agent, err := s.application.UpdateAgentCapability(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
 	writeResult(c, http.StatusOK, agent, err)
 }
 
