@@ -19,6 +19,7 @@ import {
   getAIProvider,
   isApiError,
   listAvailableAIModels,
+  testAIProviderConnection,
   updateAIProvider,
   type AIProviderBrandId,
   type AIProviderModelData,
@@ -123,6 +124,7 @@ export function ModelProviderFormPage({
   )
   const [draftModelIDs, setDraftModelIDs] = useState<Set<string>>(new Set())
   const [loadingModels, setLoadingModels] = useState(false)
+  const [testingConnection, setTestingConnection] = useState(false)
   const loadVersion = useRef(0)
   const mounted = useRef(true)
   const listPath = `/integrations/model-services/${returnSection}`
@@ -285,6 +287,33 @@ export function ModelProviderFormPage({
       contextWindow: "",
       maxOutputTokens: "",
     })
+  }
+
+  /** 使用当前未保存的地址和密钥测试模型服务连接。 */
+  async function testConnection() {
+    if (testingConnection || form.formState.isSubmitting) return
+    const valid = await form.trigger(["brand", "apiKey", "apiUrl"], {
+      shouldFocus: true,
+    })
+    if (!valid || !mounted.current) return
+    const { brand, apiKey, apiUrl } = form.getValues()
+    setTestingConnection(true)
+    try {
+      await testAIProviderConnection({ brand, apiKey, apiUrl })
+      if (!mounted.current) return
+      toast.success(t("modelServices.form.testSuccess"))
+    } catch (requestError) {
+      if (!mounted.current) return
+      if (recoverSession(requestError, navigate)) return
+      console.warn("模型服务连接测试失败", { brand, error: requestError })
+      toast.error(
+        isApiError(requestError)
+          ? apiErrorMessage(requestError, ["brand", "apiKey", "apiUrl"])
+          : t("modelServices.form.testError"),
+      )
+    } finally {
+      if (mounted.current) setTestingConnection(false)
+    }
   }
 
   /** 创建或保存模型服务供应商。 */
@@ -651,7 +680,7 @@ export function ModelProviderFormPage({
             <div className="flex items-center gap-2">
               <Button
                 type="submit"
-                disabled={form.formState.isSubmitting}
+                disabled={form.formState.isSubmitting || testingConnection}
               >
                 {form.formState.isSubmitting ? (
                   <LoaderCircleIcon className="animate-spin" />
@@ -659,6 +688,19 @@ export function ModelProviderFormPage({
                 {form.formState.isSubmitting
                   ? t("modelServices.form.saving")
                   : t("modelServices.form.save")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={testingConnection || form.formState.isSubmitting}
+                onClick={() => void testConnection()}
+              >
+                {testingConnection ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : null}
+                {testingConnection
+                  ? t("modelServices.form.testing")
+                  : t("modelServices.form.test")}
               </Button>
               <Button type="button" variant="outline" asChild>
                 <Link to={listPath}>{t("modelServices.form.cancel")}</Link>

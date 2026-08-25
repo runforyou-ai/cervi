@@ -11,6 +11,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
 // ListAIProviders 返回当前企业的模型服务供应商列表。
@@ -65,6 +66,41 @@ func (b *DirectBackend) ListAvailableAIModels(ctx context.Context, meta RequestM
 		return AIProviderModelList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, fields)
 	}
 	return AIProviderModelList{Models: aiProviderModelsFromAction(models)}, nil
+}
+
+// TestAIProviderConnection 测试模型服务供应商草稿配置。
+func (b *DirectBackend) TestAIProviderConnection(ctx context.Context, meta RequestMeta, input AIProviderConnectionInput) error {
+	if _, err := b.authenticate(ctx, meta); err != nil {
+		return err
+	}
+	err := b.testAIProviderConnection.Execute(ctx, aiprovideraction.ConnectionInput{
+		Brand: domain.AIProviderBrand(input.Brand), APIKey: input.APIKey, APIURL: input.APIURL,
+	})
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var validationError *common.FieldError
+	if errors.As(err, &validationError) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, aiProviderFieldKeys(validationError.Fields))
+	}
+	_, kind, classified := connectiontest.Details(err)
+	if !classified {
+		slog.Warn("模型服务连接测试返回未分类错误", "brand", input.Brand)
+		return UnavailableError(meta, cervii18n.ErrorAIProviderConnectionTestFailed, nil)
+	}
+	switch kind {
+	case connectiontest.FailureUnauthorized:
+		return UnavailableError(meta, cervii18n.ErrorAIProviderAuthenticationFailed, nil)
+	case connectiontest.FailureForbidden:
+		return UnavailableError(meta, cervii18n.ErrorAIProviderAuthorizationFailed, nil)
+	case connectiontest.FailureRateLimited:
+		return UnavailableError(meta, cervii18n.ErrorAIProviderRateLimited, nil)
+	default:
+		return UnavailableError(meta, cervii18n.ErrorAIProviderConnectionTestFailed, nil)
+	}
 }
 
 // CreateAIProvider 创建模型服务供应商。

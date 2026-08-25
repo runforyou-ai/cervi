@@ -532,6 +532,7 @@ export function StorageSettingsForm() {
               <dd>
                 <StatusBadge
                   variant={savedSetting.enabled ? "success" : "muted"}
+                  showDot={false}
                 >
                   {savedSetting.enabled
                     ? t("storage.detail.enabled")

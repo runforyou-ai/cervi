@@ -630,6 +630,11 @@ func (b *Backend) ListAvailableAIModels(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// TestAIProviderConnection 测试远程模型服务供应商草稿配置。
+func (b *Backend) TestAIProviderConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderConnectionInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/integrations/model-services/test", nil, input, nil)
+}
+
 // CreateAIProvider 创建远程模型服务供应商。
 func (b *Backend) CreateAIProvider(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderInput) (appservice.AIProvider, error) {
 	var output appservice.AIProvider

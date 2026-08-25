@@ -470,6 +470,13 @@ export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string
 }
 
 /**
+ * TestAIProviderConnection 测试模型服务供应商草稿配置。
+ */
+export function TestAIProviderConnection(meta: $models.RequestMeta, input: $models.AIProviderConnectionInput): $CancellablePromise<void> {
+    return $Call.ByID(840788545, meta, input);
+}
+
+/**
  * TestS3Setting 测试对象存储连接。
  */
 export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3Setting): $CancellablePromise<void> {

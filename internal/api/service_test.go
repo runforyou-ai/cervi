@@ -35,6 +35,7 @@ type testBackend struct {
 	lastPassword        appservice.ChangePasswordInput
 	lastPreferences     appservice.UserPreferencesInput
 	lastWorkStatus      appservice.UserWorkStatusInput
+	lastAIConnection    appservice.AIProviderConnectionInput
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
@@ -196,6 +197,29 @@ func (b *testBackend) UpdateOrganization(_ context.Context, meta appservice.Requ
 	b.lastMeta = meta
 	b.lastOrganization = input
 	return appservice.Organization{ID: testIdentity().Organization.ID, Name: input.Name}, nil
+}
+
+// TestAIProviderConnection 记录模型服务连接测试输入。
+func (b *testBackend) TestAIProviderConnection(_ context.Context, meta appservice.RequestMeta, input appservice.AIProviderConnectionInput) error {
+	b.lastMeta = meta
+	b.lastAIConnection = input
+	return nil
+}
+
+// TestAIProviderConnectionUsesDraftContract 验证模型服务连接测试不依赖已保存记录。
+func TestAIProviderConnectionUsesDraftContract(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	input := appservice.AIProviderConnectionInput{
+		Brand: appservice.AIProviderBrandOpenAI, APIKey: "test-key", APIURL: "https://api.openai.com/v1",
+	}
+	response := doJSON(t, http.MethodPost, server.URL+"/integrations/model-services/test", input, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusNoContent || backend.lastAIConnection != input {
+		t.Fatalf("status = %d, input = %#v", response.StatusCode, backend.lastAIConnection)
+	}
 }
 
 // TestAuthenticationUsesBearerToken 验证登录返回令牌且后续请求读取 Bearer Token。

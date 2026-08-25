@@ -57,6 +57,15 @@ export enum AIProviderBrand {
 };
 
 /**
+ * AIProviderConnectionInput 定义测试模型服务连接需要的草稿配置。
+ */
+export interface AIProviderConnectionInput {
+    "brand": AIProviderBrand;
+    "apiKey": string;
+    "apiUrl": string;
+}
+
+/**
  * AIProviderInput 定义模型服务供应商可编辑字段。
  */
 export interface AIProviderInput {
