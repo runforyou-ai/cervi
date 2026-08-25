@@ -35,11 +35,15 @@ func run(_ []string) error {
 		}
 	}()
 	systemLocale := nativesystemlocale.Detect()
+	nativeAppName := "Cervi"
+	if runtime.GOOS == "darwin" {
+		nativeAppName = nativesystemtray.ProductName(systemLocale)
+	}
 	trayController := nativesystemtray.New(systemLocale)
 	notificationProvider, notificationLifecycleServices := appservicenative.NewNotificationProvider()
 	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
-		Name:        "Cervi",
+		Name:        nativeAppName,
 		Description: "Cervi is an open-source AI customer support teammate platform",
 		Services:    notificationLifecycleServices,
 		ShouldQuit: func() bool {

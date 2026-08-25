@@ -3,6 +3,7 @@
 package systemtray
 
 import (
+	"log/slog"
 	"runtime"
 	"sync"
 
@@ -12,16 +13,17 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/services/dock"
 )
 
-// Controller 同步桌面端窗口、托盘语言和未读消息提示。
+// Controller 同步桌面端窗口、应用菜单、托盘语言和未读消息提示。
 type Controller struct {
-	mu             sync.Mutex
-	localeUpdateMu sync.Mutex
-	locale         appservice.Locale
-	window         application.Window
-	tray           *application.SystemTray
-	openItem       *application.MenuItem
-	quitItem       *application.MenuItem
-	unread         appservice.UnreadIndicator
+	mu              sync.Mutex
+	localeUpdateMu  sync.Mutex
+	locale          appservice.Locale
+	window          application.Window
+	applicationMenu *localizedApplicationMenu
+	tray            *application.SystemTray
+	openItem        *application.MenuItem
+	quitItem        *application.MenuItem
+	unread          appservice.UnreadIndicator
 }
 
 // New 创建使用系统语言作为未登录默认值的托盘控制器。
@@ -38,7 +40,9 @@ func (c *Controller) Setup(options Options) {
 		options.Window.Show().Focus()
 	}
 
-	texts := textsForLocale(c.currentLocale())
+	locale := c.currentLocale()
+	texts := textsForLocale(locale)
+	applicationMenu := newLocalizedApplicationMenu(options.App, locale)
 	trayMenu := options.App.Menu.New()
 	openItem := trayMenu.Add(texts.Open).OnClick(func(_ *application.Context) {
 		showWindow()
@@ -69,6 +73,7 @@ func (c *Controller) Setup(options Options) {
 
 	c.mu.Lock()
 	c.window = options.Window
+	c.applicationMenu = applicationMenu
 	c.tray = tray
 	c.openItem = openItem
 	c.quitItem = quitItem
@@ -77,7 +82,7 @@ func (c *Controller) Setup(options Options) {
 	options.Window.SetTitle(texts.ProductName)
 }
 
-// SetLocale 按当前用户偏好更新窗口和托盘文案。
+// SetLocale 按当前用户偏好更新窗口、应用菜单和托盘文案。
 func (c *Controller) SetLocale(locale appservice.Locale) {
 	c.localeUpdateMu.Lock()
 	defer c.localeUpdateMu.Unlock()
@@ -86,6 +91,7 @@ func (c *Controller) SetLocale(locale appservice.Locale) {
 	c.mu.Lock()
 	c.locale = locale
 	window := c.window
+	applicationMenu := c.applicationMenu
 	tray := c.tray
 	openItem := c.openItem
 	quitItem := c.quitItem
@@ -93,6 +99,9 @@ func (c *Controller) SetLocale(locale appservice.Locale) {
 
 	if window != nil {
 		window.SetTitle(texts.ProductName)
+	}
+	if applicationMenu != nil {
+		applicationMenu.setLocale(locale)
 	}
 	if tray != nil {
 		tray.SetTooltip(texts.ProductName)
@@ -107,6 +116,7 @@ func (c *Controller) SetLocale(locale appservice.Locale) {
 			}
 		})
 	}
+	slog.Info("已更新桌面端原生界面语言", "locale", locale)
 }
 
 // SetUnreadState 更新当前平台的原生未读消息提示。

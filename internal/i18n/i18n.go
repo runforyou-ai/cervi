@@ -15,6 +15,40 @@ const (
 	AppProductName                        Key = "app.product_name"
 	AppTrayOpen                           Key = "app.tray_open"
 	AppTrayQuit                           Key = "app.tray_quit"
+	AppMenuFile                           Key = "app.menu_file"
+	AppMenuEdit                           Key = "app.menu_edit"
+	AppMenuView                           Key = "app.menu_view"
+	AppMenuWindow                         Key = "app.menu_window"
+	AppMenuHelp                           Key = "app.menu_help"
+	AppMenuAbout                          Key = "app.menu_about"
+	AppMenuServices                       Key = "app.menu_services"
+	AppMenuHide                           Key = "app.menu_hide"
+	AppMenuHideOthers                     Key = "app.menu_hide_others"
+	AppMenuShowAll                        Key = "app.menu_show_all"
+	AppMenuQuit                           Key = "app.menu_quit"
+	AppMenuClose                          Key = "app.menu_close"
+	AppMenuUndo                           Key = "app.menu_undo"
+	AppMenuRedo                           Key = "app.menu_redo"
+	AppMenuCut                            Key = "app.menu_cut"
+	AppMenuCopy                           Key = "app.menu_copy"
+	AppMenuPaste                          Key = "app.menu_paste"
+	AppMenuPasteAndMatchStyle             Key = "app.menu_paste_and_match_style"
+	AppMenuDelete                         Key = "app.menu_delete"
+	AppMenuSelectAll                      Key = "app.menu_select_all"
+	AppMenuSpeech                         Key = "app.menu_speech"
+	AppMenuStartSpeaking                  Key = "app.menu_start_speaking"
+	AppMenuStopSpeaking                   Key = "app.menu_stop_speaking"
+	AppMenuReload                         Key = "app.menu_reload"
+	AppMenuForceReload                    Key = "app.menu_force_reload"
+	AppMenuOpenDevTools                   Key = "app.menu_open_dev_tools"
+	AppMenuActualSize                     Key = "app.menu_actual_size"
+	AppMenuZoomIn                         Key = "app.menu_zoom_in"
+	AppMenuZoomOut                        Key = "app.menu_zoom_out"
+	AppMenuToggleFullscreen               Key = "app.menu_toggle_fullscreen"
+	AppMenuMinimize                       Key = "app.menu_minimize"
+	AppMenuZoom                           Key = "app.menu_zoom"
+	AppMenuBringAllToFront                Key = "app.menu_bring_all_to_front"
+	AppMenuLearnMore                      Key = "app.menu_learn_more"
 	ErrorInternal                         Key = "error.internal"
 	ErrorMethodNotAllowed                 Key = "error.method_not_allowed"
 	ErrorInstallationStatusReadFailed     Key = "error.installation_status_read_failed"
@@ -192,13 +226,13 @@ func Localize(acceptLanguage string, key Key) (string, string) {
 	return message, tag.String()
 }
 
-// LocalizeMap 将一组命名文案键翻译为对应文案。
-func LocalizeMap(acceptLanguage string, keys map[string]Key) map[string]string {
+// LocalizeMap 将一组文案键翻译为对应文案。
+func LocalizeMap[K comparable](acceptLanguage string, keys map[K]Key) map[K]string {
 	if len(keys) == 0 {
 		return nil
 	}
 	localizer := goi18n.NewLocalizer(bundle, acceptLanguage)
-	messages := make(map[string]string, len(keys))
+	messages := make(map[K]string, len(keys))
 	for name, key := range keys {
 		messages[name] = localizer.MustLocalize(&goi18n.LocalizeConfig{MessageID: string(key)})
 	}
