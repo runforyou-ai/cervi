@@ -169,7 +169,7 @@ export function DeleteKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: 
 }
 
 /**
- * DeleteKnowledgeGroup 删除空知识库分组。
+ * DeleteKnowledgeGroup 删除不含子分组的知识库分组。
  */
 export function DeleteKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, groupID: string): $CancellablePromise<$models.KnowledgeBase> {
     return $Call.ByID(3559839338, meta, knowledgeBaseID, groupID);

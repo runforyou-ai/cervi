@@ -600,7 +600,7 @@ export interface KnowledgeBase {
 }
 
 /**
- * KnowledgeBaseCategory 表示知识库类型。
+ * KnowledgeBaseCategory 表示知识库内容类型。
  */
 export enum KnowledgeBaseCategory {
     /**
