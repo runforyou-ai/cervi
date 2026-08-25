@@ -280,7 +280,7 @@ export function AgentDetailView({
               "modelIdentifier",
               "systemInstruction",
             ])
-          : t("agents.capability.saveError"),
+          : t("agents.execution.saveError"),
       )
     } finally {
       saveState.finish(request)
@@ -537,11 +537,11 @@ export function AgentDetailView({
 
       <section>
         <h3 className="mb-2 text-sm font-medium">
-          {t("agents.capability.title")}
+          {t("agents.execution.title")}
         </h3>
         <div className="divide-y">
           <DetailEditRow
-            label={t("agents.capability.model")}
+            label={t("agents.execution.model")}
             value={`${agent.execution.managed.providerName} · ${agent.execution.managed.modelName}`}
             editing={editing === "executionModel"}
             editEnabled={editing === null && !saving}
@@ -566,7 +566,7 @@ export function AgentDetailView({
             />
           </DetailEditRow>
           <DetailEditRow
-            label={t("agents.capability.instruction")}
+            label={t("agents.execution.instruction")}
             value={
               <span className="whitespace-pre-wrap">
                 {agent.execution.managed.systemInstruction}
@@ -587,7 +587,7 @@ export function AgentDetailView({
                     required
                     autoFocus
                     disabled={saving}
-                    aria-label={t("agents.capability.instruction")}
+                    aria-label={t("agents.execution.instruction")}
                     aria-invalid={fieldState.invalid}
                     onBlur={() => {
                       field.onBlur()

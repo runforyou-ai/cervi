@@ -193,7 +193,7 @@ function AgentManagedExecutionFields({
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="agent-system-instruction" required>
-              {t("agents.capability.instruction")}
+              {t("agents.execution.instruction")}
             </FieldLabel>
             <Textarea
               {...field}

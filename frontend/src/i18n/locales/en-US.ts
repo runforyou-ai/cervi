@@ -264,11 +264,11 @@ const enUS = {
         instructionRequired: "Enter work instructions.",
         instructionTooLong: "Work instructions cannot exceed 20,000 characters.",
       },
-      capability: {
-        title: "Capabilities",
+      execution: {
+        title: "Execution settings",
         model: "Chat model",
         instruction: "Work instructions",
-        saveError: "Could not save capabilities. Try again.",
+        saveError: "Could not save execution settings. Try again.",
         modelSelect: "Select a chat model",
         modelLoading: "Loading models…",
         modelLoadError: "Could not load chat models.",
