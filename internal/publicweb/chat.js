@@ -776,6 +776,7 @@
       return;
     }
     var conversation = activeConversation;
+    var startsConversation = conversation.id === null;
     if (conversation.pendingBody !== text || !conversation.pendingMessageID) {
       conversation.pendingBody = text;
       conversation.pendingMessageID = createClientMessageID();
@@ -806,7 +807,11 @@
         conversation.pendingBody = "";
         conversation.draft = "";
         appendServerMessage(conversation, result.message);
-        conversation.historyLoaded = true;
+        if (startsConversation) {
+          conversation.historyLoaded = true;
+        } else if (!conversation.historyLoaded) {
+          loadConversationHistory(conversation);
+        }
         if (conversation === activeConversation) {
           if (input.value.trim() === text) {
             input.value = "";
