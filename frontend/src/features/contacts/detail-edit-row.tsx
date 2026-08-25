@@ -21,10 +21,11 @@ export function DetailEditRow({
   children: ReactNode
 }) {
   const { t } = useTranslation("contacts")
+  const showEdit = !editing && editEnabled
 
   return (
     <div className="group rounded-md px-2 py-2.5 transition-colors hover:bg-muted/50 focus-within:bg-muted/50">
-      <div className="flex items-start gap-3">
+      <div className="flex min-h-9 items-start gap-3">
         <div className="w-28 shrink-0 pt-1 text-sm text-muted-foreground">
           {label}
         </div>
@@ -35,17 +36,20 @@ export function DetailEditRow({
             <div className="pt-1 text-sm break-words">{value}</div>
           )}
         </div>
-        {!editing && editEnabled ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-            aria-label={t("detail.editField", { field: label })}
-            onClick={onEdit}
-          >
-            {t("detail.edit")}
-          </Button>
-        ) : null}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={
+            showEdit
+              ? "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+              : "invisible"
+          }
+          disabled={!showEdit}
+          aria-label={t("detail.editField", { field: label })}
+          onClick={onEdit}
+        >
+          {t("detail.edit")}
+        </Button>
       </div>
     </div>
   )
