@@ -135,6 +135,11 @@ const (
 	ErrorServerInitializationRequired     Key = "error.server_initialization_required"
 	ErrorRemoteRequestCreateFailed        Key = "error.remote_request_create_failed"
 	ErrorServerConnectionFailed           Key = "error.server_connection_failed"
+	ErrorWebsiteConversationNotFound      Key = "error.website_conversation_not_found"
+	ErrorWebsiteMessengerLoadFailed       Key = "error.website_messenger_load_failed"
+	ErrorWebsiteMessageSendFailed         Key = "error.website_message_send_failed"
+	ErrorWebsiteMessageListFailed         Key = "error.website_message_list_failed"
+	ErrorWebsiteMessageConflict           Key = "error.website_message_conflict"
 
 	FieldOrganizationNameRequired       Key = "field.organization_name_required"
 	FieldOrganizationNameTooLong        Key = "field.organization_name_too_long"
@@ -218,6 +223,13 @@ const (
 	FieldServerURLBaseOnly              Key = "field.server_url_base_only"
 	FieldServerURLHTTPSRequired         Key = "field.server_url_https_required"
 	FieldServerURLNotCervi              Key = "field.server_url_not_cervi"
+	FieldVisitorTokenInvalid            Key = "field.visitor_token_invalid"
+	FieldChannelIDInvalid               Key = "field.channel_id_invalid"
+	FieldConversationIDInvalid          Key = "field.conversation_id_invalid"
+	FieldClientMessageIDInvalid         Key = "field.client_message_id_invalid"
+	FieldMessageBodyRequired            Key = "field.message_body_required"
+	FieldMessageBodyTooLong             Key = "field.message_body_too_long"
+	FieldMessageCursorInvalid           Key = "field.message_cursor_invalid"
 )
 
 const (

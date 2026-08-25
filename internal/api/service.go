@@ -28,13 +28,29 @@ type apiError struct {
 
 // Service 是企业服务端对外提供的 Gin HTTP 适配器。
 type Service struct {
-	application *appservice.Service
-	router      *gin.Engine
+	application         *appservice.Service
+	websiteVisitor      *appservice.WebsiteVisitorService
+	trustForwardedProto bool
+	router              *gin.Engine
+}
+
+// ServiceOption 配置企业服务端 HTTP API 的独立能力。
+type ServiceOption func(*Service)
+
+// WithWebsiteVisitor 注入匿名网站访客应用服务。
+func WithWebsiteVisitor(visitor *appservice.WebsiteVisitorService, trustForwardedProto bool) ServiceOption {
+	return func(service *Service) {
+		service.websiteVisitor = visitor
+		service.trustForwardedProto = trustForwardedProto
+	}
 }
 
 // NewService 创建企业服务端 HTTP API。
-func NewService(application *appservice.Service) *Service {
+func NewService(application *appservice.Service, options ...ServiceOption) *Service {
 	service := &Service{application: application}
+	for _, option := range options {
+		option(service)
+	}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -116,6 +132,7 @@ func NewService(application *appservice.Service) *Service {
 	router.GET("/settings/storage/s3", service.getS3Setting)
 	router.PUT("/settings/storage/s3", service.saveS3Setting)
 	router.POST("/settings/storage/s3/test", service.testS3Setting)
+	service.registerWebsiteVisitorRoutes(router)
 
 	service.router = router
 	return service

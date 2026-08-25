@@ -51,7 +51,7 @@ Conversation ──> Message *
 
 长期不变量是同一 Conversation 同时最多一个未结束 `ServiceSession`。
 
-首版网站产品还采用更严格的入站控制：同一个 `ContactChannelIdentity` 同时最多一个未结束 `ServiceSession`，因此首版最多只有一条未结束客户线程。该限制用于实现类似 Intercom “阻止多个入站会话”开启时的体验，后续开放并行线程时只删除身份级部分唯一约束，不更换 Conversation 主键和公开契约。
+PR1 按当时的首版入站方案增加同一个 `ContactChannelIdentity` 同时最多一个未结束 `ServiceSession` 的约束。后续 PR2 明确开放网站访客多会话，并通过向前迁移删除身份级部分唯一索引；Conversation 级未结束唯一约束和公开契约保持不变。
 
 为让数据库直接保证首版身份级不变量，`service_sessions` 保存 `contact_channel_identity_id`。它是用于排队查询、身份级并发锁定和部分唯一约束的明确业务维度，不是从 Conversation 任意复制的展示字段。Action 写入时必须校验：
 
@@ -69,7 +69,7 @@ ServiceSession.conversation_id
 本 PR 完成以下内容：
 
 - 增加聊天领域值。
-- 通过新增迁移把 `contacts.created_by_user_id` 改为可空，不修改联系人原建表迁移。
+- 在当前目标建表迁移中把 `contacts.created_by_user_id` 定义为可空。
 - 同步调整现有手工联系人 Action，使其继续写入当前用户编号的指针值。
 - 创建六张聊天核心表及索引。
 - 增加六张表对应的服务端 Bun 模型。
@@ -126,37 +126,11 @@ MessageType
 
 现有 `internal/domain/message.go` 中用于 Messenger 演示展示的 `MessageAuthor` 与持久化 `MessageType` 不是同一层契约，本 PR 不复用、扩展或删除它。
 
-## 5. 联系人向前迁移
+## 5. 联系人模型前提
 
 ### 5.1 创建人可空
 
-保留现有 `20260818032659_create_contacts_table.sql` 原样，新增独立向前迁移：
-
-```text
-YYYYMMDDHHMMSS_alter_contacts_created_by_user_id_nullable.sql
-```
-
-Up 使用：
-
-```sql
-ALTER TABLE contacts
-    ALTER COLUMN created_by_user_id DROP NOT NULL;
-
-COMMENT ON COLUMN contacts.created_by_user_id
-    IS '创建用户编号，渠道自动创建时为空';
-```
-
-Down 恢复原约束和原注释：
-
-```sql
-ALTER TABLE contacts
-    ALTER COLUMN created_by_user_id SET NOT NULL;
-
-COMMENT ON COLUMN contacts.created_by_user_id
-    IS '创建人编号';
-```
-
-该迁移只做目标结构变更，不写历史数据回填或双版本读写逻辑。PR1 本身不会创建 `created_by_user_id = NULL` 的联系人，因此紧接 PR1 回滚时 Down 可以恢复非空约束；PR2 已产生渠道自动联系人后，如需回滚到 PR1 之前，必须先按环境管理要求清理后续业务数据或重建数据库，不能在 Down 中伪造创建用户。
+当前阶段不考虑历史数据和已经部署的旧迁移兼容。规范化后的 `20260818032659_create_contacts_table.sql` 直接把 `created_by_user_id` 定义为可空，并使用“创建用户编号，渠道自动创建时为空”的字段注释，不再保留单独的 alter 迁移。
 
 `internal/storage/server/models.Contact.CreatedByUserID` 改为 `*string`。同步把 `CreateContactAction` 中当前用户编号转换为指针后写入，保证现有手工创建逻辑继续编译并记录创建用户。联系人 DTO、表单保存结果和列表查询不暴露该字段，不增加新的可空展示契约，也不修改 list/get 的列集。
 
@@ -468,7 +442,7 @@ COMMENT ON INDEX service_sessions_org_channel_identity_last_message_index
 两个部分唯一索引分别表达长期和首版产品不变量：
 
 - Conversation 级唯一长期保留。
-- 渠道身份级唯一在以后明确开放并行入站线程时删除。
+- 渠道身份级唯一由网站访客消息 PR 的向前迁移删除。
 
 ### 6.6 `messages`
 
@@ -549,16 +523,15 @@ COMMENT ON INDEX messages_organization_idempotency_unique
 
 ## 7. 迁移与模型规则
 
-本 PR 只增加迁移文件，不修改、重排、重命名或删除仓库中任何已有迁移。新增一条联系人字段变更迁移，六张新表分别使用一个建表迁移；建表迁移命名遵循：
+六张新表分别使用一个建表迁移；建表迁移命名遵循：
 
 ```text
 YYYYMMDDHHMMSS_create_<table>_table.sql
 ```
 
-七个新增迁移的时间戳必须晚于现有 `20260822150002`，顺序固定为：
+六个聊天迁移的时间戳必须晚于现有 `20260822150002`，顺序固定为：
 
 ```text
-alter_contacts_created_by_user_id_nullable
 chat_subjects
 conversations
 customer_conversations
@@ -567,7 +540,7 @@ service_sessions
 messages
 ```
 
-联系人字段变更迁移只调整 `contacts.created_by_user_id` 的可空性和注释。每个建表迁移只创建一张表，不创建外键和 `CHECK`。所有新增或修改的数据库对象都必须在同一迁移中写全简洁中文注释，不允许留到模型或后续迁移补充：
+每个建表迁移只创建一张表，不创建外键和 `CHECK`。所有新增或修改的数据库对象都必须在同一迁移中写全简洁中文注释，不允许留到模型或后续迁移补充：
 
 - 每张新表都有 `COMMENT ON TABLE`。
 - 每一列都有 `COMMENT ON COLUMN`，包括编号、时间、可空摘要和技术字段，不因字段含义看似明显而省略。
@@ -575,9 +548,7 @@ messages
 - `kind`、`type`、`status`、`role` 等枚举型字段的列注释必须在字段含义后列出当前全部可用值，并与 `internal/domain` 中的领域值完全一致；新增枚举值时通过新的向前迁移同步更新列注释。
 - 每个显式创建的索引都有 `COMMENT ON INDEX`。
 - 每个显式命名的约束都有 `COMMENT ON CONSTRAINT ... ON ...`。
-- 联系人变更迁移在 Up 中写入新的可空语义，在 Down 中恢复原字段注释。
-
-七个新增迁移能够在空库和已执行现有迁移的数据库中顺序执行。六个建表迁移的 Down 使用各自的 `DROP TABLE`，联系人字段变更迁移的 Down 恢复非空约束和原注释；整体按反序逐个回滚。迁移已经被其他环境应用后视为不可变，更正结构只能继续增加新的向前迁移。
+六个新增迁移能够在空库中顺序执行，Down 使用各自的 `DROP TABLE` 并按反序逐个回滚。
 
 因为迁移不创建外键，`opening_message_id` 和 `last_message_id` 可以先保存尚未插入的预生成消息编号。后续入站 Action 必须在事务外预生成所需 UUID；本 PR 不插入 Fixture 或业务行证明该写入顺序。
 
@@ -589,10 +560,9 @@ messages
 
 ### 8.1 数据库
 
-- 仓库中所有已有迁移文件保持内容、名称和顺序不变。
-- 空库和已执行现有迁移的数据库都能够继续执行一条联系人字段变更迁移和六张新表迁移，不要求 `migrate:reset`。
-- 七个新增迁移可以按反序逐个回滚；联系人字段迁移的 Down 同时恢复非空约束和原注释。
-- 每个新建表迁移只创建一张表，不包含外键和 `CHECK`；枚举可用值只写入列注释，不通过数据库约束限制；联系人字段变更迁移不创建新表。
+- 空库能够按顺序执行规范化后的联系人建表迁移和六张聊天表迁移。
+- 六个聊天迁移可以按反序逐个回滚。
+- 每个新建表迁移只创建一张表，不包含外键和 `CHECK`；枚举可用值只写入列注释，不通过数据库约束限制。
 - 每张新表、每一列、每个显式索引和每个具名约束都在所属迁移中具有简洁中文数据库注释，无遗漏或后补注释。
 - 所有枚举型字段的列注释完整列出当前可用值，并与领域值定义一致。
 - 六张新表的字段顺序均为主键、`created_at`、`updated_at`、其他业务字段，且模型完整包含两个审计时间；本 PR 不修改历史迁移来统一旧表。
@@ -627,7 +597,7 @@ messages
 ## 9. 实施顺序
 
 1. 增加聊天领域值。
-2. 新增联系人字段可空性迁移并调整 Bun 模型，同步修改 `CreateContactAction` 的指针赋值；不修改原联系人建表迁移。
+2. 在目标联系人建表迁移和 Bun 模型中把创建用户定义为可空，同步修改 `CreateContactAction` 的指针赋值。
 3. 按依赖顺序增加六张建表迁移，在各迁移中写全表、列、显式索引和具名约束的中文注释。
 4. 增加六个服务端 Bun 模型。
 5. 注释管理端手动添加外部联系人菜单项。

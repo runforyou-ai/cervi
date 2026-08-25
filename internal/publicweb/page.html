@@ -21,6 +21,13 @@
       data-default-greeting="{{.Copy.ConversationPrompt}}"
       data-default-subtitle="{{.Copy.DefaultResponse}}"
       data-preview="{{.Preview}}"
+      data-channel-id="{{.ChannelID}}"
+      data-loading="{{.Copy.Loading}}"
+      data-request-failed="{{.Copy.RequestFailed}}"
+      data-session-waiting="{{.Copy.SessionWaiting}}"
+      data-session-active="{{.Copy.SessionActive}}"
+      data-session-pending="{{.Copy.SessionPending}}"
+      data-session-closed="{{.Copy.SessionClosed}}"
     >
       {{if .NotFound}}
       <main class="cv-unavailable">
@@ -51,6 +58,10 @@
           </header>
 
           <div class="cv-home-content">
+            <div class="cv-home-status" id="cv-home-initialization-status" role="status" hidden>
+              <span id="cv-home-initialization-message">{{.Copy.Loading}}</span>
+              <button type="button" id="cv-home-initialization-retry" hidden>{{.Copy.Retry}}</button>
+            </div>
             <button class="cv-recent-card" id="cv-home-recent" type="button" data-resume-conversation hidden>
               <span class="cv-presence-avatar cv-presence-avatar-small" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></span>
               <span class="cv-conversation-summary">
@@ -121,13 +132,10 @@
               <p>{{.Copy.NoMessagesDescription}}</p>
             </div>
             <div class="cv-conversation-list" id="cv-conversation-list" hidden>
-              <button type="button" data-resume-conversation>
-                <span class="cv-presence-avatar" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></span>
-                <span class="cv-conversation-summary">
-                  <span class="cv-conversation-row"><strong data-channel-title>{{.Title}}</strong><time id="cv-list-time"></time></span>
-                  <span class="cv-conversation-row"><span id="cv-list-preview">{{.Copy.ConversationPrompt}}</span><i id="cv-list-unread-dot" aria-hidden="true" hidden></i></span>
-                </span>
-              </button>
+            </div>
+            <div class="cv-inline-error" id="cv-initialization-error" role="status" hidden>
+              <p id="cv-initialization-error-message">{{.Copy.RequestFailed}}</p>
+              <button type="button" id="cv-initialization-retry">{{.Copy.Retry}}</button>
             </div>
             <button class="cv-primary-action" type="button" data-new-conversation>
               <span>{{.Copy.StartConversation}}</span>
@@ -238,14 +246,11 @@
             </div>
           </div>
 
-          <div class="cv-waiting" id="cv-waiting" hidden>
-            <span class="cv-presence-avatar cv-presence-avatar-tiny" aria-hidden="true"><span>{{.Agent.Initials}}</span></span>
-            <span>{{.Copy.WaitingForTeam}}</span>
-          </div>
+          <p class="cv-conversation-error" id="cv-conversation-error" role="status" hidden>{{.Copy.RequestFailed}}</p>
 
           <form class="cv-composer" id="cv-composer" action="#" method="dialog">
             <div class="cv-composer-main" id="cv-composer-main">
-              <textarea id="cv-input" rows="1" maxlength="4000" aria-label="{{.Copy.Message}}"></textarea>
+              <textarea id="cv-input" rows="1" aria-label="{{.Copy.Message}}"></textarea>
               <div class="cv-composer-bar">
                 <div class="cv-composer-tools">
                   <button class="cv-tool" type="button" id="cv-attach" aria-label="{{.Copy.Attach}}" title="{{.Copy.Attach}}">

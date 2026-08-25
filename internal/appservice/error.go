@@ -47,6 +47,8 @@ func (e *Error) HTTPStatus() int {
 		return http.StatusBadRequest
 	case ErrorKindNotFound:
 		return http.StatusNotFound
+	case ErrorKindConflict:
+		return http.StatusConflict
 	case ErrorKindUnavailable:
 		return http.StatusBadGateway
 	default:
@@ -88,6 +90,13 @@ func InvalidError(meta RequestMeta, messageKey cervii18n.Key, fieldKeys map[stri
 // NotFoundError 返回资源不存在的业务错误。
 func NotFoundError(meta RequestMeta, messageKey cervii18n.Key) *Error {
 	return newError(meta, ErrorKindNotFound, "", messageKey, nil)
+}
+
+// ConflictError 返回带稳定原因码的业务冲突。
+func ConflictError(meta RequestMeta, messageKey cervii18n.Key, reason string) *Error {
+	error := newError(meta, ErrorKindConflict, "", messageKey, nil)
+	error.Fields = map[string]string{"reason": reason}
+	return error
 }
 
 // UnavailableError 返回依赖服务不可用的业务错误。

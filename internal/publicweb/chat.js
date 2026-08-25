@@ -7,6 +7,14 @@
 
   var MAX_ATTACHMENT_COUNT = 10;
   var COMPOSER_MAX_HEIGHT = 160;
+  var previewMode = messenger.getAttribute("data-preview") === "true";
+  var channelID = messenger.getAttribute("data-channel-id");
+  var visitorToken = "";
+  var initialized = previewMode;
+  var initializationPending = false;
+  var messageRequestPending = false;
+  var conversationItems = [];
+  var conversationByID = Object.create(null);
   var activeRoute = "home";
   var conversationReturnRoute = "home";
   var activeConversation = createConversation();
@@ -19,6 +27,7 @@
   var expanded = false;
   var nativeContextMenuSource = "";
   var defaultTitle = document.title;
+  var displayTitle = defaultTitle;
   var demoReply = messenger.getAttribute("data-demo-reply");
   var playVoiceLabel = messenger.getAttribute("data-play-voice");
   var pauseVoiceLabel = messenger.getAttribute("data-pause-voice");
@@ -26,6 +35,14 @@
   var collapseWindowLabel = messenger.getAttribute("data-collapse-window");
   var defaultGreeting = messenger.getAttribute("data-default-greeting");
   var defaultSubtitle = messenger.getAttribute("data-default-subtitle");
+  var loadingLabel = messenger.getAttribute("data-loading");
+  var requestFailedLabel = messenger.getAttribute("data-request-failed");
+  var sessionLabels = {
+  waiting: messenger.getAttribute("data-session-waiting"),
+  active: messenger.getAttribute("data-session-active"),
+  pending: messenger.getAttribute("data-session-pending"),
+  closed: messenger.getAttribute("data-session-closed"),
+  };
   var emojiPanel = document.getElementById("cv-emoji");
   var moreMenu = document.getElementById("cv-more-menu");
   var moreToggle = document.getElementById("cv-more-toggle");
@@ -34,7 +51,6 @@
   var composerMain = document.getElementById("cv-composer-main");
   var recording = document.getElementById("cv-recording");
   var recordTime = document.getElementById("cv-record-time");
-  var waiting = document.getElementById("cv-waiting");
   var intro = document.getElementById("cv-conversation-intro");
   var unreadDot = document.getElementById("cv-unread-dot");
   var emojis = window.CERVI_COMPOSER_EMOJIS;
@@ -86,17 +102,26 @@
     }
   }
 
-  function createConversation() {
+  function createConversation(summary) {
+    summary = summary || null;
     return {
+    id: summary ? summary.id : null,
+    title: summary ? summary.title : "",
       fragment: document.createDocumentFragment(),
-      started: false,
+    started: summary !== null,
       draft: "",
-      summary: "",
-      time: "",
+    summary: summary ? summary.preview : "",
+    time: summary ? formatTime(new Date(summary.lastMessageAt)) : "",
+    lastMessageAt: summary ? summary.lastMessageAt : "",
+    serviceSession: summary ? summary.serviceSession : null,
       unread: false,
       replyState: "none",
-      waiting: false,
       typingNode: null,
+    historyLoaded: false,
+    historyLoading: false,
+    messageIDs: Object.create(null),
+    pendingMessageID: "",
+    pendingBody: "",
     };
   }
 
@@ -115,7 +140,6 @@
 
   function stashActiveConversation() {
     activeConversation.draft = input.value;
-    activeConversation.waiting = !waiting.hidden;
     Array.from(messages.children).forEach(function (node) {
       if (node !== intro) {
         activeConversation.fragment.appendChild(node);
@@ -125,13 +149,16 @@
 
   function showConversation(conversation) {
     if (activeConversation === conversation) {
+    if (!previewMode && conversation.id && !conversation.historyLoaded && !conversation.historyLoading) {
+    loadConversationHistory(conversation);
+    }
       return;
     }
     stashActiveConversation();
     activeConversation = conversation;
     messages.appendChild(activeConversation.fragment);
-    intro.hidden = activeConversation.started;
-    waiting.hidden = !activeConversation.waiting;
+  intro.hidden = previewMode ? activeConversation.started : activeConversation.id !== null;
+    $("cv-conversation-error").hidden = true;
     input.value = activeConversation.draft;
     fileInput.value = "";
     if (!recording.hidden) {
@@ -144,9 +171,15 @@
     autosize();
     updateSendState();
     messages.scrollTop = activeConversation.started ? messages.scrollHeight : 0;
+  if (!previewMode && activeConversation.id && !activeConversation.historyLoaded) {
+    loadConversationHistory(activeConversation);
+  }
   }
 
   function beginNewConversation() {
+  if (!previewMode && !initialized) {
+    return;
+  }
     var returnRoute = activeRoute;
     showConversation(createConversation());
     conversationReturnRoute = returnRoute;
@@ -161,6 +194,17 @@
     showConversation(recentConversation);
     conversationReturnRoute = returnRoute;
     navigate("conversation");
+  }
+
+  // 打开指定的真实客户会话。
+  function resumeConversation(conversation) {
+  if (!conversation) {
+    return;
+  }
+  var returnRoute = activeRoute;
+  showConversation(conversation);
+  conversationReturnRoute = returnRoute;
+  navigate("conversation");
   }
 
   function postToParent(message) {
@@ -234,7 +278,9 @@
   }
 
   function updateSendState() {
-    sendButton.disabled = input.value.trim() === "";
+  sendButton.disabled =
+    input.value.trim() === "" ||
+    (!previewMode && (!initialized || messageRequestPending || activeConversation.historyLoading));
   }
 
   function formatTime(date) {
@@ -242,6 +288,25 @@
       hour: "2-digit",
       minute: "2-digit",
     });
+  }
+
+  // 按服务端时间和会话编号稳定比较会话新旧。
+  function compareConversationRecency(left, right) {
+  var leftTime = normalizedTimestamp(left.lastMessageAt);
+  var rightTime = normalizedTimestamp(right.lastMessageAt);
+  if (leftTime !== rightTime) {
+    return leftTime < rightTime ? 1 : -1;
+  }
+  return (right.id || "").localeCompare(left.id || "");
+  }
+
+  // 把 UTC RFC3339 的小数秒补齐，避免字符串精度不同导致排序颠倒。
+  function normalizedTimestamp(value) {
+  var match = String(value || "").match(/^(.*?)(?:\.(\d+))?Z$/);
+  if (!match) {
+    return String(value || "");
+  }
+  return match[1] + "." + (match[2] || "").padEnd(9, "0").slice(0, 9) + "Z";
   }
 
   function formatDuration(seconds) {
@@ -361,8 +426,6 @@
     }
     var conversation = activeConversation;
     conversation.replyState = "pending";
-    conversation.waiting = true;
-    waiting.hidden = false;
     window.setTimeout(function () {
       appendTyping(conversation);
     }, 320);
@@ -372,10 +435,6 @@
         conversation.typingNode = null;
       }
       conversation.replyState = "sent";
-      conversation.waiting = false;
-      if (conversation === activeConversation) {
-        waiting.hidden = true;
-      }
       appendAssistantMessage(conversation, demoReply, false);
     }, 980);
   }
@@ -385,26 +444,77 @@
     $("cv-messages-empty").hidden = hasRecentConversation;
     $("cv-conversation-list").hidden = !hasRecentConversation;
     $("cv-home-recent").hidden = !hasRecentConversation;
+  $("cv-conversation-list").innerHTML = "";
     if (!hasRecentConversation) {
+    unreadDot.hidden = true;
+    postToParent({ type: "cervi:unread", unread: false });
       return;
     }
-    $("cv-list-preview").textContent = recentConversation.summary;
-    $("cv-list-time").textContent = recentConversation.time;
+  conversationItems.forEach(function (conversation) {
+    $("cv-conversation-list").appendChild(conversationListButton(conversation));
+  });
+  $("cv-home-recent").querySelector("strong").textContent =
+    previewMode ? displayTitle : recentConversation.title;
     $("cv-home-recent-preview").textContent = recentConversation.summary;
     $("cv-home-recent-time").textContent = recentConversation.time;
-    unreadDot.hidden = !recentConversation.unread;
+  unreadDot.hidden = previewMode ? !recentConversation.unread : true;
     $("cv-home-recent-unread-dot").hidden = !recentConversation.unread;
-    $("cv-list-unread-dot").hidden = !recentConversation.unread;
-    postToParent({ type: "cervi:unread", unread: recentConversation.unread });
+  postToParent({ type: "cervi:unread", unread: previewMode && recentConversation.unread });
+  }
+
+  // 创建一条可点击的会话列表项。
+  function conversationListButton(conversation) {
+  var button = document.createElement("button");
+  button.type = "button";
+  button.setAttribute("data-conversation-id", conversation.id || "preview");
+  var avatar = document.createElement("span");
+  avatar.className = "cv-presence-avatar";
+  avatar.setAttribute("aria-hidden", "true");
+  var initials = document.createElement("span");
+  initials.textContent = document.querySelector(".cv-presence-avatar span").textContent;
+  avatar.appendChild(initials);
+  var summary = document.createElement("span");
+  summary.className = "cv-conversation-summary";
+  var titleRow = document.createElement("span");
+  titleRow.className = "cv-conversation-row";
+  var title = document.createElement("strong");
+  title.textContent = previewMode ? displayTitle : conversation.title;
+  var time = document.createElement("time");
+  time.textContent = conversation.time;
+  titleRow.appendChild(title);
+  titleRow.appendChild(time);
+  var previewRow = document.createElement("span");
+  previewRow.className = "cv-conversation-row";
+  var preview = document.createElement("span");
+  preview.textContent = conversation.summary;
+  previewRow.appendChild(preview);
+  if (!previewMode && conversation.serviceSession) {
+    var status = document.createElement("small");
+    status.textContent = sessionLabels[conversation.serviceSession.status] || "";
+    previewRow.appendChild(status);
+  }
+  summary.appendChild(titleRow);
+  summary.appendChild(previewRow);
+  button.appendChild(avatar);
+  button.appendChild(summary);
+  button.addEventListener("click", function () {
+    resumeConversation(conversation);
+  });
+  return button;
   }
 
   // 更新指定会话的摘要、时间和未读状态。
   function updateConversationSummary(conversation, preview, date) {
     conversation.summary = preview;
     conversation.time = formatTime(date);
+  conversation.lastMessageAt = date.toISOString();
     conversation.unread =
       conversation !== activeConversation || activeRoute !== "conversation" || !messengerVisible;
-    recentConversation = conversation;
+  if (conversationItems.indexOf(conversation) === -1) {
+    conversationItems.push(conversation);
+  }
+  conversationItems.sort(compareConversationRecency);
+  recentConversation = conversationItems[0];
     renderRecentConversation();
   }
 
@@ -421,12 +531,283 @@
     if (!text) {
       return;
     }
+  if (!previewMode) {
+    sendRealMessage(text);
+    return;
+  }
     appendVisitorMessage(text, []);
     input.value = "";
     autosize();
     updateSendState();
     scheduleDemoReply();
     input.focus();
+  }
+
+  // 请求网站访客 JSON 接口。
+  function requestWebsiteJSON(path, options) {
+  options = options || {};
+  options.credentials = "same-origin";
+  options.headers = options.headers || {};
+  options.headers.Accept = "application/json";
+  options.headers["Accept-Language"] = document.documentElement.lang;
+  if (visitorToken) {
+    options.headers["X-Cervi-Visitor-Token"] = visitorToken;
+  }
+  return window.fetch(path, options).then(function (response) {
+    return response.text().then(function (text) {
+    var payload = null;
+    if (text) {
+      try {
+      payload = JSON.parse(text);
+      } catch (_error) {
+      payload = null;
+      }
+    }
+    if (!response.ok) {
+      var message = payload && payload.error && payload.error.message;
+      var error = new Error(message || requestFailedLabel);
+      error.payload = payload;
+      throw error;
+    }
+    return payload;
+    });
+  });
+  }
+
+  // 将服务端摘要合并到页面会话状态。
+  function upsertRealConversation(summary, preferredConversation) {
+  var conversation = conversationByID[summary.id];
+  if (!conversation) {
+    conversation = preferredConversation || createConversation(summary);
+    conversation.id = summary.id;
+    conversation.started = true;
+    conversationByID[summary.id] = conversation;
+    conversationItems.push(conversation);
+  }
+  conversation.title = summary.title;
+  conversation.summary = summary.preview;
+  conversation.lastMessageAt = summary.lastMessageAt;
+  conversation.time = formatTime(new Date(summary.lastMessageAt));
+  conversation.serviceSession = summary.serviceSession;
+    conversationItems.sort(compareConversationRecency);
+  if (!previewMode && conversationItems.length > 20) {
+    var removed = conversationItems.pop();
+    if (removed && removed !== conversation) {
+    delete conversationByID[removed.id];
+    }
+  }
+  recentConversation = conversationItems.length > 0 ? conversationItems[0] : null;
+  return conversation;
+  }
+
+  // 初始化真实网站 Messenger。
+  function initializeRealMessenger() {
+  if (previewMode || initializationPending) {
+    return;
+  }
+  initializationPending = true;
+  initialized = false;
+  setNewConversationAvailability(false);
+  $("cv-messages-empty").hidden = true;
+  $("cv-conversation-list").hidden = true;
+  showInitializationState(loadingLabel, false);
+  requestWebsiteJSON("/api/public/website-channels/" + encodeURIComponent(channelID) + "/messenger")
+    .then(function (result) {
+    visitorToken = result.visitorToken;
+    result.conversations.forEach(function (summary) {
+      upsertRealConversation(summary, null);
+    });
+    initialized = true;
+    hideInitializationState();
+    renderRecentConversation();
+    setNewConversationAvailability(true);
+    })
+    .catch(function (error) {
+    showInitializationState(error.message || requestFailedLabel, true);
+    })
+    .finally(function () {
+    initializationPending = false;
+    updateSendState();
+    });
+  }
+
+  // 显示真实入口初始化状态。
+  function showInitializationState(message, retry) {
+  $("cv-initialization-error").hidden = false;
+  $("cv-initialization-error-message").textContent = message;
+  $("cv-initialization-retry").hidden = !retry;
+  $("cv-home-initialization-status").hidden = false;
+  $("cv-home-initialization-message").textContent = message;
+  $("cv-home-initialization-retry").hidden = !retry;
+  }
+
+  // 隐藏真实入口初始化状态。
+  function hideInitializationState() {
+  $("cv-initialization-error").hidden = true;
+  $("cv-home-initialization-status").hidden = true;
+  }
+
+  // 切换真实入口的新会话按钮可用状态。
+  function setNewConversationAvailability(available) {
+  document.querySelectorAll("[data-new-conversation]").forEach(function (button) {
+    button.disabled = !available;
+  });
+  }
+
+  // 加载指定真实客户会话最近的持久消息。
+  function loadConversationHistory(conversation) {
+  if (conversation.historyLoading || !conversation.id) {
+    return;
+  }
+  conversation.historyLoading = true;
+  var requestMarker = {};
+  conversation.historyRequest = requestMarker;
+  if (conversation === activeConversation) {
+    $("cv-conversation-error").hidden = true;
+    updateSendState();
+  }
+  requestWebsiteJSON(
+    "/api/public/website-channels/" +
+    encodeURIComponent(channelID) +
+    "/conversations/" +
+    encodeURIComponent(conversation.id) +
+    "/messages",
+  )
+    .then(function (result) {
+    if (conversation.historyRequest !== requestMarker) {
+      return;
+    }
+    clearConversationMessages(conversation);
+    result.messages.forEach(function (message) {
+      appendServerMessage(conversation, message);
+    });
+    conversation.historyLoaded = true;
+          if (conversation === activeConversation) {
+            scrollToBottom();
+          }
+    })
+    .catch(function (error) {
+    if (conversation === activeConversation && conversation.historyRequest === requestMarker) {
+      $("cv-conversation-error").textContent = error.message || requestFailedLabel;
+      $("cv-conversation-error").hidden = false;
+    }
+    })
+    .finally(function () {
+    if (conversation.historyRequest !== requestMarker) {
+      return;
+    }
+    conversation.historyLoading = false;
+    if (conversation === activeConversation) {
+      updateSendState();
+    }
+    });
+  }
+
+  // 清空指定会话现有的真实消息节点。
+  function clearConversationMessages(conversation) {
+  conversation.messageIDs = Object.create(null);
+  if (conversation === activeConversation) {
+    Array.from(messages.children).forEach(function (node) {
+    if (node !== intro) {
+      node.remove();
+    }
+    });
+    return;
+  }
+  conversation.fragment = document.createDocumentFragment();
+  }
+
+  // 把一条持久消息追加到指定会话。
+  function appendServerMessage(conversation, value) {
+  if (conversation.messageIDs[value.id]) {
+    return;
+  }
+  var message = messageContainer(value.author === "visitor" ? "visitor" : "assistant");
+  message.setAttribute("data-message-id", value.id);
+  var row = document.createElement("div");
+  row.className = "cv-message-row";
+  var bubble = document.createElement("div");
+  bubble.className = "cv-message-bubble";
+  bubble.textContent = value.body;
+  row.appendChild(bubble);
+  message.appendChild(row);
+  message.appendChild(messageMeta(new Date(value.originatedAt)));
+  conversation.messageIDs[value.id] = true;
+  appendConversationNode(conversation, message);
+  }
+
+  // 生成客户端消息编号。
+  function createClientMessageID() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return window.crypto.randomUUID();
+  }
+  var bytes = new Uint8Array(16);
+  window.crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  var hex = Array.from(bytes, function (value) {
+    return value.toString(16).padStart(2, "0");
+  }).join("");
+  return hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-" + hex.slice(12, 16) + "-" + hex.slice(16, 20) + "-" + hex.slice(20);
+  }
+
+  // 发送真实网站访客文本消息。
+  function sendRealMessage(text) {
+  if (!initialized || messageRequestPending || activeConversation.historyLoading) {
+    return;
+  }
+  var conversation = activeConversation;
+  if (conversation.pendingBody !== text || !conversation.pendingMessageID) {
+    conversation.pendingBody = text;
+    conversation.pendingMessageID = createClientMessageID();
+  }
+  messageRequestPending = true;
+  $("cv-conversation-error").hidden = true;
+  updateSendState();
+  requestWebsiteJSON("/api/public/website-channels/" + encodeURIComponent(channelID) + "/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+    clientMessageId: conversation.pendingMessageID,
+    conversationId: conversation.id,
+    body: text,
+    }),
+  })
+    .then(function (result) {
+    var wasDraft = conversation.id === null;
+    conversation = upsertRealConversation(result.conversation, conversation);
+    conversation.pendingMessageID = "";
+    conversation.pendingBody = "";
+    conversation.draft = "";
+        appendServerMessage(conversation, result.message);
+    conversation.historyLoaded = !wasDraft && conversation.historyLoaded;
+    if (conversation === activeConversation) {
+      if (input.value.trim() === text) {
+      input.value = "";
+      } else {
+      conversation.draft = input.value;
+      }
+      intro.hidden = true;
+          autosize();
+    }
+    renderRecentConversation();
+    if (wasDraft) {
+      loadConversationHistory(conversation);
+    }
+    })
+    .catch(function (error) {
+    if (conversation === activeConversation) {
+      $("cv-conversation-error").textContent = error.message || requestFailedLabel;
+      $("cv-conversation-error").hidden = false;
+    }
+    })
+    .finally(function () {
+    messageRequestPending = false;
+    updateSendState();
+    if (conversation === activeConversation) {
+      input.focus();
+    }
+    });
   }
 
   function insertEmoji(emoji) {
@@ -478,6 +859,9 @@
   }
 
   function addFiles(fileList) {
+  if (!previewMode) {
+    return;
+  }
     var files = listFiles(fileList);
     if (files.length === 0) {
       return;
@@ -582,6 +966,9 @@
   }
 
   function startRecording() {
+  if (!previewMode) {
+    return;
+  }
     closeOverlays();
     composerMain.hidden = true;
     recording.hidden = false;
@@ -667,9 +1054,11 @@
 
   function forEachConversationNode(selector, callback) {
     document.querySelectorAll(selector).forEach(callback);
-    if (recentConversation && recentConversation !== activeConversation) {
-      recentConversation.fragment.querySelectorAll(selector).forEach(callback);
+  conversationItems.forEach(function (conversation) {
+    if (conversation !== activeConversation) {
+    conversation.fragment.querySelectorAll(selector).forEach(callback);
     }
+  });
   }
 
   function applyPreviewValue(value) {
@@ -679,6 +1068,7 @@
     var themeColor = typeof value.themeColor === "string" ? value.themeColor.trim().toUpperCase() : "";
     title = title || defaultTitle;
     document.title = title;
+  displayTitle = title;
     forEachConversationNode("[data-channel-title]", function (node) {
       node.textContent = title;
     });
@@ -707,6 +1097,7 @@
       );
       document.documentElement.style.setProperty("--cv-focus", focus);
     }
+  renderRecentConversation();
   }
 
   function applyWidgetState(value) {
@@ -776,6 +1167,10 @@
 
   $("cv-help-input").addEventListener("input", filterHelp);
   input.addEventListener("input", function () {
+  if (!previewMode && activeConversation.pendingBody !== input.value.trim()) {
+    activeConversation.pendingBody = "";
+    activeConversation.pendingMessageID = "";
+  }
     autosize();
     updateSendState();
   });
@@ -787,6 +1182,9 @@
     sendMessage();
   });
   input.addEventListener("paste", function (event) {
+  if (!previewMode) {
+    return;
+  }
     var files = pastedImageFiles(event);
     if (files.length === 0) {
       return;
@@ -800,6 +1198,9 @@
   });
 
   $("cv-attach").addEventListener("click", function () {
+  if (!previewMode) {
+    return;
+  }
     fileInput.click();
   });
   fileInput.addEventListener("change", function () {
@@ -813,6 +1214,8 @@
     $("cv-emoji-toggle").setAttribute("aria-expanded", String(open));
   });
   $("cv-voice").addEventListener("click", startRecording);
+  $("cv-initialization-retry").addEventListener("click", initializeRealMessenger);
+  $("cv-home-initialization-retry").addEventListener("click", initializeRealMessenger);
   $("cv-record-cancel").addEventListener("click", function () {
     resetRecording();
   });
@@ -898,4 +1301,10 @@
     }
   });
   window.addEventListener("resize", autosize);
+  if (!previewMode) {
+    $("cv-attach").disabled = true;
+    $("cv-voice").disabled = true;
+    setNewConversationAvailability(false);
+    initializeRealMessenger();
+  }
 })();
