@@ -129,7 +129,6 @@ tasks:
   run:server:
     summary: Runs the application in server mode
     deps:
-      - db:ensure
       - env:check:server
     cmds:
       - task: common:run:server
