@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建知识库分组。
+-- 创建知识库分组表。
 CREATE TABLE knowledge_groups (
     id                  uuid PRIMARY KEY DEFAULT uuidv7(),
     knowledge_base_id   uuid NOT NULL,

@@ -1,5 +1,5 @@
 -- +goose Up
--- 创建知识库表。
+-- 创建企业知识库表。
 CREATE TABLE knowledge_bases (
     id                  uuid PRIMARY KEY DEFAULT uuidv7(),
     organization_id     uuid NOT NULL,
