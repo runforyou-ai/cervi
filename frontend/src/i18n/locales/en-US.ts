@@ -434,7 +434,6 @@ const enUS = {
     modelServices: {
       navigation: "Model services",
       title: "Model services",
-      back: "Back",
       loading: "Loading…",
       retry: "Retry",
       tabs: {
@@ -454,10 +453,12 @@ const enUS = {
         more: "More",
         loadError: "Could not load model service providers.",
         empty: "No providers support {{type}} yet",
+        modelSeparator: ", ",
+        modelOverflow: ", …",
         columns: {
           brand: "Brand",
           name: "Name",
-          capabilities: "Model types",
+          models: "Models",
           apiUrl: "API URL",
           actions: "Actions",
         },

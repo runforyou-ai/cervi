@@ -34,11 +34,18 @@ type Record struct {
 	Models []Model
 }
 
+// ModelSummary 定义供应商列表中的模型目录摘要。
+type ModelSummary struct {
+	Identifier string
+	Name       string
+	Type       domain.AIModelType
+}
+
 // Summary 定义模型服务供应商列表项。
 type Summary struct {
-	ID         string
-	Brand      domain.AIProviderBrand
-	Name       string
-	APIURL     string
-	ModelTypes []domain.AIModelType
+	ID     string
+	Brand  domain.AIProviderBrand
+	Name   string
+	APIURL string
+	Models []ModelSummary
 }

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import {
   Controller,
+  type FieldErrors,
   useFieldArray,
   useForm,
 } from "react-hook-form"
@@ -23,6 +24,7 @@ import {
   type AIProviderModelData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { FormValidationMessage } from "@/components/form/form-validation-message"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -80,6 +82,26 @@ function modelFormValue(model: AIProviderModelData) {
     maxOutputTokens:
       model.maxOutputTokens > 0 ? formatTokenCount(model.maxOutputTokens) : "",
   }
+}
+
+/** 返回模型目录中的第一条字段校验提示。 */
+function modelValidationMessage(
+  errors: FieldErrors<AIProviderFormValues>["models"],
+) {
+  if (!errors) return ""
+  if (typeof errors.message === "string") return errors.message
+  if (typeof errors.root?.message === "string") return errors.root.message
+  if (!Array.isArray(errors)) return ""
+  for (const model of errors) {
+    if (!model) continue
+    const error =
+      model.identifier ??
+      model.name ??
+      model.contextWindow ??
+      model.maxOutputTokens
+    if (typeof error?.message === "string") return error.message
+  }
+  return ""
 }
 
 /** 编辑供应商连接和模型目录。 */
@@ -322,17 +344,12 @@ export function ModelProviderFormPage({
     mode === "create"
       ? t("modelServices.form.createTitle")
       : t("modelServices.form.editTitle")
+  const modelErrorMessage = modelValidationMessage(form.formState.errors.models)
   const watchedModels = form.watch("models")
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={title}>
-        {mode === "edit" ? (
-          <Button variant="link" size="sm" asChild>
-            <Link to={listPath}>{t("modelServices.back")}</Link>
-          </Button>
-        ) : null}
-      </PageHeader>
+      <PageHeader title={title} />
       <PageContent>
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
@@ -426,8 +443,11 @@ export function ModelProviderFormPage({
 
             <section>
               <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="text-sm font-medium">
+                <h3 className="flex items-center gap-2 text-sm font-medium">
                   {t("modelServices.models.title")}
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
                 </h3>
                 <div className="flex items-center gap-3">
                   <Button
@@ -622,14 +642,16 @@ export function ModelProviderFormPage({
                   </TableBody>
                 </Table>
               </div>
+              <FormValidationMessage
+                className="mt-2"
+                message={modelErrorMessage}
+              />
             </section>
 
             <div className="flex items-center gap-2">
               <Button
                 type="submit"
-                disabled={
-                  form.formState.isSubmitting || modelFields.fields.length === 0
-                }
+                disabled={form.formState.isSubmitting}
               >
                 {form.formState.isSubmitting ? (
                   <LoaderCircleIcon className="animate-spin" />
