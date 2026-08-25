@@ -270,6 +270,7 @@ export enum ChannelType {
 
     ChannelTypeWebsite = "website",
     ChannelTypeTelegram = "telegram",
+    ChannelTypeWeChatOfficialAccount = "wechat_official_account",
 };
 
 /**

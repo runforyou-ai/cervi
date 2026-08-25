@@ -4,13 +4,14 @@ package domain
 type ChannelType string
 
 const (
-	ChannelTypeWebsite  ChannelType = "website"
-	ChannelTypeTelegram ChannelType = "telegram"
+	ChannelTypeWebsite               ChannelType = "website"
+	ChannelTypeTelegram              ChannelType = "telegram"
+	ChannelTypeWeChatOfficialAccount ChannelType = "wechat_official_account"
 )
 
 // MessageChannelTypes 返回当前支持管理的消息渠道类型。
 func MessageChannelTypes() []ChannelType {
-	return []ChannelType{ChannelTypeWebsite, ChannelTypeTelegram}
+	return []ChannelType{ChannelTypeWebsite, ChannelTypeTelegram, ChannelTypeWeChatOfficialAccount}
 }
 
 // SupportedMessageChannelType 判断消息渠道类型是否受支持。

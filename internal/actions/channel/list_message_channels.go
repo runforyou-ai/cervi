@@ -21,14 +21,14 @@ func NewListMessageChannelsQuery(db *bun.DB) *ListMessageChannelsQuery {
 	return &ListMessageChannelsQuery{db: db}
 }
 
-// Execute 返回当前企业支持管理的全部消息渠道。
+// Execute 按创建时间返回当前企业支持管理的全部消息渠道。
 func (q *ListMessageChannelsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]servermodels.Channel, error) {
 	channels := make([]servermodels.Channel, 0)
 	if err := q.db.NewSelect().
 		Model(&channels).
 		Where("c.organization_id = ?", identity.Organization.ID).
 		Where("c.type IN (?)", bun.In(domain.MessageChannelTypes())).
-		OrderExpr("c.updated_at DESC, c.id DESC").
+		OrderExpr("c.created_at ASC, c.id ASC").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("list message channels: %w", err)
 	}

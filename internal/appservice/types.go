@@ -89,8 +89,9 @@ const (
 type ChannelType string
 
 const (
-	ChannelTypeWebsite  ChannelType = ChannelType(domain.ChannelTypeWebsite)
-	ChannelTypeTelegram ChannelType = ChannelType(domain.ChannelTypeTelegram)
+	ChannelTypeWebsite               ChannelType = ChannelType(domain.ChannelTypeWebsite)
+	ChannelTypeTelegram              ChannelType = ChannelType(domain.ChannelTypeTelegram)
+	ChannelTypeWeChatOfficialAccount ChannelType = ChannelType(domain.ChannelTypeWeChatOfficialAccount)
 )
 
 // MessageAuthor 表示消息发送方。
