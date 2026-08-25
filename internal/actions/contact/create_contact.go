@@ -36,7 +36,7 @@ func (a *CreateContactAction) Execute(ctx context.Context, identity *servermodel
 		}
 		contact = &servermodels.Contact{
 			OrganizationID:  identity.Organization.ID,
-			CreatedByUserID: identity.User.ID,
+			CreatedByUserID: &identity.User.ID,
 			SourceChannelID: input.ChannelID,
 			Stage:           string(input.Stage),
 		}
