@@ -14,10 +14,10 @@ var composerEmojisJSON string
 //go:embed widget.js
 var widgetScript []byte
 
-// chromeCSS 是访客聊天页样式。
+// messengerCSS 是访客 Messenger 页面样式。
 //
-//go:embed chrome.css
-var chromeCSS string
+//go:embed messenger.css
+var messengerCSS string
 
 // pageHTML 是访客聊天页模板。
 //

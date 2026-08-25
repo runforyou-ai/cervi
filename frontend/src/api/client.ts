@@ -19,6 +19,7 @@ type ErrorCause = {
   state?: string
   message: string
   fields?: Record<string, string>
+  reason?: string
 }
 
 /** 应用服务返回的结构化业务错误。 */
@@ -26,6 +27,7 @@ export class ApiError extends Error {
   readonly kind: string
   readonly state: string
   readonly fields: Record<string, string>
+  readonly reason: string
 
   /** 创建结构化业务错误。 */
   constructor(
@@ -33,12 +35,14 @@ export class ApiError extends Error {
     state: string,
     message: string,
     fields: Record<string, string> = {},
+    reason = "",
   ) {
     super(message)
     this.name = "ApiError"
     this.kind = kind
     this.state = state
     this.fields = fields
+    this.reason = reason
   }
 }
 
@@ -148,6 +152,7 @@ function normalizeError(error: unknown) {
         cause.state ?? "",
         cause.message,
         cause.fields ?? {},
+        cause.reason ?? "",
       )
     }
     return error

@@ -57,6 +57,15 @@ func NewHTTPSEntry(config serverconfig.TLSConfig, backend serverconfig.ServerCon
 
 	backendURL := &url.URL{Scheme: "http", Host: net.JoinHostPort(proxyHost(backend.Host), strconv.Itoa(backend.Port))}
 	service.proxy = httputil.NewSingleHostReverseProxy(backendURL)
+	director := service.proxy.Director
+	service.proxy.Director = func(request *http.Request) {
+		director(request)
+		protocol := "http"
+		if request.TLS != nil {
+			protocol = "https"
+		}
+		request.Header.Set("X-Forwarded-Proto", protocol)
+	}
 	service.proxy.ErrorHandler = func(writer http.ResponseWriter, request *http.Request, err error) {
 		slog.Warn("转发 HTTPS 请求失败", "host", request.Host, "path", request.URL.Path, "error", err)
 		http.Error(writer, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)

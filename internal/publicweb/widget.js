@@ -416,5 +416,9 @@
   shadow.appendChild(panel);
   shadow.appendChild(button);
   document.documentElement.appendChild(root);
-  applyLayout();
+  if (preview) {
+    setOpen(true);
+  } else {
+    applyLayout();
+  }
 })();

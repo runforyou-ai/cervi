@@ -391,7 +391,15 @@ summary:focus-visible {
 .cv-conversation-row strong { font-size: 13px; font-weight: 650; }
 .cv-conversation-row time { color: var(--cv-muted-foreground); font-size: 11px; }
 .cv-conversation-row > span { color: var(--cv-muted-foreground); font-size: 12px; }
+.cv-conversation-row small { flex: 0 0 auto; color: var(--cv-muted-foreground); font-size: 10px; }
 .cv-conversation-row i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 999px; background: var(--cv-theme); }
+.cv-home-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--cv-surface); color: var(--cv-muted-foreground); font-size: 12px; }
+.cv-home-status button { padding: 5px 10px; border: 1px solid var(--cv-border); border-radius: 8px; background: #fff; font-weight: 620; cursor: pointer; }
+.cv-inline-error { margin: auto 0; padding: 24px 12px; color: var(--cv-muted-foreground); text-align: center; }
+.cv-inline-error p { margin: 0 0 12px; font-size: 13px; line-height: 20px; }
+.cv-inline-error button { padding: 8px 14px; border: 1px solid var(--cv-border); border-radius: 10px; background: #fff; color: var(--cv-foreground); font-weight: 620; cursor: pointer; }
+.cv-primary-action:disabled,
+.cv-start-card:disabled { opacity: 0.55; cursor: default; filter: none; transform: none; }
 
 /* 帮助 */
 .cv-help-search { flex: 0 0 auto; padding: 14px 16px; border-bottom: 1px solid var(--cv-border); }
@@ -591,16 +599,7 @@ summary:focus-visible {
 .cv-typing i:nth-child(2) { animation-delay: 120ms; }
 .cv-typing i:nth-child(3) { animation-delay: 240ms; }
 @keyframes cv-typing { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
-.cv-waiting {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 4px 16px 8px;
-  color: var(--cv-muted-foreground);
-  font-size: 11px;
-}
+.cv-conversation-error { flex: 0 0 auto; margin: 0; padding: 8px 16px; color: var(--cv-danger); font-size: 12px; line-height: 18px; text-align: center; }
 
 /* 输入区 */
 .cv-composer {
@@ -642,6 +641,7 @@ summary:focus-visible {
 .cv-send { width: 36px; height: 36px; border-radius: 999px; background: var(--cv-theme); color: var(--cv-on-theme); }
 .cv-send svg { width: 18px; height: 18px; }
 .cv-send:disabled { background: var(--cv-surface-strong); color: #b0b0b7; cursor: default; transform: none; }
+.cv-tool:disabled { opacity: 0.4; cursor: default; }
 .cv-picker {
   position: absolute;
   z-index: 14;
@@ -704,15 +704,22 @@ html.cv-embed body,
 html.cv-preview body { background: transparent; }
 
 @media (min-width: 600px) {
-  .cv-home-heading { width: min(100%, 520px); margin-right: auto; margin-left: auto; }
-  .cv-home-content { width: min(100%, 500px); margin-right: auto; margin-left: auto; }
-  .cv-messages-space,
-  .cv-help-content,
-  .cv-article-list,
-  .cv-help-contact { width: min(100%, 620px); margin-right: auto; margin-left: auto; }
-  .cv-conversation-body,
-  .cv-waiting,
-  .cv-composer { width: min(100%, 640px); margin-right: auto; margin-left: auto; }
+  html.cv-embed .cv-home-heading,
+  html.cv-preview .cv-home-heading { width: min(100%, 520px); margin-right: auto; margin-left: auto; }
+  html.cv-embed .cv-home-content,
+  html.cv-preview .cv-home-content { width: min(100%, 500px); margin-right: auto; margin-left: auto; }
+  html.cv-embed .cv-messages-space,
+  html.cv-preview .cv-messages-space,
+  html.cv-embed .cv-help-content,
+  html.cv-preview .cv-help-content,
+  html.cv-embed .cv-article-list,
+  html.cv-preview .cv-article-list,
+  html.cv-embed .cv-help-contact,
+  html.cv-preview .cv-help-contact { width: min(100%, 620px); margin-right: auto; margin-left: auto; }
+  html.cv-embed .cv-conversation-body,
+  html.cv-preview .cv-conversation-body,
+  html.cv-embed .cv-composer,
+  html.cv-preview .cv-composer { width: min(100%, 640px); margin-right: auto; margin-left: auto; }
 }
 
 @media (max-width: 640px) {

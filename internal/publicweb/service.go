@@ -26,6 +26,7 @@ type Lookup func(context.Context, string) (*channelaction.PublicWebsiteChannel, 
 
 type pageView struct {
 	Lang               string
+	ChannelID          string
 	Title              string
 	Subtitle           string
 	Agent              serviceAgentView
@@ -37,7 +38,7 @@ type pageView struct {
 	Preview            bool
 	Copy               messengerCopy
 	ThemeCSS           template.CSS
-	ChromeCSS          template.CSS
+	MessengerCSS       template.CSS
 	ComposerEmojis     template.JS
 	ChatJS             template.JS
 	FrameAncestors     string
@@ -103,7 +104,6 @@ type messengerCopy struct {
 	More                      string
 	ExpandWindow              string
 	CollapseWindow            string
-	WaitingForTeam            string
 	RecordVoice               string
 	PlayVoice                 string
 	PauseVoice                string
@@ -111,6 +111,13 @@ type messengerCopy struct {
 	CancelRecording           string
 	StopRecording             string
 	MessengerNavigation       string
+	Loading                   string
+	Retry                     string
+	RequestFailed             string
+	SessionWaiting            string
+	SessionActive             string
+	SessionPending            string
+	SessionClosed             string
 }
 
 var pageTemplate = template.Must(template.New("chat").Parse(pageHTML))
@@ -294,6 +301,7 @@ func writePage(writer http.ResponseWriter, page pageView, status int) error {
 // chatView 按渠道设置生成聊天页。
 func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale domain.Locale) pageView {
 	page := baseView(entry, parseTheme(channel.ThemeColor), locale)
+	page.ChannelID = channel.ID
 	page.Title = channel.Title
 	page.Subtitle = strings.TrimSpace(channel.Subtitle)
 	if page.Subtitle == "" {
@@ -350,7 +358,7 @@ func baseView(entry string, theme theme, locale domain.Locale) pageView {
 			Initials:   agentInitials(copy.DefaultAgentName),
 		},
 		ThemeCSS:       template.CSS(theme.rootCSS()),
-		ChromeCSS:      template.CSS(chromeCSS),
+		MessengerCSS:   template.CSS(messengerCSS),
 		ComposerEmojis: template.JS(composerEmojisJSON),
 		ChatJS:         template.JS(chatJS),
 		FrameAncestors: "*",
@@ -404,7 +412,6 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"more":                      cervii18n.MessengerMore,
 	"expandWindow":              cervii18n.MessengerExpandWindow,
 	"collapseWindow":            cervii18n.MessengerCollapseWindow,
-	"waitingForTeam":            cervii18n.MessengerWaitingForTeam,
 	"recordVoice":               cervii18n.MessengerRecordVoice,
 	"playVoice":                 cervii18n.MessengerPlayVoice,
 	"pauseVoice":                cervii18n.MessengerPauseVoice,
@@ -412,6 +419,13 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"cancelRecording":           cervii18n.MessengerCancelRecording,
 	"stopRecording":             cervii18n.MessengerStopRecording,
 	"messengerNavigation":       cervii18n.MessengerNavigation,
+	"loading":                   cervii18n.MessengerLoading,
+	"retry":                     cervii18n.MessengerRetry,
+	"requestFailed":             cervii18n.MessengerRequestFailed,
+	"sessionWaiting":            cervii18n.MessengerSessionWaiting,
+	"sessionActive":             cervii18n.MessengerSessionActive,
+	"sessionPending":            cervii18n.MessengerSessionPending,
+	"sessionClosed":             cervii18n.MessengerSessionClosed,
 }
 
 // localizedMessengerCopy 返回 Messenger 固定文案。
@@ -462,7 +476,6 @@ func localizedMessengerCopy(locale domain.Locale) messengerCopy {
 		More:                      messages["more"],
 		ExpandWindow:              messages["expandWindow"],
 		CollapseWindow:            messages["collapseWindow"],
-		WaitingForTeam:            messages["waitingForTeam"],
 		RecordVoice:               messages["recordVoice"],
 		PlayVoice:                 messages["playVoice"],
 		PauseVoice:                messages["pauseVoice"],
@@ -470,6 +483,13 @@ func localizedMessengerCopy(locale domain.Locale) messengerCopy {
 		CancelRecording:           messages["cancelRecording"],
 		StopRecording:             messages["stopRecording"],
 		MessengerNavigation:       messages["messengerNavigation"],
+		Loading:                   messages["loading"],
+		Retry:                     messages["retry"],
+		RequestFailed:             messages["requestFailed"],
+		SessionWaiting:            messages["sessionWaiting"],
+		SessionActive:             messages["sessionActive"],
+		SessionPending:            messages["sessionPending"],
+		SessionClosed:             messages["sessionClosed"],
 	}
 }
 

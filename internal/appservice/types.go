@@ -31,6 +31,7 @@ type ErrorKind string
 const (
 	ErrorKindInvalid     ErrorKind = "invalid"
 	ErrorKindNotFound    ErrorKind = "not_found"
+	ErrorKindConflict    ErrorKind = "conflict"
 	ErrorKindUnavailable ErrorKind = "unavailable"
 	ErrorKindFailed      ErrorKind = "failed"
 )

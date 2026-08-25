@@ -42,7 +42,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles)
 	boundService := appservice.New(directBackend)
-	httpAPI := api.NewService(boundService)
+	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB())
+	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
+	httpAPI := api.NewService(boundService, api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"))
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
 
 	return []application.Service{
