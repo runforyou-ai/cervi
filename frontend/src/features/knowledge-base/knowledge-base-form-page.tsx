@@ -50,7 +50,7 @@ const difyDocFormCategories: Record<
   qa_model: KnowledgeBaseCategory.KnowledgeBaseCategoryQA,
 }
 
-/** Dify API 接入前使用的固定连接和知识库选项。 */
+/** 固定的 Dify 演示连接和知识库选项。 */
 const demoDifyIntegrationConnectionId =
   "019c91a2-7b4e-7e52-a1c9-6f0d8b3a2e14"
 const demoDifyKnowledgeBases = [
@@ -334,18 +334,16 @@ export function KnowledgeBaseFormPage({
                           required
                           aria-invalid={fieldState.invalid}
                           onChange={(event) => {
-                            field.onChange(event)
                             const selectedKnowledgeBase =
-                              demoDifyKnowledgeBases.find(
-                                ({ id }) => id === event.target.value,
-                              )
-                            if (selectedKnowledgeBase) {
-                              setCategory(
-                                difyDocFormCategories[
-                                  selectedKnowledgeBase.docForm
-                                ],
-                              )
-                            }
+                              demoDifyKnowledgeBases[
+                                event.currentTarget.selectedIndex
+                              ]
+                            field.onChange(event)
+                            setCategory(
+                              difyDocFormCategories[
+                                selectedKnowledgeBase.docForm
+                              ],
+                            )
                           }}
                         >
                           {demoDifyKnowledgeBases.map((knowledgeBase) => (

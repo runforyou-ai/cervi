@@ -8,7 +8,7 @@ export const knowledgeBaseNameMaxLength = 120
 export const knowledgeBaseDescriptionMaxLength = 1000
 
 /** 外部知识库编号允许的最大字符数。 */
-export const knowledgeBaseExternalResourceIdMaxLength = 512
+const knowledgeBaseExternalResourceIdMaxLength = 512
 
 /** 知识库表单校验规则。 */
 export function createKnowledgeBaseSchema(
@@ -20,7 +20,7 @@ export function createKnowledgeBaseSchema(
     externalResourceRequired: string
     externalResourceTooLong: string
   },
-  external = false,
+  isExternal: boolean,
 ) {
   return z.object({
     name: z
@@ -38,11 +38,11 @@ export function createKnowledgeBaseSchema(
     integrationConnectionId: z
       .string()
       .trim()
-      .min(external ? 1 : 0, messages.integrationRequired),
+      .min(isExternal ? 1 : 0, messages.integrationRequired),
     externalResourceId: z
       .string()
       .trim()
-      .min(external ? 1 : 0, messages.externalResourceRequired)
+      .min(isExternal ? 1 : 0, messages.externalResourceRequired)
       .max(
         knowledgeBaseExternalResourceIdMaxLength,
         messages.externalResourceTooLong,

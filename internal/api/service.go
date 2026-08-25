@@ -551,7 +551,7 @@ func (s *Service) updateKnowledgeGroup(c *gin.Context) {
 	writeResult(c, http.StatusOK, knowledgeBase, err)
 }
 
-// deleteKnowledgeGroup 删除空知识库分组。
+// deleteKnowledgeGroup 删除不含子分组的知识库分组。
 func (s *Service) deleteKnowledgeGroup(c *gin.Context) {
 	knowledgeBase, err := s.application.DeleteKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("groupID"))
 	writeResult(c, http.StatusOK, knowledgeBase, err)

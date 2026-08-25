@@ -433,7 +433,7 @@ func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.Reques
 // GetKnowledgeBase 返回远程企业知识库详情。
 func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, knowledgeBasePath(knowledgeBaseID), nil, nil, &output)
 	return output, err
 }
 
@@ -447,13 +447,13 @@ func (b *Backend) CreateKnowledgeBase(ctx context.Context, meta appservice.Reque
 // UpdateKnowledgeBase 修改远程企业知识库。
 func (b *Backend) UpdateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodPatch, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPatch, knowledgeBasePath(knowledgeBaseID), nil, input, &output)
 	return output, err
 }
 
 // DeleteKnowledgeBase 删除远程企业知识库。
 func (b *Backend) DeleteKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, nil)
+	return b.do(ctx, meta, http.MethodDelete, knowledgeBasePath(knowledgeBaseID), nil, nil, nil)
 }
 
 // CreateKnowledgeGroup 创建远程知识库分组。

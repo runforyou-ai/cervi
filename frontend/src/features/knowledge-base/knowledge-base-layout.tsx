@@ -54,7 +54,7 @@ type DeleteGroupTarget = {
   group: KnowledgeGroupData
 }
 
-/** 显示知识库资源树和当前基础管理页面。 */
+/** 显示知识库资源树和管理页面。 */
 export function KnowledgeBaseLayout() {
   const { t } = useTranslation("knowledgeBase")
   const location = useLocation()
@@ -76,6 +76,7 @@ export function KnowledgeBaseLayout() {
     location.pathname === "/knowledge-bases" ||
     location.pathname === "/knowledge-bases/"
 
+  // 路由变化时保持列表加载函数稳定，避免返回表单时重新加载侧栏。
   useEffect(() => {
     navigateRef.current = navigate
   }, [navigate])
@@ -148,7 +149,7 @@ export function KnowledgeBaseLayout() {
     }
   }
 
-  /** 删除空分组并刷新当前知识库树。 */
+  /** 删除不含子分组的分组并刷新知识库树。 */
   async function confirmDeleteGroup() {
     if (!deletingGroup || deleting) return
     const target = deletingGroup

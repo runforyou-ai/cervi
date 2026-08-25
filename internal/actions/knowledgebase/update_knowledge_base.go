@@ -37,6 +37,7 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		}
 		result, err := tx.NewUpdate().Model((*servermodels.KnowledgeBase)(nil)).
 			Set("name = ?", input.Name).
+			Set("category = ?", input.Category).
 			Set("description = ?", input.Description).
 			Set("integration_connection_id = ?", optionalString(input.IntegrationConnectionID)).
 			Set("external_resource_id = ?", optionalString(input.ExternalResourceID)).

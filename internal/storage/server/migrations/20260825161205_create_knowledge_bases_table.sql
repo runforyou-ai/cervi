@@ -18,7 +18,7 @@ COMMENT ON COLUMN knowledge_bases.id IS '知识库编号';
 COMMENT ON COLUMN knowledge_bases.organization_id IS '所属企业编号';
 COMMENT ON COLUMN knowledge_bases.created_by_user_id IS '创建用户编号';
 COMMENT ON COLUMN knowledge_bases.name IS '知识库名称';
-COMMENT ON COLUMN knowledge_bases.category IS '知识库类型：standard 文档库、qa 问答库';
+COMMENT ON COLUMN knowledge_bases.category IS '内容类型：standard 文档库、qa 问答库';
 COMMENT ON COLUMN knowledge_bases.description IS '知识库描述';
 COMMENT ON COLUMN knowledge_bases.integration_connection_id IS '外部知识库使用的集成连接编号';
 COMMENT ON COLUMN knowledge_bases.external_resource_id IS '外部平台中的知识库编号';

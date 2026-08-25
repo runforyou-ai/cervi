@@ -735,7 +735,7 @@ type TeamList struct {
 	Page  PageInfo `json:"page"`
 }
 
-// KnowledgeBaseCategory 表示知识库类型。
+// KnowledgeBaseCategory 表示知识库内容类型。
 type KnowledgeBaseCategory string
 
 const (

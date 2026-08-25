@@ -384,7 +384,7 @@ export function updateKnowledgeGroup(
   )
 }
 const deleteKnowledgeGroupBound = bind(DeleteKnowledgeGroup)
-/** 删除空知识库分组。 */
+/** 删除不含子分组的知识库分组。 */
 export function deleteKnowledgeGroup(
   knowledgeBaseId: string,
   groupId: string,

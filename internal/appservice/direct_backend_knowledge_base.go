@@ -56,7 +56,7 @@ func (b *DirectBackend) CreateKnowledgeBase(ctx context.Context, meta RequestMet
 	if err != nil {
 		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseCreateFailed, identity.Organization.ID, "")
 	}
-	slog.Info("知识库创建成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "external", record.IntegrationConnectionID != "")
+	slog.Info("知识库创建成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "category", record.Category, "external", record.IntegrationConnectionID != "")
 	return knowledgeBaseFromAction(*record), nil
 }
 
@@ -73,7 +73,7 @@ func (b *DirectBackend) UpdateKnowledgeBase(ctx context.Context, meta RequestMet
 	if err != nil {
 		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseUpdateFailed, identity.Organization.ID, knowledgeBaseID)
 	}
-	slog.Info("知识库保存成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "external", record.IntegrationConnectionID != "")
+	slog.Info("知识库保存成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "category", record.Category, "external", record.IntegrationConnectionID != "")
 	return knowledgeBaseFromAction(*record), nil
 }
 
@@ -118,7 +118,7 @@ func (b *DirectBackend) UpdateKnowledgeGroup(ctx context.Context, meta RequestMe
 	return knowledgeBaseFromAction(*record), nil
 }
 
-// DeleteKnowledgeGroup 删除空知识库分组。
+// DeleteKnowledgeGroup 删除不含子分组的知识库分组。
 func (b *DirectBackend) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID, groupID string) (KnowledgeBase, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

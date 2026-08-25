@@ -475,7 +475,7 @@ func (s *Service) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, kn
 	return s.backend.UpdateKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID, input)
 }
 
-// DeleteKnowledgeGroup 删除空知识库分组。
+// DeleteKnowledgeGroup 删除不含子分组的知识库分组。
 func (s *Service) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID, groupID string) (KnowledgeBase, error) {
 	return s.backend.DeleteKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID)
 }

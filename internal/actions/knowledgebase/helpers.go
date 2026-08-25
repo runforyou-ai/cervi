@@ -81,6 +81,9 @@ func loadGroupRecords(ctx context.Context, db bun.IDB, knowledgeBaseID string) (
 
 // loadKnowledgeGroup 读取当前企业知识库中的分组。
 func loadKnowledgeGroup(ctx context.Context, db bun.IDB, organizationID, knowledgeBaseID, groupID string) (*servermodels.KnowledgeGroup, error) {
+	if !common.ValidUUID(knowledgeBaseID) {
+		return nil, ErrNotFound
+	}
 	if !common.ValidUUID(groupID) {
 		return nil, ErrGroupNotFound
 	}

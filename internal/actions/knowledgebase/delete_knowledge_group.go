@@ -10,7 +10,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// DeleteKnowledgeGroupAction 删除知识库空分组。
+// DeleteKnowledgeGroupAction 删除知识库分组。
 type DeleteKnowledgeGroupAction struct{ db *bun.DB }
 
 // NewDeleteKnowledgeGroupAction 创建知识库分组删除操作。

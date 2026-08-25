@@ -4,6 +4,7 @@ package knowledgebase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -73,8 +74,11 @@ func validGroupParent(ctx context.Context, db bun.IDB, organizationID, knowledge
 		return nil, ErrGroupInvalid
 	}
 	parent, err := loadKnowledgeGroup(ctx, db, organizationID, knowledgeBaseID, parentID)
-	if err != nil {
+	if errors.Is(err, ErrGroupNotFound) {
 		return nil, ErrGroupInvalid
+	}
+	if err != nil {
+		return nil, err
 	}
 	if parent.IsDefault || parent.ParentID != nil {
 		return nil, ErrGroupInvalid

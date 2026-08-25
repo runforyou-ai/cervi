@@ -39,6 +39,14 @@ func TestNormalizeInput(t *testing.T) {
 	if fields["integrationConnectionId"] != ValidationIntegrationConnectionInvalid || fields["externalResourceId"] != ValidationExternalResourceRequired {
 		t.Fatalf("fields = %#v", fields)
 	}
+	_, fields = normalizeInput(Input{
+		Name:               "外部知识",
+		Category:           domain.KnowledgeBaseCategoryStandard,
+		ExternalResourceID: "remote-dataset",
+	})
+	if fields["integrationConnectionId"] != ValidationIntegrationConnectionInvalid {
+		t.Fatalf("fields = %#v", fields)
+	}
 	input, fields = normalizeInput(Input{
 		Name:                    "外部知识",
 		Category:                domain.KnowledgeBaseCategoryStandard,
