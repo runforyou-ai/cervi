@@ -423,6 +423,65 @@ func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, t
 	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID), nil, nil, nil)
 }
 
+// ListKnowledgeBases 返回远程企业知识库列表。
+func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.RequestMeta) (appservice.KnowledgeBaseList, error) {
+	var output appservice.KnowledgeBaseList
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases", nil, nil, &output)
+	return output, err
+}
+
+// GetKnowledgeBase 返回远程企业知识库详情。
+func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodGet, knowledgeBasePath(knowledgeBaseID), nil, nil, &output)
+	return output, err
+}
+
+// CreateKnowledgeBase 创建远程企业知识库。
+func (b *Backend) CreateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases", nil, input, &output)
+	return output, err
+}
+
+// UpdateKnowledgeBase 修改远程企业知识库。
+func (b *Backend) UpdateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodPatch, knowledgeBasePath(knowledgeBaseID), nil, input, &output)
+	return output, err
+}
+
+// DeleteKnowledgeBase 删除远程企业知识库。
+func (b *Backend) DeleteKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) error {
+	return b.do(ctx, meta, http.MethodDelete, knowledgeBasePath(knowledgeBaseID), nil, nil, nil)
+}
+
+// CreateKnowledgeGroup 创建远程知识库分组。
+func (b *Backend) CreateKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeGroupInput) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodPost, knowledgeBasePath(knowledgeBaseID)+"/groups", nil, input, &output)
+	return output, err
+}
+
+// UpdateKnowledgeGroup 修改远程知识库分组。
+func (b *Backend) UpdateKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID, groupID string, input appservice.KnowledgeGroupInput) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodPatch, knowledgeBasePath(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, input, &output)
+	return output, err
+}
+
+// DeleteKnowledgeGroup 删除远程知识库分组。
+func (b *Backend) DeleteKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID, groupID string) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodDelete, knowledgeBasePath(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, nil, &output)
+	return output, err
+}
+
+// knowledgeBasePath 返回远程知识库路径。
+func knowledgeBasePath(knowledgeBaseID string) string {
+	return "/knowledge-bases/" + url.PathEscape(knowledgeBaseID)
+}
+
 // ListTeamMembers 返回远程团队成员列表。
 func (b *Backend) ListTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberListInput) (appservice.TeamMemberList, error) {
 	query := url.Values{}

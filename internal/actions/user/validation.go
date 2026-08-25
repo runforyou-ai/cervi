@@ -46,8 +46,9 @@ func normalizeCreateInput(input CreateInput) (CreateInput, map[string]Validation
 	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
 	input.DisplayName = profile.DisplayName
 	input.Email = profile.Email
-	input.RoleID = strings.TrimSpace(input.RoleID)
-	if !common.ValidUUID(input.RoleID) {
+	var roleIDValid bool
+	input.RoleID, roleIDValid = common.NormalizeUUID(input.RoleID)
+	if !roleIDValid {
 		fields["roleId"] = ValidationRoleInvalid
 	}
 	switch err := commonpassword.Validate(input.Password); {
@@ -64,8 +65,9 @@ func normalizeUpdateInput(input UpdateInput) (UpdateInput, map[string]Validation
 	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
 	input.DisplayName = profile.DisplayName
 	input.Email = profile.Email
-	input.RoleID = strings.TrimSpace(input.RoleID)
-	if !common.ValidUUID(input.RoleID) {
+	var roleIDValid bool
+	input.RoleID, roleIDValid = common.NormalizeUUID(input.RoleID)
+	if !roleIDValid {
 		fields["roleId"] = ValidationRoleInvalid
 	}
 	return input, fields

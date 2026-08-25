@@ -129,15 +129,11 @@ func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) 
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
 	input.MethodType = domain.ContactMethodType(strings.TrimSpace(string(input.MethodType)))
 	input.Sort = domain.ContactSort(strings.TrimSpace(string(input.Sort)))
-	if input.Page <= 0 {
-		input.Page = 1
-	}
-	if input.PageSize <= 0 {
-		input.PageSize = 50
-	}
+	var pageValid bool
+	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
 
 	fields := make(map[string]ValidationCode)
-	if input.PageSize > 100 {
+	if !pageValid {
 		fields["pageSize"] = ValidationQueryInvalid
 	}
 	if input.Stage != "" && input.Stage != domain.ContactStageVisitor && input.Stage != domain.ContactStageLead && input.Stage != domain.ContactStageCustomer {

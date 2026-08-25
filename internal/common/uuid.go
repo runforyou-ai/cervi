@@ -8,6 +8,38 @@ import (
 
 // ValidUUID 判断记录标识是否为规范 UUID。
 func ValidUUID(value string) bool {
+	_, valid := canonicalUUID(value)
+	return valid
+}
+
+// NormalizeUUID 去除记录标识首尾空白并返回规范的小写 UUID。
+func NormalizeUUID(value string) (string, bool) {
+	return canonicalUUID(strings.TrimSpace(value))
+}
+
+// NormalizeUUIDs 规范化记录标识列表、保持顺序并去重。
+func NormalizeUUIDs(values []string) ([]string, bool) {
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		normalized, valid := NormalizeUUID(value)
+		if !valid {
+			return nil, false
+		}
+		if _, exists := seen[normalized]; exists {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+	return result, true
+}
+
+// canonicalUUID 校验并返回规范的小写 UUID。
+func canonicalUUID(value string) (string, bool) {
 	parsed, err := uuid.Parse(value)
-	return err == nil && strings.EqualFold(parsed.String(), value)
+	if err != nil || !strings.EqualFold(parsed.String(), value) {
+		return "", false
+	}
+	return parsed.String(), true
 }

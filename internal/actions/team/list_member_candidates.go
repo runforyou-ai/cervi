@@ -24,9 +24,9 @@ func NewListMemberCandidatesQuery(db *bun.DB) *ListMemberCandidatesQuery {
 // Execute 返回尚未加入指定团队的企业身份分页列表。
 func (q *ListMemberCandidatesQuery) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, input MemberCandidateInput) (MemberCandidateOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
-	var valid bool
-	input.Page, input.PageSize, valid = normalizePage(input.Page, input.PageSize)
-	if !valid {
+	var pageValid bool
+	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
+	if !pageValid {
 		return MemberCandidateOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
 	}
 	if err := validateIdentity(ctx, q.db, identity); err != nil {

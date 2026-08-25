@@ -34,14 +34,3 @@ func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
 	}
 	return input, fields
 }
-
-// normalizePage 规范化并校验分页条件。
-func normalizePage(page, pageSize int) (int, int, bool) {
-	if page <= 0 {
-		page = 1
-	}
-	if pageSize <= 0 {
-		pageSize = 50
-	}
-	return page, pageSize, pageSize <= 100
-}

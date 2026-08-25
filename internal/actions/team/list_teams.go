@@ -25,9 +25,9 @@ func (q *ListTeamsQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		return ListOutput{}, err
 	}
 	input.Query = strings.TrimSpace(input.Query)
-	var valid bool
-	input.Page, input.PageSize, valid = normalizePage(input.Page, input.PageSize)
-	if !valid {
+	var pageValid bool
+	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
+	if !pageValid {
 		return ListOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
 	}
 	apply := func(query *bun.SelectQuery) *bun.SelectQuery {

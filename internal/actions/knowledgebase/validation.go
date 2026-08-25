@@ -1,0 +1,76 @@
+//go:build server
+
+package knowledgebase
+
+import (
+	"strings"
+	"unicode/utf8"
+
+	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
+)
+
+const (
+	ValidationNameRequired                 common.FieldCode = "KNOWLEDGE_BASE_NAME_REQUIRED"
+	ValidationNameTooLong                  common.FieldCode = "KNOWLEDGE_BASE_NAME_TOO_LONG"
+	ValidationNameDuplicate                common.FieldCode = "KNOWLEDGE_BASE_NAME_DUPLICATE"
+	ValidationCategoryInvalid              common.FieldCode = "KNOWLEDGE_BASE_CATEGORY_INVALID"
+	ValidationDescriptionTooLong           common.FieldCode = "KNOWLEDGE_BASE_DESCRIPTION_TOO_LONG"
+	ValidationIntegrationConnectionInvalid common.FieldCode = "KNOWLEDGE_BASE_INTEGRATION_CONNECTION_INVALID"
+	ValidationExternalResourceRequired     common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_REQUIRED"
+	ValidationExternalResourceTooLong      common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_TOO_LONG"
+	ValidationExternalResourceDuplicate    common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_DUPLICATE"
+	ValidationGroupNameRequired            common.FieldCode = "KNOWLEDGE_GROUP_NAME_REQUIRED"
+	ValidationGroupNameTooLong             common.FieldCode = "KNOWLEDGE_GROUP_NAME_TOO_LONG"
+	ValidationGroupNameDuplicate           common.FieldCode = "KNOWLEDGE_GROUP_NAME_DUPLICATE"
+	ValidationGroupParentInvalid           common.FieldCode = "KNOWLEDGE_GROUP_PARENT_INVALID"
+)
+
+// normalizeInput 规范化并校验知识库字段。
+func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.Description = strings.TrimSpace(input.Description)
+	input.IntegrationConnectionID = strings.TrimSpace(input.IntegrationConnectionID)
+	input.ExternalResourceID = strings.TrimSpace(input.ExternalResourceID)
+	fields := make(map[string]common.FieldCode)
+	if input.Name == "" {
+		fields["name"] = ValidationNameRequired
+	} else if utf8.RuneCountInString(input.Name) > domain.KnowledgeBaseNameMaxLength {
+		fields["name"] = ValidationNameTooLong
+	}
+	if input.Category != domain.KnowledgeBaseCategoryStandard && input.Category != domain.KnowledgeBaseCategoryQA {
+		fields["category"] = ValidationCategoryInvalid
+	}
+	if utf8.RuneCountInString(input.Description) > domain.KnowledgeBaseDescriptionMaxLength {
+		fields["description"] = ValidationDescriptionTooLong
+	}
+	hasIntegration := input.IntegrationConnectionID != ""
+	hasExternalResource := input.ExternalResourceID != ""
+	if hasIntegration && !common.ValidUUID(input.IntegrationConnectionID) {
+		fields["integrationConnectionId"] = ValidationIntegrationConnectionInvalid
+	} else if !hasIntegration && hasExternalResource {
+		fields["integrationConnectionId"] = ValidationIntegrationConnectionInvalid
+	}
+	if hasIntegration && !hasExternalResource {
+		fields["externalResourceId"] = ValidationExternalResourceRequired
+	} else if utf8.RuneCountInString(input.ExternalResourceID) > domain.KnowledgeBaseExternalResourceIDMaxLength {
+		fields["externalResourceId"] = ValidationExternalResourceTooLong
+	}
+	return input, fields
+}
+
+// normalizeGroupInput 规范化并校验知识库分组字段。
+func normalizeGroupInput(input GroupInput) (GroupInput, map[string]common.FieldCode) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.ParentID = strings.TrimSpace(input.ParentID)
+	fields := make(map[string]common.FieldCode)
+	if input.Name == "" {
+		fields["name"] = ValidationGroupNameRequired
+	} else if utf8.RuneCountInString(input.Name) > domain.KnowledgeGroupNameMaxLength {
+		fields["name"] = ValidationGroupNameTooLong
+	}
+	if input.ParentID != "" && !common.ValidUUID(input.ParentID) {
+		fields["parentId"] = ValidationGroupParentInvalid
+	}
+	return input, fields
+}

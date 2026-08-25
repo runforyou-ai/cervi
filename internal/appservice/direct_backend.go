@@ -15,6 +15,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
@@ -70,6 +71,14 @@ type DirectBackend struct {
 	createTeam                        *teamaction.CreateTeamAction
 	updateTeam                        *teamaction.UpdateTeamAction
 	deleteTeam                        *teamaction.DeleteTeamAction
+	listKnowledgeBases                *knowledgebaseaction.ListKnowledgeBasesQuery
+	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
+	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
+	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
+	deleteKnowledgeBase               *knowledgebaseaction.DeleteKnowledgeBaseAction
+	createKnowledgeGroup              *knowledgebaseaction.CreateKnowledgeGroupAction
+	updateKnowledgeGroup              *knowledgebaseaction.UpdateKnowledgeGroupAction
+	deleteKnowledgeGroup              *knowledgebaseaction.DeleteKnowledgeGroupAction
 	listTeamMembers                   *teamaction.ListMembersQuery
 	listTeamMemberCandidates          *teamaction.ListMemberCandidatesQuery
 	addTeamMembers                    *teamaction.AddMembersAction
@@ -144,6 +153,14 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		createTeam:                        teamaction.NewCreateTeamAction(db),
 		updateTeam:                        teamaction.NewUpdateTeamAction(db),
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
+		listKnowledgeBases:                knowledgebaseaction.NewListKnowledgeBasesQuery(db),
+		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
+		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
+		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),
+		deleteKnowledgeBase:               knowledgebaseaction.NewDeleteKnowledgeBaseAction(db),
+		createKnowledgeGroup:              knowledgebaseaction.NewCreateKnowledgeGroupAction(db),
+		updateKnowledgeGroup:              knowledgebaseaction.NewUpdateKnowledgeGroupAction(db),
+		deleteKnowledgeGroup:              knowledgebaseaction.NewDeleteKnowledgeGroupAction(db),
 		listTeamMembers:                   teamaction.NewListMembersQuery(db),
 		listTeamMemberCandidates:          teamaction.NewListMemberCandidatesQuery(db),
 		addTeamMembers:                    teamaction.NewAddMembersAction(db),

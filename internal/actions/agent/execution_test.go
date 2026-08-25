@@ -12,12 +12,12 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// TestNormalizeExecutionInputTrimsValues 验证平台托管执行配置文本字段会被规范化。
-func TestNormalizeExecutionInputTrimsValues(t *testing.T) {
+// TestNormalizeExecutionInputNormalizesValues 验证平台托管执行配置字段会被规范化。
+func TestNormalizeExecutionInputNormalizesValues(t *testing.T) {
 	input, err := normalizeExecutionInput(ExecutionInput{
 		Mode: domain.AgentExecutionModeManaged,
 		Managed: &ManagedExecutionInput{
-			ProviderID:        " 019c7f37-8c0b-7ef0-8eca-cb672194d28d ",
+			ProviderID:        " 019C7F37-8C0B-7EF0-8ECA-CB672194D28D ",
 			ModelIdentifier:   " chat-model ",
 			SystemInstruction: " 负责回答产品问题。 ",
 		},

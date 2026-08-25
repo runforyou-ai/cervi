@@ -20,7 +20,7 @@ func NewRemoveMembersAction(db *bun.DB) *RemoveMembersAction {
 	return &RemoveMembersAction{db: db}
 }
 
-// Execute 在同一事务中解除多名成员与团队的关系。
+// Execute 规范化并校验成员后批量解除团队关系。
 func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, members []MemberIdentity) (*TeamRecord, error) {
 	var team *TeamRecord
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -32,9 +32,11 @@ func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodel
 		}
 		unique := make(map[string]MemberIdentity, len(members))
 		for _, member := range members {
-			if (member.IdentityType != domain.OrganizationIdentityTypeUser && member.IdentityType != domain.OrganizationIdentityTypeAgent) || !common.ValidUUID(member.IdentityID) {
+			identityID, identityIDValid := common.NormalizeUUID(member.IdentityID)
+			if (member.IdentityType != domain.OrganizationIdentityTypeUser && member.IdentityType != domain.OrganizationIdentityTypeAgent) || !identityIDValid {
 				return ErrMemberInvalid
 			}
+			member.IdentityID = identityID
 			unique[member.IdentityID] = member
 		}
 		if len(unique) == 0 {
