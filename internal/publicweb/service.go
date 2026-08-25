@@ -38,7 +38,7 @@ type pageView struct {
 	Preview            bool
 	Copy               messengerCopy
 	ThemeCSS           template.CSS
-	ChromeCSS          template.CSS
+	MessengerCSS       template.CSS
 	ComposerEmojis     template.JS
 	ChatJS             template.JS
 	FrameAncestors     string
@@ -358,7 +358,7 @@ func baseView(entry string, theme theme, locale domain.Locale) pageView {
 			Initials:   agentInitials(copy.DefaultAgentName),
 		},
 		ThemeCSS:       template.CSS(theme.rootCSS()),
-		ChromeCSS:      template.CSS(chromeCSS),
+		MessengerCSS:   template.CSS(messengerCSS),
 		ComposerEmojis: template.JS(composerEmojisJSON),
 		ChatJS:         template.JS(chatJS),
 		FrameAncestors: "*",

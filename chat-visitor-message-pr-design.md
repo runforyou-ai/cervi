@@ -35,7 +35,7 @@ messages
 
 ### 2.2 当前 Messenger
 
-网站访客 Messenger 位于 `internal/publicweb`。独立链接使用 `/chat/{channelID}`，嵌入页面使用 `/embed/widget/{channelID}`；两个入口共用 `page.html`、`chat.js` 和 `chrome.css`。
+网站访客 Messenger 位于 `internal/publicweb`。独立链接使用 `/chat/{channelID}`，嵌入页面使用 `/embed/widget/{channelID}`；两个入口共用 `page.html`、`chat.js` 和 `messenger.css`。
 
 当前行为包括：
 
