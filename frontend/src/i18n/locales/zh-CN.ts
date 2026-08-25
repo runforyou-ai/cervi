@@ -260,11 +260,11 @@ const zhCN = {
         instructionRequired: "请输入工作指令。",
         instructionTooLong: "工作指令不能超过 20000 个字符。",
       },
-      capability: {
-        title: "能力设置",
+      execution: {
+        title: "运行配置",
         model: "对话模型",
         instruction: "工作指令",
-        saveError: "保存能力设置失败，请重试。",
+        saveError: "保存运行配置失败，请重试。",
         modelSelect: "选择对话模型",
         modelLoading: "正在加载模型…",
         modelLoadError: "读取对话模型失败。",

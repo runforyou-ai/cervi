@@ -100,7 +100,7 @@ export function AgentModelField<TValues extends FieldValues>({
         <Field data-invalid={fieldState.invalid}>
           {hideLabel ? null : (
             <FieldLabel htmlFor={`${name}-select`} required>
-              {t("agents.capability.model")}
+              {t("agents.execution.model")}
             </FieldLabel>
           )}
           <NativeSelect
@@ -109,7 +109,7 @@ export function AgentModelField<TValues extends FieldValues>({
             required
             disabled={disabled || loadState === "loading"}
             autoFocus={autoFocus}
-            aria-label={t("agents.capability.model")}
+            aria-label={t("agents.execution.model")}
             aria-invalid={fieldState.invalid}
             onChange={(event) => {
               field.onChange(event.target.value)
@@ -123,8 +123,8 @@ export function AgentModelField<TValues extends FieldValues>({
           >
             <option value="">
               {loadState === "loading"
-                ? t("agents.capability.modelLoading")
-                : t("agents.capability.modelSelect")}
+                ? t("agents.execution.modelLoading")
+                : t("agents.execution.modelSelect")}
             </option>
             {groups.map(([providerId, group]) => (
               <optgroup key={providerId} label={group.providerName}>
@@ -144,13 +144,13 @@ export function AgentModelField<TValues extends FieldValues>({
           </NativeSelect>
           {loadState === "error" ? (
             <FieldDescription>
-              {t("agents.capability.modelLoadError")}
+              {t("agents.execution.modelLoadError")}
             </FieldDescription>
           ) : loadState === "ready" && models.length === 0 ? (
             <FieldDescription>
-              {t("agents.capability.noModels")}{" "}
+              {t("agents.execution.noModels")}{" "}
               <Link to="/integrations/model-services/chat">
-                {t("agents.capability.configureModels")}
+                {t("agents.execution.configureModels")}
               </Link>
             </FieldDescription>
           ) : null}

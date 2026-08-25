@@ -21,12 +21,13 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 	}
 	created, err := b.createAgent.Execute(ctx, identity, agentaction.CreateInput{
 		DisplayName: input.DisplayName, TeamIDs: input.TeamIDs,
-		Capability: agentCapabilityInput(input.Capability),
+		Execution: agentExecutionInput(input.Execution),
 	})
 	if err != nil {
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationTeamInvalid:               cervii18n.FieldMemberTeamInvalid,
+			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
 			agentaction.ValidationSystemInstructionRequired: cervii18n.FieldAgentSystemInstructionRequired,
 			agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
@@ -36,9 +37,10 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 		"organization_id", identity.Organization.ID,
 		"identity_id", created.IdentityID,
 		"agent_id", created.ID,
-		"revision_id", created.Capability.RevisionID,
-		"provider_id", created.Capability.ProviderID,
-		"model_identifier", created.Capability.ModelIdentifier,
+		"revision_id", created.Execution.RevisionID,
+		"execution_mode", created.Execution.Mode,
+		"provider_id", created.Execution.Managed.ProviderID,
+		"model_identifier", created.Execution.Managed.ModelIdentifier,
 	)
 	return agentFromAction(*created), nil
 }
@@ -115,27 +117,29 @@ func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agent
 	return agentFromAction(*agent), nil
 }
 
-// UpdateAgentCapability 修改企业 AI 员工的能力配置。
-func (b *DirectBackend) UpdateAgentCapability(ctx context.Context, meta RequestMeta, agentID string, input AgentCapabilityInput) (Agent, error) {
+// UpdateAgentExecution 修改企业 AI 员工的执行配置。
+func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMeta, agentID string, input AgentExecutionInput) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Agent{}, err
 	}
-	agent, err := b.updateAgentCapability.Execute(ctx, identity, agentID, agentCapabilityInput(input))
+	agent, err := b.updateAgentExecution.Execute(ctx, identity, agentID, agentExecutionInput(input))
 	if err != nil {
-		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCapabilityUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentExecutionUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
 			agentaction.ValidationSystemInstructionRequired: cervii18n.FieldAgentSystemInstructionRequired,
 			agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
 		})
 	}
-	slog.Info("AI 员工能力配置已保存",
+	slog.Info("AI 员工执行配置已保存",
 		"organization_id", identity.Organization.ID,
 		"identity_id", agent.IdentityID,
 		"agent_id", agentID,
-		"revision_id", agent.Capability.RevisionID,
-		"provider_id", agent.Capability.ProviderID,
-		"model_identifier", agent.Capability.ModelIdentifier,
+		"revision_id", agent.Execution.RevisionID,
+		"execution_mode", agent.Execution.Mode,
+		"provider_id", agent.Execution.Managed.ProviderID,
+		"model_identifier", agent.Execution.Managed.ModelIdentifier,
 	)
 	return agentFromAction(*agent), nil
 }
@@ -189,12 +193,7 @@ func agentFromAction(agent agentaction.Agent) Agent {
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	capability := AgentCapability{
-		ProviderID: agent.Capability.ProviderID, ProviderName: agent.Capability.ProviderName,
-		ModelIdentifier: agent.Capability.ModelIdentifier, ModelName: agent.Capability.ModelName,
-		SystemInstruction: agent.Capability.SystemInstruction,
-	}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Capability: capability, CreatedAt: agent.CreatedAt}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: agentExecutionFromAction(agent.Execution), CreatedAt: agent.CreatedAt}
 }
 
 // agentListItemFromAction 转换 AI 员工目录项契约。
@@ -203,19 +202,44 @@ func agentListItemFromAction(agent agentaction.ListItem) AgentListItem {
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	capability := AgentCapabilitySummary{
-		ProviderID: agent.Capability.ProviderID, ProviderName: agent.Capability.ProviderName,
-		ModelIdentifier: agent.Capability.ModelIdentifier, ModelName: agent.Capability.ModelName,
-	}
-	return AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Capability: capability, CreatedAt: agent.CreatedAt}
+	return AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: agentExecutionSummaryFromAction(agent.Execution), CreatedAt: agent.CreatedAt}
 }
 
-// agentCapabilityInput 转换 AI 员工能力配置输入。
-func agentCapabilityInput(input AgentCapabilityInput) agentaction.CapabilityInput {
-	return agentaction.CapabilityInput{
-		ProviderID: input.ProviderID, ModelIdentifier: input.ModelIdentifier,
-		SystemInstruction: input.SystemInstruction,
+// agentExecutionInput 转换 AI 员工执行配置输入。
+func agentExecutionInput(input AgentExecutionInput) agentaction.ExecutionInput {
+	var managed *agentaction.ManagedExecutionInput
+	if input.Managed != nil {
+		managed = &agentaction.ManagedExecutionInput{
+			ProviderID: input.Managed.ProviderID, ModelIdentifier: input.Managed.ModelIdentifier,
+			SystemInstruction: input.Managed.SystemInstruction,
+		}
 	}
+	return agentaction.ExecutionInput{Mode: domain.AgentExecutionMode(input.Mode), Managed: managed}
+}
+
+// agentExecutionFromAction 转换 AI 员工执行配置契约。
+func agentExecutionFromAction(execution agentaction.Execution) AgentExecution {
+	var managed *AgentManagedExecution
+	if execution.Managed != nil {
+		managed = &AgentManagedExecution{
+			ProviderID: execution.Managed.ProviderID, ProviderName: execution.Managed.ProviderName,
+			ModelIdentifier: execution.Managed.ModelIdentifier, ModelName: execution.Managed.ModelName,
+			SystemInstruction: execution.Managed.SystemInstruction,
+		}
+	}
+	return AgentExecution{RevisionID: execution.RevisionID, Mode: AgentExecutionMode(execution.Mode), Managed: managed}
+}
+
+// agentExecutionSummaryFromAction 转换 AI 员工执行配置摘要契约。
+func agentExecutionSummaryFromAction(execution agentaction.ExecutionSummary) AgentExecutionSummary {
+	var managed *AgentManagedExecutionSummary
+	if execution.Managed != nil {
+		managed = &AgentManagedExecutionSummary{
+			ProviderID: execution.Managed.ProviderID, ProviderName: execution.Managed.ProviderName,
+			ModelIdentifier: execution.Managed.ModelIdentifier, ModelName: execution.Managed.ModelName,
+		}
+	}
+	return AgentExecutionSummary{RevisionID: execution.RevisionID, Mode: AgentExecutionMode(execution.Mode), Managed: managed}
 }
 
 // agentError 转换 AI 员工领域错误并记录未处理故障。

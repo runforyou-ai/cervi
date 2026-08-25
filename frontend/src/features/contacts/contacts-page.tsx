@@ -1564,8 +1564,8 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
                           </TableCell>
                           <TableCell className="max-w-xs">
                             <span className="block truncate">
-                              {agent.capability.providerName} ·{" "}
-                              {agent.capability.modelName}
+                              {agent.execution.managed.providerName} ·{" "}
+                              {agent.execution.managed.modelName}
                             </span>
                           </TableCell>
                           <TableCell>

@@ -54,7 +54,7 @@ type DirectBackend struct {
 	listAgents                        *agentaction.ListAgentsQuery
 	getAgent                          *agentaction.GetAgentQuery
 	updateAgent                       *agentaction.UpdateAgentAction
-	updateAgentCapability             *agentaction.UpdateCapabilityAction
+	updateAgentExecution              *agentaction.UpdateExecutionAction
 	updateAgentStatus                 *agentaction.UpdateStatusAction
 	updateAgentWorkStatus             *agentaction.UpdateWorkStatusAction
 	listUsers                         *useraction.ListUsersQuery
@@ -125,7 +125,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		listAgents:                        agentaction.NewListAgentsQuery(db),
 		getAgent:                          agentaction.NewGetAgentQuery(db),
 		updateAgent:                       agentaction.NewUpdateAgentAction(db),
-		updateAgentCapability:             agentaction.NewUpdateCapabilityAction(db),
+		updateAgentExecution:              agentaction.NewUpdateExecutionAction(db),
 		updateAgentStatus:                 agentaction.NewUpdateStatusAction(db),
 		updateAgentWorkStatus:             agentaction.NewUpdateWorkStatusAction(db),
 		listUsers:                         useraction.NewListUsersQuery(db),

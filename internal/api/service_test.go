@@ -27,6 +27,7 @@ type testBackend struct {
 	lastTeam            appservice.TeamInput
 	lastTeamMembers     appservice.TeamMemberInput
 	lastAgentID         string
+	lastAgentExecution  appservice.AgentExecutionInput
 	lastAgentWorkStatus appservice.AgentWorkStatusInput
 	lastProfile         appservice.ProfileInput
 	lastFileUpload      appservice.FileUploadInput
@@ -161,6 +162,14 @@ func (b *testBackend) UpdateAgentWorkStatus(_ context.Context, meta appservice.R
 	b.lastAgentID = agentID
 	b.lastAgentWorkStatus = input
 	return appservice.Agent{ID: agentID, WorkStatus: input.WorkStatus, Teams: []appservice.TeamSummary{}}, nil
+}
+
+// UpdateAgentExecution 记录 AI 员工执行配置输入。
+func (b *testBackend) UpdateAgentExecution(_ context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentExecutionInput) (appservice.Agent, error) {
+	b.lastMeta = meta
+	b.lastAgentID = agentID
+	b.lastAgentExecution = input
+	return appservice.Agent{ID: agentID, Execution: appservice.AgentExecution{Mode: input.Mode}, Teams: []appservice.TeamSummary{}}, nil
 }
 
 // ListTeamMemberCandidates 返回测试中的空候选列表。
@@ -326,6 +335,24 @@ func TestUpdateAgentWorkStatusUsesTypedInput(t *testing.T) {
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK || backend.lastAgentID != "agent-1" || backend.lastAgentWorkStatus.WorkStatus != appservice.WorkStatusAway {
 		t.Fatalf("status = %d, agent = %q, input = %#v", response.StatusCode, backend.lastAgentID, backend.lastAgentWorkStatus)
+	}
+}
+
+// TestUpdateAgentExecutionUsesTypedInput 验证 AI 员工执行配置请求转换为类型化服务输入。
+func TestUpdateAgentExecutionUsesTypedInput(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	response := doJSON(t, http.MethodPatch, server.URL+"/agents/agent-1/execution", appservice.AgentExecutionInput{
+		Mode: appservice.AgentExecutionModeManaged,
+		Managed: &appservice.AgentManagedExecutionInput{
+			ProviderID: "provider-1", ModelIdentifier: "chat-model", SystemInstruction: "回答产品问题。",
+		},
+	}, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || backend.lastAgentID != "agent-1" || backend.lastAgentExecution.Mode != appservice.AgentExecutionModeManaged || backend.lastAgentExecution.Managed == nil || backend.lastAgentExecution.Managed.ModelIdentifier != "chat-model" {
+		t.Fatalf("status = %d, agent = %q, input = %#v", response.StatusCode, backend.lastAgentID, backend.lastAgentExecution)
 	}
 }
 

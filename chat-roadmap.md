@@ -382,12 +382,9 @@ AI 调用不能依赖用户已读状态，也不能把模型请求、工具步�
 ```text
 agent_revisions
 ├── agent_id
-├── provider_id
-├── model_identifier
-├── system_instruction
-├── generation_config
-├── tool_policy
-└── schema_version
+├── execution_mode
+├── schema_version
+└── configuration
 
 conversation_agent_policies
 ├── conversation_id
@@ -461,7 +458,7 @@ agent_tool_invocations
 └── timestamps
 ```
 
-`agent_revisions` 是不可变配置版本，模型由 `(provider_id, model_identifier)` 指向现有同企业 Chat 模型。Run 同时引用 Revision 并保存本次实际配置快照。`input_snapshot` 保存实际模型输入的有序消息引用、内容版本或哈希和 Schema 版本，不能只用起止消息编号表达可编辑的历史。`agent_run_steps` 只保存模型、工具、审批、交接等有界语义步骤；流式 Token、进度 Tick、框架 Callback 和调试日志不得逐条写入。工具参数、幂等、审批、结果未知和以后增加的设备执行位置由 Tool Invocation 及其扩展事实承担。
+`agent_revisions` 是不可变执行配置版本，由 `(execution_mode, schema_version)` 解释完整、规范化且非敏感的 `configuration` 快照；当前 `managed/v1` 通过其中的模型服务编号和模型标识选择现有同企业文本 Chat 模型。Run 同时引用 Revision 并保存本次实际解析的运行快照。`input_snapshot` 保存实际模型输入的有序消息引用、内容版本或哈希和 Schema 版本，不能只用起止消息编号表达可编辑的历史。`agent_run_steps` 只保存模型、工具、审批、交接等有界语义步骤；流式 Token、进度 Tick、框架 Callback 和调试日志不得逐条写入。工具参数、幂等、审批、结果未知和以后增加的设备执行位置由 Tool Invocation 及其扩展事实承担。
 
 独立 `message_mentions` 关系记录 @ 事实；符合策略且首次持久化的消息在同一事务写入 `conversation_agent_triggers`。同一“会话 + 智能体”的 `trigger_seq` 由服务端锁定状态后单调分配，`desired_*` 与 `processed_*` 使用该序号；对应 Message 编号只作审计指针。`originated_at` 继续只负责聊天展示排序，不能再决定 Agent 触发资格或水位。迟到的历史补拉默认不创建 Trigger，需要时通过独立总结或人工回放命令处理。
 

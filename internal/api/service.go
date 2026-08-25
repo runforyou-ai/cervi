@@ -67,7 +67,7 @@ func NewService(application *appservice.Service) *Service {
 	router.POST("/agents", service.createAgent)
 	router.GET("/agents/:agentID", service.getAgent)
 	router.PATCH("/agents/:agentID", service.updateAgent)
-	router.PATCH("/agents/:agentID/capability", service.updateAgentCapability)
+	router.PATCH("/agents/:agentID/execution", service.updateAgentExecution)
 	router.PATCH("/agents/:agentID/work-status", service.updateAgentWorkStatus)
 	router.POST("/agents/:agentID/deactivate", service.deactivateAgent)
 	router.POST("/agents/:agentID/reactivate", service.reactivateAgent)
@@ -360,13 +360,13 @@ func (s *Service) updateAgent(c *gin.Context) {
 	writeResult(c, http.StatusOK, agent, err)
 }
 
-// updateAgentCapability 修改企业 AI 员工能力配置。
-func (s *Service) updateAgentCapability(c *gin.Context) {
-	var input appservice.AgentCapabilityInput
+// updateAgentExecution 修改企业 AI 员工执行配置。
+func (s *Service) updateAgentExecution(c *gin.Context) {
+	var input appservice.AgentExecutionInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	agent, err := s.application.UpdateAgentCapability(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
+	agent, err := s.application.UpdateAgentExecution(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
 	writeResult(c, http.StatusOK, agent, err)
 }
 

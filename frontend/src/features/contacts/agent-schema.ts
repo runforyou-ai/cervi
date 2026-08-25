@@ -1,7 +1,7 @@
 /** AI 员工表单校验规则。 */
 import { z } from "zod"
 
-import { WorkStatus } from "@/api"
+import { AgentExecutionMode, WorkStatus } from "@/api"
 import { isAgentModelSelection } from "@/features/contacts/agent-model-selection"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
@@ -28,8 +28,8 @@ export function createAgentProfileSchema(messages: { nameRequired: string }) {
   })
 }
 
-/** 创建 AI 员工能力配置校验规则。 */
-export function createAgentCapabilitySchema(
+/** 创建 AI 员工平台托管执行配置校验规则。 */
+export function createAgentManagedExecutionSchema(
   messages: Omit<AgentValidationMessages, "nameRequired">,
 ) {
   return z.object({
@@ -50,17 +50,20 @@ export function createAgentCapabilitySchema(
 
 /** 创建新增 AI 员工表单校验规则。 */
 export function createAgentSchema(messages: AgentValidationMessages) {
-  return createAgentProfileSchema(messages).extend(
-    createAgentCapabilitySchema(messages).shape,
-  )
+  return createAgentProfileSchema(messages).extend({
+    execution: z.object({
+      mode: z.literal(AgentExecutionMode.AgentExecutionModeManaged),
+      managed: createAgentManagedExecutionSchema(messages),
+    }),
+  })
 }
 
 export type AgentProfileFormValues = z.infer<
   ReturnType<typeof createAgentProfileSchema>
 >
 
-export type AgentCapabilityFormValues = z.infer<
-  ReturnType<typeof createAgentCapabilitySchema>
+export type AgentManagedExecutionFormValues = z.infer<
+  ReturnType<typeof createAgentManagedExecutionSchema>
 >
 
 export type AgentFormValues = z.infer<ReturnType<typeof createAgentSchema>>

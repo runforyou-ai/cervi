@@ -211,6 +211,24 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				return
 			}
 			writeTestJSON(writer, http.StatusOK, appservice.Agent{ID: "agent-1", WorkStatus: input.WorkStatus, Teams: []appservice.TeamSummary{}})
+		case "/api/agents/agent-1/execution":
+			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected agent execution request", http.StatusBadRequest)
+				return
+			}
+			var input appservice.AgentExecutionInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, appservice.Agent{
+				ID: "agent-1", Teams: []appservice.TeamSummary{},
+				Execution: appservice.AgentExecution{RevisionID: "revision-1", Mode: input.Mode, Managed: &appservice.AgentManagedExecution{
+					ProviderID: input.Managed.ProviderID, ProviderName: "企业模型",
+					ModelIdentifier: input.Managed.ModelIdentifier, ModelName: "对话模型",
+					SystemInstruction: input.Managed.SystemInstruction,
+				}},
+			})
 		case "/api/teams/team-1/members":
 			if request.Method != http.MethodGet || request.URL.Query().Get("workStatus") != string(appservice.WorkStatusOffDuty) {
 				http.Error(writer, "unexpected team member query", http.StatusBadRequest)
@@ -351,6 +369,15 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	agent, err := backend.UpdateAgentWorkStatus(context.Background(), meta, "agent-1", appservice.AgentWorkStatusInput{WorkStatus: appservice.WorkStatusAway})
 	if err != nil || agent.WorkStatus != appservice.WorkStatusAway {
 		t.Fatalf("updated agent work status = %#v, error = %v", agent, err)
+	}
+	agent, err = backend.UpdateAgentExecution(context.Background(), meta, "agent-1", appservice.AgentExecutionInput{
+		Mode: appservice.AgentExecutionModeManaged,
+		Managed: &appservice.AgentManagedExecutionInput{
+			ProviderID: "provider-1", ModelIdentifier: "chat-model", SystemInstruction: "回答产品问题。",
+		},
+	})
+	if err != nil || agent.Execution.Managed == nil || agent.Execution.Managed.ModelIdentifier != "chat-model" {
+		t.Fatalf("updated agent execution = %#v, error = %v", agent.Execution, err)
 	}
 	offDuty := appservice.WorkStatusOffDuty
 	teamMembers, err := backend.ListTeamMembers(context.Background(), meta, "team-1", appservice.TeamMemberListInput{WorkStatus: &offDuty, Page: 1, PageSize: 50})

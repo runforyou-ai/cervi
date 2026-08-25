@@ -30,7 +30,7 @@ type Agent struct {
 	Status      domain.UserStatus `bun:"status"`
 	WorkStatus  domain.WorkStatus `bun:"work_status"`
 	Teams       []TeamSummary
-	Capability  Capability
+	Execution   Execution
 	CreatedAt   time.Time `bun:"created_at"`
 }
 
@@ -42,7 +42,7 @@ type ListItem struct {
 	Status      domain.UserStatus `bun:"status"`
 	WorkStatus  domain.WorkStatus `bun:"work_status"`
 	Teams       []TeamSummary
-	Capability  CapabilitySummary
+	Execution   ExecutionSummary
 	CreatedAt   time.Time `bun:"created_at"`
 }
 
@@ -111,9 +111,9 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 	for _, agent := range agents {
 		agentIDs = append(agentIDs, agent.ID)
 	}
-	capabilities, err := loadAgentCapabilitySummaries(ctx, q.db, identity.Organization.ID, agentIDs)
+	executions, err := loadAgentExecutionSummaries(ctx, q.db, identity.Organization.ID, agentIDs)
 	if err != nil {
-		return ListOutput{}, fmt.Errorf("load agent capability summaries: %w", err)
+		return ListOutput{}, fmt.Errorf("load agent execution summaries: %w", err)
 	}
 	for index := range agents {
 		teams, err := loadAgentTeams(ctx, q.db, identity.Organization.ID, agents[index].IdentityID)
@@ -121,7 +121,7 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 			return ListOutput{}, fmt.Errorf("load agent teams: %w", err)
 		}
 		agents[index].Teams = teams
-		agents[index].Capability = capabilities[agents[index].ID]
+		agents[index].Execution = executions[agents[index].ID]
 	}
 	return ListOutput{Agents: agents, Page: input.Page, Size: input.PageSize, Total: total}, nil
 }

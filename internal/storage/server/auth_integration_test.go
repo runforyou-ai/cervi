@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"strconv"
@@ -421,15 +422,61 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil || team.MemberCount != 1 {
 		t.Fatalf("team after adding member = %#v, error = %v", team, err)
 	}
+	provider := &servermodels.AIProvider{
+		OrganizationID: loggedIn.Identity.Organization.ID,
+		Brand:          string(domain.AIProviderBrandOpenAI),
+		Name:           "测试模型服务",
+		APIKey:         "test-key",
+		APIURL:         "https://example.com/v1",
+	}
+	if _, err := db.NewInsert().Model(provider).
+		Column("organization_id", "brand", "name", "api_key", "api_url").
+		Returning("id").
+		Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	model := &servermodels.AIProviderModel{
+		ProviderID: provider.ID, OrganizationID: loggedIn.Identity.Organization.ID,
+		Identifier: "chat-model", Name: "测试对话模型", Type: string(domain.AIModelTypeChat),
+		InputModalities: json.RawMessage(`["text"]`), ContextWindow: 128000, MaxOutputTokens: 4096,
+	}
+	if _, err := db.NewInsert().Model(model).
+		Column("provider_id", "organization_id", "identifier", "name", "model_type", "input_modalities", "context_window", "max_output_tokens").
+		Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	createdAgent, err := agentaction.NewCreateAgentAction(db).Execute(context.Background(), loggedIn.Identity, agentaction.CreateInput{
 		DisplayName: "接待智能体",
 		TeamIDs:     []string{team.ID},
+		Execution: agentaction.ExecutionInput{
+			Mode: domain.AgentExecutionModeManaged,
+			Managed: &agentaction.ManagedExecutionInput{
+				ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "负责接待客户。",
+			},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() {
+	if len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
 		t.Fatalf("created agent = %#v", createdAgent)
+	}
+	originalRevisionID := createdAgent.Execution.RevisionID
+	agentWithUpdatedExecution, err := agentaction.NewUpdateExecutionAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.ExecutionInput{
+		Mode: domain.AgentExecutionModeManaged,
+		Managed: &agentaction.ManagedExecutionInput{
+			ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "负责接待并回答客户问题。",
+		},
+	})
+	if err != nil || agentWithUpdatedExecution.Execution.RevisionID == originalRevisionID || agentWithUpdatedExecution.Execution.Managed.SystemInstruction != "负责接待并回答客户问题。" {
+		t.Fatalf("updated agent execution = %#v, error = %v", agentWithUpdatedExecution, err)
+	}
+	revisionCount, err := db.NewSelect().Model((*servermodels.AgentRevision)(nil)).
+		Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+		Where("agent_id = ?", createdAgent.ID).
+		Count(context.Background())
+	if err != nil || revisionCount != 2 {
+		t.Fatalf("agent revision count = %d, error = %v", revisionCount, err)
 	}
 	if createdAgent.IdentityID == "" || createdAgent.IdentityID == createdAgent.ID {
 		t.Fatalf("agent identity id = %q, agent id = %q", createdAgent.IdentityID, createdAgent.ID)

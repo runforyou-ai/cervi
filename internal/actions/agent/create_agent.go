@@ -20,7 +20,7 @@ import (
 type CreateInput struct {
 	DisplayName string
 	TeamIDs     []string
-	Capability  CapabilityInput
+	Execution   ExecutionInput
 }
 
 // TeamSummary 定义 AI 员工所属团队摘要。
@@ -37,13 +37,13 @@ func NewCreateAgentAction(db *bun.DB) *CreateAgentAction {
 	return &CreateAgentAction{db: db}
 }
 
-// Execute 创建 AI 员工、当前配置和团队关系。
+// Execute 创建 AI 员工、当前执行配置和团队关系。
 func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"displayName": ValidationDisplayNameRequired}}
 	}
-	capabilityInput, err := normalizeCapabilityInput(input.Capability)
+	executionInput, err := normalizeExecutionInput(input.Execution)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err != nil {
 			return err
 		}
-		model, err := loadCapabilityModel(ctx, tx, identity.Organization.ID, capabilityInput)
+		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *executionInput.Managed)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			Exec(ctx); err != nil {
 			return err
 		}
-		capability, err := insertCapabilityRevision(ctx, tx, identity, agent.ID, revisionID.String(), capabilityInput, model)
+		execution, err := insertExecutionRevision(ctx, tx, identity, agent.ID, revisionID.String(), executionInput, model)
 		if err != nil {
 			return err
 		}
@@ -108,7 +108,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Capability: capability, CreatedAt: organizationIdentity.CreatedAt}
+		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Execution: execution, CreatedAt: organizationIdentity.CreatedAt}
 		return nil
 	})
 	if err != nil {

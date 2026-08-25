@@ -158,29 +158,45 @@ agent_revisions
 ├── id
 ├── organization_id
 ├── agent_id
-├── provider_id
-├── model_identifier
-├── system_instruction
+├── execution_mode
+├── schema_version
+├── configuration
 ├── created_by_user_id
 └── created_at
 ```
 
-`generation_config`、`tool_policy` 和 `schema_version` 在进入对应真实场景时增加。项目不创建数据库外键，因此 Action 必须在事务中校验企业、Agent、Provider、模型和配置版本的关联；`(provider_id, model_identifier)` 必须对应现有模型目录中的同企业 Chat 模型，其中 `model_identifier` 映射目录字段 `identifier`。
+`execution_mode` 表示 AI 员工的执行方式，当前只接受 `managed`。未来接入外部平台时增加 `connected`，Dify、n8n 等具体平台属于该模式下的适配器或调用目标，不成为 Agent 身份类型。代码只在真实模式可用时增加对应枚举值和强类型配置，不接受尚未实现的空配置。
+
+`configuration` 是按 `(execution_mode, schema_version)` 解释的完整、规范化、非敏感 JSON 快照。当前 `managed/v1` 保存模型服务编号与名称快照、模型标识与名称快照以及系统指令。Action 必须使用对应版本的强类型编解码器严格校验，未知模式、未知结构版本和未知字段都必须失败，不能静默降级。项目不创建数据库外键，因此 Action 仍须在事务中校验企业、Agent、Provider、模型和配置版本的关联；平台托管配置选择的模型必须对应现有模型目录中的同企业文本 Chat 模型。
+
+```json
+{
+  "model": {
+    "providerId": "0198f03c-...",
+    "providerName": "企业 OpenAI",
+    "identifier": "gpt-5-mini",
+    "name": "GPT-5 mini"
+  },
+  "systemInstruction": "负责回答企业产品问题。"
+}
+```
 
 规则：
 
 - Revision 创建后不可修改；编辑 Agent 配置时创建新 Revision 并切换当前版本。
 - 已被 Run 引用的 Revision 不物理删除。
-- Provider 密钥和 Endpoint 仍属于 Provider 配置，不复制到 Revision 或 Run。
+- Revision 保存管理员当时配置的完整业务快照和非敏感名称快照；当前详情可以继续解析模型目录中的最新显示名称。
+- Provider 密钥和 Endpoint 仍属于 Provider 配置，不复制到 Revision 或 Run；未来外部平台凭据同样通过独立调用目标与凭据配置解析。
 - Tool Policy 保存产品能力标识和策略，不保存 Eino Tool 实例或 Go 类型。
-- Eino 升级不能改变历史 Revision 的业务含义；必要时通过 `schema_version` 解释。
+- Eino 是 `managed` 模式的内部执行适配器，不写入 `execution_mode`。Eino 升级不能改变历史 Revision 的业务含义；必要时通过 `schema_version` 解释。
+- 外部会话编号属于 Cervi 会话与外部会话的关联，实际工作流执行编号和最终解析版本属于 Agent Run；二者都不写入 Revision。
 
 ### 5.2 Run 配置快照
 
 每个 Run 同时保存：
 
 - `agent_revision_id`：指向权威配置版本。
-- 规范化配置快照：实际使用的 `provider_id + model_identifier`、系统指令哈希、生成参数和允许工具集合。
+- 规范化运行快照：实际解析的执行适配器与版本、模型或调用目标、系统指令哈希、生成参数和允许工具集合。
 
 Revision 负责长期配置历史，Run 快照负责证明本次执行实际使用了什么。快照不得包含 Provider 明文密钥。
 
@@ -772,7 +788,7 @@ Cervi Gateway
 固定使用内部消息显式 @Agent 作为验证入口：
 
 - 依赖 `chat-roadmap.md` 的内部文本聊天、Agent 参与者和 `message_mentions`；内部单聊和群聊都只有显式 @ 才触发，暂不启用 Agent 单聊自动响应。
-- 使用已落地的不可变 Agent Revision，并通过现有 `(provider_id, model_identifier)` 选择同企业 Chat 模型；不配置工具策略。
+- 使用已落地的不可变 Agent Revision，严格读取 `managed/v1` 配置并通过其中的模型服务编号与模型标识选择同企业文本 Chat 模型；不配置工具策略。
 - 增加最小 `conversation_agent_states`、`conversation_agent_triggers` 和 `agent_runs`，消息首次持久化时在同一事务写入 `mention` Trigger、Run 和 Task。
 - 通过 Agent Engine 的 Eino Adapter 执行一次有超时的模型调用。
 - 一个 Trigger 对应一个 Run；一个 Run 只调用一次模型，只生成一条最终文本 Message，使用 `agent:<agent_run_id>` 业务幂等键。

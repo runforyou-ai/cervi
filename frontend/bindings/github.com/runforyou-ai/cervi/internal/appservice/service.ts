@@ -449,10 +449,10 @@ export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $
 }
 
 /**
- * UpdateAgentCapability 修改企业 AI 员工的能力配置。
+ * UpdateAgentExecution 修改企业 AI 员工的执行配置。
  */
-export function UpdateAgentCapability(meta: $models.RequestMeta, agentID: string, input: $models.AgentCapabilityInput): $CancellablePromise<$models.Agent> {
-    return $Call.ByID(4134547974, meta, agentID, input);
+export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string, input: $models.AgentExecutionInput): $CancellablePromise<$models.Agent> {
+    return $Call.ByID(3177846414, meta, agentID, input);
 }
 
 /**
