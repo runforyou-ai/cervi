@@ -1,5 +1,10 @@
 /** 消息渠道类型的界面元数据。 */
-import { GlobeIcon, SendIcon, type LucideIcon } from "lucide-react"
+import {
+  GlobeIcon,
+  MessageCircleIcon,
+  SendIcon,
+  type LucideIcon,
+} from "lucide-react"
 
 import { ChannelType } from "@/api"
 
@@ -14,6 +19,11 @@ export const messageChannelTypeDefinitions = [
     type: ChannelType.ChannelTypeTelegram,
     translationKey: "telegram",
     icon: SendIcon,
+  },
+  {
+    type: ChannelType.ChannelTypeWeChatOfficialAccount,
+    translationKey: "wechatOfficialAccount",
+    icon: MessageCircleIcon,
   },
 ] as const satisfies readonly {
   type: ChannelType

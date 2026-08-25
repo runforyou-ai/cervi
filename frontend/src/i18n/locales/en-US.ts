@@ -125,6 +125,7 @@ const enUS = {
     channelTypes: {
       website: "Websites",
       telegram: "Telegram",
+      wechatOfficialAccount: "WeChat Official Account",
     },
     search: {
       employees: "Search company members",
@@ -552,6 +553,7 @@ const enUS = {
     types: {
       website: "Website",
       telegram: "Telegram",
+      wechatOfficialAccount: "WeChat Official Account",
     },
     loading: "Loading…",
     retry: "Try again",

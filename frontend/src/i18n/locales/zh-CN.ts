@@ -123,6 +123,7 @@ const zhCN = {
     channelTypes: {
       website: "网站",
       telegram: "Telegram",
+      wechatOfficialAccount: "微信公众号",
     },
     search: {
       employees: "搜索企业成员",
@@ -540,6 +541,7 @@ const zhCN = {
     types: {
       website: "网站",
       telegram: "Telegram",
+      wechatOfficialAccount: "微信公众号",
     },
     loading: "正在加载…",
     retry: "重试",

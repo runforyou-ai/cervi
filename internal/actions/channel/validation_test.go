@@ -46,6 +46,19 @@ func TestNormalizeCreateMessageChannelInput(t *testing.T) {
 	}
 
 	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
+		Type: domain.ChannelTypeWeChatOfficialAccount,
+		MessageChannelInput: MessageChannelInput{
+			Name:                  "微信公众号客服",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		},
+	})
+	if len(fields) != 0 {
+		t.Fatalf("wechat official account validation fields = %#v, want empty", fields)
+	}
+
+	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
 		Type: "email",
 		MessageChannelInput: MessageChannelInput{
 			Name:          strings.Repeat("鹿", 101),
