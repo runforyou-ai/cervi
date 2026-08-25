@@ -18,7 +18,7 @@ type AddMembersAction struct{ db *bun.DB }
 // NewAddMembersAction 创建团队成员添加操作。
 func NewAddMembersAction(db *bun.DB) *AddMembersAction { return &AddMembersAction{db: db} }
 
-// Execute 校验成员并批量建立团队关系。
+// Execute 规范化并校验成员后批量建立团队关系。
 func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, members []MemberIdentity) (*TeamRecord, error) {
 	var team *TeamRecord
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -30,10 +30,11 @@ func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		uniqueIDs := make(map[string]domain.OrganizationIdentityType, len(members))
 		for _, member := range members {
-			if (member.IdentityType != domain.OrganizationIdentityTypeUser && member.IdentityType != domain.OrganizationIdentityTypeAgent) || !common.ValidUUID(member.IdentityID) {
+			identityID, identityIDValid := common.NormalizeUUID(member.IdentityID)
+			if (member.IdentityType != domain.OrganizationIdentityTypeUser && member.IdentityType != domain.OrganizationIdentityTypeAgent) || !identityIDValid {
 				return ErrMemberInvalid
 			}
-			uniqueIDs[member.IdentityID] = member.IdentityType
+			uniqueIDs[identityID] = member.IdentityType
 		}
 		if len(uniqueIDs) == 0 {
 			return ErrMemberInvalid

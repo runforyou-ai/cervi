@@ -101,11 +101,12 @@ func normalizeExecutionInput(input ExecutionInput) (ExecutionInput, error) {
 
 // normalizeManagedExecutionInput 规范化并校验平台托管执行配置。
 func normalizeManagedExecutionInput(input ManagedExecutionInput) (ManagedExecutionInput, error) {
-	input.ProviderID = strings.TrimSpace(input.ProviderID)
+	var providerIDValid bool
+	input.ProviderID, providerIDValid = common.NormalizeUUID(input.ProviderID)
 	input.ModelIdentifier = strings.TrimSpace(input.ModelIdentifier)
 	input.SystemInstruction = strings.TrimSpace(input.SystemInstruction)
 	fields := make(map[string]common.FieldCode)
-	if !common.ValidUUID(input.ProviderID) {
+	if !providerIDValid {
 		fields["providerId"] = ValidationModelInvalid
 	}
 	if input.ModelIdentifier == "" {

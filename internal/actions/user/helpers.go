@@ -139,18 +139,11 @@ func loadUserTeams(ctx context.Context, db bun.IDB, organizationID, identityID s
 	return teams, err
 }
 
-// validateTeamIDs 校验团队列表全部属于当前企业并去重。
+// validateTeamIDs 规范化团队编号、去重并校验全部团队属于当前企业。
 func validateTeamIDs(ctx context.Context, db bun.IDB, organizationID string, teamIDs []string) ([]string, error) {
-	unique := make(map[string]struct{}, len(teamIDs))
-	for _, teamID := range teamIDs {
-		if !common.ValidUUID(teamID) {
-			return nil, &ValidationError{Fields: map[string]ValidationCode{"teamIds": ValidationTeamInvalid}}
-		}
-		unique[teamID] = struct{}{}
-	}
-	ids := make([]string, 0, len(unique))
-	for id := range unique {
-		ids = append(ids, id)
+	ids, valid := common.NormalizeUUIDs(teamIDs)
+	if !valid {
+		return nil, &ValidationError{Fields: map[string]ValidationCode{"teamIds": ValidationTeamInvalid}}
 	}
 	if len(ids) == 0 {
 		return ids, nil

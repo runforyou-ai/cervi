@@ -30,13 +30,9 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	input.Status = domain.UserStatus(strings.TrimSpace(string(input.Status)))
 	input.RoleID = strings.TrimSpace(input.RoleID)
 	input.TeamID = strings.TrimSpace(input.TeamID)
-	if input.Page <= 0 {
-		input.Page = 1
-	}
-	if input.PageSize <= 0 {
-		input.PageSize = 50
-	}
-	if input.PageSize > 100 ||
+	var pageValid bool
+	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
+	if !pageValid ||
 		(input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) ||
 		(input.RoleID != "" && !common.ValidUUID(input.RoleID)) ||
 		(input.TeamID != "" && !common.ValidUUID(input.TeamID)) {

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -49,13 +50,9 @@ func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.I
 		return ListOptionsOutput{}, err
 	}
 	input.Query = strings.TrimSpace(input.Query)
-	if input.Page <= 0 {
-		input.Page = 1
-	}
-	if input.PageSize <= 0 {
-		input.PageSize = 50
-	}
-	if input.PageSize > 100 {
+	var pageValid bool
+	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
+	if !pageValid {
 		return ListOptionsOutput{}, fmt.Errorf("member options page size invalid")
 	}
 	apply := func(query *bun.SelectQuery) *bun.SelectQuery {

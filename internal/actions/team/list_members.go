@@ -49,13 +49,9 @@ func NewListMembersQuery(db *bun.DB) *ListMembersQuery {
 func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, input MemberListInput) (MemberListOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
 	input.WorkStatus = domain.WorkStatus(strings.TrimSpace(string(input.WorkStatus)))
-	if input.Page <= 0 {
-		input.Page = 1
-	}
-	if input.PageSize <= 0 {
-		input.PageSize = 50
-	}
-	if input.PageSize > 100 {
+	var pageValid bool
+	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
+	if !pageValid {
 		return MemberListOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
 	}
 	if input.WorkStatus != "" && input.WorkStatus != domain.WorkStatusWorking && input.WorkStatus != domain.WorkStatusAway && input.WorkStatus != domain.WorkStatusOffDuty {
