@@ -2,6 +2,8 @@
 -- 创建异步任务运行记录表。
 CREATE TABLE task_runs (
     id                  uuid PRIMARY KEY DEFAULT uuidv7(),
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    updated_at          timestamptz NOT NULL DEFAULT now(),
     action_name         text NOT NULL,
     queue_name          text NOT NULL,
     payload             jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -17,13 +19,13 @@ CREATE TABLE task_runs (
     published_at        timestamptz,
     started_at          timestamptz,
     completed_at        timestamptz,
-    last_error          text,
-    created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now()
+    last_error          text
 );
 
 COMMENT ON TABLE task_runs IS '服务端异步任务运行记录';
 COMMENT ON COLUMN task_runs.id IS '任务运行编号';
+COMMENT ON COLUMN task_runs.created_at IS '创建时间';
+COMMENT ON COLUMN task_runs.updated_at IS '更新时间';
 COMMENT ON COLUMN task_runs.action_name IS '注册的 Action 名称';
 COMMENT ON COLUMN task_runs.queue_name IS '投递队列名称';
 COMMENT ON COLUMN task_runs.payload IS 'Action 输入参数';
@@ -40,8 +42,6 @@ COMMENT ON COLUMN task_runs.published_at IS '最近一次发布到消息队列�
 COMMENT ON COLUMN task_runs.started_at IS '首次开始执行时间';
 COMMENT ON COLUMN task_runs.completed_at IS '最终完成时间';
 COMMENT ON COLUMN task_runs.last_error IS '最近一次执行错误';
-COMMENT ON COLUMN task_runs.created_at IS '创建时间';
-COMMENT ON COLUMN task_runs.updated_at IS '更新时间';
 
 CREATE INDEX task_runs_status_available_index
     ON task_runs (status, available_at, created_at);
