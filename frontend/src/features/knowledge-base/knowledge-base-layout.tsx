@@ -363,6 +363,9 @@ function KnowledgeBaseTree({
   const isQA =
     knowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
   const isExternal = knowledgeBase.integrationConnectionId !== ""
+  const categoryLabel = isQA
+    ? t("category.qaShort")
+    : t("category.standardShort")
   const regularGroups = knowledgeBase.groups.filter((group) => !group.isDefault)
 
   return (
@@ -378,9 +381,7 @@ function KnowledgeBaseTree({
           className="flex h-9 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
           title={knowledgeBase.name}
         >
-          {isExternal ? (
-            <CloudIcon />
-          ) : isQA ? (
+          {isQA ? (
             <CircleHelpIcon />
           ) : (
             <FileTextIcon />
@@ -388,10 +389,11 @@ function KnowledgeBaseTree({
           <span className="truncate">{knowledgeBase.name}</span>
           <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
             {isExternal
-              ? t("category.difyShort")
-              : isQA
-                ? t("category.qaShort")
-                : t("category.standardShort")}
+              ? t("sidebar.externalCategory", {
+                  source: t("source.dify"),
+                  category: categoryLabel,
+                })
+              : categoryLabel}
           </span>
         </Link>
         <DropdownMenu>

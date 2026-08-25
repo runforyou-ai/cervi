@@ -39,11 +39,33 @@ import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-bas
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** Dify API 接入前使用的固定表单选项。 */
+type DifyDocForm = "text_model" | "hierarchical_model" | "qa_model"
+
+const difyDocFormCategories: Record<
+  DifyDocForm,
+  KnowledgeBaseCategoryId
+> = {
+  text_model: KnowledgeBaseCategory.KnowledgeBaseCategoryStandard,
+  hierarchical_model: KnowledgeBaseCategory.KnowledgeBaseCategoryStandard,
+  qa_model: KnowledgeBaseCategory.KnowledgeBaseCategoryQA,
+}
+
+/** Dify API 接入前使用的固定连接和知识库选项。 */
 const demoDifyIntegrationConnectionId =
   "019c91a2-7b4e-7e52-a1c9-6f0d8b3a2e14"
-const demoDifyKnowledgeBaseId =
-  "019c91a2-8d63-7c21-b5e7-4a9f1d6c3b20"
+const demoDifyKnowledgeBases = [
+  {
+    id: "019c91a2-8d63-7c21-b5e7-4a9f1d6c3b20",
+    docForm: "text_model",
+    label: "form.demoDifyDocumentKnowledgeBase",
+  },
+  {
+    id: "019c91a2-9f74-77a3-86d2-71b5c4e8903f",
+    docForm: "qa_model",
+    label: "form.demoDifyQAKnowledgeBase",
+  },
+] as const
+const defaultDemoDifyKnowledgeBase = demoDifyKnowledgeBases[0]
 
 /** 创建或编辑知识库。 */
 export function KnowledgeBaseFormPage({
@@ -56,9 +78,10 @@ export function KnowledgeBaseFormPage({
   const [searchParams] = useSearchParams()
   const requestedExternal =
     mode === "create" && searchParams.get("source") === "dify"
-  const requestedCategory =
-    searchParams.get("category") ===
-    KnowledgeBaseCategory.KnowledgeBaseCategoryQA
+  const requestedCategory = requestedExternal
+    ? difyDocFormCategories[defaultDemoDifyKnowledgeBase.docForm]
+    : searchParams.get("category") ===
+        KnowledgeBaseCategory.KnowledgeBaseCategoryQA
       ? KnowledgeBaseCategory.KnowledgeBaseCategoryQA
       : KnowledgeBaseCategory.KnowledgeBaseCategoryStandard
   const { upsertKnowledgeBase } = useKnowledgeBaseContext()
@@ -95,7 +118,7 @@ export function KnowledgeBaseFormPage({
         ? demoDifyIntegrationConnectionId
         : "",
       externalResourceId: requestedExternal
-        ? demoDifyKnowledgeBaseId
+        ? defaultDemoDifyKnowledgeBase.id
         : "",
     },
   })
@@ -111,7 +134,7 @@ export function KnowledgeBaseFormPage({
         ? demoDifyIntegrationConnectionId
         : "",
       externalResourceId: requestedExternal
-        ? demoDifyKnowledgeBaseId
+        ? defaultDemoDifyKnowledgeBase.id
         : "",
     })
   }, [form, mode, requestedCategory, requestedExternal])
@@ -235,12 +258,15 @@ export function KnowledgeBaseFormPage({
               <Field>
                 <FieldLabel>{t("form.category")}</FieldLabel>
                 <p className="text-sm">
-                  {external
-                    ? t("category.dify")
-                    : category ===
-                        KnowledgeBaseCategory.KnowledgeBaseCategoryQA
-                      ? t("category.qa")
-                      : t("category.standard")}
+                  {category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
+                    ? t("category.qa")
+                    : t("category.standard")}
+                </p>
+              </Field>
+              <Field>
+                <FieldLabel>{t("form.source")}</FieldLabel>
+                <p className="text-sm">
+                  {external ? t("source.dify") : t("source.internal")}
                 </p>
               </Field>
               <FormInputField
@@ -307,10 +333,29 @@ export function KnowledgeBaseFormPage({
                           id={field.name}
                           required
                           aria-invalid={fieldState.invalid}
+                          onChange={(event) => {
+                            field.onChange(event)
+                            const selectedKnowledgeBase =
+                              demoDifyKnowledgeBases.find(
+                                ({ id }) => id === event.target.value,
+                              )
+                            if (selectedKnowledgeBase) {
+                              setCategory(
+                                difyDocFormCategories[
+                                  selectedKnowledgeBase.docForm
+                                ],
+                              )
+                            }
+                          }}
                         >
-                          <option value={demoDifyKnowledgeBaseId}>
-                            {t("form.demoDifyKnowledgeBase")}
-                          </option>
+                          {demoDifyKnowledgeBases.map((knowledgeBase) => (
+                            <option
+                              key={knowledgeBase.id}
+                              value={knowledgeBase.id}
+                            >
+                              {t(knowledgeBase.label)}
+                            </option>
+                          ))}
                         </NativeSelect>
                       </Field>
                     )}
