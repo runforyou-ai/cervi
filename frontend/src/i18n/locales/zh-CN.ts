@@ -424,7 +424,6 @@ const zhCN = {
     modelServices: {
       navigation: "模型服务",
       title: "模型服务",
-      back: "返回",
       loading: "正在加载…",
       retry: "重试",
       tabs: {
@@ -444,10 +443,12 @@ const zhCN = {
         more: "更多",
         loadError: "模型服务供应商列表加载失败。",
         empty: "还没有配置支持{{type}}的供应商",
+        modelSeparator: "、",
+        modelOverflow: "、…",
         columns: {
           brand: "品牌",
           name: "名称",
-          capabilities: "模型类型",
+          models: "模型",
           apiUrl: "API 地址",
           actions: "操作",
         },

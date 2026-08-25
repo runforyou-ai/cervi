@@ -9,6 +9,7 @@ import {
   deleteAIProvider,
   isApiError,
   listAIProviders,
+  type AIProviderModelSummaryData,
   type AIProviderSummaryData,
 } from "@/api"
 import { PageContent } from "@/components/page-content"
@@ -40,15 +41,64 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
 import {
   modelServiceSectionConfigs,
   modelServiceSectionOrder,
-  modelTypeNameKeys,
   type ModelServiceSection,
 } from "@/features/integrations/model-services/model-service-options"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+
+const visibleModelLimit = 3
+
+/** 显示供应商当前类型的模型摘要和完整悬浮目录。 */
+function ProviderModelsCell({
+  models,
+}: {
+  models: AIProviderModelSummaryData[]
+}) {
+  const { t } = useTranslation("integrations")
+  if (models.length === 0) return "—"
+
+  const summary = models
+    .slice(0, visibleModelLimit)
+    .map((model) => model.name)
+    .join(t("modelServices.list.modelSeparator"))
+  const visibleSummary =
+    models.length > visibleModelLimit
+      ? `${summary}${t("modelServices.list.modelOverflow")}`
+      : summary
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className="block max-w-sm cursor-help truncate outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {visibleSummary}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={4} className="max-w-md">
+        <ul className="grid gap-1 text-left">
+          {models.map((model) => (
+            <li key={model.identifier} className="break-words">
+              <span className="font-mono">{model.identifier}</span>
+              <span aria-hidden="true"> — </span>
+              <span>{model.name}</span>
+            </li>
+          ))}
+        </ul>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
 
 /** 显示指定类型的模型服务供应商。 */
 export function ModelProviderListPage({
@@ -68,7 +118,8 @@ export function ModelProviderListPage({
   const mounted = useRef(true)
   const sectionConfig = modelServiceSectionConfigs[section]
   const visibleProviders = providers.filter(
-    (provider) => provider.modelTypes.includes(sectionConfig.modelType),
+    (provider) =>
+      provider.models.some((model) => model.type === sectionConfig.modelType),
   )
 
   /** 读取模型服务供应商列表。 */
@@ -175,7 +226,7 @@ export function ModelProviderListPage({
                   <TableRow className="hover:bg-transparent">
                     <TableHead>{t("modelServices.list.columns.brand")}</TableHead>
                     <TableHead>{t("modelServices.list.columns.name")}</TableHead>
-                    <TableHead>{t("modelServices.list.columns.capabilities")}</TableHead>
+                    <TableHead>{t("modelServices.list.columns.models")}</TableHead>
                     <TableHead>{t("modelServices.list.columns.apiUrl")}</TableHead>
                     <TableHead className="text-right">
                       {t("modelServices.list.columns.actions")}
@@ -204,9 +255,11 @@ export function ModelProviderListPage({
                           <SelectableText>{provider.name}</SelectableText>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {provider.modelTypes
-                            .map((type) => t(modelTypeNameKeys[type]))
-                            .join("、")}
+                          <ProviderModelsCell
+                            models={provider.models.filter(
+                              (model) => model.type === sectionConfig.modelType,
+                            )}
+                          />
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           <SelectableText>{provider.apiUrl}</SelectableText>

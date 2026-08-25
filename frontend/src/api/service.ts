@@ -81,6 +81,7 @@ import {
   type AIProviderList,
   type AIProviderModel,
   type AIProviderModelList,
+  type AIProviderModelSummary,
   type AIProviderSummary,
   type AgentList,
   type AgentListItem,
@@ -147,12 +148,19 @@ export type AIProviderData = Omit<AIProvider, "brand" | "models"> & {
   models: AIProviderModelData[]
 }
 
+export type AIProviderModelSummaryData = Omit<
+  AIProviderModelSummary,
+  "type"
+> & {
+  type: AIModelTypeId
+}
+
 export type AIProviderSummaryData = Omit<
   AIProviderSummary,
-  "brand" | "modelTypes"
+  "brand" | "models"
 > & {
   brand: AIProviderBrandId
-  modelTypes: AIModelTypeId[]
+  models: AIProviderModelSummaryData[]
 }
 
 export type AIProviderListData = Omit<AIProviderList, "providers"> & {
@@ -442,8 +450,15 @@ function normalizeAIProviderSummary(
   return {
     ...provider,
     brand: provider.brand as AIProviderBrandId,
-    modelTypes: asList(provider.modelTypes) as AIModelTypeId[],
+    models: asList(provider.models).map(normalizeAIProviderModelSummary),
   }
+}
+
+/** 归一化供应商列表中的模型目录摘要。 */
+function normalizeAIProviderModelSummary(
+  model: AIProviderModelSummary,
+): AIProviderModelSummaryData {
+  return { ...model, type: model.type as AIModelTypeId }
 }
 
 /** 归一化模型目录项。 */

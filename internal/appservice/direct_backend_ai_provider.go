@@ -25,13 +25,17 @@ func (b *DirectBackend) ListAIProviders(ctx context.Context, meta RequestMeta) (
 	}
 	output := make([]AIProviderSummary, 0, len(providers))
 	for _, provider := range providers {
-		modelTypes := make([]AIModelType, 0, len(provider.ModelTypes))
-		for _, modelType := range provider.ModelTypes {
-			modelTypes = append(modelTypes, AIModelType(modelType))
+		models := make([]AIProviderModelSummary, 0, len(provider.Models))
+		for _, model := range provider.Models {
+			models = append(models, AIProviderModelSummary{
+				Identifier: model.Identifier,
+				Name:       model.Name,
+				Type:       AIModelType(model.Type),
+			})
 		}
 		output = append(output, AIProviderSummary{
 			ID: provider.ID, Brand: AIProviderBrand(provider.Brand), Name: provider.Name, APIURL: provider.APIURL,
-			ModelTypes: modelTypes,
+			Models: models,
 		})
 	}
 	return AIProviderList{Providers: output}, nil

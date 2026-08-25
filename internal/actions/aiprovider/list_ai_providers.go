@@ -39,26 +39,30 @@ func (q *ListAIProvidersQuery) Execute(ctx context.Context, identity *servermode
 	modelRecords := make([]servermodels.AIProviderModel, 0)
 	if err := q.db.NewSelect().
 		Model(&modelRecords).
-		Column("provider_id", "model_type").
+		Column("provider_id", "identifier", "name", "model_type").
 		Where("aipm.organization_id = ?", identity.Organization.ID).
-		Group("provider_id", "model_type").
-		Order("provider_id ASC").
-		Order("model_type ASC").
+		Order("aipm.provider_id ASC").
+		Order("aipm.created_at ASC").
+		Order("aipm.identifier ASC").
 		Scan(ctx); err != nil {
-		return nil, fmt.Errorf("list AI provider model types: %w", err)
+		return nil, fmt.Errorf("list AI provider models: %w", err)
 	}
-	modelTypesByProvider := make(map[string][]domain.AIModelType)
+	modelsByProvider := make(map[string][]ModelSummary)
 	for _, record := range modelRecords {
-		modelTypesByProvider[record.ProviderID] = append(
-			modelTypesByProvider[record.ProviderID],
-			domain.AIModelType(record.Type),
+		modelsByProvider[record.ProviderID] = append(
+			modelsByProvider[record.ProviderID],
+			ModelSummary{
+				Identifier: record.Identifier,
+				Name:       record.Name,
+				Type:       domain.AIModelType(record.Type),
+			},
 		)
 	}
 	output := make([]Summary, 0, len(providers))
 	for _, provider := range providers {
 		output = append(output, Summary{
 			ID: provider.ID, Brand: domain.AIProviderBrand(provider.Brand), Name: provider.Name, APIURL: provider.APIURL,
-			ModelTypes: modelTypesByProvider[provider.ID],
+			Models: modelsByProvider[provider.ID],
 		})
 	}
 	return output, nil
