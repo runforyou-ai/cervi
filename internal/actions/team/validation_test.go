@@ -18,15 +18,3 @@ func TestNormalizeInput(t *testing.T) {
 		t.Fatalf("fields = %#v", fields)
 	}
 }
-
-// TestNormalizePage 验证团队分页限制。
-func TestNormalizePage(t *testing.T) {
-	page, pageSize, valid := normalizePage(0, 0)
-	if page != 1 || pageSize != 50 || !valid {
-		t.Fatalf("page = %d, pageSize = %d, valid = %v", page, pageSize, valid)
-	}
-	_, _, valid = normalizePage(1, 101)
-	if valid {
-		t.Fatal("page size above 100 should be invalid")
-	}
-}

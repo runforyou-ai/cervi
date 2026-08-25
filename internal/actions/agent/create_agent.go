@@ -117,19 +117,11 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 	return output, nil
 }
 
-// validateAndLoadTeams 校验并锁定 AI 员工所属团队。
+// validateAndLoadTeams 规范化团队编号并锁定当前企业中的团队。
 func validateAndLoadTeams(ctx context.Context, db bun.IDB, organizationID string, values []string) ([]string, []TeamSummary, error) {
-	unique := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		teamID := strings.TrimSpace(value)
-		if !common.ValidUUID(teamID) {
-			return nil, nil, &common.FieldError{Fields: map[string]common.FieldCode{"teamIds": ValidationTeamInvalid}}
-		}
-		unique[teamID] = struct{}{}
-	}
-	teamIDs := make([]string, 0, len(unique))
-	for teamID := range unique {
-		teamIDs = append(teamIDs, teamID)
+	teamIDs, valid := common.NormalizeUUIDs(values)
+	if !valid {
+		return nil, nil, &common.FieldError{Fields: map[string]common.FieldCode{"teamIds": ValidationTeamInvalid}}
 	}
 	if len(teamIDs) == 0 {
 		return teamIDs, []TeamSummary{}, nil

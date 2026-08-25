@@ -17,14 +17,18 @@ type UpdateRolesAction struct{ db *bun.DB }
 // NewUpdateRolesAction 创建企业成员角色批量调整操作。
 func NewUpdateRolesAction(db *bun.DB) *UpdateRolesAction { return &UpdateRolesAction{db: db} }
 
-// Execute 校验全部成员和角色后一次性完成调整。
+// Execute 规范化并校验成员和角色后一次性完成调整。
 func (a *UpdateRolesAction) Execute(ctx context.Context, identity *servermodels.Identity, changes []RoleChangeInput) error {
 	userIDs := make([]string, 0, len(changes))
 	roleIDs := make([]string, 0, len(changes))
 	users := make(map[string]struct{}, len(changes))
 	roles := make(map[string]struct{}, len(changes))
-	for _, change := range changes {
-		if !common.ValidUUID(change.UserID) || !common.ValidUUID(change.RoleID) {
+	for index := range changes {
+		change := &changes[index]
+		var userIDValid, roleIDValid bool
+		change.UserID, userIDValid = common.NormalizeUUID(change.UserID)
+		change.RoleID, roleIDValid = common.NormalizeUUID(change.RoleID)
+		if !userIDValid || !roleIDValid {
 			return ErrRoleChangesInvalid
 		}
 		if _, exists := users[change.UserID]; exists {
