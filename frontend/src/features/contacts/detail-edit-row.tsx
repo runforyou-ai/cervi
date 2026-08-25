@@ -36,20 +36,19 @@ export function DetailEditRow({
             <div className="pt-1 text-sm break-words">{value}</div>
           )}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={
-            showEdit
-              ? "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-              : "invisible"
-          }
-          disabled={!showEdit}
-          aria-label={t("detail.editField", { field: label })}
-          onClick={onEdit}
-        >
-          {t("detail.edit")}
-        </Button>
+        <div className="flex w-14 shrink-0 justify-end">
+          {showEdit ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+              aria-label={t("detail.editField", { field: label })}
+              onClick={onEdit}
+            >
+              {t("detail.edit")}
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   )
