@@ -914,6 +914,13 @@ type AIProviderInput struct {
 	Models []AIProviderModel `json:"models"`
 }
 
+// AIProviderConnectionInput 定义测试模型服务连接需要的草稿配置。
+type AIProviderConnectionInput struct {
+	Brand  AIProviderBrand `json:"brand"`
+	APIKey string          `json:"apiKey"`
+	APIURL string          `json:"apiUrl"`
+}
+
 // AIProviderModel 定义模型服务供应商的模型目录项。
 type AIProviderModel struct {
 	Identifier      string                 `json:"identifier"`

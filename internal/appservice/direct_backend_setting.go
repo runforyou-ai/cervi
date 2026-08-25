@@ -11,6 +11,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
 // GetS3Setting 返回当前企业的对象存储设置。
@@ -46,14 +47,12 @@ func (b *DirectBackend) SaveS3Setting(ctx context.Context, meta RequestMeta, inp
 
 // TestS3Setting 测试对象存储连接。
 func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
+	if _, err := b.authenticate(ctx, meta); err != nil {
 		return err
 	}
 	if err := b.testS3Setting.Execute(ctx, s3SettingToAction(input)); err != nil {
 		return b.s3SettingError(ctx, meta, err, cervii18n.ErrorS3ConnectionTestFailed)
 	}
-	slog.Info("对象存储连接测试成功", "organization_id", identity.Organization.ID, "provider", input.Provider)
 	return nil
 }
 
@@ -69,8 +68,8 @@ func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, er
 	if errors.Is(err, common.ErrIdentityInvalid) {
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
-	if errors.Is(err, settingaction.ErrS3ConnectionFailed) {
-		return FailedError(meta, cervii18n.ErrorS3ConnectionTestFailed)
+	if _, _, ok := connectiontest.Details(err); ok {
+		return UnavailableError(meta, cervii18n.ErrorS3ConnectionTestFailed, nil)
 	}
 	slog.Warn("对象存储操作失败", "failure", failureKey, "error", err)
 	return FailedError(meta, failureKey)

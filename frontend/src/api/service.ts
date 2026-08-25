@@ -51,6 +51,7 @@ import {
   SaveS3Setting,
   SelectProfileImage,
   SendMessageNotification,
+  TestAIProviderConnection,
   TestS3Setting,
   UpdateContact,
   UpdateAIProvider,
@@ -367,6 +368,7 @@ export const deleteRole = bind(DeleteRole)
 const listAIProvidersBound = bind(ListAIProviders)
 const getAIProviderBound = bind(GetAIProvider)
 const listAvailableAIModelsBound = bind(ListAvailableAIModels)
+const testAIProviderConnectionBound = bind(TestAIProviderConnection)
 const createAIProviderBound = bind(CreateAIProvider)
 const updateAIProviderBound = bind(UpdateAIProvider)
 
@@ -391,6 +393,9 @@ export function listAvailableAIModels(brand: AIProviderBrand) {
     asList(output.models).map(normalizeAIProviderModel),
   )
 }
+
+/** 测试模型服务供应商草稿配置。 */
+export const testAIProviderConnection = testAIProviderConnectionBound
 
 /** 创建模型服务供应商。 */
 export function createAIProvider(input: AIProviderInput) {

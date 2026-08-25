@@ -33,28 +33,20 @@ type ValidationError = common.FieldError
 func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	fields := make(map[string]ValidationCode)
 	input.Name = strings.TrimSpace(input.Name)
-	input.APIKey = strings.TrimSpace(input.APIKey)
-	input.APIURL = strings.TrimSpace(input.APIURL)
-
-	if input.Brand != domain.AIProviderBrandDeepSeek &&
-		input.Brand != domain.AIProviderBrandAlibaba &&
-		input.Brand != domain.AIProviderBrandOpenAI {
-		fields["brand"] = ValidationBrandInvalid
+	connection, connectionFields := normalizeConnectionInput(ConnectionInput{
+		Brand: input.Brand, APIKey: input.APIKey, APIURL: input.APIURL,
+	})
+	input.Brand = connection.Brand
+	input.APIKey = connection.APIKey
+	input.APIURL = connection.APIURL
+	for field, code := range connectionFields {
+		fields[field] = code
 	}
+
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
 	} else if len([]rune(input.Name)) > 100 {
 		fields["name"] = ValidationNameTooLong
-	}
-	if input.APIKey == "" {
-		fields["apiKey"] = ValidationAPIKeyRequired
-	} else if len(input.APIKey) > 2048 {
-		fields["apiKey"] = ValidationAPIKeyTooLong
-	}
-	if input.APIURL == "" {
-		fields["apiUrl"] = ValidationAPIURLRequired
-	} else if !validAPIURL(input.APIURL) {
-		fields["apiUrl"] = ValidationAPIURLInvalid
 	}
 
 	seen := make(map[string]struct{}, len(input.Models))
@@ -79,6 +71,29 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 		fields["models"] = ValidationModelsInvalid
 	}
 	input.Models = models
+	return input, fields
+}
+
+// normalizeConnectionInput 规范化并校验模型服务连接草稿。
+func normalizeConnectionInput(input ConnectionInput) (ConnectionInput, map[string]ValidationCode) {
+	fields := make(map[string]ValidationCode)
+	input.APIKey = strings.TrimSpace(input.APIKey)
+	input.APIURL = strings.TrimSpace(input.APIURL)
+	if input.Brand != domain.AIProviderBrandDeepSeek &&
+		input.Brand != domain.AIProviderBrandAlibaba &&
+		input.Brand != domain.AIProviderBrandOpenAI {
+		fields["brand"] = ValidationBrandInvalid
+	}
+	if input.APIKey == "" {
+		fields["apiKey"] = ValidationAPIKeyRequired
+	} else if len(input.APIKey) > 2048 {
+		fields["apiKey"] = ValidationAPIKeyTooLong
+	}
+	if input.APIURL == "" {
+		fields["apiUrl"] = ValidationAPIURLRequired
+	} else if !validAPIURL(input.APIURL) {
+		fields["apiUrl"] = ValidationAPIURLInvalid
+	}
 	return input, fields
 }
 

@@ -14,6 +14,13 @@ type Input struct {
 	Models []Model
 }
 
+// ConnectionInput 定义测试模型服务连接需要的草稿配置。
+type ConnectionInput struct {
+	Brand  domain.AIProviderBrand
+	APIKey string
+	APIURL string
+}
+
 // Model 定义供应商模型目录项。
 type Model struct {
 	Identifier      string

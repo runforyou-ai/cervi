@@ -99,6 +99,7 @@ func NewService(application *appservice.Service) *Service {
 	router.PUT("/settings/roles/:roleID", service.updateRole)
 	router.DELETE("/settings/roles/:roleID", service.deleteRole)
 	router.GET("/integrations/model-services/models", service.listAvailableAIModels)
+	router.POST("/integrations/model-services/test", service.testAIProviderConnection)
 	router.GET("/integrations/model-services", service.listAIProviders)
 	router.POST("/integrations/model-services", service.createAIProvider)
 	router.GET("/integrations/model-services/:providerID", service.getAIProvider)
@@ -646,6 +647,15 @@ func (s *Service) getAIProvider(c *gin.Context) {
 func (s *Service) listAvailableAIModels(c *gin.Context) {
 	models, err := s.application.ListAvailableAIModels(c.Request.Context(), requestMeta(c), appservice.AIProviderBrand(c.Query("brand")))
 	writeResult(c, http.StatusOK, models, err)
+}
+
+// testAIProviderConnection 测试模型服务供应商草稿配置。
+func (s *Service) testAIProviderConnection(c *gin.Context) {
+	var input appservice.AIProviderConnectionInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.TestAIProviderConnection(c.Request.Context(), requestMeta(c), input))
 }
 
 // createAIProvider 创建模型服务供应商。

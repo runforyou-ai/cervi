@@ -4,12 +4,13 @@ package setting
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
 // TestS3SettingActionExecute 验证 S3 连接测试会签名并访问目标存储桶。
@@ -28,7 +29,7 @@ func TestS3SettingActionExecute(t *testing.T) {
 	}))
 	defer server.Close()
 
-	action := NewTestS3SettingAction()
+	action := NewTestS3SettingAction(connectiontest.NewRunner(time.Second))
 	err := action.Execute(context.Background(), S3Setting{
 		Enabled:         true,
 		Provider:        domain.StorageProviderGeneric,
@@ -51,7 +52,7 @@ func TestS3SettingActionReturnsConnectionError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	action := NewTestS3SettingAction()
+	action := NewTestS3SettingAction(connectiontest.NewRunner(time.Second))
 	err := action.Execute(context.Background(), S3Setting{
 		Enabled:         true,
 		Provider:        domain.StorageProviderGeneric,
@@ -62,7 +63,8 @@ func TestS3SettingActionReturnsConnectionError(t *testing.T) {
 		SecretAccessKey: "secret-key",
 		ForcePathStyle:  true,
 	})
-	if !errors.Is(err, ErrS3ConnectionFailed) {
-		t.Fatalf("error = %v, want ErrS3ConnectionFailed", err)
+	stage, kind, ok := connectiontest.Details(err)
+	if !ok || stage != connectiontest.StageAuthorize || kind != connectiontest.FailureForbidden {
+		t.Fatalf("stage = %q, kind = %q, ok = %v", stage, kind, ok)
 	}
 }

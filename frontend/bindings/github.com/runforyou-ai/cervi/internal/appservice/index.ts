@@ -33,6 +33,7 @@ export {
 
 export type {
     AIProvider,
+    AIProviderConnectionInput,
     AIProviderInput,
     AIProviderList,
     AIProviderModel,

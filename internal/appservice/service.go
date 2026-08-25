@@ -64,6 +64,7 @@ type Backend interface {
 	ListAIProviders(context.Context, RequestMeta) (AIProviderList, error)
 	GetAIProvider(context.Context, RequestMeta, string) (AIProvider, error)
 	ListAvailableAIModels(context.Context, RequestMeta, AIProviderBrand) (AIProviderModelList, error)
+	TestAIProviderConnection(context.Context, RequestMeta, AIProviderConnectionInput) error
 	CreateAIProvider(context.Context, RequestMeta, AIProviderInput) (AIProvider, error)
 	UpdateAIProvider(context.Context, RequestMeta, string, AIProviderInput) (AIProvider, error)
 	DeleteAIProvider(context.Context, RequestMeta, string) error
@@ -520,6 +521,11 @@ func (s *Service) GetAIProvider(ctx context.Context, meta RequestMeta, providerI
 // ListAvailableAIModels 返回指定品牌的预设模型目录。
 func (s *Service) ListAvailableAIModels(ctx context.Context, meta RequestMeta, brand AIProviderBrand) (AIProviderModelList, error) {
 	return s.backend.ListAvailableAIModels(ctx, meta, brand)
+}
+
+// TestAIProviderConnection 测试模型服务供应商草稿配置。
+func (s *Service) TestAIProviderConnection(ctx context.Context, meta RequestMeta, input AIProviderConnectionInput) error {
+	return s.backend.TestAIProviderConnection(ctx, meta, input)
 }
 
 // CreateAIProvider 创建模型服务供应商。

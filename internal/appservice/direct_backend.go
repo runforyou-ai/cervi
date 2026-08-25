@@ -5,6 +5,7 @@ package appservice
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
@@ -21,6 +22,8 @@ import (
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -88,6 +91,7 @@ type DirectBackend struct {
 	deleteRole                        *roleaction.DeleteRoleAction
 	listAIProviders                   *aiprovideraction.ListAIProvidersQuery
 	getAIProvider                     *aiprovideraction.GetAIProviderQuery
+	testAIProviderConnection          *aiprovideraction.TestConnectionAction
 	createAIProvider                  *aiprovideraction.CreateAIProviderAction
 	updateAIProvider                  *aiprovideraction.UpdateAIProviderAction
 	deleteAIProvider                  *aiprovideraction.DeleteAIProviderAction
@@ -103,6 +107,8 @@ type DirectBackend struct {
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
 func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *DirectBackend {
+	connectionRunner := connectiontest.NewRunner(10 * time.Second)
+	modelProviderRegistry := modelprovider.NewRegistry(modelprovider.NewHTTPClient())
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -159,13 +165,14 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		deleteRole:                        roleaction.NewDeleteRoleAction(db),
 		listAIProviders:                   aiprovideraction.NewListAIProvidersQuery(db),
 		getAIProvider:                     aiprovideraction.NewGetAIProviderQuery(db),
+		testAIProviderConnection:          aiprovideraction.NewTestConnectionAction(connectionRunner, modelProviderRegistry),
 		createAIProvider:                  aiprovideraction.NewCreateAIProviderAction(db),
 		updateAIProvider:                  aiprovideraction.NewUpdateAIProviderAction(db),
 		deleteAIProvider:                  aiprovideraction.NewDeleteAIProviderAction(db),
 		updateOrganization:                organizationaction.NewUpdateOrganizationAction(db),
 		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),
-		testS3Setting:                     settingaction.NewTestS3SettingAction(),
+		testS3Setting:                     settingaction.NewTestS3SettingAction(connectionRunner),
 		createFileUpload:                  fileaction.NewCreateUploadAction(db),
 		getFile:                           fileaction.NewGetQuery(db),
 		markFileUploaded:                  fileaction.NewMarkUploadedAction(db),
