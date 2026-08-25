@@ -41,7 +41,7 @@ func TestNormalizeExecutionInputRejectsInvalidEnvelope(t *testing.T) {
 // TestNormalizeExecutionInputRejectsRequiredFields 验证无效模型和空工作指令会被拒绝。
 func TestNormalizeExecutionInputRejectsRequiredFields(t *testing.T) {
 	fields := executionValidationFields(t, ExecutionInput{
-		Mode: domain.AgentExecutionModeManaged,
+		Mode:    domain.AgentExecutionModeManaged,
 		Managed: &ManagedExecutionInput{ProviderID: "invalid"},
 	})
 	if fields["providerId"] != ValidationModelInvalid || fields["modelIdentifier"] != ValidationModelInvalid || fields["systemInstruction"] != ValidationSystemInstructionRequired {

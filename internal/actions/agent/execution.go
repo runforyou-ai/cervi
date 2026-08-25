@@ -249,10 +249,10 @@ func loadAgentExecution(ctx context.Context, db bun.IDB, organizationID, agentID
 // loadAgentExecutionSummaries 批量读取 AI 员工当前执行配置摘要。
 func loadAgentExecutionSummaries(ctx context.Context, db bun.IDB, organizationID string, agentIDs []string) (map[string]ExecutionSummary, error) {
 	type row struct {
-		AgentID        string          `bun:"agent_id"`
-		RevisionID     string          `bun:"revision_id"`
-		ExecutionMode  string          `bun:"execution_mode"`
-		SchemaVersion  int             `bun:"schema_version"`
+		AgentID       string          `bun:"agent_id"`
+		RevisionID    string          `bun:"revision_id"`
+		ExecutionMode string          `bun:"execution_mode"`
+		SchemaVersion int             `bun:"schema_version"`
 		Configuration json.RawMessage `bun:"configuration"`
 	}
 	if len(agentIDs) == 0 {
