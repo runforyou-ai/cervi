@@ -37,6 +37,7 @@ export type {
     AIProviderList,
     AIProviderModel,
     AIProviderModelList,
+    AIProviderModelSummary,
     AIProviderSummary,
     Agent,
     AgentExecution,

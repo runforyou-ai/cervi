@@ -934,13 +934,20 @@ type AIProvider struct {
 	Models []AIProviderModel `json:"models"`
 }
 
+// AIProviderModelSummary 定义供应商列表中的模型目录摘要。
+type AIProviderModelSummary struct {
+	Identifier string      `json:"identifier"`
+	Name       string      `json:"name"`
+	Type       AIModelType `json:"type"`
+}
+
 // AIProviderSummary 定义模型服务供应商列表项。
 type AIProviderSummary struct {
-	ID         string          `json:"id"`
-	Brand      AIProviderBrand `json:"brand"`
-	Name       string          `json:"name"`
-	APIURL     string          `json:"apiUrl"`
-	ModelTypes []AIModelType   `json:"modelTypes"`
+	ID     string                   `json:"id"`
+	Brand  AIProviderBrand          `json:"brand"`
+	Name   string                   `json:"name"`
+	APIURL string                   `json:"apiUrl"`
+	Models []AIProviderModelSummary `json:"models"`
 }
 
 // AIProviderList 定义模型服务供应商列表。

@@ -94,6 +94,15 @@ export interface AIProviderModelList {
 }
 
 /**
+ * AIProviderModelSummary 定义供应商列表中的模型目录摘要。
+ */
+export interface AIProviderModelSummary {
+    "identifier": string;
+    "name": string;
+    "type": AIModelType;
+}
+
+/**
  * AIProviderSummary 定义模型服务供应商列表项。
  */
 export interface AIProviderSummary {
@@ -101,7 +110,7 @@ export interface AIProviderSummary {
     "brand": AIProviderBrand;
     "name": string;
     "apiUrl": string;
-    "modelTypes": AIModelType[] | null;
+    "models": AIProviderModelSummary[] | null;
 }
 
 /**
