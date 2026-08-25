@@ -209,7 +209,7 @@ external_sender         第三方平台发送者
 
 网站独立接待页和嵌入挂件使用服务端生成的渠道级不透明 token 恢复匿名身份；企业成员仍使用 Bearer Token。
 
-- Cookie 名称为 `cervi_visitor_<去掉连字符的 channel_id>`，每个网站渠道独立；值为 32 位小写字母数字随机串，不能由业务编号推导。
+- Cookie 名称为 `cervi_visitor_<channel_id>`，每个网站渠道独立；值为 16 个随机字节编码成的 32 位小写十六进制字符串，不能由业务编号推导。
 - Cookie 有效期为 365 天，不滑动续期；设置 `Path=/`、`HttpOnly`，不设置 `Domain`。同一个公开初始化接口无法稳定区分独立页和 iframe，因此所有 HTTPS 请求统一使用 `SameSite=None; Secure`，所有 HTTP 请求使用 `SameSite=Lax` 且不设置 `Secure`。反向代理后的协议判断使用可信代理提供的外部协议，不只检查 `Request.TLS`。
 - 状态初始化请求只在 Header、Cookie 优先解析得到的 token 缺失或非法时生成 token，写回带 365 天有效期的 Cookie 并在响应中返回。已有合法 token 不重写长期 Cookie，不刷新过期时间；Header 与 Cookie 不一致时 Header 优先，但不为了收敛值滑动 Cookie。此时不创建联系人、渠道身份或会话；第一条有效文本消息才在同一事务创建业务记录。
 - 页面只在内存中保存响应 token；需要时通过 `X-Cervi-Visitor-Token` 回传，服务端按 Header、Cookie 的顺序解析。token 不写入 `localStorage`。
@@ -277,7 +277,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 网站实时入站没有可信的客户端业务时间，因此使用服务器首次接收时间作为 `originated_at`；Telegram 等能提供稳定来源时间的平台使用远端时间。Telegram 历史补拉不能用补拉入库时间重排历史。
 
-消息历史使用 `before` 游标按 `(originated_at DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一 `(originated_at, id)` 边界正序扫描更新记录。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。两种游标都由服务端编码方向、Conversation 编号和元组，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
+消息历史使用 `before` 游标按 `(originated_at DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一 `(originated_at, id)` 边界正序扫描更新记录。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。游标由服务端编码 Conversation 编号和元组，方向由查询参数表达，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
 
 会话的 `last_message_at` 表示当前已知消息最大的 `originated_at`，只向后更新。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它，删除最后一条消息也不回退它。会话预览跳过已删除消息。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
 

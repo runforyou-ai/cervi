@@ -18,22 +18,17 @@ import (
 
 const websiteMessagePageSize = 50
 
-// ListWebsiteMessagesQuery 读取网站访客客户线程的完整消息历史。
+// ListWebsiteMessagesQuery 分页读取网站访客客户线程消息。
 type ListWebsiteMessagesQuery struct {
 	db *bun.DB
 }
 
 type websiteMessageRow struct {
-	ID                string    `bun:"id"`
-	Body              string    `bun:"body"`
-	Type              string    `bun:"type"`
-	OriginatedAt      time.Time `bun:"originated_at"`
-	CreatedAt         time.Time `bun:"created_at"`
-	ParticipantID     *string   `bun:"participant_id"`
-	SubjectKind       *string   `bun:"subject_kind"`
-	SubjectSource     *string   `bun:"subject_source"`
-	SessionID         *string   `bun:"session_id"`
-	SessionIdentityID *string   `bun:"session_identity_id"`
+	ID           string    `bun:"id"`
+	Body         string    `bun:"body"`
+	OriginatedAt time.Time `bun:"originated_at"`
+	CreatedAt    time.Time `bun:"created_at"`
+	SubjectKind  string    `bun:"subject_kind"`
 }
 
 // NewListWebsiteMessagesQuery 创建网站访客消息历史查询。
@@ -41,7 +36,7 @@ func NewListWebsiteMessagesQuery(db *bun.DB) *ListWebsiteMessagesQuery {
 	return &ListWebsiteMessagesQuery{db: db}
 }
 
-// Execute 返回指定客户线程的稳定消息页。
+// Execute 返回指定客户线程的消息页。
 func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHistoryInput) (MessageHistory, error) {
 	fields := validateMessageHistoryInput(input)
 	if len(fields) > 0 {
@@ -63,13 +58,6 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 	if err != nil {
 		return MessageHistory{}, fmt.Errorf("load website message identity: %w", err)
 	}
-	contact := &servermodels.Contact{}
-	if err := q.db.NewSelect().Model(contact).
-		Where("c.organization_id = ?", channel.OrganizationID).
-		Where("c.id = ?", identity.ContactID).
-		Scan(ctx); err != nil {
-		return MessageHistory{}, ErrDataInvariant
-	}
 	owned, err := q.db.NewSelect().
 		TableExpr("customer_conversations AS cc").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id AND cv.type = ?", domain.ConversationTypeCustomer).
@@ -88,19 +76,14 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("msg.body AS body").
-		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.created_at AS created_at").
-		ColumnExpr("cp.id AS participant_id").
 		ColumnExpr("cs.kind AS subject_kind").
-		ColumnExpr("cs.source_id AS subject_source").
-		ColumnExpr("ss.id AS session_id").
-		ColumnExpr("ss.contact_channel_identity_id AS session_identity_id").
-		Join("LEFT JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
-		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
-		Join("LEFT JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
+		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
+		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Where("msg.organization_id = ?", channel.OrganizationID).
 		Where("msg.conversation_id = ?", input.ConversationID).
+		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL")
 	if input.Before != nil {
 		query = query.Where("(msg.originated_at, msg.id) < (?, ?)", input.Before.OriginatedAt, input.Before.ID).
@@ -115,7 +98,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 	if err := query.Limit(websiteMessagePageSize+1).Scan(ctx, &rows); err != nil {
 		return MessageHistory{}, fmt.Errorf("list website conversation messages: %w", err)
 	}
-	return buildMessageHistory(rows, input, contact.ID, identity.ID)
+	return buildMessageHistory(rows, input), nil
 }
 
 // validateMessageHistoryInput 校验消息分页输入。
@@ -141,8 +124,8 @@ func validateMessageHistoryInput(input MessageHistoryInput) map[string]Validatio
 	return fields
 }
 
-// buildMessageHistory 校验发送主体并构造正序消息页。
-func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput, contactID, channelIdentityID string) (MessageHistory, error) {
+// buildMessageHistory 构造正序消息页。
+func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) MessageHistory {
 	hasMore := len(rows) > websiteMessagePageSize
 	if hasMore {
 		rows = rows[:websiteMessagePageSize]
@@ -152,19 +135,18 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput, co
 	}
 	messages := make([]Message, 0, len(rows))
 	for _, row := range rows {
-		if row.Type != string(domain.MessageTypeText) || row.ParticipantID == nil || row.SubjectKind == nil || row.SubjectSource == nil ||
-			row.SessionID == nil || row.SessionIdentityID == nil || *row.SessionIdentityID != channelIdentityID ||
-			*row.SubjectKind != string(domain.ChatSubjectKindContact) || *row.SubjectSource != contactID {
-			return MessageHistory{}, ErrDataInvariant
+		author := domain.MessageAuthorAgent
+		if row.SubjectKind == string(domain.ChatSubjectKindContact) {
+			author = domain.MessageAuthorVisitor
 		}
 		messages = append(messages, Message{
-			ID: row.ID, Author: domain.MessageAuthorVisitor, Body: row.Body,
+			ID: row.ID, Author: author, Body: row.Body,
 			OriginatedAt: row.OriginatedAt, CreatedAt: row.CreatedAt,
 		})
 	}
 	result := MessageHistory{Messages: messages}
 	if len(rows) == 0 {
-		return result, nil
+		return result
 	}
 	first := MessageCursorPoint{OriginatedAt: rows[0].OriginatedAt, ID: rows[0].ID}
 	last := MessageCursorPoint{OriginatedAt: rows[len(rows)-1].OriginatedAt, ID: rows[len(rows)-1].ID}
@@ -181,5 +163,5 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput, co
 		}
 		result.After = &last
 	}
-	return result, nil
+	return result
 }

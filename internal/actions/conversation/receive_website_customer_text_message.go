@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -80,10 +81,15 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 		if err == nil {
 			return result, nil
 		}
-		if !retryableUniqueViolation(err) {
+		constraint, retryable := retryableUniqueViolation(err)
+		if !retryable {
 			return ReceiveWebsiteCustomerTextMessageResult{}, err
 		}
+		if attempt < 2 {
+			slog.Info("网站访客消息写入重试", "channel_id", normalized.ChannelID, "attempt", attempt+2, "constraint", constraint)
+		}
 	}
+	slog.Warn("网站访客消息写入重试耗尽", "channel_id", normalized.ChannelID, "error", err)
 	return ReceiveWebsiteCustomerTextMessageResult{}, fmt.Errorf("receive website message retries exhausted: %w", err)
 }
 
@@ -100,7 +106,6 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 	ensured, err := contactaction.EnsureChannelIdentity(ctx, tx, contactaction.EnsureChannelIdentityInput{
 		OrganizationID: channel.OrganizationID,
 		ChannelID:      channel.ID,
-		ChannelType:    domain.ChannelTypeWebsite,
 		ExternalID:     input.ExternalID,
 		ContactID:      ids.contact,
 		IdentityID:     ids.channelIdentity,
@@ -108,18 +113,7 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
 	}
-	identity := &servermodels.ContactChannelIdentity{}
-	if err := tx.NewSelect().
-		Model(identity).
-		Where("cci.id = ?", ensured.Identity.ID).
-		Where("cci.organization_id = ?", channel.OrganizationID).
-		For("UPDATE").
-		Scan(ctx); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, fmt.Errorf("lock channel identity: %w", err)
-	}
-	if identity.ChannelID != channel.ID || identity.ContactID != ensured.Contact.ID || identity.ExternalID != input.ExternalID {
-		return ReceiveWebsiteCustomerTextMessageResult{}, ErrDataInvariant
-	}
+	identity := ensured.Identity
 	subject, err := ensureContactSubject(ctx, tx, channel.OrganizationID, ensured.Contact.ID, ids.subject)
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
@@ -157,7 +151,6 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 		conversation.Status = string(domain.ConversationStatusActive)
 	}
 
-	createdServiceSession := false
 	if createSession {
 		route, err := resolveRouteSnapshot(ctx, tx, channel, originatedAt)
 		if err != nil {
@@ -184,7 +177,6 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 			Exec(ctx); err != nil {
 			return ReceiveWebsiteCustomerTextMessageResult{}, fmt.Errorf("create service session: %w", err)
 		}
-		createdServiceSession = true
 	} else if session.Status == string(domain.ServiceSessionStatusPending) {
 		if _, err := tx.NewUpdate().Model(session).
 			Set("status = ?", domain.ServiceSessionStatusActive).
@@ -215,7 +207,7 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 		Exec(ctx); err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, fmt.Errorf("create website customer message: %w", err)
 	}
-	if !createdServiceSession {
+	if !createSession {
 		if err := updateSessionSummary(ctx, tx, session, message); err != nil {
 			return ReceiveWebsiteCustomerTextMessageResult{}, err
 		}
@@ -237,12 +229,6 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
 	}
 	result := receiveResult(summary, session, message)
-	result.OrganizationID = channel.OrganizationID
-	result.ChannelID = channel.ID
-	result.ServiceSessionID = session.ID
-	result.CreatedContact = ensured.Created
-	result.InsertedConversation = insertedConversation
-	result.CreatedServiceSession = createdServiceSession
 	return result, nil
 }
 
@@ -276,7 +262,7 @@ func validWebsiteExternalID(value string) bool {
 		return false
 	}
 	for _, character := range value[len(websiteExternalIDPrefix):] {
-		if (character < 'a' || character > 'z') && (character < '0' || character > '9') {
+		if (character < 'a' || character > 'f') && (character < '0' || character > '9') {
 			return false
 		}
 	}
@@ -342,26 +328,16 @@ func ensureContactSubject(ctx context.Context, db bun.IDB, organizationID, conta
 // selectTargetConversation 取得指定客户线程或创建新的客户线程。
 func selectTargetConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID string, input WebsiteCustomerTextMessageInput, conversationID string) (*servermodels.Conversation, bool, error) {
 	if input.ConversationID != nil {
-		customer := &servermodels.CustomerConversation{}
-		err := db.NewSelect().Model(customer).
-			Where("cc.organization_id = ?", organizationID).
-			Where("cc.conversation_id = ?", *input.ConversationID).
+		conversation := &servermodels.Conversation{}
+		err := db.NewSelect().Model(conversation).
+			Join("JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+			Where("cv.organization_id = ?", organizationID).
+			Where("cv.id = ?", *input.ConversationID).
+			Where("cv.type = ?", domain.ConversationTypeCustomer).
 			Where("cc.contact_channel_identity_id = ?", channelIdentityID).
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, ErrConversationNotFound
-		}
-		if err != nil {
-			return nil, false, fmt.Errorf("load customer conversation relation: %w", err)
-		}
-		conversation := &servermodels.Conversation{}
-		err = db.NewSelect().Model(conversation).
-			Where("cv.organization_id = ?", organizationID).
-			Where("cv.id = ?", customer.ConversationID).
-			Where("cv.type = ?", domain.ConversationTypeCustomer).
-			Scan(ctx)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, false, ErrDataInvariant
 		}
 		if err != nil {
 			return nil, false, fmt.Errorf("load customer conversation: %w", err)
@@ -407,10 +383,9 @@ func ensureContactParticipant(ctx context.Context, db bun.IDB, organizationID, c
 		Where("cp.subject_id = ?", subjectID).
 		Scan(ctx)
 	if err == nil {
-		if participant.LeftAt != nil || participant.Role != string(domain.ConversationParticipantRoleMember) {
+		if participant.LeftAt != nil {
 			if _, err := db.NewUpdate().Model(participant).
 				Set("left_at = NULL").
-				Set("role = ?", domain.ConversationParticipantRoleMember).
 				Set("updated_at = now()").
 				WherePK().
 				Where("organization_id = ?", organizationID).
@@ -418,7 +393,6 @@ func ensureContactParticipant(ctx context.Context, db bun.IDB, organizationID, c
 				return nil, fmt.Errorf("restore contact conversation participant: %w", err)
 			}
 			participant.LeftAt = nil
-			participant.Role = string(domain.ConversationParticipantRoleMember)
 		}
 		return participant, nil
 	}
@@ -468,15 +442,17 @@ func selectServiceSession(ctx context.Context, db bun.IDB, organizationID, conve
 // resolveRouteSnapshot 解析新客服处理周期的渠道路由快照。
 func resolveRouteSnapshot(ctx context.Context, db bun.IDB, channel *servermodels.Channel, now time.Time) (routeSnapshot, error) {
 	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, domain.ChannelRoutingTargetType(channel.InitialRoutingTargetType), channel.InitialRoutingTargetID, now); err != nil {
-		return routeSnapshot{}, err
+		return routeSnapshot{}, fmt.Errorf("resolve website channel initial route: %w", err)
 	} else if available {
 		return route, nil
 	}
+	slog.Warn("网站渠道初始路由不可用", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.InitialRoutingTargetType)
 	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType), channel.FallbackRoutingTargetID, now); err != nil {
-		return routeSnapshot{}, err
+		return routeSnapshot{}, fmt.Errorf("resolve website channel fallback route: %w", err)
 	} else if available {
 		return route, nil
 	}
+	slog.Warn("网站渠道失败路由不可用，进入公共队列", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.FallbackRoutingTargetType)
 	return routeSnapshot{}, nil
 }
 
@@ -516,7 +492,7 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, targ
 
 // updateSessionSummary 按消息稳定顺序推进未结束批次摘要。
 func updateSessionSummary(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, message *servermodels.Message) error {
-	result, err := db.NewUpdate().Model(session).
+	_, err := db.NewUpdate().Model(session).
 		Set("last_message_id = ?", message.ID).
 		Set("last_message_at = ?", message.OriginatedAt).
 		Set("updated_at = now()").
@@ -528,16 +504,12 @@ func updateSessionSummary(ctx context.Context, db bun.IDB, session *servermodels
 	if err != nil {
 		return fmt.Errorf("update service session summary: %w", err)
 	}
-	if affected, _ := result.RowsAffected(); affected > 0 {
-		session.LastMessageID = message.ID
-		session.LastMessageAt = message.OriginatedAt
-	}
 	return nil
 }
 
 // updateConversationSummary 按消息稳定顺序推进客户线程摘要。
 func updateConversationSummary(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) error {
-	result, err := db.NewUpdate().Model(conversation).
+	_, err := db.NewUpdate().Model(conversation).
 		Set("last_message_id = ?", message.ID).
 		Set("last_message_at = ?", message.OriginatedAt).
 		Set("updated_at = now()").
@@ -547,10 +519,6 @@ func updateConversationSummary(ctx context.Context, db bun.IDB, conversation *se
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("update conversation summary: %w", err)
-	}
-	if affected, _ := result.RowsAffected(); affected > 0 {
-		conversation.LastMessageID = &message.ID
-		conversation.LastMessageAt = &message.OriginatedAt
 	}
 	return nil
 }
@@ -573,24 +541,22 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("cv.title AS title").
-		ColumnExpr("cv.last_message_id AS last_message_id").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("msg.body AS preview").
-		ColumnExpr("msg.originated_at AS preview_originated_at").
 		ColumnExpr("latest.id AS service_session_id").
 		ColumnExpr("latest.status AS service_session_status").
-		ColumnExpr("latest.contact_channel_identity_id AS service_session_identity_id").
-		Join("LEFT JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
-		Join("LEFT JOIN LATERAL (SELECT ss.id, ss.status, ss.contact_channel_identity_id FROM service_sessions AS ss WHERE ss.organization_id = cv.organization_id AND ss.conversation_id = cv.id ORDER BY ss.sequence DESC LIMIT 1) AS latest ON TRUE").
+		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
+		Join("JOIN LATERAL (SELECT ss.id, ss.status, ss.contact_channel_identity_id FROM service_sessions AS ss WHERE ss.organization_id = cv.organization_id AND ss.conversation_id = cv.id ORDER BY ss.sequence DESC LIMIT 1) AS latest ON TRUE").
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.id = ?", conversationID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer).
 		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
+		Where("latest.contact_channel_identity_id = ?", channelIdentityID).
 		Scan(ctx, &row)
 	if err != nil {
 		return ConversationSummary{}, fmt.Errorf("load website conversation summary: %w", err)
 	}
-	return conversationSummaryFromRow(row, channelIdentityID)
+	return conversationSummaryFromRow(row), nil
 }
 
 // loadIdempotentResult 校验并返回已经保存的网站消息。
@@ -609,82 +575,56 @@ func loadIdempotentResult(ctx context.Context, db bun.IDB, channel *servermodels
 	if message.ServiceSessionID == nil || message.SenderParticipantID == nil || message.Type != string(domain.MessageTypeText) || message.DeletedAt != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, true, ErrDataInvariant
 	}
-	participant := &servermodels.ConversationParticipant{}
-	if err := db.NewSelect().Model(participant).
-		Where("cp.organization_id = ?", channel.OrganizationID).
-		Where("cp.id = ?", *message.SenderParticipantID).
-		Where("cp.conversation_id = ?", message.ConversationID).
-		Scan(ctx); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, true, ErrDataInvariant
-	}
-	subject := &servermodels.ChatSubject{}
-	if err := db.NewSelect().Model(subject).
-		Where("cs.organization_id = ?", channel.OrganizationID).
-		Where("cs.id = ?", participant.SubjectID).
-		Where("cs.kind = ?", domain.ChatSubjectKindContact).
-		Scan(ctx); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, true, ErrDataInvariant
-	}
-	contact := &servermodels.Contact{}
-	if err := db.NewSelect().Model(contact).
-		Where("c.organization_id = ?", channel.OrganizationID).
-		Where("c.id = ?", subject.SourceID).
-		Scan(ctx); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, true, ErrDataInvariant
-	}
-	session := &servermodels.ServiceSession{}
-	if err := db.NewSelect().Model(session).
-		Where("ss.organization_id = ?", channel.OrganizationID).
-		Where("ss.id = ?", *message.ServiceSessionID).
-		Where("ss.conversation_id = ?", message.ConversationID).
-		Scan(ctx); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, true, ErrDataInvariant
-	}
-	customer := &servermodels.CustomerConversation{}
-	if err := db.NewSelect().Model(customer).
-		Where("cc.organization_id = ?", channel.OrganizationID).
-		Where("cc.conversation_id = ?", message.ConversationID).
-		Where("cc.contact_channel_identity_id = ?", session.ContactChannelIdentityID).
-		Scan(ctx); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, true, ErrDataInvariant
-	}
 	identity := &servermodels.ContactChannelIdentity{}
-	if err := db.NewSelect().Model(identity).
+	err = db.NewSelect().Model(identity).
 		Where("cci.organization_id = ?", channel.OrganizationID).
-		Where("cci.id = ?", session.ContactChannelIdentityID).
 		Where("cci.channel_id = ?", channel.ID).
-		Scan(ctx); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, true, ErrDataInvariant
-	}
-	conversation := &servermodels.Conversation{}
-	if err := db.NewSelect().Model(conversation).
-		Where("cv.organization_id = ?", channel.OrganizationID).
-		Where("cv.id = ?", message.ConversationID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer).
-		Scan(ctx); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, true, ErrDataInvariant
-	}
-	if identity.ExternalID != input.ExternalID || identity.ContactID != contact.ID || message.Body != input.Body ||
-		(input.ConversationID != nil && *input.ConversationID != message.ConversationID) {
+		Where("cci.external_id = ?", input.ExternalID).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
 		return ReceiveWebsiteCustomerTextMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
-	summary, err := loadConversationSummary(ctx, db, channel.OrganizationID, conversation.ID, identity.ID)
+	if err != nil {
+		return ReceiveWebsiteCustomerTextMessageResult{}, true, fmt.Errorf("load idempotent website identity: %w", err)
+	}
+	if message.Body != input.Body || (input.ConversationID != nil && *input.ConversationID != message.ConversationID) {
+		return ReceiveWebsiteCustomerTextMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+	}
+	session := &servermodels.ServiceSession{}
+	err = db.NewSelect().Model(session).
+		Join("JOIN customer_conversations AS cc ON cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id").
+		Join("JOIN conversation_participants AS cp ON cp.organization_id = cc.organization_id AND cp.conversation_id = cc.conversation_id").
+		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
+		Where("cc.organization_id = ?", channel.OrganizationID).
+		Where("cc.conversation_id = ?", message.ConversationID).
+		Where("cc.contact_channel_identity_id = ?", identity.ID).
+		Where("ss.id = ?", *message.ServiceSessionID).
+		Where("ss.contact_channel_identity_id = ?", identity.ID).
+		Where("cp.id = ?", *message.SenderParticipantID).
+		Where("cs.kind = ?", domain.ChatSubjectKindContact).
+		Where("cs.source_id = ?", identity.ContactID).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ReceiveWebsiteCustomerTextMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+	}
+	if err != nil {
+		return ReceiveWebsiteCustomerTextMessageResult{}, true, fmt.Errorf("check idempotent website message ownership: %w", err)
+	}
+	summary, err := loadConversationSummary(ctx, db, channel.OrganizationID, message.ConversationID, identity.ID)
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, true, err
 	}
 	result := receiveResult(summary, session, message)
-	result.OrganizationID = channel.OrganizationID
-	result.ChannelID = channel.ID
-	result.ServiceSessionID = session.ID
 	return result, true, nil
 }
 
-// retryableUniqueViolation 判断是否命中了明确允许重试的并发唯一约束。
-func retryableUniqueViolation(err error) bool {
+// retryableUniqueViolation 返回允许重试的并发唯一约束。
+func retryableUniqueViolation(err error) (string, bool) {
 	var postgresError pgdriver.Error
 	if !errors.As(err, &postgresError) || postgresError.Field('C') != "23505" {
-		return false
+		return "", false
 	}
-	_, retryable := retryableConstraintNames[postgresError.Field('n')]
-	return retryable
+	constraint := postgresError.Field('n')
+	_, retryable := retryableConstraintNames[constraint]
+	return constraint, retryable
 }

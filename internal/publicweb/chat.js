@@ -23,7 +23,8 @@
   var recordingTimer = null;
   var lightbox = null;
   var parentOrigin = document.referrer ? new URL(document.referrer).origin : "";
-  var messengerVisible = !document.documentElement.classList.contains("cv-embed");
+  var messengerVisible =
+    !document.documentElement.classList.contains("cv-embed");
   var expanded = false;
   var nativeContextMenuSource = "";
   var defaultTitle = document.title;
@@ -38,10 +39,10 @@
   var loadingLabel = messenger.getAttribute("data-loading");
   var requestFailedLabel = messenger.getAttribute("data-request-failed");
   var sessionLabels = {
-  waiting: messenger.getAttribute("data-session-waiting"),
-  active: messenger.getAttribute("data-session-active"),
-  pending: messenger.getAttribute("data-session-pending"),
-  closed: messenger.getAttribute("data-session-closed"),
+    waiting: messenger.getAttribute("data-session-waiting"),
+    active: messenger.getAttribute("data-session-active"),
+    pending: messenger.getAttribute("data-session-pending"),
+    closed: messenger.getAttribute("data-session-closed"),
   };
   var emojiPanel = document.getElementById("cv-emoji");
   var moreMenu = document.getElementById("cv-more-menu");
@@ -93,7 +94,9 @@
         scrollToBottom();
       }, 0);
     } else {
-      var heading = document.querySelector('[data-screen="' + route + '"] [data-route-heading]');
+      var heading = document.querySelector(
+        '[data-screen="' + route + '"] [data-route-heading]',
+      );
       if (heading) {
         window.setTimeout(function () {
           heading.focus();
@@ -105,29 +108,31 @@
   function createConversation(summary) {
     summary = summary || null;
     return {
-    id: summary ? summary.id : null,
-    title: summary ? summary.title : "",
+      id: summary ? summary.id : null,
+      title: summary ? summary.title : "",
       fragment: document.createDocumentFragment(),
-    started: summary !== null,
+      started: summary !== null,
       draft: "",
-    summary: summary ? summary.preview : "",
-    time: summary ? formatTime(new Date(summary.lastMessageAt)) : "",
-    lastMessageAt: summary ? summary.lastMessageAt : "",
-    serviceSession: summary ? summary.serviceSession : null,
+      summary: summary ? summary.preview : "",
+      time: summary ? formatTime(new Date(summary.lastMessageAt)) : "",
+      lastMessageAt: summary ? summary.lastMessageAt : "",
+      serviceSession: summary ? summary.serviceSession : null,
       unread: false,
       replyState: "none",
       typingNode: null,
-    historyLoaded: false,
-    historyLoading: false,
-    messageIDs: Object.create(null),
-    pendingMessageID: "",
-    pendingBody: "",
+      historyLoaded: false,
+      historyLoading: false,
+      messageIDs: Object.create(null),
+      pendingMessageID: "",
+      pendingBody: "",
     };
   }
 
   // 返回指定会话当前承载消息的容器。
   function conversationMessageContainer(conversation) {
-    return conversation === activeConversation ? messages : conversation.fragment;
+    return conversation === activeConversation
+      ? messages
+      : conversation.fragment;
   }
 
   // 向指定会话追加节点，并只滚动当前会话。
@@ -149,15 +154,22 @@
 
   function showConversation(conversation) {
     if (activeConversation === conversation) {
-    if (!previewMode && conversation.id && !conversation.historyLoaded && !conversation.historyLoading) {
-    loadConversationHistory(conversation);
-    }
+      if (
+        !previewMode &&
+        conversation.id &&
+        !conversation.historyLoaded &&
+        !conversation.historyLoading
+      ) {
+        loadConversationHistory(conversation);
+      }
       return;
     }
     stashActiveConversation();
     activeConversation = conversation;
     messages.appendChild(activeConversation.fragment);
-  intro.hidden = previewMode ? activeConversation.started : activeConversation.id !== null;
+    intro.hidden = previewMode
+      ? activeConversation.started
+      : activeConversation.id !== null;
     $("cv-conversation-error").hidden = true;
     input.value = activeConversation.draft;
     fileInput.value = "";
@@ -171,15 +183,19 @@
     autosize();
     updateSendState();
     messages.scrollTop = activeConversation.started ? messages.scrollHeight : 0;
-  if (!previewMode && activeConversation.id && !activeConversation.historyLoaded) {
-    loadConversationHistory(activeConversation);
-  }
+    if (
+      !previewMode &&
+      activeConversation.id &&
+      !activeConversation.historyLoaded
+    ) {
+      loadConversationHistory(activeConversation);
+    }
   }
 
   function beginNewConversation() {
-  if (!previewMode && !initialized) {
-    return;
-  }
+    if (!previewMode && !initialized) {
+      return;
+    }
     var returnRoute = activeRoute;
     showConversation(createConversation());
     conversationReturnRoute = returnRoute;
@@ -196,15 +212,12 @@
     navigate("conversation");
   }
 
-  // 打开指定的真实客户会话。
+  // 打开指定会话。
   function resumeConversation(conversation) {
-  if (!conversation) {
-    return;
-  }
-  var returnRoute = activeRoute;
-  showConversation(conversation);
-  conversationReturnRoute = returnRoute;
-  navigate("conversation");
+    var returnRoute = activeRoute;
+    showConversation(conversation);
+    conversationReturnRoute = returnRoute;
+    navigate("conversation");
   }
 
   function postToParent(message) {
@@ -254,33 +267,43 @@
   }
 
   function showHelpTopic(button) {
-    $("cv-help-detail-title").textContent = button.querySelector("strong").textContent;
+    $("cv-help-detail-title").textContent =
+      button.querySelector("strong").textContent;
     navigate("help-detail");
   }
 
   function filterHelp() {
     var query = $("cv-help-input").value.trim().toLocaleLowerCase();
     var visible = 0;
-    document.querySelectorAll("#cv-collection-list [data-search-text]").forEach(function (button) {
-      var searchText = button.getAttribute("data-search-text").toLocaleLowerCase();
-      button.hidden = query !== "" && searchText.indexOf(query) === -1;
-      if (!button.hidden) {
-        visible += 1;
-      }
-    });
+    document
+      .querySelectorAll("#cv-collection-list [data-search-text]")
+      .forEach(function (button) {
+        var searchText = button
+          .getAttribute("data-search-text")
+          .toLocaleLowerCase();
+        button.hidden = query !== "" && searchText.indexOf(query) === -1;
+        if (!button.hidden) {
+          visible += 1;
+        }
+      });
     $("cv-help-empty").hidden = visible !== 0;
   }
 
   function autosize() {
     input.style.height = "auto";
-    input.style.height = Math.min(input.scrollHeight, COMPOSER_MAX_HEIGHT) + "px";
-    input.style.overflowY = input.scrollHeight > COMPOSER_MAX_HEIGHT ? "auto" : "hidden";
+    input.style.height =
+      Math.min(input.scrollHeight, COMPOSER_MAX_HEIGHT) + "px";
+    input.style.overflowY =
+      input.scrollHeight > COMPOSER_MAX_HEIGHT ? "auto" : "hidden";
   }
 
   function updateSendState() {
-  sendButton.disabled =
-    input.value.trim() === "" ||
-    (!previewMode && (!initialized || messageRequestPending || activeConversation.historyLoading));
+    sendButton.disabled =
+      input.value.trim() === "" ||
+      (!previewMode &&
+        (!initialized ||
+          messageRequestPending ||
+          activeConversation.historyLoading));
   }
 
   function formatTime(date) {
@@ -292,21 +315,18 @@
 
   // 按服务端时间和会话编号稳定比较会话新旧。
   function compareConversationRecency(left, right) {
-  var leftTime = normalizedTimestamp(left.lastMessageAt);
-  var rightTime = normalizedTimestamp(right.lastMessageAt);
-  if (leftTime !== rightTime) {
-    return leftTime < rightTime ? 1 : -1;
-  }
-  return (right.id || "").localeCompare(left.id || "");
+    var leftTime = normalizedTimestamp(left.lastMessageAt);
+    var rightTime = normalizedTimestamp(right.lastMessageAt);
+    if (leftTime !== rightTime) {
+      return leftTime < rightTime ? 1 : -1;
+    }
+    return (right.id || "").localeCompare(left.id || "");
   }
 
-  // 把 UTC RFC3339 的小数秒补齐，避免字符串精度不同导致排序颠倒。
+  // normalizedTimestamp 统一 RFC3339 小数秒精度。
   function normalizedTimestamp(value) {
-  var match = String(value || "").match(/^(.*?)(?:\.(\d+))?Z$/);
-  if (!match) {
-    return String(value || "");
-  }
-  return match[1] + "." + (match[2] || "").padEnd(9, "0").slice(0, 9) + "Z";
+    var match = value.match(/^(.*?)(?:\.(\d+))?Z$/);
+    return match[1] + "." + (match[2] || "").padEnd(9, "0").slice(0, 9) + "Z";
   }
 
   function formatDuration(seconds) {
@@ -350,7 +370,9 @@
     }
     activeConversation.started = true;
     intro.hidden = true;
-    var greeting = document.querySelector("[data-channel-greeting]").textContent.trim();
+    var greeting = document
+      .querySelector("[data-channel-greeting]")
+      .textContent.trim();
     if (greeting) {
       appendAssistantMessage(activeConversation, greeting, true);
     }
@@ -444,77 +466,88 @@
     $("cv-messages-empty").hidden = hasRecentConversation;
     $("cv-conversation-list").hidden = !hasRecentConversation;
     $("cv-home-recent").hidden = !hasRecentConversation;
-  $("cv-conversation-list").innerHTML = "";
+    $("cv-conversation-list").innerHTML = "";
     if (!hasRecentConversation) {
-    unreadDot.hidden = true;
-    postToParent({ type: "cervi:unread", unread: false });
+      unreadDot.hidden = true;
+      postToParent({ type: "cervi:unread", unread: false });
       return;
     }
-  conversationItems.forEach(function (conversation) {
-    $("cv-conversation-list").appendChild(conversationListButton(conversation));
-  });
-  $("cv-home-recent").querySelector("strong").textContent =
-    previewMode ? displayTitle : recentConversation.title;
+    conversationItems.forEach(function (conversation) {
+      $("cv-conversation-list").appendChild(
+        conversationListButton(conversation),
+      );
+    });
+    $("cv-home-recent").querySelector("strong").textContent = previewMode
+      ? displayTitle
+      : recentConversation.title;
     $("cv-home-recent-preview").textContent = recentConversation.summary;
     $("cv-home-recent-time").textContent = recentConversation.time;
-  unreadDot.hidden = previewMode ? !recentConversation.unread : true;
+    unreadDot.hidden = previewMode ? !recentConversation.unread : true;
     $("cv-home-recent-unread-dot").hidden = !recentConversation.unread;
-  postToParent({ type: "cervi:unread", unread: previewMode && recentConversation.unread });
+    postToParent({
+      type: "cervi:unread",
+      unread: previewMode && recentConversation.unread,
+    });
   }
 
   // 创建一条可点击的会话列表项。
   function conversationListButton(conversation) {
-  var button = document.createElement("button");
-  button.type = "button";
-  button.setAttribute("data-conversation-id", conversation.id || "preview");
-  var avatar = document.createElement("span");
-  avatar.className = "cv-presence-avatar";
-  avatar.setAttribute("aria-hidden", "true");
-  var initials = document.createElement("span");
-  initials.textContent = document.querySelector(".cv-presence-avatar span").textContent;
-  avatar.appendChild(initials);
-  var summary = document.createElement("span");
-  summary.className = "cv-conversation-summary";
-  var titleRow = document.createElement("span");
-  titleRow.className = "cv-conversation-row";
-  var title = document.createElement("strong");
-  title.textContent = previewMode ? displayTitle : conversation.title;
-  var time = document.createElement("time");
-  time.textContent = conversation.time;
-  titleRow.appendChild(title);
-  titleRow.appendChild(time);
-  var previewRow = document.createElement("span");
-  previewRow.className = "cv-conversation-row";
-  var preview = document.createElement("span");
-  preview.textContent = conversation.summary;
-  previewRow.appendChild(preview);
-  if (!previewMode && conversation.serviceSession) {
-    var status = document.createElement("small");
-    status.textContent = sessionLabels[conversation.serviceSession.status] || "";
-    previewRow.appendChild(status);
-  }
-  summary.appendChild(titleRow);
-  summary.appendChild(previewRow);
-  button.appendChild(avatar);
-  button.appendChild(summary);
-  button.addEventListener("click", function () {
-    resumeConversation(conversation);
-  });
-  return button;
+    var button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("data-conversation-id", conversation.id || "preview");
+    var avatar = document.createElement("span");
+    avatar.className = "cv-presence-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    var initials = document.createElement("span");
+    initials.textContent = document.querySelector(
+      ".cv-presence-avatar span",
+    ).textContent;
+    avatar.appendChild(initials);
+    var summary = document.createElement("span");
+    summary.className = "cv-conversation-summary";
+    var titleRow = document.createElement("span");
+    titleRow.className = "cv-conversation-row";
+    var title = document.createElement("strong");
+    title.textContent = previewMode ? displayTitle : conversation.title;
+    var time = document.createElement("time");
+    time.textContent = conversation.time;
+    titleRow.appendChild(title);
+    titleRow.appendChild(time);
+    var previewRow = document.createElement("span");
+    previewRow.className = "cv-conversation-row";
+    var preview = document.createElement("span");
+    preview.textContent = conversation.summary;
+    previewRow.appendChild(preview);
+    if (!previewMode && conversation.serviceSession) {
+      var status = document.createElement("small");
+      status.textContent =
+        sessionLabels[conversation.serviceSession.status] || "";
+      previewRow.appendChild(status);
+    }
+    summary.appendChild(titleRow);
+    summary.appendChild(previewRow);
+    button.appendChild(avatar);
+    button.appendChild(summary);
+    button.addEventListener("click", function () {
+      resumeConversation(conversation);
+    });
+    return button;
   }
 
   // 更新指定会话的摘要、时间和未读状态。
   function updateConversationSummary(conversation, preview, date) {
     conversation.summary = preview;
     conversation.time = formatTime(date);
-  conversation.lastMessageAt = date.toISOString();
+    conversation.lastMessageAt = date.toISOString();
     conversation.unread =
-      conversation !== activeConversation || activeRoute !== "conversation" || !messengerVisible;
-  if (conversationItems.indexOf(conversation) === -1) {
-    conversationItems.push(conversation);
-  }
-  conversationItems.sort(compareConversationRecency);
-  recentConversation = conversationItems[0];
+      conversation !== activeConversation ||
+      activeRoute !== "conversation" ||
+      !messengerVisible;
+    if (conversationItems.indexOf(conversation) === -1) {
+      conversationItems.push(conversation);
+    }
+    conversationItems.sort(compareConversationRecency);
+    recentConversation = conversationItems[0];
     renderRecentConversation();
   }
 
@@ -531,10 +564,10 @@
     if (!text) {
       return;
     }
-  if (!previewMode) {
-    sendRealMessage(text);
-    return;
-  }
+    if (!previewMode) {
+      sendRealMessage(text);
+      return;
+    }
     appendVisitorMessage(text, []);
     input.value = "";
     autosize();
@@ -545,274 +578,267 @@
 
   // 请求网站访客 JSON 接口。
   function requestWebsiteJSON(path, options) {
-  options = options || {};
-  options.credentials = "same-origin";
-  options.headers = options.headers || {};
-  options.headers.Accept = "application/json";
-  options.headers["Accept-Language"] = document.documentElement.lang;
-  if (visitorToken) {
-    options.headers["X-Cervi-Visitor-Token"] = visitorToken;
-  }
-  return window.fetch(path, options).then(function (response) {
-    return response.text().then(function (text) {
-    var payload = null;
-    if (text) {
-      try {
-      payload = JSON.parse(text);
-      } catch (_error) {
-      payload = null;
-      }
+    options = options || {};
+    options.headers = options.headers || {};
+    options.headers.Accept = "application/json";
+    options.headers["Accept-Language"] = document.documentElement.lang;
+    if (visitorToken) {
+      options.headers["X-Cervi-Visitor-Token"] = visitorToken;
     }
-    if (!response.ok) {
-      var message = payload && payload.error && payload.error.message;
-      var error = new Error(message || requestFailedLabel);
-      error.payload = payload;
-      throw error;
-    }
-    return payload;
+    return window.fetch(path, options).then(function (response) {
+      return response.json().then(function (payload) {
+        if (!response.ok) {
+          var message = payload.error && payload.error.message;
+          var error = new Error(message || requestFailedLabel);
+          throw error;
+        }
+        return payload;
+      });
     });
-  });
   }
 
   // 将服务端摘要合并到页面会话状态。
   function upsertRealConversation(summary, preferredConversation) {
-  var conversation = conversationByID[summary.id];
-  if (!conversation) {
-    conversation = preferredConversation || createConversation(summary);
-    conversation.id = summary.id;
-    conversation.started = true;
-    conversationByID[summary.id] = conversation;
-    conversationItems.push(conversation);
-  }
-  conversation.title = summary.title;
-  conversation.summary = summary.preview;
-  conversation.lastMessageAt = summary.lastMessageAt;
-  conversation.time = formatTime(new Date(summary.lastMessageAt));
-  conversation.serviceSession = summary.serviceSession;
-    conversationItems.sort(compareConversationRecency);
-  if (!previewMode && conversationItems.length > 20) {
-    var removed = conversationItems.pop();
-    if (removed && removed !== conversation) {
-    delete conversationByID[removed.id];
+    var conversation = conversationByID[summary.id];
+    if (!conversation) {
+      conversation = preferredConversation || createConversation(summary);
+      conversation.id = summary.id;
+      conversation.started = true;
+      conversationByID[summary.id] = conversation;
+      conversationItems.push(conversation);
     }
-  }
-  recentConversation = conversationItems.length > 0 ? conversationItems[0] : null;
-  return conversation;
+    conversation.title = summary.title;
+    conversation.summary = summary.preview;
+    conversation.lastMessageAt = summary.lastMessageAt;
+    conversation.time = formatTime(new Date(summary.lastMessageAt));
+    conversation.serviceSession = summary.serviceSession;
+    conversationItems.sort(compareConversationRecency);
+    if (conversationItems.length > 20) {
+      var removed = conversationItems.pop();
+      if (removed) {
+        delete conversationByID[removed.id];
+      }
+    }
+    recentConversation =
+      conversationItems.length > 0 ? conversationItems[0] : null;
+    return conversation;
   }
 
   // 初始化真实网站 Messenger。
   function initializeRealMessenger() {
-  if (previewMode || initializationPending) {
-    return;
-  }
-  initializationPending = true;
-  initialized = false;
-  setNewConversationAvailability(false);
-  $("cv-messages-empty").hidden = true;
-  $("cv-conversation-list").hidden = true;
-  showInitializationState(loadingLabel, false);
-  requestWebsiteJSON("/api/public/website-channels/" + encodeURIComponent(channelID) + "/messenger")
-    .then(function (result) {
-    visitorToken = result.visitorToken;
-    result.conversations.forEach(function (summary) {
-      upsertRealConversation(summary, null);
-    });
-    initialized = true;
-    hideInitializationState();
-    renderRecentConversation();
-    setNewConversationAvailability(true);
-    })
-    .catch(function (error) {
-    showInitializationState(error.message || requestFailedLabel, true);
-    })
-    .finally(function () {
-    initializationPending = false;
-    updateSendState();
-    });
+    if (previewMode || initializationPending) {
+      return;
+    }
+    initializationPending = true;
+    initialized = false;
+    setNewConversationAvailability(false);
+    $("cv-messages-empty").hidden = true;
+    $("cv-conversation-list").hidden = true;
+    showInitializationState(loadingLabel, false);
+    requestWebsiteJSON(
+      "/api/public/website-channels/" +
+        encodeURIComponent(channelID) +
+        "/messenger",
+    )
+      .then(function (result) {
+        visitorToken = result.visitorToken;
+        result.conversations.forEach(function (summary) {
+          upsertRealConversation(summary, null);
+        });
+        initialized = true;
+        hideInitializationState();
+        renderRecentConversation();
+        setNewConversationAvailability(true);
+      })
+      .catch(function (error) {
+        showInitializationState(error.message || requestFailedLabel, true);
+      })
+      .finally(function () {
+        initializationPending = false;
+        updateSendState();
+      });
   }
 
   // 显示真实入口初始化状态。
   function showInitializationState(message, retry) {
-  $("cv-initialization-error").hidden = false;
-  $("cv-initialization-error-message").textContent = message;
-  $("cv-initialization-retry").hidden = !retry;
-  $("cv-home-initialization-status").hidden = false;
-  $("cv-home-initialization-message").textContent = message;
-  $("cv-home-initialization-retry").hidden = !retry;
+    $("cv-initialization-error").hidden = false;
+    $("cv-initialization-error-message").textContent = message;
+    $("cv-initialization-retry").hidden = !retry;
+    $("cv-home-initialization-status").hidden = false;
+    $("cv-home-initialization-message").textContent = message;
+    $("cv-home-initialization-retry").hidden = !retry;
   }
 
   // 隐藏真实入口初始化状态。
   function hideInitializationState() {
-  $("cv-initialization-error").hidden = true;
-  $("cv-home-initialization-status").hidden = true;
+    $("cv-initialization-error").hidden = true;
+    $("cv-home-initialization-status").hidden = true;
   }
 
   // 切换真实入口的新会话按钮可用状态。
   function setNewConversationAvailability(available) {
-  document.querySelectorAll("[data-new-conversation]").forEach(function (button) {
-    button.disabled = !available;
-  });
+    document
+      .querySelectorAll("[data-new-conversation]")
+      .forEach(function (button) {
+        button.disabled = !available;
+      });
   }
 
   // 加载指定真实客户会话最近的持久消息。
   function loadConversationHistory(conversation) {
-  if (conversation.historyLoading || !conversation.id) {
-    return;
-  }
-  conversation.historyLoading = true;
-  var requestMarker = {};
-  conversation.historyRequest = requestMarker;
-  if (conversation === activeConversation) {
-    $("cv-conversation-error").hidden = true;
-    updateSendState();
-  }
-  requestWebsiteJSON(
-    "/api/public/website-channels/" +
-    encodeURIComponent(channelID) +
-    "/conversations/" +
-    encodeURIComponent(conversation.id) +
-    "/messages",
-  )
-    .then(function (result) {
-    if (conversation.historyRequest !== requestMarker) {
+    if (conversation.historyLoading || !conversation.id) {
       return;
     }
-    clearConversationMessages(conversation);
-    result.messages.forEach(function (message) {
-      appendServerMessage(conversation, message);
-    });
-    conversation.historyLoaded = true;
-          if (conversation === activeConversation) {
-            scrollToBottom();
-          }
-    })
-    .catch(function (error) {
-    if (conversation === activeConversation && conversation.historyRequest === requestMarker) {
-      $("cv-conversation-error").textContent = error.message || requestFailedLabel;
-      $("cv-conversation-error").hidden = false;
-    }
-    })
-    .finally(function () {
-    if (conversation.historyRequest !== requestMarker) {
-      return;
-    }
-    conversation.historyLoading = false;
+    conversation.historyLoading = true;
     if (conversation === activeConversation) {
+      $("cv-conversation-error").hidden = true;
       updateSendState();
     }
-    });
+    requestWebsiteJSON(
+      "/api/public/website-channels/" +
+        encodeURIComponent(channelID) +
+        "/conversations/" +
+        encodeURIComponent(conversation.id) +
+        "/messages",
+    )
+      .then(function (result) {
+        clearConversationMessages(conversation);
+        result.messages.forEach(function (message) {
+          appendServerMessage(conversation, message);
+        });
+        conversation.historyLoaded = true;
+        if (conversation === activeConversation) {
+          scrollToBottom();
+        }
+      })
+      .catch(function (error) {
+        if (conversation === activeConversation) {
+          $("cv-conversation-error").textContent =
+            error.message || requestFailedLabel;
+          $("cv-conversation-error").hidden = false;
+        }
+      })
+      .finally(function () {
+        conversation.historyLoading = false;
+        if (conversation === activeConversation) {
+          updateSendState();
+        }
+      });
   }
 
   // 清空指定会话现有的真实消息节点。
   function clearConversationMessages(conversation) {
-  conversation.messageIDs = Object.create(null);
-  if (conversation === activeConversation) {
-    Array.from(messages.children).forEach(function (node) {
-    if (node !== intro) {
-      node.remove();
+    conversation.messageIDs = Object.create(null);
+    if (conversation === activeConversation) {
+      Array.from(messages.children).forEach(function (node) {
+        if (node !== intro) {
+          node.remove();
+        }
+      });
+      return;
     }
-    });
-    return;
-  }
-  conversation.fragment = document.createDocumentFragment();
+    conversation.fragment = document.createDocumentFragment();
   }
 
   // 把一条持久消息追加到指定会话。
   function appendServerMessage(conversation, value) {
-  if (conversation.messageIDs[value.id]) {
-    return;
-  }
-  var message = messageContainer(value.author === "visitor" ? "visitor" : "assistant");
-  message.setAttribute("data-message-id", value.id);
-  var row = document.createElement("div");
-  row.className = "cv-message-row";
-  var bubble = document.createElement("div");
-  bubble.className = "cv-message-bubble";
-  bubble.textContent = value.body;
-  row.appendChild(bubble);
-  message.appendChild(row);
-  message.appendChild(messageMeta(new Date(value.originatedAt)));
-  conversation.messageIDs[value.id] = true;
-  appendConversationNode(conversation, message);
+    if (conversation.messageIDs[value.id]) {
+      return;
+    }
+    var message = messageContainer(
+      value.author === "visitor" ? "visitor" : "assistant",
+    );
+    message.setAttribute("data-message-id", value.id);
+    var row = document.createElement("div");
+    row.className = "cv-message-row";
+    var bubble = document.createElement("div");
+    bubble.className = "cv-message-bubble";
+    bubble.textContent = value.body;
+    row.appendChild(bubble);
+    message.appendChild(row);
+    message.appendChild(messageMeta(new Date(value.originatedAt)));
+    conversation.messageIDs[value.id] = true;
+    appendConversationNode(conversation, message);
   }
 
   // 生成客户端消息编号。
   function createClientMessageID() {
-  if (window.crypto && typeof window.crypto.randomUUID === "function") {
     return window.crypto.randomUUID();
-  }
-  var bytes = new Uint8Array(16);
-  window.crypto.getRandomValues(bytes);
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  var hex = Array.from(bytes, function (value) {
-    return value.toString(16).padStart(2, "0");
-  }).join("");
-  return hex.slice(0, 8) + "-" + hex.slice(8, 12) + "-" + hex.slice(12, 16) + "-" + hex.slice(16, 20) + "-" + hex.slice(20);
   }
 
   // 发送真实网站访客文本消息。
   function sendRealMessage(text) {
-  if (!initialized || messageRequestPending || activeConversation.historyLoading) {
-    return;
-  }
-  var conversation = activeConversation;
-  if (conversation.pendingBody !== text || !conversation.pendingMessageID) {
-    conversation.pendingBody = text;
-    conversation.pendingMessageID = createClientMessageID();
-  }
-  messageRequestPending = true;
-  $("cv-conversation-error").hidden = true;
-  updateSendState();
-  requestWebsiteJSON("/api/public/website-channels/" + encodeURIComponent(channelID) + "/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-    clientMessageId: conversation.pendingMessageID,
-    conversationId: conversation.id,
-    body: text,
-    }),
-  })
-    .then(function (result) {
-    var wasDraft = conversation.id === null;
-    conversation = upsertRealConversation(result.conversation, conversation);
-    conversation.pendingMessageID = "";
-    conversation.pendingBody = "";
-    conversation.draft = "";
-        appendServerMessage(conversation, result.message);
-    conversation.historyLoaded = !wasDraft && conversation.historyLoaded;
-    if (conversation === activeConversation) {
-      if (input.value.trim() === text) {
-      input.value = "";
-      } else {
-      conversation.draft = input.value;
-      }
-      intro.hidden = true;
-          autosize();
+    if (
+      !initialized ||
+      messageRequestPending ||
+      activeConversation.historyLoading
+    ) {
+      return;
     }
-    renderRecentConversation();
-    if (wasDraft) {
-      loadConversationHistory(conversation);
+    var conversation = activeConversation;
+    if (conversation.pendingBody !== text || !conversation.pendingMessageID) {
+      conversation.pendingBody = text;
+      conversation.pendingMessageID = createClientMessageID();
     }
-    })
-    .catch(function (error) {
-    if (conversation === activeConversation) {
-      $("cv-conversation-error").textContent = error.message || requestFailedLabel;
-      $("cv-conversation-error").hidden = false;
-    }
-    })
-    .finally(function () {
-    messageRequestPending = false;
+    messageRequestPending = true;
+    $("cv-conversation-error").hidden = true;
     updateSendState();
-    if (conversation === activeConversation) {
-      input.focus();
-    }
-    });
+    requestWebsiteJSON(
+      "/api/public/website-channels/" +
+        encodeURIComponent(channelID) +
+        "/messages",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientMessageId: conversation.pendingMessageID,
+          conversationId: conversation.id,
+          body: text,
+        }),
+      },
+    )
+      .then(function (result) {
+        conversation = upsertRealConversation(
+          result.conversation,
+          conversation,
+        );
+        conversation.pendingMessageID = "";
+        conversation.pendingBody = "";
+        conversation.draft = "";
+        appendServerMessage(conversation, result.message);
+        conversation.historyLoaded = true;
+        if (conversation === activeConversation) {
+          if (input.value.trim() === text) {
+            input.value = "";
+          } else {
+            conversation.draft = input.value;
+          }
+          intro.hidden = true;
+          autosize();
+        }
+        renderRecentConversation();
+      })
+      .catch(function (error) {
+        if (conversation === activeConversation) {
+          $("cv-conversation-error").textContent =
+            error.message || requestFailedLabel;
+          $("cv-conversation-error").hidden = false;
+        }
+      })
+      .finally(function () {
+        messageRequestPending = false;
+        updateSendState();
+        if (conversation === activeConversation) {
+          input.focus();
+        }
+      });
   }
 
   function insertEmoji(emoji) {
-    var start = input.selectionStart === null ? input.value.length : input.selectionStart;
-    var end = input.selectionEnd === null ? input.value.length : input.selectionEnd;
+    var start =
+      input.selectionStart === null ? input.value.length : input.selectionStart;
+    var end =
+      input.selectionEnd === null ? input.value.length : input.selectionEnd;
     input.value = input.value.slice(0, start) + emoji + input.value.slice(end);
     var cursor = start + emoji.length;
     input.setSelectionRange(cursor, cursor);
@@ -859,9 +885,9 @@
   }
 
   function addFiles(fileList) {
-  if (!previewMode) {
-    return;
-  }
+    if (!previewMode) {
+      return;
+    }
     var files = listFiles(fileList);
     if (files.length === 0) {
       return;
@@ -966,16 +992,18 @@
   }
 
   function startRecording() {
-  if (!previewMode) {
-    return;
-  }
+    if (!previewMode) {
+      return;
+    }
     closeOverlays();
     composerMain.hidden = true;
     recording.hidden = false;
     recordingStartedAt = Date.now();
     recordTime.textContent = "0:00";
     recordingTimer = window.setInterval(function () {
-      recordTime.textContent = formatDuration(Math.floor((Date.now() - recordingStartedAt) / 1000));
+      recordTime.textContent = formatDuration(
+        Math.floor((Date.now() - recordingStartedAt) / 1000),
+      );
     }, 250);
   }
 
@@ -994,7 +1022,10 @@
   }
 
   function stopRecording() {
-    var duration = Math.max(1, Math.floor((Date.now() - recordingStartedAt) / 1000));
+    var duration = Math.max(
+      1,
+      Math.floor((Date.now() - recordingStartedAt) / 1000),
+    );
     resetRecording();
     startConversation();
     var now = new Date();
@@ -1021,7 +1052,10 @@
       }
       play.setAttribute("data-playing", String(!playing));
       play.setAttribute("aria-pressed", String(!playing));
-      play.setAttribute("aria-label", playing ? playVoiceLabel : pauseVoiceLabel);
+      play.setAttribute(
+        "aria-label",
+        playing ? playVoiceLabel : pauseVoiceLabel,
+      );
       play.setAttribute("title", playing ? playVoiceLabel : pauseVoiceLabel);
       if (!playing) {
         playbackTimer = window.setTimeout(function () {
@@ -1039,36 +1073,52 @@
     message.appendChild(bubble);
     message.appendChild(messageMeta(now));
     messages.appendChild(message);
-    updateConversationSummary(activeConversation, formatDuration(duration), now);
+    updateConversationSummary(
+      activeConversation,
+      formatDuration(duration),
+      now,
+    );
     scrollToBottom();
     scheduleDemoReply();
   }
 
   function relativeLuminance(hexColor) {
-    var channels = hexColor.slice(1).match(/.{2}/g).map(function (channel) {
-      var value = Number.parseInt(channel, 16) / 255;
-      return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
-    });
+    var channels = hexColor
+      .slice(1)
+      .match(/.{2}/g)
+      .map(function (channel) {
+        var value = Number.parseInt(channel, 16) / 255;
+        return value <= 0.04045
+          ? value / 12.92
+          : Math.pow((value + 0.055) / 1.055, 2.4);
+      });
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
   }
 
   function forEachConversationNode(selector, callback) {
     document.querySelectorAll(selector).forEach(callback);
-  conversationItems.forEach(function (conversation) {
-    if (conversation !== activeConversation) {
-    conversation.fragment.querySelectorAll(selector).forEach(callback);
-    }
-  });
+    conversationItems.forEach(function (conversation) {
+      if (conversation !== activeConversation) {
+        conversation.fragment.querySelectorAll(selector).forEach(callback);
+      }
+    });
   }
 
   function applyPreviewValue(value) {
     var title = typeof value.title === "string" ? value.title.trim() : "";
-    var subtitle = typeof value.subtitle === "string" ? value.subtitle.trim() : "";
-    var greeting = typeof value.greetingMessage === "string" ? value.greetingMessage.trim() : "";
-    var themeColor = typeof value.themeColor === "string" ? value.themeColor.trim().toUpperCase() : "";
+    var subtitle =
+      typeof value.subtitle === "string" ? value.subtitle.trim() : "";
+    var greeting =
+      typeof value.greetingMessage === "string"
+        ? value.greetingMessage.trim()
+        : "";
+    var themeColor =
+      typeof value.themeColor === "string"
+        ? value.themeColor.trim().toUpperCase()
+        : "";
     title = title || defaultTitle;
     document.title = title;
-  displayTitle = title;
+    displayTitle = title;
     forEachConversationNode("[data-channel-title]", function (node) {
       node.textContent = title;
     });
@@ -1078,9 +1128,12 @@
     forEachConversationNode("[data-channel-greeting]", function (node) {
       node.textContent = greeting || defaultGreeting;
     });
-    forEachConversationNode('[data-greeting="true"] .cv-message-bubble', function (node) {
-      node.textContent = greeting || defaultGreeting;
-    });
+    forEachConversationNode(
+      '[data-greeting="true"] .cv-message-bubble',
+      function (node) {
+        node.textContent = greeting || defaultGreeting;
+      },
+    );
     if (/^#[0-9A-F]{6}$/.test(themeColor)) {
       var luminance = relativeLuminance(themeColor);
       var whiteContrast = 1.05 / (luminance + 0.05);
@@ -1097,7 +1150,7 @@
       );
       document.documentElement.style.setProperty("--cv-focus", focus);
     }
-  renderRecentConversation();
+    renderRecentConversation();
   }
 
   function applyWidgetState(value) {
@@ -1134,12 +1187,16 @@
       navigate(trigger.getAttribute("data-route-target"));
     });
   });
-  document.querySelectorAll("[data-new-conversation]").forEach(function (button) {
-    button.addEventListener("click", beginNewConversation);
-  });
-  document.querySelectorAll("[data-resume-conversation]").forEach(function (button) {
-    button.addEventListener("click", resumeRecentConversation);
-  });
+  document
+    .querySelectorAll("[data-new-conversation]")
+    .forEach(function (button) {
+      button.addEventListener("click", beginNewConversation);
+    });
+  document
+    .querySelectorAll("[data-resume-conversation]")
+    .forEach(function (button) {
+      button.addEventListener("click", resumeRecentConversation);
+    });
   document.querySelectorAll("[data-help-topic]").forEach(function (button) {
     button.addEventListener("click", function () {
       showHelpTopic(button);
@@ -1158,19 +1215,31 @@
     button.addEventListener("click", closeMessenger);
   });
 
-  document.addEventListener("mousedown", rememberNativeContextMenuGesture, true);
-  document.addEventListener("keydown", rememberKeyboardContextMenuGesture, true);
-  document.addEventListener("contextmenu", allowOnlyNativeSecondaryButtonMenu, true);
+  document.addEventListener(
+    "mousedown",
+    rememberNativeContextMenuGesture,
+    true,
+  );
+  document.addEventListener(
+    "keydown",
+    rememberKeyboardContextMenuGesture,
+    true,
+  );
+  document.addEventListener(
+    "contextmenu",
+    allowOnlyNativeSecondaryButtonMenu,
+    true,
+  );
   window.addEventListener("blur", function () {
     nativeContextMenuSource = "";
   });
 
   $("cv-help-input").addEventListener("input", filterHelp);
   input.addEventListener("input", function () {
-  if (!previewMode && activeConversation.pendingBody !== input.value.trim()) {
-    activeConversation.pendingBody = "";
-    activeConversation.pendingMessageID = "";
-  }
+    if (!previewMode && activeConversation.pendingBody !== input.value.trim()) {
+      activeConversation.pendingBody = "";
+      activeConversation.pendingMessageID = "";
+    }
     autosize();
     updateSendState();
   });
@@ -1182,9 +1251,9 @@
     sendMessage();
   });
   input.addEventListener("paste", function (event) {
-  if (!previewMode) {
-    return;
-  }
+    if (!previewMode) {
+      return;
+    }
     var files = pastedImageFiles(event);
     if (files.length === 0) {
       return;
@@ -1198,9 +1267,9 @@
   });
 
   $("cv-attach").addEventListener("click", function () {
-  if (!previewMode) {
-    return;
-  }
+    if (!previewMode) {
+      return;
+    }
     fileInput.click();
   });
   fileInput.addEventListener("change", function () {
@@ -1214,8 +1283,14 @@
     $("cv-emoji-toggle").setAttribute("aria-expanded", String(open));
   });
   $("cv-voice").addEventListener("click", startRecording);
-  $("cv-initialization-retry").addEventListener("click", initializeRealMessenger);
-  $("cv-home-initialization-retry").addEventListener("click", initializeRealMessenger);
+  $("cv-initialization-retry").addEventListener(
+    "click",
+    initializeRealMessenger,
+  );
+  $("cv-home-initialization-retry").addEventListener(
+    "click",
+    initializeRealMessenger,
+  );
   $("cv-record-cancel").addEventListener("click", function () {
     resetRecording();
   });

@@ -23,3 +23,11 @@ func TestMarshalErrorFallsBackForUnknownErrors(t *testing.T) {
 		t.Fatalf("payload = %s, want nil", payload)
 	}
 }
+
+// TestMarshalErrorPreservesConflictReason 验证业务冲突原因使用独立字段传输。
+func TestMarshalErrorPreservesConflictReason(t *testing.T) {
+	payload := MarshalError(&Error{Kind: ErrorKindConflict, Message: "消息冲突。", Reason: "idempotency_mismatch"})
+	if string(payload) != `{"kind":"conflict","message":"消息冲突。","reason":"idempotency_mismatch"}` {
+		t.Fatalf("payload = %s", payload)
+	}
+}

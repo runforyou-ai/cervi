@@ -91,9 +91,6 @@ func (s *WebsiteVisitorService) InitializeMessenger(ctx context.Context, meta We
 	if err != nil {
 		return WebsiteVisitorMessenger{}, err
 	}
-	if conversations == nil {
-		conversations = []WebsiteVisitorConversation{}
-	}
 	return WebsiteVisitorMessenger{VisitorToken: visitorToken, Conversations: conversations}, nil
 }
 

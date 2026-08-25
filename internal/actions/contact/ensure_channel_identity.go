@@ -17,7 +17,6 @@ import (
 type EnsureChannelIdentityInput struct {
 	OrganizationID string
 	ChannelID      string
-	ChannelType    domain.ChannelType
 	ExternalID     string
 	ContactID      string
 	IdentityID     string
@@ -27,30 +26,19 @@ type EnsureChannelIdentityInput struct {
 type EnsuredChannelIdentity struct {
 	Contact  *servermodels.Contact
 	Identity *servermodels.ContactChannelIdentity
-	Created  bool
 }
 
 // EnsureChannelIdentity 在调用方事务中取得或创建联系人渠道身份。
 func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelIdentityInput) (EnsuredChannelIdentity, error) {
-	channel := &servermodels.Channel{}
-	if err := db.NewSelect().Model(channel).
-		Where("c.id = ?", input.ChannelID).
-		Where("c.organization_id = ?", input.OrganizationID).
-		Where("c.type = ?", input.ChannelType).
-		Scan(ctx); err != nil {
-		return EnsuredChannelIdentity{}, fmt.Errorf("load automatic contact channel: %w", err)
-	}
 	identity := &servermodels.ContactChannelIdentity{}
 	err := db.NewSelect().
 		Model(identity).
+		Where("cci.organization_id = ?", input.OrganizationID).
 		Where("cci.channel_id = ?", input.ChannelID).
 		Where("cci.external_id = ?", input.ExternalID).
 		For("UPDATE").
 		Scan(ctx)
 	if err == nil {
-		if identity.OrganizationID != input.OrganizationID || identity.ChannelID != input.ChannelID {
-			return EnsuredChannelIdentity{}, fmt.Errorf("channel identity organization mismatch")
-		}
 		contact, loadErr := loadAutomaticContact(ctx, db, input.OrganizationID, identity.ContactID)
 		if loadErr != nil {
 			return EnsuredChannelIdentity{}, loadErr
@@ -98,7 +86,7 @@ func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelI
 		Exec(ctx); err != nil {
 		return EnsuredChannelIdentity{}, fmt.Errorf("create channel identity: %w", err)
 	}
-	return EnsuredChannelIdentity{Contact: contact, Identity: identity, Created: true}, nil
+	return EnsuredChannelIdentity{Contact: contact, Identity: identity}, nil
 }
 
 // loadAutomaticContact 读取渠道身份所属的同企业联系人。

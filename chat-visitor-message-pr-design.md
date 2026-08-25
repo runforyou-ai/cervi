@@ -13,12 +13,12 @@
 PR 标题使用：
 
 ```text
-feat: 接入网站访客真实文本消息
+接通网站访客多会话消息
 ```
 
 ## 2. 依赖与当前实现
 
-### 2.1 前置依赖
+### 2.1 数据依赖
 
 本 PR 必须在数据底座 PR 合并后开发，直接使用以下表和模型：
 
@@ -31,7 +31,7 @@ service_sessions
 messages
 ```
 
-本 PR 不重复创建或重定义这些迁移，也不得修改 PR1 或更早的迁移文件。若 PR1 尚未合并，应先在 PR1 的新增迁移中修正目标结构并重新审核；若 PR1 已经合并或迁移已被环境应用，则只能在 PR2 中增加新的向前迁移，不得改写迁移历史。任何新增迁移都要在同一文件中为新增或修改的表、每一列、显式索引和具名约束写全简洁中文数据库注释，不增加双版本兼容字段。
+本 PR 不重定义这些表，只增加一条向前迁移删除渠道身份级未结束 ServiceSession 唯一索引。Conversation 级未结束唯一索引继续保留。
 
 ### 2.2 当前 Messenger
 
@@ -82,7 +82,7 @@ ContactChannelIdentity
 | 打开最新 ServiceSession 已关闭的 Conversation 发送 | 保持原 Conversation，新建下一个 ServiceSession |
 | 点击任意 Conversation 列表项 | 按该 Conversation 编号读取完整历史并继续该线程 |
 
-PR1 已建立的 `service_sessions_org_channel_identity_open_unique` 是原首版单处理线程约束。本 PR 通过新增向前迁移删除该索引，不修改已经合并的迁移历史。`service_sessions_org_conversation_open_unique` 继续保证同一 Conversation 同时最多一个未结束 ServiceSession。
+本 PR 删除 `service_sessions_org_channel_identity_open_unique`，允许一个渠道身份同时继续多条 Conversation。`service_sessions_org_conversation_open_unique` 继续保证同一 Conversation 同时最多一个未结束 ServiceSession。
 
 ### 3.3 ServiceSession 状态
 
@@ -139,12 +139,12 @@ closed  ──同一线程再次发送──> 新建下一 ServiceSession
 
 ### 5.1 Token
 
-网站访客身份使用每个渠道独立的随机 Token。Token 使用 32 位小写字母和数字，不包含联系人编号、Conversation 编号、时间和浏览器信息。
+网站访客身份使用每个渠道独立的随机 Token。Token 是 16 个随机字节编码成的 32 位小写十六进制字符串，不包含联系人编号、Conversation 编号、时间和浏览器信息。
 
 Cookie 名称：
 
 ```text
-cervi_visitor_<去掉连字符的 channel_id>
+cervi_visitor_<channel_id>
 ```
 
 Cookie 属性：
@@ -382,7 +382,7 @@ X-Cervi-Visitor-Token: <token>
 }
 ```
 
-分页使用 `(originated_at, id)` 稳定边界。无游标和 `before` 在数据库中按倒序扫描最近或更早记录后反转，`after` 直接正序扫描；三种响应的 `messages` 数组都按正序返回。游标由服务端编码方向、Conversation 编号和元组，客户端只把它作为不透明字符串回传。游标被篡改、属于其他 Conversation，或同时提交 `before` 和 `after` 时返回 `400`，不通过 `404` 暴露关系。
+分页使用 `(originated_at, id)` 稳定边界。无游标和 `before` 在数据库中按倒序扫描最近或更早记录后反转，`after` 直接正序扫描；三种响应的 `messages` 数组都按正序返回。游标编码 Conversation 编号、消息时间和消息编号，格式非法、属于其他 Conversation，或同时提交 `before` 和 `after` 时返回 `400`。
 
 无游标查询存在更早记录时返回 `before`，并用最新消息生成 `after`。`before` 查询只返回下一段 `before`；`after` 查询只返回下一次 `after`。空结果在对应方向返回 `null`，客户端增量空结果时继续保留自己已有的旧游标。
 
@@ -399,13 +399,13 @@ X-Cervi-Visitor-Token: <token>
 
 错误复用现有 `appservice.Error` 结构。`ErrorKind` 增加 `conflict` 并在 `HTTPStatus()` 映射 `409`；访客错误不携带成员会话使用的 `state = setup/login/connect`。
 
-幂等冲突使用语言无关的 `fields.reason` 区分：
+幂等冲突使用语言无关的 `error.reason` 区分：
 
 ```text
 idempotency_mismatch   相同幂等键对应不同身份、参与者、正文或非空目标线程
 ```
 
-`fields.reason` 的值固定为上述稳定码，不经过 i18n，也不进入现有字段校验使用的 FieldKey/`LocalizeMap` 映射；只有 `message` 使用请求语言本地化。WebsiteVisitorDirectBackend 必须直接保留稳定 reason。
+`error.reason` 固定为上述稳定码，不经过 i18n；只有 `message` 使用请求语言本地化。
 
 页面收到 `idempotency_mismatch` 时保留编号并显示不可原样提交的失败提示，不自动跳转。错误体不返回 SQL、约束名、访客 Token、外部身份编号或内部关联编号。
 
@@ -417,8 +417,7 @@ idempotency_mismatch   相同幂等键对应不同身份、参与者、正文或
 
 该能力接收已经规范化的 `external_id`，不感知 Cookie、Header 或网站 Token，并集中完成：
 
-- 校验渠道、企业和类型一致。
-- 按 `(channel_id, external_id)` 查找联系人渠道身份。
+- 按企业、渠道和 `external_id` 查找联系人渠道身份，并锁定已有身份行。
 - 不存在时创建 `stage = visitor` 联系人和渠道身份。
 - 自动联系人 `created_by_user_id = NULL`。
 - 自动联系人 `source_channel_id = 当前网站渠道`。
@@ -451,26 +450,22 @@ Action 最多执行三次完整事务尝试。服务器接收时间、幂等键�
 每次事务执行：
 
 1. 读取已启用的网站渠道，取得企业、初始路由和失败路由，不锁定渠道配置行。
-2. 按企业和 `chmsg:<channel_id>:<client_message_id>` 查询已有 Message 及完整关联。
+2. 按企业和 `chmsg:<channel_id>:<client_message_id>` 查询已有 Message。
 3. 幂等记录一致时直接返回保存结果，不修改业务行。
-4. 调用 `EnsureChannelIdentity` 查找或创建联系人渠道身份。
-5. 使用 `FOR UPDATE` 锁定当前 `contact_channel_identities` 行，串行维护同一访客的联系人和参与关系；不同访客不互相阻塞。
-6. 确保联系人拥有唯一 `kind = contact` ChatSubject。
-7. 请求携带 `conversationId` 时，校验它通过 `customer_conversations` 属于当前渠道身份、企业和渠道。
-8. 请求未携带 Conversation 编号时，创建新的 `type = customer`、`status = active` Conversation 和 CustomerConversation；客户入站的 `created_by_subject_id` 留空，标题使用首条正文派生值，并标记需要以 `nextSequence = 1` 新建首个 ServiceSession。
-9. 请求携带 Conversation 编号且该线程有 `waiting/active` ServiceSession 时复用；访客后续消息不得把 `waiting` 自动改为 `active`。
-10. 请求携带 Conversation 编号且该线程有 `pending` ServiceSession 时复用并改为 `active`，更新 `status_changed_at`。
-11. 请求携带 Conversation 编号且该线程最新 ServiceSession 为 `closed` 时，在已经锁定身份行的前提下计算 `nextSequence = MAX(sequence) + 1`，并标记需要新建 `waiting` ServiceSession；禁止使用 `COUNT(*) + 1`，本步不插入行。
-12. 仅当请求携带 Conversation 编号、该客户线程已经通过归属校验、但一行 ServiceSession 都没有时返回内部错误，不写消息，不能按已关闭线程重新开启。
-13. 已选定目标 Conversation 且本事务确定继续写入时，如果 `conversations.status = archived`，在本事务恢复为 `active`；访客列表和处理状态仍以最新 ServiceSession 为准。
-14. 确保联系人 ChatSubject 是目标 Conversation 的有效 `member` 参与者；已有行 `left_at` 非空时清空并复用。
-15. 需要新 ServiceSession 时解析渠道初始路由和失败路由，只生成路由快照，不在本步写入 ServiceSession。
-16. 需要新 ServiceSession 时执行唯一一次 INSERT，`opening_message_id = last_message_id = 预生成 message_id`，`last_message_at = originated_at`，同时写入渠道身份、`nextSequence` 和路由快照。
-17. 创建 `type = text` Message，写入目标 Conversation、当前 ServiceSession 和联系人参与者；`created_at`、`updated_at` 均使用插入时的默认值。
-18. 复用已有未结束 ServiceSession 时，仅在新 Message 的 `(originated_at, id)` 严格大于当前摘要时，同时更新 `last_message_id`、`last_message_at` 和 `updated_at`；消息必须属于该 Session，已经关闭的 Session 禁止回写。
-19. 按相同 `(originated_at, id)` 规则同时更新 Conversation 的 `last_message_id`、`last_message_at` 和 `updated_at`；当前摘要为空时允许更新。
-20. 更新渠道身份 `last_seen_at`。
-21. 从保存的 Message 和 ServiceSession 持久事实计算两个响应谓词，提交并返回 Conversation 摘要、ServiceSession 摘要和 Message。
+4. 调用 `EnsureChannelIdentity` 查找或创建联系人渠道身份；已有身份行在查询时使用 `FOR UPDATE`，不同访客不互相阻塞。
+5. 确保联系人拥有唯一 `kind = contact` ChatSubject。
+6. 请求携带 `conversationId` 时，校验它通过 `customer_conversations` 属于当前渠道身份和企业。
+7. 请求未携带 Conversation 编号时，创建新的 `type = customer`、`status = active` Conversation 和 CustomerConversation；客户入站的 `created_by_subject_id` 留空，标题使用首条正文派生值，并以 `nextSequence = 1` 新建首个 ServiceSession。
+8. 请求携带 Conversation 编号且该线程有 `waiting/active` ServiceSession 时复用；访客后续消息不把 `waiting` 自动改为 `active`。
+9. 请求携带 Conversation 编号且该线程有 `pending` ServiceSession 时复用并改为 `active`，更新 `status_changed_at`。
+10. 请求携带 Conversation 编号且该线程最新 ServiceSession 为 `closed` 时，使用 `MAX(sequence) + 1` 新建 `waiting` ServiceSession。
+11. 指定的客户线程没有 ServiceSession 时返回内部错误。
+12. Conversation 已归档时恢复为 `active`。
+13. 确保联系人 ChatSubject 是目标 Conversation 的有效 `member` 参与者；已有参与者离开时清空 `left_at`。
+14. 新 ServiceSession 使用当前渠道路由快照，并写入预生成的 opening/last message 编号。
+15. 创建 `type = text` Message，写入目标 Conversation、当前 ServiceSession 和联系人参与者。
+16. 按 `(originated_at, id)` 更新 ServiceSession 和 Conversation 的最后消息摘要。
+17. 更新渠道身份 `last_seen_at`，再从持久记录构造响应并提交事务。
 
 新 Conversation、ServiceSession 和 Message 存在互相引用。无外键时的写入顺序固定为：
 
@@ -521,14 +516,14 @@ chmsg:<channel_id>:<client_message_id>
 
 只有非幂等写入路径恢复回收站联系人。幂等命中不恢复联系人、不更新渠道身份最后活跃时间、不改变 Session 状态、不更新标题、最后消息和路由快照。
 
-命中时沿两条关系核对完整性：
+命中时在一次关联查询中核对消息归属：
 
 ```text
-Message → Participant → ChatSubject → Contact
+Message → Participant → ChatSubject(source_id = identity.contact_id)
 Message → ServiceSession → CustomerConversation → ContactChannelIdentity
 ```
 
-Conversation、ServiceSession、渠道身份、参与者和企业任一关系缺失或矛盾时返回内部错误，不能把残缺记录视为成功。
+正文、非空目标 Conversation 或消息归属不一致时返回幂等冲突。
 
 等价比较不一致时立即返回 `409 reason = idempotency_mismatch`。该业务冲突不进入数据库唯一冲突重试。
 
@@ -547,7 +542,7 @@ messages_organization_idempotency_unique
 
 只捕获上述约束名对应的 PostgreSQL `23505`。其他唯一冲突视为实现错误直接返回内部失败；三次完整事务尝试仍持续命中预期唯一竞态时返回 `500`，不能伪装成业务 `409`。
 
-现有渠道身份唯一索引只覆盖 `(channel_id, external_id)`。`EnsureChannelIdentity` 命中已有行后仍必须校验它的 `organization_id` 与渠道企业一致，不能因为唯一键命中而跳过企业边界。
+`EnsureChannelIdentity` 查询同时限制企业、渠道和 `external_id`。
 
 ## 10. 查询规则
 
@@ -581,7 +576,7 @@ customer_conversation.contact_channel_identity_id = 当前渠道身份
 
 不增加 `service_session_id` 过滤。ServiceSession 变化以后可以作为系统事件展示，但不切割客户线程。
 
-查询读取该 Conversation 的全部 Message，不按发送者类型过滤，否则后续成员回复会破坏游标连续性。发送者通过 `Message → Participant → ChatSubject` 解析；本 PR 合法数据只有联系人消息并映射为 `author = visitor`，遇到当前 DTO 尚不支持的主体时返回内部错误，不能静默丢弃。企业成员或 Agent 回复落地时同步增加访客端展示映射。
+查询读取该 Conversation 的未删除文本消息，不按 ServiceSession 切段。发送者通过 `Message → Participant → ChatSubject` 解析：联系人映射为 `author = visitor`，企业身份映射为 `author = agent`。
 
 网站问候语是界面配置，不是持久消息，不进入历史接口。
 
@@ -591,7 +586,7 @@ customer_conversation.contact_channel_identity_id = 当前渠道身份
 
 真实独立链接和嵌入 Messenger 加载后立即请求初始化接口。独立链接从当前路径读取渠道编号，嵌入页面从服务端输出的 `data-channel-id` 读取。`page.html` 的真实页和预览页都显式输出该属性，但 `data-preview="true"` 分支禁止使用它请求公开 API。
 
-所有请求使用 `credentials: "same-origin"`。初始化完成前禁用“开始聊天”和发送；初始化期间保留现有页面框架并显示加载状态，失败时只显示页内重试，不创建本地草稿或进入空白成功状态。
+页面使用 Fetch 默认的同源凭据策略。初始化完成前禁用“开始聊天”和发送；初始化期间保留现有页面框架并显示加载状态，失败时只显示页内重试，不创建本地草稿或进入空白成功状态。
 
 成功后在内存保存 Token，并用返回的真实 Conversation 渲染首页最近会话和消息页列表。
 
@@ -610,7 +605,7 @@ customer_conversation.contact_channel_identity_id = 当前渠道身份
 
 首条文本成功后，响应中的 `conversation.id` 写入当前草稿，该对象变为真实会话。列表按该编号 upsert：已有项更新 `title`、`preview`、`lastMessageAt` 和 `serviceSession`，没有才追加；随后按 `(lastMessageAt DESC, id DESC)` 重排，禁止无条件插入首位产生重复项。
 
-空草稿发送成功后，只要本地还没有该 `conversation.id` 的完整历史，就必须重读该 Conversation 再合并当前响应，不能用 `createdConversation` 作为是否重读的唯一判断。
+空草稿发送成功后，响应中的首条持久消息就是该新 Conversation 的完整历史，页面直接标记历史已加载，不再发起重复查询。
 
 ### 11.3 打开已有 Conversation
 
@@ -663,17 +658,14 @@ customer_conversation.contact_channel_identity_id = 当前渠道身份
 
 公开请求不使用企业成员 Bearer Token。访客 Token 只授权当前渠道身份下的客户 Conversation。
 
-发送和历史请求缺少 Token 或优先来源 Token 格式非法时返回 `400`；渠道停用或不存在返回 `404`。公开 Handler 忽略 `Authorization`，不得调用成员 `authenticate()` 或复用会读取 Bearer Token 的成员 RequestMeta。HTTP 适配器生成 `web-session:<32 位小写字母数字>`，Action 再校验前缀和总长度；裸 Token 不进入 Action。
+发送和历史请求缺少 Token 或优先来源 Token 格式非法时返回 `400`；渠道停用或不存在返回 `404`。公开 Handler 忽略 `Authorization`，不得调用成员 `authenticate()` 或复用会读取 Bearer Token 的成员 RequestMeta。HTTP 适配器生成 `web-session:<32 位小写十六进制>`，Action 再校验前缀和总长度；裸 Token 不进入 Action。
 
-每次读写显式校验：
+公开读写使用以下边界：
 
 - 渠道存在、启用且类型为 `website`。
-- 渠道身份属于当前渠道和企业。
-- 联系人属于相同企业。
-- ChatSubject 属于相同企业和联系人。
-- CustomerConversation 属于相同企业和渠道身份。
-- ServiceSession 的 Conversation、渠道身份和企业一致。
-- Message、Participant 和 Conversation 属于相同企业。
+- 渠道身份按当前企业、渠道和访客外部编号读取。
+- Conversation 历史必须通过 `customer_conversations` 属于当前渠道身份。
+- 幂等命中同时核对 Message、Participant、ChatSubject、ServiceSession 和渠道身份关系。
 
 公开 JSON 接口不启用跨域。嵌入 Messenger iframe 与接口同源请求 `/api/public`。管理端预览不调用真实接口。公开接口的成功和失败响应都写入 `Cache-Control: no-store`。
 
@@ -681,24 +673,20 @@ customer_conversation.contact_channel_identity_id = 当前渠道身份
 
 ## 13. 日志
 
-成功日志记录：
+消息写入成功日志记录：
 
 ```text
-organization_id
 channel_id
 conversation_id
 service_session_id
 message_id
-created_contact
-inserted_conversation
-created_service_session
+created_conversation
+opened_new_service_session
 ```
 
 日志不记录访客 Token、Cookie、消息正文、外部身份编号和完整请求体。
 
-日志中的 `inserted_conversation` 记录本次事务是否实际插入 Conversation，用于运维诊断；响应 `createdConversation` 是根据 `sequence = 1` 和 `opening_message_id` 计算的持久谓词。幂等命中时前者为假，后者仍可能为真。
-
-失败日志记录稳定错误类别和内部错误；内部错误不直接返回公开客户端。
+预期并发唯一冲突进入下一次事务前记录 Info；三次重试耗尽、路由降级、令牌生成失败和未映射的内部错误记录 Warning。内部错误不直接返回公开客户端。
 
 ## 14. 测试与验收
 
@@ -747,7 +735,7 @@ created_service_session
 - 幂等重试不更新最后活跃时间、状态、最后消息或路由。
 - 相同键对应不同正文、身份、参与者或非空目标 Conversation 时返回 `idempotency_mismatch`。
 - 并发相同消息只创建一条 Message。
-- 必需关联缺失或矛盾时返回内部错误。
+- 已保存 Message 的核心字段缺失时返回内部错误。
 
 ### 14.5 路由
 
@@ -766,7 +754,7 @@ created_service_session
 - 列表标题稳定，预览来自 `conversations.last_message_id`。
 - 历史包含同一 Conversation 跨多个 ServiceSession 的全部消息。
 - `before` 和 `after` 按 `(originated_at, id)` 不重不漏。
-- 游标绑定 Conversation；跨线程或篡改游标返回 `400`。
+- 游标绑定 Conversation；格式非法或跨线程游标返回 `400`。
 - 查询不按发送者过滤，响应数组始终按正序返回。
 - 其他 Token、渠道和企业的 Conversation 返回不存在。
 - 未登录可访问公开路由；成员 Bearer Token 不扩大范围。

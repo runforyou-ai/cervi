@@ -51,7 +51,7 @@ Conversation ──> Message *
 
 长期不变量是同一 Conversation 同时最多一个未结束 `ServiceSession`。
 
-PR1 按当时的首版入站方案增加同一个 `ContactChannelIdentity` 同时最多一个未结束 `ServiceSession` 的约束。后续 PR2 明确开放网站访客多会话，并通过向前迁移删除身份级部分唯一索引；Conversation 级未结束唯一约束和公开契约保持不变。
+首版网站产品采用更严格的入站控制：同一个 `ContactChannelIdentity` 同时最多一个未结束 `ServiceSession`，因此首版最多只有一条未结束客户线程。开放并行线程时只删除身份级部分唯一约束，不更换 Conversation 主键和公开契约。
 
 为让数据库直接保证首版身份级不变量，`service_sessions` 保存 `contact_channel_identity_id`。它是用于排队查询、身份级并发锁定和部分唯一约束的明确业务维度，不是从 Conversation 任意复制的展示字段。Action 写入时必须校验：
 
@@ -442,7 +442,7 @@ COMMENT ON INDEX service_sessions_org_channel_identity_last_message_index
 两个部分唯一索引分别表达长期和首版产品不变量：
 
 - Conversation 级唯一长期保留。
-- 渠道身份级唯一由网站访客消息 PR 的向前迁移删除。
+- 渠道身份级唯一在开放并行入站线程时删除。
 
 ### 6.6 `messages`
 

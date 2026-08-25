@@ -60,12 +60,6 @@ type ReceiveWebsiteCustomerTextMessageResult struct {
 	CreatedConversation     bool
 	OpenedNewServiceSession bool
 	Message                 Message
-	OrganizationID          string
-	ChannelID               string
-	ServiceSessionID        string
-	CreatedContact          bool
-	InsertedConversation    bool
-	CreatedServiceSession   bool
 }
 
 // MessageCursorPoint 定义消息分页稳定边界。

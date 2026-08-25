@@ -15,6 +15,7 @@ type Error struct {
 	State   SessionState      `json:"state,omitempty"`
 	Message string            `json:"message"`
 	Fields  map[string]string `json:"fields,omitempty"`
+	Reason  string            `json:"reason,omitempty"`
 	status  int               `json:"-"`
 }
 
@@ -95,7 +96,7 @@ func NotFoundError(meta RequestMeta, messageKey cervii18n.Key) *Error {
 // ConflictError 返回带稳定原因码的业务冲突。
 func ConflictError(meta RequestMeta, messageKey cervii18n.Key, reason string) *Error {
 	error := newError(meta, ErrorKindConflict, "", messageKey, nil)
-	error.Fields = map[string]string{"reason": reason}
+	error.Reason = reason
 	return error
 }
 

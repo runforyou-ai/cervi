@@ -4,10 +4,11 @@ package api
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
-	"math/big"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -22,8 +23,6 @@ const (
 	websiteVisitorBodyLimit = 16 * 1024
 	websiteVisitorCookieAge = 365 * 24 * 60 * 60
 )
-
-var websiteVisitorAlphabet = []byte("abcdefghijklmnopqrstuvwxyz0123456789")
 
 // registerWebsiteVisitorRoutes 注册匿名网站 Messenger 路由。
 func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
@@ -51,6 +50,7 @@ func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 		var err error
 		token, err = generateWebsiteVisitorToken()
 		if err != nil {
+			slog.Warn("生成网站访客令牌失败", "channel_id", channelID, "error", err)
 			writeApplicationError(c, appservice.FailedError(websiteVisitorRequestMeta(c), cervii18n.ErrorWebsiteMessengerLoadFailed))
 			return
 		}
@@ -144,25 +144,20 @@ func validWebsiteVisitorToken(value string) bool {
 		return false
 	}
 	for _, character := range value {
-		if (character < 'a' || character > 'z') && (character < '0' || character > '9') {
+		if (character < 'a' || character > 'f') && (character < '0' || character > '9') {
 			return false
 		}
 	}
 	return true
 }
 
-// generateWebsiteVisitorToken 生成小写字母和数字组成的随机访客 Token。
+// generateWebsiteVisitorToken 生成 32 位小写十六进制访客 Token。
 func generateWebsiteVisitorToken() (string, error) {
-	result := make([]byte, websiteVisitorTokenSize)
-	limit := big.NewInt(int64(len(websiteVisitorAlphabet)))
-	for index := range result {
-		position, err := rand.Int(rand.Reader, limit)
-		if err != nil {
-			return "", err
-		}
-		result[index] = websiteVisitorAlphabet[position.Int64()]
+	value := make([]byte, websiteVisitorTokenSize/2)
+	if _, err := rand.Read(value); err != nil {
+		return "", err
 	}
-	return string(result), nil
+	return hex.EncodeToString(value), nil
 }
 
 // setWebsiteVisitorCookie 设置渠道级长期访客 Cookie。
@@ -180,7 +175,7 @@ func (s *Service) setWebsiteVisitorCookie(c *gin.Context, channelID, token strin
 
 // websiteVisitorCookieName 返回渠道级访客 Cookie 名称。
 func websiteVisitorCookieName(channelID string) string {
-	return "cervi_visitor_" + strings.ReplaceAll(channelID, "-", "")
+	return "cervi_visitor_" + channelID
 }
 
 // websiteVisitorExternalID 把裸 Token 规范化为渠道外部编号。

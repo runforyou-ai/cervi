@@ -24,6 +24,7 @@ type apiError struct {
 	State   appservice.SessionState `json:"state,omitempty"`
 	Message string                  `json:"message"`
 	Fields  map[string]string       `json:"fields,omitempty"`
+	Reason  string                  `json:"reason,omitempty"`
 }
 
 // Service 是企业服务端对外提供的 Gin HTTP 适配器。
@@ -871,6 +872,7 @@ func writeErrorBody(c *gin.Context, applicationError *appservice.Error) {
 	c.Header("Content-Language", language)
 	c.Header("Vary", "Accept-Language")
 	c.JSON(applicationError.HTTPStatus(), errorBody{Error: apiError{
-		Kind: applicationError.Kind, State: applicationError.State, Message: applicationError.Message, Fields: applicationError.Fields,
+		Kind: applicationError.Kind, State: applicationError.State, Message: applicationError.Message,
+		Fields: applicationError.Fields, Reason: applicationError.Reason,
 	}})
 }
