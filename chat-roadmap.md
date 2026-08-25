@@ -151,11 +151,11 @@ WebSocket 不是第二套业务 API。发送、编辑、撤回、回执、成员
 ```text
 chat_subjects
 ├── id
+├── created_at
+├── updated_at
 ├── organization_id
 ├── kind
-├── source_id
-├── created_at
-└── updated_at
+└── source_id
 ```
 
 首期支持：
@@ -210,8 +210,8 @@ external_sender         第三方平台发送者
 网站独立接待页和嵌入挂件使用服务端生成的渠道级不透明 token 恢复匿名身份；企业成员仍使用 Bearer Token。
 
 - Cookie 名称为 `cervi_visitor_<去掉连字符的 channel_id>`，每个网站渠道独立；值为 32 位小写字母数字随机串，不能由业务编号推导。
-- Cookie 有效期为 365 天，不滑动续期；设置 `Path=/`、`HttpOnly`，不设置 `Domain`。HTTPS 请求设置 `Secure`；独立页使用 `SameSite=Lax`，HTTPS 嵌入挂件使用 `SameSite=None; Secure`。
-- 状态初始化请求在 token 缺失或非法时生成 token，写回 Cookie 并在响应中返回。此时不创建联系人、渠道身份或会话；第一条有效文本消息才在同一事务创建业务记录。
+- Cookie 有效期为 365 天，不滑动续期；设置 `Path=/`、`HttpOnly`，不设置 `Domain`。同一个公开初始化接口无法稳定区分独立页和 iframe，因此所有 HTTPS 请求统一使用 `SameSite=None; Secure`，所有 HTTP 请求使用 `SameSite=Lax` 且不设置 `Secure`。反向代理后的协议判断使用可信代理提供的外部协议，不只检查 `Request.TLS`。
+- 状态初始化请求只在 Header、Cookie 优先解析得到的 token 缺失或非法时生成 token，写回带 365 天有效期的 Cookie 并在响应中返回。已有合法 token 不重写长期 Cookie，不刷新过期时间；Header 与 Cookie 不一致时 Header 优先，但不为了收敛值滑动 Cookie。此时不创建联系人、渠道身份或会话；第一条有效文本消息才在同一事务创建业务记录。
 - 页面只在内存中保存响应 token；需要时通过 `X-Cervi-Visitor-Token` 回传，服务端按 Header、Cookie 的顺序解析。token 不写入 `localStorage`。
 - 匿名身份规范化为 `contact_channel_identities.external_id = web-session:<token>`；查找同时校验企业和渠道。客户端消息编号独立承担消息幂等。
 - Cookie 过期、被清除或不可用时建立新的匿名身份；渠道停用后拒绝公共访问。
@@ -277,7 +277,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 网站实时入站没有可信的客户端业务时间，因此使用服务器首次接收时间作为 `originated_at`；Telegram 等能提供稳定来源时间的平台使用远端时间。Telegram 历史补拉不能用补拉入库时间重排历史。
 
-消息历史使用 `before` 游标按 `(originated_at DESC, id DESC)` 向更早记录分页；首个网站轮询闭环使用 `after` 游标按同一 `(originated_at, id)` 边界读取更新记录，并按正序返回以便追加。两种游标都由服务端编码方向和元组，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
+消息历史使用 `before` 游标按 `(originated_at DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一 `(originated_at, id)` 边界正序扫描更新记录。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。两种游标都由服务端编码方向、Conversation 编号和元组，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
 
 会话的 `last_message_at` 表示当前已知消息最大的 `originated_at`，只向后更新。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它，删除最后一条消息也不回退它。会话预览跳过已删除消息。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
 
@@ -287,19 +287,23 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 ### 5.4 CustomerConversation
 
-`CustomerConversation` 是客户会话扩展，关联通用会话与 `contact_channel_identities`。它保证同一渠道身份只对应一个长期客户会话，并为列表提供联系人和来源渠道的可靠查询路径。
+`CustomerConversation` 是客户会话扩展，关联通用会话与 `contact_channel_identities`。一条客户 Conversation 只绑定一个渠道身份；同一渠道身份可以根据来源线程能力拥有多条 Conversation，并通过该关系为列表提供联系人和来源渠道的可靠查询路径。
+
+`customer_conversations` 同样保留 `created_at` 和 `updated_at`；当前不依赖 `updated_at` 排序或驱动业务，但不因暂时未使用而省略标准审计字段。
 
 客户会话严格表示一对一客服关系，只允许一个有效联系人参与者。群、频道和讨论组不创建 `customer_conversations`。
 
-同一联系人拥有多个渠道身份时，每个渠道身份保留独立客户会话；跨渠道历史只在联系人或工单层聚合，不自动合并消息时间线。
+网站 Messenger 能明确创建和选择 Cervi Conversation，可以把同一渠道身份下的不同客户话题保存为独立线程。Telegram Bot 私聊、微信公众号等没有稳定线程选择能力的来源，由 Adapter 固定把该渠道身份映射到一条 Conversation；来源以后提供稳定线程编号时再按真实能力扩展。不同渠道身份之间仍不自动合并消息时间线，跨渠道历史只在联系人或工单层聚合。
 
 客户会话扩展不保存外发队列、Worker 租约或渠道 FloodWait。需要调用外部客服平台时，投递状态进入独立 `customer_message_deliveries` 和渠道发送 Gate；网站访客直接读取 Cervi 时间线，不创建投递记录。
 
 ### 5.5 ServiceSession
 
-`ServiceSession` 表示一次客服处理过程，与长期消息容器分离。它保存等待、处理中、挂起、结束、负责人、团队、转接、响应指标和满意度等状态。
+`ServiceSession` 表示一条客户 Conversation 上的一次客服处理过程，与客户可见线程分离。它保存等待、处理中、挂起、结束、负责人、团队、转接、响应指标和满意度等状态。
 
-一个客户会话可以先后产生多个服务批次。内部单聊、群聊和第三方账号会话不创建服务批次。
+一个客户 Conversation 可以先后产生多个服务批次，同一 Conversation 同时最多一个未结束批次。批次不切断 Conversation 消息历史，也不作为客户侧聊天列表和历史接口的主键。内部单聊、群聊和第三方账号会话不创建服务批次。
+
+网站首版启用更严格的入站控制：同一 `contact_channel_identity` 同时最多一个未结束服务批次，因此最多一条未结束客户线程。该限制不恢复“一个身份永久一条 Conversation”；以后允许网站访客并行发起多个线程时，只放宽身份级未结束约束。
 
 ### 5.6 Ticket
 
@@ -332,22 +336,22 @@ ticket_conversation_links
 
 聊天不直接引用 `users.id` 或 `agents.id`，而是为对应 `organization_identities.id` 创建 `kind = organization_identity` 的 `chat_subject`。因此用户和智能体通过完全相同的参与者、消息、提醒和反应路径进入聊天。
 
-如在聊天迁移中调整现有 `organization_identities`，应把 `work_status_updated_at` 统一改为 `timestamptz`，避免与项目其他时间字段不一致。
+如后续需要调整现有 `organization_identities`，必须新增向前迁移，不修改已经存在的建表迁移；届时应把 `work_status_updated_at` 统一改为 `timestamptz`，避免与项目其他时间字段不一致。
 
 ### 6.2 外部联系人
 
-现有联系人 CRUD 的业务对象与聊天设计一致。第一个聊天 PR 只调整自动创建联系人所必需的字段：
+现有联系人 CRUD 的业务对象与聊天设计一致。客户聊天数据底座 PR 只调整自动创建联系人所必需的字段：
 
 - `contacts.created_by_user_id` 可空。
 - `contacts.source_channel_id` 保持非空。
-- 手工创建联系人：记录创建用户，并继续使用明确的来源渠道。
+- 现有手工创建 Action 继续记录创建用户和明确来源渠道，但管理端“添加外部联系人”入口暂时隐藏，避免创建没有真实渠道身份、却被误认为能够直接聊天的联系人。
 - 渠道自动创建联系人：创建用户为空，来源渠道为当前渠道。
 
 联系人合并、导入、系统同步和无来源手工联系人出现真实需求时，再共同设计来源审计，并决定是否把 `source_channel_id` 改为可空。当前不为假设中的未来入口提前放宽约束。
 
 `source_channel_id` 只记录联系人当前明确的创建来源，不表示联系人只能出现在该渠道，也不承担消息发送路由。真实渠道账号关系始终由 `contact_channel_identities` 表达。
 
-联系人列表和详情继续按非空来源渠道查询，不在第一个聊天 PR 中修改现有 DTO 和表单的来源契约。客户会话列表中的实际渠道始终从 `contact_channel_identities.channel_id` 读取，不能用联系人的创建来源渠道替代。
+联系人列表和详情继续按非空来源渠道查询，不在两个网站聊天 PR 中修改现有 DTO 和表单的来源契约。手工联系人表单、Action 和既有记录的编辑、删除、恢复能力暂时保留，只注释新增菜单入口。客户会话列表中的实际渠道始终从 `contact_channel_identities.channel_id` 读取，不能用联系人的创建来源渠道替代。
 
 Telegram 用户账号同步得到的联系人默认不自动创建 CRM `contacts`。只有用户明确执行“保存为外部联系人”时才建立 CRM 联系人；Bot、网站等客服入站联系人始终走渠道路径，不由 TDLib 写入，避免把成员私人通讯录污染为企业客户数据。
 
@@ -944,13 +948,13 @@ customer_message_deliveries
 
 ```text
 UNIQUE (organization_id, message_id)
-UNIQUE (conversation_id, position)
+UNIQUE (channel_id, contact_channel_identity_id, position)
 UNIQUE (channel_id, contact_channel_identity_id, provider_message_id)
     WHERE provider_message_id IS NOT NULL
-UNIQUE (conversation_id)
+UNIQUE (channel_id, contact_channel_identity_id)
     WHERE status IN ('sending', 'uncertain')
 
-INDEX (available_at, conversation_id, position)
+INDEX (available_at, channel_id, contact_channel_identity_id, position)
     WHERE status IN ('pending', 'retry_wait')
 INDEX (lease_expires_at)
     WHERE status = 'sending'
@@ -958,7 +962,7 @@ INDEX (uncertain_until)
     WHERE status = 'uncertain'
 ```
 
-`position` 是同一客户会话的严格外发顺序。在锁定对应 `customer_conversations` 行后分配 `MAX(position) + 1`，不能使用创建时间或 UUID 推导平台发送顺序。
+`position` 是同一渠道身份外发管道中的严格顺序。在锁定对应 `contact_channel_identities` 行后，按 `(channel_id, contact_channel_identity_id)` 分配 `MAX(position) + 1`，不能使用创建时间或 UUID 推导平台发送顺序。网站等允许一个渠道身份拥有多条 Conversation 的来源仍共享同一身份级外发管道，避免客户在外部一对一聊天中收到交错乱序消息；网站访客直接读取 Cervi 时间线，不创建 Delivery。
 
 渠道级 FloodWait 或全局限流不写入客户会话，使用独立状态：
 
@@ -1015,17 +1019,17 @@ needs_review
 
 阶段 1 使用 PostgreSQL Delivery 表作为持久有序队列：
 
-1. 生产事务锁定 `customer_conversations`，写入本地消息和 `pending` Delivery，分配 `position`，并通过 `EnqueueIn` 可选创建以 `delivery_id` 为作用域的快速唤醒任务。
+1. 生产事务锁定 `contact_channel_identities`，写入本地消息和 `pending` Delivery，按该渠道身份分配 `position`，并通过 `EnqueueIn` 可选创建以 `delivery_id` 为作用域的快速唤醒任务。
 2. 周期扫描器是正确性来源，持续查找已到期的 `pending/retry_wait`、租约过期的 `sending` 和到期的 `uncertain`。
-3. 多实例扫描时，对候选 `customer_conversations` 行使用 `FOR UPDATE SKIP LOCKED`；选定会话后只处理该会话最小 `position` 的非终态队头，不能对 Delivery 队头使用 `SKIP LOCKED` 后跳到下一条。
+3. 多实例扫描时，对候选 `contact_channel_identities` 行使用 `FOR UPDATE SKIP LOCKED`；选定渠道身份后只处理该身份最小 `position` 的非终态队头，不能对 Delivery 队头使用 `SKIP LOCKED` 后跳到下一条。
 4. 同一事务把队头更新为 `sending` 并写入短租约，提交后才在事务外调用平台。
 5. 平台返回后用新的短事务提交确定成功、重试、永久失败或不确定结果。
 6. Worker 崩溃后，扫描器把过期 `sending` 升级为 `uncertain`，禁止直接重发。
 7. 毒消息最终进入 `failed` 或 `needs_review`，不永久阻塞后续消息。
 
-可选快速任务使用 `cdeliv-item:<delivery_id>` 等每条投递独立的活动幂等键，只负责降低延迟；即使任务丢失或空执行，扫描器仍能恢复。禁止使用 `cdeliv:<conversation_id>` 合并整个会话的 Drain：旧 Run 尚未提交终态时，新投递可能命中旧活动任务而不创建新 Run，随后产生永久丢失唤醒。
+可选快速任务使用 `cdeliv-item:<delivery_id>` 等每条投递独立的活动幂等键，只负责降低延迟；即使任务丢失或空执行，扫描器仍能恢复。禁止使用 Conversation 或渠道身份级 Drain 任务键合并整条管道：旧 Run 尚未提交终态时，新投递可能命中旧活动任务而不创建新 Run，随后产生永久丢失唤醒。
 
-渠道限流由 `customer_channel_send_gates` 阻止同一渠道继续认领。首版可以通过 `UNIQUE (channel_id) WHERE status = 'sending'` 限制同一渠道同时只有一个平台调用，验证平台限流语义后再安全增加并发；同会话 FIFO 始终由 `position` 和队头规则保证。
+渠道限流由 `customer_channel_send_gates` 阻止同一渠道继续认领。首版可以通过 `UNIQUE (channel_id) WHERE status = 'sending'` 限制同一渠道同时只有一个平台调用，验证平台限流语义后再安全增加并发；同一渠道身份的 FIFO 始终由 `position` 和队头规则保证。
 
 ### 10.8 客户端离线增量同步
 
@@ -1259,13 +1263,13 @@ AI 流使用 `stream_id + sequence`，包含开始、增量、完成和失败帧
 
 多 Gateway 时，票据摘要通过 PostgreSQL 原子消费，并显式保存 Principal 类型。成员票据绑定企业、用户、稳定 `device_id`、客户端种类和允许的 Origin；访客票据绑定企业、网站渠道、`contact_channel_identity_id`、挂件客户端种类和允许的 Origin，不伪造用户或设备。两种票据都不能越过其绑定范围复用。
 
-认证后 `ClientHello` 携带协议主版本、Web/桌面/移动/挂件客户端种类、应用版本和能力集合。成员客户端同时携带 `mailbox_after` 和当前有权使用的共享 Inbox 游标；网站挂件只携带票据已经绑定的客户会话同步游标，并只接收严格白名单内的会话水位和临时事件。服务端不允许任何客户端任意订阅会话编号；连接按已认证身份接收通知，焦点会话只用于提高临时状态和通知密度，不能改变授权。
+认证后 `ClientHello` 携带协议主版本、Web/桌面/移动/挂件客户端种类、应用版本和能力集合。成员客户端同时携带 `mailbox_after` 和当前有权使用的共享 Inbox 游标；网站挂件只携带票据所绑定渠道身份下、客户端已经持有的客户 Conversation 同步游标，并只接收严格白名单内的会话水位和临时事件。服务端不允许任何客户端任意订阅会话编号；连接按已认证身份接收通知，焦点会话只用于提高临时状态和通知密度，不能改变授权。
 
 客户端统一实现：
 
 - 带随机抖动的指数退避重连，不进行固定间隔重试。
 - 重新连接前换取新票据；票据不能跨设备、用户、访客身份、渠道或企业复用。
-- 成员重连后先比较 Mailbox/Inbox Head；网站挂件比较已授权客户会话的同步 Head；两者都通过对应业务查询补拉，WebSocket 和 NATS 不提供历史重放。
+- 成员重连后先比较 Mailbox/Inbox Head；网站挂件比较当前渠道身份下已授权客户 Conversation 的同步 Head；两者都通过对应业务查询补拉，WebSocket 和 NATS 不提供历史重放。
 - 多设备分别保存本地游标，同一用户的连接可以同时接收通知。
 - 页面或应用进入后台时不假设长连接持续存活；恢复前台后总是校验 Head。
 
@@ -1285,6 +1289,8 @@ P3 typing、presence 等临时事件
 ## 11. 数据隔离与长期规则
 
 所有查询和写入必须显式带当前 `organization_id`，不能只凭资源 UUID 查询。由于项目迁移不创建外键和 `CHECK`，Action 必须在事务内显式校验企业边界、来源类型和关联合法性。
+
+数据库迁移采用只向前追加的方式：已经存在或已经应用的迁移文件不得修改、重排、重命名或删除，结构更正继续新增迁移。每个迁移必须在同一文件中为其新增或修改的表、每一列、显式索引和具名约束写全简洁中文数据库注释；Up 改变既有字段语义时更新注释，Down 恢复结构时也恢复原注释。`kind`、`type`、`status`、`role` 等枚举型字段必须在列注释中列出当前全部可用值，并与领域值定义保持一致；数据库不为这些枚举增加 `CHECK`，新增枚举值时使用新的向前迁移更新注释。
 
 长期保持：
 
@@ -1310,21 +1316,22 @@ P3 typing、presence 等临时事件
 
 ### 阶段 0：客户会话数据底座
 
-以网站入站消息验证 `chat_subjects`、统一会话、参与者、双时间消息、客户会话扩展、`ServiceSession` 和幂等事务闭环。
+建立 `chat_subjects`、统一 Conversation、参与者、双时间消息、客户会话扩展和 `ServiceSession` 所需的 PostgreSQL 表、索引、领域值与 Bun 模型，同时把渠道自动联系人所需的创建用户字段改为可空。
 
-阶段 0 本身只包含数据底座和入站 Action，不包含公开 API。当前第一个聊天 PR 为形成可独立验收的访客闭环，在同一个 PR 中连续完成阶段 0 和阶段 1A 的访客侧公开 HTTP 与 Messenger 接入；企业成员读取和回复仍由后续 PR 完成。
+阶段 0 由独立的数据底座 PR 完成，不包含入站 Action、公开 API 或 Messenger 真实数据接入。管理端手动添加外部联系人的菜单入口在该 PR 暂时隐藏，既有联系人 CRUD 实现保持不变。
 
-阶段 0 和当前第一个 PR 都不包括客服回复、实时推送、已读状态、Telegram 和 AI 运行表，也不创建阶段 2 的用户 Mailbox、`realtime_outbox`、Protobuf 实时协议、外部投递或客户端同步表。
+阶段 0 不包括客服回复、实时推送、已读状态、Telegram 和 AI 运行表，也不创建阶段 2 的用户 Mailbox、`realtime_outbox`、Protobuf 实时协议、外部投递或客户端同步表。
 
 ### 阶段 1：外部客户单聊
 
-阶段 1 按可独立验收的子阶段交付：先完成网站文本闭环，再以 Telegram Bot 验证外部投递，随后扩展其他客服渠道、文件和客服处理能力。网站访客界面已经按处理批次展示会话列表，因此 `ServiceSession` 数据结构随第一个网站消息 PR 提前建立；领取、转接、结束、指标和满意度仍在后续阶段交付。
+阶段 1 按可独立验收的子阶段交付：先在阶段 0 数据底座上完成网站文本闭环，再以 Telegram Bot 验证外部投递，随后扩展其他客服渠道、文件和客服处理能力。`ServiceSession` 随数据底座提前建立，但客户可见列表和历史始终以 Conversation 为线程；领取、转接、结束、指标和满意度仍在后续阶段交付。
 
 #### 阶段 1A：网站客户文本闭环
 
 - 网站访客通过第 4.5 节的渠道 Cookie 恢复身份，第一条有效文本消息创建 `stage = visitor` 联系人、渠道身份和长期客户会话。
-- 第一条有效文本同时创建或复用 `ServiceSession`；访客会话列表以处理批次为列表项，长期 `Conversation` 继续保存完整客户时间线。
-- 第一个 PR 先完成访客发送、批次列表和历史读取；企业成员列表、历史和回复作为紧随其后的独立 PR，历史使用 `before`，网站和员工页面以后使用 `after` 轮询新增消息。
+- 第一条有效文本同时创建或复用 Conversation 和 `ServiceSession`；访客会话列表以 Conversation 为列表项，ServiceSession 只提供最新处理状态摘要。
+- 网站消息 PR 完成访客发送、Conversation 列表和完整历史读取；企业成员列表、历史和回复作为后续独立 PR，历史使用 `before`，网站和员工页面以后使用 `after` 轮询新增消息。
+- 首版同一渠道身份同时最多一个 `status IN (waiting, active, pending)` 的 ServiceSession，因此最多一条正在处理的客户线程；`conversations.status = active` 不表示客服批次未结束。数据结构和公开契约已经允许同一身份先后拥有多条 Conversation，后续开放并行入站不替换客户线程编号。
 - 网站公开请求由现有 `/api` Gin Service 适配到未注册 Wails 绑定的访客应用服务和 Action；访客直接读取 Cervi 消息时间线，不创建 Delivery。
 - 本子阶段只实现文本，不包含文件、外部平台投递和统一实时基础设施。
 
@@ -1428,19 +1435,30 @@ Telegram 首个实现额外验证 TDLib 会话托管、FloodWait、远端历史�
 
 根据真实需求选择公开群、公告群、话题模式、独立子讨论空间和显式共享的跨企业工单。实现大型群 Shared Fanout、会话级订阅引用计数和容量治理后，才能取消阶段 2 的每用户 Fanout 成员上限。
 
-## 13. 第一个聊天 PR
+## 13. 前两个聊天 PR
 
-### 13.1 当前实施基线
+### 13.1 实施基线
 
-第一个聊天 PR 的详细实施基线见 [chat-first-pr-design.md](chat-first-pr-design.md)。路线图用于固定长期对象和阶段关系，详细设计根据当前代码和本轮产品目标确定具体边界。两者发生差异时，必须在本节说明原因，不能静默采用另一套契约。
+网站访客真实消息闭环拆成两个连续 PR：
 
-本轮相对原始路线图提前引入 `ServiceSession`。访客重构后的消息页已经以多次客服处理过程作为会话列表项；如果第一个公开契约先暴露长期 `Conversation`，后续引入处理批次时必须替换公开编号、历史路径和前端列表状态。提前建立批次可以让访客列表从第一版开始使用稳定的 `serviceSessionId`，长期 `Conversation` 仍保持一个渠道身份一条时间线。
+1. [chat-first-pr-design.md](chat-first-pr-design.md)：建立客户聊天数据底座并暂时隐藏管理端手动添加外部联系人的入口。
+2. [chat-visitor-message-pr-design.md](chat-visitor-message-pr-design.md)：实现网站访客身份、首条消息事务、真实 Conversation 列表和完整消息历史。
 
-本轮同时接入网站访客公开发送、批次列表和消息历史。该变化来自“第一条真实文本才创建记录，返回上一层展示真实列表”的明确产品目标。企业成员读取和回复不进入同一 PR，继续作为下一次独立交付，保持当前 PR 是访客侧可独立验收的最小闭环。
+路线图固定长期对象和阶段关系，两份详细设计固定当前代码基线下的具体字段、接口、事务和验收。三者不一致时必须同步修正，不能让实现自行选择另一套语义。
 
-### 13.2 本 PR 数据和事务
+本轮明确修正早期“一个渠道身份永久一条 Conversation、访客列表使用 ServiceSession 编号”的方案：
 
-本 PR 创建六张聊天表：
+- Conversation 是客户实际打开和继续的聊天线程。
+- ServiceSession 只是一条客户线程上的客服处理周期。
+- 同一渠道身份可以先后拥有多条 Conversation。
+- 首版仍限制同一渠道身份最多一个未结束 ServiceSession，因此最多一条正在处理的客户线程。
+- 访客列表、历史路径和页面状态从第一版开始使用 `conversationId`。
+
+这样既保持首版客服队列的单未结束会话体验，又不会在以后开放并行网站线程时替换公开主键。
+
+### 13.2 PR1：客户聊天数据底座
+
+PR1 创建六张聊天表：
 
 ```text
 chat_subjects
@@ -1451,37 +1469,65 @@ service_sessions
 messages
 ```
 
-第一条有效网站文本在同一事务中创建或取得联系人、渠道身份、联系人主体、长期客户会话、参与者、未结束服务批次和消息。一个渠道身份始终对应一个长期客户会话，同一长期会话同时最多存在一个未结束批次，已经结束后收到新消息才创建下一个批次。
+该 PR 同时：
 
-消息发送者继续只通过 `Message → Participant → ChatSubject` 解析。访客 DTO 的 `author` 只是界面映射，不建立第二套发送者模型。网站消息使用 `chmsg:<channel_id>:<client_message_id>` 幂等键，命名唯一约束和完整事务重试收敛并发创建。
+- 新增独立向前迁移，把 `contacts.created_by_user_id` 改为可空；原联系人建表迁移保持不变。
+- 增加聊天领域值和 Bun 模型。
+- 不在 `customer_conversations` 上建立渠道身份永久唯一约束。
+- 保留 Conversation 级未结束 ServiceSession 唯一约束。
+- 通过 ServiceSession 的渠道身份字段增加首版身份级未结束唯一约束。
+- 给 Conversation 增加与时间一致的 `last_message_id`。
+- 暂时注释管理端“添加外部联系人”菜单入口，保留既有表单、Action 和联系人管理能力。
 
-渠道行不加锁。创建或取得 `customer_conversations` 后立即锁定当前渠道身份对应的行，再选择未结束批次和分配 `sequence`。同一网站渠道的不同访客不会在共享渠道配置行上串行。
+PR1 一共新增一条联系人字段变更迁移和六条建表迁移。每条迁移在文件内写全相关表、列、显式索引和具名约束的中文数据库注释，不依赖后续迁移补注释。
 
-### 13.3 本 PR 接口和界面
+六张新表统一按主键、`created_at`、`updated_at`、其他业务字段的顺序建表，并全部保留两个审计时间；`customer_conversations` 使用 `conversation_id` 作为主键，`messages` 也保留独立于 `edited_at` 的 `updated_at`。PR1 不为统一格式修改任何历史迁移，既有表的字段顺序由后续独立 PR 处理。
 
-公开路由注册在现有 Wails `/api` 服务对应的 Gin Router 中，对外使用：
+PR1 不实现入站 Action、公开接口或 Messenger 真实写入。数据库中不会因为表已经存在而自动产生聊天记录。
+
+### 13.3 PR2：网站访客真实消息闭环
+
+PR2 在第一条有效网站文本事务中创建或取得联系人、渠道身份和联系人 ChatSubject，并选择或创建目标 Conversation、参与者、ServiceSession 和 Message。
+
+同一访客的事务锁点是 `contact_channel_identities` 行，不是共享渠道配置行。两个页面并发发送空草稿时，身份级未结束 ServiceSession 唯一约束和完整事务重试把它们收敛到同一条正在处理的 Conversation；不同访客不会互相串行。
+
+网站消息继续使用：
+
+```text
+chmsg:<channel_id>:<client_message_id>
+```
+
+幂等记录核对联系人主体和客户会话两条完整关系。请求指定的 Conversation 是客户线程意图的一部分；空编号重试返回首次实际创建或并发收敛到的 Conversation。
+
+公开路由注册在现有 Wails `/api` Gin Service：
 
 ```text
 GET  /api/public/website-channels/{channelID}/messenger
 POST /api/public/website-channels/{channelID}/messages
-GET  /api/public/website-channels/{channelID}/service-sessions/{serviceSessionID}/messages
+GET  /api/public/website-channels/{channelID}/conversations/{conversationID}/messages
 ```
 
-公开契约使用 `serviceSession` 和 `serviceSessions`，不使用 `conversation` 指代客服处理批次。裸访客 Token、Cookie 和 Header 只由 HTTP 适配器处理；Action 和 Query 只接收规范化的 `external_id`。
+打开页面、初始化 Token、点击“开始聊天”和输入草稿不创建业务记录。已有包含未结束 ServiceSession 的 Conversation 时直接打开；没有时创建本地草稿，首条合法文本成功后才变为真实 Conversation。
 
-打开页面、点击“开始聊天”和输入草稿不创建业务记录。已经存在未结束批次时，“开始聊天”直接读取该批次历史；没有未结束批次时才建立本地空草稿。问候语只显示在空草稿的时间线外，不写入数据库，也不混入已有批次历史。
+访客打开最新 ServiceSession 已关闭的 Conversation 并再次发送时，在同一 Conversation 上创建新的 ServiceSession，完整历史保持连续。如果该身份已经有另一条包含未结束 ServiceSession 的 Conversation，首版返回冲突并引导继续当前线程，不把正文静默写到其他 Conversation。
 
-### 13.4 现有联系人边界
+### 13.4 两个 PR 共同边界
 
-`contacts.created_by_user_id` 改为可空，网站渠道自动联系人不伪造创建用户。`contacts.source_channel_id` 保持非空并写当前网站渠道。管理界面的手工添加联系人入口和现有 CRUD 保持不变。联系人合并、导入、无来源联系人和跨渠道自然人识别不进入本 PR。
+两个 PR 都不实现：
+
+- 企业成员收件箱读取、历史和回复。
+- ServiceSession 领取、转接、挂起和结束命令。
+- 同一网站渠道身份并行多个未结束 ServiceSession。
+- 未读、实时、文件、外部平台投递、指标和满意度。
+- 第三方用户消息账号、受管访客、联邦和 AI 运行表。
+- `customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。
 
 ### 13.5 后续交付
 
 后续按独立 PR 继续完成：
 
-1. 企业成员只读服务批次列表和消息历史，并接入现有收件箱占位界面。
-2. 企业成员回复、领取、挂起和结束批次。
+1. 企业成员按未结束 ServiceSession 读取工作队列，并按 Conversation 加载完整消息历史。
+2. 企业成员回复、领取、挂起和结束 ServiceSession。
 3. 网站访客使用 `after` 轮询读取客服新消息。
-4. 未读、实时、文件、外部平台投递、转接、指标和满意度。
-
-第一个 PR 不创建第三方用户消息账号、受管访客、联邦和 AI 运行表，也不创建 `chat_outbox`、通用 Inbox、领域事件、`customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。
+4. 根据真实产品需要增加网站渠道“允许多个入站会话”配置；放开时保留 Conversation 公开主键并删除身份级未结束约束。
+5. 未读、实时、文件、外部平台投递、转接、指标和满意度。
