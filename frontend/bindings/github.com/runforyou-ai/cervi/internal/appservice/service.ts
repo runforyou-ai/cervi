@@ -85,6 +85,20 @@ export function CreateFileUpload(meta: $models.RequestMeta, input: $models.FileU
 }
 
 /**
+ * CreateKnowledgeBase 创建企业知识库。
+ */
+export function CreateKnowledgeBase(meta: $models.RequestMeta, input: $models.KnowledgeBaseInput): $CancellablePromise<$models.KnowledgeBase> {
+    return $Call.ByID(1982019343, meta, input);
+}
+
+/**
+ * CreateKnowledgeGroup 创建知识库分组。
+ */
+export function CreateKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeGroupInput): $CancellablePromise<$models.KnowledgeBase> {
+    return $Call.ByID(2458756261, meta, knowledgeBaseID, input);
+}
+
+/**
  * CreateMessageChannel 创建消息渠道。
  */
 export function CreateMessageChannel(meta: $models.RequestMeta, input: $models.CreateMessageChannelInput): $CancellablePromise<$models.MessageChannelSummary> {
@@ -148,6 +162,20 @@ export function DeleteContact(meta: $models.RequestMeta, contactID: string): $Ca
 }
 
 /**
+ * DeleteKnowledgeBase 删除企业知识库。
+ */
+export function DeleteKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<void> {
+    return $Call.ByID(541376414, meta, knowledgeBaseID);
+}
+
+/**
+ * DeleteKnowledgeGroup 删除不含子分组的知识库分组。
+ */
+export function DeleteKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, groupID: string): $CancellablePromise<$models.KnowledgeBase> {
+    return $Call.ByID(3559839338, meta, knowledgeBaseID, groupID);
+}
+
+/**
  * DeleteRole 删除自定义角色。
  */
 export function DeleteRole(meta: $models.RequestMeta, roleID: string): $CancellablePromise<void> {
@@ -180,6 +208,13 @@ export function GetAgent(meta: $models.RequestMeta, agentID: string): $Cancellab
  */
 export function GetContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
     return $Call.ByID(1550866366, meta, contactID);
+}
+
+/**
+ * GetKnowledgeBase 返回当前企业中的知识库详情。
+ */
+export function GetKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<$models.KnowledgeBase> {
+    return $Call.ByID(3589389559, meta, knowledgeBaseID);
 }
 
 /**
@@ -271,6 +306,13 @@ export function ListChannelOptions(meta: $models.RequestMeta): $CancellablePromi
  */
 export function ListContacts(meta: $models.RequestMeta, input: $models.ContactListInput): $CancellablePromise<$models.ContactList> {
     return $Call.ByID(1872706983, meta, input);
+}
+
+/**
+ * ListKnowledgeBases 返回当前企业的知识库列表。
+ */
+export function ListKnowledgeBases(meta: $models.RequestMeta): $CancellablePromise<$models.KnowledgeBaseList> {
+    return $Call.ByID(2416994044, meta);
 }
 
 /**
@@ -467,6 +509,20 @@ export function UpdateAgentWorkStatus(meta: $models.RequestMeta, agentID: string
  */
 export function UpdateContact(meta: $models.RequestMeta, contactID: string, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(183062653, meta, contactID, input);
+}
+
+/**
+ * UpdateKnowledgeBase 修改企业知识库。
+ */
+export function UpdateKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeBaseInput): $CancellablePromise<$models.KnowledgeBase> {
+    return $Call.ByID(103390268, meta, knowledgeBaseID, input);
+}
+
+/**
+ * UpdateKnowledgeGroup 修改知识库分组。
+ */
+export function UpdateKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, groupID: string, input: $models.KnowledgeGroupInput): $CancellablePromise<$models.KnowledgeBase> {
+    return $Call.ByID(1535726024, meta, knowledgeBaseID, groupID, input);
 }
 
 /**

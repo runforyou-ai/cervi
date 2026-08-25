@@ -4,6 +4,7 @@ import {
   CheckIcon,
   ContactRoundIcon,
   InboxIcon,
+  LibraryIcon,
   LoaderCircleIcon,
   LogOutIcon,
   PlugIcon,
@@ -96,6 +97,12 @@ function WorkspaceMenu({
         icon={ContactRoundIcon}
         label={t("contacts")}
         active={location.pathname.startsWith("/contacts")}
+      />
+      <WorkspaceRailItem
+        to="/knowledge-bases"
+        icon={LibraryIcon}
+        label={t("knowledgeBases")}
+        active={location.pathname.startsWith("/knowledge-bases")}
       />
       <WorkspaceRailItem
         to="/integrations/channels"

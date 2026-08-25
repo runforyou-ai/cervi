@@ -623,6 +623,71 @@ export interface InstallationStatus {
 }
 
 /**
+ * KnowledgeBase 定义知识库详情。
+ */
+export interface KnowledgeBase {
+    "id": string;
+    "name": string;
+    "category": KnowledgeBaseCategory;
+    "description": string;
+    "integrationConnectionId": string;
+    "externalResourceId": string;
+    "groups": KnowledgeGroup[] | null;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * KnowledgeBaseCategory 表示知识库内容类型。
+ */
+export enum KnowledgeBaseCategory {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeBaseCategoryStandard = "standard",
+    KnowledgeBaseCategoryQA = "qa",
+};
+
+/**
+ * KnowledgeBaseInput 定义知识库可编辑字段。
+ */
+export interface KnowledgeBaseInput {
+    "name": string;
+    "category": KnowledgeBaseCategory;
+    "description": string;
+    "integrationConnectionId": string;
+    "externalResourceId": string;
+}
+
+/**
+ * KnowledgeBaseList 定义知识库列表。
+ */
+export interface KnowledgeBaseList {
+    "knowledgeBases": KnowledgeBase[] | null;
+}
+
+/**
+ * KnowledgeGroup 定义知识库分组树节点。
+ */
+export interface KnowledgeGroup {
+    "id": string;
+    "parentId": string;
+    "name": string;
+    "isDefault": boolean;
+    "children": KnowledgeGroup[] | null;
+}
+
+/**
+ * KnowledgeGroupInput 定义知识库分组可编辑字段。
+ */
+export interface KnowledgeGroupInput {
+    "name": string;
+    "parentId": string;
+}
+
+/**
  * Locale 表示应用支持的本地化语言。
  */
 export enum Locale {
