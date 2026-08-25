@@ -157,6 +157,7 @@ cervi/
 - 本地 PostgreSQL 和 NATS 实例由所有工作区共享，不为单独工作区创建容器、端口或数据卷；每个 worktree 必须通过 `.env` 使用独立数据库和 NATS 命名空间。
 - 本地不运行 S3 兼容服务；对象存储由管理页面配置，可使用任意客户端可访问的临时 S3 兼容服务。
 - 重建库结构使用 `wails3 task migrate:reset`，或先回滚再 `migrate`；回滚和重建前先停止服务端。
+- 已合入 `main` 的迁移不可修改、重命名或重排；后续结构变化必须新增时间戳更晚的增量迁移，并提供对应的 Down 迁移。
 - 建表迁移按 `YYYYMMDDHHMMSS_create_<table>_table.sql` 命名，每个文件只创建一张表，不创建外键和 `CHECK` 约束。
 - 迁移中使用简洁中文 `COMMENT ON` 说明表和业务字段。
 
