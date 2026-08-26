@@ -119,6 +119,7 @@ export type {
     RoleList,
     RoleSummary,
     S3Setting,
+    S3SettingInput,
     Startup,
     Team,
     TeamInput,
