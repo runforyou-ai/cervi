@@ -554,9 +554,9 @@ type MemberOption struct {
 
 // MemberOptionListInput 定义企业身份选择项查询条件。
 type MemberOptionListInput struct {
-	Query    string `json:"query"`
-	Page     int    `json:"page"`
-	PageSize int    `json:"pageSize"`
+	Query    string `json:"query" query:"query"`
+	Page     int    `json:"page" query:"page,default=1"`
+	PageSize int    `json:"pageSize" query:"pageSize,default=50"`
 }
 
 // MemberOptionList 定义企业身份选择项分页结果。
@@ -598,10 +598,10 @@ type AgentManagedExecutionInput struct {
 
 // AgentListInput 定义 AI 员工目录查询条件。
 type AgentListInput struct {
-	Query    string      `json:"query"`
-	Status   *UserStatus `json:"status,omitempty"`
-	Page     int         `json:"page"`
-	PageSize int         `json:"pageSize"`
+	Query    string      `json:"query" query:"query"`
+	Status   *UserStatus `json:"status,omitempty" query:"status"`
+	Page     int         `json:"page" query:"page,default=1"`
+	PageSize int         `json:"pageSize" query:"pageSize,default=50"`
 }
 
 // Agent 定义 AI 员工信息。
@@ -692,12 +692,12 @@ type PageInfo struct {
 
 // UserListInput 定义企业成员列表查询条件。
 type UserListInput struct {
-	Query    string      `json:"query"`
-	Status   *UserStatus `json:"status,omitempty"`
-	RoleID   string      `json:"roleId"`
-	TeamID   string      `json:"teamId"`
-	Page     int         `json:"page"`
-	PageSize int         `json:"pageSize"`
+	Query    string      `json:"query" query:"query"`
+	Status   *UserStatus `json:"status,omitempty" query:"status"`
+	RoleID   string      `json:"roleId" query:"roleId"`
+	TeamID   string      `json:"teamId" query:"teamId"`
+	Page     int         `json:"page" query:"page,default=1"`
+	PageSize int         `json:"pageSize" query:"pageSize,default=50"`
 }
 
 // CreateUserInput 定义新增企业成员字段。
@@ -771,9 +771,9 @@ type Team struct {
 
 // TeamListInput 定义团队列表查询条件。
 type TeamListInput struct {
-	Query    string `json:"query"`
-	Page     int    `json:"page"`
-	PageSize int    `json:"pageSize"`
+	Query    string `json:"query" query:"query"`
+	Page     int    `json:"page" query:"page,default=1"`
+	PageSize int    `json:"pageSize" query:"pageSize,default=50"`
 }
 
 // TeamList 定义团队分页结果。
@@ -834,9 +834,9 @@ type KnowledgeBaseList struct {
 
 // TeamMemberCandidateInput 定义可加入团队的成员查询条件。
 type TeamMemberCandidateInput struct {
-	Query    string `json:"query"`
-	Page     int    `json:"page"`
-	PageSize int    `json:"pageSize"`
+	Query    string `json:"query" query:"query"`
+	Page     int    `json:"page" query:"page,default=1"`
+	PageSize int    `json:"pageSize" query:"pageSize,default=50"`
 }
 
 // TeamMemberCandidate 定义可加入团队的成员。
@@ -855,10 +855,10 @@ type TeamMemberCandidateList struct {
 
 // TeamMemberListInput 定义团队成员列表查询条件。
 type TeamMemberListInput struct {
-	Query      string      `json:"query"`
-	WorkStatus *WorkStatus `json:"workStatus,omitempty"`
-	Page       int         `json:"page"`
-	PageSize   int         `json:"pageSize"`
+	Query      string      `json:"query" query:"query"`
+	WorkStatus *WorkStatus `json:"workStatus,omitempty" query:"workStatus"`
+	Page       int         `json:"page" query:"page,default=1"`
+	PageSize   int         `json:"pageSize" query:"pageSize,default=50"`
 }
 
 // TeamMember 定义团队成员信息。
