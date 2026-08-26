@@ -289,6 +289,36 @@ body,
   background: var(--border);
 }
 
+/* 激活和悬停标签两侧以及行尾不显示分隔线。 */
+.cervi-workspace-tab[data-active="false"]:hover::after,
+.cervi-workspace-tabs [role="tablist"]
+  > :last-child
+  .cervi-workspace-tab[data-active="false"]::after,
+.cervi-workspace-tabs [role="tablist"]
+  > :has(+ * .cervi-workspace-tab[data-active="true"])
+  .cervi-workspace-tab[data-active="false"]::after,
+.cervi-workspace-tabs [role="tablist"]
+  > :has(+ * .cervi-workspace-tab:hover)
+  .cervi-workspace-tab[data-active="false"]::after {
+  content: none;
+}
+
+/* 普通标签悬停时显示内缩的圆角高亮。 */
+.cervi-workspace-tab[data-active="false"]::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0 4px 4px;
+  border-radius: var(--radius);
+  content: "";
+  background: var(--muted);
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.cervi-workspace-tab[data-active="false"]:hover::before {
+  opacity: 1;
+}
+
 .cervi-workspace-tab[data-active="true"]::before,
 .cervi-workspace-tab[data-active="true"]::after {
   position: absolute;

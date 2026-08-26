@@ -384,10 +384,10 @@ function WorkspaceTabButton({
     <div
       data-active={active}
       className={cn(
-        "cervi-workspace-tab group/tab relative mt-1 flex h-10 w-40 min-w-32 max-w-56 shrink-0 items-center transition-colors duration-150",
+        "cervi-workspace-tab group/tab relative isolate mt-1 flex h-10 w-40 shrink-0 items-center",
         active
-          ? "z-10 rounded-t-xl bg-sidebar-accent text-sidebar-accent-foreground"
-          : "bg-transparent text-foreground hover:bg-muted/55",
+          ? "z-10 rounded-t-[10px] bg-sidebar-accent text-sidebar-accent-foreground"
+          : "text-foreground",
       )}
     >
       <button
@@ -400,7 +400,7 @@ function WorkspaceTabButton({
         tabIndex={active ? 0 : -1}
         title={title}
         className={cn(
-          "flex h-full min-w-0 flex-1 items-center gap-2 rounded-t-xl px-3 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          "flex h-full min-w-0 flex-1 items-center gap-2 rounded-t-[10px] px-3 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
           active && "font-medium",
         )}
         onClick={() => onActivate(tab.id)}
