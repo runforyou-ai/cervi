@@ -1,4 +1,4 @@
-/** 提供工作台标签的激活状态和未保存状态登记。 */
+/** 提供工作台标签的未保存状态登记。 */
 import {
   createContext,
   useContext,
@@ -9,7 +9,6 @@ import {
 } from "react"
 
 type WorkspaceTabLifecycleContextValue = {
-  active: boolean
   reportDirty: (source: symbol, dirty: boolean) => void
 }
 
@@ -25,23 +24,17 @@ function useWorkspaceTabLifecycle() {
   return context
 }
 
-/** 向标签页面提供激活状态和未保存状态登记入口。 */
+/** 向标签页面提供未保存状态登记入口。 */
 export function WorkspaceTabLifecycleProvider({
-  active,
   reportDirty,
   children,
 }: WorkspaceTabLifecycleContextValue & { children: ReactNode }) {
-  const value = useMemo(() => ({ active, reportDirty }), [active, reportDirty])
+  const value = useMemo(() => ({ reportDirty }), [reportDirty])
   return (
     <WorkspaceTabLifecycleContext.Provider value={value}>
       {children}
     </WorkspaceTabLifecycleContext.Provider>
   )
-}
-
-/** 返回当前标签是否正在显示。 */
-export function useWorkspaceTabActive() {
-  return useWorkspaceTabLifecycle().active
 }
 
 /** 登记表单是否存在未保存修改。 */

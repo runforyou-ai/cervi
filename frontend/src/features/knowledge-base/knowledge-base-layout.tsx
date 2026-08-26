@@ -45,7 +45,6 @@ import {
   KnowledgeGroupDialog,
   type KnowledgeGroupDialogState,
 } from "@/features/knowledge-base/knowledge-group-dialog"
-import { useWorkspaceTabActive } from "@/contexts/workspace-tab-lifecycle"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
@@ -60,7 +59,6 @@ export function KnowledgeBaseLayout() {
   const { t } = useTranslation("knowledgeBase")
   const location = useLocation()
   const navigate = useNavigate()
-  const tabActive = useWorkspaceTabActive()
   const navigateRef = useRef(navigate)
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseData[]>([])
   const [groupDialog, setGroupDialog] =
@@ -103,14 +101,13 @@ export function KnowledgeBaseLayout() {
   }, [])
 
   useEffect(() => {
-    if (!tabActive) return
     mounted.current = true
     void load()
     return () => {
       mounted.current = false
       loadVersion.current += 1
     }
-  }, [load, tabActive])
+  }, [load])
 
   /** 把创建、保存或分组结果同步到窄侧栏。 */
   const upsertKnowledgeBase = useCallback((knowledgeBase: KnowledgeBaseData) => {

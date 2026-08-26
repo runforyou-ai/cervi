@@ -317,7 +317,6 @@ function WorkspaceTabPane({
       {portalContainer ? (
         <PortalContainerProvider container={portalContainer} active={active}>
           <WorkspaceTabLifecycleProvider
-            active={active}
             reportDirty={reportDirty}
           >
             <WorkspaceProvider value={context}>

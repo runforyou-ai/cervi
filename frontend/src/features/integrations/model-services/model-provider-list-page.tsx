@@ -52,7 +52,6 @@ import {
   modelServiceSectionOrder,
   type ModelServiceSection,
 } from "@/features/integrations/model-services/model-service-options"
-import { useWorkspaceTabActive } from "@/contexts/workspace-tab-lifecycle"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -109,7 +108,6 @@ export function ModelProviderListPage({
 }) {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
-  const tabActive = useWorkspaceTabActive()
   const [providers, setProviders] = useState<AIProviderSummaryData[]>([])
   const [deletingProvider, setDeletingProvider] =
     useState<AIProviderSummaryData | null>(null)
@@ -144,14 +142,13 @@ export function ModelProviderListPage({
   }, [navigate])
 
   useEffect(() => {
-    if (!tabActive) return
     mounted.current = true
     void load()
     return () => {
       mounted.current = false
       loadVersion.current += 1
     }
-  }, [load, tabActive])
+  }, [load])
 
   /** 删除选中的模型服务供应商。 */
   async function confirmDelete() {

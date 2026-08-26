@@ -49,7 +49,6 @@ import {
   messageChannelTypeDefinition,
   messageChannelTypeDefinitions,
 } from "@/features/channels/message-channel-types"
-import { useWorkspaceTabActive } from "@/contexts/workspace-tab-lifecycle"
 import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
@@ -125,7 +124,6 @@ function MessageChannelRow({
 export function MessageChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
-  const tabActive = useWorkspaceTabActive()
   const [channels, setChannels] = useState<MessageChannelSummary[]>([])
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
@@ -160,12 +158,11 @@ export function MessageChannelListPage() {
   }, [navigate, t])
 
   useEffect(() => {
-    if (!tabActive) return
     void loadChannels()
     return () => {
       loadVersion.current += 1
     }
-  }, [loadChannels, tabActive])
+  }, [loadChannels])
 
   const filteredChannels = useMemo(
     () =>

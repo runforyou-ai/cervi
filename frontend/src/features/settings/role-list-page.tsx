@@ -46,7 +46,6 @@ import {
   roleDescription,
   roleDisplayName,
 } from "@/features/roles/role-labels"
-import { useWorkspaceTabActive } from "@/contexts/workspace-tab-lifecycle"
 import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 
@@ -72,7 +71,6 @@ export function RoleListPage() {
   const { t } = useTranslation("settings")
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
-  const tabActive = useWorkspaceTabActive()
   const [roles, setRoles] = useState<RoleData[]>([])
   const [permissions, setPermissions] = useState<PermissionDefinition[]>([])
   const [maximum, setMaximum] = useState<number | null>(null)
@@ -105,14 +103,13 @@ export function RoleListPage() {
   }, [navigate])
 
   useEffect(() => {
-    if (!tabActive) return
     mounted.current = true
     void load()
     return () => {
       mounted.current = false
       loadVersion.current += 1
     }
-  }, [load, tabActive])
+  }, [load])
 
   /** 删除选中的自定义角色。 */
   async function confirmDelete() {
