@@ -654,7 +654,78 @@ func (b *Backend) DeleteAIProvider(ctx context.Context, meta appservice.RequestM
 	return b.do(ctx, meta, http.MethodDelete, "/integrations/model-services/"+url.PathEscape(providerID), nil, nil, nil)
 }
 
-// UpdateOrganization 修改远程企业名称。
+// ListBusinessSystems 返回远程业务系统列表。
+func (b *Backend) ListBusinessSystems(ctx context.Context, meta appservice.RequestMeta) (appservice.BusinessSystemList, error) {
+	var output appservice.BusinessSystemList
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/business-systems", nil, nil, &output)
+	return output, err
+}
+
+// GetBusinessSystem 返回远程业务系统详情。
+func (b *Backend) GetBusinessSystem(ctx context.Context, meta appservice.RequestMeta, businessSystemID string) (appservice.BusinessSystem, error) {
+	var output appservice.BusinessSystem
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/business-systems/"+url.PathEscape(businessSystemID), nil, nil, &output)
+	return output, err
+}
+
+// CreateBusinessSystem 创建远程业务系统。
+func (b *Backend) CreateBusinessSystem(ctx context.Context, meta appservice.RequestMeta, input appservice.BusinessSystemInput) (appservice.BusinessSystem, error) {
+	var output appservice.BusinessSystem
+	err := b.do(ctx, meta, http.MethodPost, "/integrations/business-systems", nil, input, &output)
+	return output, err
+}
+
+// UpdateBusinessSystem 修改远程业务系统。
+func (b *Backend) UpdateBusinessSystem(ctx context.Context, meta appservice.RequestMeta, businessSystemID string, input appservice.BusinessSystemInput) (appservice.BusinessSystem, error) {
+	var output appservice.BusinessSystem
+	err := b.do(ctx, meta, http.MethodPut, "/integrations/business-systems/"+url.PathEscape(businessSystemID), nil, input, &output)
+	return output, err
+}
+
+// DeleteBusinessSystem 删除远程业务系统。
+func (b *Backend) DeleteBusinessSystem(ctx context.Context, meta appservice.RequestMeta, businessSystemID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/integrations/business-systems/"+url.PathEscape(businessSystemID), nil, nil, nil)
+}
+
+// ListIntegrationConnections 返回远程连接器列表。
+func (b *Backend) ListIntegrationConnections(ctx context.Context, meta appservice.RequestMeta) (appservice.IntegrationConnectionList, error) {
+	var output appservice.IntegrationConnectionList
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/connectors", nil, nil, &output)
+	return output, err
+}
+
+// GetIntegrationConnection 返回远程连接器详情。
+func (b *Backend) GetIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, connectionID string) (appservice.IntegrationConnection, error) {
+	var output appservice.IntegrationConnection
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/connectors/"+url.PathEscape(connectionID), nil, nil, &output)
+	return output, err
+}
+
+// TestIntegrationConnection 测试远程连接器草稿配置。
+func (b *Backend) TestIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.IntegrationConnectionTestInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/integrations/connectors/test", nil, input, nil)
+}
+
+// CreateIntegrationConnection 创建远程连接器。
+func (b *Backend) CreateIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.IntegrationConnectionInput) (appservice.IntegrationConnection, error) {
+	var output appservice.IntegrationConnection
+	err := b.do(ctx, meta, http.MethodPost, "/integrations/connectors", nil, input, &output)
+	return output, err
+}
+
+// UpdateIntegrationConnection 修改远程连接器。
+func (b *Backend) UpdateIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, connectionID string, input appservice.IntegrationConnectionInput) (appservice.IntegrationConnection, error) {
+	var output appservice.IntegrationConnection
+	err := b.do(ctx, meta, http.MethodPut, "/integrations/connectors/"+url.PathEscape(connectionID), nil, input, &output)
+	return output, err
+}
+
+// DeleteIntegrationConnection 删除远程连接器。
+func (b *Backend) DeleteIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, connectionID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/integrations/connectors/"+url.PathEscape(connectionID), nil, nil, nil)
+}
+
+// UpdateOrganization 修改远程企业通用设置。
 func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	var output appservice.Organization
 	err := b.do(ctx, meta, http.MethodPut, "/settings/organization", nil, input, &output)

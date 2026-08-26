@@ -218,7 +218,7 @@ export function WorkspaceLayout() {
     setIdentity((current) => (current ? { ...current, user } : current))
   }
 
-  /** 同步工作台中的最新企业信息。 */
+  /** 同步工作台中的最新企业设置。 */
   function updateOrganization(organization: Organization) {
     setIdentity((current) => (current ? { ...current, organization } : current))
   }

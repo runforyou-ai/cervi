@@ -1,6 +1,6 @@
 //go:build server
 
-// Package organization 实现企业名称修改。
+// Package organization 实现企业通用设置修改。
 package organization
 
 import (
@@ -10,7 +10,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// ValidationCode 标识企业名称的校验结果。
+// ValidationCode 标识企业通用设置的校验结果。
 type ValidationCode = common.FieldCode
 
 const (
@@ -18,15 +18,16 @@ const (
 	ValidationNameTooLong  ValidationCode = "ORGANIZATION_NAME_TOO_LONG"
 )
 
-// ValidationError 表示企业名称校验失败。
+// ValidationError 表示企业通用设置校验失败。
 type ValidationError = common.FieldError
 
-// Input 定义企业名称修改输入。
+// Input 定义企业通用设置修改输入。
 type Input struct {
-	Name string
+	Name              string
+	AllowArbitraryURL bool
 }
 
-// normalizeInput 归一化并校验企业名称。
+// normalizeInput 归一化并校验企业通用设置。
 func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	fields := make(map[string]ValidationCode)

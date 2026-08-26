@@ -119,7 +119,11 @@ export function AgentForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form
+      className="space-y-9"
+      onSubmit={form.handleSubmit(submit)}
+      noValidate
+    >
       <FieldGroup className="gap-5">
         <FormInputField
           name="displayName"
@@ -163,17 +167,17 @@ export function AgentForm({
             </Field>
           )}
         />
-        <div className="flex items-center gap-2 pt-2">
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting
-              ? t("agents.form.saving")
-              : t("agents.form.save")}
-          </Button>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            {t("agents.form.cancel")}
-          </Button>
-        </div>
       </FieldGroup>
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting
+            ? t("agents.form.saving")
+            : t("agents.form.save")}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          {t("agents.form.cancel")}
+        </Button>
+      </div>
     </form>
   )
 }

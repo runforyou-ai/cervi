@@ -6,6 +6,10 @@ import { MessageChannelListPage } from "@/features/channels/message-channel-list
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
+import { BusinessSystemFormPage } from "@/features/integrations/business-systems/business-system-form-page"
+import { BusinessSystemListPage } from "@/features/integrations/business-systems/business-system-list-page"
+import { ConnectorFormPage } from "@/features/integrations/connectors/connector-form-page"
+import { ConnectorListPage } from "@/features/integrations/connectors/connector-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
@@ -23,8 +27,8 @@ const workspaceRouteDefinitions = [
   { path: "/account/security", titleKey: "tabs.routes.security" },
   { path: "/account/preferences", titleKey: "tabs.routes.preferences" },
   {
-    path: "/settings/organization",
-    titleKey: "tabs.routes.organization",
+    path: "/settings/general",
+    titleKey: "tabs.routes.general",
   },
   {
     path: "/settings/roles/new",
@@ -58,6 +62,19 @@ const workspaceRouteDefinitions = [
     titleKey: "tabs.routes.channel",
   },
   { path: "/integrations/channels", titleKey: "tabs.routes.channels" },
+  {
+    path: "/integrations/business-systems/new",
+    titleKey: "tabs.routes.newBusinessSystem",
+    transient: true,
+  },
+  {
+    path: "/integrations/business-systems/:businessSystemId",
+    titleKey: "tabs.routes.businessSystem",
+  },
+  {
+    path: "/integrations/business-systems",
+    titleKey: "tabs.routes.businessSystems",
+  },
   {
     path: "/integrations/model-services/chat/new",
     titleKey: "tabs.routes.newChatProvider",
@@ -97,11 +114,24 @@ const workspaceRouteDefinitions = [
     path: "/integrations/model-services/rerank",
     titleKey: "tabs.routes.rerankProviders",
   },
+  {
+    path: "/integrations/connectors/new",
+    titleKey: "tabs.routes.newConnector",
+    transient: true,
+  },
+  {
+    path: "/integrations/connectors/:connectionId",
+    titleKey: "tabs.routes.connector",
+  },
+  {
+    path: "/integrations/connectors",
+    titleKey: "tabs.routes.connectors",
+  },
 ] as const
 
 const workspaceRedirects: Readonly<Record<string, string>> = {
   "/account": "/account/profile",
-  "/settings": "/settings/organization",
+  "/settings": "/settings/general",
   "/contacts": "/contacts/employees",
   "/integrations": "/integrations/channels",
   "/integrations/model-services": "/integrations/model-services/chat",
@@ -187,8 +217,8 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
         element={<PersonalSettingsPage section="preferences" />}
       />
       <Route
-        path="/settings/organization"
-        element={<SystemSettingsPage section="organization" />}
+        path="/settings/general"
+        element={<SystemSettingsPage section="general" />}
       />
       <Route
         path="/settings/roles"
@@ -252,6 +282,18 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
           element={<MessageChannelFormPage mode="edit" />}
         />
         <Route
+          path="business-systems"
+          element={<BusinessSystemListPage />}
+        />
+        <Route
+          path="business-systems/new"
+          element={<BusinessSystemFormPage mode="create" />}
+        />
+        <Route
+          path="business-systems/:businessSystemId"
+          element={<BusinessSystemFormPage mode="edit" />}
+        />
+        <Route
           path="model-services/chat"
           element={<ModelProviderListPage section="chat" />}
         />
@@ -298,6 +340,15 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
           element={
             <ModelProviderFormPage mode="edit" returnSection="rerank" />
           }
+        />
+        <Route path="connectors" element={<ConnectorListPage />} />
+        <Route
+          path="connectors/new"
+          element={<ConnectorFormPage mode="create" />}
+        />
+        <Route
+          path="connectors/:connectionId"
+          element={<ConnectorFormPage mode="edit" />}
         />
       </Route>
     </Routes>

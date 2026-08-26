@@ -66,7 +66,7 @@ export function ChangePasswordForm() {
 
   return (
     <form
-      className="w-full max-w-xl"
+      className="w-full max-w-xl space-y-9"
       aria-label={t("password.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
@@ -130,15 +130,15 @@ export function ChangePasswordForm() {
             </Field>
           )}
         />
-        <div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <LoaderCircleIcon className="animate-spin" />
-            ) : null}
-            {isSubmitting ? t("password.saving") : t("password.save")}
-          </Button>
-        </div>
       </FieldGroup>
+      <div>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <LoaderCircleIcon className="animate-spin" />
+          ) : null}
+          {isSubmitting ? t("password.saving") : t("password.save")}
+        </Button>
+      </div>
     </form>
   )
 }

@@ -138,6 +138,23 @@ const (
 	AIProviderBrandOpenAI   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOpenAI)
 )
 
+// IntegrationConnectionType 表示外部系统连接器类型。
+type IntegrationConnectionType string
+
+const (
+	IntegrationConnectionTypeDify IntegrationConnectionType = IntegrationConnectionType(domain.IntegrationConnectionTypeDify)
+	IntegrationConnectionTypeN8N  IntegrationConnectionType = IntegrationConnectionType(domain.IntegrationConnectionTypeN8N)
+)
+
+// IntegrationConnectionStatus 表示连接器最近一次测试状态。
+type IntegrationConnectionStatus string
+
+const (
+	IntegrationConnectionStatusUntested    IntegrationConnectionStatus = IntegrationConnectionStatus(domain.IntegrationConnectionStatusUntested)
+	IntegrationConnectionStatusAvailable   IntegrationConnectionStatus = IntegrationConnectionStatus(domain.IntegrationConnectionStatusAvailable)
+	IntegrationConnectionStatusUnavailable IntegrationConnectionStatus = IntegrationConnectionStatus(domain.IntegrationConnectionStatusUnavailable)
+)
+
 // AIModelType 表示 AI 模型用途。
 type AIModelType string
 
@@ -216,15 +233,17 @@ type Auth struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// Organization 定义当前企业信息。
+// Organization 定义当前企业及其通用设置。
 type Organization struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	AllowArbitraryURL bool   `json:"allowArbitraryUrl"`
 }
 
-// OrganizationInput 定义企业名称修改输入。
+// OrganizationInput 定义企业通用设置修改输入。
 type OrganizationInput struct {
-	Name string `json:"name"`
+	Name              string `json:"name"`
+	AllowArbitraryURL bool   `json:"allowArbitraryUrl"`
 }
 
 // RoleKind 表示角色类型。
@@ -1016,6 +1035,74 @@ type AIProviderList struct {
 // AIProviderModelList 定义指定品牌的预设模型目录。
 type AIProviderModelList struct {
 	Models []AIProviderModel `json:"models"`
+}
+
+// BusinessSystem 定义企业配置的业务系统。
+type BusinessSystem struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	URL       string    `json:"url"`
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// BusinessSystemInput 定义业务系统可编辑字段。
+type BusinessSystemInput struct {
+	Name    string `json:"name"`
+	URL     string `json:"url"`
+	Enabled bool   `json:"enabled"`
+}
+
+// BusinessSystemList 定义企业业务系统列表。
+type BusinessSystemList struct {
+	BusinessSystems []BusinessSystem `json:"businessSystems"`
+}
+
+// IntegrationConnectionConfiguration 定义连接器认证配置。
+type IntegrationConnectionConfiguration struct {
+	APIURL string `json:"apiUrl"`
+	APIKey string `json:"apiKey"`
+}
+
+// IntegrationConnectionInput 定义连接器可编辑字段。
+type IntegrationConnectionInput struct {
+	Type          IntegrationConnectionType          `json:"type"`
+	Name          string                             `json:"name"`
+	Description   string                             `json:"description"`
+	Configuration IntegrationConnectionConfiguration `json:"configuration"`
+}
+
+// IntegrationConnectionTestInput 定义连接器草稿测试字段。
+type IntegrationConnectionTestInput struct {
+	Type          IntegrationConnectionType          `json:"type"`
+	Configuration IntegrationConnectionConfiguration `json:"configuration"`
+}
+
+// IntegrationConnection 定义连接器详情。
+type IntegrationConnection struct {
+	ID            string                             `json:"id"`
+	Type          IntegrationConnectionType          `json:"type"`
+	Name          string                             `json:"name"`
+	Description   string                             `json:"description"`
+	Configuration IntegrationConnectionConfiguration `json:"configuration"`
+	Status        IntegrationConnectionStatus        `json:"status"`
+	LastTestedAt  *time.Time                         `json:"lastTestedAt"`
+}
+
+// IntegrationConnectionSummary 定义连接器列表项。
+type IntegrationConnectionSummary struct {
+	ID           string                      `json:"id"`
+	Type         IntegrationConnectionType   `json:"type"`
+	Name         string                      `json:"name"`
+	Description  string                      `json:"description"`
+	Status       IntegrationConnectionStatus `json:"status"`
+	LastTestedAt *time.Time                  `json:"lastTestedAt"`
+}
+
+// IntegrationConnectionList 定义连接器列表。
+type IntegrationConnectionList struct {
+	Connections []IntegrationConnectionSummary `json:"connections"`
 }
 
 // S3Setting 定义 S3 兼容对象存储配置。

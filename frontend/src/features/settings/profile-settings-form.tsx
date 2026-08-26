@@ -231,7 +231,7 @@ export function ProfileSettingsForm({
 
   return (
     <form
-      className="w-full max-w-xl"
+      className="w-full max-w-xl space-y-9"
       aria-label={t("profile.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
@@ -311,15 +311,15 @@ export function ProfileSettingsForm({
             </Field>
           )}
         />
-        <div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <LoaderCircleIcon className="animate-spin" />
-            ) : null}
-            {isSubmitting ? t("profile.saving") : t("profile.save")}
-          </Button>
-        </div>
       </FieldGroup>
+      <div>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <LoaderCircleIcon className="animate-spin" />
+          ) : null}
+          {isSubmitting ? t("profile.saving") : t("profile.save")}
+        </Button>
+      </div>
     </form>
   )
 }

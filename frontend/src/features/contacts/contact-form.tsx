@@ -106,7 +106,11 @@ export function ContactForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form
+      className="space-y-9"
+      onSubmit={form.handleSubmit(submit)}
+      noValidate
+    >
       <FieldGroup className="gap-5">
         <FormInputField
           name="displayName"
@@ -208,15 +212,15 @@ export function ContactForm({
           )}
         />
 
-        <div className="flex items-center gap-2 pt-2">
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
-          </Button>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            {t("form.cancel")}
-          </Button>
-        </div>
       </FieldGroup>
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          {t("form.cancel")}
+        </Button>
+      </div>
     </form>
   )
 }

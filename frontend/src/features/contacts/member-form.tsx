@@ -119,7 +119,11 @@ export function MemberForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form
+      className="space-y-9"
+      onSubmit={form.handleSubmit(submit)}
+      noValidate
+    >
       <FieldGroup className="gap-5">
         <FormInputField
           name="displayName"
@@ -196,17 +200,17 @@ export function MemberForm({
             </Field>
           )}
         />
-        <div className="flex items-center gap-2 pt-2">
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting
-              ? t("members.form.saving")
-              : t("members.form.save")}
-          </Button>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            {t("members.form.cancel")}
-          </Button>
-        </div>
       </FieldGroup>
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting
+            ? t("members.form.saving")
+            : t("members.form.save")}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          {t("members.form.cancel")}
+        </Button>
+      </div>
     </form>
   )
 }

@@ -141,7 +141,7 @@ export function WebsiteChannelChatInterfaceForm({
 
   return (
     <form
-      className="w-full max-w-2xl"
+      className="w-full max-w-2xl space-y-9"
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
@@ -226,15 +226,15 @@ export function WebsiteChannelChatInterfaceForm({
           }}
         />
 
-        <div className="flex items-center gap-2">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? t("form.saving") : t("form.save")}
-          </Button>
-          <Button variant="outline" asChild>
-            <Link to="/integrations/channels">{t("form.cancel")}</Link>
-          </Button>
-        </div>
       </FieldGroup>
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? t("form.saving") : t("form.save")}
+        </Button>
+        <Button variant="outline" asChild>
+          <Link to="/integrations/channels">{t("form.cancel")}</Link>
+        </Button>
+      </div>
     </form>
   )
 }

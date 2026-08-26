@@ -94,21 +94,21 @@ export function ChannelReceptionSettingsForm({
 
   return (
     <form
-      className="w-full max-w-2xl"
+      className="w-full max-w-2xl space-y-9"
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
       <FieldGroup>
         <ChannelReceptionSettingsFields control={form.control} />
-        <div className="flex items-center gap-2">
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
-          </Button>
-          <Button variant="outline" asChild>
-            <Link to="/integrations/channels">{t("form.cancel")}</Link>
-          </Button>
-        </div>
       </FieldGroup>
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
+        </Button>
+        <Button variant="outline" asChild>
+          <Link to="/integrations/channels">{t("form.cancel")}</Link>
+        </Button>
+      </div>
     </form>
   )
 }
