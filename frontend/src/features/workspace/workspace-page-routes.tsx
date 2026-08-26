@@ -21,6 +21,7 @@ import {
   SystemSettingsPage,
 } from "@/features/settings/settings-page"
 
+/** 可标签化的工作台路由；tabPath 把同一功能模块的页面归入同一个标签。 */
 const workspaceRouteDefinitions = [
   { path: "/inbox", titleKey: "tabs.routes.inbox" },
   { path: "/account/profile", titleKey: "tabs.routes.profile" },

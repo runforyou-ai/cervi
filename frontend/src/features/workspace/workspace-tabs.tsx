@@ -350,7 +350,7 @@ function WorkspaceTabButton({
     <div
       data-active={active}
       className={cn(
-        "cervi-workspace-tab group/tab relative isolate mt-1 flex h-10 w-40 shrink-0 items-center",
+        "cervi-workspace-tab relative isolate mt-1 flex h-10 w-40 shrink-0 items-center",
         active
           ? "z-10 rounded-t-[10px] bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-foreground",
