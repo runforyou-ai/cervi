@@ -249,6 +249,29 @@ const (
 )
 
 const (
+	ErrorIntegrationConnectionNotFound             Key = "error.integration_connection_not_found"
+	ErrorIntegrationConnectionListFailed           Key = "error.integration_connection_list_failed"
+	ErrorIntegrationConnectionReadFailed           Key = "error.integration_connection_read_failed"
+	ErrorIntegrationConnectionCreateFailed         Key = "error.integration_connection_create_failed"
+	ErrorIntegrationConnectionUpdateFailed         Key = "error.integration_connection_update_failed"
+	ErrorIntegrationConnectionDeleteFailed         Key = "error.integration_connection_delete_failed"
+	ErrorIntegrationConnectionInUse                Key = "error.integration_connection_in_use"
+	ErrorIntegrationConnectionTestFailed           Key = "error.integration_connection_test_failed"
+	ErrorIntegrationConnectionAuthenticationFailed Key = "error.integration_connection_authentication_failed"
+	ErrorIntegrationConnectionAuthorizationFailed  Key = "error.integration_connection_authorization_failed"
+	ErrorIntegrationConnectionRateLimited          Key = "error.integration_connection_rate_limited"
+	FieldIntegrationConnectionTypeInvalid          Key = "field.integration_connection_type_invalid"
+	FieldIntegrationConnectionNameRequired         Key = "field.integration_connection_name_required"
+	FieldIntegrationConnectionNameTooLong          Key = "field.integration_connection_name_too_long"
+	FieldIntegrationConnectionNameDuplicate        Key = "field.integration_connection_name_duplicate"
+	FieldIntegrationConnectionDescriptionTooLong   Key = "field.integration_connection_description_too_long"
+	FieldIntegrationConnectionAPIKeyRequired       Key = "field.integration_connection_api_key_required"
+	FieldIntegrationConnectionAPIKeyTooLong        Key = "field.integration_connection_api_key_too_long"
+	FieldIntegrationConnectionAPIURLRequired       Key = "field.integration_connection_api_url_required"
+	FieldIntegrationConnectionAPIURLInvalid        Key = "field.integration_connection_api_url_invalid"
+)
+
+const (
 	ErrorKnowledgeBaseNotFound                     Key = "error.knowledge_base_not_found"
 	ErrorKnowledgeBaseListFailed                   Key = "error.knowledge_base_list_failed"
 	ErrorKnowledgeBaseReadFailed                   Key = "error.knowledge_base_read_failed"

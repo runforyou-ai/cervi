@@ -12,6 +12,7 @@ import {
   CreateKnowledgeGroup,
   CreateAIProvider,
   CreateBusinessSystem,
+  CreateIntegrationConnection,
   CreateRole,
   CreateTeam,
   CreateUser,
@@ -24,12 +25,14 @@ import {
   DeleteKnowledgeGroup,
   DeleteAIProvider,
   DeleteBusinessSystem,
+  DeleteIntegrationConnection,
   DeleteRole,
   DeleteTeam,
   GetContact,
   GetKnowledgeBase,
   GetAIProvider,
   GetBusinessSystem,
+  GetIntegrationConnection,
   GetAgent,
   GetRole,
   GetS3Setting,
@@ -42,6 +45,7 @@ import {
   ListMemberOptions,
   ListAIProviders,
   ListBusinessSystems,
+  ListIntegrationConnections,
   ListAvailableAIModels,
   ListContacts,
   ListKnowledgeBases,
@@ -62,12 +66,14 @@ import {
   SelectProfileImage,
   SendMessageNotification,
   TestAIProviderConnection,
+  TestIntegrationConnection,
   TestS3Setting,
   UpdateContact,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
   UpdateAIProvider,
   UpdateBusinessSystem,
+  UpdateIntegrationConnection,
   UpdateAgent,
   UpdateAgentExecution,
   UpdateAgentWorkStatus,
@@ -88,6 +94,8 @@ import {
   AIModelInputModality,
   AIModelType,
   AIProviderBrand,
+  IntegrationConnectionStatus,
+  IntegrationConnectionType,
   AgentExecutionMode,
   ContactSort,
   KnowledgeBaseCategory,
@@ -101,6 +109,10 @@ import {
   type AIProviderSummary,
   type BusinessSystem,
   type BusinessSystemList,
+  type IntegrationConnection,
+  type IntegrationConnectionInput,
+  type IntegrationConnectionList,
+  type IntegrationConnectionSummary,
   type AgentList,
   type AgentListItem,
   type AgentListInput,
@@ -195,6 +207,39 @@ export type BusinessSystemListData = Omit<
   "businessSystems"
 > & {
   businessSystems: BusinessSystem[]
+}
+
+export type IntegrationConnectionTypeId = Exclude<
+  IntegrationConnectionType,
+  IntegrationConnectionType.$zero
+>
+
+export type IntegrationConnectionStatusId = Exclude<
+  IntegrationConnectionStatus,
+  IntegrationConnectionStatus.$zero
+>
+
+export type IntegrationConnectionData = Omit<
+  IntegrationConnection,
+  "type" | "status"
+> & {
+  type: IntegrationConnectionTypeId
+  status: IntegrationConnectionStatusId
+}
+
+export type IntegrationConnectionSummaryData = Omit<
+  IntegrationConnectionSummary,
+  "type" | "status"
+> & {
+  type: IntegrationConnectionTypeId
+  status: IntegrationConnectionStatusId
+}
+
+export type IntegrationConnectionListData = Omit<
+  IntegrationConnectionList,
+  "connections"
+> & {
+  connections: IntegrationConnectionSummaryData[]
 }
 
 export type ContactDetail = Omit<Contact, "methods" | "channelIdentities"> & {
@@ -528,6 +573,24 @@ export function listBusinessSystems() {
   )
 }
 
+const listIntegrationConnectionsBound = bind(ListIntegrationConnections)
+const getIntegrationConnectionBound = bind(GetIntegrationConnection)
+const testIntegrationConnectionBound = bind(TestIntegrationConnection)
+const createIntegrationConnectionBound = bind(CreateIntegrationConnection)
+const updateIntegrationConnectionBound = bind(UpdateIntegrationConnection)
+
+/** 读取当前企业的连接器列表。 */
+export function listIntegrationConnections() {
+  return listIntegrationConnectionsBound().then(
+    (output): IntegrationConnectionListData => ({
+      ...output,
+      connections: asList(output.connections).map(
+        normalizeIntegrationConnectionSummary,
+      ),
+    }),
+  )
+}
+
 /** 读取业务系统详情。 */
 export const getBusinessSystem = bind(GetBusinessSystem)
 
@@ -539,6 +602,36 @@ export const updateBusinessSystem = bind(UpdateBusinessSystem)
 
 /** 删除业务系统。 */
 export const deleteBusinessSystem = bind(DeleteBusinessSystem)
+
+/** 读取连接器详情。 */
+export function getIntegrationConnection(connectionId: string) {
+  return getIntegrationConnectionBound(connectionId).then(
+    normalizeIntegrationConnection,
+  )
+}
+
+/** 测试连接器草稿配置。 */
+export const testIntegrationConnection = testIntegrationConnectionBound
+
+/** 创建连接器。 */
+export function createIntegrationConnection(input: IntegrationConnectionInput) {
+  return createIntegrationConnectionBound(input).then(
+    normalizeIntegrationConnection,
+  )
+}
+
+/** 修改连接器。 */
+export function updateIntegrationConnection(
+  connectionId: string,
+  input: IntegrationConnectionInput,
+) {
+  return updateIntegrationConnectionBound(connectionId, input).then(
+    normalizeIntegrationConnection,
+  )
+}
+
+/** 删除连接器。 */
+export const deleteIntegrationConnection = bind(DeleteIntegrationConnection)
 
 const listChannelOptionsBound = bind(ListChannelOptions)
 const listMessageChannelsBound = bind(ListMessageChannels)
@@ -609,6 +702,28 @@ function normalizeAIProviderSummary(
     ...provider,
     brand: provider.brand as AIProviderBrandId,
     models: asList(provider.models).map(normalizeAIProviderModelSummary),
+  }
+}
+
+/** 归一化连接器详情中的枚举值。 */
+function normalizeIntegrationConnection(
+  connection: IntegrationConnection,
+): IntegrationConnectionData {
+  return {
+    ...connection,
+    type: connection.type as IntegrationConnectionTypeId,
+    status: connection.status as IntegrationConnectionStatusId,
+  }
+}
+
+/** 归一化连接器列表项中的枚举值。 */
+function normalizeIntegrationConnectionSummary(
+  connection: IntegrationConnectionSummary,
+): IntegrationConnectionSummaryData {
+  return {
+    ...connection,
+    type: connection.type as IntegrationConnectionTypeId,
+    status: connection.status as IntegrationConnectionStatusId,
   }
 }
 

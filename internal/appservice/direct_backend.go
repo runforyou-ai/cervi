@@ -16,6 +16,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	integrationconnectionaction "github.com/runforyou-ai/cervi/internal/actions/integrationconnection"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
@@ -25,6 +26,7 @@ import (
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/integration/connector"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -110,6 +112,12 @@ type DirectBackend struct {
 	createBusinessSystem              *businesssystemaction.CreateBusinessSystemAction
 	updateBusinessSystem              *businesssystemaction.UpdateBusinessSystemAction
 	deleteBusinessSystem              *businesssystemaction.DeleteBusinessSystemAction
+	listIntegrationConnections        *integrationconnectionaction.ListIntegrationConnectionsQuery
+	getIntegrationConnection          *integrationconnectionaction.GetIntegrationConnectionQuery
+	testIntegrationConnection         *integrationconnectionaction.TestConnectionAction
+	createIntegrationConnection       *integrationconnectionaction.CreateIntegrationConnectionAction
+	updateIntegrationConnection       *integrationconnectionaction.UpdateIntegrationConnectionAction
+	deleteIntegrationConnection       *integrationconnectionaction.DeleteIntegrationConnectionAction
 	updateOrganization                *organizationaction.UpdateOrganizationAction
 	getS3Setting                      *settingaction.GetS3SettingQuery
 	saveS3Setting                     *settingaction.SaveS3SettingAction
@@ -124,6 +132,7 @@ type DirectBackend struct {
 func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	modelProviderRegistry := modelprovider.NewRegistry(modelprovider.NewHTTPClient())
+	connectorRegistry := connector.NewRegistry(connector.NewHTTPClient())
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -197,6 +206,12 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		createBusinessSystem:              businesssystemaction.NewCreateBusinessSystemAction(db),
 		updateBusinessSystem:              businesssystemaction.NewUpdateBusinessSystemAction(db),
 		deleteBusinessSystem:              businesssystemaction.NewDeleteBusinessSystemAction(db),
+		listIntegrationConnections:        integrationconnectionaction.NewListIntegrationConnectionsQuery(db),
+		getIntegrationConnection:          integrationconnectionaction.NewGetIntegrationConnectionQuery(db),
+		testIntegrationConnection:         integrationconnectionaction.NewTestConnectionAction(db, connectionRunner, connectorRegistry),
+		createIntegrationConnection:       integrationconnectionaction.NewCreateIntegrationConnectionAction(db),
+		updateIntegrationConnection:       integrationconnectionaction.NewUpdateIntegrationConnectionAction(db),
+		deleteIntegrationConnection:       integrationconnectionaction.NewDeleteIntegrationConnectionAction(db),
 		updateOrganization:                organizationaction.NewUpdateOrganizationAction(db),
 		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),

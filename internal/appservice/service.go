@@ -81,6 +81,12 @@ type Backend interface {
 	CreateBusinessSystem(context.Context, RequestMeta, BusinessSystemInput) (BusinessSystem, error)
 	UpdateBusinessSystem(context.Context, RequestMeta, string, BusinessSystemInput) (BusinessSystem, error)
 	DeleteBusinessSystem(context.Context, RequestMeta, string) error
+	ListIntegrationConnections(context.Context, RequestMeta) (IntegrationConnectionList, error)
+	GetIntegrationConnection(context.Context, RequestMeta, string) (IntegrationConnection, error)
+	TestIntegrationConnection(context.Context, RequestMeta, IntegrationConnectionTestInput) error
+	CreateIntegrationConnection(context.Context, RequestMeta, IntegrationConnectionInput) (IntegrationConnection, error)
+	UpdateIntegrationConnection(context.Context, RequestMeta, string, IntegrationConnectionInput) (IntegrationConnection, error)
+	DeleteIntegrationConnection(context.Context, RequestMeta, string) error
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
 	GetS3Setting(context.Context, RequestMeta) (S3Setting, error)
 	SaveS3Setting(context.Context, RequestMeta, S3Setting) (S3Setting, error)
@@ -619,6 +625,36 @@ func (s *Service) UpdateBusinessSystem(ctx context.Context, meta RequestMeta, bu
 // DeleteBusinessSystem 删除业务系统。
 func (s *Service) DeleteBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) error {
 	return s.backend.DeleteBusinessSystem(ctx, meta, businessSystemID)
+}
+
+// ListIntegrationConnections 返回当前企业的连接器列表。
+func (s *Service) ListIntegrationConnections(ctx context.Context, meta RequestMeta) (IntegrationConnectionList, error) {
+	return s.backend.ListIntegrationConnections(ctx, meta)
+}
+
+// GetIntegrationConnection 返回当前企业中的连接器详情。
+func (s *Service) GetIntegrationConnection(ctx context.Context, meta RequestMeta, connectionID string) (IntegrationConnection, error) {
+	return s.backend.GetIntegrationConnection(ctx, meta, connectionID)
+}
+
+// TestIntegrationConnection 测试连接器草稿配置。
+func (s *Service) TestIntegrationConnection(ctx context.Context, meta RequestMeta, input IntegrationConnectionTestInput) error {
+	return s.backend.TestIntegrationConnection(ctx, meta, input)
+}
+
+// CreateIntegrationConnection 创建外部系统连接器。
+func (s *Service) CreateIntegrationConnection(ctx context.Context, meta RequestMeta, input IntegrationConnectionInput) (IntegrationConnection, error) {
+	return s.backend.CreateIntegrationConnection(ctx, meta, input)
+}
+
+// UpdateIntegrationConnection 修改外部系统连接器。
+func (s *Service) UpdateIntegrationConnection(ctx context.Context, meta RequestMeta, connectionID string, input IntegrationConnectionInput) (IntegrationConnection, error) {
+	return s.backend.UpdateIntegrationConnection(ctx, meta, connectionID, input)
+}
+
+// DeleteIntegrationConnection 删除外部系统连接器。
+func (s *Service) DeleteIntegrationConnection(ctx context.Context, meta RequestMeta, connectionID string) error {
+	return s.backend.DeleteIntegrationConnection(ctx, meta, connectionID)
 }
 
 // UpdateOrganization 修改当前企业通用设置。

@@ -660,6 +660,91 @@ export interface InstallationStatus {
 }
 
 /**
+ * IntegrationConnection 定义连接器详情。
+ */
+export interface IntegrationConnection {
+    "id": string;
+    "type": IntegrationConnectionType;
+    "name": string;
+    "description": string;
+    "configuration": IntegrationConnectionConfiguration;
+    "status": IntegrationConnectionStatus;
+    "lastTestedAt": string | null;
+}
+
+/**
+ * IntegrationConnectionConfiguration 定义连接器认证配置。
+ */
+export interface IntegrationConnectionConfiguration {
+    "apiUrl": string;
+    "apiKey": string;
+}
+
+/**
+ * IntegrationConnectionInput 定义连接器可编辑字段。
+ */
+export interface IntegrationConnectionInput {
+    "type": IntegrationConnectionType;
+    "name": string;
+    "description": string;
+    "configuration": IntegrationConnectionConfiguration;
+}
+
+/**
+ * IntegrationConnectionList 定义连接器列表。
+ */
+export interface IntegrationConnectionList {
+    "connections": IntegrationConnectionSummary[] | null;
+}
+
+/**
+ * IntegrationConnectionStatus 表示连接器最近一次测试状态。
+ */
+export enum IntegrationConnectionStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    IntegrationConnectionStatusUntested = "untested",
+    IntegrationConnectionStatusAvailable = "available",
+    IntegrationConnectionStatusUnavailable = "unavailable",
+};
+
+/**
+ * IntegrationConnectionSummary 定义连接器列表项。
+ */
+export interface IntegrationConnectionSummary {
+    "id": string;
+    "type": IntegrationConnectionType;
+    "name": string;
+    "description": string;
+    "status": IntegrationConnectionStatus;
+    "lastTestedAt": string | null;
+}
+
+/**
+ * IntegrationConnectionTestInput 定义连接器草稿测试字段。
+ */
+export interface IntegrationConnectionTestInput {
+    "type": IntegrationConnectionType;
+    "configuration": IntegrationConnectionConfiguration;
+}
+
+/**
+ * IntegrationConnectionType 表示外部系统连接器类型。
+ */
+export enum IntegrationConnectionType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    IntegrationConnectionTypeDify = "dify",
+    IntegrationConnectionTypeN8N = "n8n",
+};
+
+/**
  * KnowledgeBase 定义知识库详情。
  */
 export interface KnowledgeBase {

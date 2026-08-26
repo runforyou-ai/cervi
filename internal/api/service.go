@@ -135,6 +135,12 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 	router.GET("/integrations/business-systems/:businessSystemID", service.getBusinessSystem)
 	router.PUT("/integrations/business-systems/:businessSystemID", service.updateBusinessSystem)
 	router.DELETE("/integrations/business-systems/:businessSystemID", service.deleteBusinessSystem)
+	router.POST("/integrations/connectors/test", service.testIntegrationConnection)
+	router.GET("/integrations/connectors", service.listIntegrationConnections)
+	router.POST("/integrations/connectors", service.createIntegrationConnection)
+	router.GET("/integrations/connectors/:connectionID", service.getIntegrationConnection)
+	router.PUT("/integrations/connectors/:connectionID", service.updateIntegrationConnection)
+	router.DELETE("/integrations/connectors/:connectionID", service.deleteIntegrationConnection)
 	router.PUT("/settings/organization", service.updateOrganization)
 	router.GET("/settings/storage/s3", service.getS3Setting)
 	router.PUT("/settings/storage/s3", service.saveS3Setting)
@@ -814,6 +820,52 @@ func (s *Service) updateBusinessSystem(c *gin.Context) {
 // deleteBusinessSystem 删除业务系统。
 func (s *Service) deleteBusinessSystem(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID")))
+}
+
+// listIntegrationConnections 返回连接器列表。
+func (s *Service) listIntegrationConnections(c *gin.Context) {
+	connections, err := s.application.ListIntegrationConnections(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, connections, err)
+}
+
+// getIntegrationConnection 返回连接器详情。
+func (s *Service) getIntegrationConnection(c *gin.Context) {
+	connection, err := s.application.GetIntegrationConnection(c.Request.Context(), requestMeta(c), c.Param("connectionID"))
+	writeResult(c, http.StatusOK, connection, err)
+}
+
+// testIntegrationConnection 测试连接器草稿配置。
+func (s *Service) testIntegrationConnection(c *gin.Context) {
+	var input appservice.IntegrationConnectionTestInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.TestIntegrationConnection(c.Request.Context(), requestMeta(c), input))
+}
+
+// createIntegrationConnection 创建连接器。
+func (s *Service) createIntegrationConnection(c *gin.Context) {
+	var input appservice.IntegrationConnectionInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	connection, err := s.application.CreateIntegrationConnection(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, connection, err)
+}
+
+// updateIntegrationConnection 修改连接器。
+func (s *Service) updateIntegrationConnection(c *gin.Context) {
+	var input appservice.IntegrationConnectionInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	connection, err := s.application.UpdateIntegrationConnection(c.Request.Context(), requestMeta(c), c.Param("connectionID"), input)
+	writeResult(c, http.StatusOK, connection, err)
+}
+
+// deleteIntegrationConnection 删除连接器。
+func (s *Service) deleteIntegrationConnection(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteIntegrationConnection(c.Request.Context(), requestMeta(c), c.Param("connectionID")))
 }
 
 // updateOrganization 修改当前企业通用设置。

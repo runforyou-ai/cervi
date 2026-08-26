@@ -20,6 +20,7 @@ type Category string
 const (
 	CategoryObjectStorage Category = "object_storage"
 	CategoryModelProvider Category = "model_provider"
+	CategoryConnector     Category = "connector"
 	CategoryAgentRuntime  Category = "agent_runtime"
 	CategoryTranslation   Category = "translation"
 	CategoryMCP           Category = "mcp"
