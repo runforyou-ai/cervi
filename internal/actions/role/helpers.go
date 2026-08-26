@@ -10,8 +10,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 // loadRole 读取当前企业中的角色。
@@ -120,8 +120,5 @@ func recordFromModel(role servermodels.Role, permissions []domain.PermissionCode
 
 // isRoleNameConflict 判断自定义角色名称是否重复。
 func isRoleNameConflict(err error) bool {
-	var postgresError pgdriver.Error
-	return errors.As(err, &postgresError) &&
-		postgresError.Field('C') == "23505" &&
-		postgresError.Field('n') == "roles_organization_custom_name_unique"
+	return pgerr.UniqueViolationOn(err, "roles_organization_custom_name_unique")
 }

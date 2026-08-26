@@ -59,13 +59,13 @@ func (a *MarkUploadedAction) Execute(ctx context.Context, identity *servermodels
 	if !validIdentity(identity) {
 		return nil, common.ErrIdentityInvalid
 	}
-	expiresAt := time.Now().UTC().Add(temporaryFileLifetime)
 	record := &servermodels.File{}
+	// 过期时间统一使用数据库时钟，与同一语句里 expires_at > now() 的比较保持同源。
 	query := a.db.NewUpdate().Model(record).
 		Set("status = ?", domain.FileStatusUploaded).
-		Set("etag = ?", optionalString(etag)).
+		Set("etag = ?", common.OptionalString(strings.TrimSpace(etag))).
 		Set("uploaded_at = now()").
-		Set("expires_at = ?", expiresAt).
+		Set("expires_at = now() + make_interval(secs => ?)", temporaryFileLifetime.Seconds()).
 		Set("updated_at = now()").
 		Where("f.id = ?", fileID).
 		Where("f.organization_id = ?", identity.Organization.ID).
@@ -92,7 +92,11 @@ func get(ctx context.Context, db *bun.DB, organizationID, fileID string, status 
 		return nil, ErrFileNotFound
 	}
 	record := &servermodels.File{}
-	query := db.NewSelect().Model(record).Where("f.id = ?", fileID)
+	// 过期标记用数据库时钟计算，与写入侧 now() + make_interval(...) 的时钟保持同源。
+	query := db.NewSelect().Model(record).
+		ColumnExpr("f.*").
+		ColumnExpr("(f.expires_at IS NULL OR f.expires_at <= now()) AS expired").
+		Where("f.id = ?", fileID)
 	if organizationID != "" {
 		query = query.Where("f.organization_id = ?", organizationID)
 	}
@@ -105,13 +109,4 @@ func get(ctx context.Context, db *bun.DB, organizationID, fileID string, status 
 		return nil, fmt.Errorf("get file: %w", err)
 	}
 	return record, nil
-}
-
-// optionalString 把空字符串转换为空值。
-func optionalString(value string) *string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil
-	}
-	return &value
 }

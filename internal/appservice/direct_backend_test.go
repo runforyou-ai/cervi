@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
@@ -17,14 +18,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // TestChannelContractConversion 验证渠道模型与应用服务契约之间的转换。
 func TestChannelContractConversion(t *testing.T) {
 	now := time.Now().UTC()
 	description := "官网咨询"
-	channel := messageChannelFromModel(&servermodels.Channel{
+	channel := messageChannelFromRecord(&channelaction.MessageChannelRecord{
 		ID: "channel-1", OrganizationID: "organization-1", CreatedByUserID: "user-1",
 		Type: string(ChannelTypeWebsite), Name: "产品官网", Description: &description,
 		DefaultLocale: string(LocaleChineseSimplified), Enabled: true, CreatedAt: now, UpdatedAt: now,
@@ -79,11 +79,15 @@ func TestContactContractConversion(t *testing.T) {
 
 // TestS3SettingContractRoundTrip 验证对象存储配置转换不丢失字段。
 func TestS3SettingContractRoundTrip(t *testing.T) {
+	input := S3SettingInput{
+		Enabled: true, Provider: StorageProviderMinIO, Endpoint: "http://127.0.0.1:9000", Region: "us-east-1",
+		Bucket: "cervi", AccessKeyID: "access", SecretAccessKey: "secret", ForcePathStyle: true,
+	}
 	want := S3Setting{
 		Enabled: true, Provider: StorageProviderMinIO, Endpoint: "http://127.0.0.1:9000", Region: "us-east-1",
 		Bucket: "cervi", AccessKeyID: "access", SecretAccessKey: "secret", ForcePathStyle: true,
 	}
-	got := s3SettingFromAction(s3SettingToAction(want))
+	got := s3SettingFromAction(s3SettingToAction(input))
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("S3 setting round trip = %#v, want %#v", got, want)
 	}

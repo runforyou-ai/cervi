@@ -16,6 +16,7 @@ import (
 //go:embed migrations/*.sql
 var migrationFiles embed.FS
 
+// migrate 使用内嵌迁移文件将移动端 SQLite 升级到最新结构。
 func migrate(ctx context.Context, db *sql.DB) error {
 	migrations, err := fs.Sub(migrationFiles, "migrations")
 	if err != nil {

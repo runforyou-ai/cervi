@@ -17,7 +17,11 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const schedulerPollInterval = time.Second
+const (
+	schedulerPollInterval = time.Second
+	// scheduleParseFailureBackoff 是存量计划解析失败后 next_run_at 的后推时长。
+	scheduleParseFailureBackoff = 5 * time.Minute
+)
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 
@@ -201,7 +205,18 @@ func (r *Runtime) triggerOneSchedule(ctx context.Context) (bool, error) {
 		}
 		schedule, err := parseSchedule(record.CronExpression, record.Timezone)
 		if err != nil {
-			return fmt.Errorf("parse stored task schedule %q: %w", record.ScheduleKey, err)
+			// 解析失败时后推 next_run_at 并提交事务；直接返回错误会导致回滚，
+			// 这条坏计划每个轮询周期都会被重新认领，阻塞其后所有到期计划。
+			slog.Error("解析存量定时计划失败，已后推下次运行时间",
+				"schedule_key", record.ScheduleKey, "error", err)
+			if _, deferErr := tx.NewRaw(`
+				UPDATE task_schedules
+				SET next_run_at = ?, updated_at = ?
+				WHERE id = ?
+			`, now.Add(scheduleParseFailureBackoff), now, record.ID).Exec(ctx); deferErr != nil {
+				return fmt.Errorf("defer broken task schedule %q: %w", record.ScheduleKey, deferErr)
+			}
+			return nil
 		}
 		dueAt := record.NextRunAt.UTC()
 		options := EnqueueOptions{

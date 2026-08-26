@@ -22,18 +22,7 @@ func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta
 		Name: input.Name, AllowArbitraryURL: input.AllowArbitraryURL,
 	})
 	if err != nil {
-		if ctx.Err() != nil {
-			return Organization{}, ctx.Err()
-		}
-		var validationError *common.FieldError
-		if errors.As(err, &validationError) {
-			return Organization{}, InvalidError(meta, cervii18n.ErrorValidationFailed, organizationFieldKeys(validationError.Fields))
-		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
-			return Organization{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
-		}
-		slog.Warn("企业通用设置更新失败", "organization_id", identity.Organization.ID, "error", err)
-		return Organization{}, FailedError(meta, cervii18n.ErrorOrganizationUpdateFailed)
+		return Organization{}, b.organizationMutationError(ctx, meta, err, cervii18n.ErrorOrganizationUpdateFailed, identity.Organization.ID)
 	}
 	slog.Info(
 		"企业通用设置更新成功",
@@ -41,6 +30,22 @@ func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta
 		"allow_arbitrary_url", organization.AllowArbitraryURL,
 	)
 	return organizationFromModel(*organization), nil
+}
+
+// organizationMutationError 转换企业设置写入错误。
+func (b *DirectBackend) organizationMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var validationError *common.FieldError
+	if errors.As(err, &validationError) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, organizationFieldKeys(validationError.Fields))
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	slog.Warn("企业设置操作失败", "organization_id", organizationID, "failure", failureKey, "error", err)
+	return FailedError(meta, failureKey)
 }
 
 // organizationFieldKeys 把企业通用设置校验错误码映射为本地化文案键。

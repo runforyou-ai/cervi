@@ -29,6 +29,15 @@ const (
 	defaultMaxAttempts = 5
 	leaseDuration      = 2 * time.Minute
 	outboxLease        = 30 * time.Second
+
+	// retryDelayBase 是失败重试指数退避的基础间隔。
+	retryDelayBase = 15 * time.Second
+	// retryDelayMaxShift 是指数退避的最大左移位数。
+	retryDelayMaxShift = 8
+	// retryDelayMax 是指数退避的封顶时长。
+	retryDelayMax = time.Hour
+	// taskErrorMaxLength 是持久化错误消息的最大字符数。
+	taskErrorMaxLength = 4000
 )
 
 var (
@@ -272,7 +281,7 @@ func (r *repository) recoverExpiringMessages(ctx context.Context, publishedBefor
 				)
 				AND NOT EXISTS (
 					SELECT 1
-					FROM task_outbox AS task_outbox
+					FROM task_outbox
 					WHERE task_outbox.task_run_id = tr.id
 				)
 			ORDER BY tr.published_at, tr.created_at
@@ -433,18 +442,22 @@ func retryDelay(attempt int) time.Duration {
 	if attempt < 1 {
 		attempt = 1
 	}
-	delay := 15 * time.Second * time.Duration(1<<min(attempt-1, 8))
-	return min(delay, time.Hour)
+	delay := retryDelayBase * time.Duration(1<<min(attempt-1, retryDelayMaxShift))
+	return min(delay, retryDelayMax)
 }
 
-// truncateError 限制持久化错误长度。
+// truncateError 限制持久化错误长度，按 rune 截断避免切断 UTF-8 字符。
 func truncateError(err error) string {
 	if err == nil {
 		return ""
 	}
 	message := err.Error()
-	if len(message) > 4000 {
-		return message[:4000]
+	if len(message) <= taskErrorMaxLength {
+		return message
 	}
-	return message
+	runes := []rune(message)
+	if len(runes) <= taskErrorMaxLength {
+		return message
+	}
+	return string(runes[:taskErrorMaxLength])
 }

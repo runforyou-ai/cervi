@@ -36,9 +36,17 @@ internal/
 ├── apiproxy/                       # 原生端到企业服务端的类型化 API 代理
 ├── appservice/                     # 跨平台应用服务、传输契约和平台 Backend
 │   └── native/                     # 原生端应用服务平台能力实现
+├── clientsession/                  # 原生端当前登录凭据管理
 ├── common/                         # 无存储、无传输、无平台依赖的通用能力
+├── config/
+│   └── server/                     # 企业服务端运行配置加载与校验
 ├── domain/                         # 各层共用的领域值
 ├── i18n/                           # 后端本地化能力和翻译词条
+├── integration/
+│   ├── connectiontest/             # 外部连接探测的通用执行语义
+│   ├── connector/                  # 外部系统连接器只读探测
+│   └── modelprovider/              # 模型服务供应商连接探测适配器
+├── publicweb/                      # 网站渠道公开嵌入脚本和访客聊天页
 ├── storage/
 │   ├── server/                     # PostgreSQL 连接、迁移和服务端模型
 │   ├── desktop/                    # 桌面端 SQLite 存储、迁移和模型

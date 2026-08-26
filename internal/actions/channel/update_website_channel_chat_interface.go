@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -25,7 +26,7 @@ func NewUpdateWebsiteChannelChatInterfaceAction(db *bun.DB) *UpdateWebsiteChanne
 }
 
 // Execute 校验渠道归属并保存聊天界面设置。
-func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input WebsiteChannelChatInterfaceInput) (*servermodels.WebsiteChannelSetting, error) {
+func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input WebsiteChannelChatInterfaceInput) (*WebsiteChannelSettingRecord, error) {
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
@@ -36,6 +37,9 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, i
 
 	setting := &servermodels.WebsiteChannelSetting{}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+			return err
+		}
 		channel := &servermodels.Channel{}
 		if err := tx.NewSelect().
 			Model(channel).
@@ -77,5 +81,6 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, i
 	if err != nil {
 		return nil, fmt.Errorf("update website channel chat interface: %w", err)
 	}
-	return setting, nil
+	record := websiteChannelSettingRecord(setting)
+	return &record, nil
 }

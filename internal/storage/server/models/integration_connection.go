@@ -9,6 +9,7 @@ import (
 )
 
 // IntegrationConnectionConfiguration 表示连接器的通用认证配置。
+// json 标签用于 jsonb 列的存储编码，不承担 API 契约。
 type IntegrationConnectionConfiguration struct {
 	APIURL string `json:"apiUrl"`
 	APIKey string `json:"apiKey"`
@@ -18,14 +19,14 @@ type IntegrationConnectionConfiguration struct {
 type IntegrationConnection struct {
 	bun.BaseModel `bun:"table:integration_connections,alias:ic"`
 
-	ID             string                             `bun:"id,pk" json:"id"`
-	OrganizationID string                             `bun:"organization_id" json:"organizationId"`
-	Type           string                             `bun:"connector_type" json:"type"`
-	Name           string                             `bun:"name" json:"name"`
-	Description    string                             `bun:"description" json:"description"`
-	Configuration  IntegrationConnectionConfiguration `bun:"configuration,type:jsonb" json:"configuration"`
-	Status         string                             `bun:"status" json:"status"`
-	LastTestedAt   *time.Time                         `bun:"last_tested_at" json:"lastTestedAt"`
-	CreatedAt      time.Time                          `bun:"created_at" json:"createdAt"`
-	UpdatedAt      time.Time                          `bun:"updated_at" json:"updatedAt"`
+	ID             string                             `bun:"id,pk"`
+	OrganizationID string                             `bun:"organization_id"`
+	Type           string                             `bun:"connector_type"`
+	Name           string                             `bun:"name"`
+	Description    string                             `bun:"description"`
+	Configuration  IntegrationConnectionConfiguration `bun:"configuration,type:jsonb"`
+	Status         string                             `bun:"status"`
+	LastTestedAt   *time.Time                         `bun:"last_tested_at"`
+	CreatedAt      time.Time                          `bun:"created_at"`
+	UpdatedAt      time.Time                          `bun:"updated_at"`
 }

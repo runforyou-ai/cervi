@@ -5,6 +5,7 @@ package team
 import (
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -32,11 +33,7 @@ type TeamRecord struct {
 }
 
 // PageInfo 定义分页信息。
-type PageInfo struct {
-	Number int
-	Size   int
-	Total  int
-}
+type PageInfo = common.PageInfo
 
 // ListOutput 定义团队分页结果。
 type ListOutput struct {

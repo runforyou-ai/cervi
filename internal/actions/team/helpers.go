@@ -7,17 +7,10 @@ import (
 	"database/sql"
 	"errors"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-// validateIdentity 校验当前企业用户账号仍可用。
-func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
-	return identityaction.Validate(ctx, db, identity)
-}
 
 // withActiveMemberCount 补充团队中账号正常的企业成员和 AI 员工数量。
 func withActiveMemberCount(query *bun.SelectQuery) *bun.SelectQuery {

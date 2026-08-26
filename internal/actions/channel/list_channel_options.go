@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -30,6 +31,9 @@ func NewListChannelOptionsQuery(db *bun.DB) *ListChannelOptionsQuery {
 
 // Execute 返回当前企业已启用且支持的渠道选择项。
 func (q *ListChannelOptionsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]Option, error) {
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
+		return nil, err
+	}
 	channels := make([]Option, 0)
 	if err := q.db.NewSelect().
 		TableExpr("channels AS c").

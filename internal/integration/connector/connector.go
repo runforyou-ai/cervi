@@ -8,19 +8,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
-const maxResponseSize = 1 << 20
-
 // HTTPDoer 定义连接器探测需要的最小 HTTP 客户端契约。
-type HTTPDoer interface {
-	Do(*http.Request) (*http.Response, error)
-}
+type HTTPDoer = connectiontest.HTTPDoer
 
 // Config 定义创建连接器探测器需要的配置。
 type Config struct {
@@ -39,11 +34,7 @@ type Registry struct {
 
 // NewHTTPClient 创建不会跟随重定向泄露凭据的探测客户端。
 func NewHTTPClient() *http.Client {
-	return &http.Client{
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
+	return connectiontest.NewHTTPClient()
 }
 
 // NewRegistry 创建内置连接器注册表。
@@ -86,30 +77,14 @@ type httpProbe struct {
 
 // Run 执行连接器 HTTP 探测。
 func (p *httpProbe) Run(ctx context.Context) error {
-	err := p.runEndpoint(ctx, p.primary)
+	err := connectiontest.RunHTTPProbe(ctx, p.client, p.primary.request, p.primary.validate)
 	for _, candidate := range p.fallbacks {
 		if err == nil || !supportsFallback(err) {
 			return err
 		}
-		err = p.runEndpoint(ctx, candidate)
+		err = connectiontest.RunHTTPProbe(ctx, p.client, candidate.request, candidate.validate)
 	}
 	return err
-}
-
-// runEndpoint 执行一次连接器接口探测。
-func (p *httpProbe) runEndpoint(ctx context.Context, candidate endpoint) error {
-	response, err := p.client.Do(candidate.request.Clone(ctx))
-	if err != nil {
-		return connectiontest.ClassifyTransportError(connectiontest.StageConnect, err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return connectiontest.HTTPStatusError(response.StatusCode)
-	}
-	if err := candidate.validate(io.LimitReader(response.Body, maxResponseSize)); err != nil {
-		return connectiontest.NewError(connectiontest.StageCapability, connectiontest.FailureProtocol, err)
-	}
-	return nil
 }
 
 // supportsFallback 判断当前失败是否允许尝试兼容接口。
@@ -125,16 +100,16 @@ func newDifyFactory(client HTTPDoer) Factory {
 	return func(config Config) (connectiontest.Probe, error) {
 		appRequest, err := newRequest(config.APIURL, "info", config.APIKey, "Authorization", "Bearer ")
 		if err != nil {
-			return nil, invalidConfigError(err)
+			return nil, connectiontest.InvalidConfigError(err)
 		}
 		knowledgeRequest, err := newRequest(config.APIURL, "datasets", config.APIKey, "Authorization", "Bearer ")
 		if err != nil {
-			return nil, invalidConfigError(err)
+			return nil, connectiontest.InvalidConfigError(err)
 		}
 		return &httpProbe{
 			client:    client,
 			primary:   endpoint{request: appRequest, validate: validateDifyApp},
-			fallbacks: []endpoint{{request: knowledgeRequest, validate: validateDataList}},
+			fallbacks: []endpoint{{request: knowledgeRequest, validate: connectiontest.ValidateDataList}},
 		}, nil
 	}
 }
@@ -144,21 +119,21 @@ func newN8NFactory(client HTTPDoer) Factory {
 	return func(config Config) (connectiontest.Probe, error) {
 		request, err := newRequest(config.APIURL, "api/v1/workflows", config.APIKey, "X-N8N-API-KEY", "")
 		if err != nil {
-			return nil, invalidConfigError(err)
+			return nil, connectiontest.InvalidConfigError(err)
 		}
 		query := request.URL.Query()
 		query.Set("limit", "1")
 		request.URL.RawQuery = query.Encode()
 		return &httpProbe{
 			client:  client,
-			primary: endpoint{request: request, validate: validateDataList},
+			primary: endpoint{request: request, validate: connectiontest.ValidateDataList},
 		}, nil
 	}
 }
 
 // newRequest 创建连接器探测请求。
 func newRequest(baseURL, path, apiKey, header, prefix string) (*http.Request, error) {
-	requestURL, err := appendPath(baseURL, path)
+	requestURL, err := connectiontest.AppendPath(baseURL, path)
 	if err != nil {
 		return nil, err
 	}
@@ -169,17 +144,6 @@ func newRequest(baseURL, path, apiKey, header, prefix string) (*http.Request, er
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set(header, prefix+apiKey)
 	return request, nil
-}
-
-// appendPath 在保留自托管基础路径的前提下追加接口路径。
-func appendPath(baseURL, path string) (string, error) {
-	parsed, err := url.Parse(baseURL)
-	if err != nil {
-		return "", err
-	}
-	parsed.RawPath = ""
-	parsed.Path = strings.TrimSuffix(parsed.Path, "/") + "/" + strings.TrimLeft(path, "/")
-	return parsed.String(), nil
 }
 
 // validateDifyApp 校验 Dify 应用信息的最小响应契约。
@@ -195,23 +159,4 @@ func validateDifyApp(reader io.Reader) error {
 		return errors.New("Dify app response does not contain name and mode")
 	}
 	return nil
-}
-
-// validateDataList 校验带 data 数组的列表响应。
-func validateDataList(reader io.Reader) error {
-	var payload struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
-		return err
-	}
-	if len(payload.Data) == 0 || payload.Data[0] != '[' {
-		return errors.New("list response does not contain a data array")
-	}
-	return nil
-}
-
-// invalidConfigError 创建连接器配置错误。
-func invalidConfigError(err error) error {
-	return connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureInvalidConfig, err)
 }

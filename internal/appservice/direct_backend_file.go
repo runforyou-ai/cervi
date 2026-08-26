@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
@@ -55,30 +54,7 @@ func (b *DirectBackend) CompleteFileUpload(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return File{}, err
 	}
-	record, err := b.getFile.Execute(ctx, identity, fileID)
-	if err != nil {
-		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
-	}
-	if record.Status == string(domain.FileStatusActive) {
-		return fileFromModel(record), nil
-	}
-	if record.Status == string(domain.FileStatusUploaded) {
-		if record.ExpiresAt != nil && record.ExpiresAt.After(time.Now().UTC()) {
-			return fileFromModel(record), nil
-		}
-		return File{}, b.fileOperationError(ctx, meta, fileaction.ErrFileNotFound, cervii18n.ErrorFileUploadCompleteFailed)
-	}
-	if record.Status != string(domain.FileStatusPending) || record.ExpiresAt == nil || !record.ExpiresAt.After(time.Now().UTC()) {
-		return File{}, b.fileOperationError(ctx, meta, fileaction.ErrFileNotFound, cervii18n.ErrorFileUploadCompleteFailed)
-	}
-	etag, actualSize, err := b.statFile(ctx, identity, record)
-	if err != nil || actualSize != record.ByteSize {
-		if err == nil {
-			err = fmt.Errorf("uploaded file size = %d, want %d", actualSize, record.ByteSize)
-		}
-		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
-	}
-	record, err = b.markFileUploaded.Execute(ctx, identity, record.ID, etag)
+	record, err := b.completeFileUpload.Execute(ctx, identity, fileID, b.statFile)
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
@@ -102,15 +78,15 @@ func (b *DirectBackend) fileUploadRequest(ctx context.Context, meta RequestMeta,
 }
 
 // statFile 按文件记录的存储类型核验内容。
-func (b *DirectBackend) statFile(ctx context.Context, identity *servermodels.Identity, record *servermodels.File) (string, int64, error) {
+func (b *DirectBackend) statFile(ctx context.Context, record *servermodels.File) (string, int64, error) {
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
-		info, err := b.localFiles.Stat(record.StorageKey)
+		info, err := b.localFiles.Stat(ctx, record.StorageKey)
 		if err != nil {
 			return "", 0, fmt.Errorf("stat local file: %w", err)
 		}
 		return "", info.Size(), nil
 	}
-	setting, err := b.getS3Setting.Execute(ctx, identity)
+	setting, err := b.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
 	if err != nil {
 		return "", 0, err
 	}

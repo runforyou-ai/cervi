@@ -65,18 +65,10 @@ func (q *GetPublicWebsiteChannelQuery) Execute(ctx context.Context, channelID st
 	return &PublicWebsiteChannel{
 		ID:                channel.ID,
 		Title:             setting.ChatTitle,
-		Subtitle:          derefText(setting.ChatSubtitle),
-		Greeting:          derefText(setting.GreetingMessage),
+		Subtitle:          common.StringValue(setting.ChatSubtitle),
+		Greeting:          common.StringValue(setting.GreetingMessage),
 		ThemeColor:        setting.ThemeColor,
 		AllowedEmbedHosts: setting.AllowedEmbedHosts,
 		DefaultLocale:     domain.Locale(channel.DefaultLocale),
 	}, nil
-}
-
-// derefText 把可空字符串读成空串或原值。
-func derefText(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
 }

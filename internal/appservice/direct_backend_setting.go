@@ -32,7 +32,7 @@ func (b *DirectBackend) GetS3Setting(ctx context.Context, meta RequestMeta) (S3S
 }
 
 // SaveS3Setting 保存当前企业的对象存储设置。
-func (b *DirectBackend) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) (S3Setting, error) {
+func (b *DirectBackend) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) (S3Setting, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return S3Setting{}, err
@@ -46,7 +46,7 @@ func (b *DirectBackend) SaveS3Setting(ctx context.Context, meta RequestMeta, inp
 }
 
 // TestS3Setting 测试对象存储连接。
-func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) error {
+func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) error {
 	if _, err := b.authenticate(ctx, meta); err != nil {
 		return err
 	}
@@ -75,13 +75,15 @@ func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, er
 	return FailedError(meta, failureKey)
 }
 
-func s3SettingToAction(input S3Setting) settingaction.S3Setting {
+// s3SettingToAction 把对象存储配置输入转换为动作层配置。
+func s3SettingToAction(input S3SettingInput) settingaction.S3Setting {
 	return settingaction.S3Setting{
 		Enabled: input.Enabled, Provider: domain.StorageProvider(input.Provider), Endpoint: input.Endpoint, Region: input.Region,
 		Bucket: input.Bucket, AccessKeyID: input.AccessKeyID, SecretAccessKey: input.SecretAccessKey, ForcePathStyle: input.ForcePathStyle,
 	}
 }
 
+// s3SettingFromAction 把动作层配置转换为应用契约。
 func s3SettingFromAction(input settingaction.S3Setting) S3Setting {
 	return S3Setting{
 		Enabled: input.Enabled, Provider: StorageProvider(input.Provider), Endpoint: input.Endpoint, Region: input.Region,
@@ -89,6 +91,7 @@ func s3SettingFromAction(input settingaction.S3Setting) S3Setting {
 	}
 }
 
+// s3SettingFieldKeys 把对象存储配置校验错误码映射为本地化文案键。
 func s3SettingFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
 		settingaction.ValidationEndpointRequired: cervii18n.FieldS3EndpointRequired, settingaction.ValidationEndpointInvalid: cervii18n.FieldS3EndpointInvalid,

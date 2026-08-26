@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -23,9 +24,12 @@ func NewUpdateMessageChannelStatusAction(db *bun.DB) *UpdateMessageChannelStatus
 }
 
 // Execute 修改当前企业中已支持消息渠道的启用状态。
-func (a *UpdateMessageChannelStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, enabled bool) (*servermodels.Channel, error) {
+func (a *UpdateMessageChannelStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, enabled bool) (*MessageChannelRecord, error) {
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
+	}
+	if err := identityaction.Validate(ctx, a.db, identity); err != nil {
+		return nil, err
 	}
 	channel := &servermodels.Channel{}
 	result, err := a.db.NewUpdate().
@@ -47,5 +51,5 @@ func (a *UpdateMessageChannelStatusAction) Execute(ctx context.Context, identity
 	if rows == 0 {
 		return nil, ErrNotFound
 	}
-	return channel, nil
+	return messageChannelRecord(channel), nil
 }

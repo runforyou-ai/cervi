@@ -10,7 +10,7 @@ import (
 
 // TaskOutbox 表示等待发布到 NATS 的任务消息。
 type TaskOutbox struct {
-	bun.BaseModel `bun:"table:task_outbox,alias:to"`
+	bun.BaseModel `bun:"table:task_outbox,alias:tob"`
 
 	TaskRunID   string    `bun:"task_run_id,pk"`
 	MessageID   string    `bun:"message_id"`

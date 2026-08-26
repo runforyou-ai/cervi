@@ -9,6 +9,7 @@ import "github.com/uptrace/bun"
 type AppSetting struct {
 	bun.BaseModel `bun:"table:app_settings,alias:setting"`
 
-	Key   string `bun:"key,pk"`
-	Value string `bun:"value"`
+	Key       string `bun:"key,pk"`
+	Value     string `bun:"value"`
+	UpdatedAt string `bun:"updated_at"`
 }

@@ -6,6 +6,7 @@ package contact
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
@@ -16,18 +17,29 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationIdentityRequired ValidationCode = "IDENTITY_REQUIRED"
-	ValidationChannelRequired  ValidationCode = "CHANNEL_REQUIRED"
-	ValidationChannelInvalid   ValidationCode = "CHANNEL_INVALID"
-	ValidationChannelImmutable ValidationCode = "CHANNEL_IMMUTABLE"
-	ValidationNameTooLong      ValidationCode = "NAME_TOO_LONG"
-	ValidationStageInvalid     ValidationCode = "STAGE_INVALID"
-	ValidationNotesTooLong     ValidationCode = "NOTES_TOO_LONG"
-	ValidationMethodsTooMany   ValidationCode = "METHODS_TOO_MANY"
-	ValidationMethodInvalid    ValidationCode = "METHOD_INVALID"
-	ValidationMethodDuplicate  ValidationCode = "METHOD_DUPLICATE"
-	ValidationPrimaryDuplicate ValidationCode = "PRIMARY_DUPLICATE"
-	ValidationQueryInvalid     ValidationCode = "QUERY_INVALID"
+	ValidationIdentityRequired ValidationCode = "CONTACT_IDENTITY_REQUIRED"
+	ValidationChannelRequired  ValidationCode = "CONTACT_CHANNEL_REQUIRED"
+	ValidationChannelInvalid   ValidationCode = "CONTACT_CHANNEL_INVALID"
+	ValidationChannelImmutable ValidationCode = "CONTACT_CHANNEL_IMMUTABLE"
+	ValidationNameTooLong      ValidationCode = "CONTACT_NAME_TOO_LONG"
+	ValidationStageInvalid     ValidationCode = "CONTACT_STAGE_INVALID"
+	ValidationNotesTooLong     ValidationCode = "CONTACT_NOTES_TOO_LONG"
+	ValidationMethodsTooMany   ValidationCode = "CONTACT_METHODS_TOO_MANY"
+	ValidationMethodInvalid    ValidationCode = "CONTACT_METHOD_INVALID"
+	ValidationMethodDuplicate  ValidationCode = "CONTACT_METHOD_DUPLICATE"
+	ValidationPrimaryDuplicate ValidationCode = "CONTACT_PRIMARY_DUPLICATE"
+	ValidationQueryInvalid     ValidationCode = "CONTACT_QUERY_INVALID"
+)
+
+const (
+	// maxDisplayNameLength 是联系人名称的最大字符数。
+	maxDisplayNameLength = 200
+	// maxNotesLength 是联系人备注的最大字符数。
+	maxNotesLength = 5000
+	// maxMethods 是联系方式的最大数量。
+	maxMethods = 20
+	// maxMethodLabelLength 是联系方式标签的最大字符数。
+	maxMethodLabelLength = 100
 )
 
 // ValidationError 表示联系人字段校验失败。
@@ -46,16 +58,16 @@ func normalizeContactInput(input ContactInput) (ContactInput, map[string]Validat
 	} else if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelInvalid
 	}
-	if len([]rune(input.DisplayName)) > 200 {
+	if utf8.RuneCountInString(input.DisplayName) > maxDisplayNameLength {
 		fields["displayName"] = ValidationNameTooLong
 	}
 	if input.Stage != domain.ContactStageVisitor && input.Stage != domain.ContactStageLead && input.Stage != domain.ContactStageCustomer {
 		fields["stage"] = ValidationStageInvalid
 	}
-	if len([]rune(input.Notes)) > 5000 {
+	if utf8.RuneCountInString(input.Notes) > maxNotesLength {
 		fields["notes"] = ValidationNotesTooLong
 	}
-	if len(input.Methods) > 20 {
+	if len(input.Methods) > maxMethods {
 		fields["methods"] = ValidationMethodsTooMany
 	} else {
 		var methodCode ValidationCode
@@ -85,7 +97,7 @@ func normalizeMethods(methods []MethodInput) ([]MethodInput, ValidationCode) {
 		method.Type = domain.ContactMethodType(strings.TrimSpace(string(method.Type)))
 		method.Value = strings.TrimSpace(method.Value)
 		method.Label = strings.TrimSpace(method.Label)
-		if len([]rune(method.Label)) > 100 && code == "" {
+		if utf8.RuneCountInString(method.Label) > maxMethodLabelLength && code == "" {
 			code = ValidationMethodInvalid
 		}
 

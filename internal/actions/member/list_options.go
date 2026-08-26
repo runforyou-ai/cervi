@@ -33,9 +33,7 @@ type ListOptionsInput struct {
 // ListOptionsOutput 定义成员选择项分页结果。
 type ListOptionsOutput struct {
 	Members []Option
-	Page    int
-	Size    int
-	Total   int
+	Page    common.PageInfo
 }
 
 // ListOptionsQuery 读取可分配的企业身份。
@@ -84,5 +82,5 @@ func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.I
 		Scan(ctx, &members); err != nil {
 		return ListOptionsOutput{}, fmt.Errorf("list member options: %w", err)
 	}
-	return ListOptionsOutput{Members: members, Page: input.Page, Size: input.PageSize, Total: total}, nil
+	return ListOptionsOutput{Members: members, Page: common.PageInfo{Number: input.Page, Size: input.PageSize, Total: total}}, nil
 }

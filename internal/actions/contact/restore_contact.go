@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -26,8 +27,9 @@ func (a *RestoreContactAction) Execute(ctx context.Context, identity *servermode
 	if !common.ValidUUID(contactID) {
 		return nil, ErrNotFound
 	}
+	var detail *ContactDetail
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		result, err := tx.NewUpdate().
@@ -48,10 +50,15 @@ func (a *RestoreContactAction) Execute(ctx context.Context, identity *servermode
 		if rows == 0 {
 			return ErrNotFound
 		}
+		loaded, err := loadContactDetail(ctx, tx, identity.Organization.ID, contactID)
+		if err != nil {
+			return err
+		}
+		detail = loaded
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("restore contact: %w", err)
 	}
-	return NewGetContactQuery(a.db).Execute(ctx, identity, contactID)
+	return detail, nil
 }

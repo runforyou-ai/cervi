@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -114,7 +115,7 @@ func normalizeManagedExecutionInput(input ManagedExecutionInput) (ManagedExecuti
 	}
 	if input.SystemInstruction == "" {
 		fields["systemInstruction"] = ValidationSystemInstructionRequired
-	} else if len([]rune(input.SystemInstruction)) > maxSystemInstructionLength {
+	} else if utf8.RuneCountInString(input.SystemInstruction) > maxSystemInstructionLength {
 		fields["systemInstruction"] = ValidationSystemInstructionTooLong
 	}
 	if len(fields) > 0 {
@@ -211,7 +212,7 @@ func decodeRevisionExecution(revision servermodels.AgentRevision) (Execution, er
 		strings.TrimSpace(configuration.Model.Identifier) == "" ||
 		strings.TrimSpace(configuration.Model.Name) == "" ||
 		strings.TrimSpace(configuration.SystemInstruction) == "" ||
-		len([]rune(configuration.SystemInstruction)) > maxSystemInstructionLength {
+		utf8.RuneCountInString(configuration.SystemInstruction) > maxSystemInstructionLength {
 		return Execution{}, errors.New("managed execution configuration is invalid")
 	}
 	return Execution{

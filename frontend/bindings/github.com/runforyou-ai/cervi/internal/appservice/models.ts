@@ -398,6 +398,8 @@ export interface ContactList {
 
 /**
  * ContactListInput 定义联系人列表查询条件。
+ * 
+ * Deleted 由回收站路径设置，不经查询参数传输。
  */
 export interface ContactListInput {
     "query": string;
@@ -1128,6 +1130,20 @@ export interface RoleSummary {
  * S3Setting 定义 S3 兼容对象存储配置。
  */
 export interface S3Setting {
+    "enabled": boolean;
+    "provider": StorageProvider;
+    "endpoint": string;
+    "region": string;
+    "bucket": string;
+    "accessKeyId": string;
+    "secretAccessKey": string;
+    "forcePathStyle": boolean;
+}
+
+/**
+ * S3SettingInput 定义保存和测试对象存储配置的输入。
+ */
+export interface S3SettingInput {
     "enabled": boolean;
     "provider": StorageProvider;
     "endpoint": string;
