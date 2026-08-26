@@ -9,6 +9,7 @@ import "github.com/uptrace/bun"
 type Organization struct {
 	bun.BaseModel `bun:"table:organizations,alias:o"`
 
-	ID   string `bun:"id,pk" json:"id"`
-	Name string `bun:"name" json:"name"`
+	ID                string `bun:"id,pk" json:"id"`
+	Name              string `bun:"name" json:"name"`
+	AllowArbitraryURL bool   `bun:"allow_arbitrary_url" json:"allowArbitraryUrl"`
 }

@@ -10,6 +10,7 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	businesssystemaction "github.com/runforyou-ai/cervi/internal/actions/businesssystem"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
@@ -106,6 +107,11 @@ type DirectBackend struct {
 	createAIProvider                  *aiprovideraction.CreateAIProviderAction
 	updateAIProvider                  *aiprovideraction.UpdateAIProviderAction
 	deleteAIProvider                  *aiprovideraction.DeleteAIProviderAction
+	listBusinessSystems               *businesssystemaction.ListBusinessSystemsQuery
+	getBusinessSystem                 *businesssystemaction.GetBusinessSystemQuery
+	createBusinessSystem              *businesssystemaction.CreateBusinessSystemAction
+	updateBusinessSystem              *businesssystemaction.UpdateBusinessSystemAction
+	deleteBusinessSystem              *businesssystemaction.DeleteBusinessSystemAction
 	listIntegrationConnections        *integrationconnectionaction.ListIntegrationConnectionsQuery
 	getIntegrationConnection          *integrationconnectionaction.GetIntegrationConnectionQuery
 	testIntegrationConnection         *integrationconnectionaction.TestConnectionAction
@@ -195,6 +201,11 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		createAIProvider:                  aiprovideraction.NewCreateAIProviderAction(db),
 		updateAIProvider:                  aiprovideraction.NewUpdateAIProviderAction(db),
 		deleteAIProvider:                  aiprovideraction.NewDeleteAIProviderAction(db),
+		listBusinessSystems:               businesssystemaction.NewListBusinessSystemsQuery(db),
+		getBusinessSystem:                 businesssystemaction.NewGetBusinessSystemQuery(db),
+		createBusinessSystem:              businesssystemaction.NewCreateBusinessSystemAction(db),
+		updateBusinessSystem:              businesssystemaction.NewUpdateBusinessSystemAction(db),
+		deleteBusinessSystem:              businesssystemaction.NewDeleteBusinessSystemAction(db),
 		listIntegrationConnections:        integrationconnectionaction.NewListIntegrationConnectionsQuery(db),
 		getIntegrationConnection:          integrationconnectionaction.NewGetIntegrationConnectionQuery(db),
 		testIntegrationConnection:         integrationconnectionaction.NewTestConnectionAction(db, connectionRunner, connectorRegistry),

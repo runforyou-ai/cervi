@@ -6,7 +6,7 @@ import { PageContent } from "@/components/page-content"
 import { PagePaneLink, PagePaneNav, PageSplit } from "@/components/page-split"
 import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
-import { OrganizationSettingsForm } from "@/features/settings/organization-settings-form"
+import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { RoleListPage } from "@/features/settings/role-list-page"
 import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
@@ -63,7 +63,7 @@ export function SystemSettingsPage({
   section,
   children,
 }: {
-  section: "organization" | "roles" | "storage"
+  section: "general" | "roles" | "storage"
   children?: ReactNode
 }) {
   const { t } = useTranslation("settings")
@@ -79,8 +79,8 @@ export function SystemSettingsPage({
           label={t("systemNavigationLabel")}
           title={t("systemTitle")}
         >
-          <PagePaneLink to="/settings/organization">
-            {t("navigation.organization")}
+          <PagePaneLink to="/settings/general">
+            {t("navigation.general")}
           </PagePaneLink>
           <PagePaneLink to="/settings/roles">
             {t("navigation.roles")}
@@ -97,8 +97,8 @@ export function SystemSettingsPage({
         <>
           <PageHeader title={title} />
           <PageContent>
-            {section === "organization" ? (
-              <OrganizationSettingsForm
+            {section === "general" ? (
+              <GeneralSettingsForm
                 organization={identity.organization}
                 onUpdated={updateOrganization}
               />

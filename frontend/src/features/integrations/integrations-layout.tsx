@@ -24,10 +24,12 @@ export function IntegrationsLayout() {
           <PagePaneLink to="/integrations/model-services">
             {t("modelServices.navigation")}
           </PagePaneLink>
+          <PagePaneLink to="/integrations/business-systems">
+            {t("businessSystems")}
+          </PagePaneLink>
           <PagePaneLink to="/integrations/connectors">
             {t("connectors.navigation")}
           </PagePaneLink>
-          <PagePaneLink>{t("businessSystems")}</PagePaneLink>
           <PagePaneLink>{t("webhooks")}</PagePaneLink>
           <PagePaneLink>{t("openApi")}</PagePaneLink>
         </PagePaneNav>

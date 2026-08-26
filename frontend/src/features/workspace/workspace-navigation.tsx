@@ -112,7 +112,7 @@ function WorkspaceMenu({
       />
       <div className="mt-auto pb-1">
         <WorkspaceRailItem
-          to="/settings/organization"
+          to="/settings/general"
           icon={SettingsIcon}
           label={t("systemSettings")}
           active={location.pathname.startsWith("/settings")}

@@ -362,7 +362,11 @@ export function WebsiteChannelUsagePanel({
               </div>
             </Field>
 
-            <form onSubmit={form.handleSubmit(submit)} noValidate>
+            <form
+              className="space-y-9"
+              onSubmit={form.handleSubmit(submit)}
+              noValidate
+            >
               <FieldGroup>
                 <Controller
                   name="allowedHosts"
@@ -385,12 +389,12 @@ export function WebsiteChannelUsagePanel({
                     </Field>
                   )}
                 />
-                <div>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? t("form.saving") : t("form.save")}
-                  </Button>
-                </div>
               </FieldGroup>
+              <div>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? t("form.saving") : t("form.save")}
+                </Button>
+              </div>
             </form>
           </FieldGroup>
         </TabsContent>

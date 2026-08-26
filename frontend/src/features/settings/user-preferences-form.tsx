@@ -137,7 +137,7 @@ export function UserPreferencesForm({
 
   return (
     <form
-      className="w-full max-w-2xl"
+      className="w-full max-w-2xl space-y-9"
       aria-label={t("preferences.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
@@ -258,13 +258,13 @@ export function UserPreferencesForm({
           />
           <NotificationPermissionSettings />
         </section>
-        <div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-            {isSubmitting ? t("preferences.saving") : t("preferences.save")}
-          </Button>
-        </div>
       </FieldGroup>
+      <div>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+          {isSubmitting ? t("preferences.saving") : t("preferences.save")}
+        </Button>
+      </div>
     </form>
   )
 }

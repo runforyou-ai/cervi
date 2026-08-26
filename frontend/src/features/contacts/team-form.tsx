@@ -72,7 +72,11 @@ export function TeamForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form
+      className="space-y-9"
+      onSubmit={form.handleSubmit(submit)}
+      noValidate
+    >
       <FieldGroup className="gap-5">
         <FormInputField
           name="name"
@@ -95,19 +99,19 @@ export function TeamForm({
             </Field>
           )}
         />
-        <div className="flex items-center gap-2 pt-2">
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting
-              ? t("teams.form.saving")
-              : t("teams.form.save")}
-          </Button>
-          {onCancel ? (
-            <Button type="button" variant="outline" onClick={onCancel}>
-              {t("teams.form.cancel")}
-            </Button>
-          ) : null}
-        </div>
       </FieldGroup>
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting
+            ? t("teams.form.saving")
+            : t("teams.form.save")}
+        </Button>
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            {t("teams.form.cancel")}
+          </Button>
+        ) : null}
+      </div>
     </form>
   )
 }

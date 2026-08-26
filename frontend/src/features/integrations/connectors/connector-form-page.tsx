@@ -230,7 +230,7 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
           </div>
         ) : (
           <form
-            className="w-full max-w-2xl"
+            className="w-full max-w-2xl space-y-9"
             onSubmit={form.handleSubmit(save)}
             noValidate
           >
@@ -318,33 +318,33 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
                   hide: t("connectors.form.hideAPIKey"),
                 }}
               />
-              <div className="flex items-center gap-2">
-                <Button type="submit" disabled={saving || testing}>
-                  {saving ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : null}
-                  {saving
-                    ? t("connectors.form.saving")
-                    : t("connectors.form.save")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={testing || saving}
-                  onClick={form.handleSubmit(test)}
-                >
-                  {testing ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : null}
-                  {testing
-                    ? t("connectors.form.testing")
-                    : t("connectors.form.test")}
-                </Button>
-                <Button type="button" variant="outline" asChild>
-                  <Link to={listPath}>{t("connectors.form.cancel")}</Link>
-                </Button>
-              </div>
             </FieldGroup>
+            <div className="flex items-center gap-2">
+              <Button type="submit" disabled={saving || testing}>
+                {saving ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : null}
+                {saving
+                  ? t("connectors.form.saving")
+                  : t("connectors.form.save")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={testing || saving}
+                onClick={form.handleSubmit(test)}
+              >
+                {testing ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : null}
+                {testing
+                  ? t("connectors.form.testing")
+                  : t("connectors.form.test")}
+              </Button>
+              <Button type="button" variant="outline" asChild>
+                <Link to={listPath}>{t("connectors.form.cancel")}</Link>
+              </Button>
+            </div>
           </form>
         )}
       </PageContent>
