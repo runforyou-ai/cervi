@@ -4,11 +4,11 @@
 
 本文档确定 Cervi 从客户会话、企业内部聊天、第三方账号接入，逐步扩展到受管外部协作、工单和跨企业联邦通信的产品路线与核心模型。
 
-本文档同时定义第一个聊天开发 PR 的实施边界。后续开发如需改变本文中的核心概念、对象边界或阶段顺序，应先更新本文档并说明原因。
+本文档最初定义了前两个聊天 PR 的实施边界；两个 PR 已合并，第 13 章记录其交付基线和后续交付清单。后续开发如需改变本文中的核心概念、对象边界或阶段顺序，应先更新本文档并说明原因。
 
 本文档还确定客户端同步和实时传输的长期边界，包括 WebSocket、Protobuf、HTTP、PostgreSQL Outbox、Core NATS 与 JetStream 的分工，避免聊天开发后再用多套协议补洞。
 
-第 7 至第 10 章、第 13 章以及后续阶段中的状态机、协议、表字段和基础设施设计，作为对应阶段的实现基线。进入实现前，结合目标平台官方能力、当前代码和容量验证做增量修正。
+第 7 至第 10 章以及后续阶段中的状态机、协议、表字段和基础设施设计，作为对应阶段的实现基线。进入实现前，结合目标平台官方能力、当前代码和容量验证做增量修正。
 
 路线阶段只定义验证和实现顺序，不提前创建远期表、依赖或接口。
 
@@ -219,6 +219,13 @@ external_sender         第三方平台发送者
 > [!WARNING]
 > Header 回传只维持当前页面内的嵌入访问；浏览器完全阻止第三方 Cookie 时，不承诺跨刷新恢复。阶段 1A 验证独立页和 HTTPS 挂件的首次访问与刷新恢复。
 
+公开访客端点是无认证入口，第一条有效文本即在事务中创建联系人、渠道身份、Conversation、ServiceSession 和 Message，必须规划防滥用能力，避免刷接口无限制造业务记录、污染客服收件箱和 CRM：
+
+- 初始化、发送和历史接口按来源 IP 和渠道限速；发送接口同时按访客身份限制消息长度和发送频率。
+- 限制单个渠道身份同时保持的未回复 Conversation 数量，超出时拒绝创建新线程并提示继续已有线程。
+- 渠道停用即拒绝公共访问是紧急止血手段；限速和配额参数由渠道配置管理，不硬编码。
+- 阶段 1A 已上线的公开端点在后续 PR 补齐上述限制，先于外部渠道扩展交付，见第 13.5 节。
+
 挂件接入 Realtime Gateway 后，公共换票端点校验该访客身份并签发第 10.12 节定义的短期一次性连接票据；Cookie 不直接用于 WebSocket 认证。
 
 ## 5. 核心业务对象
@@ -279,7 +286,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 消息历史使用 `before` 游标按 `(originated_at DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一 `(originated_at, id)` 边界正序扫描更新记录。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。游标由服务端编码 Conversation 编号和元组，方向由查询参数表达，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
 
-会话的 `last_message_at` 表示当前已知消息最大的 `originated_at`，只向后更新。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它，删除最后一条消息也不回退它。会话预览跳过已删除消息。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
+会话的 `last_message_at` 表示当前已知消息最大的 `originated_at`，`last_message_id` 与它成对指向同一条消息，两者在同一事务按 `(originated_at, id)` 只向前推进。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它们，删除最后一条消息也不回退它们，此时 `last_message_id` 允许指向已删除消息，仅继续充当排序水位。会话预览跳过已删除消息：指向消息已删除时按时间线回退查询最近一条未删除消息，不得展示已删除内容。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
 
 文件、语音、卡片、反应、@ 提醒和系统事件后续使用独立关系或类型化载荷扩展，不把所有结构塞进文本正文。
 
@@ -377,94 +384,13 @@ agent
 
 ### 7.2 运行状态与聊天状态分离
 
-AI 调用不能依赖用户已读状态，也不能把模型请求、工具步骤和令牌消耗塞入消息表。进入 AI 开发阶段时增加：
+AI 调用不能依赖用户已读状态，也不能把模型请求、工具步骤和令牌消耗塞入消息表。`agent_revisions`、`conversation_agent_policies`、`conversation_agent_states`、`conversation_agent_triggers`、`agent_runs`、`agent_run_steps` 和 `agent_tool_invocations` 的表结构、Revision 与快照语义、步骤与工具事实由 [agent-roadmap.md](agent-roadmap.md) 唯一定义，本文档不复制字段清单。本章只固定聊天域必须遵守的不变量：
 
-```text
-agent_revisions
-├── agent_id
-├── execution_mode
-├── schema_version
-└── configuration
-
-conversation_agent_policies
-├── conversation_id
-├── agent_identity_id
-├── trigger_mode
-├── allowed_tools
-├── response_policy
-└── enabled
-
-conversation_agent_states
-├── conversation_id
-├── agent_identity_id
-├── desired_trigger_seq
-├── desired_message_id
-├── processed_trigger_seq
-├── processed_message_id
-├── summary_message_id
-├── paused_at
-└── updated_at
-
-conversation_agent_triggers
-├── id
-├── organization_id
-├── conversation_id
-├── agent_identity_id
-├── trigger_seq
-├── trigger_type
-├── trigger_message_id
-└── created_at
-
-agent_runs
-├── organization_id
-├── conversation_id
-├── agent_identity_id
-├── agent_revision_id
-├── trigger_type
-├── trigger_message_id
-├── trigger_start_seq
-├── trigger_end_seq
-├── initiated_by_user_id
-├── input_snapshot
-├── config_snapshot
-├── output_message_id
-├── status
-├── token_and_cost_usage
-├── error_code
-├── error_detail
-└── timestamps
-
-agent_run_steps
-├── agent_run_id
-├── position
-├── type
-├── status
-├── summary
-├── usage
-├── error
-└── timestamps
-
-agent_tool_invocations
-├── agent_run_id
-├── step_id
-├── tool_name
-├── arguments
-├── arguments_hash
-├── idempotency_key
-├── status
-├── result
-├── result_file_id
-├── error
-└── timestamps
-```
-
-`agent_revisions` 是不可变执行配置版本，由 `(execution_mode, schema_version)` 解释完整、规范化且非敏感的 `configuration` 快照；当前 `managed/v1` 通过其中的模型服务编号和模型标识选择现有同企业文本 Chat 模型。Run 同时引用 Revision 并保存本次实际解析的运行快照。`input_snapshot` 保存实际模型输入的有序消息引用、内容版本或哈希和 Schema 版本，不能只用起止消息编号表达可编辑的历史。`agent_run_steps` 只保存模型、工具、审批、交接等有界语义步骤；流式 Token、进度 Tick、框架 Callback 和调试日志不得逐条写入。工具参数、幂等、审批、结果未知和以后增加的设备执行位置由 Tool Invocation 及其扩展事实承担。
-
-独立 `message_mentions` 关系记录 @ 事实；符合策略且首次持久化的消息在同一事务写入 `conversation_agent_triggers`。同一“会话 + 智能体”的 `trigger_seq` 由服务端锁定状态后单调分配，`desired_*` 与 `processed_*` 使用该序号；对应 Message 编号只作审计指针。`originated_at` 继续只负责聊天展示排序，不能再决定 Agent 触发资格或水位。迟到的历史补拉默认不创建 Trigger，需要时通过独立总结或人工回放命令处理。
-
-每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run，使用 `(conversation_id, agent_identity_id) WHERE status IN ('queued', 'running')` 的部分唯一索引或等价任务串行机制保证。新消息在已有 Run 执行期间只推进 `desired_*`；Run 结束时原子推进 `processed_*`，仍有差距则在同一事务创建下一 Run 并通过 `TxEnqueuer.EnqueueIn` 唤醒，不能因活动任务幂等或部分唯一索引丢失后续处理。`agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
-
-自动响应记录触发消息、精确输入快照、配置版本与快照、语义步骤、工具调用、输出消息、费用、失败、取消和人工接管，保证可审计和可恢复。
+- 独立 `message_mentions` 关系记录 @ 事实；符合策略且首次持久化的消息在同一事务写入 `conversation_agent_triggers`。
+- 同一“会话 + 智能体”的 `trigger_seq` 由服务端锁定状态后单调分配，`desired_*` 与 `processed_*` 使用该序号；对应 Message 编号只作审计指针。`originated_at` 继续只负责聊天展示排序，不能决定 Agent 触发资格或水位。迟到的历史补拉默认不创建 Trigger，需要时通过独立总结或人工回放命令处理。
+- 每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run。新消息在已有 Run 执行期间只推进 `desired_*`；Run 结束时原子推进 `processed_*`，仍有差距则在同一事务创建下一 Run 并通过 `TxEnqueuer.EnqueueIn` 唤醒，不能因活动任务幂等丢失后续处理。
+- `agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
+- 自动响应记录触发消息、精确输入快照、配置版本与快照、语义步骤、工具调用、输出消息、费用、失败、取消和人工接管，保证可审计和可恢复。
 
 首轮内部 AI 员工和网站 AI 客服验证限定为一个 Trigger、一个 Run、一次模型调用和一条最终文本 Message，不创建 Step 或 Tool Invocation，也不依赖流式实时能力。最终 Message 使用 `agent:<agent_run_id>` 业务幂等键；输出消息、Run 终态与 `processed_*` 在同一事务提交。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
 
@@ -1053,8 +979,7 @@ conversation_sync_events
 核心约束与索引：
 
 ```text
-UNIQUE (organization_id, conversation_id, seq)
-INDEX  (organization_id, conversation_id, seq)
+UNIQUE (organization_id, conversation_id, seq)   -- 兼作会话内增量扫描索引
 INDEX  (created_at)
 ```
 
@@ -1093,8 +1018,7 @@ user_conversation_wakeups
 ```text
 UNIQUE (organization_id, user_id)                         -- user_sync_states
 UNIQUE (organization_id, user_id, conversation_id)        -- 当前压缩行
-UNIQUE (organization_id, user_id, mailbox_seq)             -- 当前序号不重复
-INDEX  (organization_id, user_id, mailbox_seq)             -- 增量扫描
+UNIQUE (organization_id, user_id, mailbox_seq)            -- 序号不重复，兼作增量扫描索引
 ```
 
 规则：
@@ -1122,6 +1046,8 @@ GET /sync/mailbox?after={mailbox_seq}
 客服公共收件箱和未来团队队列属于共享广播受众，不能为每名潜在客服写个人 Wakeup。它们分别使用 `customer_inbox_seq`、`team_inbox_seq` 等共享水位和独立同步接口；连接仅在当前用户具有访问权时携带并恢复对应游标。AI、客服收件箱和用户 Mailbox 不能合并成一个全局序号。
 
 小群可以采用每用户 Mailbox 的 Fanout-on-write；大型群、公告群和共享收件箱必须采用会话或收件箱级 Shared Fanout。阶段 2 先为每用户 Fanout 设定经 PostgreSQL 压测确认的成员上限，超过上限前必须实现 Shared Fanout，不能在消息事务中为成千上万成员更新 Mailbox。具体阈值是实现和容量决策，不在领域模型中硬编码为固定产品常量。
+
+Fanout-on-write 存在两个已知的单行热点：同一用户的 `user_sync_states` 行是该用户全部会话变更的串行点，同时处理大量会话的客服等重度用户可能形成跨会话写争用；`customer_inbox_seq` 等共享收件箱水位是企业级单行计数器，每条客户入站消息都要推进它。两者与每用户 Fanout 成员上限一起进入阶段 2E 的 PostgreSQL 压测清单；出现瓶颈时优先缩短持锁事务和批量推进序号区间，不为回避热点放弃水位单调性。
 
 ### 10.9 实时传输与持久命令边界
 
@@ -1311,11 +1237,11 @@ P3 typing、presence 等临时事件
 
 ## 12. 路线阶段
 
-### 阶段 0：客户会话数据底座
+### 阶段 0：客户会话数据底座（已交付）
 
 建立 `chat_subjects`、统一 Conversation、参与者、双时间消息、客户会话扩展和 `ServiceSession` 所需的 PostgreSQL 表、索引、领域值与 Bun 模型，同时把渠道自动联系人所需的创建用户字段改为可空。
 
-阶段 0 由独立的数据底座 PR 完成，不包含入站 Action、公开 API 或 Messenger 真实数据接入。管理端手动添加外部联系人的菜单入口在该 PR 暂时隐藏，既有联系人 CRUD 实现保持不变。
+阶段 0 已由独立的数据底座 PR 交付（见第 13.2 节），不包含入站 Action、公开 API 或 Messenger 真实数据接入。管理端手动添加外部联系人的菜单入口在该 PR 暂时隐藏，既有联系人 CRUD 实现保持不变。
 
 阶段 0 不包括客服回复、实时推送、已读状态、Telegram 和 AI 运行表，也不创建阶段 2 的用户 Mailbox、`realtime_outbox`、Protobuf 实时协议、外部投递或客户端同步表。
 
@@ -1323,11 +1249,11 @@ P3 typing、presence 等临时事件
 
 阶段 1 按可独立验收的子阶段交付：先在阶段 0 数据底座上完成网站文本闭环，再以 Telegram Bot 验证外部投递，随后扩展其他客服渠道、文件和客服处理能力。`ServiceSession` 随数据底座提前建立，但客户可见列表和历史始终以 Conversation 为线程；领取、转接、结束、指标和满意度仍在后续阶段交付。
 
-#### 阶段 1A：网站客户文本闭环
+#### 阶段 1A：网站客户文本闭环（访客侧已交付）
 
 - 网站访客通过第 4.5 节的渠道 Cookie 恢复身份，第一条有效文本消息创建 `stage = visitor` 联系人、渠道身份和长期客户会话。
 - 新草稿第一条有效文本创建 Conversation 和首个 `ServiceSession`；点击已有列表项发送时复用该 Conversation，并复用或续开它的 ServiceSession。访客会话列表以 Conversation 为列表项，ServiceSession 只提供最新处理状态摘要。
-- 网站消息 PR 完成访客发送、Conversation 列表和完整历史读取；企业成员列表、历史和回复作为后续独立 PR，历史使用 `before`，网站和员工页面以后使用 `after` 轮询新增消息。
+- 网站消息 PR 已交付访客发送、Conversation 列表和完整历史读取（见第 13.3 节）；企业成员列表、历史和回复作为后续独立 PR，历史使用 `before`，网站和员工页面以后使用 `after` 轮询新增消息。
 - 同一渠道身份可以同时拥有多条正在处理的 Conversation，每条 Conversation 同时最多一个 `status IN (waiting, active, pending)` 的 ServiceSession；`conversations.status = active` 不表示客服批次未结束。
 - 网站公开请求由现有 `/api` Gin Service 适配到未注册 Wails 绑定的访客应用服务和 Action；访客直接读取 Cervi 消息时间线，不创建 Delivery。
 - 本子阶段只实现文本，不包含文件、外部平台投递和统一实时基础设施。
@@ -1393,7 +1319,7 @@ P3 typing、presence 等临时事件
 - 使用 Protobuf Edition 2024 承载同步水位、临时状态、AI 流和 WebRTC 信令。
 - Realtime Gateway 先内嵌 Server，通过专用 Outbox 向 Core NATS 定向发布；客户端不连接 NATS，JetStream 继续只承担可靠任务。
 - 客户端重连或低频校验时先读取 Mailbox/Inbox Head，再按会话序号补拉；超过保留窗口时重新获取快照。
-- 小群先使用经压测设限的每用户 Fanout；大型群和公共收件箱使用 Shared Fanout，不能让消息事务随潜在受众无限写放大。
+- 小群先使用经压测设限的每用户 Fanout；大型群和公共收件箱使用 Shared Fanout，不能让消息事务随潜在受众无限写放大。压测同时覆盖第 10.8 节的用户水位行和共享收件箱水位两个单行热点。
 
 会话 Changelog 不作为搜索、通知、AI 或联邦的事件总线；用户 Mailbox 也只是会话变化索引，不保存消息正文。
 
@@ -1432,18 +1358,18 @@ Telegram 首个实现额外验证 TDLib 会话托管、FloodWait、远端历史�
 
 根据真实需求选择公开群、公告群、话题模式、独立子讨论空间和显式共享的跨企业工单。实现大型群 Shared Fanout、会话级订阅引用计数和容量治理后，才能取消阶段 2 的每用户 Fanout 成员上限。
 
-## 13. 前两个聊天 PR
+## 13. 已交付的前两个聊天 PR
 
-### 13.1 实施基线
+### 13.1 交付基线
 
-网站访客真实消息闭环拆成两个连续 PR：
+网站访客真实消息闭环由两个已合并的连续 PR 完成：
 
-1. [chat-first-pr-design.md](chat-first-pr-design.md)：建立客户聊天数据底座并暂时隐藏管理端手动添加外部联系人的入口。
-2. [chat-visitor-message-pr-design.md](chat-visitor-message-pr-design.md)：实现网站访客身份、首条消息事务、真实 Conversation 列表和完整消息历史。
+1. 客户聊天数据底座 PR：建立客户聊天数据底座并暂时隐藏管理端手动添加外部联系人的入口。
+2. 网站访客消息 PR：实现网站访客身份、首条消息事务、真实 Conversation 列表和完整消息历史。
 
-路线图固定长期对象和阶段关系，两份详细设计固定当前代码基线下的具体字段、接口、事务和验收。三者不一致时必须同步修正，不能让实现自行选择另一套语义。
+两个 PR 对应的详细设计文档已随交付删除，本文档是当前唯一的设计基线。后续实现与本文档不一致时，先更新本文档再改代码，不能让实现自行选择另一套语义。
 
-本轮明确修正早期“一个渠道身份永久一条 Conversation、访客列表使用 ServiceSession 编号”的方案：
+交付前明确修正了早期“一个渠道身份永久一条 Conversation、访客列表使用 ServiceSession 编号”的方案：
 
 - Conversation 是客户实际打开和继续的聊天线程。
 - ServiceSession 只是一条客户线程上的客服处理周期。
@@ -1453,9 +1379,9 @@ Telegram 首个实现额外验证 TDLib 会话托管、FloodWait、远端历史�
 
 访客列表、历史和发送从第一版开始都使用 Conversation 公开主键，ServiceSession 只表达各线程内部的客服处理周期。
 
-### 13.2 PR1：客户聊天数据底座
+### 13.2 PR1：客户聊天数据底座（已合并）
 
-PR1 创建六张聊天表：
+PR1 创建了六张聊天表：
 
 ```text
 chat_subjects
@@ -1470,19 +1396,19 @@ messages
 
 - 在当前目标联系人建表迁移中把 `contacts.created_by_user_id` 定义为可空。
 - 增加聊天领域值和 Bun 模型。
-- 不在 `customer_conversations` 上建立渠道身份永久唯一约束。
+- 未在 `customer_conversations` 上建立渠道身份永久唯一约束。
 - 保留 Conversation 级未结束 ServiceSession 唯一约束。
-- 通过 ServiceSession 的渠道身份字段保存客服队列和来源边界；PR1 暂时建立的身份级未结束唯一约束由 PR2 的向前迁移删除。
+- 通过 ServiceSession 的渠道身份字段保存客服队列和来源边界；PR1 暂时建立的身份级未结束唯一约束已由 PR2 的向前迁移删除。
 - 给 Conversation 增加与时间一致的 `last_message_id`。
 - 暂时注释管理端“添加外部联系人”菜单入口，保留既有表单、Action 和联系人管理能力。
 
 PR1 的六条聊天建表迁移在文件内写全相关表、列、显式索引和具名约束的中文数据库注释；联系人创建用户的可空语义直接体现在当前目标建表迁移中。
 
-六张新表统一按主键、`created_at`、`updated_at`、其他业务字段的顺序建表，并全部保留两个审计时间；`customer_conversations` 使用 `conversation_id` 作为主键，`messages` 也保留独立于 `edited_at` 的 `updated_at`。PR1 不为统一格式修改任何历史迁移，既有表的字段顺序由后续独立 PR 处理。
+六张新表统一按主键、`created_at`、`updated_at`、其他业务字段的顺序建表，并全部保留两个审计时间；`customer_conversations` 使用 `conversation_id` 作为主键，`messages` 也保留独立于 `edited_at` 的 `updated_at`。PR1 未为统一格式修改任何历史迁移，既有表的字段顺序由后续独立 PR 处理。
 
-PR1 不实现入站 Action、公开接口或 Messenger 真实写入。数据库中不会因为表已经存在而自动产生聊天记录。
+PR1 未实现入站 Action、公开接口或 Messenger 真实写入。数据库中不会因为表已经存在而自动产生聊天记录。
 
-### 13.3 PR2：网站访客真实消息闭环
+### 13.3 PR2：网站访客真实消息闭环（已合并）
 
 PR2 在第一条有效网站文本事务中创建或取得联系人、渠道身份和联系人 ChatSubject，并选择或创建目标 Conversation、参与者、ServiceSession 和 Message。
 
@@ -1508,9 +1434,9 @@ GET  /api/public/website-channels/{channelID}/conversations/{conversationID}/mes
 
 访客点击任意 Conversation 都读取其完整历史并继续该线程。打开最新 ServiceSession 已关闭的 Conversation 再次发送时，在同一 Conversation 上创建新的 ServiceSession；其他 Conversation 是否正在处理不影响当前线程。
 
-### 13.4 两个 PR 共同边界
+### 13.4 两个 PR 的共同边界
 
-两个 PR 都不实现：
+两个 PR 均未实现以下能力，全部属于后续阶段：
 
 - 企业成员收件箱读取、历史和回复。
 - ServiceSession 领取、转接、挂起和结束命令。
@@ -1525,5 +1451,6 @@ GET  /api/public/website-channels/{channelID}/conversations/{conversationID}/mes
 1. 企业成员按未结束 ServiceSession 读取工作队列，并按 Conversation 加载完整消息历史。
 2. 企业成员回复、领取、挂起和结束 ServiceSession。
 3. 网站访客使用 `after` 轮询读取客服新消息。
-4. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
-5. 未读、实时、文件、外部平台投递、转接、指标和满意度。
+4. 公开访客端点按第 4.5 节补齐防滥用限制：接口限速、消息长度与频率约束、未回复 Conversation 数量上限；先于外部渠道扩展交付。
+5. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
+6. 未读、实时、文件、外部平台投递、转接、指标和满意度。
