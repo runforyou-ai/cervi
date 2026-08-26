@@ -22,7 +22,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { roleDisplayName } from "@/features/roles/role-labels"
@@ -79,10 +78,6 @@ export function MemberForm({
       teamIds: defaultTeamIds,
     },
   })
-  useWorkspaceTabDirty(
-    form.formState.isDirty && !form.formState.isSubmitting,
-  )
-
   useEffect(() => {
     if (!form.getValues("roleId") && defaultRoleID) {
       form.setValue("roleId", defaultRoleID)

@@ -32,10 +32,14 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/roles/new",
-    titleKey: "tabs.routes.newRole",
-    transient: true,
+    tabPath: "/settings/roles",
+    titleKey: "tabs.routes.roles",
   },
-  { path: "/settings/roles/:roleId", titleKey: "tabs.routes.role" },
+  {
+    path: "/settings/roles/:roleId",
+    tabPath: "/settings/roles",
+    titleKey: "tabs.routes.roles",
+  },
   { path: "/settings/roles", titleKey: "tabs.routes.roles" },
   { path: "/settings/storage", titleKey: "tabs.routes.storage" },
   { path: "/contacts/employees", titleKey: "tabs.routes.employees" },
@@ -44,32 +48,35 @@ const workspaceRouteDefinitions = [
   { path: "/contacts/external", titleKey: "tabs.routes.externalContacts" },
   {
     path: "/knowledge-bases/new",
-    titleKey: "tabs.routes.newKnowledgeBase",
-    transient: true,
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId",
-    titleKey: "tabs.routes.knowledgeBase",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
   },
   { path: "/knowledge-bases", titleKey: "tabs.routes.knowledgeBases" },
   {
     path: "/integrations/channels/new",
-    titleKey: "tabs.routes.newChannel",
-    transient: true,
+    tabPath: "/integrations/channels",
+    titleKey: "tabs.routes.channels",
   },
   {
     path: "/integrations/channels/:channelType/:channelId",
-    titleKey: "tabs.routes.channel",
+    tabPath: "/integrations/channels",
+    titleKey: "tabs.routes.channels",
   },
   { path: "/integrations/channels", titleKey: "tabs.routes.channels" },
   {
     path: "/integrations/business-systems/new",
-    titleKey: "tabs.routes.newBusinessSystem",
-    transient: true,
+    tabPath: "/integrations/business-systems",
+    titleKey: "tabs.routes.businessSystems",
   },
   {
     path: "/integrations/business-systems/:businessSystemId",
-    titleKey: "tabs.routes.businessSystem",
+    tabPath: "/integrations/business-systems",
+    titleKey: "tabs.routes.businessSystems",
   },
   {
     path: "/integrations/business-systems",
@@ -77,51 +84,58 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/integrations/model-services/chat/new",
-    titleKey: "tabs.routes.newChatProvider",
-    transient: true,
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/model-services/chat/:providerId",
-    titleKey: "tabs.routes.chatProvider",
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/model-services/chat",
-    titleKey: "tabs.routes.chatProviders",
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/model-services/embedding/new",
-    titleKey: "tabs.routes.newEmbeddingProvider",
-    transient: true,
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/model-services/embedding/:providerId",
-    titleKey: "tabs.routes.embeddingProvider",
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/model-services/embedding",
-    titleKey: "tabs.routes.embeddingProviders",
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/model-services/rerank/new",
-    titleKey: "tabs.routes.newRerankProvider",
-    transient: true,
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/model-services/rerank/:providerId",
-    titleKey: "tabs.routes.rerankProvider",
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/model-services/rerank",
-    titleKey: "tabs.routes.rerankProviders",
+    tabPath: "/integrations/model-services",
+    titleKey: "tabs.routes.modelServices",
   },
   {
     path: "/integrations/connectors/new",
-    titleKey: "tabs.routes.newConnector",
-    transient: true,
+    tabPath: "/integrations/connectors",
+    titleKey: "tabs.routes.connectors",
   },
   {
     path: "/integrations/connectors/:connectionId",
-    titleKey: "tabs.routes.connector",
+    tabPath: "/integrations/connectors",
+    titleKey: "tabs.routes.connectors",
   },
   {
     path: "/integrations/connectors",
@@ -144,7 +158,6 @@ export type ResolvedWorkspaceTab = {
   id: string
   href: string
   titleKey: WorkspaceTabTitleKey
-  transient: boolean
 }
 
 export type ResolvedWorkspaceLocation = {
@@ -156,7 +169,6 @@ export const defaultWorkspaceTab = {
   id: "/inbox",
   href: "/inbox",
   titleKey: "tabs.routes.inbox",
-  transient: false,
 } satisfies ResolvedWorkspaceTab
 
 /** 规范化工作台路径，避免同一页面生成重复标签。 */
@@ -191,10 +203,9 @@ export function resolveWorkspaceLocation(
   return {
     canonicalHref: href,
     tab: {
-      id: pathname,
+      id: "tabPath" in definition ? definition.tabPath : pathname,
       href,
       titleKey: definition.titleKey,
-      transient: "transient" in definition && definition.transient,
     },
   }
 }

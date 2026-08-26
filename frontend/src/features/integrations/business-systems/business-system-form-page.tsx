@@ -19,7 +19,6 @@ import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   createBusinessSystemSchema,
   type BusinessSystemFormValues,
@@ -54,10 +53,6 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
     shouldUseNativeValidation: true,
     defaultValues: { name: "", url: "", enabled: true },
   })
-  useWorkspaceTabDirty(
-    form.formState.isDirty && !form.formState.isSubmitting,
-  )
-
   /** 读取待编辑的业务系统。 */
   const loadBusinessSystem = useCallback(async () => {
     const version = ++loadVersion.current

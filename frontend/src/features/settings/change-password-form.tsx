@@ -12,7 +12,6 @@ import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   createChangePasswordSchema,
   type ChangePasswordFormValues,
@@ -33,10 +32,6 @@ export function ChangePasswordForm() {
       confirmPassword: "",
     },
   })
-  useWorkspaceTabDirty(
-    form.formState.isDirty && !form.formState.isSubmitting,
-  )
-
   /** 提交密码修改。 */
   async function save(values: ChangePasswordFormValues) {
     try {

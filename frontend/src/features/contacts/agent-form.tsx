@@ -21,7 +21,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { AgentModelField } from "@/features/contacts/agent-model-field"
 import { parseAgentModelSelection } from "@/features/contacts/agent-model-selection"
 import {
@@ -70,10 +69,6 @@ export function AgentForm({
       },
     },
   })
-  useWorkspaceTabDirty(
-    form.formState.isDirty && !form.formState.isSubmitting,
-  )
-
   /** 提交 AI 员工表单。 */
   async function submit(values: AgentFormValues) {
     try {
