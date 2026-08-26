@@ -61,6 +61,24 @@ jobs:
             exit 1
           fi
 
+      - name: Check generated application service adapters
+        shell: bash
+        run: |
+          go generate ./internal/appservice
+          generated_changes="$(git status --short --untracked-files=all -- \
+            internal/appservice/service_gen.go \
+            internal/api/service_gen.go \
+            internal/apiproxy/backend_gen.go)"
+          if [[ -n "$generated_changes" ]]; then
+            echo "Application service adapters are out of date:"
+            printf '%s\n' "$generated_changes"
+            git diff -- \
+              internal/appservice/service_gen.go \
+              internal/api/service_gen.go \
+              internal/apiproxy/backend_gen.go
+            exit 1
+          fi
+
       - name: Check generated Wails bindings
         shell: bash
         run: |
