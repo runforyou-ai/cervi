@@ -35,6 +35,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   permissionResourceLabel,
   roleDescription,
@@ -97,6 +98,10 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
     shouldUseNativeValidation: true,
     defaultValues: { name: "", description: "", permissions: [] },
   })
+  useWorkspaceTabDirty(
+    (form.formState.isDirty || memberChanges.length > 0) &&
+      !form.formState.isSubmitting,
+  )
   const selected = useWatch({ control: form.control, name: "permissions" })
   const roleName = useWatch({ control: form.control, name: "name" })
   const admin = role?.kind === RoleKind.RoleKindAdmin
@@ -226,6 +231,8 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         })
       }
       if (!mounted.current) return
+      form.reset(values)
+      setMemberChanges([])
       toast.success(
         mode === "create"
           ? t("roles.form.createSuccess")

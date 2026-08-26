@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, Outlet, useLocation, useNavigate } from "react-router"
+import { Navigate, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -24,6 +24,12 @@ import type {
   WorkspaceOutletContext,
 } from "@/features/workspace/workspace-context"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
+import {
+  defaultWorkspaceTab,
+  resolveWorkspaceLocation,
+  type ResolvedWorkspaceTab,
+} from "@/features/workspace/workspace-page-routes"
+import { WorkspaceTabs } from "@/features/workspace/workspace-tabs"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { updateNotificationUnreadIndicator } from "@/platform/notifications"
 
@@ -55,6 +61,32 @@ export function WorkspaceLayout() {
   })
   const unreadRevisionRef = useRef(0)
   const { status, identity: loadedIdentity, redirectPath } = useIdentityLoader()
+  const workspaceLocation = resolveWorkspaceLocation(location)
+  const fallbackTabRef = useRef<ResolvedWorkspaceTab>(defaultWorkspaceTab)
+  const currentHref = `${location.pathname}${location.search}${location.hash}`
+  if (
+    workspaceLocation.tab &&
+    workspaceLocation.canonicalHref === currentHref
+  ) {
+    fallbackTabRef.current = workspaceLocation.tab
+  }
+
+  /** 在不销毁已挂载标签的前提下修正规范工作台地址。 */
+  useLayoutEffect(() => {
+    if (
+      !identity ||
+      (workspaceLocation.tab && workspaceLocation.canonicalHref === currentHref)
+    ) {
+      return
+    }
+    navigate(workspaceLocation.canonicalHref, { replace: true })
+  }, [
+    currentHref,
+    identity,
+    navigate,
+    workspaceLocation.canonicalHref,
+    workspaceLocation.tab,
+  ])
 
   /** 同步当前用户的新消息通知策略。 */
   useLayoutEffect(() => {
@@ -267,6 +299,14 @@ export function WorkspaceLayout() {
       </main>
     )
   }
+  const workspaceContext = {
+    identity,
+    beginUnreadSnapshot,
+    applyUnreadSnapshot,
+    notifyNewMessage,
+    updateOrganization,
+    updateUser,
+  } satisfies WorkspaceOutletContext
 
   return (
     <UserPreferencesProvider user={identity.user}>
@@ -277,18 +317,10 @@ export function WorkspaceLayout() {
           onLogout={handleLogout}
           loggingOut={loggingOut}
         />
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-          <Outlet
-            context={{
-              identity,
-              beginUnreadSnapshot,
-              applyUnreadSnapshot,
-              notifyNewMessage,
-              updateOrganization,
-              updateUser,
-            } satisfies WorkspaceOutletContext}
-          />
-        </div>
+        <WorkspaceTabs
+          currentTab={workspaceLocation.tab ?? fallbackTabRef.current}
+          context={workspaceContext}
+        />
       </div>
     </UserPreferencesProvider>
   )

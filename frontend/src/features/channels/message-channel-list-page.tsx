@@ -1,5 +1,5 @@
 /** 消息渠道列表页，统一展示当前支持的渠道。 */
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -49,6 +49,7 @@ import {
   messageChannelTypeDefinition,
   messageChannelTypeDefinitions,
 } from "@/features/channels/message-channel-types"
+import { useWorkspaceTabActive } from "@/contexts/workspace-tab-lifecycle"
 import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
@@ -124,6 +125,7 @@ function MessageChannelRow({
 export function MessageChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
+  const tabActive = useWorkspaceTabActive()
   const [channels, setChannels] = useState<MessageChannelSummary[]>([])
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
@@ -134,27 +136,36 @@ export function MessageChannelListPage() {
     useState<MessageChannelSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const loadVersion = useRef(0)
 
   /** 加载消息渠道列表。 */
   const loadChannels = useCallback(async () => {
+    const version = ++loadVersion.current
     setLoading(true)
     setError("")
     try {
-      setChannels(await listMessageChannels())
+      const output = await listMessageChannels()
+      if (version !== loadVersion.current) return
+      setChannels(output)
     } catch (requestError) {
+      if (version !== loadVersion.current) return
       if (recoverSession(requestError, navigate)) {
         return
       }
       console.warn("消息渠道列表加载失败", requestError)
       setError(t("list.loadError"))
     } finally {
-      setLoading(false)
+      if (version === loadVersion.current) setLoading(false)
     }
   }, [navigate, t])
 
   useEffect(() => {
+    if (!tabActive) return
     void loadChannels()
-  }, [loadChannels])
+    return () => {
+      loadVersion.current += 1
+    }
+  }, [loadChannels, tabActive])
 
   const filteredChannels = useMemo(
     () =>

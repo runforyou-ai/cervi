@@ -21,7 +21,7 @@ export function IntegrationsLayout() {
           <PagePaneLink to="/integrations/channels">
             {t("messageChannels")}
           </PagePaneLink>
-          <PagePaneLink to="/integrations/model-services">
+          <PagePaneLink to="/integrations/model-services/chat">
             {t("modelServices.navigation")}
           </PagePaneLink>
           <PagePaneLink>{t("businessSystems")}</PagePaneLink>

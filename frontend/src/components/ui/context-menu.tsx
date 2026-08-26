@@ -2,6 +2,7 @@
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "radix-ui"
 
+import { usePortalContainer } from "@/components/ui/portal-container"
 import { cn } from "@/lib/utils"
 
 function ContextMenu(
@@ -22,8 +23,13 @@ function ContextMenuContent({
   className,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Content>) {
+  const pagePortal = usePortalContainer()
+  if (pagePortal && !pagePortal.active) {
+    return null
+  }
+
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Portal container={pagePortal?.container}>
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
         className={cn(
@@ -56,4 +62,23 @@ function ContextMenuItem({
   )
 }
 
-export { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger }
+function ContextMenuSeparator({
+  className,
+  ...props
+}: React.ComponentProps<typeof ContextMenuPrimitive.Separator>) {
+  return (
+    <ContextMenuPrimitive.Separator
+      data-slot="context-menu-separator"
+      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+}

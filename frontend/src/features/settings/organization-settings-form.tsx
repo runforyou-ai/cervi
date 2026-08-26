@@ -11,6 +11,7 @@ import { isApiError, updateOrganization, type Organization } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   createOrganizationSettingsSchema,
   type OrganizationSettingsFormValues,
@@ -42,6 +43,9 @@ export function OrganizationSettingsForm({
     shouldUseNativeValidation: true,
     defaultValues: { name: organization.name },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   useEffect(() => {
     mounted.current = true

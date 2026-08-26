@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/field"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   resolveWebsiteChannelOrigin,
   websiteChannelChatURL,
@@ -182,6 +183,9 @@ export function WebsiteChannelUsagePanel({
       allowedHosts: channel.access.allowedHosts.join("\n"),
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   useEffect(() => {
     let active = true

@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   Field,
   FieldDescription,
@@ -123,6 +124,9 @@ export function StorageSettingsForm() {
     shouldUseNativeValidation: true,
     defaultValues: emptySetting,
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
   const activeProvider = getStorageProvider(form.watch("provider"))
   const activeRegion = getStorageRegion(activeProvider, form.watch("region"))
   const configured = isConfigured(savedSetting)

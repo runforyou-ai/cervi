@@ -36,6 +36,7 @@ import {
   type KnowledgeBaseFormValues,
 } from "@/features/knowledge-base/knowledge-base-schema"
 import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-base-context"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -122,6 +123,9 @@ export function KnowledgeBaseFormPage({
         : "",
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   useEffect(() => {
     if (mode !== "create") return
@@ -189,6 +193,7 @@ export function KnowledgeBaseFormPage({
         knowledgeBase = await updateKnowledgeBase(knowledgeBaseId, input)
       }
       if (!mounted.current) return
+      form.reset(values)
       upsertKnowledgeBase(knowledgeBase)
       toast.success(
         mode === "create"

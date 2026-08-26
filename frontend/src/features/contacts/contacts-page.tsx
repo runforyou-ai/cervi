@@ -136,6 +136,7 @@ import { MemberForm } from "@/features/contacts/member-form"
 import { TeamForm } from "@/features/contacts/team-form"
 import { TeamMemberPicker } from "@/features/contacts/team-member-picker"
 import { roleDisplayName } from "@/features/roles/role-labels"
+import { useWorkspaceTabActive } from "@/contexts/workspace-tab-lifecycle"
 import { useWorkspace } from "@/features/workspace/workspace-context"
 import {
   channelTypeLabel,
@@ -518,6 +519,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   const { t } = useTranslation("contacts")
   const { t: tCommon } = useTranslation("common")
   const { identity, updateUser: updateWorkspaceUser } = useWorkspace()
+  const tabActive = useWorkspaceTabActive()
   const navigate = useNavigate()
   const { teamId = "" } = useParams()
   const { formatDateTime } = useDateTime()
@@ -633,6 +635,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   }, [query, search, setParameters])
 
   useEffect(() => {
+    if (!tabActive) return
     const requestID = ++catalogRequestID.current
     void Promise.all([
       listChannelOptions(),
@@ -655,7 +658,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     return () => {
       catalogRequestID.current += 1
     }
-  }, [])
+  }, [tabActive])
 
   /** 按当前范围加载联系人或企业成员列表。 */
   const loadList = useCallback(async () => {
@@ -732,13 +735,15 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
   ])
 
   useEffect(() => {
+    if (!tabActive) return
     void loadList()
     return () => {
       listRequestID.current += 1
     }
-  }, [loadList, refreshVersion])
+  }, [loadList, refreshVersion, tabActive])
 
   useEffect(() => {
+    if (!tabActive) return
     setDetail(null)
     setDetailUser(null)
     setDetailAgent(null)
@@ -774,7 +779,7 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
     return () => {
       detailRequestID.current += 1
     }
-  }, [navigate, scope, selected, setParameters, t])
+  }, [navigate, scope, selected, setParameters, t, tabActive])
 
   const selectedChannel = channels.find((channel) => channel.id === channelId)
   const title =

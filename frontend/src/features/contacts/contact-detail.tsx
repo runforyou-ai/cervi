@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { channelTypeLabel } from "@/features/contacts/contact-labels"
 import {
   createContactSchema,
@@ -140,6 +141,9 @@ export function ContactDetailView({
     shouldUseNativeValidation: true,
     defaultValues: valuesFromDetail(detail),
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   useEffect(() => {
     form.reset(valuesFromDetail(detail))
