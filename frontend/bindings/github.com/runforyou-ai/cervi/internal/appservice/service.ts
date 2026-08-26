@@ -85,6 +85,13 @@ export function CreateFileUpload(meta: $models.RequestMeta, input: $models.FileU
 }
 
 /**
+ * CreateIntegrationConnection 创建外部系统连接器。
+ */
+export function CreateIntegrationConnection(meta: $models.RequestMeta, input: $models.IntegrationConnectionInput): $CancellablePromise<$models.IntegrationConnection> {
+    return $Call.ByID(1136226000, meta, input);
+}
+
+/**
  * CreateKnowledgeBase 创建企业知识库。
  */
 export function CreateKnowledgeBase(meta: $models.RequestMeta, input: $models.KnowledgeBaseInput): $CancellablePromise<$models.KnowledgeBase> {
@@ -162,6 +169,13 @@ export function DeleteContact(meta: $models.RequestMeta, contactID: string): $Ca
 }
 
 /**
+ * DeleteIntegrationConnection 删除外部系统连接器。
+ */
+export function DeleteIntegrationConnection(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<void> {
+    return $Call.ByID(873054297, meta, connectionID);
+}
+
+/**
  * DeleteKnowledgeBase 删除企业知识库。
  */
 export function DeleteKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<void> {
@@ -208,6 +222,13 @@ export function GetAgent(meta: $models.RequestMeta, agentID: string): $Cancellab
  */
 export function GetContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
     return $Call.ByID(1550866366, meta, contactID);
+}
+
+/**
+ * GetIntegrationConnection 返回当前企业中的连接器详情。
+ */
+export function GetIntegrationConnection(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<$models.IntegrationConnection> {
+    return $Call.ByID(2403609160, meta, connectionID);
 }
 
 /**
@@ -306,6 +327,13 @@ export function ListChannelOptions(meta: $models.RequestMeta): $CancellablePromi
  */
 export function ListContacts(meta: $models.RequestMeta, input: $models.ContactListInput): $CancellablePromise<$models.ContactList> {
     return $Call.ByID(1872706983, meta, input);
+}
+
+/**
+ * ListIntegrationConnections 返回当前企业的连接器列表。
+ */
+export function ListIntegrationConnections(meta: $models.RequestMeta): $CancellablePromise<$models.IntegrationConnectionList> {
+    return $Call.ByID(3631406929, meta);
 }
 
 /**
@@ -477,6 +505,13 @@ export function TestAIProviderConnection(meta: $models.RequestMeta, input: $mode
 }
 
 /**
+ * TestIntegrationConnection 测试连接器草稿配置。
+ */
+export function TestIntegrationConnection(meta: $models.RequestMeta, input: $models.IntegrationConnectionTestInput): $CancellablePromise<void> {
+    return $Call.ByID(1043008548, meta, input);
+}
+
+/**
  * TestS3Setting 测试对象存储连接。
  */
 export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3Setting): $CancellablePromise<void> {
@@ -516,6 +551,13 @@ export function UpdateAgentWorkStatus(meta: $models.RequestMeta, agentID: string
  */
 export function UpdateContact(meta: $models.RequestMeta, contactID: string, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(183062653, meta, contactID, input);
+}
+
+/**
+ * UpdateIntegrationConnection 修改外部系统连接器。
+ */
+export function UpdateIntegrationConnection(meta: $models.RequestMeta, connectionID: string, input: $models.IntegrationConnectionInput): $CancellablePromise<$models.IntegrationConnection> {
+    return $Call.ByID(4167671323, meta, connectionID, input);
 }
 
 /**
