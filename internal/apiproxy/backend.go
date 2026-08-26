@@ -119,8 +119,6 @@ func (b *Backend) normalizeOutput(output any) {
 	switch value := output.(type) {
 	case *appservice.Identity:
 		b.normalizeUser(&value.User)
-	case *appservice.Inbox:
-		b.normalizeUser(&value.User)
 	case *appservice.CurrentUser:
 		b.normalizeUser(value)
 	case *appservice.File:

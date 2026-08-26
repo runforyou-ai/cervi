@@ -95,12 +95,14 @@ const (
 	ChannelTypeWeChatOfficialAccount ChannelType = ChannelType(domain.ChannelTypeWeChatOfficialAccount)
 )
 
-// MessageAuthor 表示消息发送方。
-type MessageAuthor string
+// ServiceSessionStatus 表示客服处理状态。
+type ServiceSessionStatus string
 
 const (
-	MessageAuthorVisitor MessageAuthor = MessageAuthor(domain.MessageAuthorVisitor)
-	MessageAuthorAgent   MessageAuthor = MessageAuthor(domain.MessageAuthorAgent)
+	ServiceSessionStatusWaiting ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusWaiting)
+	ServiceSessionStatusActive  ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusActive)
+	ServiceSessionStatusPending ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusPending)
+	ServiceSessionStatusClosed  ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusClosed)
 )
 
 // ContactStage 表示联系人阶段。
@@ -433,33 +435,21 @@ type UserWorkStatusInput struct {
 	WorkStatus WorkStatus `json:"workStatus"`
 }
 
-// Conversation 定义收件箱中的会话。
-type Conversation struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Initials string    `json:"initials"`
-	Channel  string    `json:"channel"`
-	Preview  string    `json:"preview"`
-	Time     string    `json:"time"`
-	Status   string    `json:"status"`
-	Unread   int       `json:"unread,omitempty"`
-	Online   bool      `json:"online,omitempty"`
-	Messages []Message `json:"messages"`
+// InboxConversation 定义成员收件箱中的客户会话列表项。
+type InboxConversation struct {
+	ID                   string               `json:"id"`
+	Title                string               `json:"title"`
+	ContactName          *string              `json:"contactName"`
+	ChannelType          ChannelType          `json:"channelType"`
+	ChannelName          string               `json:"channelName"`
+	Preview              string               `json:"preview"`
+	LastMessageAt        time.Time            `json:"lastMessageAt"`
+	ServiceSessionStatus ServiceSessionStatus `json:"serviceSessionStatus"`
 }
 
-// Message 定义收件箱会话中的消息。
-type Message struct {
-	ID     string        `json:"id"`
-	Author MessageAuthor `json:"author"`
-	Text   string        `json:"text"`
-	Time   string        `json:"time"`
-}
-
-// Inbox 定义统一收件箱结果。
+// Inbox 定义成员收件箱查询结果。
 type Inbox struct {
-	Organization  Organization   `json:"organization"`
-	User          CurrentUser    `json:"user"`
-	Conversations []Conversation `json:"conversations"`
+	Conversations []InboxConversation `json:"conversations"`
 }
 
 // MessageChannelSummary 定义消息渠道列表项和基础信息。

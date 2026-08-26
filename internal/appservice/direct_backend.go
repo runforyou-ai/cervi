@@ -139,7 +139,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		logout:                            authaction.NewLogoutAction(db),
 		resolveIdentity:                   authaction.NewResolveIdentityQuery(db),
 		installation:                      installationaction.NewStatusQuery(db),
-		loadInbox:                         inboxaction.NewLoadInboxQuery(),
+		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getMessageChannel:                 channelaction.NewGetMessageChannelQuery(db),

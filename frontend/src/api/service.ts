@@ -126,7 +126,7 @@ import {
   type KnowledgeBaseList,
   type KnowledgeGroup,
   type KnowledgeGroupInput,
-  type Conversation as GeneratedConversation,
+  type InboxConversation,
   type CreateAgentInput,
   type CreateUserInput,
   type User,
@@ -345,15 +345,9 @@ export type UserListResponse = Omit<UserList, "users"> & {
   users: UserData[]
 }
 
-export type ConversationData = Omit<GeneratedConversation, "messages"> & {
-  messages: NonNullable<GeneratedConversation["messages"]>
-}
-
 export type InboxData = Omit<Inbox, "conversations"> & {
-  conversations: ConversationData[]
+  conversations: InboxConversation[]
 }
-
-export type Conversation = ConversationData
 
 export type RoleData = Omit<Role, "permissions"> & {
   permissions: NonNullable<Role["permissions"]>
@@ -1039,15 +1033,12 @@ export function listMemberOptions(
   ).then((output) => ({ ...output, members: asList(output.members) }))
 }
 
-/** 读取统一收件箱。 */
+/** 读取成员收件箱的客户会话列表。 */
 export async function loadInbox(): Promise<InboxData> {
   const inbox = await loadInboxBound()
   return {
     ...inbox,
-    conversations: asList(inbox.conversations).map((conversation) => ({
-      ...conversation,
-      messages: asList(conversation.messages),
-    })),
+    conversations: asList(inbox.conversations),
   }
 }
 
