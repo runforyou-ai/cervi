@@ -4,13 +4,13 @@ package team
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 // CreateTeamAction 创建企业团队。
@@ -27,7 +27,7 @@ func (a *CreateTeamAction) Execute(ctx context.Context, identity *servermodels.I
 	}
 	record := &TeamRecord{}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		team := &servermodels.Team{OrganizationID: identity.Organization.ID, Name: input.Name, Description: input.Description, CreatedByUserID: identity.User.ID}
@@ -52,6 +52,6 @@ func (a *CreateTeamAction) Execute(ctx context.Context, identity *servermodels.I
 
 // isUniqueViolation 判断 PostgreSQL 错误是否为唯一约束冲突。
 func isUniqueViolation(err error) bool {
-	var postgresError pgdriver.Error
-	return errors.As(err, &postgresError) && postgresError.Field('C') == "23505"
+	_, ok := pgerr.UniqueViolation(err)
+	return ok
 }

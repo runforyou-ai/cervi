@@ -25,21 +25,7 @@ func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, inp
 		AvatarFileID: input.AvatarFileID,
 	})
 	if err != nil {
-		if ctx.Err() != nil {
-			return CurrentUser{}, ctx.Err()
-		}
-		var validationError *common.FieldError
-		if errors.As(err, &validationError) {
-			return CurrentUser{}, InvalidError(meta, cervii18n.ErrorValidationFailed, profileFieldKeys(validationError.Fields))
-		}
-		if errors.Is(err, useraction.ErrAvatarFileNotFound) {
-			return CurrentUser{}, NotFoundError(meta, cervii18n.ErrorFileNotFound)
-		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
-			return CurrentUser{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
-		}
-		slog.Warn("保存个人资料失败", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "error", err)
-		return CurrentUser{}, FailedError(meta, cervii18n.ErrorProfileUpdateFailed)
+		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("个人资料保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID)
 	return currentUserFromIdentity(updatedIdentity), nil
@@ -56,18 +42,7 @@ func (b *DirectBackend) ChangePassword(ctx context.Context, meta RequestMeta, in
 		NewPassword:     input.NewPassword,
 	})
 	if err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		var validationError *common.FieldError
-		if errors.As(err, &validationError) {
-			return InvalidError(meta, cervii18n.ErrorValidationFailed, passwordFieldKeys(validationError.Fields))
-		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
-			return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
-		}
-		slog.Warn("修改密码失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
-		return FailedError(meta, cervii18n.ErrorPasswordUpdateFailed)
+		return b.currentUserError(ctx, meta, err, cervii18n.ErrorPasswordUpdateFailed, passwordFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("密码修改成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
 	return nil
@@ -83,18 +58,7 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 		Locale: domain.Locale(input.Locale), TimeZone: input.TimeZone, MessageNotificationsEnabled: input.MessageNotificationsEnabled,
 	})
 	if err != nil {
-		if ctx.Err() != nil {
-			return CurrentUser{}, ctx.Err()
-		}
-		var validationError *common.FieldError
-		if errors.As(err, &validationError) {
-			return CurrentUser{}, InvalidError(meta, cervii18n.ErrorValidationFailed, preferencesFieldKeys(validationError.Fields))
-		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
-			return CurrentUser{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
-		}
-		slog.Warn("保存用户偏好失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "locale", input.Locale, "time_zone", input.TimeZone, "message_notifications_enabled", input.MessageNotificationsEnabled, "error", err)
-		return CurrentUser{}, FailedError(meta, cervii18n.ErrorPreferencesUpdateFailed)
+		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("用户偏好保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "locale", input.Locale, "time_zone", input.TimeZone, "message_notifications_enabled", input.MessageNotificationsEnabled)
 	return currentUserFromIdentity(updatedIdentity), nil
@@ -110,18 +74,7 @@ func (b *DirectBackend) UpdateUserWorkStatus(ctx context.Context, meta RequestMe
 		WorkStatus: domain.WorkStatus(input.WorkStatus),
 	})
 	if err != nil {
-		if ctx.Err() != nil {
-			return CurrentUser{}, ctx.Err()
-		}
-		var validationError *common.FieldError
-		if errors.As(err, &validationError) {
-			return CurrentUser{}, InvalidError(meta, cervii18n.ErrorValidationFailed, workStatusFieldKeys(validationError.Fields))
-		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
-			return CurrentUser{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
-		}
-		slog.Warn("保存工作状态失败", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "error", err)
-		return CurrentUser{}, FailedError(meta, cervii18n.ErrorWorkStatusUpdateFailed)
+		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("工作状态保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "work_status", input.WorkStatus)
 	return currentUserFromIdentity(updatedIdentity), nil
@@ -136,12 +89,12 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 	output, err := b.listUsers.Execute(ctx, identity, useraction.ListInput{
 		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), RoleID: input.RoleID, TeamID: input.TeamID, Page: input.Page, PageSize: input.PageSize,
 	})
-	if errors.Is(err, useraction.ErrQueryInvalid) {
-		return UserList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
-	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return UserList{}, ctx.Err()
+		}
+		if errors.Is(err, useraction.ErrQueryInvalid) {
+			return UserList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 		}
 		slog.Warn("读取企业成员列表失败", "organization_id", identity.Organization.ID, "error", err)
 		return UserList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
@@ -160,12 +113,12 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 		return User{}, err
 	}
 	user, err := b.getUser.Execute(ctx, identity, userID)
-	if errors.Is(err, useraction.ErrNotFound) {
-		return User{}, NotFoundError(meta, cervii18n.ErrorUserNotFound)
-	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return User{}, ctx.Err()
+		}
+		if errors.Is(err, useraction.ErrNotFound) {
+			return User{}, NotFoundError(meta, cervii18n.ErrorUserNotFound)
 		}
 		slog.Warn("读取企业成员失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
 		return User{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
@@ -240,6 +193,25 @@ func (b *DirectBackend) changeUserStatus(ctx context.Context, meta RequestMeta, 
 	}
 	slog.Info("企业成员账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "status", status)
 	return userFromAction(*user), nil
+}
+
+// currentUserError 转换当前用户资料、密码、偏好和工作状态操作错误。
+func (b *DirectBackend) currentUserError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, fieldKeys func(map[string]common.FieldCode) map[string]cervii18n.Key, organizationID, userID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var validationError *common.FieldError
+	if errors.As(err, &validationError) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, fieldKeys(validationError.Fields))
+	}
+	if errors.Is(err, useraction.ErrAvatarFileNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	slog.Warn("当前用户操作失败", "organization_id", organizationID, "user_id", userID, "failure", failureKey, "error", err)
+	return FailedError(meta, failureKey)
 }
 
 // userMutationError 转换企业成员写入错误。

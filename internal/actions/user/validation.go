@@ -17,15 +17,15 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationDisplayNameRequired      ValidationCode = "DISPLAY_NAME_REQUIRED"
-	ValidationEmailInvalid             ValidationCode = "EMAIL_INVALID"
-	ValidationEmailDuplicate           ValidationCode = "EMAIL_DUPLICATE"
-	ValidationCurrentPasswordIncorrect ValidationCode = "CURRENT_PASSWORD_INCORRECT"
-	ValidationPasswordTooShort         ValidationCode = "PASSWORD_TOO_SHORT"
-	ValidationPasswordTooLong          ValidationCode = "PASSWORD_TOO_LONG"
-	ValidationLocaleInvalid            ValidationCode = "LOCALE_INVALID"
-	ValidationTimeZoneInvalid          ValidationCode = "TIME_ZONE_INVALID"
-	ValidationWorkStatusInvalid        ValidationCode = "WORK_STATUS_INVALID"
+	ValidationDisplayNameRequired      ValidationCode = "USER_DISPLAY_NAME_REQUIRED"
+	ValidationEmailInvalid             ValidationCode = "USER_EMAIL_INVALID"
+	ValidationEmailDuplicate           ValidationCode = "USER_EMAIL_DUPLICATE"
+	ValidationCurrentPasswordIncorrect ValidationCode = "USER_CURRENT_PASSWORD_INCORRECT"
+	ValidationPasswordTooShort         ValidationCode = "USER_PASSWORD_TOO_SHORT"
+	ValidationPasswordTooLong          ValidationCode = "USER_PASSWORD_TOO_LONG"
+	ValidationLocaleInvalid            ValidationCode = "USER_LOCALE_INVALID"
+	ValidationTimeZoneInvalid          ValidationCode = "USER_TIME_ZONE_INVALID"
+	ValidationWorkStatusInvalid        ValidationCode = "USER_WORK_STATUS_INVALID"
 	ValidationRoleInvalid              ValidationCode = "USER_ROLE_INVALID"
 	ValidationTeamInvalid              ValidationCode = "USER_TEAM_INVALID"
 	ValidationStatusInvalid            ValidationCode = "USER_STATUS_INVALID"
@@ -33,13 +33,6 @@ const (
 
 // ValidationError 表示用户字段校验失败。
 type ValidationError = common.FieldError
-
-// ProfileInput 定义当前用户可编辑的个人资料字段。
-type ProfileInput struct {
-	DisplayName  string
-	Email        string
-	AvatarFileID string
-}
 
 // normalizeCreateInput 规范化并校验新增企业成员字段。
 func normalizeCreateInput(input CreateInput) (CreateInput, map[string]ValidationCode) {
@@ -71,24 +64,6 @@ func normalizeUpdateInput(input UpdateInput) (UpdateInput, map[string]Validation
 		fields["roleId"] = ValidationRoleInvalid
 	}
 	return input, fields
-}
-
-// ChangePasswordInput 定义当前用户修改密码所需字段。
-type ChangePasswordInput struct {
-	CurrentPassword string
-	NewPassword     string
-}
-
-// PreferencesInput 定义当前用户的偏好设置。
-type PreferencesInput struct {
-	Locale                      domain.Locale
-	TimeZone                    string
-	MessageNotificationsEnabled bool
-}
-
-// WorkStatusInput 定义当前用户主动设置的工作状态。
-type WorkStatusInput struct {
-	WorkStatus domain.WorkStatus
 }
 
 // normalizeProfileInput 规范化并校验个人资料输入。

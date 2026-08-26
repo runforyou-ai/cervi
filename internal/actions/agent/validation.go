@@ -5,10 +5,10 @@ package agent
 import "github.com/runforyou-ai/cervi/internal/common"
 
 const (
-	ValidationDisplayNameRequired       common.FieldCode = "DISPLAY_NAME_REQUIRED"
-	ValidationTeamInvalid               common.FieldCode = "MEMBER_TEAM_INVALID"
-	ValidationStatusInvalid             common.FieldCode = "USER_STATUS_INVALID"
-	ValidationWorkStatusInvalid         common.FieldCode = "WORK_STATUS_INVALID"
+	ValidationDisplayNameRequired       common.FieldCode = "AGENT_DISPLAY_NAME_REQUIRED"
+	ValidationTeamInvalid               common.FieldCode = "AGENT_TEAM_INVALID"
+	ValidationStatusInvalid             common.FieldCode = "AGENT_STATUS_INVALID"
+	ValidationWorkStatusInvalid         common.FieldCode = "AGENT_WORK_STATUS_INVALID"
 	ValidationWorkStatusUnavailable     common.FieldCode = "AGENT_WORK_STATUS_UNAVAILABLE"
 	ValidationExecutionInvalid          common.FieldCode = "AGENT_EXECUTION_INVALID"
 	ValidationModelInvalid              common.FieldCode = "AGENT_MODEL_INVALID"

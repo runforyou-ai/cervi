@@ -2,9 +2,9 @@ package appservice
 
 import (
 	"context"
-	"net/url"
 	"strings"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -126,21 +126,14 @@ func (s *Service) OpenExternalPage(ctx context.Context, meta RequestMeta, input 
 	}
 	input.Title = strings.TrimSpace(input.Title)
 	input.URL = strings.TrimSpace(input.URL)
-	if !validExternalPageURL(input.URL) {
+	if len(input.URL) > maxExternalPageURLBytes || !common.ValidHTTPURL(input.URL) {
 		return InvalidError(meta, cervii18n.ErrorExternalPageURLInvalid, nil)
 	}
 	return s.externalPageOpener.OpenExternalPage(ctx, meta, input)
 }
 
-// validExternalPageURL 校验地址为不含认证信息的完整 HTTP 或 HTTPS 地址。
-func validExternalPageURL(value string) bool {
-	if value == "" || len(value) > 2048 {
-		return false
-	}
-	parsed, err := url.Parse(value)
-	return err == nil && parsed.IsAbs() && parsed.Host != "" && parsed.User == nil &&
-		(strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https"))
-}
+// maxExternalPageURLBytes 是外部页面地址的最大字节数。
+const maxExternalPageURLBytes = 2048
 
 // CheckNotificationPermission 返回当前设备的系统通知授权状态。
 func (s *Service) CheckNotificationPermission(ctx context.Context, meta RequestMeta) (NotificationPermissionStatus, error) {

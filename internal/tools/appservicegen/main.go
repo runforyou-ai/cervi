@@ -167,7 +167,7 @@ func parseBackend(path string) ([]method, error) {
 	var methods []method
 	for _, field := range interfaceType.Methods.List {
 		if len(field.Names) != 1 {
-			continue
+			return nil, fmt.Errorf("interface Backend: embedded interfaces are not supported")
 		}
 		item, err := parseMethod(field)
 		if err != nil {
@@ -254,11 +254,14 @@ func parseRoute(directive string) (route, error) {
 
 // parseSignature 按路径占位符和指令归类方法参数并解析返回值。
 func parseSignature(item *method, functionType *ast.FuncType) error {
+	if err := validateLeadingParams(functionType.Params.List); err != nil {
+		return err
+	}
 	pathParams := pathParamNames(item.route.path)
 	pathIndex := 0
 	for index, parameter := range functionType.Params.List {
 		if index < 2 {
-			continue // context.Context 和 RequestMeta。
+			continue // 已校验为 context.Context 和 RequestMeta。
 		}
 		typeName, err := typeString(parameter.Type)
 		if err != nil {
@@ -300,6 +303,26 @@ func parseSignature(item *method, functionType *ast.FuncType) error {
 		item.output = typeName
 	default:
 		return fmt.Errorf("unsupported result count %d", len(results))
+	}
+	return nil
+}
+
+// validateLeadingParams 校验方法前两个参数依次是 context.Context 和 RequestMeta。
+func validateLeadingParams(params []*ast.Field) error {
+	if len(params) < 2 {
+		return fmt.Errorf("expected leading context.Context and RequestMeta parameters")
+	}
+	selector, ok := params[0].Type.(*ast.SelectorExpr)
+	if !ok {
+		return fmt.Errorf("first parameter must be context.Context")
+	}
+	packageIdent, ok := selector.X.(*ast.Ident)
+	if !ok || packageIdent.Name != "context" || selector.Sel.Name != "Context" {
+		return fmt.Errorf("first parameter must be context.Context")
+	}
+	ident, ok := params[1].Type.(*ast.Ident)
+	if !ok || ident.Name != "RequestMeta" {
+		return fmt.Errorf("second parameter must be RequestMeta")
 	}
 	return nil
 }

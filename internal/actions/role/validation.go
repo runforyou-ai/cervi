@@ -4,6 +4,7 @@ package role
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -13,12 +14,18 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationNameRequired       ValidationCode = "NAME_REQUIRED"
-	ValidationNameTooLong        ValidationCode = "NAME_TOO_LONG"
-	ValidationNameDuplicate      ValidationCode = "NAME_DUPLICATE"
-	ValidationDescriptionTooLong ValidationCode = "DESCRIPTION_TOO_LONG"
-	ValidationPermissionsInvalid ValidationCode = "PERMISSIONS_INVALID"
-	maxRoleNameLength                           = 10
+	ValidationNameRequired       ValidationCode = "ROLE_NAME_REQUIRED"
+	ValidationNameTooLong        ValidationCode = "ROLE_NAME_TOO_LONG"
+	ValidationNameDuplicate      ValidationCode = "ROLE_NAME_DUPLICATE"
+	ValidationDescriptionTooLong ValidationCode = "ROLE_DESCRIPTION_TOO_LONG"
+	ValidationPermissionsInvalid ValidationCode = "ROLE_PERMISSIONS_INVALID"
+)
+
+const (
+	// maxRoleNameLength 是角色名称的最大字符数。
+	maxRoleNameLength = 10
+	// maxRoleDescriptionLength 是角色描述的最大字符数。
+	maxRoleDescriptionLength = 200
 )
 
 // ValidationError 表示角色字段校验失败。
@@ -32,10 +39,10 @@ func normalizeInput(input Input, custom bool) (Input, map[string]ValidationCode)
 		input.Description = strings.TrimSpace(input.Description)
 		if input.Name == "" {
 			fields["name"] = ValidationNameRequired
-		} else if len([]rune(input.Name)) > maxRoleNameLength {
+		} else if utf8.RuneCountInString(input.Name) > maxRoleNameLength {
 			fields["name"] = ValidationNameTooLong
 		}
-		if len([]rune(input.Description)) > 200 {
+		if utf8.RuneCountInString(input.Description) > maxRoleDescriptionLength {
 			fields["description"] = ValidationDescriptionTooLong
 		}
 	} else {

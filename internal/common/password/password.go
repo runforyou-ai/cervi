@@ -11,8 +11,10 @@ import (
 const bcryptMaxBytes = 72
 
 var (
+	// ErrTooShort 表示密码长度低于最小要求。
 	ErrTooShort = errors.New("password is too short")
-	ErrTooLong  = errors.New("password is too long")
+	// ErrTooLong 表示密码超出 bcrypt 支持的最大字节数。
+	ErrTooLong = errors.New("password is too long")
 )
 
 // Validate 校验密码长度是否满足当前规则。

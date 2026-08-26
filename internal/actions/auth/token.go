@@ -9,9 +9,13 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common/token"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
+
+// ErrIdentityNotFound 表示令牌无效、已过期或对应账号不可用。
+var ErrIdentityNotFound = errors.New("token identity not found or inactive")
 
 // issueToken 签发登录令牌并返回对应身份。
 func issueToken(ctx context.Context, db bun.IDB, userID string) (token.Issued, *servermodels.Identity, error) {
@@ -35,13 +39,10 @@ func issueToken(ctx context.Context, db bun.IDB, userID string) (token.Issued, *
 	if err != nil {
 		return token.Issued{}, nil, fmt.Errorf("find token identity: %w", err)
 	}
-	if identity == nil {
-		return token.Issued{}, nil, errors.New("find token identity: empty result")
-	}
 	return issued, identity, nil
 }
 
-// resolveIdentity 返回有效令牌对应的用户身份。
+// resolveIdentity 返回有效令牌对应的用户身份；令牌无效或账号停用时返回 ErrIdentityNotFound。
 func resolveIdentity(ctx context.Context, db bun.IDB, value string) (*servermodels.Identity, error) {
 	identity := &servermodels.Identity{}
 	err := db.NewRaw(`
@@ -65,12 +66,12 @@ func resolveIdentity(ctx context.Context, db bun.IDB, value string) (*servermode
 			oi.work_status
 		FROM tokens AS token
 		JOIN users AS u ON u.id = token.user_id
-		JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = 'user'
+		JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?
 		JOIN organizations AS o ON o.id = u.organization_id
 		WHERE token.token_hash = ?
 		  AND token.expires_at > now()
 		LIMIT 1
-	`, token.Hash(value)).Scan(
+	`, domain.OrganizationIdentityTypeUser, token.Hash(value)).Scan(
 		ctx,
 		&identity.Organization.ID,
 		&identity.Organization.Name,
@@ -91,13 +92,13 @@ func resolveIdentity(ctx context.Context, db bun.IDB, value string) (*servermode
 		&identity.OrganizationIdentity.WorkStatus,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
+		return nil, ErrIdentityNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	if identity.User.Status != "active" {
-		return nil, nil
+	if identity.User.Status != string(domain.UserStatusActive) {
+		return nil, ErrIdentityNotFound
 	}
 	return identity, nil
 }

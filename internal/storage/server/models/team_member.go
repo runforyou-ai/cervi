@@ -12,10 +12,10 @@ import (
 type TeamMember struct {
 	bun.BaseModel `bun:"table:team_members,alias:tm"`
 
-	ID              string    `bun:"id,pk" json:"id"`
-	OrganizationID  string    `bun:"organization_id" json:"organizationId"`
-	TeamID          string    `bun:"team_id" json:"teamId"`
-	IdentityID      string    `bun:"identity_id" json:"identityId"`
-	CreatedByUserID string    `bun:"created_by_user_id" json:"createdByUserId"`
-	CreatedAt       time.Time `bun:"created_at" json:"createdAt"`
+	ID              string    `bun:"id,pk"`
+	OrganizationID  string    `bun:"organization_id"`
+	TeamID          string    `bun:"team_id"`
+	IdentityID      string    `bun:"identity_id"`
+	CreatedByUserID string    `bun:"created_by_user_id"`
+	CreatedAt       time.Time `bun:"created_at"`
 }

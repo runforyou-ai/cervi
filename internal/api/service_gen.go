@@ -28,48 +28,48 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
 	router.GET("/channels/:channelID", s.getMessageChannel)
 	router.POST("/channels", s.createMessageChannel)
-	router.PATCH("/channels/:channelID", s.updateMessageChannel)
-	router.PATCH("/channels/website/:channelID/chat-interface", s.updateWebsiteChannelChatInterface)
-	router.PATCH("/channels/website/:channelID/access", s.updateWebsiteChannelAccess)
+	router.PUT("/channels/:channelID", s.updateMessageChannel)
+	router.PUT("/channels/website/:channelID/chat-interface", s.updateWebsiteChannelChatInterface)
+	router.PUT("/channels/website/:channelID/access", s.updateWebsiteChannelAccess)
 	router.POST("/channels/:channelID/deactivate", s.deactivateMessageChannel)
 	router.POST("/channels/:channelID/activate", s.activateMessageChannel)
-	router.GET("/channel-options", s.listChannelOptions)
+	router.GET("/channels/options", s.listChannelOptions)
 	router.GET("/members/options", s.listMemberOptions)
 	router.GET("/agents/model-options", s.listAgentModelOptions)
 	router.POST("/agents", s.createAgent)
 	router.GET("/agents", s.listAgents)
 	router.GET("/agents/:agentID", s.getAgent)
-	router.PATCH("/agents/:agentID", s.updateAgent)
-	router.PATCH("/agents/:agentID/execution", s.updateAgentExecution)
-	router.PATCH("/agents/:agentID/work-status", s.updateAgentWorkStatus)
+	router.PUT("/agents/:agentID", s.updateAgent)
+	router.PUT("/agents/:agentID/execution", s.updateAgentExecution)
+	router.PUT("/agents/:agentID/work-status", s.updateAgentWorkStatus)
 	router.POST("/agents/:agentID/deactivate", s.deactivateAgent)
 	router.POST("/agents/:agentID/reactivate", s.reactivateAgent)
 	router.GET("/users", s.listUsers)
 	router.GET("/users/:userID", s.getUser)
 	router.POST("/users", s.createUser)
-	router.PATCH("/users/:userID", s.updateUser)
+	router.PUT("/users/:userID", s.updateUser)
 	router.PATCH("/users/roles", s.updateUserRoles)
 	router.POST("/users/:userID/deactivate", s.deactivateUser)
 	router.POST("/users/:userID/reactivate", s.reactivateUser)
 	router.GET("/teams", s.listTeams)
 	router.POST("/teams", s.createTeam)
-	router.PATCH("/teams/:teamID", s.updateTeam)
+	router.PUT("/teams/:teamID", s.updateTeam)
 	router.DELETE("/teams/:teamID", s.deleteTeam)
-	router.GET("/knowledge-bases", s.listKnowledgeBases)
-	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
-	router.POST("/knowledge-bases", s.createKnowledgeBase)
-	router.PATCH("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
-	router.DELETE("/knowledge-bases/:knowledgeBaseID", s.deleteKnowledgeBase)
-	router.POST("/knowledge-bases/:knowledgeBaseID/groups", s.createKnowledgeGroup)
-	router.PATCH("/knowledge-bases/:knowledgeBaseID/groups/:groupID", s.updateKnowledgeGroup)
-	router.DELETE("/knowledge-bases/:knowledgeBaseID/groups/:groupID", s.deleteKnowledgeGroup)
 	router.GET("/teams/:teamID/members", s.listTeamMembers)
 	router.GET("/teams/:teamID/member-candidates", s.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", s.addTeamMembers)
-	router.DELETE("/teams/:teamID/members", s.removeTeamMembers)
+	router.POST("/teams/:teamID/members/remove", s.removeTeamMembers)
+	router.GET("/knowledge-bases", s.listKnowledgeBases)
+	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
+	router.POST("/knowledge-bases", s.createKnowledgeBase)
+	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
+	router.DELETE("/knowledge-bases/:knowledgeBaseID", s.deleteKnowledgeBase)
+	router.POST("/knowledge-bases/:knowledgeBaseID/groups", s.createKnowledgeGroup)
+	router.PUT("/knowledge-bases/:knowledgeBaseID/groups/:groupID", s.updateKnowledgeGroup)
+	router.DELETE("/knowledge-bases/:knowledgeBaseID/groups/:groupID", s.deleteKnowledgeGroup)
 	router.GET("/contacts/:contactID", s.getContact)
 	router.POST("/contacts", s.createContact)
-	router.PATCH("/contacts/:contactID", s.updateContact)
+	router.PUT("/contacts/:contactID", s.updateContact)
 	router.DELETE("/contacts/:contactID", s.deleteContact)
 	router.POST("/contacts/:contactID/restore", s.restoreContact)
 	router.GET("/settings/roles", s.listRoles)
@@ -441,6 +441,46 @@ func (s *Service) deleteTeam(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteTeam(c.Request.Context(), requestMeta(c), c.Param("teamID")))
 }
 
+// listTeamMembers 返回团队成员列表。
+func (s *Service) listTeamMembers(c *gin.Context) {
+	input, ok := bindTeamMemberListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listTeamMemberCandidates 返回尚未加入团队的企业身份。
+func (s *Service) listTeamMemberCandidates(c *gin.Context) {
+	input, ok := bindTeamMemberCandidateInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListTeamMemberCandidates(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// addTeamMembers 将企业身份批量加入团队。
+func (s *Service) addTeamMembers(c *gin.Context) {
+	var input appservice.TeamMemberInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.AddTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// removeTeamMembers 将企业身份批量移出团队。
+func (s *Service) removeTeamMembers(c *gin.Context) {
+	var input appservice.TeamMemberInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RemoveTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listKnowledgeBases 返回当前企业的知识库列表。
 func (s *Service) listKnowledgeBases(c *gin.Context) {
 	output, err := s.application.ListKnowledgeBases(c.Request.Context(), requestMeta(c))
@@ -501,46 +541,6 @@ func (s *Service) updateKnowledgeGroup(c *gin.Context) {
 // deleteKnowledgeGroup 删除不含子分组的知识库分组。
 func (s *Service) deleteKnowledgeGroup(c *gin.Context) {
 	output, err := s.application.DeleteKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("groupID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// listTeamMembers 返回团队成员列表。
-func (s *Service) listTeamMembers(c *gin.Context) {
-	input, ok := bindTeamMemberListInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// listTeamMemberCandidates 返回尚未加入团队的企业身份。
-func (s *Service) listTeamMemberCandidates(c *gin.Context) {
-	input, ok := bindTeamMemberCandidateInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListTeamMemberCandidates(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// addTeamMembers 将企业身份批量加入团队。
-func (s *Service) addTeamMembers(c *gin.Context) {
-	var input appservice.TeamMemberInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.AddTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// removeTeamMembers 将企业身份批量移出团队。
-func (s *Service) removeTeamMembers(c *gin.Context) {
-	var input appservice.TeamMemberInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.RemoveTeamMembers(c.Request.Context(), requestMeta(c), c.Param("teamID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -771,7 +771,7 @@ func (s *Service) getS3Setting(c *gin.Context) {
 
 // saveS3Setting 保存当前企业的对象存储设置。
 func (s *Service) saveS3Setting(c *gin.Context) {
-	var input appservice.S3Setting
+	var input appservice.S3SettingInput
 	if !bindJSON(c, &input) {
 		return
 	}
@@ -781,7 +781,7 @@ func (s *Service) saveS3Setting(c *gin.Context) {
 
 // testS3Setting 测试对象存储连接。
 func (s *Service) testS3Setting(c *gin.Context) {
-	var input appservice.S3Setting
+	var input appservice.S3SettingInput
 	if !bindJSON(c, &input) {
 		return
 	}

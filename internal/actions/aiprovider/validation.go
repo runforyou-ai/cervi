@@ -3,8 +3,8 @@
 package aiprovider
 
 import (
-	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -14,16 +14,25 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationBrandInvalid   ValidationCode = "BRAND_INVALID"
-	ValidationNameRequired   ValidationCode = "NAME_REQUIRED"
-	ValidationNameTooLong    ValidationCode = "NAME_TOO_LONG"
-	ValidationNameDuplicate  ValidationCode = "NAME_DUPLICATE"
-	ValidationAPIKeyRequired ValidationCode = "API_KEY_REQUIRED"
-	ValidationAPIKeyTooLong  ValidationCode = "API_KEY_TOO_LONG"
-	ValidationAPIURLRequired ValidationCode = "API_URL_REQUIRED"
-	ValidationAPIURLInvalid  ValidationCode = "API_URL_INVALID"
-	ValidationModelsInvalid  ValidationCode = "MODELS_INVALID"
-	ValidationModelsInUse    ValidationCode = "MODELS_IN_USE"
+	ValidationBrandInvalid   ValidationCode = "AI_PROVIDER_BRAND_INVALID"
+	ValidationNameRequired   ValidationCode = "AI_PROVIDER_NAME_REQUIRED"
+	ValidationNameTooLong    ValidationCode = "AI_PROVIDER_NAME_TOO_LONG"
+	ValidationNameDuplicate  ValidationCode = "AI_PROVIDER_NAME_DUPLICATE"
+	ValidationAPIKeyRequired ValidationCode = "AI_PROVIDER_API_KEY_REQUIRED"
+	ValidationAPIKeyTooLong  ValidationCode = "AI_PROVIDER_API_KEY_TOO_LONG"
+	ValidationAPIURLRequired ValidationCode = "AI_PROVIDER_API_URL_REQUIRED"
+	ValidationAPIURLInvalid  ValidationCode = "AI_PROVIDER_API_URL_INVALID"
+	ValidationModelsInvalid  ValidationCode = "AI_PROVIDER_MODELS_INVALID"
+	ValidationModelsInUse    ValidationCode = "AI_PROVIDER_MODELS_IN_USE"
+)
+
+const (
+	// maxNameLength 是供应商名称的最大字符数。
+	maxNameLength = 100
+	// maxModelFieldLength 是模型标识和名称的最大字符数。
+	maxModelFieldLength = 200
+	// maxAPIKeyBytes 是 API 密钥的最大字节数。
+	maxAPIKeyBytes = 2048
 )
 
 // ValidationError 表示模型服务供应商字段校验失败。
@@ -45,7 +54,7 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
-	} else if len([]rune(input.Name)) > 100 {
+	} else if utf8.RuneCountInString(input.Name) > maxNameLength {
 		fields["name"] = ValidationNameTooLong
 	}
 
@@ -54,8 +63,8 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	for _, model := range input.Models {
 		model.Identifier = strings.TrimSpace(model.Identifier)
 		model.Name = strings.TrimSpace(model.Name)
-		if model.Identifier == "" || len([]rune(model.Identifier)) > 200 ||
-			model.Name == "" || len([]rune(model.Name)) > 200 ||
+		if model.Identifier == "" || utf8.RuneCountInString(model.Identifier) > maxModelFieldLength ||
+			model.Name == "" || utf8.RuneCountInString(model.Name) > maxModelFieldLength ||
 			model.ContextWindow <= 0 || !normalizeModel(&model) {
 			fields["models"] = ValidationModelsInvalid
 			continue
@@ -86,12 +95,12 @@ func normalizeConnectionInput(input ConnectionInput) (ConnectionInput, map[strin
 	}
 	if input.APIKey == "" {
 		fields["apiKey"] = ValidationAPIKeyRequired
-	} else if len(input.APIKey) > 2048 {
+	} else if len(input.APIKey) > maxAPIKeyBytes {
 		fields["apiKey"] = ValidationAPIKeyTooLong
 	}
 	if input.APIURL == "" {
 		fields["apiUrl"] = ValidationAPIURLRequired
-	} else if !validAPIURL(input.APIURL) {
+	} else if !common.ValidHTTPBaseURL(input.APIURL) {
 		fields["apiUrl"] = ValidationAPIURLInvalid
 	}
 	return input, fields
@@ -137,11 +146,4 @@ func validInputModalities(modalities []domain.AIModelInputModality) bool {
 		seen[modality] = struct{}{}
 	}
 	return true
-}
-
-// validAPIURL 校验 API 地址为不含认证信息的完整 HTTP 地址。
-func validAPIURL(value string) bool {
-	parsed, err := url.ParseRequestURI(value)
-	return err == nil && parsed.IsAbs() && parsed.Host != "" && parsed.User == nil &&
-		(parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.RawQuery == "" && parsed.Fragment == ""
 }

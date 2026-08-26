@@ -13,21 +13,21 @@
     <div
       class="cv-messenger"
       id="cv-messenger"
-      data-demo-reply="{{.Copy.DemoReply}}"
-      data-play-voice="{{.Copy.PlayVoice}}"
-      data-pause-voice="{{.Copy.PauseVoice}}"
-      data-expand-window="{{.Copy.ExpandWindow}}"
-      data-collapse-window="{{.Copy.CollapseWindow}}"
-      data-default-greeting="{{.Copy.ConversationPrompt}}"
-      data-default-subtitle="{{.Copy.DefaultResponse}}"
+      data-demo-reply="{{.Copy.demoReply}}"
+      data-play-voice="{{.Copy.playVoice}}"
+      data-pause-voice="{{.Copy.pauseVoice}}"
+      data-expand-window="{{.Copy.expandWindow}}"
+      data-collapse-window="{{.Copy.collapseWindow}}"
+      data-default-greeting="{{.Copy.conversationPrompt}}"
+      data-default-subtitle="{{.Copy.defaultResponse}}"
       data-preview="{{.Preview}}"
       data-channel-id="{{.ChannelID}}"
-      data-loading="{{.Copy.Loading}}"
-      data-request-failed="{{.Copy.RequestFailed}}"
-      data-session-waiting="{{.Copy.SessionWaiting}}"
-      data-session-active="{{.Copy.SessionActive}}"
-      data-session-pending="{{.Copy.SessionPending}}"
-      data-session-closed="{{.Copy.SessionClosed}}"
+      data-loading="{{.Copy.loading}}"
+      data-request-failed="{{.Copy.requestFailed}}"
+      data-session-waiting="{{.Copy.sessionWaiting}}"
+      data-session-active="{{.Copy.sessionActive}}"
+      data-session-pending="{{.Copy.sessionPending}}"
+      data-session-closed="{{.Copy.sessionClosed}}"
     >
       {{if .NotFound}}
       <main class="cv-unavailable">
@@ -45,34 +45,34 @@
               </div>
               {{if .ShowWidgetControls}}
               <div class="cv-home-actions">
-                <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+                <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.close}}" title="{{.Copy.close}}">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
                 </button>
               </div>
               {{end}}
             </div>
             <div class="cv-home-heading">
-              <p>{{.Copy.Welcome}}</p>
-              <h1 data-route-heading tabindex="-1">{{.Copy.HowCanWeHelp}}</h1>
+              <p>{{.Copy.welcome}}</p>
+              <h1 data-route-heading tabindex="-1">{{.Copy.howCanWeHelp}}</h1>
             </div>
           </header>
 
           <div class="cv-home-content">
             <div class="cv-home-status" id="cv-home-initialization-status" role="status" hidden>
-              <span id="cv-home-initialization-message">{{.Copy.Loading}}</span>
-              <button type="button" id="cv-home-initialization-retry" hidden>{{.Copy.Retry}}</button>
+              <span id="cv-home-initialization-message">{{.Copy.loading}}</span>
+              <button type="button" id="cv-home-initialization-retry" hidden>{{.Copy.retry}}</button>
             </div>
             <button class="cv-recent-card" id="cv-home-recent" type="button" data-resume-conversation hidden>
               <span class="cv-presence-avatar cv-presence-avatar-small" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></span>
               <span class="cv-conversation-summary">
                 <span class="cv-conversation-row"><strong data-channel-title>{{.Title}}</strong><time id="cv-home-recent-time"></time></span>
-                <span class="cv-conversation-row"><span id="cv-home-recent-preview">{{.Copy.ConversationPrompt}}</span><i id="cv-home-recent-unread-dot" aria-hidden="true" hidden></i></span>
+                <span class="cv-conversation-row"><span id="cv-home-recent-preview">{{.Copy.conversationPrompt}}</span><i id="cv-home-recent-unread-dot" aria-hidden="true" hidden></i></span>
               </span>
             </button>
 
             <button class="cv-start-card" type="button" data-new-conversation>
               <span class="cv-start-copy">
-                <strong>{{.Copy.StartConversation}}</strong>
+                <strong>{{.Copy.startConversation}}</strong>
                 <span data-channel-subtitle>{{.Subtitle}}</span>
               </span>
               <span class="cv-start-arrow" aria-hidden="true">
@@ -83,29 +83,29 @@
             <section class="cv-home-card" aria-labelledby="cv-home-help-title">
               <div class="cv-card-heading">
                 <div>
-                  <h2 id="cv-home-help-title">{{.Copy.ExploreHelp}}</h2>
-                  <p>{{.Copy.ExploreHelpDescription}}</p>
+                  <h2 id="cv-home-help-title">{{.Copy.exploreHelp}}</h2>
+                  <p>{{.Copy.exploreHelpDescription}}</p>
                 </div>
-                <a class="cv-text-link" href="#help" data-route-target="help">{{.Copy.ViewAll}}</a>
+                <a class="cv-text-link" href="#help" data-route-target="help">{{.Copy.viewAll}}</a>
               </div>
               <ul class="cv-link-list">
                 <li class="cv-link-row">
                   <span class="cv-link-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24"><path d="M12 3 4 7v10l8 4 8-4V7l-8-4Z" /><path d="m4 7 8 4 8-4M12 11v10" /></svg>
                   </span>
-                  <span>{{.Copy.GettingStarted}}</span>
+                  <span>{{.Copy.gettingStarted}}</span>
                 </li>
                 <li class="cv-link-row">
                   <span class="cv-link-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7" /></svg>
                   </span>
-                  <span>{{.Copy.FeaturesAndSettings}}</span>
+                  <span>{{.Copy.featuresAndSettings}}</span>
                 </li>
                 <li class="cv-link-row">
                   <span class="cv-link-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 0 1 4.6.9c0 1.8-2.4 2.1-2.4 3.6M12 17h.01" /></svg>
                   </span>
-                  <span>{{.Copy.CommonQuestions}}</span>
+                  <span>{{.Copy.commonQuestions}}</span>
                 </li>
               </ul>
             </section>
@@ -116,9 +116,9 @@
         <section class="cv-screen" data-screen="messages" hidden>
           <header class="cv-section-header">
             <div class="cv-header-spacer" aria-hidden="true"></div>
-            <h1 data-route-heading tabindex="-1">{{.Copy.Messages}}</h1>
+            <h1 data-route-heading tabindex="-1">{{.Copy.messages}}</h1>
             {{if .ShowWidgetControls}}
-            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.close}}" title="{{.Copy.close}}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
             {{else}}<div class="cv-header-spacer" aria-hidden="true"></div>{{end}}
@@ -128,17 +128,17 @@
               <div class="cv-empty-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="M20 15a3 3 0 0 1-3 3H8l-4 3v-6a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v8Z" /><path d="M8 9h8M8 13h5" /></svg>
               </div>
-              <h2>{{.Copy.NoMessages}}</h2>
-              <p>{{.Copy.NoMessagesDescription}}</p>
+              <h2>{{.Copy.noMessages}}</h2>
+              <p>{{.Copy.noMessagesDescription}}</p>
             </div>
             <div class="cv-conversation-list" id="cv-conversation-list" hidden>
             </div>
             <div class="cv-inline-error" id="cv-initialization-error" role="status" hidden>
-              <p id="cv-initialization-error-message">{{.Copy.RequestFailed}}</p>
-              <button type="button" id="cv-initialization-retry">{{.Copy.Retry}}</button>
+              <p id="cv-initialization-error-message">{{.Copy.requestFailed}}</p>
+              <button type="button" id="cv-initialization-retry">{{.Copy.retry}}</button>
             </div>
             <button class="cv-primary-action" type="button" data-new-conversation>
-              <span>{{.Copy.StartConversation}}</span>
+              <span>{{.Copy.startConversation}}</span>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
             </button>
           </div>
@@ -147,66 +147,66 @@
         <section class="cv-screen" data-screen="help" hidden>
           <header class="cv-section-header">
             <div class="cv-header-spacer" aria-hidden="true"></div>
-            <h1 data-route-heading tabindex="-1">{{.Copy.Help}}</h1>
+            <h1 data-route-heading tabindex="-1">{{.Copy.help}}</h1>
             {{if .ShowWidgetControls}}
-            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.close}}" title="{{.Copy.close}}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
             {{else}}<div class="cv-header-spacer" aria-hidden="true"></div>{{end}}
           </header>
           <div class="cv-help-search">
-            <label for="cv-help-input">{{.Copy.SearchHelp}}</label>
+            <label for="cv-help-input">{{.Copy.searchHelp}}</label>
             <div class="cv-search-well">
               <input id="cv-help-input" type="search" autocomplete="off" />
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
             </div>
           </div>
           <div class="cv-help-content">
-            <div class="cv-help-heading"><h2>{{.Copy.Collections}}</h2><span>{{.Copy.CollectionCount}}</span></div>
+            <div class="cv-help-heading"><h2>{{.Copy.collections}}</h2><span>{{.Copy.collectionCount}}</span></div>
             <div class="cv-collection-list" id="cv-collection-list">
-              <button type="button" data-help-topic="getting-started" data-search-text="{{.Copy.GettingStarted}} {{.Copy.GettingStartedDescription}}">
-                <span><strong>{{.Copy.GettingStarted}}</strong><span>{{.Copy.GettingStartedDescription}}</span><small>{{.Copy.ThreeArticles}}</small></span>
+              <button type="button" data-help-topic="getting-started" data-search-text="{{.Copy.gettingStarted}} {{.Copy.gettingStartedDescription}}">
+                <span><strong>{{.Copy.gettingStarted}}</strong><span>{{.Copy.gettingStartedDescription}}</span><small>{{.Copy.threeArticles}}</small></span>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
               </button>
-              <button type="button" data-help-topic="features" data-search-text="{{.Copy.FeaturesAndSettings}} {{.Copy.FeaturesDescription}}">
-                <span><strong>{{.Copy.FeaturesAndSettings}}</strong><span>{{.Copy.FeaturesDescription}}</span><small>{{.Copy.FiveArticles}}</small></span>
+              <button type="button" data-help-topic="features" data-search-text="{{.Copy.featuresAndSettings}} {{.Copy.featuresDescription}}">
+                <span><strong>{{.Copy.featuresAndSettings}}</strong><span>{{.Copy.featuresDescription}}</span><small>{{.Copy.fiveArticles}}</small></span>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
               </button>
-              <button type="button" data-help-topic="questions" data-search-text="{{.Copy.CommonQuestions}} {{.Copy.QuestionsDescription}}">
-                <span><strong>{{.Copy.CommonQuestions}}</strong><span>{{.Copy.QuestionsDescription}}</span><small>{{.Copy.SixArticles}}</small></span>
+              <button type="button" data-help-topic="questions" data-search-text="{{.Copy.commonQuestions}} {{.Copy.questionsDescription}}">
+                <span><strong>{{.Copy.commonQuestions}}</strong><span>{{.Copy.questionsDescription}}</span><small>{{.Copy.sixArticles}}</small></span>
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
               </button>
             </div>
-            <div class="cv-help-empty" id="cv-help-empty" hidden>{{.Copy.NoHelpResults}}</div>
+            <div class="cv-help-empty" id="cv-help-empty" hidden>{{.Copy.noHelpResults}}</div>
           </div>
         </section>
 
         <section class="cv-screen" data-screen="help-detail" hidden>
           <header class="cv-section-header cv-detail-header">
-            <button class="cv-icon-button" type="button" data-back-to="help" aria-label="{{.Copy.Back}}" title="{{.Copy.Back}}">
+            <button class="cv-icon-button" type="button" data-back-to="help" aria-label="{{.Copy.back}}" title="{{.Copy.back}}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
             </button>
-            <h1 id="cv-help-detail-title" data-route-heading tabindex="-1">{{.Copy.GettingStarted}}</h1>
+            <h1 id="cv-help-detail-title" data-route-heading tabindex="-1">{{.Copy.gettingStarted}}</h1>
             {{if .ShowWidgetControls}}
-            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+            <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.close}}" title="{{.Copy.close}}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
             {{else}}<div class="cv-header-spacer" aria-hidden="true"></div>{{end}}
           </header>
           <div class="cv-article-list" id="cv-article-list">
-            <details open><summary>{{.Copy.ArticleOneTitle}}</summary><p>{{.Copy.ArticleOneBody}}</p></details>
-            <details><summary>{{.Copy.ArticleTwoTitle}}</summary><p>{{.Copy.ArticleTwoBody}}</p></details>
-            <details><summary>{{.Copy.ArticleThreeTitle}}</summary><p>{{.Copy.ArticleThreeBody}}</p></details>
+            <details open><summary>{{.Copy.articleOneTitle}}</summary><p>{{.Copy.articleOneBody}}</p></details>
+            <details><summary>{{.Copy.articleTwoTitle}}</summary><p>{{.Copy.articleTwoBody}}</p></details>
+            <details><summary>{{.Copy.articleThreeTitle}}</summary><p>{{.Copy.articleThreeBody}}</p></details>
           </div>
           <div class="cv-help-contact">
-            <p>{{.Copy.StillNeedHelp}}</p>
-            <button class="cv-primary-action" type="button" data-new-conversation>{{.Copy.StartConversation}}</button>
+            <p>{{.Copy.stillNeedHelp}}</p>
+            <button class="cv-primary-action" type="button" data-new-conversation>{{.Copy.startConversation}}</button>
           </div>
         </section>
 
         <section class="cv-screen" data-screen="conversation" hidden>
           <header class="cv-conversation-header">
-            <button class="cv-icon-button" type="button" data-back-to="home" aria-label="{{.Copy.Back}}" title="{{.Copy.Back}}">
+            <button class="cv-icon-button" type="button" data-back-to="home" aria-label="{{.Copy.back}}" title="{{.Copy.back}}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
             </button>
             <div class="cv-conversation-identity">
@@ -220,11 +220,11 @@
               </div>
             </div>
             <div class="cv-conversation-actions">
-              <button class="cv-icon-button" type="button" id="cv-more-toggle" aria-label="{{.Copy.More}}" title="{{.Copy.More}}" aria-expanded="false" aria-controls="cv-more-menu">
+              <button class="cv-icon-button" type="button" id="cv-more-toggle" aria-label="{{.Copy.more}}" title="{{.Copy.more}}" aria-expanded="false" aria-controls="cv-more-menu">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></svg>
               </button>
               {{if .ShowWidgetControls}}
-              <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.Close}}" title="{{.Copy.Close}}">
+              <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.close}}" title="{{.Copy.close}}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
               {{end}}
@@ -233,7 +233,7 @@
               {{if .ShowWidgetControls}}
               <button type="button" id="cv-expand">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
-                <span>{{.Copy.ExpandWindow}}</span>
+                <span>{{.Copy.expandWindow}}</span>
               </button>
               {{end}}
             </div>
@@ -246,41 +246,41 @@
             </div>
           </div>
 
-          <p class="cv-conversation-error" id="cv-conversation-error" role="status" hidden>{{.Copy.RequestFailed}}</p>
+          <p class="cv-conversation-error" id="cv-conversation-error" role="status" hidden>{{.Copy.requestFailed}}</p>
 
           <form class="cv-composer" id="cv-composer" action="#" method="dialog">
             <div class="cv-composer-main" id="cv-composer-main">
-              <textarea id="cv-input" rows="1" maxlength="4000" aria-label="{{.Copy.Message}}"></textarea>
+              <textarea id="cv-input" rows="1" maxlength="4000" aria-label="{{.Copy.message}}"></textarea>
               <div class="cv-composer-bar">
                 <div class="cv-composer-tools">
-                  <button class="cv-tool" type="button" id="cv-attach" aria-label="{{.Copy.Attach}}" title="{{.Copy.Attach}}">
+                  <button class="cv-tool" type="button" id="cv-attach" aria-label="{{.Copy.attach}}" title="{{.Copy.attach}}">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.4 11-9.2 9.2a6 6 0 0 1-8.4-8.4l8.5-8.6A4 4 0 1 1 18 8.8l-8.6 8.6a2 2 0 0 1-2.8-2.8l8.5-8.5" /></svg>
                   </button>
                   <div class="cv-emoji-tool">
-                    <button class="cv-tool" type="button" id="cv-emoji-toggle" aria-label="{{.Copy.Emoji}}" title="{{.Copy.Emoji}}" aria-controls="cv-emoji" aria-expanded="false">
+                    <button class="cv-tool" type="button" id="cv-emoji-toggle" aria-label="{{.Copy.emoji}}" title="{{.Copy.emoji}}" aria-controls="cv-emoji" aria-expanded="false">
                       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg>
                     </button>
                     <div class="cv-picker" id="cv-emoji" hidden></div>
                   </div>
-                  <button class="cv-tool" type="button" id="cv-voice" aria-label="{{.Copy.RecordVoice}}" title="{{.Copy.RecordVoice}}">
+                  <button class="cv-tool" type="button" id="cv-voice" aria-label="{{.Copy.recordVoice}}" title="{{.Copy.recordVoice}}">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" /></svg>
                   </button>
                 </div>
-                <button class="cv-send" type="submit" id="cv-send" aria-label="{{.Copy.Send}}" title="{{.Copy.Send}}" disabled>
+                <button class="cv-send" type="submit" id="cv-send" aria-label="{{.Copy.send}}" title="{{.Copy.send}}" disabled>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 7-7 7 7M12 19V5" /></svg>
                 </button>
               </div>
             </div>
 
             <div class="cv-recording" id="cv-recording" hidden>
-              <button class="cv-record-action" type="button" id="cv-record-cancel" aria-label="{{.Copy.CancelRecording}}" title="{{.Copy.CancelRecording}}">
+              <button class="cv-record-action" type="button" id="cv-record-cancel" aria-label="{{.Copy.cancelRecording}}" title="{{.Copy.cancelRecording}}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
               </button>
               <div class="cv-waveform" aria-hidden="true">
                 <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
               </div>
               <time id="cv-record-time">0:00</time>
-              <button class="cv-record-stop" type="button" id="cv-record-stop" aria-label="{{.Copy.StopRecording}}" title="{{.Copy.StopRecording}}">
+              <button class="cv-record-stop" type="button" id="cv-record-stop" aria-label="{{.Copy.stopRecording}}" title="{{.Copy.stopRecording}}">
                 <span aria-hidden="true"></span>
               </button>
             </div>
@@ -289,21 +289,21 @@
         </section>
       </div>
 
-      <nav class="cv-navigation" id="cv-navigation" aria-label="{{.Copy.MessengerNavigation}}">
+      <nav class="cv-navigation" id="cv-navigation" aria-label="{{.Copy.messengerNavigation}}">
         <button type="button" data-route-target="home" aria-current="page">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" /></svg>
-          <span>{{.Copy.Home}}</span>
+          <span>{{.Copy.home}}</span>
         </button>
         <button type="button" data-route-target="messages">
           <span class="cv-nav-icon">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H8l-4 3v-6a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v8Z" /><path d="M8 9h8M8 13h5" /></svg>
             <i id="cv-unread-dot" hidden></i>
           </span>
-          <span>{{.Copy.Messages}}</span>
+          <span>{{.Copy.messages}}</span>
         </button>
         <button type="button" data-route-target="help">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 0 1 4.6.9c0 1.8-2.4 2.1-2.4 3.6M12 17h.01" /></svg>
-          <span>{{.Copy.Help}}</span>
+          <span>{{.Copy.help}}</span>
         </button>
       </nav>
       {{end}}

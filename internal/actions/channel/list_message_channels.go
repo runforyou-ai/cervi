@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -22,7 +23,10 @@ func NewListMessageChannelsQuery(db *bun.DB) *ListMessageChannelsQuery {
 }
 
 // Execute 按创建时间返回当前企业支持管理的全部消息渠道。
-func (q *ListMessageChannelsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]servermodels.Channel, error) {
+func (q *ListMessageChannelsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]MessageChannelRecord, error) {
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
+		return nil, err
+	}
 	channels := make([]servermodels.Channel, 0)
 	if err := q.db.NewSelect().
 		Model(&channels).
@@ -32,5 +36,9 @@ func (q *ListMessageChannelsQuery) Execute(ctx context.Context, identity *server
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("list message channels: %w", err)
 	}
-	return channels, nil
+	records := make([]MessageChannelRecord, 0, len(channels))
+	for index := range channels {
+		records = append(records, *messageChannelRecord(&channels[index]))
+	}
+	return records, nil
 }

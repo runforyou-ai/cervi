@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -31,7 +32,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 	}
 	var output *User
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		administratorRoleID, err := lockAdministratorRole(ctx, tx, identity.Organization.ID)

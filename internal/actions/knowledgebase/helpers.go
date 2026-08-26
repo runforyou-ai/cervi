@@ -7,12 +7,11 @@ import (
 	"database/sql"
 	"errors"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 // loadKnowledgeBase 读取当前企业中的知识库。
@@ -49,34 +48,59 @@ func loadKnowledgeBaseRecord(ctx context.Context, db bun.IDB, organizationID, kn
 
 // loadGroupRecords 返回知识库的两级分组树。
 func loadGroupRecords(ctx context.Context, db bun.IDB, knowledgeBaseID string) ([]GroupRecord, error) {
-	flat := make([]GroupRecord, 0)
+	byBase, err := loadGroupRecordsByBase(ctx, db, []string{knowledgeBaseID})
+	if err != nil {
+		return nil, err
+	}
+	groups := byBase[knowledgeBaseID]
+	if groups == nil {
+		groups = make([]GroupRecord, 0)
+	}
+	return groups, nil
+}
+
+// loadGroupRecordsByBase 一次查询多个知识库的两级分组树，按知识库编号分组返回。
+func loadGroupRecordsByBase(ctx context.Context, db bun.IDB, knowledgeBaseIDs []string) (map[string][]GroupRecord, error) {
+	byBase := make(map[string][]GroupRecord, len(knowledgeBaseIDs))
+	if len(knowledgeBaseIDs) == 0 {
+		return byBase, nil
+	}
+	type groupRow struct {
+		GroupRecord
+		KnowledgeBaseID string `bun:"knowledge_base_id"`
+	}
+	flat := make([]groupRow, 0)
 	if err := db.NewSelect().
 		TableExpr("knowledge_groups AS kg").
 		ColumnExpr("kg.id::text AS id").
 		ColumnExpr("kg.parent_id::text AS parent_id").
+		ColumnExpr("kg.knowledge_base_id::text AS knowledge_base_id").
 		Column("name", "is_default", "sort_order").
-		Where("kg.knowledge_base_id = ?", knowledgeBaseID).
+		Where("kg.knowledge_base_id IN (?)", bun.In(knowledgeBaseIDs)).
 		OrderExpr("kg.parent_id NULLS FIRST, kg.sort_order ASC, lower(kg.name) ASC, kg.id ASC").
 		Scan(ctx, &flat); err != nil {
 		return nil, err
 	}
 	children := make(map[string][]GroupRecord)
-	topLevel := make([]GroupRecord, 0)
-	for _, group := range flat {
+	topLevelByBase := make(map[string][]GroupRecord)
+	for _, row := range flat {
+		group := row.GroupRecord
 		group.Children = make([]GroupRecord, 0)
 		if group.ParentID == nil {
-			topLevel = append(topLevel, group)
+			topLevelByBase[row.KnowledgeBaseID] = append(topLevelByBase[row.KnowledgeBaseID], group)
 			continue
 		}
 		children[*group.ParentID] = append(children[*group.ParentID], group)
 	}
-	for index := range topLevel {
-		topLevel[index].Children = children[topLevel[index].ID]
-		if topLevel[index].Children == nil {
-			topLevel[index].Children = make([]GroupRecord, 0)
+	for baseID, topLevel := range topLevelByBase {
+		for index := range topLevel {
+			if nested := children[topLevel[index].ID]; nested != nil {
+				topLevel[index].Children = nested
+			}
 		}
+		byBase[baseID] = topLevel
 	}
-	return topLevel, nil
+	return byBase, nil
 }
 
 // loadKnowledgeGroup 读取当前企业知识库中的分组。
@@ -105,37 +129,15 @@ func recordFromModel(knowledgeBase servermodels.KnowledgeBase) Record {
 	return Record{
 		ID: knowledgeBase.ID, Name: knowledgeBase.Name, Category: domain.KnowledgeBaseCategory(knowledgeBase.Category),
 		Description: knowledgeBase.Description, Groups: make([]GroupRecord, 0),
-		IntegrationConnectionID: stringValue(knowledgeBase.IntegrationConnectionID),
-		ExternalResourceID:      stringValue(knowledgeBase.ExternalResourceID),
+		IntegrationConnectionID: common.StringValue(knowledgeBase.IntegrationConnectionID),
+		ExternalResourceID:      common.StringValue(knowledgeBase.ExternalResourceID),
 		CreatedAt:               knowledgeBase.CreatedAt, UpdatedAt: knowledgeBase.UpdatedAt,
 	}
 }
 
-// optionalString 把空字符串转换为数据库空值。
-func optionalString(value string) *string {
-	if value == "" {
-		return nil
-	}
-	return &value
-}
-
-// stringValue 把数据库可空字符串转换为传输字符串。
-func stringValue(value *string) string {
-	if value == nil {
-		return ""
-	}
-	return *value
-}
-
 // isConstraintConflict 判断 PostgreSQL 唯一约束冲突名称。
 func isConstraintConflict(err error, constraint string) bool {
-	var postgresError pgdriver.Error
-	return errors.As(err, &postgresError) && postgresError.Field('C') == "23505" && postgresError.Field('n') == constraint
-}
-
-// validateIdentity 校验当前企业用户账号仍可用。
-func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
-	return identityaction.Validate(ctx, db, identity)
+	return pgerr.UniqueViolationOn(err, constraint)
 }
 
 // rowsAffectedOne 校验写操作确实命中一行。

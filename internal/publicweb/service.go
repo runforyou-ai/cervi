@@ -36,7 +36,7 @@ type pageView struct {
 	NotFound           bool
 	ShowWidgetControls bool
 	Preview            bool
-	Copy               messengerCopy
+	Copy               map[string]string
 	ThemeCSS           template.CSS
 	MessengerCSS       template.CSS
 	ComposerEmojis     template.JS
@@ -56,68 +56,6 @@ type previewHostView struct {
 	Lang       string
 	Title      string
 	StageLabel string
-}
-
-// messengerCopy 定义访客 Messenger 的固定本地化文案。
-type messengerCopy struct {
-	Home                      string
-	Messages                  string
-	Help                      string
-	Message                   string
-	Close                     string
-	Attach                    string
-	Emoji                     string
-	DefaultAgentName          string
-	DefaultAgentLastActive    string
-	DemoReply                 string
-	Welcome                   string
-	HowCanWeHelp              string
-	StartConversation         string
-	DefaultResponse           string
-	ExploreHelp               string
-	ExploreHelpDescription    string
-	ViewAll                   string
-	GettingStarted            string
-	GettingStartedDescription string
-	FeaturesAndSettings       string
-	FeaturesDescription       string
-	CommonQuestions           string
-	QuestionsDescription      string
-	NoMessages                string
-	NoMessagesDescription     string
-	SearchHelp                string
-	Collections               string
-	CollectionCount           string
-	ThreeArticles             string
-	FiveArticles              string
-	SixArticles               string
-	NoHelpResults             string
-	Back                      string
-	ArticleOneTitle           string
-	ArticleOneBody            string
-	ArticleTwoTitle           string
-	ArticleTwoBody            string
-	ArticleThreeTitle         string
-	ArticleThreeBody          string
-	StillNeedHelp             string
-	ConversationPrompt        string
-	More                      string
-	ExpandWindow              string
-	CollapseWindow            string
-	RecordVoice               string
-	PlayVoice                 string
-	PauseVoice                string
-	Send                      string
-	CancelRecording           string
-	StopRecording             string
-	MessengerNavigation       string
-	Loading                   string
-	Retry                     string
-	RequestFailed             string
-	SessionWaiting            string
-	SessionActive             string
-	SessionPending            string
-	SessionClosed             string
 }
 
 var pageTemplate = template.Must(template.New("chat").Parse(pageHTML))
@@ -305,11 +243,11 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 	page.Title = channel.Title
 	page.Subtitle = strings.TrimSpace(channel.Subtitle)
 	if page.Subtitle == "" {
-		page.Subtitle = page.Copy.DefaultResponse
+		page.Subtitle = page.Copy["defaultResponse"]
 	}
 	page.Greeting = strings.TrimSpace(channel.Greeting)
 	if page.Greeting == "" {
-		page.Greeting = page.Copy.ConversationPrompt
+		page.Greeting = page.Copy["conversationPrompt"]
 	}
 	if entry == "embed" {
 		page.FrameAncestors = embedhost.FrameAncestors(channel.AllowedEmbedHosts)
@@ -326,8 +264,8 @@ func previewView(request *http.Request) pageView {
 	// 预览框同时允许管理端顶层和同源预览宿主页。
 	page.FrameAncestors = "* wails:"
 	page.Title, _ = cervii18n.Localize(string(locale), cervii18n.MessengerDefaultTitle)
-	page.Subtitle = page.Copy.DefaultResponse
-	page.Greeting = page.Copy.ConversationPrompt
+	page.Subtitle = page.Copy["defaultResponse"]
+	page.Greeting = page.Copy["conversationPrompt"]
 	return page
 }
 
@@ -347,15 +285,15 @@ func notFoundView(request *http.Request, entry string) pageView {
 
 // baseView 填充聊天页共用内容。
 func baseView(entry string, theme theme, locale domain.Locale) pageView {
-	copy := localizedMessengerCopy(locale)
+	messengerText := localizedMessengerCopy(locale)
 	page := pageView{
 		Shell:              entry,
 		ShowWidgetControls: entry == "embed",
-		Copy:               copy,
+		Copy:               messengerText,
 		Agent: serviceAgentView{
-			Name:       copy.DefaultAgentName,
-			LastActive: copy.DefaultAgentLastActive,
-			Initials:   agentInitials(copy.DefaultAgentName),
+			Name:       messengerText["defaultAgentName"],
+			LastActive: messengerText["defaultAgentLastActive"],
+			Initials:   agentInitials(messengerText["defaultAgentName"]),
 		},
 		ThemeCSS:       template.CSS(theme.rootCSS()),
 		MessengerCSS:   template.CSS(messengerCSS),
@@ -367,6 +305,8 @@ func baseView(entry string, theme theme, locale domain.Locale) pageView {
 	return page
 }
 
+// messengerCopyMessageKeys 是访客 Messenger 固定文案的唯一定义：
+// 键即模板中 .Copy 的字段名，新增文案只需在此补一条并在模板引用。
 var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"home":                      cervii18n.MessengerHome,
 	"messages":                  cervii18n.MessengerMessages,
@@ -428,69 +368,9 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"sessionClosed":             cervii18n.MessengerSessionClosed,
 }
 
-// localizedMessengerCopy 返回 Messenger 固定文案。
-func localizedMessengerCopy(locale domain.Locale) messengerCopy {
-	messages := cervii18n.LocalizeMap(string(locale), messengerCopyMessageKeys)
-	return messengerCopy{
-		Home:                      messages["home"],
-		Messages:                  messages["messages"],
-		Help:                      messages["help"],
-		Message:                   messages["message"],
-		Close:                     messages["close"],
-		Attach:                    messages["attach"],
-		Emoji:                     messages["emoji"],
-		DefaultAgentName:          messages["defaultAgentName"],
-		DefaultAgentLastActive:    messages["defaultAgentLastActive"],
-		DemoReply:                 messages["demoReply"],
-		Welcome:                   messages["welcome"],
-		HowCanWeHelp:              messages["howCanWeHelp"],
-		StartConversation:         messages["startConversation"],
-		DefaultResponse:           messages["defaultResponse"],
-		ExploreHelp:               messages["exploreHelp"],
-		ExploreHelpDescription:    messages["exploreHelpDescription"],
-		ViewAll:                   messages["viewAll"],
-		GettingStarted:            messages["gettingStarted"],
-		GettingStartedDescription: messages["gettingStartedDescription"],
-		FeaturesAndSettings:       messages["featuresAndSettings"],
-		FeaturesDescription:       messages["featuresDescription"],
-		CommonQuestions:           messages["commonQuestions"],
-		QuestionsDescription:      messages["questionsDescription"],
-		NoMessages:                messages["noMessages"],
-		NoMessagesDescription:     messages["noMessagesDescription"],
-		SearchHelp:                messages["searchHelp"],
-		Collections:               messages["collections"],
-		CollectionCount:           messages["collectionCount"],
-		ThreeArticles:             messages["threeArticles"],
-		FiveArticles:              messages["fiveArticles"],
-		SixArticles:               messages["sixArticles"],
-		NoHelpResults:             messages["noHelpResults"],
-		Back:                      messages["back"],
-		ArticleOneTitle:           messages["articleOneTitle"],
-		ArticleOneBody:            messages["articleOneBody"],
-		ArticleTwoTitle:           messages["articleTwoTitle"],
-		ArticleTwoBody:            messages["articleTwoBody"],
-		ArticleThreeTitle:         messages["articleThreeTitle"],
-		ArticleThreeBody:          messages["articleThreeBody"],
-		StillNeedHelp:             messages["stillNeedHelp"],
-		ConversationPrompt:        messages["conversationPrompt"],
-		More:                      messages["more"],
-		ExpandWindow:              messages["expandWindow"],
-		CollapseWindow:            messages["collapseWindow"],
-		RecordVoice:               messages["recordVoice"],
-		PlayVoice:                 messages["playVoice"],
-		PauseVoice:                messages["pauseVoice"],
-		Send:                      messages["send"],
-		CancelRecording:           messages["cancelRecording"],
-		StopRecording:             messages["stopRecording"],
-		MessengerNavigation:       messages["messengerNavigation"],
-		Loading:                   messages["loading"],
-		Retry:                     messages["retry"],
-		RequestFailed:             messages["requestFailed"],
-		SessionWaiting:            messages["sessionWaiting"],
-		SessionActive:             messages["sessionActive"],
-		SessionPending:            messages["sessionPending"],
-		SessionClosed:             messages["sessionClosed"],
-	}
+// localizedMessengerCopy 返回按映射表本地化后的 Messenger 固定文案。
+func localizedMessengerCopy(locale domain.Locale) map[string]string {
+	return cervii18n.LocalizeMap(string(locale), messengerCopyMessageKeys)
 }
 
 // embedRequestHost 从公开嵌入请求中读取宿主网站主机。

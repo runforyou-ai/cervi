@@ -3,8 +3,8 @@
 package businesssystem
 
 import (
-	"net/url"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 )
@@ -25,6 +25,15 @@ const (
 // ValidationError 表示业务系统字段校验失败。
 type ValidationError = common.FieldError
 
+const (
+	// maxNameLength 是业务系统名称的最大字符数。
+	maxNameLength = 100
+	// maxDescriptionLength 是业务系统描述的最大字符数。
+	maxDescriptionLength = 200
+	// maxURLBytes 是业务系统地址的最大字节数。
+	maxURLBytes = 2048
+)
+
 // normalizeInput 归一化并校验业务系统输入。
 func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	input.Name = strings.TrimSpace(input.Name)
@@ -33,25 +42,18 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	fields := make(map[string]ValidationCode)
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
-	} else if len([]rune(input.Name)) > 100 {
+	} else if utf8.RuneCountInString(input.Name) > maxNameLength {
 		fields["name"] = ValidationNameTooLong
 	}
-	if len([]rune(input.Description)) > 200 {
+	if utf8.RuneCountInString(input.Description) > maxDescriptionLength {
 		fields["description"] = ValidationDescriptionTooLong
 	}
 	if input.URL == "" {
 		fields["url"] = ValidationURLRequired
-	} else if len(input.URL) > 2048 {
+	} else if len(input.URL) > maxURLBytes {
 		fields["url"] = ValidationURLTooLong
-	} else if !validURL(input.URL) {
+	} else if !common.ValidHTTPURL(input.URL) {
 		fields["url"] = ValidationURLInvalid
 	}
 	return input, fields
-}
-
-// validURL 校验地址为不含认证信息的完整 HTTP 或 HTTPS 地址。
-func validURL(value string) bool {
-	parsed, err := url.Parse(value)
-	return err == nil && parsed.IsAbs() && parsed.Host != "" && parsed.User == nil &&
-		(strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https"))
 }

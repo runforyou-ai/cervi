@@ -15,7 +15,7 @@ func TestLocalStoreSave(t *testing.T) {
 	if err := store.Save(context.Background(), key, strings.NewReader("avatar"), 6); err != nil {
 		t.Fatal(err)
 	}
-	file, info, err := store.Open(key)
+	file, info, err := store.Open(context.Background(), key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,13 +23,13 @@ func TestLocalStoreSave(t *testing.T) {
 	if info.Size() != 6 {
 		t.Fatalf("size = %d, want 6", info.Size())
 	}
-	if err := store.Delete(key); err != nil {
+	if err := store.Delete(context.Background(), key); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Delete(key); err != nil {
+	if err := store.Delete(context.Background(), key); err != nil {
 		t.Fatalf("delete missing file: %v", err)
 	}
-	if _, err := store.Stat("../outside"); err == nil {
+	if _, err := store.Stat(context.Background(), "../outside"); err == nil {
 		t.Fatal("expected traversal key to fail")
 	}
 }
@@ -40,7 +40,7 @@ func TestLocalStoreRejectsUnexpectedSize(t *testing.T) {
 	if err := store.Save(context.Background(), "file", strings.NewReader("too long"), 3); err == nil {
 		t.Fatal("expected size mismatch")
 	}
-	if _, err := store.Stat("file"); err == nil {
+	if _, err := store.Stat(context.Background(), "file"); err == nil {
 		t.Fatal("unexpected committed file")
 	}
 }

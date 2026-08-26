@@ -12,13 +12,13 @@ import (
 type WebsiteChannelSetting struct {
 	bun.BaseModel `bun:"table:website_channel_settings,alias:wcs"`
 
-	ChannelID         string    `bun:"channel_id,pk" json:"-"`
-	OrganizationID    string    `bun:"organization_id" json:"-"`
-	ChatTitle         string    `bun:"chat_title" json:"title"`
-	ChatSubtitle      *string   `bun:"chat_subtitle" json:"subtitle"`
-	GreetingMessage   *string   `bun:"greeting_message" json:"greetingMessage"`
-	ThemeColor        string    `bun:"theme_color" json:"themeColor"`
-	AllowedEmbedHosts []string  `bun:"allowed_embed_hosts,array" json:"allowedHosts"`
-	CreatedAt         time.Time `bun:"created_at" json:"-"`
-	UpdatedAt         time.Time `bun:"updated_at" json:"-"`
+	ChannelID         string    `bun:"channel_id,pk"`
+	OrganizationID    string    `bun:"organization_id"`
+	ChatTitle         string    `bun:"chat_title"`
+	ChatSubtitle      *string   `bun:"chat_subtitle"`
+	GreetingMessage   *string   `bun:"greeting_message"`
+	ThemeColor        string    `bun:"theme_color"`
+	AllowedEmbedHosts []string  `bun:"allowed_embed_hosts,array"`
+	CreatedAt         time.Time `bun:"created_at"`
+	UpdatedAt         time.Time `bun:"updated_at"`
 }

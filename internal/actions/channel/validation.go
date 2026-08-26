@@ -6,6 +6,7 @@ package channel
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/embedhost"
@@ -23,57 +24,36 @@ var themeColorPattern = regexp.MustCompile(`^#[0-9A-F]{6}$`)
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationTypeInvalid          ValidationCode = "TYPE_INVALID"
-	ValidationNameRequired         ValidationCode = "NAME_REQUIRED"
-	ValidationNameTooLong          ValidationCode = "NAME_TOO_LONG"
-	ValidationDescriptionTooLong   ValidationCode = "DESCRIPTION_TOO_LONG"
-	ValidationDefaultLocaleInvalid ValidationCode = "DEFAULT_LOCALE_INVALID"
-	ValidationRoutingTargetInvalid ValidationCode = "ROUTING_TARGET_INVALID"
-	ValidationChatTitleRequired    ValidationCode = "CHAT_TITLE_REQUIRED"
-	ValidationChatTitleTooLong     ValidationCode = "CHAT_TITLE_TOO_LONG"
-	ValidationChatSubtitleTooLong  ValidationCode = "CHAT_SUBTITLE_TOO_LONG"
-	ValidationGreetingTooLong      ValidationCode = "GREETING_MESSAGE_TOO_LONG"
-	ValidationThemeColorInvalid    ValidationCode = "THEME_COLOR_INVALID"
-	ValidationAllowedHostsTooMany  ValidationCode = "ALLOWED_HOSTS_TOO_MANY"
-	ValidationAllowedHostInvalid   ValidationCode = "ALLOWED_HOST_INVALID"
+	ValidationTypeInvalid          ValidationCode = "CHANNEL_TYPE_INVALID"
+	ValidationNameRequired         ValidationCode = "CHANNEL_NAME_REQUIRED"
+	ValidationNameTooLong          ValidationCode = "CHANNEL_NAME_TOO_LONG"
+	ValidationDescriptionTooLong   ValidationCode = "CHANNEL_DESCRIPTION_TOO_LONG"
+	ValidationDefaultLocaleInvalid ValidationCode = "CHANNEL_DEFAULT_LOCALE_INVALID"
+	ValidationRoutingTargetInvalid ValidationCode = "CHANNEL_ROUTING_TARGET_INVALID"
+	ValidationChatTitleRequired    ValidationCode = "CHANNEL_CHAT_TITLE_REQUIRED"
+	ValidationChatTitleTooLong     ValidationCode = "CHANNEL_CHAT_TITLE_TOO_LONG"
+	ValidationChatSubtitleTooLong  ValidationCode = "CHANNEL_CHAT_SUBTITLE_TOO_LONG"
+	ValidationGreetingTooLong      ValidationCode = "CHANNEL_GREETING_MESSAGE_TOO_LONG"
+	ValidationThemeColorInvalid    ValidationCode = "CHANNEL_THEME_COLOR_INVALID"
+	ValidationAllowedHostsTooMany  ValidationCode = "CHANNEL_ALLOWED_HOSTS_TOO_MANY"
+	ValidationAllowedHostInvalid   ValidationCode = "CHANNEL_ALLOWED_HOST_INVALID"
+)
+
+const (
+	// maxNameLength 是渠道名称的最大字符数。
+	maxNameLength = 100
+	// maxDescriptionLength 是渠道描述的最大字符数。
+	maxDescriptionLength = 2000
+	// maxChatTitleLength 是聊天界面标题的最大字符数。
+	maxChatTitleLength = 100
+	// maxChatSubtitleLength 是聊天界面副标题的最大字符数。
+	maxChatSubtitleLength = 120
+	// maxGreetingMessageLength 是欢迎语的最大字符数。
+	maxGreetingMessageLength = 500
 )
 
 // ValidationError 表示渠道字段校验失败。
 type ValidationError = common.FieldError
-
-// MessageChannelInput 定义消息渠道可编辑的通用字段。
-type MessageChannelInput struct {
-	Name                  string
-	Description           string
-	DefaultLocale         domain.Locale
-	NewConversationTarget RoutingTarget
-	FallbackTarget        RoutingTarget
-}
-
-// CreateMessageChannelInput 定义创建消息渠道所需字段。
-type CreateMessageChannelInput struct {
-	MessageChannelInput
-	Type domain.ChannelType
-}
-
-// RoutingTarget 定义渠道会话流转目标。
-type RoutingTarget struct {
-	Type domain.ChannelRoutingTargetType
-	ID   string
-}
-
-// WebsiteChannelChatInterfaceInput 定义网站渠道聊天界面可编辑字段。
-type WebsiteChannelChatInterfaceInput struct {
-	Title           string
-	Subtitle        string
-	GreetingMessage string
-	ThemeColor      string
-}
-
-// WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
-type WebsiteChannelAccessInput struct {
-	AllowedHosts []string
-}
 
 // normalizeCreateMessageChannelInput 规范化并校验消息渠道创建输入。
 func normalizeCreateMessageChannelInput(input CreateMessageChannelInput) (CreateMessageChannelInput, map[string]ValidationCode) {
@@ -97,10 +77,10 @@ func normalizeMessageChannelInput(input MessageChannelInput) (MessageChannelInpu
 	fields := make(map[string]ValidationCode)
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
-	} else if len([]rune(input.Name)) > 100 {
+	} else if utf8.RuneCountInString(input.Name) > maxNameLength {
 		fields["name"] = ValidationNameTooLong
 	}
-	if len([]rune(input.Description)) > 2000 {
+	if utf8.RuneCountInString(input.Description) > maxDescriptionLength {
 		fields["description"] = ValidationDescriptionTooLong
 	}
 	if input.DefaultLocale != domain.LocaleChineseSimplified && input.DefaultLocale != domain.LocaleEnglishUnitedStates {
@@ -149,13 +129,13 @@ func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterface
 	fields := make(map[string]ValidationCode)
 	if input.Title == "" {
 		fields["title"] = ValidationChatTitleRequired
-	} else if len([]rune(input.Title)) > 100 {
+	} else if utf8.RuneCountInString(input.Title) > maxChatTitleLength {
 		fields["title"] = ValidationChatTitleTooLong
 	}
-	if len([]rune(input.Subtitle)) > 120 {
+	if utf8.RuneCountInString(input.Subtitle) > maxChatSubtitleLength {
 		fields["subtitle"] = ValidationChatSubtitleTooLong
 	}
-	if len([]rune(input.GreetingMessage)) > 500 {
+	if utf8.RuneCountInString(input.GreetingMessage) > maxGreetingMessageLength {
 		fields["greetingMessage"] = ValidationGreetingTooLong
 	}
 	if !themeColorPattern.MatchString(input.ThemeColor) {

@@ -5,6 +5,7 @@ package contact
 import (
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -38,11 +39,7 @@ type ListInput struct {
 }
 
 // PageInfo 定义服务端分页信息。
-type PageInfo struct {
-	Number int `json:"number"`
-	Size   int `json:"size"`
-	Total  int `json:"total"`
-}
+type PageInfo = common.PageInfo
 
 // ContactSummary 定义外部联系人列表项。
 type ContactSummary struct {

@@ -194,10 +194,12 @@ func (r *Runner) Run(ctx context.Context, target Target, probe Probe) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(testCtx.Err(), context.DeadlineExceeded) {
-		err = NewError(StageConnect, FailureTimeout, context.DeadlineExceeded)
-	} else {
-		err = ClassifyTransportError(StageConnect, err)
+	if _, _, classified := Details(err); !classified {
+		if errors.Is(testCtx.Err(), context.DeadlineExceeded) {
+			err = NewError(StageConnect, FailureTimeout, context.DeadlineExceeded)
+		} else {
+			err = ClassifyTransportError(StageConnect, err)
+		}
 	}
 	stage, kind, _ := Details(err)
 	attributes := append(connectionLogAttributes(target, duration), "stage", stage, "kind", kind)

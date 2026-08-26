@@ -25,15 +25,15 @@ func run(arguments []string) error {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
-		return fmt.Errorf("解析服务端参数: %w", err)
+		return fmt.Errorf("parse server arguments: %w", err)
 	}
 	if flags.NArg() != 0 {
-		return fmt.Errorf("不支持位置参数 %q", flags.Arg(0))
+		return fmt.Errorf("unexpected positional argument %q", flags.Arg(0))
 	}
 
 	config, err := serverconfig.Load(*configPath)
 	if err != nil {
-		return fmt.Errorf("加载服务端配置: %w", err)
+		return fmt.Errorf("load server config: %w", err)
 	}
 	if *checkConfig {
 		_, err := fmt.Fprintln(os.Stdout, "服务端配置有效")

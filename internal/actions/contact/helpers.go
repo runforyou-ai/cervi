@@ -7,16 +7,10 @@ import (
 	"database/sql"
 	"errors"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-// validateIdentity 校验当前用户仍是企业的有效成员。
-func validateIdentity(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
-	return identityaction.Validate(ctx, tx, identity)
-}
 
 // validateSourceChannel 校验来源渠道属于当前企业且已启用。
 func validateSourceChannel(ctx context.Context, tx bun.Tx, organizationID, channelID string) error {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -32,15 +33,15 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 	}
 	var record Record
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		result, err := tx.NewUpdate().Model((*servermodels.KnowledgeBase)(nil)).
 			Set("name = ?", input.Name).
 			Set("category = ?", input.Category).
 			Set("description = ?", input.Description).
-			Set("integration_connection_id = ?", optionalString(input.IntegrationConnectionID)).
-			Set("external_resource_id = ?", optionalString(input.ExternalResourceID)).
+			Set("integration_connection_id = ?", common.OptionalString(input.IntegrationConnectionID)).
+			Set("external_resource_id = ?", common.OptionalString(input.ExternalResourceID)).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", knowledgeBaseID).

@@ -3,6 +3,7 @@ package i18n
 
 import (
 	"embed"
+	"log/slog"
 
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
@@ -307,17 +308,18 @@ var localeFiles embed.FS
 
 var bundle = loadBundle()
 
-// Localize 根据语言偏好返回本地化文案和最终匹配的语言。
+// Localize 根据语言偏好返回本地化文案和最终匹配的语言；词条缺失或本地化失败时记录错误并回退返回键本身。
 func Localize(acceptLanguage string, key Key) (string, string) {
 	localizer := goi18n.NewLocalizer(bundle, acceptLanguage)
 	message, tag, err := localizer.LocalizeWithTag(&goi18n.LocalizeConfig{MessageID: string(key)})
 	if err != nil {
-		panic(err)
+		slog.Error("本地化文案失败，回退返回文案键", "key", string(key), "locale", acceptLanguage, "error", err)
+		return string(key), tag.String()
 	}
 	return message, tag.String()
 }
 
-// LocalizeMap 将一组文案键翻译为对应文案。
+// LocalizeMap 将一组文案键翻译为对应文案；词条缺失或本地化失败时记录错误并回退返回键本身。
 func LocalizeMap[K comparable](acceptLanguage string, keys map[K]Key) map[K]string {
 	if len(keys) == 0 {
 		return nil
@@ -325,7 +327,12 @@ func LocalizeMap[K comparable](acceptLanguage string, keys map[K]Key) map[K]stri
 	localizer := goi18n.NewLocalizer(bundle, acceptLanguage)
 	messages := make(map[K]string, len(keys))
 	for name, key := range keys {
-		messages[name] = localizer.MustLocalize(&goi18n.LocalizeConfig{MessageID: string(key)})
+		message, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: string(key)})
+		if err != nil {
+			slog.Error("本地化文案失败，回退返回文案键", "key", string(key), "locale", acceptLanguage, "error", err)
+			message = string(key)
+		}
+		messages[name] = message
 	}
 	return messages
 }

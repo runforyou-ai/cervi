@@ -74,7 +74,10 @@ func (s *LocalStore) Save(ctx context.Context, key string, source io.Reader, exp
 }
 
 // Open 打开本地文件及其状态。
-func (s *LocalStore) Open(key string) (*os.File, os.FileInfo, error) {
+func (s *LocalStore) Open(ctx context.Context, key string) (*os.File, os.FileInfo, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	path, err := s.path(key)
 	if err != nil {
 		return nil, nil, err
@@ -92,7 +95,10 @@ func (s *LocalStore) Open(key string) (*os.File, os.FileInfo, error) {
 }
 
 // Stat 返回本地文件状态。
-func (s *LocalStore) Stat(key string) (os.FileInfo, error) {
+func (s *LocalStore) Stat(ctx context.Context, key string) (os.FileInfo, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	path, err := s.path(key)
 	if err != nil {
 		return nil, err
@@ -101,7 +107,10 @@ func (s *LocalStore) Stat(key string) (os.FileInfo, error) {
 }
 
 // Delete 删除本地文件，文件不存在时直接成功。
-func (s *LocalStore) Delete(key string) error {
+func (s *LocalStore) Delete(ctx context.Context, key string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	path, err := s.path(key)
 	if err != nil {
 		return err

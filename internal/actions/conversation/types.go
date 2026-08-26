@@ -5,11 +5,12 @@ package conversation
 import (
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// ValidationCode 定义公开访客输入错误码。
-type ValidationCode string
+// ValidationCode 标识公开访客输入的校验结果；取值为访客协议使用的小写形式。
+type ValidationCode = common.FieldCode
 
 const (
 	ValidationChannelIDInvalid       ValidationCode = "channel_id_invalid"

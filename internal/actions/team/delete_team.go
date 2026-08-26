@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -21,7 +22,7 @@ func NewDeleteTeamAction(db *bun.DB) *DeleteTeamAction { return &DeleteTeamActio
 // Execute 删除团队及其成员关系，并把渠道关联重置到公共队列。
 func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		if _, err := loadTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {

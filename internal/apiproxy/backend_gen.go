@@ -108,7 +108,7 @@ func (b *Backend) CreateMessageChannel(ctx context.Context, meta appservice.Requ
 // UpdateMessageChannel 修改消息渠道基础信息。
 func (b *Backend) UpdateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.MessageChannelInput) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary
-	err := b.do(ctx, meta, http.MethodPatch, "/channels/"+url.PathEscape(channelID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/channels/"+url.PathEscape(channelID), nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -116,7 +116,7 @@ func (b *Backend) UpdateMessageChannel(ctx context.Context, meta appservice.Requ
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
 func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelChatInterfaceInput) (appservice.WebsiteChannelChatInterface, error) {
 	var output appservice.WebsiteChannelChatInterface
-	err := b.do(ctx, meta, http.MethodPatch, "/channels/website/"+url.PathEscape(channelID)+"/chat-interface", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/chat-interface", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -124,7 +124,7 @@ func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta ap
 // UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelAccessInput) (appservice.WebsiteChannelAccess, error) {
 	var output appservice.WebsiteChannelAccess
-	err := b.do(ctx, meta, http.MethodPatch, "/channels/website/"+url.PathEscape(channelID)+"/access", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/access", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -148,7 +148,7 @@ func (b *Backend) ActivateMessageChannel(ctx context.Context, meta appservice.Re
 // ListChannelOptions 返回当前企业的渠道选择项。
 func (b *Backend) ListChannelOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.ChannelOptionList, error) {
 	var output appservice.ChannelOptionList
-	err := b.do(ctx, meta, http.MethodGet, "/channel-options", nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/channels/options", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -196,7 +196,7 @@ func (b *Backend) GetAgent(ctx context.Context, meta appservice.RequestMeta, age
 // UpdateAgent 修改企业 AI 员工。
 func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.UpdateAgentInput) (appservice.Agent, error) {
 	var output appservice.Agent
-	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/agents/"+url.PathEscape(agentID), nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -204,7 +204,7 @@ func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
 func (b *Backend) UpdateAgentExecution(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentExecutionInput) (appservice.Agent, error) {
 	var output appservice.Agent
-	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID)+"/execution", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/agents/"+url.PathEscape(agentID)+"/execution", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -212,7 +212,7 @@ func (b *Backend) UpdateAgentExecution(ctx context.Context, meta appservice.Requ
 // UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
 func (b *Backend) UpdateAgentWorkStatus(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentWorkStatusInput) (appservice.Agent, error) {
 	var output appservice.Agent
-	err := b.do(ctx, meta, http.MethodPatch, "/agents/"+url.PathEscape(agentID)+"/work-status", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/agents/"+url.PathEscape(agentID)+"/work-status", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -260,7 +260,7 @@ func (b *Backend) CreateUser(ctx context.Context, meta appservice.RequestMeta, i
 // UpdateUser 修改企业成员资料、角色和所属团队。
 func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateUserInput) (appservice.User, error) {
 	var output appservice.User
-	err := b.do(ctx, meta, http.MethodPatch, "/users/"+url.PathEscape(userID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/users/"+url.PathEscape(userID), nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -305,7 +305,7 @@ func (b *Backend) CreateTeam(ctx context.Context, meta appservice.RequestMeta, i
 // UpdateTeam 修改企业团队。
 func (b *Backend) UpdateTeam(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamInput) (appservice.Team, error) {
 	var output appservice.Team
-	err := b.do(ctx, meta, http.MethodPatch, "/teams/"+url.PathEscape(teamID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/teams/"+url.PathEscape(teamID), nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -313,67 +313,6 @@ func (b *Backend) UpdateTeam(ctx context.Context, meta appservice.RequestMeta, t
 // DeleteTeam 删除企业团队及其成员关系。
 func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, teamID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID), nil, nil, nil)
-}
-
-// ListKnowledgeBases 返回当前企业的知识库列表。
-func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.RequestMeta) (appservice.KnowledgeBaseList, error) {
-	var output appservice.KnowledgeBaseList
-	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// GetKnowledgeBase 返回当前企业中的知识库详情。
-func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// CreateKnowledgeBase 创建企业知识库。
-func (b *Backend) CreateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// UpdateKnowledgeBase 修改企业知识库。
-func (b *Backend) UpdateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodPatch, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// DeleteKnowledgeBase 删除企业知识库。
-func (b *Backend) DeleteKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, nil)
-}
-
-// CreateKnowledgeGroup 创建知识库分组。
-func (b *Backend) CreateKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeGroupInput) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// UpdateKnowledgeGroup 修改知识库分组。
-func (b *Backend) UpdateKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, groupID string, input appservice.KnowledgeGroupInput) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodPatch, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// DeleteKnowledgeGroup 删除不含子分组的知识库分组。
-func (b *Backend) DeleteKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, groupID string) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
 }
 
 // ListTeamMembers 返回团队成员列表。
@@ -403,7 +342,68 @@ func (b *Backend) AddTeamMembers(ctx context.Context, meta appservice.RequestMet
 // RemoveTeamMembers 将企业身份批量移出团队。
 func (b *Backend) RemoveTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
 	var output appservice.Team
-	err := b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID)+"/members", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPost, "/teams/"+url.PathEscape(teamID)+"/members/remove", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListKnowledgeBases 返回当前企业的知识库列表。
+func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.RequestMeta) (appservice.KnowledgeBaseList, error) {
+	var output appservice.KnowledgeBaseList
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetKnowledgeBase 返回当前企业中的知识库详情。
+func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateKnowledgeBase 创建企业知识库。
+func (b *Backend) CreateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateKnowledgeBase 修改企业知识库。
+func (b *Backend) UpdateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteKnowledgeBase 删除企业知识库。
+func (b *Backend) DeleteKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, nil)
+}
+
+// CreateKnowledgeGroup 创建知识库分组。
+func (b *Backend) CreateKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeGroupInput) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateKnowledgeGroup 修改知识库分组。
+func (b *Backend) UpdateKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, groupID string, input appservice.KnowledgeGroupInput) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteKnowledgeGroup 删除不含子分组的知识库分组。
+func (b *Backend) DeleteKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, groupID string) (appservice.KnowledgeBase, error) {
+	var output appservice.KnowledgeBase
+	err := b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -427,7 +427,7 @@ func (b *Backend) CreateContact(ctx context.Context, meta appservice.RequestMeta
 // UpdateContact 修改联系人。
 func (b *Backend) UpdateContact(ctx context.Context, meta appservice.RequestMeta, contactID string, input appservice.ContactInput) (appservice.Contact, error) {
 	var output appservice.Contact
-	err := b.do(ctx, meta, http.MethodPatch, "/contacts/"+url.PathEscape(contactID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/contacts/"+url.PathEscape(contactID), nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -630,7 +630,7 @@ func (b *Backend) GetS3Setting(ctx context.Context, meta appservice.RequestMeta)
 }
 
 // SaveS3Setting 保存当前企业的对象存储设置。
-func (b *Backend) SaveS3Setting(ctx context.Context, meta appservice.RequestMeta, input appservice.S3Setting) (appservice.S3Setting, error) {
+func (b *Backend) SaveS3Setting(ctx context.Context, meta appservice.RequestMeta, input appservice.S3SettingInput) (appservice.S3Setting, error) {
 	var output appservice.S3Setting
 	err := b.do(ctx, meta, http.MethodPut, "/settings/storage/s3", nil, input, &output)
 	b.normalizeOutput(&output)
@@ -638,7 +638,7 @@ func (b *Backend) SaveS3Setting(ctx context.Context, meta appservice.RequestMeta
 }
 
 // TestS3Setting 测试对象存储连接。
-func (b *Backend) TestS3Setting(ctx context.Context, meta appservice.RequestMeta, input appservice.S3Setting) error {
+func (b *Backend) TestS3Setting(ctx context.Context, meta appservice.RequestMeta, input appservice.S3SettingInput) error {
 	return b.do(ctx, meta, http.MethodPost, "/settings/storage/s3/test", nil, input, nil)
 }
 

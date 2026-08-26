@@ -12,13 +12,13 @@ import (
 type ContactChannelIdentity struct {
 	bun.BaseModel `bun:"table:contact_channel_identities,alias:cci"`
 
-	ID             string     `bun:"id,pk" json:"id"`
-	OrganizationID string     `bun:"organization_id" json:"organizationId"`
-	ContactID      string     `bun:"contact_id" json:"contactId"`
-	ChannelID      string     `bun:"channel_id" json:"channelId"`
-	ExternalID     string     `bun:"external_id" json:"externalId"`
-	DisplayName    *string    `bun:"display_name" json:"displayName"`
-	CreatedAt      time.Time  `bun:"created_at" json:"createdAt"`
-	UpdatedAt      time.Time  `bun:"updated_at" json:"updatedAt"`
-	LastSeenAt     *time.Time `bun:"last_seen_at" json:"lastSeenAt"`
+	ID             string     `bun:"id,pk"`
+	OrganizationID string     `bun:"organization_id"`
+	ContactID      string     `bun:"contact_id"`
+	ChannelID      string     `bun:"channel_id"`
+	ExternalID     string     `bun:"external_id"`
+	DisplayName    *string    `bun:"display_name"`
+	CreatedAt      time.Time  `bun:"created_at"`
+	UpdatedAt      time.Time  `bun:"updated_at"`
+	LastSeenAt     *time.Time `bun:"last_seen_at"`
 }

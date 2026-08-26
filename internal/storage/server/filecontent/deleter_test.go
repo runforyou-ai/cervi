@@ -24,7 +24,7 @@ func TestDeleterDeleteLocalFile(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := local.Stat(key); err == nil {
+	if _, err := local.Stat(context.Background(), key); err == nil {
 		t.Fatal("local file still exists")
 	}
 }

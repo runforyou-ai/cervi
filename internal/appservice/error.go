@@ -95,9 +95,9 @@ func NotFoundError(meta RequestMeta, messageKey cervii18n.Key) *Error {
 
 // ConflictError 返回带稳定原因码的业务冲突。
 func ConflictError(meta RequestMeta, messageKey cervii18n.Key, reason string) *Error {
-	error := newError(meta, ErrorKindConflict, "", messageKey, nil)
-	error.Reason = reason
-	return error
+	conflictError := newError(meta, ErrorKindConflict, "", messageKey, nil)
+	conflictError.Reason = reason
+	return conflictError
 }
 
 // UnavailableError 返回依赖服务不可用的业务错误。

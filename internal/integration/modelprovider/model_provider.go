@@ -15,12 +15,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
-const maxResponseSize = 1 << 20
-
 // HTTPDoer 定义模型服务探测需要的最小 HTTP 客户端契约。
-type HTTPDoer interface {
-	Do(*http.Request) (*http.Response, error)
-}
+type HTTPDoer = connectiontest.HTTPDoer
 
 // Config 定义创建模型服务探测器需要的强类型配置。
 type Config struct {
@@ -39,11 +35,7 @@ type Registry struct {
 
 // NewHTTPClient 创建不会跟随重定向泄露凭据的探测客户端。
 func NewHTTPClient() *http.Client {
-	return &http.Client{
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
+	return connectiontest.NewHTTPClient()
 }
 
 // NewRegistry 创建内置供应商品牌注册表。
@@ -82,19 +74,7 @@ type httpProbe struct {
 
 // Run 执行模型服务供应商 HTTP 探测。
 func (p *httpProbe) Run(ctx context.Context) error {
-	request := p.request.Clone(ctx)
-	response, err := p.client.Do(request)
-	if err != nil {
-		return connectiontest.ClassifyTransportError(connectiontest.StageConnect, err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return connectiontest.HTTPStatusError(response.StatusCode)
-	}
-	if err := p.validate(io.LimitReader(response.Body, maxResponseSize)); err != nil {
-		return connectiontest.NewError(connectiontest.StageCapability, connectiontest.FailureProtocol, err)
-	}
-	return nil
+	return connectiontest.RunHTTPProbe(ctx, p.client, p.request, p.validate)
 }
 
 // newOpenAICompatibleFactory 创建 OpenAI 兼容模型列表探测器工厂。
@@ -104,7 +84,7 @@ func newOpenAICompatibleFactory(client HTTPDoer) Factory {
 		if err != nil {
 			return nil, err
 		}
-		return &httpProbe{client: client, request: request, validate: validateOpenAIModelList}, nil
+		return &httpProbe{client: client, request: request, validate: connectiontest.ValidateDataList}, nil
 	}
 }
 
@@ -113,11 +93,11 @@ func newAlibabaFactory(client HTTPDoer) Factory {
 	return func(config Config) (connectiontest.Probe, error) {
 		endpoint, err := alibabaModelsURL(config.APIURL)
 		if err != nil {
-			return nil, invalidConfigError(err)
+			return nil, connectiontest.InvalidConfigError(err)
 		}
 		request, err := http.NewRequest(http.MethodGet, endpoint, nil)
 		if err != nil {
-			return nil, invalidConfigError(err)
+			return nil, connectiontest.InvalidConfigError(err)
 		}
 		setHeaders(request, config.APIKey)
 		return &httpProbe{client: client, request: request, validate: validateAlibabaModelList}, nil
@@ -126,13 +106,13 @@ func newAlibabaFactory(client HTTPDoer) Factory {
 
 // newRequest 创建 OpenAI 兼容的模型列表请求。
 func newRequest(config Config) (*http.Request, error) {
-	requestURL, err := appendPath(config.APIURL, "models")
+	requestURL, err := connectiontest.AppendPath(config.APIURL, "models")
 	if err != nil {
-		return nil, invalidConfigError(err)
+		return nil, connectiontest.InvalidConfigError(err)
 	}
 	request, err := http.NewRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
-		return nil, invalidConfigError(err)
+		return nil, connectiontest.InvalidConfigError(err)
 	}
 	setHeaders(request, config.APIKey)
 	return request, nil
@@ -142,17 +122,6 @@ func newRequest(config Config) (*http.Request, error) {
 func setHeaders(request *http.Request, apiKey string) {
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Authorization", "Bearer "+apiKey)
-}
-
-// appendPath 在保留自定义基础路径的前提下追加接口路径。
-func appendPath(baseURL string, segment string) (string, error) {
-	parsed, err := url.Parse(baseURL)
-	if err != nil {
-		return "", err
-	}
-	parsed.RawPath = ""
-	parsed.Path = strings.TrimSuffix(parsed.Path, "/") + "/" + segment
-	return parsed.String(), nil
 }
 
 // alibabaModelsURL 把 OpenAI 兼容或原生基础地址转换为百炼模型列表地址。
@@ -175,20 +144,6 @@ func alibabaModelsURL(baseURL string) (string, error) {
 	return parsed.String(), nil
 }
 
-// validateOpenAIModelList 校验 OpenAI 兼容模型列表的最小响应契约。
-func validateOpenAIModelList(reader io.Reader) error {
-	var payload struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
-		return err
-	}
-	if len(payload.Data) == 0 || payload.Data[0] != '[' {
-		return errors.New("model list response does not contain a data array")
-	}
-	return nil
-}
-
 // validateAlibabaModelList 校验阿里云百炼模型列表的最小响应契约。
 func validateAlibabaModelList(reader io.Reader) error {
 	var payload struct {
@@ -204,9 +159,4 @@ func validateAlibabaModelList(reader io.Reader) error {
 		return errors.New("model list response does not contain a successful models array")
 	}
 	return nil
-}
-
-// invalidConfigError 创建连接配置错误。
-func invalidConfigError(err error) error {
-	return connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureInvalidConfig, err)
 }

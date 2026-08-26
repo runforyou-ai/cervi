@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
@@ -64,13 +63,13 @@ func (s *FileContentService) ServeHTTP(writer http.ResponseWriter, request *http
 // uploadLocalFile 将认证后的请求内容保存到本地最终目录。
 func (s *FileContentService) uploadLocalFile(writer http.ResponseWriter, request *http.Request, fileID string) {
 	identity, err := s.resolveIdentity.Execute(request.Context(), bearerToken(request.Header.Get("Authorization")))
+	if errors.Is(err, authaction.ErrIdentityNotFound) {
+		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
 	if err != nil {
 		slog.Warn("文件上传认证失败", "error", err)
 		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	if identity == nil {
-		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return
 	}
 	record, err := s.getFile.Execute(request.Context(), identity, fileID)
@@ -78,7 +77,7 @@ func (s *FileContentService) uploadLocalFile(writer http.ResponseWriter, request
 		writeFileError(writer, err)
 		return
 	}
-	if record.StorageBackend != string(domain.FileStorageBackendLocal) || record.Status != string(domain.FileStatusPending) || record.ExpiresAt == nil || !record.ExpiresAt.After(time.Now().UTC()) {
+	if record.StorageBackend != string(domain.FileStorageBackendLocal) || record.Status != string(domain.FileStatusPending) || record.Expired {
 		http.Error(writer, http.StatusText(http.StatusConflict), http.StatusConflict)
 		return
 	}
@@ -105,7 +104,7 @@ func (s *FileContentService) serveFile(writer http.ResponseWriter, request *http
 		s.serveS3File(writer, request, record)
 		return
 	}
-	file, info, err := s.local.Open(record.StorageKey)
+	file, info, err := s.local.Open(request.Context(), record.StorageKey)
 	if err != nil {
 		slog.Warn("读取本地文件失败", "file_id", record.ID, "error", err)
 		http.NotFound(writer, request)
