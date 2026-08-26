@@ -201,7 +201,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				"id": "user-1", "organizationId": "organization-1", "workStatus": string(input.WorkStatus),
 			})
 		case "/api/agents/agent-1/work-status":
-			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+			if request.Method != http.MethodPut || request.Header.Get("Authorization") != "Bearer test-token" {
 				http.Error(writer, "unexpected agent work status request", http.StatusBadRequest)
 				return
 			}
@@ -212,7 +212,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			}
 			writeTestJSON(writer, http.StatusOK, appservice.Agent{ID: "agent-1", WorkStatus: input.WorkStatus, Teams: []appservice.TeamSummary{}})
 		case "/api/agents/agent-1/execution":
-			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
+			if request.Method != http.MethodPut || request.Header.Get("Authorization") != "Bearer test-token" {
 				http.Error(writer, "unexpected agent execution request", http.StatusBadRequest)
 				return
 			}

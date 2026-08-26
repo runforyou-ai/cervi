@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -22,7 +23,7 @@ func NewGetKnowledgeBaseQuery(db *bun.DB) *GetKnowledgeBaseQuery {
 
 // Execute 返回指定知识库详情。
 func (q *GetKnowledgeBaseQuery) Execute(ctx context.Context, identity *servermodels.Identity, knowledgeBaseID string) (*Record, error) {
-	if err := validateIdentity(ctx, q.db, identity); err != nil {
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return nil, err
 	}
 	record, err := loadKnowledgeBaseRecord(ctx, q.db, identity.Organization.ID, knowledgeBaseID)

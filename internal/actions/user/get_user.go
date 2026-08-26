@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -22,7 +23,7 @@ func NewGetUserQuery(db *bun.DB) *GetUserQuery {
 
 // Execute 返回当前企业的指定成员。
 func (q *GetUserQuery) Execute(ctx context.Context, identity *servermodels.Identity, userID string) (*User, error) {
-	if err := validateIdentity(ctx, q.db, identity); err != nil {
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return nil, err
 	}
 	user, err := loadUser(ctx, q.db, identity.Organization.ID, userID)

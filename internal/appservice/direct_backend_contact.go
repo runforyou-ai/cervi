@@ -135,6 +135,7 @@ func (b *DirectBackend) contactError(ctx context.Context, meta RequestMeta, err 
 	return FailedError(meta, failureKey)
 }
 
+// contactInput 把联系人契约输入转换为动作层输入。
 func contactInput(input ContactInput) contactaction.ContactInput {
 	methods := make([]contactaction.MethodInput, 0, len(input.Methods))
 	for _, method := range input.Methods {
@@ -143,6 +144,7 @@ func contactInput(input ContactInput) contactaction.ContactInput {
 	return contactaction.ContactInput{DisplayName: input.DisplayName, ChannelID: input.ChannelID, Stage: domain.ContactStage(input.Stage), Notes: input.Notes, Methods: methods}
 }
 
+// contactFromAction 把联系人详情转换为应用契约。
 func contactFromAction(contact *contactaction.ContactDetail) Contact {
 	methods := make([]ContactMethod, 0, len(contact.Methods))
 	for _, method := range contact.Methods {
@@ -164,6 +166,7 @@ func contactFromAction(contact *contactaction.ContactDetail) Contact {
 	}
 }
 
+// contactFieldKeys 把联系人校验错误码映射为本地化文案键。
 func contactFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
 		contactaction.ValidationIdentityRequired: cervii18n.FieldContactIdentityRequired, contactaction.ValidationChannelRequired: cervii18n.FieldContactChannelRequired,

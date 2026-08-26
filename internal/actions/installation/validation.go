@@ -4,6 +4,7 @@ package installation
 
 import (
 	"errors"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
@@ -16,14 +17,14 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationOrganizationNameRequired ValidationCode = "ORGANIZATION_NAME_REQUIRED"
-	ValidationOrganizationNameTooLong  ValidationCode = "ORGANIZATION_NAME_TOO_LONG"
-	ValidationDisplayNameRequired      ValidationCode = "DISPLAY_NAME_REQUIRED"
-	ValidationEmailInvalid             ValidationCode = "EMAIL_INVALID"
-	ValidationPasswordTooShort         ValidationCode = "PASSWORD_TOO_SHORT"
-	ValidationPasswordTooLong          ValidationCode = "PASSWORD_TOO_LONG"
-	ValidationLocaleInvalid            ValidationCode = "LOCALE_INVALID"
-	ValidationTimeZoneInvalid          ValidationCode = "TIME_ZONE_INVALID"
+	ValidationOrganizationNameRequired ValidationCode = "INSTALLATION_ORGANIZATION_NAME_REQUIRED"
+	ValidationOrganizationNameTooLong  ValidationCode = "INSTALLATION_ORGANIZATION_NAME_TOO_LONG"
+	ValidationDisplayNameRequired      ValidationCode = "INSTALLATION_DISPLAY_NAME_REQUIRED"
+	ValidationEmailInvalid             ValidationCode = "INSTALLATION_EMAIL_INVALID"
+	ValidationPasswordTooShort         ValidationCode = "INSTALLATION_PASSWORD_TOO_SHORT"
+	ValidationPasswordTooLong          ValidationCode = "INSTALLATION_PASSWORD_TOO_LONG"
+	ValidationLocaleInvalid            ValidationCode = "INSTALLATION_LOCALE_INVALID"
+	ValidationTimeZoneInvalid          ValidationCode = "INSTALLATION_TIME_ZONE_INVALID"
 )
 
 // ValidationError 表示企业初始化字段校验失败。
@@ -34,7 +35,7 @@ func validateInput(input InstallWorkspaceInput) map[string]ValidationCode {
 	fields := make(map[string]ValidationCode)
 	if input.OrganizationName == "" {
 		fields["organizationName"] = ValidationOrganizationNameRequired
-	} else if len([]rune(input.OrganizationName)) > domain.OrganizationNameMaxLength {
+	} else if utf8.RuneCountInString(input.OrganizationName) > domain.OrganizationNameMaxLength {
 		fields["organizationName"] = ValidationOrganizationNameTooLong
 	}
 	if input.DisplayName == "" {

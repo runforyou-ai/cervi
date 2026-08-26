@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -25,9 +26,12 @@ func NewGetMessageChannelQuery(db *bun.DB) *GetMessageChannelQuery {
 }
 
 // Execute 返回当前企业中受支持的消息渠道基础信息。
-func (q *GetMessageChannelQuery) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) (*servermodels.Channel, error) {
+func (q *GetMessageChannelQuery) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) (*MessageChannelRecord, error) {
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
+	}
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
+		return nil, err
 	}
 	channel := &servermodels.Channel{}
 	err := q.db.NewSelect().
@@ -42,5 +46,5 @@ func (q *GetMessageChannelQuery) Execute(ctx context.Context, identity *servermo
 	if err != nil {
 		return nil, fmt.Errorf("get message channel: %w", err)
 	}
-	return channel, nil
+	return messageChannelRecord(channel), nil
 }

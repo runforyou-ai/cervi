@@ -2,17 +2,47 @@ package i18n
 
 import (
 	"encoding/json"
-	"reflect"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 )
 
-// TestLocaleFilesContainTheSameKeys 验证所有语言文件包含相同的文案键。
-func TestLocaleFilesContainTheSameKeys(t *testing.T) {
-	enUS := readLocaleKeys(t, "locales/en-US.json")
-	zhCN := readLocaleKeys(t, "locales/zh-CN.json")
-	if !reflect.DeepEqual(enUS, zhCN) {
-		t.Fatalf("locale keys differ: en-US=%v zh-CN=%v", enUS, zhCN)
+// TestKeyConstantsMatchLocaleFiles 验证包内全部 Key 常量与各语言词条键集合双向一致：常量必须都有词条，词条不得有多余键；由此同时保证各语言文件包含相同的文案键。
+func TestKeyConstantsMatchLocaleFiles(t *testing.T) {
+	constants := collectKeyConstants(t)
+	if len(constants) == 0 {
+		t.Fatal("未在包内源文件中找到任何 Key 常量")
+	}
+
+	for _, path := range []string{"locales/en-US.json", "locales/zh-CN.json"} {
+		localeKeys := readLocaleKeys(t, path)
+
+		var missing []string
+		for key := range constants {
+			if _, ok := localeKeys[key]; !ok {
+				missing = append(missing, key)
+			}
+		}
+		sort.Strings(missing)
+		if len(missing) > 0 {
+			t.Errorf("%s 缺少 Key 常量对应的词条: %v", path, missing)
+		}
+
+		var extra []string
+		for key := range localeKeys {
+			if _, ok := constants[key]; !ok {
+				extra = append(extra, key)
+			}
+		}
+		sort.Strings(extra)
+		if len(extra) > 0 {
+			t.Errorf("%s 存在没有 Key 常量对应的多余词条: %v", path, extra)
+		}
 	}
 }
 
@@ -43,169 +73,58 @@ func TestLocalizeMatchesRequestedLanguage(t *testing.T) {
 	}
 }
 
-// TestAllMessageKeysCanBeLocalized 验证全部类型化文案键均存在中英文翻译。
-func TestAllMessageKeysCanBeLocalized(t *testing.T) {
-	keys := []Key{
-		AppProductName,
-		AppTrayOpen,
-		AppTrayQuit,
-		AppMenuFile,
-		AppMenuEdit,
-		AppMenuView,
-		AppMenuWindow,
-		AppMenuHelp,
-		AppMenuAbout,
-		AppMenuServices,
-		AppMenuHide,
-		AppMenuHideOthers,
-		AppMenuShowAll,
-		AppMenuQuit,
-		AppMenuClose,
-		AppMenuUndo,
-		AppMenuRedo,
-		AppMenuCut,
-		AppMenuCopy,
-		AppMenuPaste,
-		AppMenuPasteAndMatchStyle,
-		AppMenuDelete,
-		AppMenuSelectAll,
-		AppMenuSpeech,
-		AppMenuStartSpeaking,
-		AppMenuStopSpeaking,
-		AppMenuReload,
-		AppMenuForceReload,
-		AppMenuOpenDevTools,
-		AppMenuActualSize,
-		AppMenuZoomIn,
-		AppMenuZoomOut,
-		AppMenuToggleFullscreen,
-		AppMenuMinimize,
-		AppMenuZoom,
-		AppMenuBringAllToFront,
-		AppMenuLearnMore,
-		DialogProfileImageTitle,
-		DialogProfileImageChoose,
-		MessengerPreviewTitle,
-		MessengerPreviewStageLabel,
-		MessengerDefaultTitle,
-		MessengerUnavailableTitle,
-		MessengerUnavailableMessage,
-		MessengerHome,
-		MessengerMessages,
-		MessengerHelp,
-		MessengerMessage,
-		MessengerClose,
-		MessengerAttach,
-		MessengerEmoji,
-		MessengerDefaultAgentName,
-		MessengerDefaultAgentLastActive,
-		MessengerDemoReply,
-		MessengerWelcome,
-		MessengerHowCanWeHelp,
-		MessengerStartConversation,
-		MessengerDefaultResponse,
-		MessengerExploreHelp,
-		MessengerExploreHelpDescription,
-		MessengerViewAll,
-		MessengerGettingStarted,
-		MessengerGettingStartedDescription,
-		MessengerFeaturesAndSettings,
-		MessengerFeaturesDescription,
-		MessengerCommonQuestions,
-		MessengerQuestionsDescription,
-		MessengerNoMessages,
-		MessengerNoMessagesDescription,
-		MessengerSearchHelp,
-		MessengerCollections,
-		MessengerCollectionCount,
-		MessengerThreeArticles,
-		MessengerFiveArticles,
-		MessengerSixArticles,
-		MessengerNoHelpResults,
-		MessengerBack,
-		MessengerArticleOneTitle,
-		MessengerArticleOneBody,
-		MessengerArticleTwoTitle,
-		MessengerArticleTwoBody,
-		MessengerArticleThreeTitle,
-		MessengerArticleThreeBody,
-		MessengerStillNeedHelp,
-		MessengerConversationPrompt,
-		MessengerMore,
-		MessengerExpandWindow,
-		MessengerCollapseWindow,
-		MessengerRecordVoice,
-		MessengerPlayVoice,
-		MessengerPauseVoice,
-		MessengerSend,
-		MessengerCancelRecording,
-		MessengerStopRecording,
-		MessengerNavigation,
-		MessengerLoading,
-		MessengerRetry,
-		MessengerRequestFailed,
-		MessengerSessionWaiting,
-		MessengerSessionActive,
-		MessengerSessionPending,
-		MessengerSessionClosed,
-		ErrorInternal,
-		ErrorMethodNotAllowed,
-		ErrorInstallationStatusReadFailed,
-		ErrorAlreadyInitialized,
-		ErrorInstallationRequired,
-		ErrorAuthenticationStatusFailed,
-		ErrorAuthenticationRequired,
-		ErrorValidationFailed,
-		ErrorInstallationFailed,
-		ErrorInvalidCredentials,
-		ErrorLoginFailed,
-		ErrorLogoutFailed,
-		ErrorProfileUpdateFailed,
-		ErrorPasswordUpdateFailed,
-		ErrorServerURLInvalid,
-		ErrorServerUnavailable,
-		ErrorServerConnectionSaveFailed,
-		ErrorServerConnectionRequired,
-		ErrorServerInitializationRequired,
-		ErrorRemoteRequestCreateFailed,
-		ErrorServerConnectionFailed,
-		ErrorWebsiteConversationNotFound,
-		ErrorWebsiteMessengerLoadFailed,
-		ErrorWebsiteMessageSendFailed,
-		ErrorWebsiteMessageListFailed,
-		ErrorWebsiteMessageConflict,
-		FieldOrganizationNameRequired,
-		FieldOrganizationNameTooLong,
-		FieldDisplayNameRequired,
-		FieldEmailInvalid,
-		FieldEmailDuplicate,
-		FieldPasswordTooShort,
-		FieldPasswordTooLong,
-		FieldCurrentPasswordIncorrect,
-		FieldServerURLComplete,
-		FieldServerURLBaseOnly,
-		FieldServerURLHTTPSRequired,
-		FieldServerURLNotCervi,
-		FieldVisitorTokenInvalid,
-		FieldChannelIDInvalid,
-		FieldConversationIDInvalid,
-		FieldClientMessageIDInvalid,
-		FieldMessageBodyRequired,
-		FieldMessageBodyTooLong,
-		FieldMessageCursorInvalid,
+// collectKeyConstants 解析包目录内所有非测试源文件，收集类型为 Key 的常量的字符串字面量值。
+func collectKeyConstants(t *testing.T) map[string]struct{} {
+	t.Helper()
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	for _, language := range []string{"en-US", "zh-CN"} {
-		for _, key := range keys {
-			if message, _ := Localize(language, key); message == "" {
-				t.Fatalf("Localize(%q, %q) returned an empty message", language, key)
+	fileSet := token.NewFileSet()
+	keys := make(map[string]struct{})
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fileSet, name, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range file.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.CONST {
+				continue
+			}
+			for _, spec := range genDecl.Specs {
+				valueSpec, ok := spec.(*ast.ValueSpec)
+				if !ok {
+					continue
+				}
+				ident, ok := valueSpec.Type.(*ast.Ident)
+				if !ok || ident.Name != "Key" {
+					continue
+				}
+				for _, value := range valueSpec.Values {
+					lit, ok := value.(*ast.BasicLit)
+					if !ok || lit.Kind != token.STRING {
+						continue
+					}
+					key, err := strconv.Unquote(lit.Value)
+					if err != nil {
+						t.Fatal(err)
+					}
+					keys[key] = struct{}{}
+				}
 			}
 		}
 	}
+	return keys
 }
 
-// readLocaleKeys 读取并排序指定语言文件中的文案键。
-func readLocaleKeys(t *testing.T, path string) []string {
+// readLocaleKeys 读取指定语言文件并返回其中的文案键集合。
+func readLocaleKeys(t *testing.T, path string) map[string]struct{} {
 	t.Helper()
 	content, err := localeFiles.ReadFile(path)
 	if err != nil {
@@ -215,10 +134,9 @@ func readLocaleKeys(t *testing.T, path string) []string {
 	if err := json.Unmarshal(content, &messages); err != nil {
 		t.Fatal(err)
 	}
-	keys := make([]string, 0, len(messages))
+	keys := make(map[string]struct{}, len(messages))
 	for key := range messages {
-		keys = append(keys, key)
+		keys[key] = struct{}{}
 	}
-	sort.Strings(keys)
 	return keys
 }

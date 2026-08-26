@@ -15,11 +15,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// WorkStatusInput 定义 AI 员工工作状态修改字段。
-type WorkStatusInput struct {
-	WorkStatus domain.WorkStatus
-}
-
 // UpdateWorkStatusAction 修改 AI 员工工作状态。
 type UpdateWorkStatusAction struct{ db *bun.DB }
 

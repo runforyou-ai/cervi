@@ -12,11 +12,11 @@ import (
 type Agent struct {
 	bun.BaseModel `bun:"table:agents,alias:a"`
 
-	ID               string    `bun:"id,pk" json:"id"`
-	IdentityID       string    `bun:"identity_id" json:"identityId"`
-	OrganizationID   string    `bun:"organization_id" json:"organizationId"`
-	ActiveRevisionID string    `bun:"active_revision_id" json:"activeRevisionId"`
-	Status           string    `bun:"status" json:"status"`
-	CreatedAt        time.Time `bun:"created_at" json:"createdAt"`
-	UpdatedAt        time.Time `bun:"updated_at" json:"updatedAt"`
+	ID               string    `bun:"id,pk"`
+	IdentityID       string    `bun:"identity_id"`
+	OrganizationID   string    `bun:"organization_id"`
+	ActiveRevisionID string    `bun:"active_revision_id"`
+	Status           string    `bun:"status"`
+	CreatedAt        time.Time `bun:"created_at"`
+	UpdatedAt        time.Time `bun:"updated_at"`
 }

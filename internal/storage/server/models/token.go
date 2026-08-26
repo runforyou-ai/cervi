@@ -15,4 +15,5 @@ type Token struct {
 	UserID    string    `bun:"user_id"`
 	TokenHash string    `bun:"token_hash"`
 	ExpiresAt time.Time `bun:"expires_at"`
+	CreatedAt time.Time `bun:"created_at"`
 }

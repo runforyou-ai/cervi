@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -38,7 +40,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		(input.TeamID != "" && !common.ValidUUID(input.TeamID)) {
 		return ListOutput{}, ErrQueryInvalid
 	}
-	if err := validateIdentity(ctx, q.db, identity); err != nil {
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return ListOutput{}, err
 	}
 
@@ -81,12 +83,16 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		Scan(ctx, &users); err != nil {
 		return ListOutput{}, fmt.Errorf("list users: %w", err)
 	}
-	for index := range users {
-		teams, err := loadUserTeams(ctx, q.db, identity.Organization.ID, users[index].IdentityID)
-		if err != nil {
-			return ListOutput{}, fmt.Errorf("load user teams: %w", err)
-		}
-		users[index].Teams = teams
+	identityIDs := make([]string, 0, len(users))
+	for _, user := range users {
+		identityIDs = append(identityIDs, user.IdentityID)
 	}
-	return ListOutput{Users: users, Page: PageInfo{Number: input.Page, Size: input.PageSize, Total: total}}, nil
+	teamsByIdentity, err := teamaction.LoadTeamsByIdentity(ctx, q.db, identity.Organization.ID, identityIDs)
+	if err != nil {
+		return ListOutput{}, fmt.Errorf("load user teams: %w", err)
+	}
+	for index := range users {
+		users[index].Teams = teamsByIdentity[users[index].IdentityID]
+	}
+	return ListOutput{Users: users, Page: common.PageInfo{Number: input.Page, Size: input.PageSize, Total: total}}, nil
 }

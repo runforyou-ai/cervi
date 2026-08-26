@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -26,15 +27,15 @@ func (a *CreateContactAction) Execute(ctx context.Context, identity *servermodel
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	var contact *servermodels.Contact
+	var detail *ContactDetail
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		if err := validateSourceChannel(ctx, tx, identity.Organization.ID, input.ChannelID); err != nil {
 			return err
 		}
-		contact = &servermodels.Contact{
+		contact := &servermodels.Contact{
 			OrganizationID:  identity.Organization.ID,
 			CreatedByUserID: &identity.User.ID,
 			SourceChannelID: input.ChannelID,
@@ -53,10 +54,18 @@ func (a *CreateContactAction) Execute(ctx context.Context, identity *servermodel
 			Exec(ctx); err != nil {
 			return err
 		}
-		return replaceMethods(ctx, tx, contact.OrganizationID, contact.ID, input.Methods)
+		if err := replaceMethods(ctx, tx, contact.OrganizationID, contact.ID, input.Methods); err != nil {
+			return err
+		}
+		loaded, err := loadContactDetail(ctx, tx, contact.OrganizationID, contact.ID)
+		if err != nil {
+			return err
+		}
+		detail = loaded
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create contact: %w", err)
 	}
-	return NewGetContactQuery(a.db).Execute(ctx, identity, contact.ID)
+	return detail, nil
 }

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/uptrace/bun"
@@ -30,7 +31,7 @@ func loadAgent(ctx context.Context, db bun.IDB, organizationID, agentID string) 
 	if err != nil {
 		return nil, err
 	}
-	agent.Teams, err = loadAgentTeams(ctx, db, organizationID, agent.IdentityID)
+	agent.Teams, err = teamaction.LoadIdentityTeams(ctx, db, organizationID, agent.IdentityID)
 	if err != nil {
 		return nil, err
 	}

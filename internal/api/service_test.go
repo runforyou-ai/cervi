@@ -370,7 +370,7 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 		t.Fatalf("status = %d, input = %#v", addResponse.StatusCode, backend.lastTeamMembers)
 	}
 
-	removeResponse := doJSON(t, http.MethodDelete, server.URL+"/teams/team-1/members", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.OrganizationIdentityTypeAgent, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
+	removeResponse := doJSON(t, http.MethodPost, server.URL+"/teams/team-1/members/remove", appservice.TeamMemberInput{Members: []appservice.TeamMemberIdentityInput{{IdentityType: appservice.OrganizationIdentityTypeAgent, IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967"}}}, "test-token")
 	defer removeResponse.Body.Close()
 	if removeResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.OrganizationIdentityTypeAgent {
 		t.Fatalf("status = %d, input = %#v", removeResponse.StatusCode, backend.lastTeamMembers)
@@ -396,7 +396,7 @@ func TestUpdateAgentWorkStatusUsesTypedInput(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 
-	response := doJSON(t, http.MethodPatch, server.URL+"/agents/agent-1/work-status", appservice.AgentWorkStatusInput{WorkStatus: appservice.WorkStatusAway}, "test-token")
+	response := doJSON(t, http.MethodPut, server.URL+"/agents/agent-1/work-status", appservice.AgentWorkStatusInput{WorkStatus: appservice.WorkStatusAway}, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK || backend.lastAgentID != "agent-1" || backend.lastAgentWorkStatus.WorkStatus != appservice.WorkStatusAway {
 		t.Fatalf("status = %d, agent = %q, input = %#v", response.StatusCode, backend.lastAgentID, backend.lastAgentWorkStatus)
@@ -409,7 +409,7 @@ func TestUpdateAgentExecutionUsesTypedInput(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 
-	response := doJSON(t, http.MethodPatch, server.URL+"/agents/agent-1/execution", appservice.AgentExecutionInput{
+	response := doJSON(t, http.MethodPut, server.URL+"/agents/agent-1/execution", appservice.AgentExecutionInput{
 		Mode: appservice.AgentExecutionModeManaged,
 		Managed: &appservice.AgentManagedExecutionInput{
 			ProviderID: "provider-1", ModelIdentifier: "chat-model", SystemInstruction: "回答产品问题。",

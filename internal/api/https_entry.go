@@ -28,20 +28,24 @@ const (
 	modeAuto     = tlsMode("auto")
 	modeExternal = tlsMode("external")
 	modeOff      = tlsMode("off")
+	// maxAllowedHostEntries 限制已确认公网域名缓存的条目数，防止恶意 Host 头刷量造成内存无界增长。
+	maxAllowedHostEntries = 1024
 )
 
 type tlsMode string
 
 // HTTPSEntry 按 TLS 模式代理 Wails server。
 type HTTPSEntry struct {
-	mode        tlsMode
-	cache       autocert.Cache
-	cachePath   string
-	manager     *autocert.Manager
-	proxy       *httputil.ReverseProxy
-	httpServer  *http.Server
-	httpsServer *http.Server
-	allowed     sync.Map
+	mode         tlsMode
+	cache        autocert.Cache
+	cachePath    string
+	manager      *autocert.Manager
+	proxy        *httputil.ReverseProxy
+	httpServer   *http.Server
+	httpsServer  *http.Server
+	allowed      sync.Map
+	allowedMutex sync.Mutex
+	allowedCount int
 }
 
 // NewHTTPSEntry 根据 TLS 配置创建 HTTPS 入口。
@@ -170,8 +174,23 @@ func (s *HTTPSEntry) serveHTTP(writer http.ResponseWriter, request *http.Request
 		http.NotFound(writer, request)
 		return
 	}
-	s.allowed.Store(host, struct{}{})
+	s.rememberAllowedHost(host)
 	redirectToHTTPS(writer, request, host)
+}
+
+// rememberAllowedHost 缓存已确认的公网域名；达到上限时整体清空重建，避免恶意 Host 头刷量挤掉合法新域名的签发授权。
+func (s *HTTPSEntry) rememberAllowedHost(host string) {
+	s.allowedMutex.Lock()
+	defer s.allowedMutex.Unlock()
+	if _, ok := s.allowed.Load(host); ok {
+		return
+	}
+	if s.allowedCount >= maxAllowedHostEntries {
+		s.allowed.Clear()
+		s.allowedCount = 0
+	}
+	s.allowed.Store(host, struct{}{})
+	s.allowedCount++
 }
 
 // allowCertificate 只允许通过 HTTP 入口或已有证书缓存确认的公网域名。
@@ -184,7 +203,7 @@ func (s *HTTPSEntry) allowCertificate(ctx context.Context, host string) error {
 		return nil
 	}
 	if s.cachedCertificateMatches(ctx, host) {
-		s.allowed.Store(host, struct{}{})
+		s.rememberAllowedHost(host)
 		slog.Info("已从证书缓存恢复 HTTPS 域名", "domain", host)
 		return nil
 	}

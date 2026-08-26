@@ -111,6 +111,7 @@ func (s *Service) writeContactList(c *gin.Context, deleted bool) {
 	writeResult(c, http.StatusOK, contacts, err)
 }
 
+// optionalEnum 把非空查询值转换成对应枚举指针，空值返回 nil。
 func optionalEnum[T ~string](value string) *T {
 	if value == "" {
 		return nil
@@ -119,10 +120,12 @@ func optionalEnum[T ~string](value string) *T {
 	return &typed
 }
 
+// requestMeta 从请求头提取令牌和语言，构造应用服务请求元数据。
 func requestMeta(c *gin.Context) appservice.RequestMeta {
 	return appservice.RequestMeta{Token: bearerToken(c.GetHeader("Authorization")), Locale: appservice.Locale(c.GetHeader("Accept-Language"))}
 }
 
+// bearerToken 从 Authorization 头解析 Bearer 令牌，格式不符时返回空串。
 func bearerToken(authorization string) string {
 	scheme, token, found := strings.Cut(strings.TrimSpace(authorization), " ")
 	if !found || !strings.EqualFold(scheme, "Bearer") {
@@ -131,6 +134,7 @@ func bearerToken(authorization string) string {
 	return strings.TrimSpace(token)
 }
 
+// bindJSON 绑定 JSON 请求体，失败时写入校验错误响应并返回 false。
 func bindJSON(c *gin.Context, output any) bool {
 	if err := c.ShouldBindJSON(output); err != nil {
 		writeApplicationError(c, appservice.InvalidError(requestMeta(c), cervii18n.ErrorValidationFailed, nil))
@@ -139,6 +143,7 @@ func bindJSON(c *gin.Context, output any) bool {
 	return true
 }
 
+// positiveQueryInteger 解析正整数查询参数，缺省时返回默认值，非法时写入校验错误响应。
 func positiveQueryInteger(c *gin.Context, name string, defaultValue int) (int, bool) {
 	value := c.Query(name)
 	if value == "" {
@@ -152,6 +157,7 @@ func positiveQueryInteger(c *gin.Context, name string, defaultValue int) (int, b
 	return parsed, true
 }
 
+// writeResult 无错误时按状态码写入 JSON 结果，否则写入错误响应。
 func writeResult(c *gin.Context, status int, result any, err error) {
 	if writeApplicationError(c, err) {
 		return
@@ -159,6 +165,7 @@ func writeResult(c *gin.Context, status int, result any, err error) {
 	c.JSON(status, result)
 }
 
+// writeEmpty 无错误时返回 204 空响应，否则写入错误响应。
 func writeEmpty(c *gin.Context, err error) {
 	if writeApplicationError(c, err) {
 		return
@@ -166,6 +173,7 @@ func writeEmpty(c *gin.Context, err error) {
 	c.Status(http.StatusNoContent)
 }
 
+// writeApplicationError 把应用服务错误写成结构化错误响应，返回是否已处理错误。
 func writeApplicationError(c *gin.Context, err error) bool {
 	if err == nil {
 		return false
@@ -183,6 +191,7 @@ func writeApplicationError(c *gin.Context, err error) bool {
 	return true
 }
 
+// writeErrorBody 按请求语言写入本地化的错误响应体。
 func writeErrorBody(c *gin.Context, applicationError *appservice.Error) {
 	_, language := cervii18n.Localize(c.GetHeader("Accept-Language"), cervii18n.ErrorInternal)
 	c.Header("Content-Language", language)

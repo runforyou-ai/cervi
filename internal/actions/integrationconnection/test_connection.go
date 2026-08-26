@@ -4,10 +4,12 @@ package integrationconnection
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/connector"
@@ -51,8 +53,16 @@ func (a *TestConnectionAction) ExecuteAndRecord(ctx context.Context, identity *s
 	if err := identityaction.Validate(ctx, a.db, identity); err != nil {
 		return TestResult{}, err
 	}
+	if !common.ValidUUID(connectionID) {
+		return TestResult{}, ErrNotFound
+	}
 	testErr := a.Execute(ctx, input)
 	if ctx.Err() != nil {
+		return TestResult{}, testErr
+	}
+	// 配置本身不合法说明没有发生真实探测，直接返回校验错误，不刷新连接状态。
+	var validationErr *ValidationError
+	if errors.As(testErr, &validationErr) {
 		return TestResult{}, testErr
 	}
 	status := domain.IntegrationConnectionStatusAvailable
@@ -60,14 +70,19 @@ func (a *TestConnectionAction) ExecuteAndRecord(ctx context.Context, identity *s
 		status = domain.IntegrationConnectionStatusUnavailable
 	}
 	testedAt := time.Now().UTC()
-	if _, updateErr := a.db.NewUpdate().
+	result, updateErr := a.db.NewUpdate().
 		Model((*servermodels.IntegrationConnection)(nil)).
 		Set("status = ?", status).
 		Set("last_tested_at = ?", testedAt).
+		Set("updated_at = now()").
 		Where("id = ?", connectionID).
 		Where("organization_id = ?", identity.Organization.ID).
-		Exec(ctx); updateErr != nil {
+		Exec(ctx)
+	if updateErr != nil {
 		return TestResult{}, fmt.Errorf("record integration connection test: %w", updateErr)
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return TestResult{}, ErrNotFound
 	}
 	return TestResult{Status: status, TestedAt: testedAt}, testErr
 }

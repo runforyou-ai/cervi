@@ -26,6 +26,7 @@ func NewUpdateRoleAction(db *bun.DB) *UpdateRoleAction {
 func (a *UpdateRoleAction) Execute(ctx context.Context, identity *servermodels.Identity, roleID string, input Input) (*Record, error) {
 	var role *servermodels.Role
 	var normalized Input
+	var memberCounts map[string]int
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
@@ -62,17 +63,20 @@ func (a *UpdateRoleAction) Execute(ctx context.Context, identity *servermodels.I
 				return err
 			}
 		}
-		return replacePermissions(ctx, tx, identity.Organization.ID, role.ID, normalized.Permissions)
+		if err := replacePermissions(ctx, tx, identity.Organization.ID, role.ID, normalized.Permissions); err != nil {
+			return err
+		}
+		memberCounts, err = loadMemberCounts(ctx, tx, identity.Organization.ID, []string{role.ID})
+		if err != nil {
+			return fmt.Errorf("count role members: %w", err)
+		}
+		return nil
 	})
 	if isRoleNameConflict(err) {
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"name": ValidationNameDuplicate}}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("update role: %w", err)
-	}
-	memberCounts, countErr := loadMemberCounts(ctx, a.db, identity.Organization.ID, []string{role.ID})
-	if countErr != nil {
-		return nil, fmt.Errorf("count role members: %w", countErr)
 	}
 	output := recordFromModel(*role, normalized.Permissions, memberCounts[role.ID])
 	return &output, nil

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -32,7 +33,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 	}
 	var updatedIdentity *servermodels.Identity
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		storedUser := &servermodels.User{}

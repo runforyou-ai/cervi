@@ -10,8 +10,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 // loadConnection 读取当前企业中的连接器。
@@ -58,8 +58,5 @@ func connectionInUse(ctx context.Context, db bun.IDB, organizationID, connection
 
 // isNameConflict 判断企业内连接名称是否重复。
 func isNameConflict(err error) bool {
-	var postgresError pgdriver.Error
-	return errors.As(err, &postgresError) &&
-		postgresError.Field('C') == "23505" &&
-		postgresError.Field('n') == "integration_connections_organization_name_unique"
+	return pgerr.UniqueViolationOn(err, "integration_connections_organization_name_unique")
 }

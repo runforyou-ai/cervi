@@ -84,7 +84,7 @@ func (b *DirectBackend) ListAgents(ctx context.Context, meta RequestMeta, input 
 	for _, agent := range output.Agents {
 		agents = append(agents, agentListItemFromAction(agent))
 	}
-	return AgentList{Agents: agents, Page: PageInfo{Number: output.Page, Size: output.Size, Total: output.Total}}, nil
+	return AgentList{Agents: agents, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
 
 // GetAgent 返回企业 AI 员工详情。

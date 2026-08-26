@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -33,8 +34,9 @@ func (a *UpdateContactAction) Execute(ctx context.Context, identity *servermodel
 		return nil, &ValidationError{Fields: fields}
 	}
 
+	var detail *ContactDetail
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		var sourceChannelID string
@@ -75,10 +77,18 @@ func (a *UpdateContactAction) Execute(ctx context.Context, identity *servermodel
 		if err != nil {
 			return err
 		}
-		return replaceMethods(ctx, tx, identity.Organization.ID, contactID, input.Methods)
+		if err := replaceMethods(ctx, tx, identity.Organization.ID, contactID, input.Methods); err != nil {
+			return err
+		}
+		loaded, err := loadContactDetail(ctx, tx, identity.Organization.ID, contactID)
+		if err != nil {
+			return err
+		}
+		detail = loaded
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update contact: %w", err)
 	}
-	return NewGetContactQuery(a.db).Execute(ctx, identity, contactID)
+	return detail, nil
 }

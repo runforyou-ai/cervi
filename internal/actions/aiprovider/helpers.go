@@ -12,8 +12,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 // loadProvider 读取当前企业中的模型服务供应商。
@@ -149,8 +149,5 @@ func recordFromModel(provider servermodels.AIProvider, models []Model) Record {
 
 // isNameConflict 判断企业内供应商名称是否重复。
 func isNameConflict(err error) bool {
-	var postgresError pgdriver.Error
-	return errors.As(err, &postgresError) &&
-		postgresError.Field('C') == "23505" &&
-		postgresError.Field('n') == "ai_providers_organization_name_unique"
+	return pgerr.UniqueViolationOn(err, "ai_providers_organization_name_unique")
 }

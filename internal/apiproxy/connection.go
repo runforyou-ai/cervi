@@ -51,6 +51,7 @@ type apiError struct {
 	State   appservice.SessionState `json:"state,omitempty"`
 	Message string                  `json:"message"`
 	Fields  map[string]string       `json:"fields,omitempty"`
+	Reason  string                  `json:"reason,omitempty"`
 }
 
 type serverURLValidationError struct {
@@ -135,17 +136,17 @@ func probeServer(ctx context.Context, state *remoteState) (appservice.Installati
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return appservice.InstallationStatus{}, fmt.Errorf("服务器返回 HTTP %d", response.StatusCode)
+		return appservice.InstallationStatus{}, fmt.Errorf("server returned HTTP %d", response.StatusCode)
 	}
 	var payload struct {
 		Installed        *bool  `json:"installed"`
 		OrganizationName string `json:"organizationName"`
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(&payload); err != nil {
-		return appservice.InstallationStatus{}, errors.New("服务器响应格式不正确")
+		return appservice.InstallationStatus{}, fmt.Errorf("decode installation status response: %w", err)
 	}
 	if payload.Installed == nil {
-		return appservice.InstallationStatus{}, errors.New("目标地址未提供 Cervi API")
+		return appservice.InstallationStatus{}, errors.New("target address does not serve the Cervi API")
 	}
 	return appservice.InstallationStatus{
 		Installed:        *payload.Installed,

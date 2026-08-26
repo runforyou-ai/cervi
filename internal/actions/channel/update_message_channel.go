@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -23,7 +24,7 @@ func NewUpdateMessageChannelAction(db *bun.DB) *UpdateMessageChannelAction {
 }
 
 // Execute 校验并更新当前企业中受支持的消息渠道。
-func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input MessageChannelInput) (*servermodels.Channel, error) {
+func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input MessageChannelInput) (*MessageChannelRecord, error) {
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
@@ -34,6 +35,9 @@ func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *serv
 
 	channel := &servermodels.Channel{}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+			return err
+		}
 		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "newConversationTarget", input.NewConversationTarget); err != nil {
 			return err
 		}
@@ -74,5 +78,5 @@ func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *serv
 	if err != nil {
 		return nil, fmt.Errorf("update message channel: %w", err)
 	}
-	return channel, nil
+	return messageChannelRecord(channel), nil
 }

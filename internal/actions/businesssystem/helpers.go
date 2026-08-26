@@ -9,8 +9,8 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 // loadBusinessSystem 读取当前企业中的业务系统。
@@ -44,8 +44,5 @@ func recordFromModel(input servermodels.BusinessSystem) Record {
 
 // isNameConflict 判断企业内业务系统名称是否重复。
 func isNameConflict(err error) bool {
-	var postgresError pgdriver.Error
-	return errors.As(err, &postgresError) &&
-		postgresError.Field('C') == "23505" &&
-		postgresError.Field('n') == "business_systems_organization_name_unique"
+	return pgerr.UniqueViolationOn(err, "business_systems_organization_name_unique")
 }
