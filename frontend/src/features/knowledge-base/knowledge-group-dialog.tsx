@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -66,12 +65,6 @@ export function KnowledgeGroupDialog({
     shouldUseNativeValidation: true,
     defaultValues: { name: "", parentId: "" },
   })
-  useWorkspaceTabDirty(
-    Boolean(state) &&
-      form.formState.isDirty &&
-      !form.formState.isSubmitting,
-  )
-
   useEffect(() => {
     mounted.current = true
     if (state) {

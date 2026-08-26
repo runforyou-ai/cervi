@@ -2,7 +2,6 @@
 import {
   useCallback,
   useContext,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useReducer,
@@ -13,6 +12,8 @@ import {
 import { PinIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
+  NavigationType,
+  UNSAFE_LocationContext,
   UNSAFE_NavigationContext,
   createPath,
   parsePath,
@@ -23,16 +24,6 @@ import {
 } from "react-router"
 
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -40,7 +31,6 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { PortalContainerProvider } from "@/components/ui/portal-container"
-import { WorkspaceTabLifecycleProvider } from "@/contexts/workspace-tab-lifecycle"
 import type { WorkspaceOutletContext } from "@/features/workspace/workspace-context"
 import { WorkspaceProvider } from "@/features/workspace/workspace-context"
 import {
@@ -62,7 +52,6 @@ type WorkspaceTabAction =
       tab: ResolvedWorkspaceTab
       replaceCurrent: boolean
       activatingExisting: boolean
-      protectActive: boolean
     }
   | { type: "activate"; id: string }
   | { type: "close"; id: string; nextActiveId: string }
@@ -73,7 +62,6 @@ type WorkspaceTabAction =
       sourceId: string
       tab: ResolvedWorkspaceTab
       replaceCurrent: boolean
-      protectSource: boolean
     }
 
 /** 把固定标签按固定顺序排列在普通标签之前。 */
@@ -149,12 +137,9 @@ function workspaceTabReducer(
       }
     }
 
-    const replaceSource =
-      !action.protectSource &&
-      (action.replaceCurrent || sourceTab.transient)
     const targetExists = state.tabs.some((tab) => tab.id === action.tab.id)
     if (targetExists) {
-      const pinnedIds = replaceSource
+      const pinnedIds = action.replaceCurrent
         ? replacePinnedTabId(
             state.pinnedIds,
             sourceTab.id,
@@ -163,7 +148,7 @@ function workspaceTabReducer(
         : state.pinnedIds
       const ordered = orderWorkspaceTabs(
         state.tabs
-          .filter((tab) => !replaceSource || tab.id !== sourceTab.id)
+          .filter((tab) => !action.replaceCurrent || tab.id !== sourceTab.id)
           .map((tab) =>
             tab.id === action.tab.id && tab.id !== state.activeId
               ? action.tab
@@ -176,7 +161,7 @@ function workspaceTabReducer(
         ...ordered,
       }
     }
-    if (replaceSource) {
+    if (action.replaceCurrent) {
       const ordered = orderWorkspaceTabs(
         state.tabs.map((tab) =>
           tab.id === sourceTab.id ? action.tab : tab,
@@ -199,8 +184,7 @@ function workspaceTabReducer(
   const replaceActive =
     !action.activatingExisting &&
     activeTab.id !== action.tab.id &&
-    !action.protectActive &&
-    (action.replaceCurrent || activeTab.transient)
+    action.replaceCurrent
   const existingIndex = state.tabs.findIndex((tab) => tab.id === action.tab.id)
 
   if (replaceActive) {
@@ -253,13 +237,11 @@ function WorkspaceTabPane({
   tab,
   active,
   context,
-  onDirtyChange,
   onBackgroundNavigate,
 }: {
   tab: ResolvedWorkspaceTab
   active: boolean
   context: WorkspaceOutletContext
-  onDirtyChange: (tabId: string, source: symbol, dirty: boolean) => void
   onBackgroundNavigate: (sourceId: string, to: To, replace: boolean) => void
 }) {
   const navigationContext = useContext(UNSAFE_NavigationContext)
@@ -267,11 +249,6 @@ function WorkspaceTabPane({
   activeRef.current = active
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(
     null,
-  )
-  const reportDirty = useCallback(
-    (source: symbol, dirty: boolean) =>
-      onDirtyChange(tab.id, source, dirty),
-    [onDirtyChange, tab.id],
   )
   const scopedNavigator = useMemo<Navigator>(
     () => ({
@@ -302,6 +279,20 @@ function WorkspaceTabPane({
     () => ({ ...navigationContext, navigator: scopedNavigator }),
     [navigationContext, scopedNavigator],
   )
+  /** 面板内页面只感知本标签的地址，避免切换标签时其他页面重新请求数据。 */
+  const scopedLocationContext = useMemo(() => {
+    const parsed = parsePath(tab.href)
+    return {
+      location: {
+        pathname: parsed.pathname ?? "/",
+        search: parsed.search ?? "",
+        hash: parsed.hash ?? "",
+        state: null,
+        key: tab.href,
+      },
+      navigationType: NavigationType.Pop,
+    }
+  }, [tab.href])
 
   return (
     <div
@@ -316,17 +307,15 @@ function WorkspaceTabPane({
     >
       {portalContainer ? (
         <PortalContainerProvider container={portalContainer} active={active}>
-          <WorkspaceTabLifecycleProvider
-            reportDirty={reportDirty}
-          >
-            <WorkspaceProvider value={context}>
-              <UNSAFE_NavigationContext.Provider
-                value={scopedNavigationContext}
-              >
+          <WorkspaceProvider value={context}>
+            <UNSAFE_NavigationContext.Provider
+              value={scopedNavigationContext}
+            >
+              <UNSAFE_LocationContext.Provider value={scopedLocationContext}>
                 <WorkspacePageRoutes location={tab.href} />
-              </UNSAFE_NavigationContext.Provider>
-            </WorkspaceProvider>
-          </WorkspaceTabLifecycleProvider>
+              </UNSAFE_LocationContext.Provider>
+            </UNSAFE_NavigationContext.Provider>
+          </WorkspaceProvider>
         </PortalContainerProvider>
       ) : null}
     </div>
@@ -339,7 +328,6 @@ function WorkspaceTabButton({
   index,
   tabs,
   active,
-  dirty,
   pinned,
   closable,
   onActivate,
@@ -349,7 +337,6 @@ function WorkspaceTabButton({
   index: number
   tabs: ResolvedWorkspaceTab[]
   active: boolean
-  dirty: boolean
   pinned: boolean
   closable: boolean
   onActivate: (id: string) => void
@@ -357,12 +344,9 @@ function WorkspaceTabButton({
 }) {
   const { t } = useTranslation("workspace")
   const title = t(tab.titleKey)
-  const statefulTitle = dirty
-    ? t("tabs.unsavedTab", { title })
-    : title
   const accessibleTitle = pinned
-    ? t("tabs.pinnedTab", { title: statefulTitle })
-    : statefulTitle
+    ? t("tabs.pinnedTab", { title })
+    : title
 
   /** 使用方向键切换标签，使用 Delete 关闭当前标签。 */
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
@@ -384,7 +368,7 @@ function WorkspaceTabButton({
     <div
       data-active={active}
       className={cn(
-        "cervi-workspace-tab group/tab relative isolate mt-1 flex h-10 w-40 shrink-0 items-center",
+        "cervi-workspace-tab relative isolate mt-1 flex h-10 w-40 shrink-0 items-center",
         active
           ? "z-10 rounded-t-[10px] bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-foreground",
@@ -414,12 +398,6 @@ function WorkspaceTabButton({
       >
         {pinned ? (
           <PinIcon aria-hidden="true" className="size-3.5 shrink-0" />
-        ) : null}
-        {dirty ? (
-          <span
-            aria-hidden="true"
-            className="size-1.5 shrink-0 rounded-full bg-primary"
-          />
         ) : null}
         <span className="truncate">{title}</span>
       </button>
@@ -451,29 +429,14 @@ export function WorkspaceTabs({
   const navigationType = useNavigationType()
   const pendingActivationRef = useRef<string | null>(null)
   const tabButtonRefs = useRef(new Map<string, HTMLButtonElement>())
-  const dirtySourcesRef = useRef(new Map<string, Set<symbol>>())
-  const dirtyTabIdsRef = useRef<ReadonlySet<string>>(new Set())
-  const [dirtyTabIds, setDirtyTabIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  )
   const [reloadRevisionById, setReloadRevisionById] = useState<
     Readonly<Record<string, number>>
   >({})
-  const [pendingTabAction, setPendingTabAction] = useState<
-    | { kind: "one"; id: string }
-    | { kind: "others"; id: string }
-    | { kind: "right"; id: string }
-    | { kind: "reload"; id: string }
-    | null
-  >(null)
   const [state, dispatch] = useReducer(workspaceTabReducer, {
     tabs: [currentTab],
     activeId: currentTab.id,
     pinnedIds: [],
   })
-  const activeTabIdRef = useRef(state.activeId)
-  dirtyTabIdsRef.current = dirtyTabIds
-  activeTabIdRef.current = state.activeId
 
   /** 仅在地址变化时同步标签，避免关闭操作被旧地址反向恢复。 */
   useLayoutEffect(() => {
@@ -486,13 +449,11 @@ export function WorkspaceTabs({
       tab: currentTab,
       replaceCurrent: navigationType === "REPLACE",
       activatingExisting,
-      protectActive: dirtyTabIdsRef.current.has(activeTabIdRef.current),
     })
   }, [
     currentTab.href,
     currentTab.id,
     currentTab.titleKey,
-    currentTab.transient,
     navigationType,
   ])
 
@@ -502,54 +463,13 @@ export function WorkspaceTabs({
       ?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [state.activeId])
 
-  useEffect(() => {
-    if (dirtyTabIds.size === 0) {
-      return
-    }
-
-    /** 刷新或关闭窗口前交给运行平台确认未保存内容。 */
-    function preventUnsavedUnload(event: BeforeUnloadEvent) {
-      event.preventDefault()
-      event.returnValue = ""
-    }
-
-    window.addEventListener("beforeunload", preventUnsavedUnload)
-    return () => window.removeEventListener("beforeunload", preventUnsavedUnload)
-  }, [dirtyTabIds])
-
-  /** 汇总标签内各表单的未保存状态。 */
-  const reportTabDirty = useCallback(
-    (tabId: string, source: symbol, dirty: boolean) => {
-      const sources = dirtySourcesRef.current.get(tabId) ?? new Set<symbol>()
-      if (dirty) {
-        sources.add(source)
-        dirtySourcesRef.current.set(tabId, sources)
-      } else {
-        sources.delete(source)
-        if (sources.size === 0) {
-          dirtySourcesRef.current.delete(tabId)
-        }
-      }
-      setDirtyTabIds((current) => {
-        const next = new Set(current)
-        if (sources.size > 0) {
-          next.add(tabId)
-        } else {
-          next.delete(tabId)
-        }
-        if (
-          next.size === current.size &&
-          [...next].every((id) => current.has(id))
-        ) {
-          return current
-        }
-        return next
-      })
-    },
-    [],
-  )
-
-  /** 把隐藏页面的后续导航保留在原标签中。 */
+  /**
+   * 把隐藏页面的后续导航保留在原标签中。
+   * 通过 ref 读取 navigate 以保持引用稳定：它参与每个面板的 Navigator 组装，
+   * 引用变化会让所有已挂载页面的 useNavigate 失效并触发重新加载数据。
+   */
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
   const navigateInBackgroundTab = useCallback(
     (sourceId: string, to: To, replaceCurrent: boolean) => {
       const href = typeof to === "string" ? to : createPath(to)
@@ -559,7 +479,7 @@ export function WorkspaceTabs({
         parsed.pathname === "/connect" ||
         parsed.pathname === "/setup"
       ) {
-        navigate(href, { replace: replaceCurrent })
+        navigateRef.current(href, { replace: replaceCurrent })
         return
       }
       const resolved = resolveWorkspaceLocation({
@@ -568,7 +488,7 @@ export function WorkspaceTabs({
         hash: parsed.hash ?? "",
       })
       if (!resolved.tab) {
-        navigate(resolved.canonicalHref, { replace: replaceCurrent })
+        navigateRef.current(resolved.canonicalHref, { replace: replaceCurrent })
         return
       }
       dispatch({
@@ -576,26 +496,10 @@ export function WorkspaceTabs({
         sourceId,
         tab: resolved.tab,
         replaceCurrent,
-        protectSource: dirtyTabIdsRef.current.has(sourceId),
       })
     },
-    [navigate],
+    [],
   )
-
-  /** 清除指定标签登记的未保存状态。 */
-  function discardDirtyState(ids: ReadonlySet<string>) {
-    for (const id of ids) {
-      dirtySourcesRef.current.delete(id)
-    }
-    setDirtyTabIds((current) => {
-      const next = new Set(current)
-      let changed = false
-      for (const id of ids) {
-        changed = next.delete(id) || changed
-      }
-      return changed ? next : current
-    })
-  }
 
   /** 激活现有标签并恢复其独立地址。 */
   function activateTab(id: string) {
@@ -615,21 +519,11 @@ export function WorkspaceTabs({
       id === state.activeId
         ? (state.tabs[index + 1] ?? state.tabs[index - 1])!
         : state.tabs.find((tab) => tab.id === state.activeId)!
-    discardDirtyState(new Set([id]))
     dispatch({ type: "close", id, nextActiveId: nextTab.id })
     if (id === state.activeId) {
       pendingActivationRef.current = nextTab.id
       navigate(nextTab.href)
     }
-  }
-
-  /** 关闭标签前确认是否放弃未保存内容。 */
-  function requestCloseTab(id: string) {
-    if (dirtyTabIds.has(id)) {
-      setPendingTabAction({ kind: "one", id })
-      return
-    }
-    closeTab(id)
   }
 
   /** 切换标签的固定状态并整理标签顺序。 */
@@ -639,7 +533,6 @@ export function WorkspaceTabs({
 
   /** 重新挂载指定标签，保留其他标签的页面实例。 */
   function reloadTab(id: string) {
-    discardDirtyState(new Set([id]))
     setReloadRevisionById((current) => ({
       ...current,
       [id]: (current[id] ?? 0) + 1,
@@ -647,22 +540,9 @@ export function WorkspaceTabs({
     console.info("工作台标签已重新加载", { tab_id: id })
   }
 
-  /** 重新加载前确认是否放弃未保存内容。 */
-  function requestReloadTab(id: string) {
-    if (dirtyTabIds.has(id)) {
-      setPendingTabAction({ kind: "reload", id })
-      return
-    }
-    reloadTab(id)
-  }
-
   /** 只保留指定标签，并在需要时将它激活。 */
   function closeOtherTabs(id: string) {
     const targetTab = state.tabs.find((tab) => tab.id === id)!
-    const removedIds = new Set(
-      state.tabs.filter((tab) => tab.id !== id).map((tab) => tab.id),
-    )
-    discardDirtyState(removedIds)
     dispatch({
       type: "keep",
       ids: new Set([id]),
@@ -682,7 +562,6 @@ export function WorkspaceTabs({
       state.tabs.slice(targetIndex + 1).map((tab) => tab.id),
     )
     const activeId = removedIds.has(state.activeId) ? id : state.activeId
-    discardDirtyState(removedIds)
     dispatch({
       type: "keep",
       ids: new Set(state.tabs.slice(0, targetIndex + 1).map((tab) => tab.id)),
@@ -693,51 +572,6 @@ export function WorkspaceTabs({
       navigate(targetTab.href)
     }
   }
-
-  /** 需要时确认并关闭其他标签。 */
-  function requestCloseOtherTabs(id: string) {
-    const hasDirtyTab = state.tabs.some(
-      (tab) => tab.id !== id && dirtyTabIds.has(tab.id),
-    )
-    if (hasDirtyTab) {
-      setPendingTabAction({ kind: "others", id })
-      return
-    }
-    closeOtherTabs(id)
-  }
-
-  /** 需要时确认并关闭右侧标签。 */
-  function requestCloseTabsToRight(id: string) {
-    const targetIndex = state.tabs.findIndex((tab) => tab.id === id)
-    const hasDirtyTab = state.tabs
-      .slice(targetIndex + 1)
-      .some((tab) => dirtyTabIds.has(tab.id))
-    if (hasDirtyTab) {
-      setPendingTabAction({ kind: "right", id })
-      return
-    }
-    closeTabsToRight(id)
-  }
-
-  /** 放弃未保存内容并执行等待中的操作。 */
-  function confirmPendingTabAction() {
-    const action = pendingTabAction
-    setPendingTabAction(null)
-    if (!action) {
-      return
-    }
-    if (action.kind === "one") {
-      closeTab(action.id)
-    } else if (action.kind === "others") {
-      closeOtherTabs(action.id)
-    } else if (action.kind === "right") {
-      closeTabsToRight(action.id)
-    } else {
-      reloadTab(action.id)
-    }
-  }
-
-  const reloadingDirtyTab = pendingTabAction?.kind === "reload"
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
@@ -768,16 +602,15 @@ export function WorkspaceTabs({
                     index={index}
                     tabs={state.tabs}
                     active={tab.id === state.activeId}
-                    dirty={dirtyTabIds.has(tab.id)}
                     pinned={state.pinnedIds.includes(tab.id)}
                     closable={state.tabs.length > 1}
                     onActivate={activateTab}
-                    onClose={requestCloseTab}
+                    onClose={closeTab}
                   />
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onSelect={() => requestReloadTab(tab.id)}>
+                <ContextMenuItem onSelect={() => reloadTab(tab.id)}>
                   {t("tabs.reload")}
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -792,20 +625,20 @@ export function WorkspaceTabs({
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   disabled={state.tabs.length <= 1}
-                  onSelect={() => requestCloseTab(tab.id)}
+                  onSelect={() => closeTab(tab.id)}
                 >
                   {t("tabs.closeTab")}
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   disabled={state.tabs.length <= 1}
-                  onSelect={() => requestCloseOtherTabs(tab.id)}
+                  onSelect={() => closeOtherTabs(tab.id)}
                 >
                   {t("tabs.closeOthers")}
                 </ContextMenuItem>
                 <ContextMenuItem
                   disabled={index >= state.tabs.length - 1}
-                  onSelect={() => requestCloseTabsToRight(tab.id)}
+                  onSelect={() => closeTabsToRight(tab.id)}
                 >
                   {t("tabs.closeRight")}
                 </ContextMenuItem>
@@ -821,44 +654,10 @@ export function WorkspaceTabs({
             tab={tab}
             active={tab.id === state.activeId}
             context={context}
-            onDirtyChange={reportTabDirty}
             onBackgroundNavigate={navigateInBackgroundTab}
           />
         ))}
       </div>
-      <AlertDialog
-        open={pendingTabAction !== null}
-        onOpenChange={(open) => !open && setPendingTabAction(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t(
-                reloadingDirtyTab
-                  ? "tabs.reloadUnsavedTitle"
-                  : "tabs.unsavedTitle",
-              )}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(
-                reloadingDirtyTab
-                  ? "tabs.reloadUnsavedDescription"
-                  : "tabs.unsavedDescription",
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("tabs.keepEditing")}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPendingTabAction}>
-              {t(
-                reloadingDirtyTab
-                  ? "tabs.discardAndReload"
-                  : "tabs.discardAndClose",
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

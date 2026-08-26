@@ -107,7 +107,7 @@ export function PagePaneNav({
   )
 }
 
-/** 分栏左栏导航项；activePath 用于链接目标只是该组页面之一时按公共前缀判断选中。 */
+/** 分栏左栏导航项；activePath 按公共路径前缀保持整组页面的选中态。 */
 export function PagePaneLink({
   to,
   activePath,

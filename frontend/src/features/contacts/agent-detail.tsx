@@ -28,7 +28,6 @@ import { Field, FieldDescription } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   agentWorkStatusSchema,
   createAgentManagedExecutionSchema,
@@ -147,16 +146,6 @@ export function AgentDetailView({
     shouldUseNativeValidation: true,
     defaultValues: { workStatus: agent.workStatus },
   })
-  useWorkspaceTabDirty(
-    (form.formState.isDirty && !form.formState.isSubmitting) ||
-      (managedExecutionForm.formState.isDirty &&
-        !managedExecutionForm.formState.isSubmitting) ||
-      (accountStatusForm.formState.isDirty &&
-        !accountStatusForm.formState.isSubmitting) ||
-      (workStatusForm.formState.isDirty &&
-        !workStatusForm.formState.isSubmitting),
-  )
-
   useEffect(() => {
     form.reset(valuesFromAgent(agent))
     managedExecutionForm.reset(managedExecutionValuesFromAgent(agent))

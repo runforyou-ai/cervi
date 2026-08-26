@@ -19,7 +19,6 @@ import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   createProfileSettingsSchema,
   type ProfileSettingsFormValues,
@@ -64,11 +63,6 @@ export function ProfileSettingsForm({
       email: user.email,
     },
   })
-  useWorkspaceTabDirty(
-    (form.formState.isDirty || pendingAvatar !== null) &&
-      !form.formState.isSubmitting,
-  )
-
   useEffect(() => {
     const previewURL = pendingAvatar?.previewURL
     return () => {
