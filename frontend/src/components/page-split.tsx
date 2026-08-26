@@ -1,7 +1,7 @@
 /** 页面内容区的左右分栏。 */
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
-import { NavLink } from "react-router"
+import { NavLink, useLocation } from "react-router"
 
 import { StatusBadge } from "@/components/status-badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -103,15 +103,21 @@ export function PagePaneNav({
   )
 }
 
-/** 分栏左栏导航项。 */
+/** 分栏左栏导航项；activePath 用于链接目标只是该组页面之一时按公共前缀判断选中。 */
 export function PagePaneLink({
   to,
+  activePath,
   children,
 }: {
   to?: string
+  activePath?: string
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
+  const { pathname } = useLocation()
+  const prefixActive =
+    activePath !== undefined &&
+    (pathname === activePath || pathname.startsWith(`${activePath}/`))
   const className =
     "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors"
 
@@ -135,7 +141,7 @@ export function PagePaneLink({
         cn(
           className,
           "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-          isActive &&
+          (isActive || prefixActive) &&
             "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
         )
       }
