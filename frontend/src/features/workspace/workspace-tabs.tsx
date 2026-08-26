@@ -12,6 +12,8 @@ import {
 import { PinIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
+  NavigationType,
+  UNSAFE_LocationContext,
   UNSAFE_NavigationContext,
   createPath,
   parsePath,
@@ -277,6 +279,20 @@ function WorkspaceTabPane({
     () => ({ ...navigationContext, navigator: scopedNavigator }),
     [navigationContext, scopedNavigator],
   )
+  /** 面板内页面只感知本标签的地址，避免切换标签时其他页面重新请求数据。 */
+  const scopedLocationContext = useMemo(() => {
+    const parsed = parsePath(tab.href)
+    return {
+      location: {
+        pathname: parsed.pathname ?? "/",
+        search: parsed.search ?? "",
+        hash: parsed.hash ?? "",
+        state: null,
+        key: tab.href,
+      },
+      navigationType: NavigationType.Pop,
+    }
+  }, [tab.href])
 
   return (
     <div
@@ -295,7 +311,9 @@ function WorkspaceTabPane({
             <UNSAFE_NavigationContext.Provider
               value={scopedNavigationContext}
             >
-              <WorkspacePageRoutes location={tab.href} />
+              <UNSAFE_LocationContext.Provider value={scopedLocationContext}>
+                <WorkspacePageRoutes location={tab.href} />
+              </UNSAFE_LocationContext.Provider>
             </UNSAFE_NavigationContext.Provider>
           </WorkspaceProvider>
         </PortalContainerProvider>
@@ -445,7 +463,13 @@ export function WorkspaceTabs({
       ?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [state.activeId])
 
-  /** 把隐藏页面的后续导航保留在原标签中。 */
+  /**
+   * 把隐藏页面的后续导航保留在原标签中。
+   * 通过 ref 读取 navigate 以保持引用稳定：它参与每个面板的 Navigator 组装，
+   * 引用变化会让所有已挂载页面的 useNavigate 失效并触发重新加载数据。
+   */
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
   const navigateInBackgroundTab = useCallback(
     (sourceId: string, to: To, replaceCurrent: boolean) => {
       const href = typeof to === "string" ? to : createPath(to)
@@ -455,7 +479,7 @@ export function WorkspaceTabs({
         parsed.pathname === "/connect" ||
         parsed.pathname === "/setup"
       ) {
-        navigate(href, { replace: replaceCurrent })
+        navigateRef.current(href, { replace: replaceCurrent })
         return
       }
       const resolved = resolveWorkspaceLocation({
@@ -464,7 +488,7 @@ export function WorkspaceTabs({
         hash: parsed.hash ?? "",
       })
       if (!resolved.tab) {
-        navigate(resolved.canonicalHref, { replace: replaceCurrent })
+        navigateRef.current(resolved.canonicalHref, { replace: replaceCurrent })
         return
       }
       dispatch({
@@ -474,7 +498,7 @@ export function WorkspaceTabs({
         replaceCurrent,
       })
     },
-    [navigate],
+    [],
   )
 
   /** 激活现有标签并恢复其独立地址。 */
