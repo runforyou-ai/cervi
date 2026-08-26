@@ -27,6 +27,7 @@ import { Field, FieldDescription } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { StatusBadge } from "@/components/status-badge"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   accountStatuses,
   accountStatusSchema,
@@ -132,6 +133,11 @@ export function MemberDetailView({
     shouldUseNativeValidation: true,
     defaultValues: { status: user.status },
   })
+  useWorkspaceTabDirty(
+    (form.formState.isDirty && !form.formState.isSubmitting) ||
+      (accountStatusForm.formState.isDirty &&
+        !accountStatusForm.formState.isSubmitting),
+  )
 
   useEffect(() => {
     form.reset(valuesFromUser(user))

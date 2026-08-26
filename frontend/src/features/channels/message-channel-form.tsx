@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { ChannelReceptionSettingsFields } from "@/features/channels/reception/channel-reception-settings-fields"
 import {
   createMessageChannelSchema,
@@ -70,6 +71,9 @@ export function MessageChannelForm({
       },
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   /** 提交消息渠道基础信息。 */
   async function submit(values: MessageChannelFormValues) {
@@ -104,6 +108,7 @@ export function MessageChannelForm({
         channel_id: created.id,
         channel_type: created.type,
       })
+      form.reset(values)
       navigate("/integrations/channels", { replace: true })
     } catch (error) {
       if (recoverSession(error, navigate)) {

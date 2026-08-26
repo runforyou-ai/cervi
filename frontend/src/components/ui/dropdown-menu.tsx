@@ -3,6 +3,7 @@ import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { usePortalContainer } from "@/components/ui/portal-container"
 
 function DropdownMenu(
   props: React.ComponentProps<typeof DropdownMenuPrimitive.Root>,
@@ -30,9 +31,13 @@ function DropdownMenuContent({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   const closedByPointerRef = React.useRef(false)
+  const pagePortal = usePortalContainer()
+  if (pagePortal && !pagePortal.active) {
+    return null
+  }
 
   return (
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal container={pagePortal?.container}>
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}

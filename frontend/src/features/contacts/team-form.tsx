@@ -11,6 +11,7 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 import {
@@ -47,6 +48,9 @@ export function TeamForm({
       description: team?.description ?? "",
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   useEffect(() => {
     if (!team) form.setFocus("name")

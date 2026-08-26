@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   connectorTypeConfigs,
   connectorTypeOrder,
@@ -87,6 +88,9 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
       apiKey: "",
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !saving,
+  )
   const selectedType = form.watch("type") as IntegrationConnectionTypeId
   const selectedTypeConfig = connectorTypeConfigs[selectedType]
 
@@ -140,6 +144,7 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
         await updateIntegrationConnection(connectionId, input)
       }
       if (!mounted.current) return
+      form.reset(values)
       toast.success(
         mode === "create"
           ? t("connectors.form.createSuccess")

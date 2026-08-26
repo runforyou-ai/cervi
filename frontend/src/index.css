@@ -261,6 +261,7 @@ body,
 [data-native-os="darwin"][data-window-fullscreen="false"] :is(
   [data-slot="page-header"],
   [data-slot="page-header-actions"],
+  .cervi-workspace-tabs,
   .cervi-inbox-empty-main
 ) {
   --wails-draggable: drag;
@@ -268,10 +269,50 @@ body,
 
 [data-native-os="darwin"] :is(
   .cervi-workspace-rail :is(a, button),
+  .cervi-workspace-tabs button,
   [data-slot="page-split-pane"],
   [data-slot="page-header-title"],
   [data-slot="page-header"] :is(a, button, input, select),
   .cervi-inbox-empty-main [data-slot="empty-state-content"]
 ) {
   --wails-draggable: no-drag;
+}
+
+/* 普通标签用竖线分隔，选中标签底部以凹形肩部连接标签栏。 */
+.cervi-workspace-tab[data-active="false"]::after {
+  position: absolute;
+  top: 10px;
+  right: 0;
+  bottom: 10px;
+  width: 1px;
+  content: "";
+  background: var(--border);
+}
+
+.cervi-workspace-tab[data-active="true"]::before,
+.cervi-workspace-tab[data-active="true"]::after {
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+  content: "";
+}
+
+.cervi-workspace-tab[data-active="true"]::before {
+  left: -10px;
+  background: radial-gradient(
+    circle at 0 0,
+    transparent 0 9.5px,
+    var(--sidebar-accent) 10px
+  );
+}
+
+.cervi-workspace-tab[data-active="true"]::after {
+  right: -10px;
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent 0 9.5px,
+    var(--sidebar-accent) 10px
+  );
 }

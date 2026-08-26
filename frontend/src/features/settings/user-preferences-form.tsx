@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Switch } from "@/components/ui/switch"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { NotificationPermissionSettings } from "@/features/notifications/notification-permission-settings"
 import {
   AppearanceSettings,
@@ -74,6 +75,10 @@ export function UserPreferencesForm({
         readNotificationDevicePreferences(notificationScope).soundEnabled,
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
+
   /** next-themes 初始化后同步未编辑的主题字段。 */
   useEffect(() => {
     if (!form.formState.dirtyFields.theme) {

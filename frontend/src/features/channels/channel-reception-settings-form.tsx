@@ -14,6 +14,7 @@ import {
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { ChannelReceptionSettingsFields } from "@/features/channels/reception/channel-reception-settings-fields"
 import {
   createChannelReceptionSchema,
@@ -49,6 +50,9 @@ export function ChannelReceptionSettingsForm({
       fallbackTarget: channel.fallbackTarget,
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   /** 保存消息渠道接待设置。 */
   async function submit(values: ChannelReceptionSettingsFormValues) {

@@ -22,6 +22,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { channelTypeLabel } from "@/features/contacts/contact-labels"
 import {
   createContactSchema,
@@ -65,6 +66,9 @@ export function ContactForm({
       notes: "",
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   /** 提交新建联系人。 */
   async function submit(values: ContactFormValues) {

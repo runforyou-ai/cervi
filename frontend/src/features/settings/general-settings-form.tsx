@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   createGeneralSettingsSchema,
   type GeneralSettingsFormValues,
@@ -57,6 +58,9 @@ export function GeneralSettingsForm({
       allowArbitraryUrl: organization.allowArbitraryUrl,
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
 
   useEffect(() => {
     mounted.current = true

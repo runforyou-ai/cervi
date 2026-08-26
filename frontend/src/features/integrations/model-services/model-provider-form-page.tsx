@@ -38,6 +38,7 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
+import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   Table,
   TableBody,
@@ -178,6 +179,9 @@ export function ModelProviderFormPage({
       models: [],
     },
   })
+  useWorkspaceTabDirty(
+    form.formState.isDirty && !form.formState.isSubmitting,
+  )
   const modelFields = useFieldArray({
     control: form.control,
     name: "models",
@@ -342,6 +346,7 @@ export function ModelProviderFormPage({
         await updateAIProvider(providerId, input)
       }
       if (!mounted.current) return
+      form.reset(values)
       toast.success(
         mode === "create"
           ? t("modelServices.form.createSuccess")
