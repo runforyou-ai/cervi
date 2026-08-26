@@ -43,6 +43,18 @@ func TestNormalizeInputRejectsInvalidBusinessURLs(t *testing.T) {
 	}
 }
 
+// TestNormalizeInputValidatesDescription 验证业务系统描述可留空、会去除首尾空白且长度受限。
+func TestNormalizeInputValidatesDescription(t *testing.T) {
+	input, fields := normalizeInput(Input{Name: "企业 ERP", Description: " 订单与库存管理 ", URL: "https://example.com"})
+	if len(fields) != 0 || input.Description != "订单与库存管理" {
+		t.Fatalf("normalizeInput description = %q fields = %#v", input.Description, fields)
+	}
+	_, longFields := normalizeInput(Input{Name: "企业 ERP", Description: strings.Repeat("鹿", 201), URL: "https://example.com"})
+	if longFields["description"] != ValidationDescriptionTooLong {
+		t.Fatalf("long description fields = %#v", longFields)
+	}
+}
+
 // TestNormalizeInputValidatesBusinessSystemName 验证业务系统名称必填且长度受限。
 func TestNormalizeInputValidatesBusinessSystemName(t *testing.T) {
 	_, emptyFields := normalizeInput(Input{Name: " ", URL: "https://example.com"})

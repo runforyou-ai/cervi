@@ -33,11 +33,12 @@ func (a *CreateBusinessSystemAction) Execute(ctx context.Context, identity *serv
 			return err
 		}
 		businessSystem = servermodels.BusinessSystem{
-			OrganizationID: identity.Organization.ID, Name: input.Name, URL: input.URL, Enabled: input.Enabled,
+			OrganizationID: identity.Organization.ID, Name: input.Name, Description: input.Description,
+			URL: input.URL, Enabled: input.Enabled,
 		}
 		_, err := tx.NewInsert().
 			Model(&businessSystem).
-			Column("organization_id", "name", "url", "enabled").
+			Column("organization_id", "name", "description", "url", "enabled").
 			Returning("*").
 			Exec(ctx)
 		return err

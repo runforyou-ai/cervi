@@ -294,6 +294,11 @@ type ProfileImageSelector interface {
 	SelectProfileImage(context.Context, RequestMeta) (ProfileImageFile, error)
 }
 
+// ExternalPageOpener 由支持多窗口的平台实现，在应用内新窗口打开外部页面。
+type ExternalPageOpener interface {
+	OpenExternalPage(context.Context, RequestMeta, ExternalPageInput) error
+}
+
 // NativeLocaleUpdater 同步当前设备上的原生界面语言。
 type NativeLocaleUpdater interface {
 	SetLocale(Locale)

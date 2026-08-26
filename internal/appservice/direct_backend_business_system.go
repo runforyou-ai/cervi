@@ -131,13 +131,15 @@ func (b *DirectBackend) businessSystemError(ctx context.Context, meta RequestMet
 
 // businessSystemInput 转换业务系统输入。
 func businessSystemInput(input BusinessSystemInput) businesssystemaction.Input {
-	return businesssystemaction.Input{Name: input.Name, URL: input.URL, Enabled: input.Enabled}
+	return businesssystemaction.Input{
+		Name: input.Name, Description: input.Description, URL: input.URL, Enabled: input.Enabled,
+	}
 }
 
 // businessSystemFromAction 转换业务系统输出。
 func businessSystemFromAction(input businesssystemaction.Record) BusinessSystem {
 	return BusinessSystem{
-		ID: input.ID, Name: input.Name, URL: input.URL, Enabled: input.Enabled,
+		ID: input.ID, Name: input.Name, Description: input.Description, URL: input.URL, Enabled: input.Enabled,
 		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
 }
@@ -145,12 +147,13 @@ func businessSystemFromAction(input businesssystemaction.Record) BusinessSystem 
 // businessSystemFieldKeys 映射业务系统校验错误。
 func businessSystemFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		businesssystemaction.ValidationNameRequired:  cervii18n.FieldBusinessSystemNameRequired,
-		businesssystemaction.ValidationNameTooLong:   cervii18n.FieldBusinessSystemNameTooLong,
-		businesssystemaction.ValidationNameDuplicate: cervii18n.FieldBusinessSystemNameDuplicate,
-		businesssystemaction.ValidationURLRequired:   cervii18n.FieldBusinessSystemURLRequired,
-		businesssystemaction.ValidationURLInvalid:    cervii18n.FieldBusinessSystemURLInvalid,
-		businesssystemaction.ValidationURLTooLong:    cervii18n.FieldBusinessSystemURLTooLong,
+		businesssystemaction.ValidationNameRequired:       cervii18n.FieldBusinessSystemNameRequired,
+		businesssystemaction.ValidationNameTooLong:        cervii18n.FieldBusinessSystemNameTooLong,
+		businesssystemaction.ValidationNameDuplicate:      cervii18n.FieldBusinessSystemNameDuplicate,
+		businesssystemaction.ValidationDescriptionTooLong: cervii18n.FieldBusinessSystemDescriptionTooLong,
+		businesssystemaction.ValidationURLRequired:        cervii18n.FieldBusinessSystemURLRequired,
+		businesssystemaction.ValidationURLInvalid:         cervii18n.FieldBusinessSystemURLInvalid,
+		businesssystemaction.ValidationURLTooLong:         cervii18n.FieldBusinessSystemURLTooLong,
 	}
 	return translateValidationFields(fields, keys)
 }

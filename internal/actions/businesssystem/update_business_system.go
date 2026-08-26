@@ -37,11 +37,12 @@ func (a *UpdateBusinessSystemAction) Execute(ctx context.Context, identity *serv
 			return err
 		}
 		current.Name = input.Name
+		current.Description = input.Description
 		current.URL = input.URL
 		current.Enabled = input.Enabled
 		if _, err := tx.NewUpdate().
 			Model(current).
-			Column("name", "url", "enabled").
+			Column("name", "description", "url", "enabled").
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			WherePK().

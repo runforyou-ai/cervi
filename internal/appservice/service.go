@@ -1,6 +1,12 @@
 package appservice
 
-import "context"
+import (
+	"context"
+	"net/url"
+	"strings"
+
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+)
 
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
 type Service struct {
@@ -9,6 +15,7 @@ type Service struct {
 	nativeLocaleUpdater  NativeLocaleUpdater
 	nativeNotification   NativeNotification
 	unreadIndicator      UnreadIndicator
+	externalPageOpener   ExternalPageOpener
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -39,6 +46,13 @@ func WithNativeNotification(notification NativeNotification) Option {
 func WithUnreadIndicator(indicator UnreadIndicator) Option {
 	return func(service *Service) {
 		service.unreadIndicator = indicator
+	}
+}
+
+// WithExternalPageOpener 注入原生端外部页面窗口能力。
+func WithExternalPageOpener(opener ExternalPageOpener) Option {
+	return func(service *Service) {
+		service.externalPageOpener = opener
 	}
 }
 
@@ -103,6 +117,29 @@ func (s *Service) SelectProfileImage(ctx context.Context, meta RequestMeta) (Pro
 		return ProfileImageFile{}, methodNotAllowedError(meta, "SelectProfileImage")
 	}
 	return s.profileImageSelector.SelectProfileImage(ctx, meta)
+}
+
+// OpenExternalPage 在原生端应用内新窗口打开外部页面。
+func (s *Service) OpenExternalPage(ctx context.Context, meta RequestMeta, input ExternalPageInput) error {
+	if s.externalPageOpener == nil {
+		return methodNotAllowedError(meta, "OpenExternalPage")
+	}
+	input.Title = strings.TrimSpace(input.Title)
+	input.URL = strings.TrimSpace(input.URL)
+	if !validExternalPageURL(input.URL) {
+		return InvalidError(meta, cervii18n.ErrorExternalPageURLInvalid, nil)
+	}
+	return s.externalPageOpener.OpenExternalPage(ctx, meta, input)
+}
+
+// validExternalPageURL 校验地址为不含认证信息的完整 HTTP 或 HTTPS 地址。
+func validExternalPageURL(value string) bool {
+	if value == "" || len(value) > 2048 {
+		return false
+	}
+	parsed, err := url.Parse(value)
+	return err == nil && parsed.IsAbs() && parsed.Host != "" && parsed.User == nil &&
+		(strings.EqualFold(parsed.Scheme, "http") || strings.EqualFold(parsed.Scheme, "https"))
 }
 
 // CheckNotificationPermission 返回当前设备的系统通知授权状态。

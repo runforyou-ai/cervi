@@ -4,6 +4,7 @@ import {
   CheckIcon,
   ContactRoundIcon,
   InboxIcon,
+  LayoutGridIcon,
   LibraryIcon,
   LoaderCircleIcon,
   LogOutIcon,
@@ -109,6 +110,12 @@ function WorkspaceMenu({
         icon={PlugIcon}
         label={t("integrations")}
         active={location.pathname.startsWith("/integrations")}
+      />
+      <WorkspaceRailItem
+        to="/apps"
+        icon={LayoutGridIcon}
+        label={t("apps")}
+        active={location.pathname.startsWith("/apps")}
       />
       <div className="mt-auto pb-1">
         <WorkspaceRailItem

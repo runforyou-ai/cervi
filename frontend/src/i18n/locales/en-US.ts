@@ -89,6 +89,7 @@ const enUS = {
     contacts: "Contacts",
     knowledgeBases: "Knowledge bases",
     integrations: "Integrations",
+    apps: "Apps",
     personalSettings: "Personal settings",
     systemSettings: "System settings",
     openUserMenu: "Open the user menu for {{name}}",
@@ -124,11 +125,35 @@ const enUS = {
         team: "Team",
         externalContacts: "External contacts",
         knowledgeBases: "Knowledge bases",
+        apps: "Apps",
         channels: "Message channels",
         businessSystems: "Business systems",
         modelServices: "Model services",
         connectors: "Connectors",
       },
+    },
+  },
+  apps: {
+    title: "Apps",
+    loading: "Loading…",
+    retry: "Retry",
+    loadError: "Could not load business systems.",
+    open: "Open {{name}}",
+    openError: "Could not open the business system. Please try again.",
+    empty: {
+      title: "No business systems available",
+      description:
+        "Ask an administrator to add and enable business systems under Integrations - Business systems.",
+    },
+    openUrl: {
+      action: "Open URL",
+      title: "Open URL",
+      label: "URL",
+      invalid: "Enter a complete HTTP or HTTPS URL.",
+      cancel: "Cancel",
+      open: "Open",
+      opening: "Opening…",
+      error: "Could not open the URL. Please try again.",
     },
   },
   knowledgeBase: {
@@ -584,6 +609,7 @@ const enUS = {
         createTitle: "Add business system",
         editTitle: "Edit business system",
         name: "Name",
+        description: "Description",
         url: "Website URL",
         enabled: "Enable business system",
         save: "Save",
@@ -606,6 +632,8 @@ const enUS = {
       validation: {
         nameRequired: "Enter a business system name.",
         nameTooLong: "The business system name cannot exceed 100 characters.",
+        descriptionTooLong:
+          "The business system description cannot exceed 200 characters.",
         urlRequired: "Enter the business system URL.",
         urlTooLong: "The business system URL cannot exceed 2048 characters.",
         urlInvalid:

@@ -57,6 +57,7 @@ import {
   ListMessageChannels,
   LoadIdentity,
   LoadInbox,
+  OpenExternalPage,
   ReactivateUser,
   ReactivateAgent,
   RemoveTeamMembers,
@@ -590,6 +591,9 @@ export function listIntegrationConnections() {
     }),
   )
 }
+
+/** 在原生端应用内新窗口打开外部页面。 */
+export const openExternalPage = bind(OpenExternalPage)
 
 /** 读取业务系统详情。 */
 export const getBusinessSystem = bind(GetBusinessSystem)

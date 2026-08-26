@@ -407,6 +407,12 @@ type ProfileImageFile struct {
 	DataBase64  string `json:"dataBase64"`
 }
 
+// ExternalPageInput 定义原生端打开外部页面窗口的输入。
+type ExternalPageInput struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
 // ChangePasswordInput 定义当前用户修改密码所需字段。
 type ChangePasswordInput struct {
 	CurrentPassword string `json:"currentPassword"`
@@ -1039,19 +1045,21 @@ type AIProviderModelList struct {
 
 // BusinessSystem 定义企业配置的业务系统。
 type BusinessSystem struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	URL       string    `json:"url"`
-	Enabled   bool      `json:"enabled"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	URL         string    `json:"url"`
+	Enabled     bool      `json:"enabled"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // BusinessSystemInput 定义业务系统可编辑字段。
 type BusinessSystemInput struct {
-	Name    string `json:"name"`
-	URL     string `json:"url"`
-	Enabled bool   `json:"enabled"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	URL         string `json:"url"`
+	Enabled     bool   `json:"enabled"`
 }
 
 // BusinessSystemList 定义企业业务系统列表。
