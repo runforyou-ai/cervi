@@ -4,6 +4,16 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>消息页中栏（会话列表）交互原型 · Cervi</title>
+<!--
+  实现提示：本原型只固化交互结构与信息层级，字号、栏宽、间距等具体数值是原型
+  自身的紧凑排版，不是实现规范。正式实现以系统现有标准为准：
+
+  - 字号使用系统档位（如名称 text-sm、辅助信息 text-xs），
+    不照搬本页的 13/12/11/10px 序列。
+  - 中栏总宽、范围纵栏和列表宽度按实际排版舒适度取 Tailwind 标准刻度，
+    档位定义在 PageSplit，不照搬本页的 48/296/344px。
+  - 颜色一律走 index.css 主题令牌；本页 :root 中的色值仅为预览近似。
+-->
 <style>
 /* ============ 设计令牌：与 frontend/src/index.css 保持一致 ============ */
 :root {

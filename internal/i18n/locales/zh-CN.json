@@ -222,6 +222,7 @@
   "error.server_initialization_required": "企业服务器尚未初始化，请先通过 Web 完成初始化。",
   "error.remote_request_create_failed": "创建企业服务器请求失败。",
   "error.server_connection_failed": "企业服务器连接失败。",
+  "error.inbox_load_failed": "读取会话列表失败，请重试。",
   "error.website_conversation_not_found": "没有找到这条会话。",
   "error.website_messenger_load_failed": "读取聊天内容失败，请重试。",
   "error.website_message_send_failed": "消息发送失败，请重试。",

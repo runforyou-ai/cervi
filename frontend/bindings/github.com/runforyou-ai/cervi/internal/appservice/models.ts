@@ -511,22 +511,6 @@ export interface ContactSummary {
 }
 
 /**
- * Conversation 定义收件箱中的会话。
- */
-export interface Conversation {
-    "id": string;
-    "name": string;
-    "initials": string;
-    "channel": string;
-    "preview": string;
-    "time": string;
-    "status": string;
-    "unread"?: number;
-    "online"?: boolean;
-    "messages": Message[] | null;
-}
-
-/**
  * CreateAgentInput 定义新增 AI 员工字段。
  */
 export interface CreateAgentInput {
@@ -643,12 +627,24 @@ export interface Identity {
 }
 
 /**
- * Inbox 定义统一收件箱结果。
+ * Inbox 定义成员收件箱查询结果。
  */
 export interface Inbox {
-    "organization": Organization;
-    "user": CurrentUser;
-    "conversations": Conversation[] | null;
+    "conversations": InboxConversation[] | null;
+}
+
+/**
+ * InboxConversation 定义成员收件箱中的客户会话列表项。
+ */
+export interface InboxConversation {
+    "id": string;
+    "title": string;
+    "contactName": string | null;
+    "channelType": ChannelType;
+    "channelName": string;
+    "preview": string;
+    "lastMessageAt": string;
+    "serviceSessionStatus": ServiceSessionStatus;
 }
 
 /**
@@ -868,29 +864,6 @@ export interface MemberOptionListInput {
     "page": number;
     "pageSize": number;
 }
-
-/**
- * Message 定义收件箱会话中的消息。
- */
-export interface Message {
-    "id": string;
-    "author": MessageAuthor;
-    "text": string;
-    "time": string;
-}
-
-/**
- * MessageAuthor 表示消息发送方。
- */
-export enum MessageAuthor {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    MessageAuthorVisitor = "visitor",
-    MessageAuthorAgent = "agent",
-};
 
 /**
  * MessageChannelInput 定义消息渠道可编辑的通用字段。
@@ -1163,6 +1136,21 @@ export interface S3SettingInput {
     "secretAccessKey": string;
     "forcePathStyle": boolean;
 }
+
+/**
+ * ServiceSessionStatus 表示客服处理状态。
+ */
+export enum ServiceSessionStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSessionStatusWaiting = "waiting",
+    ServiceSessionStatusActive = "active",
+    ServiceSessionStatusPending = "pending",
+    ServiceSessionStatusClosed = "closed",
+};
 
 /**
  * SessionState 表示会话入口。

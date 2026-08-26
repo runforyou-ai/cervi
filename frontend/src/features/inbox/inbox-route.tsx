@@ -33,14 +33,10 @@ export function InboxRoute() {
         return
       }
       setData(inbox)
-      const unreadCount = inbox.conversations.reduce(
-        (total, conversation) => total + (conversation.unread ?? 0),
-        0,
-      )
-      applyUnreadSnapshot(unreadCount, unreadRevision)
+      /* 未读事实属于后续阶段，当前快照恒为零。 */
+      applyUnreadSnapshot(0, unreadRevision)
       console.info("消息已加载", {
         conversation_count: inbox.conversations.length,
-        unread_count: unreadCount,
       })
     } catch (requestError) {
       if (!mountedRef.current || requestId !== requestIdRef.current) {

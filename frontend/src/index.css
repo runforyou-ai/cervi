@@ -40,6 +40,9 @@
     --color-destructive: var(--destructive);
     --color-success: var(--success);
     --color-warning: var(--warning);
+    --color-badge-website: var(--badge-website);
+    --color-badge-telegram: var(--badge-telegram);
+    --color-badge-wechat: var(--badge-wechat);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -91,6 +94,11 @@
     --destructive-foreground: oklch(1 0 0);
     --success: oklch(0.6200 0.1500 149.5);
     --warning: oklch(0.62 0.16 65);
+
+    /* 会话来源徽标色，按渠道类型区分。 */
+    --badge-website: oklch(0.6578 0.1846 253.49);
+    --badge-telegram: oklch(0.68 0.12 230);
+    --badge-wechat: oklch(0.62 0.15 149.5);
 
     --border: oklch(0.90 0.004 286.32);
     --input: oklch(0.90 0.004 286.32);
@@ -148,6 +156,10 @@
     --destructive-foreground: oklch(0.985 0 0);
     --success: oklch(0.6800 0.1500 149.5);
     --warning: oklch(0.78 0.15 75);
+
+    --badge-website: oklch(0.6578 0.1846 253.49);
+    --badge-telegram: oklch(0.68 0.12 230);
+    --badge-wechat: oklch(0.6800 0.1500 149.5);
 
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);

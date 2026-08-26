@@ -2,19 +2,39 @@
 
 package appservice
 
-import "context"
+import (
+	"context"
+	"log/slog"
 
-// LoadInbox 返回当前身份所属企业和用户，会话列表暂为空。
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+)
+
+// LoadInbox 返回当前企业的客户会话工作队列。
 func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Inbox{}, err
 	}
-	output := b.loadInbox.Execute(ctx, identity)
-	currentIdentity := identityFromModel(output.Identity)
-	return Inbox{
-		Organization:  currentIdentity.Organization,
-		User:          currentIdentity.User,
-		Conversations: []Conversation{},
-	}, nil
+	summaries, err := b.loadInbox.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return Inbox{}, ctx.Err()
+		}
+		slog.Warn("读取收件箱会话列表失败", "organization_id", identity.Organization.ID, "error", err)
+		return Inbox{}, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
+	}
+	conversations := make([]InboxConversation, 0, len(summaries))
+	for _, summary := range summaries {
+		conversations = append(conversations, InboxConversation{
+			ID:                   summary.ID,
+			Title:                summary.Title,
+			ContactName:          summary.ContactName,
+			ChannelType:          ChannelType(summary.ChannelType),
+			ChannelName:          summary.ChannelName,
+			Preview:              summary.Preview,
+			LastMessageAt:        summary.LastMessageAt,
+			ServiceSessionStatus: ServiceSessionStatus(summary.ServiceSessionStatus),
+		})
+	}
+	return Inbox{Conversations: conversations}, nil
 }
