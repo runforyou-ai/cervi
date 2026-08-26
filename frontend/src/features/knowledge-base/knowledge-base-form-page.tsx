@@ -36,7 +36,6 @@ import {
   type KnowledgeBaseFormValues,
 } from "@/features/knowledge-base/knowledge-base-schema"
 import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-base-context"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -123,10 +122,6 @@ export function KnowledgeBaseFormPage({
         : "",
     },
   })
-  useWorkspaceTabDirty(
-    form.formState.isDirty && !form.formState.isSubmitting,
-  )
-
   useEffect(() => {
     if (mode !== "create") return
     setExternal(requestedExternal)

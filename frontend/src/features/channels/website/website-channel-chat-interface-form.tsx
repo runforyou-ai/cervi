@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { useWorkspaceTabDirty } from "@/contexts/workspace-tab-lifecycle"
 import {
   createWebsiteChannelChatInterfaceSchema,
   defaultWebsiteChannelThemeColor,
@@ -70,9 +69,6 @@ export function WebsiteChannelChatInterfaceForm({
       themeColor: channel.chatInterface.themeColor,
     },
   })
-  useWorkspaceTabDirty(
-    form.formState.isDirty && !form.formState.isSubmitting,
-  )
   const previewValue = useWatch({
     control: form.control,
     compute: (value): WebsiteChannelChatInterfaceInput => ({
