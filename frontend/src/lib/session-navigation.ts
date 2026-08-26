@@ -3,6 +3,7 @@ import type { NavigateFunction } from "react-router"
 
 import { isApiError, sessionPath, SessionState } from "@/api"
 import { clearWebToken } from "@/api/client"
+import { resetResourceCache } from "@/lib/resource-client"
 
 /** 将带有会话状态的错误导航到对应入口。 */
 export function recoverSession(
@@ -18,6 +19,7 @@ export function recoverSession(
   }
   if (error.state === SessionState.SessionStateLogin) {
     clearWebToken()
+    resetResourceCache()
   }
   navigate(path, { replace: true })
   return true

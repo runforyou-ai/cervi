@@ -5,7 +5,7 @@ import { Navigate, useNavigate } from "react-router"
 
 import { LoginForm } from "@/features/auth/login-form"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
-import { useStartup } from "@/features/startup/startup-context"
+import { useStartup } from "@/contexts/startup-context"
 
 /** 检测已有登录身份并展示企业登录。 */
 export function LoginPage({

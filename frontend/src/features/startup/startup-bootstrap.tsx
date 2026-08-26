@@ -4,7 +4,7 @@ import { LoaderCircleIcon } from "lucide-react"
 import { Navigate, useLocation } from "react-router"
 
 import { SessionState, type Startup } from "@/api"
-import { StartupProvider } from "@/features/startup/startup-context"
+import { StartupProvider } from "@/contexts/startup-context"
 import { useStartupLoader } from "@/features/startup/use-startup-loader"
 
 /** 根据启动状态选择连接、初始化或当前应用入口。 */

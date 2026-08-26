@@ -1,5 +1,5 @@
 /** 业务系统新增与编辑页。 */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -25,6 +25,8 @@ import {
   createBusinessSystemSchema,
   type BusinessSystemFormValues,
 } from "@/features/integrations/business-systems/business-system-schema"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -35,9 +37,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
   const { businessSystemId = "" } = useParams()
-  const [loading, setLoading] = useState(mode === "edit")
-  const [loadError, setLoadError] = useState(false)
-  const loadVersion = useRef(0)
+  const invalidateResource = useResourceInvalidator()
   const mounted = useRef(true)
   const schema = useMemo(
     () =>
@@ -56,56 +56,58 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
     shouldUseNativeValidation: true,
     defaultValues: { name: "", description: "", url: "", enabled: true },
   })
-  /** 读取待编辑的业务系统。 */
-  const loadBusinessSystem = useCallback(async () => {
-    const version = ++loadVersion.current
-    setLoading(true)
-    setLoadError(false)
-    try {
-      const businessSystem = await getBusinessSystem(businessSystemId)
-      if (version !== loadVersion.current) return
-      form.reset({
-        name: businessSystem.name,
-        description: businessSystem.description,
-        url: businessSystem.url,
-        enabled: businessSystem.enabled,
-      })
-    } catch (requestError) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("业务系统详情加载失败", {
-        business_system_id: businessSystemId,
-        error: requestError,
-      })
-      setLoadError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [businessSystemId, form, navigate])
+  const {
+    data: businessSystem,
+    loading: detailLoading,
+    refreshing: detailRefreshing,
+    error: detailError,
+    refresh,
+  } = useResource(
+    resourceKeys.businessSystem(businessSystemId),
+    () => getBusinessSystem(businessSystemId),
+    { enabled: mode === "edit" },
+  )
+  const loading =
+    mode === "edit" &&
+    (detailLoading || (Boolean(detailError) && detailRefreshing))
+  const loadError = mode === "edit" && Boolean(detailError) && !loading
+
+  /** 详情就绪后回填业务系统表单。 */
+  useEffect(() => {
+    if (!businessSystem) return
+    form.reset({
+      name: businessSystem.name,
+      description: businessSystem.description,
+      url: businessSystem.url,
+      enabled: businessSystem.enabled,
+    })
+  }, [businessSystem, form])
 
   useEffect(() => {
     mounted.current = true
-    if (mode === "edit") void loadBusinessSystem()
     return () => {
       mounted.current = false
-      loadVersion.current += 1
     }
-  }, [loadBusinessSystem, mode])
+  }, [])
 
   /** 创建或保存业务系统。 */
   async function save(values: BusinessSystemFormValues) {
     try {
-      const businessSystem =
+      const saved =
         mode === "create"
           ? await createBusinessSystem(values)
           : await updateBusinessSystem(businessSystemId, values)
+      if (mode === "edit") {
+        void invalidateResource(resourceKeys.businessSystem(businessSystemId))
+      }
+      void invalidateResource(resourceKeys.businessSystems())
       if (!mounted.current) return
       form.reset(values)
       console.info(
         mode === "create" ? "业务系统已创建" : "业务系统已保存",
         {
-          business_system_id: businessSystem.id,
-          enabled: businessSystem.enabled,
+          business_system_id: saved.id,
+          enabled: saved.enabled,
         },
       )
       toast.success(
@@ -152,7 +154,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
             <Button
               className="mt-4"
               variant="outline"
-              onClick={() => void loadBusinessSystem()}
+              onClick={() => void refresh()}
             >
               {t("businessSystem.retry")}
             </Button>

@@ -1,10 +1,19 @@
 /** 创建文件记录并将内容上传到最终存储位置。 */
+import {
+  CompleteFileUpload,
+  CreateFileUpload,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   FilePurpose,
   FileUploadRequest,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import { bind } from "@/api/client"
 
-import { completeFileUpload, createFileUpload } from "@/api/service"
+/** 创建文件上传请求。 */
+export const createFileUpload = bind(CreateFileUpload)
+
+/** 核验并完成文件上传。 */
+export const completeFileUpload = bind(CompleteFileUpload)
 
 /** 创建、上传并确认一个临时文件。 */
 export async function uploadFile(file: globalThis.File, purpose: FilePurpose) {

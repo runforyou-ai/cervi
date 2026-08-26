@@ -1,5 +1,5 @@
 /** 企业知识库新建和编辑页。 */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -36,6 +36,8 @@ import {
   type KnowledgeBaseFormValues,
 } from "@/features/knowledge-base/knowledge-base-schema"
 import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-base-context"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -86,12 +88,10 @@ export function KnowledgeBaseFormPage({
       : KnowledgeBaseCategory.KnowledgeBaseCategoryStandard
   const { upsertKnowledgeBase } = useKnowledgeBaseContext()
   const { knowledgeBaseId = "" } = useParams()
-  const [loading, setLoading] = useState(mode === "edit")
-  const [loadError, setLoadError] = useState(false)
+  const invalidateResource = useResourceInvalidator()
   const [external, setExternal] = useState(requestedExternal)
   const [category, setCategory] =
     useState<KnowledgeBaseCategoryId>(requestedCategory)
-  const loadVersion = useRef(0)
   const mounted = useRef(true)
   const schema = useMemo(
     () =>
@@ -138,44 +138,41 @@ export function KnowledgeBaseFormPage({
     })
   }, [form, mode, requestedCategory, requestedExternal])
 
-  /** 读取待编辑知识库。 */
-  const load = useCallback(async () => {
-    if (mode !== "edit") return
-    const version = ++loadVersion.current
-    setLoading(true)
-    setLoadError(false)
-    try {
-      const knowledgeBase = await getKnowledgeBase(knowledgeBaseId)
-      if (version !== loadVersion.current) return
-      form.reset({
-        name: knowledgeBase.name,
-        description: knowledgeBase.description,
-        integrationConnectionId: knowledgeBase.integrationConnectionId,
-        externalResourceId: knowledgeBase.externalResourceId,
-      })
-      setCategory(knowledgeBase.category)
-      setExternal(knowledgeBase.integrationConnectionId !== "")
-    } catch (error) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(error, navigate)) return
-      console.warn("知识库详情加载失败", {
-        knowledge_base_id: knowledgeBaseId,
-        error,
-      })
-      setLoadError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [form, knowledgeBaseId, mode, navigate])
+  const {
+    data: loadedKnowledgeBase,
+    loading: detailLoading,
+    refreshing: detailRefreshing,
+    error: detailError,
+    refresh,
+  } = useResource(
+    resourceKeys.knowledgeBase(knowledgeBaseId),
+    () => getKnowledgeBase(knowledgeBaseId),
+    { enabled: mode === "edit" },
+  )
+  const loading =
+    mode === "edit" &&
+    (detailLoading || (Boolean(detailError) && detailRefreshing))
+  const loadError = mode === "edit" && Boolean(detailError) && !loading
+
+  /** 详情就绪后回填知识库表单和派生状态。 */
+  useEffect(() => {
+    if (!loadedKnowledgeBase) return
+    form.reset({
+      name: loadedKnowledgeBase.name,
+      description: loadedKnowledgeBase.description,
+      integrationConnectionId: loadedKnowledgeBase.integrationConnectionId,
+      externalResourceId: loadedKnowledgeBase.externalResourceId,
+    })
+    setCategory(loadedKnowledgeBase.category)
+    setExternal(loadedKnowledgeBase.integrationConnectionId !== "")
+  }, [form, loadedKnowledgeBase])
 
   useEffect(() => {
     mounted.current = true
-    void load()
     return () => {
       mounted.current = false
-      loadVersion.current += 1
     }
-  }, [load])
+  }, [])
 
   /** 保存知识库。 */
   async function save(values: KnowledgeBaseFormValues) {
@@ -186,6 +183,9 @@ export function KnowledgeBaseFormPage({
         knowledgeBase = await createKnowledgeBase(input)
       } else {
         knowledgeBase = await updateKnowledgeBase(knowledgeBaseId, input)
+      }
+      if (mode === "edit") {
+        void invalidateResource(resourceKeys.knowledgeBase(knowledgeBaseId))
       }
       if (!mounted.current) return
       form.reset(values)
@@ -243,7 +243,7 @@ export function KnowledgeBaseFormPage({
             <Button
               className="mt-4"
               variant="outline"
-              onClick={() => void load()}
+              onClick={() => void refresh()}
             >
               {t("retry")}
             </Button>

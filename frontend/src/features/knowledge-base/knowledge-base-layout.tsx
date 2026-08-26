@@ -45,6 +45,8 @@ import {
   KnowledgeGroupDialog,
   type KnowledgeGroupDialogState,
 } from "@/features/knowledge-base/knowledge-group-dialog"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
@@ -59,66 +61,41 @@ export function KnowledgeBaseLayout() {
   const { t } = useTranslation("knowledgeBase")
   const location = useLocation()
   const navigate = useNavigate()
-  const navigateRef = useRef(navigate)
-  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseData[]>([])
   const [groupDialog, setGroupDialog] =
     useState<KnowledgeGroupDialogState | null>(null)
   const [deletingKnowledgeBase, setDeletingKnowledgeBase] =
     useState<KnowledgeBaseData | null>(null)
   const [deletingGroup, setDeletingGroup] =
     useState<DeleteGroupTarget | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const loadVersion = useRef(0)
   const mounted = useRef(true)
   const indexActive =
     location.pathname === "/knowledge-bases" ||
     location.pathname === "/knowledge-bases/"
-
-  // 路由变化时保持列表加载函数稳定，避免返回表单时重新加载侧栏。
-  useEffect(() => {
-    navigateRef.current = navigate
-  }, [navigate])
-
-  /** 读取当前企业的知识库资源树。 */
-  const load = useCallback(async () => {
-    const version = ++loadVersion.current
-    setLoading(true)
-    setLoadError(false)
-    try {
-      const output = await listKnowledgeBases()
-      if (version !== loadVersion.current) return
-      setKnowledgeBases(output.knowledgeBases)
-    } catch (error) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(error, navigateRef.current)) return
-      console.warn("知识库列表加载失败", error)
-      setLoadError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [])
+  const {
+    data,
+    loading,
+    refreshing,
+    error: loadError,
+    refresh,
+  } = useResource(resourceKeys.knowledgeBases(), () => listKnowledgeBases())
+  const showLoading = loading || (Boolean(loadError) && refreshing)
+  const knowledgeBases = data?.knowledgeBases ?? []
 
   useEffect(() => {
     mounted.current = true
-    void load()
     return () => {
       mounted.current = false
-      loadVersion.current += 1
     }
-  }, [load])
+  }, [])
 
   /** 把创建、保存或分组结果同步到窄侧栏。 */
-  const upsertKnowledgeBase = useCallback((knowledgeBase: KnowledgeBaseData) => {
-    setKnowledgeBases((current) => {
-      const next = current.filter((item) => item.id !== knowledgeBase.id)
-      next.push(knowledgeBase)
-      return next.sort((left, right) =>
-        left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
-      )
-    })
-  }, [])
+  const upsertKnowledgeBase = useCallback(
+    (_knowledgeBase: KnowledgeBaseData) => {
+      void refresh()
+    },
+    [refresh],
+  )
 
   /** 删除当前选中的知识库。 */
   async function confirmDeleteKnowledgeBase() {
@@ -128,9 +105,7 @@ export function KnowledgeBaseLayout() {
     try {
       await deleteKnowledgeBase(target.id)
       if (!mounted.current) return
-      setKnowledgeBases((current) =>
-        current.filter((item) => item.id !== target.id),
-      )
+      void refresh()
       setDeletingKnowledgeBase(null)
       if (location.pathname.startsWith(`/knowledge-bases/${target.id}`)) {
         navigate("/knowledge-bases")
@@ -221,7 +196,7 @@ export function KnowledgeBaseLayout() {
               </DropdownMenu>
             }
           >
-            {loading ? (
+            {showLoading ? (
               <div className="flex h-20 items-center justify-center gap-2 text-sm text-muted-foreground">
                 <LoaderCircleIcon className="size-4 animate-spin" />
                 {t("loading")}
@@ -235,7 +210,7 @@ export function KnowledgeBaseLayout() {
                   className="mt-3"
                   variant="outline"
                   size="sm"
-                  onClick={() => void load()}
+                  onClick={() => void refresh()}
                 >
                   {t("retry")}
                 </Button>

@@ -1,0 +1,38 @@
+/** 简体中文·收件箱文案。 */
+const inbox = {
+  searchLabel: "搜索会话",
+  searchShortcut: "搜索（Ctrl/⌘+K）",
+  searchClear: "清除搜索",
+  searchEmpty: "没有匹配的会话",
+  scopeRailLabel: "消息范围",
+  scopeRailCollapse: "收起范围栏",
+  scopeRailExpand: "展开范围栏",
+  scopeAll: "全部",
+  scopeCustomer: "客户",
+  queueFilterLabel: "客户队列筛选",
+  queueFilterQueue: "排队",
+  queueFilterMine: "我负责",
+  queueFilterAi: "AI 接待中",
+  queueFilterColleague: "同事",
+  queueFilterClosed: "已关闭",
+  queueFilterMore: "更多",
+  newConversation: "发起会话",
+  newDirectConversation: "发起单聊",
+  newGroupConversation: "创建群聊",
+  anonymousVisitor: "网站访客",
+  justNow: "刚刚",
+  yesterday: "昨天",
+  emptyTitle: "还没有客户会话",
+  emptyDescription: "接入网站渠道后，新会话会出现在这里。",
+  conversationTitle: "与 {{name}} 的会话",
+  detailDescription: "客户会话详情",
+  threadComingSoon: "消息内容功能开发中",
+  sessionStatus: {
+    waiting: "排队中",
+    active: "处理中",
+    pending: "已挂起",
+    closed: "已结束",
+  },
+}
+
+export default inbox

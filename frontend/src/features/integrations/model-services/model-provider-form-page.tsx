@@ -1,5 +1,5 @@
 /** 模型服务供应商表单页。 */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import {
@@ -62,6 +62,8 @@ import {
   parseTokenCount,
   type AIProviderFormValues,
 } from "@/features/integrations/model-services/model-provider-schema"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -116,8 +118,7 @@ export function ModelProviderFormPage({
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
   const { providerId = "" } = useParams()
-  const [loading, setLoading] = useState(mode === "edit")
-  const [loadError, setLoadError] = useState(false)
+  const invalidateResource = useResourceInvalidator()
   const [modelDialogOpen, setModelDialogOpen] = useState(false)
   const [availableModels, setAvailableModels] = useState<AIProviderModelData[]>(
     [],
@@ -125,7 +126,6 @@ export function ModelProviderFormPage({
   const [draftModelIDs, setDraftModelIDs] = useState<Set<string>>(new Set())
   const [loadingModels, setLoadingModels] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
-  const loadVersion = useRef(0)
   const mounted = useRef(true)
   const listPath = `/integrations/model-services/${returnSection}`
   const initialBrand = modelServiceSectionConfigs[returnSection].defaultBrand
@@ -183,42 +183,40 @@ export function ModelProviderFormPage({
     name: "models",
   })
 
-  /** 读取待编辑的模型服务供应商。 */
-  const loadProvider = useCallback(async () => {
-    const version = ++loadVersion.current
-    setLoading(true)
-    setLoadError(false)
-    try {
-      const provider = await getAIProvider(providerId)
-      if (version !== loadVersion.current) return
-      form.reset({
-        brand: provider.brand,
-        name: provider.name,
-        apiKey: provider.apiKey,
-        apiUrl: provider.apiUrl,
-        models: provider.models.map(modelFormValue),
-      })
-    } catch (requestError) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("模型服务供应商详情加载失败", {
-        provider_id: providerId,
-        error: requestError,
-      })
-      setLoadError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [form, navigate, providerId])
+  const {
+    data: provider,
+    loading: providerLoading,
+    refreshing: providerRefreshing,
+    error: providerError,
+    refresh,
+  } = useResource(
+    resourceKeys.aiProvider(providerId),
+    () => getAIProvider(providerId),
+    { enabled: mode === "edit" },
+  )
+  const loading =
+    mode === "edit" &&
+    (providerLoading || (Boolean(providerError) && providerRefreshing))
+  const loadError = mode === "edit" && Boolean(providerError) && !loading
+
+  /** 详情就绪后回填供应商表单。 */
+  useEffect(() => {
+    if (!provider) return
+    form.reset({
+      brand: provider.brand,
+      name: provider.name,
+      apiKey: provider.apiKey,
+      apiUrl: provider.apiUrl,
+      models: provider.models.map(modelFormValue),
+    })
+  }, [form, provider])
 
   useEffect(() => {
     mounted.current = true
-    if (mode === "edit") void loadProvider()
     return () => {
       mounted.current = false
-      loadVersion.current += 1
     }
-  }, [loadProvider, mode])
+  }, [])
 
   /** 获取当前品牌的预设模型并打开选择弹窗。 */
   async function openModelDialog() {
@@ -340,7 +338,9 @@ export function ModelProviderFormPage({
         await createAIProvider(input)
       } else {
         await updateAIProvider(providerId, input)
+        void invalidateResource(resourceKeys.aiProvider(providerId))
       }
+      void invalidateResource(resourceKeys.aiProviders())
       if (!mounted.current) return
       form.reset(values)
       toast.success(
@@ -394,7 +394,7 @@ export function ModelProviderFormPage({
             <Button
               className="mt-4"
               variant="outline"
-              onClick={() => void loadProvider()}
+              onClick={() => void refresh()}
             >
               {t("modelServices.retry")}
             </Button>

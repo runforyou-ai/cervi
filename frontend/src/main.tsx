@@ -1,6 +1,7 @@
 /** 初始化国际化并挂载前端应用。 */
 import React from "react"
 import ReactDOM from "react-dom/client"
+import { QueryClientProvider } from "@tanstack/react-query"
 import { ThemeProvider } from "next-themes"
 import { HashRouter } from "react-router"
 
@@ -8,6 +9,7 @@ import App from "@/App"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { initializeI18n } from "@/i18n"
 import "@/index.css"
+import { resourceClient } from "@/lib/resource-client"
 import { resolveAppPlatform, type AppPlatform } from "@/platform/app-platform"
 
 /** Web 端启用浏览器默认右键菜单。 */
@@ -25,13 +27,15 @@ async function bootstrap() {
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <HashRouter>
-          <TooltipProvider>
-            <App platform={platform} />
-          </TooltipProvider>
-        </HashRouter>
-      </ThemeProvider>
+      <QueryClientProvider client={resourceClient}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <HashRouter>
+            <TooltipProvider>
+              <App platform={platform} />
+            </TooltipProvider>
+          </HashRouter>
+        </ThemeProvider>
+      </QueryClientProvider>
     </React.StrictMode>,
   )
 }

@@ -1,10 +1,12 @@
 /** 网站渠道挂件预览。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import type { WebsiteChannelChatInterfaceInput } from "@/api"
 import { Button } from "@/components/ui/button"
 import { resolveWebsiteChannelOrigin } from "@/features/channels/website/website-channel-access"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 
 type PreviewStatus = "loading" | "ready" | "failed"
 
@@ -16,32 +18,31 @@ export function WebsiteChatPreview({
 }) {
   const { t } = useTranslation("channels")
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [previewOrigin, setPreviewOrigin] = useState("")
   const [status, setStatus] = useState<PreviewStatus>("loading")
   const [retryKey, setRetryKey] = useState(0)
+  const originResource = useResource(resourceKeys.websiteChannelOrigin(), () =>
+    resolveWebsiteChannelOrigin(),
+  )
+  const previewOrigin = useMemo(() => {
+    if (!originResource.data) return ""
+    try {
+      return new URL(originResource.data).origin
+    } catch {
+      return ""
+    }
+  }, [originResource.data])
   const previewURL = previewOrigin ? `${previewOrigin}/chat/preview` : ""
 
+  /** 访问地址读取失败或无法解析时标记预览失败。 */
   useEffect(() => {
-    let active = true
-    setPreviewOrigin("")
-    setStatus("loading")
-
-    void resolveWebsiteChannelOrigin()
-      .then((origin) => {
-        if (!active) return
-        const parsed = new URL(origin)
-        setPreviewOrigin(parsed.origin)
-      })
-      .catch((error: unknown) => {
-        if (!active) return
-        console.warn("网站渠道 Messenger 预览地址解析失败", error)
-        setStatus("failed")
-      })
-
-    return () => {
-      active = false
+    if (originResource.error) {
+      console.warn("网站渠道 Messenger 预览地址解析失败", originResource.error)
+      setStatus("failed")
+    } else if (originResource.data !== undefined && !previewOrigin) {
+      console.warn("网站渠道 Messenger 预览地址解析失败", originResource.data)
+      setStatus("failed")
     }
-  }, [retryKey])
+  }, [originResource.data, originResource.error, previewOrigin])
 
   /** 同步聊天界面设置到访客挂件预览。 */
   const syncPreview = useCallback(() => {
@@ -101,7 +102,9 @@ export function WebsiteChatPreview({
 
   /** 重新加载挂件预览。 */
   function retry() {
+    setStatus("loading")
     setRetryKey((current) => current + 1)
+    void originResource.refresh()
   }
 
   return (
@@ -113,6 +116,7 @@ export function WebsiteChatPreview({
       <div className="relative h-[800px] overflow-hidden rounded-2xl border bg-muted/30 shadow-sm">
         {previewURL ? (
           <iframe
+            key={retryKey}
             ref={iframeRef}
             className="block size-full border-0 bg-background"
             src={previewURL}

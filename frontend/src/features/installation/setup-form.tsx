@@ -28,7 +28,7 @@ import {
   createSetupSchema,
   type SetupFormValues,
 } from "@/features/installation/setup-schema"
-import { useStartup } from "@/features/startup/startup-context"
+import { useStartup } from "@/contexts/startup-context"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 创建企业和第一个管理员账号。 */
