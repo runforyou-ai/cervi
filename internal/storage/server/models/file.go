@@ -27,4 +27,7 @@ type File struct {
 	ExpiresAt       *time.Time `bun:"expires_at"`
 	CreatedAt       time.Time  `bun:"created_at"`
 	UpdatedAt       time.Time  `bun:"updated_at"`
+
+	// Expired 是查询时按数据库时钟计算的过期标记，与写入侧的 now() 同源，不对应实际列。
+	Expired bool `bun:"expired,scanonly"`
 }

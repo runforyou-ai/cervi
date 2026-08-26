@@ -500,7 +500,7 @@ export function RestoreContact(meta: $models.RequestMeta, contactID: string): $C
 /**
  * SaveS3Setting 保存当前企业的对象存储设置。
  */
-export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3Setting): $CancellablePromise<$models.S3Setting> {
+export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<$models.S3Setting> {
     return $Call.ByID(2631396075, meta, input);
 }
 
@@ -542,7 +542,7 @@ export function TestIntegrationConnection(meta: $models.RequestMeta, input: $mod
 /**
  * TestS3Setting 测试对象存储连接。
  */
-export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3Setting): $CancellablePromise<void> {
+export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<void> {
     return $Call.ByID(944621916, meta, input);
 }
 

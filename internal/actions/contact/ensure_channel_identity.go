@@ -94,8 +94,8 @@ func loadAutomaticContact(ctx context.Context, db bun.IDB, organizationID, conta
 	contact := &servermodels.Contact{}
 	if err := db.NewSelect().
 		Model(contact).
-		Where("c.organization_id = ?", organizationID).
-		Where("c.id = ?", contactID).
+		Where("ct.organization_id = ?", organizationID).
+		Where("ct.id = ?", contactID).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("load channel identity contact: %w", err)
 	}

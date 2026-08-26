@@ -37,7 +37,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB) *WebsiteVisitorDirectBackend {
 func (b *WebsiteVisitorDirectBackend) ListConversations(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string) ([]WebsiteVisitorConversation, error) {
 	items, err := b.listConversations.Execute(ctx, channelID, externalID)
 	if err != nil {
-		return nil, websiteVisitorError(meta, err, cervii18n.ErrorWebsiteMessengerLoadFailed, "list_conversations", "channel_id", channelID)
+		return nil, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessengerLoadFailed, "list_conversations", "channel_id", channelID)
 	}
 	result := make([]WebsiteVisitorConversation, 0, len(items))
 	for _, item := range items {
@@ -53,7 +53,7 @@ func (b *WebsiteVisitorDirectBackend) SendTextMessage(ctx context.Context, meta 
 		ClientMessageID: input.ClientMessageID, Body: input.Body,
 	})
 	if err != nil {
-		return WebsiteVisitorTextMessageResult{}, websiteVisitorError(meta, err, cervii18n.ErrorWebsiteMessageSendFailed, "send_text_message", "channel_id", channelID)
+		return WebsiteVisitorTextMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessageSendFailed, "send_text_message", "channel_id", channelID)
 	}
 	slog.Info("网站访客文本消息已保存",
 		"channel_id", channelID,
@@ -77,25 +77,25 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 		ChannelID: channelID, ExternalID: externalID, ConversationID: conversationID,
 	}
 	if input.Before != "" && input.After != "" {
-		return WebsiteVisitorMessageHistory{}, websiteVisitorError(meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	if input.Before != "" {
 		point, valid := decodeWebsiteMessageCursor(input.Before, conversationID)
 		if !valid {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"before": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"before": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
 		actionInput.Before = &point
 	}
 	if input.After != "" {
 		point, valid := decodeWebsiteMessageCursor(input.After, conversationID)
 		if !valid {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"after": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"after": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
 		actionInput.After = &point
 	}
 	page, err := b.listMessages.Execute(ctx, actionInput)
 	if err != nil {
-		return WebsiteVisitorMessageHistory{}, websiteVisitorError(meta, err, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	result := WebsiteVisitorMessageHistory{Messages: make([]WebsiteVisitorMessage, 0, len(page.Messages))}
 	for _, message := range page.Messages {
@@ -131,7 +131,7 @@ func decodeWebsiteMessageCursor(value, conversationID string) (conversationactio
 }
 
 // websiteVisitorError 把语言无关访客错误映射为本地化应用错误。
-func websiteVisitorError(meta WebsiteVisitorMeta, err error, failureKey cervii18n.Key, operation string, attributes ...any) error {
+func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error, failureKey cervii18n.Key, operation string, attributes ...any) error {
 	requestMeta := RequestMeta{Locale: meta.Locale}
 	var validation *conversationaction.ValidationError
 	if errors.As(err, &validation) {
@@ -147,10 +147,13 @@ func websiteVisitorError(meta WebsiteVisitorMeta, err error, failureKey cervii18
 	if errors.As(err, &conflict) {
 		return ConflictError(requestMeta, cervii18n.ErrorWebsiteMessageConflict, conflict.Reason)
 	}
-	logAttributes := []any{"operation", operation}
-	logAttributes = append(logAttributes, attributes...)
-	logAttributes = append(logAttributes, "error", err)
-	slog.Warn("网站访客操作失败", logAttributes...)
+	// 请求被取消不属于业务失败，不产生告警日志。
+	if ctx.Err() == nil {
+		logAttributes := []any{"operation", operation}
+		logAttributes = append(logAttributes, attributes...)
+		logAttributes = append(logAttributes, "error", err)
+		slog.Warn("网站访客操作失败", logAttributes...)
+	}
 	return FailedError(requestMeta, failureKey)
 }
 

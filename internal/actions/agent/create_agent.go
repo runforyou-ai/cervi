@@ -16,19 +16,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// CreateInput 定义新增 AI 员工字段。
-type CreateInput struct {
-	DisplayName string
-	TeamIDs     []string
-	Execution   ExecutionInput
-}
-
-// TeamSummary 定义 AI 员工所属团队摘要。
-type TeamSummary struct {
-	ID   string `bun:"id"`
-	Name string `bun:"name"`
-}
-
 // CreateAgentAction 创建企业 AI 员工。
 type CreateAgentAction struct{ db *bun.DB }
 

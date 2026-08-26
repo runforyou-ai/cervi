@@ -5,7 +5,6 @@ package file
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -36,22 +35,27 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 	if backend != domain.FileStorageBackendLocal && backend != domain.FileStorageBackendS3 {
 		return nil, fmt.Errorf("invalid file storage backend %q", backend)
 	}
-	id := uuid.NewString()
-	expiresAt := time.Now().UTC().Add(temporaryFileLifetime)
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("generate file id: %w", err)
+	}
 	record := &servermodels.File{
-		ID:              id,
+		ID:              id.String(),
 		OrganizationID:  identity.Organization.ID,
 		CreatedByUserID: identity.User.ID,
 		Purpose:         string(input.Purpose),
 		StorageBackend:  string(backend),
-		StorageKey:      storageKey(identity.Organization.ID, id, input.ContentType),
+		StorageKey:      storageKey(identity.Organization.ID, id.String(), input.ContentType),
 		OriginalName:    input.FileName,
 		ContentType:     input.ContentType,
 		ByteSize:        input.ByteSize,
 		Status:          string(domain.FileStatusPending),
-		ExpiresAt:       &expiresAt,
 	}
-	if _, err := a.db.NewInsert().Model(record).Exec(ctx); err != nil {
+	// 过期时间统一使用数据库时钟，与后续 expires_at > now() 的比较保持同源。
+	if _, err := a.db.NewInsert().Model(record).
+		Value("expires_at", "now() + make_interval(secs => ?)", temporaryFileLifetime.Seconds()).
+		Returning("expires_at").
+		Exec(ctx); err != nil {
 		return nil, fmt.Errorf("create file upload: %w", err)
 	}
 	return record, nil

@@ -23,6 +23,10 @@ const (
 	expiringMessageRecoveryBatch    = 200
 	taskFinalizationTimeout         = 15 * time.Second
 	taskMessageDuplicateWindow      = 10 * time.Minute
+	// taskNakRetryDelay 是消息暂不可处理时的 NAK 重投延迟。
+	taskNakRetryDelay = 15 * time.Second
+	// taskBrokerOperationTimeout 是 JetStream 发布和确认操作的超时。
+	taskBrokerOperationTimeout = 5 * time.Second
 )
 
 type taskMessage struct {
@@ -193,7 +197,7 @@ func (r *Runtime) publishOne(ctx context.Context) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	publishCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	publishCtx, cancel := context.WithTimeout(ctx, taskBrokerOperationTimeout)
 	_, publishErr := r.jetstream.Publish(
 		publishCtx,
 		r.config.subjectPrefix()+"."+record.QueueName,
@@ -225,7 +229,7 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 	if err != nil {
 		if ctx.Err() == nil {
 			slog.Warn("认领异步任务失败", "run_id", envelope.RunID, "error", err)
-			_ = message.NakWithDelay(15 * time.Second)
+			_ = message.NakWithDelay(taskNakRetryDelay)
 		}
 		return
 	}
@@ -261,10 +265,10 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 	cancelFinalize()
 	if err != nil {
 		slog.Warn("提交异步任务成功状态失败", "run_id", run.ID, "action", run.ActionName, "error", err)
-		_ = message.NakWithDelay(15 * time.Second)
+		_ = message.NakWithDelay(taskNakRetryDelay)
 		return
 	}
-	ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ackCtx, cancel := context.WithTimeout(context.Background(), taskBrokerOperationTimeout)
 	defer cancel()
 	if err := message.DoubleAck(ackCtx); err != nil {
 		slog.Warn("确认异步任务消息失败", "run_id", run.ID, "action", run.ActionName, "error", err)
@@ -330,11 +334,11 @@ func (r *Runtime) finishFailedMessage(ctx context.Context, run *servermodels.Tas
 	cancelFinalize()
 	if err != nil {
 		slog.Warn("提交异步任务失败状态失败", "run_id", run.ID, "action", run.ActionName, "error", err)
-		_ = message.NakWithDelay(15 * time.Second)
+		_ = message.NakWithDelay(taskNakRetryDelay)
 		return
 	}
 	if retry {
-		ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ackCtx, cancel := context.WithTimeout(context.Background(), taskBrokerOperationTimeout)
 		ackErr := message.DoubleAck(ackCtx)
 		cancel()
 		if ackErr != nil {
@@ -356,7 +360,7 @@ func taskFinalizationContext(ctx context.Context) (context.Context, context.Canc
 func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, message jetstream.Msg) {
 	run, err := r.repository.getRun(ctx, runID)
 	if err != nil {
-		_ = message.NakWithDelay(15 * time.Second)
+		_ = message.NakWithDelay(taskNakRetryDelay)
 		return
 	}
 	if run == nil {
@@ -365,7 +369,7 @@ func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, mess
 		return
 	}
 	if exhausted, failErr := r.repository.failExhaustedRun(ctx, runID); failErr != nil {
-		_ = message.NakWithDelay(15 * time.Second)
+		_ = message.NakWithDelay(taskNakRetryDelay)
 		return
 	} else if exhausted {
 		slog.Error("异步任务在最终尝试中失去租约", "run_id", runID, "action", run.ActionName)
@@ -374,7 +378,7 @@ func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, mess
 	}
 	switch run.Status {
 	case statusSucceeded, statusFailed:
-		ackCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ackCtx, cancel := context.WithTimeout(context.Background(), taskBrokerOperationTimeout)
 		_ = message.DoubleAck(ackCtx)
 		cancel()
 	default:
@@ -382,8 +386,8 @@ func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, mess
 		if run.Status == statusRunning && run.LeaseExpiresAt != nil {
 			delay = time.Until(*run.LeaseExpiresAt)
 		}
-		if delay < 15*time.Second {
-			delay = 15 * time.Second
+		if delay < taskNakRetryDelay {
+			delay = taskNakRetryDelay
 		}
 		_ = message.NakWithDelay(min(delay, time.Minute))
 	}

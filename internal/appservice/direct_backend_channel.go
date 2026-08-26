@@ -11,7 +11,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // ListMessageChannels 返回当前企业的消息渠道。
@@ -22,15 +21,11 @@ func (b *DirectBackend) ListMessageChannels(ctx context.Context, meta RequestMet
 	}
 	channels, err := b.listMessageChannels.Execute(ctx, identity)
 	if err != nil {
-		if ctx.Err() != nil {
-			return MessageChannelList{}, ctx.Err()
-		}
-		slog.Warn("读取消息渠道列表失败", "organization_id", identity.Organization.ID, "error", err)
-		return MessageChannelList{}, FailedError(meta, cervii18n.ErrorChannelListFailed)
+		return MessageChannelList{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelListFailed, identity.Organization.ID, "")
 	}
 	result := make([]MessageChannelSummary, 0, len(channels))
 	for index := range channels {
-		result = append(result, messageChannelFromModel(&channels[index]))
+		result = append(result, messageChannelFromRecord(&channels[index]))
 	}
 	return MessageChannelList{Channels: result}, nil
 }
@@ -46,9 +41,9 @@ func (b *DirectBackend) GetWebsiteChannel(ctx context.Context, meta RequestMeta,
 		return WebsiteChannel{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
 	}
 	return WebsiteChannel{
-		MessageChannelSummary: messageChannelFromModel(detail.Channel),
-		ChatInterface:         websiteChannelSettingFromModel(&detail.ChatInterface),
-		Access:                websiteChannelAccessFromModel(&detail.ChatInterface),
+		MessageChannelSummary: messageChannelFromRecord(&detail.MessageChannelRecord),
+		ChatInterface:         websiteChannelSettingFromRecord(&detail.ChatInterface),
+		Access:                websiteChannelAccessFromRecord(&detail.ChatInterface),
 	}, nil
 }
 
@@ -62,7 +57,7 @@ func (b *DirectBackend) GetMessageChannel(ctx context.Context, meta RequestMeta,
 	if err != nil {
 		return MessageChannelSummary{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
 	}
-	return messageChannelFromModel(channel), nil
+	return messageChannelFromRecord(channel), nil
 }
 
 // CreateMessageChannel 创建消息渠道。
@@ -76,7 +71,7 @@ func (b *DirectBackend) CreateMessageChannel(ctx context.Context, meta RequestMe
 		return MessageChannelSummary{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelCreateFailed, identity.Organization.ID, "")
 	}
 	slog.Info("消息渠道创建成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type)
-	return messageChannelFromModel(channel), nil
+	return messageChannelFromRecord(channel), nil
 }
 
 // UpdateMessageChannel 修改消息渠道基础信息。
@@ -90,7 +85,7 @@ func (b *DirectBackend) UpdateMessageChannel(ctx context.Context, meta RequestMe
 		return MessageChannelSummary{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("消息渠道更新成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type)
-	return messageChannelFromModel(channel), nil
+	return messageChannelFromRecord(channel), nil
 }
 
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
@@ -106,7 +101,7 @@ func (b *DirectBackend) UpdateWebsiteChannelChatInterface(ctx context.Context, m
 		return WebsiteChannelChatInterface{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelChatInterfaceUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("网站渠道聊天界面更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
-	return websiteChannelSettingFromModel(setting), nil
+	return websiteChannelSettingFromRecord(setting), nil
 }
 
 // UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
@@ -122,7 +117,7 @@ func (b *DirectBackend) UpdateWebsiteChannelAccess(ctx context.Context, meta Req
 		return WebsiteChannelAccess{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelAccessUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("网站渠道允许使用的网站更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
-	return websiteChannelAccessFromModel(setting), nil
+	return websiteChannelAccessFromRecord(setting), nil
 }
 
 // DeactivateMessageChannel 停用消息渠道。
@@ -146,7 +141,7 @@ func (b *DirectBackend) setMessageChannelEnabled(ctx context.Context, meta Reque
 		return MessageChannelSummary{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("消息渠道状态已更新", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type, "enabled", enabled)
-	return messageChannelFromModel(channel), nil
+	return messageChannelFromRecord(channel), nil
 }
 
 // ListChannelOptions 返回当前企业的渠道选择项。
@@ -157,11 +152,7 @@ func (b *DirectBackend) ListChannelOptions(ctx context.Context, meta RequestMeta
 	}
 	channels, err := b.listChannelOptions.Execute(ctx, identity)
 	if err != nil {
-		if ctx.Err() != nil {
-			return ChannelOptionList{}, ctx.Err()
-		}
-		slog.Warn("读取渠道选择项失败", "organization_id", identity.Organization.ID, "error", err)
-		return ChannelOptionList{}, FailedError(meta, cervii18n.ErrorChannelSummaryListFailed)
+		return ChannelOptionList{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelSummaryListFailed, identity.Organization.ID, "")
 	}
 	result := make([]ChannelOption, 0, len(channels))
 	for _, channel := range channels {
@@ -201,24 +192,24 @@ func (b *DirectBackend) channelError(ctx context.Context, meta RequestMeta, err 
 	return FailedError(meta, failureKey)
 }
 
-// messageChannelFromModel 转换消息渠道记录。
-func messageChannelFromModel(channel *servermodels.Channel) MessageChannelSummary {
+// messageChannelFromRecord 转换消息渠道传输结构。
+func messageChannelFromRecord(channel *channelaction.MessageChannelRecord) MessageChannelSummary {
 	return MessageChannelSummary{
 		ID: channel.ID, OrganizationID: channel.OrganizationID, CreatedByUserID: channel.CreatedByUserID,
 		Type: ChannelType(channel.Type), Name: channel.Name, Description: channel.Description, DefaultLocale: Locale(channel.DefaultLocale), Enabled: channel.Enabled,
-		NewConversationTarget: channelRoutingTargetFromModel(channel.InitialRoutingTargetType, channel.InitialRoutingTargetID),
-		FallbackTarget:        channelRoutingTargetFromModel(channel.FallbackRoutingTargetType, channel.FallbackRoutingTargetID),
+		NewConversationTarget: channelRoutingTargetFromRecord(channel.InitialRoutingTargetType, channel.InitialRoutingTargetID),
+		FallbackTarget:        channelRoutingTargetFromRecord(channel.FallbackRoutingTargetType, channel.FallbackRoutingTargetID),
 		CreatedAt:             channel.CreatedAt, UpdatedAt: channel.UpdatedAt,
 	}
 }
 
-// websiteChannelSettingFromModel 转换网站渠道聊天界面设置。
-func websiteChannelSettingFromModel(setting *servermodels.WebsiteChannelSetting) WebsiteChannelChatInterface {
+// websiteChannelSettingFromRecord 转换网站渠道聊天界面设置。
+func websiteChannelSettingFromRecord(setting *channelaction.WebsiteChannelSettingRecord) WebsiteChannelChatInterface {
 	return WebsiteChannelChatInterface{Title: setting.ChatTitle, Subtitle: setting.ChatSubtitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor}
 }
 
-// websiteChannelAccessFromModel 转换网站渠道允许使用的网站。
-func websiteChannelAccessFromModel(setting *servermodels.WebsiteChannelSetting) WebsiteChannelAccess {
+// websiteChannelAccessFromRecord 转换网站渠道允许使用的网站。
+func websiteChannelAccessFromRecord(setting *channelaction.WebsiteChannelSettingRecord) WebsiteChannelAccess {
 	return WebsiteChannelAccess{AllowedHosts: setting.AllowedEmbedHosts}
 }
 
@@ -244,8 +235,8 @@ func channelRoutingTargetInput(target ChannelRoutingTarget) channelaction.Routin
 	return channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetType(target.Type), ID: target.ID}
 }
 
-// channelRoutingTargetFromModel 转换渠道记录中的会话流转目标。
-func channelRoutingTargetFromModel(targetType string, targetID *string) ChannelRoutingTarget {
+// channelRoutingTargetFromRecord 转换渠道记录中的会话流转目标。
+func channelRoutingTargetFromRecord(targetType string, targetID *string) ChannelRoutingTarget {
 	id := ""
 	if targetID != nil {
 		id = *targetID
@@ -253,6 +244,7 @@ func channelRoutingTargetFromModel(targetType string, targetID *string) ChannelR
 	return ChannelRoutingTarget{Type: ChannelRoutingTargetType(targetType), ID: id}
 }
 
+// channelFieldKeys 把渠道校验错误码映射为本地化文案键。
 func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
 		channelaction.ValidationTypeInvalid:          cervii18n.FieldChannelTypeInvalid,

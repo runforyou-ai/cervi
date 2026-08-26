@@ -17,19 +17,22 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 const websiteExternalIDPrefix = "web-session:"
 
+// maxWriteAttempts 是并发唯一约束冲突时的最大写入尝试次数。
+const maxWriteAttempts = 3
+
 var retryableConstraintNames = map[string]struct{}{
-	"contact_channel_identities_channel_external_unique":        {},
-	"chat_subjects_org_kind_source_unique":                      {},
-	"conversation_participants_org_conversation_subject_unique": {},
-	"service_sessions_org_conversation_open_unique":             {},
-	"service_sessions_org_conversation_sequence_unique":         {},
-	"messages_organization_idempotency_unique":                  {},
+	"contact_channel_identities_channel_external_unique":         {},
+	"chat_subjects_organization_kind_source_unique":              {},
+	"conversation_participants_org_conversation_subject_unique":  {},
+	"service_sessions_organization_conversation_open_unique":     {},
+	"service_sessions_organization_conversation_sequence_unique": {},
+	"messages_organization_idempotency_unique":                   {},
 }
 
 // ReceiveWebsiteCustomerTextMessageAction 持久化网站访客文本消息。
@@ -71,7 +74,7 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 	originatedAt := time.Now().UTC()
 	idempotencyKey := "chmsg:" + normalized.ChannelID + ":" + normalized.ClientMessageID
 
-	for attempt := 0; attempt < 3; attempt++ {
+	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result ReceiveWebsiteCustomerTextMessageResult
 		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 			var executeErr error
@@ -85,7 +88,7 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 		if !retryable {
 			return ReceiveWebsiteCustomerTextMessageResult{}, err
 		}
-		if attempt < 2 {
+		if attempt < maxWriteAttempts-1 {
 			slog.Info("网站访客消息写入重试", "channel_id", normalized.ChannelID, "attempt", attempt+2, "constraint", constraint)
 		}
 	}
@@ -620,11 +623,10 @@ func loadIdempotentResult(ctx context.Context, db bun.IDB, channel *servermodels
 
 // retryableUniqueViolation 返回允许重试的并发唯一约束。
 func retryableUniqueViolation(err error) (string, bool) {
-	var postgresError pgdriver.Error
-	if !errors.As(err, &postgresError) || postgresError.Field('C') != "23505" {
+	constraint, ok := pgerr.UniqueViolation(err)
+	if !ok {
 		return "", false
 	}
-	constraint := postgresError.Field('n')
 	_, retryable := retryableConstraintNames[constraint]
 	return constraint, retryable
 }

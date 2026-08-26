@@ -7,12 +7,18 @@ import (
 	"mime"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-const maxAvatarByteSize int64 = 5 * 1024 * 1024
+const (
+	// maxAvatarByteSize 是头像文件的最大字节数。
+	maxAvatarByteSize int64 = 5 * 1024 * 1024
+	// maxFileNameLength 是文件名的最大字符数。
+	maxFileNameLength = 255
+)
 
 // ValidationCode 标识文件字段校验结果。
 type ValidationCode = common.FieldCode
@@ -51,7 +57,7 @@ func normalizeUploadInput(input UploadInput) (UploadInput, map[string]Validation
 		input.ContentType = ""
 	}
 	fields := make(map[string]ValidationCode)
-	if input.FileName == "" || input.FileName == "." || len([]rune(input.FileName)) > 255 {
+	if input.FileName == "" || input.FileName == "." || utf8.RuneCountInString(input.FileName) > maxFileNameLength {
 		fields["fileName"] = ValidationFileNameRequired
 	}
 	if input.Purpose != domain.FilePurposeUserAvatar {

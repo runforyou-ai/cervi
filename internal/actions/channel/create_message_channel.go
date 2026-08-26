@@ -23,7 +23,7 @@ func NewCreateMessageChannelAction(db *bun.DB) *CreateMessageChannelAction {
 }
 
 // Execute 创建消息渠道，并初始化当前渠道类型需要的设置。
-func (a *CreateMessageChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateMessageChannelInput) (*servermodels.Channel, error) {
+func (a *CreateMessageChannelAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateMessageChannelInput) (*MessageChannelRecord, error) {
 	input, fields := normalizeCreateMessageChannelInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
@@ -80,5 +80,5 @@ func (a *CreateMessageChannelAction) Execute(ctx context.Context, identity *serv
 	if err != nil {
 		return nil, fmt.Errorf("create message channel: %w", err)
 	}
-	return channel, nil
+	return messageChannelRecord(channel), nil
 }

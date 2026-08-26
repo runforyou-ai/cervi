@@ -32,9 +32,9 @@ type Runtime struct {
 }
 
 // New 创建服务端任务运行时。
-func New(db *bun.DB, nats serverconfig.NATSConfig) *Runtime {
+func New(db *bun.DB, natsConfig serverconfig.NATSConfig) *Runtime {
 	return &Runtime{
-		config: newConfig(nats), repository: newRepository(db), registry: NewRegistry(),
+		config: newConfig(natsConfig), repository: newRepository(db), registry: NewRegistry(),
 		instanceID: uuid.NewString(),
 	}
 }

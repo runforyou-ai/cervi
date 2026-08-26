@@ -12,14 +12,14 @@ import (
 type ContactMethod struct {
 	bun.BaseModel `bun:"table:contact_methods,alias:cm"`
 
-	ID              string    `bun:"id,pk" json:"id"`
-	OrganizationID  string    `bun:"organization_id" json:"organizationId"`
-	ContactID       string    `bun:"contact_id" json:"contactId"`
-	Type            string    `bun:"type" json:"type"`
-	Value           string    `bun:"value" json:"value"`
-	NormalizedValue string    `bun:"normalized_value" json:"-"`
-	Label           *string   `bun:"label" json:"label"`
-	IsPrimary       bool      `bun:"is_primary" json:"isPrimary"`
-	CreatedAt       time.Time `bun:"created_at" json:"createdAt"`
-	UpdatedAt       time.Time `bun:"updated_at" json:"updatedAt"`
+	ID              string    `bun:"id,pk"`
+	OrganizationID  string    `bun:"organization_id"`
+	ContactID       string    `bun:"contact_id"`
+	Type            string    `bun:"type"`
+	Value           string    `bun:"value"`
+	NormalizedValue string    `bun:"normalized_value"`
+	Label           *string   `bun:"label"`
+	IsPrimary       bool      `bun:"is_primary"`
+	CreatedAt       time.Time `bun:"created_at"`
+	UpdatedAt       time.Time `bun:"updated_at"`
 }

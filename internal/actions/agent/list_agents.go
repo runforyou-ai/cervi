@@ -6,54 +6,14 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-// ListInput 定义 AI 员工目录查询条件。
-type ListInput struct {
-	Query    string
-	Status   domain.UserStatus
-	Page     int
-	PageSize int
-}
-
-// Agent 定义 AI 员工信息。
-type Agent struct {
-	ID          string            `bun:"id"`
-	IdentityID  string            `bun:"identity_id"`
-	DisplayName string            `bun:"display_name"`
-	Status      domain.UserStatus `bun:"status"`
-	WorkStatus  domain.WorkStatus `bun:"work_status"`
-	Teams       []TeamSummary
-	Execution   Execution
-	CreatedAt   time.Time `bun:"created_at"`
-}
-
-// ListItem 定义 AI 员工目录项。
-type ListItem struct {
-	ID          string            `bun:"id"`
-	IdentityID  string            `bun:"identity_id"`
-	DisplayName string            `bun:"display_name"`
-	Status      domain.UserStatus `bun:"status"`
-	WorkStatus  domain.WorkStatus `bun:"work_status"`
-	Teams       []TeamSummary
-	Execution   ExecutionSummary
-	CreatedAt   time.Time `bun:"created_at"`
-}
-
-// ListOutput 定义 AI 员工分页结果。
-type ListOutput struct {
-	Agents []ListItem
-	Page   int
-	Size   int
-	Total  int
-}
 
 // ListAgentsQuery 读取企业 AI 员工目录。
 type ListAgentsQuery struct{ db *bun.DB }
@@ -105,33 +65,22 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 		return ListOutput{}, fmt.Errorf("list agents: %w", err)
 	}
 	agentIDs := make([]string, 0, len(agents))
+	identityIDs := make([]string, 0, len(agents))
 	for _, agent := range agents {
 		agentIDs = append(agentIDs, agent.ID)
+		identityIDs = append(identityIDs, agent.IdentityID)
 	}
 	executions, err := loadAgentExecutionSummaries(ctx, q.db, identity.Organization.ID, agentIDs)
 	if err != nil {
 		return ListOutput{}, fmt.Errorf("load agent execution summaries: %w", err)
 	}
+	teamsByIdentity, err := teamaction.LoadTeamsByIdentity(ctx, q.db, identity.Organization.ID, identityIDs)
+	if err != nil {
+		return ListOutput{}, fmt.Errorf("load agent teams: %w", err)
+	}
 	for index := range agents {
-		teams, err := loadAgentTeams(ctx, q.db, identity.Organization.ID, agents[index].IdentityID)
-		if err != nil {
-			return ListOutput{}, fmt.Errorf("load agent teams: %w", err)
-		}
-		agents[index].Teams = teams
+		agents[index].Teams = teamsByIdentity[agents[index].IdentityID]
 		agents[index].Execution = executions[agents[index].ID]
 	}
-	return ListOutput{Agents: agents, Page: input.Page, Size: input.PageSize, Total: total}, nil
-}
-
-// loadAgentTeams 读取 AI 员工所属团队。
-func loadAgentTeams(ctx context.Context, db bun.IDB, organizationID, organizationIdentityID string) ([]TeamSummary, error) {
-	teams := make([]TeamSummary, 0)
-	err := db.NewSelect().TableExpr("team_members AS tm").
-		ColumnExpr("t.id::text AS id, t.name").
-		Join("JOIN teams AS t ON t.id = tm.team_id AND t.organization_id = tm.organization_id").
-		Where("tm.organization_id = ?", organizationID).
-		Where("tm.identity_id = ?", organizationIdentityID).
-		OrderExpr("lower(t.name) ASC, t.id ASC").
-		Scan(ctx, &teams)
-	return teams, err
+	return ListOutput{Agents: agents, Page: common.PageInfo{Number: input.Page, Size: input.PageSize, Total: total}}, nil
 }

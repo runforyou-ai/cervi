@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -29,14 +30,14 @@ func (a *CreateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 	}
 	var record Record
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		knowledgeBase := &servermodels.KnowledgeBase{
 			OrganizationID: identity.Organization.ID, CreatedByUserID: identity.User.ID,
 			Name: input.Name, Category: string(input.Category), Description: input.Description,
-			IntegrationConnectionID: optionalString(input.IntegrationConnectionID),
-			ExternalResourceID:      optionalString(input.ExternalResourceID),
+			IntegrationConnectionID: common.OptionalString(input.IntegrationConnectionID),
+			ExternalResourceID:      common.OptionalString(input.ExternalResourceID),
 		}
 		_, err := tx.NewInsert().Model(knowledgeBase).
 			Column("organization_id", "created_by_user_id", "name", "category", "description", "integration_connection_id", "external_resource_id").

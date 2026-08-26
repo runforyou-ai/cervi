@@ -28,7 +28,7 @@ func NewDeleter(local *LocalStore, resolveS3 S3ConfigResolver) *Deleter {
 func (d *Deleter) Delete(ctx context.Context, record *servermodels.File) error {
 	switch domain.FileStorageBackend(record.StorageBackend) {
 	case domain.FileStorageBackendLocal:
-		return d.local.Delete(record.StorageKey)
+		return d.local.Delete(ctx, record.StorageKey)
 	case domain.FileStorageBackendS3:
 		config, err := d.resolveS3(ctx, record.OrganizationID)
 		if err != nil {

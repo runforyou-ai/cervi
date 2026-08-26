@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -21,8 +22,8 @@ type GetWebsiteChannelQuery struct {
 
 // WebsiteChannelDetail 定义网站渠道详情和访客聊天界面设置。
 type WebsiteChannelDetail struct {
-	*servermodels.Channel
-	ChatInterface servermodels.WebsiteChannelSetting `json:"chatInterface"`
+	MessageChannelRecord
+	ChatInterface WebsiteChannelSettingRecord `json:"chatInterface"`
 }
 
 // NewGetWebsiteChannelQuery 创建网站渠道详情查询。
@@ -34,6 +35,9 @@ func NewGetWebsiteChannelQuery(db *bun.DB) *GetWebsiteChannelQuery {
 func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) (*WebsiteChannelDetail, error) {
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
+	}
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
+		return nil, err
 	}
 	channel := &servermodels.Channel{}
 	err := q.db.NewSelect().
@@ -56,5 +60,8 @@ func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, identity *servermo
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("get website channel settings: %w", err)
 	}
-	return &WebsiteChannelDetail{Channel: channel, ChatInterface: setting}, nil
+	return &WebsiteChannelDetail{
+		MessageChannelRecord: *messageChannelRecord(channel),
+		ChatInterface:        websiteChannelSettingRecord(&setting),
+	}, nil
 }

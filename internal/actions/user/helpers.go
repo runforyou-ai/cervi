@@ -6,19 +6,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-// validateIdentity 校验当前企业用户账号仍可用。
-func validateIdentity(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
-	return identityaction.Validate(ctx, db, identity)
-}
 
 // loadCurrentIdentity 读取当前用户账号及其企业身份。
 func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermodels.Organization, userID string) (*servermodels.Identity, error) {
@@ -70,7 +64,7 @@ func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*
 	if err != nil {
 		return nil, err
 	}
-	user.Teams, err = loadUserTeams(ctx, db, organizationID, user.IdentityID)
+	user.Teams, err = teamaction.LoadIdentityTeams(ctx, db, organizationID, user.IdentityID)
 	return user, err
 }
 
@@ -126,19 +120,6 @@ func ensureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizat
 	return nil
 }
 
-// loadUserTeams 读取成员所属的全部团队。
-func loadUserTeams(ctx context.Context, db bun.IDB, organizationID, identityID string) ([]TeamSummary, error) {
-	teams := make([]TeamSummary, 0)
-	err := db.NewSelect().TableExpr("team_members AS tm").
-		ColumnExpr("t.id::text AS id, t.name").
-		Join("JOIN teams AS t ON t.id = tm.team_id AND t.organization_id = tm.organization_id").
-		Where("tm.organization_id = ?", organizationID).
-		Where("tm.identity_id = ?", identityID).
-		OrderExpr("lower(t.name) ASC, t.id ASC").
-		Scan(ctx, &teams)
-	return teams, err
-}
-
 // validateTeamIDs 规范化团队编号、去重并校验全部团队属于当前企业。
 func validateTeamIDs(ctx context.Context, db bun.IDB, organizationID string, teamIDs []string) ([]string, error) {
 	ids, valid := common.NormalizeUUIDs(teamIDs)
@@ -161,35 +142,11 @@ func validateTeamIDs(ctx context.Context, db bun.IDB, organizationID string, tea
 	return ids, nil
 }
 
-// replaceUserTeams 按差集修改成员所属团队。
+// replaceUserTeams 校验团队编号后按差集修改成员所属团队。
 func replaceUserTeams(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, organizationIdentityID string, teamIDs []string) error {
 	ids, err := validateTeamIDs(ctx, tx, identity.Organization.ID, teamIDs)
 	if err != nil {
 		return err
 	}
-	if len(ids) == 0 {
-		_, err = tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("identity_id = ?", organizationIdentityID).
-			Exec(ctx)
-		return err
-	}
-	if _, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
-		Where("organization_id = ?", identity.Organization.ID).
-		Where("identity_id = ?", organizationIdentityID).
-		Where("team_id NOT IN (?)", bun.In(ids)).
-		Exec(ctx); err != nil {
-		return err
-	}
-	relations := make([]servermodels.TeamMember, 0, len(ids))
-	for _, teamID := range ids {
-		relations = append(relations, servermodels.TeamMember{OrganizationID: identity.Organization.ID, TeamID: teamID, IdentityID: organizationIdentityID, CreatedByUserID: identity.User.ID})
-	}
-	if _, err := tx.NewInsert().Model(&relations).
-		Column("organization_id", "team_id", "identity_id", "created_by_user_id").
-		On("CONFLICT (organization_id, team_id, identity_id) DO NOTHING").
-		Exec(ctx); err != nil {
-		return fmt.Errorf("insert user teams: %w", err)
-	}
-	return nil
+	return teamaction.ReplaceIdentityTeams(ctx, tx, identity, organizationIdentityID, ids)
 }

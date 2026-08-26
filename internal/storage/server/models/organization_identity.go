@@ -12,13 +12,13 @@ import (
 type OrganizationIdentity struct {
 	bun.BaseModel `bun:"table:organization_identities,alias:oi"`
 
-	ID                  string    `bun:"id,pk" json:"id"`
-	OrganizationID      string    `bun:"organization_id" json:"organizationId"`
-	Type                string    `bun:"type" json:"type"`
-	DisplayName         string    `bun:"display_name" json:"displayName"`
-	AvatarFileID        *string   `bun:"avatar_file_id" json:"avatarFileId"`
-	WorkStatus          string    `bun:"work_status" json:"workStatus"`
-	WorkStatusUpdatedAt time.Time `bun:"work_status_updated_at" json:"workStatusUpdatedAt"`
-	CreatedAt           time.Time `bun:"created_at" json:"createdAt"`
-	UpdatedAt           time.Time `bun:"updated_at" json:"updatedAt"`
+	ID                  string    `bun:"id,pk"`
+	OrganizationID      string    `bun:"organization_id"`
+	Type                string    `bun:"type"`
+	DisplayName         string    `bun:"display_name"`
+	AvatarFileID        *string   `bun:"avatar_file_id"`
+	WorkStatus          string    `bun:"work_status"`
+	WorkStatusUpdatedAt time.Time `bun:"work_status_updated_at"`
+	CreatedAt           time.Time `bun:"created_at"`
+	UpdatedAt           time.Time `bun:"updated_at"`
 }

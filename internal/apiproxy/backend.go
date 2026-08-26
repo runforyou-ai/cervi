@@ -300,7 +300,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 				slog.Warn("登录凭据失效后清理本地会话失败", "server_url", state.baseURL.String(), "error", err)
 			}
 		}
-		return &appservice.Error{Kind: payload.Error.Kind, State: sessionState, Message: payload.Error.Message, Fields: payload.Error.Fields}
+		return &appservice.Error{Kind: payload.Error.Kind, State: sessionState, Message: payload.Error.Message, Fields: payload.Error.Fields, Reason: payload.Error.Reason}
 	}
 	if output == nil || response.StatusCode == http.StatusNoContent {
 		return nil

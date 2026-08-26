@@ -199,6 +199,26 @@ func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID strin
 	return s.backend.DeleteTeam(ctx, meta, teamID)
 }
 
+// ListTeamMembers 返回团队成员列表。
+func (s *Service) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
+	return s.backend.ListTeamMembers(ctx, meta, teamID, input)
+}
+
+// ListTeamMemberCandidates 返回尚未加入团队的企业身份。
+func (s *Service) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
+	return s.backend.ListTeamMemberCandidates(ctx, meta, teamID, input)
+}
+
+// AddTeamMembers 将企业身份批量加入团队。
+func (s *Service) AddTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
+	return s.backend.AddTeamMembers(ctx, meta, teamID, input)
+}
+
+// RemoveTeamMembers 将企业身份批量移出团队。
+func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
+	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
+}
+
 // ListKnowledgeBases 返回当前企业的知识库列表。
 func (s *Service) ListKnowledgeBases(ctx context.Context, meta RequestMeta) (KnowledgeBaseList, error) {
 	return s.backend.ListKnowledgeBases(ctx, meta)
@@ -237,26 +257,6 @@ func (s *Service) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, kn
 // DeleteKnowledgeGroup 删除不含子分组的知识库分组。
 func (s *Service) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, groupID string) (KnowledgeBase, error) {
 	return s.backend.DeleteKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID)
-}
-
-// ListTeamMembers 返回团队成员列表。
-func (s *Service) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
-	return s.backend.ListTeamMembers(ctx, meta, teamID, input)
-}
-
-// ListTeamMemberCandidates 返回尚未加入团队的企业身份。
-func (s *Service) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
-	return s.backend.ListTeamMemberCandidates(ctx, meta, teamID, input)
-}
-
-// AddTeamMembers 将企业身份批量加入团队。
-func (s *Service) AddTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
-	return s.backend.AddTeamMembers(ctx, meta, teamID, input)
-}
-
-// RemoveTeamMembers 将企业身份批量移出团队。
-func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
-	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
 }
 
 // ListContacts 返回联系人列表。
@@ -415,11 +415,11 @@ func (s *Service) GetS3Setting(ctx context.Context, meta RequestMeta) (S3Setting
 }
 
 // SaveS3Setting 保存当前企业的对象存储设置。
-func (s *Service) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) (S3Setting, error) {
+func (s *Service) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) (S3Setting, error) {
 	return s.backend.SaveS3Setting(ctx, meta, input)
 }
 
 // TestS3Setting 测试对象存储连接。
-func (s *Service) TestS3Setting(ctx context.Context, meta RequestMeta, input S3Setting) error {
+func (s *Service) TestS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) error {
 	return s.backend.TestS3Setting(ctx, meta, input)
 }

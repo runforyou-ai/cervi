@@ -4,7 +4,9 @@ package appservice
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"sync/atomic"
 	"time"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
@@ -123,9 +125,10 @@ type DirectBackend struct {
 	saveS3Setting                     *settingaction.SaveS3SettingAction
 	testS3Setting                     *settingaction.TestS3SettingAction
 	createFileUpload                  *fileaction.CreateUploadAction
-	getFile                           *fileaction.GetQuery
-	markFileUploaded                  *fileaction.MarkUploadedAction
+	completeFileUpload                *fileaction.CompleteUploadAction
 	localFiles                        *serverfilecontent.LocalStore
+	// installed 缓存企业初始化完成状态，初始化是单向的，完成后无需再查询。
+	installed atomic.Bool
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
@@ -217,14 +220,16 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),
 		testS3Setting:                     settingaction.NewTestS3SettingAction(connectionRunner),
 		createFileUpload:                  fileaction.NewCreateUploadAction(db),
-		getFile:                           fileaction.NewGetQuery(db),
-		markFileUploaded:                  fileaction.NewMarkUploadedAction(db),
+		completeFileUpload:                fileaction.NewCompleteUploadAction(db),
 		localFiles:                        localFiles,
 	}
 }
 
-// requireInitialized 校验企业是否已完成初始化。
+// requireInitialized 校验企业是否已完成初始化；初始化完成后结果进程内缓存，不再重复查询。
 func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta) error {
+	if b.installed.Load() {
+		return nil
+	}
 	status, err := b.InstallationStatus(ctx, meta)
 	if err != nil {
 		return err
@@ -232,6 +237,7 @@ func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta
 	if !status.Installed {
 		return SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
 	}
+	b.installed.Store(true)
 	return nil
 }
 
@@ -244,16 +250,16 @@ func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*se
 		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	identity, err := b.resolveIdentity.Execute(ctx, meta.Token)
+	if errors.Is(err, authaction.ErrIdentityNotFound) {
+		slog.Info("登录令牌无效")
+		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 		slog.Warn("读取登录令牌失败", "error", err)
 		return nil, FailedError(meta, cervii18n.ErrorAuthenticationStatusFailed)
-	}
-	if identity == nil {
-		slog.Info("登录令牌无效")
-		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	return identity, nil
 }

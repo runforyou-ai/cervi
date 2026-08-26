@@ -5,6 +5,7 @@ package organization
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -33,7 +34,7 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	fields := make(map[string]ValidationCode)
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
-	} else if len([]rune(input.Name)) > domain.OrganizationNameMaxLength {
+	} else if utf8.RuneCountInString(input.Name) > domain.OrganizationNameMaxLength {
 		fields["name"] = ValidationNameTooLong
 	}
 	return input, fields

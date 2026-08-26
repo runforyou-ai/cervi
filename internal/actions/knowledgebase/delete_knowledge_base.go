@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,7 +24,7 @@ func NewDeleteKnowledgeBaseAction(db *bun.DB) *DeleteKnowledgeBaseAction {
 // Execute 删除当前企业中的指定知识库。
 func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *servermodels.Identity, knowledgeBaseID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := validateIdentity(ctx, tx, identity); err != nil {
+		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
 		if _, err := loadKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID); err != nil {

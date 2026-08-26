@@ -30,5 +30,5 @@ func (b *DirectBackend) ListMemberOptions(ctx context.Context, meta RequestMeta,
 			ID: member.ID, Type: OrganizationIdentityType(member.Type), DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
 		})
 	}
-	return MemberOptionList{Members: members, Page: PageInfo{Number: output.Page, Size: output.Size, Total: output.Total}}, nil
+	return MemberOptionList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }

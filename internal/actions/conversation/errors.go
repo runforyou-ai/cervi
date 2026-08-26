@@ -2,7 +2,11 @@
 
 package conversation
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/runforyou-ai/cervi/internal/common"
+)
 
 var (
 	// ErrChannelNotFound 表示网站渠道不存在或不可用。
@@ -22,9 +26,4 @@ type ConflictError struct {
 func (e *ConflictError) Error() string { return "conversation conflict: " + e.Reason }
 
 // ValidationError 表示公开访客输入不合法。
-type ValidationError struct {
-	Fields map[string]ValidationCode
-}
-
-// Error 返回输入校验失败。
-func (e *ValidationError) Error() string { return "conversation input validation failed" }
+type ValidationError = common.FieldError
