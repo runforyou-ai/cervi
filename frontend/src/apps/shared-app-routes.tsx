@@ -7,6 +7,8 @@ import { MessageChannelListPage } from "@/features/channels/message-channel-list
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
+import { ConnectorFormPage } from "@/features/integrations/connectors/connector-form-page"
+import { ConnectorListPage } from "@/features/integrations/connectors/connector-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
@@ -181,6 +183,15 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
             element={
               <ModelProviderFormPage mode="edit" returnSection="rerank" />
             }
+          />
+          <Route path="connectors" element={<ConnectorListPage />} />
+          <Route
+            path="connectors/new"
+            element={<ConnectorFormPage mode="create" />}
+          />
+          <Route
+            path="connectors/:connectionId"
+            element={<ConnectorFormPage mode="edit" />}
           />
         </Route>
       </Route>
