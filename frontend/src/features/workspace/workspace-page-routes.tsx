@@ -5,6 +5,7 @@ import { MessageChannelFormPage } from "@/features/channels/message-channel-form
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
+import { AppsPage } from "@/features/apps/apps-page"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
 import { BusinessSystemFormPage } from "@/features/integrations/business-systems/business-system-form-page"
 import { BusinessSystemListPage } from "@/features/integrations/business-systems/business-system-list-page"
@@ -58,6 +59,7 @@ const workspaceRouteDefinitions = [
     titleKey: "tabs.routes.knowledgeBases",
   },
   { path: "/knowledge-bases", titleKey: "tabs.routes.knowledgeBases" },
+  { path: "/apps", titleKey: "tabs.routes.apps" },
   {
     path: "/integrations/channels/new",
     tabPath: "/integrations/channels",
@@ -272,6 +274,7 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
         path="/contacts/external"
         element={<ContactsPage scope="external" />}
       />
+      <Route path="/apps" element={<AppsPage />} />
       <Route path="/knowledge-bases" element={<KnowledgeBaseLayout />}>
         <Route index element={<KnowledgeBaseIndexPage />} />
         <Route

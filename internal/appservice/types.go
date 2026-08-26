@@ -96,6 +96,12 @@ type Identity struct {
 	User         CurrentUser  `json:"user"`
 }
 
+// ExternalPageInput 定义原生端打开外部页面窗口的输入。
+type ExternalPageInput struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
 // MessageNotificationInput 定义当前设备的新消息通知内容。
 type MessageNotificationInput struct {
 	ID           string `json:"id"`

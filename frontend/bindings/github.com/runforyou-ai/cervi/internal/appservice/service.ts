@@ -456,6 +456,13 @@ export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
 }
 
 /**
+ * OpenExternalPage 在原生端应用内新窗口打开外部页面。
+ */
+export function OpenExternalPage(meta: $models.RequestMeta, input: $models.ExternalPageInput): $CancellablePromise<void> {
+    return $Call.ByID(1306697186, meta, input);
+}
+
+/**
  * ProbeServer 检测企业服务器并返回公开企业名称，不保存地址。
  */
 export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<$models.InstallationStatus> {

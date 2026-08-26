@@ -7,17 +7,19 @@ import "time"
 
 // Input 定义业务系统可编辑字段。
 type Input struct {
-	Name    string
-	URL     string
-	Enabled bool
+	Name        string
+	Description string
+	URL         string
+	Enabled     bool
 }
 
 // Record 定义业务系统记录。
 type Record struct {
-	ID        string
-	Name      string
-	URL       string
-	Enabled   bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          string
+	Name        string
+	Description string
+	URL         string
+	Enabled     bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

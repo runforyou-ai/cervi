@@ -40,6 +40,7 @@ func applicationServices(
 		appservice.WithNativeLocaleUpdater(nativeLocaleUpdater),
 		appservice.WithNativeNotification(notification),
 		appservice.WithUnreadIndicator(unreadIndicator),
+		appservice.WithExternalPageOpener(appservicenative.NewExternalPageOpener()),
 	)
 	return []application.Service{
 		application.NewServiceWithOptions(service, application.ServiceOptions{

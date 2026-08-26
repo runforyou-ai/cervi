@@ -37,7 +37,7 @@ func loadBusinessSystem(ctx context.Context, db bun.IDB, organizationID, busines
 // recordFromModel 转换业务系统存储模型。
 func recordFromModel(input servermodels.BusinessSystem) Record {
 	return Record{
-		ID: input.ID, Name: input.Name, URL: input.URL, Enabled: input.Enabled,
+		ID: input.ID, Name: input.Name, Description: input.Description, URL: input.URL, Enabled: input.Enabled,
 		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
 }

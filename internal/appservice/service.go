@@ -1,6 +1,12 @@
 package appservice
 
-import "context"
+import (
+	"context"
+	"strings"
+
+	"github.com/runforyou-ai/cervi/internal/common"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+)
 
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
 type Service struct {
@@ -9,6 +15,7 @@ type Service struct {
 	nativeLocaleUpdater  NativeLocaleUpdater
 	nativeNotification   NativeNotification
 	unreadIndicator      UnreadIndicator
+	externalPageOpener   ExternalPageOpener
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -39,6 +46,13 @@ func WithNativeNotification(notification NativeNotification) Option {
 func WithUnreadIndicator(indicator UnreadIndicator) Option {
 	return func(service *Service) {
 		service.unreadIndicator = indicator
+	}
+}
+
+// WithExternalPageOpener 注入原生端外部页面窗口能力。
+func WithExternalPageOpener(opener ExternalPageOpener) Option {
+	return func(service *Service) {
+		service.externalPageOpener = opener
 	}
 }
 
@@ -104,6 +118,22 @@ func (s *Service) SelectProfileImage(ctx context.Context, meta RequestMeta) (Pro
 	}
 	return s.profileImageSelector.SelectProfileImage(ctx, meta)
 }
+
+// OpenExternalPage 在原生端应用内新窗口打开外部页面。
+func (s *Service) OpenExternalPage(ctx context.Context, meta RequestMeta, input ExternalPageInput) error {
+	if s.externalPageOpener == nil {
+		return methodNotAllowedError(meta, "OpenExternalPage")
+	}
+	input.Title = strings.TrimSpace(input.Title)
+	input.URL = strings.TrimSpace(input.URL)
+	if len(input.URL) > maxExternalPageURLBytes || !common.ValidHTTPURL(input.URL) {
+		return InvalidError(meta, cervii18n.ErrorExternalPageURLInvalid, nil)
+	}
+	return s.externalPageOpener.OpenExternalPage(ctx, meta, input)
+}
+
+// maxExternalPageURLBytes 是外部页面地址的最大字节数。
+const maxExternalPageURLBytes = 2048
 
 // CheckNotificationPermission 返回当前设备的系统通知授权状态。
 func (s *Service) CheckNotificationPermission(ctx context.Context, meta RequestMeta) (NotificationPermissionStatus, error) {

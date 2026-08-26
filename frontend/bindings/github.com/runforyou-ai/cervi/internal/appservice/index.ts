@@ -79,6 +79,7 @@ export type {
     CreateMessageChannelInput,
     CreateUserInput,
     CurrentUser,
+    ExternalPageInput,
     File,
     FileUpload,
     FileUploadInput,

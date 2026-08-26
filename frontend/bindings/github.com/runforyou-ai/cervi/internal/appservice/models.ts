@@ -275,6 +275,7 @@ export interface Auth {
 export interface BusinessSystem {
     "id": string;
     "name": string;
+    "description": string;
     "url": string;
     "enabled": boolean;
     "createdAt": string;
@@ -286,6 +287,7 @@ export interface BusinessSystem {
  */
 export interface BusinessSystemInput {
     "name": string;
+    "description": string;
     "url": string;
     "enabled": boolean;
 }
@@ -572,6 +574,14 @@ export interface CurrentUser {
     "messageNotificationsEnabled": boolean;
     "workStatus": WorkStatus;
     "avatarUrl": string;
+}
+
+/**
+ * ExternalPageInput 定义原生端打开外部页面窗口的输入。
+ */
+export interface ExternalPageInput {
+    "title": string;
+    "url": string;
 }
 
 /**

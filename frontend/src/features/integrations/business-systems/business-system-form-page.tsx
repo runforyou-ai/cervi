@@ -19,7 +19,9 @@ import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import {
+  businessSystemDescriptionMaxLength,
   createBusinessSystemSchema,
   type BusinessSystemFormValues,
 } from "@/features/integrations/business-systems/business-system-schema"
@@ -42,6 +44,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
       createBusinessSystemSchema({
         nameRequired: t("businessSystem.validation.nameRequired"),
         nameTooLong: t("businessSystem.validation.nameTooLong"),
+        descriptionTooLong: t("businessSystem.validation.descriptionTooLong"),
         urlRequired: t("businessSystem.validation.urlRequired"),
         urlTooLong: t("businessSystem.validation.urlTooLong"),
         urlInvalid: t("businessSystem.validation.urlInvalid"),
@@ -51,7 +54,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
   const form = useForm<BusinessSystemFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: { name: "", url: "", enabled: true },
+    defaultValues: { name: "", description: "", url: "", enabled: true },
   })
   /** 读取待编辑的业务系统。 */
   const loadBusinessSystem = useCallback(async () => {
@@ -63,6 +66,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
       if (version !== loadVersion.current) return
       form.reset({
         name: businessSystem.name,
+        description: businessSystem.description,
         url: businessSystem.url,
         enabled: businessSystem.enabled,
       })
@@ -120,7 +124,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
       })
       toast.error(
         isApiError(requestError)
-          ? apiErrorMessage(requestError, ["name", "url"])
+          ? apiErrorMessage(requestError, ["name", "description", "url"])
           : t("businessSystem.form.saveError"),
       )
     }
@@ -165,6 +169,27 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
                 control={form.control}
                 label={t("businessSystem.form.name")}
                 autoFocus={mode === "create"}
+              />
+              <Controller
+                name="description"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel
+                      htmlFor="business-system-description"
+                      required={false}
+                    >
+                      {t("businessSystem.form.description")}
+                    </FieldLabel>
+                    <Textarea
+                      {...field}
+                      id="business-system-description"
+                      rows={3}
+                      maxLength={businessSystemDescriptionMaxLength}
+                      aria-invalid={fieldState.invalid}
+                    />
+                  </Field>
+                )}
               />
               <FormInputField
                 name="url"

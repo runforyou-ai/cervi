@@ -15,6 +15,7 @@ type BusinessSystem struct {
 	ID             string    `bun:"id,pk"`
 	OrganizationID string    `bun:"organization_id"`
 	Name           string    `bun:"name"`
+	Description    string    `bun:"description"`
 	URL            string    `bun:"url"`
 	Enabled        bool      `bun:"enabled"`
 	CreatedAt      time.Time `bun:"created_at"`
