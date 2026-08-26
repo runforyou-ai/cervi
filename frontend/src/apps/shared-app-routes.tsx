@@ -7,6 +7,8 @@ import { MessageChannelListPage } from "@/features/channels/message-channel-list
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
+import { BusinessSystemFormPage } from "@/features/integrations/business-systems/business-system-form-page"
+import { BusinessSystemListPage } from "@/features/integrations/business-systems/business-system-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
@@ -56,11 +58,11 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
         />
         <Route
           path="/settings"
-          element={<Navigate to="/settings/organization" replace />}
+          element={<Navigate to="/settings/general" replace />}
         />
         <Route
-          path="/settings/organization"
-          element={<SystemSettingsPage section="organization" />}
+          path="/settings/general"
+          element={<SystemSettingsPage section="general" />}
         />
         <Route
           path="/settings/roles"
@@ -127,6 +129,18 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
           <Route
             path="channels/:channelType/:channelId"
             element={<MessageChannelFormPage mode="edit" />}
+          />
+          <Route
+            path="business-systems"
+            element={<BusinessSystemListPage />}
+          />
+          <Route
+            path="business-systems/new"
+            element={<BusinessSystemFormPage mode="create" />}
+          />
+          <Route
+            path="business-systems/:businessSystemId"
+            element={<BusinessSystemFormPage mode="edit" />}
           />
           <Route
             path="model-services"

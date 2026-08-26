@@ -20,7 +20,9 @@ func identityFromModel(identity *servermodels.Identity) Identity {
 
 // organizationFromModel 把存储企业转换为应用契约。
 func organizationFromModel(organization servermodels.Organization) Organization {
-	return Organization{ID: organization.ID, Name: organization.Name}
+	return Organization{
+		ID: organization.ID, Name: organization.Name, AllowArbitraryURL: organization.AllowArbitraryURL,
+	}
 }
 
 // currentUserFromIdentity 把存储身份转换为当前用户契约。

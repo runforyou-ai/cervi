@@ -11,6 +11,7 @@ import {
   CreateKnowledgeBase,
   CreateKnowledgeGroup,
   CreateAIProvider,
+  CreateBusinessSystem,
   CreateRole,
   CreateTeam,
   CreateUser,
@@ -22,11 +23,13 @@ import {
   DeleteKnowledgeBase,
   DeleteKnowledgeGroup,
   DeleteAIProvider,
+  DeleteBusinessSystem,
   DeleteRole,
   DeleteTeam,
   GetContact,
   GetKnowledgeBase,
   GetAIProvider,
+  GetBusinessSystem,
   GetAgent,
   GetRole,
   GetS3Setting,
@@ -38,6 +41,7 @@ import {
   ListAgentModelOptions,
   ListMemberOptions,
   ListAIProviders,
+  ListBusinessSystems,
   ListAvailableAIModels,
   ListContacts,
   ListKnowledgeBases,
@@ -63,6 +67,7 @@ import {
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
   UpdateAIProvider,
+  UpdateBusinessSystem,
   UpdateAgent,
   UpdateAgentExecution,
   UpdateAgentWorkStatus,
@@ -94,6 +99,8 @@ import {
   type AIProviderModelList,
   type AIProviderModelSummary,
   type AIProviderSummary,
+  type BusinessSystem,
+  type BusinessSystemList,
   type AgentList,
   type AgentListItem,
   type AgentListInput,
@@ -181,6 +188,13 @@ export type AIProviderSummaryData = Omit<
 
 export type AIProviderListData = Omit<AIProviderList, "providers"> & {
   providers: AIProviderSummaryData[]
+}
+
+export type BusinessSystemListData = Omit<
+  BusinessSystemList,
+  "businessSystems"
+> & {
+  businessSystems: BusinessSystem[]
 }
 
 export type ContactDetail = Omit<Contact, "methods" | "channelIdentities"> & {
@@ -422,7 +436,7 @@ export const addTeamMembers = bind(AddTeamMembers)
 export const removeTeamMembers = bind(RemoveTeamMembers)
 /** 读取对象存储设置。 */
 export const getS3Setting = bind(GetS3Setting)
-/** 修改当前企业名称。 */
+/** 修改当前企业通用设置。 */
 export const updateOrganization = bind(UpdateOrganization)
 /** 保存对象存储设置。 */
 export const saveS3Setting = bind(SaveS3Setting)
@@ -501,6 +515,30 @@ export function updateAIProvider(providerId: string, input: AIProviderInput) {
 
 /** 删除模型服务供应商。 */
 export const deleteAIProvider = bind(DeleteAIProvider)
+
+const listBusinessSystemsBound = bind(ListBusinessSystems)
+
+/** 读取当前企业的业务系统列表。 */
+export function listBusinessSystems() {
+  return listBusinessSystemsBound().then(
+    (output): BusinessSystemListData => ({
+      ...output,
+      businessSystems: asList(output.businessSystems),
+    }),
+  )
+}
+
+/** 读取业务系统详情。 */
+export const getBusinessSystem = bind(GetBusinessSystem)
+
+/** 创建业务系统。 */
+export const createBusinessSystem = bind(CreateBusinessSystem)
+
+/** 修改业务系统。 */
+export const updateBusinessSystem = bind(UpdateBusinessSystem)
+
+/** 删除业务系统。 */
+export const deleteBusinessSystem = bind(DeleteBusinessSystem)
 
 const listChannelOptionsBound = bind(ListChannelOptions)
 const listMessageChannelsBound = bind(ListMessageChannels)

@@ -129,7 +129,7 @@ export function KnowledgeGroupDialog({
           </DialogTitle>
         </DialogHeader>
         <form
-          className="grid gap-6"
+          className="grid gap-9"
           onSubmit={form.handleSubmit(save)}
           noValidate
         >

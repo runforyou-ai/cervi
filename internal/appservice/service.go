@@ -76,6 +76,11 @@ type Backend interface {
 	CreateAIProvider(context.Context, RequestMeta, AIProviderInput) (AIProvider, error)
 	UpdateAIProvider(context.Context, RequestMeta, string, AIProviderInput) (AIProvider, error)
 	DeleteAIProvider(context.Context, RequestMeta, string) error
+	ListBusinessSystems(context.Context, RequestMeta) (BusinessSystemList, error)
+	GetBusinessSystem(context.Context, RequestMeta, string) (BusinessSystem, error)
+	CreateBusinessSystem(context.Context, RequestMeta, BusinessSystemInput) (BusinessSystem, error)
+	UpdateBusinessSystem(context.Context, RequestMeta, string, BusinessSystemInput) (BusinessSystem, error)
+	DeleteBusinessSystem(context.Context, RequestMeta, string) error
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
 	GetS3Setting(context.Context, RequestMeta) (S3Setting, error)
 	SaveS3Setting(context.Context, RequestMeta, S3Setting) (S3Setting, error)
@@ -591,7 +596,32 @@ func (s *Service) DeleteAIProvider(ctx context.Context, meta RequestMeta, provid
 	return s.backend.DeleteAIProvider(ctx, meta, providerID)
 }
 
-// UpdateOrganization 修改当前企业名称。
+// ListBusinessSystems 返回当前企业配置的业务系统。
+func (s *Service) ListBusinessSystems(ctx context.Context, meta RequestMeta) (BusinessSystemList, error) {
+	return s.backend.ListBusinessSystems(ctx, meta)
+}
+
+// GetBusinessSystem 返回当前企业中的业务系统详情。
+func (s *Service) GetBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) (BusinessSystem, error) {
+	return s.backend.GetBusinessSystem(ctx, meta, businessSystemID)
+}
+
+// CreateBusinessSystem 创建业务系统。
+func (s *Service) CreateBusinessSystem(ctx context.Context, meta RequestMeta, input BusinessSystemInput) (BusinessSystem, error) {
+	return s.backend.CreateBusinessSystem(ctx, meta, input)
+}
+
+// UpdateBusinessSystem 修改业务系统。
+func (s *Service) UpdateBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string, input BusinessSystemInput) (BusinessSystem, error) {
+	return s.backend.UpdateBusinessSystem(ctx, meta, businessSystemID, input)
+}
+
+// DeleteBusinessSystem 删除业务系统。
+func (s *Service) DeleteBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) error {
+	return s.backend.DeleteBusinessSystem(ctx, meta, businessSystemID)
+}
+
+// UpdateOrganization 修改当前企业通用设置。
 func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	return s.backend.UpdateOrganization(ctx, meta, input)
 }

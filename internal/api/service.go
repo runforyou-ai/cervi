@@ -130,6 +130,11 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 	router.GET("/integrations/model-services/:providerID", service.getAIProvider)
 	router.PUT("/integrations/model-services/:providerID", service.updateAIProvider)
 	router.DELETE("/integrations/model-services/:providerID", service.deleteAIProvider)
+	router.GET("/integrations/business-systems", service.listBusinessSystems)
+	router.POST("/integrations/business-systems", service.createBusinessSystem)
+	router.GET("/integrations/business-systems/:businessSystemID", service.getBusinessSystem)
+	router.PUT("/integrations/business-systems/:businessSystemID", service.updateBusinessSystem)
+	router.DELETE("/integrations/business-systems/:businessSystemID", service.deleteBusinessSystem)
 	router.PUT("/settings/organization", service.updateOrganization)
 	router.GET("/settings/storage/s3", service.getS3Setting)
 	router.PUT("/settings/storage/s3", service.saveS3Setting)
@@ -772,7 +777,46 @@ func (s *Service) deleteAIProvider(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteAIProvider(c.Request.Context(), requestMeta(c), c.Param("providerID")))
 }
 
-// updateOrganization 修改当前企业名称。
+// listBusinessSystems 返回业务系统列表。
+func (s *Service) listBusinessSystems(c *gin.Context) {
+	businessSystems, err := s.application.ListBusinessSystems(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, businessSystems, err)
+}
+
+// getBusinessSystem 返回业务系统详情。
+func (s *Service) getBusinessSystem(c *gin.Context) {
+	businessSystem, err := s.application.GetBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID"))
+	writeResult(c, http.StatusOK, businessSystem, err)
+}
+
+// createBusinessSystem 创建业务系统。
+func (s *Service) createBusinessSystem(c *gin.Context) {
+	var input appservice.BusinessSystemInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	businessSystem, err := s.application.CreateBusinessSystem(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, businessSystem, err)
+}
+
+// updateBusinessSystem 修改业务系统。
+func (s *Service) updateBusinessSystem(c *gin.Context) {
+	var input appservice.BusinessSystemInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	businessSystem, err := s.application.UpdateBusinessSystem(
+		c.Request.Context(), requestMeta(c), c.Param("businessSystemID"), input,
+	)
+	writeResult(c, http.StatusOK, businessSystem, err)
+}
+
+// deleteBusinessSystem 删除业务系统。
+func (s *Service) deleteBusinessSystem(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID")))
+}
+
+// updateOrganization 修改当前企业通用设置。
 func (s *Service) updateOrganization(c *gin.Context) {
 	var input appservice.OrganizationInput
 	if !bindJSON(c, &input) {

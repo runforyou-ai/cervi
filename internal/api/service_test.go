@@ -16,26 +16,28 @@ import (
 
 type testBackend struct {
 	appservice.Backend
-	lastMeta            appservice.RequestMeta
-	lastOrganization    appservice.OrganizationInput
-	lastUserList        appservice.UserListInput
-	lastCreateUser      appservice.CreateUserInput
-	lastUpdateUser      appservice.UpdateUserInput
-	lastRoleChanges     appservice.UserRoleChangesInput
-	lastTeamList        appservice.TeamListInput
-	lastTeamMemberList  appservice.TeamMemberListInput
-	lastTeam            appservice.TeamInput
-	lastTeamMembers     appservice.TeamMemberInput
-	lastAgentID         string
-	lastAgentExecution  appservice.AgentExecutionInput
-	lastAgentWorkStatus appservice.AgentWorkStatusInput
-	lastProfile         appservice.ProfileInput
-	lastFileUpload      appservice.FileUploadInput
-	lastFileID          string
-	lastPassword        appservice.ChangePasswordInput
-	lastPreferences     appservice.UserPreferencesInput
-	lastWorkStatus      appservice.UserWorkStatusInput
-	lastAIConnection    appservice.AIProviderConnectionInput
+	lastMeta             appservice.RequestMeta
+	lastOrganization     appservice.OrganizationInput
+	lastUserList         appservice.UserListInput
+	lastCreateUser       appservice.CreateUserInput
+	lastUpdateUser       appservice.UpdateUserInput
+	lastRoleChanges      appservice.UserRoleChangesInput
+	lastTeamList         appservice.TeamListInput
+	lastTeamMemberList   appservice.TeamMemberListInput
+	lastTeam             appservice.TeamInput
+	lastTeamMembers      appservice.TeamMemberInput
+	lastAgentID          string
+	lastAgentExecution   appservice.AgentExecutionInput
+	lastAgentWorkStatus  appservice.AgentWorkStatusInput
+	lastProfile          appservice.ProfileInput
+	lastFileUpload       appservice.FileUploadInput
+	lastFileID           string
+	lastPassword         appservice.ChangePasswordInput
+	lastPreferences      appservice.UserPreferencesInput
+	lastWorkStatus       appservice.UserWorkStatusInput
+	lastAIConnection     appservice.AIProviderConnectionInput
+	lastBusinessSystemID string
+	lastBusinessSystem   appservice.BusinessSystemInput
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
@@ -192,17 +194,56 @@ func (b *testBackend) RemoveTeamMembers(_ context.Context, meta appservice.Reque
 	return appservice.Team{ID: teamID}, nil
 }
 
-// UpdateOrganization 保存测试企业名称。
+// UpdateOrganization 保存测试企业通用设置。
 func (b *testBackend) UpdateOrganization(_ context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	b.lastMeta = meta
 	b.lastOrganization = input
-	return appservice.Organization{ID: testIdentity().Organization.ID, Name: input.Name}, nil
+	return appservice.Organization{
+		ID: testIdentity().Organization.ID, Name: input.Name, AllowArbitraryURL: input.AllowArbitraryURL,
+	}, nil
 }
 
 // TestAIProviderConnection 记录模型服务连接测试输入。
 func (b *testBackend) TestAIProviderConnection(_ context.Context, meta appservice.RequestMeta, input appservice.AIProviderConnectionInput) error {
 	b.lastMeta = meta
 	b.lastAIConnection = input
+	return nil
+}
+
+// ListBusinessSystems 返回测试业务系统列表。
+func (b *testBackend) ListBusinessSystems(_ context.Context, meta appservice.RequestMeta) (appservice.BusinessSystemList, error) {
+	b.lastMeta = meta
+	return appservice.BusinessSystemList{BusinessSystems: []appservice.BusinessSystem{{
+		ID: "business-system-1", Name: "企业 ERP", URL: "https://erp.example.com", Enabled: true,
+	}}}, nil
+}
+
+// GetBusinessSystem 返回测试业务系统详情。
+func (b *testBackend) GetBusinessSystem(_ context.Context, meta appservice.RequestMeta, businessSystemID string) (appservice.BusinessSystem, error) {
+	b.lastMeta = meta
+	b.lastBusinessSystemID = businessSystemID
+	return appservice.BusinessSystem{ID: businessSystemID, Name: "企业 ERP", URL: "https://erp.example.com", Enabled: true}, nil
+}
+
+// CreateBusinessSystem 记录业务系统创建输入。
+func (b *testBackend) CreateBusinessSystem(_ context.Context, meta appservice.RequestMeta, input appservice.BusinessSystemInput) (appservice.BusinessSystem, error) {
+	b.lastMeta = meta
+	b.lastBusinessSystem = input
+	return appservice.BusinessSystem{ID: "business-system-1", Name: input.Name, URL: input.URL, Enabled: input.Enabled}, nil
+}
+
+// UpdateBusinessSystem 记录业务系统修改输入。
+func (b *testBackend) UpdateBusinessSystem(_ context.Context, meta appservice.RequestMeta, businessSystemID string, input appservice.BusinessSystemInput) (appservice.BusinessSystem, error) {
+	b.lastMeta = meta
+	b.lastBusinessSystemID = businessSystemID
+	b.lastBusinessSystem = input
+	return appservice.BusinessSystem{ID: businessSystemID, Name: input.Name, URL: input.URL, Enabled: input.Enabled}, nil
+}
+
+// DeleteBusinessSystem 记录业务系统删除编号。
+func (b *testBackend) DeleteBusinessSystem(_ context.Context, meta appservice.RequestMeta, businessSystemID string) error {
+	b.lastMeta = meta
+	b.lastBusinessSystemID = businessSystemID
 	return nil
 }
 
@@ -478,13 +519,15 @@ func TestUpdateUserWorkStatusUsesTypedInput(t *testing.T) {
 	}
 }
 
-// TestOrganizationSettingsUseTypedContract 验证企业信息接口保存类型化契约。
-func TestOrganizationSettingsUseTypedContract(t *testing.T) {
+// TestGeneralSettingsUseTypedContract 验证通用设置接口保存类型化契约。
+func TestGeneralSettingsUseTypedContract(t *testing.T) {
 	backend := &testBackend{}
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 
-	updateResponse := doJSON(t, http.MethodPut, server.URL+"/settings/organization", appservice.OrganizationInput{Name: "鹿行协作"}, "test-token")
+	updateResponse := doJSON(t, http.MethodPut, server.URL+"/settings/organization", appservice.OrganizationInput{
+		Name: "鹿行协作", AllowArbitraryURL: true,
+	}, "test-token")
 	defer updateResponse.Body.Close()
 	if updateResponse.StatusCode != http.StatusOK {
 		t.Fatalf("update status = %d, want %d", updateResponse.StatusCode, http.StatusOK)
@@ -493,8 +536,47 @@ func TestOrganizationSettingsUseTypedContract(t *testing.T) {
 	if err := json.NewDecoder(updateResponse.Body).Decode(&organization); err != nil {
 		t.Fatal(err)
 	}
-	if organization.Name != "鹿行协作" || backend.lastMeta.Token != "test-token" || backend.lastOrganization.Name != "鹿行协作" {
+	if organization.Name != "鹿行协作" || !organization.AllowArbitraryURL || backend.lastMeta.Token != "test-token" || backend.lastOrganization.Name != "鹿行协作" || !backend.lastOrganization.AllowArbitraryURL {
 		t.Fatalf("organization = %#v, meta = %#v", organization, backend.lastMeta)
+	}
+}
+
+// TestBusinessSystemRoutesUseTypedContract 验证业务系统管理接口的方法、状态码和类型化输入。
+func TestBusinessSystemRoutesUseTypedContract(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	listResponse := doJSON(t, http.MethodGet, server.URL+"/integrations/business-systems", nil, "test-token")
+	defer listResponse.Body.Close()
+	if listResponse.StatusCode != http.StatusOK {
+		t.Fatalf("list status = %d, want %d", listResponse.StatusCode, http.StatusOK)
+	}
+
+	createInput := appservice.BusinessSystemInput{Name: "企业 ERP", URL: "https://erp.example.com", Enabled: true}
+	createResponse := doJSON(t, http.MethodPost, server.URL+"/integrations/business-systems", createInput, "test-token")
+	defer createResponse.Body.Close()
+	if createResponse.StatusCode != http.StatusCreated || backend.lastBusinessSystem != createInput {
+		t.Fatalf("create status = %d, input = %#v", createResponse.StatusCode, backend.lastBusinessSystem)
+	}
+
+	getResponse := doJSON(t, http.MethodGet, server.URL+"/integrations/business-systems/business-system-1", nil, "test-token")
+	defer getResponse.Body.Close()
+	if getResponse.StatusCode != http.StatusOK || backend.lastBusinessSystemID != "business-system-1" {
+		t.Fatalf("get status = %d, ID = %q", getResponse.StatusCode, backend.lastBusinessSystemID)
+	}
+
+	updateInput := appservice.BusinessSystemInput{Name: "企业 ERP", URL: "https://erp.example.com/workbench", Enabled: false}
+	updateResponse := doJSON(t, http.MethodPut, server.URL+"/integrations/business-systems/business-system-1", updateInput, "test-token")
+	defer updateResponse.Body.Close()
+	if updateResponse.StatusCode != http.StatusOK || backend.lastBusinessSystemID != "business-system-1" || backend.lastBusinessSystem != updateInput {
+		t.Fatalf("update status = %d, ID = %q, input = %#v", updateResponse.StatusCode, backend.lastBusinessSystemID, backend.lastBusinessSystem)
+	}
+
+	deleteResponse := doJSON(t, http.MethodDelete, server.URL+"/integrations/business-systems/business-system-1", nil, "test-token")
+	defer deleteResponse.Body.Close()
+	if deleteResponse.StatusCode != http.StatusNoContent || backend.lastBusinessSystemID != "business-system-1" {
+		t.Fatalf("delete status = %d, ID = %q", deleteResponse.StatusCode, backend.lastBusinessSystemID)
 	}
 }
 

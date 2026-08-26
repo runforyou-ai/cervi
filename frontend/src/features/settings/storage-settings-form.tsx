@@ -333,16 +333,17 @@ export function StorageSettingsForm() {
     <div className="w-full max-w-3xl">
       {editing ? (
         <form
-          className="w-full"
+          className="w-full space-y-9"
           onSubmit={form.handleSubmit(save)}
           noValidate
         >
-          <h3 className="mb-4 text-base font-medium">
-            {configured
-              ? t("storage.form.editTitle")
-              : t("storage.form.configureTitle")}
-          </h3>
-          <FieldGroup>
+          <div>
+            <h3 className="mb-4 text-base font-medium">
+              {configured
+                ? t("storage.form.editTitle")
+                : t("storage.form.configureTitle")}
+            </h3>
+            <FieldGroup>
             <Controller
               name="provider"
               control={form.control}
@@ -492,32 +493,33 @@ export function StorageSettingsForm() {
               )}
             />
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" disabled={submitting}>
-                {pendingAction === "save"
-                  ? t("storage.form.saving")
-                  : t("storage.form.save")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={submitting}
-                onClick={form.handleSubmit(test)}
-              >
-                {pendingAction === "test"
-                  ? t("storage.form.testing")
-                  : t("storage.form.test")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={submitting}
-                onClick={cancelEditing}
-              >
-                {t("storage.form.cancel")}
-              </Button>
-            </div>
-          </FieldGroup>
+            </FieldGroup>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="submit" disabled={submitting}>
+              {pendingAction === "save"
+                ? t("storage.form.saving")
+                : t("storage.form.save")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={submitting}
+              onClick={form.handleSubmit(test)}
+            >
+              {pendingAction === "test"
+                ? t("storage.form.testing")
+                : t("storage.form.test")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={submitting}
+              onClick={cancelEditing}
+            >
+              {t("storage.form.cancel")}
+            </Button>
+          </div>
         </form>
       ) : configured ? (
         <section aria-labelledby="storage-detail-title">

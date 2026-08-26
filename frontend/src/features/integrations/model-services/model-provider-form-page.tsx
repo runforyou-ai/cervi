@@ -400,7 +400,7 @@ export function ModelProviderFormPage({
           </div>
         ) : (
           <form
-            className="w-full space-y-8"
+            className="w-full space-y-9"
             onSubmit={form.handleSubmit(save)}
             noValidate
           >
@@ -470,7 +470,7 @@ export function ModelProviderFormPage({
               />
             </FieldGroup>
 
-            <section>
+            <section className="relative">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="flex items-center gap-2 text-sm font-medium">
                   {t("modelServices.models.title")}
@@ -671,8 +671,9 @@ export function ModelProviderFormPage({
                   </TableBody>
                 </Table>
               </div>
+              {/* 校验提示使用表单分区间距，不改变操作按钮位置。 */}
               <FormValidationMessage
-                className="mt-2"
+                className="absolute top-full right-0 left-0 mt-2"
                 message={modelErrorMessage}
               />
             </section>

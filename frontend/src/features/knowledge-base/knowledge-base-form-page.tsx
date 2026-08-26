@@ -250,7 +250,7 @@ export function KnowledgeBaseFormPage({
           </div>
         ) : (
           <form
-            className="w-full max-w-3xl space-y-8"
+            className="w-full max-w-3xl space-y-9"
             onSubmit={form.handleSubmit(save)}
             noValidate
           >

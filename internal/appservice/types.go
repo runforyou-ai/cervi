@@ -216,15 +216,17 @@ type Auth struct {
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// Organization 定义当前企业信息。
+// Organization 定义当前企业及其通用设置。
 type Organization struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	AllowArbitraryURL bool   `json:"allowArbitraryUrl"`
 }
 
-// OrganizationInput 定义企业名称修改输入。
+// OrganizationInput 定义企业通用设置修改输入。
 type OrganizationInput struct {
-	Name string `json:"name"`
+	Name              string `json:"name"`
+	AllowArbitraryURL bool   `json:"allowArbitraryUrl"`
 }
 
 // RoleKind 表示角色类型。
@@ -1016,6 +1018,28 @@ type AIProviderList struct {
 // AIProviderModelList 定义指定品牌的预设模型目录。
 type AIProviderModelList struct {
 	Models []AIProviderModel `json:"models"`
+}
+
+// BusinessSystem 定义企业配置的业务系统。
+type BusinessSystem struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	URL       string    `json:"url"`
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// BusinessSystemInput 定义业务系统可编辑字段。
+type BusinessSystemInput struct {
+	Name    string `json:"name"`
+	URL     string `json:"url"`
+	Enabled bool   `json:"enabled"`
+}
+
+// BusinessSystemList 定义企业业务系统列表。
+type BusinessSystemList struct {
+	BusinessSystems []BusinessSystem `json:"businessSystems"`
 }
 
 // S3Setting 定义 S3 兼容对象存储配置。
