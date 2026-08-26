@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>消息页中栏（会话列表）交互原型 · Cervi</title>
+<style>
+/* ============ 设计令牌：与 frontend/src/index.css 保持一致 ============ */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.6578 0.1846 253.49);
+  --primary-foreground: oklch(1 0 0);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.94 0.03 253.49);
+  --accent-foreground: oklch(0.42 0.10 253.49);
+  --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.62 0.15 149.5);
+  --warning: oklch(0.62 0.16 65);
+  --border: oklch(0.90 0.004 286.32);
+  --input: oklch(0.90 0.004 286.32);
+  --ring: oklch(0.6578 0.1846 253.49);
+  --sidebar: oklch(0.972 0.002 286);
+  --sidebar-foreground: oklch(0.35 0.006 286);
+  --sidebar-border: oklch(0.88 0.004 286);
+  --sidebar-secondary: oklch(0.99 0.001 286);
+  --sidebar-accent: oklch(0.90 0.045 253.49);
+  --sidebar-accent-foreground: oklch(0.42 0.10 253.49);
+  --radius: 0.5rem;
+  /* 来源徽标色（原型内约定，正式实现进入主题令牌） */
+  --badge-website: oklch(0.6578 0.1846 253.49);
+  --badge-wechat: oklch(0.62 0.15 149.5);
+  --badge-telegram: oklch(0.68 0.12 230);
+  --badge-federation: oklch(0.55 0.17 295);
+  --badge-guest: oklch(0.62 0.16 65);
+  --badge-agent: oklch(0.55 0.02 286);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-family: 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', system-ui, sans-serif; }
+body { background: oklch(0.985 0.001 286); color: var(--foreground); font-size: 14px; line-height: 1.5; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+svg { flex-shrink: 0; }
+
+/* ============ 原型页整体布局 ============ */
+.page { max-width: 1400px; margin: 0 auto; padding: 32px 24px 64px; }
+.page > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.page > header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.page > header p { margin-top: 4px; font-size: 13px; color: var(--muted-foreground); }
+.lang-toggle {
+  flex-shrink: 0; height: 30px; padding: 0 14px; border: 1px solid var(--border);
+  border-radius: 999px; font-size: 12.5px; color: var(--muted-foreground); background: var(--background);
+}
+.lang-toggle:hover { background: var(--muted); color: var(--foreground); }
+.layout { display: flex; gap: 28px; align-items: flex-start; }
+.stage { position: sticky; top: 24px; flex-shrink: 0; }
+.notes { flex: 1; min-width: 360px; }
+
+/* ============ 应用画布：一级轨 + 中栏 + 主区占位 ============ */
+.canvas {
+  display: flex; height: 720px; width: 800px;
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--background);
+  box-shadow: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10);
+}
+.rail {
+  width: 76px; flex-shrink: 0; display: flex; flex-direction: column; align-items: stretch;
+  gap: 4px; padding: 10px 6px; background: var(--sidebar);
+  border-right: 1px solid var(--sidebar-border); color: var(--sidebar-foreground);
+}
+.rail .avatar-block { display: flex; justify-content: center; padding: 0 6px 6px; }
+.rail .avatar-block span {
+  display: flex; width: 40px; height: 40px; align-items: center; justify-content: center;
+  border-radius: 8px; background: var(--primary); color: var(--primary-foreground);
+  font-size: 13px; font-weight: 600;
+}
+.rail-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  height: 56px; border-radius: 6px; font-size: 11px; line-height: 1.2; color: var(--sidebar-foreground);
+}
+.rail-item.active { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); font-weight: 500; }
+.rail-item svg { width: 20px; height: 20px; }
+
+/* ============ 中栏（本原型的设计对象） ============ */
+.pane {
+  width: 344px; flex-shrink: 0; display: flex; flex-direction: column; min-height: 0;
+  background: var(--background); border-right: 1px solid var(--border);
+  user-select: none; transition: width 0.15s ease;
+}
+.pane.rail-collapsed { width: 296px; }
+
+/* 顶部操作行：收纳 + 搜索 + 新建，56px 与右侧会话页头等高 */
+.pane-top {
+  display: flex; align-items: center; gap: 8px; height: 56px; flex-shrink: 0;
+  padding: 0 12px; border-bottom: 1px solid var(--border);
+}
+.searchbox { position: relative; flex: 1; min-width: 0; }
+.searchbox svg.lead {
+  position: absolute; top: 50%; left: 10px; transform: translateY(-50%);
+  width: 16px; height: 16px; color: var(--muted-foreground); pointer-events: none;
+}
+.searchbox input {
+  width: 100%; height: 34px; padding: 0 30px 0 32px;
+  border: 1px solid transparent; border-radius: calc(var(--radius) * 0.8);
+  background: var(--muted); font: inherit; font-size: 13px; color: var(--foreground);
+  outline: none; transition: background 0.15s, border-color 0.15s;
+}
+.searchbox input::placeholder { color: var(--muted-foreground); }
+.searchbox input:focus { background: var(--background); border-color: var(--ring); }
+.searchbox .clear-btn {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+  display: none; width: 22px; height: 22px; align-items: center; justify-content: center;
+  border-radius: 6px; color: var(--muted-foreground);
+}
+.searchbox .clear-btn:hover { background: var(--muted); color: var(--foreground); }
+.searchbox .clear-btn svg { width: 14px; height: 14px; }
+.pane.searching .clear-btn { display: flex; }
+
+/* 顶部 ghost 图标按钮：收纳纵栏 / 发起会话 */
+.top-icon-btn {
+  position: relative; display: flex; width: 34px; height: 34px; align-items: center; justify-content: center;
+  flex-shrink: 0; border-radius: calc(var(--radius) * 0.8);
+  color: var(--muted-foreground); background: transparent; transition: background 0.15s;
+}
+.top-icon-btn:hover, .top-icon-btn[aria-expanded="true"] { background: var(--muted); color: var(--foreground); }
+.top-icon-btn svg { width: 17px; height: 17px; }
+.top-icon-btn .dot {
+  position: absolute; top: 5px; right: 5px; width: 7px; height: 7px;
+  border-radius: 999px; background: var(--primary); border: 1px solid var(--background);
+}
+
+/* 新建下拉菜单 */
+.menu {
+  position: absolute; z-index: 30; top: 50px; right: 8px; min-width: 208px;
+  padding: 4px; border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.8);
+  background: var(--background); box-shadow: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10);
+  display: none;
+}
+.menu.open { display: block; }
+.menu-item {
+  display: flex; width: 100%; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 6px; font-size: 13px; text-align: left;
+}
+.menu-item:hover:not(.disabled) { background: var(--accent); color: var(--accent-foreground); }
+.menu-item svg { width: 16px; height: 16px; color: var(--muted-foreground); }
+.menu-item:hover:not(.disabled) svg { color: var(--accent-foreground); }
+.menu-item.disabled { cursor: default; color: var(--muted-foreground); }
+.menu-item .soon {
+  margin-left: auto; font-size: 11px; color: var(--muted-foreground);
+  border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; line-height: 16px;
+}
+.menu-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+
+/* 范围纵栏：48px 常驻左缘，一次点击切换，零遮挡零位移；无独立底色，仅一条浅分隔线界定列表边缘 */
+.pane-body { display: flex; flex: 1; min-height: 0; }
+.scope-rail {
+  display: flex; width: 48px; flex-shrink: 0; flex-direction: column; align-items: stretch;
+  gap: 2px; padding: 6px 3px 6px 5px; overflow-y: auto; scrollbar-width: none;
+  border-right: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+}
+.scope-rail::-webkit-scrollbar { display: none; }
+.rail-scope {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 7px 0 6px; border-radius: 8px; color: var(--muted-foreground);
+  transition: background 0.12s, color 0.12s;
+}
+.rail-scope:hover { background: var(--muted); color: var(--foreground); }
+.rail-scope.active { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+.rail-scope svg { width: 17px; height: 17px; }
+.rail-scope .lbl {
+  font-size: 10px; line-height: 1.1; text-align: center;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 1px;
+}
+/* 未读只用圆点示意，具体数字在列表项上；仅客户队列保留琥珀数字 */
+.rail-scope .dot {
+  position: absolute; top: 4px; right: 7px; width: 7px; height: 7px;
+  border-radius: 999px; background: var(--primary); border: 1px solid var(--background);
+}
+.rail-scope .badge.queue {
+  position: absolute; top: 1px; right: 3px; display: flex; min-width: 15px; height: 15px;
+  padding: 0 4px; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--warning); color: var(--primary-foreground);
+  font-size: 9.5px; font-weight: 600; border: 1px solid var(--background);
+}
+.rail-scope.unread-rail { margin-top: auto; }
+.pane-list-col { display: flex; flex: 1; min-width: 0; flex-direction: column; min-height: 0; }
+.chip {
+  position: relative; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  height: 26px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px;
+  font-size: 12px; color: var(--muted-foreground); background: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+.chip:hover { color: var(--foreground); background: var(--muted); }
+.chip.active { background: var(--accent); color: var(--accent-foreground); border-color: transparent; font-weight: 500; }
+/* 子筛选：客户队列。高频三段 + 「更多」下拉收纳低频项 */
+.sub-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-shrink: 0; padding: 8px 12px 4px; }
+.seg { display: inline-flex; padding: 2px; gap: 2px; border-radius: calc(var(--radius) * 0.8); background: var(--muted); }
+.seg button {
+  display: inline-flex; align-items: center; gap: 3px;
+  height: 24px; padding: 0 9px; border-radius: 6px; font-size: 12px; color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.seg button.active { background: var(--background); color: var(--foreground); font-weight: 500; box-shadow: 0px 1px 2px hsl(0 0% 0% / 0.08); }
+.seg button .cnt { margin-left: 3px; color: var(--warning); font-weight: 600; }
+.seg button svg { width: 11px; height: 11px; }
+.cs-menu {
+  position: absolute; z-index: 20; top: calc(100% - 2px); display: none; min-width: 108px;
+  padding: 4px; border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.8);
+  background: var(--background); box-shadow: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10);
+}
+.cs-menu.open { display: block; }
+.cs-menu button {
+  display: flex; width: 100%; align-items: center; padding: 6px 8px;
+  border-radius: 6px; font-size: 12px; text-align: left;
+}
+.cs-menu button:hover { background: var(--accent); color: var(--accent-foreground); }
+.cs-menu button.active { color: var(--accent-foreground); font-weight: 500; }
+
+/* 会话列表 */
+.conv-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px 12px; }
+.conv-scroll::-webkit-scrollbar { width: 8px; }
+.conv-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; border: 2px solid var(--background); }
+.conv-item {
+  display: flex; width: 100%; align-items: flex-start; gap: 12px;
+  padding: 10px 12px; border-radius: calc(var(--radius) * 1.4); text-align: left;
+  transition: background 0.12s;
+}
+.conv-item:hover { background: var(--accent); color: var(--accent-foreground); }
+.conv-item.selected { background: var(--accent); color: var(--accent-foreground); }
+.conv-item:hover .preview, .conv-item.selected .preview,
+.conv-item:hover .time, .conv-item.selected .time { color: var(--accent-foreground); opacity: 0.75; }
+
+.avatar-wrap { position: relative; flex-shrink: 0; }
+.avatar {
+  display: flex; width: 36px; height: 36px; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--muted); color: var(--muted-foreground);
+  font-size: 12px; font-weight: 500;
+}
+.online-dot {
+  position: absolute; right: 0; bottom: 0; width: 10px; height: 10px;
+  border-radius: 999px; background: var(--success); border: 2px solid var(--background);
+}
+.src-badge {
+  position: absolute; right: -3px; bottom: -3px; display: flex; width: 16px; height: 16px;
+  align-items: center; justify-content: center; border-radius: 999px;
+  border: 2px solid var(--background); color: #fff;
+}
+.src-badge svg { width: 9px; height: 9px; }
+.src-badge.website { background: var(--badge-website); }
+.src-badge.wechat { background: var(--badge-wechat); }
+.src-badge.telegram { background: var(--badge-telegram); }
+.src-badge.federation { background: var(--badge-federation); }
+.src-badge.guest { background: var(--badge-guest); }
+.src-badge.agent { background: var(--badge-agent); }
+
+.conv-body { flex: 1; min-width: 0; }
+.conv-line1 { display: flex; align-items: center; gap: 6px; }
+.conv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
+.tag {
+  flex-shrink: 0; font-size: 10.5px; line-height: 16px; padding: 0 5px;
+  border-radius: 4px; border: 1px solid; font-weight: 500;
+}
+.tag.ext { color: var(--warning); border-color: color-mix(in oklch, var(--warning) 45%, transparent); }
+.tag.fed { color: var(--badge-federation); border-color: color-mix(in oklch, var(--badge-federation) 40%, transparent); }
+.mute-ico { flex-shrink: 0; width: 13px; height: 13px; color: var(--muted-foreground); }
+.time { margin-left: auto; flex-shrink: 0; font-size: 11px; color: var(--muted-foreground); }
+.time.waiting { color: var(--warning); font-weight: 500; }
+.conv-line2 { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.acct-mini {
+  flex-shrink: 0; font-size: 10.5px; line-height: 16px; padding: 0 5px;
+  border-radius: 4px; background: var(--muted); color: var(--muted-foreground); font-weight: 500;
+}
+.conv-item:hover .acct-mini, .conv-item.selected .acct-mini { background: color-mix(in oklch, var(--accent-foreground) 12%, transparent); }
+.preview { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted-foreground); }
+.preview .draft { color: var(--destructive); }
+.preview .mention { color: var(--primary); font-weight: 500; }
+.unread {
+  margin-left: auto; flex-shrink: 0; display: flex; min-width: 18px; height: 18px; padding: 0 5px;
+  align-items: center; justify-content: center; border-radius: 999px;
+  background: var(--primary); color: var(--primary-foreground); font-size: 10.5px; font-weight: 500;
+}
+.unread.muted-unread { background: var(--border); color: var(--muted-foreground); }
+.pin-ico { margin-left: auto; flex-shrink: 0; width: 13px; height: 13px; color: var(--muted-foreground); }
+.conv-line2 .pin-ico { margin-left: 0; }
+
+.list-empty { padding: 48px 24px; text-align: center; font-size: 13px; color: var(--muted-foreground); }
+
+/* 搜索模式 */
+.search-scope-row { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding: 8px 12px; flex-wrap: wrap; }
+.search-scope-row .divider { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+.result-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; }
+.result-group-title {
+  padding: 10px 12px 4px; font-size: 11px; font-weight: 600; color: var(--muted-foreground);
+  letter-spacing: 0.02em;
+}
+.result-item {
+  display: flex; width: 100%; align-items: center; gap: 10px;
+  padding: 7px 12px; border-radius: calc(var(--radius) * 0.8); text-align: left;
+}
+.result-item:hover, .result-item.selected { background: var(--accent); color: var(--accent-foreground); }
+.result-item .avatar { width: 28px; height: 28px; font-size: 10.5px; }
+.result-body { flex: 1; min-width: 0; }
+.result-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-sub { font-size: 11px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-item:hover .result-sub, .result-item.selected .result-sub { color: var(--accent-foreground); opacity: 0.75; }
+.result-time { flex-shrink: 0; font-size: 11px; color: var(--muted-foreground); }
+mark { background: transparent; color: var(--primary); font-weight: 600; }
+.result-more { display: block; width: 100%; padding: 5px 12px; font-size: 12px; color: var(--primary); text-align: left; border-radius: 6px; }
+.result-more:hover { background: var(--muted); }
+.search-foot {
+  flex-shrink: 0; display: flex; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--muted-foreground);
+}
+.search-foot kbd {
+  font-family: inherit; border: 1px solid var(--border); border-radius: 4px;
+  padding: 0 4px; background: var(--muted); font-size: 10px;
+}
+.search-empty { padding: 40px 24px; text-align: center; font-size: 13px; color: var(--muted-foreground); }
+
+/* 右侧主区占位 */
+.main-placeholder {
+  flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--background);
+}
+.main-placeholder header {
+  display: flex; height: 56px; flex-shrink: 0; align-items: center; gap: 12px;
+  padding: 0 16px; border-bottom: 1px solid var(--border);
+}
+.main-placeholder .ph-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.main-placeholder .ph-name { font-size: 13px; font-weight: 500; }
+.main-placeholder .ph-sub { font-size: 11px; color: var(--muted-foreground); }
+.main-placeholder .ph-body {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in oklch, var(--muted) 22%, transparent);
+  color: var(--muted-foreground); font-size: 13px;
+}
+
+/* ============ 右侧设计说明 ============ */
+.notes section { margin-bottom: 28px; }
+.notes h2 {
+  font-size: 15px; font-weight: 600; margin-bottom: 10px; letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 8px;
+}
+.notes h2 .no {
+  display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center;
+  border-radius: 6px; background: var(--accent); color: var(--accent-foreground); font-size: 11px;
+}
+.notes p, .notes li { font-size: 13px; color: oklch(0.32 0.006 286); }
+.notes p { margin-bottom: 8px; }
+.notes ul, .notes ol { padding-left: 18px; margin-bottom: 8px; }
+.notes li { margin-bottom: 5px; }
+.notes li strong, .notes p strong { color: var(--foreground); font-weight: 600; }
+.notes code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11.5px;
+  background: var(--muted); border-radius: 4px; padding: 1px 5px;
+}
+.notes table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 8px; }
+.notes th, .notes td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.notes th { background: var(--muted); font-weight: 600; }
+.notes .hint {
+  border-left: 3px solid var(--primary); background: color-mix(in oklch, var(--accent) 45%, transparent);
+  border-radius: 0 8px 8px 0; padding: 8px 12px; font-size: 12.5px; margin-bottom: 8px;
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1>消息页中栏（会话列表）交互原型</h1>
+      <p>左侧为可交互原型：可点击范围纵栏、收纳按钮、加号菜单、会话项，聚焦搜索框进入搜索模式（快捷键 <code style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:0 4px;background:var(--muted)">Ctrl/⌘ K</code>），Esc 退出。右上角按钮可切换原型界面语言，用于中英文案对照；设计说明保持中文。</p>
+    </div>
+    <button class="lang-toggle" id="langToggle">English</button>
+  </header>
+
+  <div class="layout">
+    <!-- ==================== 可交互原型 ==================== -->
+    <div class="stage">
+      <div class="canvas">
+        <!-- 一级图标轨（示意） -->
+        <aside class="rail">
+          <div class="avatar-block"><span>林</span></div>
+          <div class="rail-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+            <span data-t="nav.messages">消息</span>
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 2v2"/><path d="M17.915 22a6 6 0 0 0-12 0"/><path d="M8 2v2"/><circle cx="12" cy="12" r="4"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>
+            <span data-t="nav.contacts">通讯录</span>
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>
+            <span data-t="nav.kb">知识库</span>
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></svg>
+            <span data-t="nav.integrations">集成</span>
+          </div>
+        </aside>
+
+        <!-- 中栏：设计对象 -->
+        <div class="pane" id="pane">
+          <!-- 顶部：收纳 + 搜索 + 新建 -->
+          <div class="pane-top" style="position: relative;">
+            <button class="top-icon-btn" id="railToggle" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+              <span class="dot" id="railToggleDot" style="display: none;"></span>
+            </button>
+            <div class="searchbox">
+              <svg class="lead" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input id="searchInput" type="text" autocomplete="off" />
+              <button class="clear-btn" id="clearSearch">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <button class="top-icon-btn" id="newBtn" aria-expanded="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+            <!-- 加号菜单 -->
+            <div class="menu" id="newMenu" role="menu">
+              <button class="menu-item" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                <span data-t="menu.direct">发起单聊</span>
+              </button>
+              <button class="menu-item" role="menuitem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span data-t="menu.group">创建群聊</span>
+              </button>
+              <div class="menu-sep"></div>
+              <button class="menu-item disabled" role="menuitem" aria-disabled="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg>
+                <span data-t="menu.invite">邀请外部协作</span>
+                <span class="soon" data-t="menu.soon">即将推出</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 浏览态：范围纵栏 + 列表（由 JS 渲染） -->
+          <div id="browseView" style="display: contents;"></div>
+          <!-- 搜索态：范围行 + 结果（由 JS 渲染） -->
+          <div id="searchView" style="display: none;"></div>
+        </div>
+
+        <!-- 右侧主区（示意，不属于本设计范围） -->
+        <div class="main-placeholder">
+          <header>
+            <div class="avatar-wrap"><div class="avatar" id="mainAvatar">研</div></div>
+            <div class="ph-title">
+              <span class="ph-name" id="mainName">产品研发组</span>
+              <span class="ph-sub" id="mainSub">群聊</span>
+            </div>
+          </header>
+          <div class="ph-body" data-t="main.body">会话主区（不属于本原型设计范围）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 设计说明 ==================== -->
+    <div class="notes">
+      <section>
+        <h2><span class="no">1</span>定位与原则</h2>
+        <p>中栏是全部消息来源的<strong>统一收件箱</strong>：客服会话、内部单聊群聊、第三方账号会话、外部协作和联邦会话都进入同一时间线列表，与 chat-roadmap「统一 Conversation 容器」的模型一致，不为来源分裂成多个列表页。</p>
+        <ul>
+          <li><strong>「全部」= 与我相关，不是企业全量时间线</strong>：包含我参与的内部会话、我绑定账号的第三方会话、我负责或负责过的客户会话。排队和 AI 接待中的客户会话属于<strong>共享队列</strong>，只在「客户」范围可见——对应 roadmap 10.8 用户 Mailbox 与客服共享收件箱分离的模型。因此即使 AI 同时接待上千条会话，也不会淹没任何人的「全部」列表；AI 转人工升级时会话进入「排队」，通过队列计数与范围圆点提醒。</li>
+          <li><strong>默认零噪音</strong>：「全部」只按 <code>last_message_at</code> 倒序展示，来源差异只通过头像角标和极简标签表达，不引入分组标题。</li>
+          <li><strong>来源用筛选表达，不用导航表达</strong>：范围筛选是同一列表的过滤器，切换不改变路由结构，仅同步 URL 查询参数以便恢复。</li>
+          <li><strong>能力渐进</strong>：范围筛选项只在对应能力启用后出现（见第 8 节阶段映射），首期界面只有搜索、加号和列表本身。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="no">2</span>布局与尺寸</h2>
+        <ul>
+          <li>中栏总宽 344px = 48px 范围纵栏 + 296px 列表（<code>PageSplit</code> 增加消息页专用档位）；纵栏收起或未启用（首期只有「全部」）时为 296px。列表列比通用二级栏略窄，双行列表项在 296px 下仍有充足截断余量。窄视口 <code>paneOnNarrow="fill"</code> 占满，选中会话后以 Sheet 打开主区（维持现状）。</li>
+          <li>顶部操作行高 56px（<code>h-14</code>），与右侧会话页头同高并共享 <code>border-b</code>，形成贯通的水平线。</li>
+          <li>消息页中栏不显示模块标题（遵守「二级栏显示模块标题（消息页除外）」的约定），搜索框即是这一栏的头部。</li>
+          <li>列表项 <code>rounded-xl px-3</code>、头像 36px、hover/选中用 <code>accent</code> 浅蓝，全部沿用现有 InboxPage 样式。</li>
+          <li><strong>视觉减负</strong>：搜索框用浅灰填充无边框（聚焦才出描边）、收纳与加号为 ghost 图标按钮、纵栏不带独立底色，仅以一条比中栏边框浅一档的竖分隔线界定列表左缘。字号收敛为名称 13 / 预览 12 / 时间等辅助 11 三档（微标签 10.5，纵栏标签 10 并带截断保护）。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="no">3</span>顶部：收纳 + 搜索 + 加号</h2>
+        <p><strong>收纳按钮</strong>（最左，ghost 图标）：收起/展开范围纵栏，位置固定不随纵栏消失，展开与收起互为可逆。收起后中栏回到 296px；此时若当前范围之外存在个人未读或排队队列有等待，按钮右上角显示圆点，保证收起不等于失联。纵栏未启用时该按钮不渲染。</p>
+        <p><strong>搜索框</strong>（中，弹性宽度）：</p>
+        <ul>
+          <li>浅灰填充、无边框，聚焦才出现描边；<code>Ctrl/⌘+K</code> 或 <code>/</code> 聚焦，快捷键提示放 tooltip 不占输入框。</li>
+          <li>聚焦即进入搜索模式（见第 7 节），失焦不自动退出，由 <code>Esc</code> 或清除按钮退出，避免点击结果时列表闪回。</li>
+        </ul>
+        <p><strong>加号</strong>（右，ghost 图标）：点击弹出「发起会话」菜单，服务于用户主动发起的会话——客户会话由渠道入站产生、第三方账号会话由绑定账号投影产生，都不在此新建：</p>
+        <ul>
+          <li><strong>发起单聊</strong>：打开人员选择器，可选企业成员与 AI 员工（同一 ChatSubject 路径）；同一主体对收敛到既有长期单聊，已存在时直接打开。</li>
+          <li><strong>创建群聊</strong>：打开建群对话框（群名 + 多选成员，成员含 AI 员工）。</li>
+          <li><strong>邀请外部协作</strong>：阶段 4 能力，未启用前不渲染；原型中以「即将推出」灰显仅作演示。</li>
+        </ul>
+        <p>菜单项保持两三个高频动作；不把「绑定外部账号」「新建渠道」等配置入口放进来，它们属于集成/设置页。</p>
+      </section>
+
+      <section>
+        <h2><span class="no">4</span>范围筛选</h2>
+        <p>范围切换使用中栏左缘的 <strong>48px 范围纵栏</strong>（图标 + 双字标签），Telegram 文件夹栏验证过的模式。此前评估过的三种方案都有硬伤：横向 chips 数量一多就要滚动、被滚出视口的范围不可发现；下拉浮层遮挡列表且选一次收一次；内嵌展开面板会把列表上下推挤。纵栏同时满足四个约束——<strong>全部范围常驻可见、单击直达可连续切换、零遮挡、零布局位移</strong>，数量增长只消耗纵向空间。纵栏不带独立底色，只用一条浅一档的竖分隔线界定列表左缘——既给列表一个稳定的起始边，又不会重到读成第三条独立面板。</p>
+        <p>范围统一按<strong>「我在和谁说话」</strong>一个维度命名：<strong>全部 / 客户 / 内部 / 伙伴</strong>，之后是<strong>绑定账号项</strong>：</p>
+        <ul>
+          <li><strong>客户</strong>：对外接待会话，对齐 roadmap「客户会话」术语。</li>
+          <li><strong>伙伴</strong>：受管外部协作与联邦会话合并——对方走访客门户还是部署了 Cervi 是实现差异，不是用户心智差异；列表项上以琥珀「外部」标（访客）和紫色企业名标（联邦）区分，将来有真实需求再加子筛选。</li>
+          <li><strong>绑定账号直接上纵栏</strong>：不设统一「外部账号」分类，每个绑定账号（如 TG·销售号）以平台图标 + 账号备注名作为独立纵栏项，与「账号视图隔离」的模型同构，也免去账号子筛选行；账号连接异常在对应项上标注。</li>
+          <li>徽标降噪：各范围只用<strong>小圆点</strong>表示存在个人未读（静音不计、客户共享队列不计，具体数字在列表项上）；唯一的数字徽标是「客户」的琥珀色<strong>排队数</strong>——这是需要行动的队列信号，跨范围可见。</li>
+          <li>「仅未读」开关固定在纵栏底部，与范围正交、跨范围保持，激活时空列表提示「没有未读会话」。</li>
+          <li>渐进显示：只有「全部」一个范围时不渲染纵栏和收纳按钮，中栏保持 296px。</li>
+        </ul>
+        <p><strong>客户范围</strong>额外出现队列子筛选：<strong>排队 n / 我负责 / AI 接待 / 同事 / 已关闭</strong>——按「这条会话现在归谁」做互斥且穷尽的划分，与 ServiceSession 的「批次状态 + 负责人」严格同构（排队 = 未分配的等待批次；我负责 / AI / 同事 = 未结束批次的负责人；已关闭 = 最新批次已结束）。分段控件只平铺<strong>高频三段</strong>（排队 / 我负责 / AI 接待），低频的「同事」「已关闭」收进行尾的<strong>「更多」下拉</strong>——它们是巡查与回溯入口，不是日常工作台；选中后「更多」位置显示所选项名并保持选中态，保证状态可见。这也让分段在 296px 列表宽下（含英文文案）不换行：</p>
+        <ul>
+          <li><strong>默认落点是「我负责」</strong>：客服进来第一眼是自己的工作台；排队压力由琥珀数字（分段与纵栏徽标）常驻提醒，需要领取时一步可达。</li>
+          <li>「排队」按等待时长升序、时间列显示「已等待 x 分钟」（琥珀色）；点击排队会话进入领取动线（主区顶部出现「领取」，领取命令属于后续 PR）。</li>
+          <li>「AI 接待」列出 Agent 正在自动处理的会话，供巡查与随时人工接管；不产生个人未读，也不进入「全部」。AI 升级转人工时流转到「排队」并计入队列数字。</li>
+          <li>「同事」列出其他成员负责中的会话，列表项标注负责人；首期按企业边界全员可见，引入团队权限后再收敛可见范围，界面结构不变。不产生任何提醒。</li>
+          <li>「已关闭」是归档检索视图，按最后消息时间倒序、懒加载分页；客户在已关闭会话上再次发消息时，同一 Conversation 开新批次并自动流回「排队」，无需手动重开。</li>
+          <li>信号语义：只有「我负责」的新消息计入个人未读（纵栏圆点的来源）；「排队」用琥珀数字；AI 接待、同事、已关闭不产生提醒。</li>
+          <li>不设「全部」子项：五段划分已穷尽，跨状态找历史会话由搜索承接（搜索继承客户范围）。</li>
+        </ul>
+        <p><strong>子筛选只用于「状态与责任」维度，不用于会话形态</strong>：内部、伙伴和账号范围是个人收件箱，没有队列语义，不设「单聊/群聊」这类形态子筛选——列表、角标和搜索已经足够。将来某范围出现真实的状态维度（如伙伴按企业筛选）再按同一模式补充。</p>
+      </section>
+
+      <section>
+        <h2><span class="no">5</span>列表项解构</h2>
+        <table>
+          <tr><th style="width:96px">元素</th><th>规则</th></tr>
+          <tr><td>头像 + 角标</td><td>36px 圆形首字头像。右下 16px 来源角标表达<strong>平台/来源</strong>：网站（蓝·地球）、微信（绿）、Telegram（青·纸飞机）、联邦（紫·建筑）、外部协作（琥珀·人）、AI 员工（灰·机器人）。<strong>内部会话不加角标</strong>，保证最高频场景最干净；单聊在线状态沿用右下绿点（与角标互斥，取角标优先）。</td></tr>
+          <tr><td>第一行</td><td>名称（截断）＋条件标签＋静音图标＋右侧时间。标签只有两种：群聊含外部参与者时的持续「外部」标（琥珀描边，对应路线图第 11 章要求）；联邦会话显示对方企业名（紫描边）。</td></tr>
+          <tr><td>第二行</td><td>预览（截断）＋右侧未读徽章。群聊预览带发送者前缀「李雷：」；草稿显示红色「[草稿]」并保持原时间排序；被 @ 显示蓝色「[@我]」前缀；同事负责的客户会话显示负责人小标。</td></tr>
+          <tr><td>账号标识</td><td>第三方账号会话在预览前显示灰底小标「TG·销售号」，明确<strong>收发账号</strong>（角标只表达平台，账号标才是发送路由身份）。同一自然人多账号绝不合并。</td></tr>
+          <tr><td>未读徽章</td><td>常规为品牌蓝圆徽；静音会话降级为灰徽，且不计入范围圆点和一级轨角标。99+ 封顶。</td></tr>
+          <tr><td>置顶</td><td>置顶会话排最前，第二行行尾显示图钉小图标，不设分组标题。置顶/静音/归档是个人视图状态（<code>conversation_user_states</code>），通过列表项右键或长按菜单操作。</td></tr>
+        </table>
+      </section>
+
+      <section>
+        <h2><span class="no">6</span>排序规则</h2>
+        <ol>
+          <li>置顶组按 <code>last_message_at</code> 倒序在最前。</li>
+          <li>其余按 <code>last_message_at</code> 倒序；预览跳过已删除消息（沿用路线图 5.3 的水位语义）。</li>
+          <li>例外一：客户范围的「排队」按等待时长升序（最久未接待在最上），这是队列公平性要求。</li>
+          <li>例外二：「已关闭」按最后消息时间倒序懒加载，是归档检索视图。</li>
+        </ol>
+      </section>
+
+      <section>
+        <h2><span class="no">7</span>搜索模式</h2>
+        <p>聚焦搜索框后，筛选行和列表被搜索态整体替换（同栏内切换，不弹独立浮层）：</p>
+        <ul>
+          <li><strong>范围继承</strong>：第一行显示范围 chips——当前范围（如「客户」「TG·销售号」）+「全部消息」。进入时默认选中当前浏览范围，一次点击即切全局，实现「既可全局也可限定范围」。当前范围为「全部」时只显示「全部消息」。</li>
+          <li><strong>类型过滤</strong>：分隔线后是类型 chips「会话 / 消息 / 联系人」，默认全选中（分组展示），点击可只看某一类。</li>
+          <li><strong>空查询</strong>：显示「最近打开」列表，兼作快速切换器（⌘K 的主要用途）。</li>
+          <li><strong>结果分组</strong>：会话（按名称匹配）、消息（全文匹配，显示所在会话 + 高亮片段 + 时间，点击跳到消息上下文）、联系人与成员（可直接发起会话）。每组最多 5 条 + 「查看全部」。</li>
+          <li><strong>键盘</strong>：↑↓ 跨组移动，Enter 打开，Esc 退出并还原浏览态；底部固定快捷键提示条。</li>
+          <li>会话内搜索不在此处，放在会话主区页头（范围天然是当前会话），两个入口不混用。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2><span class="no">8</span>能力与阶段映射</h2>
+        <table>
+          <tr><th>界面元素</th><th>出现条件（对应 chat-roadmap）</th></tr>
+          <tr><td>搜索 + 会话列表</td><td>已具备（阶段 1A 已交付访客侧，成员收件箱在 13.5 后续交付）</td></tr>
+          <tr><td>加号（单聊/群聊）</td><td>阶段 2A / 2B</td></tr>
+          <tr><td>「客户」范围 + 队列子筛选（排队/我负责/同事/已关闭）</td><td>成员收件箱与 ServiceSession 处理 PR；此前列表只有客户会话，无需纵栏</td></tr>
+          <tr><td>「AI 接待」子筛选</td><td>阶段 2D 网站 AI 客服上线后</td></tr>
+          <tr><td>「内部」范围</td><td>阶段 2A 出现内部会话后，与「客户」同时出现（纵栏与收纳按钮此时启用）</td></tr>
+          <tr><td>未读徽章 / 仅未读 / @我前缀</td><td>阶段 2B（已读事实）与 2E（未读同步）</td></tr>
+          <tr><td>绑定账号纵栏项 + 账号小标</td><td>阶段 3，且当前用户至少绑定一个账号</td></tr>
+          <tr><td>「伙伴」范围 + 「外部」标签</td><td>阶段 4 受管协作；阶段 6 联邦会话并入同一范围，以企业名标签区分</td></tr>
+        </table>
+        <div class="hint">实现顺序建议：先落地「顶部搜索 + 加号 + 统一列表」骨架和列表项解构（角标、双行、未读），范围纵栏在出现第二个范围（客户 + 内部并存）时启用，以「全部/客户/内部」三项起步；搜索先做会话名过滤，消息全文与联系人分组随搜索后端能力补齐，界面结构不变。</div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==================== 语言 ==================== */
+let lang = "zh";
+
+/* 界面文案字典：原型内联即可，正式实现进 i18n 资源。 */
+const T = {
+  zh: {
+    "nav.messages": "消息", "nav.contacts": "通讯录", "nav.kb": "知识库", "nav.integrations": "集成",
+    "search.placeholder": "搜索", "search.title": "搜索（Ctrl/⌘+K）", "search.aria": "搜索消息", "search.clear": "退出搜索",
+    "btn.new": "发起会话", "btn.collapse": "收起范围栏", "btn.expand": "展开范围栏",
+    "menu.direct": "发起单聊", "menu.group": "创建群聊", "menu.invite": "邀请外部协作", "menu.soon": "即将推出",
+    "scope.all": "全部", "scope.customer": "客户", "scope.internal": "内部", "scope.partner": "伙伴",
+    "rail.aria": "消息范围", "rail.unread": "未读", "rail.unreadTitle": "仅显示未读",
+    "seg.queue": "排队", "seg.mine": "我负责", "seg.ai": "AI 接待", "seg.colleague": "同事", "seg.closed": "已关闭", "seg.more": "更多",
+    "tag.external": "外部",
+    "empty.scope": "此范围暂无会话", "empty.unread": "没有未读会话",
+    "prefix.draft": "[草稿] ", "prefix.mention": "[@我] ",
+    "sr.allMessages": "全部消息", "sr.typeAll": "全部", "sr.typeConv": "会话", "sr.typeMsg": "消息", "sr.typeContact": "联系人",
+    "sr.recent": "最近打开", "sr.groupConv": "会话", "sr.groupMsg": "消息", "sr.groupContact": "联系人与成员",
+    "sr.viewAll": "在消息中查看全部结果", "sr.noResults": "没有与“{q}”匹配的结果",
+    "sr.select": "选择", "sr.open": "打开", "sr.exit": "退出",
+    "main.group": "群聊", "main.direct": "单聊", "main.customer": "客户会话",
+    "main.body": "会话主区（不属于本原型设计范围）",
+    "lang.toggle": "English",
+  },
+  en: {
+    "nav.messages": "Messages", "nav.contacts": "Contacts", "nav.kb": "Knowledge", "nav.integrations": "Integrations",
+    "search.placeholder": "Search", "search.title": "Search (Ctrl/⌘+K)", "search.aria": "Search messages", "search.clear": "Exit search",
+    "btn.new": "New chat", "btn.collapse": "Collapse filter rail", "btn.expand": "Expand filter rail",
+    "menu.direct": "New direct message", "menu.group": "New group chat", "menu.invite": "Invite external partner", "menu.soon": "Coming soon",
+    "scope.all": "All", "scope.customer": "Clients", "scope.internal": "Internal", "scope.partner": "Partners",
+    "rail.aria": "Message scopes", "rail.unread": "Unread", "rail.unreadTitle": "Show unread only",
+    "seg.queue": "Queue", "seg.mine": "Mine", "seg.ai": "AI", "seg.colleague": "Teammates", "seg.closed": "Closed", "seg.more": "More",
+    "tag.external": "External",
+    "empty.scope": "No conversations in this scope", "empty.unread": "No unread conversations",
+    "prefix.draft": "[Draft] ", "prefix.mention": "[@me] ",
+    "sr.allMessages": "All messages", "sr.typeAll": "All", "sr.typeConv": "Chats", "sr.typeMsg": "Messages", "sr.typeContact": "People",
+    "sr.recent": "Recent", "sr.groupConv": "Chats", "sr.groupMsg": "Messages", "sr.groupContact": "People",
+    "sr.viewAll": "View all message results", "sr.noResults": "No results for \u201C{q}\u201D",
+    "sr.select": "Select", "sr.open": "Open", "sr.exit": "Exit",
+    "main.group": "Group chat", "main.direct": "Direct message", "main.customer": "Customer conversation",
+    "main.body": "Conversation area (out of scope for this prototype)",
+    "lang.toggle": "中文",
+  },
+};
+
+function t(key) { return T[lang][key] ?? key; }
+/* 取本地化字段：对象按当前语言取值，字符串原样返回。 */
+function L(v) { return v && typeof v === "object" ? v[lang] : v; }
+
+/* ==================== 示例数据 ==================== */
+const conversations = [
+  { id: "c1", name: { zh: "产品研发组", en: "Product Team" }, initials: { zh: "研", en: "PT" }, type: "group", source: "internal",
+    preview: { zh: "王芳：新版本的搜索接口下周联调", en: "Wang Fang: search API joint testing next week" },
+    mentionMe: true, time: "10:24", unread: 3, pinned: true },
+  { id: "c2", name: { zh: "张明", en: "Zhang Ming" }, initials: { zh: "张", en: "ZM" }, type: "direct", source: "internal", online: true,
+    preview: { zh: "好的，方案我下午看完给你回复", en: "OK, I'll review the plan this afternoon" }, time: "09:58", unread: 0, pinned: true },
+  { id: "c14", name: { zh: "网站访客 #4903", en: "Web visitor #4903" }, initials: { zh: "访", en: "W" }, type: "customer", source: "customer", channel: "website",
+    preview: { zh: "AI：已发送部署文档链接", en: "AI: deployment docs link sent" }, time: "10:33", unread: 0, serviceStatus: "ai" },
+  { id: "c3", name: { zh: "网站访客 #4821", en: "Web visitor #4821" }, initials: { zh: "访", en: "W" }, type: "customer", source: "customer", channel: "website",
+    preview: { zh: "你们的私有化部署支持 ARM 吗？", en: "Does self-hosting support ARM?" },
+    time: { zh: "已等待 4 分钟", en: "Waiting 4 min" }, waiting: true, unread: 2, serviceStatus: "waiting" },
+  { id: "c4", name: { zh: "李婷", en: "Li Ting" }, initials: { zh: "李", en: "LT" }, type: "customer", source: "customer", channel: "wechat", mine: true,
+    preview: { zh: "请问发票可以开专票吗", en: "Can I get a VAT invoice?" }, time: "10:31", unread: 1, serviceStatus: "mine" },
+  { id: "c16", name: { zh: "网站访客 #4788", en: "Web visitor #4788" }, initials: { zh: "访", en: "W" }, type: "customer", source: "customer", channel: "website",
+    owner: { zh: "李雷", en: "Li Lei" },
+    preview: { zh: "好的，我再试一次", en: "OK, let me try again" }, time: "10:18", unread: 0, serviceStatus: "colleague" },
+  { id: "c5", name: { zh: "蓝湖科技 · 刘强", en: "Bluelake · Liu Qiang" }, initials: { zh: "刘", en: "LQ" }, type: "direct", source: "federation",
+    orgTag: { zh: "蓝湖科技", en: "Bluelake" },
+    preview: { zh: "对账单我这边确认过了", en: "Statement confirmed on my side" }, time: "10:02", unread: 1 },
+  { id: "c6", name: { zh: "老客户-陈总", en: "Mr. Chen (client)" }, initials: { zh: "陈", en: "C" }, type: "direct", source: "account", channel: "telegram", account: "tg-sales",
+    preview: { zh: "下季度的合作可以再聊聊", en: "Let's discuss next quarter's deal" }, time: "09:47", unread: 2 },
+  { id: "c7", name: { zh: "供应商-华宇物流", en: "Huayu Logistics" }, initials: { zh: "华", en: "HL" }, type: "group", source: "guest", externalMembers: true,
+    preview: { zh: "赵倩：本周五前完成入库", en: "Zhao Qian: inbound done by Friday" }, time: "09:30", unread: 0 },
+  { id: "c8", name: { zh: "市场部周会", en: "Marketing Weekly" }, initials: { zh: "市", en: "MW" }, type: "group", source: "internal", muted: true,
+    preview: { zh: "孙磊：会议纪要已上传知识库", en: "Sun Lei: minutes uploaded to KB" }, time: "09:12", unread: 12 },
+  { id: "c15", name: { zh: "Telegram 咨询 · Anna", en: "Telegram · Anna" }, initials: "A", type: "customer", source: "customer", channel: "telegram",
+    preview: { zh: "AI：Pricing page link sent", en: "AI: pricing page link sent" }, time: "09:26", unread: 0, serviceStatus: "ai" },
+  { id: "c9", name: "Ivan Petrov", initials: "IP", type: "customer", source: "customer", channel: "telegram",
+    preview: "Is there an English version?", time: { zh: "已等待 18 分钟", en: "Waiting 18 min" }, waiting: true, unread: 1, serviceStatus: "waiting" },
+  { id: "c10", name: { zh: "AI 客服助手", en: "AI Support Agent" }, initials: "AI", type: "direct", source: "internal", agent: true,
+    preview: { zh: "已生成本周客服会话摘要", en: "Weekly support summary generated" }, time: { zh: "昨天", en: "Yesterday" }, unread: 0 },
+  { id: "c11", name: { zh: "王芳", en: "Wang Fang" }, initials: { zh: "王", en: "WF" }, type: "direct", source: "internal",
+    preview: { zh: "好的，我明天上午把合同发给你", en: "I'll send the contract tomorrow morning" }, draft: true, time: { zh: "昨天", en: "Yesterday" }, unread: 0 },
+  { id: "c12", name: "Design Community", initials: "DC", type: "group", source: "account", channel: "telegram", account: "tg-personal", muted: true,
+    preview: "Anna: new icon set released", time: { zh: "昨天", en: "Yesterday" }, unread: 45 },
+  { id: "c13", name: { zh: "周凯", en: "Zhou Kai" }, initials: { zh: "周", en: "ZK" }, type: "customer", source: "customer", channel: "website", mine: true,
+    preview: { zh: "感谢，问题已经解决了", en: "Thanks, issue resolved" }, time: { zh: "周一", en: "Mon" }, unread: 0, serviceStatus: "closed" },
+  { id: "c17", name: { zh: "微信客户 · 赵女士", en: "WeChat · Ms. Zhao" }, initials: { zh: "赵", en: "Z" }, type: "customer", source: "customer", channel: "wechat",
+    preview: { zh: "问题解决了，谢谢", en: "Solved, thank you" }, time: { zh: "上周", en: "Last week" }, unread: 0, serviceStatus: "closed" },
+];
+
+const sampleMessages = [
+  { conv: { zh: "产品研发组", en: "Product Team" }, initials: { zh: "研", en: "PT" },
+    text: { zh: "新版本的搜索接口下周联调", en: "Search API joint testing next week" }, time: "10:24" },
+  { conv: { zh: "李婷", en: "Li Ting" }, initials: { zh: "李", en: "LT" },
+    text: { zh: "请问发票可以开专票吗", en: "Can I get a VAT invoice?" }, time: "10:31" },
+  { conv: { zh: "供应商-华宇物流", en: "Huayu Logistics" }, initials: { zh: "华", en: "HL" },
+    text: { zh: "搜索无结果的问题已经修复", en: "The empty search result bug is fixed" }, time: { zh: "周二", en: "Tue" } },
+  { conv: { zh: "张明", en: "Zhang Ming" }, initials: { zh: "张", en: "ZM" },
+    text: { zh: "发票抬头我发你邮箱了", en: "Invoice title sent to your email" }, time: { zh: "周一", en: "Mon" } },
+];
+
+const sampleContacts = [
+  { name: { zh: "张明", en: "Zhang Ming" }, initials: { zh: "张", en: "ZM" }, desc: { zh: "产品部 · 员工", en: "Product · Member" } },
+  { name: { zh: "王芳", en: "Wang Fang" }, initials: { zh: "王", en: "WF" }, desc: { zh: "研发部 · 员工", en: "Engineering · Member" } },
+  { name: { zh: "AI 客服助手", en: "AI Support Agent" }, initials: "AI", desc: { zh: "AI 员工", en: "AI teammate" } },
+  { name: { zh: "陈总", en: "Mr. Chen" }, initials: { zh: "陈", en: "C" }, desc: { zh: "外部联系人 · Telegram", en: "External contact · Telegram" } },
+];
+
+/* 范围统一用「我在和谁说话」维度命名；受管协作与联邦合并为「伙伴」，列表项标签区分。 */
+const scopes = ["all", "customer", "internal", "partner"];
+
+/* 绑定的外部账号直接成为纵栏项，不设统一「外部账号」分类。 */
+const boundAccounts = [
+  { id: "tg-sales", label: { zh: "TG·销售号", en: "TG·Sales" }, short: { zh: "销售号", en: "Sales" } },
+  { id: "tg-personal", label: { zh: "TG·个人号", en: "TG·Personal" }, short: { zh: "个人号", en: "Personal" } },
+];
+
+function accountLabel(id) {
+  const a = boundAccounts.find(x => x.id === id);
+  return a ? L(a.label) : id;
+}
+
+/* ==================== 状态 ==================== */
+const state = {
+  scope: "all",           // all | customer | internal | partner | account
+  railCollapsed: false,
+  unreadOnly: false,
+  csFilter: "mine",       // queue | mine | ai | colleague | closed
+  account: null,          // scope = account 时的具体绑定账号 id
+  selectedId: "c1",
+  searching: false,
+  query: "",
+  searchScope: "current", // current | global
+  searchType: "all",      // all | conv | msg | contact
+};
+
+const pane = document.getElementById("pane");
+const browseView = document.getElementById("browseView");
+const searchView = document.getElementById("searchView");
+const searchInput = document.getElementById("searchInput");
+
+/* ==================== 图标 ==================== */
+const icons = {
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/></svg>',
+  building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  bot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M9 13v2"/><path d="M15 13v2"/></svg>',
+  bellOff: '<svg class="mute-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H4c3 0 3-9 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></svg>',
+  pin: '<svg class="pin-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>',
+  filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46"/></svg>',
+  caret: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+};
+
+const badgeIcon = { website: icons.globe, wechat: icons.chat, telegram: icons.send, federation: icons.building, guest: icons.user, agent: icons.bot };
+
+function srcBadge(conv) {
+  if (conv.agent) return `<span class="src-badge agent">${icons.bot}</span>`;
+  if (conv.source === "customer" || conv.source === "account") {
+    return `<span class="src-badge ${conv.channel}">${badgeIcon[conv.channel]}</span>`;
+  }
+  if (conv.source === "federation") return `<span class="src-badge federation">${icons.building}</span>`;
+  if (conv.source === "guest") return `<span class="src-badge guest">${icons.user}</span>`;
+  return conv.online ? '<span class="online-dot"></span>' : "";
+}
+
+function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+/* ==================== 浏览态渲染 ==================== */
+/* 个人未读：静音不计；客户会话只有「我负责」计入个人未读，共享队列不算。 */
+function isPersonalUnread(c) {
+  return !c.muted && c.unread > 0 && (c.source !== "customer" || c.mine);
+}
+
+/* 判断会话是否命中某个范围；账号范围额外用具体账号匹配。 */
+function matchesScope(c, key, account) {
+  if (key === "all") return c.source !== "customer" || c.mine;
+  if (key === "partner") return c.source === "guest" || c.source === "federation";
+  if (key === "account") return c.account === account;
+  return c.source === key;
+}
+
+function scopeHasPersonalUnread(key, account) {
+  return conversations.some(c => isPersonalUnread(c) && matchesScope(c, key, account));
+}
+
+function scopeLabel() {
+  if (state.scope === "account") return accountLabel(state.account);
+  return t("scope." + state.scope);
+}
+
+/* 客户子筛选与 ServiceSession 状态的映射。 */
+function matchesCsFilter(c) {
+  if (state.csFilter === "queue") return c.serviceStatus === "waiting";
+  return c.serviceStatus === state.csFilter;
+}
+
+function visibleConversations() {
+  /* 「全部」= 与我相关：客户会话只保留我负责的，排队和 AI 接待属于共享队列，仅在「客户」范围可见。 */
+  let list = conversations.filter(c => matchesScope(c, state.scope, state.account));
+  if (state.scope === "customer") {
+    list = list.filter(matchesCsFilter);
+  }
+  if (state.unreadOnly) list = list.filter(c => c.unread > 0);
+  const pinned = list.filter(c => c.pinned);
+  const rest = list.filter(c => !c.pinned);
+  return [...pinned, ...rest];
+}
+
+/* 范围纵栏的图标。 */
+const scopeRailIcons = {
+  all: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>',
+  customer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Z"/><path d="M21 14h-3a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-5Z"/><path d="M3 14v-3a9 9 0 0 1 18 0v3"/></svg>',
+  internal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  partner: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/></svg>',
+  account: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/></svg>',
+};
+
+/* 渲染范围纵栏：范围项 + 绑定账号项；未读用圆点示意，客户队列保留琥珀数字；底部为「仅未读」开关。 */
+function railHtml() {
+  const waitingCount = conversations.filter(c => c.serviceStatus === "waiting").length;
+  const scopeItems = scopes.map(key => {
+    let badge = "";
+    if (key === "customer" && waitingCount > 0) {
+      badge = `<span class="badge queue">${waitingCount}</span>`;
+    } else if (scopeHasPersonalUnread(key)) {
+      badge = '<span class="dot"></span>';
+    }
+    const label = t("scope." + key);
+    return `
+    <button class="rail-scope ${state.scope === key ? "active" : ""}" data-scope="${key}" title="${label}">
+      ${scopeRailIcons[key]}<span class="lbl">${label}</span>${badge}
+    </button>`;
+  }).join("");
+  const accountItems = boundAccounts.map(a => {
+    const active = state.scope === "account" && state.account === a.id;
+    const badge = scopeHasPersonalUnread("account", a.id) ? '<span class="dot"></span>' : "";
+    return `
+    <button class="rail-scope ${active ? "active" : ""}" data-scope="account" data-acct="${a.id}" title="${L(a.label)}">
+      ${scopeRailIcons.account}<span class="lbl">${L(a.short)}</span>${badge}
+    </button>`;
+  }).join("");
+  return `<nav class="scope-rail" aria-label="${t("rail.aria")}">
+    ${scopeItems}
+    ${accountItems}
+    <button class="rail-scope unread-rail ${state.unreadOnly ? "active" : ""}" id="unreadToggle" title="${t("rail.unreadTitle")}" aria-pressed="${state.unreadOnly}">
+      ${icons.filter}<span class="lbl">${t("rail.unread")}</span>
+    </button>
+  </nav>`;
+}
+
+function renderBrowse() {
+  const waitingCount = conversations.filter(c => c.serviceStatus === "waiting").length;
+
+  /* 客户队列子筛选：高频三段（排队/我负责/AI 接待）平铺，低频的同事与已关闭收进「更多」下拉。 */
+  let subRow = "";
+  if (state.scope === "customer") {
+    const moreActive = state.csFilter === "colleague" || state.csFilter === "closed";
+    const mainSegs = [
+      ["queue", `${t("seg.queue")}<span class="cnt">${waitingCount}</span>`],
+      ["mine", t("seg.mine")],
+      ["ai", t("seg.ai")],
+    ].map(([k, label]) =>
+      `<button data-cs="${k}" class="${state.csFilter === k ? "active" : ""}">${label}</button>`).join("");
+    const moreLabel = moreActive ? t("seg." + state.csFilter) : t("seg.more");
+    subRow = `<div class="sub-row">
+      <div class="seg">
+        ${mainSegs}
+        <button id="csMoreBtn" class="${moreActive ? "active" : ""}" aria-haspopup="menu" aria-expanded="false">${moreLabel}${icons.caret}</button>
+      </div>
+      <div class="cs-menu" id="csMenu" role="menu">
+        <button data-cs="colleague" role="menuitem" class="${state.csFilter === "colleague" ? "active" : ""}">${t("seg.colleague")}</button>
+        <button data-cs="closed" role="menuitem" class="${state.csFilter === "closed" ? "active" : ""}">${t("seg.closed")}</button>
+      </div>
+    </div>`;
+  }
+
+  const list = visibleConversations();
+  const items = list.length === 0
+    ? `<div class="list-empty">${state.unreadOnly ? t("empty.unread") : t("empty.scope")}</div>`
+    : list.map(c => {
+        const tags = [
+          c.externalMembers ? `<span class="tag ext">${t("tag.external")}</span>` : "",
+          c.orgTag ? `<span class="tag fed">${esc(L(c.orgTag))}</span>` : "",
+          c.muted ? icons.bellOff : "",
+        ].join("");
+        let previewPrefix = "";
+        if (c.draft) previewPrefix = `<span class="draft">${t("prefix.draft")}</span>`;
+        else if (c.mentionMe) previewPrefix = `<span class="mention">${t("prefix.mention")}</span>`;
+        const trailing = c.unread > 0
+          ? `<span class="unread ${c.muted ? "muted-unread" : ""}">${c.unread > 99 ? "99+" : c.unread}</span>`
+          : (c.pinned ? icons.pin : "");
+        /* 第二行小标：第三方账号显示收发账号；同事负责的客户会话显示负责人。 */
+        let miniTag = "";
+        if (c.account) miniTag = `<span class="acct-mini">${esc(accountLabel(c.account))}</span>`;
+        else if (c.owner && state.scope === "customer") miniTag = `<span class="acct-mini">${esc(L(c.owner))}</span>`;
+        return `
+        <button class="conv-item ${state.selectedId === c.id ? "selected" : ""}" data-id="${c.id}">
+          <span class="avatar-wrap"><span class="avatar">${L(c.initials)}</span>${srcBadge(c)}</span>
+          <span class="conv-body">
+            <span class="conv-line1">
+              <span class="conv-name">${esc(L(c.name))}</span>${tags}
+              <span class="time ${c.waiting ? "waiting" : ""}">${L(c.time)}</span>
+            </span>
+            <span class="conv-line2">
+              ${miniTag}
+              <span class="preview">${previewPrefix}${esc(L(c.preview))}</span>
+              ${trailing}
+            </span>
+          </span>
+        </button>`;
+      }).join("");
+
+  browseView.innerHTML = `
+    <div class="pane-body">
+      ${state.railCollapsed ? "" : railHtml()}
+      <div class="pane-list-col">
+        ${subRow}
+        <div class="conv-scroll">${items}</div>
+      </div>
+    </div>`;
+
+  pane.classList.toggle("rail-collapsed", state.railCollapsed);
+  updateRailToggle();
+
+  browseView.querySelectorAll(".rail-scope[data-scope]").forEach(b =>
+    b.addEventListener("click", () => {
+      state.scope = b.dataset.scope;
+      state.account = b.dataset.acct ?? null;
+      renderBrowse();
+    }));
+  browseView.querySelectorAll("[data-cs]").forEach(b =>
+    b.addEventListener("click", () => { state.csFilter = b.dataset.cs; renderBrowse(); }));
+  const csMoreBtn = browseView.querySelector("#csMoreBtn");
+  const csMenu = browseView.querySelector("#csMenu");
+  if (csMoreBtn) {
+    csMoreBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      const open = csMenu.classList.toggle("open");
+      csMoreBtn.setAttribute("aria-expanded", String(open));
+      if (open) csMenu.style.left = `${csMoreBtn.offsetLeft}px`;
+    });
+  }
+  browseView.querySelector("#unreadToggle")?.addEventListener("click", () => {
+    state.unreadOnly = !state.unreadOnly; renderBrowse();
+  });
+  browseView.querySelectorAll(".conv-item").forEach(b =>
+    b.addEventListener("click", () => { selectConversation(b.dataset.id); }));
+}
+
+/* 同步收纳按钮状态：收起且当前范围之外存在个人未读或排队等待时显示圆点。 */
+function updateRailToggle() {
+  const toggle = document.getElementById("railToggle");
+  const dot = document.getElementById("railToggleDot");
+  toggle.setAttribute("aria-pressed", String(state.railCollapsed));
+  const label = state.railCollapsed ? t("btn.expand") : t("btn.collapse");
+  toggle.setAttribute("aria-label", label);
+  toggle.title = label;
+  const waitingCount = conversations.filter(c => c.serviceStatus === "waiting").length;
+  const hiddenSignal =
+    state.railCollapsed &&
+    (waitingCount > 0 ||
+      conversations.some(c => isPersonalUnread(c) && !matchesScope(c, state.scope, state.account)));
+  dot.style.display = hiddenSignal ? "" : "none";
+}
+
+function selectConversation(id) {
+  state.selectedId = id;
+  const c = conversations.find(x => x.id === id);
+  if (c) {
+    document.getElementById("mainAvatar").textContent = L(c.initials);
+    document.getElementById("mainName").textContent = L(c.name);
+    document.getElementById("mainSub").textContent =
+      c.type === "group" ? t("main.group") : c.type === "customer" ? t("main.customer") : t("main.direct");
+  }
+  renderBrowse();
+}
+
+/* ==================== 搜索态渲染 ==================== */
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return esc(text);
+  return esc(text.slice(0, i)) + "<mark>" + esc(text.slice(i, i + q.length)) + "</mark>" + esc(text.slice(i + q.length));
+}
+
+function renderSearch() {
+  const q = state.query.trim();
+  const scopeChips = state.scope === "all"
+    ? `<button class="chip active">${t("sr.allMessages")}</button>`
+    : `<button class="chip ${state.searchScope === "current" ? "active" : ""}" data-sscope="current">${esc(scopeLabel())}</button>
+       <button class="chip ${state.searchScope === "global" ? "active" : ""}" data-sscope="global">${t("sr.allMessages")}</button>`;
+  const typeChips = [["all", t("sr.typeAll")], ["conv", t("sr.typeConv")], ["msg", t("sr.typeMsg")], ["contact", t("sr.typeContact")]].map(([k, l]) =>
+    `<button class="chip ${state.searchType === k ? "active" : ""}" data-stype="${k}">${l}</button>`).join("");
+
+  let body = "";
+  if (!q) {
+    const recent = conversations.slice(0, 5);
+    body = `<div class="result-group-title">${t("sr.recent")}</div>` + recent.map(c => `
+      <button class="result-item" data-open="${c.id}">
+        <span class="avatar-wrap"><span class="avatar">${L(c.initials)}</span></span>
+        <span class="result-body"><span class="result-name">${esc(L(c.name))}</span></span>
+        <span class="result-time">${L(c.time)}</span>
+      </button>`).join("");
+  } else {
+    const ql = q.toLowerCase();
+    const inScope = c =>
+      state.scope === "all" ||
+      state.searchScope === "global" ||
+      matchesScope(c, state.scope, state.account);
+    const convHits = conversations.filter(c => inScope(c) && L(c.name).toLowerCase().includes(ql)).slice(0, 5);
+    const msgHits = sampleMessages.filter(m => L(m.text).toLowerCase().includes(ql) || L(m.conv).toLowerCase().includes(ql)).slice(0, 5);
+    const contactHits = sampleContacts.filter(p => L(p.name).toLowerCase().includes(ql)).slice(0, 5);
+    const groups = [];
+    if ((state.searchType === "all" || state.searchType === "conv") && convHits.length) {
+      groups.push(`<div class="result-group-title">${t("sr.groupConv")}</div>` + convHits.map(c => `
+        <button class="result-item" data-open="${c.id}">
+          <span class="avatar-wrap"><span class="avatar">${L(c.initials)}</span>${srcBadge(c)}</span>
+          <span class="result-body">
+            <span class="result-name">${highlight(L(c.name), q)}</span>
+            <span class="result-sub">${esc(L(c.preview))}</span>
+          </span>
+          <span class="result-time">${L(c.time)}</span>
+        </button>`).join(""));
+    }
+    if ((state.searchType === "all" || state.searchType === "msg") && msgHits.length) {
+      groups.push(`<div class="result-group-title">${t("sr.groupMsg")}</div>` + msgHits.map(m => `
+        <button class="result-item">
+          <span class="avatar-wrap"><span class="avatar">${L(m.initials)}</span></span>
+          <span class="result-body">
+            <span class="result-name">${esc(L(m.conv))}</span>
+            <span class="result-sub">${highlight(L(m.text), q)}</span>
+          </span>
+          <span class="result-time">${L(m.time)}</span>
+        </button>`).join("") +
+        `<button class="result-more">${t("sr.viewAll")}</button>`);
+    }
+    if ((state.searchType === "all" || state.searchType === "contact") && contactHits.length) {
+      groups.push(`<div class="result-group-title">${t("sr.groupContact")}</div>` + contactHits.map(p => `
+        <button class="result-item">
+          <span class="avatar-wrap"><span class="avatar">${L(p.initials)}</span></span>
+          <span class="result-body">
+            <span class="result-name">${highlight(L(p.name), q)}</span>
+            <span class="result-sub">${esc(L(p.desc))}</span>
+          </span>
+        </button>`).join(""));
+    }
+    body = groups.length ? groups.join("") : `<div class="search-empty">${t("sr.noResults").replace("{q}", esc(q))}</div>`;
+  }
+
+  searchView.innerHTML = `
+    <div class="search-scope-row">
+      ${scopeChips}
+      <span class="divider"></span>
+      ${typeChips}
+    </div>
+    <div class="result-scroll">${body}</div>
+    <div class="search-foot"><span><kbd>↑</kbd><kbd>↓</kbd> ${t("sr.select")}</span><span><kbd>Enter</kbd> ${t("sr.open")}</span><span><kbd>Esc</kbd> ${t("sr.exit")}</span></div>`;
+
+  searchView.querySelectorAll("[data-sscope]").forEach(b =>
+    b.addEventListener("click", () => { state.searchScope = b.dataset.sscope; renderSearch(); searchInput.focus(); }));
+  searchView.querySelectorAll("[data-stype]").forEach(b =>
+    b.addEventListener("click", () => { state.searchType = b.dataset.stype; renderSearch(); searchInput.focus(); }));
+  searchView.querySelectorAll("[data-open]").forEach(b =>
+    b.addEventListener("click", () => { exitSearch(); selectConversation(b.dataset.open); }));
+}
+
+/* ==================== 搜索模式切换 ==================== */
+function enterSearch() {
+  if (state.searching) return;
+  state.searching = true;
+  state.searchScope = "current";
+  state.searchType = "all";
+  pane.classList.add("searching");
+  browseView.style.display = "none";
+  searchView.style.display = "contents";
+  renderSearch();
+}
+
+function exitSearch() {
+  state.searching = false;
+  state.query = "";
+  searchInput.value = "";
+  searchInput.blur();
+  pane.classList.remove("searching");
+  searchView.style.display = "none";
+  browseView.style.display = "contents";
+  renderBrowse();
+}
+
+searchInput.addEventListener("focus", enterSearch);
+searchInput.addEventListener("input", () => { state.query = searchInput.value; renderSearch(); });
+document.getElementById("clearSearch").addEventListener("click", exitSearch);
+
+/* ==================== 纵栏收纳 ==================== */
+document.getElementById("railToggle").addEventListener("click", () => {
+  state.railCollapsed = !state.railCollapsed;
+  renderBrowse();
+});
+
+/* ==================== 加号菜单 ==================== */
+const newBtn = document.getElementById("newBtn");
+const newMenu = document.getElementById("newMenu");
+newBtn.addEventListener("click", e => {
+  e.stopPropagation();
+  const open = newMenu.classList.toggle("open");
+  newBtn.setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("click", e => {
+  if (!newMenu.contains(e.target) && e.target !== newBtn) {
+    newMenu.classList.remove("open");
+    newBtn.setAttribute("aria-expanded", "false");
+  }
+  const csMenu = document.getElementById("csMenu");
+  if (csMenu && csMenu.classList.contains("open") && !csMenu.contains(e.target)) {
+    csMenu.classList.remove("open");
+    document.getElementById("csMoreBtn")?.setAttribute("aria-expanded", "false");
+  }
+});
+
+/* ==================== 语言切换 ==================== */
+/* 应用静态文案：data-t 节点、输入框属性和顶部按钮提示。 */
+function applyLang() {
+  document.querySelectorAll("[data-t]").forEach(el => { el.textContent = t(el.dataset.t); });
+  searchInput.placeholder = t("search.placeholder");
+  searchInput.title = t("search.title");
+  searchInput.setAttribute("aria-label", t("search.aria"));
+  document.getElementById("clearSearch").setAttribute("aria-label", t("search.clear"));
+  newBtn.title = t("btn.new");
+  newBtn.setAttribute("aria-label", t("btn.new"));
+  document.getElementById("langToggle").textContent = t("lang.toggle");
+}
+
+document.getElementById("langToggle").addEventListener("click", () => {
+  lang = lang === "zh" ? "en" : "zh";
+  applyLang();
+  selectConversation(state.selectedId);
+  if (state.searching) renderSearch();
+});
+
+/* ==================== 键盘 ==================== */
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault(); searchInput.focus(); return;
+  }
+  if (e.key === "/" && document.activeElement !== searchInput) {
+    e.preventDefault(); searchInput.focus(); return;
+  }
+  if (e.key === "Escape" && state.searching) { exitSearch(); return; }
+  if (!state.searching && (e.key === "ArrowDown" || e.key === "ArrowUp") && document.activeElement === document.body) {
+    e.preventDefault();
+    const list = visibleConversations();
+    const i = list.findIndex(c => c.id === state.selectedId);
+    const next = e.key === "ArrowDown" ? Math.min(i + 1, list.length - 1) : Math.max(i - 1, 0);
+    if (list[next]) selectConversation(list[next].id);
+  }
+});
+
+applyLang();
+selectConversation(state.selectedId);
+</script>
+</body>
+</html>
