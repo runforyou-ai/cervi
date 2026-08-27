@@ -16,7 +16,7 @@ import { ModelProviderListPage } from "@/features/integrations/model-services/mo
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
 import { KnowledgeBaseIndexPage } from "@/features/knowledge-base/knowledge-base-index-page"
 import { KnowledgeBaseLayout } from "@/features/knowledge-base/knowledge-base-layout"
-import { RoleFormPage } from "@/features/settings/role-form-page"
+import { RoleFormPage } from "@/features/roles/role-form-page"
 import {
   PersonalSettingsPage,
   SystemSettingsPage,

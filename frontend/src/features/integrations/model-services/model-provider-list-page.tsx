@@ -1,5 +1,5 @@
 /** 模型服务供应商列表页。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -52,6 +52,8 @@ import {
   modelServiceSectionOrder,
   type ModelServiceSection,
 } from "@/features/integrations/model-services/model-service-options"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -108,47 +110,29 @@ export function ModelProviderListPage({
 }) {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
-  const [providers, setProviders] = useState<AIProviderSummaryData[]>([])
   const [deletingProvider, setDeletingProvider] =
     useState<AIProviderSummaryData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const loadVersion = useRef(0)
   const mounted = useRef(true)
   const sectionConfig = modelServiceSectionConfigs[section]
+  const { data, loading, refreshing, error, refresh } = useResource(
+    resourceKeys.aiProviders(),
+    () => listAIProviders(),
+  )
+  const invalidate = useResourceInvalidator()
+  const showLoading = loading || (Boolean(error) && refreshing)
+  const providers = data?.providers ?? []
   const visibleProviders = providers.filter(
     (provider) =>
       provider.models.some((model) => model.type === sectionConfig.modelType),
   )
 
-  /** 读取模型服务供应商列表。 */
-  const load = useCallback(async () => {
-    const version = ++loadVersion.current
-    setLoading(true)
-    setError(false)
-    try {
-      const output = await listAIProviders()
-      if (version !== loadVersion.current) return
-      setProviders(output.providers)
-    } catch (requestError) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("模型服务供应商列表加载失败", requestError)
-      setError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [navigate])
-
   useEffect(() => {
     mounted.current = true
-    void load()
     return () => {
       mounted.current = false
-      loadVersion.current += 1
     }
-  }, [load])
+  }, [])
 
   /** 删除选中的模型服务供应商。 */
   async function confirmDelete() {
@@ -157,9 +141,8 @@ export function ModelProviderListPage({
     try {
       await deleteAIProvider(deletingProvider.id)
       if (!mounted.current) return
-      setProviders((current) =>
-        current.filter((provider) => provider.id !== deletingProvider.id),
-      )
+      void refresh()
+      void invalidate(resourceKeys.aiProvider(deletingProvider.id))
       setDeletingProvider(null)
       toast.success(t("modelServices.delete.success"))
     } catch (requestError) {
@@ -205,7 +188,7 @@ export function ModelProviderListPage({
         </Tabs>
 
         <div className="mt-6">
-          {loading ? (
+          {showLoading ? (
             <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
               <LoaderCircleIcon className="size-4 animate-spin" />
               {t("modelServices.loading")}
@@ -215,7 +198,11 @@ export function ModelProviderListPage({
               <p className="text-sm text-muted-foreground">
                 {t("modelServices.list.loadError")}
               </p>
-              <Button className="mt-4" variant="outline" onClick={load}>
+              <Button
+                className="mt-4"
+                variant="outline"
+                onClick={() => void refresh()}
+              >
                 {t("modelServices.retry")}
               </Button>
             </div>

@@ -1,9 +1,7 @@
 /** 管理工作台标签及长期挂载的页面实例。 */
 import {
   useCallback,
-  useContext,
   useLayoutEffect,
-  useMemo,
   useReducer,
   useRef,
   useState,
@@ -12,14 +10,10 @@ import {
 import { PinIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
-  NavigationType,
-  UNSAFE_LocationContext,
-  UNSAFE_NavigationContext,
   createPath,
   parsePath,
   useNavigate,
   useNavigationType,
-  type Navigator,
   type To,
 } from "react-router"
 
@@ -31,13 +25,18 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { PortalContainerProvider } from "@/components/ui/portal-container"
-import type { WorkspaceOutletContext } from "@/features/workspace/workspace-context"
-import { WorkspaceProvider } from "@/features/workspace/workspace-context"
+import type { WorkspaceOutletContext } from "@/contexts/workspace-context"
+import { WorkspaceProvider } from "@/contexts/workspace-context"
+import {
+  TabScopedRouter,
+  type TabBackgroundNavigate,
+} from "@/features/workspace/tab-scoped-router"
 import {
   WorkspacePageRoutes,
   resolveWorkspaceLocation,
   type ResolvedWorkspaceTab,
 } from "@/features/workspace/workspace-page-routes"
+import { resourceClient } from "@/lib/resource-client"
 import { cn } from "@/lib/utils"
 
 type WorkspaceTabState = {
@@ -242,57 +241,11 @@ function WorkspaceTabPane({
   tab: ResolvedWorkspaceTab
   active: boolean
   context: WorkspaceOutletContext
-  onBackgroundNavigate: (sourceId: string, to: To, replace: boolean) => void
+  onBackgroundNavigate: TabBackgroundNavigate
 }) {
-  const navigationContext = useContext(UNSAFE_NavigationContext)
-  const activeRef = useRef(active)
-  activeRef.current = active
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(
     null,
   )
-  const scopedNavigator = useMemo<Navigator>(
-    () => ({
-      ...navigationContext.navigator,
-      go: (delta) => {
-        if (activeRef.current) {
-          navigationContext.navigator.go(delta)
-        }
-      },
-      push: (to, state, options) => {
-        if (activeRef.current) {
-          navigationContext.navigator.push(to, state, options)
-        } else {
-          onBackgroundNavigate(tab.id, to, false)
-        }
-      },
-      replace: (to, state, options) => {
-        if (activeRef.current) {
-          navigationContext.navigator.replace(to, state, options)
-        } else {
-          onBackgroundNavigate(tab.id, to, true)
-        }
-      },
-    }),
-    [navigationContext.navigator, onBackgroundNavigate, tab.id],
-  )
-  const scopedNavigationContext = useMemo(
-    () => ({ ...navigationContext, navigator: scopedNavigator }),
-    [navigationContext, scopedNavigator],
-  )
-  /** 面板内页面只感知本标签的地址，避免切换标签时其他页面重新请求数据。 */
-  const scopedLocationContext = useMemo(() => {
-    const parsed = parsePath(tab.href)
-    return {
-      location: {
-        pathname: parsed.pathname ?? "/",
-        search: parsed.search ?? "",
-        hash: parsed.hash ?? "",
-        state: null,
-        key: tab.href,
-      },
-      navigationType: NavigationType.Pop,
-    }
-  }, [tab.href])
 
   return (
     <div
@@ -308,13 +261,14 @@ function WorkspaceTabPane({
       {portalContainer ? (
         <PortalContainerProvider container={portalContainer} active={active}>
           <WorkspaceProvider value={context}>
-            <UNSAFE_NavigationContext.Provider
-              value={scopedNavigationContext}
+            <TabScopedRouter
+              tabId={tab.id}
+              href={tab.href}
+              active={active}
+              onBackgroundNavigate={onBackgroundNavigate}
             >
-              <UNSAFE_LocationContext.Provider value={scopedLocationContext}>
-                <WorkspacePageRoutes location={tab.href} />
-              </UNSAFE_LocationContext.Provider>
-            </UNSAFE_NavigationContext.Provider>
+              <WorkspacePageRoutes location={tab.href} />
+            </TabScopedRouter>
           </WorkspaceProvider>
         </PortalContainerProvider>
       ) : null}
@@ -531,8 +485,10 @@ export function WorkspaceTabs({
     dispatch({ type: "pin", id, pinned })
   }
 
-  /** 重新挂载指定标签，保留其他标签的页面实例。 */
+  /** 重新挂载指定标签并失效查询缓存，保留其他标签的页面实例。 */
   function reloadTab(id: string) {
+    /* 缓存默认永久新鲜，重挂载不会自动重取，这里显式失效全部查询。 */
+    void resourceClient.invalidateQueries()
     setReloadRevisionById((current) => ({
       ...current,
       [id]: (current[id] ?? 0) + 1,

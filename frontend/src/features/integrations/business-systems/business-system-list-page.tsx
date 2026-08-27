@@ -1,5 +1,5 @@
 /** 业务系统列表页。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -40,6 +40,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -47,42 +49,27 @@ import { recoverSession } from "@/lib/session-navigation"
 export function BusinessSystemListPage() {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
-  const [businessSystems, setBusinessSystems] = useState<BusinessSystem[]>([])
   const [deletingBusinessSystem, setDeletingBusinessSystem] =
     useState<BusinessSystem | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const loadVersion = useRef(0)
   const mounted = useRef(true)
-
-  /** 读取业务系统列表。 */
-  const load = useCallback(async () => {
-    const version = ++loadVersion.current
-    setLoading(true)
-    setLoadError(false)
-    try {
-      const output = await listBusinessSystems()
-      if (version !== loadVersion.current) return
-      setBusinessSystems(output.businessSystems)
-    } catch (requestError) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("业务系统列表加载失败", { error: requestError })
-      setLoadError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [navigate])
+  const {
+    data,
+    loading,
+    refreshing,
+    error: loadError,
+    refresh,
+  } = useResource(resourceKeys.businessSystems(), () => listBusinessSystems())
+  const invalidate = useResourceInvalidator()
+  const showLoading = loading || (Boolean(loadError) && refreshing)
+  const businessSystems = data?.businessSystems ?? []
 
   useEffect(() => {
     mounted.current = true
-    void load()
     return () => {
       mounted.current = false
-      loadVersion.current += 1
     }
-  }, [load])
+  }, [])
 
   /** 删除选中的业务系统。 */
   async function confirmDelete() {
@@ -91,9 +78,8 @@ export function BusinessSystemListPage() {
     try {
       await deleteBusinessSystem(deletingBusinessSystem.id)
       if (!mounted.current) return
-      setBusinessSystems((current) =>
-        current.filter((item) => item.id !== deletingBusinessSystem.id),
-      )
+      void refresh()
+      void invalidate(resourceKeys.businessSystem(deletingBusinessSystem.id))
       console.info("业务系统已删除", {
         business_system_id: deletingBusinessSystem.id,
       })
@@ -126,7 +112,7 @@ export function BusinessSystemListPage() {
         </Button>
       </PageHeader>
       <PageContent>
-        {loading ? (
+        {showLoading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
             {t("businessSystem.loading")}
@@ -136,7 +122,11 @@ export function BusinessSystemListPage() {
             <p className="text-sm text-muted-foreground">
               {t("businessSystem.list.loadError")}
             </p>
-            <Button className="mt-4" variant="outline" onClick={load}>
+            <Button
+              className="mt-4"
+              variant="outline"
+              onClick={() => void refresh()}
+            >
               {t("businessSystem.retry")}
             </Button>
           </div>

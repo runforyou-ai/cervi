@@ -1,11 +1,5 @@
 /** 对象存储设置表单。 */
-import {
-  type MouseEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react"
+import { type MouseEvent, useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { EyeIcon, EyeOffIcon, LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -21,6 +15,8 @@ import {
   testS3Setting,
   type StorageProviderId,
 } from "@/api"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { StatusBadge } from "@/components/status-badge"
@@ -93,8 +89,6 @@ function isConfigured(setting: StorageSettingsFormValues) {
 export function StorageSettingsForm() {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState("")
   const [savedSetting, setSavedSetting] =
     useState<StorageSettingsFormValues>(emptySetting)
   const [editing, setEditing] = useState(false)
@@ -171,29 +165,24 @@ export function StorageSettingsForm() {
     })
   }
 
-  /** 读取已保存的对象存储设置。 */
-  const loadSetting = useCallback(async () => {
-    setLoading(true)
-    setLoadError("")
-    try {
-      const setting = await getS3Setting()
-      setSavedSetting(setting)
-      setEditing(false)
-      form.reset(setting)
-    } catch (error) {
-      if (recoverSession(error, navigate)) {
-        return
-      }
-      console.warn("对象存储设置加载失败", error)
-      setLoadError(t("storage.loadError"))
-    } finally {
-      setLoading(false)
-    }
-  }, [form, navigate, t])
+  const {
+    data: loadedSetting,
+    loading: settingLoading,
+    refreshing: settingRefreshing,
+    error,
+    refresh,
+  } = useResource(resourceKeys.s3Setting(), () => getS3Setting())
+  const loading =
+    settingLoading || (Boolean(error) && settingRefreshing)
+  const loadError = error && !loading ? t("storage.loadError") : ""
 
+  /** 设置就绪后同步详情视图并回填表单。 */
   useEffect(() => {
-    void loadSetting()
-  }, [loadSetting])
+    if (!loadedSetting) return
+    setSavedSetting(loadedSetting)
+    setEditing(false)
+    form.reset(loadedSetting)
+  }, [form, loadedSetting])
 
   /** 处理对象存储请求错误。 */
   function handleRequestError(error: unknown, message: string) {
@@ -217,6 +206,7 @@ export function StorageSettingsForm() {
       setSavedSetting(saved)
       setEditing(false)
       form.reset(saved)
+      void refresh()
       console.info("对象存储设置已保存")
       toast.success(t("storage.saveSuccess"))
     } catch (error) {
@@ -262,6 +252,7 @@ export function StorageSettingsForm() {
       const enabledSetting = await saveS3Setting(nextSetting)
       setSavedSetting(enabledSetting)
       form.reset(enabledSetting)
+      void refresh()
       console.info("对象存储已启用")
       toast.success(t("storage.enableSuccess"))
     } catch (error) {
@@ -281,6 +272,7 @@ export function StorageSettingsForm() {
       setSavedSetting(disabledSetting)
       setEditing(false)
       form.reset(disabledSetting)
+      void refresh()
       console.info("对象存储已停用")
       toast.success(t("storage.disableSuccess"))
     } catch (error) {
@@ -317,7 +309,7 @@ export function StorageSettingsForm() {
         <Button
           className="mt-4"
           variant="outline"
-          onClick={() => void loadSetting()}
+          onClick={() => void refresh()}
         >
           {t("storage.retry")}
         </Button>

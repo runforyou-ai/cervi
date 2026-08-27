@@ -1,5 +1,5 @@
 /** 各消息渠道共用的接待设置字段和候选项加载。 */
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import {
   Controller,
   type Control,
@@ -7,7 +7,6 @@ import {
   type Path,
 } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -19,7 +18,8 @@ import {
   type MemberOption,
   type Team,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import type { ChannelReceptionSettingsFormValues } from "@/features/channels/reception/channel-reception-schema"
@@ -176,30 +176,27 @@ export function ChannelReceptionSettingsFields<
   TValues extends FieldValues & ChannelReceptionSettingsFormValues,
 >({ control }: { control: Control<TValues> }) {
   const { t } = useTranslation("channels")
-  const navigate = useNavigate()
-  const [teams, setTeams] = useState<Team[]>([])
-  const [members, setMembers] = useState<MemberOption[]>([])
+  const { data: options, error } = useResource(
+    resourceKeys.channelReceptionOptions(),
+    async () => {
+      const [teams, members] = await Promise.all([
+        listAllTeams(),
+        listAllMemberOptions(),
+      ])
+      return { teams, members }
+    },
+    { staleTime: 0 },
+  )
+  const teams = options?.teams ?? []
+  const members = options?.members ?? []
 
+  /** 候选项加载失败时提示用户。 */
   useEffect(() => {
-    let active = true
-    void Promise.all([listAllTeams(), listAllMemberOptions()])
-      .then(([teamList, memberList]) => {
-        if (!active) return
-        setTeams(teamList)
-        setMembers(memberList)
-      })
-      .catch((error: unknown) => {
-        if (!active) return
-        if (recoverSession(error, navigate)) return
-        console.warn("渠道接待候选项加载失败", error)
-        setTeams([])
-        setMembers([])
-        toast.error(t("routing.loadError"))
-      })
-    return () => {
-      active = false
+    if (error) {
+      console.warn("渠道接待候选项加载失败", error)
+      toast.error(t("routing.loadError"))
     }
-  }, [navigate, t])
+  }, [error, t])
 
   return (
     <>

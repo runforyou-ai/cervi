@@ -1,5 +1,5 @@
 /** 应用启动器页，按平台打开企业配置的外部业务系统。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -14,7 +14,9 @@ import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { OpenUrlDialog } from "@/features/apps/open-url-dialog"
-import { useWorkspace } from "@/features/workspace/workspace-context"
+import { useWorkspace } from "@/contexts/workspace-context"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { openExternalPage } from "@/platform/open-external-page"
@@ -24,39 +26,19 @@ export function AppsPage() {
   const { t } = useTranslation("apps")
   const navigate = useNavigate()
   const { identity } = useWorkspace()
-  const [businessSystems, setBusinessSystems] = useState<BusinessSystem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
   const [openUrlDialogOpen, setOpenUrlDialogOpen] = useState(false)
-  const loadVersion = useRef(0)
-
-  /** 读取启用的业务系统列表。 */
-  const load = useCallback(async () => {
-    const version = ++loadVersion.current
-    setLoading(true)
-    setLoadError(false)
-    try {
-      const output = await listBusinessSystems()
-      if (version !== loadVersion.current) return
-      setBusinessSystems(
-        output.businessSystems.filter((system) => system.enabled),
-      )
-    } catch (requestError) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("业务系统启动器加载失败", { error: requestError })
-      setLoadError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [navigate])
-
-  useEffect(() => {
-    void load()
-    return () => {
-      loadVersion.current += 1
-    }
-  }, [load])
+  const {
+    data,
+    loading,
+    refreshing,
+    error: loadError,
+    refresh,
+  } = useResource(resourceKeys.businessSystems(), () => listBusinessSystems())
+  const showLoading = loading || (Boolean(loadError) && refreshing)
+  const businessSystems = useMemo(
+    () => (data?.businessSystems ?? []).filter((system) => system.enabled),
+    [data],
+  )
 
   /** 按平台打开选中的业务系统。 */
   async function openBusinessSystem(system: BusinessSystem) {
@@ -87,7 +69,7 @@ export function AppsPage() {
         ) : null}
       </PageHeader>
       <PageContent>
-        {loading ? (
+        {showLoading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
             {t("loading")}
@@ -95,7 +77,11 @@ export function AppsPage() {
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
             <p className="text-sm text-muted-foreground">{t("loadError")}</p>
-            <Button className="mt-4" variant="outline" onClick={load}>
+            <Button
+              className="mt-4"
+              variant="outline"
+              onClick={() => void refresh()}
+            >
               {t("retry")}
             </Button>
           </div>

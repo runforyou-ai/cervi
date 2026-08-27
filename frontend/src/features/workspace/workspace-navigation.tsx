@@ -35,8 +35,8 @@ import {
   selectableWorkStatuses,
   WorkStatusDot,
   workStatusLabel,
-} from "@/features/users/work-status"
-import { UserAvatar } from "@/features/users/user-avatar"
+} from "@/components/work-status"
+import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 

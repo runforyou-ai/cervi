@@ -15,6 +15,8 @@ import {
   type WebsiteChannelAccessData,
   type WebsiteChannelData,
 } from "@/api"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import {
@@ -159,8 +161,6 @@ export function WebsiteChannelUsagePanel({
 }) {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
-  const [origin, setOrigin] = useState("")
-  const [error, setError] = useState("")
   const [copied, setCopied] = useState<"snippet" | "link" | "">("")
   const [copyFailed, setCopyFailed] = useState(false)
   const [instructions, setInstructions] = useState<WebsiteChannelAccessTab | "">("")
@@ -182,31 +182,23 @@ export function WebsiteChannelUsagePanel({
       allowedHosts: channel.access.allowedHosts.join("\n"),
     },
   })
+  const originResource = useResource(resourceKeys.websiteChannelOrigin(), () =>
+    resolveWebsiteChannelOrigin(),
+  )
+  const origin = originResource.data ?? ""
+  const error =
+    originResource.error || originResource.data === ""
+      ? t("usage.originError")
+      : ""
+
+  /** 记录访问地址读取失败或为空的原因。 */
   useEffect(() => {
-    let active = true
-    setError("")
-    void resolveWebsiteChannelOrigin()
-      .then((value) => {
-        if (!active) {
-          return
-        }
-        if (value === "") {
-          console.warn("网站渠道访问地址为空")
-          setError(t("usage.originError"))
-          return
-        }
-        setOrigin(value)
-      })
-      .catch((requestError: unknown) => {
-        if (active) {
-          console.warn("网站渠道访问地址解析失败", requestError)
-          setError(t("usage.originError"))
-        }
-      })
-    return () => {
-      active = false
+    if (originResource.error) {
+      console.warn("网站渠道访问地址解析失败", originResource.error)
+    } else if (originResource.data === "") {
+      console.warn("网站渠道访问地址为空")
     }
-  }, [t])
+  }, [originResource.data, originResource.error])
 
   useEffect(() => {
     if (copied === "") {

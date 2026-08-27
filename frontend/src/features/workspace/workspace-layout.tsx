@@ -22,7 +22,7 @@ import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import type {
   WorkspaceNewMessageNotification,
   WorkspaceOutletContext,
-} from "@/features/workspace/workspace-context"
+} from "@/contexts/workspace-context"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
   defaultWorkspaceTab,

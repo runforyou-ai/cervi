@@ -1,5 +1,5 @@
 /** 连接器列表页。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/table"
 import { connectorTypeConfigs } from "@/features/integrations/connectors/connector-options"
 import { useDateTime } from "@/hooks/use-date-time"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -65,44 +67,24 @@ export function ConnectorListPage() {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
-  const [connections, setConnections] = useState<
-    IntegrationConnectionSummaryData[]
-  >([])
   const [deletingConnection, setDeletingConnection] =
     useState<IntegrationConnectionSummaryData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const loadVersion = useRef(0)
   const mounted = useRef(true)
-
-  /** 读取连接器列表。 */
-  const load = useCallback(async () => {
-    const version = ++loadVersion.current
-    setLoading(true)
-    setError(false)
-    try {
-      const output = await listIntegrationConnections()
-      if (version !== loadVersion.current) return
-      setConnections(output.connections)
-    } catch (requestError) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("连接器列表加载失败", requestError)
-      setError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [navigate])
+  const { data, loading, refreshing, error, refresh } = useResource(
+    resourceKeys.connectors(),
+    () => listIntegrationConnections(),
+  )
+  const invalidate = useResourceInvalidator()
+  const showLoading = loading || (Boolean(error) && refreshing)
+  const connections = data?.connections ?? []
 
   useEffect(() => {
     mounted.current = true
-    void load()
     return () => {
       mounted.current = false
-      loadVersion.current += 1
     }
-  }, [load])
+  }, [])
 
   /** 删除选中的连接器。 */
   async function confirmDelete() {
@@ -111,9 +93,8 @@ export function ConnectorListPage() {
     try {
       await deleteIntegrationConnection(deletingConnection.id)
       if (!mounted.current) return
-      setConnections((current) =>
-        current.filter((connection) => connection.id !== deletingConnection.id),
-      )
+      void refresh()
+      void invalidate(resourceKeys.connector(deletingConnection.id))
       setDeletingConnection(null)
       toast.success(t("connectors.delete.success"))
     } catch (requestError) {
@@ -143,7 +124,7 @@ export function ConnectorListPage() {
         </Button>
       </PageHeader>
       <PageContent>
-        {loading ? (
+        {showLoading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
             {t("connectors.loading")}
@@ -153,7 +134,11 @@ export function ConnectorListPage() {
             <p className="text-sm text-muted-foreground">
               {t("connectors.list.loadError")}
             </p>
-            <Button className="mt-4" variant="outline" onClick={load}>
+            <Button
+              className="mt-4"
+              variant="outline"
+              onClick={() => void refresh()}
+            >
               {t("connectors.retry")}
             </Button>
           </div>

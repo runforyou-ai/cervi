@@ -34,7 +34,8 @@ import {
   type WebsiteChannelAccessTab,
 } from "@/features/channels/website/website-channel-usage-panel"
 import { WebsiteChatPreview } from "@/features/channels/website/website-chat-preview"
-import { recoverSession } from "@/lib/session-navigation"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
 const baseEditTabs = ["basic", "reception"] as const
 const websiteEditTabs = [...baseEditTabs, "chat-interface", "usage"] as const
@@ -250,68 +251,67 @@ export function MessageChannelFormPage({
   const navigate = useNavigate()
   const { channelId = "", channelType = "" } = useParams()
   const [channel, setChannel] = useState<EditableChannel | null>(null)
-  const [loading, setLoading] = useState(mode === "edit")
-  const [error, setError] = useState("")
-  const [reloadKey, setReloadKey] = useState(0)
-
-  useEffect(() => {
-    if (mode !== "edit") {
-      return
-    }
-    if (!isMessageChannelType(channelType)) {
-      navigate("/integrations/channels", { replace: true })
-      return
-    }
-
-    let active = true
-    setLoading(true)
-    setError("")
-    const request: Promise<EditableChannel> =
+  const editable = mode === "edit" && isMessageChannelType(channelType)
+  const {
+    data: loadedChannel,
+    loading: detailLoading,
+    refreshing: detailRefreshing,
+    error: detailError,
+    refresh,
+  } = useResource<EditableChannel>(
+    resourceKeys.messageChannel(channelType, channelId),
+    () =>
       channelType === ChannelType.ChannelTypeWebsite
         ? getWebsiteChannel(channelId)
-        : getMessageChannel(channelId)
-    void request
-      .then((loadedChannel) => {
-        if (!active) {
-          return
-        }
-        if (loadedChannel.type !== channelType) {
-          navigate(
-            `/integrations/channels/${loadedChannel.type}/${loadedChannel.id}`,
-            { replace: true },
-          )
-          return
-        }
-        setChannel(loadedChannel)
-      })
-      .catch((requestError: unknown) => {
-        if (!active) {
-          return
-        }
-        if (recoverSession(requestError, navigate)) {
-          return
-        }
-        if (isNotFoundApiError(requestError)) {
-          console.warn("消息渠道不存在", {
-            channel_id: channelId,
-            channel_type: channelType,
-          })
-          navigate("/integrations/channels", { replace: true })
-          return
-        }
-        console.warn("消息渠道详情加载失败", requestError)
-        setError(t("form.loadError"))
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false)
-        }
-      })
+        : getMessageChannel(channelId),
+    { enabled: editable },
+  )
 
-    return () => {
-      active = false
+  /** 编辑模式下拦截无效的渠道类型参数。 */
+  useEffect(() => {
+    if (mode === "edit" && !isMessageChannelType(channelType)) {
+      navigate("/integrations/channels", { replace: true })
     }
-  }, [channelId, channelType, mode, navigate, reloadKey, t])
+  }, [channelType, mode, navigate])
+
+  /** 详情就绪后校正地址中的渠道类型并同步编辑状态。 */
+  useEffect(() => {
+    if (!loadedChannel) {
+      return
+    }
+    if (loadedChannel.type !== channelType) {
+      navigate(
+        `/integrations/channels/${loadedChannel.type}/${loadedChannel.id}`,
+        { replace: true },
+      )
+      return
+    }
+    setChannel(loadedChannel)
+  }, [channelType, loadedChannel, navigate])
+
+  /** 渠道不存在时回到渠道列表。 */
+  useEffect(() => {
+    if (detailError && isNotFoundApiError(detailError)) {
+      console.warn("消息渠道不存在", {
+        channel_id: channelId,
+        channel_type: channelType,
+      })
+      navigate("/integrations/channels", { replace: true })
+    }
+  }, [channelId, channelType, detailError, navigate])
+
+  const loading =
+    mode === "edit" &&
+    (detailLoading ||
+      (!channel && !detailError) ||
+      (Boolean(detailError) && detailRefreshing))
+  const invalidateResource = useResourceInvalidator()
+
+  /** 子表单保存后同步本地渠道并失效详情缓存。 */
+  function handleChannelChange(next: EditableChannel) {
+    setChannel(next)
+    void invalidateResource(resourceKeys.messageChannel(channelType, channelId))
+  }
 
   const typeDefinition = channel
     ? messageChannelTypeDefinition(channel.type)
@@ -349,11 +349,13 @@ export function MessageChannelFormPage({
         ) : mode === "edit" && !channel ? (
           <div className="flex min-h-48 items-center justify-center text-center">
             <div>
-              <p className="text-sm text-muted-foreground">{error}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("form.loadError")}
+              </p>
               <Button
                 className="mt-4"
                 variant="outline"
-                onClick={() => setReloadKey((current) => current + 1)}
+                onClick={() => void refresh()}
               >
                 {t("retry")}
               </Button>
@@ -363,7 +365,7 @@ export function MessageChannelFormPage({
           <MessageChannelEditTabs
             key={channel.id}
             channel={channel}
-            onChannelChange={setChannel}
+            onChannelChange={handleChannelChange}
           />
         ) : (
           <MessageChannelForm />

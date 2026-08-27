@@ -22,7 +22,7 @@ import {
   createServerConnectionSchema,
   type ServerConnectionFormValues,
 } from "@/features/server-connection/server-connection-schema"
-import { useStartup } from "@/features/startup/startup-context"
+import { useStartup } from "@/contexts/startup-context"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 type DetectedServer = {

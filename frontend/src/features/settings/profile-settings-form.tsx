@@ -24,7 +24,7 @@ import {
   type ProfileSettingsFormValues,
 } from "@/features/settings/profile-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { UserAvatar } from "@/features/users/user-avatar"
+import { UserAvatar } from "@/components/user-avatar"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
 const avatarContentTypes = new Set(["image/jpeg", "image/png", "image/webp"])

@@ -30,16 +30,26 @@ wails3 task common:build:frontend
 frontend/
 ├── bindings/                       # Wails 自动生成的 TypeScript 绑定
 └── src/
-    ├── api/                        # 认证、绑定调用和边界归一化
+    ├── api/                        # 认证与按业务域拆分的绑定调用和边界归一化
     ├── apps/
+    │   ├── shared-app-routes.tsx   # Web 与桌面端共用的业务路由
     │   ├── web/                    # Web 应用入口和路由
     │   ├── desktop/                # 桌面端应用入口和路由
-    │   └── mobile/                 # 移动端独立页面
-    ├── components/form/            # 通用表单展示组件
-    ├── features/                   # Web 与桌面端共用的业务功能
-    ├── i18n/                       # 国际化资源
+    │   └── mobile/                 # 移动端独立入口、路由和页面
+    ├── components/                 # 跨 feature 共享的展示组件
+    │   ├── form/                   # 通用表单展示组件
+    │   └── ui/                     # 基础 UI 组件
+    ├── contexts/                   # 跨 feature 共享的 React 上下文
+    ├── features/                   # Web 与桌面端共用的业务功能，按业务域分目录
+    ├── hooks/                      # 通用 hooks，含统一数据读取 useResource
+    ├── i18n/                       # 国际化资源，按语言目录和 namespace 分文件
+    ├── lib/                        # 通用纯函数工具
     └── platform/                   # 运行平台识别
 ```
+
+- `src/api` 按业务域一个文件组织，页面统一从 `@/api` 聚合入口导入；共享归一化工具放 `api/normalize.ts`。
+- 页面归其路由所属的 feature；被多个 feature 使用的展示组件放 `src/components`，被多个 feature 使用的上下文放 `src/contexts`，feature 私有的上下文和 hooks 留在各自目录内。features 之间不得形成循环依赖；`features/workspace` 作为路由中枢可以引用各 feature 的页面，其余 feature 不得反向引用 workspace。
+- 一个例外：角色域的页面在 `features/roles`，由设置页外壳（`features/settings`）按路由引用；该依赖保持 settings → roles 单向。
 
 ## 业务契约
 
@@ -48,6 +58,16 @@ frontend/
 - 页面只通过 `src/api` 调用绑定：`client` 注入认证与错误，`service` 绑定方法并归一化可空切片。页面不直接引用 `frontend/bindings`。
 - 前端只保留表单值、组件 Props、页面状态、查询参数派生类型，以及对生成类型中可空切片的边界归一化类型。
 - 页面卸载时忽略过期结果，不要取消 Wails 绑定调用。
+
+## 数据读取
+
+- 页面数据读取统一使用 `src/hooks/use-resource.ts` 的 `useResource`（基于 TanStack Query），不再手写 `useEffect` 加过期标志的取数样板。查询 key 统一在 `src/hooks/resource-keys.ts` 的 `resourceKeys` 工厂中定义，页面不得手写 key 数组；同一份后端数据在不同页面使用相同 key 以共享缓存，查询参数变化必须体现在 key 中。
+- 读取错误由 `useResource` 统一做会话入口恢复；变更操作直接调用 `@/api`，成功后通过 `refresh` 或 `useResourceInvalidator` 失效相关 key，不手工修补缓存数据。
+- 会话引导流程（启动探测、身份加载）保持独立实现，不强制走 `useResource`。
+
+## 路由
+
+- `react-router` 在 `package.json` 中锁定精确版本。其 `UNSAFE_` 内部 API 只允许出现在 `src/features/workspace/tab-scoped-router.tsx`；升级 react-router 前必须先验证该模块行为未变化。
 
 ## 表单
 

@@ -1,5 +1,5 @@
 /** 连接器新增和编辑页。 */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -32,6 +32,8 @@ import {
   createConnectorSchema,
   type ConnectorFormValues,
 } from "@/features/integrations/connectors/connector-schema"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -55,11 +57,9 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
   const { connectionId = "" } = useParams()
-  const [loading, setLoading] = useState(mode === "edit")
-  const [loadError, setLoadError] = useState(false)
+  const invalidateResource = useResourceInvalidator()
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
-  const loadVersion = useRef(0)
   const mounted = useRef(true)
   const initialType = IntegrationConnectionType.IntegrationConnectionTypeDify
   const schema = useMemo(
@@ -90,43 +90,40 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
   const selectedType = form.watch("type") as IntegrationConnectionTypeId
   const selectedTypeConfig = connectorTypeConfigs[selectedType]
 
-  /** 读取待编辑的连接器。 */
-  const load = useCallback(async () => {
-    if (mode !== "edit") return
-    const version = ++loadVersion.current
-    setLoading(true)
-    setLoadError(false)
-    try {
-      const connection = await getIntegrationConnection(connectionId)
-      if (version !== loadVersion.current) return
-      form.reset({
-        type: connection.type,
-        name: connection.name,
-        description: connection.description,
-        apiURL: connection.configuration.apiUrl,
-        apiKey: connection.configuration.apiKey,
-      })
-    } catch (requestError) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("连接器详情加载失败", {
-        connection_id: connectionId,
-        error: requestError,
-      })
-      setLoadError(true)
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [connectionId, form, mode, navigate])
+  const {
+    data: connection,
+    loading: connectionLoading,
+    refreshing: connectionRefreshing,
+    error: connectionError,
+    refresh,
+  } = useResource(
+    resourceKeys.connector(connectionId),
+    () => getIntegrationConnection(connectionId),
+    { enabled: mode === "edit" },
+  )
+  const loading =
+    mode === "edit" &&
+    (connectionLoading || (Boolean(connectionError) && connectionRefreshing))
+  const loadError = mode === "edit" && Boolean(connectionError) && !loading
+
+  /** 详情就绪后回填连接器表单。 */
+  useEffect(() => {
+    if (!connection) return
+    form.reset({
+      type: connection.type,
+      name: connection.name,
+      description: connection.description,
+      apiURL: connection.configuration.apiUrl,
+      apiKey: connection.configuration.apiKey,
+    })
+  }, [connection, form])
 
   useEffect(() => {
     mounted.current = true
-    void load()
     return () => {
       mounted.current = false
-      loadVersion.current += 1
     }
-  }, [load])
+  }, [])
 
   /** 保存连接器并返回列表。 */
   async function save(values: ConnectorFormValues) {
@@ -138,7 +135,9 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
         await createIntegrationConnection(input)
       } else {
         await updateIntegrationConnection(connectionId, input)
+        void invalidateResource(resourceKeys.connector(connectionId))
       }
+      void invalidateResource(resourceKeys.connectors())
       if (!mounted.current) return
       form.reset(values)
       toast.success(
@@ -225,7 +224,11 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
             <p className="text-sm text-muted-foreground">
               {t("connectors.form.loadError")}
             </p>
-            <Button className="mt-4" variant="outline" onClick={load}>
+            <Button
+              className="mt-4"
+              variant="outline"
+              onClick={() => void refresh()}
+            >
               {t("connectors.retry")}
             </Button>
           </div>

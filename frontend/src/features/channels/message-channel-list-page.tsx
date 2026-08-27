@@ -1,5 +1,5 @@
 /** 消息渠道列表页，统一展示当前支持的渠道。 */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -49,6 +49,8 @@ import {
   messageChannelTypeDefinition,
   messageChannelTypeDefinitions,
 } from "@/features/channels/message-channel-types"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
@@ -124,7 +126,7 @@ function MessageChannelRow({
 export function MessageChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
-  const [channels, setChannels] = useState<MessageChannelSummary[]>([])
+  const invalidate = useResourceInvalidator()
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
   const [enabledStatus, setEnabledStatus] =
@@ -132,37 +134,15 @@ export function MessageChannelListPage() {
   const [updatingChannelId, setUpdatingChannelId] = useState("")
   const [confirmingChannel, setConfirmingChannel] =
     useState<MessageChannelSummary | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const loadVersion = useRef(0)
-
-  /** 加载消息渠道列表。 */
-  const loadChannels = useCallback(async () => {
-    const version = ++loadVersion.current
-    setLoading(true)
-    setError("")
-    try {
-      const output = await listMessageChannels()
-      if (version !== loadVersion.current) return
-      setChannels(output)
-    } catch (requestError) {
-      if (version !== loadVersion.current) return
-      if (recoverSession(requestError, navigate)) {
-        return
-      }
-      console.warn("消息渠道列表加载失败", requestError)
-      setError(t("list.loadError"))
-    } finally {
-      if (version === loadVersion.current) setLoading(false)
-    }
-  }, [navigate, t])
-
-  useEffect(() => {
-    void loadChannels()
-    return () => {
-      loadVersion.current += 1
-    }
-  }, [loadChannels])
+  const {
+    data,
+    loading,
+    refreshing,
+    error,
+    refresh,
+  } = useResource(resourceKeys.messageChannels(), () => listMessageChannels())
+  const channels = useMemo(() => data ?? [], [data])
+  const showLoading = loading || (Boolean(error) && refreshing)
 
   const filteredChannels = useMemo(
     () =>
@@ -184,9 +164,8 @@ export function MessageChannelListPage() {
       const updated = channel.enabled
         ? await deactivateMessageChannel(channel.id)
         : await activateMessageChannel(channel.id)
-      setChannels((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      )
+      void refresh()
+      void invalidate(resourceKeys.channelOptions())
       console.info("消息渠道状态已更新", {
         channel_id: channel.id,
         channel_type: channel.type,
@@ -263,15 +242,19 @@ export function MessageChannelListPage() {
       </ListToolbar>
 
       <PageContent>
-        {loading ? (
+        {showLoading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
             <LoaderCircleIcon className="size-4 animate-spin" />
             {t("loading")}
           </div>
         ) : error ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border p-6 text-center">
-            <p className="text-sm text-muted-foreground">{error}</p>
-            <Button className="mt-4" variant="outline" onClick={loadChannels}>
+            <p className="text-sm text-muted-foreground">{t("list.loadError")}</p>
+            <Button
+              className="mt-4"
+              variant="outline"
+              onClick={() => void refresh()}
+            >
               {t("retry")}
             </Button>
           </div>

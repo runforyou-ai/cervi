@@ -8,10 +8,10 @@ import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
-import { RoleListPage } from "@/features/settings/role-list-page"
+import { RoleListPage } from "@/features/roles/role-list-page"
 import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
-import { useWorkspace } from "@/features/workspace/workspace-context"
+import { useWorkspace } from "@/contexts/workspace-context"
 
 /** 个人设置导航和当前设置表单。 */
 export function PersonalSettingsPage({
