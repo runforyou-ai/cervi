@@ -158,6 +158,9 @@ type Backend interface {
 	// ListKnowledgeBases 返回当前企业的知识库列表。
 	//cervi:route GET /knowledge-bases
 	ListKnowledgeBases(context.Context, RequestMeta) (KnowledgeBaseList, error)
+	// ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
+	//cervi:route GET /integration-connections/:connectionID/knowledge-bases
+	ListExternalKnowledgeBaseOptions(context.Context, RequestMeta, string) (ExternalKnowledgeBaseOptionList, error)
 	// GetKnowledgeBase 返回当前企业中的知识库详情。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID
 	GetKnowledgeBase(context.Context, RequestMeta, string) (KnowledgeBase, error)

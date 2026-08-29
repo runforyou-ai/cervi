@@ -363,6 +363,14 @@ func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
+// ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
+func (b *Backend) ListExternalKnowledgeBaseOptions(ctx context.Context, meta appservice.RequestMeta, connectionID string) (appservice.ExternalKnowledgeBaseOptionList, error) {
+	var output appservice.ExternalKnowledgeBaseOptionList
+	err := b.do(ctx, meta, http.MethodGet, "/integration-connections/"+url.PathEscape(connectionID)+"/knowledge-bases", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase

@@ -54,8 +54,10 @@ func (b *DirectBackend) TestIntegrationConnection(ctx context.Context, meta Requ
 	if _, err := b.authenticate(ctx, meta); err != nil {
 		return err
 	}
-	err := b.testIntegrationConnection.Execute(ctx, integrationConnectionTestInput(input))
-	return b.integrationConnectionTestError(ctx, meta, err)
+	if err := b.testIntegrationConnection.Execute(ctx, integrationConnectionTestInput(input)); err != nil {
+		return b.integrationConnectionTestError(ctx, meta, err)
+	}
+	return nil
 }
 
 // CreateIntegrationConnection 创建外部系统连接器。
@@ -133,9 +135,6 @@ func (b *DirectBackend) integrationConnectionMutationError(ctx context.Context, 
 
 // integrationConnectionTestError 转换连接器测试错误。
 func (b *DirectBackend) integrationConnectionTestError(ctx context.Context, meta RequestMeta, err error) error {
-	if err == nil {
-		return nil
-	}
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -146,9 +145,14 @@ func (b *DirectBackend) integrationConnectionTestError(ctx context.Context, meta
 	if errors.Is(err, integrationconnectionaction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorIntegrationConnectionNotFound)
 	}
+	return integrationConnectionRemoteError(meta, err)
+}
+
+// integrationConnectionRemoteError 转换外部连接访问错误。
+func integrationConnectionRemoteError(meta RequestMeta, err error) error {
 	_, kind, classified := connectiontest.Details(err)
 	if !classified {
-		slog.Warn("连接器测试返回未分类错误", "error", err)
+		slog.Warn("外部连接访问返回未分类错误", "error", err)
 		return UnavailableError(meta, cervii18n.ErrorIntegrationConnectionTestFailed, nil)
 	}
 	switch kind {
