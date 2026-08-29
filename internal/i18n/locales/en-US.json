@@ -223,6 +223,8 @@
   "error.remote_request_create_failed": "Could not create the company server request.",
   "error.server_connection_failed": "The company server connection failed.",
   "error.inbox_load_failed": "Could not load the conversation list. Try again.",
+  "error.conversation_not_found": "This conversation could not be found.",
+  "error.conversation_message_list_failed": "Could not load the conversation messages. Try again.",
   "error.website_conversation_not_found": "This conversation could not be found.",
   "error.website_messenger_load_failed": "Could not load the chat. Try again.",
   "error.website_message_send_failed": "Could not send the message. Try again.",

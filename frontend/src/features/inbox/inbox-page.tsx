@@ -39,6 +39,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useUserTimeZone } from "@/contexts/user-preferences"
+import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { cn } from "@/lib/utils"
 
@@ -546,7 +547,7 @@ function InboxConversationList({
   )
 }
 
-/** 选中会话的主区：头部信息和消息占位。 */
+/** 选中会话的主区：头部信息和只读消息时间线。 */
 function ConversationMain({
   conversation,
   narrowViewport = false,
@@ -579,9 +580,10 @@ function ConversationMain({
           </div>
         </div>
       </header>
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/20 p-6">
-        <p className="text-sm text-muted-foreground">{t("threadComingSoon")}</p>
-      </div>
+      <ConversationTimeline
+        key={conversation.id}
+        conversationID={conversation.id}
+      />
     </div>
   )
 }
@@ -716,9 +718,11 @@ export function InboxPage({
         paneClassName="transition-[width]"
         pane={pane}
       >
-        <section className="hidden min-h-0 flex-1 md:block">
-          <ConversationMain conversation={selectedConversation} />
-        </section>
+        {isNarrowViewport ? null : (
+          <section className="min-h-0 flex-1">
+            <ConversationMain conversation={selectedConversation} />
+          </section>
+        )}
       </PageSplit>
 
       <Sheet open={isNarrowDetailOpen} onOpenChange={setIsNarrowDetailOpen}>

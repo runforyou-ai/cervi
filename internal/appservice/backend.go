@@ -47,6 +47,9 @@ type Backend interface {
 	// LoadInbox 返回当前用户的统一收件箱。
 	//cervi:route GET /inbox
 	LoadInbox(context.Context, RequestMeta) (Inbox, error)
+	// ListConversationMessages 返回成员可见的会话消息。
+	//cervi:route GET /conversations/:conversationID/messages
+	ListConversationMessages(context.Context, RequestMeta, string, ConversationMessageListInput) (ConversationMessageList, error)
 	// ListMessageChannels 返回消息渠道列表。
 	//cervi:route GET /channels
 	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)

@@ -11,7 +11,7 @@ import (
 var (
 	// ErrChannelNotFound 表示网站渠道不存在或不可用。
 	ErrChannelNotFound = errors.New("website channel not found")
-	// ErrConversationNotFound 表示客户会话不属于当前渠道身份。
+	// ErrConversationNotFound 表示客户会话不存在或当前身份无权访问。
 	ErrConversationNotFound = errors.New("customer conversation not found")
 	// ErrDataInvariant 表示聊天持久关系不完整或互相矛盾。
 	ErrDataInvariant = errors.New("conversation data invariant violated")
@@ -25,5 +25,5 @@ type ConflictError struct {
 // Error 返回稳定冲突原因。
 func (e *ConflictError) Error() string { return "conversation conflict: " + e.Reason }
 
-// ValidationError 表示公开访客输入不合法。
+// ValidationError 表示会话业务输入不合法。
 type ValidationError = common.FieldError

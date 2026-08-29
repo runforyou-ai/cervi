@@ -358,6 +358,13 @@ export function ListContacts(meta: $models.RequestMeta, input: $models.ContactLi
 }
 
 /**
+ * ListConversationMessages 返回成员可见的会话消息。
+ */
+export function ListConversationMessages(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageListInput): $CancellablePromise<$models.ConversationMessageList> {
+    return $Call.ByID(2470800485, meta, conversationID, input);
+}
+
+/**
  * ListIntegrationConnections 返回当前企业的连接器列表。
  */
 export function ListIntegrationConnections(meta: $models.RequestMeta): $CancellablePromise<$models.IntegrationConnectionList> {
