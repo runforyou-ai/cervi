@@ -112,6 +112,54 @@ func TestDifyKnowledgeBaseLister(t *testing.T) {
 	}
 }
 
+// TestDifyKnowledgeDocumentLister 验证 Dify 知识文档列表保留分页和展示字段。
+func TestDifyKnowledgeDocumentLister(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v1/datasets/dataset-1/documents" {
+			t.Fatalf("unexpected request path: %s", request.URL.Path)
+		}
+		if authorization := request.Header.Get("Authorization"); authorization != "Bearer dataset-key" {
+			t.Fatalf("unexpected authorization header: %s", authorization)
+		}
+		if page := request.URL.Query().Get("page"); page != "2" {
+			t.Fatalf("unexpected page: %s", page)
+		}
+		if limit := request.URL.Query().Get("limit"); limit != "20" {
+			t.Fatalf("unexpected limit: %s", limit)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{
+			"data":[
+				{"id":"document-1","name":"产品手册.pdf","display_status":"available","created_at":1787950000},
+				{"id":"document-2","name":"常见问题.txt","display_status":"indexing","created_at":1787952000}
+			],
+			"page":2,"limit":20,"total":22,"has_more":false
+		}`))
+	}))
+	defer server.Close()
+
+	output, err := NewDifyKnowledgeDocumentLister(server.Client()).List(
+		context.Background(),
+		DifyKnowledgeBaseConfig{APIURL: server.URL + "/v1", APIKey: "dataset-key"},
+		"dataset-1",
+		2,
+		20,
+	)
+	if err != nil {
+		t.Fatalf("list knowledge documents: %v", err)
+	}
+	if output.Total != 22 || len(output.Documents) != 2 {
+		t.Fatalf("unexpected output: %#v", output)
+	}
+	if output.Documents[0].Status != "available" || output.Documents[0].CreatedAt == nil ||
+		output.Documents[0].CreatedAt.Unix() != 1787950000 {
+		t.Fatalf("unexpected first document: %#v", output.Documents[0])
+	}
+	if output.Documents[1].CreatedAt == nil || output.Documents[1].CreatedAt.Unix() != 1787952000 {
+		t.Fatalf("unexpected second document time: %#v", output.Documents[1].CreatedAt)
+	}
+}
+
 // TestN8NProbe 验证 n8n 探测使用公开工作流接口和 API 密钥请求头。
 func TestN8NProbe(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

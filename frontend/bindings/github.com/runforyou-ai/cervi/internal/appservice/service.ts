@@ -379,6 +379,13 @@ export function ListKnowledgeBases(meta: $models.RequestMeta): $CancellablePromi
 }
 
 /**
+ * ListKnowledgeDocuments 返回指定外部知识库的文档列表。
+ */
+export function ListKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeDocumentListInput): $CancellablePromise<$models.KnowledgeDocumentList> {
+    return $Call.ByID(4195704972, meta, knowledgeBaseID, input);
+}
+
+/**
  * ListMemberOptions 返回可分配的企业成员和 AI 员工。
  */
 export function ListMemberOptions(meta: $models.RequestMeta, input: $models.MemberOptionListInput): $CancellablePromise<$models.MemberOptionList> {

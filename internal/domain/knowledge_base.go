@@ -18,3 +18,15 @@ const (
 	KnowledgeBaseCategoryStandard KnowledgeBaseCategory = "standard"
 	KnowledgeBaseCategoryQA       KnowledgeBaseCategory = "qa"
 )
+
+// KnowledgeDocumentStatus 表示知识文档的统一处理状态。
+type KnowledgeDocumentStatus string
+
+const (
+	KnowledgeDocumentStatusProcessing KnowledgeDocumentStatus = "processing"
+	KnowledgeDocumentStatusReady      KnowledgeDocumentStatus = "ready"
+	KnowledgeDocumentStatusPaused     KnowledgeDocumentStatus = "paused"
+	KnowledgeDocumentStatusError      KnowledgeDocumentStatus = "error"
+	KnowledgeDocumentStatusDisabled   KnowledgeDocumentStatus = "disabled"
+	KnowledgeDocumentStatusArchived   KnowledgeDocumentStatus = "archived"
+)

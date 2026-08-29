@@ -15,4 +15,6 @@ var (
 	ErrGroupNotEmpty = errors.New("knowledge group not empty")
 	// ErrExternalGroupUnsupported 表示外部知识库不允许创建分组。
 	ErrExternalGroupUnsupported = errors.New("external knowledge base group unsupported")
+	// ErrDocumentListUnsupported 表示当前知识库来源不支持读取文档列表。
+	ErrDocumentListUnsupported = errors.New("knowledge document list unsupported")
 )

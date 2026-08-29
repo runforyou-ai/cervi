@@ -43,6 +43,28 @@ type ExternalOptionRecord struct {
 	Category domain.KnowledgeBaseCategory
 }
 
+// DocumentListInput 定义知识文档分页条件。
+type DocumentListInput struct {
+	Page     int
+	PageSize int
+}
+
+// DocumentRecord 定义知识文档列表项。
+type DocumentRecord struct {
+	ID        string
+	Name      string
+	Status    domain.KnowledgeDocumentStatus
+	CreatedAt *time.Time
+}
+
+// DocumentListOutput 定义知识文档分页结果。
+type DocumentListOutput struct {
+	Documents []DocumentRecord
+	Page      int
+	PageSize  int
+	Total     int
+}
+
 // GroupRecord 定义知识库分组树节点。
 type GroupRecord struct {
 	ID        string  `bun:"id"`

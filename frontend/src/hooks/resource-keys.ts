@@ -53,6 +53,11 @@ export const resourceKeys = {
   /** 指定连接可访问的外部知识库选项。 */
   externalKnowledgeBaseOptions: (connectionId?: string) =>
     itemKey("external-knowledge-base-options", connectionId),
+  /** 指定知识库的文档列表，可带分页参数。 */
+  knowledgeDocuments: (
+    knowledgeBaseId?: string,
+    parameters?: KeyParameters,
+  ) => scopedListKey("knowledge-documents", knowledgeBaseId, parameters),
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */

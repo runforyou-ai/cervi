@@ -24,13 +24,37 @@ const knowledgeBase = {
     more: "More actions for {{name}}",
     externalCategory: "{{source}} · {{category}}",
     addGroup: "New group",
-    edit: "Edit knowledge base",
     delete: "Delete",
   },
   selection: {
     empty: "Select a knowledge base from the left.",
     createDocument: "New document knowledge base",
     createQA: "New Q&A knowledge base",
+  },
+  documents: {
+    title: "Knowledge documents",
+    loading: "Loading knowledge documents…",
+    loadError: "Could not load knowledge documents.",
+    empty: "This knowledge base has no documents",
+    columns: {
+      name: "Document name",
+      status: "Status",
+      createdAt: "Created",
+    },
+    status: {
+      processing: "Processing",
+      ready: "Available",
+      paused: "Paused",
+      error: "Failed",
+      disabled: "Disabled",
+      archived: "Archived",
+    },
+    pagination: {
+      total: "{{count}} documents total",
+      previous: "Previous",
+      next: "Next",
+      page: "Page {{current}} of {{total}}",
+    },
   },
   form: {
     createTitle: "New knowledge base",

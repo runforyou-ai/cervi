@@ -14,6 +14,18 @@ const (
 	KnowledgeBaseCategoryQA       KnowledgeBaseCategory = KnowledgeBaseCategory(domain.KnowledgeBaseCategoryQA)
 )
 
+// KnowledgeDocumentStatus 表示知识文档的处理状态。
+type KnowledgeDocumentStatus string
+
+const (
+	KnowledgeDocumentStatusProcessing KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusProcessing)
+	KnowledgeDocumentStatusReady      KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusReady)
+	KnowledgeDocumentStatusPaused     KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusPaused)
+	KnowledgeDocumentStatusError      KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusError)
+	KnowledgeDocumentStatusDisabled   KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusDisabled)
+	KnowledgeDocumentStatusArchived   KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusArchived)
+)
+
 // KnowledgeBaseInput 定义知识库可编辑字段。
 type KnowledgeBaseInput struct {
 	Name                    string                `json:"name"`
@@ -66,4 +78,24 @@ type ExternalKnowledgeBaseOption struct {
 // ExternalKnowledgeBaseOptionList 定义外部知识库选择项列表。
 type ExternalKnowledgeBaseOptionList struct {
 	KnowledgeBases []ExternalKnowledgeBaseOption `json:"knowledgeBases"`
+}
+
+// KnowledgeDocumentListInput 定义知识文档分页条件。
+type KnowledgeDocumentListInput struct {
+	Page     int `json:"page" query:"page,default=1"`
+	PageSize int `json:"pageSize" query:"pageSize,default=20"`
+}
+
+// KnowledgeDocumentSummary 定义知识文档列表项。
+type KnowledgeDocumentSummary struct {
+	ID        string                  `json:"id"`
+	Name      string                  `json:"name"`
+	Status    KnowledgeDocumentStatus `json:"status"`
+	CreatedAt *time.Time              `json:"createdAt"`
+}
+
+// KnowledgeDocumentList 定义知识文档分页结果。
+type KnowledgeDocumentList struct {
+	Documents []KnowledgeDocumentSummary `json:"documents"`
+	Page      PageInfo                   `json:"page"`
 }

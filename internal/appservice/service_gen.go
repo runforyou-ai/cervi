@@ -229,6 +229,11 @@ func (s *Service) ListExternalKnowledgeBaseOptions(ctx context.Context, meta Req
 	return s.backend.ListExternalKnowledgeBaseOptions(ctx, meta, connectionID)
 }
 
+// ListKnowledgeDocuments 返回指定外部知识库的文档列表。
+func (s *Service) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
+	return s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
+}
+
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (s *Service) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBase, error) {
 	return s.backend.GetKnowledgeBase(ctx, meta, knowledgeBaseID)

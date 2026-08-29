@@ -458,9 +458,11 @@ export function KnowledgeBaseFormPage({
                     ? t("form.create")
                     : t("form.save")}
               </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to="/knowledge-bases">{t("form.cancel")}</Link>
-              </Button>
+              {mode === "create" ? (
+                <Button type="button" variant="outline" asChild>
+                  <Link to="/knowledge-bases">{t("form.cancel")}</Link>
+                </Button>
+              ) : null}
             </div>
           </form>
         )}

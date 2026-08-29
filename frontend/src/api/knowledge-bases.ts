@@ -7,16 +7,21 @@ import {
   GetKnowledgeBase,
   ListExternalKnowledgeBaseOptions,
   ListKnowledgeBases,
+  ListKnowledgeDocuments,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   KnowledgeBaseCategory,
+  KnowledgeDocumentStatus,
   type ExternalKnowledgeBaseOption,
   type ExternalKnowledgeBaseOptionList,
   type KnowledgeBase,
   type KnowledgeBaseInput,
   type KnowledgeBaseList,
+  type KnowledgeDocumentList,
+  type KnowledgeDocumentListInput,
+  type KnowledgeDocumentSummary,
   type KnowledgeGroup,
   type KnowledgeGroupInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -58,6 +63,27 @@ export type ExternalKnowledgeBaseOptionListData = Omit<
   knowledgeBases: ExternalKnowledgeBaseOptionData[]
 }
 
+export type KnowledgeDocumentStatusId = Exclude<
+  KnowledgeDocumentStatus,
+  KnowledgeDocumentStatus.$zero
+>
+
+export type KnowledgeDocumentData = Omit<
+  KnowledgeDocumentSummary,
+  "status"
+> & {
+  status: KnowledgeDocumentStatusId
+}
+
+export type KnowledgeDocumentListData = Omit<
+  KnowledgeDocumentList,
+  "documents"
+> & {
+  documents: KnowledgeDocumentData[]
+}
+
+export type KnowledgeDocumentListQuery = Partial<KnowledgeDocumentListInput>
+
 const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
 const getKnowledgeBaseBound = bind(GetKnowledgeBase)
 const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
@@ -68,6 +94,7 @@ const listKnowledgeBasesBound = bind(ListKnowledgeBases)
 const listExternalKnowledgeBaseOptionsBound = bind(
   ListExternalKnowledgeBaseOptions,
 )
+const listKnowledgeDocumentsBound = bind(ListKnowledgeDocuments)
 
 /** 创建企业知识库。 */
 export function createKnowledgeBase(
@@ -79,8 +106,11 @@ export function createKnowledgeBase(
 /** 读取企业知识库详情。 */
 export function getKnowledgeBase(
   knowledgeBaseId: string,
+  signal?: AbortSignal,
 ): Promise<KnowledgeBaseData> {
-  return getKnowledgeBaseBound(knowledgeBaseId).then(normalizeKnowledgeBase)
+  return getKnowledgeBaseBound(knowledgeBaseId, signal).then(
+    normalizeKnowledgeBase,
+  )
 }
 
 /** 修改企业知识库。 */
@@ -144,6 +174,25 @@ export function listExternalKnowledgeBaseOptions(
     knowledgeBases: asList(output.knowledgeBases).map((knowledgeBase) => ({
       ...knowledgeBase,
       category: knowledgeBase.category as KnowledgeBaseCategoryId,
+    })),
+  }))
+}
+
+/** 读取指定外部知识库的一页文档。 */
+export function listKnowledgeDocuments(
+  knowledgeBaseId: string,
+  query: KnowledgeDocumentListQuery = {},
+  signal?: AbortSignal,
+): Promise<KnowledgeDocumentListData> {
+  return listKnowledgeDocumentsBound(
+    knowledgeBaseId,
+    { page: query.page ?? 1, pageSize: query.pageSize ?? 20 },
+    signal,
+  ).then((output) => ({
+    ...output,
+    documents: asList(output.documents).map((document) => ({
+      ...document,
+      status: document.status as KnowledgeDocumentStatusId,
     })),
   }))
 }

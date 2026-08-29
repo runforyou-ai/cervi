@@ -92,3 +92,37 @@ func TestNormalizeGroupInput(t *testing.T) {
 		t.Fatalf("fields = %#v", fields)
 	}
 }
+
+// TestNormalizeDocumentListInput 验证知识文档分页默认值和上限。
+func TestNormalizeDocumentListInput(t *testing.T) {
+	input, fields := normalizeDocumentListInput(DocumentListInput{})
+	if len(fields) != 0 || input.Page != 1 || input.PageSize != defaultKnowledgeDocumentPageSize {
+		t.Fatalf("input = %#v, fields = %#v", input, fields)
+	}
+	_, fields = normalizeDocumentListInput(DocumentListInput{Page: 2, PageSize: 101})
+	if fields["pageSize"] != ValidationDocumentQueryInvalid {
+		t.Fatalf("fields = %#v", fields)
+	}
+}
+
+// TestKnowledgeDocumentStatusFromDify 验证 Dify 文档状态映射为统一状态。
+func TestKnowledgeDocumentStatusFromDify(t *testing.T) {
+	tests := map[string]domain.KnowledgeDocumentStatus{
+		"queuing":   domain.KnowledgeDocumentStatusProcessing,
+		"indexing":  domain.KnowledgeDocumentStatusProcessing,
+		"available": domain.KnowledgeDocumentStatusReady,
+		"paused":    domain.KnowledgeDocumentStatusPaused,
+		"error":     domain.KnowledgeDocumentStatusError,
+		"disabled":  domain.KnowledgeDocumentStatusDisabled,
+		"archived":  domain.KnowledgeDocumentStatusArchived,
+	}
+	for status, expected := range tests {
+		actual, err := knowledgeDocumentStatusFromDify(status)
+		if err != nil || actual != expected {
+			t.Fatalf("status %q: actual = %q, error = %v", status, actual, err)
+		}
+	}
+	if _, err := knowledgeDocumentStatusFromDify("future_status"); err == nil {
+		t.Fatal("unsupported status should fail")
+	}
+}

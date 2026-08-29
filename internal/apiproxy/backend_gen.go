@@ -363,6 +363,14 @@ func (b *Backend) ListExternalKnowledgeBaseOptions(ctx context.Context, meta app
 	return output, err
 }
 
+// ListKnowledgeDocuments 返回指定外部知识库的文档列表。
+func (b *Backend) ListKnowledgeDocuments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeDocumentListInput) (appservice.KnowledgeDocumentList, error) {
+	var output appservice.KnowledgeDocumentList
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents", encodeKnowledgeDocumentListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase
@@ -655,6 +663,14 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "query", input.Query)
 	setOptionalQuery(query, "status", input.Status)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeKnowledgeDocumentListInputQuery 将 appservice.KnowledgeDocumentListInput 编码为查询参数。
+func encodeKnowledgeDocumentListInputQuery(input appservice.KnowledgeDocumentListInput) url.Values {
+	query := url.Values{}
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query
