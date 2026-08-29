@@ -3,24 +3,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import {
   ChevronDownIcon,
-  GlobeIcon,
   HeadsetIcon,
-  MessageCircleIcon,
   MessagesSquareIcon,
   PanelLeftIcon,
   PlusIcon,
   SearchIcon,
-  SendIcon,
-  UserRoundIcon,
   XIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import {
-  ChannelType,
-  ServiceSessionStatus,
-  type InboxConversation,
-} from "@/api"
+import { ServiceSessionStatus, type InboxConversation } from "@/api"
 import { PageSplit } from "@/components/page-split"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
@@ -39,8 +31,17 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useUserTimeZone } from "@/contexts/user-preferences"
+import { ConversationComposer } from "@/features/inbox/conversation-composer"
+import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
+import {
+  ConversationAvatar,
+  ConversationHeader,
+} from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
-import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
+import {
+  useIsNarrowViewport,
+  useIsWideViewport,
+} from "@/hooks/use-narrow-viewport"
 import { cn } from "@/lib/utils"
 
 /** 消息范围；后续阶段出现内部会话等来源后按能力扩展。 */
@@ -53,23 +54,6 @@ const scopes = [
   { id: "all", labelKey: "scopeAll", icon: MessagesSquareIcon },
   { id: "customer", labelKey: "scopeCustomer", icon: HeadsetIcon },
 ] as const
-
-const sourceBadges: Partial<
-  Record<ChannelType, { icon: typeof GlobeIcon; className: string }>
-> = {
-  [ChannelType.ChannelTypeWebsite]: {
-    icon: GlobeIcon,
-    className: "bg-badge-website",
-  },
-  [ChannelType.ChannelTypeTelegram]: {
-    icon: SendIcon,
-    className: "bg-badge-telegram",
-  },
-  [ChannelType.ChannelTypeWeChatOfficialAccount]: {
-    icon: MessageCircleIcon,
-    className: "bg-badge-wechat",
-  },
-}
 
 /** 客服处理状态文案。 */
 function sessionStatusLabel(
@@ -164,45 +148,6 @@ function useMinuteTick() {
     const timer = window.setInterval(() => setTick((tick) => tick + 1), 60_000)
     return () => window.clearInterval(timer)
   }, [])
-}
-
-/** 会话头像和来源渠道角标。 */
-function ConversationAvatar({
-  conversation,
-  className,
-}: {
-  conversation: InboxConversation
-  className?: string
-}) {
-  const badge = sourceBadges[conversation.channelType]
-
-  return (
-    <div className="relative shrink-0">
-      <div
-        className={cn(
-          "flex size-10 items-center justify-center rounded-lg bg-muted text-sm font-medium text-muted-foreground",
-          className,
-        )}
-      >
-        {conversation.contactName ? (
-          conversation.contactName.slice(0, 1).toLocaleUpperCase()
-        ) : (
-          <UserRoundIcon className="size-4.5" />
-        )}
-      </div>
-      {badge ? (
-        <span
-          aria-hidden="true"
-          className={cn(
-            "absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full border-2 border-background text-white",
-            badge.className,
-          )}
-        >
-          <badge.icon className="size-2" />
-        </span>
-      ) : null}
-    </div>
-  )
 }
 
 /** 顶部操作行：收纳纵栏、搜索框和发起会话占位菜单。 */
@@ -547,7 +492,7 @@ function InboxConversationList({
   )
 }
 
-/** 选中会话的主区：头部信息和只读消息时间线。 */
+/** 组合当前 Conversation 的头部、时间线、回复区和上下文栏。 */
 function ConversationMain({
   conversation,
   narrowViewport = false,
@@ -556,34 +501,63 @@ function ConversationMain({
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation("inbox")
+  const isWideViewport = useIsWideViewport()
   const conversationName = useConversationName()
+  const [contextSheetOpen, setContextSheetOpen] = useState(false)
+  const [contextCollapsed, setContextCollapsed] = useState(false)
+  const contactName = conversationName(conversation)
+  const sessionStatus = sessionStatusLabel(conversation.serviceSessionStatus, t)
+  const desktopContextVisible = isWideViewport && !contextCollapsed
+  const contextVisible = isWideViewport
+    ? desktopContextVisible
+    : contextSheetOpen
+
+  useEffect(() => {
+    if (isWideViewport) {
+      setContextSheetOpen(false)
+    }
+  }, [isWideViewport])
+
+  /** 切换当前视口使用的上下文栏。 */
+  function toggleContext() {
+    if (isWideViewport) {
+      setContextCollapsed((collapsed) => !collapsed)
+      return
+    }
+    setContextSheetOpen((open) => !open)
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <header
-        data-slot="page-header"
-        className={cn(
-          "flex h-14 shrink-0 items-center gap-3 border-b border-border/60 px-4",
-          narrowViewport && "pr-14",
-        )}
-      >
-        <div data-slot="page-header-title" className="flex min-w-0 items-center gap-3">
-          <ConversationAvatar conversation={conversation} />
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-medium">
-              {conversation.title}
-            </h2>
-            <p className="truncate text-xs text-muted-foreground">
-              {conversationName(conversation)} · {conversation.channelName} ·{" "}
-              {sessionStatusLabel(conversation.serviceSessionStatus, t)}
-            </p>
-          </div>
-        </div>
-      </header>
-      <ConversationTimeline
-        key={conversation.id}
-        conversationID={conversation.id}
+      <ConversationHeader
+        conversation={conversation}
+        contactName={contactName}
+        sessionStatus={sessionStatus}
+        contextVisible={contextVisible}
+        narrowViewport={narrowViewport}
+        onContextToggle={toggleContext}
       />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <ConversationTimeline
+            key={conversation.id}
+            conversationID={conversation.id}
+          />
+          <ConversationComposer
+            key={conversation.id}
+            conversationID={conversation.id}
+          />
+        </div>
+        <ConversationContextPane
+          conversation={conversation}
+          contactName={contactName}
+          sessionStatus={sessionStatus}
+          desktopVisible={desktopContextVisible}
+          sheetOpen={!isWideViewport && contextSheetOpen}
+          onDesktopCollapse={() => setContextCollapsed(true)}
+          onSheetOpenChange={setContextSheetOpen}
+        />
+      </div>
     </div>
   )
 }
@@ -735,7 +709,10 @@ export function InboxPage({
             </SheetTitle>
             <SheetDescription>{t("detailDescription")}</SheetDescription>
           </SheetHeader>
-          <ConversationMain conversation={selectedConversation} narrowViewport />
+          <ConversationMain
+            conversation={selectedConversation}
+            narrowViewport
+          />
         </SheetContent>
       </Sheet>
     </>
