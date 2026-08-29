@@ -1,4 +1,4 @@
-// Package connector 实现外部系统连接器的只读连接探测。
+// Package connector 实现外部系统连接器的只读访问适配。
 package connector
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
-// HTTPDoer 定义连接器探测需要的最小 HTTP 客户端契约。
+// HTTPDoer 定义连接器 HTTP 请求需要的最小客户端契约。
 type HTTPDoer = connectiontest.HTTPDoer
 
 // Config 定义创建连接器探测器需要的配置。
@@ -32,7 +32,7 @@ type Registry struct {
 	factories map[domain.IntegrationConnectionType]Factory
 }
 
-// NewHTTPClient 创建不会跟随重定向泄露凭据的探测客户端。
+// NewHTTPClient 创建不跟随重定向的连接器客户端。
 func NewHTTPClient() *http.Client {
 	return connectiontest.NewHTTPClient()
 }
@@ -77,12 +77,12 @@ type httpProbe struct {
 
 // Run 执行连接器 HTTP 探测。
 func (p *httpProbe) Run(ctx context.Context) error {
-	err := connectiontest.RunHTTPProbe(ctx, p.client, p.primary.request, p.primary.validate)
+	err := connectiontest.ReadHTTPResponse(ctx, p.client, p.primary.request, p.primary.validate)
 	for _, candidate := range p.fallbacks {
 		if err == nil || !supportsFallback(err) {
 			return err
 		}
-		err = connectiontest.RunHTTPProbe(ctx, p.client, candidate.request, candidate.validate)
+		err = connectiontest.ReadHTTPResponse(ctx, p.client, candidate.request, candidate.validate)
 	}
 	return err
 }

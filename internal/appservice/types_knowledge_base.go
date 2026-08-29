@@ -55,3 +55,15 @@ type KnowledgeBase struct {
 type KnowledgeBaseList struct {
 	KnowledgeBases []KnowledgeBase `json:"knowledgeBases"`
 }
+
+// ExternalKnowledgeBaseOption 定义外部知识库选择项。
+type ExternalKnowledgeBaseOption struct {
+	ID       string                `json:"id"`
+	Name     string                `json:"name"`
+	Category KnowledgeBaseCategory `json:"category"`
+}
+
+// ExternalKnowledgeBaseOptionList 定义外部知识库选择项列表。
+type ExternalKnowledgeBaseOptionList struct {
+	KnowledgeBases []ExternalKnowledgeBaseOption `json:"knowledgeBases"`
+}

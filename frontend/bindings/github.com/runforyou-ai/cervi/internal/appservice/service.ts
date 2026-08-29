@@ -365,6 +365,13 @@ export function ListConversationMessages(meta: $models.RequestMeta, conversation
 }
 
 /**
+ * ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
+ */
+export function ListExternalKnowledgeBaseOptions(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<$models.ExternalKnowledgeBaseOptionList> {
+    return $Call.ByID(1363605376, meta, connectionID);
+}
+
+/**
  * ListIntegrationConnections 返回当前企业的连接器列表。
  */
 export function ListIntegrationConnections(meta: $models.RequestMeta): $CancellablePromise<$models.IntegrationConnectionList> {

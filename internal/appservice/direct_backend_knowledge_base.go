@@ -11,6 +11,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
 // ListKnowledgeBases 返回当前企业的知识库列表。
@@ -28,6 +29,48 @@ func (b *DirectBackend) ListKnowledgeBases(ctx context.Context, meta RequestMeta
 		knowledgeBases = append(knowledgeBases, knowledgeBaseFromAction(record))
 	}
 	return KnowledgeBaseList{KnowledgeBases: knowledgeBases}, nil
+}
+
+// ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
+func (b *DirectBackend) ListExternalKnowledgeBaseOptions(
+	ctx context.Context,
+	meta RequestMeta,
+	connectionID string,
+) (ExternalKnowledgeBaseOptionList, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return ExternalKnowledgeBaseOptionList{}, err
+	}
+	records, err := b.listExternalKnowledgeBaseOptions.Execute(ctx, identity, connectionID)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ExternalKnowledgeBaseOptionList{}, ctx.Err()
+		}
+		if stage, kind, classified := connectiontest.Details(err); classified {
+			slog.Warn("Dify 知识库列表读取失败",
+				"organization_id", identity.Organization.ID,
+				"connection_id", connectionID,
+				"stage", stage,
+				"kind", kind,
+			)
+			return ExternalKnowledgeBaseOptionList{}, integrationConnectionRemoteError(meta, err)
+		}
+		return ExternalKnowledgeBaseOptionList{}, b.knowledgeBaseError(
+			ctx, meta, err, cervii18n.ErrorKnowledgeBaseListFailed, identity.Organization.ID, "",
+		)
+	}
+	knowledgeBases := make([]ExternalKnowledgeBaseOption, 0, len(records))
+	for _, record := range records {
+		knowledgeBases = append(knowledgeBases, ExternalKnowledgeBaseOption{
+			ID: record.ID, Name: record.Name, Category: KnowledgeBaseCategory(record.Category),
+		})
+	}
+	slog.Info("Dify 知识库列表读取成功",
+		"organization_id", identity.Organization.ID,
+		"connection_id", connectionID,
+		"knowledge_base_count", len(knowledgeBases),
+	)
+	return ExternalKnowledgeBaseOptionList{KnowledgeBases: knowledgeBases}, nil
 }
 
 // GetKnowledgeBase 返回当前企业中的知识库详情。

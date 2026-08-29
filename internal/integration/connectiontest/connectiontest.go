@@ -1,4 +1,4 @@
-// Package connectiontest 定义外部连接探测的通用执行语义。
+// Package connectiontest 定义外部连接访问的错误分类与探测语义。
 package connectiontest
 
 import (
@@ -34,7 +34,7 @@ const (
 	LocationDevice Location = "device"
 )
 
-// Stage 标识连接探测失败的阶段。
+// Stage 标识外部连接失败阶段。
 type Stage string
 
 const (
@@ -80,32 +80,32 @@ func (f ProbeFunc) Run(ctx context.Context) error {
 	return f(ctx)
 }
 
-// Error 描述已经规范化的连接探测错误。
+// Error 描述已经分类的外部连接错误。
 type Error struct {
 	Stage Stage
 	Kind  FailureKind
 	err   error
 }
 
-// Error 返回连接探测错误描述。
+// Error 返回外部连接错误描述。
 func (e *Error) Error() string {
 	if e.err == nil {
-		return fmt.Sprintf("connection test failed at %s: %s", e.Stage, e.Kind)
+		return fmt.Sprintf("external connection failed at %s: %s", e.Stage, e.Kind)
 	}
-	return fmt.Sprintf("connection test failed at %s: %s: %v", e.Stage, e.Kind, e.err)
+	return fmt.Sprintf("external connection failed at %s: %s: %v", e.Stage, e.Kind, e.err)
 }
 
-// Unwrap 返回原始探测错误。
+// Unwrap 返回原始错误。
 func (e *Error) Unwrap() error {
 	return e.err
 }
 
-// NewError 创建已经分类的连接探测错误。
+// NewError 创建已经分类的外部连接错误。
 func NewError(stage Stage, kind FailureKind, err error) *Error {
 	return &Error{Stage: stage, Kind: kind, err: err}
 }
 
-// Details 返回连接探测错误的失败阶段和类别。
+// Details 返回外部连接错误的失败阶段和类别。
 func Details(err error) (Stage, FailureKind, bool) {
 	var connectionError *Error
 	if !errors.As(err, &connectionError) {

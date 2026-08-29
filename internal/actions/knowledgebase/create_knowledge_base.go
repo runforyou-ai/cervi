@@ -33,6 +33,9 @@ func (a *CreateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
+		if err := validateDifyConnection(ctx, tx, identity.Organization.ID, input.IntegrationConnectionID); err != nil {
+			return err
+		}
 		knowledgeBase := &servermodels.KnowledgeBase{
 			OrganizationID: identity.Organization.ID, CreatedByUserID: identity.User.ID,
 			Name: input.Name, Category: string(input.Category), Description: input.Description,
