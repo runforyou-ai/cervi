@@ -43,9 +43,10 @@ func run(_ []string) error {
 	notificationProvider, notificationLifecycleServices := appservicenative.NewNotificationProvider()
 	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
-		Name:        nativeAppName,
-		Description: "Cervi is an open-source AI customer support teammate platform",
-		Services:    notificationLifecycleServices,
+		Name:                        nativeAppName,
+		Description:                 "Cervi is an open-source AI customer support teammate platform",
+		Services:                    notificationLifecycleServices,
+		DisableDefaultSignalHandler: runtime.GOOS == "ios",
 		ShouldQuit: func() bool {
 			if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
 				return true
@@ -66,6 +67,10 @@ func run(_ []string) error {
 		},
 		Linux: application.LinuxOptions{
 			DisableQuitOnLastWindowClosed: true,
+		},
+		IOS: application.IOSOptions{
+			DisableBounce:           true,
+			DisableScrollIndicators: true,
 		},
 	})
 

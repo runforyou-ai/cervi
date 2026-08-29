@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react"
 
 import type { CurrentUser } from "@/api"
-import { i18n } from "@/i18n"
+import { changeAppLanguage } from "@/i18n"
 
 const UserTimeZoneContext = createContext<CurrentUser["timeZone"] | null>(null)
 
@@ -15,7 +15,7 @@ export function UserPreferencesProvider({
   children: ReactNode
 }) {
   useEffect(() => {
-    void i18n.changeLanguage(user.locale).catch((error) => {
+    void changeAppLanguage(user.locale).catch((error) => {
       console.warn("切换界面语言失败", error)
     })
   }, [user.locale])

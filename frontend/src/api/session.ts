@@ -5,6 +5,7 @@ import {
   LoadStartup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import { bind } from "@/api/client"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 读取初始化或服务器连接入口。 */
 export const loadStartup = bind(LoadStartup)
@@ -18,7 +19,7 @@ export function sessionPath(state: string) {
     case SessionState.SessionStateLogin:
       return "/login"
     case SessionState.SessionStateSetup:
-      return "/setup"
+      return resolveAppPlatform() === "web" ? "/setup" : "/connect"
     case SessionState.SessionStateConnect:
       return "/connect"
     default:

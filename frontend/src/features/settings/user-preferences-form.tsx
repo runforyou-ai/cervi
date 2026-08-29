@@ -34,6 +34,7 @@ import {
   createUserPreferencesSchema,
   type UserPreferencesFormValues,
 } from "@/features/settings/user-preferences-schema"
+import { changeAppLanguage } from "@/i18n"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { supportedTimeZones } from "@/lib/time-zones"
 import {
@@ -50,7 +51,7 @@ export function UserPreferencesForm({
   user: CurrentUser
   onUpdated: (user: CurrentUser) => void
 }) {
-  const { t, i18n } = useTranslation("settings")
+  const { t } = useTranslation("settings")
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const notificationScope = useMemo<NotificationDeviceScope>(
@@ -107,7 +108,7 @@ export function UserPreferencesForm({
         notificationSoundEnabled: values.notificationSoundEnabled,
       })
       onUpdated(updated)
-      await i18n.changeLanguage(updated.locale)
+      await changeAppLanguage(updated.locale)
       console.info("偏好设置已保存", {
         user_id: updated.id,
         locale: updated.locale,

@@ -19,8 +19,8 @@ type Error struct {
 	status  int               `json:"-"`
 }
 
-// Error 返回错误种类或会话状态，以及用户文案。
-func (e *Error) Error() string {
+// displayMessage 返回错误种类或会话状态，以及用户文案。
+func (e *Error) displayMessage() string {
 	if e.Kind != "" {
 		return string(e.Kind) + ": " + e.Message
 	}
