@@ -13,6 +13,8 @@ const (
 	TriggerBusiness = "business"
 	TriggerManual   = "manual"
 	TriggerSchedule = "schedule"
+	// QueueAgent 隔离可能长时间运行的 Agent 任务。
+	QueueAgent = "agent"
 )
 
 // EnqueueOptions 定义一次服务端异步 Action 投递参数。
