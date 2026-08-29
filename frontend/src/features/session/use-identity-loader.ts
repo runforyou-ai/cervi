@@ -9,6 +9,7 @@ import {
   type Identity,
 } from "@/api"
 import { clearWebToken } from "@/api/client"
+import { resetResourceCache } from "@/lib/resource-client"
 
 type IdentityLoadState = {
   status: "loading" | "loaded" | "anonymous" | "redirect" | "failed"
@@ -18,6 +19,7 @@ type IdentityLoadState = {
 
 /** 读取登录身份，并把明确的会话错误转换成入口。 */
 export function useIdentityLoader() {
+  const [revision, setRevision] = useState(0)
   const [state, setState] = useState<IdentityLoadState>({
     status: "loading",
     identity: null,
@@ -37,6 +39,7 @@ export function useIdentityLoader() {
         if (isApiError(error) && error.state === SessionState.SessionStateLogin) {
           console.info("登录状态已失效")
           clearWebToken()
+          resetResourceCache()
           setState({ status: "anonymous", identity: null, redirectPath: null })
           return
         }
@@ -55,7 +58,13 @@ export function useIdentityLoader() {
     return () => {
       stale = true
     }
-  }, [])
+  }, [revision])
 
-  return state
+  return {
+    ...state,
+    retry: () => {
+      setState({ status: "loading", identity: null, redirectPath: null })
+      setRevision((current) => current + 1)
+    },
+  }
 }

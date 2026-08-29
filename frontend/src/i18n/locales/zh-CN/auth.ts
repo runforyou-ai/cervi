@@ -14,6 +14,8 @@ const auth = {
   invalidCredentials: "邮箱或密码错误。",
   networkError: "无法连接服务器，请稍后重试。",
   serverError: "登录失败，请稍后重试。",
+  identityLoadError: "无法确认当前登录状态，请检查网络后重试。",
+  retry: "重试",
   changeServer: "切换",
 }
 

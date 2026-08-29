@@ -6,6 +6,8 @@ const common = {
     close: "Close",
     back: "Back",
   },
+  retry: "Try again",
+  startupLoadError: "Could not start the app. Check your connection and try again.",
   comingSoon: "Soon",
   workStatuses: {
     working: "Working",

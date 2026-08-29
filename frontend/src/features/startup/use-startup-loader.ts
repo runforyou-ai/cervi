@@ -6,6 +6,7 @@ import { loadStartup, type Startup } from "@/api"
 type StartupLoadState =
   | { status: "loading"; startup?: never }
   | { status: "loaded"; startup: Startup }
+  | { status: "failed"; startup?: never }
 
 let startupRequest: Promise<Startup> | null = null
 
@@ -20,6 +21,7 @@ function requestStartup() {
 
 /** 启动时检测一次当前平台能否进入应用。 */
 export function useStartupLoader() {
+  const [revision, setRevision] = useState(0)
   const [state, setState] = useState<StartupLoadState>({
     status: "loading",
   })
@@ -33,12 +35,20 @@ export function useStartupLoader() {
       (error: unknown) => {
         if (stale) return
         console.warn("启动检测失败，停止加载后续页面", error)
+        setState({ status: "failed" })
       },
     )
     return () => {
       stale = true
     }
-  }, [])
+  }, [revision])
 
-  return state
+  return {
+    ...state,
+    retry: () => {
+      startupRequest = null
+      setState({ status: "loading" })
+      setRevision((current) => current + 1)
+    },
+  }
 }

@@ -1,9 +1,11 @@
 /** 在业务路由挂载前完成统一启动检测。 */
 import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { Navigate, useLocation } from "react-router"
 
 import { SessionState, type Startup } from "@/api"
+import { Button } from "@/components/ui/button"
 import { StartupProvider } from "@/contexts/startup-context"
 import { useStartupLoader } from "@/features/startup/use-startup-loader"
 
@@ -29,10 +31,28 @@ function StartupLoading() {
   )
 }
 
+/** 展示启动检测失败并允许重试。 */
+function StartupFailed({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation("common")
+
+  return (
+    <main className="flex min-h-dvh items-center justify-center px-6 text-center">
+      <div>
+        <p className="text-sm text-muted-foreground">
+          {t("startupLoadError")}
+        </p>
+        <Button className="mt-4" variant="outline" onClick={onRetry}>
+          {t("retry")}
+        </Button>
+      </div>
+    </main>
+  )
+}
+
 /** 启动检测完成前阻止业务页面挂载。 */
 export function StartupBootstrap({ children }: { children: React.ReactNode }) {
   const location = useLocation()
-  const { status, startup } = useStartupLoader()
+  const { status, startup, retry } = useStartupLoader()
   const [completed, setCompleted] = useState(false)
   const [organizationName, setOrganizationName] = useState<string | null>(null)
   const completeStartup = useCallback((name: string) => {
@@ -60,7 +80,10 @@ export function StartupBootstrap({ children }: { children: React.ReactNode }) {
     }
   }, [location.pathname, startup])
 
-  if (status !== "loaded") {
+  if (status === "failed") {
+    return <StartupFailed onRetry={retry} />
+  }
+  if (status === "loading") {
     return <StartupLoading />
   }
   if (completed) return content

@@ -17,6 +17,8 @@ import { resetResourceCache } from "@/lib/resource-client"
 import { resolveBrowserTimeZone } from "@/lib/time-zones"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
+const connectServerBound = bind(ConnectServer)
+
 /** 读取已保存的企业服务器地址。 */
 export const getServerURL = bind(ServerURL)
 
@@ -57,5 +59,14 @@ export async function install(
 /** 检测企业服务器并返回公开企业名称，不保存地址。 */
 export const probeServer = bind(ProbeServer)
 
-/** 验证并保存企业服务器地址。 */
-export const connectServer = bind(ConnectServer)
+/** 验证并保存企业服务器地址，并在切换企业时清空上一会话缓存。 */
+export async function connectServer(serverURL: string) {
+  const previousServerURL = await getServerURL()
+  await connectServerBound(serverURL)
+  const currentServerURL = await getServerURL()
+  const changed = previousServerURL !== currentServerURL
+  if (previousServerURL !== "" && changed) {
+    resetResourceCache()
+  }
+  return { changed }
+}
