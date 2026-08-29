@@ -77,6 +77,7 @@ type DirectBackend struct {
 	updateTeam                        *teamaction.UpdateTeamAction
 	deleteTeam                        *teamaction.DeleteTeamAction
 	listKnowledgeBases                *knowledgebaseaction.ListKnowledgeBasesQuery
+	listExternalKnowledgeBaseOptions  *knowledgebaseaction.ListExternalOptionsQuery
 	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
 	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
 	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
@@ -135,7 +136,8 @@ type DirectBackend struct {
 func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	modelProviderRegistry := modelprovider.NewRegistry(modelprovider.NewHTTPClient())
-	connectorRegistry := connector.NewRegistry(connector.NewHTTPClient())
+	connectorClient := connector.NewHTTPClient()
+	connectorRegistry := connector.NewRegistry(connectorClient)
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -172,6 +174,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		updateTeam:                        teamaction.NewUpdateTeamAction(db),
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
 		listKnowledgeBases:                knowledgebaseaction.NewListKnowledgeBasesQuery(db),
+		listExternalKnowledgeBaseOptions:  knowledgebaseaction.NewListExternalOptionsQuery(db, connector.NewDifyKnowledgeBaseLister(connectorClient)),
 		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),

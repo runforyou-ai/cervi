@@ -10,15 +10,15 @@ import (
 	"strings"
 )
 
-// maxResponseSize 限制探测响应的读取上限，防止异常响应耗尽内存。
+// maxResponseSize 限制外部 HTTP 响应的读取上限。
 const maxResponseSize = 1 << 20
 
-// HTTPDoer 定义连接探测需要的最小 HTTP 客户端契约。
+// HTTPDoer 定义外部 HTTP 请求需要的最小客户端契约。
 type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-// NewHTTPClient 创建不会跟随重定向泄露凭据的探测客户端。
+// NewHTTPClient 创建不跟随重定向的 HTTP 客户端。
 func NewHTTPClient() *http.Client {
 	return &http.Client{
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
@@ -27,8 +27,8 @@ func NewHTTPClient() *http.Client {
 	}
 }
 
-// RunHTTPProbe 执行一次 HTTP 探测请求，并规范化传输、状态和响应契约错误。
-func RunHTTPProbe(ctx context.Context, client HTTPDoer, request *http.Request, validate func(io.Reader) error) error {
+// ReadHTTPResponse 读取外部 HTTP 响应，并规范化传输、状态和响应契约错误。
+func ReadHTTPResponse(ctx context.Context, client HTTPDoer, request *http.Request, decode func(io.Reader) error) error {
 	response, err := client.Do(request.Clone(ctx))
 	if err != nil {
 		return ClassifyTransportError(StageConnect, err)
@@ -37,7 +37,7 @@ func RunHTTPProbe(ctx context.Context, client HTTPDoer, request *http.Request, v
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return HTTPStatusError(response.StatusCode)
 	}
-	if err := validate(io.LimitReader(response.Body, maxResponseSize)); err != nil {
+	if err := decode(io.LimitReader(response.Body, maxResponseSize)); err != nil {
 		return NewError(StageCapability, FailureProtocol, err)
 	}
 	return nil

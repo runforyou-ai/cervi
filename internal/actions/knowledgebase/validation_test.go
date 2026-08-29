@@ -58,6 +58,25 @@ func TestNormalizeInput(t *testing.T) {
 	}
 }
 
+// TestCategoryFromDifyDocForm 验证 Dify 文档模式映射为 Cervi 知识库类型。
+func TestCategoryFromDifyDocForm(t *testing.T) {
+	tests := map[string]domain.KnowledgeBaseCategory{
+		"":                   domain.KnowledgeBaseCategoryStandard,
+		"text_model":         domain.KnowledgeBaseCategoryStandard,
+		"hierarchical_model": domain.KnowledgeBaseCategoryStandard,
+		"qa_model":           domain.KnowledgeBaseCategoryQA,
+	}
+	for docForm, expected := range tests {
+		actual, err := categoryFromDifyDocForm(docForm)
+		if err != nil || actual != expected {
+			t.Fatalf("doc_form %q: category = %q, error = %v", docForm, actual, err)
+		}
+	}
+	if _, err := categoryFromDifyDocForm("future_model"); err == nil {
+		t.Fatal("unsupported doc_form should fail")
+	}
+}
+
 // TestNormalizeGroupInput 验证分组名称和上级编号校验。
 func TestNormalizeGroupInput(t *testing.T) {
 	input, fields := normalizeGroupInput(GroupInput{Name: "  产品  "})

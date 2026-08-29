@@ -5,12 +5,15 @@ import {
   DeleteKnowledgeBase,
   DeleteKnowledgeGroup,
   GetKnowledgeBase,
+  ListExternalKnowledgeBaseOptions,
   ListKnowledgeBases,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   KnowledgeBaseCategory,
+  type ExternalKnowledgeBaseOption,
+  type ExternalKnowledgeBaseOptionList,
   type KnowledgeBase,
   type KnowledgeBaseInput,
   type KnowledgeBaseList,
@@ -41,6 +44,20 @@ export type KnowledgeBaseListData = Omit<
   knowledgeBases: KnowledgeBaseData[]
 }
 
+export type ExternalKnowledgeBaseOptionData = Omit<
+  ExternalKnowledgeBaseOption,
+  "category"
+> & {
+  category: KnowledgeBaseCategoryId
+}
+
+export type ExternalKnowledgeBaseOptionListData = Omit<
+  ExternalKnowledgeBaseOptionList,
+  "knowledgeBases"
+> & {
+  knowledgeBases: ExternalKnowledgeBaseOptionData[]
+}
+
 const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
 const getKnowledgeBaseBound = bind(GetKnowledgeBase)
 const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
@@ -48,6 +65,9 @@ const createKnowledgeGroupBound = bind(CreateKnowledgeGroup)
 const updateKnowledgeGroupBound = bind(UpdateKnowledgeGroup)
 const deleteKnowledgeGroupBound = bind(DeleteKnowledgeGroup)
 const listKnowledgeBasesBound = bind(ListKnowledgeBases)
+const listExternalKnowledgeBaseOptionsBound = bind(
+  ListExternalKnowledgeBaseOptions,
+)
 
 /** 创建企业知识库。 */
 export function createKnowledgeBase(
@@ -112,6 +132,19 @@ export function listKnowledgeBases(): Promise<KnowledgeBaseListData> {
   return listKnowledgeBasesBound().then((output) => ({
     ...output,
     knowledgeBases: asList(output.knowledgeBases).map(normalizeKnowledgeBase),
+  }))
+}
+
+/** 读取指定 Dify 连接可访问的知识库选项。 */
+export function listExternalKnowledgeBaseOptions(
+  connectionId: string,
+): Promise<ExternalKnowledgeBaseOptionListData> {
+  return listExternalKnowledgeBaseOptionsBound(connectionId).then((output) => ({
+    ...output,
+    knowledgeBases: asList(output.knowledgeBases).map((knowledgeBase) => ({
+      ...knowledgeBase,
+      category: knowledgeBase.category as KnowledgeBaseCategoryId,
+    })),
   }))
 }
 

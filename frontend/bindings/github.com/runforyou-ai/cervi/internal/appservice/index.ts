@@ -78,6 +78,8 @@ export type {
     CreateMessageChannelInput,
     CreateUserInput,
     CurrentUser,
+    ExternalKnowledgeBaseOption,
+    ExternalKnowledgeBaseOptionList,
     ExternalPageInput,
     File,
     FileUpload,

@@ -36,6 +36,13 @@ type Record struct {
 	UpdatedAt               time.Time `bun:"updated_at"`
 }
 
+// ExternalOptionRecord 定义外部知识库选择项。
+type ExternalOptionRecord struct {
+	ID       string
+	Name     string
+	Category domain.KnowledgeBaseCategory
+}
+
 // GroupRecord 定义知识库分组树节点。
 type GroupRecord struct {
 	ID        string  `bun:"id"`

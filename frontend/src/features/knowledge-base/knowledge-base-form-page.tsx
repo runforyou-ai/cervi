@@ -13,16 +13,18 @@ import {
 import { toast } from "sonner"
 
 import {
+  IntegrationConnectionType,
   KnowledgeBaseCategory,
   type KnowledgeBaseCategoryId,
   type KnowledgeBaseData,
   createKnowledgeBase,
   getKnowledgeBase,
   isApiError,
+  listExternalKnowledgeBaseOptions,
+  listIntegrationConnections,
   updateKnowledgeBase,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
-import { PageBack } from "@/components/page-back"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -41,34 +43,6 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-type DifyDocForm = "text_model" | "hierarchical_model" | "qa_model"
-
-const difyDocFormCategories: Record<
-  DifyDocForm,
-  KnowledgeBaseCategoryId
-> = {
-  text_model: KnowledgeBaseCategory.KnowledgeBaseCategoryStandard,
-  hierarchical_model: KnowledgeBaseCategory.KnowledgeBaseCategoryStandard,
-  qa_model: KnowledgeBaseCategory.KnowledgeBaseCategoryQA,
-}
-
-/** 固定的 Dify 演示连接和知识库选项。 */
-const demoDifyIntegrationConnectionId =
-  "019c91a2-7b4e-7e52-a1c9-6f0d8b3a2e14"
-const demoDifyKnowledgeBases = [
-  {
-    id: "019c91a2-8d63-7c21-b5e7-4a9f1d6c3b20",
-    docForm: "text_model",
-    label: "form.demoDifyDocumentKnowledgeBase",
-  },
-  {
-    id: "019c91a2-9f74-77a3-86d2-71b5c4e8903f",
-    docForm: "qa_model",
-    label: "form.demoDifyQAKnowledgeBase",
-  },
-] as const
-const defaultDemoDifyKnowledgeBase = demoDifyKnowledgeBases[0]
-
 /** 创建或编辑知识库。 */
 export function KnowledgeBaseFormPage({
   mode,
@@ -80,10 +54,9 @@ export function KnowledgeBaseFormPage({
   const [searchParams] = useSearchParams()
   const requestedExternal =
     mode === "create" && searchParams.get("source") === "dify"
-  const requestedCategory = requestedExternal
-    ? difyDocFormCategories[defaultDemoDifyKnowledgeBase.docForm]
-    : searchParams.get("category") ===
-        KnowledgeBaseCategory.KnowledgeBaseCategoryQA
+  const requestedCategory =
+    searchParams.get("category") ===
+    KnowledgeBaseCategory.KnowledgeBaseCategoryQA
       ? KnowledgeBaseCategory.KnowledgeBaseCategoryQA
       : KnowledgeBaseCategory.KnowledgeBaseCategoryStandard
   const { upsertKnowledgeBase } = useKnowledgeBaseContext()
@@ -114,14 +87,12 @@ export function KnowledgeBaseFormPage({
     defaultValues: {
       name: "",
       description: "",
-      integrationConnectionId: requestedExternal
-        ? demoDifyIntegrationConnectionId
-        : "",
-      externalResourceId: requestedExternal
-        ? defaultDemoDifyKnowledgeBase.id
-        : "",
+      integrationConnectionId: "",
+      externalResourceId: "",
     },
   })
+  const selectedConnectionId = form.watch("integrationConnectionId")
+  const selectedExternalResourceId = form.watch("externalResourceId")
   useEffect(() => {
     if (mode !== "create") return
     setExternal(requestedExternal)
@@ -129,12 +100,8 @@ export function KnowledgeBaseFormPage({
     form.reset({
       name: "",
       description: "",
-      integrationConnectionId: requestedExternal
-        ? demoDifyIntegrationConnectionId
-        : "",
-      externalResourceId: requestedExternal
-        ? defaultDemoDifyKnowledgeBase.id
-        : "",
+      integrationConnectionId: "",
+      externalResourceId: "",
     })
   }, [form, mode, requestedCategory, requestedExternal])
 
@@ -143,7 +110,7 @@ export function KnowledgeBaseFormPage({
     loading: detailLoading,
     refreshing: detailRefreshing,
     error: detailError,
-    refresh,
+    refresh: refreshKnowledgeBase,
   } = useResource(
     resourceKeys.knowledgeBase(knowledgeBaseId),
     () => getKnowledgeBase(knowledgeBaseId),
@@ -153,6 +120,58 @@ export function KnowledgeBaseFormPage({
     mode === "edit" &&
     (detailLoading || (Boolean(detailError) && detailRefreshing))
   const loadError = mode === "edit" && Boolean(detailError) && !loading
+  const {
+    data: connectionList,
+    loading: connectionLoading,
+    refreshing: connectionRefreshing,
+    error: connectionError,
+    refresh: refreshConnections,
+  } = useResource(
+    resourceKeys.connectors(),
+    () => listIntegrationConnections(),
+    { enabled: external, staleTime: 0 },
+  )
+  const difyConnections = (connectionList?.connections ?? []).filter(
+    (connection) =>
+      connection.type ===
+      IntegrationConnectionType.IntegrationConnectionTypeDify,
+  )
+  const showConnectionLoading =
+    external &&
+    (connectionLoading || (Boolean(connectionError) && connectionRefreshing))
+  const {
+    data: externalOptionList,
+    loading: externalOptionLoading,
+    refreshing: externalOptionRefreshing,
+    error: externalOptionError,
+    refresh: refreshExternalOptions,
+  } = useResource(
+    resourceKeys.externalKnowledgeBaseOptions(selectedConnectionId),
+    () => listExternalKnowledgeBaseOptions(selectedConnectionId),
+    { enabled: external && selectedConnectionId !== "", staleTime: 0 },
+  )
+  const externalOptions = useMemo(
+    () => externalOptionList?.knowledgeBases ?? [],
+    [externalOptionList],
+  )
+  const selectedExternalOption = externalOptions.find(
+    (knowledgeBase) => knowledgeBase.id === selectedExternalResourceId,
+  )
+  const effectiveCategory = selectedExternalOption?.category ?? category
+  const isQACategory =
+    effectiveCategory === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
+  const showExternalOptionLoading =
+    external &&
+    selectedConnectionId !== "" &&
+    (externalOptionLoading ||
+      (Boolean(externalOptionError) && externalOptionRefreshing))
+  const externalConfigurationReady =
+    !external ||
+    (!showConnectionLoading &&
+      !connectionError &&
+      !showExternalOptionLoading &&
+      !externalOptionError &&
+      Boolean(selectedExternalOption))
 
   /** 详情就绪后回填知识库表单和派生状态。 */
   useEffect(() => {
@@ -178,7 +197,7 @@ export function KnowledgeBaseFormPage({
   async function save(values: KnowledgeBaseFormValues) {
     try {
       let knowledgeBase: KnowledgeBaseData
-      const input = { ...values, category }
+      const input = { ...values, category: effectiveCategory }
       if (mode === "create") {
         knowledgeBase = await createKnowledgeBase(input)
       } else {
@@ -226,9 +245,7 @@ export function KnowledgeBaseFormPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={title}>
-        <PageBack to="/knowledge-bases" />
-      </PageHeader>
+      <PageHeader title={title} />
       <PageContent>
         {loading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
@@ -243,7 +260,7 @@ export function KnowledgeBaseFormPage({
             <Button
               className="mt-4"
               variant="outline"
-              onClick={() => void refresh()}
+              onClick={() => void refreshKnowledgeBase()}
             >
               {t("retry")}
             </Button>
@@ -258,9 +275,7 @@ export function KnowledgeBaseFormPage({
               <Field>
                 <FieldLabel>{t("form.category")}</FieldLabel>
                 <p className="text-sm">
-                  {category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
-                    ? t("category.qa")
-                    : t("category.standard")}
+                  {isQACategory ? t("category.qa") : t("category.standard")}
                 </p>
               </Field>
               <Field>
@@ -307,16 +322,66 @@ export function KnowledgeBaseFormPage({
                         <FieldLabel htmlFor={field.name} required>
                           {t("form.integration")}
                         </FieldLabel>
-                        <NativeSelect
-                          {...field}
-                          id={field.name}
-                          required
-                          aria-invalid={fieldState.invalid}
-                        >
-                          <option value={demoDifyIntegrationConnectionId}>
-                            {t("form.demoDifyIntegration")}
-                          </option>
-                        </NativeSelect>
+                        {showConnectionLoading ? (
+                          <NativeSelect id={field.name} disabled>
+                            <option>{t("form.connectionsLoading")}</option>
+                          </NativeSelect>
+                        ) : connectionError ? (
+                          <div className="flex items-center gap-3">
+                            <p className="text-sm text-muted-foreground">
+                              {t("form.connectionsLoadError")}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void refreshConnections()}
+                            >
+                              {t("retry")}
+                            </Button>
+                          </div>
+                        ) : difyConnections.length === 0 ? (
+                          <div className="flex items-center gap-3">
+                            <p className="text-sm text-muted-foreground">
+                              {t("form.noDifyConnections")}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              asChild
+                            >
+                              <Link to="/integrations/connectors/new">
+                                {t("form.addDifyConnection")}
+                              </Link>
+                            </Button>
+                          </div>
+                        ) : (
+                          <NativeSelect
+                            {...field}
+                            id={field.name}
+                            required
+                            aria-invalid={fieldState.invalid}
+                            onChange={(event) => {
+                              field.onChange(event)
+                              form.setValue("externalResourceId", "", {
+                                shouldDirty: true,
+                              })
+                              setCategory(
+                                KnowledgeBaseCategory.KnowledgeBaseCategoryStandard,
+                              )
+                            }}
+                          >
+                            <option value="" disabled>
+                              {t("form.selectIntegration")}
+                            </option>
+                            {difyConnections.map((connection) => (
+                              <option key={connection.id} value={connection.id}>
+                                {connection.name}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        )}
                       </Field>
                     )}
                   />
@@ -328,33 +393,52 @@ export function KnowledgeBaseFormPage({
                         <FieldLabel htmlFor={field.name} required>
                           {t("form.difyKnowledgeBase")}
                         </FieldLabel>
-                        <NativeSelect
-                          {...field}
-                          id={field.name}
-                          required
-                          aria-invalid={fieldState.invalid}
-                          onChange={(event) => {
-                            const selectedKnowledgeBase =
-                              demoDifyKnowledgeBases[
-                                event.currentTarget.selectedIndex
-                              ]
-                            field.onChange(event)
-                            setCategory(
-                              difyDocFormCategories[
-                                selectedKnowledgeBase.docForm
-                              ],
-                            )
-                          }}
-                        >
-                          {demoDifyKnowledgeBases.map((knowledgeBase) => (
-                            <option
-                              key={knowledgeBase.id}
-                              value={knowledgeBase.id}
+                        {selectedConnectionId === "" ? (
+                          <NativeSelect id={field.name} disabled>
+                            <option>{t("form.selectIntegrationFirst")}</option>
+                          </NativeSelect>
+                        ) : showExternalOptionLoading ? (
+                          <NativeSelect id={field.name} disabled>
+                            <option>{t("form.knowledgeBasesLoading")}</option>
+                          </NativeSelect>
+                        ) : externalOptionError ? (
+                          <div className="flex items-center gap-3">
+                            <p className="text-sm text-muted-foreground">
+                              {t("form.knowledgeBasesLoadError")}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void refreshExternalOptions()}
                             >
-                              {t(knowledgeBase.label)}
+                              {t("retry")}
+                            </Button>
+                          </div>
+                        ) : externalOptions.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">
+                            {t("form.noDifyKnowledgeBases")}
+                          </p>
+                        ) : (
+                          <NativeSelect
+                            {...field}
+                            id={field.name}
+                            required
+                            aria-invalid={fieldState.invalid}
+                          >
+                            <option value="" disabled>
+                              {t("form.selectDifyKnowledgeBase")}
                             </option>
-                          ))}
-                        </NativeSelect>
+                            {externalOptions.map((knowledgeBase) => (
+                              <option
+                                key={knowledgeBase.id}
+                                value={knowledgeBase.id}
+                              >
+                                {knowledgeBase.name}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        )}
                       </Field>
                     )}
                   />
@@ -362,7 +446,12 @@ export function KnowledgeBaseFormPage({
               ) : null}
             </FieldGroup>
             <div className="flex items-center gap-3">
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+              <Button
+                type="submit"
+                disabled={
+                  form.formState.isSubmitting || !externalConfigurationReady
+                }
+              >
                 {form.formState.isSubmitting
                   ? t("form.saving")
                   : mode === "create"
