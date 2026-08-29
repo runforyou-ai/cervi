@@ -61,6 +61,7 @@ type PreferencesInput struct {
 	Locale                      domain.Locale
 	TimeZone                    string
 	MessageNotificationsEnabled bool
+	WorkspaceTabsEnabled        bool
 }
 
 // WorkStatusInput 定义当前用户主动设置的工作状态。

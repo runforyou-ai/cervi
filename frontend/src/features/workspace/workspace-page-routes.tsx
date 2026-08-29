@@ -213,7 +213,7 @@ export function resolveWorkspaceLocation(
   }
 }
 
-/** 按标签保存的独立地址渲染一份工作台页面树。 */
+/** 按指定地址渲染一份工作台页面树。 */
 export function WorkspacePageRoutes({ location }: { location: string }) {
   return (
     <Routes location={location}>

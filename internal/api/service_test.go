@@ -103,6 +103,7 @@ func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.R
 	identity.User.Locale = input.Locale
 	identity.User.TimeZone = input.TimeZone
 	identity.User.MessageNotificationsEnabled = input.MessageNotificationsEnabled
+	identity.User.WorkspaceTabsEnabled = input.WorkspaceTabsEnabled
 	return identity.User, nil
 }
 
@@ -491,12 +492,13 @@ func TestUpdateUserPreferencesUsesTypedInput(t *testing.T) {
 		Locale:                      appservice.LocaleEnglishUnitedStates,
 		TimeZone:                    "America/New_York",
 		MessageNotificationsEnabled: true,
+		WorkspaceTabsEnabled:        true,
 	}, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
-	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" || !backend.lastPreferences.MessageNotificationsEnabled {
+	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" || !backend.lastPreferences.MessageNotificationsEnabled || !backend.lastPreferences.WorkspaceTabsEnabled {
 		t.Fatalf("preferences input = %#v, meta = %#v", backend.lastPreferences, backend.lastMeta)
 	}
 }
@@ -614,7 +616,7 @@ func TestBearerTokenParsing(t *testing.T) {
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
-		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: true, WorkStatus: appservice.WorkStatusWorking},
+		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: true, WorkspaceTabsEnabled: true, WorkStatus: appservice.WorkStatusWorking},
 	}
 }
 

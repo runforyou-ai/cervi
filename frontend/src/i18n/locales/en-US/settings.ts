@@ -65,6 +65,12 @@ const settings = {
       zhCN: "简体中文",
       enUS: "English",
     },
+    workspace: {
+      title: "Workspace",
+      tabs: "Use multiple tabs",
+      tabsDescription:
+        "Keep multiple feature pages open, or switch within the current page when disabled.",
+    },
     notifications: {
       title: "Notifications",
       newMessages: "New message notifications",
