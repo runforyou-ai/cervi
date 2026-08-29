@@ -1,43 +1,64 @@
 /** 企业服务器连接页。 */
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react"
-import { useLocation, useNavigate } from "react-router"
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 
 import { ServerConnectionForm } from "@/features/server-connection/server-connection-form"
 
-export type ServerConnectionSource = "login"
-
-/** 居中基础表单，并让检测结果保持顶部锚点向下展开。 */
-function CenteredContent({
-  anchorReady,
-  children,
-}: {
-  anchorReady: boolean
-  children: ReactNode
-}) {
+/** 按未展开高度垂直居中，内容增高时只向下延伸。 */
+function AnchoredCenter({ children }: { children: ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null)
-  const [anchorHeight, setAnchorHeight] = useState<number | null>(null)
+  const compactHeightRef = useRef<number | null>(null)
+  const [offset, setOffset] = useState<number | null>(null)
 
   useLayoutEffect(() => {
-    if (!anchorReady) {
-      setAnchorHeight(null)
+    const node = contentRef.current
+    if (!node) {
       return
     }
-    if (!contentRef.current) return
-    setAnchorHeight(contentRef.current.offsetHeight)
-  }, [anchorReady])
+
+    const lockOffset = (height: number) => {
+      compactHeightRef.current = height
+      setOffset(Math.max(24, (window.innerHeight - height) / 2))
+    }
+
+    const sync = () => {
+      const height = node.offsetHeight
+      const compact = compactHeightRef.current
+      if (compact == null || height <= compact + 1) {
+        lockOffset(height)
+      }
+    }
+
+    const onResize = () => {
+      const compact = compactHeightRef.current
+      if (compact == null) {
+        sync()
+        return
+      }
+      setOffset(Math.max(24, (window.innerHeight - compact) / 2))
+    }
+
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(node)
+    window.addEventListener("resize", onResize)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("resize", onResize)
+    }
+  }, [])
 
   return (
-    <main className="flex h-dvh w-full overflow-y-auto px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10">
+    <main
+      className={
+        offset == null
+          ? "flex min-h-dvh w-full items-center justify-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10"
+          : "flex min-h-dvh w-full justify-center px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-10 md:pb-10"
+      }
+    >
       <div
         ref={contentRef}
-        className="mx-auto my-auto w-full max-w-sm shrink-0"
-        style={anchorHeight === null ? undefined : { height: anchorHeight }}
+        className="w-full max-w-sm"
+        style={offset == null ? undefined : { marginTop: offset }}
       >
         {children}
       </div>
@@ -45,41 +66,14 @@ function CenteredContent({
   )
 }
 
-/** 从一次性路由状态中读取主动切换服务器的来源。 */
-function connectionSource(value: unknown): ServerConnectionSource | null {
-  if (typeof value !== "object" || value === null || !("from" in value)) {
-    return null
-  }
-  const from = (value as { from?: unknown }).from
-  return from === "login" ? from : null
-}
-
 /** 展示企业服务器地址表单。 */
 export function ServerConnectionPage() {
-  const location = useLocation()
-  const navigate = useNavigate()
-  const source = connectionSource(location.state)
-  const [anchorReady, setAnchorReady] = useState(false)
-  const updateAnchorReady = useCallback(
-    (ready: boolean) => setAnchorReady(ready),
-    [],
-  )
-
-  /** 取消主动切换并返回登录页。 */
-  function cancelServerChange() {
-    navigate("/login", { replace: true })
-  }
-
   return (
-    <CenteredContent anchorReady={anchorReady}>
+    <AnchoredCenter>
       <div className="mb-6 text-center">
         <p className="text-lg font-semibold tracking-tight">Cervi</p>
       </div>
-      <ServerConnectionForm
-        source={source}
-        onCancel={source ? cancelServerChange : undefined}
-        onEditableLayoutChange={updateAnchorReady}
-      />
-    </CenteredContent>
+      <ServerConnectionForm />
+    </AnchoredCenter>
   )
 }

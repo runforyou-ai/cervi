@@ -9,7 +9,6 @@ import {
 } from "react-router"
 
 import type { Identity } from "@/api"
-import { Button } from "@/components/ui/button"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { cn } from "@/lib/utils"
@@ -53,7 +52,7 @@ function MobileTab({
 /** 加载一次当前身份并渲染移动端工作区。 */
 export function MobileWorkspaceLayout() {
   const { t } = useTranslation("mobile")
-  const { status, identity, redirectPath, retry } = useIdentityLoader()
+  const { status, identity, redirectPath } = useIdentityLoader()
 
   if (status === "anonymous") return <Navigate to="/login" replace />
   if (status === "redirect" && redirectPath) {
@@ -62,14 +61,9 @@ export function MobileWorkspaceLayout() {
   if (status === "failed") {
     return (
       <main className="flex min-h-dvh items-center justify-center px-6 text-center">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {t("identityLoadError")}
-          </p>
-          <Button className="mt-4" variant="outline" onClick={retry}>
-            {t("retry")}
-          </Button>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {t("identityLoadError")}
+        </p>
       </main>
     )
   }

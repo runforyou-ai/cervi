@@ -12,7 +12,6 @@ import {
   type Organization,
   type CurrentUser,
 } from "@/api"
-import { Button } from "@/components/ui/button"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import {
   activateNotificationPolicy,
@@ -62,12 +61,7 @@ export function WorkspaceLayout() {
     attentionPending: false,
   })
   const unreadRevisionRef = useRef(0)
-  const {
-    status,
-    identity: loadedIdentity,
-    redirectPath,
-    retry: retryIdentity,
-  } = useIdentityLoader()
+  const { status, identity: loadedIdentity, redirectPath } = useIdentityLoader()
   const workspaceLocation = resolveWorkspaceLocation(location)
   const fallbackTabRef = useRef<ResolvedWorkspaceTab>(defaultWorkspaceTab)
   const currentHref = `${location.pathname}${location.search}${location.hash}`
@@ -293,19 +287,8 @@ export function WorkspaceLayout() {
   }
   if (status === "failed") {
     return (
-      <main className="flex min-h-svh items-center justify-center px-6 text-center">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {t("identityLoadError")}
-          </p>
-          <Button
-            className="mt-4"
-            variant="outline"
-            onClick={retryIdentity}
-          >
-            {t("retry")}
-          </Button>
-        </div>
+      <main className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+        {t("identityLoadError")}
       </main>
     )
   }

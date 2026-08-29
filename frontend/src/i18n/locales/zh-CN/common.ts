@@ -6,8 +6,6 @@ const common = {
     close: "关闭",
     back: "返回",
   },
-  retry: "重试",
-  startupLoadError: "无法启动应用，请检查网络后重试。",
   comingSoon: "即将支持",
   workStatuses: {
     working: "工作中",

@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate } from "react-router"
 
 import { LoginForm } from "@/features/auth/login-form"
-import { Button } from "@/components/ui/button"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { useStartup } from "@/contexts/startup-context"
 
@@ -17,7 +16,7 @@ export function LoginPage({
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
   const { organizationName } = useStartup()
-  const { status, redirectPath, retry } = useIdentityLoader()
+  const { status, redirectPath } = useIdentityLoader()
 
   if (status === "loaded") return <Navigate to="/inbox" replace />
   if (status === "redirect" && redirectPath) {
@@ -30,27 +29,13 @@ export function LoginPage({
       </main>
     )
   }
-  if (status === "failed") {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-6 text-center">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {t("identityLoadError")}
-          </p>
-          <Button className="mt-4" variant="outline" onClick={retry}>
-            {t("retry")}
-          </Button>
-        </div>
-      </main>
-    )
-  }
   if (organizationName.trim() === "") {
     return <Navigate to={allowServerChange ? "/connect" : "/setup"} replace />
   }
 
   return (
-    <main className="h-dvh w-full overflow-y-auto px-6 md:px-10">
-      <div className="mx-auto flex min-h-full w-full max-w-sm flex-col justify-center pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:py-10">
+    <main className="flex min-h-dvh w-full items-center justify-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10">
+      <div className="w-full max-w-sm">
         <div className="mb-8 w-full">
           <p className="text-center text-xl font-medium tracking-tight">
             {organizationName}
@@ -58,12 +43,7 @@ export function LoginPage({
               <button
                 type="button"
                 className="ml-2.5 inline-block whitespace-nowrap align-bottom text-[11px] font-medium tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() =>
-                  navigate("/connect", {
-                    replace: true,
-                    state: { from: "login" },
-                  })
-                }
+                onClick={() => navigate("/connect")}
               >
                 {t("changeServer")}
               </button>

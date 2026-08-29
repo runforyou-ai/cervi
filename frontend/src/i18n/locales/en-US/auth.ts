@@ -14,8 +14,6 @@ const auth = {
   invalidCredentials: "Incorrect email or password.",
   networkError: "Could not connect to the server. Please try again.",
   serverError: "Could not log in. Please try again.",
-  identityLoadError: "Could not check the current login status. Try again.",
-  retry: "Try again",
   changeServer: "Switch",
 }
 
