@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -13,6 +14,11 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/uptrace/bun"
+)
+
+var (
+	_ Enqueuer   = (*Runtime)(nil)
+	_ TxEnqueuer = (*Runtime)(nil)
 )
 
 // Runtime 运行服务端异步 Action、定时计划和可靠消息投递。
@@ -51,10 +57,36 @@ func (r *Runtime) RegisterSchedule(definition ScheduleDefinition) {
 
 // Enqueue 将 Action 输入持久化并等待可靠发布。
 func (r *Runtime) Enqueue(ctx context.Context, actionName string, payload any, options EnqueueOptions) (string, error) {
-	if _, exists := r.registry.lookup(actionName); !exists {
-		return "", fmt.Errorf("task action %q is not registered", actionName)
+	encoded, normalized, err := r.prepareEnqueue(actionName, payload, options)
+	if err != nil {
+		return "", err
 	}
-	return r.repository.Enqueue(ctx, actionName, payload, options)
+	return r.repository.enqueue(ctx, actionName, encoded, normalized)
+}
+
+// EnqueueIn 将 Action 输入加入调用方已经开启的业务事务。
+func (r *Runtime) EnqueueIn(ctx context.Context, tx bun.IDB, actionName string, payload any, options EnqueueOptions) (string, error) {
+	encoded, normalized, err := r.prepareEnqueue(actionName, payload, options)
+	if err != nil {
+		return "", err
+	}
+	return enqueueIn(ctx, tx, actionName, encoded, normalized, "")
+}
+
+// prepareEnqueue 校验并编码一次任务投递输入。
+func (r *Runtime) prepareEnqueue(actionName string, payload any, options EnqueueOptions) (json.RawMessage, EnqueueOptions, error) {
+	if _, exists := r.registry.lookup(actionName); !exists {
+		return nil, options, fmt.Errorf("task action %q is not registered", actionName)
+	}
+	encoded, err := encodePayload(payload)
+	if err != nil {
+		return nil, options, err
+	}
+	normalized, err := normalizeEnqueueOptions(options)
+	if err != nil {
+		return nil, options, err
+	}
+	return encoded, normalized, nil
 }
 
 // Start 校验计划、连接 NATS 并启动服务端任务循环。
