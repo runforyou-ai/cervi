@@ -19,6 +19,6 @@ func NewLogoutAction(db *bun.DB) *LogoutAction {
 }
 
 // Execute 删除当前登录令牌。
-func (a *LogoutAction) Execute(ctx context.Context, token string) error {
-	return revokeToken(ctx, a.db, token)
+func (a *LogoutAction) Execute(ctx context.Context, organizationID string, token string) error {
+	return revokeToken(ctx, a.db, organizationID, token)
 }

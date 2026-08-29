@@ -41,7 +41,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	// 全局前置：安装企业并校验初始状态，失败直接终止整个测试。
 	db := store.DB()
-	status := installationaction.NewStatusQuery(db)
+	tenantResolver := organizationaction.NewLegacyTenantResolver(db)
+	status := installationaction.NewStatusQuery(tenantResolver)
 	alreadyInstalled, err := status.Execute(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +100,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	// 全局前置：解析安装令牌、登出并重新登录管理员，失败直接终止整个测试。
 	resolveIdentity := authaction.NewResolveIdentityQuery(db)
-	identity, err := resolveIdentity.Execute(context.Background(), installed.Token)
+	identity, err := resolveIdentity.Execute(context.Background(), installed.Identity.Organization.ID, installed.Token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,14 +112,15 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 
 	logout := authaction.NewLogoutAction(db)
-	if err := logout.Execute(context.Background(), installed.Token); err != nil {
+	if err := logout.Execute(context.Background(), installed.Identity.Organization.ID, installed.Token); err != nil {
 		t.Fatal(err)
 	}
 
 	login := authaction.NewLoginAction(db)
 	loggedIn, err := login.Execute(context.Background(), authaction.LoginInput{
-		Email:    "ADMIN@example.com",
-		Password: "password123",
+		OrganizationID: installed.Identity.Organization.ID,
+		Email:          "ADMIN@example.com",
+		Password:       "password123",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -167,7 +169,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal("workspace tabs enabled = false, want true")
 		}
 		loggedIn.Identity = updatedPreferences
-		resolvedPreferences, err := resolveIdentity.Execute(context.Background(), loggedIn.Token)
+		resolvedPreferences, err := resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, loggedIn.Token)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -651,7 +653,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if activeAvatar.Status != string(domain.FileStatusActive) || activeAvatar.ExpiresAt != nil {
 			t.Fatalf("active avatar = %#v", activeAvatar)
 		}
-		resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Token)
+		resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, loggedIn.Token)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -697,7 +699,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := cleanup.Execute(context.Background(), fileaction.DeleteExpiredInput{FileID: avatar.ID}); err != nil {
 			t.Fatal(err)
 		}
-		resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Token)
+		resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, loggedIn.Token)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -707,7 +709,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if !errors.Is(err, useraction.ErrAvatarFileNotFound) {
 			t.Fatalf("invalid avatar error = %v, want file not found", err)
 		}
-		resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Token)
+		resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, loggedIn.Token)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -733,10 +735,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := login.Execute(context.Background(), authaction.LoginInput{Email: "new@example.com", Password: "password123"}); !errors.Is(err, authaction.ErrInvalidCredentials) {
+		if _, err := login.Execute(context.Background(), authaction.LoginInput{OrganizationID: loggedIn.Identity.Organization.ID, Email: "new@example.com", Password: "password123"}); !errors.Is(err, authaction.ErrInvalidCredentials) {
 			t.Fatalf("old password login error = %v, want invalid credentials", err)
 		}
-		if _, err := login.Execute(context.Background(), authaction.LoginInput{Email: "new@example.com", Password: "new-password123"}); err != nil {
+		if _, err := login.Execute(context.Background(), authaction.LoginInput{OrganizationID: loggedIn.Identity.Organization.ID, Email: "new@example.com", Password: "new-password123"}); err != nil {
 			t.Fatalf("new password login error = %v", err)
 		}
 	})
@@ -924,7 +926,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := login.Execute(context.Background(), authaction.LoginInput{Email: "new@example.com", Password: "new-password123"}); !errors.Is(err, authaction.ErrInvalidCredentials) {
+		if _, err := login.Execute(context.Background(), authaction.LoginInput{OrganizationID: loggedIn.Identity.Organization.ID, Email: "new@example.com", Password: "new-password123"}); !errors.Is(err, authaction.ErrInvalidCredentials) {
 			t.Fatalf("inactive user login error = %v, want invalid credentials", err)
 		}
 		if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, common.ErrIdentityInvalid) {

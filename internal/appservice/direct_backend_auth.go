@@ -13,11 +13,15 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
 // InstallationStatus 返回服务端初始化状态和公开企业名称。
 func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
-	status, err := b.installation.Execute(ctx)
+	scope, err := b.resolveTenant.Resolve(ctx, tenant.Hostname(ctx))
+	if errors.Is(err, tenant.ErrNotFound) {
+		return InstallationStatus{}, nil
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return InstallationStatus{}, ctx.Err()
@@ -25,7 +29,7 @@ func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta
 		slog.Warn("读取初始化状态失败", "error", err)
 		return InstallationStatus{}, FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
 	}
-	return InstallationStatus{Installed: status.Installed, OrganizationName: status.OrganizationName}, nil
+	return InstallationStatus{Installed: true, OrganizationName: scope.OrganizationName}, nil
 }
 
 // InstallWorkspace 创建企业管理员并返回登录令牌。
@@ -67,10 +71,11 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 
 // Login 校验账号密码并返回登录令牌。
 func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
-	if err := b.requireInitialized(ctx, meta); err != nil {
+	scope, err := b.requireInitialized(ctx, meta)
+	if err != nil {
 		return Auth{}, err
 	}
-	output, err := b.login.Execute(ctx, authaction.LoginInput{Email: input.Email, Password: input.Password})
+	output, err := b.login.Execute(ctx, authaction.LoginInput{OrganizationID: scope.OrganizationID, Email: input.Email, Password: input.Password})
 	if errors.Is(err, authaction.ErrInvalidCredentials) {
 		return Auth{}, InvalidError(meta, cervii18n.ErrorInvalidCredentials, nil)
 	}
@@ -91,7 +96,7 @@ func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 	if err != nil {
 		return err
 	}
-	if err := b.logout.Execute(ctx, meta.Token); err != nil {
+	if err := b.logout.Execute(ctx, identity.Organization.ID, meta.Token); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

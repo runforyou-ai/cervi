@@ -1,6 +1,6 @@
 //go:build server
 
-// Package organization 实现企业通用设置修改。
+// Package organization 实现企业查询和通用设置修改。
 package organization
 
 import (
