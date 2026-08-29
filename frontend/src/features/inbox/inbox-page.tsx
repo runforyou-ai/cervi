@@ -39,6 +39,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useUserTimeZone } from "@/contexts/user-preferences"
+import { previousDayKey } from "@/features/inbox/calendar"
+import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { cn } from "@/lib/utils"
 
@@ -95,7 +97,7 @@ function useConversationName() {
   const { t } = useTranslation("inbox")
   return useCallback(
     (conversation: InboxConversation) =>
-      conversation.contactName ?? t("anonymousVisitor"),
+      conversation.contactName?.trim() || t("anonymousVisitor"),
     [t],
   )
 }
@@ -142,7 +144,7 @@ function useConversationTime() {
       if (day === dayKey.format(now)) {
         return relative.format(-Math.floor(elapsedMs / 3_600_000), "hour")
       }
-      if (day === dayKey.format(new Date(now.getTime() - 86_400_000))) {
+      if (day === previousDayKey(dayKey.format(now))) {
         return t("yesterday")
       }
       if (elapsedMs < 6 * 86_400_000) {
@@ -174,6 +176,7 @@ function ConversationAvatar({
   className?: string
 }) {
   const badge = sourceBadges[conversation.channelType]
+  const contactName = conversation.contactName?.trim()
 
   return (
     <div className="relative shrink-0">
@@ -183,8 +186,8 @@ function ConversationAvatar({
           className,
         )}
       >
-        {conversation.contactName ? (
-          conversation.contactName.slice(0, 1).toLocaleUpperCase()
+        {contactName ? (
+          contactName.slice(0, 1).toLocaleUpperCase()
         ) : (
           <UserRoundIcon className="size-4.5" />
         )}
@@ -546,7 +549,7 @@ function InboxConversationList({
   )
 }
 
-/** 选中会话的主区：头部信息和消息占位。 */
+/** 选中会话的主区：头部信息和只读消息时间线。 */
 function ConversationMain({
   conversation,
   narrowViewport = false,
@@ -579,9 +582,10 @@ function ConversationMain({
           </div>
         </div>
       </header>
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/20 p-6">
-        <p className="text-sm text-muted-foreground">{t("threadComingSoon")}</p>
-      </div>
+      <ConversationTimeline
+        key={conversation.id}
+        conversationID={conversation.id}
+      />
     </div>
   )
 }
@@ -716,9 +720,11 @@ export function InboxPage({
         paneClassName="transition-[width]"
         pane={pane}
       >
-        <section className="hidden min-h-0 flex-1 md:block">
-          <ConversationMain conversation={selectedConversation} />
-        </section>
+        {isNarrowViewport ? null : (
+          <section className="min-h-0 flex-1">
+            <ConversationMain conversation={selectedConversation} />
+          </section>
+        )}
       </PageSplit>
 
       <Sheet open={isNarrowDetailOpen} onOpenChange={setIsNarrowDetailOpen}>

@@ -15,6 +15,7 @@ import (
 	businesssystemaction "github.com/runforyou-ai/cervi/internal/actions/businesssystem"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
@@ -48,6 +49,7 @@ type DirectBackend struct {
 	resolveIdentity                   *authaction.ResolveIdentityQuery
 	installation                      *installationaction.StatusQuery
 	loadInbox                         *inboxaction.LoadInboxQuery
+	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
 	getMessageChannel                 *channelaction.GetMessageChannelQuery
@@ -145,6 +147,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		resolveIdentity:                   authaction.NewResolveIdentityQuery(db),
 		installation:                      installationaction.NewStatusQuery(db),
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
+		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getMessageChannel:                 channelaction.NewGetMessageChannelQuery(db),

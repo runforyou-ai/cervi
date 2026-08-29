@@ -360,6 +360,19 @@ export enum ChannelType {
 };
 
 /**
+ * ChatSubjectKind 表示聊天主体类型。
+ */
+export enum ChatSubjectKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ChatSubjectKindOrganizationIdentity = "organization_identity",
+    ChatSubjectKindContact = "contact",
+};
+
+/**
  * Contact 定义联系人完整详情。
  */
 export interface Contact {
@@ -508,6 +521,44 @@ export interface ContactSummary {
     "sourceChannelName": string;
     "createdAt": string;
     "deletedAt": string | null;
+}
+
+/**
+ * ConversationMessage 定义成员可见的会话消息。
+ */
+export interface ConversationMessage {
+    "id": string;
+    "type": MessageType;
+    "body": string;
+    "originatedAt": string;
+    "createdAt": string;
+    "sender": ConversationMessageSender | null;
+}
+
+/**
+ * ConversationMessageList 定义成员消息页。
+ */
+export interface ConversationMessageList {
+    "messages": ConversationMessage[] | null;
+    "before": string | null;
+    "after": string | null;
+}
+
+/**
+ * ConversationMessageListInput 定义成员消息查询方向。
+ */
+export interface ConversationMessageListInput {
+    "before": string;
+    "after": string;
+}
+
+/**
+ * ConversationMessageSender 定义消息发送主体。
+ */
+export interface ConversationMessageSender {
+    "chatSubjectId": string;
+    "kind": ChatSubjectKind;
+    "displayName": string | null;
 }
 
 /**
@@ -927,6 +978,18 @@ export interface MessageNotificationInput {
     "body": string;
     "soundEnabled": boolean;
 }
+
+/**
+ * MessageType 表示会话消息类型。
+ */
+export enum MessageType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MessageTypeText = "text",
+};
 
 /**
  * NotificationPermissionStatus 表示当前设备的系统通知授权状态。

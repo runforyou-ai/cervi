@@ -1,6 +1,12 @@
-/** 成员收件箱调用与归一化。 */
-import { LoadInbox } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
+/** 成员收件箱与会话消息调用归一化。 */
+import {
+  ListConversationMessages,
+  LoadInbox,
+} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
+  ConversationMessage,
+  ConversationMessageList,
+  ConversationMessageListInput,
   Inbox,
   InboxConversation,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -11,7 +17,15 @@ export type InboxData = Omit<Inbox, "conversations"> & {
   conversations: InboxConversation[]
 }
 
+export type ConversationMessageListData = Omit<
+  ConversationMessageList,
+  "messages"
+> & {
+  messages: ConversationMessage[]
+}
+
 const loadInboxBound = bind(LoadInbox)
+const listConversationMessagesBound = bind(ListConversationMessages)
 
 /** 读取成员收件箱的客户会话列表。 */
 export async function loadInbox(): Promise<InboxData> {
@@ -20,4 +34,18 @@ export async function loadInbox(): Promise<InboxData> {
     ...inbox,
     conversations: asList(inbox.conversations),
   }
+}
+
+/** 分页读取成员可见的会话消息。 */
+export async function listConversationMessages(
+  conversationID: string,
+  input: ConversationMessageListInput = { before: "", after: "" },
+  signal?: AbortSignal,
+): Promise<ConversationMessageListData> {
+  const result = await listConversationMessagesBound(
+    conversationID,
+    input,
+    signal,
+  )
+  return { ...result, messages: asList(result.messages) }
 }

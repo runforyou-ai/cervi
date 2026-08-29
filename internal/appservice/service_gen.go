@@ -44,6 +44,11 @@ func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error
 	return s.backend.LoadInbox(ctx, meta)
 }
 
+// ListConversationMessages 返回成员可见的会话消息。
+func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
+	return s.backend.ListConversationMessages(ctx, meta, conversationID, input)
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (s *Service) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
 	return s.backend.ListMessageChannels(ctx, meta)
