@@ -113,6 +113,7 @@ func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.R
 	identity.User.Locale = input.Locale
 	identity.User.TimeZone = input.TimeZone
 	identity.User.MessageNotificationsEnabled = input.MessageNotificationsEnabled
+	identity.User.WorkspaceTabsEnabled = input.WorkspaceTabsEnabled
 	return identity.User, nil
 }
 
@@ -516,12 +517,13 @@ func TestUpdateUserPreferencesUsesTypedInput(t *testing.T) {
 		Locale:                      appservice.LocaleEnglishUnitedStates,
 		TimeZone:                    "America/New_York",
 		MessageNotificationsEnabled: true,
+		WorkspaceTabsEnabled:        true,
 	}, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
-	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" || !backend.lastPreferences.MessageNotificationsEnabled {
+	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" || !backend.lastPreferences.MessageNotificationsEnabled || !backend.lastPreferences.WorkspaceTabsEnabled {
 		t.Fatalf("preferences input = %#v, meta = %#v", backend.lastPreferences, backend.lastMeta)
 	}
 }

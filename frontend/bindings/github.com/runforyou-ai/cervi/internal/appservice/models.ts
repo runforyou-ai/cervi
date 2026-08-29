@@ -607,6 +607,7 @@ export interface CurrentUser {
     "locale": Locale;
     "timeZone": string;
     "messageNotificationsEnabled": boolean;
+    "workspaceTabsEnabled": boolean;
     "workStatus": WorkStatus;
     "avatarUrl": string;
 }
@@ -1445,6 +1446,7 @@ export interface UserPreferencesInput {
     "locale": Locale;
     "timeZone": string;
     "messageNotificationsEnabled": boolean;
+    "workspaceTabsEnabled": boolean;
 }
 
 /**

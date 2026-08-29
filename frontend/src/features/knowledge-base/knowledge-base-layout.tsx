@@ -7,6 +7,7 @@ import {
   FolderIcon,
   LoaderCircleIcon,
   MoreHorizontalIcon,
+  PlusIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, Outlet, useLocation, useNavigate } from "react-router"
@@ -169,11 +170,17 @@ export function KnowledgeBaseLayout() {
             action={
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="xs">
-                    {t("sidebar.create")}
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                    aria-label={t("sidebar.create")}
+                    title={t("sidebar.create")}
+                  >
+                    <PlusIcon />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent side="right" align="start" className="w-48">
                   <DropdownMenuItem asChild>
                     <Link to="/knowledge-bases/new?category=standard">
                       <FileTextIcon />

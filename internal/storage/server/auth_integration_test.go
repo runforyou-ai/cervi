@@ -65,6 +65,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
+	if installed.Identity.User.WorkspaceTabsEnabled {
+		t.Fatal("workspace tabs enabled = true, want false")
+	}
 	if installed.Identity.User.IdentityID == "" || installed.Identity.User.IdentityID == installed.Identity.User.ID {
 		t.Fatalf("user identity id = %q, user id = %q", installed.Identity.User.IdentityID, installed.Identity.User.ID)
 	}
@@ -152,6 +155,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Locale:                      domain.LocaleEnglishUnitedStates,
 			TimeZone:                    "America/New_York",
 			MessageNotificationsEnabled: false,
+			WorkspaceTabsEnabled:        true,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -159,12 +163,15 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if updatedPreferences.User.MessageNotificationsEnabled {
 			t.Fatal("message notifications enabled = true, want false")
 		}
+		if !updatedPreferences.User.WorkspaceTabsEnabled {
+			t.Fatal("workspace tabs enabled = false, want true")
+		}
 		loggedIn.Identity = updatedPreferences
 		resolvedPreferences, err := resolveIdentity.Execute(context.Background(), loggedIn.Token)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resolvedPreferences == nil || resolvedPreferences.User.MessageNotificationsEnabled {
+		if resolvedPreferences == nil || resolvedPreferences.User.MessageNotificationsEnabled || !resolvedPreferences.User.WorkspaceTabsEnabled {
 			t.Fatalf("identity after preferences update = %#v", resolvedPreferences)
 		}
 		updatedWorkStatus, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})

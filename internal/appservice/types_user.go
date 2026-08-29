@@ -35,6 +35,7 @@ type CurrentUser struct {
 	Locale                      Locale     `json:"locale"`
 	TimeZone                    string     `json:"timeZone"`
 	MessageNotificationsEnabled bool       `json:"messageNotificationsEnabled"`
+	WorkspaceTabsEnabled        bool       `json:"workspaceTabsEnabled"`
 	WorkStatus                  WorkStatus `json:"workStatus"`
 	AvatarURL                   string     `json:"avatarUrl"`
 }
@@ -57,6 +58,7 @@ type UserPreferencesInput struct {
 	Locale                      Locale `json:"locale"`
 	TimeZone                    string `json:"timeZone"`
 	MessageNotificationsEnabled bool   `json:"messageNotificationsEnabled"`
+	WorkspaceTabsEnabled        bool   `json:"workspaceTabsEnabled"`
 }
 
 // UserWorkStatusInput 定义当前用户主动设置的工作状态。
