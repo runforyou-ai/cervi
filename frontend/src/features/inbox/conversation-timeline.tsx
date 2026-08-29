@@ -1,4 +1,3 @@
-/** 读取并展示当前客户 Conversation 的文本消息。 */
 import {
   useEffect,
   useLayoutEffect,
@@ -8,6 +7,7 @@ import {
 } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 
 import {
   ChatSubjectKind,
@@ -18,11 +18,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
+import { previousDayKey } from "@/features/inbox/calendar"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
+import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
-
-type TimelineState = ConversationMessageListData
 
 /** 按稳定消息顺序合并并去重时间线。 */
 function mergeMessages(
@@ -54,20 +54,22 @@ export function ConversationTimeline({
   conversationID: string
 }) {
   const { t, i18n } = useTranslation("inbox")
+  const navigate = useNavigate()
   const timeZone = useUserTimeZone()
   const scrollRootRef = useRef<HTMLDivElement>(null)
-  const initializedRef = useRef(false)
   const aliveRef = useRef(true)
   const beforeRequestRef = useRef(0)
-  const initialScrollRef = useRef(false)
+  const initialScrollRef = useRef(true)
   const previousScrollHeightRef = useRef<number | null>(null)
-  const [timeline, setTimeline] = useState<TimelineState | null>(null)
+  const [timeline, setTimeline] =
+    useState<ConversationMessageListData | null>(null)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [earlierError, setEarlierError] = useState(false)
   const { data, loading, error, refresh } = useResource(
     resourceKeys.conversationMessages(conversationID),
     (signal) => listConversationMessages(conversationID, undefined, signal),
   )
+  const currentPage = timeline ?? data
 
   const dateFormatters = useMemo(() => {
     const locale = i18n.resolvedLanguage
@@ -100,16 +102,9 @@ export function ConversationTimeline({
     }
   }, [])
 
-  useEffect(() => {
-    if (!data || initializedRef.current) return
-    initializedRef.current = true
-    initialScrollRef.current = true
-    setTimeline(data)
-  }, [data])
-
   useLayoutEffect(() => {
     const viewport = timelineViewport(scrollRootRef.current)
-    if (!viewport || !timeline) return
+    if (!viewport || !currentPage) return
     if (initialScrollRef.current) {
       initialScrollRef.current = false
       viewport.scrollTop = viewport.scrollHeight
@@ -120,11 +115,11 @@ export function ConversationTimeline({
         viewport.scrollHeight - previousScrollHeightRef.current
       previousScrollHeightRef.current = null
     }
-  }, [timeline])
+  }, [currentPage])
 
   /** 加载并前插一页更早消息。 */
   async function loadEarlier() {
-    const before = timeline?.before
+    const before = currentPage?.before
     if (!before || loadingEarlier) return
     const request = beforeRequestRef.current + 1
     beforeRequestRef.current = request
@@ -133,26 +128,28 @@ export function ConversationTimeline({
     setLoadingEarlier(true)
     setEarlierError(false)
     try {
-      const page = await listConversationMessages(conversationID, {
+      const earlierPage = await listConversationMessages(conversationID, {
         before,
         after: "",
       })
       if (!aliveRef.current || beforeRequestRef.current !== request) return
       setTimeline((current) => {
-        if (!current || current.before !== before) return current
+        const base = current ?? currentPage
+        if (!base || base.before !== before) return current
         return {
-          messages: mergeMessages(page.messages, current.messages),
-          before: page.before,
-          after: current.after,
+          messages: mergeMessages(earlierPage.messages, base.messages),
+          before: earlierPage.before,
+          after: base.after,
         }
       })
-    } catch (error) {
+    } catch (requestError) {
       if (!aliveRef.current || beforeRequestRef.current !== request) return
       previousScrollHeightRef.current = null
+      if (recoverSession(requestError, navigate)) return
       setEarlierError(true)
       console.warn("加载更早会话消息失败", {
         conversationId: conversationID,
-        error,
+        error: requestError,
       })
     } finally {
       if (aliveRef.current && beforeRequestRef.current === request) {
@@ -161,7 +158,7 @@ export function ConversationTimeline({
     }
   }
 
-  if (loading && !timeline) {
+  if (loading && !currentPage) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center gap-2 bg-muted/20 text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
@@ -170,7 +167,7 @@ export function ConversationTimeline({
     )
   }
 
-  if (error && !timeline) {
+  if (error && !currentPage) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/20 p-6 text-center">
         <div>
@@ -190,7 +187,7 @@ export function ConversationTimeline({
     )
   }
 
-  if (!timeline || timeline.messages.length === 0) {
+  if (!currentPage || currentPage.messages.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/20 p-6 text-sm text-muted-foreground">
         {t("messagesEmpty")}
@@ -199,16 +196,14 @@ export function ConversationTimeline({
   }
 
   const today = dateFormatters.dayKey.format(new Date())
-  const yesterday = dateFormatters.dayKey.format(
-    new Date(Date.now() - 86_400_000),
-  )
+  const yesterday = previousDayKey(today)
   let previousDay = ""
 
   return (
     <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1 bg-muted/20">
       <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-5 md:px-6">
         <div className="mb-5 flex min-h-7 items-center justify-center">
-          {timeline.before ? (
+          {currentPage.before ? (
             <Button
               size="sm"
               variant="ghost"
@@ -228,16 +223,19 @@ export function ConversationTimeline({
         </div>
 
         <div className="grid gap-3">
-          {timeline.messages.map((message) => {
+          {currentPage.messages.map((message) => {
             const date = new Date(message.originatedAt)
             const day = dateFormatters.dayKey.format(date)
             const showDay = day !== previousDay
             previousDay = day
             const incoming =
-              message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
+              !message.sender ||
+              message.sender.kind === ChatSubjectKind.ChatSubjectKindContact
             const senderName =
-              message.sender?.displayName ??
-              (incoming ? t("anonymousVisitor") : t("unknownSender"))
+              message.sender?.displayName?.trim() ||
+              (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
+                ? t("anonymousVisitor")
+                : t("unknownSender"))
             const dayLabel =
               day === today
                 ? t("messageToday")
