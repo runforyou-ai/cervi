@@ -20,6 +20,7 @@ import {
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { useUserTimeZone } from "@/contexts/user-preferences"
+import { previousDayKey } from "@/features/inbox/calendar"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
@@ -111,7 +112,7 @@ function useConversationTime() {
       if (day === dayKey.format(now)) {
         return relative.format(-Math.floor(elapsedMs / 3_600_000), "hour")
       }
-      if (day === dayKey.format(new Date(now.getTime() - 86_400_000))) {
+      if (day === previousDayKey(dayKey.format(now))) {
         return t("yesterday")
       }
       if (day.slice(0, 4) === dayKey.format(now).slice(0, 4)) {

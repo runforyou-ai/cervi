@@ -24,9 +24,13 @@ function CenteredContent({
   const [anchorHeight, setAnchorHeight] = useState<number | null>(null)
 
   useLayoutEffect(() => {
-    if (!anchorReady || anchorHeight !== null || !contentRef.current) return
+    if (!anchorReady) {
+      setAnchorHeight(null)
+      return
+    }
+    if (!contentRef.current) return
     setAnchorHeight(contentRef.current.offsetHeight)
-  }, [anchorHeight, anchorReady])
+  }, [anchorReady])
 
   return (
     <main className="flex h-dvh w-full overflow-y-auto px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10">
@@ -56,7 +60,10 @@ export function ServerConnectionPage() {
   const navigate = useNavigate()
   const source = connectionSource(location.state)
   const [anchorReady, setAnchorReady] = useState(false)
-  const markAnchorReady = useCallback(() => setAnchorReady(true), [])
+  const updateAnchorReady = useCallback(
+    (ready: boolean) => setAnchorReady(ready),
+    [],
+  )
 
   /** 取消主动切换并返回登录页。 */
   function cancelServerChange() {
@@ -71,7 +78,7 @@ export function ServerConnectionPage() {
       <ServerConnectionForm
         source={source}
         onCancel={source ? cancelServerChange : undefined}
-        onEditableLayoutReady={markAnchorReady}
+        onEditableLayoutChange={updateAnchorReady}
       />
     </CenteredContent>
   )

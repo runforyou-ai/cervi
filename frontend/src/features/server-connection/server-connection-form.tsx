@@ -1,5 +1,5 @@
 /** 企业服务器地址表单与已保存连接恢复。 */
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, RefreshCwIcon, SearchIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -41,11 +41,11 @@ type SavedServerState =
 export function ServerConnectionForm({
   source,
   onCancel,
-  onEditableLayoutReady,
+  onEditableLayoutChange,
 }: {
   source: ServerConnectionSource | null
   onCancel?: () => void
-  onEditableLayoutReady?: () => void
+  onEditableLayoutChange?: (ready: boolean) => void
 }) {
   const { t } = useTranslation("connection")
   const navigate = useNavigate()
@@ -103,11 +103,11 @@ export function ServerConnectionForm({
     }
   }, [getValues, reset, savedServerRevision])
 
-  useEffect(() => {
-    if (savedServer.status === "loaded" && !recoveryMode) {
-      onEditableLayoutReady?.()
-    }
-  }, [onEditableLayoutReady, recoveryMode, savedServer.status])
+  useLayoutEffect(() => {
+    onEditableLayoutChange?.(
+      savedServer.status === "loaded" && !recoveryMode,
+    )
+  }, [onEditableLayoutChange, recoveryMode, savedServer.status])
 
   /** 展示服务器检测或连接错误。 */
   function showConnectionError(error: unknown) {
@@ -214,6 +214,17 @@ export function ServerConnectionForm({
         <CardHeader>
           <CardTitle>{t("readErrorTitle")}</CardTitle>
           <CardDescription>{t("readErrorDescription")}</CardDescription>
+          {onCancel ? (
+            <CardAction>
+              <Button
+                className="h-11"
+                variant="ghost"
+                onClick={onCancel}
+              >
+                {t("cancel")}
+              </Button>
+            </CardAction>
+          ) : null}
         </CardHeader>
         <CardContent>
           <Button
