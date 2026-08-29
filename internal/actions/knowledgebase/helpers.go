@@ -32,6 +32,59 @@ func loadKnowledgeBase(ctx context.Context, db bun.IDB, organizationID, knowledg
 	return knowledgeBase, nil
 }
 
+// validateDifyConnection 校验外部知识库引用的是当前企业的 Dify 连接。
+func validateDifyConnection(ctx context.Context, db bun.IDB, organizationID, connectionID string) error {
+	if connectionID == "" {
+		return nil
+	}
+	var id string
+	err := db.NewSelect().
+		TableExpr("integration_connections AS ic").
+		ColumnExpr("ic.id::text").
+		Where("ic.id = ?", connectionID).
+		Where("ic.organization_id = ?", organizationID).
+		Where("ic.connector_type = ?", domain.IntegrationConnectionTypeDify).
+		For("SHARE").
+		Scan(ctx, &id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return invalidDifyConnectionError()
+	}
+	return err
+}
+
+// loadDifyConfiguration 读取当前企业的 Dify 连接配置。
+func loadDifyConfiguration(
+	ctx context.Context,
+	db bun.IDB,
+	organizationID, connectionID string,
+) (servermodels.IntegrationConnectionConfiguration, error) {
+	if !common.ValidUUID(connectionID) {
+		return servermodels.IntegrationConnectionConfiguration{}, invalidDifyConnectionError()
+	}
+	connection := &servermodels.IntegrationConnection{}
+	err := db.NewSelect().
+		Model(connection).
+		Column("configuration").
+		Where("ic.id = ?", connectionID).
+		Where("ic.organization_id = ?", organizationID).
+		Where("ic.connector_type = ?", domain.IntegrationConnectionTypeDify).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return servermodels.IntegrationConnectionConfiguration{}, invalidDifyConnectionError()
+	}
+	if err != nil {
+		return servermodels.IntegrationConnectionConfiguration{}, err
+	}
+	return connection.Configuration, nil
+}
+
+// invalidDifyConnectionError 返回 Dify 连接字段错误。
+func invalidDifyConnectionError() *common.FieldError {
+	return &common.FieldError{Fields: map[string]common.FieldCode{
+		"integrationConnectionId": ValidationIntegrationConnectionInvalid,
+	}}
+}
+
 // loadKnowledgeBaseRecord 读取带分组树的知识库详情。
 func loadKnowledgeBaseRecord(ctx context.Context, db bun.IDB, organizationID, knowledgeBaseID string) (*Record, error) {
 	knowledgeBase, err := loadKnowledgeBase(ctx, db, organizationID, knowledgeBaseID)

@@ -50,6 +50,9 @@ export const resourceKeys = {
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */
   knowledgeBase: (id?: string) => itemKey("knowledge-base", id),
+  /** 指定连接可访问的外部知识库选项。 */
+  externalKnowledgeBaseOptions: (connectionId?: string) =>
+    itemKey("external-knowledge-base-options", connectionId),
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */
