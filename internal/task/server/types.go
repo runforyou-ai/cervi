@@ -5,6 +5,8 @@ package server
 import (
 	"context"
 	"time"
+
+	"github.com/uptrace/bun"
 )
 
 const (
@@ -25,6 +27,11 @@ type EnqueueOptions struct {
 // Enqueuer 将一个 Action 输入提交给服务端任务运行时。
 type Enqueuer interface {
 	Enqueue(ctx context.Context, actionName string, payload any, options EnqueueOptions) (string, error)
+}
+
+// TxEnqueuer 将一个 Action 输入加入调用方已经开启的业务事务。
+type TxEnqueuer interface {
+	EnqueueIn(ctx context.Context, tx bun.IDB, actionName string, payload any, options EnqueueOptions) (string, error)
 }
 
 // ScheduleDefinition 定义一个由代码管理的服务端定时 Action。

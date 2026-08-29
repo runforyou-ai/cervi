@@ -55,23 +55,12 @@ func newRepository(db *bun.DB) *repository {
 	return &repository{db: db}
 }
 
-// Enqueue 在同一事务内创建任务运行记录和发件箱消息。
-func (r *repository) Enqueue(ctx context.Context, actionName string, payload any, options EnqueueOptions) (string, error) {
-	encoded, err := encodePayload(payload)
-	if err != nil {
-		return "", err
-	}
-	options, err = normalizeEnqueueOptions(options)
-	if err != nil {
-		return "", err
-	}
-	if !actionNamePattern.MatchString(actionName) {
-		return "", fmt.Errorf("invalid task action name %q", actionName)
-	}
+// enqueue 在独立事务内创建任务运行记录和发件箱消息。
+func (r *repository) enqueue(ctx context.Context, actionName string, payload json.RawMessage, options EnqueueOptions) (string, error) {
 	var runID string
-	err = r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var enqueueErr error
-		runID, enqueueErr = enqueueIn(ctx, tx, actionName, encoded, options, "")
+		runID, enqueueErr = enqueueIn(ctx, tx, actionName, payload, options, "")
 		return enqueueErr
 	})
 	return runID, err
