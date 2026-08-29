@@ -616,7 +616,7 @@ func TestBearerTokenParsing(t *testing.T) {
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
 		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
-		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: true, WorkspaceTabsEnabled: true, WorkStatus: appservice.WorkStatusWorking},
+		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: true, WorkStatus: appservice.WorkStatusWorking},
 	}
 }
 

@@ -55,12 +55,22 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 		return CurrentUser{}, err
 	}
 	updatedIdentity, err := b.updateUserPreferences.Execute(ctx, identity, useraction.PreferencesInput{
-		Locale: domain.Locale(input.Locale), TimeZone: input.TimeZone, MessageNotificationsEnabled: input.MessageNotificationsEnabled, WorkspaceTabsEnabled: input.WorkspaceTabsEnabled,
+		Locale:                      domain.Locale(input.Locale),
+		TimeZone:                    input.TimeZone,
+		MessageNotificationsEnabled: input.MessageNotificationsEnabled,
+		WorkspaceTabsEnabled:        input.WorkspaceTabsEnabled,
 	})
 	if err != nil {
 		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
-	slog.Info("用户偏好保存成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "locale", input.Locale, "time_zone", input.TimeZone, "message_notifications_enabled", input.MessageNotificationsEnabled, "workspace_tabs_enabled", input.WorkspaceTabsEnabled)
+	slog.Info("用户偏好保存成功",
+		"organization_id", identity.Organization.ID,
+		"user_id", identity.User.ID,
+		"locale", input.Locale,
+		"time_zone", input.TimeZone,
+		"message_notifications_enabled", input.MessageNotificationsEnabled,
+		"workspace_tabs_enabled", input.WorkspaceTabsEnabled,
+	)
 	return currentUserFromIdentity(updatedIdentity), nil
 }
 

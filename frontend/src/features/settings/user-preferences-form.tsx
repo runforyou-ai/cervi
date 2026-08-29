@@ -42,7 +42,7 @@ import {
   type NotificationDeviceScope,
 } from "@/platform/notifications"
 
-/** 修改当前用户的界面语言、时区、主题、工作台和通知偏好。 */
+/** 修改当前用户偏好设置。 */
 export function UserPreferencesForm({
   user,
   onUpdated,

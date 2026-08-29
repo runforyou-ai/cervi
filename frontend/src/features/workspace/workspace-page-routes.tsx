@@ -1,4 +1,4 @@
-/** 定义可作为工作台标签长期挂载的页面路由。 */
+/** 定义工作台页面路由和多标签分组。 */
 import { Route, Routes, matchPath, type Location } from "react-router"
 
 import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"

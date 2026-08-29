@@ -72,7 +72,7 @@ export function WorkspaceLayout() {
     fallbackTabRef.current = workspaceLocation.tab
   }
 
-  /** 修正规范工作台地址，避免无效路径进入页面树。 */
+  /** 修正规范工作台地址。 */
   useLayoutEffect(() => {
     if (
       !identity ||
@@ -323,7 +323,7 @@ export function WorkspaceLayout() {
           <WorkspaceTabs currentTab={currentTab} context={workspaceContext} />
         ) : (
           <WorkspaceSinglePage
-            currentTab={currentTab}
+            href={currentTab.href}
             context={workspaceContext}
           />
         )}
