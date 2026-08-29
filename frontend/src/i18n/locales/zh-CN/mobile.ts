@@ -1,6 +1,5 @@
 /** 简体中文·移动端文案。 */
 const mobile = {
-  organization: "企业",
   logout: "退出登录",
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",
@@ -22,10 +21,9 @@ const mobile = {
   },
   me: {
     title: "我的",
-    server: "企业服务器",
-    serverLoadError: "无法读取企业服务器地址",
-    serverNotSaved: "未保存企业服务器地址",
-    changeServer: "切换企业服务器",
+    profile: "基础资料",
+    displayName: "姓名",
+    email: "邮箱",
   },
 }
 

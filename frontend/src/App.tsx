@@ -24,6 +24,15 @@ function AppLoading() {
 
 /** 根应用，按平台渲染对应入口。 */
 function App({ platform }: { platform: AppPlatform }) {
+  const mobileToastOffset =
+    platform === "mobile"
+      ? {
+          top: "calc(env(safe-area-inset-top) + 1rem)",
+          right: "1rem",
+          left: "1rem",
+        }
+      : undefined
+
   return (
     <>
       <StartupBootstrap>
@@ -33,7 +42,11 @@ function App({ platform }: { platform: AppPlatform }) {
           {platform === "mobile" ? <MobileApp /> : null}
         </Suspense>
       </StartupBootstrap>
-      <Toaster />
+      <Toaster
+        position={platform === "mobile" ? "top-center" : undefined}
+        offset={mobileToastOffset}
+        mobileOffset={mobileToastOffset}
+      />
     </>
   )
 }

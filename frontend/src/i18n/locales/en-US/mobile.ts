@@ -1,6 +1,5 @@
 /** 美式英语·移动端文案。 */
 const mobile = {
-  organization: "Company",
   logout: "Log out",
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",
@@ -22,10 +21,9 @@ const mobile = {
   },
   me: {
     title: "Me",
-    server: "Company server",
-    serverLoadError: "Could not load the company server address",
-    serverNotSaved: "No company server address is saved",
-    changeServer: "Switch company server",
+    profile: "Profile",
+    displayName: "Name",
+    email: "Email",
   },
 }
 

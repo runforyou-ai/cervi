@@ -10,16 +10,18 @@ import { ServerConnectionPage } from "@/features/server-connection/server-connec
 /** 渲染移动端路由。 */
 export default function MobileApp() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/inbox" replace />} />
-      <Route path="/connect" element={<ServerConnectionPage />} />
-      <Route path="/login" element={<LoginPage allowServerChange />} />
-      <Route path="/setup" element={<Navigate to="/connect" replace />} />
-      <Route element={<MobileWorkspaceLayout />}>
-        <Route path="/inbox" element={<MobileInboxPage />} />
-        <Route path="/me" element={<MobileMePage />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <div className="h-dvh w-full overflow-x-hidden">
+      <Routes>
+        <Route path="/" element={<Navigate to="/inbox" replace />} />
+        <Route path="/connect" element={<ServerConnectionPage />} />
+        <Route path="/login" element={<LoginPage allowServerChange />} />
+        <Route path="/setup" element={<Navigate to="/connect" replace />} />
+        <Route element={<MobileWorkspaceLayout />}>
+          <Route path="/inbox" element={<MobileInboxPage />} />
+          <Route path="/me" element={<MobileMePage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
   )
 }

@@ -41,9 +41,11 @@ type SavedServerState =
 export function ServerConnectionForm({
   source,
   onCancel,
+  onEditableLayoutReady,
 }: {
   source: ServerConnectionSource | null
   onCancel?: () => void
+  onEditableLayoutReady?: () => void
 }) {
   const { t } = useTranslation("connection")
   const navigate = useNavigate()
@@ -66,6 +68,11 @@ export function ServerConnectionForm({
   })
   const { getValues, reset, watch } = form
   const serverUrl = watch("serverUrl").trim()
+  const recoveryMode =
+    savedServer.status === "loaded" &&
+    source === null &&
+    !editing &&
+    savedServer.serverUrl !== ""
 
   useEffect(() => {
     if (detected && detected.serverUrl !== serverUrl) {
@@ -96,6 +103,12 @@ export function ServerConnectionForm({
     }
   }, [getValues, reset, savedServerRevision])
 
+  useEffect(() => {
+    if (savedServer.status === "loaded" && !recoveryMode) {
+      onEditableLayoutReady?.()
+    }
+  }, [onEditableLayoutReady, recoveryMode, savedServer.status])
+
   /** 展示服务器检测或连接错误。 */
   function showConnectionError(error: unknown) {
     if (isApiError(error)) {
@@ -117,19 +130,15 @@ export function ServerConnectionForm({
   }
 
   /** 根据连接来源选择成功后的页面。 */
-  function connectionDestination(changed: boolean) {
+  function connectionDestination() {
     if (source === "login") return "/login"
-    if (source === "me") return changed ? "/login" : "/me"
     return "/inbox"
   }
 
   /** 完成启动状态并进入当前连接对应的页面。 */
-  function finishConnection(
-    organizationName: string,
-    changed: boolean,
-  ) {
+  function finishConnection(organizationName: string) {
     completeStartup(organizationName)
-    navigate(connectionDestination(changed), { replace: true })
+    navigate(connectionDestination(), { replace: true })
   }
 
   /** 检测企业服务器并展示企业名称。 */
@@ -151,8 +160,8 @@ export function ServerConnectionForm({
     if (!detected) return
     setConnecting(true)
     try {
-      const result = await connectServer(detected.serverUrl)
-      finishConnection(detected.organizationName, result.changed)
+      await connectServer(detected.serverUrl)
+      finishConnection(detected.organizationName)
     } catch (error) {
       showConnectionError(error)
     } finally {
@@ -167,8 +176,8 @@ export function ServerConnectionForm({
     try {
       const result = await inspectServer(savedServer.serverUrl)
       if (!result) return
-      const connection = await connectServer(result.serverUrl)
-      finishConnection(result.organizationName, connection.changed)
+      await connectServer(result.serverUrl)
+      finishConnection(result.organizationName)
     } catch (error) {
       showConnectionError(error)
     } finally {
@@ -220,8 +229,6 @@ export function ServerConnectionForm({
     )
   }
 
-  const recoveryMode =
-    source === null && !editing && savedServer.serverUrl !== ""
   if (recoveryMode) {
     return (
       <Card>

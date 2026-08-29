@@ -11,6 +11,7 @@ import { fallbackLanguage } from "@/i18n/resources"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
 const tokenStorageKey = "cervi.token"
+const androidErrorMarker = "\n__CERVI_API_ERROR_V1__:"
 
 type StoredToken = Pick<Auth, "token" | "expiresAt">
 
@@ -147,17 +148,40 @@ function normalizeError(error: unknown) {
     const cause = (error as Error & { cause?: unknown }).cause
     if (error instanceof CancelError && cause instanceof Error) return cause
     if (isErrorCause(cause)) {
-      return new ApiError(
-        cause.kind ?? "",
-        cause.state ?? "",
-        cause.message,
-        cause.fields ?? {},
-        cause.reason ?? "",
-      )
+      return apiErrorFromCause(cause)
     }
+    const androidCause = parseAndroidErrorCause(error.message)
+    if (androidCause) return apiErrorFromCause(androidCause)
     return error
   }
   return new ApiError("failed", "", "Request failed")
+}
+
+/** 从结构化错误原因创建统一的前端业务错误。 */
+function apiErrorFromCause(cause: ErrorCause) {
+  return new ApiError(
+    cause.kind ?? "",
+    cause.state ?? "",
+    cause.message,
+    cause.fields ?? {},
+    cause.reason ?? "",
+  )
+}
+
+/** 从 Android 错误文本恢复 wailsapp/wails#6053 未传递的结构化原因。 */
+function parseAndroidErrorCause(message: string) {
+  const markerIndex = message.lastIndexOf(androidErrorMarker)
+  if (markerIndex < 0) return undefined
+  const encoded = message.slice(markerIndex + androidErrorMarker.length)
+  try {
+    const bytes = Uint8Array.from(globalThis.atob(encoded), (character) =>
+      character.charCodeAt(0),
+    )
+    const cause: unknown = JSON.parse(new TextDecoder().decode(bytes))
+    return isErrorCause(cause) ? cause : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** 判断异常原因是否为结构化业务错误。 */

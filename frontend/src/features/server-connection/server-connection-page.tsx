@@ -1,85 +1,39 @@
 /** 企业服务器连接页。 */
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react"
 import { useLocation, useNavigate } from "react-router"
 
 import { ServerConnectionForm } from "@/features/server-connection/server-connection-form"
-import { resolveAppPlatform } from "@/platform/app-platform"
 
-export type ServerConnectionSource = "login" | "me"
+export type ServerConnectionSource = "login"
 
-/** 按未展开高度垂直居中，内容增高时只向下延伸。 */
-function AnchoredCenter({
+/** 居中基础表单，并让检测结果保持顶部锚点向下展开。 */
+function CenteredContent({
+  anchorReady,
   children,
-  topAligned = false,
 }: {
+  anchorReady: boolean
   children: ReactNode
-  topAligned?: boolean
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
-  const compactHeightRef = useRef<number | null>(null)
-  const [offset, setOffset] = useState<number | null>(null)
+  const [anchorHeight, setAnchorHeight] = useState<number | null>(null)
 
   useLayoutEffect(() => {
-    if (topAligned) return
-    const node = contentRef.current
-    if (!node) {
-      return
-    }
-
-    const lockOffset = (height: number) => {
-      compactHeightRef.current = height
-      setOffset(Math.max(24, (window.innerHeight - height) / 2))
-    }
-
-    const sync = () => {
-      const height = node.offsetHeight
-      const compact = compactHeightRef.current
-      if (compact == null || height <= compact + 1) {
-        lockOffset(height)
-      }
-    }
-
-    const onResize = () => {
-      const compact = compactHeightRef.current
-      if (compact == null) {
-        sync()
-        return
-      }
-      setOffset(Math.max(24, (window.innerHeight - compact) / 2))
-    }
-
-    sync()
-    const observer = new ResizeObserver(sync)
-    observer.observe(node)
-    window.addEventListener("resize", onResize)
-    return () => {
-      observer.disconnect()
-      window.removeEventListener("resize", onResize)
-    }
-  }, [topAligned])
-
-  if (topAligned) {
-    return (
-      <main className="h-dvh w-full overflow-y-auto px-6">
-        <div className="mx-auto w-full max-w-sm pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-          {children}
-        </div>
-      </main>
-    )
-  }
+    if (!anchorReady || anchorHeight !== null || !contentRef.current) return
+    setAnchorHeight(contentRef.current.offsetHeight)
+  }, [anchorHeight, anchorReady])
 
   return (
-    <main
-      className={
-        offset == null
-          ? "flex h-dvh w-full items-center justify-center overflow-y-auto px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10"
-          : "flex h-dvh w-full justify-center overflow-y-auto px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-10 md:pb-10"
-      }
-    >
+    <main className="flex h-dvh w-full overflow-y-auto px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10">
       <div
         ref={contentRef}
-        className="w-full max-w-sm"
-        style={offset == null ? undefined : { marginTop: offset }}
+        className="mx-auto my-auto w-full max-w-sm shrink-0"
+        style={anchorHeight === null ? undefined : { height: anchorHeight }}
       >
         {children}
       </div>
@@ -93,7 +47,7 @@ function connectionSource(value: unknown): ServerConnectionSource | null {
     return null
   }
   const from = (value as { from?: unknown }).from
-  return from === "login" || from === "me" ? from : null
+  return from === "login" ? from : null
 }
 
 /** 展示企业服务器地址表单。 */
@@ -101,22 +55,24 @@ export function ServerConnectionPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const source = connectionSource(location.state)
-  const mobile = resolveAppPlatform() === "mobile"
+  const [anchorReady, setAnchorReady] = useState(false)
+  const markAnchorReady = useCallback(() => setAnchorReady(true), [])
 
-  /** 取消主动切换并返回来源页。 */
+  /** 取消主动切换并返回登录页。 */
   function cancelServerChange() {
-    navigate(source === "me" ? "/me" : "/login", { replace: true })
+    navigate("/login", { replace: true })
   }
 
   return (
-    <AnchoredCenter topAligned={mobile}>
+    <CenteredContent anchorReady={anchorReady}>
       <div className="mb-6 text-center">
         <p className="text-lg font-semibold tracking-tight">Cervi</p>
       </div>
       <ServerConnectionForm
         source={source}
         onCancel={source ? cancelServerChange : undefined}
+        onEditableLayoutReady={markAnchorReady}
       />
-    </AnchoredCenter>
+    </CenteredContent>
   )
 }
