@@ -34,8 +34,6 @@ const inbox = {
   messagesLoadEarlier: "Load earlier messages",
   messagesLoadingEarlier: "Loading",
   messagesLoadEarlierError: "Could not load earlier messages",
-  messageToday: "Today",
-  messageYesterday: "Yesterday",
   unknownSender: "Unknown sender",
   conversationTransfer: "Transfer",
   conversationHandToAi: "Hand to AI",

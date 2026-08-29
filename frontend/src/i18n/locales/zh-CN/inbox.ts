@@ -33,8 +33,6 @@ const inbox = {
   messagesLoadEarlier: "加载更早消息",
   messagesLoadingEarlier: "正在加载",
   messagesLoadEarlierError: "更早的消息加载失败",
-  messageToday: "今天",
-  messageYesterday: "昨天",
   unknownSender: "未知发送者",
   conversationTransfer: "转给同事",
   conversationHandToAi: "交给 AI",

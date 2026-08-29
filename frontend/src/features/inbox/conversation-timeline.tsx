@@ -18,7 +18,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
-import { previousDayKey } from "@/features/inbox/calendar"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -45,6 +44,17 @@ function timelineViewport(root: HTMLDivElement | null) {
   return root?.querySelector<HTMLElement>(
     '[data-slot="scroll-area-viewport"]',
   )
+}
+
+/** 按 Helmdesk 的 MM-DD HH:mm 格式显示用户时区中的消息时间。 */
+function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  )
+  return `${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
 }
 
 /** 客户会话只读消息时间线。 */
@@ -74,22 +84,18 @@ export function ConversationTimeline({
   const dateFormatters = useMemo(() => {
     const locale = i18n.resolvedLanguage
     return {
-      dayKey: new Intl.DateTimeFormat("en-CA", {
+      messageTime: new Intl.DateTimeFormat("en-US", {
         timeZone,
-        year: "numeric",
         month: "2-digit",
         day: "2-digit",
-      }),
-      day: new Intl.DateTimeFormat(locale, {
-        timeZone,
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }),
-      time: new Intl.DateTimeFormat(locale, {
-        timeZone,
         hour: "2-digit",
         minute: "2-digit",
+        hourCycle: "h23",
+      }),
+      full: new Intl.DateTimeFormat(locale, {
+        timeZone,
+        dateStyle: "medium",
+        timeStyle: "short",
       }),
     }
   }, [i18n.resolvedLanguage, timeZone])
@@ -195,10 +201,6 @@ export function ConversationTimeline({
     )
   }
 
-  const today = dateFormatters.dayKey.format(new Date())
-  const yesterday = previousDayKey(today)
-  let previousDay = ""
-
   return (
     <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1 bg-background">
       <div className="flex w-full flex-col px-4 pb-3 md:px-6">
@@ -225,11 +227,8 @@ export function ConversationTimeline({
         ) : null}
 
         <div className="grid gap-3">
-          {currentPage.messages.map((message, index) => {
+          {currentPage.messages.map((message) => {
             const date = new Date(message.originatedAt)
-            const day = dateFormatters.dayKey.format(date)
-            const showDay = day !== previousDay
-            previousDay = day
             const incoming =
               !message.sender ||
               message.sender.kind === ChatSubjectKind.ChatSubjectKindContact
@@ -238,54 +237,57 @@ export function ConversationTimeline({
               (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
                 ? t("anonymousVisitor")
                 : t("unknownSender"))
-            const dayLabel =
-              day === today
-                ? t("messageToday")
-                : day === yesterday
-                  ? t("messageYesterday")
-                  : dateFormatters.day.format(date)
+            const senderInitial =
+              Array.from(senderName)[0]?.toLocaleUpperCase() ?? "?"
 
             return (
-              <div key={message.id}>
-                {showDay ? (
-                  <div
-                    className={cn(
-                      "mb-3 flex items-center gap-3 text-xs text-muted-foreground",
-                      index > 0 && "mt-3",
-                    )}
-                  >
-                    <span className="h-px flex-1 bg-border/70" />
-                    <time dateTime={message.originatedAt}>{dayLabel}</time>
-                    <span className="h-px flex-1 bg-border/70" />
-                  </div>
-                ) : null}
-                <article
+              <article
+                key={message.id}
+                className={cn(
+                  "flex items-start gap-2",
+                  incoming ? "justify-start" : "justify-end",
+                )}
+                aria-label={`${senderName} ${dateFormatters.full.format(date)}`}
+              >
+                <div
                   className={cn(
-                    "flex flex-col",
-                    incoming ? "items-start" : "items-end",
+                    "flex max-w-[75%] flex-col gap-1",
+                    incoming ? "ml-10 items-start" : "mr-10 items-end",
                   )}
                 >
-                  <span className="mb-1 px-1 text-xs text-muted-foreground">
-                    {senderName}
-                  </span>
-                  <div
-                    className={cn(
-                      "max-w-[min(82%,36rem)] rounded-2xl px-3.5 py-2.5 text-sm break-words whitespace-pre-wrap shadow-xs",
-                      incoming
-                        ? "rounded-bl-md border bg-background text-foreground"
-                        : "rounded-br-md bg-primary text-primary-foreground",
-                    )}
-                  >
-                    {message.body}
-                  </div>
                   <time
                     dateTime={message.originatedAt}
-                    className="mt-1 px-1 text-[11px] text-muted-foreground"
+                    title={dateFormatters.full.format(date)}
+                    className="text-[11px] text-muted-foreground/80"
                   >
-                    {dateFormatters.time.format(date)}
+                    {formatMessageTime(dateFormatters.messageTime, date)}
                   </time>
-                </article>
-              </div>
+                  <div className="relative max-w-full">
+                    <span
+                      className={cn(
+                        "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
+                        incoming
+                          ? "right-full mr-2 border bg-background text-foreground"
+                          : "left-full ml-2 bg-primary text-primary-foreground",
+                      )}
+                      title={senderName}
+                      aria-hidden="true"
+                    >
+                      {senderInitial}
+                    </span>
+                    <div
+                      className={cn(
+                        "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words whitespace-pre-wrap [overflow-wrap:anywhere]",
+                        incoming
+                          ? "rounded-bl-sm border bg-background text-foreground shadow-xs"
+                          : "rounded-br-sm bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {message.body}
+                    </div>
+                  </div>
+                </div>
+              </article>
             )
           })}
         </div>

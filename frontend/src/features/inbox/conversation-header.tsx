@@ -1,9 +1,6 @@
 import {
-  ArrowRightLeftIcon,
-  BotIcon,
   GlobeIcon,
   MessageCircleIcon,
-  PanelRightIcon,
   SendIcon,
   UserRoundIcon,
 } from "lucide-react"
@@ -135,7 +132,6 @@ export function ConversationHeader({
           className="hidden lg:inline-flex"
           disabled
         >
-          <ArrowRightLeftIcon />
           {t("conversationTransfer")}
         </Button>
         <Button
@@ -145,20 +141,19 @@ export function ConversationHeader({
           className="hidden lg:inline-flex"
           disabled
         >
-          <BotIcon />
           {t("conversationHandToAi")}
         </Button>
         <Button
           type="button"
           variant="outline"
-          size="icon-sm"
+          size="sm"
           className="text-muted-foreground xl:hidden"
           aria-label={contextActionLabel}
           aria-pressed={contextVisible}
           title={contextActionLabel}
           onClick={onContextToggle}
         >
-          <PanelRightIcon />
+          {t("contextTitleBar")}
         </Button>
       </div>
     </header>
