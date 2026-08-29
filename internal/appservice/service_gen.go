@@ -49,6 +49,11 @@ func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta
 	return s.backend.ListConversationMessages(ctx, meta, conversationID, input)
 }
 
+// SendCustomerTextMessage 发送客户会话文本消息。
+func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
+	return s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input)
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (s *Service) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
 	return s.backend.ListMessageChannels(ctx, meta)

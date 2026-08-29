@@ -81,6 +81,14 @@ func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.
 	return output, err
 }
 
+// SendCustomerTextMessage 发送客户会话文本消息。
+func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerTextMessageInput) (appservice.ConversationMessage, error) {
+	var output appservice.ConversationMessage
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList

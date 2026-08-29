@@ -136,6 +136,20 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			writeTestJSON(writer, http.StatusUnauthorized, map[string]any{"error": map[string]string{
 				"state": "login", "message": "Authentication required.",
 			}})
+		case "/api/conversations/conversation-1/messages":
+			if request.Method != http.MethodPost || request.Header.Get("Authorization") != "Bearer test-token" {
+				http.Error(writer, "unexpected customer message request", http.StatusBadRequest)
+				return
+			}
+			var input appservice.CustomerTextMessageInput
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
+				http.Error(writer, err.Error(), http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, appservice.ConversationMessage{
+				ID: input.ClientMessageID, Type: appservice.MessageTypeText, Body: input.Body,
+				Sender: &appservice.ConversationMessageSender{Kind: appservice.ChatSubjectKindOrganizationIdentity},
+			})
 		case "/api/profile":
 			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
 				http.Error(writer, "unexpected profile request", http.StatusBadRequest)
@@ -331,6 +345,12 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	}
 	if _, err := backend.LoadInbox(context.Background(), meta); err != nil {
 		t.Fatal(err)
+	}
+	message, err := backend.SendCustomerTextMessage(context.Background(), meta, "conversation-1", appservice.CustomerTextMessageInput{
+		ClientMessageID: "message-1", Body: "回复客户",
+	})
+	if err != nil || message.ID != "message-1" || message.Body != "回复客户" || message.Sender == nil || message.Sender.Kind != appservice.ChatSubjectKindOrganizationIdentity {
+		t.Fatalf("customer message = %#v, error = %v", message, err)
 	}
 	user, err := backend.UpdateProfile(context.Background(), meta, appservice.ProfileInput{
 		DisplayName:  "林晓",

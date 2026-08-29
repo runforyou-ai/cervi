@@ -1253,7 +1253,7 @@ P3 typing、presence 等临时事件
 
 - 网站访客通过第 4.5 节的渠道 Cookie 恢复身份，第一条有效文本消息创建 `stage = visitor` 联系人、渠道身份和长期客户会话。
 - 新草稿第一条有效文本创建 Conversation 和首个 `ServiceSession`；点击已有列表项发送时复用该 Conversation，并复用或续开它的 ServiceSession。访客会话列表以 Conversation 为列表项，ServiceSession 只提供最新处理状态摘要。
-- 网站消息 PR 已交付访客发送、Conversation 列表和完整历史读取（见第 13.3 节）；企业成员列表、历史和回复作为后续独立 PR，历史使用 `before`，网站和员工页面以后使用 `after` 轮询新增消息。
+- 网站消息 PR 已交付访客发送、Conversation 列表和完整历史读取（见第 13.3 节）；企业成员列表、历史和回复也已由后续独立 PR 交付，历史使用 `before`，网站和员工页面以后使用 `after` 轮询新增消息。
 - 同一渠道身份可以同时拥有多条正在处理的 Conversation，每条 Conversation 同时最多一个 `status IN (waiting, active, pending)` 的 ServiceSession；`conversations.status = active` 不表示客服批次未结束。
 - 网站公开请求由现有 `/api` Gin Service 适配到未注册 Wails 绑定的访客应用服务和 Action；访客直接读取 Cervi 消息时间线，不创建 Delivery。
 - 本子阶段只实现文本，不包含文件、外部平台投递和统一实时基础设施。
@@ -1362,12 +1362,14 @@ Telegram 首个实现额外验证 TDLib 会话托管、FloodWait、远端历史�
 
 ### 13.1 交付基线
 
-客户聊天当前由四个连续 PR 推进：
+客户聊天当前由六个连续 PR 推进：
 
 1. 客户聊天数据底座 PR：建立客户聊天数据底座并暂时隐藏管理端手动添加外部联系人的入口。
 2. 网站访客消息 PR：实现网站访客身份、首条消息事务、真实 Conversation 列表和完整消息历史。
 3. 成员客户会话列表 PR：实现未结束客户会话工作队列和消息页中栏骨架。
 4. 成员客户会话历史 PR：实现成员按 Conversation 读取和渲染完整文本历史。
+5. 客户会话工作区 PR：建立 Conversation 工作区和独立联系人上下文栏骨架。
+6. 成员文本回复 PR：实现成员回复、首次回复隐式领取和当前时间线即时更新。
 
 前两个 PR 对应的详细设计文档已随交付删除；成员侧后续 PR 的临时边界记录在 `inbox-frontend-followup-plan.md`，完成对应交付后删除。本文档仍是长期设计基线，后续实现与本文档不一致时，先更新本文档再改代码，不能让实现自行选择另一套语义。
 
@@ -1454,31 +1456,36 @@ GET /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
 
 成员消息 DTO 保留消息类型、双时间和真实 ChatSubject 发送者，不复用访客挂件的 `visitor/agent` 二元作者视角。前端在会话主区加载最近一页并使用 `before` 读取更早文本，按消息编号去重并保持阅读位置；`after` 已作为后续 HTTP 增量补拉契约，但本 PR 不自动调用。
 
-### 13.6 PR5：客户会话工作区骨架（本次交付）
+### 13.6 PR5：客户会话工作区骨架（已合并）
 
 PR5 以 Helmdesk 收件箱为样式和交互基线，把选中区拆为客户 Conversation 工作区和独立联系人上下文栏。会话头展示联系人、Conversation 标题和最新 ServiceSession 状态；右栏建立资料、AI 助手和业务三个页签，并在宽屏支持拖动调整宽度与收起，在较窄视口使用 Sheet。
 
 时间线仍只读取当前 Conversation，不按联系人拼接其他 Conversation。每条消息显示来源时间、真实发送主体头像和方向气泡；每个 ServiceSession 的 opening message 前显示批次序号、开始时间和状态，单个批次同样显示边界。回复区、转给同事和交给 AI 只保留禁用骨架，不调用业务接口。
 
-### 13.7 当前共同边界
+### 13.7 PR6：成员文本回复（本次交付）
+
+PR6 增加 `POST /api/conversations/{conversationID}/messages` 成员客户会话文本消息命令。消息使用 `mmsg:<organization_identity_id>:<client_message_id>` 永久幂等键；Action 在事务中锁定最新 ServiceSession，禁止抢占其他主体负责的批次，并在公共队列首次回复时由当前成员领取并激活。首次实际成员回复建立或恢复 ChatSubject 和 ConversationParticipant，写入 Message、首次响应时间以及 Conversation 和 ServiceSession 摘要。
+
+网站渠道回复直接写入 Cervi 时间线，不创建 Delivery、异步任务或实时事件。前端启用工作区回复区，成功后立即合入成员时间线并刷新收件箱摘要；访客和成员自动补拉仍留给下一 PR。
+
+### 13.8 当前共同边界
 
 当前客户聊天仍未实现以下能力，全部属于后续阶段：
 
-- 企业成员回复和双方 `after` 自动补拉。
+- 双方 `after` 自动补拉。
 - ServiceSession 领取、转接、挂起和结束命令。
 - 客户队列按负责人、团队和关闭状态真实筛选。
 - 未读、实时、文件、外部平台投递、指标和满意度。
 - 第三方用户消息账号、受管访客、联邦和 AI 运行表。
 - `customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。
 
-### 13.8 后续交付
+### 13.9 后续交付
 
 后续按独立 PR 继续完成：
 
-1. 企业成员文本回复；无负责人的排队批次在首次回复时由当前成员领取并激活。
-2. 网站访客和成员页面使用 `after` 轮询新增文本消息，完成网站双方文本闭环。
-3. 公开访客端点按第 4.5 节补齐防滥用限制：接口限速、消息长度与频率约束、未回复 Conversation 数量上限；先于外部渠道扩展交付。
-4. ServiceSession 显式领取、挂起和结束命令。
-5. 客户队列子筛选按状态和负责人落地，并与 URL 查询参数同步。
-6. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
-7. 未读、统一实时、文件、外部平台投递、转接、指标和满意度。
+1. 网站访客和成员页面使用 `after` 轮询新增文本消息，完成网站双方文本闭环。
+2. 公开访客端点按第 4.5 节补齐防滥用限制：接口限速、消息长度与频率约束、未回复 Conversation 数量上限；先于外部渠道扩展交付。
+3. ServiceSession 显式领取、挂起和结束命令。
+4. 客户队列子筛选按状态和负责人落地，并与 URL 查询参数同步。
+5. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
+6. 未读、统一实时、文件、外部平台投递、转接、指标和满意度。

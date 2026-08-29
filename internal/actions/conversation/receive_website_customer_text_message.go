@@ -26,7 +26,7 @@ const websiteExternalIDPrefix = "web-session:"
 // maxWriteAttempts 是并发唯一约束冲突时的最大写入尝试次数。
 const maxWriteAttempts = 3
 
-var retryableConstraintNames = map[string]struct{}{
+var websiteMessageRetryableConstraintNames = map[string]struct{}{
 	"contact_channel_identities_channel_external_unique":         {},
 	"chat_subjects_organization_kind_source_unique":              {},
 	"conversation_participants_org_conversation_subject_unique":  {},
@@ -84,7 +84,7 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 		if err == nil {
 			return result, nil
 		}
-		constraint, retryable := retryableUniqueViolation(err)
+		constraint, retryable := retryableUniqueViolation(err, websiteMessageRetryableConstraintNames)
 		if !retryable {
 			return ReceiveWebsiteCustomerTextMessageResult{}, err
 		}
@@ -622,11 +622,11 @@ func loadIdempotentResult(ctx context.Context, db bun.IDB, channel *servermodels
 }
 
 // retryableUniqueViolation 返回允许重试的并发唯一约束。
-func retryableUniqueViolation(err error) (string, bool) {
+func retryableUniqueViolation(err error, constraintNames map[string]struct{}) (string, bool) {
 	constraint, ok := pgerr.UniqueViolation(err)
 	if !ok {
 		return "", false
 	}
-	_, retryable := retryableConstraintNames[constraint]
+	_, retryable := constraintNames[constraint]
 	return constraint, retryable
 }

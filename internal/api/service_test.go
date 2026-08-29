@@ -37,6 +37,7 @@ type testBackend struct {
 	lastWorkStatus       appservice.UserWorkStatusInput
 	lastConversationID   string
 	lastConversationList appservice.ConversationMessageListInput
+	lastCustomerMessage  appservice.CustomerTextMessageInput
 	lastDocumentBaseID   string
 	lastDocumentQuery    appservice.KnowledgeDocumentListInput
 	lastAIConnection     appservice.AIProviderConnectionInput
@@ -74,6 +75,14 @@ func (b *testBackend) ListConversationMessages(_ context.Context, meta appservic
 	b.lastConversationID = conversationID
 	b.lastConversationList = input
 	return appservice.ConversationMessageList{Messages: []appservice.ConversationMessage{}}, nil
+}
+
+// SendCustomerTextMessage 记录成员客户消息输入。
+func (b *testBackend) SendCustomerTextMessage(_ context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerTextMessageInput) (appservice.ConversationMessage, error) {
+	b.lastMeta = meta
+	b.lastConversationID = conversationID
+	b.lastCustomerMessage = input
+	return appservice.ConversationMessage{ID: input.ClientMessageID, Type: appservice.MessageTypeText, Body: input.Body}, nil
 }
 
 // ListKnowledgeDocuments 记录知识文档查询输入。
@@ -381,6 +390,24 @@ func TestConversationMessageQueryUsesTypedCursors(t *testing.T) {
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK || backend.lastConversationID != conversationID || backend.lastConversationList.Before != before || backend.lastConversationList.After != "" {
 		t.Fatalf("status = %d, conversation = %q, input = %#v", response.StatusCode, backend.lastConversationID, backend.lastConversationList)
+	}
+}
+
+// TestCustomerTextMessageUsesTypedContract 验证成员回复路径和请求体转换为类型化输入。
+func TestCustomerTextMessageUsesTypedContract(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
+	input := appservice.CustomerTextMessageInput{
+		ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+		Body:            "回复客户",
+	}
+	response := doJSON(t, http.MethodPost, server.URL+"/conversations/"+conversationID+"/messages", input, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || backend.lastConversationID != conversationID || backend.lastCustomerMessage != input {
+		t.Fatalf("status = %d, conversation = %q, input = %#v", response.StatusCode, backend.lastConversationID, backend.lastCustomerMessage)
 	}
 }
 

@@ -25,6 +25,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/work-status", s.updateUserWorkStatus)
 	router.GET("/inbox", s.loadInbox)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
+	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
 	router.GET("/channels/:channelID", s.getMessageChannel)
@@ -199,6 +200,16 @@ func (s *Service) listConversationMessages(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListConversationMessages(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// sendCustomerTextMessage 发送客户会话文本消息。
+func (s *Service) sendCustomerTextMessage(c *gin.Context) {
+	var input appservice.CustomerTextMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendCustomerTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

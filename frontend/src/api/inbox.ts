@@ -2,11 +2,13 @@
 import {
   ListConversationMessages,
   LoadInbox,
+  SendCustomerTextMessage,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   ConversationMessage,
   ConversationMessageList,
   ConversationMessageListInput,
+  CustomerTextMessageInput,
   Inbox,
   InboxConversation,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -26,6 +28,7 @@ export type ConversationMessageListData = Omit<
 
 const loadInboxBound = bind(LoadInbox)
 const listConversationMessagesBound = bind(ListConversationMessages)
+const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
 
 /** 读取成员收件箱的客户会话列表。 */
 export async function loadInbox(): Promise<InboxData> {
@@ -48,4 +51,12 @@ export async function listConversationMessages(
     signal,
   )
   return { ...result, messages: asList(result.messages) }
+}
+
+/** 发送成员客户会话文本消息。 */
+export function sendCustomerTextMessage(
+  conversationID: string,
+  input: CustomerTextMessageInput,
+) {
+  return sendCustomerTextMessageBound(conversationID, input)
 }

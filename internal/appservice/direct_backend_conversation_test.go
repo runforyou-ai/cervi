@@ -3,6 +3,8 @@
 package appservice
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -32,5 +34,24 @@ func TestConversationMessageCursorRejectsAnotherConversation(t *testing.T) {
 	cursor := encodeConversationMessageCursor("0198ddee-c056-7bc5-a1d9-586f878ee966", point)
 	if _, valid := decodeConversationMessageCursor(cursor, "0198ddee-c056-7bc5-a1d9-586f878ee977"); valid {
 		t.Fatal("expected cross-conversation cursor to be rejected")
+	}
+}
+
+// TestCustomerTextMessageErrorMapsConflicts 验证成员回复冲突保留稳定原因。
+func TestCustomerTextMessageErrorMapsConflicts(t *testing.T) {
+	tests := []struct {
+		reason  string
+		message string
+	}{
+		{reason: conversationaction.ConflictReasonIdempotencyMismatch, message: "这条消息与之前的发送内容不一致。"},
+		{reason: conversationaction.ConflictReasonServiceSessionOwned, message: "这条会话已由其他客服负责。"},
+		{reason: conversationaction.ConflictReasonServiceSessionNotReplyable, message: "当前客服处理周期无法回复。"},
+	}
+	for _, test := range tests {
+		err := customerTextMessageError(context.Background(), RequestMeta{Locale: LocaleChineseSimplified}, &conversationaction.ConflictError{Reason: test.reason}, "organization-1", "conversation-1")
+		var apiError *Error
+		if !errors.As(err, &apiError) || apiError.Kind != ErrorKindConflict || apiError.Reason != test.reason || apiError.Message != test.message {
+			t.Fatalf("error = %#v", err)
+		}
 	}
 }

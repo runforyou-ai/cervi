@@ -540,6 +540,13 @@ export function SelectProfileImage(meta: $models.RequestMeta): $CancellablePromi
 }
 
 /**
+ * SendCustomerTextMessage 发送客户会话文本消息。
+ */
+export function SendCustomerTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(1986181614, meta, conversationID, input);
+}
+
+/**
  * SendMessageNotification 在当前设备投递一条新消息系统通知。
  */
 export function SendMessageNotification(meta: $models.RequestMeta, input: $models.MessageNotificationInput): $CancellablePromise<void> {
