@@ -1,8 +1,8 @@
 /** 外部知识库文档只读列表页。 */
-import { useCallback, useEffect, useState } from "react"
+import { useEffect } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, useParams, useSearchParams } from "react-router"
+import { Navigate, useParams } from "react-router"
 
 import {
   KnowledgeDocumentStatus,
@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useDateTime } from "@/hooks/use-date-time"
+import { useListSearchParams } from "@/hooks/use-list-search-params"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -63,47 +64,20 @@ export function KnowledgeDocumentListPage() {
   const { t } = useTranslation("knowledgeBase")
   const { formatDateTime } = useDateTime()
   const { knowledgeBaseId = "" } = useParams()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const keyword = searchParams.get("q") ?? ""
+  const {
+    searchParams,
+    setParameters,
+    query: keyword,
+    search,
+    setSearch,
+  } = useListSearchParams()
   const status = optionalWailsEnum(
     KnowledgeDocumentStatus,
     searchParams.get("status"),
   )
-  const [search, setSearch] = useState(keyword)
   const parsedPage = Number(searchParams.get("page") ?? "1")
   const currentPage =
     Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
-
-  /** 更新文档列表查询参数。 */
-  const setParameters = useCallback(
-    (changes: Record<string, string | null>, replace = false) => {
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current)
-          for (const [name, value] of Object.entries(changes)) {
-            if (!value) {
-              next.delete(name)
-            } else {
-              next.set(name, value)
-            }
-          }
-          return next
-        },
-        { replace },
-      )
-    },
-    [setSearchParams],
-  )
-
-  useEffect(() => setSearch(keyword), [keyword])
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (search !== keyword) {
-        setParameters({ q: search || null, page: null })
-      }
-    }, 300)
-    return () => window.clearTimeout(timeout)
-  }, [keyword, search, setParameters])
 
   const detail = useResource(
     resourceKeys.knowledgeBase(knowledgeBaseId),

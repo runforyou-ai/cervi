@@ -39,11 +39,19 @@ type WorkspaceUnreadState = {
   attentionPending: boolean
 }
 
-/** 页面导航后清除文字选区。 */
+/** 页面导航后清除非编辑区域的文字选区。 */
 function useClearSelectionOnNavigation() {
   const location = useLocation()
 
   useLayoutEffect(() => {
+    const activeElement = document.activeElement
+    if (
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement ||
+      (activeElement instanceof HTMLElement && activeElement.isContentEditable)
+    ) {
+      return
+    }
     window.getSelection()?.removeAllRanges()
   }, [location.key])
 }
