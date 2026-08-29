@@ -49,8 +49,13 @@ func AppendPath(baseURL, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	parsed.RawPath = ""
-	parsed.Path = strings.TrimSuffix(parsed.Path, "/") + "/" + strings.TrimLeft(path, "/")
+	escapedPath := strings.TrimLeft(path, "/")
+	decodedPath, err := url.PathUnescape(escapedPath)
+	if err != nil {
+		return "", err
+	}
+	parsed.RawPath = strings.TrimSuffix(parsed.EscapedPath(), "/") + "/" + escapedPath
+	parsed.Path = strings.TrimSuffix(parsed.Path, "/") + "/" + decodedPath
 	return parsed.String(), nil
 }
 

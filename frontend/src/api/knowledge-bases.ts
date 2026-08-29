@@ -5,22 +5,29 @@ import {
   DeleteKnowledgeBase,
   DeleteKnowledgeGroup,
   GetKnowledgeBase,
+  GetKnowledgeDocument,
   ListExternalKnowledgeBaseOptions,
   ListKnowledgeBases,
+  ListKnowledgeDocumentSegments,
   ListKnowledgeDocuments,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   KnowledgeBaseCategory,
+  KnowledgeDocumentSegmentIndexStatus,
   KnowledgeDocumentStatus,
   type ExternalKnowledgeBaseOption,
   type ExternalKnowledgeBaseOptionList,
   type KnowledgeBase,
   type KnowledgeBaseInput,
   type KnowledgeBaseList,
+  type KnowledgeDocument,
   type KnowledgeDocumentList,
   type KnowledgeDocumentListInput,
+  type KnowledgeDocumentSegment,
+  type KnowledgeDocumentSegmentList,
+  type KnowledgeDocumentSegmentListInput,
   type KnowledgeDocumentSummary,
   type KnowledgeGroup,
   type KnowledgeGroupInput,
@@ -84,6 +91,36 @@ export type KnowledgeDocumentListData = Omit<
 
 export type KnowledgeDocumentListQuery = Partial<KnowledgeDocumentListInput>
 
+export type KnowledgeDocumentDetailData = Omit<
+  KnowledgeDocument,
+  "status"
+> & {
+  status: KnowledgeDocumentStatusId
+}
+
+export type KnowledgeDocumentSegmentIndexStatusId = Exclude<
+  KnowledgeDocumentSegmentIndexStatus,
+  KnowledgeDocumentSegmentIndexStatus.$zero
+>
+
+export type KnowledgeDocumentSegmentData = Omit<
+  KnowledgeDocumentSegment,
+  "indexStatus"
+> & {
+  indexStatus: KnowledgeDocumentSegmentIndexStatusId
+}
+
+export type KnowledgeDocumentSegmentListData = Omit<
+  KnowledgeDocumentSegmentList,
+  "segments"
+> & {
+  segments: KnowledgeDocumentSegmentData[]
+}
+
+export type KnowledgeDocumentSegmentListQuery = Partial<
+  KnowledgeDocumentSegmentListInput
+>
+
 const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
 const getKnowledgeBaseBound = bind(GetKnowledgeBase)
 const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
@@ -95,6 +132,10 @@ const listExternalKnowledgeBaseOptionsBound = bind(
   ListExternalKnowledgeBaseOptions,
 )
 const listKnowledgeDocumentsBound = bind(ListKnowledgeDocuments)
+const getKnowledgeDocumentBound = bind(GetKnowledgeDocument)
+const listKnowledgeDocumentSegmentsBound = bind(
+  ListKnowledgeDocumentSegments,
+)
 
 /** 创建企业知识库。 */
 export function createKnowledgeBase(
@@ -198,6 +239,46 @@ export function listKnowledgeDocuments(
     documents: asList(output.documents).map((document) => ({
       ...document,
       status: document.status as KnowledgeDocumentStatusId,
+    })),
+  }))
+}
+
+/** 读取指定外部知识文档详情。 */
+export function getKnowledgeDocument(
+  knowledgeBaseId: string,
+  documentId: string,
+  signal?: AbortSignal,
+): Promise<KnowledgeDocumentDetailData> {
+  return getKnowledgeDocumentBound(knowledgeBaseId, documentId, signal).then(
+    (document) => ({
+      ...document,
+      status: document.status as KnowledgeDocumentStatusId,
+    }),
+  )
+}
+
+/** 读取指定外部知识文档的一页分段。 */
+export function listKnowledgeDocumentSegments(
+  knowledgeBaseId: string,
+  documentId: string,
+  query: KnowledgeDocumentSegmentListQuery = {},
+  signal?: AbortSignal,
+): Promise<KnowledgeDocumentSegmentListData> {
+  return listKnowledgeDocumentSegmentsBound(
+    knowledgeBaseId,
+    documentId,
+    {
+      keyword: query.keyword ?? "",
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 20,
+    },
+    signal,
+  ).then((output) => ({
+    ...output,
+    segments: asList(output.segments).map((segment) => ({
+      ...segment,
+      indexStatus:
+        segment.indexStatus as KnowledgeDocumentSegmentIndexStatusId,
     })),
   }))
 }

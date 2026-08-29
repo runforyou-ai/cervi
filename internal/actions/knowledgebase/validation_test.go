@@ -106,6 +106,19 @@ func TestNormalizeDocumentListInput(t *testing.T) {
 	}
 }
 
+// TestNormalizeDocumentSegmentListInput 验证知识文档分段查询条件规范化和分页范围。
+func TestNormalizeDocumentSegmentListInput(t *testing.T) {
+	input, fields := normalizeDocumentSegmentListInput(DocumentSegmentListInput{Keyword: "  安装  "})
+	if len(fields) != 0 || input.Keyword != "安装" || input.Page != 1 ||
+		input.PageSize != defaultKnowledgeDocumentPageSize {
+		t.Fatalf("input = %#v, fields = %#v", input, fields)
+	}
+	_, fields = normalizeDocumentSegmentListInput(DocumentSegmentListInput{Page: 2, PageSize: 101})
+	if fields["pageSize"] != ValidationDocumentQueryInvalid {
+		t.Fatalf("fields = %#v", fields)
+	}
+}
+
 // TestKnowledgeDocumentStatusMapping 验证 Dify 与统一文档状态的双向映射。
 func TestKnowledgeDocumentStatusMapping(t *testing.T) {
 	tests := map[string]domain.KnowledgeDocumentStatus{
@@ -137,5 +150,26 @@ func TestKnowledgeDocumentStatusMapping(t *testing.T) {
 	}
 	if _, ok := knowledgeDocumentStatusToDify("future_status"); ok {
 		t.Fatal("unsupported filter status should fail")
+	}
+}
+
+// TestKnowledgeDocumentSegmentIndexStatusMapping 验证 Dify 分段索引状态的完整映射。
+func TestKnowledgeDocumentSegmentIndexStatusMapping(t *testing.T) {
+	tests := map[string]domain.KnowledgeDocumentSegmentIndexStatus{
+		"waiting":    domain.KnowledgeDocumentSegmentIndexStatusWaiting,
+		"indexing":   domain.KnowledgeDocumentSegmentIndexStatusIndexing,
+		"completed":  domain.KnowledgeDocumentSegmentIndexStatusCompleted,
+		"error":      domain.KnowledgeDocumentSegmentIndexStatusError,
+		"paused":     domain.KnowledgeDocumentSegmentIndexStatusPaused,
+		"re_segment": domain.KnowledgeDocumentSegmentIndexStatusResegment,
+	}
+	for status, expected := range tests {
+		actual, err := knowledgeDocumentSegmentIndexStatusFromDify(status)
+		if err != nil || actual != expected {
+			t.Fatalf("status %q: actual = %q, error = %v", status, actual, err)
+		}
+	}
+	if _, err := knowledgeDocumentSegmentIndexStatusFromDify("future_status"); err == nil {
+		t.Fatal("unsupported status should fail")
 	}
 }

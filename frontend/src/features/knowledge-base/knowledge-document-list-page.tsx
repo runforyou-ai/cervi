@@ -2,7 +2,7 @@
 import { useEffect } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, useParams } from "react-router"
+import { Link, Navigate, useParams } from "react-router"
 
 import {
   KnowledgeDocumentStatus,
@@ -203,13 +203,16 @@ export function KnowledgeDocumentListPage() {
                   <TableHead>{t("documents.columns.name")}</TableHead>
                   <TableHead>{t("documents.columns.status")}</TableHead>
                   <TableHead>{t("documents.columns.createdAt")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("documents.columns.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {documents.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={3}
+                      colSpan={4}
                       className="h-32 text-center text-muted-foreground"
                     >
                       {keyword || status
@@ -235,6 +238,15 @@ export function KnowledgeDocumentListPage() {
                         {document.createdAt
                           ? formatDateTime(document.createdAt)
                           : "—"}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link
+                            to={`/knowledge-bases/${knowledgeBaseId}/documents/${encodeURIComponent(document.id)}`}
+                          >
+                            {t("documents.view")}
+                          </Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))

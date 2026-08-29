@@ -877,6 +877,18 @@ export interface KnowledgeBaseList {
 }
 
 /**
+ * KnowledgeDocument 定义知识文档详情。
+ */
+export interface KnowledgeDocument {
+    "id": string;
+    "name": string;
+    "status": KnowledgeDocumentStatus;
+    "wordCount": number | null;
+    "hitCount": number;
+    "createdAt": string | null;
+}
+
+/**
  * KnowledgeDocumentList 定义知识文档分页结果。
  */
 export interface KnowledgeDocumentList {
@@ -890,6 +902,54 @@ export interface KnowledgeDocumentList {
 export interface KnowledgeDocumentListInput {
     "keyword": string;
     "status"?: KnowledgeDocumentStatus | null;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * KnowledgeDocumentSegment 定义知识文档分段列表项。
+ */
+export interface KnowledgeDocumentSegment {
+    "id": string;
+    "position": number;
+    "content": string;
+    "answer": string | null;
+    "wordCount": number;
+    "hitCount": number;
+    "indexStatus": KnowledgeDocumentSegmentIndexStatus;
+    "createdAt": string | null;
+}
+
+/**
+ * KnowledgeDocumentSegmentIndexStatus 表示知识文档分段的索引状态。
+ */
+export enum KnowledgeDocumentSegmentIndexStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeDocumentSegmentIndexStatusWaiting = "waiting",
+    KnowledgeDocumentSegmentIndexStatusIndexing = "indexing",
+    KnowledgeDocumentSegmentIndexStatusCompleted = "completed",
+    KnowledgeDocumentSegmentIndexStatusError = "error",
+    KnowledgeDocumentSegmentIndexStatusPaused = "paused",
+    KnowledgeDocumentSegmentIndexStatusResegment = "re_segment",
+};
+
+/**
+ * KnowledgeDocumentSegmentList 定义知识文档分段分页结果。
+ */
+export interface KnowledgeDocumentSegmentList {
+    "segments": KnowledgeDocumentSegment[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * KnowledgeDocumentSegmentListInput 定义知识文档分段列表查询条件。
+ */
+export interface KnowledgeDocumentSegmentListInput {
+    "keyword": string;
     "page": number;
     "pageSize": number;
 }

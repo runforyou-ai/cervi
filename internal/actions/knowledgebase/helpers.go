@@ -6,13 +6,21 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/connector"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
 )
+
+// difyKnowledgeAccess 定义当前企业访问 Dify 知识库所需的服务端上下文。
+type difyKnowledgeAccess struct {
+	Config    connector.DifyKnowledgeBaseConfig
+	DatasetID string
+}
 
 // loadKnowledgeBase 读取当前企业中的知识库。
 func loadKnowledgeBase(ctx context.Context, db bun.IDB, organizationID, knowledgeBaseID string) (*servermodels.KnowledgeBase, error) {
@@ -76,6 +84,41 @@ func loadDifyConfiguration(
 		return servermodels.IntegrationConnectionConfiguration{}, err
 	}
 	return connection.Configuration, nil
+}
+
+// loadDifyKnowledgeAccess 解析当前企业外部知识库的 Dify 访问上下文。
+func loadDifyKnowledgeAccess(
+	ctx context.Context,
+	db bun.IDB,
+	organizationID, knowledgeBaseID string,
+) (difyKnowledgeAccess, error) {
+	knowledgeBase, err := loadKnowledgeBase(ctx, db, organizationID, knowledgeBaseID)
+	if err != nil {
+		return difyKnowledgeAccess{}, err
+	}
+	if knowledgeBase.IntegrationConnectionID == nil || knowledgeBase.ExternalResourceID == nil {
+		return difyKnowledgeAccess{}, ErrDocumentReadUnsupported
+	}
+	datasetID := strings.TrimSpace(*knowledgeBase.ExternalResourceID)
+	if datasetID == "" {
+		return difyKnowledgeAccess{}, ErrDocumentReadUnsupported
+	}
+	configuration, err := loadDifyConfiguration(
+		ctx,
+		db,
+		organizationID,
+		*knowledgeBase.IntegrationConnectionID,
+	)
+	if err != nil {
+		return difyKnowledgeAccess{}, err
+	}
+	return difyKnowledgeAccess{
+		Config: connector.DifyKnowledgeBaseConfig{
+			APIURL: configuration.APIURL,
+			APIKey: configuration.APIKey,
+		},
+		DatasetID: datasetID,
+	}, nil
 }
 
 // invalidDifyConnectionError 返回 Dify 连接字段错误。

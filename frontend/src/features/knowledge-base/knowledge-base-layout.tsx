@@ -414,7 +414,8 @@ function KnowledgeBaseTree({
             to={contentPath}
             className={cn(
               "flex h-8 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              currentPath === contentPath &&
+              (currentPath === contentPath ||
+                currentPath.startsWith(`${contentPath}/`)) &&
                 "bg-sidebar-accent/60 font-medium text-sidebar-accent-foreground",
             )}
           >

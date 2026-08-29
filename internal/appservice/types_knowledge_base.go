@@ -27,6 +27,18 @@ const (
 	KnowledgeDocumentStatusArchived   KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusArchived)
 )
 
+// KnowledgeDocumentSegmentIndexStatus 表示知识文档分段的索引状态。
+type KnowledgeDocumentSegmentIndexStatus string
+
+const (
+	KnowledgeDocumentSegmentIndexStatusWaiting   KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusWaiting)
+	KnowledgeDocumentSegmentIndexStatusIndexing  KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusIndexing)
+	KnowledgeDocumentSegmentIndexStatusCompleted KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusCompleted)
+	KnowledgeDocumentSegmentIndexStatusError     KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusError)
+	KnowledgeDocumentSegmentIndexStatusPaused    KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusPaused)
+	KnowledgeDocumentSegmentIndexStatusResegment KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusResegment)
+)
+
 // KnowledgeBaseInput 定义知识库可编辑字段。
 type KnowledgeBaseInput struct {
 	Name                    string                `json:"name"`
@@ -101,4 +113,39 @@ type KnowledgeDocumentSummary struct {
 type KnowledgeDocumentList struct {
 	Documents []KnowledgeDocumentSummary `json:"documents"`
 	Page      PageInfo                   `json:"page"`
+}
+
+// KnowledgeDocument 定义知识文档详情。
+type KnowledgeDocument struct {
+	ID        string                  `json:"id"`
+	Name      string                  `json:"name"`
+	Status    KnowledgeDocumentStatus `json:"status"`
+	WordCount *int                    `json:"wordCount"`
+	HitCount  int                     `json:"hitCount"`
+	CreatedAt *time.Time              `json:"createdAt"`
+}
+
+// KnowledgeDocumentSegmentListInput 定义知识文档分段列表查询条件。
+type KnowledgeDocumentSegmentListInput struct {
+	Keyword  string `json:"keyword" query:"keyword"`
+	Page     int    `json:"page" query:"page,default=1"`
+	PageSize int    `json:"pageSize" query:"pageSize,default=20"`
+}
+
+// KnowledgeDocumentSegment 定义知识文档分段列表项。
+type KnowledgeDocumentSegment struct {
+	ID          string                              `json:"id"`
+	Position    int                                 `json:"position"`
+	Content     string                              `json:"content"`
+	Answer      *string                             `json:"answer"`
+	WordCount   int                                 `json:"wordCount"`
+	HitCount    int                                 `json:"hitCount"`
+	IndexStatus KnowledgeDocumentSegmentIndexStatus `json:"indexStatus"`
+	CreatedAt   *time.Time                          `json:"createdAt"`
+}
+
+// KnowledgeDocumentSegmentList 定义知识文档分段分页结果。
+type KnowledgeDocumentSegmentList struct {
+	Segments []KnowledgeDocumentSegment `json:"segments"`
+	Page     PageInfo                   `json:"page"`
 }
