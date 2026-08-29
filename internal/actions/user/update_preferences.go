@@ -37,6 +37,7 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 			Set("locale = ?", input.Locale).
 			Set("time_zone = ?", input.TimeZone).
 			Set("message_notifications_enabled = ?", input.MessageNotificationsEnabled).
+			Set("workspace_tabs_enabled = ?", input.WorkspaceTabsEnabled).
 			Set("updated_at = now()").
 			Where("u.id = ?", identity.User.ID).
 			Where("u.organization_id = ?", identity.Organization.ID).

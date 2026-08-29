@@ -74,7 +74,7 @@ type httpProbe struct {
 
 // Run 执行模型服务供应商 HTTP 探测。
 func (p *httpProbe) Run(ctx context.Context) error {
-	return connectiontest.RunHTTPProbe(ctx, p.client, p.request, p.validate)
+	return connectiontest.ReadHTTPResponse(ctx, p.client, p.request, p.validate)
 }
 
 // newOpenAICompatibleFactory 创建 OpenAI 兼容模型列表探测器工厂。

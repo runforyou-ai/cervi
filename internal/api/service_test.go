@@ -35,6 +35,8 @@ type testBackend struct {
 	lastPassword         appservice.ChangePasswordInput
 	lastPreferences      appservice.UserPreferencesInput
 	lastWorkStatus       appservice.UserWorkStatusInput
+	lastConversationID   string
+	lastConversationList appservice.ConversationMessageListInput
 	lastAIConnection     appservice.AIProviderConnectionInput
 	lastBusinessSystemID string
 	lastBusinessSystem   appservice.BusinessSystemInput
@@ -62,6 +64,14 @@ func (b *testBackend) LoadIdentity(_ context.Context, meta appservice.RequestMet
 		return appservice.Identity{}, &appservice.Error{State: appservice.SessionStateLogin, Message: "请先登录。"}
 	}
 	return testIdentity(), nil
+}
+
+// ListConversationMessages 记录成员消息查询输入。
+func (b *testBackend) ListConversationMessages(_ context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageListInput) (appservice.ConversationMessageList, error) {
+	b.lastMeta = meta
+	b.lastConversationID = conversationID
+	b.lastConversationList = input
+	return appservice.ConversationMessageList{Messages: []appservice.ConversationMessage{}}, nil
 }
 
 // UpdateProfile 记录个人资料输入并返回更新后的用户。
@@ -103,6 +113,7 @@ func (b *testBackend) UpdateUserPreferences(_ context.Context, meta appservice.R
 	identity.User.Locale = input.Locale
 	identity.User.TimeZone = input.TimeZone
 	identity.User.MessageNotificationsEnabled = input.MessageNotificationsEnabled
+	identity.User.WorkspaceTabsEnabled = input.WorkspaceTabsEnabled
 	return identity.User, nil
 }
 
@@ -332,6 +343,21 @@ func TestListQueryIsConvertedToTypedInput(t *testing.T) {
 	}
 }
 
+// TestConversationMessageQueryUsesTypedCursors 验证成员消息路径和游标转换为类型化输入。
+func TestConversationMessageQueryUsesTypedCursors(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
+	const before = "0198ddee-c056-7bc5-a1d9-586f878ee966.1787992200123456789.0198ddf0-a234-7f01-8d99-e3e0af0f5f65"
+	response := doJSON(t, http.MethodGet, server.URL+"/conversations/"+conversationID+"/messages?before="+before, nil, "test-token")
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK || backend.lastConversationID != conversationID || backend.lastConversationList.Before != before || backend.lastConversationList.After != "" {
+		t.Fatalf("status = %d, conversation = %q, input = %#v", response.StatusCode, backend.lastConversationID, backend.lastConversationList)
+	}
+}
+
 // TestMemberAndTeamMutationsUseTypedContracts 验证成员和团队写入使用类型化契约。
 func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 	backend := &testBackend{}
@@ -491,12 +517,13 @@ func TestUpdateUserPreferencesUsesTypedInput(t *testing.T) {
 		Locale:                      appservice.LocaleEnglishUnitedStates,
 		TimeZone:                    "America/New_York",
 		MessageNotificationsEnabled: true,
+		WorkspaceTabsEnabled:        true,
 	}, "test-token")
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
-	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" || !backend.lastPreferences.MessageNotificationsEnabled {
+	if backend.lastMeta.Token != "test-token" || backend.lastPreferences.Locale != appservice.LocaleEnglishUnitedStates || backend.lastPreferences.TimeZone != "America/New_York" || !backend.lastPreferences.MessageNotificationsEnabled || !backend.lastPreferences.WorkspaceTabsEnabled {
 		t.Fatalf("preferences input = %#v, meta = %#v", backend.lastPreferences, backend.lastMeta)
 	}
 }

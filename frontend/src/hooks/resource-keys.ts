@@ -22,6 +22,9 @@ function scopedListKey(prefix: string, scopeId?: string, parameters?: KeyParamet
 export const resourceKeys = {
   /** 收件箱数据。 */
   inbox: () => ["inbox"],
+  /** 单个会话的初始消息页。 */
+  conversationMessages: (conversationId?: string) =>
+    itemKey("conversation-messages", conversationId),
   /** 消息渠道列表。 */
   messageChannels: () => ["message-channels"],
   /** 单个消息渠道，按类型与 ID 标识。 */
@@ -50,6 +53,9 @@ export const resourceKeys = {
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */
   knowledgeBase: (id?: string) => itemKey("knowledge-base", id),
+  /** 指定连接可访问的外部知识库选项。 */
+  externalKnowledgeBaseOptions: (connectionId?: string) =>
+    itemKey("external-knowledge-base-options", connectionId),
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */

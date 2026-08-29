@@ -15,6 +15,7 @@ import (
 	businesssystemaction "github.com/runforyou-ai/cervi/internal/actions/businesssystem"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
@@ -48,6 +49,7 @@ type DirectBackend struct {
 	resolveIdentity                   *authaction.ResolveIdentityQuery
 	installation                      *installationaction.StatusQuery
 	loadInbox                         *inboxaction.LoadInboxQuery
+	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
 	getMessageChannel                 *channelaction.GetMessageChannelQuery
@@ -77,6 +79,7 @@ type DirectBackend struct {
 	updateTeam                        *teamaction.UpdateTeamAction
 	deleteTeam                        *teamaction.DeleteTeamAction
 	listKnowledgeBases                *knowledgebaseaction.ListKnowledgeBasesQuery
+	listExternalKnowledgeBaseOptions  *knowledgebaseaction.ListExternalOptionsQuery
 	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
 	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
 	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
@@ -135,7 +138,8 @@ type DirectBackend struct {
 func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	modelProviderRegistry := modelprovider.NewRegistry(modelprovider.NewHTTPClient())
-	connectorRegistry := connector.NewRegistry(connector.NewHTTPClient())
+	connectorClient := connector.NewHTTPClient()
+	connectorRegistry := connector.NewRegistry(connectorClient)
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -143,6 +147,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		resolveIdentity:                   authaction.NewResolveIdentityQuery(db),
 		installation:                      installationaction.NewStatusQuery(db),
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
+		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getMessageChannel:                 channelaction.NewGetMessageChannelQuery(db),
@@ -172,6 +177,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		updateTeam:                        teamaction.NewUpdateTeamAction(db),
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
 		listKnowledgeBases:                knowledgebaseaction.NewListKnowledgeBasesQuery(db),
+		listExternalKnowledgeBaseOptions:  knowledgebaseaction.NewListExternalOptionsQuery(db, connector.NewDifyKnowledgeBaseLister(connectorClient)),
 		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),

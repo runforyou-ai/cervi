@@ -73,6 +73,14 @@ func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta) (a
 	return output, err
 }
 
+// ListConversationMessages 返回成员可见的会话消息。
+func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageListInput) (appservice.ConversationMessageList, error) {
+	var output appservice.ConversationMessageList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/messages", encodeConversationMessageListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList
@@ -351,6 +359,14 @@ func (b *Backend) RemoveTeamMembers(ctx context.Context, meta appservice.Request
 func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.RequestMeta) (appservice.KnowledgeBaseList, error) {
 	var output appservice.KnowledgeBaseList
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
+func (b *Backend) ListExternalKnowledgeBaseOptions(ctx context.Context, meta appservice.RequestMeta, connectionID string) (appservice.ExternalKnowledgeBaseOptionList, error) {
+	var output appservice.ExternalKnowledgeBaseOptionList
+	err := b.do(ctx, meta, http.MethodGet, "/integration-connections/"+url.PathEscape(connectionID)+"/knowledge-bases", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -649,6 +665,14 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeConversationMessageListInputQuery 将 appservice.ConversationMessageListInput 编码为查询参数。
+func encodeConversationMessageListInputQuery(input appservice.ConversationMessageListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "before", input.Before)
+	setQuery(query, "after", input.After)
 	return query
 }
 

@@ -148,6 +148,8 @@ const (
 	ErrorRemoteRequestCreateFailed        Key = "error.remote_request_create_failed"
 	ErrorServerConnectionFailed           Key = "error.server_connection_failed"
 	ErrorInboxLoadFailed                  Key = "error.inbox_load_failed"
+	ErrorConversationNotFound             Key = "error.conversation_not_found"
+	ErrorConversationMessageListFailed    Key = "error.conversation_message_list_failed"
 	ErrorWebsiteConversationNotFound      Key = "error.website_conversation_not_found"
 	ErrorWebsiteMessengerLoadFailed       Key = "error.website_messenger_load_failed"
 	ErrorWebsiteMessageSendFailed         Key = "error.website_message_send_failed"

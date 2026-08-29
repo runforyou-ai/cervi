@@ -30,6 +30,7 @@ import {
   resolveWorkspaceLocation,
   type ResolvedWorkspaceTab,
 } from "@/features/workspace/workspace-page-routes"
+import { WorkspaceSinglePage } from "@/features/workspace/workspace-single-page"
 import { WorkspaceTabs } from "@/features/workspace/workspace-tabs"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { updateNotificationUnreadIndicator } from "@/platform/notifications"
@@ -77,7 +78,7 @@ export function WorkspaceLayout() {
     fallbackTabRef.current = workspaceLocation.tab
   }
 
-  /** 在不销毁已挂载标签的前提下修正规范工作台地址。 */
+  /** 修正规范工作台地址。 */
   useLayoutEffect(() => {
     if (
       !identity ||
@@ -324,6 +325,7 @@ export function WorkspaceLayout() {
     updateOrganization,
     updateUser,
   } satisfies WorkspaceOutletContext
+  const currentTab = workspaceLocation.tab ?? fallbackTabRef.current
 
   return (
     <UserPreferencesProvider user={identity.user}>
@@ -334,10 +336,14 @@ export function WorkspaceLayout() {
           onLogout={handleLogout}
           loggingOut={loggingOut}
         />
-        <WorkspaceTabs
-          currentTab={workspaceLocation.tab ?? fallbackTabRef.current}
-          context={workspaceContext}
-        />
+        {identity.user.workspaceTabsEnabled ? (
+          <WorkspaceTabs currentTab={currentTab} context={workspaceContext} />
+        ) : (
+          <WorkspaceSinglePage
+            href={currentTab.href}
+            context={workspaceContext}
+          />
+        )}
       </div>
     </UserPreferencesProvider>
   )

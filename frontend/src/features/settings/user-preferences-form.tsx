@@ -43,7 +43,7 @@ import {
   type NotificationDeviceScope,
 } from "@/platform/notifications"
 
-/** 修改当前用户的界面语言、时区、主题和通知偏好。 */
+/** 修改当前用户偏好设置。 */
 export function UserPreferencesForm({
   user,
   onUpdated,
@@ -70,6 +70,7 @@ export function UserPreferencesForm({
       locale: user.locale as UserPreferencesFormValues["locale"],
       timeZone: user.timeZone,
       theme: (theme ?? "system") as ThemePreference,
+      workspaceTabsEnabled: user.workspaceTabsEnabled,
       messageNotificationsEnabled: user.messageNotificationsEnabled,
       notificationSoundEnabled:
         readNotificationDevicePreferences(notificationScope).soundEnabled,
@@ -90,6 +91,7 @@ export function UserPreferencesForm({
       const updated = await updateUserPreferences({
         locale: values.locale,
         timeZone: values.timeZone,
+        workspaceTabsEnabled: values.workspaceTabsEnabled,
         messageNotificationsEnabled: values.messageNotificationsEnabled,
       })
       setTheme(values.theme)
@@ -101,6 +103,7 @@ export function UserPreferencesForm({
         locale: values.locale,
         timeZone: updated.timeZone,
         theme: values.theme,
+        workspaceTabsEnabled: updated.workspaceTabsEnabled,
         messageNotificationsEnabled: updated.messageNotificationsEnabled,
         notificationSoundEnabled: values.notificationSoundEnabled,
       })
@@ -111,6 +114,7 @@ export function UserPreferencesForm({
         locale: updated.locale,
         time_zone: updated.timeZone,
         theme: values.theme,
+        workspace_tabs_enabled: updated.workspaceTabsEnabled,
         message_notifications_enabled: updated.messageNotificationsEnabled,
         notification_sound_enabled: values.notificationSoundEnabled,
       })
@@ -202,6 +206,38 @@ export function UserPreferencesForm({
             </Field>
           )}
         />
+        <section
+          className="grid gap-4 border-t pt-5"
+          aria-labelledby="workspace-preferences-title"
+        >
+          <h3 id="workspace-preferences-title" className="font-medium">
+            {t("preferences.workspace.title")}
+          </h3>
+          <Controller
+            name="workspaceTabsEnabled"
+            control={form.control}
+            render={({ field }) => (
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor={field.name}>
+                    {t("preferences.workspace.tabs")}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {t("preferences.workspace.tabsDescription")}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  id={field.name}
+                  name={field.name}
+                  checked={field.value}
+                  onBlur={field.onBlur}
+                  onCheckedChange={field.onChange}
+                  ref={field.ref}
+                />
+              </Field>
+            )}
+          />
+        </section>
         <section
           className="grid gap-4 border-t pt-5"
           aria-labelledby="notification-preferences-title"
