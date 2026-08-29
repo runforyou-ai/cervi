@@ -92,3 +92,50 @@ func TestNormalizeGroupInput(t *testing.T) {
 		t.Fatalf("fields = %#v", fields)
 	}
 }
+
+// TestNormalizeDocumentListInput 验证知识文档查询条件规范化和分页范围。
+func TestNormalizeDocumentListInput(t *testing.T) {
+	input, fields := normalizeDocumentListInput(DocumentListInput{Keyword: "  产品  ", Status: " ready "})
+	if len(fields) != 0 || input.Keyword != "产品" || input.Status != domain.KnowledgeDocumentStatusReady ||
+		input.Page != 1 || input.PageSize != defaultKnowledgeDocumentPageSize {
+		t.Fatalf("input = %#v, fields = %#v", input, fields)
+	}
+	_, fields = normalizeDocumentListInput(DocumentListInput{Page: 2, PageSize: 101})
+	if fields["pageSize"] != ValidationDocumentQueryInvalid {
+		t.Fatalf("fields = %#v", fields)
+	}
+}
+
+// TestKnowledgeDocumentStatusMapping 验证 Dify 与统一文档状态的双向映射。
+func TestKnowledgeDocumentStatusMapping(t *testing.T) {
+	tests := map[string]domain.KnowledgeDocumentStatus{
+		"queuing":   domain.KnowledgeDocumentStatusQueued,
+		"indexing":  domain.KnowledgeDocumentStatusProcessing,
+		"available": domain.KnowledgeDocumentStatusReady,
+		"paused":    domain.KnowledgeDocumentStatusPaused,
+		"error":     domain.KnowledgeDocumentStatusError,
+		"disabled":  domain.KnowledgeDocumentStatusDisabled,
+		"archived":  domain.KnowledgeDocumentStatusArchived,
+	}
+	for status, expected := range tests {
+		actual, err := knowledgeDocumentStatusFromDify(status)
+		if err != nil || actual != expected {
+			t.Fatalf("status %q: actual = %q, error = %v", status, actual, err)
+		}
+	}
+	if _, err := knowledgeDocumentStatusFromDify("future_status"); err == nil {
+		t.Fatal("unsupported status should fail")
+	}
+	for difyStatus, expected := range tests {
+		actual, ok := knowledgeDocumentStatusToDify(expected)
+		if !ok || actual != difyStatus {
+			t.Fatalf("status %q: dify status = %q, valid = %v", expected, actual, ok)
+		}
+	}
+	if status, ok := knowledgeDocumentStatusToDify(""); !ok || status != "" {
+		t.Fatalf("empty status: dify status = %q, valid = %v", status, ok)
+	}
+	if _, ok := knowledgeDocumentStatusToDify("future_status"); ok {
+		t.Fatal("unsupported filter status should fail")
+	}
+}

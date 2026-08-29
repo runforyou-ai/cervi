@@ -877,6 +877,52 @@ export interface KnowledgeBaseList {
 }
 
 /**
+ * KnowledgeDocumentList 定义知识文档分页结果。
+ */
+export interface KnowledgeDocumentList {
+    "documents": KnowledgeDocumentSummary[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * KnowledgeDocumentListInput 定义知识文档列表查询条件。
+ */
+export interface KnowledgeDocumentListInput {
+    "keyword": string;
+    "status"?: KnowledgeDocumentStatus | null;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * KnowledgeDocumentStatus 表示知识文档的统一状态。
+ */
+export enum KnowledgeDocumentStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeDocumentStatusQueued = "queued",
+    KnowledgeDocumentStatusProcessing = "processing",
+    KnowledgeDocumentStatusReady = "ready",
+    KnowledgeDocumentStatusPaused = "paused",
+    KnowledgeDocumentStatusError = "error",
+    KnowledgeDocumentStatusDisabled = "disabled",
+    KnowledgeDocumentStatusArchived = "archived",
+};
+
+/**
+ * KnowledgeDocumentSummary 定义知识文档列表项。
+ */
+export interface KnowledgeDocumentSummary {
+    "id": string;
+    "name": string;
+    "status": KnowledgeDocumentStatus;
+    "createdAt": string | null;
+}
+
+/**
  * KnowledgeGroup 定义知识库分组树节点。
  */
 export interface KnowledgeGroup {

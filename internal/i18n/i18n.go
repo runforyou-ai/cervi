@@ -291,6 +291,8 @@ const (
 	ErrorKnowledgeGroupCreateFailed                Key = "error.knowledge_group_create_failed"
 	ErrorKnowledgeGroupUpdateFailed                Key = "error.knowledge_group_update_failed"
 	ErrorKnowledgeGroupDeleteFailed                Key = "error.knowledge_group_delete_failed"
+	ErrorKnowledgeDocumentListFailed               Key = "error.knowledge_document_list_failed"
+	ErrorKnowledgeDocumentListUnsupported          Key = "error.knowledge_document_list_unsupported"
 	FieldKnowledgeBaseNameRequired                 Key = "field.knowledge_base_name_required"
 	FieldKnowledgeBaseNameTooLong                  Key = "field.knowledge_base_name_too_long"
 	FieldKnowledgeBaseNameDuplicate                Key = "field.knowledge_base_name_duplicate"
@@ -304,6 +306,7 @@ const (
 	FieldKnowledgeGroupNameTooLong                 Key = "field.knowledge_group_name_too_long"
 	FieldKnowledgeGroupNameDuplicate               Key = "field.knowledge_group_name_duplicate"
 	FieldKnowledgeGroupParentInvalid               Key = "field.knowledge_group_parent_invalid"
+	FieldKnowledgeDocumentQueryInvalid             Key = "field.knowledge_document_query_invalid"
 )
 
 //go:embed locales/*.json

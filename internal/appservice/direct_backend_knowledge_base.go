@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -71,6 +72,72 @@ func (b *DirectBackend) ListExternalKnowledgeBaseOptions(
 		"knowledge_base_count", len(knowledgeBases),
 	)
 	return ExternalKnowledgeBaseOptionList{KnowledgeBases: knowledgeBases}, nil
+}
+
+// ListKnowledgeDocuments 返回指定外部知识库的文档列表。
+func (b *DirectBackend) ListKnowledgeDocuments(
+	ctx context.Context,
+	meta RequestMeta,
+	knowledgeBaseID string,
+	input KnowledgeDocumentListInput,
+) (KnowledgeDocumentList, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return KnowledgeDocumentList{}, err
+	}
+	output, err := b.listKnowledgeDocuments.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.DocumentListInput{
+		Keyword: input.Keyword, Status: optionalDomain[KnowledgeDocumentStatus, domain.KnowledgeDocumentStatus](input.Status),
+		Page: input.Page, PageSize: input.PageSize,
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return KnowledgeDocumentList{}, ctx.Err()
+		}
+		if stage, kind, classified := connectiontest.Details(err); classified {
+			slog.Warn("Dify 知识文档列表读取失败",
+				"organization_id", identity.Organization.ID,
+				"knowledge_base_id", knowledgeBaseID,
+				"stage", stage,
+				"kind", kind,
+			)
+			switch kind {
+			case connectiontest.FailureUnauthorized,
+				connectiontest.FailureForbidden,
+				connectiontest.FailureRateLimited,
+				connectiontest.FailureTimeout,
+				connectiontest.FailureNetwork,
+				connectiontest.FailureTLS,
+				connectiontest.FailureUnavailable:
+				return KnowledgeDocumentList{}, integrationConnectionRemoteError(meta, err)
+			default:
+				return KnowledgeDocumentList{}, FailedError(meta, cervii18n.ErrorKnowledgeDocumentListFailed)
+			}
+		}
+		return KnowledgeDocumentList{}, b.knowledgeBaseError(
+			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentListFailed, identity.Organization.ID, knowledgeBaseID,
+		)
+	}
+	documents := make([]KnowledgeDocumentSummary, 0, len(output.Documents))
+	for _, document := range output.Documents {
+		documents = append(documents, KnowledgeDocumentSummary{
+			ID: document.ID, Name: document.Name, Status: KnowledgeDocumentStatus(document.Status),
+			CreatedAt: document.CreatedAt,
+		})
+	}
+	slog.Info("Dify 知识文档列表读取成功",
+		"organization_id", identity.Organization.ID,
+		"knowledge_base_id", knowledgeBaseID,
+		"page", output.Page,
+		"page_size", output.PageSize,
+		"page_document_count", len(documents),
+		"total_document_count", output.Total,
+		"keyword_filtered", strings.TrimSpace(input.Keyword) != "",
+		"status", optionalDomain[KnowledgeDocumentStatus, string](input.Status),
+	)
+	return KnowledgeDocumentList{
+		Documents: documents,
+		Page:      PageInfo{Number: output.Page, Size: output.PageSize, Total: output.Total},
+	}, nil
 }
 
 // GetKnowledgeBase 返回当前企业中的知识库详情。
@@ -202,6 +269,9 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 	if errors.Is(err, knowledgebaseaction.ErrExternalGroupUnsupported) {
 		return InvalidError(meta, cervii18n.ErrorKnowledgeGroupExternalUnsupported, nil)
 	}
+	if errors.Is(err, knowledgebaseaction.ErrDocumentListUnsupported) {
+		return InvalidError(meta, cervii18n.ErrorKnowledgeDocumentListUnsupported, nil)
+	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if knowledgeBaseID != "" {
 		attributes = append(attributes, "knowledge_base_id", knowledgeBaseID)
@@ -252,6 +322,7 @@ func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervi
 		knowledgebaseaction.ValidationGroupNameTooLong:             cervii18n.FieldKnowledgeGroupNameTooLong,
 		knowledgebaseaction.ValidationGroupNameDuplicate:           cervii18n.FieldKnowledgeGroupNameDuplicate,
 		knowledgebaseaction.ValidationGroupParentInvalid:           cervii18n.FieldKnowledgeGroupParentInvalid,
+		knowledgebaseaction.ValidationDocumentQueryInvalid:         cervii18n.FieldKnowledgeDocumentQueryInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

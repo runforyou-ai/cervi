@@ -342,10 +342,11 @@ function KnowledgeBaseTree({
 }) {
   const { t } = useTranslation("knowledgeBase")
   const path = `/knowledge-bases/${knowledgeBase.id}`
-  const active = currentPath === path
   const isQA =
     knowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
   const isExternal = knowledgeBase.integrationConnectionId !== ""
+  const contentPath = `${path}/documents`
+  const active = currentPath === path
   const categoryLabel = isQA
     ? t("category.qaShort")
     : t("category.standardShort")
@@ -393,14 +394,13 @@ function KnowledgeBaseTree({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {!isExternal ? (
-              <DropdownMenuItem onSelect={() => onCreateGroup()}>
-                {t("sidebar.addGroup")}
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem onSelect={() => onCreateGroup()}>
+                  {t("sidebar.addGroup")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
             ) : null}
-            <DropdownMenuItem asChild>
-              <Link to={path}>{t("sidebar.edit")}</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem destructive onSelect={onDeleteKnowledgeBase}>
               {t("sidebar.delete")}
             </DropdownMenuItem>
@@ -409,10 +409,24 @@ function KnowledgeBaseTree({
       </div>
 
       <div className="mt-1 ml-3 border-l pl-2">
-        <div className="flex h-8 items-center gap-2 px-2 text-xs text-muted-foreground">
-          <FolderIcon className="size-3.5 shrink-0" />
-          <span className="truncate">{t("group.default")}</span>
-        </div>
+        {isExternal ? (
+          <Link
+            to={contentPath}
+            className={cn(
+              "flex h-8 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              currentPath === contentPath &&
+                "bg-sidebar-accent/60 font-medium text-sidebar-accent-foreground",
+            )}
+          >
+            <FolderIcon className="size-3.5 shrink-0" />
+            <span className="truncate">{t("group.default")}</span>
+          </Link>
+        ) : (
+          <div className="flex h-8 items-center gap-2 px-2 text-xs text-muted-foreground">
+            <FolderIcon className="size-3.5 shrink-0" />
+            <span className="truncate">{t("group.default")}</span>
+          </div>
+        )}
         {regularGroups.map((group) => (
           <div key={group.id}>
             <KnowledgeGroupTreeRow

@@ -24,6 +24,7 @@ const (
 	ValidationGroupNameTooLong             common.FieldCode = "KNOWLEDGE_GROUP_NAME_TOO_LONG"
 	ValidationGroupNameDuplicate           common.FieldCode = "KNOWLEDGE_GROUP_NAME_DUPLICATE"
 	ValidationGroupParentInvalid           common.FieldCode = "KNOWLEDGE_GROUP_PARENT_INVALID"
+	ValidationDocumentQueryInvalid         common.FieldCode = "KNOWLEDGE_DOCUMENT_QUERY_INVALID"
 )
 
 // normalizeInput 规范化并校验知识库字段。

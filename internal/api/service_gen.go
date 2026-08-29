@@ -62,6 +62,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/teams/:teamID/members/remove", s.removeTeamMembers)
 	router.GET("/knowledge-bases", s.listKnowledgeBases)
 	router.GET("/integration-connections/:connectionID/knowledge-bases", s.listExternalKnowledgeBaseOptions)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
@@ -505,6 +506,16 @@ func (s *Service) listExternalKnowledgeBaseOptions(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listKnowledgeDocuments 返回指定外部知识库的文档列表。
+func (s *Service) listKnowledgeDocuments(c *gin.Context) {
+	input, ok := bindKnowledgeDocumentListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListKnowledgeDocuments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // getKnowledgeBase 返回当前企业中的知识库详情。
 func (s *Service) getKnowledgeBase(c *gin.Context) {
 	output, err := s.application.GetKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"))
@@ -829,6 +840,24 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 	return appservice.ConversationMessageListInput{
 		Before: c.Query("before"),
 		After:  c.Query("after"),
+	}, true
+}
+
+// bindKnowledgeDocumentListInputQuery 从查询参数解析 appservice.KnowledgeDocumentListInput。
+func bindKnowledgeDocumentListInputQuery(c *gin.Context) (appservice.KnowledgeDocumentListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.KnowledgeDocumentListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 20)
+	if !ok {
+		return appservice.KnowledgeDocumentListInput{}, false
+	}
+	return appservice.KnowledgeDocumentListInput{
+		Keyword:  c.Query("keyword"),
+		Status:   optionalEnum[appservice.KnowledgeDocumentStatus](c.Query("status")),
+		Page:     page,
+		PageSize: pageSize,
 	}, true
 }
 

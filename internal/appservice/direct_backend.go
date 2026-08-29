@@ -80,6 +80,7 @@ type DirectBackend struct {
 	deleteTeam                        *teamaction.DeleteTeamAction
 	listKnowledgeBases                *knowledgebaseaction.ListKnowledgeBasesQuery
 	listExternalKnowledgeBaseOptions  *knowledgebaseaction.ListExternalOptionsQuery
+	listKnowledgeDocuments            *knowledgebaseaction.ListKnowledgeDocumentsQuery
 	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
 	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
 	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
@@ -178,6 +179,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
 		listKnowledgeBases:                knowledgebaseaction.NewListKnowledgeBasesQuery(db),
 		listExternalKnowledgeBaseOptions:  knowledgebaseaction.NewListExternalOptionsQuery(db, connector.NewDifyKnowledgeBaseLister(connectorClient)),
+		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, connector.NewDifyKnowledgeDocumentLister(connectorClient)),
 		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),
