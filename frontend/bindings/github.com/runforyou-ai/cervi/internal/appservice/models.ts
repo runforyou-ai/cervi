@@ -562,6 +562,22 @@ export interface CurrentUser {
 }
 
 /**
+ * ExternalKnowledgeBaseOption 定义外部知识库选择项。
+ */
+export interface ExternalKnowledgeBaseOption {
+    "id": string;
+    "name": string;
+    "category": KnowledgeBaseCategory;
+}
+
+/**
+ * ExternalKnowledgeBaseOptionList 定义外部知识库选择项列表。
+ */
+export interface ExternalKnowledgeBaseOptionList {
+    "knowledgeBases": ExternalKnowledgeBaseOption[] | null;
+}
+
+/**
  * ExternalPageInput 定义原生端打开外部页面窗口的输入。
  */
 export interface ExternalPageInput {

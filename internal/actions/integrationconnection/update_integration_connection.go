@@ -37,6 +37,15 @@ func (a *UpdateIntegrationConnectionAction) Execute(ctx context.Context, identit
 		if err != nil {
 			return err
 		}
+		if current.Type != string(input.Type) {
+			inUse, err := connectionInUse(ctx, tx, identity.Organization.ID, current.ID)
+			if err != nil {
+				return err
+			}
+			if inUse {
+				return ErrInUse
+			}
+		}
 		current.Type = string(input.Type)
 		current.Name = input.Name
 		current.Description = input.Description

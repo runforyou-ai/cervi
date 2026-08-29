@@ -60,6 +60,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/teams/:teamID/members", s.addTeamMembers)
 	router.POST("/teams/:teamID/members/remove", s.removeTeamMembers)
 	router.GET("/knowledge-bases", s.listKnowledgeBases)
+	router.GET("/integration-connections/:connectionID/knowledge-bases", s.listExternalKnowledgeBaseOptions)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
@@ -484,6 +485,12 @@ func (s *Service) removeTeamMembers(c *gin.Context) {
 // listKnowledgeBases 返回当前企业的知识库列表。
 func (s *Service) listKnowledgeBases(c *gin.Context) {
 	output, err := s.application.ListKnowledgeBases(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
+func (s *Service) listExternalKnowledgeBaseOptions(c *gin.Context) {
+	output, err := s.application.ListExternalKnowledgeBaseOptions(c.Request.Context(), requestMeta(c), c.Param("connectionID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 

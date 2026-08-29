@@ -36,6 +36,9 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
+		if err := validateDifyConnection(ctx, tx, identity.Organization.ID, input.IntegrationConnectionID); err != nil {
+			return err
+		}
 		result, err := tx.NewUpdate().Model((*servermodels.KnowledgeBase)(nil)).
 			Set("name = ?", input.Name).
 			Set("category = ?", input.Category).
