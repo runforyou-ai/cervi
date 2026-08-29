@@ -54,9 +54,18 @@ func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta Reque
 				DisplayName:   message.Sender.DisplayName,
 			}
 		}
+		var sessionStart *ConversationMessageSessionStart
+		if message.SessionStart != nil {
+			sessionStart = &ConversationMessageSessionStart{
+				Sequence:  message.SessionStart.Sequence,
+				StartedAt: message.SessionStart.StartedAt,
+				Status:    ServiceSessionStatus(message.SessionStart.Status),
+			}
+		}
 		result.Messages = append(result.Messages, ConversationMessage{
 			ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
-			OriginatedAt: message.OriginatedAt, CreatedAt: message.CreatedAt, Sender: sender,
+			OriginatedAt: message.OriginatedAt, CreatedAt: message.CreatedAt,
+			Sender: sender, SessionStart: sessionStart,
 		})
 	}
 	if history.Before != nil {

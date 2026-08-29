@@ -92,6 +92,13 @@ type ConversationMessageSender struct {
 	DisplayName   *string
 }
 
+// ConversationMessageSessionStart 定义客服处理周期开始标记。
+type ConversationMessageSessionStart struct {
+	Sequence  int64
+	StartedAt time.Time
+	Status    domain.ServiceSessionStatus
+}
+
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
 	ID           string
@@ -100,6 +107,7 @@ type ConversationMessage struct {
 	OriginatedAt time.Time
 	CreatedAt    time.Time
 	Sender       *ConversationMessageSender
+	SessionStart *ConversationMessageSessionStart
 }
 
 // ConversationMessageHistoryInput 定义成员消息历史查询方向。

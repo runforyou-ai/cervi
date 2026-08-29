@@ -34,14 +34,22 @@ type ConversationMessageSender struct {
 	DisplayName   *string         `json:"displayName"`
 }
 
+// ConversationMessageSessionStart 定义客服处理周期开始标记。
+type ConversationMessageSessionStart struct {
+	Sequence  int64                `json:"sequence"`
+	StartedAt time.Time            `json:"startedAt"`
+	Status    ServiceSessionStatus `json:"status"`
+}
+
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	ID           string                     `json:"id"`
-	Type         MessageType                `json:"type"`
-	Body         string                     `json:"body"`
-	OriginatedAt time.Time                  `json:"originatedAt"`
-	CreatedAt    time.Time                  `json:"createdAt"`
-	Sender       *ConversationMessageSender `json:"sender"`
+	ID           string                           `json:"id"`
+	Type         MessageType                      `json:"type"`
+	Body         string                           `json:"body"`
+	OriginatedAt time.Time                        `json:"originatedAt"`
+	CreatedAt    time.Time                        `json:"createdAt"`
+	Sender       *ConversationMessageSender       `json:"sender"`
+	SessionStart *ConversationMessageSessionStart `json:"sessionStart"`
 }
 
 // ConversationMessageList 定义成员消息页。

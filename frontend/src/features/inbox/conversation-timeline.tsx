@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -11,6 +12,7 @@ import { useNavigate } from "react-router"
 
 import {
   ChatSubjectKind,
+  ServiceSessionStatus,
   listConversationMessages,
   type ConversationMessage,
   type ConversationMessageListData,
@@ -227,7 +229,7 @@ export function ConversationTimeline({
         ) : null}
 
         <div className="grid gap-3">
-          {currentPage.messages.map((message) => {
+          {currentPage.messages.map((message, index) => {
             const date = new Date(message.originatedAt)
             const incoming =
               !message.sender ||
@@ -241,53 +243,79 @@ export function ConversationTimeline({
               Array.from(senderName)[0]?.toLocaleUpperCase() ?? "?"
 
             return (
-              <article
-                key={message.id}
-                className={cn(
-                  "flex items-start gap-2",
-                  incoming ? "justify-start" : "justify-end",
-                )}
-                aria-label={`${senderName} ${dateFormatters.full.format(date)}`}
-              >
-                <div
-                  className={cn(
-                    "flex max-w-[75%] flex-col gap-1",
-                    incoming ? "ml-10 items-start" : "mr-10 items-end",
-                  )}
-                >
-                  <time
-                    dateTime={message.originatedAt}
-                    title={dateFormatters.full.format(date)}
-                    className="text-[11px] text-muted-foreground/80"
+              <Fragment key={message.id}>
+                {message.sessionStart ? (
+                  <div
+                    className={cn(
+                      "flex items-center gap-3 text-xs font-semibold text-foreground",
+                      index > 0 && "mt-3",
+                    )}
                   >
-                    {formatMessageTime(dateFormatters.messageTime, date)}
-                  </time>
-                  <div className="relative max-w-full">
-                    <span
-                      className={cn(
-                        "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
-                        incoming
-                          ? "right-full mr-2 border bg-background text-foreground"
-                          : "left-full ml-2 bg-primary text-primary-foreground",
-                      )}
-                      title={senderName}
-                      aria-hidden="true"
-                    >
-                      {senderInitial}
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="rounded-full border border-primary bg-background px-3 py-1 text-primary">
+                      {t("sessionBoundary", {
+                        sequence: message.sessionStart.sequence,
+                        time: formatMessageTime(
+                          dateFormatters.messageTime,
+                          new Date(message.sessionStart.startedAt),
+                        ),
+                      })}{" "}
+                      ·{" "}
+                      {message.sessionStart.status ===
+                      ServiceSessionStatus.ServiceSessionStatusClosed
+                        ? t("sessionBoundaryClosed")
+                        : t("sessionBoundaryOngoing")}
                     </span>
-                    <div
-                      className={cn(
-                        "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words whitespace-pre-wrap [overflow-wrap:anywhere]",
-                        incoming
-                          ? "rounded-bl-sm border bg-background text-foreground shadow-xs"
-                          : "rounded-br-sm bg-primary text-primary-foreground",
-                      )}
+                    <span className="h-px flex-1 bg-border" />
+                  </div>
+                ) : null}
+                <article
+                  className={cn(
+                    "flex items-start gap-2",
+                    incoming ? "justify-start" : "justify-end",
+                  )}
+                  aria-label={`${senderName} ${dateFormatters.full.format(date)}`}
+                >
+                  <div
+                    className={cn(
+                      "flex max-w-[75%] flex-col gap-1",
+                      incoming ? "ml-10 items-start" : "mr-10 items-end",
+                    )}
+                  >
+                    <time
+                      dateTime={message.originatedAt}
+                      title={dateFormatters.full.format(date)}
+                      className="text-[11px] text-muted-foreground/80"
                     >
-                      {message.body}
+                      {formatMessageTime(dateFormatters.messageTime, date)}
+                    </time>
+                    <div className="relative max-w-full">
+                      <span
+                        className={cn(
+                          "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
+                          incoming
+                            ? "right-full mr-2 border bg-background text-foreground"
+                            : "left-full ml-2 bg-primary text-primary-foreground",
+                        )}
+                        title={senderName}
+                        aria-hidden="true"
+                      >
+                        {senderInitial}
+                      </span>
+                      <div
+                        className={cn(
+                          "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words whitespace-pre-wrap [overflow-wrap:anywhere]",
+                          incoming
+                            ? "rounded-bl-sm border bg-background text-foreground shadow-xs"
+                            : "rounded-br-sm bg-primary text-primary-foreground",
+                        )}
+                      >
+                        {message.body}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </article>
+                </article>
+              </Fragment>
             )
           })}
         </div>

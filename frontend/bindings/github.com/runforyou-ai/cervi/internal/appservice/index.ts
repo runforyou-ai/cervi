@@ -80,6 +80,7 @@ export type {
     ConversationMessageList,
     ConversationMessageListInput,
     ConversationMessageSender,
+    ConversationMessageSessionStart,
     CreateAgentInput,
     CreateMessageChannelInput,
     CreateUserInput,

@@ -61,7 +61,9 @@
 - 时间线沿用 Helmdesk 的主区留白和消息行结构：只保留左右和底部内边距，不展示“今天”等
   日期分隔；每条消息在气泡上方显示 `MM-DD HH:mm`，访客和企业主体分别使用左右头像位、
   75% 消息列与对应方向的气泡样式。
-- 本 PR 不修改 appservice DTO、生成绑定、消息查询、资源 Key、`PageSplit` 或 WebSocket 相关代码。
+- 成员消息查询在每个 ServiceSession 的 opening message 上返回序号、开始时间和状态；时间线按
+  Helmdesk 样式显示“第 N 次会话 · MM-DD HH:mm · 状态”，单个 ServiceSession 也显示边界。
+- 除上述开始标记外，本 PR 不扩展消息查询，不修改资源 Key、`PageSplit` 或 WebSocket 相关代码。
 
 ## PR F4：成员文本回复
 

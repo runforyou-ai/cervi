@@ -533,6 +533,7 @@ export interface ConversationMessage {
     "originatedAt": string;
     "createdAt": string;
     "sender": ConversationMessageSender | null;
+    "sessionStart": ConversationMessageSessionStart | null;
 }
 
 /**
@@ -559,6 +560,15 @@ export interface ConversationMessageSender {
     "chatSubjectId": string;
     "kind": ChatSubjectKind;
     "displayName": string | null;
+}
+
+/**
+ * ConversationMessageSessionStart 定义客服处理周期开始标记。
+ */
+export interface ConversationMessageSessionStart {
+    "sequence": number;
+    "startedAt": string;
+    "status": ServiceSessionStatus;
 }
 
 /**

@@ -23,14 +23,18 @@ type ListConversationMessagesQuery struct {
 }
 
 type conversationMessageRow struct {
-	ID                string    `bun:"id"`
-	Type              string    `bun:"type"`
-	Body              string    `bun:"body"`
-	OriginatedAt      time.Time `bun:"originated_at"`
-	CreatedAt         time.Time `bun:"created_at"`
-	SenderSubjectID   *string   `bun:"sender_subject_id"`
-	SenderKind        *string   `bun:"sender_kind"`
-	SenderDisplayName *string   `bun:"sender_display_name"`
+	ID                             string     `bun:"id"`
+	Type                           string     `bun:"type"`
+	Body                           string     `bun:"body"`
+	OriginatedAt                   time.Time  `bun:"originated_at"`
+	CreatedAt                      time.Time  `bun:"created_at"`
+	SenderSubjectID                *string    `bun:"sender_subject_id"`
+	SenderKind                     *string    `bun:"sender_kind"`
+	SenderDisplayName              *string    `bun:"sender_display_name"`
+	ServiceSessionOpeningMessageID *string    `bun:"service_session_opening_message_id"`
+	ServiceSessionSequence         *int64     `bun:"service_session_sequence"`
+	ServiceSessionStartedAt        *time.Time `bun:"service_session_started_at"`
+	ServiceSessionStatus           *string    `bun:"service_session_status"`
 }
 
 // NewListConversationMessagesQuery 创建成员消息历史查询。
@@ -71,8 +75,13 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		ColumnExpr("cs.id AS sender_subject_id").
 		ColumnExpr("cs.kind AS sender_kind").
 		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) WHEN cs.kind = ? THEN oi.display_name END AS sender_display_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
+		ColumnExpr("ss.opening_message_id AS service_session_opening_message_id").
+		ColumnExpr("ss.sequence AS service_session_sequence").
+		ColumnExpr("ss.created_at AS service_session_started_at").
+		ColumnExpr("ss.status AS service_session_status").
 		Join("LEFT JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("LEFT JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
 		Join("JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN contacts AS c ON c.id = cs.source_id AND c.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindContact).
@@ -136,6 +145,13 @@ func buildConversationMessageHistory(rows []conversationMessageRow, input Conver
 				ChatSubjectID: *row.SenderSubjectID,
 				Kind:          domain.ChatSubjectKind(*row.SenderKind),
 				DisplayName:   row.SenderDisplayName,
+			}
+		}
+		if row.ServiceSessionOpeningMessageID != nil && *row.ServiceSessionOpeningMessageID == row.ID {
+			message.SessionStart = &ConversationMessageSessionStart{
+				Sequence:  *row.ServiceSessionSequence,
+				StartedAt: *row.ServiceSessionStartedAt,
+				Status:    domain.ServiceSessionStatus(*row.ServiceSessionStatus),
 			}
 		}
 		messages = append(messages, message)
