@@ -201,29 +201,31 @@ export function ConversationTimeline({
 
   return (
     <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1 bg-background">
-      <div className="flex w-full flex-col px-4 py-5 md:px-6">
-        <div className="mb-5 flex min-h-7 items-center justify-center">
-          {currentPage.before ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={loadingEarlier}
-              onClick={() => void loadEarlier()}
-            >
-              {loadingEarlier
-                ? t("messagesLoadingEarlier")
-                : t("messagesLoadEarlier")}
-            </Button>
-          ) : null}
-          {earlierError ? (
-            <span className="ml-2 text-xs text-destructive" role="status">
-              {t("messagesLoadEarlierError")}
-            </span>
-          ) : null}
-        </div>
+      <div className="flex w-full flex-col px-4 pb-3 md:px-6">
+        {currentPage.before || earlierError ? (
+          <div className="flex items-center justify-center py-2">
+            {currentPage.before ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={loadingEarlier}
+                onClick={() => void loadEarlier()}
+              >
+                {loadingEarlier
+                  ? t("messagesLoadingEarlier")
+                  : t("messagesLoadEarlier")}
+              </Button>
+            ) : null}
+            {earlierError ? (
+              <span className="ml-2 text-xs text-destructive" role="status">
+                {t("messagesLoadEarlierError")}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="grid gap-3">
-          {currentPage.messages.map((message) => {
+          {currentPage.messages.map((message, index) => {
             const date = new Date(message.originatedAt)
             const day = dateFormatters.dayKey.format(date)
             const showDay = day !== previousDay
@@ -246,7 +248,12 @@ export function ConversationTimeline({
             return (
               <div key={message.id}>
                 {showDay ? (
-                  <div className="my-3 flex items-center gap-3 text-xs text-muted-foreground">
+                  <div
+                    className={cn(
+                      "mb-3 flex items-center gap-3 text-xs text-muted-foreground",
+                      index > 0 && "mt-3",
+                    )}
+                  >
                     <span className="h-px flex-1 bg-border/70" />
                     <time dateTime={message.originatedAt}>{dayLabel}</time>
                     <span className="h-px flex-1 bg-border/70" />

@@ -3,11 +3,16 @@ import {
   BriefcaseBusinessIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  GlobeIcon,
+  MessageCircleIcon,
+  MessagesSquareIcon,
+  SendIcon,
 } from "lucide-react"
+import { useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useTranslation } from "react-i18next"
 
-import type { InboxConversation } from "@/api"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ChannelType, type InboxConversation } from "@/api"
+import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
   SheetContent,
@@ -23,6 +28,23 @@ import {
 } from "@/components/ui/tabs"
 import { ConversationAvatar } from "@/features/inbox/conversation-header"
 import { cn } from "@/lib/utils"
+
+const contextPanelMinWidth = 320
+const contextPanelMaxWidth = 640
+const contextPanelToggleWidth = 16
+
+const channelIcons: Partial<Record<ChannelType, typeof GlobeIcon>> = {
+  [ChannelType.ChannelTypeWebsite]: GlobeIcon,
+  [ChannelType.ChannelTypeTelegram]: SendIcon,
+  [ChannelType.ChannelTypeWeChatOfficialAccount]: MessageCircleIcon,
+}
+
+function clampContextPanelWidth(width: number) {
+  return Math.min(
+    contextPanelMaxWidth,
+    Math.max(contextPanelMinWidth, width),
+  )
+}
 
 function ContextPlaceholder({
   icon: Icon,
@@ -50,33 +72,44 @@ function ContextPlaceholder({
 function ConversationContextContent({
   conversation,
   contactName,
+  sessionStatus,
   sheet = false,
 }: {
   conversation: InboxConversation
   contactName: string
+  sessionStatus: string
   sheet?: boolean
 }) {
   const { t } = useTranslation("inbox")
+  const ChannelIcon =
+    channelIcons[conversation.channelType] ?? MessagesSquareIcon
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
       <div
         className={cn(
-          "flex h-16 shrink-0 items-center gap-3 border-b px-4",
+          "shrink-0 space-y-1.5 border-b px-3 py-2.5",
           sheet && "pr-12",
         )}
       >
-        <ConversationAvatar conversation={conversation} className="size-9" />
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {t("contextCurrentContact")}
-          </p>
-          <h2
-            className="mt-0.5 truncate text-sm font-semibold"
-            title={contactName}
+        <div className="flex items-center gap-2">
+          <ChannelIcon className="size-4 shrink-0 text-muted-foreground" />
+          <span
+            className="min-w-0 truncate text-sm font-medium text-foreground"
+            title={conversation.channelName}
           >
-            {contactName}
-          </h2>
+            {conversation.channelName}
+          </span>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            {t("contextReceptionStatus")}：
+            <span className="text-foreground">{sessionStatus}</span>
+          </span>
+          <span className="min-w-0 truncate" title={conversation.title}>
+            {t("contextConversationLabel")}：
+            <span className="text-foreground">{conversation.title}</span>
+          </span>
         </div>
       </div>
 
@@ -107,30 +140,35 @@ function ConversationContextContent({
 
         <TabsContent
           value="profile"
-          className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+          className="mt-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3"
         >
-          <ScrollArea className="min-h-0 flex-1">
-            <section className="p-4">
-              <dl className="grid gap-3 text-sm">
-                <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-center gap-3">
-                  <dt className="text-xs text-muted-foreground">
-                    {t("contextContactName")}
-                  </dt>
-                  <dd className="min-w-0 truncate" title={contactName}>
+          <section className="space-y-4">
+            <dl className="space-y-2 text-sm">
+              <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
+                <dt className="flex min-h-8 min-w-0 items-center text-xs text-muted-foreground">
+                  {t("contextContactName")}
+                </dt>
+                <dd className="flex min-h-8 min-w-0 items-center gap-2">
+                  <ConversationAvatar
+                    conversation={conversation}
+                    className="size-7 rounded-full text-xs"
+                  />
+                  <span className="min-w-0 truncate" title={contactName}>
                     {contactName}
-                  </dd>
-                </div>
-              </dl>
-              <p className="mt-4 rounded-lg border border-dashed p-3 text-xs leading-5 text-muted-foreground">
-                {t("contextContactDetailsPlaceholder")}
-              </p>
-            </section>
-          </ScrollArea>
+                  </span>
+                </dd>
+              </div>
+            </dl>
+            <Separator />
+            <p className="text-xs leading-5 text-muted-foreground">
+              {t("contextContactDetailsPlaceholder")}
+            </p>
+          </section>
         </TabsContent>
 
         <TabsContent
           value="assistant"
-          className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+          className="mt-0 min-h-0 flex-1 overflow-hidden"
         >
           <ContextPlaceholder
             icon={BotIcon}
@@ -141,7 +179,7 @@ function ConversationContextContent({
 
         <TabsContent
           value="business"
-          className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+          className="mt-0 min-h-0 flex-1 overflow-hidden"
         >
           <ContextPlaceholder
             icon={BriefcaseBusinessIcon}
@@ -158,6 +196,7 @@ function ConversationContextContent({
 export function ConversationContextPane({
   conversation,
   contactName,
+  sessionStatus,
   desktopVisible,
   sheetOpen,
   onDesktopToggle,
@@ -165,19 +204,66 @@ export function ConversationContextPane({
 }: {
   conversation: InboxConversation
   contactName: string
+  sessionStatus: string
   desktopVisible: boolean
   sheetOpen: boolean
   onDesktopToggle: () => void
   onSheetOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation("inbox")
+  const [contextPanelWidth, setContextPanelWidth] = useState(380)
+
+  function startContextPanelResize(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function resizeContextPanel(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    setContextPanelWidth(
+      clampContextPanelWidth(
+        window.innerWidth - event.clientX - contextPanelToggleWidth,
+      ),
+    )
+  }
+
+  function stopContextPanelResize(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
 
   return (
     <>
-      <div className="relative hidden h-full w-4 shrink-0 border-l bg-background xl:block">
+      <div
+        className={cn(
+          "relative hidden h-full min-h-0 w-4 shrink-0 bg-background xl:block",
+          desktopVisible && "border-l",
+        )}
+      >
+        {desktopVisible ? (
+          <button
+            type="button"
+            className="absolute top-0 left-0 z-20 h-full w-2 -translate-x-1 cursor-col-resize touch-none"
+            aria-label={t("contextResize")}
+            onPointerDown={startContextPanelResize}
+            onPointerMove={resizeContextPanel}
+            onPointerUp={stopContextPanelResize}
+            onPointerCancel={stopContextPanelResize}
+          />
+        ) : null}
         <button
           type="button"
-          className="absolute top-1/2 left-0 z-10 flex h-12 w-4 -translate-y-1/2 items-center justify-center border border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground"
+          className={cn(
+            "absolute top-1/2 left-0 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center border border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground",
+            desktopVisible
+              ? "rounded-r-md border-l-0"
+              : "rounded-l-md border-r-0",
+          )}
           aria-label={
             desktopVisible ? t("contextClose") : t("contextOpen")
           }
@@ -192,14 +278,19 @@ export function ConversationContextPane({
         </button>
       </div>
 
-      {desktopVisible ? (
-        <aside className="hidden h-full min-h-0 w-80 shrink-0 overflow-hidden xl:block">
-          <ConversationContextContent
-            conversation={conversation}
-            contactName={contactName}
-          />
-        </aside>
-      ) : null}
+      <aside
+        className={cn(
+          "relative hidden h-full min-h-0 min-w-0 shrink-0 overflow-hidden bg-background xl:block",
+          !desktopVisible && "xl:hidden",
+        )}
+        style={{ width: contextPanelWidth }}
+      >
+        <ConversationContextContent
+          conversation={conversation}
+          contactName={contactName}
+          sessionStatus={sessionStatus}
+        />
+      </aside>
 
       <Sheet open={sheetOpen} onOpenChange={onSheetOpenChange}>
         <SheetContent className="data-[side=right]:w-full gap-0 p-0 sm:max-w-sm">
@@ -210,6 +301,7 @@ export function ConversationContextPane({
           <ConversationContextContent
             conversation={conversation}
             contactName={contactName}
+            sessionStatus={sessionStatus}
             sheet
           />
         </SheetContent>

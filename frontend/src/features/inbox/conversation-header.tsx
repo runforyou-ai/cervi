@@ -3,7 +3,6 @@ import {
   BotIcon,
   GlobeIcon,
   MessageCircleIcon,
-  MessagesSquareIcon,
   PanelRightIcon,
   SendIcon,
   UserRoundIcon,
@@ -71,15 +70,17 @@ export function ConversationAvatar({
   )
 }
 
-/** 展示当前 Conversation 标题和已接入的处理摘要。 */
+/** 按 Helmdesk 会话头布局展示当前联系人、会话状态和操作区。 */
 export function ConversationHeader({
   conversation,
+  contactName,
   sessionStatus,
   contextVisible,
   narrowViewport = false,
   onContextToggle,
 }: {
   conversation: InboxConversation
+  contactName: string
   sessionStatus: string
   contextVisible: boolean
   narrowViewport?: boolean
@@ -94,28 +95,32 @@ export function ConversationHeader({
     <header
       data-slot="conversation-header"
       className={cn(
-        "flex h-16 shrink-0 items-center gap-3 border-b border-border/60 px-4",
+        "flex shrink-0 items-center gap-3 border-b px-4 py-3",
         narrowViewport && "pr-14",
       )}
     >
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/30 text-muted-foreground">
-        <MessagesSquareIcon className="size-4" />
-      </div>
+      <ConversationAvatar
+        conversation={conversation}
+        className="size-9 rounded-full"
+      />
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-            {t("conversationCurrent")}
-          </span>
-          <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+          <h2
+            className="min-w-0 flex-1 truncate text-sm font-semibold"
+            title={contactName}
+          >
+            {contactName}
+          </h2>
+        </div>
+        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]">
             {sessionStatus}
           </span>
-        </div>
-        <div className="mt-0.5 flex min-w-0 items-baseline gap-2">
-          <h2 className="truncate text-sm font-semibold">
+          <span
+            className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
+            title={conversation.title}
+          >
             {conversation.title}
-          </h2>
-          <span className="shrink-0 text-xs text-muted-foreground">
-            {conversation.channelName}
           </span>
         </div>
       </div>
@@ -147,7 +152,7 @@ export function ConversationHeader({
           type="button"
           variant="outline"
           size="icon-sm"
-          className="xl:hidden"
+          className="text-muted-foreground xl:hidden"
           aria-label={contextActionLabel}
           aria-pressed={contextVisible}
           title={contextActionLabel}

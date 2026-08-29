@@ -533,6 +533,7 @@ function ConversationMain({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ConversationHeader
           conversation={conversation}
+          contactName={contactName}
           sessionStatus={sessionStatus}
           contextVisible={contextVisible}
           narrowViewport={narrowViewport}
@@ -550,6 +551,7 @@ function ConversationMain({
       <ConversationContextPane
         conversation={conversation}
         contactName={contactName}
+        sessionStatus={sessionStatus}
         desktopVisible={desktopContextVisible}
         sheetOpen={!isWideViewport && contextSheetOpen}
         onDesktopToggle={() =>
