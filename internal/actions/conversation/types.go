@@ -9,7 +9,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// ValidationCode 标识公开访客输入的校验结果；取值为访客协议使用的小写形式。
+// ValidationCode 标识会话业务输入的校验结果。
 type ValidationCode = common.FieldCode
 
 const (
@@ -81,6 +81,37 @@ type MessageHistoryInput struct {
 // MessageHistory 定义消息历史和下一页边界。
 type MessageHistory struct {
 	Messages []Message
+	Before   *MessageCursorPoint
+	After    *MessageCursorPoint
+}
+
+// ConversationMessageSender 定义成员可见的消息发送主体。
+type ConversationMessageSender struct {
+	ChatSubjectID string
+	Kind          domain.ChatSubjectKind
+	DisplayName   *string
+}
+
+// ConversationMessage 定义成员可见的会话消息。
+type ConversationMessage struct {
+	ID           string
+	Type         domain.MessageType
+	Body         string
+	OriginatedAt time.Time
+	CreatedAt    time.Time
+	Sender       *ConversationMessageSender
+}
+
+// ConversationMessageHistoryInput 定义成员消息历史查询方向。
+type ConversationMessageHistoryInput struct {
+	ConversationID string
+	Before         *MessageCursorPoint
+	After          *MessageCursorPoint
+}
+
+// ConversationMessageHistory 定义成员消息历史和下一页边界。
+type ConversationMessageHistory struct {
+	Messages []ConversationMessage
 	Before   *MessageCursorPoint
 	After    *MessageCursorPoint
 }

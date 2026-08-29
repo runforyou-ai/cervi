@@ -24,6 +24,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/preferences", s.updateUserPreferences)
 	router.PATCH("/work-status", s.updateUserWorkStatus)
 	router.GET("/inbox", s.loadInbox)
+	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
 	router.GET("/channels/:channelID", s.getMessageChannel)
@@ -188,6 +189,16 @@ func (s *Service) updateUserWorkStatus(c *gin.Context) {
 // loadInbox 返回当前用户的统一收件箱。
 func (s *Service) loadInbox(c *gin.Context) {
 	output, err := s.application.LoadInbox(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listConversationMessages 返回成员可见的会话消息。
+func (s *Service) listConversationMessages(c *gin.Context) {
+	input, ok := bindConversationMessageListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListConversationMessages(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -821,6 +832,14 @@ func bindAgentListInputQuery(c *gin.Context) (appservice.AgentListInput, bool) {
 		Status:   optionalEnum[appservice.UserStatus](c.Query("status")),
 		Page:     page,
 		PageSize: pageSize,
+	}, true
+}
+
+// bindConversationMessageListInputQuery 从查询参数解析 appservice.ConversationMessageListInput。
+func bindConversationMessageListInputQuery(c *gin.Context) (appservice.ConversationMessageListInput, bool) {
+	return appservice.ConversationMessageListInput{
+		Before: c.Query("before"),
+		After:  c.Query("after"),
 	}, true
 }
 
