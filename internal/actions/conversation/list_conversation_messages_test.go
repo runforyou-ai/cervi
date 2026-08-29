@@ -70,6 +70,66 @@ func TestBuildConversationMessageHistoryPreservesMissingSender(t *testing.T) {
 	}
 }
 
+// TestBuildConversationMessageHistoryMarksSessionOpeningMessage 验证单个处理周期也保留开始标记。
+func TestBuildConversationMessageHistoryMarksSessionOpeningMessage(t *testing.T) {
+	rows := makeConversationMessageRows(3)
+	openingMessageID := rows[2].ID
+	sequence := int64(1)
+	startedAt := time.Unix(1, 0)
+	status := string(domain.ServiceSessionStatusActive)
+	for index := range rows {
+		rows[index].ServiceSessionOpeningMessageID = &openingMessageID
+		rows[index].ServiceSessionSequence = &sequence
+		rows[index].ServiceSessionStartedAt = &startedAt
+		rows[index].ServiceSessionStatus = &status
+	}
+
+	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	if len(history.Messages) != 3 || history.Messages[0].SessionStart == nil {
+		t.Fatalf("messages = %#v", history.Messages)
+	}
+	if history.Messages[0].SessionStart.Sequence != sequence || history.Messages[0].SessionStart.StartedAt != startedAt || history.Messages[0].SessionStart.Status != domain.ServiceSessionStatusActive {
+		t.Fatalf("session start = %#v", history.Messages[0].SessionStart)
+	}
+	if history.Messages[1].SessionStart != nil || history.Messages[2].SessionStart != nil {
+		t.Fatalf("non-opening session starts = %#v, %#v", history.Messages[1].SessionStart, history.Messages[2].SessionStart)
+	}
+}
+
+// TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage 验证多个处理周期分别标记首条消息。
+func TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage(t *testing.T) {
+	rows := makeConversationMessageRows(4)
+	firstOpeningMessageID := rows[3].ID
+	secondOpeningMessageID := rows[1].ID
+	firstSequence, secondSequence := int64(1), int64(2)
+	firstStartedAt, secondStartedAt := time.Unix(1, 0), time.Unix(3, 0)
+	closedStatus := string(domain.ServiceSessionStatusClosed)
+	activeStatus := string(domain.ServiceSessionStatusActive)
+	for index := 2; index < 4; index++ {
+		rows[index].ServiceSessionOpeningMessageID = &firstOpeningMessageID
+		rows[index].ServiceSessionSequence = &firstSequence
+		rows[index].ServiceSessionStartedAt = &firstStartedAt
+		rows[index].ServiceSessionStatus = &closedStatus
+	}
+	for index := 0; index < 2; index++ {
+		rows[index].ServiceSessionOpeningMessageID = &secondOpeningMessageID
+		rows[index].ServiceSessionSequence = &secondSequence
+		rows[index].ServiceSessionStartedAt = &secondStartedAt
+		rows[index].ServiceSessionStatus = &activeStatus
+	}
+
+	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	if history.Messages[0].SessionStart == nil || history.Messages[0].SessionStart.Sequence != firstSequence {
+		t.Fatalf("first session start = %#v", history.Messages[0].SessionStart)
+	}
+	if history.Messages[2].SessionStart == nil || history.Messages[2].SessionStart.Sequence != secondSequence {
+		t.Fatalf("second session start = %#v", history.Messages[2].SessionStart)
+	}
+	if history.Messages[1].SessionStart != nil || history.Messages[3].SessionStart != nil {
+		t.Fatalf("non-opening session starts = %#v, %#v", history.Messages[1].SessionStart, history.Messages[3].SessionStart)
+	}
+}
+
 // makeConversationMessageRows 创建查询已经按目标方向排列的消息行。
 func makeConversationMessageRows(count int) []conversationMessageRow {
 	displayName := "访客"

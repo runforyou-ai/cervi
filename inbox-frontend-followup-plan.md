@@ -47,15 +47,23 @@
 
 ## PR F3：会话工作区前端骨架
 
-- 保留现有范围纵栏和会话列表，主区拆为会话头、当前 Conversation 时间线、回复区和上下文栏。
-- 会话头以 Conversation 标题为主信息，联系人、渠道和最新 ServiceSession 状态为辅助信息；
-  操作区只保留稳定布局，不展示尚无 capability 数据的领取、转接或 AI 操作。
+- 保留现有范围纵栏和会话列表；选中区横向拆为 Conversation 工作区和独立联系人上下文栏，
+  右栏分隔线从选中区顶部贯穿到底部。
+- 会话头沿用 Helmdesk 的信息层级，展示当前联系人头像和名称，并以徽标承载会话标题与最新
+  ServiceSession 状态；操作区展示禁用的转给同事、交给 AI 占位，避免在 capability 接入前
+  产生可执行假象。
 - 时间线继续只读取当前 Conversation，不按联系人拼接其他 Conversation；ServiceSession 不切断消息历史。
 - 底部回复区整体禁用，只建立编辑区、附件操作位和发送操作的布局，不调用回复或上传接口。
-- 上下文栏只使用当前 `InboxConversation` 字段展示会话和联系人摘要，不按联系人名称推断其他会话。
-  联系人的其他 Conversation 等待独立只读 Context 查询按 Contact 编号提供。
-- `xl` 以上显示可收起的 20rem 上下文栏；更窄视口通过会话头按钮打开 Sheet。
-- 本 PR 不修改 appservice DTO、生成绑定、消息查询、资源 Key、`PageSplit` 或 WebSocket 相关代码。
+- 上下文栏顶部沿用 Helmdesk 的渠道摘要布局，展示渠道、会话标题和最新 ServiceSession 状态；
+  正文建立资料、AI 助手和业务三个 tab 骨架，只使用当前 `InboxConversation` 中已有字段。
+- `xl` 以上上下文栏默认宽 380px、可在 320–640px 之间拖动；全高分隔 gutter 上的中部把手
+  负责收起或展开，更窄视口通过会话头入口打开 Sheet。
+- 时间线沿用 Helmdesk 的主区留白和消息行结构：只保留左右和底部内边距，不展示“今天”等
+  日期分隔；每条消息在气泡上方显示 `MM-DD HH:mm`，访客和企业主体分别使用左右头像位、
+  75% 消息列与对应方向的气泡样式。
+- 成员消息查询在每个 ServiceSession 的 opening message 上返回序号、开始时间和状态；时间线按
+  Helmdesk 样式显示“第 N 次会话 · MM-DD HH:mm · 状态”，单个 ServiceSession 也显示边界。
+- 除上述开始标记外，本 PR 不扩展消息查询，不修改资源 Key、`PageSplit` 或 WebSocket 相关代码。
 
 ## PR F4：成员文本回复
 
