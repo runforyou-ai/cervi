@@ -22,6 +22,7 @@ type User struct {
 	Locale                      string    `bun:"locale"`
 	TimeZone                    string    `bun:"time_zone"`
 	MessageNotificationsEnabled bool      `bun:"message_notifications_enabled"`
+	WorkspaceTabsEnabled        bool      `bun:"workspace_tabs_enabled"`
 	CreatedAt                   time.Time `bun:"created_at"`
 	UpdatedAt                   time.Time `bun:"updated_at"`
 }

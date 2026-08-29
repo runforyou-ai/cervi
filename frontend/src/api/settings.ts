@@ -35,5 +35,5 @@ export const selectProfileImage = bind(SelectProfileImage)
 /** 修改当前用户的登录密码。 */
 export const changePassword = bind(ChangePassword)
 
-/** 修改当前用户的语言、时区和账号级通知设置。 */
+/** 修改当前用户偏好设置。 */
 export const updateUserPreferences = bind(UpdateUserPreferences)

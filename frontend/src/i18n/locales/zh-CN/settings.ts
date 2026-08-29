@@ -64,6 +64,12 @@ const settings = {
       zhCN: "简体中文",
       enUS: "English",
     },
+    workspace: {
+      title: "工作台",
+      tabs: "使用多标签页",
+      tabsDescription:
+        "开启后会保留多个已打开的功能页面；关闭后将在当前页面中切换。",
+    },
     notifications: {
       title: "通知",
       newMessages: "新消息提醒",
