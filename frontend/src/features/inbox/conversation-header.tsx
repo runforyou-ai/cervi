@@ -1,7 +1,9 @@
-/** 展示客户 Conversation 标题、来源摘要和上下文栏入口。 */
 import {
+  ArrowRightLeftIcon,
+  BotIcon,
   GlobeIcon,
   MessageCircleIcon,
+  MessagesSquareIcon,
   PanelRightIcon,
   SendIcon,
   UserRoundIcon,
@@ -38,6 +40,7 @@ export function ConversationAvatar({
   className?: string
 }) {
   const badge = sourceBadges[conversation.channelType]
+  const contactName = conversation.contactName?.trim()
 
   return (
     <div className="relative shrink-0">
@@ -47,8 +50,8 @@ export function ConversationAvatar({
           className,
         )}
       >
-        {conversation.contactName ? (
-          conversation.contactName.slice(0, 1).toLocaleUpperCase()
+        {contactName ? (
+          contactName.slice(0, 1).toLocaleUpperCase()
         ) : (
           <UserRoundIcon className="size-4.5" />
         )}
@@ -71,14 +74,12 @@ export function ConversationAvatar({
 /** 展示当前 Conversation 标题和已接入的处理摘要。 */
 export function ConversationHeader({
   conversation,
-  contactName,
   sessionStatus,
   contextVisible,
   narrowViewport = false,
   onContextToggle,
 }: {
   conversation: InboxConversation
-  contactName: string
   sessionStatus: string
   contextVisible: boolean
   narrowViewport?: boolean
@@ -97,21 +98,56 @@ export function ConversationHeader({
         narrowViewport && "pr-14",
       )}
     >
-      <ConversationAvatar conversation={conversation} />
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/30 text-muted-foreground">
+        <MessagesSquareIcon className="size-4" />
+      </div>
       <div className="min-w-0 flex-1">
-        <h2 className="truncate text-sm font-semibold">{conversation.title}</h2>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {contactName} · {conversation.channelName} · {sessionStatus}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+            {t("conversationCurrent")}
+          </span>
+          <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+            {sessionStatus}
+          </span>
+        </div>
+        <div className="mt-0.5 flex min-w-0 items-baseline gap-2">
+          <h2 className="truncate text-sm font-semibold">
+            {conversation.title}
+          </h2>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {conversation.channelName}
+          </span>
+        </div>
       </div>
       <div
         data-slot="conversation-actions"
-        className="flex shrink-0 items-center"
+        className="flex shrink-0 items-center gap-2"
       >
         <Button
           type="button"
           variant="outline"
+          size="sm"
+          className="hidden lg:inline-flex"
+          disabled
+        >
+          <ArrowRightLeftIcon />
+          {t("conversationTransfer")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="hidden lg:inline-flex"
+          disabled
+        >
+          <BotIcon />
+          {t("conversationHandToAi")}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
           size="icon-sm"
+          className="xl:hidden"
           aria-label={contextActionLabel}
           aria-pressed={contextVisible}
           title={contextActionLabel}

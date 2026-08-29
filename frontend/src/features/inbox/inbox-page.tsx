@@ -493,7 +493,7 @@ function InboxConversationList({
   )
 }
 
-/** 组合当前 Conversation 的头部、时间线、回复区和上下文栏。 */
+/** 组合当前 Conversation 工作区和独立联系人上下文栏。 */
 function ConversationMain({
   conversation,
   narrowViewport = false,
@@ -529,36 +529,34 @@ function ConversationMain({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <ConversationHeader
-        conversation={conversation}
-        contactName={contactName}
-        sessionStatus={sessionStatus}
-        contextVisible={contextVisible}
-        narrowViewport={narrowViewport}
-        onContextToggle={toggleContext}
-      />
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <ConversationTimeline
-            key={conversation.id}
-            conversationID={conversation.id}
-          />
-          <ConversationComposer
-            key={conversation.id}
-            conversationID={conversation.id}
-          />
-        </div>
-        <ConversationContextPane
+    <div className="flex h-full min-h-0 bg-background">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <ConversationHeader
           conversation={conversation}
-          contactName={contactName}
           sessionStatus={sessionStatus}
-          desktopVisible={desktopContextVisible}
-          sheetOpen={!isWideViewport && contextSheetOpen}
-          onDesktopCollapse={() => setContextCollapsed(true)}
-          onSheetOpenChange={setContextSheetOpen}
+          contextVisible={contextVisible}
+          narrowViewport={narrowViewport}
+          onContextToggle={toggleContext}
+        />
+        <ConversationTimeline
+          key={conversation.id}
+          conversationID={conversation.id}
+        />
+        <ConversationComposer
+          key={conversation.id}
+          conversationID={conversation.id}
         />
       </div>
+      <ConversationContextPane
+        conversation={conversation}
+        contactName={contactName}
+        desktopVisible={desktopContextVisible}
+        sheetOpen={!isWideViewport && contextSheetOpen}
+        onDesktopToggle={() =>
+          setContextCollapsed((collapsed) => !collapsed)
+        }
+        onSheetOpenChange={setContextSheetOpen}
+      />
     </div>
   )
 }

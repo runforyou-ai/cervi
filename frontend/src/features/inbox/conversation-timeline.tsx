@@ -160,7 +160,7 @@ export function ConversationTimeline({
 
   if (loading && !currentPage) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center gap-2 bg-muted/20 text-sm text-muted-foreground">
+      <div className="flex min-h-0 flex-1 items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
         {t("messagesLoading")}
       </div>
@@ -169,7 +169,7 @@ export function ConversationTimeline({
 
   if (error && !currentPage) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/20 p-6 text-center">
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6 text-center">
         <div>
           <p className="text-sm text-muted-foreground">
             {t("messagesLoadError")}
@@ -189,7 +189,7 @@ export function ConversationTimeline({
 
   if (!currentPage || currentPage.messages.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-muted/20 p-6 text-sm text-muted-foreground">
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6 text-sm text-muted-foreground">
         {t("messagesEmpty")}
       </div>
     )
@@ -200,8 +200,8 @@ export function ConversationTimeline({
   let previousDay = ""
 
   return (
-    <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1 bg-muted/20">
-      <div className="mx-auto flex w-full max-w-4xl flex-col px-4 py-5 md:px-6">
+    <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1 bg-background">
+      <div className="flex w-full flex-col px-4 py-5 md:px-6">
         <div className="mb-5 flex min-h-7 items-center justify-center">
           {currentPage.before ? (
             <Button

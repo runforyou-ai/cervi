@@ -47,14 +47,17 @@
 
 ## PR F3：会话工作区前端骨架
 
-- 保留现有范围纵栏和会话列表，主区拆为会话头、当前 Conversation 时间线、回复区和上下文栏。
-- 会话头以 Conversation 标题为主信息，联系人、渠道和最新 ServiceSession 状态为辅助信息；
-  操作区只保留稳定布局，不展示尚无 capability 数据的领取、转接或 AI 操作。
+- 保留现有范围纵栏和会话列表；选中区横向拆为 Conversation 工作区和独立联系人上下文栏，
+  右栏分隔线从选中区顶部贯穿到底部。
+- Conversation 会话头只展示会话标题、渠道和最新 ServiceSession 状态，不与联系人信息混排；
+  操作区展示禁用的转给同事、交给 AI 占位，避免在 capability 接入前产生可执行假象。
 - 时间线继续只读取当前 Conversation，不按联系人拼接其他 Conversation；ServiceSession 不切断消息历史。
 - 底部回复区整体禁用，只建立编辑区、附件操作位和发送操作的布局，不调用回复或上传接口。
-- 上下文栏只使用当前 `InboxConversation` 字段展示会话和联系人摘要，不按联系人名称推断其他会话。
-  联系人的其他 Conversation 等待独立只读 Context 查询按 Contact 编号提供。
-- `xl` 以上显示可收起的 20rem 上下文栏；更窄视口通过会话头按钮打开 Sheet。
+- 上下文栏顶部独立展示当前联系人；正文先建立资料、AI 助手和业务三个 tab 骨架，只使用当前
+  `InboxConversation` 中已有的联系人字段，不按联系人名称推断其他会话。
+- `xl` 以上显示 20rem 上下文栏，并使用贯穿全高分隔线上的中部把手收起或展开；更窄视口
+  通过会话头的单一入口打开 Sheet。
+- 时间线占满 Conversation 工作区的可用宽度，不使用居中的固定最大宽度容器。
 - 本 PR 不修改 appservice DTO、生成绑定、消息查询、资源 Key、`PageSplit` 或 WebSocket 相关代码。
 
 ## PR F4：成员文本回复
