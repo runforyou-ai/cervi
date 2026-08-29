@@ -20,6 +20,6 @@ func NewResolveIdentityQuery(db *bun.DB) *ResolveIdentityQuery {
 }
 
 // Execute 返回有效令牌对应的用户身份。
-func (q *ResolveIdentityQuery) Execute(ctx context.Context, value string) (*servermodels.Identity, error) {
-	return resolveIdentity(ctx, q.db, value)
+func (q *ResolveIdentityQuery) Execute(ctx context.Context, organizationID string, value string) (*servermodels.Identity, error) {
+	return resolveIdentity(ctx, q.db, organizationID, value)
 }

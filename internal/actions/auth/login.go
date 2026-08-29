@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -25,8 +26,9 @@ type LoginAction struct {
 
 // LoginInput 定义登录操作输入。
 type LoginInput struct {
-	Email    string
-	Password string
+	OrganizationID string
+	Email          string
+	Password       string
 }
 
 // LoginOutput 返回登录身份和新令牌。
@@ -43,10 +45,14 @@ func NewLoginAction(db *bun.DB) *LoginAction {
 
 // Execute 校验账号密码，将工作状态切换为工作中并签发登录令牌。
 func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutput, error) {
+	if !common.ValidUUID(input.OrganizationID) {
+		return LoginOutput{}, ErrInvalidCredentials
+	}
 	user := &servermodels.User{}
 	err := a.db.NewSelect().Model(user).
 		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.password_hash, u.role_id::text, u.status, u.locale, u.time_zone").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
+		Where("u.organization_id = ?", input.OrganizationID).
 		Where("lower(u.email) = lower(?)", commonemail.Normalize(input.Email)).
 		Limit(1).
 		Scan(ctx)
@@ -72,7 +78,7 @@ func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutpu
 			Exec(ctx); err != nil {
 			return err
 		}
-		issued, identity, err := issueToken(ctx, tx, user.ID)
+		issued, identity, err := issueToken(ctx, tx, input.OrganizationID, user.ID)
 		if err != nil {
 			return err
 		}

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"sync/atomic"
 	"time"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
@@ -33,6 +32,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -47,7 +47,7 @@ type DirectBackend struct {
 	login                             *authaction.LoginAction
 	logout                            *authaction.LogoutAction
 	resolveIdentity                   *authaction.ResolveIdentityQuery
-	installation                      *installationaction.StatusQuery
+	resolveTenant                     tenant.Resolver
 	loadInbox                         *inboxaction.LoadInboxQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
@@ -130,12 +130,10 @@ type DirectBackend struct {
 	createFileUpload                  *fileaction.CreateUploadAction
 	completeFileUpload                *fileaction.CompleteUploadAction
 	localFiles                        *serverfilecontent.LocalStore
-	// installed 缓存企业初始化完成状态，初始化是单向的，完成后无需再查询。
-	installed atomic.Bool
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	modelProviderRegistry := modelprovider.NewRegistry(modelprovider.NewHTTPClient())
 	connectorClient := connector.NewHTTPClient()
@@ -145,7 +143,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 		login:                             authaction.NewLoginAction(db),
 		logout:                            authaction.NewLogoutAction(db),
 		resolveIdentity:                   authaction.NewResolveIdentityQuery(db),
-		installation:                      installationaction.NewStatusQuery(db),
+		resolveTenant:                     tenantResolver,
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
@@ -231,31 +229,32 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore) *Dir
 	}
 }
 
-// requireInitialized 校验企业是否已完成初始化；初始化完成后结果进程内缓存，不再重复查询。
-func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta) error {
-	if b.installed.Load() {
-		return nil
+// requireInitialized 解析当前请求的企业范围，并校验该企业是否已完成初始化。
+func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta) (tenant.Scope, error) {
+	scope, err := b.resolveTenant.Resolve(ctx, tenant.Hostname(ctx))
+	if errors.Is(err, tenant.ErrNotFound) {
+		return tenant.Scope{}, SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
 	}
-	status, err := b.InstallationStatus(ctx, meta)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return tenant.Scope{}, ctx.Err()
+		}
+		slog.Warn("解析当前企业失败", "error", err)
+		return tenant.Scope{}, FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
 	}
-	if !status.Installed {
-		return SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
-	}
-	b.installed.Store(true)
-	return nil
+	return scope, nil
 }
 
 // authenticate 校验登录令牌并返回当前身份。
 func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
-	if err := b.requireInitialized(ctx, meta); err != nil {
+	scope, err := b.requireInitialized(ctx, meta)
+	if err != nil {
 		return nil, err
 	}
 	if meta.Token == "" {
 		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
-	identity, err := b.resolveIdentity.Execute(ctx, meta.Token)
+	identity, err := b.resolveIdentity.Execute(ctx, scope.OrganizationID, meta.Token)
 	if errors.Is(err, authaction.ErrIdentityNotFound) {
 		slog.Info("登录令牌无效")
 		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -245,11 +246,7 @@ func (s *HTTPSEntry) cachedCertificateMatches(ctx context.Context, host string) 
 
 // requestHost 规范化请求域名并判断是否应当保留 HTTP。
 func requestHost(value string) (string, bool) {
-	host := strings.TrimSpace(value)
-	if parsed, _, err := net.SplitHostPort(host); err == nil {
-		host = parsed
-	}
-	host = strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
+	host := tenant.NormalizeHostname(value)
 	if host == "" {
 		return "", false
 	}

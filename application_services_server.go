@@ -7,6 +7,7 @@ import (
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -40,7 +41,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: fileaction.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,
 	})
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles)
+	tenantResolver := organizationaction.NewLegacyTenantResolver(appStorage.DB())
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB())
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
@@ -57,7 +59,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		application.NewServiceWithOptions(httpAPI, application.ServiceOptions{
 			Route: "/api",
 		}),
-		application.NewServiceWithOptions(api.NewFileContentService(appStorage.DB(), localFiles), application.ServiceOptions{
+		application.NewServiceWithOptions(api.NewFileContentService(appStorage.DB(), localFiles, tenantResolver), application.ServiceOptions{
 			Route: "/files/",
 		}),
 		application.NewService(&serverTaskLifecycle{runtime: tasks}),

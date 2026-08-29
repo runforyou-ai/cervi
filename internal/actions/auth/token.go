@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/token"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -18,7 +19,7 @@ import (
 var ErrIdentityNotFound = errors.New("token identity not found or inactive")
 
 // issueToken 签发登录令牌并返回对应身份。
-func issueToken(ctx context.Context, db bun.IDB, userID string) (token.Issued, *servermodels.Identity, error) {
+func issueToken(ctx context.Context, db bun.IDB, organizationID string, userID string) (token.Issued, *servermodels.Identity, error) {
 	issued, err := token.Issue()
 	if err != nil {
 		return token.Issued{}, nil, fmt.Errorf("issue token: %w", err)
@@ -35,7 +36,7 @@ func issueToken(ctx context.Context, db bun.IDB, userID string) (token.Issued, *
 		return token.Issued{}, nil, fmt.Errorf("save token: %w", err)
 	}
 
-	identity, err := resolveIdentity(ctx, db, issued.Token)
+	identity, err := resolveIdentity(ctx, db, organizationID, issued.Token)
 	if err != nil {
 		return token.Issued{}, nil, fmt.Errorf("find token identity: %w", err)
 	}
@@ -43,7 +44,10 @@ func issueToken(ctx context.Context, db bun.IDB, userID string) (token.Issued, *
 }
 
 // resolveIdentity 返回有效令牌对应的用户身份；令牌无效或账号停用时返回 ErrIdentityNotFound。
-func resolveIdentity(ctx context.Context, db bun.IDB, value string) (*servermodels.Identity, error) {
+func resolveIdentity(ctx context.Context, db bun.IDB, organizationID string, value string) (*servermodels.Identity, error) {
+	if !common.ValidUUID(organizationID) {
+		return nil, ErrIdentityNotFound
+	}
 	identity := &servermodels.Identity{}
 	err := db.NewRaw(`
 		SELECT
@@ -69,10 +73,11 @@ func resolveIdentity(ctx context.Context, db bun.IDB, value string) (*servermode
 		JOIN users AS u ON u.id = token.user_id
 		JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?
 		JOIN organizations AS o ON o.id = u.organization_id
-		WHERE token.token_hash = ?
+		WHERE u.organization_id = ?
+		  AND token.token_hash = ?
 		  AND token.expires_at > now()
 		LIMIT 1
-	`, domain.OrganizationIdentityTypeUser, token.Hash(value)).Scan(
+	`, domain.OrganizationIdentityTypeUser, organizationID, token.Hash(value)).Scan(
 		ctx,
 		&identity.Organization.ID,
 		&identity.Organization.Name,
@@ -106,10 +111,16 @@ func resolveIdentity(ctx context.Context, db bun.IDB, value string) (*servermode
 }
 
 // revokeToken 删除令牌记录。
-func revokeToken(ctx context.Context, db *bun.DB, value string) error {
-	_, err := db.NewDelete().
-		Model((*servermodels.Token)(nil)).
-		Where("token_hash = ?", token.Hash(value)).
-		Exec(ctx)
+func revokeToken(ctx context.Context, db *bun.DB, organizationID string, value string) error {
+	if !common.ValidUUID(organizationID) {
+		return ErrIdentityNotFound
+	}
+	_, err := db.ExecContext(ctx, `
+		DELETE FROM tokens AS token
+		USING users AS u
+		WHERE token.user_id = u.id
+		  AND u.organization_id = ?
+		  AND token.token_hash = ?
+	`, organizationID, token.Hash(value))
 	return err
 }

@@ -16,11 +16,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
 // FileContentService 处理文件内容的上传、读取和对象存储跳转。
 type FileContentService struct {
+	resolveTenant   tenant.Resolver
 	resolveIdentity *authaction.ResolveIdentityQuery
 	getFile         *fileaction.GetQuery
 	getS3Setting    *settingaction.GetS3SettingQuery
@@ -28,8 +30,9 @@ type FileContentService struct {
 }
 
 // NewFileContentService 创建文件内容服务。
-func NewFileContentService(db *bun.DB, local *serverfilecontent.LocalStore) *FileContentService {
+func NewFileContentService(db *bun.DB, local *serverfilecontent.LocalStore, tenantResolver tenant.Resolver) *FileContentService {
 	return &FileContentService{
+		resolveTenant:   tenantResolver,
 		resolveIdentity: authaction.NewResolveIdentityQuery(db),
 		getFile:         fileaction.NewGetQuery(db),
 		getS3Setting:    settingaction.NewGetS3SettingQuery(db),
@@ -62,7 +65,17 @@ func (s *FileContentService) ServeHTTP(writer http.ResponseWriter, request *http
 
 // uploadLocalFile 将认证后的请求内容保存到本地最终目录。
 func (s *FileContentService) uploadLocalFile(writer http.ResponseWriter, request *http.Request, fileID string) {
-	identity, err := s.resolveIdentity.Execute(request.Context(), bearerToken(request.Header.Get("Authorization")))
+	scope, err := s.resolveTenant.Resolve(request.Context(), tenant.Hostname(request.Context()))
+	if errors.Is(err, tenant.ErrNotFound) {
+		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	if err != nil {
+		slog.Warn("文件上传企业解析失败", "error", err)
+		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	identity, err := s.resolveIdentity.Execute(request.Context(), scope.OrganizationID, bearerToken(request.Header.Get("Authorization")))
 	if errors.Is(err, authaction.ErrIdentityNotFound) {
 		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return

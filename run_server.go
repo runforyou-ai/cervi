@@ -12,6 +12,7 @@ import (
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/storage"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -60,7 +61,8 @@ func run(arguments []string) error {
 		Description: "Cervi is an open-source AI customer support teammate platform",
 		Services:    services,
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(assets),
+			Handler:    application.AssetFileServerFS(assets),
+			Middleware: tenant.HTTPMiddleware,
 		},
 		Server: application.ServerOptions{
 			Host: config.Server.Host,
