@@ -1,3 +1,4 @@
+/** 客户 Conversation 的只读消息时间线。 */
 import {
   Fragment,
   useEffect,

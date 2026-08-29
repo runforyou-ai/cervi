@@ -96,6 +96,40 @@ func TestBuildConversationMessageHistoryMarksSessionOpeningMessage(t *testing.T)
 	}
 }
 
+// TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage 验证多个处理周期分别标记首条消息。
+func TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage(t *testing.T) {
+	rows := makeConversationMessageRows(4)
+	firstOpeningMessageID := rows[3].ID
+	secondOpeningMessageID := rows[1].ID
+	firstSequence, secondSequence := int64(1), int64(2)
+	firstStartedAt, secondStartedAt := time.Unix(1, 0), time.Unix(3, 0)
+	closedStatus := string(domain.ServiceSessionStatusClosed)
+	activeStatus := string(domain.ServiceSessionStatusActive)
+	for index := 2; index < 4; index++ {
+		rows[index].ServiceSessionOpeningMessageID = &firstOpeningMessageID
+		rows[index].ServiceSessionSequence = &firstSequence
+		rows[index].ServiceSessionStartedAt = &firstStartedAt
+		rows[index].ServiceSessionStatus = &closedStatus
+	}
+	for index := 0; index < 2; index++ {
+		rows[index].ServiceSessionOpeningMessageID = &secondOpeningMessageID
+		rows[index].ServiceSessionSequence = &secondSequence
+		rows[index].ServiceSessionStartedAt = &secondStartedAt
+		rows[index].ServiceSessionStatus = &activeStatus
+	}
+
+	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	if history.Messages[0].SessionStart == nil || history.Messages[0].SessionStart.Sequence != firstSequence {
+		t.Fatalf("first session start = %#v", history.Messages[0].SessionStart)
+	}
+	if history.Messages[2].SessionStart == nil || history.Messages[2].SessionStart.Sequence != secondSequence {
+		t.Fatalf("second session start = %#v", history.Messages[2].SessionStart)
+	}
+	if history.Messages[1].SessionStart != nil || history.Messages[3].SessionStart != nil {
+		t.Fatalf("non-opening session starts = %#v, %#v", history.Messages[1].SessionStart, history.Messages[3].SessionStart)
+	}
+}
+
 // makeConversationMessageRows 创建查询已经按目标方向排列的消息行。
 func makeConversationMessageRows(count int) []conversationMessageRow {
 	displayName := "访客"

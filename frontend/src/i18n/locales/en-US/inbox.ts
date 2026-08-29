@@ -55,14 +55,11 @@ const inbox = {
   contextAssistantTab: "AI Assistant",
   contextBusinessTab: "Business",
   contextContactName: "Name",
-  contextContactDetailsPlaceholder:
-    "More details will appear when contact context data is connected.",
+  contextContactDetailsPlaceholder: "No additional details.",
   contextAssistantTitle: "AI Assistant",
-  contextAssistantDescription:
-    "Reserved for conversation assistance, summaries, and suggestions.",
+  contextAssistantDescription: "No AI assistant content yet.",
   contextBusinessTitle: "Business context",
-  contextBusinessDescription:
-    "Reserved for external business systems and integration panels.",
+  contextBusinessDescription: "No business context yet.",
   sessionStatus: {
     waiting: "Waiting",
     active: "Active",

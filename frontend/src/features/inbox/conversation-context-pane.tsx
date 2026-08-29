@@ -1,3 +1,4 @@
+/** 客户会话联系人上下文栏。 */
 import {
   BotIcon,
   BriefcaseBusinessIcon,
@@ -39,6 +40,7 @@ const channelIcons: Partial<Record<ChannelType, typeof GlobeIcon>> = {
   [ChannelType.ChannelTypeWeChatOfficialAccount]: MessageCircleIcon,
 }
 
+/** 把联系人上下文栏宽度限制在桌面可用范围内。 */
 function clampContextPanelWidth(width: number) {
   return Math.min(
     contextPanelMaxWidth,
@@ -46,6 +48,7 @@ function clampContextPanelWidth(width: number) {
   )
 }
 
+/** 展示尚无数据的上下文页签。 */
 function ContextPlaceholder({
   icon: Icon,
   title,
@@ -213,6 +216,7 @@ export function ConversationContextPane({
   const { t } = useTranslation("inbox")
   const [contextPanelWidth, setContextPanelWidth] = useState(380)
 
+  /** 开始拖动联系人上下文栏。 */
   function startContextPanelResize(
     event: ReactPointerEvent<HTMLButtonElement>,
   ) {
@@ -220,6 +224,7 @@ export function ConversationContextPane({
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
+  /** 按指针位置调整联系人上下文栏宽度。 */
   function resizeContextPanel(event: ReactPointerEvent<HTMLButtonElement>) {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
     setContextPanelWidth(
@@ -229,6 +234,7 @@ export function ConversationContextPane({
     )
   }
 
+  /** 结束拖动联系人上下文栏。 */
   function stopContextPanelResize(
     event: ReactPointerEvent<HTMLButtonElement>,
   ) {

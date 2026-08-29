@@ -1,3 +1,4 @@
+/** 客户会话头与联系人头像。 */
 import {
   GlobeIcon,
   MessageCircleIcon,
