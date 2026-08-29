@@ -19,9 +19,6 @@ func TestConfigNamespaceNames(t *testing.T) {
 	if config.streamName() != "CERVI_FEATURE_ONE_TASKS" {
 		t.Fatalf("stream name = %q", config.streamName())
 	}
-	if config.consumerName() != "CERVI_FEATURE_ONE_WORKERS" {
-		t.Fatalf("consumer name = %q", config.consumerName())
-	}
 	if config.subjectPrefix() != "cervi.feature_one.tasks" {
 		t.Fatalf("subject prefix = %q", config.subjectPrefix())
 	}

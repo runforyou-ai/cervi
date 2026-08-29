@@ -11,13 +11,23 @@ import (
 )
 
 const (
-	natsStartupTimeout = 15 * time.Second
-	taskStreamMaxBytes = int64(1 << 30)
-	taskStreamMaxAge   = 30 * 24 * time.Hour
-	taskReplicas       = 1
-	taskWorkers        = 4
-	taskMaxAckPending  = 1024
+	natsStartupTimeout    = 15 * time.Second
+	taskStreamMaxBytes    = int64(1 << 30)
+	taskStreamMaxAge      = 30 * 24 * time.Hour
+	taskReplicas          = 1
+	standardTaskWorkers   = 4
+	agentTaskWorkers      = 2
+	taskPoolMaxAckPending = 1024
+	workerPoolStandard    = "standard"
+	workerPoolAgent       = "agent"
 )
+
+// workerPoolConfig 定义一组相互隔离的任务 Worker。
+type workerPoolConfig struct {
+	Name          string
+	Workers       int
+	MaxAckPending int
+}
 
 // runtimeConfig 定义服务端任务运行时配置。
 type runtimeConfig struct {
@@ -27,8 +37,7 @@ type runtimeConfig struct {
 	MaxBytes       int64
 	MaxAge         time.Duration
 	Replicas       int
-	Workers        int
-	MaxAckPending  int
+	WorkerPools    []workerPoolConfig
 }
 
 // newConfig 补充任务运行时的固定配置。
@@ -40,8 +49,10 @@ func newConfig(nats serverconfig.NATSConfig) runtimeConfig {
 		MaxBytes:       taskStreamMaxBytes,
 		MaxAge:         taskStreamMaxAge,
 		Replicas:       taskReplicas,
-		Workers:        taskWorkers,
-		MaxAckPending:  taskMaxAckPending,
+		WorkerPools: []workerPoolConfig{
+			{Name: workerPoolStandard, Workers: standardTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
+			{Name: workerPoolAgent, Workers: agentTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
+		},
 	}
 }
 
@@ -50,12 +61,35 @@ func (c runtimeConfig) streamName() string {
 	return "CERVI_" + strings.ToUpper(c.Namespace) + "_TASKS"
 }
 
-// consumerName 生成任务 Consumer 名称。
-func (c runtimeConfig) consumerName() string {
+// legacyConsumerName 返回拆分 Worker Pool 前使用的 Consumer 名称。
+func (c runtimeConfig) legacyConsumerName() string {
 	return "CERVI_" + strings.ToUpper(c.Namespace) + "_WORKERS"
+}
+
+// consumerName 生成指定 Worker Pool 的 Consumer 名称。
+func (c runtimeConfig) consumerName(pool string) string {
+	return "CERVI_" + strings.ToUpper(c.Namespace) + "_" + strings.ToUpper(pool) + "_WORKERS"
 }
 
 // subjectPrefix 生成任务 Subject 前缀。
 func (c runtimeConfig) subjectPrefix() string {
 	return "cervi." + c.Namespace + ".tasks"
+}
+
+// filterSubject 生成指定 Worker Pool 的订阅过滤条件。
+func (c runtimeConfig) filterSubject(pool string) string {
+	return c.subjectPrefix() + "." + pool + ".>"
+}
+
+// taskSubject 生成指定逻辑队列的发布 Subject。
+func (c runtimeConfig) taskSubject(queue string) string {
+	return c.subjectPrefix() + "." + workerPoolForQueue(queue) + "." + queue
+}
+
+// workerPoolForQueue 返回逻辑队列所属的 Worker Pool。
+func workerPoolForQueue(queue string) string {
+	if queue == QueueAgent {
+		return workerPoolAgent
+	}
+	return workerPoolStandard
 }

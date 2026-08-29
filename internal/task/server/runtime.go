@@ -21,6 +21,13 @@ var (
 	_ TxEnqueuer = (*Runtime)(nil)
 )
 
+// workerPoolRuntime 保存一个 Worker Pool 的 Broker 与消费状态。
+type workerPoolRuntime struct {
+	config         workerPoolConfig
+	consumer       jetstream.Consumer
+	consumeContext jetstream.ConsumeContext
+}
+
 // Runtime 运行服务端异步 Action、定时计划和可靠消息投递。
 type Runtime struct {
 	config     runtimeConfig
@@ -29,12 +36,11 @@ type Runtime struct {
 	schedules  []ScheduleDefinition
 	instanceID string
 
-	cancel         context.CancelFunc
-	connection     *nats.Conn
-	jetstream      jetstream.JetStream
-	consumer       jetstream.Consumer
-	consumeContext jetstream.ConsumeContext
-	waitGroup      sync.WaitGroup
+	cancel      context.CancelFunc
+	connection  *nats.Conn
+	jetstream   jetstream.JetStream
+	workerPools []workerPoolRuntime
+	waitGroup   sync.WaitGroup
 }
 
 // New 创建服务端任务运行时。
@@ -101,9 +107,12 @@ func (r *Runtime) Start(parent context.Context) error {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	r.cancel = cancel
-	if err := r.startConsumer(ctx); err != nil {
+	if err := r.startConsumers(ctx); err != nil {
 		cancel()
+		r.stopConsumers()
+		r.waitGroup.Wait()
 		r.connection.Close()
+		r.resetBroker()
 		return err
 	}
 	r.waitGroup.Add(3)
@@ -113,9 +122,10 @@ func (r *Runtime) Start(parent context.Context) error {
 	slog.Info("服务端任务运行时已启动",
 		"namespace", r.config.Namespace,
 		"stream", r.config.streamName(),
-		"consumer", r.config.consumerName(),
-		"workers", r.config.Workers,
-		"max_ack_pending", r.config.MaxAckPending,
+		"standard_consumer", r.config.consumerName(workerPoolStandard),
+		"standard_workers", r.workerCount(workerPoolStandard),
+		"agent_consumer", r.config.consumerName(workerPoolAgent),
+		"agent_workers", r.workerCount(workerPoolAgent),
 		"schedules", len(r.schedules),
 	)
 	return nil
@@ -126,18 +136,36 @@ func (r *Runtime) Stop() error {
 	if r.cancel == nil {
 		return nil
 	}
-	if r.consumeContext != nil {
-		r.consumeContext.Stop()
-	}
 	r.cancel()
+	r.stopConsumers()
 	r.waitGroup.Wait()
 	if r.connection != nil {
 		if err := r.connection.Drain(); err != nil {
 			r.connection.Close()
+			r.resetBroker()
 			return fmt.Errorf("drain NATS connection: %w", err)
 		}
 		r.connection.Close()
 	}
+	r.resetBroker()
 	slog.Info("服务端任务运行时已停止", "namespace", r.config.Namespace)
 	return nil
+}
+
+// workerCount 返回指定 Worker Pool 的并发数。
+func (r *Runtime) workerCount(pool string) int {
+	for _, item := range r.config.WorkerPools {
+		if item.Name == pool {
+			return item.Workers
+		}
+	}
+	return 0
+}
+
+// resetBroker 清理已经停止的 Broker 生命周期状态。
+func (r *Runtime) resetBroker() {
+	r.cancel = nil
+	r.connection = nil
+	r.jetstream = nil
+	r.workerPools = nil
 }

@@ -72,49 +72,67 @@ func (r *Runtime) connectBroker(ctx context.Context) error {
 		connection.Close()
 		return fmt.Errorf("ensure JetStream task stream: %w", err)
 	}
-	consumer, err := js.CreateOrUpdateConsumer(ctx, r.config.streamName(), jetstream.ConsumerConfig{
-		Name:          r.config.consumerName(),
-		Durable:       r.config.consumerName(),
-		Description:   "Cervi server Action workers (" + r.config.Namespace + ")",
-		AckPolicy:     jetstream.AckExplicitPolicy,
-		AckWait:       leaseDuration,
-		MaxDeliver:    -1,
-		FilterSubject: r.config.subjectPrefix() + ".>",
-		MaxAckPending: r.config.MaxAckPending,
-		Replicas:      r.config.Replicas,
-	})
-	if err != nil {
+	if err := js.DeleteConsumer(ctx, r.config.streamName(), r.config.legacyConsumerName()); err != nil && !errors.Is(err, jetstream.ErrConsumerNotFound) {
 		connection.Close()
-		return fmt.Errorf("ensure JetStream task consumer: %w", err)
+		return fmt.Errorf("delete legacy JetStream task consumer: %w", err)
+	}
+	pools := make([]workerPoolRuntime, 0, len(r.config.WorkerPools))
+	for _, pool := range r.config.WorkerPools {
+		consumer, err := js.CreateOrUpdateConsumer(ctx, r.config.streamName(), jetstream.ConsumerConfig{
+			Name:          r.config.consumerName(pool.Name),
+			Durable:       r.config.consumerName(pool.Name),
+			Description:   "Cervi server " + pool.Name + " Action workers (" + r.config.Namespace + ")",
+			AckPolicy:     jetstream.AckExplicitPolicy,
+			AckWait:       leaseDuration,
+			MaxDeliver:    -1,
+			FilterSubject: r.config.filterSubject(pool.Name),
+			MaxAckPending: pool.MaxAckPending,
+			Replicas:      r.config.Replicas,
+		})
+		if err != nil {
+			connection.Close()
+			return fmt.Errorf("ensure JetStream %s task consumer: %w", pool.Name, err)
+		}
+		pools = append(pools, workerPoolRuntime{config: pool, consumer: consumer})
 	}
 	r.connection = connection
 	r.jetstream = js
-	r.consumer = consumer
+	r.workerPools = pools
 	return nil
 }
 
-// startConsumer 启动有界并发的 JetStream 消费器。
-func (r *Runtime) startConsumer(ctx context.Context) error {
-	jobs := make(chan jetstream.Msg, r.config.Workers*2)
-	consumeContext, err := r.consumer.Consume(func(message jetstream.Msg) {
+// startConsumers 启动各自有界并发的 JetStream 消费器。
+func (r *Runtime) startConsumers(ctx context.Context) error {
+	for index := range r.workerPools {
+		if err := r.startConsumer(ctx, &r.workerPools[index]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// startConsumer 启动一个 Worker Pool 的 JetStream 消费器。
+func (r *Runtime) startConsumer(ctx context.Context, pool *workerPoolRuntime) error {
+	jobs := make(chan jetstream.Msg, pool.config.Workers*2)
+	consumeContext, err := pool.consumer.Consume(func(message jetstream.Msg) {
 		select {
 		case jobs <- message:
 		case <-ctx.Done():
 		}
 	},
-		jetstream.PullMaxMessages(r.config.Workers*2),
+		jetstream.PullMaxMessages(pool.config.Workers*2),
 		jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
 			if ctx.Err() == nil {
-				slog.Warn("NATS 任务消费异常", "namespace", r.config.Namespace, "error", err)
+				slog.Warn("NATS 任务消费异常", "namespace", r.config.Namespace, "pool", pool.config.Name, "error", err)
 			}
 		}),
 	)
 	if err != nil {
-		return fmt.Errorf("start JetStream task consumer: %w", err)
+		return fmt.Errorf("start JetStream %s task consumer: %w", pool.config.Name, err)
 	}
-	r.consumeContext = consumeContext
-	for index := range r.config.Workers {
-		workerID := fmt.Sprintf("%s-%d", r.instanceID, index+1)
+	pool.consumeContext = consumeContext
+	for index := range pool.config.Workers {
+		workerID := fmt.Sprintf("%s-%s-%d", r.instanceID, pool.config.Name, index+1)
 		r.waitGroup.Add(1)
 		go func() {
 			defer r.waitGroup.Done()
@@ -129,6 +147,20 @@ func (r *Runtime) startConsumer(ctx context.Context) error {
 		}()
 	}
 	return nil
+}
+
+// stopConsumers 停止所有任务拉取并等待回调退出。
+func (r *Runtime) stopConsumers() {
+	for index := range r.workerPools {
+		if r.workerPools[index].consumeContext != nil {
+			r.workerPools[index].consumeContext.Stop()
+		}
+	}
+	for index := range r.workerPools {
+		if r.workerPools[index].consumeContext != nil {
+			<-r.workerPools[index].consumeContext.Closed()
+		}
+	}
 }
 
 // runOutbox 持续将 PostgreSQL 发件箱可靠发布到 JetStream。
@@ -200,7 +232,7 @@ func (r *Runtime) publishOne(ctx context.Context) (bool, error) {
 	publishCtx, cancel := context.WithTimeout(ctx, taskBrokerOperationTimeout)
 	_, publishErr := r.jetstream.Publish(
 		publishCtx,
-		r.config.subjectPrefix()+"."+record.QueueName,
+		r.config.taskSubject(record.QueueName),
 		payload,
 		jetstream.WithMsgID(record.MessageID),
 	)
