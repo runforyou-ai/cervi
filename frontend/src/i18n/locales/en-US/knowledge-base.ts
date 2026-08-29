@@ -36,12 +36,20 @@ const knowledgeBase = {
     loading: "Loading knowledge documents…",
     loadError: "Could not load knowledge documents.",
     empty: "This knowledge base has no documents",
+    filteredEmpty: "No documents match these filters",
+    filters: {
+      search: "Search documents",
+      status: "Status",
+      allStatuses: "All statuses",
+      clear: "Clear filters",
+    },
     columns: {
       name: "Document name",
       status: "Status",
       createdAt: "Created",
     },
     status: {
+      queued: "Queued",
       processing: "Processing",
       ready: "Available",
       paused: "Paused",

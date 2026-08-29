@@ -36,12 +36,20 @@ const knowledgeBase = {
     loading: "正在读取知识文档…",
     loadError: "读取知识文档失败。",
     empty: "这个知识库还没有文档",
+    filteredEmpty: "没有符合条件的文档",
+    filters: {
+      search: "搜索文档",
+      status: "状态",
+      allStatuses: "全部状态",
+      clear: "清除筛选",
+    },
     columns: {
       name: "文档名称",
       status: "状态",
       createdAt: "创建时间",
     },
     status: {
+      queued: "排队中",
       processing: "处理中",
       ready: "可用",
       paused: "已暂停",

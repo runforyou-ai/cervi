@@ -56,7 +56,7 @@ export const resourceKeys = {
   /** 指定连接可访问的外部知识库选项。 */
   externalKnowledgeBaseOptions: (connectionId?: string) =>
     itemKey("external-knowledge-base-options", connectionId),
-  /** 指定知识库的文档列表，可带分页参数。 */
+  /** 指定知识库及查询条件的文档列表。 */
   knowledgeDocuments: (
     knowledgeBaseId?: string,
     parameters?: KeyParameters,

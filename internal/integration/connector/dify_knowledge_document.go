@@ -29,6 +29,14 @@ type DifyKnowledgeDocumentPage struct {
 	Total     int
 }
 
+// DifyKnowledgeDocumentListInput 定义 Dify 知识文档列表查询条件。
+type DifyKnowledgeDocumentListInput struct {
+	Keyword  string
+	Status   string
+	Page     int
+	PageSize int
+}
+
 // DifyKnowledgeDocumentLister 读取 Dify 知识库中的文档。
 type DifyKnowledgeDocumentLister struct {
 	client connectiontest.HTTPDoer
@@ -44,7 +52,7 @@ func (l *DifyKnowledgeDocumentLister) List(
 	ctx context.Context,
 	config DifyKnowledgeBaseConfig,
 	datasetID string,
-	page, pageSize int,
+	input DifyKnowledgeDocumentListInput,
 ) (DifyKnowledgeDocumentPage, error) {
 	ctx, cancel := context.WithTimeout(ctx, difyKnowledgeDocumentTimeout)
 	defer cancel()
@@ -68,8 +76,14 @@ func (l *DifyKnowledgeDocumentLister) List(
 		return DifyKnowledgeDocumentPage{}, err
 	}
 	query := request.URL.Query()
-	query.Set("page", fmt.Sprintf("%d", page))
-	query.Set("limit", fmt.Sprintf("%d", pageSize))
+	if input.Keyword != "" {
+		query.Set("keyword", input.Keyword)
+	}
+	if input.Status != "" {
+		query.Set("status", input.Status)
+	}
+	query.Set("page", fmt.Sprintf("%d", input.Page))
+	query.Set("limit", fmt.Sprintf("%d", input.PageSize))
 	request.URL.RawQuery = query.Encode()
 
 	var payload struct {

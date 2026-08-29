@@ -43,8 +43,10 @@ type ExternalOptionRecord struct {
 	Category domain.KnowledgeBaseCategory
 }
 
-// DocumentListInput 定义知识文档分页条件。
+// DocumentListInput 定义知识文档列表查询条件。
 type DocumentListInput struct {
+	Keyword  string
+	Status   domain.KnowledgeDocumentStatus
 	Page     int
 	PageSize int
 }

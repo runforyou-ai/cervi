@@ -1,5 +1,5 @@
 /** 外部知识库文档只读列表页。 */
-import { useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useParams, useSearchParams } from "react-router"
@@ -11,6 +11,12 @@ import {
   listKnowledgeDocuments,
   type KnowledgeDocumentStatusId,
 } from "@/api"
+import {
+  ListToolbar,
+  ListToolbarFilter,
+  ListToolbarReset,
+  ListToolbarSearch,
+} from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
@@ -28,8 +34,18 @@ import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 
 const documentPageSize = 20
+const documentStatuses = [
+  KnowledgeDocumentStatus.KnowledgeDocumentStatusQueued,
+  KnowledgeDocumentStatus.KnowledgeDocumentStatusProcessing,
+  KnowledgeDocumentStatus.KnowledgeDocumentStatusPaused,
+  KnowledgeDocumentStatus.KnowledgeDocumentStatusError,
+  KnowledgeDocumentStatus.KnowledgeDocumentStatusReady,
+  KnowledgeDocumentStatus.KnowledgeDocumentStatusDisabled,
+  KnowledgeDocumentStatus.KnowledgeDocumentStatusArchived,
+] satisfies KnowledgeDocumentStatusId[]
 
 /** 选择知识文档状态的展示样式。 */
 function statusVariant(status: KnowledgeDocumentStatusId) {
@@ -48,9 +64,47 @@ export function KnowledgeDocumentListPage() {
   const { formatDateTime } = useDateTime()
   const { knowledgeBaseId = "" } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
+  const keyword = searchParams.get("q") ?? ""
+  const status = optionalWailsEnum(
+    KnowledgeDocumentStatus,
+    searchParams.get("status"),
+  )
+  const [search, setSearch] = useState(keyword)
   const parsedPage = Number(searchParams.get("page") ?? "1")
   const currentPage =
     Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
+
+  /** 更新文档列表查询参数。 */
+  const setParameters = useCallback(
+    (changes: Record<string, string | null>, replace = false) => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current)
+          for (const [name, value] of Object.entries(changes)) {
+            if (!value) {
+              next.delete(name)
+            } else {
+              next.set(name, value)
+            }
+          }
+          return next
+        },
+        { replace },
+      )
+    },
+    [setSearchParams],
+  )
+
+  useEffect(() => setSearch(keyword), [keyword])
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      if (search !== keyword) {
+        setParameters({ q: search || null, page: null })
+      }
+    }, 300)
+    return () => window.clearTimeout(timeout)
+  }, [keyword, search, setParameters])
+
   const detail = useResource(
     resourceKeys.knowledgeBase(knowledgeBaseId),
     (signal) => getKnowledgeBase(knowledgeBaseId, signal),
@@ -58,13 +112,20 @@ export function KnowledgeDocumentListPage() {
   )
   const list = useResource(
     resourceKeys.knowledgeDocuments(knowledgeBaseId, {
+      keyword,
+      status,
       page: currentPage,
       pageSize: documentPageSize,
     }),
     (signal) =>
       listKnowledgeDocuments(
         knowledgeBaseId,
-        { page: currentPage, pageSize: documentPageSize },
+        {
+          keyword,
+          status,
+          page: currentPage,
+          pageSize: documentPageSize,
+        },
         signal,
       ),
     {
@@ -90,24 +151,15 @@ export function KnowledgeDocumentListPage() {
   /** 把超出总页数的地址收回最后一页。 */
   useEffect(() => {
     if (!list.data || currentPage <= totalPages) return
-    const next = new URLSearchParams(searchParams)
-    if (totalPages === 1) {
-      next.delete("page")
-    } else {
-      next.set("page", String(totalPages))
-    }
-    setSearchParams(next, { replace: true })
-  }, [currentPage, list.data, searchParams, setSearchParams, totalPages])
+    setParameters(
+      { page: totalPages === 1 ? null : String(totalPages) },
+      true,
+    )
+  }, [currentPage, list.data, setParameters, totalPages])
 
   /** 切换文档页码。 */
   function changePage(nextPage: number) {
-    const next = new URLSearchParams(searchParams)
-    if (nextPage <= 1) {
-      next.delete("page")
-    } else {
-      next.set("page", String(nextPage))
-    }
-    setSearchParams(next)
+    setParameters({ page: nextPage <= 1 ? null : String(nextPage) })
   }
 
   if (detail.data?.integrationConnectionId === "") {
@@ -117,6 +169,35 @@ export function KnowledgeDocumentListPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={detail.data?.name ?? t("documents.title")} />
+      <ListToolbar>
+        <ListToolbarSearch
+          value={search}
+          aria-label={t("documents.filters.search")}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <ListToolbarFilter
+          label={t("documents.filters.status")}
+          allLabel={t("documents.filters.allStatuses")}
+          value={status ?? ""}
+          options={documentStatuses.map((documentStatus) => ({
+            value: documentStatus,
+            label: t(`documents.status.${documentStatus}`),
+          }))}
+          onValueChange={(value) =>
+            setParameters({ status: value || null, page: null })
+          }
+        />
+        {search || status ? (
+          <ListToolbarReset
+            onClick={() => {
+              setSearch("")
+              setParameters({ q: null, status: null, page: null })
+            }}
+          >
+            {t("documents.filters.clear")}
+          </ListToolbarReset>
+        ) : null}
+      </ListToolbar>
       <PageContent>
         {showLoading ? (
           <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
@@ -157,7 +238,9 @@ export function KnowledgeDocumentListPage() {
                       colSpan={3}
                       className="h-32 text-center text-muted-foreground"
                     >
-                      {t("documents.empty")}
+                      {keyword || status
+                        ? t("documents.filteredEmpty")
+                        : t("documents.empty")}
                     </TableCell>
                   </TableRow>
                 ) : (

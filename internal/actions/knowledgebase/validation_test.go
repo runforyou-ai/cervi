@@ -93,10 +93,11 @@ func TestNormalizeGroupInput(t *testing.T) {
 	}
 }
 
-// TestNormalizeDocumentListInput 验证知识文档分页默认值和上限。
+// TestNormalizeDocumentListInput 验证知识文档查询条件规范化和分页范围。
 func TestNormalizeDocumentListInput(t *testing.T) {
-	input, fields := normalizeDocumentListInput(DocumentListInput{})
-	if len(fields) != 0 || input.Page != 1 || input.PageSize != defaultKnowledgeDocumentPageSize {
+	input, fields := normalizeDocumentListInput(DocumentListInput{Keyword: "  产品  ", Status: " ready "})
+	if len(fields) != 0 || input.Keyword != "产品" || input.Status != domain.KnowledgeDocumentStatusReady ||
+		input.Page != 1 || input.PageSize != defaultKnowledgeDocumentPageSize {
 		t.Fatalf("input = %#v, fields = %#v", input, fields)
 	}
 	_, fields = normalizeDocumentListInput(DocumentListInput{Page: 2, PageSize: 101})
@@ -105,10 +106,10 @@ func TestNormalizeDocumentListInput(t *testing.T) {
 	}
 }
 
-// TestKnowledgeDocumentStatusFromDify 验证 Dify 文档状态映射为统一状态。
-func TestKnowledgeDocumentStatusFromDify(t *testing.T) {
+// TestKnowledgeDocumentStatusMapping 验证 Dify 与统一文档状态的双向映射。
+func TestKnowledgeDocumentStatusMapping(t *testing.T) {
 	tests := map[string]domain.KnowledgeDocumentStatus{
-		"queuing":   domain.KnowledgeDocumentStatusProcessing,
+		"queuing":   domain.KnowledgeDocumentStatusQueued,
 		"indexing":  domain.KnowledgeDocumentStatusProcessing,
 		"available": domain.KnowledgeDocumentStatusReady,
 		"paused":    domain.KnowledgeDocumentStatusPaused,
@@ -124,5 +125,17 @@ func TestKnowledgeDocumentStatusFromDify(t *testing.T) {
 	}
 	if _, err := knowledgeDocumentStatusFromDify("future_status"); err == nil {
 		t.Fatal("unsupported status should fail")
+	}
+	for difyStatus, expected := range tests {
+		actual, ok := knowledgeDocumentStatusToDify(expected)
+		if !ok || actual != difyStatus {
+			t.Fatalf("status %q: dify status = %q, valid = %v", expected, actual, ok)
+		}
+	}
+	if status, ok := knowledgeDocumentStatusToDify(""); !ok || status != "" {
+		t.Fatalf("empty status: dify status = %q, valid = %v", status, ok)
+	}
+	if _, ok := knowledgeDocumentStatusToDify("future_status"); ok {
+		t.Fatal("unsupported filter status should fail")
 	}
 }

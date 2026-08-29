@@ -14,10 +14,11 @@ const (
 	KnowledgeBaseCategoryQA       KnowledgeBaseCategory = KnowledgeBaseCategory(domain.KnowledgeBaseCategoryQA)
 )
 
-// KnowledgeDocumentStatus 表示知识文档的处理状态。
+// KnowledgeDocumentStatus 表示知识文档的统一状态。
 type KnowledgeDocumentStatus string
 
 const (
+	KnowledgeDocumentStatusQueued     KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusQueued)
 	KnowledgeDocumentStatusProcessing KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusProcessing)
 	KnowledgeDocumentStatusReady      KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusReady)
 	KnowledgeDocumentStatusPaused     KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusPaused)
@@ -80,10 +81,12 @@ type ExternalKnowledgeBaseOptionList struct {
 	KnowledgeBases []ExternalKnowledgeBaseOption `json:"knowledgeBases"`
 }
 
-// KnowledgeDocumentListInput 定义知识文档分页条件。
+// KnowledgeDocumentListInput 定义知识文档列表查询条件。
 type KnowledgeDocumentListInput struct {
-	Page     int `json:"page" query:"page,default=1"`
-	PageSize int `json:"pageSize" query:"pageSize,default=20"`
+	Keyword  string                   `json:"keyword" query:"keyword"`
+	Status   *KnowledgeDocumentStatus `json:"status,omitempty" query:"status"`
+	Page     int                      `json:"page" query:"page,default=1"`
+	PageSize int                      `json:"pageSize" query:"pageSize,default=20"`
 }
 
 // KnowledgeDocumentSummary 定义知识文档列表项。

@@ -875,15 +875,17 @@ export interface KnowledgeDocumentList {
 }
 
 /**
- * KnowledgeDocumentListInput 定义知识文档分页条件。
+ * KnowledgeDocumentListInput 定义知识文档列表查询条件。
  */
 export interface KnowledgeDocumentListInput {
+    "keyword": string;
+    "status"?: KnowledgeDocumentStatus | null;
     "page": number;
     "pageSize": number;
 }
 
 /**
- * KnowledgeDocumentStatus 表示知识文档的处理状态。
+ * KnowledgeDocumentStatus 表示知识文档的统一状态。
  */
 export enum KnowledgeDocumentStatus {
     /**
@@ -891,6 +893,7 @@ export enum KnowledgeDocumentStatus {
      */
     $zero = "",
 
+    KnowledgeDocumentStatusQueued = "queued",
     KnowledgeDocumentStatusProcessing = "processing",
     KnowledgeDocumentStatusReady = "ready",
     KnowledgeDocumentStatusPaused = "paused",

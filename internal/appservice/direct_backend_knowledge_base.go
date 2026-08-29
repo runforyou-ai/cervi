@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -85,6 +86,7 @@ func (b *DirectBackend) ListKnowledgeDocuments(
 		return KnowledgeDocumentList{}, err
 	}
 	output, err := b.listKnowledgeDocuments.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.DocumentListInput{
+		Keyword: input.Keyword, Status: optionalDomain[KnowledgeDocumentStatus, domain.KnowledgeDocumentStatus](input.Status),
 		Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
@@ -129,6 +131,8 @@ func (b *DirectBackend) ListKnowledgeDocuments(
 		"page_size", output.PageSize,
 		"page_document_count", len(documents),
 		"total_document_count", output.Total,
+		"keyword_filtered", strings.TrimSpace(input.Keyword) != "",
+		"status", optionalDomain[KnowledgeDocumentStatus, string](input.Status),
 	)
 	return KnowledgeDocumentList{
 		Documents: documents,

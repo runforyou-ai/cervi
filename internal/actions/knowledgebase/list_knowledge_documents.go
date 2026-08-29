@@ -5,6 +5,7 @@ package knowledgebase
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -17,7 +18,7 @@ import (
 const defaultKnowledgeDocumentPageSize = 20
 
 type difyKnowledgeDocumentLister interface {
-	List(context.Context, connector.DifyKnowledgeBaseConfig, string, int, int) (connector.DifyKnowledgeDocumentPage, error)
+	List(context.Context, connector.DifyKnowledgeBaseConfig, string, connector.DifyKnowledgeDocumentListInput) (connector.DifyKnowledgeDocumentPage, error)
 }
 
 // ListKnowledgeDocumentsQuery 查询外部知识库中的文档。
@@ -39,6 +40,10 @@ func (q *ListKnowledgeDocumentsQuery) Execute(
 	input DocumentListInput,
 ) (DocumentListOutput, error) {
 	input, fields := normalizeDocumentListInput(input)
+	difyStatus, statusValid := knowledgeDocumentStatusToDify(input.Status)
+	if !statusValid {
+		fields["status"] = ValidationDocumentQueryInvalid
+	}
 	if len(fields) > 0 {
 		return DocumentListOutput{}, &common.FieldError{Fields: fields}
 	}
@@ -64,7 +69,12 @@ func (q *ListKnowledgeDocumentsQuery) Execute(
 	page, err := q.lister.List(ctx, connector.DifyKnowledgeBaseConfig{
 		APIURL: configuration.APIURL,
 		APIKey: configuration.APIKey,
-	}, *knowledgeBase.ExternalResourceID, input.Page, input.PageSize)
+	}, *knowledgeBase.ExternalResourceID, connector.DifyKnowledgeDocumentListInput{
+		Keyword:  input.Keyword,
+		Status:   difyStatus,
+		Page:     input.Page,
+		PageSize: input.PageSize,
+	})
 	if err != nil {
 		return DocumentListOutput{}, fmt.Errorf("list external knowledge documents: %w", err)
 	}
@@ -84,8 +94,10 @@ func (q *ListKnowledgeDocumentsQuery) Execute(
 	}, nil
 }
 
-// normalizeDocumentListInput 补齐并校验知识文档分页条件。
+// normalizeDocumentListInput 规范知识文档查询条件并校验分页范围。
 func normalizeDocumentListInput(input DocumentListInput) (DocumentListInput, map[string]common.FieldCode) {
+	input.Keyword = strings.TrimSpace(input.Keyword)
+	input.Status = domain.KnowledgeDocumentStatus(strings.TrimSpace(string(input.Status)))
 	if input.Page <= 0 {
 		input.Page = 1
 	}
@@ -102,7 +114,9 @@ func normalizeDocumentListInput(input DocumentListInput) (DocumentListInput, map
 // knowledgeDocumentStatusFromDify 把 Dify 展示状态映射为统一知识文档状态。
 func knowledgeDocumentStatusFromDify(status string) (domain.KnowledgeDocumentStatus, error) {
 	switch status {
-	case "queuing", "indexing":
+	case "queuing":
+		return domain.KnowledgeDocumentStatusQueued, nil
+	case "indexing":
 		return domain.KnowledgeDocumentStatusProcessing, nil
 	case "available":
 		return domain.KnowledgeDocumentStatusReady, nil
@@ -116,5 +130,29 @@ func knowledgeDocumentStatusFromDify(status string) (domain.KnowledgeDocumentSta
 		return domain.KnowledgeDocumentStatusArchived, nil
 	default:
 		return "", fmt.Errorf("unsupported dify knowledge document status %q", status)
+	}
+}
+
+// knowledgeDocumentStatusToDify 把统一知识文档状态映射为 Dify 筛选状态。
+func knowledgeDocumentStatusToDify(status domain.KnowledgeDocumentStatus) (string, bool) {
+	switch status {
+	case "":
+		return "", true
+	case domain.KnowledgeDocumentStatusQueued:
+		return "queuing", true
+	case domain.KnowledgeDocumentStatusProcessing:
+		return "indexing", true
+	case domain.KnowledgeDocumentStatusReady:
+		return "available", true
+	case domain.KnowledgeDocumentStatusPaused:
+		return "paused", true
+	case domain.KnowledgeDocumentStatusError:
+		return "error", true
+	case domain.KnowledgeDocumentStatusDisabled:
+		return "disabled", true
+	case domain.KnowledgeDocumentStatusArchived:
+		return "archived", true
+	default:
+		return "", false
 	}
 }

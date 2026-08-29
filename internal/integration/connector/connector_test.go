@@ -112,7 +112,7 @@ func TestDifyKnowledgeBaseLister(t *testing.T) {
 	}
 }
 
-// TestDifyKnowledgeDocumentLister 验证 Dify 知识文档列表保留分页和展示字段。
+// TestDifyKnowledgeDocumentLister 验证 Dify 知识文档查询参数和展示字段。
 func TestDifyKnowledgeDocumentLister(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/datasets/dataset-1/documents" {
@@ -126,6 +126,12 @@ func TestDifyKnowledgeDocumentLister(t *testing.T) {
 		}
 		if limit := request.URL.Query().Get("limit"); limit != "20" {
 			t.Fatalf("unexpected limit: %s", limit)
+		}
+		if keyword := request.URL.Query().Get("keyword"); keyword != "产品" {
+			t.Fatalf("unexpected keyword: %s", keyword)
+		}
+		if status := request.URL.Query().Get("status"); status != "available" {
+			t.Fatalf("unexpected status: %s", status)
 		}
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{
@@ -142,8 +148,7 @@ func TestDifyKnowledgeDocumentLister(t *testing.T) {
 		context.Background(),
 		DifyKnowledgeBaseConfig{APIURL: server.URL + "/v1", APIKey: "dataset-key"},
 		"dataset-1",
-		2,
-		20,
+		DifyKnowledgeDocumentListInput{Keyword: "产品", Status: "available", Page: 2, PageSize: 20},
 	)
 	if err != nil {
 		t.Fatalf("list knowledge documents: %v", err)

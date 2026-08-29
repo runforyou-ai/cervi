@@ -186,7 +186,12 @@ export function listKnowledgeDocuments(
 ): Promise<KnowledgeDocumentListData> {
   return listKnowledgeDocumentsBound(
     knowledgeBaseId,
-    { page: query.page ?? 1, pageSize: query.pageSize ?? 20 },
+    {
+      keyword: query.keyword ?? "",
+      status: query.status ?? null,
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 20,
+    },
     signal,
   ).then((output) => ({
     ...output,

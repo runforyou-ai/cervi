@@ -854,6 +854,8 @@ func bindKnowledgeDocumentListInputQuery(c *gin.Context) (appservice.KnowledgeDo
 		return appservice.KnowledgeDocumentListInput{}, false
 	}
 	return appservice.KnowledgeDocumentListInput{
+		Keyword:  c.Query("keyword"),
+		Status:   optionalEnum[appservice.KnowledgeDocumentStatus](c.Query("status")),
 		Page:     page,
 		PageSize: pageSize,
 	}, true

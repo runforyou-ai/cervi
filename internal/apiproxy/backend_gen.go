@@ -687,6 +687,8 @@ func encodeConversationMessageListInputQuery(input appservice.ConversationMessag
 // encodeKnowledgeDocumentListInputQuery 将 appservice.KnowledgeDocumentListInput 编码为查询参数。
 func encodeKnowledgeDocumentListInputQuery(input appservice.KnowledgeDocumentListInput) url.Values {
 	query := url.Values{}
+	setQuery(query, "keyword", input.Keyword)
+	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query
