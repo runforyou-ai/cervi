@@ -31,3 +31,15 @@ const (
 	KnowledgeDocumentStatusDisabled   KnowledgeDocumentStatus = "disabled"
 	KnowledgeDocumentStatusArchived   KnowledgeDocumentStatus = "archived"
 )
+
+// KnowledgeDocumentSegmentIndexStatus 表示知识文档分段的索引状态。
+type KnowledgeDocumentSegmentIndexStatus string
+
+const (
+	KnowledgeDocumentSegmentIndexStatusWaiting   KnowledgeDocumentSegmentIndexStatus = "waiting"
+	KnowledgeDocumentSegmentIndexStatusIndexing  KnowledgeDocumentSegmentIndexStatus = "indexing"
+	KnowledgeDocumentSegmentIndexStatusCompleted KnowledgeDocumentSegmentIndexStatus = "completed"
+	KnowledgeDocumentSegmentIndexStatusError     KnowledgeDocumentSegmentIndexStatus = "error"
+	KnowledgeDocumentSegmentIndexStatusPaused    KnowledgeDocumentSegmentIndexStatus = "paused"
+	KnowledgeDocumentSegmentIndexStatusResegment KnowledgeDocumentSegmentIndexStatus = "re_segment"
+)

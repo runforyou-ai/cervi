@@ -18,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
 // TestChannelContractConversion 验证渠道模型与应用服务契约之间的转换。
@@ -144,5 +145,24 @@ func TestDirectBackendPreservesCancellation(t *testing.T) {
 	err := (&DirectBackend{}).contactError(ctx, RequestMeta{}, errors.New("query failed"), cervii18n.ErrorContactReadFailed)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context canceled", err)
+	}
+}
+
+// TestKnowledgeDocumentReadMapsRemoteNotFound 验证 Dify 文档 404 转换为文档不存在。
+func TestKnowledgeDocumentReadMapsRemoteNotFound(t *testing.T) {
+	backend := &DirectBackend{}
+	err := backend.knowledgeDocumentReadError(
+		context.Background(),
+		RequestMeta{Locale: LocaleChineseSimplified},
+		connectiontest.NewError(connectiontest.StageCapability, connectiontest.FailureNotFound, errors.New("not found")),
+		cervii18n.ErrorKnowledgeDocumentReadFailed,
+		"organization-1",
+		"knowledge-base-1",
+		"document-1",
+	)
+	converted, ok := err.(*Error)
+	if !ok || converted.Kind != ErrorKindNotFound || converted.HTTPStatus() != http.StatusNotFound ||
+		converted.Message != "没有找到这个知识文档。" {
+		t.Fatalf("error = %#v", err)
 	}
 }

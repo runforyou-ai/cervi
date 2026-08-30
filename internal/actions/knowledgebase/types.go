@@ -67,6 +67,44 @@ type DocumentListOutput struct {
 	Total     int
 }
 
+// DocumentDetailRecord 定义知识文档详情。
+type DocumentDetailRecord struct {
+	ID        string
+	Name      string
+	Status    domain.KnowledgeDocumentStatus
+	WordCount *int
+	HitCount  int
+	CreatedAt *time.Time
+}
+
+// DocumentSegmentListInput 定义知识文档分段列表查询条件。
+type DocumentSegmentListInput struct {
+	Keyword  string
+	Status   domain.KnowledgeDocumentSegmentIndexStatus
+	Page     int
+	PageSize int
+}
+
+// DocumentSegmentRecord 定义知识文档分段列表项。
+type DocumentSegmentRecord struct {
+	ID          string
+	Position    int
+	Content     string
+	Answer      *string
+	WordCount   int
+	HitCount    int
+	IndexStatus domain.KnowledgeDocumentSegmentIndexStatus
+	CreatedAt   *time.Time
+}
+
+// DocumentSegmentListOutput 定义知识文档分段分页结果。
+type DocumentSegmentListOutput struct {
+	Segments []DocumentSegmentRecord
+	Page     int
+	PageSize int
+	Total    int
+}
+
 // GroupRecord 定义知识库分组树节点。
 type GroupRecord struct {
 	ID        string  `bun:"id"`

@@ -50,26 +50,11 @@ func (q *ListKnowledgeDocumentsQuery) Execute(
 	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return DocumentListOutput{}, err
 	}
-	knowledgeBase, err := loadKnowledgeBase(ctx, q.db, identity.Organization.ID, knowledgeBaseID)
+	access, err := loadDifyKnowledgeAccess(ctx, q.db, identity.Organization.ID, knowledgeBaseID)
 	if err != nil {
 		return DocumentListOutput{}, err
 	}
-	if knowledgeBase.IntegrationConnectionID == nil || knowledgeBase.ExternalResourceID == nil {
-		return DocumentListOutput{}, ErrDocumentListUnsupported
-	}
-	configuration, err := loadDifyConfiguration(
-		ctx,
-		q.db,
-		identity.Organization.ID,
-		*knowledgeBase.IntegrationConnectionID,
-	)
-	if err != nil {
-		return DocumentListOutput{}, err
-	}
-	page, err := q.lister.List(ctx, connector.DifyKnowledgeBaseConfig{
-		APIURL: configuration.APIURL,
-		APIKey: configuration.APIKey,
-	}, *knowledgeBase.ExternalResourceID, connector.DifyKnowledgeDocumentListInput{
+	page, err := q.lister.List(ctx, access.Config, access.DatasetID, connector.DifyKnowledgeDocumentListInput{
 		Keyword:  input.Keyword,
 		Status:   difyStatus,
 		Page:     input.Page,

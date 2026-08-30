@@ -154,6 +154,30 @@ export function KnowledgeBaseFormPage({
     () => externalOptionList?.knowledgeBases ?? [],
     [externalOptionList],
   )
+
+  /** 远端列表刷新后，把失效选择同步到当前首个可用知识库。 */
+  useEffect(() => {
+    if (!externalOptionList || selectedConnectionId === "") return
+    if (
+      externalOptions.some(
+        (knowledgeBase) => knowledgeBase.id === selectedExternalResourceId,
+      )
+    ) {
+      return
+    }
+    const nextExternalResourceId = externalOptions[0]?.id ?? ""
+    if (nextExternalResourceId === selectedExternalResourceId) return
+    form.setValue("externalResourceId", nextExternalResourceId, {
+      shouldDirty: selectedExternalResourceId !== "",
+    })
+  }, [
+    externalOptionList,
+    externalOptions,
+    form,
+    selectedConnectionId,
+    selectedExternalResourceId,
+  ])
+
   const selectedExternalOption = externalOptions.find(
     (knowledgeBase) => knowledgeBase.id === selectedExternalResourceId,
   )

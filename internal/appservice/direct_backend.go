@@ -82,6 +82,8 @@ type DirectBackend struct {
 	listKnowledgeBases                *knowledgebaseaction.ListKnowledgeBasesQuery
 	listExternalKnowledgeBaseOptions  *knowledgebaseaction.ListExternalOptionsQuery
 	listKnowledgeDocuments            *knowledgebaseaction.ListKnowledgeDocumentsQuery
+	getKnowledgeDocument              *knowledgebaseaction.GetKnowledgeDocumentQuery
+	listKnowledgeDocumentSegments     *knowledgebaseaction.ListKnowledgeDocumentSegmentsQuery
 	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
 	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
 	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
@@ -140,6 +142,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 	modelProviderRegistry := modelprovider.NewRegistry(modelprovider.NewHTTPClient())
 	connectorClient := connector.NewHTTPClient()
 	connectorRegistry := connector.NewRegistry(connectorClient)
+	difyKnowledgeDocuments := connector.NewDifyKnowledgeDocumentLister(connectorClient)
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -179,7 +182,9 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
 		listKnowledgeBases:                knowledgebaseaction.NewListKnowledgeBasesQuery(db),
 		listExternalKnowledgeBaseOptions:  knowledgebaseaction.NewListExternalOptionsQuery(db, connector.NewDifyKnowledgeBaseLister(connectorClient)),
-		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, connector.NewDifyKnowledgeDocumentLister(connectorClient)),
+		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, difyKnowledgeDocuments),
+		getKnowledgeDocument:              knowledgebaseaction.NewGetKnowledgeDocumentQuery(db, difyKnowledgeDocuments),
+		listKnowledgeDocumentSegments:     knowledgebaseaction.NewListKnowledgeDocumentSegmentsQuery(db, difyKnowledgeDocuments),
 		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),

@@ -61,6 +61,26 @@ export const resourceKeys = {
     knowledgeBaseId?: string,
     parameters?: KeyParameters,
   ) => scopedListKey("knowledge-documents", knowledgeBaseId, parameters),
+  /** 指定知识库中的单个知识文档。 */
+  knowledgeDocument: (knowledgeBaseId: string, documentId: string) => [
+    "knowledge-document",
+    knowledgeBaseId,
+    documentId,
+  ],
+  /** 指定知识文档及查询条件的分段列表。 */
+  knowledgeDocumentSegments: (
+    knowledgeBaseId: string,
+    documentId: string,
+    parameters?: KeyParameters,
+  ) =>
+    parameters === undefined
+      ? ["knowledge-document-segments", knowledgeBaseId, documentId]
+      : [
+          "knowledge-document-segments",
+          knowledgeBaseId,
+          documentId,
+          parameters,
+        ],
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */

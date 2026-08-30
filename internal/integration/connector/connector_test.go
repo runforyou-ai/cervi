@@ -165,6 +165,115 @@ func TestDifyKnowledgeDocumentLister(t *testing.T) {
 	}
 }
 
+// TestDifyKnowledgeDocumentDetailAndSegments 验证 Dify 文档详情与分段读取契约。
+func TestDifyKnowledgeDocumentDetailAndSegments(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if authorization := request.Header.Get("Authorization"); authorization != "Bearer dataset-key" {
+			t.Fatalf("unexpected authorization header: %s", authorization)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/v1/datasets/dataset-1/documents/document-1":
+			if metadata := request.URL.Query().Get("metadata"); metadata != "without" {
+				t.Fatalf("unexpected metadata: %s", metadata)
+			}
+			_, _ = writer.Write([]byte(`{
+				"id":"document-1","name":"产品手册.pdf","display_status":"available",
+				"word_count":520,"hit_count":12,"created_at":1787950000
+			}`))
+		case "/v1/datasets/dataset-1/documents/document-1/segments":
+			query := request.URL.Query()
+			if query.Get("keyword") != "安装" || query.Get("status") != "completed" ||
+				query.Get("page") != "2" || query.Get("limit") != "20" {
+				t.Fatalf("unexpected segment query: %s", request.URL.RawQuery)
+			}
+			_, _ = writer.Write([]byte(`{
+				"data":[
+					{"id":"segment-1","position":21,"content":"如何安装？","answer":null,"word_count":6,"hit_count":3,"status":"completed","enabled":true,"created_at":1787951000},
+					{"id":"segment-2","position":22,"content":"","answer":"请下载安装包。","word_count":8,"hit_count":0,"status":"indexing","enabled":false,"created_at":null}
+				],
+				"page":2,"limit":20,"total":22,"has_more":false,"doc_form":"qa_model"
+			}`))
+		default:
+			t.Fatalf("unexpected request path: %s", request.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	reader := NewDifyKnowledgeDocumentLister(server.Client())
+	config := DifyKnowledgeBaseConfig{APIURL: server.URL + "/v1", APIKey: "dataset-key"}
+	document, err := reader.Get(context.Background(), config, "dataset-1", "document-1")
+	if err != nil {
+		t.Fatalf("get knowledge document: %v", err)
+	}
+	if document.ID != "document-1" || document.Status != "available" || document.WordCount == nil ||
+		*document.WordCount != 520 ||
+		document.HitCount != 12 || document.CreatedAt == nil || document.CreatedAt.Unix() != 1787950000 {
+		t.Fatalf("unexpected document: %#v", document)
+	}
+	page, err := reader.ListSegments(
+		context.Background(),
+		config,
+		"dataset-1",
+		"document-1",
+		DifyKnowledgeDocumentSegmentListInput{Keyword: "安装", Status: "completed", Page: 2, PageSize: 20},
+	)
+	if err != nil {
+		t.Fatalf("list knowledge document segments: %v", err)
+	}
+	if page.Total != 22 || len(page.Segments) != 2 || page.Segments[0].Answer != nil ||
+		page.Segments[0].Status != "completed" || page.Segments[0].Position != 21 || page.Segments[1].Answer == nil ||
+		*page.Segments[1].Answer != "请下载安装包。" || page.Segments[1].Status != "indexing" {
+		t.Fatalf("unexpected segment page: %#v", page)
+	}
+}
+
+// TestDifyKnowledgeDocumentDetailAllowsMissingWordCount 验证详情接口未返回字数时保留未知语义。
+func TestDifyKnowledgeDocumentDetailAllowsMissingWordCount(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{
+			"id":"document-1","name":"产品手册.pdf","display_status":"available",
+			"hit_count":12,"created_at":1787950000
+		}`))
+	}))
+	defer server.Close()
+
+	document, err := NewDifyKnowledgeDocumentLister(server.Client()).Get(
+		context.Background(),
+		DifyKnowledgeBaseConfig{APIURL: server.URL, APIKey: "dataset-key"},
+		"dataset-1",
+		"document-1",
+	)
+	if err != nil || document.WordCount != nil {
+		t.Fatalf("document = %#v, error = %v", document, err)
+	}
+}
+
+// TestDifyKnowledgeDocumentSegmentsRejectMissingState 验证分段缺少索引状态时按协议错误处理。
+func TestDifyKnowledgeDocumentSegmentsRejectMissingState(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{
+			"data":[{"id":"segment-1","position":1,"content":"内容","word_count":2,"hit_count":0}],
+			"page":1,"limit":20,"total":1
+		}`))
+	}))
+	defer server.Close()
+
+	_, err := NewDifyKnowledgeDocumentLister(server.Client()).ListSegments(
+		context.Background(),
+		DifyKnowledgeBaseConfig{APIURL: server.URL, APIKey: "dataset-key"},
+		"dataset-1",
+		"document-1",
+		DifyKnowledgeDocumentSegmentListInput{Page: 1, PageSize: 20},
+	)
+	_, kind, classified := connectiontest.Details(err)
+	if !classified || kind != connectiontest.FailureProtocol {
+		t.Fatalf("error = %v, kind = %q", err, kind)
+	}
+}
+
 // TestN8NProbe 验证 n8n 探测使用公开工作流接口和 API 密钥请求头。
 func TestN8NProbe(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

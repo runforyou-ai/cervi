@@ -260,6 +260,13 @@ export function GetKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: str
 }
 
 /**
+ * GetKnowledgeDocument 返回指定外部知识文档详情。
+ */
+export function GetKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(593812391, meta, knowledgeBaseID, documentID);
+}
+
+/**
  * GetMessageChannel 返回消息渠道基础信息。
  */
 export function GetMessageChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.MessageChannelSummary> {
@@ -383,6 +390,13 @@ export function ListIntegrationConnections(meta: $models.RequestMeta): $Cancella
  */
 export function ListKnowledgeBases(meta: $models.RequestMeta): $CancellablePromise<$models.KnowledgeBaseList> {
     return $Call.ByID(2416994044, meta);
+}
+
+/**
+ * ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
+ */
+export function ListKnowledgeDocumentSegments(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentSegmentListInput): $CancellablePromise<$models.KnowledgeDocumentSegmentList> {
+    return $Call.ByID(63381217, meta, knowledgeBaseID, documentID, input);
 }
 
 /**

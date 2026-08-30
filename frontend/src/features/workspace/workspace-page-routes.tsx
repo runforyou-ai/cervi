@@ -17,6 +17,7 @@ import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-
 import { KnowledgeBaseIndexPage } from "@/features/knowledge-base/knowledge-base-index-page"
 import { KnowledgeBaseLayout } from "@/features/knowledge-base/knowledge-base-layout"
 import { KnowledgeDocumentListPage } from "@/features/knowledge-base/knowledge-document-list-page"
+import { KnowledgeDocumentPage } from "@/features/knowledge-base/knowledge-document-page"
 import { RoleFormPage } from "@/features/roles/role-form-page"
 import {
   PersonalSettingsPage,
@@ -51,6 +52,11 @@ const workspaceRouteDefinitions = [
   { path: "/contacts/external", titleKey: "tabs.routes.externalContacts" },
   {
     path: "/knowledge-bases/new",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+  },
+  {
+    path: "/knowledge-bases/:knowledgeBaseId/documents/:documentId",
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
   },
@@ -286,6 +292,10 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
         <Route
           path="new"
           element={<KnowledgeBaseFormPage mode="create" />}
+        />
+        <Route
+          path=":knowledgeBaseId/documents/:documentId"
+          element={<KnowledgeDocumentPage />}
         />
         <Route
           path=":knowledgeBaseId/documents"

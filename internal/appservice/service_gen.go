@@ -244,6 +244,16 @@ func (s *Service) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, 
 	return s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
 }
 
+// GetKnowledgeDocument 返回指定外部知识文档详情。
+func (s *Service) GetKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocument, error) {
+	return s.backend.GetKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
+}
+
+// ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
+func (s *Service) ListKnowledgeDocumentSegments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentSegmentListInput) (KnowledgeDocumentSegmentList, error) {
+	return s.backend.ListKnowledgeDocumentSegments(ctx, meta, knowledgeBaseID, documentID, input)
+}
+
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (s *Service) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBase, error) {
 	return s.backend.GetKnowledgeBase(ctx, meta, knowledgeBaseID)

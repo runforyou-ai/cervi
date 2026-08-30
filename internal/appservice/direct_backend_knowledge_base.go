@@ -90,31 +90,9 @@ func (b *DirectBackend) ListKnowledgeDocuments(
 		Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
-		if ctx.Err() != nil {
-			return KnowledgeDocumentList{}, ctx.Err()
-		}
-		if stage, kind, classified := connectiontest.Details(err); classified {
-			slog.Warn("Dify 知识文档列表读取失败",
-				"organization_id", identity.Organization.ID,
-				"knowledge_base_id", knowledgeBaseID,
-				"stage", stage,
-				"kind", kind,
-			)
-			switch kind {
-			case connectiontest.FailureUnauthorized,
-				connectiontest.FailureForbidden,
-				connectiontest.FailureRateLimited,
-				connectiontest.FailureTimeout,
-				connectiontest.FailureNetwork,
-				connectiontest.FailureTLS,
-				connectiontest.FailureUnavailable:
-				return KnowledgeDocumentList{}, integrationConnectionRemoteError(meta, err)
-			default:
-				return KnowledgeDocumentList{}, FailedError(meta, cervii18n.ErrorKnowledgeDocumentListFailed)
-			}
-		}
-		return KnowledgeDocumentList{}, b.knowledgeBaseError(
-			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentListFailed, identity.Organization.ID, knowledgeBaseID,
+		return KnowledgeDocumentList{}, b.knowledgeDocumentReadError(
+			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentListFailed,
+			identity.Organization.ID, knowledgeBaseID, "",
 		)
 	}
 	documents := make([]KnowledgeDocumentSummary, 0, len(output.Documents))
@@ -137,6 +115,91 @@ func (b *DirectBackend) ListKnowledgeDocuments(
 	return KnowledgeDocumentList{
 		Documents: documents,
 		Page:      PageInfo{Number: output.Page, Size: output.PageSize, Total: output.Total},
+	}, nil
+}
+
+// GetKnowledgeDocument 返回指定外部知识文档详情。
+func (b *DirectBackend) GetKnowledgeDocument(
+	ctx context.Context,
+	meta RequestMeta,
+	knowledgeBaseID, documentID string,
+) (KnowledgeDocument, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return KnowledgeDocument{}, err
+	}
+	record, err := b.getKnowledgeDocument.Execute(ctx, identity, knowledgeBaseID, documentID)
+	if err != nil {
+		return KnowledgeDocument{}, b.knowledgeDocumentReadError(
+			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed,
+			identity.Organization.ID, knowledgeBaseID, documentID,
+		)
+	}
+	slog.Info("Dify 知识文档读取成功",
+		"organization_id", identity.Organization.ID,
+		"knowledge_base_id", knowledgeBaseID,
+		"document_id", documentID,
+	)
+	return KnowledgeDocument{
+		ID: record.ID, Name: record.Name, Status: KnowledgeDocumentStatus(record.Status),
+		WordCount: record.WordCount, HitCount: record.HitCount, CreatedAt: record.CreatedAt,
+	}, nil
+}
+
+// ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
+func (b *DirectBackend) ListKnowledgeDocumentSegments(
+	ctx context.Context,
+	meta RequestMeta,
+	knowledgeBaseID, documentID string,
+	input KnowledgeDocumentSegmentListInput,
+) (KnowledgeDocumentSegmentList, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return KnowledgeDocumentSegmentList{}, err
+	}
+	output, err := b.listKnowledgeDocumentSegments.Execute(
+		ctx,
+		identity,
+		knowledgeBaseID,
+		documentID,
+		knowledgebaseaction.DocumentSegmentListInput{
+			Keyword: input.Keyword,
+			Status: optionalDomain[
+				KnowledgeDocumentSegmentIndexStatus,
+				domain.KnowledgeDocumentSegmentIndexStatus,
+			](input.Status),
+			Page: input.Page, PageSize: input.PageSize,
+		},
+	)
+	if err != nil {
+		return KnowledgeDocumentSegmentList{}, b.knowledgeDocumentReadError(
+			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSegmentListFailed,
+			identity.Organization.ID, knowledgeBaseID, documentID,
+		)
+	}
+	segments := make([]KnowledgeDocumentSegment, 0, len(output.Segments))
+	for _, segment := range output.Segments {
+		segments = append(segments, KnowledgeDocumentSegment{
+			ID: segment.ID, Position: segment.Position, Content: segment.Content, Answer: segment.Answer,
+			WordCount: segment.WordCount, HitCount: segment.HitCount,
+			IndexStatus: KnowledgeDocumentSegmentIndexStatus(segment.IndexStatus),
+			CreatedAt:   segment.CreatedAt,
+		})
+	}
+	slog.Info("Dify 知识文档分段列表读取成功",
+		"organization_id", identity.Organization.ID,
+		"knowledge_base_id", knowledgeBaseID,
+		"document_id", documentID,
+		"page", output.Page,
+		"page_size", output.PageSize,
+		"page_segment_count", len(segments),
+		"total_segment_count", output.Total,
+		"keyword_filtered", strings.TrimSpace(input.Keyword) != "",
+		"index_status", optionalDomain[KnowledgeDocumentSegmentIndexStatus, string](input.Status),
+	)
+	return KnowledgeDocumentSegmentList{
+		Segments: segments,
+		Page:     PageInfo{Number: output.Page, Size: output.PageSize, Total: output.Total},
 	}, nil
 }
 
@@ -269,8 +332,11 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 	if errors.Is(err, knowledgebaseaction.ErrExternalGroupUnsupported) {
 		return InvalidError(meta, cervii18n.ErrorKnowledgeGroupExternalUnsupported, nil)
 	}
-	if errors.Is(err, knowledgebaseaction.ErrDocumentListUnsupported) {
-		return InvalidError(meta, cervii18n.ErrorKnowledgeDocumentListUnsupported, nil)
+	if errors.Is(err, knowledgebaseaction.ErrDocumentNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentNotFound)
+	}
+	if errors.Is(err, knowledgebaseaction.ErrDocumentReadUnsupported) {
+		return InvalidError(meta, cervii18n.ErrorKnowledgeDocumentReadUnsupported, nil)
 	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if knowledgeBaseID != "" {
@@ -278,6 +344,47 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 	}
 	slog.Warn("知识库操作失败", attributes...)
 	return FailedError(meta, failureKey)
+}
+
+// knowledgeDocumentReadError 转换知识文档远程读取错误并保留本地知识库错误语义。
+func (b *DirectBackend) knowledgeDocumentReadError(
+	ctx context.Context,
+	meta RequestMeta,
+	err error,
+	failureKey cervii18n.Key,
+	organizationID, knowledgeBaseID, documentID string,
+) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if stage, kind, classified := connectiontest.Details(err); classified {
+		attributes := []any{
+			"organization_id", organizationID,
+			"knowledge_base_id", knowledgeBaseID,
+			"stage", stage,
+			"kind", kind,
+		}
+		if documentID != "" {
+			attributes = append(attributes, "document_id", documentID)
+		}
+		slog.Warn("Dify 知识文档读取失败", attributes...)
+		if kind == connectiontest.FailureNotFound && documentID != "" {
+			return NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentNotFound)
+		}
+		switch kind {
+		case connectiontest.FailureUnauthorized,
+			connectiontest.FailureForbidden,
+			connectiontest.FailureRateLimited,
+			connectiontest.FailureTimeout,
+			connectiontest.FailureNetwork,
+			connectiontest.FailureTLS,
+			connectiontest.FailureUnavailable:
+			return integrationConnectionRemoteError(meta, err)
+		default:
+			return FailedError(meta, failureKey)
+		}
+	}
+	return b.knowledgeBaseError(ctx, meta, err, failureKey, organizationID, knowledgeBaseID)
 }
 
 // knowledgeBaseFromAction 转换知识库契约。

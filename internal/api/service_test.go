@@ -39,7 +39,9 @@ type testBackend struct {
 	lastConversationList appservice.ConversationMessageListInput
 	lastCustomerMessage  appservice.CustomerTextMessageInput
 	lastDocumentBaseID   string
+	lastDocumentID       string
 	lastDocumentQuery    appservice.KnowledgeDocumentListInput
+	lastSegmentQuery     appservice.KnowledgeDocumentSegmentListInput
 	lastAIConnection     appservice.AIProviderConnectionInput
 	lastBusinessSystemID string
 	lastBusinessSystem   appservice.BusinessSystemInput
@@ -91,6 +93,26 @@ func (b *testBackend) ListKnowledgeDocuments(_ context.Context, meta appservice.
 	b.lastDocumentBaseID = knowledgeBaseID
 	b.lastDocumentQuery = input
 	return appservice.KnowledgeDocumentList{Documents: []appservice.KnowledgeDocumentSummary{}, Page: appservice.PageInfo{Number: input.Page, Size: input.PageSize}}, nil
+}
+
+// GetKnowledgeDocument 记录知识文档详情路径参数。
+func (b *testBackend) GetKnowledgeDocument(_ context.Context, meta appservice.RequestMeta, knowledgeBaseID, documentID string) (appservice.KnowledgeDocument, error) {
+	b.lastMeta = meta
+	b.lastDocumentBaseID = knowledgeBaseID
+	b.lastDocumentID = documentID
+	return appservice.KnowledgeDocument{ID: documentID}, nil
+}
+
+// ListKnowledgeDocumentSegments 记录知识文档分段查询输入。
+func (b *testBackend) ListKnowledgeDocumentSegments(_ context.Context, meta appservice.RequestMeta, knowledgeBaseID, documentID string, input appservice.KnowledgeDocumentSegmentListInput) (appservice.KnowledgeDocumentSegmentList, error) {
+	b.lastMeta = meta
+	b.lastDocumentBaseID = knowledgeBaseID
+	b.lastDocumentID = documentID
+	b.lastSegmentQuery = input
+	return appservice.KnowledgeDocumentSegmentList{
+		Segments: []appservice.KnowledgeDocumentSegment{},
+		Page:     appservice.PageInfo{Number: input.Page, Size: input.PageSize},
+	}, nil
 }
 
 // UpdateProfile 记录个人资料输入并返回更新后的用户。
@@ -375,6 +397,30 @@ func TestKnowledgeDocumentQueryUsesTypedContract(t *testing.T) {
 	if response.StatusCode != http.StatusOK || backend.lastDocumentBaseID != knowledgeBaseID || input.Keyword != "产品" ||
 		input.Status == nil || *input.Status != appservice.KnowledgeDocumentStatusReady || input.Page != 2 || input.PageSize != 10 {
 		t.Fatalf("status = %d, knowledge base = %q, input = %#v", response.StatusCode, backend.lastDocumentBaseID, input)
+	}
+}
+
+// TestKnowledgeDocumentDetailRoutesUseTypedContract 验证知识文档详情与分段路径和查询绑定。
+func TestKnowledgeDocumentDetailRoutesUseTypedContract(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	const knowledgeBaseID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
+	const documentID = "remote-document-1"
+	detailResponse := doJSON(t, http.MethodGet, server.URL+"/knowledge-bases/"+knowledgeBaseID+"/documents/"+documentID, nil, "test-token")
+	defer detailResponse.Body.Close()
+	if detailResponse.StatusCode != http.StatusOK || backend.lastDocumentBaseID != knowledgeBaseID || backend.lastDocumentID != documentID {
+		t.Fatalf("status = %d, knowledge base = %q, document = %q", detailResponse.StatusCode, backend.lastDocumentBaseID, backend.lastDocumentID)
+	}
+
+	segmentResponse := doJSON(t, http.MethodGet, server.URL+"/knowledge-bases/"+knowledgeBaseID+"/documents/"+documentID+"/segments?keyword=安装&status=completed&page=2&pageSize=10", nil, "test-token")
+	defer segmentResponse.Body.Close()
+	input := backend.lastSegmentQuery
+	if segmentResponse.StatusCode != http.StatusOK || backend.lastDocumentBaseID != knowledgeBaseID ||
+		backend.lastDocumentID != documentID || input.Keyword != "安装" || input.Status == nil ||
+		*input.Status != appservice.KnowledgeDocumentSegmentIndexStatusCompleted || input.Page != 2 || input.PageSize != 10 {
+		t.Fatalf("status = %d, knowledge base = %q, document = %q, input = %#v", segmentResponse.StatusCode, backend.lastDocumentBaseID, backend.lastDocumentID, input)
 	}
 }
 
