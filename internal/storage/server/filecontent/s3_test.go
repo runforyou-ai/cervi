@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestPresignRequests 验证对象存储上传和读取请求无需访问远端即可签发。
+// TestPresignRequests 验证对象存储上传请求携带不可变缓存元数据。
 func TestPresignRequests(t *testing.T) {
 	config := S3Config{
 		Endpoint: "https://storage.example.com", Region: "us-east-1", Bucket: "cervi",
@@ -25,12 +25,10 @@ func TestPresignRequests(t *testing.T) {
 	if _, exists := put.Headers["Host"]; exists {
 		t.Fatalf("browser upload request contains forbidden Host header: %#v", put.Headers)
 	}
-
-	get, err := PresignGet(context.Background(), config, "organizations/org/files/file.png", "image/png", "头像.png")
-	if err != nil {
-		t.Fatal(err)
+	if put.Headers["Cache-Control"] != ImmutableCacheControl {
+		t.Fatalf("cache control = %q, want %q", put.Headers["Cache-Control"], ImmutableCacheControl)
 	}
-	if get.Method != http.MethodGet || !strings.Contains(get.URL, "X-Amz-Signature=") {
-		t.Fatalf("get request = %#v", get)
+	if put.Headers["Content-Type"] != "image/png" {
+		t.Fatalf("content type = %q, want image/png", put.Headers["Content-Type"])
 	}
 }

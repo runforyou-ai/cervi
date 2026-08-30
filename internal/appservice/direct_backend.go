@@ -138,6 +138,7 @@ type DirectBackend struct {
 	testS3Setting                     *settingaction.TestS3SettingAction
 	createFileUpload                  *fileaction.CreateUploadAction
 	completeFileUpload                *fileaction.CompleteUploadAction
+	getFile                           *fileaction.GetQuery
 	localFiles                        *serverfilecontent.LocalStore
 }
 
@@ -244,6 +245,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		testS3Setting:                     settingaction.NewTestS3SettingAction(connectionRunner),
 		createFileUpload:                  fileaction.NewCreateUploadAction(db),
 		completeFileUpload:                fileaction.NewCompleteUploadAction(db),
+		getFile:                           fileaction.NewGetQuery(db),
 		localFiles:                        localFiles,
 	}
 }

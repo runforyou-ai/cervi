@@ -13,7 +13,10 @@ import (
 
 // TestDeleterDeleteLocalFile 验证删除器移除本地文件。
 func TestDeleterDeleteLocalFile(t *testing.T) {
-	local := &LocalStore{root: t.TempDir()}
+	local, err := NewLocalStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	key := "organizations/org/files/file.png"
 	if err := local.Save(context.Background(), key, strings.NewReader("avatar"), 6); err != nil {
 		t.Fatal(err)

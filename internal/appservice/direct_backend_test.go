@@ -81,16 +81,36 @@ func TestContactContractConversion(t *testing.T) {
 // TestS3SettingContractRoundTrip 验证对象存储配置转换不丢失字段。
 func TestS3SettingContractRoundTrip(t *testing.T) {
 	input := S3SettingInput{
-		Enabled: true, Provider: StorageProviderMinIO, Endpoint: "http://127.0.0.1:9000", Region: "us-east-1",
+		Enabled: true, Provider: StorageProviderMinIO, Endpoint: "http://127.0.0.1:9000", PublicBaseURL: "https://cdn.example.com", Region: "us-east-1",
 		Bucket: "cervi", AccessKeyID: "access", SecretAccessKey: "secret", ForcePathStyle: true,
 	}
 	want := S3Setting{
-		Enabled: true, Provider: StorageProviderMinIO, Endpoint: "http://127.0.0.1:9000", Region: "us-east-1",
+		Enabled: true, Provider: StorageProviderMinIO, Endpoint: "http://127.0.0.1:9000", PublicBaseURL: "https://cdn.example.com", Region: "us-east-1",
 		Bucket: "cervi", AccessKeyID: "access", SecretAccessKey: "secret", ForcePathStyle: true,
 	}
 	got := s3SettingFromAction(s3SettingToAction(input))
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("S3 setting round trip = %#v, want %#v", got, want)
+	}
+}
+
+// TestS3TestFailureKey 验证对象存储各探针阶段返回独立的用户文案。
+func TestS3TestFailureKey(t *testing.T) {
+	tests := []struct {
+		failure settingaction.S3TestFailure
+		want    cervii18n.Key
+	}{
+		{failure: settingaction.S3TestFailureBucketAccess, want: cervii18n.ErrorS3BucketAccessFailed},
+		{failure: settingaction.S3TestFailureCORS, want: cervii18n.ErrorS3CORSFailed},
+		{failure: settingaction.S3TestFailureUpload, want: cervii18n.ErrorS3UploadTestFailed},
+		{failure: settingaction.S3TestFailurePublicAccess, want: cervii18n.ErrorS3PublicAccessFailed},
+		{failure: settingaction.S3TestFailureCleanup, want: cervii18n.ErrorS3CleanupFailed},
+		{failure: settingaction.S3TestFailure("unknown"), want: cervii18n.ErrorS3ConnectionTestFailed},
+	}
+	for _, test := range tests {
+		if got := s3TestFailureKey(test.failure); got != test.want {
+			t.Errorf("s3TestFailureKey(%q) = %q, want %q", test.failure, got, test.want)
+		}
 	}
 }
 

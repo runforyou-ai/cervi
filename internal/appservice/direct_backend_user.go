@@ -28,7 +28,11 @@ func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, inp
 		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("个人资料保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID)
-	return currentUserFromIdentity(updatedIdentity), nil
+	user, err := b.currentUserFromIdentity(ctx, updatedIdentity)
+	if err != nil {
+		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
+	}
+	return user, nil
 }
 
 // ChangePassword 核验当前密码并保存新密码。
@@ -71,7 +75,11 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 		"message_notifications_enabled", input.MessageNotificationsEnabled,
 		"workspace_tabs_enabled", input.WorkspaceTabsEnabled,
 	)
-	return currentUserFromIdentity(updatedIdentity), nil
+	user, err := b.currentUserFromIdentity(ctx, updatedIdentity)
+	if err != nil {
+		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
+	}
+	return user, nil
 }
 
 // UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
@@ -87,7 +95,11 @@ func (b *DirectBackend) UpdateUserWorkStatus(ctx context.Context, meta RequestMe
 		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("工作状态保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "work_status", input.WorkStatus)
-	return currentUserFromIdentity(updatedIdentity), nil
+	user, err := b.currentUserFromIdentity(ctx, updatedIdentity)
+	if err != nil {
+		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
+	}
+	return user, nil
 }
 
 // ListUsers 返回企业成员列表。

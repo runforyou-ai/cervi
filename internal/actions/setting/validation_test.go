@@ -14,6 +14,7 @@ func TestNormalizeS3Setting(t *testing.T) {
 		Enabled:         true,
 		Provider:        domain.StorageProviderAWS,
 		Endpoint:        " https://s3.example.com ",
+		PublicBaseURL:   " https://cdn.example.com/assets/ ",
 		Region:          " us-east-1 ",
 		Bucket:          " cervi ",
 		AccessKeyID:     " access-key ",
@@ -22,7 +23,7 @@ func TestNormalizeS3Setting(t *testing.T) {
 	if len(fields) != 0 {
 		t.Fatalf("unexpected validation fields: %#v", fields)
 	}
-	if normalized.Endpoint != "https://s3.example.com" || normalized.Bucket != "cervi" {
+	if normalized.Endpoint != "https://s3.example.com" || normalized.PublicBaseURL != "https://cdn.example.com/assets" || normalized.Bucket != "cervi" {
 		t.Fatalf("unexpected normalized setting: %#v", normalized)
 	}
 
@@ -31,8 +32,8 @@ func TestNormalizeS3Setting(t *testing.T) {
 		t.Fatalf("unexpected MinIO validation fields: %#v", minioFields)
 	}
 
-	_, fields = normalizeS3Setting(S3Setting{Provider: "unknown", Endpoint: "s3.example.com?query=value"})
-	for _, name := range []string{"provider", "endpoint", "region", "bucket", "accessKeyId", "secretAccessKey"} {
+	_, fields = normalizeS3Setting(S3Setting{Provider: "unknown", Endpoint: "s3.example.com?query=value", PublicBaseURL: "cdn.example.com?query=value"})
+	for _, name := range []string{"provider", "endpoint", "publicBaseUrl", "region", "bucket", "accessKeyId", "secretAccessKey"} {
 		if _, exists := fields[name]; !exists {
 			t.Fatalf("missing validation field %q in %#v", name, fields)
 		}

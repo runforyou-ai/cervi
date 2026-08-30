@@ -79,7 +79,7 @@ func TestAbsoluteContentURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := backend.absoluteContentURL("/files/file-1/content"); got != "https://cervi.example.com/company/files/file-1/content" {
+	if got := backend.absoluteContentURL("/storage/organizations/org/files/file.png"); got != "https://cervi.example.com/company/storage/organizations/org/files/file.png" {
 		t.Fatalf("content URL = %q", got)
 	}
 	if got := backend.absoluteContentURL("https://storage.example.com/object"); got != "https://storage.example.com/object" {
@@ -166,7 +166,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			}
 			writeTestJSON(writer, http.StatusOK, map[string]string{
 				"id": "user-1", "organizationId": "organization-1", "displayName": input.DisplayName, "email": input.Email,
-				"avatarUrl": "/files/file-1/content",
+				"avatarUrl": "/storage/organizations/org/files/file.png",
 			})
 		case "/api/password":
 			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
@@ -360,7 +360,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if user.DisplayName != "林晓" || user.Email != "lin@example.com" || user.AvatarURL != remote.URL+"/files/file-1/content" {
+	if user.DisplayName != "林晓" || user.Email != "lin@example.com" || user.AvatarURL != remote.URL+"/storage/organizations/org/files/file.png" {
 		t.Fatalf("updated user = %#v", user)
 	}
 	if err := backend.ChangePassword(context.Background(), meta, appservice.ChangePasswordInput{

@@ -67,7 +67,12 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
 	}
 	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "admin_id", output.Identity.User.ID)
-	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	identity, err := b.identityFromModel(ctx, output.Identity)
+	if err != nil {
+		slog.Warn("读取初始化用户头像失败", "organization_id", output.Identity.Organization.ID, "error", err)
+		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
+	}
+	return Auth{Identity: identity, Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
 // Login 校验账号密码并返回登录令牌。
@@ -88,7 +93,12 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
 	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "work_status", domain.WorkStatusWorking)
-	return Auth{Identity: identityFromModel(output.Identity), Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	identity, err := b.identityFromModel(ctx, output.Identity)
+	if err != nil {
+		slog.Warn("读取登录用户头像失败", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "error", err)
+		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
+	}
+	return Auth{Identity: identity, Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
 }
 
 // Logout 删除当前登录令牌。
@@ -114,7 +124,12 @@ func (b *DirectBackend) LoadIdentity(ctx context.Context, meta RequestMeta) (Ide
 	if err != nil {
 		return Identity{}, err
 	}
-	return identityFromModel(identity), nil
+	output, err := b.identityFromModel(ctx, identity)
+	if err != nil {
+		slog.Warn("读取当前用户头像失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		return Identity{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
+	}
+	return output, nil
 }
 
 // installationFieldKeys 把初始化校验错误码映射为本地化文案键。

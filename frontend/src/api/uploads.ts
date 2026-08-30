@@ -37,9 +37,6 @@ export async function uploadFileContent(
       (entry): entry is [string, string] => entry[1] !== undefined,
     ),
   )
-  if (!Object.keys(headers).some((name) => name.toLowerCase() === "content-type")) {
-    headers["Content-Type"] = file.type
-  }
   const response = await fetch(request.url, {
     method: request.method,
     headers,

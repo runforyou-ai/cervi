@@ -41,11 +41,15 @@ func (b *DirectBackend) CreateFileUpload(ctx context.Context, meta RequestMeta, 
 	if err != nil {
 		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
-	request, err := b.fileUploadRequest(ctx, meta, record, setting)
+	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, setting.PublicBaseURL)
 	if err != nil {
 		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
-	return FileUpload{File: fileFromModel(record), Request: request}, nil
+	request, err := b.fileUploadRequest(ctx, meta, record, setting, contentURL)
+	if err != nil {
+		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+	}
+	return FileUpload{File: fileFromModel(record, contentURL), Request: request}, nil
 }
 
 // CompleteFileUpload 核验文件内容并将上传标记为完成。
@@ -58,15 +62,19 @@ func (b *DirectBackend) CompleteFileUpload(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
+	contentURL, err := b.fileURLForRecord(ctx, record)
+	if err != nil {
+		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
+	}
 	slog.Info("文件上传已完成", "organization_id", identity.Organization.ID, "file_id", record.ID, "storage_backend", record.StorageBackend)
-	return fileFromModel(record), nil
+	return fileFromModel(record, contentURL), nil
 }
 
 // fileUploadRequest 返回本地上传地址或 S3 预签名请求。
-func (b *DirectBackend) fileUploadRequest(ctx context.Context, meta RequestMeta, record *servermodels.File, setting settingaction.S3Setting) (FileUploadRequest, error) {
+func (b *DirectBackend) fileUploadRequest(ctx context.Context, meta RequestMeta, record *servermodels.File, setting settingaction.S3Setting, contentURL string) (FileUploadRequest, error) {
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
 		return FileUploadRequest{
-			Method: http.MethodPut, URL: fileContentURL(record.ID),
+			Method: http.MethodPut, URL: contentURL,
 			Headers: map[string]string{"Authorization": "Bearer " + meta.Token, "Content-Type": record.ContentType},
 		}, nil
 	}
@@ -75,6 +83,19 @@ func (b *DirectBackend) fileUploadRequest(ctx context.Context, meta RequestMeta,
 		return FileUploadRequest{}, fmt.Errorf("presign S3 file upload: %w", err)
 	}
 	return FileUploadRequest{Method: signed.Method, URL: signed.URL, Headers: signed.Headers}, nil
+}
+
+// fileURLForRecord 按文件记录和所属企业设置生成公开地址。
+func (b *DirectBackend) fileURLForRecord(ctx context.Context, record *servermodels.File) (string, error) {
+	publicBaseURL := ""
+	if record.StorageBackend == string(domain.FileStorageBackendS3) {
+		setting, err := b.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
+		if err != nil {
+			return "", err
+		}
+		publicBaseURL = setting.PublicBaseURL
+	}
+	return fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, publicBaseURL)
 }
 
 // statFile 按文件记录的存储类型核验内容。
@@ -117,8 +138,8 @@ func (b *DirectBackend) fileOperationError(ctx context.Context, meta RequestMeta
 }
 
 // fileFromModel 把存储文件转换为应用契约。
-func fileFromModel(record *servermodels.File) File {
-	return File{ID: record.ID, Name: record.OriginalName, ContentType: record.ContentType, ByteSize: record.ByteSize, ContentURL: fileContentURL(record.ID)}
+func fileFromModel(record *servermodels.File, contentURL string) File {
+	return File{ID: record.ID, Name: record.OriginalName, ContentType: record.ContentType, ByteSize: record.ByteSize, ContentURL: contentURL}
 }
 
 // fileFieldKeys 返回文件字段校验文案。
