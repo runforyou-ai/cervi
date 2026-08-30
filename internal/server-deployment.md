@@ -122,6 +122,8 @@ sudo systemctl restart cervi
 
 公网域名的 80/443 需转发到当前服务器。只有公网域名会申请证书；IP、`localhost`、无点主机名以及 `.localhost`、`.local`、`.internal`、`.home.arpa` 地址继续使用 HTTP。停用 `auto` 后删除 drop-in 并重新加载 systemd。
 
+从 `off` 或 `external` 改为 `auto` 后需重启服务。已绑定企业访问地址的公网域名可在首次 HTTPS 访问时直接签发证书；未绑定的新域名必须先访问 HTTP 入口。每个服务进程在任意 3 小时内最多放行 40 个新证书签发尝试窗口，同一域名 1 分钟内的并发请求合并计数；有效期内的缓存证书和后台续期不占用该额度。
+
 ## Windows Server
 
 文件路径：

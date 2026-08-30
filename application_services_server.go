@@ -22,7 +22,8 @@ import (
 
 // applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
 func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
-	httpsEntry := api.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()))
+	tenantResolver := organizationaction.NewTenantResolver(appStorage.DB())
+	httpsEntry := api.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()), tenantResolver)
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, err
@@ -41,7 +42,6 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: fileaction.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,
 	})
-	tenantResolver := organizationaction.NewTenantResolver(appStorage.DB())
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB())
