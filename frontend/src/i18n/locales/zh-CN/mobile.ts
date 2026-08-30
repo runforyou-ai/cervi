@@ -16,8 +16,8 @@ const mobile = {
     refresh: "刷新消息",
     loadError: "无法加载消息，请检查网络后重试。",
     refreshError: "消息刷新失败，点击重试",
-    emptyTitle: "暂无客户会话",
-    emptyDescription: "有新的客户会话时，会显示在这里。",
+    emptyTitle: "暂无会话",
+    emptyDescription: "新的客户会话和成员单聊会显示在这里。",
   },
   me: {
     title: "我的",
