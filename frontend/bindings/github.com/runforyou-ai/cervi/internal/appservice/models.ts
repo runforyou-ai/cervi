@@ -1059,6 +1059,53 @@ export interface KnowledgeGroupInput {
 }
 
 /**
+ * KnowledgeRetrievalInput 定义知识库检索条件。
+ */
+export interface KnowledgeRetrievalInput {
+    "query": string;
+    "method": KnowledgeRetrievalMethod;
+    "rerankingEnabled": boolean;
+    "topK": number;
+    "scoreThresholdEnabled": boolean;
+    "scoreThreshold": number;
+}
+
+/**
+ * KnowledgeRetrievalMethod 表示知识库检索方式。
+ */
+export enum KnowledgeRetrievalMethod {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeRetrievalMethodKeyword = "keyword",
+    KnowledgeRetrievalMethodSemantic = "semantic",
+    KnowledgeRetrievalMethodFullText = "full_text",
+    KnowledgeRetrievalMethodHybrid = "hybrid",
+};
+
+/**
+ * KnowledgeRetrievalRecord 定义知识库检索命中项。
+ */
+export interface KnowledgeRetrievalRecord {
+    "documentId": string;
+    "documentName": string;
+    "segmentId": string;
+    "position": number;
+    "content": string;
+    "answer": string | null;
+    "score": number | null;
+}
+
+/**
+ * KnowledgeRetrievalResult 定义知识库检索结果。
+ */
+export interface KnowledgeRetrievalResult {
+    "records": KnowledgeRetrievalRecord[] | null;
+}
+
+/**
  * Locale 表示应用支持的本地化语言。
  */
 export enum Locale {

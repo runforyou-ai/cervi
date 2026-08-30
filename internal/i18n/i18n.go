@@ -313,6 +313,7 @@ const (
 	ErrorKnowledgeDocumentSegmentListFailed        Key = "error.knowledge_document_segment_list_failed"
 	ErrorKnowledgeDocumentNotFound                 Key = "error.knowledge_document_not_found"
 	ErrorKnowledgeDocumentReadUnsupported          Key = "error.knowledge_document_read_unsupported"
+	ErrorKnowledgeRetrievalFailed                  Key = "error.knowledge_retrieval_failed"
 	FieldKnowledgeBaseNameRequired                 Key = "field.knowledge_base_name_required"
 	FieldKnowledgeBaseNameTooLong                  Key = "field.knowledge_base_name_too_long"
 	FieldKnowledgeBaseNameDuplicate                Key = "field.knowledge_base_name_duplicate"
@@ -327,6 +328,11 @@ const (
 	FieldKnowledgeGroupNameDuplicate               Key = "field.knowledge_group_name_duplicate"
 	FieldKnowledgeGroupParentInvalid               Key = "field.knowledge_group_parent_invalid"
 	FieldKnowledgeDocumentQueryInvalid             Key = "field.knowledge_document_query_invalid"
+	FieldKnowledgeRetrievalQueryRequired           Key = "field.knowledge_retrieval_query_required"
+	FieldKnowledgeRetrievalQueryTooLong            Key = "field.knowledge_retrieval_query_too_long"
+	FieldKnowledgeRetrievalMethodInvalid           Key = "field.knowledge_retrieval_method_invalid"
+	FieldKnowledgeRetrievalTopKInvalid             Key = "field.knowledge_retrieval_top_k_invalid"
+	FieldKnowledgeRetrievalScoreThresholdInvalid   Key = "field.knowledge_retrieval_score_threshold_invalid"
 )
 
 //go:embed locales/*.json

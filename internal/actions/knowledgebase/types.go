@@ -105,6 +105,27 @@ type DocumentSegmentListOutput struct {
 	Total    int
 }
 
+// RetrievalInput 定义知识库检索条件。
+type RetrievalInput struct {
+	Query                 string
+	Method                domain.KnowledgeRetrievalMethod
+	RerankingEnabled      bool
+	TopK                  int
+	ScoreThresholdEnabled bool
+	ScoreThreshold        float64
+}
+
+// RetrievalRecord 定义知识库检索命中项。
+type RetrievalRecord struct {
+	DocumentID   string
+	DocumentName string
+	SegmentID    string
+	Position     int
+	Content      string
+	Answer       *string
+	Score        *float64
+}
+
 // GroupRecord 定义知识库分组树节点。
 type GroupRecord struct {
 	ID        string  `bun:"id"`

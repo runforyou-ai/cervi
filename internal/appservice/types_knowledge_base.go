@@ -14,6 +14,16 @@ const (
 	KnowledgeBaseCategoryQA       KnowledgeBaseCategory = KnowledgeBaseCategory(domain.KnowledgeBaseCategoryQA)
 )
 
+// KnowledgeRetrievalMethod 表示知识库检索方式。
+type KnowledgeRetrievalMethod string
+
+const (
+	KnowledgeRetrievalMethodKeyword  KnowledgeRetrievalMethod = KnowledgeRetrievalMethod(domain.KnowledgeRetrievalMethodKeyword)
+	KnowledgeRetrievalMethodSemantic KnowledgeRetrievalMethod = KnowledgeRetrievalMethod(domain.KnowledgeRetrievalMethodSemantic)
+	KnowledgeRetrievalMethodFullText KnowledgeRetrievalMethod = KnowledgeRetrievalMethod(domain.KnowledgeRetrievalMethodFullText)
+	KnowledgeRetrievalMethodHybrid   KnowledgeRetrievalMethod = KnowledgeRetrievalMethod(domain.KnowledgeRetrievalMethodHybrid)
+)
+
 // KnowledgeDocumentStatus 表示知识文档的统一状态。
 type KnowledgeDocumentStatus string
 
@@ -149,4 +159,30 @@ type KnowledgeDocumentSegment struct {
 type KnowledgeDocumentSegmentList struct {
 	Segments []KnowledgeDocumentSegment `json:"segments"`
 	Page     PageInfo                   `json:"page"`
+}
+
+// KnowledgeRetrievalInput 定义知识库检索条件。
+type KnowledgeRetrievalInput struct {
+	Query                 string                   `json:"query"`
+	Method                KnowledgeRetrievalMethod `json:"method"`
+	RerankingEnabled      bool                     `json:"rerankingEnabled"`
+	TopK                  int                      `json:"topK"`
+	ScoreThresholdEnabled bool                     `json:"scoreThresholdEnabled"`
+	ScoreThreshold        float64                  `json:"scoreThreshold"`
+}
+
+// KnowledgeRetrievalRecord 定义知识库检索命中项。
+type KnowledgeRetrievalRecord struct {
+	DocumentID   string   `json:"documentId"`
+	DocumentName string   `json:"documentName"`
+	SegmentID    string   `json:"segmentId"`
+	Position     int      `json:"position"`
+	Content      string   `json:"content"`
+	Answer       *string  `json:"answer"`
+	Score        *float64 `json:"score"`
+}
+
+// KnowledgeRetrievalResult 定义知识库检索结果。
+type KnowledgeRetrievalResult struct {
+	Records []KnowledgeRetrievalRecord `json:"records"`
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -203,6 +204,56 @@ func (b *DirectBackend) ListKnowledgeDocumentSegments(
 	}, nil
 }
 
+// RetrieveKnowledgeBase 检索指定外部知识库。
+func (b *DirectBackend) RetrieveKnowledgeBase(
+	ctx context.Context,
+	meta RequestMeta,
+	knowledgeBaseID string,
+	input KnowledgeRetrievalInput,
+) (KnowledgeRetrievalResult, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return KnowledgeRetrievalResult{}, err
+	}
+	startedAt := time.Now()
+	records, err := b.retrieveKnowledgeBase.Execute(
+		ctx,
+		identity,
+		knowledgeBaseID,
+		knowledgebaseaction.RetrievalInput{
+			Query: input.Query, Method: domain.KnowledgeRetrievalMethod(input.Method),
+			RerankingEnabled: input.RerankingEnabled, TopK: input.TopK,
+			ScoreThresholdEnabled: input.ScoreThresholdEnabled, ScoreThreshold: input.ScoreThreshold,
+		},
+	)
+	if err != nil {
+		return KnowledgeRetrievalResult{}, b.knowledgeRetrievalError(
+			ctx, meta, err, identity.Organization.ID, knowledgeBaseID,
+			time.Since(startedAt), input,
+		)
+	}
+	output := make([]KnowledgeRetrievalRecord, 0, len(records))
+	for _, record := range records {
+		output = append(output, KnowledgeRetrievalRecord{
+			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
+			SegmentID: record.SegmentID, Position: record.Position,
+			Content: record.Content, Answer: record.Answer, Score: record.Score,
+		})
+	}
+	slog.Info("Dify 知识库检索成功",
+		"organization_id", identity.Organization.ID,
+		"knowledge_base_id", knowledgeBaseID,
+		"method", input.Method,
+		"reranking_enabled", input.RerankingEnabled,
+		"top_k", input.TopK,
+		"score_threshold_enabled", input.ScoreThresholdEnabled,
+		"score_threshold", input.ScoreThreshold,
+		"result_count", len(output),
+		"duration_ms", time.Since(startedAt).Milliseconds(),
+	)
+	return KnowledgeRetrievalResult{Records: output}, nil
+}
+
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (b *DirectBackend) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBase, error) {
 	identity, err := b.authenticate(ctx, meta)
@@ -354,6 +405,42 @@ func (b *DirectBackend) knowledgeDocumentReadError(
 	failureKey cervii18n.Key,
 	organizationID, knowledgeBaseID, documentID string,
 ) error {
+	return b.knowledgeRemoteReadError(
+		ctx, meta, err, failureKey, organizationID, knowledgeBaseID, documentID,
+		"Dify 知识文档读取失败",
+	)
+}
+
+// knowledgeRetrievalError 转换知识库远程检索错误并保留本地知识库错误语义。
+func (b *DirectBackend) knowledgeRetrievalError(
+	ctx context.Context,
+	meta RequestMeta,
+	err error,
+	organizationID, knowledgeBaseID string,
+	duration time.Duration,
+	input KnowledgeRetrievalInput,
+) error {
+	return b.knowledgeRemoteReadError(
+		ctx, meta, err, cervii18n.ErrorKnowledgeRetrievalFailed,
+		organizationID, knowledgeBaseID, "", "Dify 知识库检索失败",
+		"method", input.Method,
+		"reranking_enabled", input.RerankingEnabled,
+		"top_k", input.TopK,
+		"score_threshold_enabled", input.ScoreThresholdEnabled,
+		"score_threshold", input.ScoreThreshold,
+		"duration_ms", duration.Milliseconds(),
+	)
+}
+
+// knowledgeRemoteReadError 转换 Dify 只读能力错误并保留本地知识库错误语义。
+func (b *DirectBackend) knowledgeRemoteReadError(
+	ctx context.Context,
+	meta RequestMeta,
+	err error,
+	failureKey cervii18n.Key,
+	organizationID, knowledgeBaseID, documentID, logMessage string,
+	additionalAttributes ...any,
+) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -367,7 +454,9 @@ func (b *DirectBackend) knowledgeDocumentReadError(
 		if documentID != "" {
 			attributes = append(attributes, "document_id", documentID)
 		}
-		slog.Warn("Dify 知识文档读取失败", attributes...)
+		attributes = append(attributes, additionalAttributes...)
+		attributes = append(attributes, "error", err)
+		slog.Warn(logMessage, attributes...)
 		if kind == connectiontest.FailureNotFound && documentID != "" {
 			return NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentNotFound)
 		}
@@ -416,20 +505,25 @@ func knowledgeGroupsFromAction(records []knowledgebaseaction.GroupRecord) []Know
 // knowledgeBaseFieldKeys 把知识库校验错误码映射为本地化文案键。
 func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		knowledgebaseaction.ValidationNameRequired:                 cervii18n.FieldKnowledgeBaseNameRequired,
-		knowledgebaseaction.ValidationNameTooLong:                  cervii18n.FieldKnowledgeBaseNameTooLong,
-		knowledgebaseaction.ValidationNameDuplicate:                cervii18n.FieldKnowledgeBaseNameDuplicate,
-		knowledgebaseaction.ValidationCategoryInvalid:              cervii18n.FieldKnowledgeBaseCategoryInvalid,
-		knowledgebaseaction.ValidationDescriptionTooLong:           cervii18n.FieldKnowledgeBaseDescriptionTooLong,
-		knowledgebaseaction.ValidationIntegrationConnectionInvalid: cervii18n.FieldKnowledgeBaseIntegrationConnectionInvalid,
-		knowledgebaseaction.ValidationExternalResourceRequired:     cervii18n.FieldKnowledgeBaseExternalResourceRequired,
-		knowledgebaseaction.ValidationExternalResourceTooLong:      cervii18n.FieldKnowledgeBaseExternalResourceTooLong,
-		knowledgebaseaction.ValidationExternalResourceDuplicate:    cervii18n.FieldKnowledgeBaseExternalResourceDuplicate,
-		knowledgebaseaction.ValidationGroupNameRequired:            cervii18n.FieldKnowledgeGroupNameRequired,
-		knowledgebaseaction.ValidationGroupNameTooLong:             cervii18n.FieldKnowledgeGroupNameTooLong,
-		knowledgebaseaction.ValidationGroupNameDuplicate:           cervii18n.FieldKnowledgeGroupNameDuplicate,
-		knowledgebaseaction.ValidationGroupParentInvalid:           cervii18n.FieldKnowledgeGroupParentInvalid,
-		knowledgebaseaction.ValidationDocumentQueryInvalid:         cervii18n.FieldKnowledgeDocumentQueryInvalid,
+		knowledgebaseaction.ValidationNameRequired:                   cervii18n.FieldKnowledgeBaseNameRequired,
+		knowledgebaseaction.ValidationNameTooLong:                    cervii18n.FieldKnowledgeBaseNameTooLong,
+		knowledgebaseaction.ValidationNameDuplicate:                  cervii18n.FieldKnowledgeBaseNameDuplicate,
+		knowledgebaseaction.ValidationCategoryInvalid:                cervii18n.FieldKnowledgeBaseCategoryInvalid,
+		knowledgebaseaction.ValidationDescriptionTooLong:             cervii18n.FieldKnowledgeBaseDescriptionTooLong,
+		knowledgebaseaction.ValidationIntegrationConnectionInvalid:   cervii18n.FieldKnowledgeBaseIntegrationConnectionInvalid,
+		knowledgebaseaction.ValidationExternalResourceRequired:       cervii18n.FieldKnowledgeBaseExternalResourceRequired,
+		knowledgebaseaction.ValidationExternalResourceTooLong:        cervii18n.FieldKnowledgeBaseExternalResourceTooLong,
+		knowledgebaseaction.ValidationExternalResourceDuplicate:      cervii18n.FieldKnowledgeBaseExternalResourceDuplicate,
+		knowledgebaseaction.ValidationGroupNameRequired:              cervii18n.FieldKnowledgeGroupNameRequired,
+		knowledgebaseaction.ValidationGroupNameTooLong:               cervii18n.FieldKnowledgeGroupNameTooLong,
+		knowledgebaseaction.ValidationGroupNameDuplicate:             cervii18n.FieldKnowledgeGroupNameDuplicate,
+		knowledgebaseaction.ValidationGroupParentInvalid:             cervii18n.FieldKnowledgeGroupParentInvalid,
+		knowledgebaseaction.ValidationDocumentQueryInvalid:           cervii18n.FieldKnowledgeDocumentQueryInvalid,
+		knowledgebaseaction.ValidationRetrievalQueryRequired:         cervii18n.FieldKnowledgeRetrievalQueryRequired,
+		knowledgebaseaction.ValidationRetrievalQueryTooLong:          cervii18n.FieldKnowledgeRetrievalQueryTooLong,
+		knowledgebaseaction.ValidationRetrievalMethodInvalid:         cervii18n.FieldKnowledgeRetrievalMethodInvalid,
+		knowledgebaseaction.ValidationRetrievalTopKInvalid:           cervii18n.FieldKnowledgeRetrievalTopKInvalid,
+		knowledgebaseaction.ValidationRetrievalScoreThresholdInvalid: cervii18n.FieldKnowledgeRetrievalScoreThresholdInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

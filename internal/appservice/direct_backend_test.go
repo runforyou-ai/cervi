@@ -166,3 +166,22 @@ func TestKnowledgeDocumentReadMapsRemoteNotFound(t *testing.T) {
 		t.Fatalf("error = %#v", err)
 	}
 }
+
+// TestKnowledgeRetrievalKeepsRemoteNotFoundGeneric 验证远端知识库 404 不冒充本地资源不存在。
+func TestKnowledgeRetrievalKeepsRemoteNotFoundGeneric(t *testing.T) {
+	backend := &DirectBackend{}
+	err := backend.knowledgeRetrievalError(
+		context.Background(),
+		RequestMeta{Locale: LocaleChineseSimplified},
+		connectiontest.NewError(connectiontest.StageCapability, connectiontest.FailureNotFound, errors.New("not found")),
+		"organization-1",
+		"knowledge-base-1",
+		0,
+		KnowledgeRetrievalInput{},
+	)
+	converted, ok := err.(*Error)
+	if !ok || converted.Kind != ErrorKindFailed || converted.HTTPStatus() != http.StatusInternalServerError ||
+		converted.Message != "检索知识库失败。" {
+		t.Fatalf("error = %#v", err)
+	}
+}

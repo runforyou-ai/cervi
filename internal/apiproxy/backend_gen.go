@@ -440,6 +440,14 @@ func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appser
 	return output, err
 }
 
+// RetrieveKnowledgeBase 检索指定外部知识库。
+func (b *Backend) RetrieveKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeRetrievalInput) (appservice.KnowledgeRetrievalResult, error) {
+	var output appservice.KnowledgeRetrievalResult
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/retrieve", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase

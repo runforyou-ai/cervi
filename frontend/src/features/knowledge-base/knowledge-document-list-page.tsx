@@ -1,5 +1,5 @@
 /** 外部知识库文档只读列表页。 */
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, Navigate, useParams } from "react-router"
@@ -36,6 +36,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { optionalWailsEnum } from "@/lib/wails-enum"
+import { KnowledgeRetrievalSheet } from "@/features/knowledge-base/knowledge-retrieval-sheet"
 
 const documentPageSize = 20
 const documentStatuses = [
@@ -121,6 +122,10 @@ export function KnowledgeDocumentListPage() {
     total: 0,
   }
   const totalPages = Math.max(1, Math.ceil(page.total / page.size))
+  const retrievalTriggerRef = useRef<HTMLButtonElement>(null)
+  const retrievalOpen =
+    searchParams.get("retrieval") === "1" &&
+    Boolean(detail.data?.integrationConnectionId)
 
   /** 把超出总页数的地址收回最后一页。 */
   useEffect(() => {
@@ -136,13 +141,31 @@ export function KnowledgeDocumentListPage() {
     setParameters({ page: nextPage <= 1 ? null : String(nextPage) })
   }
 
+  /** 通过地址参数打开或关闭检索侧栏。 */
+  function setRetrievalOpen(open: boolean) {
+    setParameters({ retrieval: open ? "1" : null }, !open)
+  }
+
   if (detail.data?.integrationConnectionId === "") {
     return <Navigate replace to={`/knowledge-bases/${knowledgeBaseId}`} />
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={detail.data?.name ?? t("documents.title")} />
+      <PageHeader title={detail.data?.name ?? t("documents.title")}>
+        {detail.data?.integrationConnectionId ? (
+          <Button
+            ref={retrievalTriggerRef}
+            variant="outline"
+            size="sm"
+            aria-controls="knowledge-retrieval-sheet"
+            aria-expanded={retrievalOpen}
+            onClick={() => setRetrievalOpen(true)}
+          >
+            {t("retrieval.action")}
+          </Button>
+        ) : null}
+      </PageHeader>
       <ListToolbar>
         <ListToolbarSearch
           value={search}
@@ -285,6 +308,13 @@ export function KnowledgeDocumentListPage() {
           </div>
         )}
       </PageContent>
+      <KnowledgeRetrievalSheet
+        key={knowledgeBaseId}
+        open={retrievalOpen}
+        onOpenChange={setRetrievalOpen}
+        knowledgeBaseId={knowledgeBaseId}
+        triggerRef={retrievalTriggerRef}
+      />
     </div>
   )
 }
