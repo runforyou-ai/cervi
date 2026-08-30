@@ -5,6 +5,7 @@ import {
   Navigate,
   NavLink,
   Outlet,
+  useMatch,
   useOutletContext,
 } from "react-router"
 
@@ -53,6 +54,8 @@ function MobileTab({
 export function MobileWorkspaceLayout() {
   const { t } = useTranslation("mobile")
   const { status, identity, redirectPath } = useIdentityLoader()
+  const directConversationOpen =
+    useMatch("/inbox/direct/:conversationID") !== null
 
   if (status === "anonymous") return <Navigate to="/login" replace />
   if (status === "redirect" && redirectPath) {
@@ -79,24 +82,31 @@ export function MobileWorkspaceLayout() {
   return (
     <UserPreferencesProvider user={identity.user}>
       <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)]">
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div
+          className={cn(
+            "min-h-0 flex-1 overflow-hidden",
+            directConversationOpen && "pb-[env(safe-area-inset-bottom)]",
+          )}
+        >
           <Outlet context={{ identity } satisfies MobileWorkspaceContext} />
         </div>
-        <nav
-          aria-label={t("tabs.label")}
-          className="shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom)]"
-        >
-          <div className="grid grid-cols-2">
-            {mobileTabs.map((tab) => (
-              <MobileTab
-                key={tab.path}
-                path={tab.path}
-                label={t(tab.labelKey)}
-                icon={tab.icon}
-              />
-            ))}
-          </div>
-        </nav>
+        {directConversationOpen ? null : (
+          <nav
+            aria-label={t("tabs.label")}
+            className="shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom)]"
+          >
+            <div className="grid grid-cols-2">
+              {mobileTabs.map((tab) => (
+                <MobileTab
+                  key={tab.path}
+                  path={tab.path}
+                  label={t(tab.labelKey)}
+                  icon={tab.icon}
+                />
+              ))}
+            </div>
+          </nav>
+        )}
       </div>
     </UserPreferencesProvider>
   )

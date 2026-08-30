@@ -1,11 +1,15 @@
 /** 消息列表路由。 */
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { loadInbox } from "@/api"
 import { Button } from "@/components/ui/button"
 import { InboxPage } from "@/features/inbox/inbox-page"
+import {
+  memberChatPollingInterval,
+  useMemberChatPollingActive,
+} from "@/features/inbox/use-member-chat-polling"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -14,11 +18,24 @@ import { useResource } from "@/hooks/use-resource"
 export function InboxRoute() {
   const { t } = useTranslation("workspace")
   const { applyUnreadSnapshot, beginUnreadSnapshot } = useWorkspace()
+  const pollingActive = useMemberChatPollingActive()
+  const previousPollingActiveRef = useRef(pollingActive)
   const { data, loading, refreshing, error, refresh } = useResource(
     resourceKeys.inbox(),
     () => loadInbox(),
+    {
+      refetchInterval: pollingActive ? memberChatPollingInterval : false,
+      refetchOnWindowFocus: false,
+    },
   )
   const showLoading = loading || (Boolean(error) && refreshing)
+
+  useEffect(() => {
+    if (pollingActive && !previousPollingActiveRef.current && data) {
+      void refresh()
+    }
+    previousPollingActiveRef.current = pollingActive
+  }, [data, pollingActive, refresh])
 
   /** 数据就绪或更新后同步未读快照；命中缓存的重新挂载同样生效。 */
   useEffect(() => {

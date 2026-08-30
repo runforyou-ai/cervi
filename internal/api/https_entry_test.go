@@ -4,6 +4,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -15,8 +16,19 @@ import (
 	"time"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 	"golang.org/x/crypto/acme/autocert"
 )
+
+type fixedTenantResolver string
+
+// Resolve 只返回测试指定的企业访问地址。
+func (r fixedTenantResolver) Resolve(_ context.Context, accessHost string) (tenant.Scope, error) {
+	if accessHost == string(r) {
+		return tenant.Scope{OrganizationID: "organization-id"}, nil
+	}
+	return tenant.Scope{}, tenant.ErrNotFound
+}
 
 // TestRequestHostKeepsLocalAddressesOnHTTP 验证本地和内网地址不会申请公网证书。
 func TestRequestHostKeepsLocalAddressesOnHTTP(t *testing.T) {
@@ -66,9 +78,31 @@ func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
 	service := NewHTTPSEntry(
 		serverconfig.TLSConfig{Mode: "external"},
 		serverconfig.ServerConfig{Host: "127.0.0.1", Port: 8080},
+		nil,
+		nil,
 	)
 	if service.mode != modeExternal || service.httpServer != nil || service.httpsServer != nil {
 		t.Fatal("expected external mode without HTTP or HTTPS listeners")
+	}
+}
+
+// TestCertificateRequestLimiterBoundsNewAttempts 验证新证书请求受滑动时间窗口限制。
+func TestCertificateRequestLimiterBoundsNewAttempts(t *testing.T) {
+	limiter := &certificateRequestLimiter{}
+	now := time.Now()
+	for index := range certificateRequestLimit {
+		if !limiter.allow("host-"+big.NewInt(int64(index)).String()+".example.com", now) {
+			t.Fatalf("request %d rejected before the limit", index+1)
+		}
+	}
+	if limiter.allow("overflow.example.com", now) {
+		t.Fatal("expected request beyond the limit to be rejected")
+	}
+	if !limiter.allow("host-0.example.com", now.Add(certificateRequestRetryWindow-time.Second)) {
+		t.Fatal("expected duplicate host inside retry window to share the attempt")
+	}
+	if !limiter.allow("after-window.example.com", now.Add(certificateRequestWindow+time.Second)) {
+		t.Fatal("expected request after the sliding window to be accepted")
 	}
 }
 
@@ -91,7 +125,7 @@ func TestProxyHostFollowsServerListener(t *testing.T) {
 func TestAllowCertificateRestoresCachedDomain(t *testing.T) {
 	const host = "cached.runforyou.app"
 	cache := autocert.DirCache(t.TempDir())
-	if err := cache.Put(t.Context(), host, cachedCertificate(t, host)); err != nil {
+	if err := cache.Put(t.Context(), host, cachedCertificate(t, host, time.Now().Add(-time.Hour), time.Now().Add(time.Hour))); err != nil {
 		t.Fatalf("cache certificate: %v", err)
 	}
 	service := &HTTPSEntry{cache: cache}
@@ -106,8 +140,43 @@ func TestAllowCertificateRestoresCachedDomain(t *testing.T) {
 	}
 }
 
+// TestAllowCertificateRejectsExpiredCachedDomain 验证过期缓存不会绕过新证书限制。
+func TestAllowCertificateRejectsExpiredCachedDomain(t *testing.T) {
+	const host = "expired.runforyou.app"
+	cache := autocert.DirCache(t.TempDir())
+	data := cachedCertificate(t, host, time.Now().Add(-2*time.Hour), time.Now().Add(-time.Hour))
+	if err := cache.Put(t.Context(), host, data); err != nil {
+		t.Fatalf("cache expired certificate: %v", err)
+	}
+	service := &HTTPSEntry{cache: cache}
+	if err := service.allowCertificate(t.Context(), host); err == nil {
+		t.Fatal("expected expired cached domain without HTTP entry to be rejected")
+	}
+	if _, ok := service.certified.Load(host); ok {
+		t.Fatal("expected expired cached domain not to be marked as certified")
+	}
+}
+
+// TestAllowCertificateRestoresTenantDomain 验证已绑定企业的域名可以从 HTTPS 直接触发签发。
+func TestAllowCertificateRestoresTenantDomain(t *testing.T) {
+	const host = "tenant.runforyou.app"
+	service := &HTTPSEntry{
+		cache:  autocert.DirCache(t.TempDir()),
+		tenant: fixedTenantResolver(host),
+	}
+	if err := service.allowCertificate(t.Context(), host); err != nil {
+		t.Fatalf("tenant domain rejected: %v", err)
+	}
+	if _, ok := service.allowed.Load(host); !ok {
+		t.Fatal("expected tenant domain to be restored in memory")
+	}
+	if err := service.allowCertificate(t.Context(), "unknown.runforyou.app"); err == nil {
+		t.Fatal("expected unknown domain without HTTP entry to be rejected")
+	}
+}
+
 // cachedCertificate 创建符合 autocert 缓存格式的测试证书。
-func cachedCertificate(t *testing.T, host string) []byte {
+func cachedCertificate(t *testing.T, host string, notBefore, notAfter time.Time) []byte {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -117,8 +186,8 @@ func cachedCertificate(t *testing.T, host string) []byte {
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: host},
 		DNSNames:     []string{host},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour),
+		NotBefore:    notBefore,
+		NotAfter:     notAfter,
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}

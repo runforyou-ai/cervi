@@ -12,7 +12,7 @@ import {
 import { useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useTranslation } from "react-i18next"
 
-import { ChannelType, type InboxConversation } from "@/api"
+import { ChannelType, type CustomerInboxConversationData } from "@/api"
 import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
@@ -78,14 +78,14 @@ function ConversationContextContent({
   sessionStatus,
   sheet = false,
 }: {
-  conversation: InboxConversation
+  conversation: CustomerInboxConversationData
   contactName: string
   sessionStatus: string
   sheet?: boolean
 }) {
   const { t } = useTranslation("inbox")
   const ChannelIcon =
-    channelIcons[conversation.channelType] ?? MessagesSquareIcon
+    channelIcons[conversation.customer.channelType] ?? MessagesSquareIcon
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
@@ -99,9 +99,9 @@ function ConversationContextContent({
           <ChannelIcon className="size-4 shrink-0 text-muted-foreground" />
           <span
             className="min-w-0 truncate text-sm font-medium text-foreground"
-            title={conversation.channelName}
+            title={conversation.customer.channelName}
           >
-            {conversation.channelName}
+            {conversation.customer.channelName}
           </span>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -109,9 +109,14 @@ function ConversationContextContent({
             {t("contextReceptionStatus")}：
             <span className="text-foreground">{sessionStatus}</span>
           </span>
-          <span className="min-w-0 truncate" title={conversation.title}>
+          <span
+            className="min-w-0 truncate"
+            title={conversation.customer.title}
+          >
             {t("contextConversationLabel")}：
-            <span className="text-foreground">{conversation.title}</span>
+            <span className="text-foreground">
+              {conversation.customer.title}
+            </span>
           </span>
         </div>
       </div>
@@ -205,7 +210,7 @@ export function ConversationContextPane({
   onDesktopToggle,
   onSheetOpenChange,
 }: {
-  conversation: InboxConversation
+  conversation: CustomerInboxConversationData
   contactName: string
   sessionStatus: string
   desktopVisible: boolean

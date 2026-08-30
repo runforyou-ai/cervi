@@ -16,8 +16,9 @@ const mobile = {
     refresh: "Refresh messages",
     loadError: "Could not load messages. Check your connection and try again.",
     refreshError: "Could not refresh messages. Tap to try again.",
-    emptyTitle: "No customer conversations",
-    emptyDescription: "New customer conversations will appear here.",
+    emptyTitle: "No conversations",
+    emptyDescription:
+      "New customer conversations and member chats will appear here.",
   },
   me: {
     title: "Me",

@@ -52,6 +52,8 @@ type DirectBackend struct {
 	loadInbox                         *inboxaction.LoadInboxQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
+	startDirectConversation           *conversationaction.StartDirectConversationAction
+	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
 	getTelegramChannel                *channelaction.GetTelegramChannelQuery
@@ -158,6 +160,8 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
+		startDirectConversation:           conversationaction.NewStartDirectConversationAction(db),
+		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getTelegramChannel:                channelaction.NewGetTelegramChannelQuery(db),
@@ -250,7 +254,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 
 // requireInitialized 解析当前请求的企业范围，并校验该企业是否已完成初始化。
 func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta) (tenant.Scope, error) {
-	scope, err := b.resolveTenant.Resolve(ctx, tenant.Hostname(ctx))
+	scope, err := b.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
 	if errors.Is(err, tenant.ErrNotFound) {
 		return tenant.Scope{}, SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
 	}

@@ -13,13 +13,14 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationChannelIDInvalid       ValidationCode = "channel_id_invalid"
-	ValidationExternalIDInvalid      ValidationCode = "external_id_invalid"
-	ValidationConversationIDInvalid  ValidationCode = "conversation_id_invalid"
-	ValidationClientMessageIDInvalid ValidationCode = "client_message_id_invalid"
-	ValidationBodyRequired           ValidationCode = "body_required"
-	ValidationBodyTooLong            ValidationCode = "body_too_long"
-	ValidationCursorInvalid          ValidationCode = "cursor_invalid"
+	ValidationChannelIDInvalid        ValidationCode = "channel_id_invalid"
+	ValidationExternalIDInvalid       ValidationCode = "external_id_invalid"
+	ValidationConversationIDInvalid   ValidationCode = "conversation_id_invalid"
+	ValidationTargetIdentityIDInvalid ValidationCode = "target_identity_id_invalid"
+	ValidationClientMessageIDInvalid  ValidationCode = "client_message_id_invalid"
+	ValidationBodyRequired            ValidationCode = "body_required"
+	ValidationBodyTooLong             ValidationCode = "body_too_long"
+	ValidationCursorInvalid           ValidationCode = "cursor_invalid"
 )
 
 const (
@@ -96,6 +97,7 @@ type MessageHistory struct {
 type ConversationMessageSender struct {
 	ChatSubjectID string
 	Kind          domain.ChatSubjectKind
+	SourceID      string
 	DisplayName   *string
 }
 
@@ -133,6 +135,27 @@ type ConversationMessageHistory struct {
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。
 type CustomerTextMessageInput struct {
+	ConversationID  string
+	ClientMessageID string
+	Body            string
+}
+
+// DirectConversationInput 定义成员发起内部单聊的目标。
+type DirectConversationInput struct {
+	TargetIdentityID string
+}
+
+// DirectConversationSummary 定义成员内部单聊摘要。
+type DirectConversationSummary struct {
+	ID             string
+	PeerIdentityID string
+	PeerName       string
+	Preview        *string
+	LastMessageAt  *time.Time
+}
+
+// DirectTextMessageInput 定义成员发送的内部单聊文本消息。
+type DirectTextMessageInput struct {
 	ConversationID  string
 	ClientMessageID string
 	Body            string

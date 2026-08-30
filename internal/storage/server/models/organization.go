@@ -14,6 +14,7 @@ type Organization struct {
 	bun.BaseModel `bun:"table:organizations,alias:o"`
 
 	ID                string    `bun:"id,pk"`
+	AccessHost        string    `bun:"access_host"`
 	Name              string    `bun:"name"`
 	AllowArbitraryURL bool      `bun:"allow_arbitrary_url"`
 	CreatedAt         time.Time `bun:"created_at"`

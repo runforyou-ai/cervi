@@ -6,6 +6,7 @@ package inbox
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -13,34 +14,62 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// ConversationSummary 定义成员收件箱中的客户会话摘要。
-type ConversationSummary struct {
-	ID                   string
+const inboxConversationTypeLimit = 50
+
+// CustomerConversationSummary 定义收件箱中的客户会话详情。
+type CustomerConversationSummary struct {
 	Title                string
 	ContactName          *string
 	ContactAvatarFileID  *string
 	ChannelType          domain.ChannelType
 	ChannelName          string
-	Preview              string
-	LastMessageAt        time.Time
+	Preview              *string
+	LastMessageAt        *time.Time
 	ServiceSessionStatus domain.ServiceSessionStatus
 }
 
-// LoadInboxQuery 读取当前企业的客户会话工作队列。
+// DirectConversationSummary 定义收件箱中的内部单聊详情。
+type DirectConversationSummary struct {
+	PeerIdentityID string
+	PeerName       string
+	Preview        *string
+	LastMessageAt  *time.Time
+}
+
+// ConversationSummary 定义统一收件箱会话信封。
+type ConversationSummary struct {
+	ID       string
+	Type     domain.ConversationType
+	Customer *CustomerConversationSummary
+	Direct   *DirectConversationSummary
+	sortAt   *time.Time
+}
+
+// LoadInboxQuery 读取当前企业的统一收件箱。
 type LoadInboxQuery struct {
 	db *bun.DB
 }
 
-type inboxConversationRow struct {
-	ID                   string    `bun:"id"`
-	Title                string    `bun:"title"`
-	ContactName          *string   `bun:"contact_name"`
-	ContactAvatarFileID  *string   `bun:"contact_avatar_file_id"`
-	ChannelType          string    `bun:"channel_type"`
-	ChannelName          string    `bun:"channel_name"`
-	Preview              string    `bun:"preview"`
-	LastMessageAt        time.Time `bun:"last_message_at"`
-	ServiceSessionStatus string    `bun:"service_session_status"`
+type customerConversationRow struct {
+	ID                   string     `bun:"id"`
+	Title                string     `bun:"title"`
+	ContactName          *string    `bun:"contact_name"`
+	ContactAvatarFileID  *string    `bun:"contact_avatar_file_id"`
+	ChannelType          string     `bun:"channel_type"`
+	ChannelName          string     `bun:"channel_name"`
+	Preview              *string    `bun:"preview"`
+	LastMessageAt        *time.Time `bun:"last_message_at"`
+	ServiceSessionStatus string     `bun:"service_session_status"`
+	SortAt               *time.Time `bun:"sort_at"`
+}
+
+type directConversationRow struct {
+	ID             string     `bun:"id"`
+	PeerIdentityID string     `bun:"peer_identity_id"`
+	PeerName       string     `bun:"peer_name"`
+	Preview        *string    `bun:"preview"`
+	LastMessageAt  *time.Time `bun:"last_message_at"`
+	SortAt         *time.Time `bun:"sort_at"`
 }
 
 // NewLoadInboxQuery 创建成员收件箱查询。
@@ -48,9 +77,58 @@ func NewLoadInboxQuery(db *bun.DB) *LoadInboxQuery {
 	return &LoadInboxQuery{db: db}
 }
 
-// Execute 按企业边界返回最新处理批次未结束的客户会话。
+// Execute 分别读取客户会话和内部单聊后合并排序。
 func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]ConversationSummary, error) {
-	var rows []inboxConversationRow
+	customers, err := q.loadCustomerConversations(ctx, identity.Organization.ID)
+	if err != nil {
+		return nil, err
+	}
+	directs, err := q.loadDirectConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]ConversationSummary, 0, len(customers)+len(directs))
+	for _, row := range customers {
+		result = append(result, ConversationSummary{
+			ID: row.ID, Type: domain.ConversationTypeCustomer, sortAt: row.SortAt,
+			Customer: &CustomerConversationSummary{
+				Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
+				ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
+				Preview: row.Preview, LastMessageAt: row.LastMessageAt,
+				ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus),
+			},
+		})
+	}
+	for _, row := range directs {
+		result = append(result, ConversationSummary{
+			ID: row.ID, Type: domain.ConversationTypeDirect, sortAt: row.SortAt,
+			Direct: &DirectConversationSummary{
+				PeerIdentityID: row.PeerIdentityID, PeerName: row.PeerName,
+				Preview: row.Preview, LastMessageAt: row.LastMessageAt,
+			},
+		})
+	}
+	sort.Slice(result, func(first, second int) bool {
+		firstTime := result[first].sortAt
+		secondTime := result[second].sortAt
+		if firstTime == nil || secondTime == nil {
+			if firstTime == nil && secondTime == nil {
+				return result[first].ID > result[second].ID
+			}
+			return firstTime != nil
+		}
+		if firstTime.Equal(*secondTime) {
+			return result[first].ID > result[second].ID
+		}
+		return firstTime.After(*secondTime)
+	})
+	return result, nil
+}
+
+// loadCustomerConversations 读取最新处理批次未结束的客户会话。
+func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organizationID string) ([]customerConversationRow, error) {
+	var rows []customerConversationRow
 	err := q.db.NewSelect().
 		TableExpr("customer_conversations AS cc").
 		ColumnExpr("cv.id AS id").
@@ -62,13 +140,14 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("latest.status AS service_session_status").
+		ColumnExpr("cv.last_message_at AS sort_at").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cc.organization_id").
 		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cc.organization_id").
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
 		Join("JOIN LATERAL (SELECT ss.status FROM service_sessions AS ss WHERE ss.organization_id = cv.organization_id AND ss.conversation_id = cv.id ORDER BY ss.sequence DESC LIMIT 1) AS latest ON TRUE").
-		Where("cc.organization_id = ?", identity.Organization.ID).
+		Where("cc.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer).
 		Where("latest.status IN (?)", bun.In([]domain.ServiceSessionStatus{
 			domain.ServiceSessionStatusWaiting,
@@ -76,24 +155,40 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			domain.ServiceSessionStatusPending,
 		})).
 		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
-		Limit(50).
+		Limit(inboxConversationTypeLimit).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("list inbox conversations: %w", err)
+		return nil, fmt.Errorf("list customer inbox conversations: %w", err)
 	}
-	result := make([]ConversationSummary, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, ConversationSummary{
-			ID:                   row.ID,
-			Title:                row.Title,
-			ContactName:          row.ContactName,
-			ContactAvatarFileID:  row.ContactAvatarFileID,
-			ChannelType:          domain.ChannelType(row.ChannelType),
-			ChannelName:          row.ChannelName,
-			Preview:              row.Preview,
-			LastMessageAt:        row.LastMessageAt,
-			ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus),
-		})
+	return rows, nil
+}
+
+// loadDirectConversations 读取当前成员参与的内部单聊，包括尚无消息的新会话。
+func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizationID, identityID string) ([]directConversationRow, error) {
+	var rows []directConversationRow
+	err := q.db.NewSelect().
+		TableExpr("conversations AS cv").
+		ColumnExpr("cv.id AS id").
+		ColumnExpr("peer_cs.source_id AS peer_identity_id").
+		ColumnExpr("peer_oi.display_name AS peer_name").
+		ColumnExpr("msg.body AS preview").
+		ColumnExpr("cv.last_message_at AS last_message_at").
+		ColumnExpr("cv.last_message_at AS sort_at").
+		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
+		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
+		Join("JOIN conversation_participants AS peer ON peer.organization_id = cv.organization_id AND peer.conversation_id = cv.id AND peer.subject_id <> mine.subject_id AND peer.left_at IS NULL").
+		Join("JOIN chat_subjects AS peer_cs ON peer_cs.organization_id = peer.organization_id AND peer_cs.id = peer.subject_id AND peer_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = peer_cs.organization_id AND peer_oi.id = peer_cs.source_id AND peer_oi.type = ?", domain.OrganizationIdentityTypeUser).
+		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
+		Where("cv.organization_id = ?", organizationID).
+		Where("cv.type = ?", domain.ConversationTypeDirect).
+		Where("cv.status = ?", domain.ConversationStatusActive).
+		Where("(SELECT count(*) FROM conversation_participants AS all_cp WHERE all_cp.organization_id = cv.organization_id AND all_cp.conversation_id = cv.id) = 2").
+		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
+		Limit(inboxConversationTypeLimit).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("list direct inbox conversations: %w", err)
 	}
-	return result, nil
+	return rows, nil
 }

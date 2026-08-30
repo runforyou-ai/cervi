@@ -295,7 +295,6 @@ tasks:
         -p {{.SERVER_PORT}}:{{.SERVER_PORT}}
         {{if eq .TLS_MODE "auto"}}-p 80:80 -p 443:443{{end}}
         -v {{.APP_NAME}}-files:/data/files
-        -v {{.APP_NAME}}-tls:/data/tls
         {{.TAG | default (printf "%s:latest" .APP_NAME)}}
     vars:
       TAG: "{{.TAG}}"

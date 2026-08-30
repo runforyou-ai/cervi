@@ -39,7 +39,6 @@ nats:
 
 tls:
   mode: off
-  dataDirectory: /var/lib/cervi/tls
   acmeEmail: ""
 
 storage:
@@ -104,7 +103,7 @@ journalctl -u cervi -f
 
 ### Linux 自动 HTTPS
 
-将基础模板中的 `tls.mode` 改为 `auto`。`tls.dataDirectory` 用于持久化证书，`tls.acmeEmail` 可填写 ACME 联系邮箱。
+将基础模板中的 `tls.mode` 改为 `auto`。自动 HTTPS 的 ACME 账户、证书和临时验证数据统一保存在 PostgreSQL，`tls.acmeEmail` 可填写 ACME 联系邮箱。
 
 `auto` 模式需要监听 80/443。将以下 drop-in 保存为 `/etc/systemd/system/cervi.service.d/auto-https.conf`：
 
@@ -121,7 +120,9 @@ sudo systemctl daemon-reload
 sudo systemctl restart cervi
 ```
 
-公网域名的 80/443 需转发到当前服务器。停用 `auto` 后删除 drop-in 并重新加载 systemd。
+公网域名的 80/443 需转发到当前服务器。只有公网域名会申请证书；IP、`localhost`、无点主机名以及 `.localhost`、`.local`、`.internal`、`.home.arpa` 地址继续使用 HTTP。停用 `auto` 后删除 drop-in 并重新加载 systemd。
+
+从 `off` 或 `external` 改为 `auto` 后需重启服务。已绑定企业访问地址的公网域名可在首次 HTTPS 访问时直接签发证书；未绑定的新域名必须先访问 HTTP 入口。每个服务进程在任意 3 小时内最多放行 40 个新证书签发尝试窗口，同一域名 1 分钟内的并发请求合并计数；有效期内的缓存证书和后台续期不占用该额度。
 
 ## Windows Server
 
@@ -158,7 +159,7 @@ Windows 默认使用 `off` TLS 模式，并以前台进程或服务包装器运�
 
 ## 容器
 
-持久化 `/data/files` 和 `/data/tls`。`auto` 模式映射 80/443，外部终止 HTTPS 时使用 `external` 模式。
+只需持久化 `/data/files`；自动 TLS 数据保存在 PostgreSQL。`auto` 模式映射 80/443，外部终止 HTTPS 时使用 `external` 模式。
 
 ## 升级
 

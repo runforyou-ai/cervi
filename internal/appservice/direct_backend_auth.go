@@ -18,7 +18,7 @@ import (
 
 // InstallationStatus 返回服务端初始化状态和公开企业名称。
 func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
-	scope, err := b.resolveTenant.Resolve(ctx, tenant.Hostname(ctx))
+	scope, err := b.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
 	if errors.Is(err, tenant.ErrNotFound) {
 		return InstallationStatus{}, nil
 	}
@@ -43,6 +43,7 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		return Auth{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAlreadyInitialized).WithStatus(http.StatusConflict)
 	}
 	output, err := b.installWorkspace.Execute(ctx, installationaction.InstallWorkspaceInput{
+		AccessHost:       tenant.AccessHost(ctx),
 		OrganizationName: input.OrganizationName,
 		DisplayName:      input.DisplayName,
 		Email:            input.Email,

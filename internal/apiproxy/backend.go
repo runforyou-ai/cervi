@@ -136,7 +136,10 @@ func (b *Backend) normalizeOutput(output any) {
 		}
 	case *appservice.Inbox:
 		for index := range value.Conversations {
-			value.Conversations[index].ContactAvatarURL = b.absoluteContentURL(value.Conversations[index].ContactAvatarURL)
+			customer := value.Conversations[index].Customer
+			if customer != nil {
+				customer.ContactAvatarURL = b.absoluteContentURL(customer.ContactAvatarURL)
+			}
 		}
 	}
 }

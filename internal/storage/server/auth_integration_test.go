@@ -18,6 +18,7 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
@@ -30,6 +31,7 @@ import (
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
 // TestServerActionsWithPostgreSQL 验证服务端核心操作。
@@ -45,9 +47,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	// 全局前置：安装企业并校验初始状态，失败直接终止整个测试。
 	db := store.DB()
-	tenantResolver := organizationaction.NewLegacyTenantResolver(db)
+	const accessHost = "cervi.test"
+	tenantContext := tenant.WithAccessHost(context.Background(), accessHost)
+	tenantResolver := organizationaction.NewTenantResolver(db)
 	status := installationaction.NewStatusQuery(tenantResolver)
-	alreadyInstalled, err := status.Execute(context.Background())
+	alreadyInstalled, err := status.Execute(tenantContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,6 +61,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	install := installationaction.NewInstallWorkspaceAction(db)
 	installed, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
+		AccessHost:       accessHost,
 		OrganizationName: "鹿行测试公司",
 		DisplayName:      "管理员",
 		Email:            "admin@example.com",
@@ -69,6 +74,20 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
+	}
+	if installed.Identity.Organization.AccessHost != accessHost {
+		t.Fatalf("organization access host = %q, want %q", installed.Identity.Organization.AccessHost, accessHost)
+	}
+	if _, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
+		AccessHost:       accessHost,
+		OrganizationName: "重复企业",
+		DisplayName:      "管理员",
+		Email:            "duplicate@example.com",
+		Password:         "password123",
+		Locale:           domain.LocaleChineseSimplified,
+		TimeZone:         "Asia/Shanghai",
+	}); !errors.Is(err, installationaction.ErrAlreadyInstalled) {
+		t.Fatalf("duplicate access host error = %v, want ErrAlreadyInstalled", err)
 	}
 	if installed.Identity.User.WorkspaceTabsEnabled {
 		t.Fatal("workspace tabs enabled = true, want false")
@@ -94,12 +113,43 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if teamMemberCount != 0 {
 		t.Fatalf("team member count after installation = %d, want 0", teamMemberCount)
 	}
-	currentStatus, err := status.Execute(context.Background())
+	currentStatus, err := status.Execute(tenantContext)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !currentStatus.Installed || currentStatus.OrganizationName != "鹿行测试公司" {
 		t.Fatalf("status = %#v", currentStatus)
+	}
+	const otherAccessHost = "other.cervi.test:8443"
+	otherTenantContext := tenant.WithAccessHost(context.Background(), otherAccessHost)
+	otherStatus, err := status.Execute(otherTenantContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if otherStatus.Installed {
+		t.Fatalf("unbound access host status = %#v, want setup", otherStatus)
+	}
+	otherInstalled, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
+		AccessHost:       otherAccessHost,
+		OrganizationName: "另一家测试公司",
+		DisplayName:      "管理员",
+		Email:            "admin@example.com",
+		Password:         "password123",
+		Locale:           domain.LocaleChineseSimplified,
+		TimeZone:         "Asia/Shanghai",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if otherInstalled.Identity.Organization.ID == installed.Identity.Organization.ID {
+		t.Fatal("different access hosts resolved to the same organization")
+	}
+	otherStatus, err = status.Execute(otherTenantContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !otherStatus.Installed || otherStatus.OrganizationName != "另一家测试公司" {
+		t.Fatalf("other tenant status = %#v", otherStatus)
 	}
 
 	// 全局前置：解析安装令牌、登出并重新登录管理员，失败直接终止整个测试。
@@ -199,15 +249,22 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if organization.Name != "鹿行协作" {
-			t.Fatalf("updated organization name = %q, want 鹿行协作", organization.Name)
+		if organization.Name != "鹿行协作" || organization.AccessHost != accessHost {
+			t.Fatalf("updated organization = %#v, want name 鹿行协作 and access host %q", organization, accessHost)
 		}
-		currentStatus, err := status.Execute(context.Background())
+		currentStatus, err := status.Execute(tenantContext)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if currentStatus.OrganizationName != "鹿行协作" {
 			t.Fatalf("status organization name = %q, want 鹿行协作", currentStatus.OrganizationName)
+		}
+		otherStatus, err := status.Execute(otherTenantContext)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if otherStatus.OrganizationName != "另一家测试公司" {
+			t.Fatalf("other status organization name = %q, want 另一家测试公司", otherStatus.OrganizationName)
 		}
 	})
 
@@ -468,7 +525,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("Telegram message count = %d, want 2", messageCountBeforeReply)
 		}
 		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db)
-		_, err = sendCustomerMessage.Execute(context.Background(), &loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
 			ConversationID:  telegramConversation.ID,
 			ClientMessageID: "019d4e1c-40a5-77dd-82e6-6951f9957ba5",
 			Body:            "不应写入的 Telegram 回复",
@@ -839,6 +896,125 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		team, err = teamaction.NewAddMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: createdMember.IdentityID}})
 		if err != nil || team.MemberCount != 1 {
 			t.Fatalf("team after adding member = %#v, error = %v", team, err)
+		}
+	})
+
+	// 覆盖双向并发发起、双方收件箱、成员授权和内部文本消息。
+	runStep("企业成员内部单聊", func(t *testing.T) {
+		memberLogin, err := login.Execute(context.Background(), authaction.LoginInput{
+			OrganizationID: loggedIn.Identity.Organization.ID,
+			Email:          createdMember.Email,
+			Password:       "password123",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		start := conversationaction.NewStartDirectConversationAction(db)
+		startGate := make(chan struct{})
+		startResults := make(chan conversationaction.DirectConversationSummary, 2)
+		startErrors := make(chan error, 2)
+		requests := []struct {
+			identity *servermodels.Identity
+			targetID string
+		}{
+			{identity: loggedIn.Identity, targetID: memberLogin.Identity.OrganizationIdentity.ID},
+			{identity: memberLogin.Identity, targetID: loggedIn.Identity.OrganizationIdentity.ID},
+		}
+		for _, request := range requests {
+			request := request
+			go func() {
+				<-startGate
+				summary, executeErr := start.Execute(context.Background(), request.identity, conversationaction.DirectConversationInput{TargetIdentityID: request.targetID})
+				startResults <- summary
+				startErrors <- executeErr
+			}()
+		}
+		close(startGate)
+
+		conversationID := ""
+		for range requests {
+			if executeErr := <-startErrors; executeErr != nil {
+				t.Fatal(executeErr)
+			}
+			summary := <-startResults
+			if conversationID == "" {
+				conversationID = summary.ID
+			} else if summary.ID != conversationID {
+				t.Fatalf("concurrent direct conversation ids = %q and %q", conversationID, summary.ID)
+			}
+		}
+
+		conversationCount, err := db.NewSelect().
+			Model((*servermodels.Conversation)(nil)).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("type = ?", domain.ConversationTypeDirect).
+			Count(context.Background())
+		if err != nil || conversationCount != 1 {
+			t.Fatalf("direct conversation count = %d, error = %v", conversationCount, err)
+		}
+		participantCount, err := db.NewSelect().
+			Model((*servermodels.ConversationParticipant)(nil)).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("conversation_id = ?", conversationID).
+			Count(context.Background())
+		if err != nil || participantCount != 2 {
+			t.Fatalf("direct participant count = %d, error = %v", participantCount, err)
+		}
+
+		inbox := inboxaction.NewLoadInboxQuery(db)
+		for _, request := range requests {
+			items, loadErr := inbox.Execute(context.Background(), request.identity)
+			if loadErr != nil {
+				t.Fatal(loadErr)
+			}
+			found := false
+			for _, item := range items {
+				if item.ID == conversationID && item.Type == domain.ConversationTypeDirect && item.Direct != nil && item.Direct.PeerIdentityID == request.targetID && item.Direct.LastMessageAt == nil {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("direct conversation missing from inbox: %#v", items)
+			}
+		}
+
+		send := conversationaction.NewSendDirectTextMessageAction(db)
+		message, err := send.Execute(context.Background(), memberLogin.Identity, conversationaction.DirectTextMessageInput{
+			ConversationID:  conversationID,
+			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+			Body:            "你好，管理员",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if message.Sender == nil || message.Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
+			t.Fatalf("direct message sender = %#v", message.Sender)
+		}
+		history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID})
+		if err != nil || len(history.Messages) != 1 || history.Messages[0].ID != message.ID || history.Messages[0].Sender == nil || history.Messages[0].Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
+			t.Fatalf("direct message history = %#v, error = %v", history, err)
+		}
+
+		if _, err := db.NewUpdate().Model((*servermodels.Conversation)(nil)).
+			Set("status = ?", domain.ConversationStatusArchived).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("id = ?", conversationID).
+			Exec(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+			ConversationID:  conversationID,
+			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f66",
+			Body:            "归档后发送",
+		})
+		if !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("send archived direct error = %v, want conversation not found", err)
+		}
+		reopened, err := start.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectConversationInput{TargetIdentityID: memberLogin.Identity.OrganizationIdentity.ID})
+		if err != nil || reopened.ID != conversationID {
+			t.Fatalf("reopened direct conversation = %#v, error = %v", reopened, err)
 		}
 	})
 
