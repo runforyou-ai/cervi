@@ -1,14 +1,16 @@
 -- +goose Up
--- 把渠道头像从远端引用切换为企业文件引用。
+-- 增加渠道身份的企业头像文件、外部版本和单调刷新位置。
 ALTER TABLE contact_channel_identities
-    DROP COLUMN avatar_external_id,
-    ADD COLUMN avatar_file_id uuid;
+    ADD COLUMN avatar_file_id uuid,
+    ADD COLUMN avatar_external_version text,
+    ADD COLUMN avatar_source_order bigint NOT NULL DEFAULT 0;
 
 COMMENT ON COLUMN contact_channel_identities.avatar_file_id IS '渠道头像文件编号';
+COMMENT ON COLUMN contact_channel_identities.avatar_external_version IS '渠道头像的稳定外部版本';
+COMMENT ON COLUMN contact_channel_identities.avatar_source_order IS '最后头像刷新对应的来源内顺序';
 
 -- +goose Down
 ALTER TABLE contact_channel_identities
-    DROP COLUMN avatar_file_id,
-    ADD COLUMN avatar_external_id text;
-
-COMMENT ON COLUMN contact_channel_identities.avatar_external_id IS '渠道头像的不透明外部引用';
+    DROP COLUMN avatar_source_order,
+    DROP COLUMN avatar_external_version,
+    DROP COLUMN avatar_file_id;
