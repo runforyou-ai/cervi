@@ -1,6 +1,7 @@
 /** 移动端独立入口和路由。 */
 import { Navigate, Route, Routes } from "react-router"
 
+import { MobileDirectConversationPage } from "@/apps/mobile/mobile-direct-conversation-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
 import { MobileMePage } from "@/apps/mobile/mobile-me-page"
 import { MobileWorkspaceLayout } from "@/apps/mobile/mobile-workspace-layout"
@@ -18,6 +19,10 @@ export default function MobileApp() {
         <Route path="/setup" element={<Navigate to="/connect" replace />} />
         <Route element={<MobileWorkspaceLayout />}>
           <Route path="/inbox" element={<MobileInboxPage />} />
+          <Route
+            path="/inbox/direct/:conversationID"
+            element={<MobileDirectConversationPage />}
+          />
           <Route path="/me" element={<MobileMePage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

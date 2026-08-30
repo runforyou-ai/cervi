@@ -1285,9 +1285,9 @@ P3 typing、presence 等临时事件
 
 阶段 2 依次交付成员单聊、基础群聊、内部 AI 员工验证、网站 AI 客服以及统一实时与离线同步。
 
-#### 阶段 2A：成员文本单聊（Web/桌面端已完成）
+#### 阶段 2A：成员文本单聊（全端已完成）
 
-- Web 与桌面端已实现成员会话列表、历史、文本发送和 `before/after` 轮询；移动端内部单聊留给后续独立 PR。
+- Web、桌面端和移动端已实现成员会话列表、历史、文本发送和 `before/after` 轮询；移动端使用独立详情路由和前台可见性判断。
 - 同一企业内同一对有效 ChatSubject 只对应一个长期 `direct` 会话；两个并发创建请求必须收敛到同一会话。
 - 单聊严格按有效参与者授权，不包含已读、实时、文件和 Agent 自动响应。
 
@@ -1470,7 +1470,7 @@ PR6 增加 `POST /api/conversations/{conversationID}/messages` 成员客户会�
 
 ### 13.8 阶段 2A：企业成员文本单聊（本次交付）
 
-本 PR 增加企业成员内部单聊的 Web 与桌面端闭环：
+企业成员内部单聊已完成 Web、桌面端和移动端闭环：
 
 ```text
 POST /api/direct-conversations
@@ -1484,9 +1484,9 @@ Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 
 
 统一 Inbox 使用 `type + customer?/direct?` 信封。Customer 与 Direct 分别最多读取 50 条，合并后不再截断；Direct 使用最后消息左连接，空会话返回可空预览与时间，合并按 `last_message_at DESC NULLS LAST, id DESC` 排序，空会话沉底。消息发送者的 `sourceId` 明确定义为 `chat_subjects.source_id`：Customer 中联系人靠左、所有企业身份靠右；Direct 中 `sourceId == CurrentUser.identityId` 靠右，对方靠左。
 
-成员收件箱和当前 Customer/Direct 时间线每 3 秒轮询，只在消息路由所属工作区标签活动、页面可见且窗口聚焦时运行，恢复前台后立即补拉。空 Direct 在没有 `after` 时轮询无游标最近页，得到第一条消息后安装游标；空增量响应保留旧游标，`before`、`after` 和本地发送结果按消息编号合并，切换会话后忽略旧结果。
+成员收件箱和当前 Customer/Direct 时间线每 3 秒轮询；Web 与桌面端只在消息路由所属工作区标签活动、页面可见且窗口聚焦时运行，移动端只在应用前台可见时运行，恢复前台后立即补拉。空 Direct 在没有 `after` 时轮询无游标最近页，得到第一条消息后安装游标；空增量响应保留旧游标，`before`、`after` 和本地发送结果按消息编号合并，切换会话后忽略旧结果。
 
-前端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，群聊继续显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接、交给 AI 或客户上下文栏。本 PR 对移动端只适配联合 DTO，并安全忽略 Direct；移动端单聊列表、详情、发送和轮询由下一 PR 交付。
+Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，群聊继续显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接、交给 AI 或客户上下文栏。移动端统一展示 Customer 与 Direct 摘要，Customer 仍保持只读摘要，Direct 支持发起、详情、历史、文本发送和前台轮询；移动端详情隐藏一级导航并独立处理底部安全区。
 
 ### 13.9 当前共同边界与后续交付
 

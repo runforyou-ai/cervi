@@ -5,18 +5,25 @@ import { usePortalContainer } from "@/components/ui/portal-container"
 
 export const memberChatPollingInterval = 3_000
 
-/** 判断当前消息页是否同时处于活动标签、可见页面和聚焦窗口。 */
-export function useMemberChatPollingActive() {
+/** 判断当前消息页是否处于允许成员消息轮询的前台状态。 */
+export function useMemberChatPollingActive({
+  requireWindowFocus = true,
+}: {
+  requireWindowFocus?: boolean
+} = {}) {
   const pagePortal = usePortalContainer()
   const [windowActive, setWindowActive] = useState(
-    () => document.visibilityState === "visible" && document.hasFocus(),
+    () =>
+      document.visibilityState === "visible" &&
+      (!requireWindowFocus || document.hasFocus()),
   )
 
   useEffect(() => {
     /** 同步浏览器或桌面窗口的前台状态。 */
     function syncWindowState() {
       setWindowActive(
-        document.visibilityState === "visible" && document.hasFocus(),
+        document.visibilityState === "visible" &&
+          (!requireWindowFocus || document.hasFocus()),
       )
     }
 
@@ -28,7 +35,7 @@ export function useMemberChatPollingActive() {
       window.removeEventListener("focus", syncWindowState)
       window.removeEventListener("blur", syncWindowState)
     }
-  }, [])
+  }, [requireWindowFocus])
 
   return (pagePortal?.active ?? true) && windowActive
 }

@@ -646,6 +646,7 @@ function ConversationThread({
 }: {
   conversation: CustomerInboxConversationData | DirectInboxConversationData
 }) {
+  const { identity } = useWorkspace()
   const [sentMessages, setSentMessages] = useState<ConversationMessage[]>([])
 
   /** 合并接口返回的已发送消息。 */
@@ -662,6 +663,7 @@ function ConversationThread({
       <ConversationTimeline
         conversationID={conversation.id}
         conversationType={conversation.type}
+        currentIdentityID={identity.user.identityId}
         sentMessages={sentMessages}
       />
       <ConversationComposer

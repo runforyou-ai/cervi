@@ -23,7 +23,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
-import { useWorkspace } from "@/contexts/workspace-context"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
@@ -71,17 +70,20 @@ function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
 export function ConversationTimeline({
   conversationID,
   conversationType,
+  currentIdentityID,
+  requireWindowFocus = true,
   sentMessages,
 }: {
   conversationID: string
   conversationType: ConversationType
+  currentIdentityID: string
+  requireWindowFocus?: boolean
   sentMessages: ConversationMessage[]
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
-  const { identity } = useWorkspace()
   const timeZone = useUserTimeZone()
-  const pollingActive = useMemberChatPollingActive()
+  const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const aliveRef = useRef(true)
   const beforeRequestRef = useRef(0)
@@ -326,7 +328,7 @@ export function ConversationTimeline({
             const incoming =
               conversationType === ConversationType.ConversationTypeDirect
                 ? !message.sender ||
-                  message.sender.sourceId !== identity.user.identityId
+                  message.sender.sourceId !== currentIdentityID
                 : !message.sender ||
                   message.sender.kind ===
                     ChatSubjectKind.ChatSubjectKindContact
