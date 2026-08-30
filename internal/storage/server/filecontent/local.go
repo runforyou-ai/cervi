@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -16,7 +17,8 @@ import (
 
 // LocalStore 管理服务器本地文件目录。
 type LocalStore struct {
-	root string
+	objects   string
+	temporary string
 }
 
 // NewLocalStore 创建指定目录的本地文件存储。
@@ -25,11 +27,21 @@ func NewLocalStore(root string) (*LocalStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve local file storage path: %w", err)
 	}
-	if err := os.MkdirAll(absolute, 0o750); err != nil {
+	objects := filepath.Join(absolute, "objects")
+	temporary := filepath.Join(absolute, "temporary")
+	if err := os.MkdirAll(objects, 0o750); err != nil {
 		return nil, fmt.Errorf("create local file storage directory: %w", err)
 	}
-	slog.Info("本地文件存储已初始化", "path", absolute)
-	return &LocalStore{root: absolute}, nil
+	if err := os.MkdirAll(temporary, 0o750); err != nil {
+		return nil, fmt.Errorf("create local upload temporary directory: %w", err)
+	}
+	slog.Info("本地文件存储已初始化", "path", objects)
+	return &LocalStore{objects: objects, temporary: temporary}, nil
+}
+
+// ObjectsFS 返回只包含最终对象的静态文件系统。
+func (s *LocalStore) ObjectsFS() fs.FS {
+	return os.DirFS(s.objects)
 }
 
 // Save 将内容流式写入本地文件并原子替换目标。
@@ -41,7 +53,7 @@ func (s *LocalStore) Save(ctx context.Context, key string, source io.Reader, exp
 	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		return fmt.Errorf("create local file directory: %w", err)
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(target), ".upload-*")
+	temporary, err := os.CreateTemp(s.temporary, ".upload-*")
 	if err != nil {
 		return fmt.Errorf("create local upload file: %w", err)
 	}
@@ -127,5 +139,5 @@ func (s *LocalStore) path(key string) (string, error) {
 	if cleaned == "." || filepath.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
 		return "", errors.New("invalid local file storage key")
 	}
-	return filepath.Join(s.root, cleaned), nil
+	return filepath.Join(s.objects, cleaned), nil
 }

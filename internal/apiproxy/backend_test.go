@@ -79,7 +79,7 @@ func TestAbsoluteContentURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := backend.absoluteContentURL("/files/file-1/content"); got != "https://cervi.example.com/company/files/file-1/content" {
+	if got := backend.absoluteContentURL("/storage/organizations/org/files/file.png"); got != "https://cervi.example.com/company/storage/organizations/org/files/file.png" {
 		t.Fatalf("content URL = %q", got)
 	}
 	if got := backend.absoluteContentURL("https://storage.example.com/object"); got != "https://storage.example.com/object" {
@@ -116,6 +116,7 @@ func TestBackendUnavailablePreservesConnection(t *testing.T) {
 
 // TestBackendConnectsAndUsesBearerToken 验证类型化远程调用使用 Bearer Token。
 func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
+	const contactAvatarURL = "https://cdn.example.com/organizations/organization-1/files/019d4e1c-40a5-77dd-82e6-6951f9957ba5.png"
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/api/installation/status":
@@ -131,7 +132,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 						"id": "conversation-1", "type": "customer", "direct": nil,
 						"customer": map[string]any{
 							"title": "Telegram 会话", "contactName": "访客",
-							"contactAvatarUrl": "/files/avatar-file-1/content",
+							"contactAvatarUrl": contactAvatarURL,
 							"channelType":      "telegram", "channelName": "Telegram", "preview": "你好",
 							"lastMessageAt": time.Now(), "serviceSessionStatus": "waiting",
 						},
@@ -172,7 +173,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			}
 			writeTestJSON(writer, http.StatusOK, map[string]string{
 				"id": "user-1", "organizationId": "organization-1", "displayName": input.DisplayName, "email": input.Email,
-				"avatarUrl": "/files/file-1/content",
+				"avatarUrl": "/storage/organizations/org/files/file.png",
 			})
 		case "/api/password":
 			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
@@ -353,7 +354,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(inbox.Conversations) != 1 || inbox.Conversations[0].Customer == nil || inbox.Conversations[0].Customer.ContactAvatarURL != remote.URL+"/files/avatar-file-1/content" {
+	if len(inbox.Conversations) != 1 || inbox.Conversations[0].Customer == nil || inbox.Conversations[0].Customer.ContactAvatarURL != contactAvatarURL {
 		t.Fatalf("normalized inbox = %#v", inbox)
 	}
 	message, err := backend.SendCustomerTextMessage(context.Background(), meta, "conversation-1", appservice.CustomerTextMessageInput{
@@ -370,7 +371,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if user.DisplayName != "林晓" || user.Email != "lin@example.com" || user.AvatarURL != remote.URL+"/files/file-1/content" {
+	if user.DisplayName != "林晓" || user.Email != "lin@example.com" || user.AvatarURL != remote.URL+"/storage/organizations/org/files/file.png" {
 		t.Fatalf("updated user = %#v", user)
 	}
 	if err := backend.ChangePassword(context.Background(), meta, appservice.ChangePasswordInput{

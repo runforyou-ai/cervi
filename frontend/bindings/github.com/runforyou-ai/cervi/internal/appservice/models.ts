@@ -1417,6 +1417,7 @@ export interface S3Setting {
     "enabled": boolean;
     "provider": StorageProvider;
     "endpoint": string;
+    "publicBaseUrl": string;
     "region": string;
     "bucket": string;
     "accessKeyId": string;
@@ -1431,6 +1432,7 @@ export interface S3SettingInput {
     "enabled": boolean;
     "provider": StorageProvider;
     "endpoint": string;
+    "publicBaseUrl": string;
     "region": string;
     "bucket": string;
     "accessKeyId": string;

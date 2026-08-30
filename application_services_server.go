@@ -80,8 +80,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		application.NewServiceWithOptions(httpAPI, application.ServiceOptions{
 			Route: "/api",
 		}),
-		application.NewServiceWithOptions(api.NewFileContentService(appStorage.DB(), localFiles, tenantResolver), application.ServiceOptions{
-			Route: "/files/",
+		application.NewServiceWithOptions(api.NewLocalObjectService(appStorage.DB(), localFiles, tenantResolver), application.ServiceOptions{
+			Route: "/storage/",
 		}),
 		application.NewService(&serverTaskLifecycle{runtime: tasks}),
 		application.NewServiceWithOptions(publicweb.NewEmbedService(publicLookup), application.ServiceOptions{

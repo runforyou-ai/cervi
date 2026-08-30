@@ -1514,6 +1514,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Enabled:         true,
 			Provider:        domain.StorageProviderAWS,
 			Endpoint:        "https://s3.example.com",
+			PublicBaseURL:   "https://cdn.example.com",
 			Region:          "us-east-1",
 			Bucket:          "cervi",
 			AccessKeyID:     "access-key",

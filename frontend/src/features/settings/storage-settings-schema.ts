@@ -25,6 +25,8 @@ export function createStorageSettingsSchema(messages: {
   providerInvalid: string
   endpointRequired: string
   endpointInvalid: string
+  publicBaseUrlRequired: string
+  publicBaseUrlInvalid: string
   regionRequired: string
   bucketRequired: string
   accessKeyIdRequired: string
@@ -41,6 +43,11 @@ export function createStorageSettingsSchema(messages: {
       .trim()
       .min(1, messages.endpointRequired)
       .refine(validEndpoint, messages.endpointInvalid),
+    publicBaseUrl: z
+      .string()
+      .trim()
+      .min(1, messages.publicBaseUrlRequired)
+      .refine(validEndpoint, messages.publicBaseUrlInvalid),
     region: z.string().trim().min(1, messages.regionRequired),
     bucket: z.string().trim().min(1, messages.bucketRequired),
     accessKeyId: z.string().trim().min(1, messages.accessKeyIdRequired),

@@ -24,6 +24,7 @@ type S3Setting struct {
 	Enabled         bool            `json:"enabled"`
 	Provider        StorageProvider `json:"provider"`
 	Endpoint        string          `json:"endpoint"`
+	PublicBaseURL   string          `json:"publicBaseUrl"`
 	Region          string          `json:"region"`
 	Bucket          string          `json:"bucket"`
 	AccessKeyID     string          `json:"accessKeyId"`
@@ -36,6 +37,7 @@ type S3SettingInput struct {
 	Enabled         bool            `json:"enabled"`
 	Provider        StorageProvider `json:"provider"`
 	Endpoint        string          `json:"endpoint"`
+	PublicBaseURL   string          `json:"publicBaseUrl"`
 	Region          string          `json:"region"`
 	Bucket          string          `json:"bucket"`
 	AccessKeyID     string          `json:"accessKeyId"`

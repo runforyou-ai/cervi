@@ -17,6 +17,7 @@ func TestSaveS3SettingRejectsInvalidIdentity(t *testing.T) {
 	input := S3Setting{
 		Provider:        domain.StorageProviderAWS,
 		Endpoint:        "https://s3.us-east-1.amazonaws.com",
+		PublicBaseURL:   "https://cdn.example.com",
 		Region:          "us-east-1",
 		Bucket:          "example",
 		AccessKeyID:     "access-key",

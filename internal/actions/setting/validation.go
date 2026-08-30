@@ -4,7 +4,6 @@
 package setting
 
 import (
-	"net/url"
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -33,6 +32,8 @@ type ValidationCode = common.FieldCode
 const (
 	ValidationEndpointRequired        ValidationCode = "ENDPOINT_REQUIRED"
 	ValidationEndpointInvalid         ValidationCode = "ENDPOINT_INVALID"
+	ValidationPublicBaseURLRequired   ValidationCode = "PUBLIC_BASE_URL_REQUIRED"
+	ValidationPublicBaseURLInvalid    ValidationCode = "PUBLIC_BASE_URL_INVALID"
 	ValidationProviderInvalid         ValidationCode = "PROVIDER_INVALID"
 	ValidationRegionRequired          ValidationCode = "REGION_REQUIRED"
 	ValidationBucketRequired          ValidationCode = "BUCKET_REQUIRED"
@@ -48,6 +49,7 @@ type S3Setting struct {
 	Enabled         bool                   `json:"enabled"`
 	Provider        domain.StorageProvider `json:"provider"`
 	Endpoint        string                 `json:"endpoint"`
+	PublicBaseURL   string                 `json:"publicBaseUrl"`
 	Region          string                 `json:"region"`
 	Bucket          string                 `json:"bucket"`
 	AccessKeyID     string                 `json:"accessKeyId"`
@@ -59,6 +61,7 @@ type S3Setting struct {
 func normalizeS3Setting(input S3Setting) (S3Setting, map[string]ValidationCode) {
 	input.Provider = domain.StorageProvider(strings.ToLower(strings.TrimSpace(string(input.Provider))))
 	input.Endpoint = strings.TrimSpace(input.Endpoint)
+	input.PublicBaseURL = strings.TrimRight(strings.TrimSpace(input.PublicBaseURL), "/")
 	input.Region = strings.TrimSpace(input.Region)
 	input.Bucket = strings.TrimSpace(input.Bucket)
 	input.AccessKeyID = strings.TrimSpace(input.AccessKeyID)
@@ -72,6 +75,11 @@ func normalizeS3Setting(input S3Setting) (S3Setting, map[string]ValidationCode) 
 		fields["endpoint"] = ValidationEndpointRequired
 	} else if !validEndpoint(input.Endpoint) {
 		fields["endpoint"] = ValidationEndpointInvalid
+	}
+	if input.PublicBaseURL == "" {
+		fields["publicBaseUrl"] = ValidationPublicBaseURLRequired
+	} else if !validEndpoint(input.PublicBaseURL) {
+		fields["publicBaseUrl"] = ValidationPublicBaseURLInvalid
 	}
 	if input.Region == "" {
 		fields["region"] = ValidationRegionRequired
@@ -99,11 +107,5 @@ func defaultS3Setting() S3Setting {
 
 // validEndpoint 判断对象存储服务地址是否完整有效。
 func validEndpoint(value string) bool {
-	parsed, err := url.ParseRequestURI(value)
-	return err == nil &&
-		(parsed.Scheme == "http" || parsed.Scheme == "https") &&
-		parsed.Host != "" &&
-		parsed.User == nil &&
-		parsed.RawQuery == "" &&
-		parsed.Fragment == ""
+	return common.ValidHTTPBaseURL(value)
 }

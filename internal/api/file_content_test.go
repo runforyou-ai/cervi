@@ -2,25 +2,58 @@
 
 package api
 
-import "testing"
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
 
-// TestContentFileID 验证文件内容服务能解析 Wails 移除挂载路径后的请求。
-func TestContentFileID(t *testing.T) {
-	fileID, ok := contentFileID("file-1/content")
-	if !ok || fileID != "file-1" {
-		t.Fatalf("contentFileID() = %q, %v", fileID, ok)
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
+)
+
+// TestLocalObjectStorageKey 验证本地对象服务只接受规范 storage_key。
+func TestLocalObjectStorageKey(t *testing.T) {
+	requestPath := "organizations/00000000-0000-0000-0000-000000000001/files/00000000-0000-0000-0000-000000000002.png"
+	storageKey, ok := localObjectStorageKey(requestPath)
+	if !ok || storageKey != requestPath {
+		t.Fatalf("localObjectStorageKey() = %q, %v", storageKey, ok)
 	}
-	if _, ok := contentFileID("/files/file-1"); ok {
-		t.Fatal("expected incomplete content path to fail")
+	for _, invalid := range []string{
+		"organizations/org/files/file.png",
+		"organizations/00000000-0000-0000-0000-000000000001/files/../file.png",
+		"organizations/00000000-0000-0000-0000-000000000001/files/00000000-0000-0000-0000-000000000002",
+	} {
+		if _, ok := localObjectStorageKey(invalid); ok {
+			t.Fatalf("expected %q to fail", invalid)
+		}
 	}
 }
 
-// TestContentDisposition 验证可预览类型内联展示，其他类型下载。
-func TestContentDisposition(t *testing.T) {
-	if value := contentDisposition("image/png", "头像.png"); value[:6] != "inline" {
-		t.Fatalf("image disposition = %q", value)
+// TestLocalObjectServiceServesFinalObjects 验证本地读取直接使用最终对象目录的静态文件服务。
+func TestLocalObjectServiceServesFinalObjects(t *testing.T) {
+	store, err := serverfilecontent.NewLocalStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if value := contentDisposition("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "方案.docx"); value[:10] != "attachment" {
-		t.Fatalf("document disposition = %q", value)
+	storageKey := "organizations/00000000-0000-0000-0000-000000000001/files/00000000-0000-0000-0000-000000000002.png"
+	if err := store.Save(context.Background(), storageKey, strings.NewReader("avatar"), 6); err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/"+storageKey, nil)
+	NewLocalObjectService(nil, store, nil).ServeHTTP(response, request)
+	if response.Code != http.StatusOK || response.Body.String() != "avatar" {
+		t.Fatalf("response = %d %q", response.Code, response.Body.String())
+	}
+	if response.Header().Get("Cache-Control") != serverfilecontent.ImmutableCacheControl {
+		t.Fatalf("cache control = %q", response.Header().Get("Cache-Control"))
+	}
+
+	missing := httptest.NewRecorder()
+	missingRequest := httptest.NewRequest(http.MethodGet, "/organizations/00000000-0000-0000-0000-000000000001/files/00000000-0000-0000-0000-000000000003.png", nil)
+	NewLocalObjectService(nil, store, nil).ServeHTTP(missing, missingRequest)
+	if missing.Code != http.StatusNotFound || missing.Header().Get("Cache-Control") != "" {
+		t.Fatalf("missing response = %d, cache control %q", missing.Code, missing.Header().Get("Cache-Control"))
 	}
 }

@@ -13,7 +13,10 @@ import (
 
 // TestWriterSavesLocalImportedFile 验证服务端导入内容按记录写入本地目录。
 func TestWriterSavesLocalImportedFile(t *testing.T) {
-	local := &LocalStore{root: t.TempDir()}
+	local, err := NewLocalStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	record := &servermodels.File{
 		StorageBackend: string(domain.FileStorageBackendLocal),
 		StorageKey:     "organizations/org/files/avatar.jpg", ByteSize: 3,

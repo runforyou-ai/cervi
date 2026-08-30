@@ -103,11 +103,21 @@ func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta Reque
 	if err != nil {
 		return TeamMemberCandidateList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
 	}
+	avatarFileIDs := make([]string, 0, len(output.Members))
+	for _, member := range output.Members {
+		if member.AvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *member.AvatarFileID)
+		}
+	}
+	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	if err != nil {
+		return TeamMemberCandidateList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
+	}
 	members := make([]TeamMemberCandidate, 0, len(output.Members))
 	for _, member := range output.Members {
 		members = append(members, TeamMemberCandidate{
 			IdentityType: OrganizationIdentityType(member.IdentityType), IdentityID: member.IdentityID,
-			DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
+			DisplayName: member.DisplayName, AvatarURL: optionalFileURL(avatarURLs, member.AvatarFileID),
 		})
 	}
 	return TeamMemberCandidateList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil

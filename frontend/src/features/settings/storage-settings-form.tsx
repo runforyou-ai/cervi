@@ -58,6 +58,7 @@ const emptySetting: StorageSettingsFormValues = {
   enabled: false,
   provider: StorageProvider.StorageProviderGeneric,
   endpoint: "https://s3.us-east-1.amazonaws.com",
+  publicBaseUrl: "",
   region: "us-east-1",
   bucket: "",
   accessKeyId: "",
@@ -68,6 +69,7 @@ const emptySetting: StorageSettingsFormValues = {
 const settingFieldNames = [
   "provider",
   "endpoint",
+  "publicBaseUrl",
   "region",
   "bucket",
   "accessKeyId",
@@ -78,6 +80,7 @@ const settingFieldNames = [
 function isConfigured(setting: StorageSettingsFormValues) {
   return Boolean(
     setting.endpoint.trim() &&
+      setting.publicBaseUrl.trim() &&
       setting.region.trim() &&
       setting.bucket.trim() &&
       setting.accessKeyId.trim() &&
@@ -103,6 +106,8 @@ export function StorageSettingsForm() {
         providerInvalid: t("storage.validation.providerInvalid"),
         endpointRequired: t("storage.validation.endpointRequired"),
         endpointInvalid: t("storage.validation.endpointInvalid"),
+        publicBaseUrlRequired: t("storage.validation.publicBaseUrlRequired"),
+        publicBaseUrlInvalid: t("storage.validation.publicBaseUrlInvalid"),
         regionRequired: t("storage.validation.regionRequired"),
         bucketRequired: t("storage.validation.bucketRequired"),
         accessKeyIdRequired: t("storage.validation.accessKeyIdRequired"),
@@ -435,6 +440,25 @@ export function StorageSettingsForm() {
               )}
             />
 
+            <Controller
+              name="publicBaseUrl"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name} required>
+                    {t("storage.form.publicBaseUrl")}
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    id={field.name}
+                    type="url"
+                    required
+                    aria-invalid={fieldState.invalid}
+                  />
+                </Field>
+              )}
+            />
+
             <FormInputField
               name="bucket"
               control={form.control}
@@ -555,6 +579,12 @@ export function StorageSettingsForm() {
                 {t("storage.form.endpoint")}
               </dt>
               <dd className="break-all">{savedSetting.endpoint}</dd>
+            </div>
+            <div className="grid gap-1 border-b py-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+              <dt className="text-muted-foreground">
+                {t("storage.form.publicBaseUrl")}
+              </dt>
+              <dd className="break-all">{savedSetting.publicBaseUrl}</dd>
             </div>
             <div className="grid gap-1 border-b py-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
               <dt className="text-muted-foreground">

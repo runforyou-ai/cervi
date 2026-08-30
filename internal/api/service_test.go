@@ -146,7 +146,7 @@ func (b *testBackend) UpdateProfile(_ context.Context, meta appservice.RequestMe
 func (b *testBackend) CreateFileUpload(_ context.Context, meta appservice.RequestMeta, input appservice.FileUploadInput) (appservice.FileUpload, error) {
 	b.lastMeta = meta
 	b.lastFileUpload = input
-	return appservice.FileUpload{File: appservice.File{ID: "file-1"}, Request: appservice.FileUploadRequest{Method: http.MethodPut, URL: "/files/file-1/content"}}, nil
+	return appservice.FileUpload{File: appservice.File{ID: "file-1"}, Request: appservice.FileUploadRequest{Method: http.MethodPut, URL: "/storage/organizations/org/files/file.png"}}, nil
 }
 
 // CompleteFileUpload 记录完成上传的文件编号。

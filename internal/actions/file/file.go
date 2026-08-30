@@ -26,6 +26,13 @@ type GetQuery struct {
 	db *bun.DB
 }
 
+// Location 定义生成公开地址所需的文件位置。
+type Location struct {
+	ID             string                    `bun:"id"`
+	StorageBackend domain.FileStorageBackend `bun:"storage_backend"`
+	StorageKey     string                    `bun:"storage_key"`
+}
+
 // NewGetQuery 创建文件查询。
 func NewGetQuery(db *bun.DB) *GetQuery {
 	return &GetQuery{db: db}
@@ -39,9 +46,49 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 	return get(ctx, q.db, identity.Organization.ID, fileID, "")
 }
 
-// GetActiveByID 返回已关联业务数据的指定文件。
-func (q *GetQuery) GetActiveByID(ctx context.Context, fileID string) (*servermodels.File, error) {
-	return get(ctx, q.db, "", fileID, domain.FileStatusActive)
+// ExecuteByStorageKey 返回当前企业中使用指定存储键的文件。
+func (q *GetQuery) ExecuteByStorageKey(ctx context.Context, identity *servermodels.Identity, storageKey string) (*servermodels.File, error) {
+	if !validIdentity(identity) {
+		return nil, common.ErrIdentityInvalid
+	}
+	record := &servermodels.File{}
+	err := q.db.NewSelect().Model(record).
+		ColumnExpr("f.*").
+		ColumnExpr("(f.expires_at IS NULL OR f.expires_at <= now()) AS expired").
+		Where("f.organization_id = ?", identity.Organization.ID).
+		Where("f.storage_key = ?", storageKey).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrFileNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get file by storage key: %w", err)
+	}
+	return record, nil
+}
+
+// ListActiveLocations 批量返回当前企业已关联文件的存储位置。
+func (q *GetQuery) ListActiveLocations(ctx context.Context, identity *servermodels.Identity, fileIDs []string) ([]Location, error) {
+	if !validIdentity(identity) {
+		return nil, common.ErrIdentityInvalid
+	}
+	fileIDs, valid := common.NormalizeUUIDs(fileIDs)
+	if !valid {
+		return nil, ErrFileNotFound
+	}
+	locations := make([]Location, 0, len(fileIDs))
+	if len(fileIDs) == 0 {
+		return locations, nil
+	}
+	if err := q.db.NewSelect().TableExpr("files AS f").
+		ColumnExpr("f.id::text, f.storage_backend, f.storage_key").
+		Where("f.organization_id = ?", identity.Organization.ID).
+		Where("f.id IN (?)", bun.In(fileIDs)).
+		Where("f.status = ?", domain.FileStatusActive).
+		Scan(ctx, &locations); err != nil {
+		return nil, fmt.Errorf("list active file locations: %w", err)
+	}
+	return locations, nil
 }
 
 // MarkUploadedAction 将核验通过的文件标记为已上传。

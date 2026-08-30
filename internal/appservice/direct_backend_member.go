@@ -24,10 +24,21 @@ func (b *DirectBackend) ListMemberOptions(ctx context.Context, meta RequestMeta,
 		slog.Warn("读取企业身份选择项失败", "organization_id", identity.Organization.ID, "error", err)
 		return MemberOptionList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
 	}
+	avatarFileIDs := make([]string, 0, len(output.Members))
+	for _, member := range output.Members {
+		if member.AvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *member.AvatarFileID)
+		}
+	}
+	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	if err != nil {
+		slog.Warn("读取企业身份头像失败", "organization_id", identity.Organization.ID, "error", err)
+		return MemberOptionList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
+	}
 	members := make([]MemberOption, 0, len(output.Members))
 	for _, member := range output.Members {
 		members = append(members, MemberOption{
-			ID: member.ID, Type: OrganizationIdentityType(member.Type), DisplayName: member.DisplayName, AvatarURL: avatarContentURL(member.AvatarFileID),
+			ID: member.ID, Type: OrganizationIdentityType(member.Type), DisplayName: member.DisplayName, AvatarURL: optionalFileURL(avatarURLs, member.AvatarFileID),
 		})
 	}
 	return MemberOptionList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
