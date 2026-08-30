@@ -254,6 +254,21 @@ export interface AgentModelOptionList {
 }
 
 /**
+ * AgentRunStatus 表示 Agent 单聊当前最近一次运行状态。
+ */
+export enum AgentRunStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentRunStatusQueued = "queued",
+    AgentRunStatusRunning = "running",
+    AgentRunStatusSucceeded = "succeeded",
+    AgentRunStatusFailed = "failed",
+};
+
+/**
  * AgentWorkStatusInput 定义 AI 员工工作状态修改字段。
  */
 export interface AgentWorkStatusInput {
@@ -670,9 +685,11 @@ export interface DirectConversationInput {
  */
 export interface DirectInboxConversation {
     "peerIdentityId": string;
+    "peerType": OrganizationIdentityType;
     "peerName": string;
     "preview": string | null;
     "lastMessageAt": string | null;
+    "agentRunStatus": AgentRunStatus | null;
 }
 
 /**

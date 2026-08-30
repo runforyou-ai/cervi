@@ -361,6 +361,17 @@ func (r *Runtime) heartbeat(ctx context.Context, runID, workerID string, message
 
 // finishFailedMessage 提交 Action 错误并安排重试或终止消息。
 func (r *Runtime) finishFailedMessage(ctx context.Context, run *servermodels.TaskRun, workerID string, message jetstream.Msg, runErr error) {
+	willRetry := !task.IsPermanent(runErr) && run.Attempt < run.MaxAttempts
+	if !willRetry {
+		finalizeCtx, cancelFinalize := taskFinalizationContext(ctx)
+		finalizeErr := r.finalizeActionFailure(finalizeCtx, run, runErr)
+		cancelFinalize()
+		if finalizeErr != nil {
+			slog.Warn("提交异步任务业务失败终态失败", "run_id", run.ID, "action", run.ActionName, "error", finalizeErr)
+			_ = message.NakWithDelay(taskNakRetryDelay)
+			return
+		}
+	}
 	finalizeCtx, cancelFinalize := taskFinalizationContext(ctx)
 	retry, err := r.repository.failRun(finalizeCtx, run, workerID, runErr, task.IsPermanent(runErr))
 	cancelFinalize()
@@ -383,6 +394,15 @@ func (r *Runtime) finishFailedMessage(ctx context.Context, run *servermodels.Tas
 	slog.Error("异步任务执行失败", "run_id", run.ID, "action", run.ActionName, "attempt", run.Attempt, "error", runErr)
 }
 
+// finalizeActionFailure 在任务最终失败前提交已注册的业务收尾。
+func (r *Runtime) finalizeActionFailure(ctx context.Context, run *servermodels.TaskRun, runErr error) error {
+	finalize, exists := r.registry.lookupTerminalFailure(run.ActionName)
+	if !exists {
+		return nil
+	}
+	return finalize(ctx, run.Payload, runErr)
+}
+
 // taskFinalizationContext 为任务终态写入保留独立的短超时窗口。
 func taskFinalizationContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.WithoutCancel(ctx), taskFinalizationTimeout)
@@ -400,13 +420,24 @@ func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, mess
 		_ = message.TermWithReason("task run does not exist")
 		return
 	}
-	if exhausted, failErr := r.repository.failExhaustedRun(ctx, runID); failErr != nil {
-		_ = message.NakWithDelay(taskNakRetryDelay)
-		return
-	} else if exhausted {
-		slog.Error("异步任务在最终尝试中失去租约", "run_id", runID, "action", run.ActionName)
-		_ = message.TermWithReason("task worker lease expired after final attempt")
-		return
+	if run.Status == statusRunning && run.Attempt >= run.MaxAttempts && run.LeaseExpiresAt != nil && !run.LeaseExpiresAt.After(time.Now()) {
+		exhaustedErr := errors.New("task worker lease expired after final attempt")
+		finalizeCtx, cancelFinalize := taskFinalizationContext(ctx)
+		finalizeErr := r.finalizeActionFailure(finalizeCtx, run, exhaustedErr)
+		cancelFinalize()
+		if finalizeErr != nil {
+			slog.Warn("提交耗尽任务业务失败终态失败", "run_id", run.ID, "action", run.ActionName, "error", finalizeErr)
+			_ = message.NakWithDelay(taskNakRetryDelay)
+			return
+		}
+		if exhausted, failErr := r.repository.failExhaustedRun(ctx, runID); failErr != nil {
+			_ = message.NakWithDelay(taskNakRetryDelay)
+			return
+		} else if exhausted {
+			slog.Error("异步任务在最终尝试中失去租约", "run_id", runID, "action", run.ActionName)
+			_ = message.TermWithReason(exhaustedErr.Error())
+			return
+		}
 	}
 	switch run.Status {
 	case statusSucceeded, statusFailed:

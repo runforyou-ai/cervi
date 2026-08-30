@@ -1,6 +1,7 @@
 /** 客户会话头与联系人头像。 */
 import { useEffect, useState } from "react"
 import {
+  BotIcon,
   GlobeIcon,
   MessageCircleIcon,
   SendIcon,
@@ -12,9 +13,11 @@ import {
   ChannelType,
   isCustomerInboxConversation,
   isDirectInboxConversation,
+  OrganizationIdentityType,
   type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
+import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { cn } from "@/lib/utils"
 
 const sourceBadges: Partial<
@@ -52,6 +55,9 @@ export function ConversationAvatar({
   const contactName = customer?.contactName?.trim() || direct?.peerName.trim()
   const avatarURL = customer?.contactAvatarUrl ?? ""
   const [avatarFailed, setAvatarFailed] = useState(false)
+  const directAgent =
+    direct?.peerType ===
+    OrganizationIdentityType.OrganizationIdentityTypeAgent
 
   useEffect(() => setAvatarFailed(false), [avatarURL])
 
@@ -71,6 +77,8 @@ export function ConversationAvatar({
             draggable={false}
             onError={() => setAvatarFailed(true)}
           />
+        ) : directAgent ? (
+          <BotIcon className="size-4.5" />
         ) : contactName ? (
           contactName.slice(0, 1).toLocaleUpperCase()
         ) : (
@@ -112,6 +120,13 @@ export function ConversationHeader({
   const customer = isCustomerInboxConversation(conversation)
     ? conversation.customer
     : null
+  const direct = isDirectInboxConversation(conversation)
+    ? conversation.direct
+    : null
+  const agentRunLabel = agentRunStatusLabel(
+    direct?.agentRunStatus ?? null,
+    t,
+  )
   const contextActionLabel = contextVisible
     ? t("contextClose")
     : t("contextOpen")
@@ -148,6 +163,10 @@ export function ConversationHeader({
             >
               {customer.title}
             </span>
+          </div>
+        ) : agentRunLabel ? (
+          <div className="text-xs text-muted-foreground">
+            {agentRunLabel}
           </div>
         ) : null}
       </div>

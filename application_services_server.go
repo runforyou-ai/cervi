@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
@@ -13,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
@@ -33,6 +35,15 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}
 	resolveFileS3 := newFileContentS3ConfigResolver(appStorage.DB())
 	tasks := servertask.New(appStorage.DB(), config.NATS)
+	agentRuntime, err := agentruntime.New()
+	if err != nil {
+		return nil, err
+	}
+	agentRunScheduler := agentrunaction.NewScheduler(tasks)
+	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime)
+	if err := servertask.RegisterJSONWithTerminalFailure(tasks.Registry(), agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
+		return nil, err
+	}
 	scanExpired := fileaction.NewScanExpiredAction(appStorage.DB(), tasks)
 	deleteExpired := fileaction.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, resolveFileS3))
 	if err := servertask.RegisterJSON(tasks.Registry(), fileaction.ScanExpiredActionName, scanExpired.Execute); err != nil {
@@ -46,7 +57,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: fileaction.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,
 	})
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB())
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

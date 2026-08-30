@@ -18,7 +18,6 @@ import {
   ServiceSessionStatus,
   isCustomerInboxConversation,
   isDirectInboxConversation,
-  type ConversationMessage,
   type CustomerInboxConversationData,
   type DirectInboxConversationData,
   type InboxConversation,
@@ -43,6 +42,7 @@ import {
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { previousDayKey } from "@/features/inbox/calendar"
+import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
 import {
@@ -51,6 +51,7 @@ import {
 } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
+import { useOutgoingConversationMessages } from "@/features/inbox/use-outgoing-conversation-messages"
 import {
   useIsNarrowViewport,
   useIsWideViewport,
@@ -498,8 +499,8 @@ function InboxConversationList({
   }
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
-      <div className="grid pb-1.5">
+    <ScrollArea className="min-h-0 min-w-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:block">
+      <div className="grid min-w-0 pb-1.5">
         {conversations.map((conversation) => {
           const name = conversationName(conversation)
           const summary = isCustomerInboxConversation(conversation)
@@ -508,6 +509,14 @@ function InboxConversationList({
               ? conversation.direct
               : null
           if (!summary) return null
+          const agentRunLabel = agentRunStatusLabel(
+            isDirectInboxConversation(conversation)
+              ? conversation.direct.agentRunStatus
+              : null,
+            t,
+          )
+          const preview = summary.preview ?? t("messagesEmpty")
+          const formattedTime = formatTime(summary.lastMessageAt)
           return (
             <button
               key={conversation.id}
@@ -515,7 +524,7 @@ function InboxConversationList({
               aria-pressed={selectedId === conversation.id}
               aria-label={name}
               className={cn(
-                "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors",
+                "flex w-full min-w-0 items-start gap-3 px-3 py-2.5 text-left transition-colors",
                 selectedId === conversation.id
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-muted",
@@ -523,29 +532,40 @@ function InboxConversationList({
               onClick={() => onSelect(conversation.id)}
             >
               <ConversationAvatar conversation={conversation} />
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">
-                    {name}
+              <span className="min-w-0 flex-1 overflow-hidden">
+                <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {name}
+                    </span>
+                    {agentRunLabel ? (
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {agentRunLabel}
+                      </span>
+                    ) : null}
                   </span>
-                  <span
-                    className={cn(
-                      "ml-auto shrink-0 text-xs text-muted-foreground",
-                      selectedId === conversation.id &&
-                        "text-accent-foreground/75",
-                    )}
-                  >
-                    {formatTime(summary.lastMessageAt)}
-                  </span>
+                  {formattedTime ? (
+                    <time
+                      dateTime={summary.lastMessageAt ?? undefined}
+                      className={cn(
+                        "shrink-0 text-xs text-muted-foreground",
+                        selectedId === conversation.id &&
+                          "text-accent-foreground/75",
+                      )}
+                    >
+                      {formattedTime}
+                    </time>
+                  ) : null}
                 </span>
                 <span
+                  title={preview}
                   className={cn(
-                    "mt-0.5 block truncate text-xs text-muted-foreground",
+                    "mt-0.5 block w-full min-w-0 truncate text-xs text-muted-foreground",
                     selectedId === conversation.id &&
                       "text-accent-foreground/75",
                   )}
                 >
-                  {summary.preview ?? t("messagesEmpty")}
+                  {preview}
                 </span>
               </span>
             </button>
@@ -649,19 +669,10 @@ function ConversationThread({
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
-  const [sentMessages, setSentMessages] = useState<ConversationMessage[]>([])
+  const outgoing = useOutgoingConversationMessages()
   const replySupported =
     isDirectInboxConversation(conversation) ||
     conversation.customer.channelType === ChannelType.ChannelTypeWebsite
-
-  /** 合并接口返回的已发送消息。 */
-  function appendSentMessage(message: ConversationMessage) {
-    setSentMessages((current) =>
-      current.some((item) => item.id === message.id)
-        ? current
-        : [...current, message],
-    )
-  }
 
   return (
     <>
@@ -669,13 +680,15 @@ function ConversationThread({
         conversationID={conversation.id}
         conversationType={conversation.type}
         currentIdentityID={identity.user.identityId}
-        sentMessages={sentMessages}
+        outgoingMessages={outgoing.messages}
       />
       {replySupported ? (
         <ConversationComposer
           conversationID={conversation.id}
           conversationType={conversation.type}
-          onSent={appendSentMessage}
+          onSending={outgoing.start}
+          onSent={outgoing.succeed}
+          onFailed={outgoing.fail}
         />
       ) : (
         <div className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-5 text-center text-sm text-muted-foreground">

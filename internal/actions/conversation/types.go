@@ -149,6 +149,7 @@ type DirectConversationInput struct {
 type DirectConversationSummary struct {
 	ID             string
 	PeerIdentityID string
+	PeerType       domain.OrganizationIdentityType
 	PeerName       string
 	Preview        *string
 	LastMessageAt  *time.Time

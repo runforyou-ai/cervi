@@ -14,7 +14,7 @@ import (
 
 var _ tenant.Resolver = (*TenantResolver)(nil)
 
-// TenantResolver 根据访问地址解析企业。
+// TenantResolver 优先根据访问地址解析企业，并兼容升级前的唯一企业。
 type TenantResolver struct {
 	db *bun.DB
 }
@@ -31,12 +31,10 @@ func (r *TenantResolver) Resolve(ctx context.Context, accessHost string) (tenant
 		return tenant.Scope{}, tenant.ErrNotFound
 	}
 	organization := &servermodels.Organization{}
-	err := r.db.NewSelect().
-		Model(organization).
-		Column("id", "name").
-		Where("o.access_host = ?", accessHost).
-		Limit(1).
-		Scan(ctx)
+	err := r.selectByAccessHost(ctx, organization, accessHost)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = r.selectByAccessHost(ctx, organization, "")
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return tenant.Scope{}, tenant.ErrNotFound
 	}
@@ -47,4 +45,14 @@ func (r *TenantResolver) Resolve(ctx context.Context, accessHost string) (tenant
 		OrganizationID:   organization.ID,
 		OrganizationName: organization.Name,
 	}, nil
+}
+
+// selectByAccessHost 按规范化访问地址读取企业。
+func (r *TenantResolver) selectByAccessHost(ctx context.Context, organization *servermodels.Organization, accessHost string) error {
+	return r.db.NewSelect().
+		Model(organization).
+		Column("id", "name").
+		Where("o.access_host = ?", accessHost).
+		Limit(1).
+		Scan(ctx)
 }

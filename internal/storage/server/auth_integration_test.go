@@ -13,6 +13,7 @@ import (
 	"time"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
@@ -27,12 +28,37 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/task"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 )
+
+type testAgentRuntime struct {
+	run func(context.Context, agentruntime.RunRequest, agentruntime.InputFeed) (agentruntime.RunResult, error)
+}
+
+func (r testAgentRuntime) Run(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+	return r.run(ctx, request, feed)
+}
+
+func assertDirectAgentRunStatus(t *testing.T, conversations []inboxaction.ConversationSummary, conversationID string, status domain.AgentRunStatus, preview string) {
+	t.Helper()
+	for _, conversation := range conversations {
+		if conversation.ID != conversationID {
+			continue
+		}
+		if conversation.Direct == nil || conversation.Direct.PeerType != domain.OrganizationIdentityTypeAgent || conversation.Direct.AgentRunStatus == nil || *conversation.Direct.AgentRunStatus != status || conversation.Direct.Preview == nil || *conversation.Direct.Preview != preview {
+			t.Fatalf("agent inbox conversation = %#v", conversation)
+		}
+		return
+	}
+	t.Fatalf("agent inbox conversation %q not found", conversationID)
+}
 
 // TestServerActionsWithPostgreSQL 验证服务端核心操作。
 // 企业安装与管理员登录是全局前置，留在顶层；其余按领域拆成有序子测试，
@@ -150,6 +176,29 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if !otherStatus.Installed || otherStatus.OrganizationName != "另一家测试公司" {
 		t.Fatalf("other tenant status = %#v", otherStatus)
+	}
+	legacyOrganization := &servermodels.Organization{AccessHost: "", Name: "升级前企业"}
+	if _, err := db.NewInsert().Model(legacyOrganization).
+		Column("access_host", "name").
+		Returning("id").
+		Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	legacyTenantContext := tenant.WithAccessHost(context.Background(), "legacy.cervi.test")
+	legacyStatus, err := status.Execute(legacyTenantContext)
+	if err != nil || !legacyStatus.Installed || legacyStatus.OrganizationName != legacyOrganization.Name {
+		t.Fatalf("legacy tenant status = %#v, error = %v", legacyStatus, err)
+	}
+	currentStatus, err = status.Execute(tenantContext)
+	if err != nil || currentStatus.OrganizationName != installed.Identity.Organization.Name {
+		t.Fatalf("exact tenant status with legacy fallback = %#v, error = %v", currentStatus, err)
+	}
+	if _, err := db.NewDelete().Model(legacyOrganization).WherePK().Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	legacyStatus, err = status.Execute(legacyTenantContext)
+	if err != nil || legacyStatus.Installed {
+		t.Fatalf("removed legacy tenant status = %#v, error = %v", legacyStatus, err)
 	}
 
 	// 全局前置：解析安装令牌、登出并重新登录管理员，失败直接终止整个测试。
@@ -981,7 +1030,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 		}
 
-		send := conversationaction.NewSendDirectTextMessageAction(db)
+		send := conversationaction.NewSendDirectTextMessageAction(db, nil)
 		message, err := send.Execute(context.Background(), memberLogin.Identity, conversationaction.DirectTextMessageInput{
 			ConversationID:  conversationID,
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
@@ -1151,6 +1200,210 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || updatedAgent.WorkStatus != domain.WorkStatusWorking {
 			t.Fatalf("working agent = %#v, error = %v", updatedAgent, err)
 		}
+
+		taskRuntime := servertask.New(db, serverconfig.NATSConfig{})
+		if err := servertask.RegisterJSON[agentrunaction.RunInput](taskRuntime.Registry(), agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error {
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		scheduler := agentrunaction.NewScheduler(taskRuntime)
+		agentConversation, err := conversationaction.NewStartDirectConversationAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.DirectConversationInput{
+			TargetIdentityID: createdAgent.IdentityID,
+		})
+		if err != nil || agentConversation.PeerType != domain.OrganizationIdentityTypeAgent {
+			t.Fatalf("agent direct conversation = %#v, error = %v", agentConversation, err)
+		}
+		sendAgentMessage := conversationaction.NewSendDirectTextMessageAction(db, scheduler)
+		firstAgentMessage := conversationaction.DirectTextMessageInput{
+			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7",
+		}
+		firstSaved, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, firstAgentMessage)
+		if err != nil {
+			t.Fatal(err)
+		}
+		firstRetried, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, firstAgentMessage)
+		if err != nil || firstRetried.ID != firstSaved.ID {
+			t.Fatalf("idempotent agent message = %#v, error = %v", firstRetried, err)
+		}
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f71", Body: "只给我最终结果",
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		state := &servermodels.ConversationAgentState{}
+		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		triggerCount, err := db.NewSelect().Model((*servermodels.ConversationAgentTrigger)(nil)).Where("cat.conversation_id = ?", agentConversation.ID).Count(context.Background())
+		if err != nil || state.DesiredSeq != 2 || state.ProcessedSeq != 0 || triggerCount != 2 {
+			t.Fatalf("scheduled agent input state = %#v, triggers = %d, error = %v", state, triggerCount, err)
+		}
+		run := &servermodels.AgentRun{}
+		if err := db.NewSelect().Model(run).Where("agr.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		taskRun := &servermodels.TaskRun{}
+		if err := db.NewSelect().Model(taskRun).Where("tr.idempotency_key = ?", "agent:"+run.ID).Scan(context.Background()); err != nil || taskRun.MaxAttempts != 3 {
+			t.Fatalf("agent task run = %#v, error = %v", taskRun, err)
+		}
+		inboxBeforeRun, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertDirectAgentRunStatus(t, inboxBeforeRun, agentConversation.ID, domain.AgentRunStatusQueued, "只给我最终结果")
+
+		executedRuntime := testAgentRuntime{run: func(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+			if request.Name != "售前智能体" || request.Model.Identifier != model.Identifier {
+				return agentruntime.RunResult{}, errors.New("unexpected agent runtime request")
+			}
+			pending, err := feed.Peek(ctx, 0)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			if len(pending) != 2 || pending[1].Seq != 2 {
+				return agentruntime.RunResult{}, errors.New("unexpected pending agent triggers")
+			}
+			firstClaim, err := feed.Claim(ctx, pending[0].Seq)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			if firstClaim.EndSeq != 1 || len(firstClaim.Messages) != 1 {
+				return agentruntime.RunResult{}, errors.New("agent claim exceeded requested boundary")
+			}
+			claimed, err := feed.Claim(ctx, pending[1].Seq)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			if claimed.EndSeq != 2 || len(claimed.Messages) != 2 {
+				return agentruntime.RunResult{}, errors.New("unexpected claimed agent input")
+			}
+			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}}, nil
+		}}
+		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime)
+		if _, err := db.ExecContext(context.Background(), `
+			ALTER TABLE messages
+			ADD CONSTRAINT messages_reject_test_agent_response
+			CHECK (idempotency_key IS NULL OR idempotency_key NOT LIKE 'agent:%')
+		`); err != nil {
+			t.Fatal(err)
+		}
+		persistenceErr := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID})
+		if persistenceErr == nil || task.IsPermanent(persistenceErr) {
+			t.Fatalf("agent completion persistence error = %#v", persistenceErr)
+		}
+		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.NewSelect().Model(run).Where("agr.id = ?", run.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		messageCountAfterPersistenceError, err := db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", agentConversation.ID).Count(context.Background())
+		if err != nil || state.ProcessedSeq != 0 || run.Status != string(domain.AgentRunStatusRunning) || messageCountAfterPersistenceError != 2 {
+			t.Fatalf("agent run after completion persistence error = %#v, state = %#v, messages = %d, error = %v", run, state, messageCountAfterPersistenceError, err)
+		}
+		if _, err := db.ExecContext(context.Background(), `ALTER TABLE messages DROP CONSTRAINT messages_reject_test_agent_response`); err != nil {
+			t.Fatal(err)
+		}
+		if err := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID}); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.NewSelect().Model(run).Where("agr.id = ?", run.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		messageCount, err := db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", agentConversation.ID).Count(context.Background())
+		if err != nil || state.ProcessedSeq != 2 || run.Status != string(domain.AgentRunStatusSucceeded) || run.ResponseMessageID == nil || messageCount != 3 {
+			t.Fatalf("completed agent run = %#v, state = %#v, messages = %d, error = %v", run, state, messageCount, err)
+		}
+		inboxAfterRun, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertDirectAgentRunStatus(t, inboxAfterRun, agentConversation.ID, domain.AgentRunStatusSucceeded, "结果是 42")
+
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f72", Body: "这次模拟模型失败",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		failedRun := &servermodels.AgentRun{}
+		if err := db.NewSelect().Model(failedRun).
+			Where("agr.conversation_id = ?", agentConversation.ID).
+			Where("agr.status = ?", domain.AgentRunStatusQueued).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		failingRuntime := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+			pending, err := feed.Peek(ctx, 0)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			if len(pending) != 1 || pending[0].Seq != 3 {
+				return agentruntime.RunResult{}, errors.New("unexpected failing agent trigger")
+			}
+			if _, err := feed.Claim(ctx, pending[0].Seq); err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			return agentruntime.RunResult{}, errors.New("model rejected input")
+		}}
+		if err := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime).Execute(context.Background(), agentrunaction.RunInput{RunID: failedRun.ID}); err == nil {
+			t.Fatal("failing agent run succeeded")
+		}
+		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.NewSelect().Model(failedRun).Where("agr.id = ?", failedRun.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if state.ProcessedSeq != 3 || failedRun.Status != string(domain.AgentRunStatusFailed) || failedRun.TriggerEndSeq == nil || *failedRun.TriggerEndSeq != 3 {
+			t.Fatalf("failed claimed agent run = %#v, state = %#v", failedRun, state)
+		}
+
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f73", Body: "失败后继续",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		exhaustedRun := &servermodels.AgentRun{}
+		if err := db.NewSelect().Model(exhaustedRun).
+			Where("agr.conversation_id = ?", agentConversation.ID).
+			Where("agr.status = ?", domain.AgentRunStatusQueued).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if exhaustedRun.TriggerStartSeq != 4 {
+			t.Fatalf("agent run after failure starts at %d, want 4", exhaustedRun.TriggerStartSeq)
+		}
+		finalizer := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime)
+		if err := finalizer.FinalizeFailure(context.Background(), agentrunaction.RunInput{RunID: exhaustedRun.ID}, errors.New("task attempts exhausted")); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.NewSelect().Model(exhaustedRun).Where("agr.id = ?", exhaustedRun.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if state.ProcessedSeq != 4 || exhaustedRun.Status != string(domain.AgentRunStatusFailed) || exhaustedRun.TriggerEndSeq == nil || *exhaustedRun.TriggerEndSeq != 4 {
+			t.Fatalf("exhausted agent run = %#v, state = %#v", exhaustedRun, state)
+		}
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f74", Body: "耗尽后继续",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		nextRun := &servermodels.AgentRun{}
+		if err := db.NewSelect().Model(nextRun).
+			Where("agr.conversation_id = ?", agentConversation.ID).
+			Where("agr.status = ?", domain.AgentRunStatusQueued).
+			Scan(context.Background()); err != nil || nextRun.TriggerStartSeq != 5 {
+			t.Fatalf("agent run after exhausted task = %#v, error = %v", nextRun, err)
+		}
+
 		if _, err := useraction.NewUpdateUserAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
 			DisplayName: createdMember.DisplayName, Email: createdMember.Email, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},
 		}); err != nil {

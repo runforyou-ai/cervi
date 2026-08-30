@@ -392,7 +392,7 @@ AI 调用不能依赖用户已读状态，也不能把模型请求、工具步�
 - `agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
 - 自动响应记录触发消息、精确输入快照、配置版本与快照、语义步骤、工具调用、输出消息、费用、失败、取消和人工接管，保证可审计和可恢复。
 
-首轮内部 AI 员工和网站 AI 客服验证限定为一个 Trigger、一个 Run、一次模型调用和一条最终文本 Message，不创建 Step 或 Tool Invocation，也不依赖流式实时能力。最终 Message 使用 `agent:<agent_run_id>` 业务幂等键；输出消息、Run 终态与 `processed_*` 在同一事务提交。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
+首轮内部 AI 员工验证使用 Agent Direct 自动触发，并允许同一 Run 在 Eino 安全点吸收连续 Trigger；网站 AI 客服的合并策略在对应阶段确定。两者都只持久化一条最终文本 Message，不依赖流式实时能力。内部验证先开放一个无副作用计算器且不创建 Tool Invocation；任何业务、设备或副作用 Tool 仍须先落完整审计。最终 Message 使用 `agent:<agent_run_id>` 业务幂等键；输出消息、Run 终态与 `processed_*` 在同一事务提交。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
 
 ## 8. 第三方用户消息账号接入预留
 
@@ -1299,9 +1299,10 @@ P3 typing、presence 等临时事件
 
 #### 阶段 2C：内部 Agent 最小聊天事实与 AI 员工验证
 
-- Agent 作为普通聊天主体加入内部单聊或群聊，首个入口由显式 @Agent 触发，并生成一条最终文本 Message。
+- Agent 作为普通聊天主体加入内部单聊，发给活跃 Agent 的新文本自动触发，并生成一条最终文本 Message；群聊 @Agent 在基础群聊和提醒事实完成后接入。
+- 首个 Runtime 精确锁定 Eino v0.10 Alpha，并用纯函数计算器验证 Tool 闭环；运行中到达的新消息必须在下一次 Tool 或模型规划前通过持久 Trigger 补入。
 - 客户端通过业务查询和轮询读取最终消息，本子阶段不依赖统一实时、AI 流式帧或离线 Mailbox。
-- 本子阶段验收参与者、@ 事实、最终 Message 和访问边界；Runtime 由 `agent-roadmap.md` 定义。
+- 本子阶段验收 Agent Participant、Trigger 水位、Run 幂等、最终 Message 和访问边界；Runtime 由 `agent-roadmap.md` 定义。
 
 #### 阶段 2D：网站 AI 客服
 
@@ -1478,7 +1479,7 @@ POST /api/direct-conversations/{conversationID}/messages
 GET  /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
 ```
 
-发起单聊只接受当前企业的活跃用户身份，不接受自己、AI 员工、联系人、跨企业或停用用户。服务端在校验完成后，使用规范文本 `cervi:direct:<organization_id>:<min_identity_id>:<max_identity_id>` 的稳定 `bigint` 哈希取得事务级 advisory lock；锁内取得双方 `organization_identity` ChatSubject，并只复用类型为 `direct`、同企业、Participant 总数恰好为 2 且主体集合精确匹配的 Conversation。锁在创建 ChatSubject 前取得，Direct 创建统一经过该 Action，不增加主体配对关系表。已有归档会话只在显式发起时恢复为 `active`。
+阶段 2A 交付时发起单聊只接受当前企业的活跃用户身份；阶段 2C 扩展为同时接受活跃 Agent 身份，仍不接受自己、联系人、跨企业或停用身份。服务端在校验完成后，使用规范文本 `cervi:direct:<organization_id>:<min_identity_id>:<max_identity_id>` 的稳定 `bigint` 哈希取得事务级 advisory lock；锁内取得双方 `organization_identity` ChatSubject，并只复用类型为 `direct`、同企业、Participant 总数恰好为 2 且主体集合精确匹配的 Conversation。锁在创建 ChatSubject 前取得，Direct 创建统一经过该 Action，不增加主体配对关系表。已有归档会话只在显式发起时恢复为 `active`。
 
 Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 Participant 或恢复归档 Conversation；消息继续使用 `mmsg:<organization_identity_id>:<client_message_id>` 幂等键，且不关联 ServiceSession。成员历史查询按 Conversation 类型严格分叉：Customer 保持企业与客户扩展授权，Direct 要求当前身份是未离开的 Participant，其他类型不开放。
 
@@ -1488,7 +1489,15 @@ Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 
 
 Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，群聊继续显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接、交给 AI 或客户上下文栏。移动端统一展示 Customer 与 Direct 摘要，Customer 仍保持只读摘要，Direct 支持发起、详情、历史、文本发送和前台轮询；移动端详情隐藏一级导航并独立处理底部安全区。
 
-### 13.9 当前共同边界与后续交付
+### 13.9 阶段 2C：Agent Direct、Eino 与计算器 Tool（本次交付）
+
+本 PR 在既有 Direct 上允许选择活跃 AI 员工。用户文本首次持久化时，在同一事务推进 `conversation_agent_states`、创建 `conversation_agent_triggers`、单个活动 `agent_runs` 和隔离 Agent Worker 任务；消息幂等重放不重复触发。Run 成功或失败都推进明确的 `processed_seq`，Task 重试耗尽通过通用终态回调收敛业务 Run，避免活动索引永久卡住会话。
+
+Runtime 通过内部适配层精确锁定 Eino v0.10 Alpha，并优先使用 eino-ext 的 OpenAI 兼容模型组件。首个 Tool 只有无副作用四则运算计算器；TurnLoop 轮询持久 Trigger，通过 `Push + AnySafePoint` 并等待 preempt ack，保证 Tool 完成后、下一次模型规划前读取最新会话上下文。该重建方式只适用于可安全重放的计算器，不作为未来设备或副作用 Tool 的恢复模型。
+
+Web、桌面端与移动端复用统一收件箱、Direct 时间线和前台轮询，展示 Agent 类型及排队、运行、失败状态；移动端详情继续遵循前台运行与底部安全区约束。本 PR 不实现流式输出、Tool Invocation、审批、设备权限、本地 Agent Runtime、群聊 @Agent 或网站 AI 客服。
+
+### 13.10 当前共同边界与后续交付
 
 网站访客 Messenger 已在当前打开的 Conversation 中使用 `after` 每 3 秒补拉新增文本；页面不可见或嵌入挂件收起时停止轮询，恢复后立即补拉。访客发送结果与增量结果按 `(originated_at, id)` 有序去重合入，发送不自行推进服务端游标。
 
@@ -1497,7 +1506,7 @@ Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，�
 - ServiceSession 领取、转接、挂起和结束命令。
 - 客户队列按负责人、团队和关闭状态真实筛选。
 - 未读、实时、文件、外部平台投递、指标和满意度。
-- 第三方用户消息账号、受管访客、联邦和 AI 运行表。
+- 第三方用户消息账号、受管访客、联邦和完整 Agent 策略与审计表。
 - `customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。
 
 后续按独立 PR 继续完成：

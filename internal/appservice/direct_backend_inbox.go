@@ -47,9 +47,14 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox,
 			}
 		}
 		if summary.Direct != nil {
+			var agentRunStatus *AgentRunStatus
+			if summary.Direct.AgentRunStatus != nil {
+				status := AgentRunStatus(*summary.Direct.AgentRunStatus)
+				agentRunStatus = &status
+			}
 			conversation.Direct = &DirectInboxConversation{
-				PeerIdentityID: summary.Direct.PeerIdentityID, PeerName: summary.Direct.PeerName,
-				Preview: summary.Direct.Preview, LastMessageAt: summary.Direct.LastMessageAt,
+				PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName,
+				Preview: summary.Direct.Preview, LastMessageAt: summary.Direct.LastMessageAt, AgentRunStatus: agentRunStatus,
 			}
 		}
 		conversations = append(conversations, conversation)

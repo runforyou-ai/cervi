@@ -46,6 +46,43 @@ func TestRegisterJSONMarksInvalidPayloadPermanent(t *testing.T) {
 	}
 }
 
+// TestRegisterJSONWithTerminalFailure 解码并执行最终失败业务收尾。
+func TestRegisterJSONWithTerminalFailure(t *testing.T) {
+	type input struct {
+		Value string `json:"value"`
+	}
+	registry := NewRegistry()
+	var finalized string
+	terminalErr := errors.New("attempts exhausted")
+	if err := RegisterJSONWithTerminalFailure(
+		registry,
+		"test.finalized_action",
+		func(context.Context, input) error { return nil },
+		func(_ context.Context, value input, runErr error) error {
+			if !errors.Is(runErr, terminalErr) {
+				t.Fatalf("terminal error = %v", runErr)
+			}
+			finalized = value.Value
+			return nil
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	finalize, exists := registry.lookupTerminalFailure("test.finalized_action")
+	if !exists {
+		t.Fatal("terminal failure handler not found")
+	}
+	if err := finalize(context.Background(), json.RawMessage(`{"value":"done"}`), terminalErr); err != nil {
+		t.Fatal(err)
+	}
+	if finalized != "done" {
+		t.Fatalf("finalized input = %q", finalized)
+	}
+	if err := finalize(context.Background(), json.RawMessage(`{"value":`), terminalErr); err != nil {
+		t.Fatalf("malformed terminal payload should not block task finalization: %v", err)
+	}
+}
+
 // TestPermanentPreservesCause 验证永久错误仍支持错误链判断。
 func TestPermanentPreservesCause(t *testing.T) {
 	cause := errors.New("invalid input")

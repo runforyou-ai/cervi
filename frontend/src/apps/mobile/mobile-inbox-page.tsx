@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import {
+  BotIcon,
   GlobeIcon,
   LoaderCircleIcon,
   MessageCircleIcon,
@@ -19,6 +20,7 @@ import {
   isCustomerInboxConversation,
   isDirectInboxConversation,
   loadInbox,
+  OrganizationIdentityType,
   ServiceSessionStatus,
   type CustomerInboxConversationData,
   type DirectInboxConversationData,
@@ -28,6 +30,7 @@ import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
+import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
 import {
   memberChatPollingInterval,
@@ -182,6 +185,9 @@ function MobileConversationAvatar({
     : directConversation?.direct.peerName.trim()
   const avatarURL = customerConversation?.customer.contactAvatarUrl ?? ""
   const [avatarFailed, setAvatarFailed] = useState(false)
+  const directAgent =
+    directConversation?.direct.peerType ===
+    OrganizationIdentityType.OrganizationIdentityTypeAgent
 
   useEffect(() => setAvatarFailed(false), [avatarURL])
 
@@ -201,6 +207,8 @@ function MobileConversationAvatar({
             draggable={false}
             onError={() => setAvatarFailed(true)}
           />
+        ) : directAgent ? (
+          <BotIcon className="size-4.5" />
         ) : displayName ? (
           Array.from(displayName)[0]?.toLocaleUpperCase()
         ) : (
@@ -242,21 +250,44 @@ function MobileConversationRow({
     ? customerConversation.customer.contactName ?? t("anonymousVisitor")
     : directConversation?.direct.peerName.trim() || t("unknownSender")
   const summary = customerConversation?.customer ?? directConversation?.direct
+  const agentRunLabel = agentRunStatusLabel(
+    directConversation?.direct.agentRunStatus ?? null,
+    t,
+  )
 
   if (!summary) return null
+  const preview = summary.preview ?? t("messagesEmpty")
+  const formattedTime = formatTime(summary.lastMessageAt)
 
   const content = (
     <>
       <MobileConversationAvatar conversation={conversation} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-[15px] font-medium">{name}</p>
-          <time className="ml-auto shrink-0 text-xs text-muted-foreground">
-            {formatTime(summary.lastMessageAt)}
-          </time>
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="min-w-0 flex-1 truncate text-[15px] font-medium">
+              {name}
+            </p>
+            {agentRunLabel ? (
+              <span className="shrink-0 text-[10px] text-muted-foreground">
+                {agentRunLabel}
+              </span>
+            ) : null}
+          </div>
+          {formattedTime ? (
+            <time
+              dateTime={summary.lastMessageAt ?? undefined}
+              className="shrink-0 text-xs text-muted-foreground"
+            >
+              {formattedTime}
+            </time>
+          ) : null}
         </div>
-        <p className="mt-0.5 truncate text-sm text-muted-foreground">
-          {summary.preview ?? t("messagesEmpty")}
+        <p
+          title={preview}
+          className="mt-0.5 w-full min-w-0 truncate text-sm text-muted-foreground"
+        >
+          {preview}
         </p>
         {customerConversation ? (
           <div className="mt-1.5 flex min-w-0 items-center gap-2">
@@ -287,14 +318,14 @@ function MobileConversationRow({
       {directConversation ? (
         <button
           type="button"
-          className="flex w-full gap-3 px-4 py-3 text-left transition-colors active:bg-muted"
+          className="flex w-full min-w-0 gap-3 px-4 py-3 text-left transition-colors active:bg-muted"
           aria-label={name}
           onClick={() => onOpenDirect(directConversation)}
         >
           {content}
         </button>
       ) : (
-        <div className="flex gap-3 px-4 py-3">{content}</div>
+        <div className="flex min-w-0 gap-3 px-4 py-3">{content}</div>
       )}
     </li>
   )

@@ -34,12 +34,19 @@ type StartDirectConversationAction struct {
 
 // SendDirectTextMessageAction 持久化企业成员内部单聊文本消息。
 type SendDirectTextMessageAction struct {
-	db *bun.DB
+	db             *bun.DB
+	agentScheduler DirectAgentMessageScheduler
+}
+
+// DirectAgentMessageScheduler 把发给 Agent 的单聊消息加入持久化输入流。
+type DirectAgentMessageScheduler interface {
+	Schedule(context.Context, bun.IDB, string, string, string, string, string) error
 }
 
 type directTargetRow struct {
-	IdentityID  string `bun:"identity_id"`
-	DisplayName string `bun:"display_name"`
+	IdentityID   string                          `bun:"identity_id"`
+	IdentityType domain.OrganizationIdentityType `bun:"identity_type"`
+	DisplayName  string                          `bun:"display_name"`
 }
 
 type directConversationIDs struct {
@@ -57,9 +64,12 @@ type directConversationSummaryRow struct {
 }
 
 type directSendContextRow struct {
-	ConversationID string `bun:"conversation_id"`
-	ParticipantID  string `bun:"participant_id"`
-	SubjectID      string `bun:"subject_id"`
+	ConversationID string                          `bun:"conversation_id"`
+	ParticipantID  string                          `bun:"participant_id"`
+	SubjectID      string                          `bun:"subject_id"`
+	PeerType       domain.OrganizationIdentityType `bun:"peer_type"`
+	PeerIdentityID string                          `bun:"peer_identity_id"`
+	PeerRevisionID *string                         `bun:"peer_revision_id"`
 }
 
 // NewStartDirectConversationAction 创建内部单聊发起操作。
@@ -68,8 +78,8 @@ func NewStartDirectConversationAction(db *bun.DB) *StartDirectConversationAction
 }
 
 // NewSendDirectTextMessageAction 创建内部单聊发送操作。
-func NewSendDirectTextMessageAction(db *bun.DB) *SendDirectTextMessageAction {
-	return &SendDirectTextMessageAction{db: db}
+func NewSendDirectTextMessageAction(db *bun.DB, agentScheduler DirectAgentMessageScheduler) *SendDirectTextMessageAction {
+	return &SendDirectTextMessageAction{db: db, agentScheduler: agentScheduler}
 }
 
 // Execute 发起或打开当前成员与目标成员的长期单聊。
@@ -189,6 +199,17 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 				Exec(ctx); err != nil {
 				return fmt.Errorf("create direct text message: %w", err)
 			}
+			if sendContext.PeerType == domain.OrganizationIdentityTypeAgent {
+				if a.agentScheduler == nil || sendContext.PeerIdentityID == "" || sendContext.PeerRevisionID == nil {
+					return ErrDataInvariant
+				}
+				if err := a.agentScheduler.Schedule(
+					ctx, tx, identity.Organization.ID, normalized.ConversationID,
+					sendContext.PeerIdentityID, *sendContext.PeerRevisionID, message.ID,
+				); err != nil {
+					return fmt.Errorf("schedule agent direct message: %w", err)
+				}
+			}
 			conversation := &servermodels.Conversation{ID: normalized.ConversationID, OrganizationID: identity.Organization.ID}
 			if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
 				return err
@@ -216,12 +237,13 @@ func loadDirectTarget(ctx context.Context, db bun.IDB, organizationID, identityI
 	err := db.NewSelect().
 		TableExpr("organization_identities AS oi").
 		ColumnExpr("oi.id AS identity_id").
+		ColumnExpr("oi.type AS identity_type").
 		ColumnExpr("oi.display_name AS display_name").
-		Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ?", organizationID).
 		Where("oi.id = ?", identityID).
-		Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
-		Where("u.status = ?", domain.UserStatusActive).
+		Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
 		Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return directTargetRow{}, ErrDirectTargetNotFound
@@ -341,7 +363,7 @@ func loadDirectConversationSummary(ctx context.Context, db bun.IDB, organization
 		return DirectConversationSummary{}, fmt.Errorf("load direct conversation summary: %w", err)
 	}
 	return DirectConversationSummary{
-		ID: row.ID, PeerIdentityID: target.IdentityID, PeerName: target.DisplayName,
+		ID: row.ID, PeerIdentityID: target.IdentityID, PeerType: target.IdentityType, PeerName: target.DisplayName,
 		Preview: row.Preview, LastMessageAt: row.LastMessageAt,
 	}, nil
 }
@@ -354,16 +376,21 @@ func loadDirectSendContext(ctx context.Context, db bun.IDB, identity *servermode
 		ColumnExpr("cv.id AS conversation_id").
 		ColumnExpr("mine.id AS participant_id").
 		ColumnExpr("mine_cs.id AS subject_id").
+		ColumnExpr("peer_oi.type AS peer_type").
+		ColumnExpr("peer_oi.id AS peer_identity_id").
+		ColumnExpr("peer_a.active_revision_id AS peer_revision_id").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		Join("JOIN conversation_participants AS peer ON peer.organization_id = cv.organization_id AND peer.conversation_id = cv.id AND peer.subject_id <> mine.subject_id AND peer.left_at IS NULL").
 		Join("JOIN chat_subjects AS peer_cs ON peer_cs.organization_id = peer.organization_id AND peer_cs.id = peer.subject_id AND peer_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = peer_cs.organization_id AND peer_oi.id = peer_cs.source_id AND peer_oi.type = ?", domain.OrganizationIdentityTypeUser).
-		Join("JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id AND peer_u.status = ?", domain.UserStatusActive).
+		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = peer_cs.organization_id AND peer_oi.id = peer_cs.source_id").
+		Join("LEFT JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id").
+		Join("LEFT JOIN agents AS peer_a ON peer_a.organization_id = peer_oi.organization_id AND peer_a.identity_id = peer_oi.id").
 		Where("cv.organization_id = ?", identity.Organization.ID).
 		Where("cv.id = ?", conversationID).
 		Where("cv.type = ?", domain.ConversationTypeDirect).
 		Where("cv.status = ?", domain.ConversationStatusActive).
+		Where("((peer_oi.type = ? AND peer_u.status = ?) OR (peer_oi.type = ? AND peer_a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
 		Where("(SELECT count(*) FROM conversation_participants AS all_cp WHERE all_cp.organization_id = cv.organization_id AND all_cp.conversation_id = cv.id) = 2").
 		Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
