@@ -269,6 +269,7 @@ export function listKnowledgeDocumentSegments(
     documentId,
     {
       keyword: query.keyword ?? "",
+      status: query.status ?? null,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 20,
     },

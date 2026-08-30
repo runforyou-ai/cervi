@@ -127,9 +127,10 @@ type KnowledgeDocument struct {
 
 // KnowledgeDocumentSegmentListInput 定义知识文档分段列表查询条件。
 type KnowledgeDocumentSegmentListInput struct {
-	Keyword  string `json:"keyword" query:"keyword"`
-	Page     int    `json:"page" query:"page,default=1"`
-	PageSize int    `json:"pageSize" query:"pageSize,default=20"`
+	Keyword  string                               `json:"keyword" query:"keyword"`
+	Status   *KnowledgeDocumentSegmentIndexStatus `json:"status,omitempty" query:"status"`
+	Page     int                                  `json:"page" query:"page,default=1"`
+	PageSize int                                  `json:"pageSize" query:"pageSize,default=20"`
 }
 
 // KnowledgeDocumentSegment 定义知识文档分段列表项。

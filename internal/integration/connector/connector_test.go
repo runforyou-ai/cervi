@@ -183,7 +183,8 @@ func TestDifyKnowledgeDocumentDetailAndSegments(t *testing.T) {
 			}`))
 		case "/v1/datasets/dataset-1/documents/document-1/segments":
 			query := request.URL.Query()
-			if query.Get("keyword") != "安装" || query.Get("page") != "2" || query.Get("limit") != "20" {
+			if query.Get("keyword") != "安装" || query.Get("status") != "completed" ||
+				query.Get("page") != "2" || query.Get("limit") != "20" {
 				t.Fatalf("unexpected segment query: %s", request.URL.RawQuery)
 			}
 			_, _ = writer.Write([]byte(`{
@@ -215,7 +216,7 @@ func TestDifyKnowledgeDocumentDetailAndSegments(t *testing.T) {
 		config,
 		"dataset-1",
 		"document-1",
-		DifyKnowledgeDocumentSegmentListInput{Keyword: "安装", Page: 2, PageSize: 20},
+		DifyKnowledgeDocumentSegmentListInput{Keyword: "安装", Status: "completed", Page: 2, PageSize: 20},
 	)
 	if err != nil {
 		t.Fatalf("list knowledge document segments: %v", err)

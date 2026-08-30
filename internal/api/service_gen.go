@@ -891,6 +891,7 @@ func bindKnowledgeDocumentSegmentListInputQuery(c *gin.Context) (appservice.Know
 	}
 	return appservice.KnowledgeDocumentSegmentListInput{
 		Keyword:  c.Query("keyword"),
+		Status:   optionalEnum[appservice.KnowledgeDocumentSegmentIndexStatus](c.Query("status")),
 		Page:     page,
 		PageSize: pageSize,
 	}, true

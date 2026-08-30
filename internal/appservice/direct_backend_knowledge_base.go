@@ -163,7 +163,12 @@ func (b *DirectBackend) ListKnowledgeDocumentSegments(
 		knowledgeBaseID,
 		documentID,
 		knowledgebaseaction.DocumentSegmentListInput{
-			Keyword: input.Keyword, Page: input.Page, PageSize: input.PageSize,
+			Keyword: input.Keyword,
+			Status: optionalDomain[
+				KnowledgeDocumentSegmentIndexStatus,
+				domain.KnowledgeDocumentSegmentIndexStatus,
+			](input.Status),
+			Page: input.Page, PageSize: input.PageSize,
 		},
 	)
 	if err != nil {
@@ -190,6 +195,7 @@ func (b *DirectBackend) ListKnowledgeDocumentSegments(
 		"page_segment_count", len(segments),
 		"total_segment_count", output.Total,
 		"keyword_filtered", strings.TrimSpace(input.Keyword) != "",
+		"index_status", optionalDomain[KnowledgeDocumentSegmentIndexStatus, string](input.Status),
 	)
 	return KnowledgeDocumentSegmentList{
 		Segments: segments,

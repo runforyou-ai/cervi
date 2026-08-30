@@ -79,8 +79,12 @@ const knowledgeBase = {
       createdAt: "创建时间",
     },
     segments: {
-      search: "搜索分段内容",
-      clear: "清除搜索",
+      filters: {
+        search: "搜索分段内容",
+        status: "索引状态",
+        allStatuses: "全部状态",
+        clear: "清除筛选",
+      },
       empty: "这个文档还没有分段",
       filteredEmpty: "没有符合条件的分段",
       columns: {

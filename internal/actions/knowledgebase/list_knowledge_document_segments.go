@@ -61,7 +61,8 @@ func (q *ListKnowledgeDocumentSegmentsQuery) Execute(
 		access.DatasetID,
 		documentID,
 		connector.DifyKnowledgeDocumentSegmentListInput{
-			Keyword: input.Keyword, Page: input.Page, PageSize: input.PageSize,
+			Keyword: input.Keyword, Status: string(input.Status),
+			Page: input.Page, PageSize: input.PageSize,
 		},
 	)
 	if err != nil {
@@ -111,6 +112,7 @@ func normalizeDocumentSegmentListInput(
 	input DocumentSegmentListInput,
 ) (DocumentSegmentListInput, map[string]common.FieldCode) {
 	input.Keyword = strings.TrimSpace(input.Keyword)
+	input.Status = domain.KnowledgeDocumentSegmentIndexStatus(strings.TrimSpace(string(input.Status)))
 	if input.Page <= 0 {
 		input.Page = 1
 	}
@@ -120,6 +122,11 @@ func normalizeDocumentSegmentListInput(
 	fields := make(map[string]common.FieldCode)
 	if input.PageSize > 100 {
 		fields["pageSize"] = ValidationDocumentQueryInvalid
+	}
+	if input.Status != "" {
+		if _, err := knowledgeDocumentSegmentIndexStatusFromDify(string(input.Status)); err != nil {
+			fields["status"] = ValidationDocumentQueryInvalid
+		}
 	}
 	return input, fields
 }

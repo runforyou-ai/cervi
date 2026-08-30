@@ -17,6 +17,7 @@ import {
 } from "@/api"
 import {
   ListToolbar,
+  ListToolbarFilter,
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
@@ -39,8 +40,17 @@ import { useListSearchParams } from "@/hooks/use-list-search-params"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 
 const segmentPageSize = 20
+const segmentIndexStatuses = [
+  KnowledgeDocumentSegmentIndexStatus.KnowledgeDocumentSegmentIndexStatusWaiting,
+  KnowledgeDocumentSegmentIndexStatus.KnowledgeDocumentSegmentIndexStatusIndexing,
+  KnowledgeDocumentSegmentIndexStatus.KnowledgeDocumentSegmentIndexStatusCompleted,
+  KnowledgeDocumentSegmentIndexStatus.KnowledgeDocumentSegmentIndexStatusError,
+  KnowledgeDocumentSegmentIndexStatus.KnowledgeDocumentSegmentIndexStatusPaused,
+  KnowledgeDocumentSegmentIndexStatus.KnowledgeDocumentSegmentIndexStatusResegment,
+] satisfies KnowledgeDocumentSegmentIndexStatusId[]
 
 /** 选择知识文档状态的展示样式。 */
 function statusVariant(status: KnowledgeDocumentStatusId) {
@@ -84,6 +94,10 @@ export function KnowledgeDocumentPage() {
     search,
     setSearch,
   } = useListSearchParams()
+  const status = optionalWailsEnum(
+    KnowledgeDocumentSegmentIndexStatus,
+    searchParams.get("status"),
+  )
   const parsedPage = Number(searchParams.get("page") ?? "1")
   const currentPage =
     Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
@@ -109,6 +123,7 @@ export function KnowledgeDocumentPage() {
   const segments = useResource(
     resourceKeys.knowledgeDocumentSegments(knowledgeBaseId, documentId, {
       keyword,
+      status,
       page: currentPage,
       pageSize: segmentPageSize,
     }),
@@ -116,7 +131,7 @@ export function KnowledgeDocumentPage() {
       listKnowledgeDocumentSegments(
         knowledgeBaseId,
         documentId,
-        { keyword, page: currentPage, pageSize: segmentPageSize },
+        { keyword, status, page: currentPage, pageSize: segmentPageSize },
         signal,
       ),
     {
@@ -211,7 +226,7 @@ export function KnowledgeDocumentPage() {
           <div>
             <dt className="text-muted-foreground">
               {t(
-                keyword
+                keyword || status
                   ? "documentDetail.metadata.matchedSegmentCount"
                   : "documentDetail.metadata.segmentCount",
               )}
@@ -236,17 +251,29 @@ export function KnowledgeDocumentPage() {
         <ListToolbar>
           <ListToolbarSearch
             value={search}
-            aria-label={t("documentDetail.segments.search")}
+            aria-label={t("documentDetail.segments.filters.search")}
             onChange={(event) => setSearch(event.target.value)}
           />
-          {search ? (
+          <ListToolbarFilter
+            label={t("documentDetail.segments.filters.status")}
+            allLabel={t("documentDetail.segments.filters.allStatuses")}
+            value={status ?? ""}
+            options={segmentIndexStatuses.map((indexStatus) => ({
+              value: indexStatus,
+              label: t(`documentDetail.segments.status.${indexStatus}`),
+            }))}
+            onValueChange={(value) =>
+              setParameters({ status: value || null, page: null })
+            }
+          />
+          {search || status ? (
             <ListToolbarReset
               onClick={() => {
                 setSearch("")
-                setParameters({ q: null, page: null })
+                setParameters({ q: null, status: null, page: null })
               }}
             >
-              {t("documentDetail.segments.clear")}
+              {t("documentDetail.segments.filters.clear")}
             </ListToolbarReset>
           ) : null}
         </ListToolbar>
@@ -309,7 +336,7 @@ export function KnowledgeDocumentPage() {
                       colSpan={columnCount}
                       className="h-32 text-center text-muted-foreground"
                     >
-                      {keyword
+                      {keyword || status
                         ? t("documentDetail.segments.filteredEmpty")
                         : t("documentDetail.segments.empty")}
                     </TableCell>

@@ -80,6 +80,7 @@ type DocumentDetailRecord struct {
 // DocumentSegmentListInput 定义知识文档分段列表查询条件。
 type DocumentSegmentListInput struct {
 	Keyword  string
+	Status   domain.KnowledgeDocumentSegmentIndexStatus
 	Page     int
 	PageSize int
 }

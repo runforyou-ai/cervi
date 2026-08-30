@@ -405,11 +405,12 @@ func TestKnowledgeDocumentDetailRoutesUseTypedContract(t *testing.T) {
 		t.Fatalf("status = %d, knowledge base = %q, document = %q", detailResponse.StatusCode, backend.lastDocumentBaseID, backend.lastDocumentID)
 	}
 
-	segmentResponse := doJSON(t, http.MethodGet, server.URL+"/knowledge-bases/"+knowledgeBaseID+"/documents/"+documentID+"/segments?keyword=安装&page=2&pageSize=10", nil, "test-token")
+	segmentResponse := doJSON(t, http.MethodGet, server.URL+"/knowledge-bases/"+knowledgeBaseID+"/documents/"+documentID+"/segments?keyword=安装&status=completed&page=2&pageSize=10", nil, "test-token")
 	defer segmentResponse.Body.Close()
 	input := backend.lastSegmentQuery
 	if segmentResponse.StatusCode != http.StatusOK || backend.lastDocumentBaseID != knowledgeBaseID ||
-		backend.lastDocumentID != documentID || input.Keyword != "安装" || input.Page != 2 || input.PageSize != 10 {
+		backend.lastDocumentID != documentID || input.Keyword != "安装" || input.Status == nil ||
+		*input.Status != appservice.KnowledgeDocumentSegmentIndexStatusCompleted || input.Page != 2 || input.PageSize != 10 {
 		t.Fatalf("status = %d, knowledge base = %q, document = %q, input = %#v", segmentResponse.StatusCode, backend.lastDocumentBaseID, backend.lastDocumentID, input)
 	}
 }

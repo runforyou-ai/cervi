@@ -950,6 +950,7 @@ export interface KnowledgeDocumentSegmentList {
  */
 export interface KnowledgeDocumentSegmentListInput {
     "keyword": string;
+    "status"?: KnowledgeDocumentSegmentIndexStatus | null;
     "page": number;
     "pageSize": number;
 }

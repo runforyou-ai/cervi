@@ -714,6 +714,7 @@ func encodeKnowledgeDocumentListInputQuery(input appservice.KnowledgeDocumentLis
 func encodeKnowledgeDocumentSegmentListInputQuery(input appservice.KnowledgeDocumentSegmentListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "keyword", input.Keyword)
+	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query

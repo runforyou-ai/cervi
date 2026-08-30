@@ -79,10 +79,14 @@ const knowledgeBase = {
       createdAt: "Created",
     },
     segments: {
-      search: "Search segment content",
-      clear: "Clear search",
+      filters: {
+        search: "Search segment content",
+        status: "Index status",
+        allStatuses: "All statuses",
+        clear: "Clear filters",
+      },
       empty: "This document has no segments",
-      filteredEmpty: "No segments match this search",
+      filteredEmpty: "No segments match these filters",
       columns: {
         position: "No.",
         content: "Content",

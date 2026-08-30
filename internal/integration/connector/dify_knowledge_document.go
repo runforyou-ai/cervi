@@ -60,6 +60,7 @@ type DifyKnowledgeDocumentSegmentPage struct {
 // DifyKnowledgeDocumentSegmentListInput 定义 Dify 知识文档分段查询条件。
 type DifyKnowledgeDocumentSegmentListInput struct {
 	Keyword  string
+	Status   string
 	Page     int
 	PageSize int
 }
@@ -241,6 +242,9 @@ func (l *DifyKnowledgeDocumentLister) ListSegments(
 	query := request.URL.Query()
 	if input.Keyword != "" {
 		query.Set("keyword", input.Keyword)
+	}
+	if input.Status != "" {
+		query.Set("status", input.Status)
 	}
 	query.Set("page", fmt.Sprintf("%d", input.Page))
 	query.Set("limit", fmt.Sprintf("%d", input.PageSize))

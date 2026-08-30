@@ -108,13 +108,17 @@ func TestNormalizeDocumentListInput(t *testing.T) {
 
 // TestNormalizeDocumentSegmentListInput 验证知识文档分段查询条件规范化和分页范围。
 func TestNormalizeDocumentSegmentListInput(t *testing.T) {
-	input, fields := normalizeDocumentSegmentListInput(DocumentSegmentListInput{Keyword: "  安装  "})
-	if len(fields) != 0 || input.Keyword != "安装" || input.Page != 1 ||
+	input, fields := normalizeDocumentSegmentListInput(DocumentSegmentListInput{Keyword: "  安装  ", Status: " completed "})
+	if len(fields) != 0 || input.Keyword != "安装" || input.Status != domain.KnowledgeDocumentSegmentIndexStatusCompleted || input.Page != 1 ||
 		input.PageSize != defaultKnowledgeDocumentPageSize {
 		t.Fatalf("input = %#v, fields = %#v", input, fields)
 	}
 	_, fields = normalizeDocumentSegmentListInput(DocumentSegmentListInput{Page: 2, PageSize: 101})
 	if fields["pageSize"] != ValidationDocumentQueryInvalid {
+		t.Fatalf("fields = %#v", fields)
+	}
+	_, fields = normalizeDocumentSegmentListInput(DocumentSegmentListInput{Status: "future_status"})
+	if fields["status"] != ValidationDocumentQueryInvalid {
 		t.Fatalf("fields = %#v", fields)
 	}
 }
