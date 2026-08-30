@@ -71,6 +71,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/segments", s.listKnowledgeDocumentSegments)
+	router.POST("/knowledge-bases/:knowledgeBaseID/retrieve", s.retrieveKnowledgeBase)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
@@ -592,6 +593,16 @@ func (s *Service) listKnowledgeDocumentSegments(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListKnowledgeDocumentSegments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// retrieveKnowledgeBase 检索指定外部知识库。
+func (s *Service) retrieveKnowledgeBase(c *gin.Context) {
+	var input appservice.KnowledgeRetrievalInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RetrieveKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

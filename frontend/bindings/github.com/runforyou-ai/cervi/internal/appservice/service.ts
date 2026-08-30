@@ -547,6 +547,13 @@ export function RestoreContact(meta: $models.RequestMeta, contactID: string): $C
 }
 
 /**
+ * RetrieveKnowledgeBase 检索指定外部知识库。
+ */
+export function RetrieveKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeRetrievalInput): $CancellablePromise<$models.KnowledgeRetrievalResult> {
+    return $Call.ByID(720738771, meta, knowledgeBaseID, input);
+}
+
+/**
  * SaveS3Setting 保存当前企业的对象存储设置。
  */
 export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<$models.S3Setting> {

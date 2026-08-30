@@ -91,6 +91,7 @@ type DirectBackend struct {
 	listKnowledgeDocuments            *knowledgebaseaction.ListKnowledgeDocumentsQuery
 	getKnowledgeDocument              *knowledgebaseaction.GetKnowledgeDocumentQuery
 	listKnowledgeDocumentSegments     *knowledgebaseaction.ListKnowledgeDocumentSegmentsQuery
+	retrieveKnowledgeBase             *knowledgebaseaction.RetrieveKnowledgeBaseQuery
 	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
 	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
 	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
@@ -150,6 +151,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 	connectorClient := connector.NewHTTPClient()
 	connectorRegistry := connector.NewRegistry(connectorClient)
 	difyKnowledgeDocuments := connector.NewDifyKnowledgeDocumentLister(connectorClient)
+	difyKnowledgeRetriever := connector.NewDifyKnowledgeRetriever(connectorClient)
 	telegramAPI := telegram.NewClient(connectiontest.NewHTTPClient())
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
@@ -199,6 +201,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, difyKnowledgeDocuments),
 		getKnowledgeDocument:              knowledgebaseaction.NewGetKnowledgeDocumentQuery(db, difyKnowledgeDocuments),
 		listKnowledgeDocumentSegments:     knowledgebaseaction.NewListKnowledgeDocumentSegmentsQuery(db, difyKnowledgeDocuments),
+		retrieveKnowledgeBase:             knowledgebaseaction.NewRetrieveKnowledgeBaseQuery(db, difyKnowledgeRetriever),
 		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),
