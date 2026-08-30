@@ -46,7 +46,12 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB())
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
-	httpAPI := api.NewService(boundService, api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"))
+	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB())
+	httpAPI := api.NewService(
+		boundService,
+		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),
+		api.WithTelegramWebhook(telegramWebhook),
+	)
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
 
 	return []application.Service{

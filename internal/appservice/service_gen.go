@@ -64,6 +64,21 @@ func (s *Service) GetWebsiteChannel(ctx context.Context, meta RequestMeta, chann
 	return s.backend.GetWebsiteChannel(ctx, meta, channelID)
 }
 
+// GetTelegramChannel 返回 Telegram 渠道详情。
+func (s *Service) GetTelegramChannel(ctx context.Context, meta RequestMeta, channelID string) (TelegramChannel, error) {
+	return s.backend.GetTelegramChannel(ctx, meta, channelID)
+}
+
+// TestTelegramChannelConnection 测试 Telegram 草稿 Token。
+func (s *Service) TestTelegramChannelConnection(ctx context.Context, meta RequestMeta, channelID string, input TelegramChannelConnectionTestInput) error {
+	return s.backend.TestTelegramChannelConnection(ctx, meta, channelID, input)
+}
+
+// SaveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
+func (s *Service) SaveTelegramChannelConnection(ctx context.Context, meta RequestMeta, channelID string, input TelegramChannelConnectionInput) (TelegramChannel, error) {
+	return s.backend.SaveTelegramChannelConnection(ctx, meta, channelID, input)
+}
+
 // GetMessageChannel 返回消息渠道基础信息。
 func (s *Service) GetMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
 	return s.backend.GetMessageChannel(ctx, meta, channelID)

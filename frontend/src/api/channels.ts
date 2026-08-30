@@ -1,12 +1,15 @@
-/** 消息渠道和网站渠道调用与归一化。 */
+/** 消息渠道及类型扩展调用与归一化。 */
 import {
   ActivateMessageChannel,
   CreateMessageChannel,
   DeactivateMessageChannel,
   GetMessageChannel,
+  GetTelegramChannel,
   GetWebsiteChannel,
   ListChannelOptions,
   ListMessageChannels,
+  SaveTelegramChannelConnection,
+  TestTelegramChannelConnection,
   UpdateMessageChannel,
   UpdateWebsiteChannelAccess,
   UpdateWebsiteChannelChatInterface,
@@ -16,7 +19,7 @@ import type {
   WebsiteChannelAccess as GeneratedWebsiteChannelAccess,
   WebsiteChannelAccessInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
-import { bind } from "@/api/client"
+import { bind, isApiError } from "@/api/client"
 import { asList } from "@/api/normalize"
 
 export type WebsiteChannelAccessData = Omit<
@@ -31,19 +34,25 @@ export type WebsiteChannelData = Omit<GeneratedWebsiteChannel, "access"> & {
 }
 
 const getWebsiteChannelBound = bind(GetWebsiteChannel)
+const getTelegramChannelBound = bind(GetTelegramChannel)
 const getMessageChannelBound = bind(GetMessageChannel)
 const updateWebsiteChannelAccessBound = bind(UpdateWebsiteChannelAccess)
 const listChannelOptionsBound = bind(ListChannelOptions)
 const listMessageChannelsBound = bind(ListMessageChannels)
 
 /** 读取网站渠道详情。 */
-export function getWebsiteChannel(channelId: string) {
-  return getWebsiteChannelBound(channelId).then(normalizeWebsiteChannel)
+export function getWebsiteChannel(channelId: string, signal?: AbortSignal) {
+  return getWebsiteChannelBound(channelId, signal).then(normalizeWebsiteChannel)
 }
 
 /** 读取消息渠道基础信息。 */
-export function getMessageChannel(channelId: string) {
-  return getMessageChannelBound(channelId)
+export function getMessageChannel(channelId: string, signal?: AbortSignal) {
+  return getMessageChannelBound(channelId, signal)
+}
+
+/** 读取 Telegram 渠道详情。 */
+export function getTelegramChannel(channelId: string, signal?: AbortSignal) {
+  return getTelegramChannelBound(channelId, signal)
 }
 
 /** 创建消息渠道。 */
@@ -51,6 +60,25 @@ export const createMessageChannel = bind(CreateMessageChannel)
 
 /** 修改消息渠道基础信息。 */
 export const updateMessageChannel = bind(UpdateMessageChannel)
+
+/** 测试 Telegram 草稿 Token。 */
+export const testTelegramChannelConnection = bind(
+  TestTelegramChannelConnection,
+)
+
+/** 保存 Telegram 机器人和 Webhook 设置。 */
+export const saveTelegramChannelConnection = bind(
+  SaveTelegramChannelConnection,
+)
+
+/** 判断保存是否需要用户确认复用其他渠道的 Telegram Bot。 */
+export function isTelegramBotReuseConfirmationError(error: unknown) {
+  return (
+    isApiError(error) &&
+    error.kind === "conflict" &&
+    error.reason === "telegram_bot_reuse_confirmation_required"
+  )
+}
 
 /** 修改网站渠道聊天界面。 */
 export const updateWebsiteChannelChatInterface = bind(

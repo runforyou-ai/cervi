@@ -150,6 +150,48 @@ func TestNormalizeWebsiteChannelAccessInput(t *testing.T) {
 	}
 }
 
+// TestNormalizeTelegramConnectionInput 验证本地、内网和带路径的回调基础地址可保存。
+func TestNormalizeTelegramConnectionInput(t *testing.T) {
+	normalized, fields := normalizeTelegramConnectionInput(TelegramChannelConnectionInput{
+		BotToken:       " 123456:test_token ",
+		WebhookBaseURL: " http://127.0.0.1:34115/cervi/ ",
+	})
+	if len(fields) != 0 {
+		t.Fatalf("validation fields = %#v, want empty", fields)
+	}
+	if normalized.BotToken != "123456:test_token" || normalized.WebhookBaseURL != "http://127.0.0.1:34115/cervi" {
+		t.Fatalf("unexpected normalized Telegram connection: %#v", normalized)
+	}
+	webhookURL, err := telegramWebhookURL(normalized.WebhookBaseURL, "channel-id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if webhookURL != "http://127.0.0.1:34115/cervi/api/public/telegram-channels/channel-id/webhook" {
+		t.Fatalf("webhook URL = %q", webhookURL)
+	}
+}
+
+// TestNormalizeTelegramConnectionInputRejectsUnsafeBaseURL 验证回调基础地址不接受凭据、查询或片段。
+func TestNormalizeTelegramConnectionInputRejectsUnsafeBaseURL(t *testing.T) {
+	tests := []string{
+		"",
+		"ftp://example.com",
+		"https://user:password@example.com",
+		"https://example.com?tenant=cervi",
+		"https://example.com#webhook",
+		"example.com",
+	}
+	for _, baseURL := range tests {
+		_, fields := normalizeTelegramConnectionInput(TelegramChannelConnectionInput{
+			BotToken:       "123456:test_token",
+			WebhookBaseURL: baseURL,
+		})
+		if fields["webhookBaseURL"] != ValidationTelegramBaseURLInvalid {
+			t.Fatalf("base URL %q validation = %#v", baseURL, fields)
+		}
+	}
+}
+
 // TestMalformedChannelIDReturnsNotFound 验证非法 UUID 不会进入数据库查询。
 func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 	identity := &servermodels.Identity{}
@@ -173,6 +215,13 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 			name: "get",
 			execute: func() error {
 				_, err := NewGetWebsiteChannelQuery(nil).Execute(context.Background(), identity, "not-a-uuid")
+				return err
+			},
+		},
+		{
+			name: "get Telegram",
+			execute: func() error {
+				_, err := NewGetTelegramChannelQuery(nil).Execute(context.Background(), identity, "not-a-uuid")
 				return err
 			},
 		},
@@ -208,6 +257,32 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 			name: "get public",
 			execute: func() error {
 				_, err := NewGetPublicWebsiteChannelQuery(nil).Execute(context.Background(), "not-a-uuid")
+				return err
+			},
+		},
+		{
+			name: "receive Telegram webhook",
+			execute: func() error {
+				return NewReceiveTelegramWebhookAction(nil).Preflight(context.Background(), "not-a-uuid", "secret")
+			},
+		},
+		{
+			name: "test Telegram connection",
+			execute: func() error {
+				return NewTestTelegramConnectionAction(nil, nil, nil).Execute(context.Background(), identity, "not-a-uuid", TelegramChannelConnectionTestInput{})
+			},
+		},
+		{
+			name: "save Telegram connection",
+			execute: func() error {
+				_, err := NewSaveTelegramConnectionAction(nil, nil, nil).Execute(context.Background(), identity, "not-a-uuid", TelegramChannelConnectionInput{})
+				return err
+			},
+		},
+		{
+			name: "update Telegram status",
+			execute: func() error {
+				_, err := NewUpdateTelegramChannelStatusAction(nil, nil, nil).Execute(context.Background(), identity, "not-a-uuid", true)
 				return err
 			},
 		},

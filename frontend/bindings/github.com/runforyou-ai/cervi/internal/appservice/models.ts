@@ -1519,6 +1519,67 @@ export interface TeamSummary {
 }
 
 /**
+ * TelegramChannel 定义 Telegram 渠道详情。
+ */
+export interface TelegramChannel {
+    "id": string;
+    "organizationId": string;
+    "createdByUserId": string;
+    "type": ChannelType;
+    "name": string;
+    "description": string | null;
+    "defaultLocale": Locale;
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
+    "enabled": boolean;
+    "createdAt": string;
+    "updatedAt": string;
+    "connection": TelegramChannelConnection;
+}
+
+/**
+ * TelegramChannelConnection 定义 Telegram 机器人和 Webhook 信息。
+ */
+export interface TelegramChannelConnection {
+    "botToken": string;
+    "botId": string | null;
+    "botUsername": string | null;
+    "botDisplayName": string | null;
+    "webhookUrl": string;
+    "webhookSecret": string;
+    "webhookStatus": TelegramWebhookStatus | null;
+}
+
+/**
+ * TelegramChannelConnectionInput 定义 Telegram 连接保存输入。
+ */
+export interface TelegramChannelConnectionInput {
+    "botToken": string;
+    "webhookBaseURL": string;
+    "confirmBotReuse": boolean;
+}
+
+/**
+ * TelegramChannelConnectionTestInput 定义 Telegram 草稿连接测试输入。
+ */
+export interface TelegramChannelConnectionTestInput {
+    "botToken": string;
+}
+
+/**
+ * TelegramWebhookStatus 表示 Telegram Webhook 的连接状态。
+ */
+export enum TelegramWebhookStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    TelegramWebhookStatusWaiting = "waiting",
+    TelegramWebhookStatusNormal = "normal",
+};
+
+/**
  * UnreadIndicatorState 定义未读数量和托盘提醒条件。
  */
 export interface UnreadIndicatorState {

@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import {
   activateMessageChannel,
   deactivateMessageChannel,
+  isApiError,
   listMessageChannels,
   type MessageChannelSummary,
 } from "@/api"
@@ -51,6 +52,7 @@ import {
 } from "@/features/channels/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
@@ -181,7 +183,11 @@ export function MessageChannelListPage() {
         enabled: !channel.enabled,
         error: requestError,
       })
-      toast.error(t("list.statusUpdateError"))
+      toast.error(
+        isApiError(requestError)
+          ? apiErrorMessage(requestError)
+          : t("list.statusUpdateError"),
+      )
     } finally {
       setUpdatingChannelId("")
       setConfirmingChannel(null)

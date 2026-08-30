@@ -4,6 +4,7 @@
 package channel
 
 import (
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -24,19 +25,23 @@ var themeColorPattern = regexp.MustCompile(`^#[0-9A-F]{6}$`)
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationTypeInvalid          ValidationCode = "CHANNEL_TYPE_INVALID"
-	ValidationNameRequired         ValidationCode = "CHANNEL_NAME_REQUIRED"
-	ValidationNameTooLong          ValidationCode = "CHANNEL_NAME_TOO_LONG"
-	ValidationDescriptionTooLong   ValidationCode = "CHANNEL_DESCRIPTION_TOO_LONG"
-	ValidationDefaultLocaleInvalid ValidationCode = "CHANNEL_DEFAULT_LOCALE_INVALID"
-	ValidationRoutingTargetInvalid ValidationCode = "CHANNEL_ROUTING_TARGET_INVALID"
-	ValidationChatTitleRequired    ValidationCode = "CHANNEL_CHAT_TITLE_REQUIRED"
-	ValidationChatTitleTooLong     ValidationCode = "CHANNEL_CHAT_TITLE_TOO_LONG"
-	ValidationChatSubtitleTooLong  ValidationCode = "CHANNEL_CHAT_SUBTITLE_TOO_LONG"
-	ValidationGreetingTooLong      ValidationCode = "CHANNEL_GREETING_MESSAGE_TOO_LONG"
-	ValidationThemeColorInvalid    ValidationCode = "CHANNEL_THEME_COLOR_INVALID"
-	ValidationAllowedHostsTooMany  ValidationCode = "CHANNEL_ALLOWED_HOSTS_TOO_MANY"
-	ValidationAllowedHostInvalid   ValidationCode = "CHANNEL_ALLOWED_HOST_INVALID"
+	ValidationTypeInvalid            ValidationCode = "CHANNEL_TYPE_INVALID"
+	ValidationNameRequired           ValidationCode = "CHANNEL_NAME_REQUIRED"
+	ValidationNameTooLong            ValidationCode = "CHANNEL_NAME_TOO_LONG"
+	ValidationDescriptionTooLong     ValidationCode = "CHANNEL_DESCRIPTION_TOO_LONG"
+	ValidationDefaultLocaleInvalid   ValidationCode = "CHANNEL_DEFAULT_LOCALE_INVALID"
+	ValidationRoutingTargetInvalid   ValidationCode = "CHANNEL_ROUTING_TARGET_INVALID"
+	ValidationChatTitleRequired      ValidationCode = "CHANNEL_CHAT_TITLE_REQUIRED"
+	ValidationChatTitleTooLong       ValidationCode = "CHANNEL_CHAT_TITLE_TOO_LONG"
+	ValidationChatSubtitleTooLong    ValidationCode = "CHANNEL_CHAT_SUBTITLE_TOO_LONG"
+	ValidationGreetingTooLong        ValidationCode = "CHANNEL_GREETING_MESSAGE_TOO_LONG"
+	ValidationThemeColorInvalid      ValidationCode = "CHANNEL_THEME_COLOR_INVALID"
+	ValidationAllowedHostsTooMany    ValidationCode = "CHANNEL_ALLOWED_HOSTS_TOO_MANY"
+	ValidationAllowedHostInvalid     ValidationCode = "CHANNEL_ALLOWED_HOST_INVALID"
+	ValidationTelegramTokenRequired  ValidationCode = "TELEGRAM_BOT_TOKEN_REQUIRED"
+	ValidationTelegramTokenTooLong   ValidationCode = "TELEGRAM_BOT_TOKEN_TOO_LONG"
+	ValidationTelegramTokenInvalid   ValidationCode = "TELEGRAM_BOT_TOKEN_INVALID"
+	ValidationTelegramBaseURLInvalid ValidationCode = "TELEGRAM_WEBHOOK_BASE_URL_INVALID"
 )
 
 const (
@@ -50,6 +55,10 @@ const (
 	maxChatSubtitleLength = 120
 	// maxGreetingMessageLength 是欢迎语的最大字符数。
 	maxGreetingMessageLength = 500
+	// maxTelegramBotTokenLength 是 Telegram Bot Token 的最大存储长度。
+	maxTelegramBotTokenLength = 512
+	// maxTelegramWebhookBaseURLLength 是 Webhook 基础地址的最大长度。
+	maxTelegramWebhookBaseURLLength = 2048
 )
 
 // ValidationError 表示渠道字段校验失败。
@@ -158,4 +167,49 @@ func normalizeWebsiteChannelAccessInput(input WebsiteChannelAccessInput) (Websit
 	}
 	input.AllowedHosts = normalized
 	return input, fields
+}
+
+// normalizeTelegramConnectionTestInput 规范化并校验 Telegram 测试输入。
+func normalizeTelegramConnectionTestInput(input TelegramChannelConnectionTestInput) (TelegramChannelConnectionTestInput, map[string]ValidationCode) {
+	input.BotToken = strings.TrimSpace(input.BotToken)
+	fields := make(map[string]ValidationCode)
+	if input.BotToken == "" {
+		fields["botToken"] = ValidationTelegramTokenRequired
+	} else if len(input.BotToken) > maxTelegramBotTokenLength {
+		fields["botToken"] = ValidationTelegramTokenTooLong
+	}
+	return input, fields
+}
+
+// normalizeTelegramConnectionInput 规范化并校验 Telegram 保存输入。
+func normalizeTelegramConnectionInput(input TelegramChannelConnectionInput) (TelegramChannelConnectionInput, map[string]ValidationCode) {
+	testInput, fields := normalizeTelegramConnectionTestInput(TelegramChannelConnectionTestInput{BotToken: input.BotToken})
+	input.BotToken = testInput.BotToken
+	input.WebhookBaseURL = strings.TrimSpace(input.WebhookBaseURL)
+	if len(input.WebhookBaseURL) > maxTelegramWebhookBaseURLLength {
+		fields["webhookBaseURL"] = ValidationTelegramBaseURLInvalid
+		return input, fields
+	}
+	parsed, err := url.ParseRequestURI(input.WebhookBaseURL)
+	if err != nil || !parsed.IsAbs() || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
+		(parsed.Scheme != "http" && parsed.Scheme != "https") {
+		fields["webhookBaseURL"] = ValidationTelegramBaseURLInvalid
+		return input, fields
+	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	parsed.Path = strings.TrimRight(parsed.Path, "/")
+	parsed.RawPath = ""
+	input.WebhookBaseURL = parsed.String()
+	return input, fields
+}
+
+// telegramWebhookURL 使用已保存基础地址生成 Telegram 回调地址。
+func telegramWebhookURL(baseURL, channelID string) (string, error) {
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/api/public/telegram-channels/" + channelID + "/webhook"
+	parsed.RawPath = ""
+	return parsed.String(), nil
 }

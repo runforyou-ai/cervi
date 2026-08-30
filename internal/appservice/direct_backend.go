@@ -30,6 +30,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/connector"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
+	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/tenant"
@@ -53,11 +54,15 @@ type DirectBackend struct {
 	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
+	getTelegramChannel                *channelaction.GetTelegramChannelQuery
 	getMessageChannel                 *channelaction.GetMessageChannelQuery
 	createMessageChannel              *channelaction.CreateMessageChannelAction
 	updateMessageChannel              *channelaction.UpdateMessageChannelAction
 	updateWebsiteChannelChatInterface *channelaction.UpdateWebsiteChannelChatInterfaceAction
 	updateWebsiteChannelAccess        *channelaction.UpdateWebsiteChannelAccessAction
+	testTelegramConnection            *channelaction.TestTelegramConnectionAction
+	saveTelegramConnection            *channelaction.SaveTelegramConnectionAction
+	updateTelegramChannelStatus       *channelaction.UpdateTelegramChannelStatusAction
 	updateMessageChannelStatus        *channelaction.UpdateMessageChannelStatusAction
 	listChannelOptions                *channelaction.ListChannelOptionsQuery
 	listMemberOptions                 *memberaction.ListOptionsQuery
@@ -143,6 +148,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 	connectorClient := connector.NewHTTPClient()
 	connectorRegistry := connector.NewRegistry(connectorClient)
 	difyKnowledgeDocuments := connector.NewDifyKnowledgeDocumentLister(connectorClient)
+	telegramAPI := telegram.NewClient(connectiontest.NewHTTPClient())
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -154,11 +160,15 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
+		getTelegramChannel:                channelaction.NewGetTelegramChannelQuery(db),
 		getMessageChannel:                 channelaction.NewGetMessageChannelQuery(db),
 		createMessageChannel:              channelaction.NewCreateMessageChannelAction(db),
 		updateMessageChannel:              channelaction.NewUpdateMessageChannelAction(db),
 		updateWebsiteChannelChatInterface: channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db),
 		updateWebsiteChannelAccess:        channelaction.NewUpdateWebsiteChannelAccessAction(db),
+		testTelegramConnection:            channelaction.NewTestTelegramConnectionAction(db, connectionRunner, telegramAPI),
+		saveTelegramConnection:            channelaction.NewSaveTelegramConnectionAction(db, connectionRunner, telegramAPI),
+		updateTelegramChannelStatus:       channelaction.NewUpdateTelegramChannelStatusAction(db, connectionRunner, telegramAPI),
 		updateMessageChannelStatus:        channelaction.NewUpdateMessageChannelStatusAction(db),
 		listChannelOptions:                channelaction.NewListChannelOptionsQuery(db),
 		listMemberOptions:                 memberaction.NewListOptionsQuery(db),

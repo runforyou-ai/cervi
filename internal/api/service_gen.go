@@ -28,6 +28,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
+	router.GET("/channels/telegram/:channelID", s.getTelegramChannel)
+	router.POST("/channels/telegram/:channelID/connection/test", s.testTelegramChannelConnection)
+	router.PUT("/channels/telegram/:channelID/connection", s.saveTelegramChannelConnection)
 	router.GET("/channels/:channelID", s.getMessageChannel)
 	router.POST("/channels", s.createMessageChannel)
 	router.PUT("/channels/:channelID", s.updateMessageChannel)
@@ -224,6 +227,31 @@ func (s *Service) listMessageChannels(c *gin.Context) {
 // getWebsiteChannel 返回网站渠道详情。
 func (s *Service) getWebsiteChannel(c *gin.Context) {
 	output, err := s.application.GetWebsiteChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getTelegramChannel 返回 Telegram 渠道详情。
+func (s *Service) getTelegramChannel(c *gin.Context) {
+	output, err := s.application.GetTelegramChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// testTelegramChannelConnection 测试 Telegram 草稿 Token。
+func (s *Service) testTelegramChannelConnection(c *gin.Context) {
+	var input appservice.TelegramChannelConnectionTestInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.TestTelegramChannelConnection(c.Request.Context(), requestMeta(c), c.Param("channelID"), input))
+}
+
+// saveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
+func (s *Service) saveTelegramChannelConnection(c *gin.Context) {
+	var input appservice.TelegramChannelConnectionInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SaveTelegramChannelConnection(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

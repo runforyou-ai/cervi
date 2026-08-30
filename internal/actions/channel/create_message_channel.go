@@ -61,21 +61,32 @@ func (a *CreateMessageChannelAction) Execute(ctx context.Context, identity *serv
 		if err != nil {
 			return err
 		}
-		if input.Type != domain.ChannelTypeWebsite {
+		switch input.Type {
+		case domain.ChannelTypeWebsite:
+			setting := &servermodels.WebsiteChannelSetting{
+				ChannelID:      channel.ID,
+				OrganizationID: identity.Organization.ID,
+				ChatTitle:      channel.Name,
+				ThemeColor:     DefaultWebsiteChannelThemeColor,
+			}
+			_, err = tx.NewInsert().
+				Model(setting).
+				Column("channel_id", "organization_id", "chat_title", "theme_color").
+				Exec(ctx)
+			return err
+		case domain.ChannelTypeTelegram:
+			setting := &servermodels.TelegramChannelSetting{
+				ChannelID:      channel.ID,
+				OrganizationID: identity.Organization.ID,
+			}
+			_, err = tx.NewInsert().
+				Model(setting).
+				Column("channel_id", "organization_id").
+				Exec(ctx)
+			return err
+		default:
 			return nil
 		}
-
-		setting := &servermodels.WebsiteChannelSetting{
-			ChannelID:      channel.ID,
-			OrganizationID: identity.Organization.ID,
-			ChatTitle:      channel.Name,
-			ThemeColor:     DefaultWebsiteChannelThemeColor,
-		}
-		_, err = tx.NewInsert().
-			Model(setting).
-			Column("channel_id", "organization_id", "chat_title", "theme_color").
-			Exec(ctx)
-		return err
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create message channel: %w", err)
