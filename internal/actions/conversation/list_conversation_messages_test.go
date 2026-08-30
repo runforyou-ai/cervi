@@ -134,6 +134,7 @@ func TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage(t *testin
 func makeConversationMessageRows(count int) []conversationMessageRow {
 	displayName := "访客"
 	subjectID := "0198ddf0-a234-7f01-8d99-e3e0af0f0000"
+	sourceID := "0198ddf0-a234-7f01-8d99-e3e0af0f0001"
 	subjectKind := string(domain.ChatSubjectKindContact)
 	rows := make([]conversationMessageRow, 0, count)
 	for index := 0; index < count; index++ {
@@ -142,7 +143,8 @@ func makeConversationMessageRows(count int) []conversationMessageRow {
 			Type: string(domain.MessageTypeText), Body: fmt.Sprintf("消息 %d", index),
 			OriginatedAt: time.Unix(int64(count-index), 0), CreatedAt: time.Unix(int64(count-index), 0),
 			SenderSubjectID: &subjectID,
-			SenderKind:      &subjectKind, SenderDisplayName: &displayName,
+			SenderKind:      &subjectKind, SenderSourceID: &sourceID,
+			SenderDisplayName: &displayName,
 		})
 	}
 	return rows

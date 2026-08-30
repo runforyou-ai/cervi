@@ -111,7 +111,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input, idempotencyKey); err != nil || found {
+	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, idempotencyKey, true); err != nil || found {
 		return saved, err
 	}
 
@@ -151,7 +151,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
 		return ConversationMessage{}, err
 	}
-	return memberConversationMessage(message, subject.ID, identity.OrganizationIdentity.DisplayName), nil
+	return memberConversationMessage(message, subject.ID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName), nil
 }
 
 // normalizeCustomerTextMessageInput 规范化并校验成员客户消息输入。
@@ -226,7 +226,7 @@ func lockLatestServiceSessionForReply(ctx context.Context, db bun.IDB, organizat
 }
 
 // loadIdempotentMemberMessage 校验并返回已经保存的成员消息。
-func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input CustomerTextMessageInput, idempotencyKey string) (ConversationMessage, bool, error) {
+func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID, body, idempotencyKey string, requireServiceSession bool) (ConversationMessage, bool, error) {
 	row := idempotentMemberMessageRow{}
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
@@ -255,7 +255,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	if err != nil {
 		return ConversationMessage{}, false, fmt.Errorf("load idempotent member message: %w", err)
 	}
-	if !memberMessageMatches(row, identity.OrganizationIdentity.ID, input) {
+	if !memberMessageMatches(row, identity.OrganizationIdentity.ID, conversationID, body, requireServiceSession) {
 		return ConversationMessage{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	message := &servermodels.Message{
@@ -263,13 +263,17 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ServiceSessionID: row.ServiceSessionID, SenderParticipantID: row.SenderParticipantID,
 		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt,
 	}
-	return memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity.DisplayName), true, nil
+	return memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName), true, nil
 }
 
 // memberMessageMatches 校验幂等消息对应完整的成员发送意图。
-func memberMessageMatches(row idempotentMemberMessageRow, identityID string, input CustomerTextMessageInput) bool {
-	return row.ConversationID == input.ConversationID && row.Body == input.Body && row.Type == string(domain.MessageTypeText) && row.DeletedAt == nil &&
-		row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID &&
+func memberMessageMatches(row idempotentMemberMessageRow, identityID, conversationID, body string, requireServiceSession bool) bool {
+	serviceSessionMatches := row.ServiceSessionID == nil && row.JoinedServiceSessionID == nil
+	if requireServiceSession {
+		serviceSessionMatches = row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID
+	}
+	return row.ConversationID == conversationID && row.Body == body && row.Type == string(domain.MessageTypeText) && row.DeletedAt == nil &&
+		serviceSessionMatches &&
 		row.SenderParticipantID != nil && row.SenderSubjectID != nil && row.SenderSubjectKind != nil && row.SenderSubjectSourceID != nil &&
 		*row.SenderSubjectKind == string(domain.ChatSubjectKindOrganizationIdentity) && *row.SenderSubjectSourceID == identityID
 }
@@ -325,28 +329,7 @@ func applyMemberReplySessionPlan(ctx context.Context, db bun.IDB, session *serve
 
 // ensureMemberChatSubject 取得或创建当前企业成员的聊天主体。
 func ensureMemberChatSubject(ctx context.Context, db bun.IDB, identity *servermodels.Identity, subjectID string) (*servermodels.ChatSubject, error) {
-	subject := &servermodels.ChatSubject{}
-	err := db.NewSelect().Model(subject).
-		Where("cs.organization_id = ?", identity.Organization.ID).
-		Where("cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Where("cs.source_id = ?", identity.OrganizationIdentity.ID).
-		Scan(ctx)
-	if err == nil {
-		return subject, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return nil, fmt.Errorf("find member chat subject: %w", err)
-	}
-	subject = &servermodels.ChatSubject{
-		ID: subjectID, OrganizationID: identity.Organization.ID,
-		Kind: string(domain.ChatSubjectKindOrganizationIdentity), SourceID: identity.OrganizationIdentity.ID,
-	}
-	if _, err := db.NewInsert().Model(subject).
-		Column("id", "organization_id", "kind", "source_id").
-		Exec(ctx); err != nil {
-		return nil, fmt.Errorf("create member chat subject: %w", err)
-	}
-	return subject, nil
+	return ensureOrganizationIdentityChatSubject(ctx, db, identity.Organization.ID, identity.OrganizationIdentity.ID, subjectID)
 }
 
 // ensureMemberConversationParticipant 取得、创建或恢复当前成员的会话参与者。
@@ -402,13 +385,14 @@ func recordFirstMemberResponse(ctx context.Context, db bun.IDB, session *serverm
 }
 
 // memberConversationMessage 构造成员消息时间线结果。
-func memberConversationMessage(message *servermodels.Message, subjectID, displayName string) ConversationMessage {
+func memberConversationMessage(message *servermodels.Message, subjectID, sourceID, displayName string) ConversationMessage {
 	name := displayName
 	return ConversationMessage{
 		ID: message.ID, Type: domain.MessageTypeText, Body: message.Body,
 		OriginatedAt: message.OriginatedAt, CreatedAt: message.CreatedAt,
 		Sender: &ConversationMessageSender{
-			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity, DisplayName: &name,
+			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,
+			SourceID: sourceID, DisplayName: &name,
 		},
 	}
 }

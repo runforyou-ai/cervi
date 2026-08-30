@@ -1,6 +1,7 @@
-/** 客户 Conversation 的消息时间线。 */
+/** Customer 与 Direct Conversation 共用的成员消息时间线。 */
 import {
   Fragment,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -13,6 +14,7 @@ import { useNavigate } from "react-router"
 
 import {
   ChatSubjectKind,
+  ConversationType,
   ServiceSessionStatus,
   listConversationMessages,
   type ConversationMessage,
@@ -21,6 +23,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
+import { useWorkspace } from "@/contexts/workspace-context"
+import {
+  memberChatPollingInterval,
+  useMemberChatPollingActive,
+} from "@/features/inbox/use-member-chat-polling"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -60,20 +67,26 @@ function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
   return `${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
 }
 
-/** 展示客户会话历史和当前页面已发送消息。 */
+/** 展示成员可见的会话历史和当前页面已发送消息。 */
 export function ConversationTimeline({
   conversationID,
+  conversationType,
   sentMessages,
 }: {
   conversationID: string
+  conversationType: ConversationType
   sentMessages: ConversationMessage[]
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
+  const { identity } = useWorkspace()
   const timeZone = useUserTimeZone()
+  const pollingActive = useMemberChatPollingActive()
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const aliveRef = useRef(true)
   const beforeRequestRef = useRef(0)
+  const pollingRequestRef = useRef(false)
+  const timelineRef = useRef<ConversationMessageListData | null>(null)
   const initialScrollRef = useRef(true)
   const previousScrollHeightRef = useRef<number | null>(null)
   const previousSentCountRef = useRef(0)
@@ -84,11 +97,12 @@ export function ConversationTimeline({
   const { data, loading, error, refresh } = useResource(
     resourceKeys.conversationMessages(conversationID),
     (signal) => listConversationMessages(conversationID, undefined, signal),
+    { refetchOnWindowFocus: false },
   )
-  const currentPage = timeline ?? data
-  const visibleMessages = useMemo(
-    () => mergeMessages(currentPage?.messages ?? [], sentMessages),
-    [currentPage, sentMessages],
+  const currentPage = timeline ?? data ?? null
+  const visibleMessages = mergeMessages(
+    currentPage?.messages ?? [],
+    sentMessages,
   )
 
   const dateFormatters = useMemo(() => {
@@ -118,6 +132,68 @@ export function ConversationTimeline({
     }
   }, [])
 
+  useEffect(() => {
+    if (!data) return
+    setTimeline((current) =>
+      current
+        ? {
+            messages: mergeMessages(current.messages, data.messages),
+            before: current.before,
+            after: current.after ?? data.after,
+          }
+        : data,
+    )
+  }, [data])
+
+  useEffect(() => {
+    timelineRef.current = timeline
+  }, [timeline])
+
+  /** 增量读取当前会话的新消息；空会话使用无游标最近页。 */
+  const pollMessages = useCallback(async () => {
+    const base = timelineRef.current
+    if (!base || pollingRequestRef.current) return
+    pollingRequestRef.current = true
+    const after = base.after
+    try {
+      const page = await listConversationMessages(
+        conversationID,
+        after ? { before: "", after } : undefined,
+      )
+      if (!aliveRef.current) return
+      setTimeline((current) => {
+        if (!current || (after && current.after !== after)) return current
+        return {
+          messages: mergeMessages(current.messages, page.messages),
+          before: current.before ?? page.before,
+          after:
+            page.messages.length > 0 && page.after
+              ? page.after
+              : current.after,
+        }
+      })
+    } catch (pollError) {
+      if (!aliveRef.current || recoverSession(pollError, navigate)) return
+      console.warn("轮询成员会话消息失败", {
+        conversationId: conversationID,
+        error: pollError,
+      })
+    } finally {
+      pollingRequestRef.current = false
+    }
+  }, [conversationID, navigate])
+
+  const timelineReady = timeline !== null
+  useEffect(() => {
+    if (!pollingActive || !timelineReady) return
+    void pollMessages()
+    const timer = window.setInterval(
+      () => void pollMessages(),
+      memberChatPollingInterval,
+    )
+    return () => window.clearInterval(timer)
+  }, [pollMessages, pollingActive, timelineReady])
+
   useLayoutEffect(() => {
     const viewport = timelineViewport(scrollRootRef.current)
     if (!viewport) return
@@ -143,7 +219,7 @@ export function ConversationTimeline({
 
   /** 加载并前插一页更早消息。 */
   async function loadEarlier() {
-    const before = currentPage?.before
+    const before = timelineRef.current?.before
     if (!before || loadingEarlier) return
     const request = beforeRequestRef.current + 1
     beforeRequestRef.current = request
@@ -158,7 +234,7 @@ export function ConversationTimeline({
       })
       if (!aliveRef.current || beforeRequestRef.current !== request) return
       setTimeline((current) => {
-        const base = current ?? currentPage
+        const base = current
         if (!base || base.before !== before) return current
         return {
           messages: mergeMessages(earlierPage.messages, base.messages),
@@ -248,8 +324,12 @@ export function ConversationTimeline({
           {visibleMessages.map((message, index) => {
             const date = new Date(message.originatedAt)
             const incoming =
-              !message.sender ||
-              message.sender.kind === ChatSubjectKind.ChatSubjectKindContact
+              conversationType === ConversationType.ConversationTypeDirect
+                ? !message.sender ||
+                  message.sender.sourceId !== identity.user.identityId
+                : !message.sender ||
+                  message.sender.kind ===
+                    ChatSubjectKind.ChatSubjectKindContact
             const senderName =
               message.sender?.displayName?.trim() ||
               (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact

@@ -14,9 +14,10 @@ import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
+  isCustomerInboxConversation,
   loadInbox,
   ServiceSessionStatus,
-  type InboxConversation,
+  type CustomerInboxConversationData,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { useUserTimeZone } from "@/contexts/user-preferences"
@@ -100,7 +101,8 @@ function useConversationTime() {
       day: "2-digit",
     })
 
-    return (value: string) => {
+    return (value: string | null) => {
+      if (!value) return ""
       const date = new Date(value)
       const now = new Date()
       const elapsedMs = now.getTime() - date.getTime()
@@ -136,15 +138,15 @@ function useMinuteTick() {
 function MobileConversationAvatar({
   conversation,
 }: {
-  conversation: InboxConversation
+  conversation: CustomerInboxConversationData
 }) {
-  const badge = sourceBadges[conversation.channelType]
+  const badge = sourceBadges[conversation.customer.channelType]
 
   return (
     <div className="relative shrink-0">
       <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-sm font-medium text-muted-foreground">
-        {conversation.contactName ? (
-          conversation.contactName.slice(0, 1).toLocaleUpperCase()
+        {conversation.customer.contactName ? (
+          conversation.customer.contactName.slice(0, 1).toLocaleUpperCase()
         ) : (
           <UserRoundIcon className="size-4.5" />
         )}
@@ -168,11 +170,11 @@ function MobileConversationAvatar({
 function MobileConversationRow({
   conversation,
 }: {
-  conversation: InboxConversation
+  conversation: CustomerInboxConversationData
 }) {
   const { t } = useTranslation("inbox")
   const formatTime = useConversationTime()
-  const name = conversation.contactName ?? t("anonymousVisitor")
+  const name = conversation.customer.contactName ?? t("anonymousVisitor")
 
   return (
     <li className="flex gap-3 border-b px-4 py-3 last:border-b-0">
@@ -181,23 +183,28 @@ function MobileConversationRow({
         <div className="flex items-center gap-2">
           <p className="truncate text-[15px] font-medium">{name}</p>
           <time className="ml-auto shrink-0 text-xs text-muted-foreground">
-            {formatTime(conversation.lastMessageAt)}
+            {formatTime(conversation.customer.lastMessageAt)}
           </time>
         </div>
         <p className="mt-0.5 truncate text-sm text-muted-foreground">
-          {conversation.preview}
+          {conversation.customer.preview ?? t("messagesEmpty")}
         </p>
         <div className="mt-1.5 flex min-w-0 items-center gap-2">
           <span className="truncate text-xs text-muted-foreground">
-            {conversation.channelName}
+            {conversation.customer.channelName}
           </span>
           <span
             className={cn(
               "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-              sessionStatusClass(conversation.serviceSessionStatus),
+              sessionStatusClass(
+                conversation.customer.serviceSessionStatus,
+              ),
             )}
           >
-            {sessionStatusLabel(conversation.serviceSessionStatus, t)}
+            {sessionStatusLabel(
+              conversation.customer.serviceSessionStatus,
+              t,
+            )}
           </span>
         </div>
       </div>
@@ -214,6 +221,8 @@ export function MobileInboxPage() {
     { staleTime: 0 },
   )
   useMinuteTick()
+  const customerConversations =
+    data?.conversations.filter(isCustomerInboxConversation) ?? []
 
   useEffect(() => {
     /** 应用回到前台时刷新会话摘要。 */
@@ -280,7 +289,7 @@ export function MobileInboxPage() {
               {t("inbox.refreshError")}
             </button>
           ) : null}
-          {data.conversations.length === 0 ? (
+          {customerConversations.length === 0 ? (
             <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center">
               <div className="max-w-xs">
                 <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border shadow-sm">
@@ -297,7 +306,7 @@ export function MobileInboxPage() {
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <ul>
-                {data.conversations.map((conversation) => (
+                {customerConversations.map((conversation) => (
                   <MobileConversationRow
                     key={conversation.id}
                     conversation={conversation}

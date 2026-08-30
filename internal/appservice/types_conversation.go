@@ -37,6 +37,7 @@ type CustomerTextMessageInput struct {
 type ConversationMessageSender struct {
 	ChatSubjectID string          `json:"chatSubjectId"`
 	Kind          ChatSubjectKind `json:"kind"`
+	SourceID      string          `json:"sourceId"`
 	DisplayName   *string         `json:"displayName"`
 }
 
@@ -63,4 +64,15 @@ type ConversationMessageList struct {
 	Messages []ConversationMessage `json:"messages"`
 	Before   *string               `json:"before"`
 	After    *string               `json:"after"`
+}
+
+// DirectConversationInput 定义成员发起内部单聊的目标。
+type DirectConversationInput struct {
+	TargetIdentityID string `json:"targetIdentityId"`
+}
+
+// DirectTextMessageInput 定义成员发送的内部单聊文本消息。
+type DirectTextMessageInput struct {
+	ClientMessageID string `json:"clientMessageId"`
+	Body            string `json:"body"`
 }

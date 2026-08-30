@@ -8,13 +8,18 @@ import {
   PanelLeftIcon,
   PlusIcon,
   SearchIcon,
+  UsersRoundIcon,
   XIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
   ServiceSessionStatus,
+  isCustomerInboxConversation,
+  isDirectInboxConversation,
   type ConversationMessage,
+  type CustomerInboxConversationData,
+  type DirectInboxConversationData,
   type InboxConversation,
 } from "@/api"
 import { PageSplit } from "@/components/page-split"
@@ -35,6 +40,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useUserTimeZone } from "@/contexts/user-preferences"
+import { useWorkspace } from "@/contexts/workspace-context"
 import { previousDayKey } from "@/features/inbox/calendar"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
@@ -43,21 +49,58 @@ import {
   ConversationHeader,
 } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
+import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
 import {
   useIsNarrowViewport,
   useIsWideViewport,
 } from "@/hooks/use-narrow-viewport"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
-/** 消息范围；后续阶段出现内部会话等来源后按能力扩展。 */
-type InboxScope = "all" | "customer"
+/** 与收件箱原型一致的消息范围。 */
+type InboxScope = "all" | "customer" | "internal"
 
 /** 客户范围的队列子筛选；与 ServiceSession「批次状态 + 负责人」同构。 */
 type CustomerQueueFilter = "queue" | "mine" | "ai" | "colleague" | "closed"
 
+/** 使用与服务端一致的普通字符串 id 倒序。 */
+function compareIDsDescending(first: string, second: string) {
+  if (first === second) return 0
+  return first > second ? -1 : 1
+}
+
+/** 统一按最后消息倒序排列，尚无消息的会话沉底。 */
+function compareInboxConversations(
+  first: InboxConversation,
+  second: InboxConversation,
+) {
+  const firstSummary = isCustomerInboxConversation(first)
+    ? first.customer
+    : isDirectInboxConversation(first)
+      ? first.direct
+      : null
+  const secondSummary = isCustomerInboxConversation(second)
+    ? second.customer
+    : isDirectInboxConversation(second)
+      ? second.direct
+      : null
+  const firstTime = firstSummary?.lastMessageAt
+  const secondTime = secondSummary?.lastMessageAt
+  if (!firstTime || !secondTime) {
+    if (!firstTime && !secondTime)
+      return compareIDsDescending(first.id, second.id)
+    return firstTime ? -1 : 1
+  }
+  const timeDifference = Date.parse(secondTime) - Date.parse(firstTime)
+  if (timeDifference) return timeDifference
+  return compareIDsDescending(first.id, second.id)
+}
+
 const scopes = [
   { id: "all", labelKey: "scopeAll", icon: MessagesSquareIcon },
   { id: "customer", labelKey: "scopeCustomer", icon: HeadsetIcon },
+  { id: "internal", labelKey: "scopeInternal", icon: UsersRoundIcon },
 ] as const
 
 /** 客服处理状态文案。 */
@@ -84,8 +127,15 @@ function sessionStatusLabel(
 function useConversationName() {
   const { t } = useTranslation("inbox")
   return useCallback(
-    (conversation: InboxConversation) =>
-      conversation.contactName?.trim() || t("anonymousVisitor"),
+    (conversation: InboxConversation) => {
+      if (isDirectInboxConversation(conversation)) {
+        return conversation.direct.peerName.trim() || t("unknownSender")
+      }
+      if (isCustomerInboxConversation(conversation)) {
+        return conversation.customer.contactName?.trim() || t("anonymousVisitor")
+      }
+      return t("unknownSender")
+    },
     [t],
   )
 }
@@ -118,7 +168,8 @@ function useConversationTime() {
       day: "2-digit",
     })
 
-    return (value: string) => {
+    return (value: string | null) => {
+      if (!value) return ""
       const date = new Date(value)
       const now = new Date()
       const elapsedMs = now.getTime() - date.getTime()
@@ -162,12 +213,14 @@ function InboxPaneTop({
   railCollapsed,
   onRailToggle,
   searchDisabled,
+  onStartDirect,
 }: {
   query: string
   onQueryChange: (query: string) => void
   railCollapsed: boolean
   onRailToggle: () => void
   searchDisabled: boolean
+  onStartDirect: () => void
 }) {
   const { t } = useTranslation("inbox")
   const { t: tCommon } = useTranslation("common")
@@ -241,11 +294,10 @@ function InboxPaneTop({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-52">
-          <DropdownMenuItem disabled className="gap-2">
+          <DropdownMenuItem className="gap-2" onSelect={onStartDirect}>
             <span className="min-w-0 flex-1 truncate">
               {t("newDirectConversation")}
             </span>
-            <StatusBadge variant="muted">{tCommon("comingSoon")}</StatusBadge>
           </DropdownMenuItem>
           <DropdownMenuItem disabled className="gap-2">
             <span className="min-w-0 flex-1 truncate">
@@ -449,6 +501,12 @@ function InboxConversationList({
       <div className="grid pb-1.5">
         {conversations.map((conversation) => {
           const name = conversationName(conversation)
+          const summary = isCustomerInboxConversation(conversation)
+            ? conversation.customer
+            : isDirectInboxConversation(conversation)
+              ? conversation.direct
+              : null
+          if (!summary) return null
           return (
             <button
               key={conversation.id}
@@ -476,7 +534,7 @@ function InboxConversationList({
                         "text-accent-foreground/75",
                     )}
                   >
-                    {formatTime(conversation.lastMessageAt)}
+                    {formatTime(summary.lastMessageAt)}
                   </span>
                 </span>
                 <span
@@ -486,7 +544,7 @@ function InboxConversationList({
                       "text-accent-foreground/75",
                   )}
                 >
-                  {conversation.preview}
+                  {summary.preview ?? t("messagesEmpty")}
                 </span>
               </span>
             </button>
@@ -511,11 +569,25 @@ function ConversationMain({
   const [contextSheetOpen, setContextSheetOpen] = useState(false)
   const [contextCollapsed, setContextCollapsed] = useState(false)
   const contactName = conversationName(conversation)
-  const sessionStatus = sessionStatusLabel(conversation.serviceSessionStatus, t)
-  const desktopContextVisible = isWideViewport && !contextCollapsed
-  const contextVisible = isWideViewport
-    ? desktopContextVisible
-    : contextSheetOpen
+  const customerConversation = isCustomerInboxConversation(conversation)
+    ? conversation
+    : null
+  const directConversation = isDirectInboxConversation(conversation)
+    ? conversation
+    : null
+  const sessionStatus = customerConversation
+    ? sessionStatusLabel(
+        customerConversation.customer.serviceSessionStatus,
+        t,
+      )
+    : ""
+  const desktopContextVisible =
+    customerConversation !== null && isWideViewport && !contextCollapsed
+  const contextVisible = customerConversation
+    ? isWideViewport
+      ? desktopContextVisible
+      : contextSheetOpen
+    : false
 
   useEffect(() => {
     if (isWideViewport) {
@@ -532,6 +604,9 @@ function ConversationMain({
     setContextSheetOpen((open) => !open)
   }
 
+  const validConversation = customerConversation ?? directConversation
+  if (!validConversation) return null
+
   return (
     <div className="flex h-full min-h-0 bg-background">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -545,26 +620,32 @@ function ConversationMain({
         />
         <ConversationThread
           key={conversation.id}
-          conversationID={conversation.id}
+          conversation={validConversation}
         />
       </div>
-      <ConversationContextPane
-        conversation={conversation}
-        contactName={contactName}
-        sessionStatus={sessionStatus}
-        desktopVisible={desktopContextVisible}
-        sheetOpen={!isWideViewport && contextSheetOpen}
-        onDesktopToggle={() =>
-          setContextCollapsed((collapsed) => !collapsed)
-        }
-        onSheetOpenChange={setContextSheetOpen}
-      />
+      {customerConversation ? (
+        <ConversationContextPane
+          conversation={customerConversation}
+          contactName={contactName}
+          sessionStatus={sessionStatus}
+          desktopVisible={desktopContextVisible}
+          sheetOpen={!isWideViewport && contextSheetOpen}
+          onDesktopToggle={() =>
+            setContextCollapsed((collapsed) => !collapsed)
+          }
+          onSheetOpenChange={setContextSheetOpen}
+        />
+      ) : null}
     </div>
   )
 }
 
 /** 协调当前会话时间线和回复区的即时消息。 */
-function ConversationThread({ conversationID }: { conversationID: string }) {
+function ConversationThread({
+  conversation,
+}: {
+  conversation: CustomerInboxConversationData | DirectInboxConversationData
+}) {
   const [sentMessages, setSentMessages] = useState<ConversationMessage[]>([])
 
   /** 合并接口返回的已发送消息。 */
@@ -579,11 +660,13 @@ function ConversationThread({ conversationID }: { conversationID: string }) {
   return (
     <>
       <ConversationTimeline
-        conversationID={conversationID}
+        conversationID={conversation.id}
+        conversationType={conversation.type}
         sentMessages={sentMessages}
       />
       <ConversationComposer
-        conversationID={conversationID}
+        conversationID={conversation.id}
+        conversationType={conversation.type}
         onSent={appendSentMessage}
       />
     </>
@@ -597,31 +680,77 @@ export function InboxPage({
   conversations: InboxConversation[]
 }) {
   const { t } = useTranslation("inbox")
+  const { identity } = useWorkspace()
   const isNarrowViewport = useIsNarrowViewport()
+  const invalidate = useResourceInvalidator()
   const [scope, setScope] = useState<InboxScope>("all")
   const [railCollapsed, setRailCollapsed] = useState(false)
   const [queueFilter, setQueueFilter] = useState<CustomerQueueFilter>("mine")
   const [query, setQuery] = useState("")
   const [selectedId, setSelectedId] = useState(() => conversations[0]?.id ?? "")
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
+  const [directDialogOpen, setDirectDialogOpen] = useState(false)
+  const [startedConversations, setStartedConversations] = useState<
+    DirectInboxConversationData[]
+  >([])
   const conversationName = useConversationName()
 
-  /* 首期只有客户会话，两个范围返回同一列表；出现内部会话后按范围过滤。 */
-  const scopedConversations = conversations
+  const validConversations = useMemo(
+    () =>
+      conversations.filter(
+        (conversation) =>
+          isCustomerInboxConversation(conversation) ||
+          isDirectInboxConversation(conversation),
+      ),
+    [conversations],
+  )
+  const allConversations = useMemo(
+    () =>
+      [
+        ...startedConversations.filter(
+          (started) =>
+            !validConversations.some(
+              (conversation) => conversation.id === started.id,
+            ),
+        ),
+        ...validConversations,
+      ].sort(compareInboxConversations),
+    [startedConversations, validConversations],
+  )
+  const scopedConversations = useMemo(() => {
+    switch (scope) {
+      case "customer":
+        return allConversations.filter(isCustomerInboxConversation)
+      case "internal":
+        return allConversations.filter(isDirectInboxConversation)
+      default:
+        return allConversations
+    }
+  }, [allConversations, scope])
 
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const visibleConversations = useMemo(() => {
     if (!normalizedQuery) {
       return scopedConversations
     }
-    return scopedConversations.filter((conversation) =>
-      [
-        conversationName(conversation),
-        conversation.title,
-        conversation.preview,
-        conversation.channelName,
-      ].some((value) => value.toLocaleLowerCase().includes(normalizedQuery)),
-    )
+    return scopedConversations.filter((conversation) => {
+      const values = isCustomerInboxConversation(conversation)
+        ? [
+            conversationName(conversation),
+            conversation.customer.title,
+            conversation.customer.preview ?? "",
+            conversation.customer.channelName,
+          ]
+        : isDirectInboxConversation(conversation)
+          ? [
+              conversation.direct.peerName,
+              conversation.direct.preview ?? "",
+            ]
+          : []
+      return values.some((value) =>
+        value.toLocaleLowerCase().includes(normalizedQuery),
+      )
+    })
   }, [conversationName, normalizedQuery, scopedConversations])
 
   useEffect(() => {
@@ -631,14 +760,31 @@ export function InboxPage({
   }, [isNarrowViewport])
 
   useEffect(() => {
-    if (!conversations.some((conversation) => conversation.id === selectedId)) {
-      setSelectedId(conversations[0]?.id ?? "")
+    if (
+      !scopedConversations.some(
+        (conversation) => conversation.id === selectedId,
+      )
+    ) {
+      setSelectedId(scopedConversations[0]?.id ?? "")
     }
-  }, [conversations, selectedId])
+  }, [scopedConversations, selectedId])
+
+  useEffect(() => {
+    setStartedConversations((current) => {
+      const pending = current.filter(
+        (started) =>
+          !validConversations.some(
+            (conversation) => conversation.id === started.id,
+          ),
+      )
+      return pending.length === current.length ? current : pending
+    })
+  }, [validConversations])
 
   const selectedConversation =
-    conversations.find((conversation) => conversation.id === selectedId) ??
-    conversations[0]
+    scopedConversations.find(
+      (conversation) => conversation.id === selectedId,
+    ) ?? scopedConversations[0]
 
   /** 选中一个会话。 */
   function selectConversation(conversationId: string) {
@@ -649,6 +795,20 @@ export function InboxPage({
     }
   }
 
+  /** 将新打开的内部单聊放入列表并选中。 */
+  function showStartedConversation(
+    conversation: DirectInboxConversationData,
+  ) {
+    setStartedConversations((current) => [
+      conversation,
+      ...current.filter((item) => item.id !== conversation.id),
+    ])
+    setScope("internal")
+    setSelectedId(conversation.id)
+    setIsNarrowDetailOpen(isNarrowViewport)
+    void invalidate(resourceKeys.inbox())
+  }
+
   const pane = (
     <div className="flex min-h-0 flex-1 flex-col">
       <InboxPaneTop
@@ -656,7 +816,8 @@ export function InboxPage({
         onQueryChange={setQuery}
         railCollapsed={railCollapsed}
         onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
-        searchDisabled={conversations.length === 0}
+        searchDisabled={allConversations.length === 0}
+        onStartDirect={() => setDirectDialogOpen(true)}
       />
       <div className="flex min-h-0 flex-1">
         {railCollapsed ? null : (
@@ -668,17 +829,18 @@ export function InboxPage({
               filter={queueFilter}
               onFilterChange={setQueueFilter}
               waitingCount={
-                conversations.filter(
+                allConversations.filter(
                   (conversation) =>
-                    conversation.serviceSessionStatus ===
-                    ServiceSessionStatus.ServiceSessionStatusWaiting,
+                    isCustomerInboxConversation(conversation) &&
+                    conversation.customer.serviceSessionStatus ===
+                      ServiceSessionStatus.ServiceSessionStatusWaiting,
                 ).length
               }
             />
           ) : null}
           <InboxConversationList
             conversations={visibleConversations}
-            hasAnyConversation={conversations.length > 0}
+            hasAnyConversation={scopedConversations.length > 0}
             selectedId={selectedId}
             onSelect={selectConversation}
           />
@@ -686,30 +848,6 @@ export function InboxPage({
       </div>
     </div>
   )
-
-  if (conversations.length === 0) {
-    return (
-      <PageSplit
-        paneWidth={railCollapsed ? "inboxCollapsed" : "inbox"}
-        className="bg-background"
-        paneClassName="transition-[width]"
-        pane={pane}
-        mainClassName="cervi-inbox-empty-main items-center justify-center p-6"
-      >
-        <div data-slot="empty-state-content" className="max-w-sm text-center">
-          <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
-            <MessagesSquareIcon className="size-5 text-muted-foreground" />
-          </div>
-          <h2 className="text-base font-semibold tracking-tight">
-            {t("emptyTitle")}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {t("emptyDescription")}
-          </p>
-        </div>
-      </PageSplit>
-    )
-  }
 
   return (
     <>
@@ -720,29 +858,52 @@ export function InboxPage({
         paneClassName="transition-[width]"
         pane={pane}
       >
-        {isNarrowViewport ? null : (
+        {isNarrowViewport ? null : selectedConversation ? (
           <section className="min-h-0 flex-1">
             <ConversationMain conversation={selectedConversation} />
           </section>
+        ) : (
+          <div className="cervi-inbox-empty-main flex min-h-0 flex-1 items-center justify-center p-6">
+            <div data-slot="empty-state-content" className="max-w-sm text-center">
+              <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
+                <MessagesSquareIcon className="size-5 text-muted-foreground" />
+              </div>
+              <h2 className="text-base font-semibold tracking-tight">
+                {t("emptyTitle")}
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t("emptyDescription")}
+              </p>
+            </div>
+          </div>
         )}
       </PageSplit>
 
-      <Sheet open={isNarrowDetailOpen} onOpenChange={setIsNarrowDetailOpen}>
-        <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
-          <SheetHeader className="sr-only">
-            <SheetTitle>
-              {t("conversationTitle", {
-                name: conversationName(selectedConversation),
-              })}
-            </SheetTitle>
-            <SheetDescription>{t("detailDescription")}</SheetDescription>
-          </SheetHeader>
-          <ConversationMain
-            conversation={selectedConversation}
-            narrowViewport
-          />
-        </SheetContent>
-      </Sheet>
+      {selectedConversation ? (
+        <Sheet open={isNarrowDetailOpen} onOpenChange={setIsNarrowDetailOpen}>
+          <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
+            <SheetHeader className="sr-only">
+              <SheetTitle>
+                {t("conversationTitle", {
+                  name: conversationName(selectedConversation),
+                })}
+              </SheetTitle>
+              <SheetDescription>{t("detailDescription")}</SheetDescription>
+            </SheetHeader>
+            <ConversationMain
+              conversation={selectedConversation}
+              narrowViewport
+            />
+          </SheetContent>
+        </Sheet>
+      ) : null}
+
+      <StartDirectConversationDialog
+        open={directDialogOpen}
+        currentIdentityID={identity.user.identityId}
+        onOpenChange={setDirectDialogOpen}
+        onStarted={showStartedConversation}
+      />
     </>
   )
 }

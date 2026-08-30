@@ -11,8 +11,10 @@ import (
 var (
 	// ErrChannelNotFound 表示网站渠道不存在或不可用。
 	ErrChannelNotFound = errors.New("website channel not found")
-	// ErrConversationNotFound 表示客户会话不存在或当前身份无权访问。
-	ErrConversationNotFound = errors.New("customer conversation not found")
+	// ErrConversationNotFound 表示会话不存在或当前身份无权访问。
+	ErrConversationNotFound = errors.New("conversation not found")
+	// ErrDirectTargetNotFound 表示内部单聊目标不存在或不可用。
+	ErrDirectTargetNotFound = errors.New("direct conversation target not found")
 	// ErrDataInvariant 表示聊天持久关系不完整或互相矛盾。
 	ErrDataInvariant = errors.New("conversation data invariant violated")
 )
