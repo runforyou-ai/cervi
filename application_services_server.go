@@ -12,6 +12,9 @@ import (
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -28,9 +31,10 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err != nil {
 		return nil, err
 	}
+	resolveFileS3 := newFileContentS3ConfigResolver(appStorage.DB())
 	tasks := servertask.New(appStorage.DB(), config.NATS)
 	scanExpired := fileaction.NewScanExpiredAction(appStorage.DB(), tasks)
-	deleteExpired := fileaction.NewDeleteExpiredAction(appStorage.DB(), newFileContentDeleter(appStorage.DB(), localFiles))
+	deleteExpired := fileaction.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, resolveFileS3))
 	if err := servertask.RegisterJSON(tasks.Registry(), fileaction.ScanExpiredActionName, scanExpired.Execute); err != nil {
 		return nil, err
 	}
@@ -46,7 +50,19 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB())
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
-	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB())
+	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
+	getS3Setting := settingaction.NewGetS3SettingQuery(appStorage.DB())
+	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
+		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
+		if err != nil {
+			return "", err
+		}
+		if setting.Enabled {
+			return domain.FileStorageBackendS3, nil
+		}
+		return domain.FileStorageBackendLocal, nil
+	}, serverfilecontent.NewWriter(localFiles, resolveFileS3))
+	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), telegramAPI, telegramAvatarFiles)
 	httpAPI := api.NewService(
 		boundService,
 		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),
@@ -77,10 +93,10 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}, nil
 }
 
-// newFileContentDeleter 创建读取企业配置的文件内容删除器。
-func newFileContentDeleter(db *bun.DB, local *serverfilecontent.LocalStore) *serverfilecontent.Deleter {
+// newFileContentS3ConfigResolver 创建读取企业对象存储配置的解析器。
+func newFileContentS3ConfigResolver(db *bun.DB) serverfilecontent.S3ConfigResolver {
 	getS3Setting := settingaction.NewGetS3SettingQuery(db)
-	return serverfilecontent.NewDeleter(local, func(ctx context.Context, organizationID string) (serverfilecontent.S3Config, error) {
+	return func(ctx context.Context, organizationID string) (serverfilecontent.S3Config, error) {
 		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
 		if err != nil {
 			return serverfilecontent.S3Config{}, err
@@ -90,7 +106,7 @@ func newFileContentDeleter(db *bun.DB, local *serverfilecontent.LocalStore) *ser
 			AccessKeyID: setting.AccessKeyID, SecretAccessKey: setting.SecretAccessKey,
 			ForcePathStyle: setting.ForcePathStyle,
 		}, nil
-	})
+	}
 }
 
 // httpsLifecycle 将 HTTPS 入口接入 Wails 服务生命周期。

@@ -1,29 +1,58 @@
-/** 移动端客户会话摘要列表。 */
-import { useEffect, useMemo, useState } from "react"
+/** 移动端统一会话摘要列表和内部单聊入口。 */
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import {
   GlobeIcon,
   LoaderCircleIcon,
   MessageCircleIcon,
   MessagesSquareIcon,
+  PlusIcon,
   RefreshCwIcon,
   SendIcon,
   UserRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 
 import {
   ChannelType,
+  isCustomerInboxConversation,
+  isDirectInboxConversation,
   loadInbox,
   ServiceSessionStatus,
+  type CustomerInboxConversationData,
+  type DirectInboxConversationData,
   type InboxConversation,
 } from "@/api"
+import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
+import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
+import {
+  memberChatPollingInterval,
+  useMemberChatPollingActive,
+} from "@/features/inbox/use-member-chat-polling"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import {
+  useResource,
+  useResourceInvalidator,
+} from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
+
+type MobileInboxConversation =
+  | CustomerInboxConversationData
+  | DirectInboxConversationData
+
+/** 只保留移动端当前认识的 Customer 与 Direct 信封。 */
+function isMobileInboxConversation(
+  conversation: InboxConversation,
+): conversation is MobileInboxConversation {
+  return (
+    isCustomerInboxConversation(conversation) ||
+    isDirectInboxConversation(conversation)
+  )
+}
 
 const sourceBadges: Partial<
   Record<ChannelType, { icon: typeof GlobeIcon; className: string }>
@@ -100,7 +129,8 @@ function useConversationTime() {
       day: "2-digit",
     })
 
-    return (value: string) => {
+    return (value: string | null) => {
+      if (!value) return ""
       const date = new Date(value)
       const now = new Date()
       const elapsedMs = now.getTime() - date.getTime()
@@ -136,15 +166,43 @@ function useMinuteTick() {
 function MobileConversationAvatar({
   conversation,
 }: {
-  conversation: InboxConversation
+  conversation: MobileInboxConversation
 }) {
-  const badge = sourceBadges[conversation.channelType]
+  const customerConversation = isCustomerInboxConversation(conversation)
+    ? conversation
+    : null
+  const directConversation = isDirectInboxConversation(conversation)
+    ? conversation
+    : null
+  const badge = customerConversation
+    ? sourceBadges[customerConversation.customer.channelType]
+    : null
+  const displayName = customerConversation
+    ? customerConversation.customer.contactName?.trim()
+    : directConversation?.direct.peerName.trim()
+  const avatarURL = customerConversation?.customer.contactAvatarUrl ?? ""
+  const [avatarFailed, setAvatarFailed] = useState(false)
+
+  useEffect(() => setAvatarFailed(false), [avatarURL])
 
   return (
     <div className="relative shrink-0">
-      <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-sm font-medium text-muted-foreground">
-        {conversation.contactName ? (
-          conversation.contactName.slice(0, 1).toLocaleUpperCase()
+      <div
+        className={cn(
+          "flex size-11 items-center justify-center overflow-hidden bg-muted text-sm font-medium text-muted-foreground",
+          directConversation ? "rounded-full" : "rounded-xl",
+        )}
+      >
+        {avatarURL && !avatarFailed ? (
+          <img
+            src={avatarURL}
+            alt=""
+            className="size-full rounded-[inherit] object-cover"
+            draggable={false}
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : displayName ? (
+          Array.from(displayName)[0]?.toLocaleUpperCase()
         ) : (
           <UserRoundIcon className="size-4.5" />
         )}
@@ -164,67 +222,130 @@ function MobileConversationAvatar({
   )
 }
 
-/** 渲染一条不可进入详情的客户会话摘要。 */
+/** 渲染一条移动端 Customer 或 Direct 会话摘要。 */
 function MobileConversationRow({
   conversation,
+  onOpenDirect,
 }: {
-  conversation: InboxConversation
+  conversation: MobileInboxConversation
+  onOpenDirect: (conversation: DirectInboxConversationData) => void
 }) {
   const { t } = useTranslation("inbox")
   const formatTime = useConversationTime()
-  const name = conversation.contactName ?? t("anonymousVisitor")
+  const customerConversation = isCustomerInboxConversation(conversation)
+    ? conversation
+    : null
+  const directConversation = isDirectInboxConversation(conversation)
+    ? conversation
+    : null
+  const name = customerConversation
+    ? customerConversation.customer.contactName ?? t("anonymousVisitor")
+    : directConversation?.direct.peerName.trim() || t("unknownSender")
+  const summary = customerConversation?.customer ?? directConversation?.direct
 
-  return (
-    <li className="flex gap-3 border-b px-4 py-3 last:border-b-0">
+  if (!summary) return null
+
+  const content = (
+    <>
       <MobileConversationAvatar conversation={conversation} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <p className="truncate text-[15px] font-medium">{name}</p>
           <time className="ml-auto shrink-0 text-xs text-muted-foreground">
-            {formatTime(conversation.lastMessageAt)}
+            {formatTime(summary.lastMessageAt)}
           </time>
         </div>
         <p className="mt-0.5 truncate text-sm text-muted-foreground">
-          {conversation.preview}
+          {summary.preview ?? t("messagesEmpty")}
         </p>
-        <div className="mt-1.5 flex min-w-0 items-center gap-2">
-          <span className="truncate text-xs text-muted-foreground">
-            {conversation.channelName}
-          </span>
-          <span
-            className={cn(
-              "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-              sessionStatusClass(conversation.serviceSessionStatus),
-            )}
-          >
-            {sessionStatusLabel(conversation.serviceSessionStatus, t)}
-          </span>
-        </div>
+        {customerConversation ? (
+          <div className="mt-1.5 flex min-w-0 items-center gap-2">
+            <span className="truncate text-xs text-muted-foreground">
+              {customerConversation.customer.channelName}
+            </span>
+            <span
+              className={cn(
+                "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                sessionStatusClass(
+                  customerConversation.customer.serviceSessionStatus,
+                ),
+              )}
+            >
+              {sessionStatusLabel(
+                customerConversation.customer.serviceSessionStatus,
+                t,
+              )}
+            </span>
+          </div>
+        ) : null}
       </div>
+    </>
+  )
+
+  return (
+    <li className="border-b last:border-b-0">
+      {directConversation ? (
+        <button
+          type="button"
+          className="flex w-full gap-3 px-4 py-3 text-left transition-colors active:bg-muted"
+          aria-label={name}
+          onClick={() => onOpenDirect(directConversation)}
+        >
+          {content}
+        </button>
+      ) : (
+        <div className="flex gap-3 px-4 py-3">{content}</div>
+      )}
     </li>
   )
 }
 
-/** 加载并显示移动端客户会话摘要。 */
+/** 加载并显示移动端统一会话摘要。 */
 export function MobileInboxPage() {
   const { t } = useTranslation("mobile")
+  const { t: tInbox } = useTranslation("inbox")
+  const { identity } = useMobileWorkspace()
+  const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
+  const pollingActive = useMemberChatPollingActive({
+    requireWindowFocus: false,
+  })
+  const previousPollingActiveRef = useRef(pollingActive)
+  const [directDialogOpen, setDirectDialogOpen] = useState(false)
   const { data, loading, refreshing, error, refresh } = useResource(
     resourceKeys.inbox(),
     () => loadInbox(),
-    { staleTime: 0 },
+    {
+      staleTime: 0,
+      refetchInterval: pollingActive ? memberChatPollingInterval : false,
+      refetchOnWindowFocus: false,
+    },
   )
   useMinuteTick()
+  const conversations =
+    data?.conversations.filter(isMobileInboxConversation) ?? []
 
   useEffect(() => {
-    /** 应用回到前台时刷新会话摘要。 */
-    function refreshWhenVisible() {
-      if (document.visibilityState === "visible") void refresh()
+    if (pollingActive && !previousPollingActiveRef.current && data) {
+      void refresh()
     }
-    document.addEventListener("visibilitychange", refreshWhenVisible)
-    return () => {
-      document.removeEventListener("visibilitychange", refreshWhenVisible)
-    }
-  }, [refresh])
+    previousPollingActiveRef.current = pollingActive
+  }, [data, pollingActive, refresh])
+
+  /** 发起成功后直接进入 Direct 详情并刷新后台 Inbox 摘要。 */
+  function openStartedConversation(conversation: DirectInboxConversationData) {
+    void invalidate(resourceKeys.inbox())
+    navigate(`/inbox/direct/${conversation.id}`, {
+      state: { conversation },
+    })
+  }
+
+  /** 进入已有 Direct 详情。 */
+  function openDirectConversation(conversation: DirectInboxConversationData) {
+    navigate(`/inbox/direct/${conversation.id}`, {
+      state: { conversation },
+    })
+  }
 
   return (
     <section className="flex h-full min-h-0 flex-col">
@@ -234,6 +355,14 @@ export function MobileInboxPage() {
         </h1>
         <Button
           className="ml-auto"
+          variant="ghost"
+          size="icon-lg"
+          aria-label={tInbox("newDirectConversation")}
+          onClick={() => setDirectDialogOpen(true)}
+        >
+          <PlusIcon />
+        </Button>
+        <Button
           variant="ghost"
           size="icon-lg"
           disabled={loading || refreshing}
@@ -280,7 +409,7 @@ export function MobileInboxPage() {
               {t("inbox.refreshError")}
             </button>
           ) : null}
-          {data.conversations.length === 0 ? (
+          {conversations.length === 0 ? (
             <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center">
               <div className="max-w-xs">
                 <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border shadow-sm">
@@ -297,10 +426,11 @@ export function MobileInboxPage() {
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <ul>
-                {data.conversations.map((conversation) => (
+                {conversations.map((conversation) => (
                   <MobileConversationRow
                     key={conversation.id}
                     conversation={conversation}
+                    onOpenDirect={openDirectConversation}
                   />
                 ))}
               </ul>
@@ -308,6 +438,13 @@ export function MobileInboxPage() {
           )}
         </>
       ) : null}
+
+      <StartDirectConversationDialog
+        open={directDialogOpen}
+        currentIdentityID={identity.user.identityId}
+        onOpenChange={setDirectDialogOpen}
+        onStarted={openStartedConversation}
+      />
     </section>
   )
 }

@@ -559,6 +559,7 @@ export interface ConversationMessageListInput {
 export interface ConversationMessageSender {
     "chatSubjectId": string;
     "kind": ChatSubjectKind;
+    "sourceId": string;
     "displayName": string | null;
 }
 
@@ -570,6 +571,19 @@ export interface ConversationMessageSessionStart {
     "startedAt": string;
     "status": ServiceSessionStatus;
 }
+
+/**
+ * ConversationType 表示统一收件箱会话类型。
+ */
+export enum ConversationType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ConversationTypeCustomer = "customer",
+    ConversationTypeDirect = "direct",
+};
 
 /**
  * CreateAgentInput 定义新增 AI 员工字段。
@@ -623,9 +637,48 @@ export interface CurrentUser {
 }
 
 /**
+ * CustomerInboxConversation 定义客户会话摘要。
+ */
+export interface CustomerInboxConversation {
+    "title": string;
+    "contactName": string | null;
+    "contactAvatarUrl": string;
+    "channelType": ChannelType;
+    "channelName": string;
+    "preview": string | null;
+    "lastMessageAt": string | null;
+    "serviceSessionStatus": ServiceSessionStatus;
+}
+
+/**
  * CustomerTextMessageInput 定义成员发送的客户会话文本消息。
  */
 export interface CustomerTextMessageInput {
+    "clientMessageId": string;
+    "body": string;
+}
+
+/**
+ * DirectConversationInput 定义成员发起内部单聊的目标。
+ */
+export interface DirectConversationInput {
+    "targetIdentityId": string;
+}
+
+/**
+ * DirectInboxConversation 定义内部单聊摘要。
+ */
+export interface DirectInboxConversation {
+    "peerIdentityId": string;
+    "peerName": string;
+    "preview": string | null;
+    "lastMessageAt": string | null;
+}
+
+/**
+ * DirectTextMessageInput 定义成员发送的内部单聊文本消息。
+ */
+export interface DirectTextMessageInput {
     "clientMessageId": string;
     "body": string;
 }
@@ -720,17 +773,13 @@ export interface Inbox {
 }
 
 /**
- * InboxConversation 定义成员收件箱中的客户会话列表项。
+ * InboxConversation 定义成员统一收件箱列表项。
  */
 export interface InboxConversation {
     "id": string;
-    "title": string;
-    "contactName": string | null;
-    "channelType": ChannelType;
-    "channelName": string;
-    "preview": string;
-    "lastMessageAt": string;
-    "serviceSessionStatus": ServiceSessionStatus;
+    "type": ConversationType;
+    "customer": CustomerInboxConversation | null;
+    "direct": DirectInboxConversation | null;
 }
 
 /**
@@ -1008,6 +1057,53 @@ export interface KnowledgeGroup {
 export interface KnowledgeGroupInput {
     "name": string;
     "parentId": string;
+}
+
+/**
+ * KnowledgeRetrievalInput 定义知识库检索条件。
+ */
+export interface KnowledgeRetrievalInput {
+    "query": string;
+    "method": KnowledgeRetrievalMethod;
+    "rerankingEnabled": boolean;
+    "topK": number;
+    "scoreThresholdEnabled": boolean;
+    "scoreThreshold": number;
+}
+
+/**
+ * KnowledgeRetrievalMethod 表示知识库检索方式。
+ */
+export enum KnowledgeRetrievalMethod {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeRetrievalMethodKeyword = "keyword",
+    KnowledgeRetrievalMethodSemantic = "semantic",
+    KnowledgeRetrievalMethodFullText = "full_text",
+    KnowledgeRetrievalMethodHybrid = "hybrid",
+};
+
+/**
+ * KnowledgeRetrievalRecord 定义知识库检索命中项。
+ */
+export interface KnowledgeRetrievalRecord {
+    "documentId": string;
+    "documentName": string;
+    "segmentId": string;
+    "position": number;
+    "content": string;
+    "answer": string | null;
+    "score": number | null;
+}
+
+/**
+ * KnowledgeRetrievalResult 定义知识库检索结果。
+ */
+export interface KnowledgeRetrievalResult {
+    "records": KnowledgeRetrievalRecord[] | null;
 }
 
 /**

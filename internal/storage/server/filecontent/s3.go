@@ -3,6 +3,7 @@
 package filecontent
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"time"
@@ -35,6 +36,18 @@ type SignedRequest struct {
 type ObjectInfo struct {
 	ByteSize int64
 	ETag     string
+}
+
+// Put 把服务端内容写入 S3 兼容对象存储并返回 ETag。
+func Put(ctx context.Context, config S3Config, key, contentType string, data []byte) (string, error) {
+	output, err := newS3Client(config).PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(config.Bucket), Key: aws.String(key), ContentType: aws.String(contentType),
+		ContentLength: aws.Int64(int64(len(data))), Body: bytes.NewReader(data),
+	})
+	if err != nil {
+		return "", err
+	}
+	return aws.ToString(output.ETag), nil
 }
 
 // PresignPut 创建对象直传请求。

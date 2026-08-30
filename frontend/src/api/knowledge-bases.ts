@@ -10,6 +10,7 @@ import {
   ListKnowledgeBases,
   ListKnowledgeDocumentSegments,
   ListKnowledgeDocuments,
+  RetrieveKnowledgeBase,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -31,6 +32,9 @@ import {
   type KnowledgeDocumentSummary,
   type KnowledgeGroup,
   type KnowledgeGroupInput,
+  type KnowledgeRetrievalInput,
+  type KnowledgeRetrievalRecord,
+  type KnowledgeRetrievalResult,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import { asList } from "@/api/normalize"
@@ -121,6 +125,13 @@ export type KnowledgeDocumentSegmentListQuery = Partial<
   KnowledgeDocumentSegmentListInput
 >
 
+export type KnowledgeRetrievalResultData = Omit<
+  KnowledgeRetrievalResult,
+  "records"
+> & {
+  records: KnowledgeRetrievalRecord[]
+}
+
 const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
 const getKnowledgeBaseBound = bind(GetKnowledgeBase)
 const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
@@ -136,6 +147,7 @@ const getKnowledgeDocumentBound = bind(GetKnowledgeDocument)
 const listKnowledgeDocumentSegmentsBound = bind(
   ListKnowledgeDocumentSegments,
 )
+const retrieveKnowledgeBaseBound = bind(RetrieveKnowledgeBase)
 
 /** 创建企业知识库。 */
 export function createKnowledgeBase(
@@ -281,6 +293,17 @@ export function listKnowledgeDocumentSegments(
       indexStatus:
         segment.indexStatus as KnowledgeDocumentSegmentIndexStatusId,
     })),
+  }))
+}
+
+/** 检索指定外部知识库并归一化命中列表。 */
+export function retrieveKnowledgeBase(
+  knowledgeBaseId: string,
+  input: KnowledgeRetrievalInput,
+): Promise<KnowledgeRetrievalResultData> {
+  return retrieveKnowledgeBaseBound(knowledgeBaseId, input).then((output) => ({
+    ...output,
+    records: asList(output.records),
   }))
 }
 

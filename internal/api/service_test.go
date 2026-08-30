@@ -38,6 +38,8 @@ type testBackend struct {
 	lastConversationID   string
 	lastConversationList appservice.ConversationMessageListInput
 	lastCustomerMessage  appservice.CustomerTextMessageInput
+	lastDirectStart      appservice.DirectConversationInput
+	lastDirectMessage    appservice.DirectTextMessageInput
 	lastDocumentBaseID   string
 	lastDocumentID       string
 	lastDocumentQuery    appservice.KnowledgeDocumentListInput
@@ -84,6 +86,21 @@ func (b *testBackend) SendCustomerTextMessage(_ context.Context, meta appservice
 	b.lastMeta = meta
 	b.lastConversationID = conversationID
 	b.lastCustomerMessage = input
+	return appservice.ConversationMessage{ID: input.ClientMessageID, Type: appservice.MessageTypeText, Body: input.Body}, nil
+}
+
+// StartDirectConversation 记录内部单聊发起输入。
+func (b *testBackend) StartDirectConversation(_ context.Context, meta appservice.RequestMeta, input appservice.DirectConversationInput) (appservice.InboxConversation, error) {
+	b.lastMeta = meta
+	b.lastDirectStart = input
+	return appservice.InboxConversation{ID: "direct-1", Type: appservice.ConversationTypeDirect}, nil
+}
+
+// SendDirectTextMessage 记录内部单聊消息输入。
+func (b *testBackend) SendDirectTextMessage(_ context.Context, meta appservice.RequestMeta, conversationID string, input appservice.DirectTextMessageInput) (appservice.ConversationMessage, error) {
+	b.lastMeta = meta
+	b.lastConversationID = conversationID
+	b.lastDirectMessage = input
 	return appservice.ConversationMessage{ID: input.ClientMessageID, Type: appservice.MessageTypeText, Body: input.Body}, nil
 }
 
@@ -454,6 +471,31 @@ func TestCustomerTextMessageUsesTypedContract(t *testing.T) {
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK || backend.lastConversationID != conversationID || backend.lastCustomerMessage != input {
 		t.Fatalf("status = %d, conversation = %q, input = %#v", response.StatusCode, backend.lastConversationID, backend.lastCustomerMessage)
+	}
+}
+
+// TestDirectConversationCommandsUseTypedContracts 验证内部单聊命令路径和请求体绑定。
+func TestDirectConversationCommandsUseTypedContracts(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	startInput := appservice.DirectConversationInput{TargetIdentityID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f64"}
+	startResponse := doJSON(t, http.MethodPost, server.URL+"/direct-conversations", startInput, "test-token")
+	defer startResponse.Body.Close()
+	if startResponse.StatusCode != http.StatusOK || backend.lastDirectStart != startInput {
+		t.Fatalf("start status = %d, input = %#v", startResponse.StatusCode, backend.lastDirectStart)
+	}
+
+	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
+	messageInput := appservice.DirectTextMessageInput{
+		ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+		Body:            "你好，同事",
+	}
+	messageResponse := doJSON(t, http.MethodPost, server.URL+"/direct-conversations/"+conversationID+"/messages", messageInput, "test-token")
+	defer messageResponse.Body.Close()
+	if messageResponse.StatusCode != http.StatusOK || backend.lastConversationID != conversationID || backend.lastDirectMessage != messageInput {
+		t.Fatalf("message status = %d, conversation = %q, input = %#v", messageResponse.StatusCode, backend.lastConversationID, backend.lastDirectMessage)
 	}
 }
 

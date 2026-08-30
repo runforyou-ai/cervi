@@ -284,13 +284,13 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 网站实时入站没有可信的客户端业务时间，因此使用服务器首次接收时间作为 `originated_at`；Telegram 等能提供稳定来源时间的平台使用远端时间。Telegram 历史补拉不能用补拉入库时间重排历史。
 
-消息历史使用 `before` 游标按 `(originated_at DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一 `(originated_at, id)` 边界正序扫描更新记录。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。游标由服务端编码 Conversation 编号和元组，方向由查询参数表达，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
+消息历史使用 `before` 游标按 `(originated_at DESC, source_order DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一三元边界正序扫描更新记录。`source_order` 对没有平台顺序的网站和站内消息为 `0`，Telegram 私聊使用同一 Chat 内的 `message_id`。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。游标由服务端编码 Conversation 编号和三元组，方向由查询参数表达，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的最终稳定分页分界，不代表第三方平台的来源顺序。
 
-会话的 `last_message_at` 表示当前已知消息最大的 `originated_at`，`last_message_id` 与它成对指向同一条消息，两者在同一事务按 `(originated_at, id)` 只向前推进。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它们，删除最后一条消息也不回退它们，此时 `last_message_id` 允许指向已删除消息，仅继续充当排序水位。会话预览跳过已删除消息：指向消息已删除时按时间线回退查询最近一条未删除消息，不得展示已删除内容。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
+会话的 `last_message_at`、`last_message_source_order` 和 `last_message_id` 成组指向当前已知顺序最大的消息，并在同一事务按对应三元组只向前推进。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它们，删除最后一条消息也不回退它们，此时 `last_message_id` 允许指向已删除消息，仅继续充当排序水位。会话预览跳过已删除消息：指向消息已删除时按时间线回退查询最近一条未删除消息，不得展示已删除内容。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
 
 文件、语音、卡片、反应、@ 提醒和系统事件后续使用独立关系或类型化载荷扩展，不把所有结构塞进文本正文。
 
-`messages` 是时间线内容的事实来源，但 `(originated_at, id)` 游标只能发现新插入消息。阶段 2 对旧消息编辑、删除及其他聊天实体变化使用独立 `conversation_sync_events` 补拉，不把消息表改造成领域事件日志。
+`messages` 是时间线内容的事实来源，但 `(originated_at, source_order, id)` 游标只能发现新插入消息。阶段 2 对旧消息编辑、删除及其他聊天实体变化使用独立 `conversation_sync_events` 补拉，不把消息表改造成领域事件日志。
 
 ### 5.4 CustomerConversation
 
@@ -636,13 +636,13 @@ provider_read_cursor
 
 Adapter 负责平台规范化，业务 Action 只校验非空、长度和作用域。禁止统一 `lower()`，也不把用户名、手机号、邮箱、工作区名称或 Endpoint 当作稳定账号主键。
 
-`source_order` 是可空 `bigint`，只在平台提供同一远端会话内稳定、可比较的整数顺序时填写：
+第三方用户账号映射中的 `connected_message_records.source_order` 是可空 `bigint`，只在平台提供同一远端会话内稳定、可比较的整数顺序时填写：
 
 - Telegram 可以使用整数消息编号。
 - 没有稳定整数顺序的平台保持为空，时间线退回 `(originated_at, id)`。
 - 不得使用时间戳转换、Hash、填零或平台内部不可公开的深度值伪造顺序。
 - 不为 `(connected_chat_id, source_order)` 创建唯一约束。
-- 阶段 0 不在 `messages` 增加该字段；阶段 3 先保存在连接消息映射中。
+- 客服和站内时间线的 `messages.source_order` 已在阶段 1 为 Telegram Bot 私聊增加，使用非空 `bigint`，没有来源顺序时统一为 `0`；它与第三方账号映射字段不共用约束。
 
 账号级 `projection_cursor` 表示当前账号投影进度，会话级 `connected_chats.projection_cursor` 表示单个远端会话历史补拉进度，`provider_read_cursor` 表示平台已读位置。三者语义不同，不能共用时间戳或消息编号字段。
 
@@ -956,7 +956,7 @@ needs_review
 
 ### 10.8 客户端离线增量同步
 
-新消息可以通过 `(originated_at, id)` 的 `after` 游标补拉，更早历史通过同一元组的 `before` 游标读取；但旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
+新消息可以通过 `(originated_at, source_order, id)` 的 `after` 游标补拉，更早历史通过同一元组的 `before` 游标读取；但旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
 
 阶段 2 承诺实时消息和离线补拉时使用“用户 Mailbox 指出哪些会话变化，会话 Changelog 描述具体变化”的两层游标。只使用每会话序号时，拥有大量会话、多个设备或多个第三方账号的用户必须扫描全部会话才能发现变化，不能作为目标设计。
 
@@ -1249,11 +1249,11 @@ P3 typing、presence 等临时事件
 
 阶段 1 按可独立验收的子阶段交付：先在阶段 0 数据底座上完成网站文本闭环，再以 Telegram Bot 验证外部投递，随后扩展其他客服渠道、文件和客服处理能力。`ServiceSession` 随数据底座提前建立，但客户可见列表和历史始终以 Conversation 为线程；领取、转接、结束、指标和满意度仍在后续阶段交付。
 
-#### 阶段 1A：网站客户文本闭环（访客侧已交付）
+#### 阶段 1A：网站客户文本闭环（双方文本轮询闭环已完成）
 
 - 网站访客通过第 4.5 节的渠道 Cookie 恢复身份，第一条有效文本消息创建 `stage = visitor` 联系人、渠道身份和长期客户会话。
 - 新草稿第一条有效文本创建 Conversation 和首个 `ServiceSession`；点击已有列表项发送时复用该 Conversation，并复用或续开它的 ServiceSession。访客会话列表以 Conversation 为列表项，ServiceSession 只提供最新处理状态摘要。
-- 网站消息 PR 已交付访客发送、Conversation 列表和完整历史读取（见第 13.3 节）；企业成员列表、历史和回复也已由后续独立 PR 交付，历史使用 `before`，网站和员工页面以后使用 `after` 轮询新增消息。
+- 网站消息 PR 已交付访客发送、Conversation 列表和完整历史读取（见第 13.3 节）；企业成员列表、历史和回复也已由后续独立 PR 交付。访客与成员当前打开的会话均使用 `after` 轮询新增消息，并在页面恢复可见后立即补拉。
 - 同一渠道身份可以同时拥有多条正在处理的 Conversation，每条 Conversation 同时最多一个 `status IN (waiting, active, pending)` 的 ServiceSession；`conversations.status = active` 不表示客服批次未结束。
 - 网站公开请求由现有 `/api` Gin Service 适配到未注册 Wails 绑定的访客应用服务和 Action；访客直接读取 Cervi 消息时间线，不创建 Delivery。
 - 本子阶段只实现文本，不包含文件、外部平台投递和统一实时基础设施。
@@ -1285,9 +1285,9 @@ P3 typing、presence 等临时事件
 
 阶段 2 依次交付成员单聊、基础群聊、内部 AI 员工验证、网站 AI 客服以及统一实时与离线同步。
 
-#### 阶段 2A：成员文本单聊
+#### 阶段 2A：成员文本单聊（全端已完成）
 
-- 实现成员会话列表、历史和文本发送，首版可沿用 `before/after` 查询与轮询。
+- Web、桌面端和移动端已实现成员会话列表、历史、文本发送和 `before/after` 轮询；移动端使用独立详情路由和前台可见性判断。
 - 同一企业内同一对有效 ChatSubject 只对应一个长期 `direct` 会话；两个并发创建请求必须收敛到同一会话。
 - 单聊严格按有效参与者授权，不包含已读、实时、文件和 Agent 自动响应。
 
@@ -1452,7 +1452,7 @@ PR4 增加成员会话消息查询：
 GET /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
 ```
 
-成员查询按当前企业授权 `customer` Conversation，不要求最新 ServiceSession 仍未结束，避免以后读取已关闭会话时改变历史权限。`before` 与 `after` 互斥，游标绑定 Conversation；消息按 `(originated_at, id)` 稳定分页并统一正序返回。
+成员查询按当前企业授权 `customer` Conversation，不要求最新 ServiceSession 仍未结束，避免以后读取已关闭会话时改变历史权限。`before` 与 `after` 互斥，游标绑定 Conversation；当前消息按 `(originated_at, source_order, id)` 稳定分页并统一正序返回。
 
 成员消息 DTO 保留消息类型、双时间和真实 ChatSubject 发送者，不复用访客挂件的 `visitor/agent` 二元作者视角。前端在会话主区加载最近一页并使用 `before` 读取更早文本，按消息编号去重并保持阅读位置；`after` 已作为后续 HTTP 增量补拉契约，但本 PR 不自动调用。
 
@@ -1468,24 +1468,42 @@ PR6 增加 `POST /api/conversations/{conversationID}/messages` 成员客户会�
 
 网站渠道回复直接写入 Cervi 时间线，不创建 Delivery、异步任务或实时事件。前端启用工作区回复区，成功后立即合入成员时间线并刷新收件箱摘要；访客和成员自动补拉仍留给下一 PR。
 
-### 13.8 当前共同边界
+### 13.8 阶段 2A：企业成员文本单聊（本次交付）
 
-当前客户聊天仍未实现以下能力，全部属于后续阶段：
+企业成员内部单聊已完成 Web、桌面端和移动端闭环：
 
-- 双方 `after` 自动补拉。
+```text
+POST /api/direct-conversations
+POST /api/direct-conversations/{conversationID}/messages
+GET  /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
+```
+
+发起单聊只接受当前企业的活跃用户身份，不接受自己、AI 员工、联系人、跨企业或停用用户。服务端在校验完成后，使用规范文本 `cervi:direct:<organization_id>:<min_identity_id>:<max_identity_id>` 的稳定 `bigint` 哈希取得事务级 advisory lock；锁内取得双方 `organization_identity` ChatSubject，并只复用类型为 `direct`、同企业、Participant 总数恰好为 2 且主体集合精确匹配的 Conversation。锁在创建 ChatSubject 前取得，Direct 创建统一经过该 Action，不增加主体配对关系表。已有归档会话只在显式发起时恢复为 `active`。
+
+Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 Participant 或恢复归档 Conversation；消息继续使用 `mmsg:<organization_identity_id>:<client_message_id>` 幂等键，且不关联 ServiceSession。成员历史查询按 Conversation 类型严格分叉：Customer 保持企业与客户扩展授权，Direct 要求当前身份是未离开的 Participant，其他类型不开放。
+
+统一 Inbox 使用 `type + customer?/direct?` 信封。Customer 与 Direct 分别最多读取 50 条，合并后不再截断；Direct 使用最后消息左连接，空会话返回可空预览与时间，合并按 `last_message_at DESC NULLS LAST, id DESC` 排序，空会话沉底。消息发送者的 `sourceId` 明确定义为 `chat_subjects.source_id`：Customer 中联系人靠左、所有企业身份靠右；Direct 中 `sourceId == CurrentUser.identityId` 靠右，对方靠左。
+
+成员收件箱和当前 Customer/Direct 时间线每 3 秒轮询；Web 与桌面端只在消息路由所属工作区标签活动、页面可见且窗口聚焦时运行，移动端只在应用前台可见时运行，恢复前台后立即补拉。空 Direct 在没有 `after` 时轮询无游标最近页，得到第一条消息后安装游标；空增量响应保留旧游标，`before`、`after` 和本地发送结果按消息编号合并，切换会话后忽略旧结果。
+
+Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，群聊继续显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接、交给 AI 或客户上下文栏。移动端统一展示 Customer 与 Direct 摘要，Customer 仍保持只读摘要，Direct 支持发起、详情、历史、文本发送和前台轮询；移动端详情隐藏一级导航并独立处理底部安全区。
+
+### 13.9 当前共同边界与后续交付
+
+网站访客 Messenger 已在当前打开的 Conversation 中使用 `after` 每 3 秒补拉新增文本；页面不可见或嵌入挂件收起时停止轮询，恢复后立即补拉。访客发送结果与增量结果按 `(originated_at, id)` 有序去重合入，发送不自行推进服务端游标。
+
+当前聊天仍未实现以下能力，全部属于后续阶段：
+
 - ServiceSession 领取、转接、挂起和结束命令。
 - 客户队列按负责人、团队和关闭状态真实筛选。
 - 未读、实时、文件、外部平台投递、指标和满意度。
 - 第三方用户消息账号、受管访客、联邦和 AI 运行表。
 - `customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。
 
-### 13.9 后续交付
-
 后续按独立 PR 继续完成：
 
-1. 网站访客和成员页面使用 `after` 轮询新增文本消息，完成网站双方文本闭环。
-2. 公开访客端点按第 4.5 节补齐防滥用限制：接口限速、消息长度与频率约束、未回复 Conversation 数量上限；先于外部渠道扩展交付。
-3. ServiceSession 显式领取、挂起和结束命令。
-4. 客户队列子筛选按状态和负责人落地，并与 URL 查询参数同步。
-5. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
-6. 未读、统一实时、文件、外部平台投递、转接、指标和满意度。
+1. 公开访客端点按第 4.5 节补齐防滥用限制：接口限速、消息长度与频率约束、未回复 Conversation 数量上限；先于外部渠道扩展交付。
+2. ServiceSession 显式领取、挂起和结束命令。
+3. 客户队列子筛选按状态和负责人落地，并与 URL 查询参数同步。
+4. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
+5. 未读、统一实时、文件、外部平台投递、转接、指标和满意度。

@@ -13,13 +13,14 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationChannelIDInvalid       ValidationCode = "channel_id_invalid"
-	ValidationExternalIDInvalid      ValidationCode = "external_id_invalid"
-	ValidationConversationIDInvalid  ValidationCode = "conversation_id_invalid"
-	ValidationClientMessageIDInvalid ValidationCode = "client_message_id_invalid"
-	ValidationBodyRequired           ValidationCode = "body_required"
-	ValidationBodyTooLong            ValidationCode = "body_too_long"
-	ValidationCursorInvalid          ValidationCode = "cursor_invalid"
+	ValidationChannelIDInvalid        ValidationCode = "channel_id_invalid"
+	ValidationExternalIDInvalid       ValidationCode = "external_id_invalid"
+	ValidationConversationIDInvalid   ValidationCode = "conversation_id_invalid"
+	ValidationTargetIdentityIDInvalid ValidationCode = "target_identity_id_invalid"
+	ValidationClientMessageIDInvalid  ValidationCode = "client_message_id_invalid"
+	ValidationBodyRequired            ValidationCode = "body_required"
+	ValidationBodyTooLong             ValidationCode = "body_too_long"
+	ValidationCursorInvalid           ValidationCode = "cursor_invalid"
 )
 
 const (
@@ -29,6 +30,8 @@ const (
 	ConflictReasonServiceSessionOwned = "service_session_owned"
 	// ConflictReasonServiceSessionNotReplyable 表示客服处理周期当前不可回复。
 	ConflictReasonServiceSessionNotReplyable = "service_session_not_replyable"
+	// ConflictReasonChannelOutboundUnsupported 表示来源渠道尚不支持外发。
+	ConflictReasonChannelOutboundUnsupported = "channel_outbound_unsupported"
 )
 
 // WebsiteCustomerTextMessageInput 定义网站客户文本消息。
@@ -70,6 +73,7 @@ type ReceiveWebsiteCustomerTextMessageResult struct {
 // MessageCursorPoint 定义消息分页稳定边界。
 type MessageCursorPoint struct {
 	OriginatedAt time.Time
+	SourceOrder  int64
 	ID           string
 }
 
@@ -93,6 +97,7 @@ type MessageHistory struct {
 type ConversationMessageSender struct {
 	ChatSubjectID string
 	Kind          domain.ChatSubjectKind
+	SourceID      string
 	DisplayName   *string
 }
 
@@ -130,6 +135,27 @@ type ConversationMessageHistory struct {
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。
 type CustomerTextMessageInput struct {
+	ConversationID  string
+	ClientMessageID string
+	Body            string
+}
+
+// DirectConversationInput 定义成员发起内部单聊的目标。
+type DirectConversationInput struct {
+	TargetIdentityID string
+}
+
+// DirectConversationSummary 定义成员内部单聊摘要。
+type DirectConversationSummary struct {
+	ID             string
+	PeerIdentityID string
+	PeerName       string
+	Preview        *string
+	LastMessageAt  *time.Time
+}
+
+// DirectTextMessageInput 定义成员发送的内部单聊文本消息。
+type DirectTextMessageInput struct {
 	ConversationID  string
 	ClientMessageID string
 	Body            string

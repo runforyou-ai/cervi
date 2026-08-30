@@ -53,6 +53,12 @@ type Backend interface {
 	// SendCustomerTextMessage 发送客户会话文本消息。
 	//cervi:route POST /conversations/:conversationID/messages
 	SendCustomerTextMessage(context.Context, RequestMeta, string, CustomerTextMessageInput) (ConversationMessage, error)
+	// StartDirectConversation 发起或打开企业成员内部单聊。
+	//cervi:route POST /direct-conversations
+	StartDirectConversation(context.Context, RequestMeta, DirectConversationInput) (InboxConversation, error)
+	// SendDirectTextMessage 发送内部单聊文本消息。
+	//cervi:route POST /direct-conversations/:conversationID/messages
+	SendDirectTextMessage(context.Context, RequestMeta, string, DirectTextMessageInput) (ConversationMessage, error)
 	// ListMessageChannels 返回消息渠道列表。
 	//cervi:route GET /channels
 	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)
@@ -182,6 +188,9 @@ type Backend interface {
 	// ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/segments
 	ListKnowledgeDocumentSegments(context.Context, RequestMeta, string, string, KnowledgeDocumentSegmentListInput) (KnowledgeDocumentSegmentList, error)
+	// RetrieveKnowledgeBase 检索指定外部知识库。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/retrieve
+	RetrieveKnowledgeBase(context.Context, RequestMeta, string, KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error)
 	// GetKnowledgeBase 返回当前企业中的知识库详情。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID
 	GetKnowledgeBase(context.Context, RequestMeta, string) (KnowledgeBase, error)

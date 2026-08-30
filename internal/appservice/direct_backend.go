@@ -52,6 +52,8 @@ type DirectBackend struct {
 	loadInbox                         *inboxaction.LoadInboxQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
+	startDirectConversation           *conversationaction.StartDirectConversationAction
+	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
 	getTelegramChannel                *channelaction.GetTelegramChannelQuery
@@ -89,6 +91,7 @@ type DirectBackend struct {
 	listKnowledgeDocuments            *knowledgebaseaction.ListKnowledgeDocumentsQuery
 	getKnowledgeDocument              *knowledgebaseaction.GetKnowledgeDocumentQuery
 	listKnowledgeDocumentSegments     *knowledgebaseaction.ListKnowledgeDocumentSegmentsQuery
+	retrieveKnowledgeBase             *knowledgebaseaction.RetrieveKnowledgeBaseQuery
 	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
 	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
 	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
@@ -149,6 +152,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 	connectorClient := connector.NewHTTPClient()
 	connectorRegistry := connector.NewRegistry(connectorClient)
 	difyKnowledgeDocuments := connector.NewDifyKnowledgeDocumentLister(connectorClient)
+	difyKnowledgeRetriever := connector.NewDifyKnowledgeRetriever(connectorClient)
 	telegramAPI := telegram.NewClient(connectiontest.NewHTTPClient())
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
@@ -159,6 +163,8 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
+		startDirectConversation:           conversationaction.NewStartDirectConversationAction(db),
+		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getTelegramChannel:                channelaction.NewGetTelegramChannelQuery(db),
@@ -196,6 +202,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, difyKnowledgeDocuments),
 		getKnowledgeDocument:              knowledgebaseaction.NewGetKnowledgeDocumentQuery(db, difyKnowledgeDocuments),
 		listKnowledgeDocumentSegments:     knowledgebaseaction.NewListKnowledgeDocumentSegmentsQuery(db, difyKnowledgeDocuments),
+		retrieveKnowledgeBase:             knowledgebaseaction.NewRetrieveKnowledgeBaseQuery(db, difyKnowledgeRetriever),
 		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),

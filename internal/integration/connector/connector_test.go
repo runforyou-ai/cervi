@@ -2,8 +2,10 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -271,6 +273,218 @@ func TestDifyKnowledgeDocumentSegmentsRejectMissingState(t *testing.T) {
 	_, kind, classified := connectiontest.Details(err)
 	if !classified || kind != connectiontest.FailureProtocol {
 		t.Fatalf("error = %v, kind = %q", err, kind)
+	}
+}
+
+// TestDifyKnowledgeRetriever 验证 Dify 检索请求和命中分段映射。
+func TestDifyKnowledgeRetriever(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if authorization := request.Header.Get("Authorization"); authorization != "Bearer dataset-key" {
+			t.Fatalf("unexpected authorization header: %s", authorization)
+		}
+		if request.URL.Path == "/v1/datasets/dataset-1" && request.Method == http.MethodGet {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"indexing_technique":"economy","retrieval_model_dict":null}`))
+			return
+		}
+		if request.Method != http.MethodPost || request.URL.Path != "/v1/datasets/dataset-1/retrieve" {
+			t.Fatalf("unexpected request: %s %s", request.Method, request.URL.Path)
+		}
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		var query string
+		if err := json.Unmarshal(body["query"], &query); err != nil || query != "如何安装？" || len(body) != 2 {
+			t.Fatalf("unexpected request body: %#v", body)
+		}
+		var retrievalModel struct {
+			SearchMethod          string  `json:"search_method"`
+			RerankingEnable       bool    `json:"reranking_enable"`
+			TopK                  int     `json:"top_k"`
+			ScoreThresholdEnabled bool    `json:"score_threshold_enabled"`
+			ScoreThreshold        float64 `json:"score_threshold"`
+		}
+		if err := json.Unmarshal(body["retrieval_model"], &retrievalModel); err != nil ||
+			retrievalModel.SearchMethod != "keyword_search" || !retrievalModel.RerankingEnable ||
+			retrievalModel.TopK != 6 || !retrievalModel.ScoreThresholdEnabled || retrievalModel.ScoreThreshold != 0.75 {
+			t.Fatalf("unexpected retrieval model: %#v", retrievalModel)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{
+			"records":[
+				{"segment":{"id":"segment-2","position":2,"document_id":"document-1","content":"第二步","answer":null,"document":{"id":"document-1","name":"安装手册.md"}},"score":0.82},
+				{"segment":{"id":"segment-1","position":1,"document_id":"document-2","content":"问题","answer":"答案"},"score":null},
+				{"segment":{"id":"segment-3","position":3,"document_id":"document-3","content":"说明","answer":null},"score":0}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	records, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
+		context.Background(),
+		DifyKnowledgeBaseConfig{APIURL: server.URL + "/v1", APIKey: "dataset-key"},
+		"dataset-1",
+		"如何安装？",
+		domain.KnowledgeRetrievalOptions{
+			Method: domain.KnowledgeRetrievalMethodKeyword, RerankingEnabled: true,
+			TopK: 6, ScoreThresholdEnabled: true, ScoreThreshold: 0.75,
+		},
+	)
+	if err != nil {
+		t.Fatalf("retrieve knowledge base: %v", err)
+	}
+	if len(records) != 3 || records[0].SegmentID != "segment-2" || records[0].DocumentName != "安装手册.md" ||
+		records[0].Score == nil || *records[0].Score != 0.82 || records[1].DocumentName != "" ||
+		records[1].Score != nil || records[1].Answer == nil || *records[1].Answer != "答案" ||
+		records[2].Score != nil {
+		t.Fatalf("unexpected records: %#v", records)
+	}
+}
+
+// TestDifyKnowledgeRetrieverUsesConfiguredModel 验证检索沿用知识库现有配置。
+func TestDifyKnowledgeRetrieverUsesConfiguredModel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		if request.Method == http.MethodGet {
+			_, _ = writer.Write([]byte(`{
+				"indexing_technique":"high_quality",
+				"retrieval_model_dict":{
+					"search_method":"hybrid_search","reranking_enable":false,"top_k":7,"score_threshold_enabled":false,
+					"reranking_model":{"reranking_provider_name":"provider","reranking_model_name":"model"},
+					"weights":{"weight_type":"semantic_first"}
+				}
+			}`))
+			return
+		}
+		var body struct {
+			RetrievalModel struct {
+				SearchMethod          string         `json:"search_method"`
+				RerankingEnable       bool           `json:"reranking_enable"`
+				TopK                  int            `json:"top_k"`
+				ScoreThresholdEnabled bool           `json:"score_threshold_enabled"`
+				ScoreThreshold        float64        `json:"score_threshold"`
+				RerankingModel        map[string]any `json:"reranking_model"`
+				Weights               map[string]any `json:"weights"`
+			} `json:"retrieval_model"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil ||
+			body.RetrievalModel.SearchMethod != "semantic_search" || !body.RetrievalModel.RerankingEnable ||
+			body.RetrievalModel.TopK != 12 || !body.RetrievalModel.ScoreThresholdEnabled ||
+			body.RetrievalModel.ScoreThreshold != 0.4 ||
+			body.RetrievalModel.RerankingModel["reranking_model_name"] != "model" ||
+			body.RetrievalModel.Weights["weight_type"] != "semantic_first" {
+			t.Fatalf("unexpected request body: %#v, error: %v", body, err)
+		}
+		_, _ = writer.Write([]byte(`{
+			"records":[{
+				"segment":{"id":"segment-1","position":1,"document_id":"document-1","content":"语义命中"},
+				"score":0
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	records, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
+		context.Background(),
+		DifyKnowledgeBaseConfig{APIURL: server.URL, APIKey: "dataset-key"},
+		"dataset-1",
+		"测试",
+		domain.KnowledgeRetrievalOptions{
+			Method: domain.KnowledgeRetrievalMethodSemantic, RerankingEnabled: true,
+			TopK: 12, ScoreThresholdEnabled: true, ScoreThreshold: 0.4,
+		},
+	)
+	if err != nil || len(records) != 1 || records[0].Score == nil || *records[0].Score != 0 {
+		t.Fatalf("records = %#v, error = %v", records, err)
+	}
+}
+
+// TestDifyKnowledgeRetrieverReportsInvalidField 验证协议错误指出具体记录和字段。
+func TestDifyKnowledgeRetrieverReportsInvalidField(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		if request.Method == http.MethodGet {
+			_, _ = writer.Write([]byte(`{"indexing_technique":"high_quality","retrieval_model_dict":null}`))
+			return
+		}
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		var model struct {
+			SearchMethod string `json:"search_method"`
+			TopK         int    `json:"top_k"`
+		}
+		if err := json.Unmarshal(body["retrieval_model"], &model); err != nil ||
+			model.SearchMethod != "keyword_search" || model.TopK != 4 {
+			t.Fatalf("unexpected retrieval model: %s", body["retrieval_model"])
+		}
+		_, _ = writer.Write([]byte(`{
+			"records":[{"segment":{"id":"segment-1","document_id":"document-1","content":"内容"},"score":0.8}]
+		}`))
+	}))
+	defer server.Close()
+
+	_, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
+		context.Background(),
+		DifyKnowledgeBaseConfig{APIURL: server.URL, APIKey: "dataset-key"},
+		"dataset-1",
+		"测试",
+		domain.KnowledgeRetrievalOptions{
+			Method: domain.KnowledgeRetrievalMethodKeyword, TopK: 4, ScoreThreshold: 0.5,
+		},
+	)
+	_, kind, classified := connectiontest.Details(err)
+	if !classified || kind != connectiontest.FailureProtocol ||
+		!strings.Contains(err.Error(), "record 1 contains invalid segment.position") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestDifyKnowledgeSearchMethod 验证统一检索方式完整映射到 Dify。
+func TestDifyKnowledgeSearchMethod(t *testing.T) {
+	tests := map[domain.KnowledgeRetrievalMethod]string{
+		domain.KnowledgeRetrievalMethodKeyword:  difyKnowledgeSearchMethodKeyword,
+		domain.KnowledgeRetrievalMethodSemantic: difyKnowledgeSearchMethodSemantic,
+		domain.KnowledgeRetrievalMethodFullText: difyKnowledgeSearchMethodFullText,
+		domain.KnowledgeRetrievalMethodHybrid:   difyKnowledgeSearchMethodHybrid,
+	}
+	for method, expected := range tests {
+		actual, valid := difyKnowledgeSearchMethod(method)
+		if !valid || actual != expected {
+			t.Fatalf("method %q: actual = %q, valid = %v", method, actual, valid)
+		}
+	}
+	if _, valid := difyKnowledgeSearchMethod("future"); valid {
+		t.Fatal("unsupported method should fail")
+	}
+}
+
+// TestDifyKnowledgeRetrieverRejectsEconomySemanticSearch 验证经济模式不会静默改写用户选择。
+func TestDifyKnowledgeRetrieverRejectsEconomySemanticSearch(t *testing.T) {
+	postCalled := false
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		if request.Method == http.MethodPost {
+			postCalled = true
+		}
+		_, _ = writer.Write([]byte(`{"indexing_technique":"economy","retrieval_model_dict":null}`))
+	}))
+	defer server.Close()
+
+	_, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
+		context.Background(),
+		DifyKnowledgeBaseConfig{APIURL: server.URL, APIKey: "dataset-key"},
+		"dataset-1",
+		"测试",
+		domain.KnowledgeRetrievalOptions{
+			Method: domain.KnowledgeRetrievalMethodSemantic, TopK: 4, ScoreThreshold: 0.5,
+		},
+	)
+	_, kind, classified := connectiontest.Details(err)
+	if !classified || kind != connectiontest.FailureInvalidConfig || postCalled {
+		t.Fatalf("error = %v, kind = %q, post called = %v", err, kind, postCalled)
 	}
 }
 

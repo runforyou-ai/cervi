@@ -14,7 +14,12 @@ import { recoverSession } from "@/lib/session-navigation"
 export function useResource<T>(
   key: QueryKey,
   load: (signal: AbortSignal) => Promise<T>,
-  options: { enabled?: boolean; staleTime?: number } = {},
+  options: {
+    enabled?: boolean
+    staleTime?: number
+    refetchInterval?: number | false
+    refetchOnWindowFocus?: boolean
+  } = {},
 ) {
   const navigate = useNavigate()
   const query = useQuery({
@@ -22,6 +27,8 @@ export function useResource<T>(
     queryFn: ({ signal }) => load(signal),
     enabled: options.enabled,
     staleTime: options.staleTime,
+    refetchInterval: options.refetchInterval,
+    refetchOnWindowFocus: options.refetchOnWindowFocus,
   })
 
   const sessionError = query.error

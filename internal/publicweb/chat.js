@@ -7,6 +7,7 @@
 
   var MAX_ATTACHMENT_COUNT = 10;
   var COMPOSER_MAX_HEIGHT = 160;
+  var MESSAGE_POLL_INTERVAL = 3000;
   var previewMode = messenger.getAttribute("data-preview") === "true";
   var channelID = messenger.getAttribute("data-channel-id");
   var visitorToken = "";
@@ -19,6 +20,8 @@
   var conversationReturnRoute = "home";
   var activeConversation = createConversation();
   var recentConversation = null;
+  var messagePollingTimer = null;
+  var messagePollingConversation = null;
   var recordingStartedAt = 0;
   var recordingTimer = null;
   var lightbox = null;
@@ -103,6 +106,7 @@
         }, 0);
       }
     }
+    syncRealMessagePolling();
   }
 
   function createConversation(summary) {
@@ -118,6 +122,10 @@
       lastMessageAt: summary ? summary.lastMessageAt : "",
       serviceSession: summary ? summary.serviceSession : null,
       unread: false,
+      after: "",
+      polling: false,
+      pollSeq: 0,
+      lastMessageID: "",
       replyState: "none",
       typingNode: null,
       historyLoaded: false,
@@ -162,6 +170,7 @@
       ) {
         loadConversationHistory(conversation);
       }
+      syncRealMessagePolling();
       return;
     }
     stashActiveConversation();
@@ -190,6 +199,7 @@
     ) {
       loadConversationHistory(activeConversation);
     }
+    syncRealMessagePolling();
   }
 
   function beginNewConversation() {
@@ -327,6 +337,22 @@
   function normalizedTimestamp(value) {
     var match = value.match(/^(.*?)(?:\.(\d+))?Z$/);
     return match[1] + "." + (match[2] || "").padEnd(9, "0").slice(0, 9) + "Z";
+  }
+
+  // 按消息来源时间和编号比较稳定时间线位置。
+  function compareMessagePosition(leftAt, leftID, rightAt, rightID) {
+    if (!leftAt || !rightAt) {
+      if (leftAt === rightAt) {
+        return (leftID || "").localeCompare(rightID || "");
+      }
+      return leftAt ? 1 : -1;
+    }
+    var leftTime = normalizedTimestamp(leftAt);
+    var rightTime = normalizedTimestamp(rightAt);
+    if (leftTime !== rightTime) {
+      return leftTime < rightTime ? -1 : 1;
+    }
+    return (leftID || "").localeCompare(rightID || "");
   }
 
   function formatDuration(seconds) {
@@ -535,10 +561,23 @@
   }
 
   // 更新指定会话的摘要、时间和未读状态。
-  function updateConversationSummary(conversation, preview, date) {
+  function updateConversationSummary(conversation, preview, date, messageID) {
+    var originatedAt =
+      typeof date === "string" ? date : date.toISOString();
+    if (
+      compareMessagePosition(
+        originatedAt,
+        messageID,
+        conversation.lastMessageAt,
+        conversation.lastMessageID,
+      ) < 0
+    ) {
+      return;
+    }
     conversation.summary = preview;
-    conversation.time = formatTime(date);
-    conversation.lastMessageAt = date.toISOString();
+    conversation.time = formatTime(new Date(originatedAt));
+    conversation.lastMessageAt = originatedAt;
+    conversation.lastMessageID = messageID || "";
     conversation.unread =
       conversation !== activeConversation ||
       activeRoute !== "conversation" ||
@@ -598,7 +637,11 @@
   }
 
   // 将服务端摘要合并到页面会话状态。
-  function upsertRealConversation(summary, preferredConversation) {
+  function upsertRealConversation(
+    summary,
+    preferredConversation,
+    summaryMessageID,
+  ) {
     var conversation = conversationByID[summary.id];
     if (!conversation) {
       conversation = preferredConversation || createConversation(summary);
@@ -608,9 +651,19 @@
       conversationItems.push(conversation);
     }
     conversation.title = summary.title;
-    conversation.summary = summary.preview;
-    conversation.lastMessageAt = summary.lastMessageAt;
-    conversation.time = formatTime(new Date(summary.lastMessageAt));
+    if (
+      compareMessagePosition(
+        summary.lastMessageAt,
+        summaryMessageID,
+        conversation.lastMessageAt,
+        conversation.lastMessageID,
+      ) >= 0
+    ) {
+      conversation.summary = summary.preview;
+      conversation.lastMessageAt = summary.lastMessageAt;
+      conversation.lastMessageID = summaryMessageID || "";
+      conversation.time = formatTime(new Date(summary.lastMessageAt));
+    }
     conversation.serviceSession = summary.serviceSession;
     conversationItems.sort(compareConversationRecency);
     if (conversationItems.length > 20) {
@@ -656,6 +709,7 @@
       .finally(function () {
         initializationPending = false;
         updateSendState();
+        syncRealMessagePolling();
       });
   }
 
@@ -706,7 +760,17 @@
         result.messages.forEach(function (message) {
           appendServerMessage(conversation, message);
         });
+        conversation.after = result.after || "";
         conversation.historyLoaded = true;
+        if (result.messages.length > 0) {
+          var lastMessage = result.messages[result.messages.length - 1];
+          updateConversationSummary(
+            conversation,
+            lastMessage.body,
+            lastMessage.originatedAt,
+            lastMessage.id,
+          );
+        }
         if (conversation === activeConversation) {
           scrollToBottom();
         }
@@ -723,6 +787,7 @@
         if (conversation === activeConversation) {
           updateSendState();
         }
+        syncRealMessagePolling();
       });
   }
 
@@ -740,7 +805,34 @@
     conversation.fragment = document.createDocumentFragment();
   }
 
-  // 把一条持久消息追加到指定会话。
+  // 按稳定时间线位置插入持久消息节点。
+  function insertServerMessageNode(conversation, node, originatedAt, id) {
+    var container = conversationMessageContainer(conversation);
+    var nextNode = null;
+    container.querySelectorAll("[data-message-id]").forEach(function (current) {
+      if (
+        !nextNode &&
+        compareMessagePosition(
+          originatedAt,
+          id,
+          current.getAttribute("data-originated-at"),
+          current.getAttribute("data-message-id"),
+        ) < 0
+      ) {
+        nextNode = current;
+      }
+    });
+    if (nextNode) {
+      container.insertBefore(node, nextNode);
+    } else {
+      container.appendChild(node);
+    }
+    if (conversation === activeConversation) {
+      scrollToBottom();
+    }
+  }
+
+  // 把一条持久消息有序合入指定会话。
   function appendServerMessage(conversation, value) {
     if (conversation.messageIDs[value.id]) {
       return;
@@ -749,6 +841,7 @@
       value.author === "visitor" ? "visitor" : "assistant",
     );
     message.setAttribute("data-message-id", value.id);
+    message.setAttribute("data-originated-at", value.originatedAt);
     var row = document.createElement("div");
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
@@ -758,7 +851,117 @@
     message.appendChild(row);
     message.appendChild(messageMeta(new Date(value.originatedAt)));
     conversation.messageIDs[value.id] = true;
-    appendConversationNode(conversation, message);
+    insertServerMessageNode(
+      conversation,
+      message,
+      value.originatedAt,
+      value.id,
+    );
+  }
+
+  // 返回当前允许访客消息轮询的会话。
+  function realMessagePollingTarget() {
+    if (
+      previewMode ||
+      !initialized ||
+      !messengerVisible ||
+      document.visibilityState !== "visible" ||
+      activeRoute !== "conversation" ||
+      !activeConversation.id ||
+      !activeConversation.historyLoaded ||
+      activeConversation.historyLoading
+    ) {
+      return null;
+    }
+    return activeConversation;
+  }
+
+  // 停止访客消息轮询定时器。
+  function stopRealMessagePolling() {
+    if (messagePollingTimer !== null) {
+      window.clearInterval(messagePollingTimer);
+      messagePollingTimer = null;
+    }
+    messagePollingConversation = null;
+  }
+
+  // 根据当前页面和挂件状态同步访客消息轮询。
+  function syncRealMessagePolling() {
+    var conversation = realMessagePollingTarget();
+    if (
+      conversation &&
+      messagePollingTimer !== null &&
+      messagePollingConversation === conversation
+    ) {
+      return;
+    }
+    stopRealMessagePolling();
+    if (!conversation) {
+      return;
+    }
+    messagePollingConversation = conversation;
+    pollConversationMessages(conversation);
+    messagePollingTimer = window.setInterval(function () {
+      var current = realMessagePollingTarget();
+      if (current !== messagePollingConversation) {
+        syncRealMessagePolling();
+        return;
+      }
+      pollConversationMessages(current);
+    }, MESSAGE_POLL_INTERVAL);
+  }
+
+  // 使用服务端 after 游标增量补拉指定访客会话。
+  function pollConversationMessages(conversation) {
+    if (conversation.polling) {
+      return;
+    }
+    var requestAfter = conversation.after;
+    var requestSeq = conversation.pollSeq;
+    var path =
+      "/api/public/website-channels/" +
+      encodeURIComponent(channelID) +
+      "/conversations/" +
+      encodeURIComponent(conversation.id) +
+      "/messages";
+    if (requestAfter) {
+      path += "?after=" + encodeURIComponent(requestAfter);
+    }
+    conversation.polling = true;
+    requestWebsiteJSON(path)
+      .then(function (result) {
+        if (
+          conversation.pollSeq !== requestSeq ||
+          (requestAfter && conversation.after !== requestAfter)
+        ) {
+          return;
+        }
+        result.messages.forEach(function (message) {
+          appendServerMessage(conversation, message);
+        });
+        if (result.messages.length === 0) {
+          return;
+        }
+        if (result.after) {
+          conversation.after = result.after;
+        }
+        var lastMessage = result.messages[result.messages.length - 1];
+        updateConversationSummary(
+          conversation,
+          lastMessage.body,
+          lastMessage.originatedAt,
+          lastMessage.id,
+        );
+      })
+      .catch(function (error) {
+        console.warn("轮询网站访客会话消息失败", {
+          conversationId: conversation.id,
+          error: error,
+        });
+      })
+      .finally(function () {
+        conversation.polling = false;
+      });
   }
 
   // 生成客户端消息编号。
@@ -777,6 +980,8 @@
     }
     var conversation = activeConversation;
     var startsConversation = conversation.id === null;
+    conversation.pollSeq += 1;
+    stopRealMessagePolling();
     if (conversation.pendingBody !== text || !conversation.pendingMessageID) {
       conversation.pendingBody = text;
       conversation.pendingMessageID = createClientMessageID();
@@ -802,6 +1007,7 @@
         conversation = upsertRealConversation(
           result.conversation,
           conversation,
+          result.message.id,
         );
         conversation.pendingMessageID = "";
         conversation.pendingBody = "";
@@ -833,6 +1039,8 @@
       .finally(function () {
         messageRequestPending = false;
         updateSendState();
+        stopRealMessagePolling();
+        syncRealMessagePolling();
         if (conversation === activeConversation) {
           input.focus();
         }
@@ -1179,6 +1387,7 @@
       clearUnread();
     }
     autosize();
+    syncRealMessagePolling();
   }
 
   syncMoreAvailability();
@@ -1380,6 +1589,7 @@
       postToParent({ type: "cervi:preview-ready" });
     }
   });
+  document.addEventListener("visibilitychange", syncRealMessagePolling);
   window.addEventListener("resize", autosize);
   if (!previewMode) {
     $("cv-attach").disabled = true;

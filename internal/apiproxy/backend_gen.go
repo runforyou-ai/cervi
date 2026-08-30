@@ -89,6 +89,22 @@ func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.R
 	return output, err
 }
 
+// StartDirectConversation 发起或打开企业成员内部单聊。
+func (b *Backend) StartDirectConversation(ctx context.Context, meta appservice.RequestMeta, input appservice.DirectConversationInput) (appservice.InboxConversation, error) {
+	var output appservice.InboxConversation
+	err := b.do(ctx, meta, http.MethodPost, "/direct-conversations", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// SendDirectTextMessage 发送内部单聊文本消息。
+func (b *Backend) SendDirectTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.DirectTextMessageInput) (appservice.ConversationMessage, error) {
+	var output appservice.ConversationMessage
+	err := b.do(ctx, meta, http.MethodPost, "/direct-conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList
@@ -420,6 +436,14 @@ func (b *Backend) GetKnowledgeDocument(ctx context.Context, meta appservice.Requ
 func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentSegmentListInput) (appservice.KnowledgeDocumentSegmentList, error) {
 	var output appservice.KnowledgeDocumentSegmentList
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/segments", encodeKnowledgeDocumentSegmentListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// RetrieveKnowledgeBase 检索指定外部知识库。
+func (b *Backend) RetrieveKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeRetrievalInput) (appservice.KnowledgeRetrievalResult, error) {
+	var output appservice.KnowledgeRetrievalResult
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/retrieve", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

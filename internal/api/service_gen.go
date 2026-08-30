@@ -26,6 +26,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/inbox", s.loadInbox)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
+	router.POST("/direct-conversations", s.startDirectConversation)
+	router.POST("/direct-conversations/:conversationID/messages", s.sendDirectTextMessage)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
 	router.GET("/channels/telegram/:channelID", s.getTelegramChannel)
@@ -69,6 +71,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/segments", s.listKnowledgeDocumentSegments)
+	router.POST("/knowledge-bases/:knowledgeBaseID/retrieve", s.retrieveKnowledgeBase)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
@@ -215,6 +218,26 @@ func (s *Service) sendCustomerTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendCustomerTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// startDirectConversation 发起或打开企业成员内部单聊。
+func (s *Service) startDirectConversation(c *gin.Context) {
+	var input appservice.DirectConversationInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.StartDirectConversation(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// sendDirectTextMessage 发送内部单聊文本消息。
+func (s *Service) sendDirectTextMessage(c *gin.Context) {
+	var input appservice.DirectTextMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendDirectTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -570,6 +593,16 @@ func (s *Service) listKnowledgeDocumentSegments(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListKnowledgeDocumentSegments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// retrieveKnowledgeBase 检索指定外部知识库。
+func (s *Service) retrieveKnowledgeBase(c *gin.Context) {
+	var input appservice.KnowledgeRetrievalInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RetrieveKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

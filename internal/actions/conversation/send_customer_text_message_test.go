@@ -90,20 +90,20 @@ func TestMemberMessageMatches(t *testing.T) {
 		Type: string(domain.MessageTypeText), Body: "回复客户",
 	}
 	input := CustomerTextMessageInput{ConversationID: conversationID, Body: "回复客户"}
-	if !memberMessageMatches(row, identityID, input) {
+	if !memberMessageMatches(row, identityID, input.ConversationID, input.Body, true) {
 		t.Fatal("expected idempotent message to match")
 	}
 	input.Body = "另一条回复"
-	if memberMessageMatches(row, identityID, input) {
+	if memberMessageMatches(row, identityID, input.ConversationID, input.Body, true) {
 		t.Fatal("expected changed body to conflict")
 	}
 	input.Body = row.Body
 	input.ConversationID = "0198ddee-c056-7bc5-a1d9-586f878ee977"
-	if memberMessageMatches(row, identityID, input) {
+	if memberMessageMatches(row, identityID, input.ConversationID, input.Body, true) {
 		t.Fatal("expected changed conversation to conflict")
 	}
 	input.ConversationID = conversationID
-	if memberMessageMatches(row, "0198ddf0-a234-7f01-8d99-e3e0af0f5f69", input) {
+	if memberMessageMatches(row, "0198ddf0-a234-7f01-8d99-e3e0af0f5f69", input.ConversationID, input.Body, true) {
 		t.Fatal("expected changed sender to conflict")
 	}
 }

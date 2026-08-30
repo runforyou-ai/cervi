@@ -1,4 +1,5 @@
 /** 客户会话头与联系人头像。 */
+import { useEffect, useState } from "react"
 import {
   GlobeIcon,
   MessageCircleIcon,
@@ -7,7 +8,12 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { ChannelType, type InboxConversation } from "@/api"
+import {
+  ChannelType,
+  isCustomerInboxConversation,
+  isDirectInboxConversation,
+  type InboxConversation,
+} from "@/api"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -36,18 +42,36 @@ export function ConversationAvatar({
   conversation: InboxConversation
   className?: string
 }) {
-  const badge = sourceBadges[conversation.channelType]
-  const contactName = conversation.contactName?.trim()
+  const customer = isCustomerInboxConversation(conversation)
+    ? conversation.customer
+    : null
+  const direct = isDirectInboxConversation(conversation)
+    ? conversation.direct
+    : null
+  const badge = customer ? sourceBadges[customer.channelType] : undefined
+  const contactName = customer?.contactName?.trim() || direct?.peerName.trim()
+  const avatarURL = customer?.contactAvatarUrl ?? ""
+  const [avatarFailed, setAvatarFailed] = useState(false)
+
+  useEffect(() => setAvatarFailed(false), [avatarURL])
 
   return (
     <div className="relative shrink-0">
       <div
         className={cn(
-          "flex size-10 items-center justify-center rounded-lg bg-muted text-sm font-medium text-muted-foreground",
+          "flex size-10 items-center justify-center overflow-hidden rounded-lg bg-muted text-sm font-medium text-muted-foreground",
           className,
         )}
       >
-        {contactName ? (
+        {avatarURL && !avatarFailed ? (
+          <img
+            src={avatarURL}
+            alt=""
+            className="size-full rounded-[inherit] object-cover"
+            draggable={false}
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : contactName ? (
           contactName.slice(0, 1).toLocaleUpperCase()
         ) : (
           <UserRoundIcon className="size-4.5" />
@@ -85,6 +109,9 @@ export function ConversationHeader({
   onContextToggle: () => void
 }) {
   const { t } = useTranslation("inbox")
+  const customer = isCustomerInboxConversation(conversation)
+    ? conversation.customer
+    : null
   const contextActionLabel = contextVisible
     ? t("contextClose")
     : t("contextOpen")
@@ -110,53 +137,57 @@ export function ConversationHeader({
             {contactName}
           </h2>
         </div>
-        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]">
-            {sessionStatus}
-          </span>
-          <span
-            className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
-            title={conversation.title}
+        {customer ? (
+          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]">
+              {sessionStatus}
+            </span>
+            <span
+              className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
+              title={customer.title}
+            >
+              {customer.title}
+            </span>
+          </div>
+        ) : null}
+      </div>
+      {customer ? (
+        <div
+          data-slot="conversation-actions"
+          className="flex shrink-0 items-center gap-2"
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="hidden lg:inline-flex"
+            disabled
           >
-            {conversation.title}
-          </span>
+            {t("conversationTransfer")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="hidden lg:inline-flex"
+            disabled
+          >
+            {t("conversationHandToAi")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-muted-foreground xl:hidden"
+            aria-label={contextActionLabel}
+            aria-pressed={contextVisible}
+            title={contextActionLabel}
+            onClick={onContextToggle}
+          >
+            {t("contextTitleBar")}
+          </Button>
         </div>
-      </div>
-      <div
-        data-slot="conversation-actions"
-        className="flex shrink-0 items-center gap-2"
-      >
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="hidden lg:inline-flex"
-          disabled
-        >
-          {t("conversationTransfer")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="hidden lg:inline-flex"
-          disabled
-        >
-          {t("conversationHandToAi")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="text-muted-foreground xl:hidden"
-          aria-label={contextActionLabel}
-          aria-pressed={contextVisible}
-          title={contextActionLabel}
-          onClick={onContextToggle}
-        >
-          {t("contextTitleBar")}
-        </Button>
-      </div>
+      ) : null}
     </header>
   )
 }

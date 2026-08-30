@@ -25,6 +25,7 @@ type ServiceSession struct {
 	OpeningMessageID         string     `bun:"opening_message_id"`
 	LastMessageID            string     `bun:"last_message_id"`
 	LastMessageAt            time.Time  `bun:"last_message_at"`
+	LastMessageSourceOrder   int64      `bun:"last_message_source_order"`
 	AssignedAt               *time.Time `bun:"assigned_at"`
 	FirstResponseAt          *time.Time `bun:"first_response_at"`
 	StatusChangedAt          time.Time  `bun:"status_changed_at"`

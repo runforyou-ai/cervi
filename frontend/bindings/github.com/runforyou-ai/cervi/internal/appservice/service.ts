@@ -547,6 +547,13 @@ export function RestoreContact(meta: $models.RequestMeta, contactID: string): $C
 }
 
 /**
+ * RetrieveKnowledgeBase 检索指定外部知识库。
+ */
+export function RetrieveKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeRetrievalInput): $CancellablePromise<$models.KnowledgeRetrievalResult> {
+    return $Call.ByID(720738771, meta, knowledgeBaseID, input);
+}
+
+/**
  * SaveS3Setting 保存当前企业的对象存储设置。
  */
 export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<$models.S3Setting> {
@@ -575,6 +582,13 @@ export function SendCustomerTextMessage(meta: $models.RequestMeta, conversationI
 }
 
 /**
+ * SendDirectTextMessage 发送内部单聊文本消息。
+ */
+export function SendDirectTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.DirectTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(1058328585, meta, conversationID, input);
+}
+
+/**
  * SendMessageNotification 在当前设备投递一条新消息系统通知。
  */
 export function SendMessageNotification(meta: $models.RequestMeta, input: $models.MessageNotificationInput): $CancellablePromise<void> {
@@ -586,6 +600,13 @@ export function SendMessageNotification(meta: $models.RequestMeta, input: $model
  */
 export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string> {
     return $Call.ByID(791180750, meta);
+}
+
+/**
+ * StartDirectConversation 发起或打开企业成员内部单聊。
+ */
+export function StartDirectConversation(meta: $models.RequestMeta, input: $models.DirectConversationInput): $CancellablePromise<$models.InboxConversation> {
+    return $Call.ByID(1906625364, meta, input);
 }
 
 /**

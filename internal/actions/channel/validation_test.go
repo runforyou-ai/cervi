@@ -263,7 +263,7 @@ func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
 		{
 			name: "receive Telegram webhook",
 			execute: func() error {
-				return NewReceiveTelegramWebhookAction(nil).Preflight(context.Background(), "not-a-uuid", "secret")
+				return NewReceiveTelegramWebhookAction(nil, nil, nil).Preflight(context.Background(), "not-a-uuid", "secret")
 			},
 		},
 		{
