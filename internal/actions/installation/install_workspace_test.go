@@ -15,6 +15,7 @@ import (
 func TestInstallRejectsPasswordLongerThanBcryptLimit(t *testing.T) {
 	action := NewInstallWorkspaceAction(nil)
 	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
+		AccessHost:       "localhost:8080",
 		OrganizationName: "鹿行测试公司",
 		DisplayName:      "管理员",
 		Email:            "admin@example.com",
@@ -30,6 +31,7 @@ func TestInstallRejectsPasswordLongerThanBcryptLimit(t *testing.T) {
 func TestInstallRejectsInvalidLocaleAndTimeZone(t *testing.T) {
 	action := NewInstallWorkspaceAction(nil)
 	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
+		AccessHost:       "localhost:8080",
 		OrganizationName: "鹿行测试公司",
 		DisplayName:      "管理员",
 		Email:            "admin@example.com",
@@ -47,6 +49,7 @@ func TestInstallRejectsInvalidLocaleAndTimeZone(t *testing.T) {
 func TestInstallRejectsOrganizationNameLongerThanLimit(t *testing.T) {
 	action := NewInstallWorkspaceAction(nil)
 	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
+		AccessHost:       "localhost:8080",
 		OrganizationName: strings.Repeat("名", domain.OrganizationNameMaxLength+1),
 		DisplayName:      "管理员",
 		Email:            "admin@example.com",
@@ -55,5 +58,14 @@ func TestInstallRejectsOrganizationNameLongerThanLimit(t *testing.T) {
 	var validationError *ValidationError
 	if !errors.As(err, &validationError) || validationError.Fields["organizationName"] != ValidationOrganizationNameTooLong {
 		t.Fatalf("error = %#v, want organization name too long", err)
+	}
+}
+
+// TestInstallRejectsMissingAccessHost 验证初始化操作必须绑定当前访问地址。
+func TestInstallRejectsMissingAccessHost(t *testing.T) {
+	action := NewInstallWorkspaceAction(nil)
+	_, err := action.Execute(context.Background(), InstallWorkspaceInput{})
+	if !errors.Is(err, ErrAccessHostMissing) {
+		t.Fatalf("error = %#v, want ErrAccessHostMissing", err)
 	}
 }

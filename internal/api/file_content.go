@@ -65,7 +65,7 @@ func (s *FileContentService) ServeHTTP(writer http.ResponseWriter, request *http
 
 // uploadLocalFile 将认证后的请求内容保存到本地最终目录。
 func (s *FileContentService) uploadLocalFile(writer http.ResponseWriter, request *http.Request, fileID string) {
-	scope, err := s.resolveTenant.Resolve(request.Context(), tenant.Hostname(request.Context()))
+	scope, err := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
 	if errors.Is(err, tenant.ErrNotFound) {
 		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return

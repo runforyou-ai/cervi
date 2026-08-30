@@ -44,7 +44,6 @@ storage:
 	t.Setenv("NATS_NAMESPACE", "environment")
 	t.Setenv("WAILS_SERVER_PORT", "28080")
 	t.Setenv("TLS_MODE", "external")
-	t.Setenv("TLS_DATA_DIR", "/var/lib/cervi/tls")
 	t.Setenv("TLS_ACME_EMAIL", "admin@example.com")
 	t.Setenv("FILE_STORAGE_PATH", t.TempDir())
 
@@ -55,7 +54,7 @@ storage:
 	if config.Database.Host != "database.internal" || config.Database.Port != 5433 || config.Database.User != "environment" || config.Database.Password != "secret@value" || config.Database.Name != "cervi" || config.Database.SSLMode != "require" || config.Server.Port != 28080 {
 		t.Fatalf("环境变量未覆盖文件配置: %#v", config)
 	}
-	if config.TLS.Mode != "external" || config.TLS.DataDirectory != "/var/lib/cervi/tls" || config.TLS.ACMEEmail != "admin@example.com" {
+	if config.TLS.Mode != "external" || config.TLS.ACMEEmail != "admin@example.com" {
 		t.Fatalf("TLS 环境变量未覆盖文件配置: %#v", config.TLS)
 	}
 	if config.NATS.URL != "nats://environment:4222" || config.NATS.Namespace != "environment" {
@@ -114,7 +113,7 @@ func clearServerEnvironment(t *testing.T) {
 		"WAILS_SERVER_HOST", "WAILS_SERVER_PORT",
 		"POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "POSTGRES_SSLMODE",
 		"NATS_URL", "NATS_NAMESPACE",
-		"TLS_MODE", "TLS_DATA_DIR", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
+		"TLS_MODE", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
 	} {
 		t.Setenv(name, "")
 		if err := os.Unsetenv(name); err != nil {
@@ -128,7 +127,6 @@ func TestValidationRejectsAutoTLSPortConflict(t *testing.T) {
 	config := validTestConfig()
 	config.Server.Port = 443
 	config.TLS.Mode = "auto"
-	config.TLS.DataDirectory = t.TempDir()
 	config.Storage.LocalDirectory = t.TempDir()
 	config.normalize()
 	if err := config.validate(); err == nil {

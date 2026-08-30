@@ -49,9 +49,8 @@ type NATSConfig struct {
 
 // TLSConfig 定义企业服务端 TLS 入口配置。
 type TLSConfig struct {
-	Mode          string `yaml:"mode"`
-	DataDirectory string `yaml:"dataDirectory"`
-	ACMEEmail     string `yaml:"acmeEmail"`
+	Mode      string `yaml:"mode"`
+	ACMEEmail string `yaml:"acmeEmail"`
 }
 
 // StorageConfig 定义企业服务端本地文件存储配置。
@@ -92,7 +91,6 @@ func (config *Config) normalize() {
 	config.NATS.URL = strings.TrimSpace(config.NATS.URL)
 	config.NATS.Namespace = strings.TrimSpace(config.NATS.Namespace)
 	config.TLS.Mode = strings.ToLower(strings.TrimSpace(config.TLS.Mode))
-	config.TLS.DataDirectory = strings.TrimSpace(config.TLS.DataDirectory)
 	config.TLS.ACMEEmail = strings.TrimSpace(config.TLS.ACMEEmail)
 	config.Storage.LocalDirectory = strings.TrimSpace(config.Storage.LocalDirectory)
 }
@@ -115,7 +113,6 @@ func defaultConfig() Config {
 func applyEnvironment(config *Config) error {
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
-	applyStringEnvironment("TLS_DATA_DIR", &config.TLS.DataDirectory)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.TLS.ACMEEmail)
 	applyStringEnvironment("FILE_STORAGE_PATH", &config.Storage.LocalDirectory)
 	applyStringEnvironment("POSTGRES_HOST", &config.Database.Host)
@@ -182,11 +179,6 @@ func (config Config) validate() error {
 	}
 	if config.Storage.LocalDirectory == "" {
 		return fmt.Errorf("必须配置本地文件存储目录")
-	}
-	if mode == "auto" {
-		if config.TLS.DataDirectory == "" {
-			return fmt.Errorf("TLS 自动模式必须配置证书数据目录")
-		}
 	}
 	return nil
 }

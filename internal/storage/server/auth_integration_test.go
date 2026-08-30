@@ -29,6 +29,7 @@ import (
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
 // TestServerActionsWithPostgreSQL 验证服务端核心操作。
@@ -44,9 +45,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	// 全局前置：安装企业并校验初始状态，失败直接终止整个测试。
 	db := store.DB()
-	tenantResolver := organizationaction.NewLegacyTenantResolver(db)
+	const accessHost = "cervi.test"
+	tenantContext := tenant.WithAccessHost(context.Background(), accessHost)
+	tenantResolver := organizationaction.NewTenantResolver(db)
 	status := installationaction.NewStatusQuery(tenantResolver)
-	alreadyInstalled, err := status.Execute(context.Background())
+	alreadyInstalled, err := status.Execute(tenantContext)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +59,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	install := installationaction.NewInstallWorkspaceAction(db)
 	installed, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
+		AccessHost:       accessHost,
 		OrganizationName: "鹿行测试公司",
 		DisplayName:      "管理员",
 		Email:            "admin@example.com",
@@ -68,6 +72,20 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
+	}
+	if installed.Identity.Organization.AccessHost != accessHost {
+		t.Fatalf("organization access host = %q, want %q", installed.Identity.Organization.AccessHost, accessHost)
+	}
+	if _, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
+		AccessHost:       accessHost,
+		OrganizationName: "重复企业",
+		DisplayName:      "管理员",
+		Email:            "duplicate@example.com",
+		Password:         "password123",
+		Locale:           domain.LocaleChineseSimplified,
+		TimeZone:         "Asia/Shanghai",
+	}); !errors.Is(err, installationaction.ErrAlreadyInstalled) {
+		t.Fatalf("duplicate access host error = %v, want ErrAlreadyInstalled", err)
 	}
 	if installed.Identity.User.WorkspaceTabsEnabled {
 		t.Fatal("workspace tabs enabled = true, want false")
@@ -93,12 +111,43 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if teamMemberCount != 0 {
 		t.Fatalf("team member count after installation = %d, want 0", teamMemberCount)
 	}
-	currentStatus, err := status.Execute(context.Background())
+	currentStatus, err := status.Execute(tenantContext)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !currentStatus.Installed || currentStatus.OrganizationName != "鹿行测试公司" {
 		t.Fatalf("status = %#v", currentStatus)
+	}
+	const otherAccessHost = "other.cervi.test:8443"
+	otherTenantContext := tenant.WithAccessHost(context.Background(), otherAccessHost)
+	otherStatus, err := status.Execute(otherTenantContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if otherStatus.Installed {
+		t.Fatalf("unbound access host status = %#v, want setup", otherStatus)
+	}
+	otherInstalled, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
+		AccessHost:       otherAccessHost,
+		OrganizationName: "另一家测试公司",
+		DisplayName:      "管理员",
+		Email:            "admin@example.com",
+		Password:         "password123",
+		Locale:           domain.LocaleChineseSimplified,
+		TimeZone:         "Asia/Shanghai",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if otherInstalled.Identity.Organization.ID == installed.Identity.Organization.ID {
+		t.Fatal("different access hosts resolved to the same organization")
+	}
+	otherStatus, err = status.Execute(otherTenantContext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !otherStatus.Installed || otherStatus.OrganizationName != "另一家测试公司" {
+		t.Fatalf("other tenant status = %#v", otherStatus)
 	}
 
 	// 全局前置：解析安装令牌、登出并重新登录管理员，失败直接终止整个测试。
@@ -198,15 +247,22 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if organization.Name != "鹿行协作" {
-			t.Fatalf("updated organization name = %q, want 鹿行协作", organization.Name)
+		if organization.Name != "鹿行协作" || organization.AccessHost != accessHost {
+			t.Fatalf("updated organization = %#v, want name 鹿行协作 and access host %q", organization, accessHost)
 		}
-		currentStatus, err := status.Execute(context.Background())
+		currentStatus, err := status.Execute(tenantContext)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if currentStatus.OrganizationName != "鹿行协作" {
 			t.Fatalf("status organization name = %q, want 鹿行协作", currentStatus.OrganizationName)
+		}
+		otherStatus, err := status.Execute(otherTenantContext)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if otherStatus.OrganizationName != "另一家测试公司" {
+			t.Fatalf("other status organization name = %q, want 另一家测试公司", otherStatus.OrganizationName)
 		}
 	})
 

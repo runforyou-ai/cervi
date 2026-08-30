@@ -250,7 +250,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 
 // requireInitialized 解析当前请求的企业范围，并校验该企业是否已完成初始化。
 func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta) (tenant.Scope, error) {
-	scope, err := b.resolveTenant.Resolve(ctx, tenant.Hostname(ctx))
+	scope, err := b.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
 	if errors.Is(err, tenant.ErrNotFound) {
 		return tenant.Scope{}, SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
 	}
