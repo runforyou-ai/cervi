@@ -1,4 +1,5 @@
 /** 客户会话头与联系人头像。 */
+import { useEffect, useState } from "react"
 import {
   GlobeIcon,
   MessageCircleIcon,
@@ -49,16 +50,28 @@ export function ConversationAvatar({
     : null
   const badge = customer ? sourceBadges[customer.channelType] : undefined
   const contactName = customer?.contactName?.trim() || direct?.peerName.trim()
+  const avatarURL = customer?.contactAvatarUrl ?? ""
+  const [avatarFailed, setAvatarFailed] = useState(false)
+
+  useEffect(() => setAvatarFailed(false), [avatarURL])
 
   return (
     <div className="relative shrink-0">
       <div
         className={cn(
-          "flex size-10 items-center justify-center rounded-lg bg-muted text-sm font-medium text-muted-foreground",
+          "flex size-10 items-center justify-center overflow-hidden rounded-lg bg-muted text-sm font-medium text-muted-foreground",
           className,
         )}
       >
-        {contactName ? (
+        {avatarURL && !avatarFailed ? (
+          <img
+            src={avatarURL}
+            alt=""
+            className="size-full rounded-[inherit] object-cover"
+            draggable={false}
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : contactName ? (
           contactName.slice(0, 1).toLocaleUpperCase()
         ) : (
           <UserRoundIcon className="size-4.5" />

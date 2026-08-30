@@ -207,7 +207,7 @@ PUT  /channels/telegram/:channelID/connection
 {
   "url": "<derived webhook URL>",
   "secret_token": "<current random secret>",
-  "allowed_updates": ["my_chat_member"],
+  "allowed_updates": ["message", "my_chat_member"],
   "drop_pending_updates": true
 }
 ```
@@ -325,7 +325,16 @@ POST /api/public/telegram-channels/:channelID/webhook
 
 ## 12. 后续 PR
 
-下一个业务 PR 再扩展 `allowed_updates` 并实现 Telegram 私聊 Update 的同步持久化、幂等去重、联系人/会话/消息映射和可靠投递。在这些落库能力完成前，首个 PR 不对业务消息返回 2xx，避免静默丢失用户消息。
+后续按两个独立业务 PR 交付：
+
+1. 先扩展 `allowed_updates`，同步持久化 Telegram 私聊文本 Update，完成幂等去重、联系人/单 Conversation/消息映射和成员端只读展示；群聊和非文本 Update 明确确认后忽略，数据库失败才返回非 2xx。外发可用前，前后端均禁止成员向非 Website 渠道写入本地假回复。
+2. 再增加 `customer_message_deliveries`、渠道发送 Gate、有序扫描器和 `uncertain/needs_review` 状态机，接通 Telegram `sendMessage` 后启用成员回复。
+
+第一步在私聊文本事务提交后 best-effort 调用 `getUserProfilePhotos` 刷新渠道身份头像；失败不改变消息成功状态。服务端先用 Telegram `file_unique_id` 查询 `files.external_id`，已存在时直接复用，不存在时再通过 `getFile` 下载经过大小和图片魔数校验的内容，并按企业当前配置写入本地目录或 S3 对象存储；`storage_key` 仍使用 Cervi 内部文件 UUID 生成。成员端只接收 Cervi 文件地址，任何响应、重定向和日志都不得暴露 Telegram 下载地址或 Token。头像删除会清空引用并回收旧文件。
+
+第一步发布后，已注册 Webhook 的存量 Telegram 渠道需要重新保存或重新启用一次，才能把新增的 `message` 写入远端 `allowed_updates`；不在启动时批量重注册。
+
+这样入站消息先形成可独立验收的最小闭环，外部投递的可靠性边界仍由下一 PR 完整建设，不使用同步 `sendMessage` 代替 Delivery。
 
 持续 Webhook 健康监控若以后确有需要再单独设计；当前产品状态只有“等待连接”和“连接正常”，因此不引入 `getWebhookInfo`、投递异常状态或失败降级。
 

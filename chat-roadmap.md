@@ -284,13 +284,13 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 网站实时入站没有可信的客户端业务时间，因此使用服务器首次接收时间作为 `originated_at`；Telegram 等能提供稳定来源时间的平台使用远端时间。Telegram 历史补拉不能用补拉入库时间重排历史。
 
-消息历史使用 `before` 游标按 `(originated_at DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一 `(originated_at, id)` 边界正序扫描更新记录。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。游标由服务端编码 Conversation 编号和元组，方向由查询参数表达，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的稳定分页分界，不代表第三方平台的来源顺序；Telegram 阶段为同秒消息增加 `source_order` 或等价第三排序键。
+消息历史使用 `before` 游标按 `(originated_at DESC, source_order DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一三元边界正序扫描更新记录。`source_order` 对没有平台顺序的网站和站内消息为 `0`，Telegram 私聊使用同一 Chat 内的 `message_id`。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。游标由服务端编码 Conversation 编号和三元组，方向由查询参数表达，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的最终稳定分页分界，不代表第三方平台的来源顺序。
 
-会话的 `last_message_at` 表示当前已知消息最大的 `originated_at`，`last_message_id` 与它成对指向同一条消息，两者在同一事务按 `(originated_at, id)` 只向前推进。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它们，删除最后一条消息也不回退它们，此时 `last_message_id` 允许指向已删除消息，仅继续充当排序水位。会话预览跳过已删除消息：指向消息已删除时按时间线回退查询最近一条未删除消息，不得展示已删除内容。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
+会话的 `last_message_at`、`last_message_source_order` 和 `last_message_id` 成组指向当前已知顺序最大的消息，并在同一事务按对应三元组只向前推进。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它们，删除最后一条消息也不回退它们，此时 `last_message_id` 允许指向已删除消息，仅继续充当排序水位。会话预览跳过已删除消息：指向消息已删除时按时间线回退查询最近一条未删除消息，不得展示已删除内容。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
 
 文件、语音、卡片、反应、@ 提醒和系统事件后续使用独立关系或类型化载荷扩展，不把所有结构塞进文本正文。
 
-`messages` 是时间线内容的事实来源，但 `(originated_at, id)` 游标只能发现新插入消息。阶段 2 对旧消息编辑、删除及其他聊天实体变化使用独立 `conversation_sync_events` 补拉，不把消息表改造成领域事件日志。
+`messages` 是时间线内容的事实来源，但 `(originated_at, source_order, id)` 游标只能发现新插入消息。阶段 2 对旧消息编辑、删除及其他聊天实体变化使用独立 `conversation_sync_events` 补拉，不把消息表改造成领域事件日志。
 
 ### 5.4 CustomerConversation
 
@@ -636,13 +636,13 @@ provider_read_cursor
 
 Adapter 负责平台规范化，业务 Action 只校验非空、长度和作用域。禁止统一 `lower()`，也不把用户名、手机号、邮箱、工作区名称或 Endpoint 当作稳定账号主键。
 
-`source_order` 是可空 `bigint`，只在平台提供同一远端会话内稳定、可比较的整数顺序时填写：
+第三方用户账号映射中的 `connected_message_records.source_order` 是可空 `bigint`，只在平台提供同一远端会话内稳定、可比较的整数顺序时填写：
 
 - Telegram 可以使用整数消息编号。
 - 没有稳定整数顺序的平台保持为空，时间线退回 `(originated_at, id)`。
 - 不得使用时间戳转换、Hash、填零或平台内部不可公开的深度值伪造顺序。
 - 不为 `(connected_chat_id, source_order)` 创建唯一约束。
-- 阶段 0 不在 `messages` 增加该字段；阶段 3 先保存在连接消息映射中。
+- 客服和站内时间线的 `messages.source_order` 已在阶段 1 为 Telegram Bot 私聊增加，使用非空 `bigint`，没有来源顺序时统一为 `0`；它与第三方账号映射字段不共用约束。
 
 账号级 `projection_cursor` 表示当前账号投影进度，会话级 `connected_chats.projection_cursor` 表示单个远端会话历史补拉进度，`provider_read_cursor` 表示平台已读位置。三者语义不同，不能共用时间戳或消息编号字段。
 
@@ -956,7 +956,7 @@ needs_review
 
 ### 10.8 客户端离线增量同步
 
-新消息可以通过 `(originated_at, id)` 的 `after` 游标补拉，更早历史通过同一元组的 `before` 游标读取；但旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
+新消息可以通过 `(originated_at, source_order, id)` 的 `after` 游标补拉，更早历史通过同一元组的 `before` 游标读取；但旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
 
 阶段 2 承诺实时消息和离线补拉时使用“用户 Mailbox 指出哪些会话变化，会话 Changelog 描述具体变化”的两层游标。只使用每会话序号时，拥有大量会话、多个设备或多个第三方账号的用户必须扫描全部会话才能发现变化，不能作为目标设计。
 
@@ -1452,7 +1452,7 @@ PR4 增加成员会话消息查询：
 GET /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
 ```
 
-成员查询按当前企业授权 `customer` Conversation，不要求最新 ServiceSession 仍未结束，避免以后读取已关闭会话时改变历史权限。`before` 与 `after` 互斥，游标绑定 Conversation；消息按 `(originated_at, id)` 稳定分页并统一正序返回。
+成员查询按当前企业授权 `customer` Conversation，不要求最新 ServiceSession 仍未结束，避免以后读取已关闭会话时改变历史权限。`before` 与 `after` 互斥，游标绑定 Conversation；当前消息按 `(originated_at, source_order, id)` 稳定分页并统一正序返回。
 
 成员消息 DTO 保留消息类型、双时间和真实 ChatSubject 发送者，不复用访客挂件的 `visitor/agent` 二元作者视角。前端在会话主区加载最近一页并使用 `before` 读取更早文本，按消息编号去重并保持阅读位置；`after` 已作为后续 HTTP 增量补拉契约，但本 PR 不自动调用。
 

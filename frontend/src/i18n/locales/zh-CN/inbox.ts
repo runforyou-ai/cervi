@@ -54,6 +54,7 @@ const inbox = {
   messageSend: "发送",
   messageSending: "发送中",
   messageSendError: "消息发送失败，请重试",
+  channelReplyUnsupported: "当前消息渠道暂不支持回复。",
   contextOpen: "展开资料栏",
   contextClose: "收起资料栏",
   contextResize: "调整资料栏宽度",

@@ -642,6 +642,7 @@ export interface CurrentUser {
 export interface CustomerInboxConversation {
     "title": string;
     "contactName": string | null;
+    "contactAvatarUrl": string;
     "channelType": ChannelType;
     "channelName": string;
     "preview": string | null;

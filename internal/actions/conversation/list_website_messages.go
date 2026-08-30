@@ -27,6 +27,7 @@ type websiteMessageRow struct {
 	ID           string    `bun:"id"`
 	Body         string    `bun:"body"`
 	OriginatedAt time.Time `bun:"originated_at"`
+	SourceOrder  int64     `bun:"source_order"`
 	CreatedAt    time.Time `bun:"created_at"`
 	SubjectKind  string    `bun:"subject_kind"`
 }
@@ -77,6 +78,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("msg.body AS body").
 		ColumnExpr("msg.originated_at AS originated_at").
+		ColumnExpr("msg.source_order AS source_order").
 		ColumnExpr("msg.created_at AS created_at").
 		ColumnExpr("cs.kind AS subject_kind").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
@@ -86,13 +88,13 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL")
 	if input.Before != nil {
-		query = query.Where("(msg.originated_at, msg.id) < (?, ?)", input.Before.OriginatedAt, input.Before.ID).
-			OrderExpr("msg.originated_at DESC, msg.id DESC")
+		query = query.Where("(msg.originated_at, msg.source_order, msg.id) < (?, ?, ?)", input.Before.OriginatedAt, input.Before.SourceOrder, input.Before.ID).
+			OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC")
 	} else if input.After != nil {
-		query = query.Where("(msg.originated_at, msg.id) > (?, ?)", input.After.OriginatedAt, input.After.ID).
-			OrderExpr("msg.originated_at ASC, msg.id ASC")
+		query = query.Where("(msg.originated_at, msg.source_order, msg.id) > (?, ?, ?)", input.After.OriginatedAt, input.After.SourceOrder, input.After.ID).
+			OrderExpr("msg.originated_at ASC, msg.source_order ASC, msg.id ASC")
 	} else {
-		query = query.OrderExpr("msg.originated_at DESC, msg.id DESC")
+		query = query.OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC")
 	}
 	var rows []websiteMessageRow
 	if err := query.Limit(websiteMessagePageSize+1).Scan(ctx, &rows); err != nil {
@@ -117,7 +119,7 @@ func validateMessageHistoryInput(input MessageHistoryInput) map[string]Validatio
 		fields["cursor"] = ValidationCursorInvalid
 	}
 	for _, cursor := range []*MessageCursorPoint{input.Before, input.After} {
-		if cursor != nil && (cursor.OriginatedAt.IsZero() || !common.ValidUUID(cursor.ID)) {
+		if cursor != nil && (cursor.OriginatedAt.IsZero() || cursor.SourceOrder < 0 || !common.ValidUUID(cursor.ID)) {
 			fields["cursor"] = ValidationCursorInvalid
 		}
 	}
@@ -148,8 +150,8 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 	if len(rows) == 0 {
 		return result
 	}
-	first := MessageCursorPoint{OriginatedAt: rows[0].OriginatedAt, ID: rows[0].ID}
-	last := MessageCursorPoint{OriginatedAt: rows[len(rows)-1].OriginatedAt, ID: rows[len(rows)-1].ID}
+	first := MessageCursorPoint{OriginatedAt: rows[0].OriginatedAt, SourceOrder: rows[0].SourceOrder, ID: rows[0].ID}
+	last := MessageCursorPoint{OriginatedAt: rows[len(rows)-1].OriginatedAt, SourceOrder: rows[len(rows)-1].SourceOrder, ID: rows[len(rows)-1].ID}
 	switch {
 	case input.Before != nil:
 		if hasMore {

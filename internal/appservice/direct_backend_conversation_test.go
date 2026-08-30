@@ -16,11 +16,12 @@ func TestConversationMessageCursorRoundTrip(t *testing.T) {
 	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
 	point := conversationaction.MessageCursorPoint{
 		OriginatedAt: time.Date(2026, time.August, 29, 8, 30, 0, 123456789, time.UTC),
+		SourceOrder:  42,
 		ID:           "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
 	}
 	cursor := encodeConversationMessageCursor(conversationID, point)
 	decoded, valid := decodeConversationMessageCursor(cursor, conversationID)
-	if !valid || decoded.ID != point.ID || !decoded.OriginatedAt.Equal(point.OriginatedAt) {
+	if !valid || decoded.ID != point.ID || decoded.SourceOrder != point.SourceOrder || !decoded.OriginatedAt.Equal(point.OriginatedAt) {
 		t.Fatalf("decoded cursor = %#v, valid = %v", decoded, valid)
 	}
 }
@@ -46,6 +47,7 @@ func TestCustomerTextMessageErrorMapsConflicts(t *testing.T) {
 		{reason: conversationaction.ConflictReasonIdempotencyMismatch, message: "这条消息与之前的发送内容不一致。"},
 		{reason: conversationaction.ConflictReasonServiceSessionOwned, message: "这条会话已由其他客服负责。"},
 		{reason: conversationaction.ConflictReasonServiceSessionNotReplyable, message: "当前客服处理周期无法回复。"},
+		{reason: conversationaction.ConflictReasonChannelOutboundUnsupported, message: "当前消息渠道暂不支持回复。"},
 	}
 	for _, test := range tests {
 		err := customerTextMessageError(context.Background(), RequestMeta{Locale: LocaleChineseSimplified}, &conversationaction.ConflictError{Reason: test.reason}, "organization-1", "conversation-1")

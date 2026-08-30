@@ -381,33 +381,215 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("registered webhooks = %#v, saved secret = %q", webhooks, savedTelegram.Connection.WebhookSecret)
 		}
 
-		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db)
+		telegramAvatarAPI := &telegramProfilePhotoAPIStub{
+			photo:      &telegramintegration.ProfilePhoto{FileID: "avatar-file-1", UniqueID: "avatar-version-1"},
+			downloaded: telegramintegration.DownloadedPhoto{ContentType: "image/jpeg", Data: []byte{0xff, 0xd8, 0xff}},
+		}
+		importedAvatarWriter := &importedFileWriterStub{}
+		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
+			return domain.FileStorageBackendLocal, nil
+		}, importedAvatarWriter)
+		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, telegramAvatarAPI, telegramAvatarFiles)
 		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
 		}
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
-			Secret: savedTelegram.Connection.WebhookSecret,
-		}); !errors.Is(err, channelaction.ErrTelegramWebhookUnsupported) {
-			t.Fatalf("unsupported update error = %v", err)
-		}
-		waitingTelegram, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if waitingTelegram.Connection.WebhookStatus == nil || *waitingTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusWaiting) {
-			t.Fatalf("status after unsupported update = %#v", waitingTelegram.Connection.WebhookStatus)
-		}
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
-			Secret: savedTelegram.Connection.WebhookSecret, MyChatMember: true,
+			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 1,
 		}); err != nil {
-			t.Fatal(err)
+			t.Fatalf("ignored update error = %v", err)
 		}
 		connectedTelegram, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if connectedTelegram.Connection.WebhookStatus == nil || *connectedTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusNormal) {
+			t.Fatalf("status after ignored update = %#v", connectedTelegram.Connection.WebhookStatus)
+		}
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 2, MyChatMember: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		connectedTelegram, err = channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if connectedTelegram.Connection.WebhookStatus == nil || *connectedTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusNormal) {
 			t.Fatalf("connected Telegram status = %#v", connectedTelegram.Connection.WebhookStatus)
+		}
+		telegramOriginatedAt := time.Date(2026, time.August, 30, 5, 6, 7, 0, time.UTC)
+		telegramMessage := channelaction.TelegramWebhookInput{
+			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 3,
+			Message: &channelaction.TelegramWebhookMessage{
+				ChatID: 998877, MessageID: 41, SenderID: 998877,
+				DisplayName: "Telegram 访客", Body: "Telegram 私聊消息",
+				OriginatedAt: telegramOriginatedAt,
+			},
+		}
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
+			t.Fatal(err)
+		}
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
+			t.Fatalf("duplicate Telegram message with unchanged avatar error = %v", err)
+		}
+		telegramAvatarAPI.err = errors.New("avatar unavailable")
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
+			t.Fatalf("duplicate Telegram message with avatar failure error = %v", err)
+		}
+		telegramAvatarAPI.err = nil
+		telegramMessages := make([]servermodels.Message, 0)
+		if err := db.NewSelect().Model(&telegramMessages).
+			Join("JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+			Where("cci.channel_id = ?", telegramChannel.ID).
+			Where("cci.external_id = ?", "998877").
+			OrderExpr("msg.originated_at ASC, msg.source_order ASC, msg.id ASC").
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if len(telegramMessages) != 1 || telegramMessages[0].Body != telegramMessage.Message.Body || telegramMessages[0].SourceOrder != telegramMessage.Message.MessageID || !telegramMessages[0].OriginatedAt.Equal(telegramOriginatedAt) {
+			t.Fatalf("Telegram messages = %#v", telegramMessages)
+		}
+		telegramMessage.UpdateID = 4
+		telegramMessage.Message.MessageID = 42
+		telegramMessage.Message.DisplayName = "Telegram 新名称"
+		telegramMessage.Message.Body = "同秒第二条消息"
+		telegramAvatarAPI.photo = &telegramintegration.ProfilePhoto{FileID: "avatar-file-2", UniqueID: "avatar-version-2"}
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
+			t.Fatal(err)
+		}
+		var telegramIdentity servermodels.ContactChannelIdentity
+		if err := db.NewSelect().Model(&telegramIdentity).
+			Where("cci.channel_id = ?", telegramChannel.ID).
+			Where("cci.external_id = ?", "998877").
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if telegramIdentity.DisplayName == nil || *telegramIdentity.DisplayName != telegramMessage.Message.DisplayName {
+			t.Fatalf("Telegram identity display name = %#v", telegramIdentity.DisplayName)
+		}
+		if telegramIdentity.AvatarFileID == nil {
+			t.Fatalf("Telegram identity avatar = %#v", telegramIdentity)
+		}
+		telegramAvatarFilesInDatabase := make([]servermodels.File, 0)
+		if err := db.NewSelect().Model(&telegramAvatarFilesInDatabase).
+			Where("f.organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("f.purpose = ?", domain.FilePurposeContactAvatar).
+			OrderExpr("f.created_at ASC, f.id ASC").
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if len(telegramAvatarFilesInDatabase) != 2 || telegramAvatarFilesInDatabase[0].Status != string(domain.FileStatusDeleting) ||
+			telegramAvatarFilesInDatabase[1].ID != *telegramIdentity.AvatarFileID || telegramAvatarFilesInDatabase[1].Status != string(domain.FileStatusActive) ||
+			telegramAvatarFilesInDatabase[1].StorageBackend != string(domain.FileStorageBackendLocal) || telegramAvatarFilesInDatabase[1].ContentType != "image/jpeg" ||
+			telegramAvatarFilesInDatabase[0].ExternalID == nil || *telegramAvatarFilesInDatabase[0].ExternalID != "avatar-version-1" ||
+			telegramAvatarFilesInDatabase[1].ExternalID == nil || *telegramAvatarFilesInDatabase[1].ExternalID != "avatar-version-2" {
+			t.Fatalf("Telegram avatar files = %#v", telegramAvatarFilesInDatabase)
+		}
+		if importedAvatarWriter.saved != 2 {
+			t.Fatalf("imported Telegram avatar writes = %d, want 2", importedAvatarWriter.saved)
+		}
+		latestTelegramMessage := servermodels.Message{}
+		if err := db.NewSelect().Model(&latestTelegramMessage).
+			Join("JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+			Where("cci.channel_id = ?", telegramChannel.ID).
+			Where("cci.external_id = ?", "998877").
+			OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC").
+			Limit(1).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if latestTelegramMessage.Body != telegramMessage.Message.Body || latestTelegramMessage.SourceOrder != telegramMessage.Message.MessageID || !latestTelegramMessage.OriginatedAt.Equal(telegramOriginatedAt) {
+			t.Fatalf("latest Telegram message = %#v", latestTelegramMessage)
+		}
+		telegramConversation := struct {
+			ID string `bun:"id"`
+		}{}
+		err = db.NewSelect().
+			TableExpr("customer_conversations AS cc").
+			ColumnExpr("cc.conversation_id AS id").
+			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+			Where("cci.channel_id = ?", telegramChannel.ID).
+			Where("cci.external_id = ?", "998877").
+			Scan(context.Background(), &telegramConversation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		messageCountBeforeReply, err := db.NewSelect().Model((*servermodels.Message)(nil)).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("conversation_id = ?", telegramConversation.ID).
+			Count(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if messageCountBeforeReply != 2 {
+			t.Fatalf("Telegram message count = %d, want 2", messageCountBeforeReply)
+		}
+		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db)
+		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+			ConversationID:  telegramConversation.ID,
+			ClientMessageID: "019d4e1c-40a5-77dd-82e6-6951f9957ba5",
+			Body:            "不应写入的 Telegram 回复",
+		})
+		var replyConflict *conversationaction.ConflictError
+		if !errors.As(err, &replyConflict) || replyConflict.Reason != conversationaction.ConflictReasonChannelOutboundUnsupported {
+			t.Fatalf("Telegram reply error = %#v", err)
+		}
+		messageCountAfterReply, err := db.NewSelect().Model((*servermodels.Message)(nil)).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("conversation_id = ?", telegramConversation.ID).
+			Count(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if messageCountAfterReply != messageCountBeforeReply {
+			t.Fatalf("Telegram message count after rejected reply = %d, want %d", messageCountAfterReply, messageCountBeforeReply)
+		}
+		sameAvatarMessage := *telegramMessage.Message
+		sameAvatarMessage.MessageID = 43
+		sameAvatarMessage.Body = "头像未变化的 Telegram 消息"
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 5, Message: &sameAvatarMessage,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		telegramIdentity = servermodels.ContactChannelIdentity{}
+		if err := db.NewSelect().Model(&telegramIdentity).
+			Where("cci.channel_id = ?", telegramChannel.ID).
+			Where("cci.external_id = ?", "998877").
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if telegramIdentity.AvatarFileID == nil || *telegramIdentity.AvatarFileID != telegramAvatarFilesInDatabase[1].ID || importedAvatarWriter.saved != 2 {
+			t.Fatalf("unchanged Telegram avatar = %#v, writes = %d", telegramIdentity, importedAvatarWriter.saved)
+		}
+		noAvatarMessage := *telegramMessage.Message
+		noAvatarMessage.MessageID = 44
+		noAvatarMessage.Body = "删除头像后的 Telegram 消息"
+		telegramAvatarAPI.photo = nil
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 6, Message: &noAvatarMessage,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		telegramIdentity = servermodels.ContactChannelIdentity{}
+		if err := db.NewSelect().Model(&telegramIdentity).
+			Where("cci.channel_id = ?", telegramChannel.ID).
+			Where("cci.external_id = ?", "998877").
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if telegramIdentity.AvatarFileID != nil {
+			t.Fatalf("deleted Telegram avatar = %#v", telegramIdentity)
+		}
+		activeTelegramAvatarCount, err := db.NewSelect().Model((*servermodels.File)(nil)).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("purpose = ?", domain.FilePurposeContactAvatar).
+			Where("status = ?", domain.FileStatusActive).
+			Count(context.Background())
+		if err != nil || activeTelegramAvatarCount != 0 {
+			t.Fatalf("active Telegram avatar count = %d, error = %v", activeTelegramAvatarCount, err)
 		}
 
 		reusedBotChannel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
@@ -1417,6 +1599,36 @@ func (f *telegramBotAPIFake) deletedTokens() []string {
 }
 
 var _ telegramintegration.BotAPI = (*telegramBotAPIFake)(nil)
+
+type telegramProfilePhotoAPIStub struct {
+	photo      *telegramintegration.ProfilePhoto
+	downloaded telegramintegration.DownloadedPhoto
+	err        error
+}
+
+// GetUserProfilePhoto 返回测试预设的当前头像。
+func (s *telegramProfilePhotoAPIStub) GetUserProfilePhoto(context.Context, string, int64) (*telegramintegration.ProfilePhoto, error) {
+	return s.photo, s.err
+}
+
+// DownloadPhoto 返回测试预设的头像内容。
+func (s *telegramProfilePhotoAPIStub) DownloadPhoto(context.Context, string, string) (telegramintegration.DownloadedPhoto, error) {
+	return s.downloaded, s.err
+}
+
+var _ telegramintegration.ProfilePhotoAPI = (*telegramProfilePhotoAPIStub)(nil)
+
+type importedFileWriterStub struct {
+	saved int
+}
+
+// Save 接受测试导入内容并返回固定 ETag。
+func (s *importedFileWriterStub) Save(context.Context, *servermodels.File, []byte) (string, error) {
+	s.saved++
+	return "telegram-avatar-etag", nil
+}
+
+var _ fileaction.ContentWriter = (*importedFileWriterStub)(nil)
 
 // testDatabaseConfig 从测试专用的 PostgreSQL 分项环境变量读取连接配置。
 func testDatabaseConfig(t *testing.T) serverconfig.DatabaseConfig {

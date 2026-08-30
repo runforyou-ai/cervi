@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 
@@ -18,6 +19,7 @@ import (
 const (
 	defaultBaseURL  = "https://api.telegram.org"
 	maxResponseSize = 1 << 20
+	maxAvatarSize   = 5 << 20
 )
 
 var botTokenPattern = regexp.MustCompile(`^[0-9]+:[A-Za-z0-9_-]+$`)
@@ -29,6 +31,24 @@ type Bot struct {
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	Username  string `json:"username"`
+}
+
+// ProfilePhoto 定义 Telegram 用户当前头像的可下载引用和唯一标识。
+type ProfilePhoto struct {
+	FileID   string
+	UniqueID string
+}
+
+// DownloadedPhoto 返回经过内容校验的头像字节。
+type DownloadedPhoto struct {
+	ContentType string
+	Data        []byte
+}
+
+// ProfilePhotoAPI 定义用户头像同步和读取依赖的 Telegram 能力。
+type ProfilePhotoAPI interface {
+	GetUserProfilePhoto(context.Context, string, int64) (*ProfilePhoto, error)
+	DownloadPhoto(context.Context, string, string) (DownloadedPhoto, error)
 }
 
 // Webhook 定义 setWebhook 所需字段。
@@ -56,8 +76,9 @@ func WithBaseURL(baseURL string) Option {
 
 // Client 调用 Telegram Bot API，且不会在错误中暴露包含 Token 的 URL。
 type Client struct {
-	httpClient connectiontest.HTTPDoer
-	baseURL    string
+	httpClient     connectiontest.HTTPDoer
+	downloadClient connectiontest.HTTPDoer
+	baseURL        string
 }
 
 // NewClient 创建 Telegram Bot API 客户端。
@@ -65,7 +86,15 @@ func NewClient(httpClient connectiontest.HTTPDoer, options ...Option) *Client {
 	if httpClient == nil {
 		httpClient = connectiontest.NewHTTPClient()
 	}
-	client := &Client{httpClient: httpClient, baseURL: defaultBaseURL}
+	downloadClient := httpClient
+	if standardClient, ok := httpClient.(*http.Client); ok {
+		clone := *standardClient
+		clone.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+		downloadClient = &clone
+	}
+	client := &Client{httpClient: httpClient, downloadClient: downloadClient, baseURL: defaultBaseURL}
 	for _, option := range options {
 		option(client)
 	}
@@ -84,6 +113,97 @@ func (c *Client) GetMe(ctx context.Context, token string) (Bot, error) {
 	return bot, nil
 }
 
+// GetUserProfilePhoto 返回用户最新头像的最大静态尺寸，无头像时返回 nil。
+func (c *Client) GetUserProfilePhoto(ctx context.Context, token string, userID int64) (*ProfilePhoto, error) {
+	if userID <= 0 {
+		return nil, protocolError()
+	}
+	result := struct {
+		Photos [][]struct {
+			FileID       string `json:"file_id"`
+			FileUniqueID string `json:"file_unique_id"`
+			Width        int64  `json:"width"`
+			Height       int64  `json:"height"`
+		} `json:"photos"`
+	}{}
+	if err := c.call(ctx, token, "getUserProfilePhotos", struct {
+		UserID int64 `json:"user_id"`
+		Offset int   `json:"offset"`
+		Limit  int   `json:"limit"`
+	}{UserID: userID, Limit: 1}, &result); err != nil {
+		return nil, err
+	}
+	if len(result.Photos) == 0 {
+		return nil, nil
+	}
+	var selected *ProfilePhoto
+	var selectedArea int64
+	for _, size := range result.Photos[0] {
+		fileID := strings.TrimSpace(size.FileID)
+		uniqueID := strings.TrimSpace(size.FileUniqueID)
+		if fileID == "" || uniqueID == "" || size.Width <= 0 || size.Height <= 0 || size.Width > 10000 || size.Height > 10000 {
+			continue
+		}
+		area := size.Width * size.Height
+		if selected == nil || area > selectedArea {
+			selected = &ProfilePhoto{FileID: fileID, UniqueID: uniqueID}
+			selectedArea = area
+		}
+	}
+	if selected == nil {
+		return nil, protocolError()
+	}
+	return selected, nil
+}
+
+// DownloadPhoto 通过 getFile 下载并校验 Telegram 头像内容。
+func (c *Client) DownloadPhoto(ctx context.Context, token, fileID string) (DownloadedPhoto, error) {
+	fileID = strings.TrimSpace(fileID)
+	if fileID == "" || len(fileID) > 512 {
+		return DownloadedPhoto{}, protocolError()
+	}
+	file := struct {
+		FileSize *int64 `json:"file_size"`
+		FilePath string `json:"file_path"`
+	}{}
+	if err := c.call(ctx, token, "getFile", struct {
+		FileID string `json:"file_id"`
+	}{FileID: fileID}, &file); err != nil {
+		return DownloadedPhoto{}, err
+	}
+	if file.FileSize != nil && (*file.FileSize <= 0 || *file.FileSize > maxAvatarSize) {
+		return DownloadedPhoto{}, protocolError()
+	}
+	endpoint, err := c.fileURL(token, file.FilePath)
+	if err != nil {
+		return DownloadedPhoto{}, protocolError()
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return DownloadedPhoto{}, protocolError()
+	}
+	response, err := c.downloadClient.Do(request)
+	if err != nil {
+		return DownloadedPhoto{}, safeTransportError(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return DownloadedPhoto{}, connectiontest.HTTPStatusError(response.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxAvatarSize+1))
+	if err != nil {
+		return DownloadedPhoto{}, protocolError()
+	}
+	if len(data) == 0 || len(data) > maxAvatarSize {
+		return DownloadedPhoto{}, protocolError()
+	}
+	contentType := avatarContentType(data)
+	if contentType == "" {
+		return DownloadedPhoto{}, protocolError()
+	}
+	return DownloadedPhoto{ContentType: contentType, Data: data}, nil
+}
+
 // SetWebhook 注册当前渠道的 Webhook。
 func (c *Client) SetWebhook(ctx context.Context, token string, webhook Webhook) error {
 	var accepted bool
@@ -94,7 +214,7 @@ func (c *Client) SetWebhook(ctx context.Context, token string, webhook Webhook) 
 		DropPendingUpdates bool     `json:"drop_pending_updates"`
 	}{
 		URL: webhook.URL, SecretToken: webhook.Secret,
-		AllowedUpdates: []string{"my_chat_member"}, DropPendingUpdates: true,
+		AllowedUpdates: []string{"message", "my_chat_member"}, DropPendingUpdates: true,
 	}, &accepted)
 	if err != nil {
 		return err
@@ -179,6 +299,46 @@ func (c *Client) methodURL(token, method string) (string, error) {
 	base.RawPath = ""
 	base.Path = strings.TrimRight(base.Path, "/") + "/bot" + token + "/" + method
 	return base.String(), nil
+}
+
+// fileURL 构造受限于 Telegram 基础地址的文件下载地址。
+func (c *Client) fileURL(token, filePath string) (string, error) {
+	token = strings.TrimSpace(token)
+	filePath = strings.TrimSpace(filePath)
+	if !botTokenPattern.MatchString(token) || filePath == "" || strings.HasPrefix(filePath, "/") || strings.Contains(filePath, "\\") {
+		return "", errors.New("invalid Telegram file path")
+	}
+	reference, err := url.Parse(filePath)
+	if err != nil || reference.IsAbs() || reference.Host != "" || reference.RawQuery != "" || reference.Fragment != "" {
+		return "", errors.New("invalid Telegram file path")
+	}
+	cleanedPath := path.Clean(reference.Path)
+	if cleanedPath != reference.Path || cleanedPath == "." || cleanedPath == ".." || strings.HasPrefix(cleanedPath, "../") {
+		return "", errors.New("invalid Telegram file path")
+	}
+	base, err := url.Parse(c.baseURL)
+	if err != nil || !base.IsAbs() || base.Host == "" {
+		return "", errors.New("invalid base URL")
+	}
+	base.RawPath = ""
+	base.RawQuery = ""
+	base.Fragment = ""
+	base.Path = strings.TrimRight(base.Path, "/") + "/file/bot" + token + "/" + reference.Path
+	return base.String(), nil
+}
+
+// avatarContentType 按文件魔数识别允许的静态头像格式。
+func avatarContentType(data []byte) string {
+	switch {
+	case len(data) >= 3 && data[0] == 0xff && data[1] == 0xd8 && data[2] == 0xff:
+		return "image/jpeg"
+	case len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}):
+		return "image/png"
+	case len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP":
+		return "image/webp"
+	default:
+		return ""
+	}
 }
 
 // safeTransportError 保留错误分类但移除可能包含 Token URL 的原始错误。

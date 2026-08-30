@@ -14,6 +14,7 @@ import {
 import { useTranslation } from "react-i18next"
 
 import {
+  ChannelType,
   ServiceSessionStatus,
   isCustomerInboxConversation,
   isDirectInboxConversation,
@@ -646,8 +647,12 @@ function ConversationThread({
 }: {
   conversation: CustomerInboxConversationData | DirectInboxConversationData
 }) {
+  const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
   const [sentMessages, setSentMessages] = useState<ConversationMessage[]>([])
+  const replySupported =
+    isDirectInboxConversation(conversation) ||
+    conversation.customer.channelType === ChannelType.ChannelTypeWebsite
 
   /** 合并接口返回的已发送消息。 */
   function appendSentMessage(message: ConversationMessage) {
@@ -666,11 +671,17 @@ function ConversationThread({
         currentIdentityID={identity.user.identityId}
         sentMessages={sentMessages}
       />
-      <ConversationComposer
-        conversationID={conversation.id}
-        conversationType={conversation.type}
-        onSent={appendSentMessage}
-      />
+      {replySupported ? (
+        <ConversationComposer
+          conversationID={conversation.id}
+          conversationType={conversation.type}
+          onSent={appendSentMessage}
+        />
+      ) : (
+        <div className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-5 text-center text-sm text-muted-foreground">
+          {t("channelReplyUnsupported")}
+        </div>
+      )}
     </>
   )
 }

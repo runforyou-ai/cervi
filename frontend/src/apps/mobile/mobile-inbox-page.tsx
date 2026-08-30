@@ -180,16 +180,28 @@ function MobileConversationAvatar({
   const displayName = customerConversation
     ? customerConversation.customer.contactName?.trim()
     : directConversation?.direct.peerName.trim()
+  const avatarURL = customerConversation?.customer.contactAvatarUrl ?? ""
+  const [avatarFailed, setAvatarFailed] = useState(false)
+
+  useEffect(() => setAvatarFailed(false), [avatarURL])
 
   return (
     <div className="relative shrink-0">
       <div
         className={cn(
-          "flex size-11 items-center justify-center bg-muted text-sm font-medium text-muted-foreground",
+          "flex size-11 items-center justify-center overflow-hidden bg-muted text-sm font-medium text-muted-foreground",
           directConversation ? "rounded-full" : "rounded-xl",
         )}
       >
-        {displayName ? (
+        {avatarURL && !avatarFailed ? (
+          <img
+            src={avatarURL}
+            alt=""
+            className="size-full rounded-[inherit] object-cover"
+            draggable={false}
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : displayName ? (
           Array.from(displayName)[0]?.toLocaleUpperCase()
         ) : (
           <UserRoundIcon className="size-4.5" />

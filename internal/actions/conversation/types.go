@@ -30,6 +30,8 @@ const (
 	ConflictReasonServiceSessionOwned = "service_session_owned"
 	// ConflictReasonServiceSessionNotReplyable 表示客服处理周期当前不可回复。
 	ConflictReasonServiceSessionNotReplyable = "service_session_not_replyable"
+	// ConflictReasonChannelOutboundUnsupported 表示来源渠道尚不支持外发。
+	ConflictReasonChannelOutboundUnsupported = "channel_outbound_unsupported"
 )
 
 // WebsiteCustomerTextMessageInput 定义网站客户文本消息。
@@ -71,6 +73,7 @@ type ReceiveWebsiteCustomerTextMessageResult struct {
 // MessageCursorPoint 定义消息分页稳定边界。
 type MessageCursorPoint struct {
 	OriginatedAt time.Time
+	SourceOrder  int64
 	ID           string
 }
 

@@ -49,6 +49,11 @@ type UploadInput struct {
 
 // normalizeUploadInput 规范化并校验待上传文件元数据。
 func normalizeUploadInput(input UploadInput) (UploadInput, map[string]ValidationCode) {
+	return normalizeFileInput(input, domain.FilePurposeUserAvatar)
+}
+
+// normalizeFileInput 按指定的单一用途规范化文件元数据。
+func normalizeFileInput(input UploadInput, purpose domain.FilePurpose) (UploadInput, map[string]ValidationCode) {
 	input.FileName = strings.TrimSpace(filepath.Base(strings.ReplaceAll(input.FileName, "\\", "/")))
 	mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(input.ContentType))
 	if err == nil {
@@ -60,7 +65,7 @@ func normalizeUploadInput(input UploadInput) (UploadInput, map[string]Validation
 	if input.FileName == "" || input.FileName == "." || utf8.RuneCountInString(input.FileName) > maxFileNameLength {
 		fields["fileName"] = ValidationFileNameRequired
 	}
-	if input.Purpose != domain.FilePurposeUserAvatar {
+	if input.Purpose != purpose {
 		fields["purpose"] = ValidationPurposeInvalid
 	}
 	if _, exists := avatarFileExtensions[input.ContentType]; !exists {

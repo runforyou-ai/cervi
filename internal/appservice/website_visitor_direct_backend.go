@@ -114,20 +114,24 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 
 // encodeWebsiteMessageCursor 编码绑定 Conversation 的消息位置。
 func encodeWebsiteMessageCursor(conversationID string, point conversationaction.MessageCursorPoint) string {
-	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + point.ID
+	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + strconv.FormatInt(point.SourceOrder, 10) + "." + point.ID
 }
 
 // decodeWebsiteMessageCursor 解析当前 Conversation 的消息位置。
 func decodeWebsiteMessageCursor(value, conversationID string) (conversationaction.MessageCursorPoint, bool) {
 	parts := strings.Split(value, ".")
-	if len(parts) != 3 || parts[0] != conversationID {
+	if len(parts) != 4 || parts[0] != conversationID {
 		return conversationaction.MessageCursorPoint{}, false
 	}
 	originatedAt, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil || originatedAt <= 0 {
 		return conversationaction.MessageCursorPoint{}, false
 	}
-	return conversationaction.MessageCursorPoint{OriginatedAt: time.Unix(0, originatedAt).UTC(), ID: parts[2]}, true
+	sourceOrder, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil || sourceOrder < 0 {
+		return conversationaction.MessageCursorPoint{}, false
+	}
+	return conversationaction.MessageCursorPoint{OriginatedAt: time.Unix(0, originatedAt).UTC(), SourceOrder: sourceOrder, ID: parts[3]}, true
 }
 
 // websiteVisitorError 把语言无关访客错误映射为本地化应用错误。

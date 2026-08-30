@@ -29,7 +29,8 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox,
 		if summary.Customer != nil {
 			conversation.Customer = &CustomerInboxConversation{
 				Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
-				ChannelType: ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
+				ContactAvatarURL: avatarContentURL(summary.Customer.ContactAvatarFileID),
+				ChannelType:      ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
 				Preview: summary.Customer.Preview, LastMessageAt: summary.Customer.LastMessageAt,
 				ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus),
 			}

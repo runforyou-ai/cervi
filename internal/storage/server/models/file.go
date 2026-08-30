@@ -16,6 +16,7 @@ type File struct {
 	OrganizationID  string     `bun:"organization_id"`
 	CreatedByUserID string     `bun:"created_by_user_id"`
 	Purpose         string     `bun:"purpose"`
+	ExternalID      *string    `bun:"external_id"`
 	StorageBackend  string     `bun:"storage_backend"`
 	StorageKey      string     `bun:"storage_key"`
 	OriginalName    string     `bun:"original_name"`
