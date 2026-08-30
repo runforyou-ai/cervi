@@ -623,6 +623,14 @@ export interface CurrentUser {
 }
 
 /**
+ * CustomerTextMessageInput 定义成员发送的客户会话文本消息。
+ */
+export interface CustomerTextMessageInput {
+    "clientMessageId": string;
+    "body": string;
+}
+
+/**
  * ExternalKnowledgeBaseOption 定义外部知识库选择项。
  */
 export interface ExternalKnowledgeBaseOption {

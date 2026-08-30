@@ -25,6 +25,10 @@ const (
 const (
 	// ConflictReasonIdempotencyMismatch 表示同一消息编号对应了不同写入意图。
 	ConflictReasonIdempotencyMismatch = "idempotency_mismatch"
+	// ConflictReasonServiceSessionOwned 表示客服处理周期已由其他主体负责。
+	ConflictReasonServiceSessionOwned = "service_session_owned"
+	// ConflictReasonServiceSessionNotReplyable 表示客服处理周期当前不可回复。
+	ConflictReasonServiceSessionNotReplyable = "service_session_not_replyable"
 )
 
 // WebsiteCustomerTextMessageInput 定义网站客户文本消息。
@@ -122,4 +126,11 @@ type ConversationMessageHistory struct {
 	Messages []ConversationMessage
 	Before   *MessageCursorPoint
 	After    *MessageCursorPoint
+}
+
+// CustomerTextMessageInput 定义成员发送的客户会话文本消息。
+type CustomerTextMessageInput struct {
+	ConversationID  string
+	ClientMessageID string
+	Body            string
 }

@@ -50,6 +50,7 @@ type DirectBackend struct {
 	resolveTenant                     tenant.Resolver
 	loadInbox                         *inboxaction.LoadInboxQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
+	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
 	getMessageChannel                 *channelaction.GetMessageChannelQuery
@@ -147,6 +148,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		resolveTenant:                     tenantResolver,
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
+		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getMessageChannel:                 channelaction.NewGetMessageChannelQuery(db),

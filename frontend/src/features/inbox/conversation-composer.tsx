@@ -1,24 +1,114 @@
-/** 建立客户会话回复区的非交互布局。 */
-import { PaperclipIcon } from "lucide-react"
+/** 提交客户会话成员文本回复。 */
+import { useEffect, useMemo, useRef } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
+import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
+import { toast } from "sonner"
 
+import {
+  isApiError,
+  sendCustomerTextMessage,
+  type ConversationMessage,
+} from "@/api"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  createConversationComposerSchema,
+  type ConversationComposerValues,
+} from "@/features/inbox/conversation-composer-schema"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
+import { apiErrorMessage } from "@/lib/form-errors"
+import { recoverSession } from "@/lib/session-navigation"
 
-/** 展示整体禁用的回复编辑区。 */
+type PendingMessage = {
+  body: string
+  clientMessageID: string
+}
+
+/** 展示并提交客户会话回复编辑区。 */
 export function ConversationComposer({
   conversationID,
+  onSent,
 }: {
   conversationID: string
+  onSent: (message: ConversationMessage) => void
 }) {
   const { t } = useTranslation("inbox")
+  const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
+  const aliveRef = useRef(true)
+  const pendingRef = useRef<PendingMessage | null>(null)
+  const schema = useMemo(
+    () =>
+      createConversationComposerSchema({
+        bodyRequired: t("messageBodyRequired"),
+        bodyTooLong: t("messageBodyTooLong"),
+      }),
+    [t],
+  )
+  const form = useForm<ConversationComposerValues>({
+    resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
+    defaultValues: { body: "" },
+  })
   const inputID = `conversation-reply-${conversationID}`
 
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+    }
+  }, [])
+
+  /** 发送当前客户会话文本回复。 */
+  async function send(values: ConversationComposerValues) {
+    const body = values.body.trim()
+    const pending =
+      pendingRef.current?.body === body
+        ? pendingRef.current
+        : { body, clientMessageID: window.crypto.randomUUID() }
+    pendingRef.current = pending
+    try {
+      const message = await sendCustomerTextMessage(conversationID, {
+        clientMessageId: pending.clientMessageID,
+        body,
+      })
+      void invalidate(resourceKeys.inbox())
+      void invalidate(resourceKeys.conversationMessages(conversationID))
+      if (!aliveRef.current) return
+      pendingRef.current = null
+      form.reset()
+      onSent(message)
+    } catch (error) {
+      if (recoverSession(error, navigate)) return
+      if (!aliveRef.current) return
+      console.warn("发送成员客户消息失败", {
+        conversationId: conversationID,
+        error,
+      })
+      if (isApiError(error)) {
+        if (error.reason === "idempotency_mismatch") {
+          pendingRef.current = null
+        }
+        toast.error(apiErrorMessage(error, ["body", "clientMessageId"]))
+        return
+      }
+      toast.error(t("messageSendError"))
+    }
+  }
+
+  const { isSubmitting } = form.formState
+
   return (
-    <footer
+    <form
       data-slot="conversation-composer"
       data-conversation-id={conversationID}
       className="shrink-0 border-t border-border/60 bg-background p-3"
+      onSubmit={form.handleSubmit(send)}
+      noValidate
     >
       <div className="overflow-hidden rounded-xl border border-input bg-muted/15 shadow-xs">
         <label
@@ -28,9 +118,12 @@ export function ConversationComposer({
           {t("replyLabel")}
         </label>
         <Textarea
+          {...form.register("body")}
           id={inputID}
-          disabled
+          disabled={isSubmitting}
           rows={3}
+          required
+          aria-invalid={form.formState.errors.body ? true : undefined}
           className="min-h-20 resize-none rounded-none border-0 bg-transparent py-2 shadow-none focus-visible:ring-0"
         />
         <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
@@ -44,11 +137,14 @@ export function ConversationComposer({
           >
             <PaperclipIcon />
           </Button>
-          <Button type="button" size="sm" disabled>
-            {t("messageSend")}
+          <Button type="submit" size="sm" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <LoaderCircleIcon className="animate-spin" />
+            ) : null}
+            {isSubmitting ? t("messageSending") : t("messageSend")}
           </Button>
         </div>
       </div>
-    </footer>
+    </form>
   )
 }

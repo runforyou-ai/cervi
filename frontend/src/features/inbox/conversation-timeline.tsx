@@ -1,4 +1,4 @@
-/** 客户 Conversation 的只读消息时间线。 */
+/** 客户 Conversation 的消息时间线。 */
 import {
   Fragment,
   useEffect,
@@ -60,11 +60,13 @@ function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
   return `${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
 }
 
-/** 客户会话只读消息时间线。 */
+/** 展示客户会话历史和当前页面已发送消息。 */
 export function ConversationTimeline({
   conversationID,
+  sentMessages,
 }: {
   conversationID: string
+  sentMessages: ConversationMessage[]
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -74,6 +76,7 @@ export function ConversationTimeline({
   const beforeRequestRef = useRef(0)
   const initialScrollRef = useRef(true)
   const previousScrollHeightRef = useRef<number | null>(null)
+  const previousSentCountRef = useRef(0)
   const [timeline, setTimeline] =
     useState<ConversationMessageListData | null>(null)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
@@ -83,6 +86,10 @@ export function ConversationTimeline({
     (signal) => listConversationMessages(conversationID, undefined, signal),
   )
   const currentPage = timeline ?? data
+  const visibleMessages = useMemo(
+    () => mergeMessages(currentPage?.messages ?? [], sentMessages),
+    [currentPage, sentMessages],
+  )
 
   const dateFormatters = useMemo(() => {
     const locale = i18n.resolvedLanguage
@@ -113,9 +120,16 @@ export function ConversationTimeline({
 
   useLayoutEffect(() => {
     const viewport = timelineViewport(scrollRootRef.current)
-    if (!viewport || !currentPage) return
-    if (initialScrollRef.current) {
+    if (!viewport) return
+    const sentCountIncreased =
+      sentMessages.length > previousSentCountRef.current
+    previousSentCountRef.current = sentMessages.length
+    if (initialScrollRef.current && currentPage) {
       initialScrollRef.current = false
+      viewport.scrollTop = viewport.scrollHeight
+      return
+    }
+    if (sentCountIncreased) {
       viewport.scrollTop = viewport.scrollHeight
       return
     }
@@ -123,8 +137,9 @@ export function ConversationTimeline({
       viewport.scrollTop +=
         viewport.scrollHeight - previousScrollHeightRef.current
       previousScrollHeightRef.current = null
+      return
     }
-  }, [currentPage])
+  }, [currentPage, sentMessages.length])
 
   /** 加载并前插一页更早消息。 */
   async function loadEarlier() {
@@ -196,7 +211,7 @@ export function ConversationTimeline({
     )
   }
 
-  if (!currentPage || currentPage.messages.length === 0) {
+  if (visibleMessages.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6 text-sm text-muted-foreground">
         {t("messagesEmpty")}
@@ -207,9 +222,9 @@ export function ConversationTimeline({
   return (
     <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1 bg-background">
       <div className="flex w-full flex-col px-4 pb-3 md:px-6">
-        {currentPage.before || earlierError ? (
+        {currentPage?.before || earlierError ? (
           <div className="flex items-center justify-center py-2">
-            {currentPage.before ? (
+            {currentPage?.before ? (
               <Button
                 size="sm"
                 variant="ghost"
@@ -230,7 +245,7 @@ export function ConversationTimeline({
         ) : null}
 
         <div className="grid gap-3">
-          {currentPage.messages.map((message, index) => {
+          {visibleMessages.map((message, index) => {
             const date = new Date(message.originatedAt)
             const incoming =
               !message.sender ||

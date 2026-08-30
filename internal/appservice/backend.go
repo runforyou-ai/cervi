@@ -50,6 +50,9 @@ type Backend interface {
 	// ListConversationMessages 返回成员可见的会话消息。
 	//cervi:route GET /conversations/:conversationID/messages
 	ListConversationMessages(context.Context, RequestMeta, string, ConversationMessageListInput) (ConversationMessageList, error)
+	// SendCustomerTextMessage 发送客户会话文本消息。
+	//cervi:route POST /conversations/:conversationID/messages
+	SendCustomerTextMessage(context.Context, RequestMeta, string, CustomerTextMessageInput) (ConversationMessage, error)
 	// ListMessageChannels 返回消息渠道列表。
 	//cervi:route GET /channels
 	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)

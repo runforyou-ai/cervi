@@ -45,7 +45,7 @@
 - 超过一页的历史可以继续向前加载，消息正序、无重复，切换会话不会串线。
 - 初始响应在存在消息时返回 `after`，但本 PR 不轮询新增消息。
 
-## PR F3：会话工作区前端骨架
+## PR F3：会话工作区前端骨架（已完成）
 
 - 保留现有范围纵栏和会话列表；选中区横向拆为 Conversation 工作区和独立联系人上下文栏，
   右栏分隔线从选中区顶部贯穿到底部。
@@ -65,7 +65,7 @@
   Helmdesk 样式显示“第 N 次会话 · MM-DD HH:mm · 状态”，单个 ServiceSession 也显示边界。
 - 除上述开始标记外，本 PR 不扩展消息查询，不修改资源 Key、`PageSplit` 或 WebSocket 相关代码。
 
-## PR F4：成员文本回复
+## PR F4：成员文本回复（已完成）
 
 - 回复统一经过 `appservice.Service`，在事务中校验企业、客户 Conversation 和最新未结束
   ServiceSession。

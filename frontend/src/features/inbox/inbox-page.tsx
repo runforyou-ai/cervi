@@ -12,7 +12,11 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { ServiceSessionStatus, type InboxConversation } from "@/api"
+import {
+  ServiceSessionStatus,
+  type ConversationMessage,
+  type InboxConversation,
+} from "@/api"
 import { PageSplit } from "@/components/page-split"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
@@ -539,11 +543,7 @@ function ConversationMain({
           narrowViewport={narrowViewport}
           onContextToggle={toggleContext}
         />
-        <ConversationTimeline
-          key={conversation.id}
-          conversationID={conversation.id}
-        />
-        <ConversationComposer
+        <ConversationThread
           key={conversation.id}
           conversationID={conversation.id}
         />
@@ -560,6 +560,33 @@ function ConversationMain({
         onSheetOpenChange={setContextSheetOpen}
       />
     </div>
+  )
+}
+
+/** 协调当前会话时间线和回复区的即时消息。 */
+function ConversationThread({ conversationID }: { conversationID: string }) {
+  const [sentMessages, setSentMessages] = useState<ConversationMessage[]>([])
+
+  /** 合并接口返回的已发送消息。 */
+  function appendSentMessage(message: ConversationMessage) {
+    setSentMessages((current) =>
+      current.some((item) => item.id === message.id)
+        ? current
+        : [...current, message],
+    )
+  }
+
+  return (
+    <>
+      <ConversationTimeline
+        conversationID={conversationID}
+        sentMessages={sentMessages}
+      />
+      <ConversationComposer
+        conversationID={conversationID}
+        onSent={appendSentMessage}
+      />
+    </>
   )
 }
 

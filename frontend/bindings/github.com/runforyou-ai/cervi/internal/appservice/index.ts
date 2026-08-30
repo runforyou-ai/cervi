@@ -86,6 +86,7 @@ export type {
     CreateMessageChannelInput,
     CreateUserInput,
     CurrentUser,
+    CustomerTextMessageInput,
     ExternalKnowledgeBaseOption,
     ExternalKnowledgeBaseOptionList,
     ExternalPageInput,

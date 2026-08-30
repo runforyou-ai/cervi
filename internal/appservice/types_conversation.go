@@ -27,6 +27,12 @@ type ConversationMessageListInput struct {
 	After  string `json:"after" query:"after"`
 }
 
+// CustomerTextMessageInput 定义成员发送的客户会话文本消息。
+type CustomerTextMessageInput struct {
+	ClientMessageID string `json:"clientMessageId"`
+	Body            string `json:"body"`
+}
+
 // ConversationMessageSender 定义消息发送主体。
 type ConversationMessageSender struct {
 	ChatSubjectID string          `json:"chatSubjectId"`
