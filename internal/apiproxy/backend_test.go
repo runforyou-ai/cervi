@@ -127,9 +127,12 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 		case "/api/inbox":
 			if request.Header.Get("Authorization") == "Bearer test-token" {
 				writeTestJSON(writer, http.StatusOK, map[string]any{
-					"organization":  map[string]string{"id": "organization-1", "name": "鹿行"},
-					"user":          map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "admin@example.com"},
-					"conversations": []any{},
+					"conversations": []map[string]any{{
+						"id": "conversation-1", "title": "Telegram 会话", "contactName": "访客",
+						"contactAvatarUrl": "/files/avatar-file-1/content",
+						"channelType":      "telegram", "channelName": "Telegram", "preview": "你好",
+						"lastMessageAt": time.Now(), "serviceSessionStatus": "waiting",
+					}},
 				})
 				return
 			}
@@ -343,8 +346,12 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := backend.LoadInbox(context.Background(), meta); err != nil {
+	inbox, err := backend.LoadInbox(context.Background(), meta)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if len(inbox.Conversations) != 1 || inbox.Conversations[0].ContactAvatarURL != remote.URL+"/files/avatar-file-1/content" {
+		t.Fatalf("normalized inbox = %#v", inbox)
 	}
 	message, err := backend.SendCustomerTextMessage(context.Background(), meta, "conversation-1", appservice.CustomerTextMessageInput{
 		ClientMessageID: "message-1", Body: "回复客户",

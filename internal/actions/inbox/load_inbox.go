@@ -18,6 +18,7 @@ type ConversationSummary struct {
 	ID                   string
 	Title                string
 	ContactName          *string
+	ContactAvatarFileID  *string
 	ChannelType          domain.ChannelType
 	ChannelName          string
 	Preview              string
@@ -34,6 +35,7 @@ type inboxConversationRow struct {
 	ID                   string    `bun:"id"`
 	Title                string    `bun:"title"`
 	ContactName          *string   `bun:"contact_name"`
+	ContactAvatarFileID  *string   `bun:"contact_avatar_file_id"`
 	ChannelType          string    `bun:"channel_type"`
 	ChannelName          string    `bun:"channel_name"`
 	Preview              string    `bun:"preview"`
@@ -54,6 +56,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("COALESCE(cci.display_name, c.display_name) AS contact_name").
+		ColumnExpr("cci.avatar_file_id AS contact_avatar_file_id").
 		ColumnExpr("ch.type AS channel_type").
 		ColumnExpr("ch.name AS channel_name").
 		ColumnExpr("msg.body AS preview").
@@ -84,6 +87,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			ID:                   row.ID,
 			Title:                row.Title,
 			ContactName:          row.ContactName,
+			ContactAvatarFileID:  row.ContactAvatarFileID,
 			ChannelType:          domain.ChannelType(row.ChannelType),
 			ChannelName:          row.ChannelName,
 			Preview:              row.Preview,

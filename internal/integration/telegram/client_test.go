@@ -1,6 +1,7 @@
 package telegram
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -42,7 +43,146 @@ func TestGetMe(t *testing.T) {
 	}
 }
 
-// TestSetWebhook 验证注册参数固定限制为 my_chat_member 并丢弃积压 Update。
+// TestGetUserProfilePhoto 验证只返回最新头像中的最大静态尺寸。
+func TestGetUserProfilePhoto(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.URL.Path != "/bot"+testBotToken+"/getUserProfilePhotos" {
+			t.Fatalf("unexpected request: %s %s", request.Method, request.URL.Path)
+		}
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(body) != `{"user_id":998877,"offset":0,"limit":1}` {
+			t.Fatalf("request body = %s", body)
+		}
+		_, _ = writer.Write([]byte(`{"ok":true,"result":{"total_count":1,"photos":[[{"file_id":"small","file_unique_id":"same","width":160,"height":160},{"file_id":"large","file_unique_id":"same","width":640,"height":640}]]}}`))
+	}))
+	defer server.Close()
+
+	photo, err := NewClient(server.Client(), WithBaseURL(server.URL)).GetUserProfilePhoto(context.Background(), testBotToken, 998877)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if photo == nil || photo.FileID != "large" || photo.UniqueID != "same" {
+		t.Fatalf("profile photo = %#v", photo)
+	}
+}
+
+// TestGetUserProfilePhotoWithoutPhoto 验证没有头像时返回 nil。
+func TestGetUserProfilePhotoWithoutPhoto(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(`{"ok":true,"result":{"total_count":0,"photos":[]}}`))
+	}))
+	defer server.Close()
+
+	photo, err := NewClient(server.Client(), WithBaseURL(server.URL)).GetUserProfilePhoto(context.Background(), testBotToken, 998877)
+	if err != nil || photo != nil {
+		t.Fatalf("profile photo = %#v, error = %v", photo, err)
+	}
+}
+
+// TestDownloadPhoto 验证 getFile 后按魔数返回头像内容。
+func TestDownloadPhoto(t *testing.T) {
+	content := []byte{0xff, 0xd8, 0xff, 0x01}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/bot" + testBotToken + "/getFile":
+			_, _ = writer.Write([]byte(`{"ok":true,"result":{"file_id":"avatar","file_size":4,"file_path":"photos/avatar.jpg"}}`))
+		case "/file/bot" + testBotToken + "/photos/avatar.jpg":
+			writer.Header().Set("Content-Type", "text/plain")
+			_, _ = writer.Write(content)
+		default:
+			t.Fatalf("unexpected request path: %s", request.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	downloaded, err := NewClient(server.Client(), WithBaseURL(server.URL)).DownloadPhoto(context.Background(), testBotToken, "avatar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if downloaded.ContentType != "image/jpeg" || !bytes.Equal(downloaded.Data, content) {
+		t.Fatalf("downloaded photo = %#v", downloaded)
+	}
+}
+
+// TestDownloadPhotoRejectsUnsafeContent 验证非法路径、非图片、超限和重定向均失败。
+func TestDownloadPhotoRejectsUnsafeContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		filePath string
+		content  []byte
+		redirect bool
+	}{
+		{name: "parent path", filePath: "../avatar.jpg", content: []byte{0xff, 0xd8, 0xff}},
+		{name: "encoded parent path", filePath: "photos/%2e%2e/avatar.jpg", content: []byte{0xff, 0xd8, 0xff}},
+		{name: "absolute URL", filePath: "https://example.com/avatar.jpg", content: []byte{0xff, 0xd8, 0xff}},
+		{name: "not image", filePath: "photos/avatar.jpg", content: []byte("not an image")},
+		{name: "too large", filePath: "photos/avatar.jpg", content: bytes.Repeat([]byte{0xff}, maxAvatarSize+1)},
+		{name: "redirect", filePath: "photos/avatar.jpg", redirect: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			followed := false
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				switch request.URL.Path {
+				case "/bot" + testBotToken + "/getFile":
+					_, _ = writer.Write([]byte(`{"ok":true,"result":{"file_id":"avatar","file_path":"` + test.filePath + `"}}`))
+				case "/file/bot" + testBotToken + "/photos/avatar.jpg":
+					if test.redirect {
+						http.Redirect(writer, request, "/followed", http.StatusFound)
+						return
+					}
+					_, _ = writer.Write(test.content)
+				case "/followed":
+					followed = true
+				default:
+					http.NotFound(writer, request)
+				}
+			}))
+			defer server.Close()
+
+			client := NewClient(connectiontest.NewHTTPClient(), WithBaseURL(server.URL))
+			if _, err := client.DownloadPhoto(context.Background(), testBotToken, "avatar"); err == nil {
+				t.Fatal("unsafe avatar download succeeded")
+			}
+			if followed {
+				t.Fatal("avatar download followed redirect")
+			}
+		})
+	}
+}
+
+// TestDownloadPhotoErrorDoesNotLeakTokenURL 验证头像传输错误不会暴露下载地址。
+func TestDownloadPhotoErrorDoesNotLeakTokenURL(t *testing.T) {
+	client := NewClient(httpDoerFunc(func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path == "/bot"+testBotToken+"/getFile" {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"ok":true,"result":{"file_id":"avatar","file_path":"photos/avatar.jpg"}}`)),
+			}, nil
+		}
+		return nil, &url.Error{Op: "Get", URL: request.URL.String(), Err: context.DeadlineExceeded}
+	}), WithBaseURL("https://api.telegram.org"))
+
+	_, err := client.DownloadPhoto(context.Background(), testBotToken, "avatar")
+	if err == nil || strings.Contains(err.Error(), testBotToken) || strings.Contains(err.Error(), "/file/bot") {
+		t.Fatalf("unsafe avatar error = %v", err)
+	}
+}
+
+// TestFileURLRejectsParentPath 验证规范化后仍向上跳转的文件路径会在请求前被拒绝。
+func TestFileURLRejectsParentPath(t *testing.T) {
+	client := NewClient(nil)
+	for _, filePath := range []string{"../avatar.jpg", "photos/%2e%2e/avatar.jpg"} {
+		if endpoint, err := client.fileURL(testBotToken, filePath); err == nil {
+			t.Fatalf("unsafe file path %q produced %q", filePath, endpoint)
+		}
+	}
+}
+
+// TestSetWebhook 验证注册参数固定限制为私聊消息和成员状态并丢弃积压 Update。
 func TestSetWebhook(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/bot"+testBotToken+"/setWebhook" {
@@ -52,7 +192,7 @@ func TestSetWebhook(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		const expected = `{"url":"https://cervi.example/api/public/telegram-channels/channel-id/webhook","secret_token":"secret_token","allowed_updates":["my_chat_member"],"drop_pending_updates":true}`
+		const expected = `{"url":"https://cervi.example/api/public/telegram-channels/channel-id/webhook","secret_token":"secret_token","allowed_updates":["message","my_chat_member"],"drop_pending_updates":true}`
 		if string(body) != expected {
 			t.Fatalf("request body = %s, want %s", body, expected)
 		}

@@ -13,6 +13,7 @@ import {
 import { useTranslation } from "react-i18next"
 
 import {
+  ChannelType,
   ServiceSessionStatus,
   type ConversationMessage,
   type InboxConversation,
@@ -546,6 +547,7 @@ function ConversationMain({
         <ConversationThread
           key={conversation.id}
           conversationID={conversation.id}
+          channelType={conversation.channelType}
         />
       </div>
       <ConversationContextPane
@@ -564,7 +566,14 @@ function ConversationMain({
 }
 
 /** 协调当前会话时间线和回复区的即时消息。 */
-function ConversationThread({ conversationID }: { conversationID: string }) {
+function ConversationThread({
+  conversationID,
+  channelType,
+}: {
+  conversationID: string
+  channelType: ChannelType
+}) {
+  const { t } = useTranslation("inbox")
   const [sentMessages, setSentMessages] = useState<ConversationMessage[]>([])
 
   /** 合并接口返回的已发送消息。 */
@@ -582,10 +591,16 @@ function ConversationThread({ conversationID }: { conversationID: string }) {
         conversationID={conversationID}
         sentMessages={sentMessages}
       />
-      <ConversationComposer
-        conversationID={conversationID}
-        onSent={appendSentMessage}
-      />
+      {channelType === ChannelType.ChannelTypeWebsite ? (
+        <ConversationComposer
+          conversationID={conversationID}
+          onSent={appendSentMessage}
+        />
+      ) : (
+        <div className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-5 text-center text-sm text-muted-foreground">
+          {t("channelReplyUnsupported")}
+        </div>
+      )}
     </>
   )
 }

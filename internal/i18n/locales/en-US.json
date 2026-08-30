@@ -237,6 +237,7 @@
   "error.customer_message_conflict": "This message does not match the content previously sent with the same identifier.",
   "error.service_session_owned": "This conversation is assigned to another teammate.",
   "error.service_session_not_replyable": "The current service session cannot receive replies.",
+  "error.channel_outbound_unsupported": "Replies are not supported for this message channel yet.",
   "error.website_conversation_not_found": "This conversation could not be found.",
   "error.website_messenger_load_failed": "Could not load the chat. Try again.",
   "error.website_message_send_failed": "Could not send the message. Try again.",

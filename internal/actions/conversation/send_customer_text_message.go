@@ -107,6 +107,9 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err != nil {
 		return ConversationMessage{}, err
 	}
+	if err := ensureCustomerConversationOutboundSupported(ctx, tx, identity.Organization.ID, conversation.ID); err != nil {
+		return ConversationMessage{}, err
+	}
 	session, err := lockLatestServiceSessionForReply(ctx, tx, identity.Organization.ID, conversation.ID)
 	if err != nil {
 		return ConversationMessage{}, err
@@ -152,6 +155,29 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		return ConversationMessage{}, err
 	}
 	return memberConversationMessage(message, subject.ID, identity.OrganizationIdentity.DisplayName), nil
+}
+
+// ensureCustomerConversationOutboundSupported 校验客户会话来源渠道已实现外发。
+func ensureCustomerConversationOutboundSupported(ctx context.Context, db bun.IDB, organizationID, conversationID string) error {
+	var channelType string
+	err := db.NewSelect().
+		TableExpr("customer_conversations AS cc").
+		ColumnExpr("ch.type").
+		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
+		Where("cc.organization_id = ?", organizationID).
+		Where("cc.conversation_id = ?", conversationID).
+		Scan(ctx, &channelType)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrDataInvariant
+	}
+	if err != nil {
+		return fmt.Errorf("load customer conversation outbound channel: %w", err)
+	}
+	if domain.ChannelType(channelType) != domain.ChannelTypeWebsite {
+		return &ConflictError{Reason: ConflictReasonChannelOutboundUnsupported}
+	}
+	return nil
 }
 
 // normalizeCustomerTextMessageInput 规范化并校验成员客户消息输入。

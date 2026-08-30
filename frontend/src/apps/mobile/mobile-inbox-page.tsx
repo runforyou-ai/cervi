@@ -139,11 +139,22 @@ function MobileConversationAvatar({
   conversation: InboxConversation
 }) {
   const badge = sourceBadges[conversation.channelType]
+  const [avatarFailed, setAvatarFailed] = useState(false)
+
+  useEffect(() => setAvatarFailed(false), [conversation.contactAvatarUrl])
 
   return (
     <div className="relative shrink-0">
-      <div className="flex size-11 items-center justify-center rounded-xl bg-muted text-sm font-medium text-muted-foreground">
-        {conversation.contactName ? (
+      <div className="flex size-11 items-center justify-center overflow-hidden rounded-xl bg-muted text-sm font-medium text-muted-foreground">
+        {conversation.contactAvatarUrl && !avatarFailed ? (
+          <img
+            src={conversation.contactAvatarUrl}
+            alt=""
+            className="size-full rounded-[inherit] object-cover"
+            draggable={false}
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : conversation.contactName ? (
           conversation.contactName.slice(0, 1).toLocaleUpperCase()
         ) : (
           <UserRoundIcon className="size-4.5" />

@@ -47,6 +47,7 @@ const inbox = {
   messageSend: "Send",
   messageSending: "Sending",
   messageSendError: "Could not send the message. Try again.",
+  channelReplyUnsupported: "Replies are not supported for this message channel yet.",
   contextOpen: "Expand details panel",
   contextClose: "Collapse details panel",
   contextResize: "Resize details panel",

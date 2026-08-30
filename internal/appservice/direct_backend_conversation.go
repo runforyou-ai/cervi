@@ -107,20 +107,24 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 
 // encodeConversationMessageCursor 编码绑定会话的成员消息游标。
 func encodeConversationMessageCursor(conversationID string, point conversationaction.MessageCursorPoint) string {
-	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + point.ID
+	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + strconv.FormatInt(point.SourceOrder, 10) + "." + point.ID
 }
 
 // decodeConversationMessageCursor 解码并校验成员消息游标所属会话。
 func decodeConversationMessageCursor(value, conversationID string) (conversationaction.MessageCursorPoint, bool) {
 	parts := strings.Split(value, ".")
-	if len(parts) != 3 || parts[0] != conversationID || !common.ValidUUID(parts[2]) {
+	if len(parts) != 4 || parts[0] != conversationID || !common.ValidUUID(parts[3]) {
 		return conversationaction.MessageCursorPoint{}, false
 	}
 	originatedAt, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil || originatedAt <= 0 {
 		return conversationaction.MessageCursorPoint{}, false
 	}
-	return conversationaction.MessageCursorPoint{OriginatedAt: time.Unix(0, originatedAt).UTC(), ID: parts[2]}, true
+	sourceOrder, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil || sourceOrder < 0 {
+		return conversationaction.MessageCursorPoint{}, false
+	}
+	return conversationaction.MessageCursorPoint{OriginatedAt: time.Unix(0, originatedAt).UTC(), SourceOrder: sourceOrder, ID: parts[3]}, true
 }
 
 // conversationMessageError 转换成员消息读取错误。
@@ -165,6 +169,8 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 			messageKey = cervii18n.ErrorServiceSessionOwned
 		case conversationaction.ConflictReasonServiceSessionNotReplyable:
 			messageKey = cervii18n.ErrorServiceSessionNotReplyable
+		case conversationaction.ConflictReasonChannelOutboundUnsupported:
+			messageKey = cervii18n.ErrorChannelOutboundUnsupported
 		}
 		return ConflictError(meta, messageKey, conflictError.Reason)
 	}

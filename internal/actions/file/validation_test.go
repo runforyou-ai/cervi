@@ -27,4 +27,12 @@ func TestNormalizeUploadInput(t *testing.T) {
 	if fields["contentType"] != ValidationContentTypeInvalid || fields["byteSize"] != ValidationByteSizeInvalid {
 		t.Fatalf("invalid fields = %#v", fields)
 	}
+	_, fields = normalizeUploadInput(UploadInput{Purpose: domain.FilePurposeContactAvatar, FileName: "avatar.jpg", ContentType: "image/jpeg", ByteSize: 3})
+	if fields["purpose"] != ValidationPurposeInvalid {
+		t.Fatalf("client contact avatar fields = %#v", fields)
+	}
+	_, fields = normalizeFileInput(UploadInput{Purpose: domain.FilePurposeContactAvatar, FileName: "avatar.jpg", ContentType: "image/jpeg", ByteSize: 3}, domain.FilePurposeContactAvatar)
+	if len(fields) != 0 {
+		t.Fatalf("imported contact avatar fields = %#v", fields)
+	}
 }

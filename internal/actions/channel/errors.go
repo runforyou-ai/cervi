@@ -13,6 +13,4 @@ var (
 	ErrTelegramBotReuseConfirmationRequired = errors.New("Telegram bot reuse confirmation required")
 	// ErrTelegramWebhookUnauthorized 表示 Telegram Webhook Secret 不匹配。
 	ErrTelegramWebhookUnauthorized = errors.New("Telegram webhook unauthorized")
-	// ErrTelegramWebhookUnsupported 表示 Telegram Update 尚未支持处理。
-	ErrTelegramWebhookUnsupported = errors.New("Telegram webhook update unsupported")
 )

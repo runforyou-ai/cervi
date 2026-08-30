@@ -14,11 +14,12 @@ func TestWebsiteMessageCursorRoundTrip(t *testing.T) {
 	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
 	point := conversationaction.MessageCursorPoint{
 		OriginatedAt: time.Date(2026, 8, 25, 10, 20, 30, 123456789, time.UTC),
+		SourceOrder:  42,
 		ID:           "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
 	}
 	cursor := encodeWebsiteMessageCursor(conversationID, point)
 	decoded, valid := decodeWebsiteMessageCursor(cursor, conversationID)
-	if !valid || decoded.ID != point.ID || !decoded.OriginatedAt.Equal(point.OriginatedAt) {
+	if !valid || decoded.ID != point.ID || decoded.SourceOrder != point.SourceOrder || !decoded.OriginatedAt.Equal(point.OriginatedAt) {
 		t.Fatalf("decoded cursor = %#v, valid = %t", decoded, valid)
 	}
 }

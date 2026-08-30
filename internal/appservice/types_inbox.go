@@ -21,6 +21,7 @@ type InboxConversation struct {
 	ID                   string               `json:"id"`
 	Title                string               `json:"title"`
 	ContactName          *string              `json:"contactName"`
+	ContactAvatarURL     string               `json:"contactAvatarUrl"`
 	ChannelType          ChannelType          `json:"channelType"`
 	ChannelName          string               `json:"channelName"`
 	Preview              string               `json:"preview"`

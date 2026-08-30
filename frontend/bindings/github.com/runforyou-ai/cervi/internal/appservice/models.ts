@@ -726,6 +726,7 @@ export interface InboxConversation {
     "id": string;
     "title": string;
     "contactName": string | null;
+    "contactAvatarUrl": string;
     "channelType": ChannelType;
     "channelName": string;
     "preview": string;
