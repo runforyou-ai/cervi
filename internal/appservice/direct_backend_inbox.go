@@ -23,13 +23,24 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox,
 		slog.Warn("读取收件箱会话列表失败", "organization_id", identity.Organization.ID, "error", err)
 		return Inbox{}, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
 	}
+	avatarFileIDs := make([]string, 0, len(summaries))
+	for _, summary := range summaries {
+		if summary.Customer != nil && summary.Customer.ContactAvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *summary.Customer.ContactAvatarFileID)
+		}
+	}
+	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	if err != nil {
+		slog.Warn("读取收件箱联系人头像失败", "organization_id", identity.Organization.ID, "error", err)
+		return Inbox{}, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
+	}
 	conversations := make([]InboxConversation, 0, len(summaries))
 	for _, summary := range summaries {
 		conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type)}
 		if summary.Customer != nil {
 			conversation.Customer = &CustomerInboxConversation{
 				Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
-				ContactAvatarURL: avatarContentURL(summary.Customer.ContactAvatarFileID),
+				ContactAvatarURL: optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
 				ChannelType:      ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
 				Preview: summary.Customer.Preview, LastMessageAt: summary.Customer.LastMessageAt,
 				ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus),

@@ -41,7 +41,7 @@ type ObjectInfo struct {
 // Put 把服务端内容写入 S3 兼容对象存储并返回 ETag。
 func Put(ctx context.Context, config S3Config, key, contentType string, data []byte) (string, error) {
 	output, err := newS3Client(config).PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(config.Bucket), Key: aws.String(key), ContentType: aws.String(contentType),
+		Bucket: aws.String(config.Bucket), Key: aws.String(key), ContentType: aws.String(contentType), CacheControl: aws.String(ImmutableCacheControl),
 		ContentLength: aws.Int64(int64(len(data))), Body: bytes.NewReader(data),
 	})
 	if err != nil {
