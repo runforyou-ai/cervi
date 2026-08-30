@@ -16,6 +16,16 @@ const (
 	ServiceSessionStatusClosed  ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusClosed)
 )
 
+// AgentRunStatus 表示 Agent 单聊当前最近一次运行状态。
+type AgentRunStatus string
+
+const (
+	AgentRunStatusQueued    AgentRunStatus = AgentRunStatus(domain.AgentRunStatusQueued)
+	AgentRunStatusRunning   AgentRunStatus = AgentRunStatus(domain.AgentRunStatusRunning)
+	AgentRunStatusSucceeded AgentRunStatus = AgentRunStatus(domain.AgentRunStatusSucceeded)
+	AgentRunStatusFailed    AgentRunStatus = AgentRunStatus(domain.AgentRunStatusFailed)
+)
+
 // ConversationType 表示统一收件箱会话类型。
 type ConversationType string
 
@@ -38,10 +48,12 @@ type CustomerInboxConversation struct {
 
 // DirectInboxConversation 定义内部单聊摘要。
 type DirectInboxConversation struct {
-	PeerIdentityID string     `json:"peerIdentityId"`
-	PeerName       string     `json:"peerName"`
-	Preview        *string    `json:"preview"`
-	LastMessageAt  *time.Time `json:"lastMessageAt"`
+	PeerIdentityID string                   `json:"peerIdentityId"`
+	PeerType       OrganizationIdentityType `json:"peerType"`
+	PeerName       string                   `json:"peerName"`
+	Preview        *string                  `json:"preview"`
+	LastMessageAt  *time.Time               `json:"lastMessageAt"`
+	AgentRunStatus *AgentRunStatus          `json:"agentRunStatus"`
 }
 
 // InboxConversation 定义成员统一收件箱列表项。

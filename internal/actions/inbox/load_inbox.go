@@ -31,9 +31,11 @@ type CustomerConversationSummary struct {
 // DirectConversationSummary 定义收件箱中的内部单聊详情。
 type DirectConversationSummary struct {
 	PeerIdentityID string
+	PeerType       domain.OrganizationIdentityType
 	PeerName       string
 	Preview        *string
 	LastMessageAt  *time.Time
+	AgentRunStatus *domain.AgentRunStatus
 }
 
 // ConversationSummary 定义统一收件箱会话信封。
@@ -66,9 +68,11 @@ type customerConversationRow struct {
 type directConversationRow struct {
 	ID             string     `bun:"id"`
 	PeerIdentityID string     `bun:"peer_identity_id"`
+	PeerType       string     `bun:"peer_type"`
 	PeerName       string     `bun:"peer_name"`
 	Preview        *string    `bun:"preview"`
 	LastMessageAt  *time.Time `bun:"last_message_at"`
+	AgentRunStatus *string    `bun:"agent_run_status"`
 	SortAt         *time.Time `bun:"sort_at"`
 }
 
@@ -101,11 +105,16 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		})
 	}
 	for _, row := range directs {
+		var agentRunStatus *domain.AgentRunStatus
+		if row.AgentRunStatus != nil {
+			status := domain.AgentRunStatus(*row.AgentRunStatus)
+			agentRunStatus = &status
+		}
 		result = append(result, ConversationSummary{
 			ID: row.ID, Type: domain.ConversationTypeDirect, sortAt: row.SortAt,
 			Direct: &DirectConversationSummary{
-				PeerIdentityID: row.PeerIdentityID, PeerName: row.PeerName,
-				Preview: row.Preview, LastMessageAt: row.LastMessageAt,
+				PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName,
+				Preview: row.Preview, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
 			},
 		})
 	}
@@ -170,19 +179,25 @@ func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizati
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("peer_cs.source_id AS peer_identity_id").
+		ColumnExpr("peer_oi.type AS peer_type").
 		ColumnExpr("peer_oi.display_name AS peer_name").
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("cv.last_message_at AS last_message_at").
+		ColumnExpr("latest_agent_run.status AS agent_run_status").
 		ColumnExpr("cv.last_message_at AS sort_at").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
 		Join("JOIN conversation_participants AS peer ON peer.organization_id = cv.organization_id AND peer.conversation_id = cv.id AND peer.subject_id <> mine.subject_id AND peer.left_at IS NULL").
 		Join("JOIN chat_subjects AS peer_cs ON peer_cs.organization_id = peer.organization_id AND peer_cs.id = peer.subject_id AND peer_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = peer_cs.organization_id AND peer_oi.id = peer_cs.source_id AND peer_oi.type = ?", domain.OrganizationIdentityTypeUser).
+		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = peer_cs.organization_id AND peer_oi.id = peer_cs.source_id").
+		Join("LEFT JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id").
+		Join("LEFT JOIN agents AS peer_a ON peer_a.organization_id = peer_oi.organization_id AND peer_a.identity_id = peer_oi.id").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
+		Join("LEFT JOIN LATERAL (SELECT agr.status FROM agent_runs AS agr WHERE agr.organization_id = cv.organization_id AND agr.conversation_id = cv.id AND agr.agent_identity_id = peer_oi.id ORDER BY agr.created_at DESC, agr.id DESC LIMIT 1) AS latest_agent_run ON peer_oi.type = ?", domain.OrganizationIdentityTypeAgent).
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeDirect).
 		Where("cv.status = ?", domain.ConversationStatusActive).
+		Where("((peer_oi.type = ? AND peer_u.status = ?) OR (peer_oi.type = ? AND peer_a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
 		Where("(SELECT count(*) FROM conversation_participants AS all_cp WHERE all_cp.organization_id = cv.organization_id AND all_cp.conversation_id = cv.id) = 2").
 		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
 		Limit(inboxConversationTypeLimit).

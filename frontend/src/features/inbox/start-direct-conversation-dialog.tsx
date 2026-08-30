@@ -1,6 +1,11 @@
 /** 企业成员内部单聊发起选择器。 */
 import { useMemo, useState } from "react"
-import { LoaderCircleIcon, SearchIcon, UserRoundIcon } from "lucide-react"
+import {
+  BotIcon,
+  LoaderCircleIcon,
+  SearchIcon,
+  UserRoundIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -73,8 +78,6 @@ export function StartDirectConversationDialog({
     const normalizedQuery = query.trim().toLocaleLowerCase()
     return (data ?? []).filter(
       (member) =>
-        member.type ===
-          OrganizationIdentityType.OrganizationIdentityTypeUser &&
         member.id !== currentIdentityID &&
         (!normalizedQuery ||
           member.displayName.toLocaleLowerCase().includes(normalizedQuery)),
@@ -168,7 +171,10 @@ export function StartDirectConversationDialog({
                   onClick={() => void start(member)}
                 >
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-                    {member.displayName ? (
+                    {member.type ===
+                    OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                      <BotIcon className="size-4" />
+                    ) : member.displayName ? (
                       Array.from(member.displayName)[0]?.toLocaleUpperCase()
                     ) : (
                       <UserRoundIcon className="size-4" />
@@ -177,6 +183,12 @@ export function StartDirectConversationDialog({
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {member.displayName}
                   </span>
+                  {member.type ===
+                  OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {t("directPickerAgent")}
+                    </span>
+                  ) : null}
                   {startingIdentityID === member.id ? (
                     <LoaderCircleIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
                   ) : null}

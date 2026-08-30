@@ -1,15 +1,13 @@
 /** 提交 Customer 或 Direct 会话的成员文本消息。 */
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
   ConversationType,
-  isApiError,
   sendCustomerTextMessage,
   sendDirectTextMessage,
   type ConversationMessage,
@@ -20,31 +18,32 @@ import {
   createConversationComposerSchema,
   type ConversationComposerValues,
 } from "@/features/inbox/conversation-composer-schema"
+import {
+  conversationSendingIndicatorDelay,
+  type OutgoingConversationDraft,
+} from "@/features/inbox/use-outgoing-conversation-messages"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-
-type PendingMessage = {
-  body: string
-  clientMessageID: string
-}
 
 /** 展示并提交成员会话文本编辑区。 */
 export function ConversationComposer({
   conversationID,
   conversationType,
+  onSending,
   onSent,
+  onFailed,
 }: {
   conversationID: string
   conversationType: ConversationType
-  onSent: (message: ConversationMessage) => void
+  onSending: (message: OutgoingConversationDraft) => void
+  onSent: (clientMessageID: string, message: ConversationMessage) => void
+  onFailed: (clientMessageID: string) => void
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const aliveRef = useRef(true)
-  const pendingRef = useRef<PendingMessage | null>(null)
   const schema = useMemo(
     () =>
       createConversationComposerSchema({
@@ -70,27 +69,27 @@ export function ConversationComposer({
   /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
     const body = values.body.trim()
-    const pending =
-      pendingRef.current?.body === body
-        ? pendingRef.current
-        : { body, clientMessageID: window.crypto.randomUUID() }
-    pendingRef.current = pending
+    const clientMessageID = window.crypto.randomUUID()
+    onSending({
+      clientMessageID,
+      body,
+      originatedAt: new Date().toISOString(),
+    })
+    form.resetField("body")
     try {
       const message =
         conversationType === ConversationType.ConversationTypeDirect
           ? await sendDirectTextMessage(conversationID, {
-              clientMessageId: pending.clientMessageID,
+              clientMessageId: clientMessageID,
               body,
             })
           : await sendCustomerTextMessage(conversationID, {
-              clientMessageId: pending.clientMessageID,
+              clientMessageId: clientMessageID,
               body,
             })
       void invalidate(resourceKeys.inbox())
       if (!aliveRef.current) return
-      pendingRef.current = null
-      form.reset()
-      onSent(message)
+      onSent(clientMessageID, message)
     } catch (error) {
       if (recoverSession(error, navigate)) return
       if (!aliveRef.current) return
@@ -98,18 +97,24 @@ export function ConversationComposer({
         conversationId: conversationID,
         error,
       })
-      if (isApiError(error)) {
-        if (error.reason === "idempotency_mismatch") {
-          pendingRef.current = null
-        }
-        toast.error(apiErrorMessage(error, ["body", "clientMessageId"]))
-        return
-      }
-      toast.error(t("messageSendError"))
+      onFailed(clientMessageID)
     }
   }
 
   const { isSubmitting } = form.formState
+  const [showSubmitting, setShowSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!isSubmitting) {
+      setShowSubmitting(false)
+      return
+    }
+    const timer = window.setTimeout(
+      () => setShowSubmitting(true),
+      conversationSendingIndicatorDelay,
+    )
+    return () => window.clearTimeout(timer)
+  }, [isSubmitting])
 
   return (
     <form
@@ -147,10 +152,12 @@ export function ConversationComposer({
             <PaperclipIcon />
           </Button>
           <Button type="submit" size="sm" disabled={isSubmitting}>
-            {isSubmitting ? (
+            {isSubmitting && showSubmitting ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : null}
-            {isSubmitting ? t("messageSending") : t("messageSend")}
+            {isSubmitting && showSubmitting
+              ? t("messageSending")
+              : t("messageSend")}
           </Button>
         </div>
       </div>

@@ -27,6 +27,7 @@ import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
+import type { OutgoingConversationMessage } from "@/features/inbox/use-outgoing-conversation-messages"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -42,6 +43,53 @@ function mergeMessages(
     messages.set(message.id, message)
   }
   return [...messages.values()].sort((left, right) => {
+    const timeDifference =
+      Date.parse(left.originatedAt) - Date.parse(right.originatedAt)
+    return timeDifference || left.id.localeCompare(right.id)
+  })
+}
+
+type TimelineMessage = Pick<
+  ConversationMessage,
+  "id" | "body" | "originatedAt" | "sender" | "sessionStart"
+> & {
+  local: boolean
+  deliveryStatus: "sending" | "failed" | null
+}
+
+/** 合并服务端消息和当前页面的即时发送状态。 */
+function mergeTimelineMessages(
+  current: ConversationMessage[],
+  outgoing: OutgoingConversationMessage[],
+) {
+  const saved = outgoing.flatMap((message) =>
+    message.saved ? [message.saved] : [],
+  )
+  const messages: TimelineMessage[] = mergeMessages(current, saved).map(
+    (message) => ({
+      ...message,
+      local: false,
+      deliveryStatus: null,
+    }),
+  )
+  for (const message of outgoing) {
+    if (message.saved) continue
+    messages.push({
+      id: `local:${message.clientMessageID}`,
+      body: message.body,
+      originatedAt: message.originatedAt,
+      sender: null,
+      sessionStart: null,
+      local: true,
+      deliveryStatus:
+        message.status === "failed"
+          ? "failed"
+          : message.showSending
+            ? "sending"
+            : null,
+    })
+  }
+  return messages.sort((left, right) => {
     const timeDifference =
       Date.parse(left.originatedAt) - Date.parse(right.originatedAt)
     return timeDifference || left.id.localeCompare(right.id)
@@ -72,13 +120,13 @@ export function ConversationTimeline({
   conversationType,
   currentIdentityID,
   requireWindowFocus = true,
-  sentMessages,
+  outgoingMessages,
 }: {
   conversationID: string
   conversationType: ConversationType
   currentIdentityID: string
   requireWindowFocus?: boolean
-  sentMessages: ConversationMessage[]
+  outgoingMessages: OutgoingConversationMessage[]
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -102,9 +150,9 @@ export function ConversationTimeline({
     { refetchOnWindowFocus: false },
   )
   const currentPage = timeline ?? data ?? null
-  const visibleMessages = mergeMessages(
+  const visibleMessages = mergeTimelineMessages(
     currentPage?.messages ?? [],
-    sentMessages,
+    outgoingMessages,
   )
 
   const dateFormatters = useMemo(() => {
@@ -200,8 +248,8 @@ export function ConversationTimeline({
     const viewport = timelineViewport(scrollRootRef.current)
     if (!viewport) return
     const sentCountIncreased =
-      sentMessages.length > previousSentCountRef.current
-    previousSentCountRef.current = sentMessages.length
+      outgoingMessages.length > previousSentCountRef.current
+    previousSentCountRef.current = outgoingMessages.length
     if (initialScrollRef.current && currentPage) {
       initialScrollRef.current = false
       viewport.scrollTop = viewport.scrollHeight
@@ -217,7 +265,7 @@ export function ConversationTimeline({
       previousScrollHeightRef.current = null
       return
     }
-  }, [currentPage, sentMessages.length])
+  }, [currentPage, outgoingMessages.length])
 
   /** 加载并前插一页更早消息。 */
   async function loadEarlier() {
@@ -260,7 +308,7 @@ export function ConversationTimeline({
     }
   }
 
-  if (loading && !currentPage) {
+  if (loading && !currentPage && outgoingMessages.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
         <LoaderCircleIcon className="size-4 animate-spin" />
@@ -269,7 +317,7 @@ export function ConversationTimeline({
     )
   }
 
-  if (error && !currentPage) {
+  if (error && !currentPage && outgoingMessages.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6 text-center">
         <div>
@@ -325,15 +373,18 @@ export function ConversationTimeline({
         <div className="grid gap-3">
           {visibleMessages.map((message, index) => {
             const date = new Date(message.originatedAt)
-            const incoming =
-              conversationType === ConversationType.ConversationTypeDirect
+            const incoming = message.local
+              ? false
+              : conversationType === ConversationType.ConversationTypeDirect
                 ? !message.sender ||
                   message.sender.sourceId !== currentIdentityID
                 : !message.sender ||
                   message.sender.kind ===
                     ChatSubjectKind.ChatSubjectKindContact
             const senderName =
-              message.sender?.displayName?.trim() ||
+              (message.local
+                ? t("messageSenderYou")
+                : message.sender?.displayName?.trim()) ||
               (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
                 ? t("anonymousVisitor")
                 : t("unknownSender"))
@@ -411,6 +462,25 @@ export function ConversationTimeline({
                         {message.body}
                       </div>
                     </div>
+                    {message.deliveryStatus ? (
+                      <span
+                        className={cn(
+                          "text-[11px]",
+                          message.deliveryStatus === "failed"
+                            ? "text-destructive"
+                            : "text-muted-foreground",
+                        )}
+                        role={
+                          message.deliveryStatus === "failed"
+                            ? "status"
+                            : undefined
+                        }
+                      >
+                        {message.deliveryStatus === "failed"
+                          ? t("messageSendError")
+                          : t("messageSending")}
+                      </span>
+                    ) : null}
                   </div>
                 </article>
               </Fragment>

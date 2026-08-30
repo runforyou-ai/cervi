@@ -1,6 +1,11 @@
 /** 移动端企业成员内部单聊详情。 */
-import { useMemo, useState } from "react"
-import { ArrowLeftIcon, LoaderCircleIcon, UserRoundIcon } from "lucide-react"
+import { useMemo } from "react"
+import {
+  ArrowLeftIcon,
+  BotIcon,
+  LoaderCircleIcon,
+  UserRoundIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
   Navigate,
@@ -13,14 +18,20 @@ import {
   ConversationType,
   isDirectInboxConversation,
   loadInbox,
-  type ConversationMessage,
+  OrganizationIdentityType,
   type DirectInboxConversationData,
   type InboxConversation,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
+import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
+import {
+  memberChatPollingInterval,
+  useMemberChatPollingActive,
+} from "@/features/inbox/use-member-chat-polling"
+import { useOutgoingConversationMessages } from "@/features/inbox/use-outgoing-conversation-messages"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -41,10 +52,24 @@ function directConversationFromState(
 }
 
 /** 展示当前 Direct 的移动端头部。 */
-function MobileDirectHeader({ peerName }: { peerName: string }) {
+function MobileDirectHeader({
+  conversation,
+  peerName,
+}: {
+  conversation: DirectInboxConversationData | null
+  peerName: string
+}) {
   const { t } = useTranslation("common")
+  const { t: tInbox } = useTranslation("inbox")
   const navigate = useNavigate()
   const initial = Array.from(peerName)[0]?.toLocaleUpperCase()
+  const directAgent =
+    conversation?.direct.peerType ===
+    OrganizationIdentityType.OrganizationIdentityTypeAgent
+  const agentRunLabel = agentRunStatusLabel(
+    conversation?.direct.agentRunStatus ?? null,
+    tInbox,
+  )
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b px-2">
@@ -58,9 +83,20 @@ function MobileDirectHeader({ peerName }: { peerName: string }) {
         <ArrowLeftIcon />
       </Button>
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-        {initial ? initial : <UserRoundIcon className="size-4" />}
+        {directAgent ? (
+          <BotIcon className="size-4" />
+        ) : initial ? (
+          initial
+        ) : (
+          <UserRoundIcon className="size-4" />
+        )}
       </span>
-      <h1 className="min-w-0 truncate text-base font-semibold">{peerName}</h1>
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate text-base font-semibold">{peerName}</h1>
+        {agentRunLabel ? (
+          <p className="text-xs text-muted-foreground">{agentRunLabel}</p>
+        ) : null}
+      </div>
     </header>
   )
 }
@@ -75,16 +111,19 @@ export function MobileDirectConversationPage() {
     () => directConversationFromState(location.state, conversationID),
     [conversationID, location.state],
   )
+  const pollingActive = useMemberChatPollingActive({
+    requireWindowFocus: false,
+  })
   const { data, loading } = useResource(
     resourceKeys.inbox(),
     () => loadInbox(),
     {
-      enabled: stateConversation === null,
       staleTime: 0,
+      refetchInterval: pollingActive ? memberChatPollingInterval : false,
       refetchOnWindowFocus: false,
     },
   )
-  const [sentMessages, setSentMessages] = useState<ConversationMessage[]>([])
+  const outgoing = useOutgoingConversationMessages()
 
   if (!conversationID) return <Navigate to="/inbox" replace />
 
@@ -95,15 +134,14 @@ export function MobileDirectConversationPage() {
     return <Navigate to="/inbox" replace />
   }
   const conversation =
-    stateConversation ??
     (matchedConversation && isDirectInboxConversation(matchedConversation)
       ? matchedConversation
-      : null)
+      : null) ?? stateConversation
   const peerName = conversation?.direct.peerName.trim() || t("unknownSender")
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
-      <MobileDirectHeader peerName={peerName} />
+      <MobileDirectHeader conversation={conversation} peerName={peerName} />
       {loading && !conversation ? (
         <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
           <LoaderCircleIcon className="size-4 animate-spin" />
@@ -116,18 +154,14 @@ export function MobileDirectConversationPage() {
             conversationType={ConversationType.ConversationTypeDirect}
             currentIdentityID={identity.user.identityId}
             requireWindowFocus={false}
-            sentMessages={sentMessages}
+            outgoingMessages={outgoing.messages}
           />
           <ConversationComposer
             conversationID={conversationID}
             conversationType={ConversationType.ConversationTypeDirect}
-            onSent={(message) =>
-              setSentMessages((current) =>
-                current.some((item) => item.id === message.id)
-                  ? current
-                  : [...current, message],
-              )
-            }
+            onSending={outgoing.start}
+            onSent={outgoing.succeed}
+            onFailed={outgoing.fail}
           />
         </>
       )}

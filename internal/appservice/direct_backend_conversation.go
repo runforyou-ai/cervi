@@ -56,7 +56,7 @@ func (b *DirectBackend) StartDirectConversation(ctx context.Context, meta Reques
 	return InboxConversation{
 		ID: summary.ID, Type: ConversationTypeDirect,
 		Direct: &DirectInboxConversation{
-			PeerIdentityID: summary.PeerIdentityID, PeerName: summary.PeerName,
+			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName,
 			Preview: summary.Preview, LastMessageAt: summary.LastMessageAt,
 		},
 	}, nil
