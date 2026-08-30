@@ -27,6 +27,7 @@ const channels = {
     reception: "接待设置",
     chatInterface: "聊天界面",
     usage: "接入方式",
+    connection: "连接",
   },
   list: {
     title: "消息渠道",
@@ -76,7 +77,6 @@ const channels = {
     saving: "正在保存…",
     saved: "基本信息已保存。",
     cancel: "取消",
-    back: "返回",
     loadError: "消息渠道详情加载失败。",
     networkError: "无法连接服务器，请稍后重试。",
   },
@@ -116,6 +116,46 @@ const channels = {
     teamRequired: "请选择团队。",
     memberRequired: "请选择成员。",
     fallbackDifferent: "无法处理时不能转回同一个团队或成员。",
+  },
+  telegramConnection: {
+    form: {
+      botToken: "Bot Token",
+      showToken: "显示 Token",
+      hideToken: "隐藏 Token",
+      save: "保存",
+      saving: "正在保存…",
+      test: "测试连接",
+      testing: "正在测试…",
+      cancel: "取消",
+    },
+    saved: "Telegram 连接已保存。",
+    tested: "连接测试成功。",
+    saveError: "无法保存 Telegram 连接，请稍后重试。",
+    testError: "连接测试失败，请稍后重试。",
+    reuseConfirmation: {
+      title: "确认复用 Telegram Bot？",
+      description:
+        "这个 Bot 已被其他渠道使用。继续保存后，Telegram 会把 Webhook 切换到当前渠道，旧渠道将无法继续接收通知。",
+      cancel: "取消",
+      confirm: "继续保存",
+    },
+    info: {
+      title: "连接信息",
+      botDisplayName: "机器人名称",
+      botUsername: "机器人用户名",
+      botId: "Bot ID",
+      webhookUrl: "Webhook 地址",
+      webhookSecret: "Secret Token",
+      webhookStatus: "Webhook 状态",
+    },
+    status: {
+      waiting: "等待连接",
+      normal: "连接正常",
+    },
+    validation: {
+      tokenRequired: "请输入 Bot Token。",
+      tokenTooLong: "Bot Token 不能超过 512 个字符。",
+    },
   },
   usage: {
     embed: "网站嵌入",

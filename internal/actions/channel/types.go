@@ -43,6 +43,18 @@ type WebsiteChannelAccessInput struct {
 	AllowedHosts []string
 }
 
+// TelegramChannelConnectionInput 定义 Telegram 连接可编辑字段。
+type TelegramChannelConnectionInput struct {
+	BotToken        string
+	WebhookBaseURL  string
+	ConfirmBotReuse bool
+}
+
+// TelegramChannelConnectionTestInput 定义 Telegram 草稿连接测试字段。
+type TelegramChannelConnectionTestInput struct {
+	BotToken string
+}
+
 // MessageChannelRecord 定义消息渠道传输字段。
 type MessageChannelRecord struct {
 	ID                        string    `json:"id"`
@@ -68,6 +80,19 @@ type WebsiteChannelSettingRecord struct {
 	GreetingMessage   *string  `json:"greetingMessage"`
 	ThemeColor        string   `json:"themeColor"`
 	AllowedEmbedHosts []string `json:"allowedHosts"`
+}
+
+// TelegramChannelSettingRecord 定义 Telegram 机器人和 Webhook 传输字段。
+type TelegramChannelSettingRecord struct {
+	BotToken           string     `json:"botToken"`
+	BotID              *int64     `json:"botId"`
+	BotUsername        *string    `json:"botUsername"`
+	BotDisplayName     *string    `json:"botDisplayName"`
+	WebhookBaseURL     string     `json:"webhookBaseUrl"`
+	WebhookURL         string     `json:"webhookUrl"`
+	WebhookSecret      string     `json:"webhookSecret"`
+	WebhookStatus      *string    `json:"webhookStatus"`
+	WebhookConnectedAt *time.Time `json:"webhookConnectedAt"`
 }
 
 // messageChannelRecord 把渠道存储模型转换为传输结构。
@@ -99,4 +124,26 @@ func websiteChannelSettingRecord(setting *servermodels.WebsiteChannelSetting) We
 		ThemeColor:        setting.ThemeColor,
 		AllowedEmbedHosts: setting.AllowedEmbedHosts,
 	}
+}
+
+// telegramChannelSettingRecord 把 Telegram 设置存储模型转换为传输结构。
+func telegramChannelSettingRecord(setting *servermodels.TelegramChannelSetting) TelegramChannelSettingRecord {
+	return TelegramChannelSettingRecord{
+		BotToken:           optionalStringValue(setting.BotToken),
+		BotID:              setting.BotID,
+		BotUsername:        setting.BotUsername,
+		BotDisplayName:     setting.BotDisplayName,
+		WebhookBaseURL:     optionalStringValue(setting.WebhookBaseURL),
+		WebhookSecret:      optionalStringValue(setting.WebhookSecret),
+		WebhookStatus:      setting.WebhookStatus,
+		WebhookConnectedAt: setting.WebhookConnectedAt,
+	}
+}
+
+// optionalStringValue 返回可空字符串的实际值。
+func optionalStringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

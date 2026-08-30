@@ -34,6 +34,7 @@ export {
     ServiceSessionStatus,
     SessionState,
     StorageProvider,
+    TelegramWebhookStatus,
     UserStatus,
     WorkStatus
 } from "./models.js";
@@ -153,6 +154,10 @@ export type {
     TeamMemberList,
     TeamMemberListInput,
     TeamSummary,
+    TelegramChannel,
+    TelegramChannelConnection,
+    TelegramChannelConnectionInput,
+    TelegramChannelConnectionTestInput,
     UnreadIndicatorState,
     UpdateAgentInput,
     UpdateUserInput,

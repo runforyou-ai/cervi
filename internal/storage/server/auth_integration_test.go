@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +25,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -263,12 +266,199 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		telegramDetail, err := channelaction.NewGetMessageChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		telegramDetail, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if telegramDetail.Type != string(domain.ChannelTypeTelegram) {
+		if telegramDetail.Type != string(domain.ChannelTypeTelegram) || telegramDetail.Connection.BotToken != "" || telegramDetail.Connection.WebhookStatus != nil {
 			t.Fatalf("unexpected telegram channel: %#v", telegramDetail)
+		}
+		telegramSettingCount, err := db.NewSelect().
+			Model((*servermodels.TelegramChannelSetting)(nil)).
+			Where("tcs.channel_id = ?", telegramChannel.ID).
+			Count(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if telegramSettingCount != 1 {
+			t.Fatalf("telegram setting count = %d, want 1", telegramSettingCount)
+		}
+
+		telegramAPI := &telegramBotAPIFake{bot: telegramintegration.Bot{
+			ID: 987654321, IsBot: true, FirstName: "Cervi", LastName: "Support", Username: "cervi_support_bot",
+		}}
+		telegramRunner := connectiontest.NewRunner(time.Second)
+		testTelegram := channelaction.NewTestTelegramConnectionAction(db, telegramRunner, telegramAPI)
+		if err := testTelegram.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.TelegramChannelConnectionTestInput{BotToken: "123456:draft_token"}); err != nil {
+			t.Fatal(err)
+		}
+		detailAfterTest, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if detailAfterTest.Connection.BotToken != "" || detailAfterTest.Connection.WebhookStatus != nil || len(telegramAPI.webhooks()) != 0 {
+			t.Fatalf("test changed Telegram setting: %#v", detailAfterTest.Connection)
+		}
+
+		saveTelegram := channelaction.NewSaveTelegramConnectionAction(db, telegramRunner, telegramAPI)
+		savedTelegram, err := saveTelegram.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.TelegramChannelConnectionInput{
+			BotToken:       "123456:saved_token",
+			WebhookBaseURL: "http://127.0.0.1:34115/cervi",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if savedTelegram.Connection.BotID == nil || *savedTelegram.Connection.BotID != telegramAPI.bot.ID ||
+			savedTelegram.Connection.BotUsername == nil || *savedTelegram.Connection.BotUsername != telegramAPI.bot.Username ||
+			savedTelegram.Connection.BotDisplayName == nil || *savedTelegram.Connection.BotDisplayName != "Cervi Support" ||
+			savedTelegram.Connection.WebhookStatus == nil || *savedTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusWaiting) {
+			t.Fatalf("saved Telegram connection = %#v", savedTelegram.Connection)
+		}
+		const expectedTelegramWebhookURL = "http://127.0.0.1:34115/cervi/api/public/telegram-channels/"
+		if savedTelegram.Connection.WebhookURL != expectedTelegramWebhookURL+telegramChannel.ID+"/webhook" {
+			t.Fatalf("webhook URL = %q", savedTelegram.Connection.WebhookURL)
+		}
+		webhooks := telegramAPI.webhooks()
+		if len(webhooks) != 1 || webhooks[0].URL != savedTelegram.Connection.WebhookURL || webhooks[0].Secret != savedTelegram.Connection.WebhookSecret {
+			t.Fatalf("registered webhooks = %#v, saved secret = %q", webhooks, savedTelegram.Connection.WebhookSecret)
+		}
+
+		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db)
+		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
+			t.Fatalf("wrong secret error = %v", err)
+		}
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+			Secret: savedTelegram.Connection.WebhookSecret,
+		}); !errors.Is(err, channelaction.ErrTelegramWebhookUnsupported) {
+			t.Fatalf("unsupported update error = %v", err)
+		}
+		waitingTelegram, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if waitingTelegram.Connection.WebhookStatus == nil || *waitingTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusWaiting) {
+			t.Fatalf("status after unsupported update = %#v", waitingTelegram.Connection.WebhookStatus)
+		}
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+			Secret: savedTelegram.Connection.WebhookSecret, MyChatMember: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		connectedTelegram, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if connectedTelegram.Connection.WebhookStatus == nil || *connectedTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusNormal) {
+			t.Fatalf("connected Telegram status = %#v", connectedTelegram.Connection.WebhookStatus)
+		}
+
+		reusedBotChannel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
+			Type: domain.ChannelTypeTelegram,
+			MessageChannelInput: channelaction.MessageChannelInput{
+				Name:                  "Telegram 复用确认",
+				DefaultLocale:         domain.LocaleChineseSimplified,
+				NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+				FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		webhookCountBeforeReuse := len(telegramAPI.webhooks())
+		_, err = saveTelegram.Execute(context.Background(), loggedIn.Identity, reusedBotChannel.ID, channelaction.TelegramChannelConnectionInput{
+			BotToken: "123456:reused_token", WebhookBaseURL: "http://127.0.0.1:34115/cervi",
+		})
+		if !errors.Is(err, channelaction.ErrTelegramBotReuseConfirmationRequired) {
+			t.Fatalf("unconfirmed Telegram bot reuse error = %v", err)
+		}
+		unconfirmedReuse, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, reusedBotChannel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if unconfirmedReuse.Connection.BotToken != "" || len(telegramAPI.webhooks()) != webhookCountBeforeReuse {
+			t.Fatalf("unconfirmed reuse changed state: detail=%#v webhooks=%#v", unconfirmedReuse.Connection, telegramAPI.webhooks())
+		}
+		confirmedReuse, err := saveTelegram.Execute(context.Background(), loggedIn.Identity, reusedBotChannel.ID, channelaction.TelegramChannelConnectionInput{
+			BotToken: "123456:reused_token", WebhookBaseURL: "http://127.0.0.1:34115/cervi", ConfirmBotReuse: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if confirmedReuse.Connection.BotID == nil || *confirmedReuse.Connection.BotID != telegramAPI.bot.ID ||
+			len(telegramAPI.webhooks()) != webhookCountBeforeReuse+1 ||
+			telegramAPI.webhooks()[webhookCountBeforeReuse].URL != confirmedReuse.Connection.WebhookURL {
+			t.Fatalf("confirmed Telegram bot reuse = %#v, webhooks = %#v", confirmedReuse.Connection, telegramAPI.webhooks())
+		}
+		originalAfterReuse, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if originalAfterReuse.Connection.WebhookSecret != connectedTelegram.Connection.WebhookSecret ||
+			originalAfterReuse.Connection.WebhookStatus == nil || *originalAfterReuse.Connection.WebhookStatus != string(domain.TelegramWebhookStatusNormal) {
+			t.Fatalf("reusing bot changed old channel = %#v", originalAfterReuse.Connection)
+		}
+
+		updateTelegramStatus := channelaction.NewUpdateTelegramChannelStatusAction(db, telegramRunner, telegramAPI)
+		disabledTelegram, err := updateTelegramStatus.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if disabledTelegram.Enabled {
+			t.Fatal("disabled Telegram channel remains enabled")
+		}
+		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, savedTelegram.Connection.WebhookSecret); !errors.Is(err, channelaction.ErrNotFound) {
+			t.Fatalf("disabled webhook preflight error = %v", err)
+		}
+		if len(telegramAPI.deletedTokens()) != 0 {
+			t.Fatalf("deleted Telegram tokens = %#v", telegramAPI.deletedTokens())
+		}
+
+		reenabledTelegram, err := updateTelegramStatus.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reenabledTelegram.Enabled {
+			t.Fatal("re-enabled Telegram channel remains disabled")
+		}
+		reenabledDetail, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reenabledDetail.Connection.WebhookStatus == nil || *reenabledDetail.Connection.WebhookStatus != string(domain.TelegramWebhookStatusWaiting) || reenabledDetail.Connection.WebhookSecret == savedTelegram.Connection.WebhookSecret {
+			t.Fatalf("re-enabled Telegram connection = %#v", reenabledDetail.Connection)
+		}
+		if _, err := db.NewDelete().Model((*servermodels.TelegramChannelSetting)(nil)).Where("channel_id = ?", reusedBotChannel.ID).Exec(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.NewDelete().Model((*servermodels.Channel)(nil)).Where("id = ?", reusedBotChannel.ID).Exec(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+
+		startSaves := make(chan struct{})
+		saveErrors := make(chan error, 2)
+		for _, token := range []string{"123456:concurrent_one", "123456:concurrent_two"} {
+			token := token
+			go func() {
+				<-startSaves
+				_, err := saveTelegram.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.TelegramChannelConnectionInput{
+					BotToken: token, WebhookBaseURL: "http://127.0.0.1:34115/cervi",
+				})
+				saveErrors <- err
+			}()
+		}
+		close(startSaves)
+		for range 2 {
+			if err := <-saveErrors; err != nil {
+				t.Fatal(err)
+			}
+		}
+		concurrentDetail, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		webhooks = telegramAPI.webhooks()
+		if len(webhooks) < 4 || webhooks[len(webhooks)-1].Secret != concurrentDetail.Connection.WebhookSecret {
+			t.Fatalf("final registered webhook = %#v, database secret = %q", webhooks, concurrentDetail.Connection.WebhookSecret)
 		}
 		settingCount, err := db.NewSelect().
 			Model((*servermodels.WebsiteChannelSetting)(nil)).
@@ -1002,6 +1192,54 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 	})
 }
+
+type telegramBotAPIFake struct {
+	mu             sync.Mutex
+	bot            telegramintegration.Bot
+	getMeTokens    []string
+	setWebhooks    []telegramintegration.Webhook
+	deleteWebhooks []string
+}
+
+// GetMe 记录 Token 并返回测试机器人。
+func (f *telegramBotAPIFake) GetMe(_ context.Context, token string) (telegramintegration.Bot, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.getMeTokens = append(f.getMeTokens, token)
+	return f.bot, nil
+}
+
+// SetWebhook 记录最后一次注册参数。
+func (f *telegramBotAPIFake) SetWebhook(_ context.Context, _ string, webhook telegramintegration.Webhook) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.setWebhooks = append(f.setWebhooks, webhook)
+	return nil
+}
+
+// DeleteWebhook 记录被清理的 Token。
+func (f *telegramBotAPIFake) DeleteWebhook(_ context.Context, token string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.deleteWebhooks = append(f.deleteWebhooks, token)
+	return nil
+}
+
+// webhooks 返回注册调用快照。
+func (f *telegramBotAPIFake) webhooks() []telegramintegration.Webhook {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]telegramintegration.Webhook(nil), f.setWebhooks...)
+}
+
+// deletedTokens 返回删除调用快照。
+func (f *telegramBotAPIFake) deletedTokens() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.deleteWebhooks...)
+}
+
+var _ telegramintegration.BotAPI = (*telegramBotAPIFake)(nil)
 
 // testDatabaseConfig 从测试专用的 PostgreSQL 分项环境变量读取连接配置。
 func testDatabaseConfig(t *testing.T) serverconfig.DatabaseConfig {

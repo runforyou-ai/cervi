@@ -53,6 +53,43 @@ type WebsiteChannel struct {
 	Access        WebsiteChannelAccess        `json:"access"`
 }
 
+// TelegramWebhookStatus 表示 Telegram Webhook 的连接状态。
+type TelegramWebhookStatus string
+
+const (
+	TelegramWebhookStatusWaiting TelegramWebhookStatus = TelegramWebhookStatus(domain.TelegramWebhookStatusWaiting)
+	TelegramWebhookStatusNormal  TelegramWebhookStatus = TelegramWebhookStatus(domain.TelegramWebhookStatusNormal)
+)
+
+// TelegramChannel 定义 Telegram 渠道详情。
+type TelegramChannel struct {
+	MessageChannelSummary
+	Connection TelegramChannelConnection `json:"connection"`
+}
+
+// TelegramChannelConnection 定义 Telegram 机器人和 Webhook 信息。
+type TelegramChannelConnection struct {
+	BotToken       string                 `json:"botToken"`
+	BotID          *string                `json:"botId"`
+	BotUsername    *string                `json:"botUsername"`
+	BotDisplayName *string                `json:"botDisplayName"`
+	WebhookURL     string                 `json:"webhookUrl"`
+	WebhookSecret  string                 `json:"webhookSecret"`
+	WebhookStatus  *TelegramWebhookStatus `json:"webhookStatus"`
+}
+
+// TelegramChannelConnectionInput 定义 Telegram 连接保存输入。
+type TelegramChannelConnectionInput struct {
+	BotToken        string `json:"botToken"`
+	WebhookBaseURL  string `json:"webhookBaseURL"`
+	ConfirmBotReuse bool   `json:"confirmBotReuse"`
+}
+
+// TelegramChannelConnectionTestInput 定义 Telegram 草稿连接测试输入。
+type TelegramChannelConnectionTestInput struct {
+	BotToken string `json:"botToken"`
+}
+
 // MessageChannelInput 定义消息渠道可编辑的通用字段。
 type MessageChannelInput struct {
 	Name                  string               `json:"name"`

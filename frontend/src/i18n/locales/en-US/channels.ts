@@ -27,6 +27,7 @@ const channels = {
     reception: "Reception settings",
     chatInterface: "Chat interface",
     usage: "Integration",
+    connection: "Connection",
   },
   list: {
     title: "Message channels",
@@ -76,7 +77,6 @@ const channels = {
     saving: "Saving…",
     saved: "Basic information saved.",
     cancel: "Cancel",
-    back: "Back",
     loadError: "Could not load the message channel.",
     networkError: "Could not connect to the server. Try again later.",
   },
@@ -117,6 +117,46 @@ const channels = {
     teamRequired: "Select a team.",
     memberRequired: "Select a member.",
     fallbackDifferent: "The fallback cannot use the same team or member.",
+  },
+  telegramConnection: {
+    form: {
+      botToken: "Bot token",
+      showToken: "Show token",
+      hideToken: "Hide token",
+      save: "Save",
+      saving: "Saving…",
+      test: "Test connection",
+      testing: "Testing…",
+      cancel: "Cancel",
+    },
+    saved: "Telegram connection saved.",
+    tested: "Connection test succeeded.",
+    saveError: "Could not save the Telegram connection. Try again later.",
+    testError: "Connection test failed. Try again later.",
+    reuseConfirmation: {
+      title: "Reuse this Telegram bot?",
+      description:
+        "This bot is already used by another channel. Continuing will switch its Telegram webhook to this channel, and the previous channel will stop receiving updates.",
+      cancel: "Cancel",
+      confirm: "Continue saving",
+    },
+    info: {
+      title: "Connection information",
+      botDisplayName: "Bot name",
+      botUsername: "Bot username",
+      botId: "Bot ID",
+      webhookUrl: "Webhook URL",
+      webhookSecret: "Secret token",
+      webhookStatus: "Webhook status",
+    },
+    status: {
+      waiting: "Waiting for connection",
+      normal: "Connected",
+    },
+    validation: {
+      tokenRequired: "Enter a bot token.",
+      tokenTooLong: "The bot token cannot exceed 512 characters.",
+    },
   },
   usage: {
     embed: "Website embed",

@@ -288,6 +288,13 @@ export function GetS3Setting(meta: $models.RequestMeta): $CancellablePromise<$mo
 }
 
 /**
+ * GetTelegramChannel 返回 Telegram 渠道详情。
+ */
+export function GetTelegramChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.TelegramChannel> {
+    return $Call.ByID(675085480, meta, channelID);
+}
+
+/**
  * GetUser 返回企业成员详情。
  */
 export function GetUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
@@ -547,6 +554,13 @@ export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3Settin
 }
 
 /**
+ * SaveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
+ */
+export function SaveTelegramChannelConnection(meta: $models.RequestMeta, channelID: string, input: $models.TelegramChannelConnectionInput): $CancellablePromise<$models.TelegramChannel> {
+    return $Call.ByID(857691531, meta, channelID, input);
+}
+
+/**
  * SelectProfileImage 在原生端选择并读取用户头像图片。
  */
 export function SelectProfileImage(meta: $models.RequestMeta): $CancellablePromise<$models.ProfileImageFile> {
@@ -593,6 +607,13 @@ export function TestIntegrationConnection(meta: $models.RequestMeta, input: $mod
  */
 export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<void> {
     return $Call.ByID(944621916, meta, input);
+}
+
+/**
+ * TestTelegramChannelConnection 测试 Telegram 草稿 Token。
+ */
+export function TestTelegramChannelConnection(meta: $models.RequestMeta, channelID: string, input: $models.TelegramChannelConnectionTestInput): $CancellablePromise<void> {
+    return $Call.ByID(324699684, meta, channelID, input);
 }
 
 /**

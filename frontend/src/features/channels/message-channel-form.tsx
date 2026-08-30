@@ -111,7 +111,10 @@ export function MessageChannelForm({
         channel_type: created.type,
       })
       form.reset(values)
-      navigate("/integrations/channels", { replace: true })
+      navigate(
+        `/integrations/channels/${created.type}/${created.id}?tab=basic`,
+        { replace: true },
+      )
     } catch (error) {
       if (recoverSession(error, navigate)) {
         return

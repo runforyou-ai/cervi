@@ -6,12 +6,16 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
+
+const telegramBotReuseConfirmationReason = "telegram_bot_reuse_confirmation_required"
 
 // ListMessageChannels 返回当前企业的消息渠道。
 func (b *DirectBackend) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
@@ -45,6 +49,48 @@ func (b *DirectBackend) GetWebsiteChannel(ctx context.Context, meta RequestMeta,
 		ChatInterface:         websiteChannelSettingFromRecord(&detail.ChatInterface),
 		Access:                websiteChannelAccessFromRecord(&detail.ChatInterface),
 	}, nil
+}
+
+// GetTelegramChannel 返回 Telegram 渠道详情。
+func (b *DirectBackend) GetTelegramChannel(ctx context.Context, meta RequestMeta, channelID string) (TelegramChannel, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return TelegramChannel{}, err
+	}
+	detail, err := b.getTelegramChannel.Execute(ctx, identity, channelID)
+	if err != nil {
+		return TelegramChannel{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
+	}
+	return telegramChannelFromRecord(detail), nil
+}
+
+// TestTelegramChannelConnection 测试 Telegram 草稿 Token。
+func (b *DirectBackend) TestTelegramChannelConnection(ctx context.Context, meta RequestMeta, channelID string, input TelegramChannelConnectionTestInput) error {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	err = b.testTelegramConnection.Execute(ctx, identity, channelID, channelaction.TelegramChannelConnectionTestInput{BotToken: input.BotToken})
+	if err == nil {
+		return nil
+	}
+	return b.telegramConnectionError(ctx, meta, err, cervii18n.ErrorTelegramConnectionTestFailed, identity.Organization.ID, channelID)
+}
+
+// SaveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
+func (b *DirectBackend) SaveTelegramChannelConnection(ctx context.Context, meta RequestMeta, channelID string, input TelegramChannelConnectionInput) (TelegramChannel, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return TelegramChannel{}, err
+	}
+	detail, err := b.saveTelegramConnection.Execute(ctx, identity, channelID, channelaction.TelegramChannelConnectionInput{
+		BotToken: input.BotToken, WebhookBaseURL: input.WebhookBaseURL, ConfirmBotReuse: input.ConfirmBotReuse,
+	})
+	if err != nil {
+		return TelegramChannel{}, b.telegramConnectionError(ctx, meta, err, cervii18n.ErrorTelegramConnectionSaveFailed, identity.Organization.ID, channelID)
+	}
+	slog.Info("Telegram 渠道连接已保存", "organization_id", identity.Organization.ID, "channel_id", channelID)
+	return telegramChannelFromRecord(detail), nil
 }
 
 // GetMessageChannel 返回消息渠道基础信息。
@@ -136,8 +182,20 @@ func (b *DirectBackend) setMessageChannelEnabled(ctx context.Context, meta Reque
 	if err != nil {
 		return MessageChannelSummary{}, err
 	}
-	channel, err := b.updateMessageChannelStatus.Execute(ctx, identity, channelID, enabled)
+	current, err := b.getMessageChannel.Execute(ctx, identity, channelID)
 	if err != nil {
+		return MessageChannelSummary{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
+	}
+	var channel *channelaction.MessageChannelRecord
+	if current.Type == string(domain.ChannelTypeTelegram) {
+		channel, err = b.updateTelegramChannelStatus.Execute(ctx, identity, channelID, enabled)
+	} else {
+		channel, err = b.updateMessageChannelStatus.Execute(ctx, identity, channelID, enabled)
+	}
+	if err != nil {
+		if errors.Is(err, channelaction.ErrTelegramConnectionRequired) {
+			return MessageChannelSummary{}, InvalidError(meta, cervii18n.ErrorTelegramConnectionRequired, nil)
+		}
 		return MessageChannelSummary{}, b.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("消息渠道状态已更新", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type, "enabled", enabled)
@@ -213,6 +271,56 @@ func websiteChannelAccessFromRecord(setting *channelaction.WebsiteChannelSetting
 	return WebsiteChannelAccess{AllowedHosts: setting.AllowedEmbedHosts}
 }
 
+// telegramChannelFromRecord 转换 Telegram 渠道详情。
+func telegramChannelFromRecord(detail *channelaction.TelegramChannelDetail) TelegramChannel {
+	connection := detail.Connection
+	var botID *string
+	if connection.BotID != nil {
+		value := strconv.FormatInt(*connection.BotID, 10)
+		botID = &value
+	}
+	var status *TelegramWebhookStatus
+	if connection.WebhookStatus != nil {
+		value := TelegramWebhookStatus(*connection.WebhookStatus)
+		status = &value
+	}
+	return TelegramChannel{
+		MessageChannelSummary: messageChannelFromRecord(&detail.MessageChannelRecord),
+		Connection: TelegramChannelConnection{
+			BotToken: connection.BotToken, BotID: botID, BotUsername: connection.BotUsername,
+			BotDisplayName: connection.BotDisplayName, WebhookURL: connection.WebhookURL,
+			WebhookSecret: connection.WebhookSecret, WebhookStatus: status,
+		},
+	}
+}
+
+// telegramConnectionError 转换 Telegram 连接校验和外部访问错误。
+func (b *DirectBackend) telegramConnectionError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, channelID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	var validationError *common.FieldError
+	if errors.As(err, &validationError) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
+	}
+	if errors.Is(err, channelaction.ErrNotFound) || errors.Is(err, common.ErrIdentityInvalid) {
+		return b.channelError(ctx, meta, err, failureKey, organizationID, channelID)
+	}
+	if errors.Is(err, channelaction.ErrTelegramBotReuseConfirmationRequired) {
+		return ConflictError(meta, cervii18n.FieldTelegramBotInUse, telegramBotReuseConfirmationReason)
+	}
+	_, kind, classified := connectiontest.Details(err)
+	if !classified {
+		return b.channelError(ctx, meta, err, failureKey, organizationID, channelID)
+	}
+	switch kind {
+	case connectiontest.FailureInvalidConfig, connectiontest.FailureUnauthorized, connectiontest.FailureForbidden, connectiontest.FailureNotFound:
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"botToken": cervii18n.FieldTelegramBotTokenInvalid})
+	default:
+		return UnavailableError(meta, failureKey, nil)
+	}
+}
+
 // channelInput 转换消息渠道修改输入。
 func channelInput(input MessageChannelInput) channelaction.MessageChannelInput {
 	return channelaction.MessageChannelInput{
@@ -247,19 +355,23 @@ func channelRoutingTargetFromRecord(targetType string, targetID *string) Channel
 // channelFieldKeys 把渠道校验错误码映射为本地化文案键。
 func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		channelaction.ValidationTypeInvalid:          cervii18n.FieldChannelTypeInvalid,
-		channelaction.ValidationNameRequired:         cervii18n.FieldChannelNameRequired,
-		channelaction.ValidationNameTooLong:          cervii18n.FieldChannelNameTooLong,
-		channelaction.ValidationDescriptionTooLong:   cervii18n.FieldChannelDescriptionTooLong,
-		channelaction.ValidationDefaultLocaleInvalid: cervii18n.FieldChannelDefaultLocaleInvalid,
-		channelaction.ValidationRoutingTargetInvalid: cervii18n.FieldChannelRoutingTargetInvalid,
-		channelaction.ValidationChatTitleRequired:    cervii18n.FieldChannelChatTitleRequired,
-		channelaction.ValidationChatTitleTooLong:     cervii18n.FieldChannelChatTitleTooLong,
-		channelaction.ValidationChatSubtitleTooLong:  cervii18n.FieldChannelChatSubtitleTooLong,
-		channelaction.ValidationGreetingTooLong:      cervii18n.FieldChannelGreetingTooLong,
-		channelaction.ValidationThemeColorInvalid:    cervii18n.FieldChannelThemeColorInvalid,
-		channelaction.ValidationAllowedHostsTooMany:  cervii18n.FieldChannelAllowedHostsTooMany,
-		channelaction.ValidationAllowedHostInvalid:   cervii18n.FieldChannelAllowedHostInvalid,
+		channelaction.ValidationTypeInvalid:            cervii18n.FieldChannelTypeInvalid,
+		channelaction.ValidationNameRequired:           cervii18n.FieldChannelNameRequired,
+		channelaction.ValidationNameTooLong:            cervii18n.FieldChannelNameTooLong,
+		channelaction.ValidationDescriptionTooLong:     cervii18n.FieldChannelDescriptionTooLong,
+		channelaction.ValidationDefaultLocaleInvalid:   cervii18n.FieldChannelDefaultLocaleInvalid,
+		channelaction.ValidationRoutingTargetInvalid:   cervii18n.FieldChannelRoutingTargetInvalid,
+		channelaction.ValidationChatTitleRequired:      cervii18n.FieldChannelChatTitleRequired,
+		channelaction.ValidationChatTitleTooLong:       cervii18n.FieldChannelChatTitleTooLong,
+		channelaction.ValidationChatSubtitleTooLong:    cervii18n.FieldChannelChatSubtitleTooLong,
+		channelaction.ValidationGreetingTooLong:        cervii18n.FieldChannelGreetingTooLong,
+		channelaction.ValidationThemeColorInvalid:      cervii18n.FieldChannelThemeColorInvalid,
+		channelaction.ValidationAllowedHostsTooMany:    cervii18n.FieldChannelAllowedHostsTooMany,
+		channelaction.ValidationAllowedHostInvalid:     cervii18n.FieldChannelAllowedHostInvalid,
+		channelaction.ValidationTelegramTokenRequired:  cervii18n.FieldTelegramBotTokenRequired,
+		channelaction.ValidationTelegramTokenTooLong:   cervii18n.FieldTelegramBotTokenTooLong,
+		channelaction.ValidationTelegramTokenInvalid:   cervii18n.FieldTelegramBotTokenInvalid,
+		channelaction.ValidationTelegramBaseURLInvalid: cervii18n.FieldTelegramWebhookBaseURLInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

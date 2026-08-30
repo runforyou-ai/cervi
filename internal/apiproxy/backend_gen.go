@@ -105,6 +105,27 @@ func (b *Backend) GetWebsiteChannel(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
+// GetTelegramChannel 返回 Telegram 渠道详情。
+func (b *Backend) GetTelegramChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.TelegramChannel, error) {
+	var output appservice.TelegramChannel
+	err := b.do(ctx, meta, http.MethodGet, "/channels/telegram/"+url.PathEscape(channelID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// TestTelegramChannelConnection 测试 Telegram 草稿 Token。
+func (b *Backend) TestTelegramChannelConnection(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.TelegramChannelConnectionTestInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/channels/telegram/"+url.PathEscape(channelID)+"/connection/test", nil, input, nil)
+}
+
+// SaveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
+func (b *Backend) SaveTelegramChannelConnection(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.TelegramChannelConnectionInput) (appservice.TelegramChannel, error) {
+	var output appservice.TelegramChannel
+	err := b.do(ctx, meta, http.MethodPut, "/channels/telegram/"+url.PathEscape(channelID)+"/connection", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetMessageChannel 返回消息渠道基础信息。
 func (b *Backend) GetMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary

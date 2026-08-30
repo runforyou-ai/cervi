@@ -24,6 +24,7 @@ const (
 	CategoryAgentRuntime  Category = "agent_runtime"
 	CategoryTranslation   Category = "translation"
 	CategoryMCP           Category = "mcp"
+	CategoryTelegram      Category = "telegram"
 )
 
 // Location 标识探测实际执行的位置。

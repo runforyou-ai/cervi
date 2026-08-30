@@ -31,6 +31,7 @@ type apiError struct {
 type Service struct {
 	application         *appservice.Service
 	websiteVisitor      *appservice.WebsiteVisitorService
+	telegramWebhook     TelegramWebhookReceiver
 	trustForwardedProto bool
 	router              *gin.Engine
 }
@@ -43,6 +44,13 @@ func WithWebsiteVisitor(visitor *appservice.WebsiteVisitorService, trustForwarde
 	return func(service *Service) {
 		service.websiteVisitor = visitor
 		service.trustForwardedProto = trustForwardedProto
+	}
+}
+
+// WithTelegramWebhook 注入 Telegram 公开回调接收能力。
+func WithTelegramWebhook(receiver TelegramWebhookReceiver) ServiceOption {
+	return func(service *Service) {
+		service.telegramWebhook = receiver
 	}
 }
 
@@ -61,6 +69,7 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 	router.GET("/contacts", service.listContacts)
 	router.GET("/contacts/trash", service.listDeletedContacts)
 	service.registerWebsiteVisitorRoutes(router)
+	service.registerTelegramWebhookRoutes(router)
 
 	service.router = router
 	return service

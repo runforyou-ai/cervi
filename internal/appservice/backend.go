@@ -59,6 +59,15 @@ type Backend interface {
 	// GetWebsiteChannel 返回网站渠道详情。
 	//cervi:route GET /channels/website/:channelID
 	GetWebsiteChannel(context.Context, RequestMeta, string) (WebsiteChannel, error)
+	// GetTelegramChannel 返回 Telegram 渠道详情。
+	//cervi:route GET /channels/telegram/:channelID
+	GetTelegramChannel(context.Context, RequestMeta, string) (TelegramChannel, error)
+	// TestTelegramChannelConnection 测试 Telegram 草稿 Token。
+	//cervi:route POST /channels/telegram/:channelID/connection/test
+	TestTelegramChannelConnection(context.Context, RequestMeta, string, TelegramChannelConnectionTestInput) error
+	// SaveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
+	//cervi:route PUT /channels/telegram/:channelID/connection
+	SaveTelegramChannelConnection(context.Context, RequestMeta, string, TelegramChannelConnectionInput) (TelegramChannel, error)
 	// GetMessageChannel 返回消息渠道基础信息。
 	//cervi:route GET /channels/:channelID
 	GetMessageChannel(context.Context, RequestMeta, string) (MessageChannelSummary, error)
