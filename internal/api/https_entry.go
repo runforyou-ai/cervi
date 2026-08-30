@@ -20,6 +20,7 @@ import (
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
+	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -31,27 +32,46 @@ const (
 	modeOff      = tlsMode("off")
 	// maxAllowedHostEntries 限制已确认公网域名缓存的条目数，防止恶意 Host 头刷量造成内存无界增长。
 	maxAllowedHostEntries = 1024
+	// certificateRequestLimit 为 autocert 的双挑战、双密钥签发路径预留 Let's Encrypt 订单额度。
+	certificateRequestLimit       = 40
+	certificateRequestWindow      = 3 * time.Hour
+	certificateRequestRetryWindow = time.Minute
 )
 
 type tlsMode string
+
+// certificateRequestLimiter 限制可能创建 ACME 订单的新证书请求。
+type certificateRequestLimiter struct {
+	mutex    sync.Mutex
+	attempts []time.Time
+	hosts    map[string]time.Time
+}
 
 // HTTPSEntry 按 TLS 模式代理 Wails server。
 type HTTPSEntry struct {
 	mode         tlsMode
 	cache        autocert.Cache
+	tenant       tenant.Resolver
 	manager      *autocert.Manager
 	proxy        *httputil.ReverseProxy
 	httpServer   *http.Server
 	httpsServer  *http.Server
 	allowed      sync.Map
+	certified    sync.Map
 	allowedMutex sync.Mutex
 	allowedCount int
+	requests     certificateRequestLimiter
 }
 
 // NewHTTPSEntry 根据 TLS 配置和共享缓存创建 HTTPS 入口。
-func NewHTTPSEntry(config serverconfig.TLSConfig, backend serverconfig.ServerConfig, cache autocert.Cache) *HTTPSEntry {
+func NewHTTPSEntry(
+	config serverconfig.TLSConfig,
+	backend serverconfig.ServerConfig,
+	cache autocert.Cache,
+	tenantResolver tenant.Resolver,
+) *HTTPSEntry {
 	mode := tlsMode(config.Mode)
-	service := &HTTPSEntry{mode: mode}
+	service := &HTTPSEntry{mode: mode, tenant: tenantResolver}
 	if mode != modeAuto {
 		return service
 	}
@@ -82,6 +102,8 @@ func NewHTTPSEntry(config serverconfig.TLSConfig, backend serverconfig.ServerCon
 		HostPolicy: service.allowCertificate,
 		Email:      config.ACMEEmail,
 	}
+	tlsConfig := service.manager.TLSConfig()
+	tlsConfig.GetCertificate = service.getCertificate
 	service.httpServer = &http.Server{
 		Addr:              httpAddress,
 		Handler:           service.manager.HTTPHandler(http.HandlerFunc(service.serveHTTP)),
@@ -91,11 +113,76 @@ func NewHTTPSEntry(config serverconfig.TLSConfig, backend serverconfig.ServerCon
 	service.httpsServer = &http.Server{
 		Addr:              httpsAddress,
 		Handler:           service.proxy,
-		TLSConfig:         service.manager.TLSConfig(),
+		TLSConfig:         tlsConfig,
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 	return service
+}
+
+// getCertificate 在 autocert 发起新证书流程前施加全局速率限制。
+func (s *HTTPSEntry) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	if len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto {
+		return s.manager.GetCertificate(hello)
+	}
+	host, local := requestHost(hello.ServerName)
+	if host == "" || local {
+		return nil, fmt.Errorf("host is not a public domain")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := s.allowCertificate(ctx, host); err != nil {
+		return nil, err
+	}
+	if _, ok := s.certified.Load(host); !ok && s.cachedCertificateMatches(ctx, host) {
+		s.markCertifiedHost(host)
+	}
+	if _, ok := s.certified.Load(host); !ok && !s.requests.allow(host, time.Now()) {
+		slog.Warn(
+			"自动 HTTPS 证书请求超过速率限制",
+			"domain", host,
+			"limit", certificateRequestLimit,
+			"window", certificateRequestWindow,
+		)
+		return nil, fmt.Errorf("automatic certificate request rate limit exceeded")
+	}
+	certificate, err := s.manager.GetCertificate(hello)
+	if err == nil {
+		s.markCertifiedHost(host)
+	}
+	return certificate, err
+}
+
+// allow 对同一域名一分钟内的并发或失败重试只计一次。
+func (l *certificateRequestLimiter) allow(host string, now time.Time) bool {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	if last, ok := l.hosts[host]; ok && now.Before(last.Add(certificateRequestRetryWindow)) {
+		return true
+	}
+
+	cutoff := now.Add(-certificateRequestWindow)
+	firstActive := 0
+	for firstActive < len(l.attempts) && !l.attempts[firstActive].After(cutoff) {
+		firstActive++
+	}
+	if firstActive > 0 {
+		l.attempts = append([]time.Time(nil), l.attempts[firstActive:]...)
+	}
+	for existingHost, last := range l.hosts {
+		if !last.Add(certificateRequestRetryWindow).After(now) {
+			delete(l.hosts, existingHost)
+		}
+	}
+	if len(l.attempts) >= certificateRequestLimit {
+		return false
+	}
+	if l.hosts == nil {
+		l.hosts = make(map[string]time.Time)
+	}
+	l.hosts[host] = now
+	l.attempts = append(l.attempts, now)
+	return true
 }
 
 // proxyHost 返回 HTTPS 入口访问服务监听器使用的地址。
@@ -186,13 +273,20 @@ func (s *HTTPSEntry) rememberAllowedHost(host string) {
 	}
 	if s.allowedCount >= maxAllowedHostEntries {
 		s.allowed.Clear()
+		s.certified.Clear()
 		s.allowedCount = 0
 	}
 	s.allowed.Store(host, struct{}{})
 	s.allowedCount++
 }
 
-// allowCertificate 只允许通过 HTTP 入口或已有证书缓存确认的公网域名。
+// markCertifiedHost 缓存已签发域名，并与已确认域名共享容量上限。
+func (s *HTTPSEntry) markCertifiedHost(host string) {
+	s.rememberAllowedHost(host)
+	s.certified.Store(host, struct{}{})
+}
+
+// allowCertificate 只允许通过 HTTP 入口、已有证书或已绑定企业的公网域名。
 func (s *HTTPSEntry) allowCertificate(ctx context.Context, host string) error {
 	host, local := requestHost(host)
 	if host == "" || local {
@@ -202,15 +296,25 @@ func (s *HTTPSEntry) allowCertificate(ctx context.Context, host string) error {
 		return nil
 	}
 	if s.cachedCertificateMatches(ctx, host) {
-		s.rememberAllowedHost(host)
+		s.markCertifiedHost(host)
 		slog.Info("已从证书缓存恢复 HTTPS 域名", "domain", host)
 		return nil
+	}
+	if s.tenant != nil {
+		if _, err := s.tenant.Resolve(ctx, tenant.NormalizeAccessHost(host)); err == nil {
+			s.rememberAllowedHost(host)
+			slog.Info("已从企业访问地址恢复 HTTPS 域名", "domain", host)
+			return nil
+		} else if !errors.Is(err, tenant.ErrNotFound) {
+			slog.Warn("查询 HTTPS 域名所属企业失败", "domain", host, "error", err)
+		}
 	}
 	return fmt.Errorf("host has not entered through HTTP")
 }
 
 // cachedCertificateMatches 判断持久化缓存中是否存在属于该域名的证书。
 func (s *HTTPSEntry) cachedCertificateMatches(ctx context.Context, host string) bool {
+	now := time.Now()
 	for _, key := range []string{host, host + "+rsa"} {
 		data, err := s.cache.Get(ctx, key)
 		if errors.Is(err, autocert.ErrCacheMiss) {
@@ -232,6 +336,10 @@ func (s *HTTPSEntry) cachedCertificateMatches(ctx context.Context, host string) 
 		leaf, err := x509.ParseCertificate(certificate.Certificate[0])
 		if err != nil {
 			slog.Warn("解析缓存证书失败", "domain", host, "cache_key", key, "error", err)
+			continue
+		}
+		if now.Before(leaf.NotBefore) || now.After(leaf.NotAfter) {
+			slog.Warn("缓存证书不在有效期内", "domain", host, "cache_key", key)
 			continue
 		}
 		if err := leaf.VerifyHostname(host); err == nil {
