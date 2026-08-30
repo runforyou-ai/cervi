@@ -39,7 +39,6 @@ type tlsMode string
 type HTTPSEntry struct {
 	mode         tlsMode
 	cache        autocert.Cache
-	cachePath    string
 	manager      *autocert.Manager
 	proxy        *httputil.ReverseProxy
 	httpServer   *http.Server
@@ -49,8 +48,8 @@ type HTTPSEntry struct {
 	allowedCount int
 }
 
-// NewHTTPSEntry 根据 TLS 配置创建 HTTPS 入口。
-func NewHTTPSEntry(config serverconfig.TLSConfig, backend serverconfig.ServerConfig) *HTTPSEntry {
+// NewHTTPSEntry 根据 TLS 配置和共享缓存创建 HTTPS 入口。
+func NewHTTPSEntry(config serverconfig.TLSConfig, backend serverconfig.ServerConfig, cache autocert.Cache) *HTTPSEntry {
 	mode := tlsMode(config.Mode)
 	service := &HTTPSEntry{mode: mode}
 	if mode != modeAuto {
@@ -76,8 +75,7 @@ func NewHTTPSEntry(config serverconfig.TLSConfig, backend serverconfig.ServerCon
 		http.Error(writer, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
 	}
 
-	service.cachePath = config.DataDirectory
-	service.cache = autocert.DirCache(config.DataDirectory)
+	service.cache = cache
 	service.manager = &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		Cache:      service.cache,
@@ -141,7 +139,7 @@ func (s *HTTPSEntry) Start(ctx context.Context) error {
 			slog.Warn("关闭自动 HTTPS 服务失败", "error", err)
 		}
 	}()
-	slog.Info("自动 HTTPS 入口已启动", "http", httpAddress, "https", httpsAddress, "certificate_cache", s.cachePath)
+	slog.Info("自动 HTTPS 入口已启动", "http", httpAddress, "https", httpsAddress, "certificate_cache", "postgresql")
 	return nil
 }
 

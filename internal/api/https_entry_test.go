@@ -66,6 +66,7 @@ func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
 	service := NewHTTPSEntry(
 		serverconfig.TLSConfig{Mode: "external"},
 		serverconfig.ServerConfig{Host: "127.0.0.1", Port: 8080},
+		nil,
 	)
 	if service.mode != modeExternal || service.httpServer != nil || service.httpsServer != nil {
 		t.Fatal("expected external mode without HTTP or HTTPS listeners")

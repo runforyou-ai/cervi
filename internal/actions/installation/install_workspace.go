@@ -15,10 +15,15 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common/token"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
-var ErrAlreadyInstalled = errors.New("workspace is already installed")
+var (
+	ErrAlreadyInstalled  = errors.New("workspace is already installed")
+	ErrAccessHostMissing = errors.New("workspace access host is missing")
+)
 
 // InstallWorkspaceAction 执行企业初始化操作。
 type InstallWorkspaceAction struct {
@@ -27,6 +32,7 @@ type InstallWorkspaceAction struct {
 
 // InstallWorkspaceInput 定义企业初始化输入。
 type InstallWorkspaceInput struct {
+	AccessHost       string
 	OrganizationName string
 	DisplayName      string
 	Email            string
@@ -49,6 +55,10 @@ func NewInstallWorkspaceAction(db *bun.DB) *InstallWorkspaceAction {
 
 // Execute 校验初始化信息并创建企业管理员和登录令牌。
 func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorkspaceInput) (InstallWorkspaceOutput, error) {
+	input.AccessHost = tenant.NormalizeAccessHost(input.AccessHost)
+	if input.AccessHost == "" {
+		return InstallWorkspaceOutput{}, ErrAccessHostMissing
+	}
 	input.OrganizationName = strings.TrimSpace(input.OrganizationName)
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	input.Email = commonemail.Normalize(input.Email)
@@ -67,24 +77,15 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 
 	identity := &servermodels.Identity{}
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if _, err := tx.ExecContext(ctx, "LOCK TABLE organizations IN EXCLUSIVE MODE"); err != nil {
-			return err
-		}
-
-		installed, err := tx.NewSelect().Model((*servermodels.Organization)(nil)).Exists(ctx)
-		if err != nil {
-			return err
-		}
-		if installed {
-			return ErrAlreadyInstalled
-		}
-
-		organization := &servermodels.Organization{Name: input.OrganizationName}
+		organization := &servermodels.Organization{AccessHost: input.AccessHost, Name: input.OrganizationName}
 		if _, err := tx.NewInsert().
 			Model(organization).
-			Column("name").
+			Column("access_host", "name").
 			Returning("id").
 			Exec(ctx); err != nil {
+			if pgerr.UniqueViolationOn(err, "organizations_access_host_unique") {
+				return ErrAlreadyInstalled
+			}
 			return err
 		}
 
