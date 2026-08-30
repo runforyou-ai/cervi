@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -26,6 +27,7 @@ type ContentWriter interface {
 type ImportInput struct {
 	OrganizationID  string
 	CreatedByUserID string
+	ExternalID      string
 	FileName        string
 	ContentType     string
 	Data            []byte
@@ -48,6 +50,10 @@ func (a *ImportAction) Execute(ctx context.Context, input ImportInput) (*serverm
 	if !common.ValidUUID(input.OrganizationID) || !common.ValidUUID(input.CreatedByUserID) {
 		return nil, errors.New("invalid imported file owner")
 	}
+	input.ExternalID = strings.TrimSpace(input.ExternalID)
+	if input.ExternalID == "" {
+		return nil, errors.New("imported file external ID is required")
+	}
 	metadata, fields := normalizeFileInput(UploadInput{
 		Purpose: domain.FilePurposeContactAvatar, FileName: input.FileName,
 		ContentType: input.ContentType, ByteSize: int64(len(input.Data)),
@@ -68,7 +74,7 @@ func (a *ImportAction) Execute(ctx context.Context, input ImportInput) (*serverm
 	}
 	record := &servermodels.File{
 		ID: fileID.String(), OrganizationID: input.OrganizationID, CreatedByUserID: input.CreatedByUserID,
-		Purpose: string(domain.FilePurposeContactAvatar), StorageBackend: string(backend),
+		Purpose: string(domain.FilePurposeContactAvatar), ExternalID: &input.ExternalID, StorageBackend: string(backend),
 		StorageKey:   storageKey(input.OrganizationID, fileID.String(), metadata.ContentType),
 		OriginalName: metadata.FileName, ContentType: metadata.ContentType, ByteSize: metadata.ByteSize,
 		Status: string(domain.FileStatusPending),

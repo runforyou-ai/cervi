@@ -468,7 +468,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if telegramIdentity.DisplayName == nil || *telegramIdentity.DisplayName != telegramMessage.Message.DisplayName {
 			t.Fatalf("Telegram identity display name = %#v", telegramIdentity.DisplayName)
 		}
-		if telegramIdentity.AvatarFileID == nil || telegramIdentity.AvatarExternalVersion == nil || len(*telegramIdentity.AvatarExternalVersion) != 64 || telegramIdentity.AvatarSourceOrder != 42 {
+		if telegramIdentity.AvatarFileID == nil {
 			t.Fatalf("Telegram identity avatar = %#v", telegramIdentity)
 		}
 		telegramAvatarFilesInDatabase := make([]servermodels.File, 0)
@@ -481,7 +481,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if len(telegramAvatarFilesInDatabase) != 2 || telegramAvatarFilesInDatabase[0].Status != string(domain.FileStatusDeleting) ||
 			telegramAvatarFilesInDatabase[1].ID != *telegramIdentity.AvatarFileID || telegramAvatarFilesInDatabase[1].Status != string(domain.FileStatusActive) ||
-			telegramAvatarFilesInDatabase[1].StorageBackend != string(domain.FileStorageBackendLocal) || telegramAvatarFilesInDatabase[1].ContentType != "image/jpeg" {
+			telegramAvatarFilesInDatabase[1].StorageBackend != string(domain.FileStorageBackendLocal) || telegramAvatarFilesInDatabase[1].ContentType != "image/jpeg" ||
+			telegramAvatarFilesInDatabase[0].ExternalID == nil || *telegramAvatarFilesInDatabase[0].ExternalID != "avatar-version-1" ||
+			telegramAvatarFilesInDatabase[1].ExternalID == nil || *telegramAvatarFilesInDatabase[1].ExternalID != "avatar-version-2" {
 			t.Fatalf("Telegram avatar files = %#v", telegramAvatarFilesInDatabase)
 		}
 		if importedAvatarWriter.saved != 2 {
@@ -544,12 +546,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if messageCountAfterReply != messageCountBeforeReply {
 			t.Fatalf("Telegram message count after rejected reply = %d, want %d", messageCountAfterReply, messageCountBeforeReply)
 		}
-		outOfOrderMessage := *telegramMessage.Message
-		outOfOrderMessage.MessageID = 40
-		outOfOrderMessage.Body = "迟到的 Telegram 消息"
-		telegramAvatarAPI.photo = &telegramintegration.ProfilePhoto{FileID: "avatar-file-old", UniqueID: "avatar-version-old"}
+		sameAvatarMessage := *telegramMessage.Message
+		sameAvatarMessage.MessageID = 43
+		sameAvatarMessage.Body = "头像未变化的 Telegram 消息"
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
-			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 5, Message: &outOfOrderMessage,
+			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 5, Message: &sameAvatarMessage,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -560,11 +561,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if telegramIdentity.AvatarFileID == nil || *telegramIdentity.AvatarFileID != telegramAvatarFilesInDatabase[1].ID || telegramIdentity.AvatarSourceOrder != 42 {
-			t.Fatalf("out-of-order avatar replaced newer value: %#v", telegramIdentity)
+		if telegramIdentity.AvatarFileID == nil || *telegramIdentity.AvatarFileID != telegramAvatarFilesInDatabase[1].ID || importedAvatarWriter.saved != 2 {
+			t.Fatalf("unchanged Telegram avatar = %#v, writes = %d", telegramIdentity, importedAvatarWriter.saved)
 		}
 		noAvatarMessage := *telegramMessage.Message
-		noAvatarMessage.MessageID = 43
+		noAvatarMessage.MessageID = 44
 		noAvatarMessage.Body = "删除头像后的 Telegram 消息"
 		telegramAvatarAPI.photo = nil
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
@@ -579,7 +580,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if telegramIdentity.AvatarFileID != nil || telegramIdentity.AvatarExternalVersion != nil || telegramIdentity.AvatarSourceOrder != 43 {
+		if telegramIdentity.AvatarFileID != nil {
 			t.Fatalf("deleted Telegram avatar = %#v", telegramIdentity)
 		}
 		activeTelegramAvatarCount, err := db.NewSelect().Model((*servermodels.File)(nil)).

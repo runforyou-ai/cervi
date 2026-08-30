@@ -33,7 +33,7 @@ type Bot struct {
 	Username  string `json:"username"`
 }
 
-// ProfilePhoto 定义 Telegram 用户当前头像的可下载引用和稳定版本。
+// ProfilePhoto 定义 Telegram 用户当前头像的可下载引用和唯一标识。
 type ProfilePhoto struct {
 	FileID   string
 	UniqueID string

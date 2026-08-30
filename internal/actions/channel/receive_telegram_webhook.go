@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -149,7 +148,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 		refreshCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), telegramAvatarRefreshTimeout)
 		refreshErr := a.refreshTelegramContactAvatar(
 			refreshCtx, channelID, avatarOrganizationID, avatarCreatedByUserID,
-			avatarIdentityID, avatarBotToken, input.Message.SenderID, input.Message.MessageID,
+			avatarIdentityID, avatarBotToken, input.Message.SenderID,
 		)
 		cancel()
 		if refreshErr != nil {
@@ -172,32 +171,21 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 func (a *ReceiveTelegramWebhookAction) refreshTelegramContactAvatar(
 	ctx context.Context,
 	channelID, organizationID, createdByUserID, identityID, token string,
-	senderID, sourceOrder int64,
+	senderID int64,
 ) error {
-	current := &servermodels.ContactChannelIdentity{}
-	if err := a.db.NewSelect().Model(current).
-		Column("avatar_source_order").
-		Where("cci.id = ?", identityID).
-		Where("cci.organization_id = ?", organizationID).
-		Where("cci.channel_id = ?", channelID).
-		Scan(ctx); err != nil {
-		return fmt.Errorf("load Telegram contact avatar cursor: %w", err)
-	}
-	if current.AvatarSourceOrder > sourceOrder {
-		return nil
-	}
 	photo, err := a.avatarAPI.GetUserProfilePhoto(ctx, token, senderID)
 	if err != nil {
 		return err
 	}
 	if photo == nil {
-		return a.applyTelegramContactAvatar(ctx, channelID, organizationID, identityID, sourceOrder, nil, nil)
+		return a.applyTelegramContactAvatar(ctx, channelID, organizationID, identityID, nil)
 	}
-	digest := sha256.Sum256([]byte(photo.UniqueID))
-	version := hex.EncodeToString(digest[:])
-	unchanged, err := a.advanceTelegramContactAvatarCursor(ctx, channelID, organizationID, identityID, version, sourceOrder)
-	if err != nil || unchanged {
+	existing, err := a.findTelegramContactAvatarFile(ctx, organizationID, photo.UniqueID)
+	if err != nil {
 		return err
+	}
+	if existing != nil {
+		return a.applyTelegramContactAvatar(ctx, channelID, organizationID, identityID, existing)
 	}
 	if a.avatarFiles == nil {
 		return errors.New("Telegram contact avatar importer is unavailable")
@@ -208,49 +196,47 @@ func (a *ReceiveTelegramWebhookAction) refreshTelegramContactAvatar(
 	}
 	imported, err := a.avatarFiles.Execute(ctx, fileaction.ImportInput{
 		OrganizationID: organizationID, CreatedByUserID: createdByUserID,
+		ExternalID:  photo.UniqueID,
 		FileName:    telegramAvatarFileName(downloaded.ContentType),
 		ContentType: downloaded.ContentType, Data: downloaded.Data,
 	})
 	if err != nil {
 		return err
 	}
-	return a.applyTelegramContactAvatar(ctx, channelID, organizationID, identityID, sourceOrder, &version, imported)
+	return a.applyTelegramContactAvatar(ctx, channelID, organizationID, identityID, imported)
 }
 
-// advanceTelegramContactAvatarCursor 在头像版本未变化时只推进来源顺序。
-func (a *ReceiveTelegramWebhookAction) advanceTelegramContactAvatarCursor(ctx context.Context, channelID, organizationID, identityID, version string, sourceOrder int64) (bool, error) {
-	result, err := a.db.NewUpdate().Model((*servermodels.ContactChannelIdentity)(nil)).
-		Set("avatar_source_order = ?", sourceOrder).
-		Set("updated_at = now()").
-		Where("id = ?", identityID).
-		Where("organization_id = ?", organizationID).
-		Where("channel_id = ?", channelID).
-		Where("avatar_file_id IS NOT NULL").
-		Where("avatar_external_version = ?", version).
-		Where("avatar_source_order <= ?", sourceOrder).
-		Exec(ctx)
-	if err != nil {
-		return false, fmt.Errorf("advance Telegram contact avatar cursor: %w", err)
+// findTelegramContactAvatarFile 按 Telegram 文件唯一标识复用已写入的企业文件。
+func (a *ReceiveTelegramWebhookAction) findTelegramContactAvatarFile(ctx context.Context, organizationID, externalID string) (*servermodels.File, error) {
+	record := &servermodels.File{}
+	err := a.db.NewSelect().Model(record).
+		Where("f.organization_id = ?", organizationID).
+		Where("f.purpose = ?", domain.FilePurposeContactAvatar).
+		Where("f.external_id = ?", externalID).
+		Where("(f.status = ? OR (f.status = ? AND f.expires_at > now()))", domain.FileStatusActive, domain.FileStatusUploaded).
+		OrderExpr("CASE WHEN f.status = ? THEN 0 ELSE 1 END", domain.FileStatusActive).
+		OrderExpr("f.created_at DESC, f.id DESC").
+		Limit(1).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
 	}
-	rows, err := result.RowsAffected()
 	if err != nil {
-		return false, fmt.Errorf("read Telegram contact avatar cursor count: %w", err)
+		return nil, fmt.Errorf("find Telegram contact avatar file: %w", err)
 	}
-	return rows > 0, nil
+	return record, nil
 }
 
 // applyTelegramContactAvatar 原子切换头像文件引用并回收旧文件。
 func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 	ctx context.Context,
 	channelID, organizationID, identityID string,
-	sourceOrder int64,
-	version *string,
-	imported *servermodels.File,
+	next *servermodels.File,
 ) error {
 	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		current := &servermodels.ContactChannelIdentity{}
 		if err := tx.NewSelect().Model(current).
-			Column("id", "organization_id", "channel_id", "avatar_file_id", "avatar_external_version", "avatar_source_order").
+			Column("id", "organization_id", "channel_id", "avatar_file_id").
 			Where("cci.id = ?", identityID).
 			Where("cci.organization_id = ?", organizationID).
 			Where("cci.channel_id = ?", channelID).
@@ -258,35 +244,23 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 			Scan(ctx); err != nil {
 			return fmt.Errorf("lock Telegram contact avatar: %w", err)
 		}
-		if current.AvatarSourceOrder > sourceOrder {
+		if next == nil && current.AvatarFileID == nil {
 			return nil
 		}
-		if version != nil && current.AvatarFileID != nil && current.AvatarExternalVersion != nil && *current.AvatarExternalVersion == *version {
-			_, err := tx.NewUpdate().Model((*servermodels.ContactChannelIdentity)(nil)).
-				Set("avatar_source_order = ?", sourceOrder).
-				Set("updated_at = now()").
-				Where("id = ?", identityID).
-				Where("organization_id = ?", organizationID).
-				Where("channel_id = ?", channelID).
-				Exec(ctx)
-			return err
+		if next != nil && current.AvatarFileID != nil && *current.AvatarFileID == next.ID {
+			return nil
 		}
 
 		var nextFileID any
-		var nextVersion any
-		if imported != nil {
-			if version == nil {
-				return errors.New("Telegram contact avatar version is required")
-			}
+		if next != nil {
 			result, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
 				Set("status = ?", domain.FileStatusActive).
 				Set("expires_at = NULL").
 				Set("updated_at = now()").
-				Where("id = ?", imported.ID).
+				Where("id = ?", next.ID).
 				Where("organization_id = ?", organizationID).
 				Where("purpose = ?", domain.FilePurposeContactAvatar).
-				Where("status = ?", domain.FileStatusUploaded).
-				Where("expires_at > now()").
+				Where("(status = ? OR (status = ? AND expires_at > now()))", domain.FileStatusActive, domain.FileStatusUploaded).
 				Exec(ctx)
 			if err != nil {
 				return fmt.Errorf("activate Telegram contact avatar file: %w", err)
@@ -298,20 +272,16 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 			if rows == 0 {
 				return fileaction.ErrFileNotFound
 			}
-			nextFileID = imported.ID
-			nextVersion = *version
+			nextFileID = next.ID
 		}
 
 		previousFileID := current.AvatarFileID
 		result, err := tx.NewUpdate().Model((*servermodels.ContactChannelIdentity)(nil)).
 			Set("avatar_file_id = ?", nextFileID).
-			Set("avatar_external_version = ?", nextVersion).
-			Set("avatar_source_order = ?", sourceOrder).
 			Set("updated_at = now()").
 			Where("id = ?", identityID).
 			Where("organization_id = ?", organizationID).
 			Where("channel_id = ?", channelID).
-			Where("avatar_source_order <= ?", sourceOrder).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("update Telegram contact avatar: %w", err)
@@ -323,7 +293,7 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 		if rows == 0 {
 			return errors.New("Telegram contact avatar was not updated")
 		}
-		if previousFileID != nil && (imported == nil || *previousFileID != imported.ID) {
+		if previousFileID != nil && (next == nil || *previousFileID != next.ID) {
 			if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
 				Set("status = ?", domain.FileStatusDeleting).
 				Set("expires_at = now()").
@@ -332,6 +302,7 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 				Where("organization_id = ?", organizationID).
 				Where("purpose = ?", domain.FilePurposeContactAvatar).
 				Where("status = ?", domain.FileStatusActive).
+				Where("NOT EXISTS (SELECT 1 FROM contact_channel_identities AS other WHERE other.organization_id = f.organization_id AND other.avatar_file_id = f.id)").
 				Exec(ctx); err != nil {
 				return fmt.Errorf("retire previous Telegram contact avatar: %w", err)
 			}
