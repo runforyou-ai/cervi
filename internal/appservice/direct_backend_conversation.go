@@ -36,7 +36,54 @@ func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta Reques
 	return conversationMessageFromAction(message), nil
 }
 
-// ListConversationMessages 返回成员可见的客户会话消息。
+// StartDirectConversation 发起或打开企业成员内部单聊。
+func (b *DirectBackend) StartDirectConversation(ctx context.Context, meta RequestMeta, input DirectConversationInput) (InboxConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return InboxConversation{}, err
+	}
+	summary, err := b.startDirectConversation.Execute(ctx, identity, conversationaction.DirectConversationInput{
+		TargetIdentityID: input.TargetIdentityID,
+	})
+	if err != nil {
+		return InboxConversation{}, directConversationError(ctx, meta, err, identity.Organization.ID, input.TargetIdentityID, "start")
+	}
+	slog.Info("企业成员内部单聊已打开",
+		"organization_id", identity.Organization.ID,
+		"conversation_id", summary.ID,
+		"target_identity_id", summary.PeerIdentityID,
+	)
+	return InboxConversation{
+		ID: summary.ID, Type: ConversationTypeDirect,
+		Direct: &DirectInboxConversation{
+			PeerIdentityID: summary.PeerIdentityID, PeerName: summary.PeerName,
+			Preview: summary.Preview, LastMessageAt: summary.LastMessageAt,
+		},
+	}, nil
+}
+
+// SendDirectTextMessage 发送内部单聊文本消息。
+func (b *DirectBackend) SendDirectTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input DirectTextMessageInput) (ConversationMessage, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return ConversationMessage{}, err
+	}
+	message, err := b.sendDirectTextMessage.Execute(ctx, identity, conversationaction.DirectTextMessageInput{
+		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body,
+	})
+	if err != nil {
+		return ConversationMessage{}, directConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "send")
+	}
+	slog.Info("企业成员内部单聊文本消息已保存",
+		"organization_id", identity.Organization.ID,
+		"conversation_id", conversationID,
+		"message_id", message.ID,
+		"sender_identity_id", identity.OrganizationIdentity.ID,
+	)
+	return conversationMessageFromAction(message), nil
+}
+
+// ListConversationMessages 返回成员可见的会话消息。
 func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -87,6 +134,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		sender = &ConversationMessageSender{
 			ChatSubjectID: message.Sender.ChatSubjectID,
 			Kind:          ChatSubjectKind(message.Sender.Kind),
+			SourceID:      message.Sender.SourceID,
 			DisplayName:   message.Sender.DisplayName,
 		}
 	}
@@ -103,6 +151,35 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		OriginatedAt: message.OriginatedAt, CreatedAt: message.CreatedAt,
 		Sender: sender, SessionStart: sessionStart,
 	}
+}
+
+// directConversationError 转换内部单聊命令错误。
+func directConversationError(ctx context.Context, meta RequestMeta, err error, organizationID, targetID, operation string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrDirectTargetNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorDirectTargetNotFound)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	var validationError *conversationaction.ValidationError
+	if errors.As(err, &validationError) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+	}
+	var conflictError *conversationaction.ConflictError
+	if errors.As(err, &conflictError) {
+		return ConflictError(meta, cervii18n.ErrorDirectMessageConflict, conflictError.Reason)
+	}
+	slog.Warn("内部单聊命令失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
+	if operation == "start" {
+		return FailedError(meta, cervii18n.ErrorDirectConversationStartFailed)
+	}
+	return FailedError(meta, cervii18n.ErrorDirectMessageSendFailed)
 }
 
 // encodeConversationMessageCursor 编码绑定会话的成员消息游标。
@@ -173,9 +250,10 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 }
 
 var conversationMessageValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{
-	conversationaction.ValidationConversationIDInvalid:  cervii18n.FieldConversationIDInvalid,
-	conversationaction.ValidationClientMessageIDInvalid: cervii18n.FieldClientMessageIDInvalid,
-	conversationaction.ValidationBodyRequired:           cervii18n.FieldMessageBodyRequired,
-	conversationaction.ValidationBodyTooLong:            cervii18n.FieldMessageBodyTooLong,
-	conversationaction.ValidationCursorInvalid:          cervii18n.FieldMessageCursorInvalid,
+	conversationaction.ValidationConversationIDInvalid:   cervii18n.FieldConversationIDInvalid,
+	conversationaction.ValidationClientMessageIDInvalid:  cervii18n.FieldClientMessageIDInvalid,
+	conversationaction.ValidationBodyRequired:            cervii18n.FieldMessageBodyRequired,
+	conversationaction.ValidationBodyTooLong:             cervii18n.FieldMessageBodyTooLong,
+	conversationaction.ValidationCursorInvalid:           cervii18n.FieldMessageCursorInvalid,
+	conversationaction.ValidationTargetIdentityIDInvalid: cervii18n.FieldTargetIdentityIDInvalid,
 }

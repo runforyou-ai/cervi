@@ -1285,9 +1285,9 @@ P3 typing、presence 等临时事件
 
 阶段 2 依次交付成员单聊、基础群聊、内部 AI 员工验证、网站 AI 客服以及统一实时与离线同步。
 
-#### 阶段 2A：成员文本单聊
+#### 阶段 2A：成员文本单聊（Web/桌面端已完成）
 
-- 实现成员会话列表、历史和文本发送，首版可沿用 `before/after` 查询与轮询。
+- Web 与桌面端已实现成员会话列表、历史、文本发送和 `before/after` 轮询；移动端内部单聊留给后续独立 PR。
 - 同一企业内同一对有效 ChatSubject 只对应一个长期 `direct` 会话；两个并发创建请求必须收敛到同一会话。
 - 单聊严格按有效参与者授权，不包含已读、实时、文件和 Agent 自动响应。
 
@@ -1468,22 +1468,40 @@ PR6 增加 `POST /api/conversations/{conversationID}/messages` 成员客户会�
 
 网站渠道回复直接写入 Cervi 时间线，不创建 Delivery、异步任务或实时事件。前端启用工作区回复区，成功后立即合入成员时间线并刷新收件箱摘要；访客和成员自动补拉仍留给下一 PR。
 
-### 13.8 当前共同边界
+### 13.8 阶段 2A：企业成员文本单聊（本次交付）
 
-当前客户聊天仍未实现以下能力，全部属于后续阶段：
+本 PR 增加企业成员内部单聊的 Web 与桌面端闭环：
 
-- 双方 `after` 自动补拉。
+```text
+POST /api/direct-conversations
+POST /api/direct-conversations/{conversationID}/messages
+GET  /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
+```
+
+发起单聊只接受当前企业的活跃用户身份，不接受自己、AI 员工、联系人、跨企业或停用用户。服务端在校验完成后，使用规范文本 `cervi:direct:<organization_id>:<min_identity_id>:<max_identity_id>` 的稳定 `bigint` 哈希取得事务级 advisory lock；锁内取得双方 `organization_identity` ChatSubject，并只复用类型为 `direct`、同企业、Participant 总数恰好为 2 且主体集合精确匹配的 Conversation。锁在创建 ChatSubject 前取得，Direct 创建统一经过该 Action，不增加主体配对关系表。已有归档会话只在显式发起时恢复为 `active`。
+
+Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 Participant 或恢复归档 Conversation；消息继续使用 `mmsg:<organization_identity_id>:<client_message_id>` 幂等键，且不关联 ServiceSession。成员历史查询按 Conversation 类型严格分叉：Customer 保持企业与客户扩展授权，Direct 要求当前身份是未离开的 Participant，其他类型不开放。
+
+统一 Inbox 使用 `type + customer?/direct?` 信封。Customer 与 Direct 分别最多读取 50 条，合并后不再截断；Direct 使用最后消息左连接，空会话返回可空预览与时间，合并按 `last_message_at DESC NULLS LAST, id DESC` 排序，空会话沉底。消息发送者的 `sourceId` 明确定义为 `chat_subjects.source_id`：Customer 中联系人靠左、所有企业身份靠右；Direct 中 `sourceId == CurrentUser.identityId` 靠右，对方靠左。
+
+成员收件箱和当前 Customer/Direct 时间线每 3 秒轮询，只在消息路由所属工作区标签活动、页面可见且窗口聚焦时运行，恢复前台后立即补拉。空 Direct 在没有 `after` 时轮询无游标最近页，得到第一条消息后安装游标；空增量响应保留旧游标，`before`、`after` 和本地发送结果按消息编号合并，切换会话后忽略旧结果。
+
+前端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，群聊继续显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接、交给 AI 或客户上下文栏。本 PR 对移动端只适配联合 DTO，并安全忽略 Direct；移动端单聊列表、详情、发送和轮询由下一 PR 交付。
+
+### 13.9 当前共同边界与后续交付
+
+当前聊天仍未实现以下能力，全部属于后续阶段：
+
+- 网站访客 Messenger 的 `after` 自动补拉；成员侧 Customer 和 Direct 已完成。
 - ServiceSession 领取、转接、挂起和结束命令。
 - 客户队列按负责人、团队和关闭状态真实筛选。
 - 未读、实时、文件、外部平台投递、指标和满意度。
 - 第三方用户消息账号、受管访客、联邦和 AI 运行表。
 - `customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。
 
-### 13.9 后续交付
-
 后续按独立 PR 继续完成：
 
-1. 网站访客和成员页面使用 `after` 轮询新增文本消息，完成网站双方文本闭环。
+1. 网站访客 Messenger 使用 `after` 轮询新增文本消息，完成网站双方文本闭环。
 2. 公开访客端点按第 4.5 节补齐防滥用限制：接口限速、消息长度与频率约束、未回复 Conversation 数量上限；先于外部渠道扩展交付。
 3. ServiceSession 显式领取、挂起和结束命令。
 4. 客户队列子筛选按状态和负责人落地，并与 URL 查询参数同步。

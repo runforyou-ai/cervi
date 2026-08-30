@@ -53,6 +53,12 @@ type Backend interface {
 	// SendCustomerTextMessage 发送客户会话文本消息。
 	//cervi:route POST /conversations/:conversationID/messages
 	SendCustomerTextMessage(context.Context, RequestMeta, string, CustomerTextMessageInput) (ConversationMessage, error)
+	// StartDirectConversation 发起或打开企业成员内部单聊。
+	//cervi:route POST /direct-conversations
+	StartDirectConversation(context.Context, RequestMeta, DirectConversationInput) (InboxConversation, error)
+	// SendDirectTextMessage 发送内部单聊文本消息。
+	//cervi:route POST /direct-conversations/:conversationID/messages
+	SendDirectTextMessage(context.Context, RequestMeta, string, DirectTextMessageInput) (ConversationMessage, error)
 	// ListMessageChannels 返回消息渠道列表。
 	//cervi:route GET /channels
 	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)

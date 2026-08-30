@@ -1,4 +1,4 @@
-/** 提交客户会话成员文本回复。 */
+/** 提交 Customer 或 Direct 会话的成员文本消息。 */
 import { useEffect, useMemo, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
@@ -8,8 +8,10 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ConversationType,
   isApiError,
   sendCustomerTextMessage,
+  sendDirectTextMessage,
   type ConversationMessage,
 } from "@/api"
 import { Button } from "@/components/ui/button"
@@ -28,12 +30,14 @@ type PendingMessage = {
   clientMessageID: string
 }
 
-/** 展示并提交客户会话回复编辑区。 */
+/** 展示并提交成员会话文本编辑区。 */
 export function ConversationComposer({
   conversationID,
+  conversationType,
   onSent,
 }: {
   conversationID: string
+  conversationType: ConversationType
   onSent: (message: ConversationMessage) => void
 }) {
   const { t } = useTranslation("inbox")
@@ -63,7 +67,7 @@ export function ConversationComposer({
     }
   }, [])
 
-  /** 发送当前客户会话文本回复。 */
+  /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
     const body = values.body.trim()
     const pending =
@@ -72,12 +76,17 @@ export function ConversationComposer({
         : { body, clientMessageID: window.crypto.randomUUID() }
     pendingRef.current = pending
     try {
-      const message = await sendCustomerTextMessage(conversationID, {
-        clientMessageId: pending.clientMessageID,
-        body,
-      })
+      const message =
+        conversationType === ConversationType.ConversationTypeDirect
+          ? await sendDirectTextMessage(conversationID, {
+              clientMessageId: pending.clientMessageID,
+              body,
+            })
+          : await sendCustomerTextMessage(conversationID, {
+              clientMessageId: pending.clientMessageID,
+              body,
+            })
       void invalidate(resourceKeys.inbox())
-      void invalidate(resourceKeys.conversationMessages(conversationID))
       if (!aliveRef.current) return
       pendingRef.current = null
       form.reset()
@@ -85,7 +94,7 @@ export function ConversationComposer({
     } catch (error) {
       if (recoverSession(error, navigate)) return
       if (!aliveRef.current) return
-      console.warn("发送成员客户消息失败", {
+      console.warn("发送成员会话消息失败", {
         conversationId: conversationID,
         error,
       })

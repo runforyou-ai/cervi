@@ -89,6 +89,22 @@ func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.R
 	return output, err
 }
 
+// StartDirectConversation 发起或打开企业成员内部单聊。
+func (b *Backend) StartDirectConversation(ctx context.Context, meta appservice.RequestMeta, input appservice.DirectConversationInput) (appservice.InboxConversation, error) {
+	var output appservice.InboxConversation
+	err := b.do(ctx, meta, http.MethodPost, "/direct-conversations", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// SendDirectTextMessage 发送内部单聊文本消息。
+func (b *Backend) SendDirectTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.DirectTextMessageInput) (appservice.ConversationMessage, error) {
+	var output appservice.ConversationMessage
+	err := b.do(ctx, meta, http.MethodPost, "/direct-conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList

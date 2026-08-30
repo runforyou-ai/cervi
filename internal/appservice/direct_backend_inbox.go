@@ -9,7 +9,7 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
-// LoadInbox 返回当前企业的客户会话工作队列。
+// LoadInbox 返回当前企业的统一会话工作队列。
 func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -25,16 +25,22 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox,
 	}
 	conversations := make([]InboxConversation, 0, len(summaries))
 	for _, summary := range summaries {
-		conversations = append(conversations, InboxConversation{
-			ID:                   summary.ID,
-			Title:                summary.Title,
-			ContactName:          summary.ContactName,
-			ChannelType:          ChannelType(summary.ChannelType),
-			ChannelName:          summary.ChannelName,
-			Preview:              summary.Preview,
-			LastMessageAt:        summary.LastMessageAt,
-			ServiceSessionStatus: ServiceSessionStatus(summary.ServiceSessionStatus),
-		})
+		conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type)}
+		if summary.Customer != nil {
+			conversation.Customer = &CustomerInboxConversation{
+				Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
+				ChannelType: ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
+				Preview: summary.Customer.Preview, LastMessageAt: summary.Customer.LastMessageAt,
+				ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus),
+			}
+		}
+		if summary.Direct != nil {
+			conversation.Direct = &DirectInboxConversation{
+				PeerIdentityID: summary.Direct.PeerIdentityID, PeerName: summary.Direct.PeerName,
+				Preview: summary.Direct.Preview, LastMessageAt: summary.Direct.LastMessageAt,
+			}
+		}
+		conversations = append(conversations, conversation)
 	}
 	return Inbox{Conversations: conversations}, nil
 }

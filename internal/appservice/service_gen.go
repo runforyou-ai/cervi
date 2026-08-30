@@ -54,6 +54,16 @@ func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta,
 	return s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input)
 }
 
+// StartDirectConversation 发起或打开企业成员内部单聊。
+func (s *Service) StartDirectConversation(ctx context.Context, meta RequestMeta, input DirectConversationInput) (InboxConversation, error) {
+	return s.backend.StartDirectConversation(ctx, meta, input)
+}
+
+// SendDirectTextMessage 发送内部单聊文本消息。
+func (s *Service) SendDirectTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input DirectTextMessageInput) (ConversationMessage, error) {
+	return s.backend.SendDirectTextMessage(ctx, meta, conversationID, input)
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (s *Service) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
 	return s.backend.ListMessageChannels(ctx, meta)

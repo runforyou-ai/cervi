@@ -16,7 +16,9 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
@@ -657,6 +659,125 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		team, err = teamaction.NewAddMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: createdMember.IdentityID}})
 		if err != nil || team.MemberCount != 1 {
 			t.Fatalf("team after adding member = %#v, error = %v", team, err)
+		}
+	})
+
+	// 覆盖双向并发发起、双方收件箱、成员授权和内部文本消息。
+	runStep("企业成员内部单聊", func(t *testing.T) {
+		memberLogin, err := login.Execute(context.Background(), authaction.LoginInput{
+			OrganizationID: loggedIn.Identity.Organization.ID,
+			Email:          createdMember.Email,
+			Password:       "password123",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		start := conversationaction.NewStartDirectConversationAction(db)
+		startGate := make(chan struct{})
+		startResults := make(chan conversationaction.DirectConversationSummary, 2)
+		startErrors := make(chan error, 2)
+		requests := []struct {
+			identity *servermodels.Identity
+			targetID string
+		}{
+			{identity: loggedIn.Identity, targetID: memberLogin.Identity.OrganizationIdentity.ID},
+			{identity: memberLogin.Identity, targetID: loggedIn.Identity.OrganizationIdentity.ID},
+		}
+		for _, request := range requests {
+			request := request
+			go func() {
+				<-startGate
+				summary, executeErr := start.Execute(context.Background(), request.identity, conversationaction.DirectConversationInput{TargetIdentityID: request.targetID})
+				startResults <- summary
+				startErrors <- executeErr
+			}()
+		}
+		close(startGate)
+
+		conversationID := ""
+		for range requests {
+			if executeErr := <-startErrors; executeErr != nil {
+				t.Fatal(executeErr)
+			}
+			summary := <-startResults
+			if conversationID == "" {
+				conversationID = summary.ID
+			} else if summary.ID != conversationID {
+				t.Fatalf("concurrent direct conversation ids = %q and %q", conversationID, summary.ID)
+			}
+		}
+
+		conversationCount, err := db.NewSelect().
+			Model((*servermodels.Conversation)(nil)).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("type = ?", domain.ConversationTypeDirect).
+			Count(context.Background())
+		if err != nil || conversationCount != 1 {
+			t.Fatalf("direct conversation count = %d, error = %v", conversationCount, err)
+		}
+		participantCount, err := db.NewSelect().
+			Model((*servermodels.ConversationParticipant)(nil)).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("conversation_id = ?", conversationID).
+			Count(context.Background())
+		if err != nil || participantCount != 2 {
+			t.Fatalf("direct participant count = %d, error = %v", participantCount, err)
+		}
+
+		inbox := inboxaction.NewLoadInboxQuery(db)
+		for _, request := range requests {
+			items, loadErr := inbox.Execute(context.Background(), request.identity)
+			if loadErr != nil {
+				t.Fatal(loadErr)
+			}
+			found := false
+			for _, item := range items {
+				if item.ID == conversationID && item.Type == domain.ConversationTypeDirect && item.Direct != nil && item.Direct.PeerIdentityID == request.targetID && item.Direct.LastMessageAt == nil {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("direct conversation missing from inbox: %#v", items)
+			}
+		}
+
+		send := conversationaction.NewSendDirectTextMessageAction(db)
+		message, err := send.Execute(context.Background(), memberLogin.Identity, conversationaction.DirectTextMessageInput{
+			ConversationID:  conversationID,
+			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+			Body:            "你好，管理员",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if message.Sender == nil || message.Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
+			t.Fatalf("direct message sender = %#v", message.Sender)
+		}
+		history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID})
+		if err != nil || len(history.Messages) != 1 || history.Messages[0].ID != message.ID || history.Messages[0].Sender == nil || history.Messages[0].Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
+			t.Fatalf("direct message history = %#v, error = %v", history, err)
+		}
+
+		if _, err := db.NewUpdate().Model((*servermodels.Conversation)(nil)).
+			Set("status = ?", domain.ConversationStatusArchived).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("id = ?", conversationID).
+			Exec(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+			ConversationID:  conversationID,
+			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f66",
+			Body:            "归档后发送",
+		})
+		if !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("send archived direct error = %v, want conversation not found", err)
+		}
+		reopened, err := start.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectConversationInput{TargetIdentityID: memberLogin.Identity.OrganizationIdentity.ID})
+		if err != nil || reopened.ID != conversationID {
+			t.Fatalf("reopened direct conversation = %#v, error = %v", reopened, err)
 		}
 	})
 

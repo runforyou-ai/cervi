@@ -4,6 +4,8 @@ package conversation
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -17,7 +19,7 @@ import (
 
 const conversationMessagePageSize = 50
 
-// ListConversationMessagesQuery 分页读取成员可见的客户会话消息。
+// ListConversationMessagesQuery 分页读取成员可见的会话消息。
 type ListConversationMessagesQuery struct {
 	db *bun.DB
 }
@@ -30,6 +32,7 @@ type conversationMessageRow struct {
 	CreatedAt                      time.Time  `bun:"created_at"`
 	SenderSubjectID                *string    `bun:"sender_subject_id"`
 	SenderKind                     *string    `bun:"sender_kind"`
+	SenderSourceID                 *string    `bun:"sender_source_id"`
 	SenderDisplayName              *string    `bun:"sender_display_name"`
 	ServiceSessionOpeningMessageID *string    `bun:"service_session_opening_message_id"`
 	ServiceSessionSequence         *int64     `bun:"service_session_sequence"`
@@ -42,7 +45,7 @@ func NewListConversationMessagesQuery(db *bun.DB) *ListConversationMessagesQuery
 	return &ListConversationMessagesQuery{db: db}
 }
 
-// Execute 返回当前企业客户 Conversation 的消息页。
+// Execute 按会话类型授权并返回当前成员可见的消息页。
 func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ConversationMessageHistoryInput) (ConversationMessageHistory, error) {
 	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return ConversationMessageHistory{}, err
@@ -51,18 +54,8 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		return ConversationMessageHistory{}, &ValidationError{Fields: fields}
 	}
 
-	available, err := q.db.NewSelect().
-		TableExpr("conversations AS cv").
-		Join("JOIN customer_conversations AS cc ON cc.conversation_id = cv.id AND cc.organization_id = cv.organization_id").
-		Where("cv.organization_id = ?", identity.Organization.ID).
-		Where("cv.id = ?", input.ConversationID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer).
-		Exists(ctx)
-	if err != nil {
-		return ConversationMessageHistory{}, fmt.Errorf("check customer conversation access: %w", err)
-	}
-	if !available {
-		return ConversationMessageHistory{}, ErrConversationNotFound
+	if err := authorizeConversationHistory(ctx, q.db, identity, input.ConversationID); err != nil {
+		return ConversationMessageHistory{}, err
 	}
 
 	query := q.db.NewSelect().
@@ -74,6 +67,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		ColumnExpr("msg.created_at AS created_at").
 		ColumnExpr("cs.id AS sender_subject_id").
 		ColumnExpr("cs.kind AS sender_kind").
+		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) WHEN cs.kind = ? THEN oi.display_name END AS sender_display_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		ColumnExpr("ss.opening_message_id AS service_session_opening_message_id").
 		ColumnExpr("ss.sequence AS service_session_sequence").
@@ -82,7 +76,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		Join("LEFT JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
-		Join("JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+		Join("LEFT JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN contacts AS c ON c.id = cs.source_id AND c.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
@@ -102,9 +96,61 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 
 	var rows []conversationMessageRow
 	if err := query.Limit(conversationMessagePageSize+1).Scan(ctx, &rows); err != nil {
-		return ConversationMessageHistory{}, fmt.Errorf("list customer conversation messages: %w", err)
+		return ConversationMessageHistory{}, fmt.Errorf("list conversation messages: %w", err)
 	}
 	return buildConversationMessageHistory(rows, input), nil
+}
+
+// authorizeConversationHistory 对不同会话类型应用各自的成员可见性规则。
+func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) error {
+	var conversationType string
+	err := db.NewSelect().
+		TableExpr("conversations AS cv").
+		ColumnExpr("cv.type").
+		Where("cv.organization_id = ?", identity.Organization.ID).
+		Where("cv.id = ?", conversationID).
+		Scan(ctx, &conversationType)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrConversationNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("load conversation type for history: %w", err)
+	}
+
+	switch domain.ConversationType(conversationType) {
+	case domain.ConversationTypeCustomer:
+		available, err := db.NewSelect().
+			TableExpr("customer_conversations AS cc").
+			Where("cc.organization_id = ?", identity.Organization.ID).
+			Where("cc.conversation_id = ?", conversationID).
+			Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check customer conversation access: %w", err)
+		}
+		if !available {
+			return ErrConversationNotFound
+		}
+		return nil
+	case domain.ConversationTypeDirect:
+		available, err := db.NewSelect().
+			TableExpr("conversation_participants AS cp").
+			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
+			Where("cp.organization_id = ?", identity.Organization.ID).
+			Where("cp.conversation_id = ?", conversationID).
+			Where("cp.left_at IS NULL").
+			Where("cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+			Where("cs.source_id = ?", identity.OrganizationIdentity.ID).
+			Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check direct conversation access: %w", err)
+		}
+		if !available {
+			return ErrConversationNotFound
+		}
+		return nil
+	default:
+		return ErrConversationNotFound
+	}
 }
 
 // validateConversationMessageHistoryInput 校验成员消息历史输入。
@@ -140,10 +186,11 @@ func buildConversationMessageHistory(rows []conversationMessageRow, input Conver
 			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
 			OriginatedAt: row.OriginatedAt, CreatedAt: row.CreatedAt,
 		}
-		if row.SenderSubjectID != nil && row.SenderKind != nil {
+		if row.SenderSubjectID != nil && row.SenderKind != nil && row.SenderSourceID != nil {
 			message.Sender = &ConversationMessageSender{
 				ChatSubjectID: *row.SenderSubjectID,
 				Kind:          domain.ChatSubjectKind(*row.SenderKind),
+				SourceID:      *row.SenderSourceID,
 				DisplayName:   row.SenderDisplayName,
 			}
 		}

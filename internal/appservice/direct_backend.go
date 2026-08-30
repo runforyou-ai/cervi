@@ -52,6 +52,8 @@ type DirectBackend struct {
 	loadInbox                         *inboxaction.LoadInboxQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
+	startDirectConversation           *conversationaction.StartDirectConversationAction
+	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
 	getTelegramChannel                *channelaction.GetTelegramChannelQuery
@@ -158,6 +160,8 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
+		startDirectConversation:           conversationaction.NewStartDirectConversationAction(db),
+		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getTelegramChannel:                channelaction.NewGetTelegramChannelQuery(db),
