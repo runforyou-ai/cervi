@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"uuid"
 
@@ -31,10 +32,14 @@ const (
 
 // ExecuteAction 执行并收尾一次 Agent 业务运行。
 type ExecuteAction struct {
-	db       *bun.DB
-	enqueuer servertask.TxEnqueuer
-	runtime  agentruntime.Runtime
+	db          *bun.DB
+	enqueuer    servertask.TxEnqueuer
+	runtime     agentruntime.Runtime
+	runningMu   sync.Mutex
+	runningRuns map[string]*runningAgentRun
 }
+
+type runningAgentRun struct{ cancel context.CancelFunc }
 
 type executionContext struct {
 	Run             servermodels.AgentRun `bun:",embed"`
@@ -49,7 +54,79 @@ type executionContext struct {
 
 // NewExecuteAction 创建 Agent Worker Action。
 func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime) *ExecuteAction {
-	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime}
+	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, runningRuns: make(map[string]*runningAgentRun)}
+}
+
+// CancelForServiceSession 在客服事务内取消原负责人尚未结束的运行。
+func (a *ExecuteAction) CancelForServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
+	agent, err := db.NewSelect().Model((*servermodels.Agent)(nil)).
+		Where("a.organization_id = ?", organizationID).
+		Where("a.identity_id = ?", agentIdentityID).
+		Exists(ctx)
+	if err != nil || !agent {
+		return nil, err
+	}
+	state := &servermodels.ConversationAgentState{}
+	stateExists := true
+	if err := db.NewSelect().Model(state).
+		Where("cas.organization_id = ?", organizationID).
+		Where("cas.conversation_id = ?", conversationID).
+		Where("cas.agent_identity_id = ?", agentIdentityID).
+		For("UPDATE").
+		Scan(ctx); errors.Is(err, sql.ErrNoRows) {
+		stateExists = false
+	} else if err != nil {
+		return nil, fmt.Errorf("lock assigned agent state: %w", err)
+	}
+	runIDs := make([]string, 0)
+	if err := db.NewRaw(`
+		UPDATE agent_runs
+		SET status = ?, error_code = ?, completed_at = now(), updated_at = now()
+		WHERE organization_id = ?
+			AND conversation_id = ?
+			AND agent_identity_id = ?
+			AND status IN (?, ?)
+		RETURNING id
+	`, domain.AgentRunStatusCancelled, reason, organizationID, conversationID, agentIdentityID, domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
+		Scan(ctx, &runIDs); err != nil {
+		return nil, fmt.Errorf("cancel assigned agent runs: %w", err)
+	}
+	if stateExists {
+		if _, err := db.NewUpdate().Model(state).
+			Set("processed_seq = ?", state.DesiredSeq).
+			Set("updated_at = now()").
+			WherePK().
+			Exec(ctx); err != nil {
+			return nil, fmt.Errorf("advance cancelled agent state: %w", err)
+		}
+	}
+	return runIDs, nil
+}
+
+// CancelRunContexts 尽力取消本进程中正在执行的模型调用。
+func (a *ExecuteAction) CancelRunContexts(runIDs []string) {
+	a.runningMu.Lock()
+	defer a.runningMu.Unlock()
+	for _, runID := range runIDs {
+		if running := a.runningRuns[runID]; running != nil {
+			running.cancel()
+		}
+	}
+}
+
+// registerRunContext 注册一次可被客服负责人变化中断的模型调用。
+func (a *ExecuteAction) registerRunContext(runID string, cancel context.CancelFunc) func() {
+	running := &runningAgentRun{cancel: cancel}
+	a.runningMu.Lock()
+	a.runningRuns[runID] = running
+	a.runningMu.Unlock()
+	return func() {
+		a.runningMu.Lock()
+		if a.runningRuns[runID] == running {
+			delete(a.runningRuns, runID)
+		}
+		a.runningMu.Unlock()
+	}
 }
 
 // Execute 运行 TurnLoop，并只保存吸收完当前输入后的稳定回复。
@@ -66,6 +143,8 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	}
 	runCtx, cancel := context.WithTimeout(ctx, agentRunTimeout)
 	defer cancel()
+	unregister := a.registerRunContext(execution.Run.ID, cancel)
+	defer unregister()
 	maxOutputTokens := agentMaxOutputTokens
 	if execution.MaxOutputTokens > 0 && execution.MaxOutputTokens < int64(maxOutputTokens) {
 		maxOutputTokens = int(execution.MaxOutputTokens)
@@ -90,8 +169,12 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if failErr := a.fail(ctx, execution.Run.ID, err); failErr != nil {
+	terminal, failErr := a.fail(ctx, execution.Run.ID, err)
+	if failErr != nil {
 		return fmt.Errorf("agent run failed: %v; persist failure: %w", err, failErr)
+	}
+	if terminal {
+		return nil
 	}
 	return task.Permanent(fmt.Errorf("execute agent run: %w", err))
 }
@@ -105,23 +188,38 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 	} else if err != nil {
 		return executionContext{}, false, fmt.Errorf("load agent run status: %w", err)
 	}
-	if status == string(domain.AgentRunStatusSucceeded) || status == string(domain.AgentRunStatusFailed) {
+	if agentRunStatusTerminal(status) {
 		return executionContext{}, true, nil
 	}
 	if status != string(domain.AgentRunStatusQueued) && status != string(domain.AgentRunStatusRunning) {
 		return executionContext{}, false, task.Permanent(fmt.Errorf("unsupported agent run status %q", status))
 	}
-	if _, err := a.db.NewUpdate().Model((*servermodels.AgentRun)(nil)).
+	result, err := a.db.NewUpdate().Model((*servermodels.AgentRun)(nil)).
 		Set("status = ?", domain.AgentRunStatusRunning).
 		Set("started_at = COALESCE(started_at, now())").
 		Set("updated_at = now()").
 		Where("id = ?", runID).
 		Where("status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
-		Exec(ctx); err != nil {
+		Exec(ctx)
+	if err != nil {
 		return executionContext{}, false, fmt.Errorf("begin agent run: %w", err)
 	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return executionContext{}, false, fmt.Errorf("read begun agent run rows: %w", err)
+	}
+	if rows == 0 {
+		if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
+			Column("status").Where("agr.id = ?", runID).Scan(ctx, &status); err != nil {
+			return executionContext{}, false, fmt.Errorf("reload agent run status: %w", err)
+		}
+		if agentRunStatusTerminal(status) {
+			return executionContext{}, true, nil
+		}
+		return executionContext{}, false, fmt.Errorf("agent run status changed to %q before begin", status)
+	}
 	execution := executionContext{}
-	err := a.db.NewSelect().
+	err = a.db.NewSelect().
 		TableExpr("agent_runs AS agr").
 		ColumnExpr("agr.*").
 		ColumnExpr("oi.display_name AS agent_name").
@@ -140,14 +238,38 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		Where("ar.schema_version = 1").
 		Where("aipm.model_type = ?", domain.AIModelTypeChat).
 		Scan(ctx, &execution)
+	if errors.Is(err, sql.ErrNoRows) {
+		if reloadErr := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
+			Column("status").Where("agr.id = ?", runID).Scan(ctx, &status); reloadErr != nil {
+			return executionContext{}, false, fmt.Errorf("reload unavailable agent run status: %w", reloadErr)
+		}
+		if agentRunStatusTerminal(status) {
+			return executionContext{}, true, nil
+		}
+	}
 	if err != nil {
 		return executionContext{}, false, fmt.Errorf("load agent run execution: %w", err)
 	}
 	return execution, false, nil
 }
 
+// agentRunStatusTerminal 判断 Agent Run 是否已经进入不可覆盖的终态。
+func agentRunStatusTerminal(status string) bool {
+	return status == string(domain.AgentRunStatusSucceeded) ||
+		status == string(domain.AgentRunStatusFailed) ||
+		status == string(domain.AgentRunStatusCancelled)
+}
+
 // complete 原子写入最终回复、推进消费序号并补投递竞态中的后续输入。
 func (a *ExecuteAction) complete(ctx context.Context, execution executionContext, result agentruntime.RunResult) error {
+	var status string
+	if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
+		Column("status").Where("agr.id = ?", execution.Run.ID).Scan(ctx, &status); err != nil {
+		return err
+	}
+	if agentRunStatusTerminal(status) {
+		return nil
+	}
 	content := strings.TrimSpace(result.Content)
 	if content == "" || result.EndSeq <= 0 {
 		return errors.New("agent runtime returned an invalid result")
@@ -170,7 +292,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		if err := tx.NewSelect().Model(run).Where("agr.id = ?", execution.Run.ID).For("UPDATE").Scan(ctx); err != nil {
 			return fmt.Errorf("lock agent run for completion: %w", err)
 		}
-		if run.Status == string(domain.AgentRunStatusSucceeded) {
+		if agentRunStatusTerminal(run.Status) {
 			return nil
 		}
 		if run.Status != string(domain.AgentRunStatusRunning) || run.TriggerEndSeq == nil || *run.TriggerEndSeq != result.EndSeq {
@@ -243,13 +365,17 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 }
 
 // fail 标记最终失败，并为执行期间刚到达的新输入补建下一次运行。
-func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) error {
+func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (bool, error) {
 	message := truncateRunError(runErr)
 	initial := &servermodels.AgentRun{}
 	if err := a.db.NewSelect().Model(initial).Where("agr.id = ?", runID).Scan(ctx); err != nil {
-		return err
+		return false, err
 	}
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	if agentRunStatusTerminal(initial.Status) {
+		return true, nil
+	}
+	terminal := false
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		state := &servermodels.ConversationAgentState{}
 		if err := tx.NewSelect().Model(state).
 			Where("cas.conversation_id = ?", initial.ConversationID).
@@ -262,7 +388,8 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) er
 		if err := tx.NewSelect().Model(run).Where("agr.id = ?", runID).For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
-		if run.Status == string(domain.AgentRunStatusSucceeded) || run.Status == string(domain.AgentRunStatusFailed) {
+		if agentRunStatusTerminal(run.Status) {
+			terminal = true
 			return nil
 		}
 		if run.Status != string(domain.AgentRunStatusQueued) && run.Status != string(domain.AgentRunStatusRunning) {
@@ -319,6 +446,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) er
 		_, err := insertAndEnqueueRun(ctx, tx, a.enqueuer, run.OrganizationID, run.ConversationID, run.AgentIdentityID, revisionID, failureEnd+1)
 		return err
 	})
+	return terminal, err
 }
 
 // FinalizeFailure 在任务达到最终失败时收敛 Agent 业务运行。
@@ -326,7 +454,8 @@ func (a *ExecuteAction) FinalizeFailure(ctx context.Context, input RunInput, run
 	if !common.ValidUUID(input.RunID) {
 		return errors.New("agent run id is invalid")
 	}
-	return a.fail(ctx, input.RunID, runErr)
+	_, err := a.fail(ctx, input.RunID, runErr)
+	return err
 }
 
 // truncateRunError 限制持久化错误详情长度。

@@ -4,32 +4,38 @@ package channel
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
 // validateRoutingTarget 校验会话流转目标属于当前企业且可用。
-func validateRoutingTarget(ctx context.Context, db bun.IDB, organizationID, field string, target RoutingTarget) error {
+func validateRoutingTarget(ctx context.Context, db bun.IDB, organizationID string, channelType domain.ChannelType, field string, target RoutingTarget) error {
 	if target.Type == domain.ChannelRoutingTargetTypePublicQueue {
 		return nil
 	}
-	var query *bun.SelectQuery
+	var available bool
+	var err error
 	switch target.Type {
 	case domain.ChannelRoutingTargetTypeTeam:
-		query = db.NewSelect().Model((*servermodels.Team)(nil)).
+		available, err = db.NewSelect().Model((*servermodels.Team)(nil)).
 			Where("organization_id = ?", organizationID).
-			Where("id = ?", target.ID)
+			Where("id = ?", target.ID).
+			Exists(ctx)
 	case domain.ChannelRoutingTargetTypeMember:
-		query = db.NewSelect().TableExpr("organization_identities AS oi").
-			Join("LEFT JOIN users AS u ON u.identity_id = oi.id AND u.organization_id = oi.organization_id").
-			Join("LEFT JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id").
-			Where("oi.organization_id = ?", organizationID).
-			Where("oi.id = ?", target.ID).
-			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive)
+		identity, loadErr := identityaction.LockActiveCustomerServiceIdentity(ctx, db, organizationID, target.ID)
+		if errors.Is(loadErr, sql.ErrNoRows) {
+			break
+		}
+		if loadErr != nil {
+			return loadErr
+		}
+		available = domain.OrganizationIdentityType(identity.Type) != domain.OrganizationIdentityTypeAgent || domain.ChannelSupportsAgentAssignee(channelType)
 	}
-	available, err := query.Exists(ctx)
 	if err != nil {
 		return err
 	}

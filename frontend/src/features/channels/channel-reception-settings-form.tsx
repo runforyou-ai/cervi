@@ -94,7 +94,10 @@ export function ChannelReceptionSettingsForm({
       noValidate
     >
       <FieldGroup>
-        <ChannelReceptionSettingsFields control={form.control} />
+        <ChannelReceptionSettingsFields
+          control={form.control}
+          channelType={channel.type}
+        />
       </FieldGroup>
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={form.formState.isSubmitting}>

@@ -11,11 +11,12 @@ import { toast } from "sonner"
 
 import {
   ChannelRoutingTargetType,
+  ChannelType,
   OrganizationIdentityType,
-  listMemberOptions,
+  listCustomerServiceAssignees,
   listTeams,
   type ChannelRoutingTarget,
-  type MemberOption,
+  type InboxAssignee,
   type Team,
 } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -41,12 +42,12 @@ function ReceptionTargetField<
   name,
   control,
   teams,
-  members,
+  assignees,
 }: {
   name: ReceptionTargetName
   control: Control<TValues>
   teams: Team[]
-  members: MemberOption[]
+  assignees: InboxAssignee[]
 }) {
   const { t } = useTranslation("channels")
   const isFallback = name === "fallbackTarget"
@@ -116,11 +117,14 @@ function ReceptionTargetField<
                               {team.name}
                             </option>
                           ))
-                        : members.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.displayName}（
+                        : assignees.map((assignee) => (
+                            <option
+                              key={assignee.identityId}
+                              value={assignee.identityId}
+                            >
+                              {assignee.displayName}（
                               {t(
-                                member.type ===
+                                assignee.type ===
                                   OrganizationIdentityType.OrganizationIdentityTypeAgent
                                   ? "routing.agent"
                                   : "routing.person",
@@ -154,41 +158,35 @@ async function listAllTeams() {
   return teams
 }
 
-/** 分页读取全部成员接待候选项。 */
-async function listAllMemberOptions() {
-  const members: MemberOption[] = []
-  let page = 1
-  let pages = 1
-  do {
-    const output = await listMemberOptions({
-      page,
-      pageSize: receptionOptionPageSize,
-    })
-    members.push(...output.members)
-    pages = Math.ceil(output.page.total / receptionOptionPageSize)
-    page += 1
-  } while (page <= pages)
-  return members
-}
-
 /** 渲染可被不同渠道表单复用的接待设置字段。 */
 export function ChannelReceptionSettingsFields<
   TValues extends FieldValues & ChannelReceptionSettingsFormValues,
->({ control }: { control: Control<TValues> }) {
+>({
+  control,
+  channelType,
+}: {
+  control: Control<TValues>
+  channelType: ChannelType
+}) {
   const { t } = useTranslation("channels")
   const { data: options, error } = useResource(
     resourceKeys.channelReceptionOptions(),
     async () => {
-      const [teams, members] = await Promise.all([
+      const [teams, assignees] = await Promise.all([
         listAllTeams(),
-        listAllMemberOptions(),
+        listCustomerServiceAssignees(),
       ])
-      return { teams, members }
+      return { teams, assignees }
     },
     { staleTime: 0 },
   )
   const teams = options?.teams ?? []
-  const members = options?.members ?? []
+  const assignees = (options?.assignees ?? []).filter(
+    (assignee) =>
+      channelType === ChannelType.ChannelTypeWebsite ||
+      assignee.type !==
+        OrganizationIdentityType.OrganizationIdentityTypeAgent,
+  )
 
   /** 候选项加载失败时提示用户。 */
   useEffect(() => {
@@ -206,7 +204,7 @@ export function ChannelReceptionSettingsFields<
           name={name}
           control={control}
           teams={teams}
-          members={members}
+          assignees={assignees}
         />
       ))}
     </>

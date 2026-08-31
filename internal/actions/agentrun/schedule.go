@@ -41,11 +41,10 @@ func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, co
 			conversation_id, organization_id, agent_identity_id, desired_seq, processed_seq
 		)
 		VALUES (?, ?, ?, 1, 0)
-		ON CONFLICT (conversation_id) DO UPDATE
+		ON CONFLICT (conversation_id, agent_identity_id) DO UPDATE
 		SET desired_seq = conversation_agent_states.desired_seq + 1,
 			updated_at = now()
 		WHERE conversation_agent_states.organization_id = EXCLUDED.organization_id
-			AND conversation_agent_states.agent_identity_id = EXCLUDED.agent_identity_id
 		RETURNING desired_seq, processed_seq
 	`, conversationID, organizationID, agentIdentityID).Scan(ctx, &sequence)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -57,10 +56,11 @@ func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, co
 	triggerID := uuid.NewV7()
 	trigger := &servermodels.ConversationAgentTrigger{
 		ID: triggerID.String(), OrganizationID: organizationID, ConversationID: conversationID,
-		AgentIdentityID: agentIdentityID, TriggerSeq: sequence.DesiredSeq, TriggerMessageID: messageID,
+		AgentIdentityID: agentIdentityID, TriggerType: string(domain.AgentTriggerTypeDirect),
+		TriggerSeq: sequence.DesiredSeq, TriggerMessageID: messageID,
 	}
 	if _, err := db.NewInsert().Model(trigger).
-		Column("id", "organization_id", "conversation_id", "agent_identity_id", "trigger_seq", "trigger_message_id").
+		Column("id", "organization_id", "conversation_id", "agent_identity_id", "trigger_type", "trigger_seq", "trigger_message_id").
 		Exec(ctx); err != nil {
 		return fmt.Errorf("create agent trigger: %w", err)
 	}
@@ -86,11 +86,11 @@ func insertAndEnqueueRun(ctx context.Context, db bun.IDB, enqueuer servertask.Tx
 	runID := uuid.NewV7()
 	run := &servermodels.AgentRun{
 		ID: runID.String(), OrganizationID: organizationID, ConversationID: conversationID,
-		AgentIdentityID: agentIdentityID, AgentRevisionID: revisionID, Status: string(domain.AgentRunStatusQueued),
+		AgentIdentityID: agentIdentityID, AgentRevisionID: revisionID, TriggerType: string(domain.AgentTriggerTypeDirect), Status: string(domain.AgentRunStatusQueued),
 		TriggerStartSeq: startSeq,
 	}
 	if _, err := db.NewInsert().Model(run).
-		Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "status", "trigger_start_seq").
+		Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "trigger_type", "status", "trigger_start_seq").
 		Exec(ctx); err != nil {
 		return "", fmt.Errorf("create agent run: %w", err)
 	}

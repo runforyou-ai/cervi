@@ -4,6 +4,8 @@ package channel
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -38,10 +40,22 @@ func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "newConversationTarget", input.NewConversationTarget); err != nil {
+		if err := tx.NewSelect().Model(channel).
+			Column("id", "type").
+			Where("c.id = ?", channelID).
+			Where("c.organization_id = ?", identity.Organization.ID).
+			Where("c.type IN (?)", bun.In(domain.MessageChannelTypes())).
+			For("UPDATE").
+			Scan(ctx); errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		} else if err != nil {
 			return err
 		}
-		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "fallbackTarget", input.FallbackTarget); err != nil {
+		channelType := domain.ChannelType(channel.Type)
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, channelType, "newConversationTarget", input.NewConversationTarget); err != nil {
+			return err
+		}
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, channelType, "fallbackTarget", input.FallbackTarget); err != nil {
 			return err
 		}
 		var description *string

@@ -186,7 +186,11 @@ export function ConversationHeader({
     { enabled: Boolean(customer && sessionOpen && assignedToCurrentUser) },
   )
   const transferCandidates = assignees.filter(
-    (assignee) => assignee.identityId !== currentIdentityId,
+    (assignee) =>
+      assignee.identityId !== currentIdentityId &&
+      (customer?.channelType === ChannelType.ChannelTypeWebsite ||
+        assignee.type !==
+          OrganizationIdentityType.OrganizationIdentityTypeAgent),
   )
   const contextActionLabel = contextVisible
     ? t("contextClose")

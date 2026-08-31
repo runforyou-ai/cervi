@@ -14,7 +14,7 @@ type ConversationAgentState struct {
 
 	ConversationID  string    `bun:"conversation_id,pk"`
 	OrganizationID  string    `bun:"organization_id"`
-	AgentIdentityID string    `bun:"agent_identity_id"`
+	AgentIdentityID string    `bun:"agent_identity_id,pk"`
 	DesiredSeq      int64     `bun:"desired_seq"`
 	ProcessedSeq    int64     `bun:"processed_seq"`
 	CreatedAt       time.Time `bun:"created_at"`

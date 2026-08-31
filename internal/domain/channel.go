@@ -24,6 +24,11 @@ func SupportedMessageChannelType(channelType ChannelType) bool {
 	return false
 }
 
+// ChannelSupportsAgentAssignee 判断渠道是否允许 AI 员工作为会话负责人并对外回复。
+func ChannelSupportsAgentAssignee(channelType ChannelType) bool {
+	return channelType == ChannelTypeWebsite
+}
+
 // ChannelRoutingTargetType 定义渠道会话流转目标类型。
 type ChannelRoutingTargetType string
 
