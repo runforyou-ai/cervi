@@ -17,6 +17,9 @@ CREATE TABLE channels (
     enabled                        boolean NOT NULL DEFAULT true
 );
 
+CREATE INDEX channels_organization_type_enabled_index
+    ON channels (organization_id, type, enabled);
+
 COMMENT ON TABLE channels IS '企业消息渠道';
 COMMENT ON COLUMN channels.id IS '渠道编号';
 COMMENT ON COLUMN channels.created_at IS '创建时间';
@@ -32,9 +35,6 @@ COMMENT ON COLUMN channels.initial_routing_target_id IS '初始路由团队或�
 COMMENT ON COLUMN channels.fallback_routing_target_type IS '失败路由目标类型';
 COMMENT ON COLUMN channels.fallback_routing_target_id IS '失败路由团队或成员编号';
 COMMENT ON COLUMN channels.enabled IS '是否启用';
-
-CREATE INDEX channels_organization_type_enabled_index
-    ON channels (organization_id, type, enabled);
 
 -- +goose Down
 DROP TABLE channels;

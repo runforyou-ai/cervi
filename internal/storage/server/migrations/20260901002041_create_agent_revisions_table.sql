@@ -11,6 +11,9 @@ CREATE TABLE agent_revisions (
     created_by_user_id  uuid NOT NULL
 );
 
+CREATE INDEX agent_revisions_organization_agent_index
+    ON agent_revisions (organization_id, agent_id, created_at DESC);
+
 COMMENT ON TABLE agent_revisions IS 'AI 员工不可变配置版本';
 COMMENT ON COLUMN agent_revisions.id IS '配置版本编号';
 COMMENT ON COLUMN agent_revisions.created_at IS '创建时间';
@@ -20,9 +23,6 @@ COMMENT ON COLUMN agent_revisions.execution_mode IS '执行方式';
 COMMENT ON COLUMN agent_revisions.schema_version IS '配置结构版本';
 COMMENT ON COLUMN agent_revisions.configuration IS '非敏感执行配置快照';
 COMMENT ON COLUMN agent_revisions.created_by_user_id IS '创建用户编号';
-
-CREATE INDEX agent_revisions_organization_agent_index
-    ON agent_revisions (organization_id, agent_id, created_at DESC);
 
 -- +goose Down
 DROP TABLE agent_revisions;

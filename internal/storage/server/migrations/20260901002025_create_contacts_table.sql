@@ -13,6 +13,15 @@ CREATE TABLE contacts (
     deleted_at          timestamptz
 );
 
+CREATE INDEX contacts_organization_deleted_stage_updated_index
+    ON contacts (organization_id, deleted_at, stage, updated_at DESC, id DESC);
+
+CREATE INDEX contacts_organization_display_name_index
+    ON contacts (organization_id, lower(display_name));
+
+CREATE INDEX contacts_organization_source_channel_index
+    ON contacts (organization_id, source_channel_id, deleted_at);
+
 COMMENT ON TABLE contacts IS '企业外部联系人';
 COMMENT ON COLUMN contacts.id IS '联系人编号';
 COMMENT ON COLUMN contacts.created_at IS '创建时间';
@@ -24,15 +33,6 @@ COMMENT ON COLUMN contacts.display_name IS '显示名称';
 COMMENT ON COLUMN contacts.stage IS '客户阶段';
 COMMENT ON COLUMN contacts.notes IS '备注';
 COMMENT ON COLUMN contacts.deleted_at IS '移入回收站时间';
-
-CREATE INDEX contacts_organization_deleted_stage_updated_index
-    ON contacts (organization_id, deleted_at, stage, updated_at DESC, id DESC);
-
-CREATE INDEX contacts_organization_display_name_index
-    ON contacts (organization_id, lower(display_name));
-
-CREATE INDEX contacts_organization_source_channel_index
-    ON contacts (organization_id, source_channel_id, deleted_at);
 
 -- +goose Down
 DROP TABLE contacts;

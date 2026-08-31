@@ -22,6 +22,36 @@ CREATE TABLE service_sessions (
     closed_by_identity_id        uuid
 );
 
+CREATE UNIQUE INDEX service_sessions_organization_conversation_sequence_unique
+    ON service_sessions (
+        organization_id,
+        conversation_id,
+        sequence
+    );
+
+CREATE UNIQUE INDEX service_sessions_organization_opening_message_unique
+    ON service_sessions (organization_id, opening_message_id);
+
+CREATE UNIQUE INDEX service_sessions_organization_conversation_open_unique
+    ON service_sessions (organization_id, conversation_id)
+    WHERE status = 'open';
+
+CREATE INDEX service_sessions_organization_conversation_last_message_index
+    ON service_sessions (
+        organization_id,
+        conversation_id,
+        last_message_at DESC,
+        id DESC
+    );
+
+CREATE INDEX service_sessions_org_channel_identity_last_message_index
+    ON service_sessions (
+        organization_id,
+        contact_channel_identity_id,
+        last_message_at DESC,
+        id DESC
+    );
+
 COMMENT ON TABLE service_sessions IS '客户会话客服处理周期';
 COMMENT ON COLUMN service_sessions.id IS '客服处理周期编号';
 COMMENT ON COLUMN service_sessions.created_at IS '创建时间';
@@ -42,49 +72,14 @@ COMMENT ON COLUMN service_sessions.first_response_at IS '首次客服响应时�
 COMMENT ON COLUMN service_sessions.status_changed_at IS '处理状态最后变更时间';
 COMMENT ON COLUMN service_sessions.closed_at IS '关闭时间';
 COMMENT ON COLUMN service_sessions.closed_by_identity_id IS '关闭人企业身份编号';
-
-CREATE UNIQUE INDEX service_sessions_organization_conversation_sequence_unique
-    ON service_sessions (
-        organization_id,
-        conversation_id,
-        sequence
-    );
-
 COMMENT ON INDEX service_sessions_organization_conversation_sequence_unique
     IS '企业客户会话处理周期序号唯一索引';
-
-CREATE UNIQUE INDEX service_sessions_organization_opening_message_unique
-    ON service_sessions (organization_id, opening_message_id);
-
 COMMENT ON INDEX service_sessions_organization_opening_message_unique
     IS '企业客服处理周期首条消息唯一索引';
-
-CREATE UNIQUE INDEX service_sessions_organization_conversation_open_unique
-    ON service_sessions (organization_id, conversation_id)
-    WHERE status = 'open';
-
 COMMENT ON INDEX service_sessions_organization_conversation_open_unique
     IS '企业客户会话未结束处理周期唯一索引';
-
-CREATE INDEX service_sessions_organization_conversation_last_message_index
-    ON service_sessions (
-        organization_id,
-        conversation_id,
-        last_message_at DESC,
-        id DESC
-    );
-
 COMMENT ON INDEX service_sessions_organization_conversation_last_message_index
     IS '企业客户会话处理周期最后消息索引';
-
-CREATE INDEX service_sessions_org_channel_identity_last_message_index
-    ON service_sessions (
-        organization_id,
-        contact_channel_identity_id,
-        last_message_at DESC,
-        id DESC
-    );
-
 COMMENT ON INDEX service_sessions_org_channel_identity_last_message_index
     IS '企业渠道身份处理周期最后消息索引';
 

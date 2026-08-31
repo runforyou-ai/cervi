@@ -11,6 +11,9 @@ CREATE TABLE task_outbox (
     last_error          text
 );
 
+CREATE INDEX task_outbox_available_index
+    ON task_outbox (available_at, created_at);
+
 COMMENT ON TABLE task_outbox IS '等待可靠发布到 NATS 的任务消息';
 COMMENT ON COLUMN task_outbox.task_run_id IS '关联任务运行编号';
 COMMENT ON COLUMN task_outbox.created_at IS '创建时间';
@@ -20,9 +23,6 @@ COMMENT ON COLUMN task_outbox.queue_name IS '目标任务队列';
 COMMENT ON COLUMN task_outbox.attempts IS '已经尝试发布的次数';
 COMMENT ON COLUMN task_outbox.available_at IS '允许下次发布的时间';
 COMMENT ON COLUMN task_outbox.last_error IS '最近一次发布错误';
-
-CREATE INDEX task_outbox_available_index
-    ON task_outbox (available_at, created_at);
 
 -- +goose Down
 DROP TABLE task_outbox;

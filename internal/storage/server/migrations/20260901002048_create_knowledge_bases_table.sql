@@ -13,6 +13,13 @@ CREATE TABLE knowledge_bases (
     external_resource_id text
 );
 
+CREATE UNIQUE INDEX knowledge_bases_organization_name_unique
+    ON knowledge_bases (organization_id, lower(name));
+
+CREATE UNIQUE INDEX knowledge_bases_external_resource_unique
+    ON knowledge_bases (organization_id, integration_connection_id, external_resource_id)
+    WHERE integration_connection_id IS NOT NULL AND external_resource_id IS NOT NULL;
+
 COMMENT ON TABLE knowledge_bases IS '企业知识库';
 COMMENT ON COLUMN knowledge_bases.id IS '知识库编号';
 COMMENT ON COLUMN knowledge_bases.created_at IS '创建时间';
@@ -24,13 +31,6 @@ COMMENT ON COLUMN knowledge_bases.category IS '内容类型：standard 文档库
 COMMENT ON COLUMN knowledge_bases.description IS '知识库描述';
 COMMENT ON COLUMN knowledge_bases.integration_connection_id IS '外部知识库使用的集成连接编号';
 COMMENT ON COLUMN knowledge_bases.external_resource_id IS '外部平台中的知识库编号';
-
-CREATE UNIQUE INDEX knowledge_bases_organization_name_unique
-    ON knowledge_bases (organization_id, lower(name));
-
-CREATE UNIQUE INDEX knowledge_bases_external_resource_unique
-    ON knowledge_bases (organization_id, integration_connection_id, external_resource_id)
-    WHERE integration_connection_id IS NOT NULL AND external_resource_id IS NOT NULL;
 
 -- +goose Down
 DROP TABLE knowledge_bases;

@@ -12,6 +12,21 @@ CREATE TABLE conversation_participants (
     left_at          timestamptz
 );
 
+CREATE UNIQUE INDEX conversation_participants_org_conversation_subject_unique
+    ON conversation_participants (
+        organization_id,
+        conversation_id,
+        subject_id
+    );
+
+CREATE INDEX conversation_participants_organization_subject_active_index
+    ON conversation_participants (
+        organization_id,
+        subject_id,
+        left_at,
+        conversation_id
+    );
+
 COMMENT ON TABLE conversation_participants IS '会话参与者关系';
 COMMENT ON COLUMN conversation_participants.id IS '会话参与者关系编号';
 COMMENT ON COLUMN conversation_participants.created_at IS '创建时间';
@@ -22,25 +37,8 @@ COMMENT ON COLUMN conversation_participants.subject_id IS '聊天主体编号';
 COMMENT ON COLUMN conversation_participants.role IS '会话参与角色：owner、member';
 COMMENT ON COLUMN conversation_participants.joined_at IS '首次加入时间';
 COMMENT ON COLUMN conversation_participants.left_at IS '离开时间';
-
-CREATE UNIQUE INDEX conversation_participants_org_conversation_subject_unique
-    ON conversation_participants (
-        organization_id,
-        conversation_id,
-        subject_id
-    );
-
 COMMENT ON INDEX conversation_participants_org_conversation_subject_unique
     IS '企业会话内聊天主体唯一索引';
-
-CREATE INDEX conversation_participants_organization_subject_active_index
-    ON conversation_participants (
-        organization_id,
-        subject_id,
-        left_at,
-        conversation_id
-    );
-
 COMMENT ON INDEX conversation_participants_organization_subject_active_index
     IS '企业聊天主体参与会话状态索引';
 

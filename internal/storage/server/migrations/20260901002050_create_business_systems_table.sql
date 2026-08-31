@@ -11,6 +11,12 @@ CREATE TABLE business_systems (
     enabled          boolean NOT NULL DEFAULT true
 );
 
+CREATE UNIQUE INDEX business_systems_organization_name_unique
+    ON business_systems (organization_id, lower(name));
+
+CREATE INDEX business_systems_organization_created_at_index
+    ON business_systems (organization_id, created_at);
+
 COMMENT ON TABLE business_systems IS '企业业务系统';
 COMMENT ON COLUMN business_systems.id IS '业务系统编号';
 COMMENT ON COLUMN business_systems.created_at IS '添加时间';
@@ -20,12 +26,6 @@ COMMENT ON COLUMN business_systems.name IS '业务系统名称';
 COMMENT ON COLUMN business_systems.description IS '业务系统描述';
 COMMENT ON COLUMN business_systems.url IS '业务系统地址';
 COMMENT ON COLUMN business_systems.enabled IS '是否启用';
-
-CREATE UNIQUE INDEX business_systems_organization_name_unique
-    ON business_systems (organization_id, lower(name));
-
-CREATE INDEX business_systems_organization_created_at_index
-    ON business_systems (organization_id, created_at);
 
 -- +goose Down
 DROP TABLE business_systems;

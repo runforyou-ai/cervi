@@ -16,6 +16,13 @@ CREATE TABLE task_schedules (
     last_enqueued_at    timestamptz
 );
 
+CREATE UNIQUE INDEX task_schedules_key_unique
+    ON task_schedules (schedule_key);
+
+CREATE INDEX task_schedules_due_index
+    ON task_schedules (next_run_at, schedule_key)
+    WHERE enabled = true;
+
 COMMENT ON TABLE task_schedules IS '服务端定时 Action 计划';
 COMMENT ON COLUMN task_schedules.id IS '计划编号';
 COMMENT ON COLUMN task_schedules.created_at IS '创建时间';
@@ -30,13 +37,6 @@ COMMENT ON COLUMN task_schedules.enabled IS '是否启用计划';
 COMMENT ON COLUMN task_schedules.max_attempts IS '每次任务最多执行次数';
 COMMENT ON COLUMN task_schedules.next_run_at IS '下一次待触发时间';
 COMMENT ON COLUMN task_schedules.last_enqueued_at IS '最近一次已创建任务的计划时间';
-
-CREATE UNIQUE INDEX task_schedules_key_unique
-    ON task_schedules (schedule_key);
-
-CREATE INDEX task_schedules_due_index
-    ON task_schedules (next_run_at, schedule_key)
-    WHERE enabled = true;
 
 -- +goose Down
 DROP TABLE task_schedules;

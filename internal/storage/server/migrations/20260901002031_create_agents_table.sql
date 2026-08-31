@@ -10,6 +10,12 @@ CREATE TABLE agents (
     active_revision_id  uuid NOT NULL
 );
 
+CREATE UNIQUE INDEX agents_organization_identity_unique
+    ON agents (organization_id, identity_id);
+
+CREATE UNIQUE INDEX agents_organization_active_revision_unique
+    ON agents (organization_id, active_revision_id);
+
 COMMENT ON TABLE agents IS 'AI 员工';
 COMMENT ON COLUMN agents.id IS 'AI 员工编号';
 COMMENT ON COLUMN agents.created_at IS '创建时间';
@@ -18,12 +24,6 @@ COMMENT ON COLUMN agents.identity_id IS '企业身份编号';
 COMMENT ON COLUMN agents.organization_id IS '所属企业编号';
 COMMENT ON COLUMN agents.status IS '账号状态';
 COMMENT ON COLUMN agents.active_revision_id IS '当前配置版本编号';
-
-CREATE UNIQUE INDEX agents_organization_identity_unique
-    ON agents (organization_id, identity_id);
-
-CREATE UNIQUE INDEX agents_organization_active_revision_unique
-    ON agents (organization_id, active_revision_id);
 
 -- +goose Down
 DROP TABLE agents;

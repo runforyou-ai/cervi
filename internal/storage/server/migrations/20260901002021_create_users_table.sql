@@ -15,6 +15,12 @@ CREATE TABLE users (
     workspace_tabs_enabled  boolean NOT NULL DEFAULT false
 );
 
+CREATE UNIQUE INDEX users_organization_email_unique
+    ON users (organization_id, lower(email));
+
+CREATE UNIQUE INDEX users_organization_identity_unique
+    ON users (organization_id, identity_id);
+
 COMMENT ON TABLE users IS '用户账号';
 COMMENT ON COLUMN users.id IS '用户编号';
 COMMENT ON COLUMN users.created_at IS '创建时间';
@@ -28,12 +34,6 @@ COMMENT ON COLUMN users.locale IS '界面语言';
 COMMENT ON COLUMN users.time_zone IS '日期时间显示时区';
 COMMENT ON COLUMN users.message_notifications_enabled IS '是否启用新消息提醒';
 COMMENT ON COLUMN users.workspace_tabs_enabled IS '是否启用工作台多标签页';
-
-CREATE UNIQUE INDEX users_organization_email_unique
-    ON users (organization_id, lower(email));
-
-CREATE UNIQUE INDEX users_organization_identity_unique
-    ON users (organization_id, identity_id);
 
 -- +goose Down
 DROP TABLE users;

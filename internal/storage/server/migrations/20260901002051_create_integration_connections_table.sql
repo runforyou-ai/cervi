@@ -13,6 +13,12 @@ CREATE TABLE integration_connections (
     last_tested_at   timestamptz
 );
 
+CREATE UNIQUE INDEX integration_connections_organization_name_unique
+    ON integration_connections (organization_id, lower(name));
+
+CREATE INDEX integration_connections_organization_created_at_index
+    ON integration_connections (organization_id, created_at);
+
 COMMENT ON TABLE integration_connections IS '企业外部系统连接器';
 COMMENT ON COLUMN integration_connections.id IS '连接编号';
 COMMENT ON COLUMN integration_connections.created_at IS '添加时间';
@@ -24,12 +30,6 @@ COMMENT ON COLUMN integration_connections.description IS '连接说明';
 COMMENT ON COLUMN integration_connections.configuration IS '连接器配置';
 COMMENT ON COLUMN integration_connections.status IS '最近一次连接测试状态';
 COMMENT ON COLUMN integration_connections.last_tested_at IS '最近一次连接测试时间';
-
-CREATE UNIQUE INDEX integration_connections_organization_name_unique
-    ON integration_connections (organization_id, lower(name));
-
-CREATE INDEX integration_connections_organization_created_at_index
-    ON integration_connections (organization_id, created_at);
 
 -- +goose Down
 DROP TABLE integration_connections;

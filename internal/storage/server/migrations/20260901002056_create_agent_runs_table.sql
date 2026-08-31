@@ -18,6 +18,13 @@ CREATE TABLE agent_runs (
     completed_at         timestamptz
 );
 
+CREATE UNIQUE INDEX agent_runs_conversation_active_unique
+    ON agent_runs (conversation_id, agent_identity_id)
+    WHERE status IN ('queued', 'running');
+
+CREATE INDEX agent_runs_organization_conversation_created_index
+    ON agent_runs (organization_id, conversation_id, created_at DESC);
+
 COMMENT ON TABLE agent_runs IS 'Agent 业务运行';
 COMMENT ON COLUMN agent_runs.id IS '运行编号';
 COMMENT ON COLUMN agent_runs.created_at IS '创建时间';
@@ -34,13 +41,6 @@ COMMENT ON COLUMN agent_runs.usage IS '模型用量汇总';
 COMMENT ON COLUMN agent_runs.last_error IS '最终失败信息';
 COMMENT ON COLUMN agent_runs.started_at IS '首次开始执行时间';
 COMMENT ON COLUMN agent_runs.completed_at IS '最终完成时间';
-
-CREATE UNIQUE INDEX agent_runs_conversation_active_unique
-    ON agent_runs (conversation_id, agent_identity_id)
-    WHERE status IN ('queued', 'running');
-
-CREATE INDEX agent_runs_organization_conversation_created_index
-    ON agent_runs (organization_id, conversation_id, created_at DESC);
 
 -- +goose Down
 DROP TABLE agent_runs;
