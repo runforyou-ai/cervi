@@ -219,7 +219,22 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		Where("cc.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer)
 	if input.Scope == domain.InboxScopeAll {
-		query = query.Where("latest.status = ?", domain.ServiceSessionStatusOpen)
+		query = query.
+			Where("latest.status = ?", domain.ServiceSessionStatusOpen).
+			Where(`(
+				latest.assignee_identity_id = ?
+				OR EXISTS (
+					SELECT 1
+					FROM conversation_participants AS related_cp
+					JOIN chat_subjects AS related_cs
+						ON related_cs.organization_id = related_cp.organization_id
+						AND related_cs.id = related_cp.subject_id
+					WHERE related_cp.organization_id = cv.organization_id
+						AND related_cp.conversation_id = cv.id
+						AND related_cs.kind = ?
+						AND related_cs.source_id = ?
+				)
+			)`, currentIdentityID, domain.ChatSubjectKindOrganizationIdentity, currentIdentityID)
 	} else {
 		switch input.CustomerView {
 		case domain.CustomerInboxViewQueue:

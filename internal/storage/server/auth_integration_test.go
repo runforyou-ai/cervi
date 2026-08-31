@@ -61,6 +61,21 @@ func assertDirectAgentRunStatus(t *testing.T, conversations []inboxaction.Conver
 	t.Fatalf("agent inbox conversation %q not found", conversationID)
 }
 
+// assertInboxConversationPresence 校验指定会话是否出现在收件箱查询结果中。
+func assertInboxConversationPresence(t *testing.T, conversations []inboxaction.ConversationSummary, conversationID string, want bool) {
+	t.Helper()
+	found := false
+	for _, conversation := range conversations {
+		if conversation.ID == conversationID {
+			found = true
+			break
+		}
+	}
+	if found != want {
+		t.Fatalf("inbox conversation %q presence = %t, want %t: %#v", conversationID, found, want, conversations)
+	}
+}
+
 // TestServerActionsWithPostgreSQL 验证服务端核心操作。
 // 企业安装与管理员登录是全局前置，留在顶层；其余按领域拆成有序子测试，
 // 子测试之间存在数据依赖，必须按声明顺序执行，不可并行。
@@ -1269,6 +1284,19 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if websiteSession.AssigneeIdentityID == nil || *websiteSession.AssigneeIdentityID != createdAgent.IdentityID {
 			t.Fatalf("website agent route session = %#v", websiteSession)
 		}
+		inboxQuery := inboxaction.NewLoadInboxQuery(db)
+		allBeforeWebsiteClaim, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, allBeforeWebsiteClaim, websiteInbound.Conversation.ID, false)
+		coworkerInboxBeforeWebsiteClaim, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
+			Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, coworkerInboxBeforeWebsiteClaim, websiteInbound.Conversation.ID, true)
 		websiteTriggerCount, err := db.NewSelect().Model((*servermodels.ConversationAgentTrigger)(nil)).
 			Where("cat.conversation_id = ?", websiteInbound.Conversation.ID).
 			Count(context.Background())
@@ -1284,6 +1312,31 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		claimedWebsite, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
 		if err != nil || claimedWebsite.Assignee == nil || claimedWebsite.Assignee.IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
 			t.Fatalf("claim agent session without state = %#v, error = %v", claimedWebsite, err)
+		}
+		allAfterWebsiteClaim, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, allAfterWebsiteClaim, websiteInbound.Conversation.ID, true)
+		transferredWithoutReply, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
+			ConversationID: websiteInbound.Conversation.ID, AssigneeIdentityID: createdAgent.IdentityID,
+		})
+		if err != nil || transferredWithoutReply.Assignee == nil || transferredWithoutReply.Assignee.IdentityID != createdAgent.IdentityID {
+			t.Fatalf("transfer unparticipated website session = %#v, error = %v", transferredWithoutReply, err)
+		}
+		allAfterTransferWithoutReply, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, allAfterTransferWithoutReply, websiteInbound.Conversation.ID, false)
+		reclaimedWebsite, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
+		if err != nil || reclaimedWebsite.Assignee == nil || reclaimedWebsite.Assignee.IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
+			t.Fatalf("reclaim website session before reply = %#v, error = %v", reclaimedWebsite, err)
+		}
+		if _, err := conversationaction.NewSendCustomerTextMessageAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+			ConversationID: websiteInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f91", Body: "我已参与处理",
+		}); err != nil {
+			t.Fatal(err)
 		}
 		if _, err := db.NewUpdate().Model((*servermodels.AgentRevision)(nil)).
 			Set("schema_version = 2").
@@ -1333,6 +1386,18 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if invalidRevisionSession.AssigneeIdentityID != nil {
 			t.Fatalf("invalid revision website route session = %#v", invalidRevisionSession)
 		}
+		allWithUnrelatedQueue, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, allWithUnrelatedQueue, invalidRevisionInbound.Conversation.ID, false)
+		queueInbox, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
+			Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, queueInbox, invalidRevisionInbound.Conversation.ID, true)
 		if _, err := db.NewUpdate().Model((*servermodels.AgentRevision)(nil)).
 			Set("schema_version = 1").
 			Where("id = ?", agentWithUpdatedExecution.Execution.RevisionID).
@@ -1345,6 +1410,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || transferredWebsite.Assignee == nil || transferredWebsite.Assignee.IdentityID != createdAgent.IdentityID {
 			t.Fatalf("transfer website session to agent = %#v, error = %v", transferredWebsite, err)
 		}
+		allAfterWebsiteTransfer, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, allAfterWebsiteTransfer, websiteInbound.Conversation.ID, true)
 		updatedAgent, err = agentaction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, domain.UserStatusInactive)
 		if err != nil || updatedAgent.Status != domain.UserStatusInactive || updatedAgent.WorkStatus != domain.WorkStatusOffDuty {
 			t.Fatalf("inactive agent = %#v, error = %v", updatedAgent, err)
@@ -1672,6 +1742,23 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil || nextRun.TriggerStartSeq != 5 {
 			t.Fatalf("agent run after exhausted task = %#v, error = %v", nextRun, err)
 		}
+
+		closedWebsite, err := closeServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
+		if err != nil || closedWebsite.Status != domain.ServiceSessionStatusClosed {
+			t.Fatalf("closed participated website session = %#v, error = %v", closedWebsite, err)
+		}
+		allAfterWebsiteClose, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, allAfterWebsiteClose, websiteInbound.Conversation.ID, false)
+		closedInbox, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
+			Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewClosed,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertInboxConversationPresence(t, closedInbox, websiteInbound.Conversation.ID, true)
 
 		if _, err := useraction.NewUpdateUserAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
 			DisplayName: createdMember.DisplayName, Email: createdMember.Email, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},
