@@ -8,8 +8,10 @@ import { toast } from "sonner"
 
 import {
   AgentExecutionMode,
+  RoleKind,
   createAgent,
   isApiError,
+  type RoleData,
   type Team,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
@@ -21,6 +23,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
+import { NativeSelect } from "@/components/ui/native-select"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import { parseAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
 import {
@@ -29,36 +32,49 @@ import {
 } from "@/features/contacts/agents/agent-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { roleDisplayName } from "@/features/roles/role-labels"
 
 /** 创建 AI 员工。 */
 export function AgentForm({
   teams,
+  roles,
   defaultTeamIds = [],
   onSaved,
   onCancel,
 }: {
   teams: Team[]
+  roles: RoleData[]
   defaultTeamIds?: string[]
   onSaved: () => void
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
+  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
       createAgentSchema({
         nameRequired: t("agents.validation.nameRequired"),
+        roleRequired: t("members.validation.roleRequired"),
         modelRequired: t("agents.validation.modelRequired"),
         instructionRequired: t("agents.validation.instructionRequired"),
         instructionTooLong: t("agents.validation.instructionTooLong"),
       }),
     [t],
   )
+  const assignableRoles = roles.filter(
+    (role) => role.kind !== RoleKind.RoleKindAdmin,
+  )
+  const defaultRoleID =
+    assignableRoles.find((role) => role.kind === RoleKind.RoleKindMember)?.id ??
+    assignableRoles[0]?.id ??
+    ""
   const form = useForm<AgentFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: {
       displayName: "",
+      roleId: defaultRoleID,
       teamIds: defaultTeamIds,
       execution: {
         mode: AgentExecutionMode.AgentExecutionModeManaged,
@@ -77,6 +93,7 @@ export function AgentForm({
       )
       const created = await createAgent({
         displayName: values.displayName,
+        roleId: values.roleId,
         teamIds: values.teamIds,
         execution: {
           mode: values.execution.mode,
@@ -102,6 +119,7 @@ export function AgentForm({
         isApiError(error)
           ? apiErrorMessage(error, [
               "displayName",
+              "roleId",
               "execution",
               "providerId",
               "modelIdentifier",
@@ -125,6 +143,28 @@ export function AgentForm({
           control={form.control}
           label={t("agents.form.name")}
           autoFocus
+        />
+        <Controller
+          name="roleId"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name} required>
+                {t("members.form.role")}
+              </FieldLabel>
+              <NativeSelect
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+              >
+                {assignableRoles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {roleDisplayName(role, tCommon)}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Field>
+          )}
         />
         <AgentManagedExecutionFields control={form.control} />
         <Controller

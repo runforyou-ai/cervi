@@ -93,17 +93,6 @@ type UpdateUserInput struct {
 	TeamIDs     []string `json:"teamIds"`
 }
 
-// UserRoleChangeInput 定义一名企业成员的目标角色。
-type UserRoleChangeInput struct {
-	UserID string `json:"userId"`
-	RoleID string `json:"roleId"`
-}
-
-// UserRoleChangesInput 定义一次批量角色调整。
-type UserRoleChangesInput struct {
-	Changes []UserRoleChangeInput `json:"changes"`
-}
-
 // User 定义企业成员信息。
 type User struct {
 	ID          string        `json:"id"`

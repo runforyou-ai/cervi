@@ -1,6 +1,5 @@
 /** 应用启动器页，按平台打开企业配置的外部业务系统。 */
 import { useMemo, useState } from "react"
-import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -10,6 +9,7 @@ import {
   listBusinessSystems,
   type BusinessSystem,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -70,10 +70,9 @@ export function AppsPage() {
       </PageHeader>
       <PageContent>
         {showLoading ? (
-          <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {t("loading")}
-          </div>
+          </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
             <p className="text-sm text-muted-foreground">{t("loadError")}</p>

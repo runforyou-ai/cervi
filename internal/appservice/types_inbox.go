@@ -10,10 +10,8 @@ import (
 type ServiceSessionStatus string
 
 const (
-	ServiceSessionStatusWaiting ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusWaiting)
-	ServiceSessionStatusActive  ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusActive)
-	ServiceSessionStatusPending ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusPending)
-	ServiceSessionStatusClosed  ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusClosed)
+	ServiceSessionStatusOpen   ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusOpen)
+	ServiceSessionStatusClosed ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusClosed)
 )
 
 // AgentRunStatus 表示 Agent 单聊当前最近一次运行状态。
@@ -25,6 +23,45 @@ const (
 	AgentRunStatusSucceeded AgentRunStatus = AgentRunStatus(domain.AgentRunStatusSucceeded)
 	AgentRunStatusFailed    AgentRunStatus = AgentRunStatus(domain.AgentRunStatusFailed)
 )
+
+// InboxScope 表示统一收件箱读取范围。
+type InboxScope string
+
+const (
+	InboxScopeAll      InboxScope = InboxScope(domain.InboxScopeAll)
+	InboxScopeCustomer InboxScope = InboxScope(domain.InboxScopeCustomer)
+	InboxScopeInternal InboxScope = InboxScope(domain.InboxScopeInternal)
+)
+
+// CustomerInboxView 表示客户会话队列视图。
+type CustomerInboxView string
+
+const (
+	CustomerInboxViewQueue     CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewQueue)
+	CustomerInboxViewMine      CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewMine)
+	CustomerInboxViewCoworkers CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewCoworkers)
+	CustomerInboxViewClosed    CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewClosed)
+)
+
+// LoadInboxInput 定义统一收件箱查询条件。
+type LoadInboxInput struct {
+	Scope              InboxScope        `json:"scope" query:"scope"`
+	CustomerView       CustomerInboxView `json:"customerView" query:"customerView"`
+	AssigneeIdentityID string            `json:"assigneeIdentityId" query:"assigneeIdentityId"`
+}
+
+// InboxAssignee 定义客户会话负责人摘要。
+type InboxAssignee struct {
+	IdentityID  string                   `json:"identityId"`
+	Type        OrganizationIdentityType `json:"type"`
+	DisplayName string                   `json:"displayName"`
+	AvatarURL   string                   `json:"avatarUrl"`
+}
+
+// CustomerServiceAssigneeList 定义客服筛选候选列表。
+type CustomerServiceAssigneeList struct {
+	Assignees []InboxAssignee `json:"assignees"`
+}
 
 // ConversationType 表示统一收件箱会话类型。
 type ConversationType string
@@ -44,6 +81,8 @@ type CustomerInboxConversation struct {
 	Preview              *string              `json:"preview"`
 	LastMessageAt        *time.Time           `json:"lastMessageAt"`
 	ServiceSessionStatus ServiceSessionStatus `json:"serviceSessionStatus"`
+	ServiceSessionID     string               `json:"serviceSessionId"`
+	Assignee             *InboxAssignee       `json:"assignee"`
 }
 
 // DirectInboxConversation 定义内部单聊摘要。

@@ -43,6 +43,20 @@ export function CheckNotificationPermission(meta: $models.RequestMeta): $Cancell
 }
 
 /**
+ * ClaimServiceSession 领取或接管客户会话最新处理周期。
+ */
+export function ClaimServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
+    return $Call.ByID(104372695, meta, conversationID);
+}
+
+/**
+ * CloseServiceSession 关闭客户会话最新处理周期。
+ */
+export function CloseServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
+    return $Call.ByID(3932400583, meta, conversationID);
+}
+
+/**
  * CompleteFileUpload 核验并完成文件上传。
  */
 export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<$models.File> {
@@ -379,6 +393,13 @@ export function ListConversationMessages(meta: $models.RequestMeta, conversation
 }
 
 /**
+ * ListCustomerServiceAssignees 返回有效真人和 AI 客服。
+ */
+export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerServiceAssigneeList> {
+    return $Call.ByID(630654755, meta);
+}
+
+/**
  * ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
  */
 export function ListExternalKnowledgeBaseOptions(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<$models.ExternalKnowledgeBaseOptionList> {
@@ -472,8 +493,8 @@ export function LoadIdentity(meta: $models.RequestMeta): $CancellablePromise<$mo
 /**
  * LoadInbox 返回当前用户的统一收件箱。
  */
-export function LoadInbox(meta: $models.RequestMeta): $CancellablePromise<$models.Inbox> {
-    return $Call.ByID(129302578, meta);
+export function LoadInbox(meta: $models.RequestMeta, input: $models.LoadInboxInput): $CancellablePromise<$models.Inbox> {
+    return $Call.ByID(129302578, meta, input);
 }
 
 /**
@@ -530,6 +551,13 @@ export function ReactivateUser(meta: $models.RequestMeta, userID: string): $Canc
  */
 export function RemoveTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
     return $Call.ByID(3538693274, meta, teamID, input);
+}
+
+/**
+ * ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+ */
+export function ReopenServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
+    return $Call.ByID(4025586058, meta, conversationID);
 }
 
 /**
@@ -638,6 +666,13 @@ export function TestTelegramChannelConnection(meta: $models.RequestMeta, channel
 }
 
 /**
+ * TransferServiceSession 把当前负责的处理周期转给另一位客服。
+ */
+export function TransferServiceSession(meta: $models.RequestMeta, conversationID: string, input: $models.TransferServiceSessionInput): $CancellablePromise<$models.CustomerServiceSession> {
+    return $Call.ByID(2034510468, meta, conversationID, input);
+}
+
+/**
  * UpdateAIProvider 修改模型服务供应商。
  */
 export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
@@ -729,6 +764,13 @@ export function UpdateRole(meta: $models.RequestMeta, roleID: string, input: $mo
 }
 
 /**
+ * UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+ */
+export function UpdateRoleAssignments(meta: $models.RequestMeta, input: $models.RoleAssignmentsInput): $CancellablePromise<void> {
+    return $Call.ByID(2402672415, meta, input);
+}
+
+/**
  * UpdateTeam 修改企业团队。
  */
 export function UpdateTeam(meta: $models.RequestMeta, teamID: string, input: $models.TeamInput): $CancellablePromise<$models.Team> {
@@ -754,13 +796,6 @@ export function UpdateUser(meta: $models.RequestMeta, userID: string, input: $mo
  */
 export function UpdateUserPreferences(meta: $models.RequestMeta, input: $models.UserPreferencesInput): $CancellablePromise<$models.CurrentUser> {
     return $Call.ByID(3982988274, meta, input);
-}
-
-/**
- * UpdateUserRoles 在一个事务中批量调整企业成员角色。
- */
-export function UpdateUserRoles(meta: $models.RequestMeta, input: $models.UserRoleChangesInput): $CancellablePromise<void> {
-    return $Call.ByID(2927672865, meta, input);
 }
 
 /**

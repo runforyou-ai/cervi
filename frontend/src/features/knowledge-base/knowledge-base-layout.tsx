@@ -5,7 +5,6 @@ import {
   CloudIcon,
   FileTextIcon,
   FolderIcon,
-  LoaderCircleIcon,
   MoreHorizontalIcon,
   PlusIcon,
 } from "lucide-react"
@@ -22,6 +21,7 @@ import {
   type KnowledgeBaseData,
   type KnowledgeGroupData,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import {
   AlertDialog,
@@ -204,10 +204,9 @@ export function KnowledgeBaseLayout() {
             }
           >
             {showLoading ? (
-              <div className="flex h-20 items-center justify-center gap-2 text-sm text-muted-foreground">
-                <LoaderCircleIcon className="size-4 animate-spin" />
+              <LoadingIndicator className="h-20 justify-center">
                 {t("loading")}
-              </div>
+              </LoadingIndicator>
             ) : loadError ? (
               <div className="flex flex-col items-center px-2 py-6 text-center">
                 <p className="text-sm text-muted-foreground">

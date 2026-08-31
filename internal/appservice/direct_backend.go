@@ -50,8 +50,13 @@ type DirectBackend struct {
 	resolveIdentity                   *authaction.ResolveIdentityQuery
 	resolveTenant                     tenant.Resolver
 	loadInbox                         *inboxaction.LoadInboxQuery
+	listCustomerServiceAssignees      *inboxaction.ListCustomerServiceAssigneesQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
+	claimServiceSession               *conversationaction.ClaimServiceSessionAction
+	transferServiceSession            *conversationaction.TransferServiceSessionAction
+	closeServiceSession               *conversationaction.CloseServiceSessionAction
+	reopenServiceSession              *conversationaction.ReopenServiceSessionAction
 	startDirectConversation           *conversationaction.StartDirectConversationAction
 	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
@@ -80,7 +85,7 @@ type DirectBackend struct {
 	getUser                           *useraction.GetUserQuery
 	createUser                        *useraction.CreateUserAction
 	updateUser                        *useraction.UpdateUserAction
-	updateUserRoles                   *useraction.UpdateRolesAction
+	updateRoleAssignments             *roleaction.UpdateAssignmentsAction
 	updateUserStatus                  *useraction.UpdateStatusAction
 	listTeams                         *teamaction.ListTeamsQuery
 	createTeam                        *teamaction.CreateTeamAction
@@ -161,8 +166,13 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		resolveIdentity:                   authaction.NewResolveIdentityQuery(db),
 		resolveTenant:                     tenantResolver,
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
+		listCustomerServiceAssignees:      inboxaction.NewListCustomerServiceAssigneesQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
+		claimServiceSession:               conversationaction.NewClaimServiceSessionAction(db),
+		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db),
+		closeServiceSession:               conversationaction.NewCloseServiceSessionAction(db),
+		reopenServiceSession:              conversationaction.NewReopenServiceSessionAction(db),
 		startDirectConversation:           conversationaction.NewStartDirectConversationAction(db),
 		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db, agentScheduler),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
@@ -191,7 +201,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		getUser:                           useraction.NewGetUserQuery(db),
 		createUser:                        useraction.NewCreateUserAction(db),
 		updateUser:                        useraction.NewUpdateUserAction(db),
-		updateUserRoles:                   useraction.NewUpdateRolesAction(db),
+		updateRoleAssignments:             roleaction.NewUpdateAssignmentsAction(db),
 		updateUserStatus:                  useraction.NewUpdateStatusAction(db),
 		listTeams:                         teamaction.NewListTeamsQuery(db),
 		createTeam:                        teamaction.NewCreateTeamAction(db),

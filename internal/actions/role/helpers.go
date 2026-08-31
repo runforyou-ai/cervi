@@ -69,8 +69,8 @@ func loadMemberCounts(ctx context.Context, db bun.IDB, organizationID string, ro
 	if err := db.NewSelect().
 		TableExpr("roles AS r").
 		ColumnExpr("r.id::text AS role_id").
-		ColumnExpr("count(u.id) AS member_count").
-		Join("LEFT JOIN users AS u ON u.organization_id = r.organization_id AND u.role_id = r.id").
+		ColumnExpr("count(oi.id) AS member_count").
+		Join("LEFT JOIN organization_identities AS oi ON oi.organization_id = r.organization_id AND oi.role_id = r.id").
 		Where("r.organization_id = ?", organizationID).
 		Where("r.id IN (?)", bun.In(roleIDs)).
 		GroupExpr("r.id").

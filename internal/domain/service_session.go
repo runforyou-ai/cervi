@@ -4,8 +4,6 @@ package domain
 type ServiceSessionStatus string
 
 const (
-	ServiceSessionStatusWaiting ServiceSessionStatus = "waiting"
-	ServiceSessionStatusActive  ServiceSessionStatus = "active"
-	ServiceSessionStatusPending ServiceSessionStatus = "pending"
-	ServiceSessionStatusClosed  ServiceSessionStatus = "closed"
+	ServiceSessionStatusOpen   ServiceSessionStatus = "open"
+	ServiceSessionStatusClosed ServiceSessionStatus = "closed"
 )

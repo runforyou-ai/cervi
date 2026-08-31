@@ -32,7 +32,31 @@ const (
 	ConflictReasonServiceSessionNotReplyable = "service_session_not_replyable"
 	// ConflictReasonChannelOutboundUnsupported 表示来源渠道尚不支持外发。
 	ConflictReasonChannelOutboundUnsupported = "channel_outbound_unsupported"
+	// ConflictReasonServiceSessionAlreadyOpen 表示客服处理周期已经打开。
+	ConflictReasonServiceSessionAlreadyOpen = "service_session_already_open"
 )
+
+// ServiceSessionAssignee 定义客服处理周期负责人。
+type ServiceSessionAssignee struct {
+	IdentityID   string
+	Type         domain.OrganizationIdentityType
+	DisplayName  string
+	AvatarFileID *string
+}
+
+// ServiceSessionResult 定义客服处理周期命令结果。
+type ServiceSessionResult struct {
+	ID       string
+	Status   domain.ServiceSessionStatus
+	Assignee *ServiceSessionAssignee
+	ClosedAt *time.Time
+}
+
+// TransferServiceSessionInput 定义客服处理周期转交目标。
+type TransferServiceSessionInput struct {
+	ConversationID     string
+	AssigneeIdentityID string
+}
 
 // WebsiteCustomerTextMessageInput 定义网站客户文本消息。
 type WebsiteCustomerTextMessageInput struct {

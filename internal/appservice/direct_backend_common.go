@@ -52,7 +52,7 @@ func currentUserContract(identity *servermodels.Identity) CurrentUser {
 	organizationIdentity := identity.OrganizationIdentity
 	return CurrentUser{
 		ID: user.ID, IdentityID: user.IdentityID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: organizationIdentity.DisplayName,
-		RoleID: user.RoleID, Status: UserStatus(user.Status), Locale: Locale(user.Locale), TimeZone: user.TimeZone, MessageNotificationsEnabled: user.MessageNotificationsEnabled, WorkspaceTabsEnabled: user.WorkspaceTabsEnabled,
+		RoleID: organizationIdentity.RoleID, Status: UserStatus(user.Status), Locale: Locale(user.Locale), TimeZone: user.TimeZone, MessageNotificationsEnabled: user.MessageNotificationsEnabled, WorkspaceTabsEnabled: user.WorkspaceTabsEnabled,
 		WorkStatus: WorkStatus(organizationIdentity.WorkStatus),
 	}
 }

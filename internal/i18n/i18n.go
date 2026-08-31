@@ -167,6 +167,8 @@ const (
 	ErrorServiceSessionOwned              Key = "error.service_session_owned"
 	ErrorServiceSessionNotReplyable       Key = "error.service_session_not_replyable"
 	ErrorChannelOutboundUnsupported       Key = "error.channel_outbound_unsupported"
+	ErrorServiceSessionAlreadyOpen        Key = "error.service_session_already_open"
+	ErrorServiceSessionUpdateFailed       Key = "error.service_session_update_failed"
 	ErrorWebsiteConversationNotFound      Key = "error.website_conversation_not_found"
 	ErrorWebsiteMessengerLoadFailed       Key = "error.website_messenger_load_failed"
 	ErrorWebsiteMessageSendFailed         Key = "error.website_message_send_failed"

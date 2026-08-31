@@ -36,6 +36,97 @@ func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta Reques
 	return conversationMessageFromAction(message), nil
 }
 
+// ClaimServiceSession 领取或接管客户会话最新处理周期。
+func (b *DirectBackend) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return CustomerServiceSession{}, err
+	}
+	result, err := b.claimServiceSession.Execute(ctx, identity, conversationID)
+	if err != nil {
+		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	return customerServiceSessionFromAction(result), nil
+}
+
+// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+func (b *DirectBackend) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return CustomerServiceSession{}, err
+	}
+	result, err := b.transferServiceSession.Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: conversationID, AssigneeIdentityID: input.AssigneeIdentityID})
+	if err != nil {
+		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	return customerServiceSessionFromAction(result), nil
+}
+
+// CloseServiceSession 关闭客户会话最新处理周期。
+func (b *DirectBackend) CloseServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return CustomerServiceSession{}, err
+	}
+	result, err := b.closeServiceSession.Execute(ctx, identity, conversationID)
+	if err != nil {
+		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	return customerServiceSessionFromAction(result), nil
+}
+
+// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+func (b *DirectBackend) ReopenServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return CustomerServiceSession{}, err
+	}
+	result, err := b.reopenServiceSession.Execute(ctx, identity, conversationID)
+	if err != nil {
+		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	return customerServiceSessionFromAction(result), nil
+}
+
+// customerServiceSessionFromAction 转换客服处理周期命令结果。
+func customerServiceSessionFromAction(result conversationaction.ServiceSessionResult) CustomerServiceSession {
+	var assignee *InboxAssignee
+	if result.Assignee != nil {
+		assignee = &InboxAssignee{IdentityID: result.Assignee.IdentityID, Type: OrganizationIdentityType(result.Assignee.Type), DisplayName: result.Assignee.DisplayName}
+	}
+	return CustomerServiceSession{ID: result.ID, Status: ServiceSessionStatus(result.Status), Assignee: assignee, ClosedAt: result.ClosedAt}
+}
+
+// serviceSessionMutationError 转换客服处理周期命令错误。
+func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	var validationError *conversationaction.ValidationError
+	if errors.As(err, &validationError) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+	}
+	var conflictError *conversationaction.ConflictError
+	if errors.As(err, &conflictError) {
+		messageKey := cervii18n.ErrorServiceSessionNotReplyable
+		switch conflictError.Reason {
+		case conversationaction.ConflictReasonServiceSessionOwned:
+			messageKey = cervii18n.ErrorServiceSessionOwned
+		case conversationaction.ConflictReasonServiceSessionAlreadyOpen:
+			messageKey = cervii18n.ErrorServiceSessionAlreadyOpen
+		}
+		return ConflictError(meta, messageKey, conflictError.Reason)
+	}
+	slog.Warn("客服处理周期操作失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
+	return FailedError(meta, cervii18n.ErrorServiceSessionUpdateFailed)
+}
+
 // StartDirectConversation 发起或打开企业成员内部单聊。
 func (b *DirectBackend) StartDirectConversation(ctx context.Context, meta RequestMeta, input DirectConversationInput) (InboxConversation, error) {
 	identity, err := b.authenticate(ctx, meta)

@@ -40,8 +40,13 @@ func (s *Service) UpdateUserWorkStatus(ctx context.Context, meta RequestMeta, in
 }
 
 // LoadInbox 返回当前用户的统一收件箱。
-func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta) (Inbox, error) {
-	return s.backend.LoadInbox(ctx, meta)
+func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta, input LoadInboxInput) (Inbox, error) {
+	return s.backend.LoadInbox(ctx, meta, input)
+}
+
+// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
+func (s *Service) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta) (CustomerServiceAssigneeList, error) {
+	return s.backend.ListCustomerServiceAssignees(ctx, meta)
 }
 
 // ListConversationMessages 返回成员可见的会话消息。
@@ -52,6 +57,26 @@ func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta
 // SendCustomerTextMessage 发送客户会话文本消息。
 func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
 	return s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input)
+}
+
+// ClaimServiceSession 领取或接管客户会话最新处理周期。
+func (s *Service) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+	return s.backend.ClaimServiceSession(ctx, meta, conversationID)
+}
+
+// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+func (s *Service) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
+	return s.backend.TransferServiceSession(ctx, meta, conversationID, input)
+}
+
+// CloseServiceSession 关闭客户会话最新处理周期。
+func (s *Service) CloseServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+	return s.backend.CloseServiceSession(ctx, meta, conversationID)
+}
+
+// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+func (s *Service) ReopenServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+	return s.backend.ReopenServiceSession(ctx, meta, conversationID)
 }
 
 // StartDirectConversation 发起或打开企业成员内部单聊。
@@ -199,9 +224,9 @@ func (s *Service) UpdateUser(ctx context.Context, meta RequestMeta, userID strin
 	return s.backend.UpdateUser(ctx, meta, userID, input)
 }
 
-// UpdateUserRoles 在一个事务中批量调整企业成员角色。
-func (s *Service) UpdateUserRoles(ctx context.Context, meta RequestMeta, input UserRoleChangesInput) error {
-	return s.backend.UpdateUserRoles(ctx, meta, input)
+// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+func (s *Service) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, input RoleAssignmentsInput) error {
+	return s.backend.UpdateRoleAssignments(ctx, meta, input)
 }
 
 // DeactivateUser 禁用企业成员账号。

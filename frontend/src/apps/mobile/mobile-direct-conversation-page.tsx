@@ -3,7 +3,6 @@ import { useMemo } from "react"
 import {
   ArrowLeftIcon,
   BotIcon,
-  LoaderCircleIcon,
   UserRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -24,6 +23,7 @@ import {
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
@@ -33,7 +33,7 @@ import {
 } from "@/features/inbox/use-member-chat-polling"
 import { useOutgoingConversationMessages } from "@/features/inbox/use-outgoing-conversation-messages"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
 type MobileDirectLocationState = {
   conversation?: InboxConversation
@@ -105,6 +105,7 @@ function MobileDirectHeader({
 export function MobileDirectConversationPage() {
   const { t } = useTranslation("inbox")
   const { identity } = useMobileWorkspace()
+  const invalidate = useResourceInvalidator()
   const location = useLocation()
   const { conversationID = "" } = useParams()
   const stateConversation = useMemo(
@@ -143,10 +144,9 @@ export function MobileDirectConversationPage() {
     <section className="flex h-full min-h-0 flex-col bg-background">
       <MobileDirectHeader conversation={conversation} peerName={peerName} />
       {loading && !conversation ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <LoaderCircleIcon className="size-4 animate-spin" />
+        <LoadingIndicator className="min-h-0 flex-1 justify-center">
           {t("messagesLoading")}
-        </div>
+        </LoadingIndicator>
       ) : (
         <>
           <ConversationTimeline
@@ -159,6 +159,9 @@ export function MobileDirectConversationPage() {
           <ConversationComposer
             conversationID={conversationID}
             conversationType={ConversationType.ConversationTypeDirect}
+            onSucceeded={() =>
+              void invalidate(resourceKeys.inbox(), { exact: true })
+            }
             onSending={outgoing.start}
             onSent={outgoing.succeed}
             onFailed={outgoing.fail}

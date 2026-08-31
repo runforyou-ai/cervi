@@ -1,8 +1,8 @@
 /** 登录页。 */
-import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate } from "react-router"
 
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { LoginForm } from "@/features/auth/login-form"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { useStartup } from "@/contexts/startup-context"
@@ -25,7 +25,9 @@ export function LoginPage({
   if (status === "loading") {
     return (
       <main className="flex min-h-dvh items-center justify-center">
-        <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
+        <LoadingIndicator>
+          <span className="sr-only">Loading</span>
+        </LoadingIndicator>
       </main>
     )
   }

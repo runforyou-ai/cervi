@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react"
-import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
@@ -20,6 +19,7 @@ import {
   type ConversationMessage,
   type ConversationMessageListData,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
@@ -310,10 +310,9 @@ export function ConversationTimeline({
 
   if (loading && !currentPage && outgoingMessages.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
-        <LoaderCircleIcon className="size-4 animate-spin" />
+      <LoadingIndicator className="min-h-0 flex-1 justify-center bg-background">
         {t("messagesLoading")}
-      </div>
+      </LoadingIndicator>
     )
   }
 

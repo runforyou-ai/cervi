@@ -93,6 +93,29 @@ func (b *DirectBackend) DeleteRole(ctx context.Context, meta RequestMeta, roleID
 	return nil
 }
 
+// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+func (b *DirectBackend) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, input RoleAssignmentsInput) error {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	assignments := make([]roleaction.AssignmentInput, 0, len(input.Assignments))
+	for _, assignment := range input.Assignments {
+		assignments = append(assignments, roleaction.AssignmentInput{IdentityID: assignment.IdentityID, RoleID: assignment.RoleID})
+	}
+	if err := b.updateRoleAssignments.Execute(ctx, identity, assignments); err != nil {
+		if errors.Is(err, roleaction.ErrAssignmentInvalid) || errors.Is(err, roleaction.ErrAgentAdministrator) {
+			return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		}
+		if errors.Is(err, roleaction.ErrLastActiveAdministrator) {
+			return InvalidError(meta, cervii18n.ErrorUserLastActiveAdministrator, nil)
+		}
+		return b.roleError(ctx, meta, err, cervii18n.ErrorRoleUpdateFailed, identity.Organization.ID)
+	}
+	slog.Info("企业身份角色批量调整成功", "organization_id", identity.Organization.ID, "assignment_count", len(assignments))
+	return nil
+}
+
 // roleMutationError 转换角色写入校验和操作错误。
 func (b *DirectBackend) roleMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	var validationError *common.FieldError

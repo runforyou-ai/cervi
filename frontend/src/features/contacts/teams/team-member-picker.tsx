@@ -1,6 +1,6 @@
 /** 团队成员候选搜索、多选和批量添加。 */
 import { useEffect, useState } from "react"
-import { LoaderCircleIcon, SearchIcon } from "lucide-react"
+import { SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -12,6 +12,7 @@ import {
   type Team,
   type TeamMemberCandidate,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -150,10 +151,9 @@ export function TeamMemberPicker({
 
       <div className="max-h-[min(24rem,50svh)] min-h-56 overflow-y-auto rounded-md border">
         {loading ? (
-          <div className="flex min-h-56 items-center justify-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="min-h-56 justify-center">
             {t("loading")}
-          </div>
+          </LoadingIndicator>
         ) : failed ? (
           <div className="flex min-h-56 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
             <span>{t("teams.members.loadError")}</span>

@@ -15,13 +15,14 @@ import {
   PermissionLevel,
   RoleKind,
   updateRole,
-  updateUserRoles,
+  updateRoleAssignments,
   type PermissionCode,
   type PermissionDefinition,
   type PermissionResource,
   type RoleData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -213,9 +214,9 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         void invalidateResource(resourceKeys.role(roleId))
       }
       if (memberChanges.length > 0) {
-        await updateUserRoles({
-          changes: memberChanges.map((change) => ({
-            userId: change.user.id,
+        await updateRoleAssignments({
+          assignments: memberChanges.map((change) => ({
+            identityId: change.member.identityId,
             roleId:
               change.nextRoleID === newRoleID
                 ? targetRoleID
@@ -225,6 +226,9 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         void invalidateResource(resourceKeys.roles())
         void invalidateResource(resourceKeys.role())
         void invalidateResource(resourceKeys.users())
+        void invalidateResource(resourceKeys.agents())
+        void invalidateResource(resourceKeys.roleMembers())
+        void invalidateResource(resourceKeys.customerServiceAssignees())
       }
       if (!mounted.current) return
       form.reset(values)
@@ -264,7 +268,10 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   const pendingRoleIDs = useMemo(
     () =>
       Object.fromEntries(
-        memberChanges.map((change) => [change.user.id, change.nextRoleID]),
+        memberChanges.map((change) => [
+          change.member.identityId,
+          change.nextRoleID,
+        ]),
       ),
     [memberChanges],
   )
@@ -286,10 +293,9 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       <PageHeader title={title} />
       <PageContent>
         {loading ? (
-          <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {t("roles.loading")}
-          </div>
+          </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
             <p className="text-sm text-muted-foreground">

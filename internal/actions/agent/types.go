@@ -13,6 +13,7 @@ import (
 // CreateInput 定义新增 AI 员工字段。
 type CreateInput struct {
 	DisplayName string
+	RoleID      string
 	TeamIDs     []string
 	Execution   ExecutionInput
 }
@@ -20,6 +21,7 @@ type CreateInput struct {
 // UpdateInput 定义 AI 员工可编辑字段。
 type UpdateInput struct {
 	DisplayName string
+	RoleID      string
 	TeamIDs     []string
 }
 
@@ -44,6 +46,9 @@ type Agent struct {
 	ID          string            `bun:"id"`
 	IdentityID  string            `bun:"identity_id"`
 	DisplayName string            `bun:"display_name"`
+	RoleID      string            `bun:"role_id"`
+	RoleKind    domain.RoleKind   `bun:"role_kind"`
+	RoleName    string            `bun:"role_name"`
 	Status      domain.UserStatus `bun:"status"`
 	WorkStatus  domain.WorkStatus `bun:"work_status"`
 	Teams       []TeamSummary
@@ -56,6 +61,9 @@ type ListItem struct {
 	ID          string            `bun:"id"`
 	IdentityID  string            `bun:"identity_id"`
 	DisplayName string            `bun:"display_name"`
+	RoleID      string            `bun:"role_id"`
+	RoleKind    domain.RoleKind   `bun:"role_kind"`
+	RoleName    string            `bun:"role_name"`
 	Status      domain.UserStatus `bun:"status"`
 	WorkStatus  domain.WorkStatus `bun:"work_status"`
 	Teams       []TeamSummary

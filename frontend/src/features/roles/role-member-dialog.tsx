@@ -1,14 +1,17 @@
 /** 角色成员的左右分栏配置对话框。 */
 import { useEffect, useMemo, useState } from "react"
-import { LoaderCircleIcon, SearchIcon } from "lucide-react"
+import { SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
+  listAgents,
   listUsers,
   RoleKind,
+  type AgentListItemData,
   type UserData,
   type RoleData,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -27,16 +30,18 @@ const memberPageSize = 100
 
 /** 描述待随角色表单保存的成员调整。 */
 export type RoleMemberChange = {
-  user: UserData
+  member: RoleMemberData
   previousRoleID: string
   nextRoleID: string
 }
 
 type RoleMemberOption = Pick<RoleData, "id" | "kind" | "name">
+type RoleMemberData = UserData | AgentListItemData
 
 /** 读取当前企业的全部成员。 */
 async function listAllMembers() {
   const users: UserData[] = []
+  const agents: AgentListItemData[] = []
   let page = 1
   let pages = 1
   do {
@@ -45,14 +50,22 @@ async function listAllMembers() {
     pages = Math.ceil(output.page.total / memberPageSize)
     page += 1
   } while (page <= pages)
-  return users
+  page = 1
+  pages = 1
+  do {
+    const output = await listAgents({ page, pageSize: memberPageSize })
+    agents.push(...output.agents)
+    pages = Math.ceil(output.page.total / memberPageSize)
+    page += 1
+  } while (page <= pages)
+  return [...users, ...agents]
 }
 
 /** 判断成员姓名或邮箱是否包含搜索内容。 */
-function matchesMember(user: UserData, query: string) {
+function matchesMember(user: RoleMemberData, query: string) {
   const keyword = query.trim().toLocaleLowerCase()
   if (!keyword) return true
-  return `${user.displayName}\n${user.email}`
+  return `${user.displayName}\n${"email" in user ? user.email : ""}`
     .toLocaleLowerCase()
     .includes(keyword)
 }
@@ -66,7 +79,7 @@ function MemberRow({
   disabled = false,
   actionDisabled = false,
 }: {
-  user: UserData
+  user: RoleMemberData
   assignedRoleName?: string
   action: () => void
   actionLabel: string
@@ -83,7 +96,9 @@ function MemberRow({
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{user.displayName}</p>
-        <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {"email" in user ? user.email : t("roles.members.aiEmployee")}
+        </p>
         {assignedRoleName ? (
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {t("roles.members.assignedTo", { role: assignedRoleName })}
@@ -125,15 +140,15 @@ export function RoleMemberDialog({
     (item) => item.kind === RoleKind.RoleKindMember,
   )
   const {
-    data: loadedUsers,
-    loading: usersLoading,
-    error: usersError,
-  } = useResource(resourceKeys.usersAll(), () => listAllMembers(), {
+    data: loadedMembers,
+    loading: membersLoading,
+    error: membersError,
+  } = useResource(resourceKeys.roleMembers(), () => listAllMembers(), {
     enabled: role !== null,
   })
-  const users = useMemo(() => loadedUsers ?? [], [loadedUsers])
-  const loading = role !== null && usersLoading
-  const error = role !== null && Boolean(usersError)
+  const members = useMemo(() => loadedMembers ?? [], [loadedMembers])
+  const loading = role !== null && membersLoading
+  const error = role !== null && Boolean(membersError)
 
   /** 打开对话框时按最新成员和暂存调整初始化草稿。 */
   useEffect(() => {
@@ -142,46 +157,54 @@ export function RoleMemberDialog({
       setDraftRoleIDs({})
       return
     }
-    if (!loadedUsers) return
+    if (!loadedMembers) return
     const roleIDs = Object.fromEntries(
-      loadedUsers.map((user) => [user.id, user.role.id]),
+      loadedMembers.map((member) => [member.identityId, member.role.id]),
     )
     setDraftRoleIDs({ ...roleIDs, ...pendingRoleIDs })
-  }, [loadedUsers, pendingRoleIDs, role])
+  }, [loadedMembers, pendingRoleIDs, role])
 
   const selectedUsers = role
-    ? users.filter(
-        (user) => (draftRoleIDs[user.id] ?? user.role.id) === role.id,
+    ? members.filter(
+        (member) =>
+          (draftRoleIDs[member.identityId] ?? member.role.id) === role.id,
       )
     : []
   const availableUsers = useMemo(
     () =>
       role
-        ? users.filter(
-            (user) =>
-              (draftRoleIDs[user.id] ?? user.role.id) !== role.id &&
-              matchesMember(user, query),
+        ? members.filter(
+            (member) =>
+              !(
+                role.kind === RoleKind.RoleKindAdmin &&
+                !("email" in member)
+              ) &&
+              (draftRoleIDs[member.identityId] ?? member.role.id) !== role.id &&
+              matchesMember(member, query),
           )
         : [],
-    [draftRoleIDs, query, role, users],
+    [draftRoleIDs, members, query, role],
   )
-  const changedUsers = users.filter(
-    (user) =>
-      (draftRoleIDs[user.id] ?? user.role.id) !== user.role.id,
+  const changedUsers = members.filter(
+    (member) =>
+      (draftRoleIDs[member.identityId] ?? member.role.id) !== member.role.id,
   )
 
   /** 暂存成员的目标角色。 */
-  function stageUserRole(user: UserData, nextRole: RoleMemberOption) {
-    setDraftRoleIDs((current) => ({ ...current, [user.id]: nextRole.id }))
+  function stageUserRole(user: RoleMemberData, nextRole: RoleMemberOption) {
+    setDraftRoleIDs((current) => ({
+      ...current,
+      [user.identityId]: nextRole.id,
+    }))
   }
 
   /** 确认成员调整并交给角色详情页暂存。 */
   function confirmChanges() {
     onConfirm(
       changedUsers.map((user) => ({
-        user,
+        member: user,
         previousRoleID: user.role.id,
-        nextRoleID: draftRoleIDs[user.id] ?? user.role.id,
+        nextRoleID: draftRoleIDs[user.identityId] ?? user.role.id,
       })),
     )
     onOpenChange(false)
@@ -204,10 +227,9 @@ export function RoleMemberDialog({
           </DialogTitle>
         </DialogHeader>
         {loading ? (
-          <div className="flex h-80 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="h-80 justify-center rounded-lg border">
             {t("roles.members.loading")}
-          </div>
+          </LoadingIndicator>
         ) : error ? (
           <div className="flex h-80 items-center justify-center rounded-lg border text-sm text-muted-foreground">
             {t("roles.members.loadError")}
@@ -235,14 +257,15 @@ export function RoleMemberDialog({
                 ) : (
                   <ul>
                     {availableUsers.map((user) => {
-                      const draftRoleID = draftRoleIDs[user.id] ?? user.role.id
+                      const draftRoleID =
+                        draftRoleIDs[user.identityId] ?? user.role.id
                       const draftRole =
                         roles.find((item) => item.id === draftRoleID) ?? user.role
                       const assigned = draftRole.kind !== RoleKind.RoleKindMember
                       const assignedRoleName = roleDisplayName(draftRole, tCommon)
                       return (
                         <MemberRow
-                          key={user.id}
+                          key={user.identityId}
                           user={user}
                           disabled={assigned}
                           assignedRoleName={assigned ? assignedRoleName : undefined}
@@ -274,7 +297,7 @@ export function RoleMemberDialog({
                   <ul>
                     {selectedUsers.map((user) => (
                       <MemberRow
-                        key={user.id}
+                        key={user.identityId}
                         user={user}
                         disabled={!defaultRole || role?.id === defaultRole.id}
                         actionDisabled={!defaultRole || role?.id === defaultRole.id}

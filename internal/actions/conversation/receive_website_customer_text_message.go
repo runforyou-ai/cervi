@@ -311,7 +311,7 @@ func selectServiceSession(ctx context.Context, db bun.IDB, organizationID, conve
 		return nil, false, ErrDataInvariant
 	}
 	switch domain.ServiceSessionStatus(session.Status) {
-	case domain.ServiceSessionStatusWaiting, domain.ServiceSessionStatusActive, domain.ServiceSessionStatusPending:
+	case domain.ServiceSessionStatusOpen:
 		return session, false, nil
 	case domain.ServiceSessionStatusClosed:
 		return &servermodels.ServiceSession{Sequence: session.Sequence + 1}, true, nil
@@ -380,7 +380,7 @@ func updateSessionSummary(ctx context.Context, db bun.IDB, session *servermodels
 		Set("updated_at = now()").
 		WherePK().
 		Where("organization_id = ?", message.OrganizationID).
-		Where("status IN (?, ?, ?)", domain.ServiceSessionStatusWaiting, domain.ServiceSessionStatusActive, domain.ServiceSessionStatusPending).
+		Where("status = ?", domain.ServiceSessionStatusOpen).
 		Where("(last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID).
 		Exec(ctx)
 	if err != nil {

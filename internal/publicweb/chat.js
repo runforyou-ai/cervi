@@ -42,9 +42,7 @@
   var loadingLabel = messenger.getAttribute("data-loading");
   var requestFailedLabel = messenger.getAttribute("data-request-failed");
   var sessionLabels = {
-    waiting: messenger.getAttribute("data-session-waiting"),
-    active: messenger.getAttribute("data-session-active"),
-    pending: messenger.getAttribute("data-session-pending"),
+    open: messenger.getAttribute("data-session-open"),
     closed: messenger.getAttribute("data-session-closed"),
   };
   var emojiPanel = document.getElementById("cv-emoji");

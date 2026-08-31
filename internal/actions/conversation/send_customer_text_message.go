@@ -38,8 +38,7 @@ type memberMessageIDs struct {
 }
 
 type memberReplySessionPlan struct {
-	assign   bool
-	activate bool
+	assign bool
 }
 
 type idempotentMemberMessageRow struct {
@@ -309,18 +308,18 @@ func planMemberReplySession(status domain.ServiceSessionStatus, assigneeIdentity
 	if status == domain.ServiceSessionStatusClosed {
 		return memberReplySessionPlan{}, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
 	}
-	if status != domain.ServiceSessionStatusWaiting && status != domain.ServiceSessionStatusActive && status != domain.ServiceSessionStatusPending {
+	if status != domain.ServiceSessionStatusOpen {
 		return memberReplySessionPlan{}, ErrDataInvariant
 	}
 	if assigneeIdentityID != nil && *assigneeIdentityID != identityID {
 		return memberReplySessionPlan{}, &ConflictError{Reason: ConflictReasonServiceSessionOwned}
 	}
-	return memberReplySessionPlan{assign: assigneeIdentityID == nil, activate: status != domain.ServiceSessionStatusActive}, nil
+	return memberReplySessionPlan{assign: assigneeIdentityID == nil}, nil
 }
 
 // applyMemberReplySessionPlan 应用成员回复对应的客服周期状态迁移。
 func applyMemberReplySessionPlan(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, identityID string, now time.Time, plan memberReplySessionPlan) error {
-	if !plan.assign && !plan.activate {
+	if !plan.assign {
 		return nil
 	}
 	query := db.NewUpdate().Model(session).
@@ -332,11 +331,6 @@ func applyMemberReplySessionPlan(ctx context.Context, db bun.IDB, session *serve
 			Set("assignee_identity_id = ?", identityID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now)
 	}
-	if plan.activate {
-		query = query.
-			Set("status = ?", domain.ServiceSessionStatusActive).
-			Set("status_changed_at = ?", now)
-	}
 	if _, err := query.Exec(ctx); err != nil {
 		return fmt.Errorf("apply member reply service session: %w", err)
 	}
@@ -345,10 +339,6 @@ func applyMemberReplySessionPlan(ctx context.Context, db bun.IDB, session *serve
 		if session.AssignedAt == nil {
 			session.AssignedAt = &now
 		}
-	}
-	if plan.activate {
-		session.Status = string(domain.ServiceSessionStatusActive)
-		session.StatusChangedAt = now
 	}
 	return nil
 }

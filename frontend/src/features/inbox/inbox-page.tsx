@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import {
+  CheckIcon,
   ChevronDownIcon,
   HeadsetIcon,
   MessagesSquareIcon,
@@ -15,14 +16,22 @@ import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
+  CustomerInboxView,
+  InboxScope,
+  OrganizationIdentityType,
   ServiceSessionStatus,
   isCustomerInboxConversation,
   isDirectInboxConversation,
+  listCustomerServiceAssignees,
   type CustomerInboxConversationData,
+  type CustomerServiceSession,
   type DirectInboxConversationData,
+  type InboxAssignee,
   type InboxConversation,
+  type LoadInboxQuery,
 } from "@/api"
 import { PageSplit } from "@/components/page-split"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -57,14 +66,8 @@ import {
   useIsWideViewport,
 } from "@/hooks/use-narrow-viewport"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
-
-/** 与收件箱原型一致的消息范围。 */
-type InboxScope = "all" | "customer" | "internal"
-
-/** 客户范围的队列子筛选；与 ServiceSession「批次状态 + 负责人」同构。 */
-type CustomerQueueFilter = "queue" | "mine" | "ai" | "colleague" | "closed"
 
 /** 使用与服务端一致的普通字符串 id 倒序。 */
 function compareIDsDescending(first: string, second: string) {
@@ -99,10 +102,90 @@ function compareInboxConversations(
   return compareIDsDescending(first.id, second.id)
 }
 
+/** 生成字段完整且可精确失效的收件箱查询。 */
+function inboxQuery(
+  scope: InboxScope,
+  customerView = CustomerInboxView.CustomerInboxViewQueue,
+  assigneeIdentityId = "",
+): LoadInboxQuery {
+  return { scope, customerView, assigneeIdentityId }
+}
+
+/** 返回完整查询的稳定标识。 */
+function inboxQueryIdentity(query: LoadInboxQuery) {
+  return `${query.scope}\u0000${query.customerView}\u0000${query.assigneeIdentityId}`
+}
+
+/** 返回客服处理周期当前所属的筛选查询。 */
+function customerPlacementQueries(
+  status: ServiceSessionStatus,
+  assigneeIdentityId: string,
+  currentIdentityId: string,
+) {
+  if (status === ServiceSessionStatus.ServiceSessionStatusClosed) {
+    return [
+      inboxQuery(
+        InboxScope.InboxScopeCustomer,
+        CustomerInboxView.CustomerInboxViewClosed,
+      ),
+    ]
+  }
+  if (!assigneeIdentityId) {
+    return [inboxQuery(InboxScope.InboxScopeCustomer)]
+  }
+  if (assigneeIdentityId === currentIdentityId) {
+    return [
+      inboxQuery(
+        InboxScope.InboxScopeCustomer,
+        CustomerInboxView.CustomerInboxViewMine,
+      ),
+    ]
+  }
+  return [
+    inboxQuery(
+      InboxScope.InboxScopeCustomer,
+      CustomerInboxView.CustomerInboxViewCoworkers,
+    ),
+    inboxQuery(
+      InboxScope.InboxScopeCustomer,
+      CustomerInboxView.CustomerInboxViewCoworkers,
+      assigneeIdentityId,
+    ),
+  ]
+}
+
+/** 把处理周期命令结果合并到当前客户会话摘要。 */
+function customerConversationWithServiceSession(
+  conversation: CustomerInboxConversationData,
+  session: Pick<CustomerServiceSession, "id" | "status" | "assignee">,
+): CustomerInboxConversationData {
+  return {
+    ...conversation,
+    customer: {
+      ...conversation.customer,
+      serviceSessionId: session.id,
+      serviceSessionStatus: session.status,
+      assignee: session.assignee,
+    },
+  }
+}
+
 const scopes = [
-  { id: "all", labelKey: "scopeAll", icon: MessagesSquareIcon },
-  { id: "customer", labelKey: "scopeCustomer", icon: HeadsetIcon },
-  { id: "internal", labelKey: "scopeInternal", icon: UsersRoundIcon },
+  {
+    id: InboxScope.InboxScopeAll,
+    labelKey: "scopeAll",
+    icon: MessagesSquareIcon,
+  },
+  {
+    id: InboxScope.InboxScopeCustomer,
+    labelKey: "scopeCustomer",
+    icon: HeadsetIcon,
+  },
+  {
+    id: InboxScope.InboxScopeInternal,
+    labelKey: "scopeInternal",
+    icon: UsersRoundIcon,
+  },
 ] as const
 
 /** 客服处理状态文案。 */
@@ -111,12 +194,8 @@ function sessionStatusLabel(
   t: TFunction<"inbox">,
 ) {
   switch (status) {
-    case ServiceSessionStatus.ServiceSessionStatusWaiting:
-      return t("sessionStatus.waiting")
-    case ServiceSessionStatus.ServiceSessionStatusActive:
-      return t("sessionStatus.active")
-    case ServiceSessionStatus.ServiceSessionStatusPending:
-      return t("sessionStatus.pending")
+    case ServiceSessionStatus.ServiceSessionStatusOpen:
+      return t("sessionStatus.open")
     case ServiceSessionStatus.ServiceSessionStatusClosed:
       return t("sessionStatus.closed")
     default:
@@ -350,125 +429,163 @@ function InboxScopeRail({
   )
 }
 
-/** 客户范围的队列子筛选：高频三段下划线页签平铺，低频项收进「更多」下拉。当前仅样式交互，尚未过滤列表。 */
+/** 客户范围的四个服务视图；同事视图在下拉中继续选择具体客服。 */
 function InboxCustomerQueueFilter({
-  filter,
-  onFilterChange,
-  waitingCount,
+  view,
+  assigneeIdentityId,
+  assignees,
+  currentIdentityId,
+  onChange,
 }: {
-  filter: CustomerQueueFilter
-  onFilterChange: (filter: CustomerQueueFilter) => void
-  waitingCount: number
+  view: CustomerInboxView
+  assigneeIdentityId: string
+  assignees: InboxAssignee[]
+  currentIdentityId: string
+  onChange: (view: CustomerInboxView, assigneeIdentityId?: string) => void
 }) {
   const { t } = useTranslation("inbox")
-
-  const primarySegments = [
-    { id: "queue", label: t("queueFilterQueue") },
-    { id: "mine", label: t("queueFilterMine") },
-    { id: "ai", label: t("queueFilterAi") },
-  ] as const
-
-  const moreSegments = [
-    { id: "colleague", label: t("queueFilterColleague") },
-    { id: "closed", label: t("queueFilterClosed") },
-  ] as const
-
-  const activeMoreSegment = moreSegments.find(
-    (segment) => segment.id === filter,
+  const coworkers = assignees.filter(
+    (assignee) => assignee.identityId !== currentIdentityId,
   )
+  const selectedCoworker = coworkers.find(
+    (assignee) => assignee.identityId === assigneeIdentityId,
+  )
+  const segments = [
+    {
+      id: CustomerInboxView.CustomerInboxViewQueue,
+      label: t("queueFilterQueue"),
+    },
+    {
+      id: CustomerInboxView.CustomerInboxViewMine,
+      label: t("queueFilterMine"),
+    },
+  ] as const
+
+  function tabClass(active: boolean) {
+    return cn(
+      "relative h-9 min-w-0 flex-1 rounded-md px-1 text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      active
+        ? "text-foreground"
+        : "text-muted-foreground hover:text-foreground",
+    )
+  }
+
+  function activeIndicator(active: boolean) {
+    return active ? (
+      <span
+        aria-hidden="true"
+        className="absolute right-1 -bottom-px left-1 h-0.5 rounded bg-primary"
+      />
+    ) : null
+  }
 
   return (
     <div
       role="tablist"
       aria-label={t("queueFilterLabel")}
-      className="flex shrink-0 items-stretch border-b border-border/60 pt-2"
+      className="flex shrink-0 items-stretch border-b border-border/60 px-2 pt-2"
     >
-      <div className="flex min-w-0 flex-1 items-stretch justify-between pl-2">
-        {primarySegments.map((segment) => {
-          const active = filter === segment.id
-          return (
-            <button
-              key={segment.id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              className={cn(
-                "relative h-8 min-w-0 rounded-md px-1 text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                active
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-              onClick={() => onFilterChange(segment.id)}
-            >
-              <span className="block truncate">{segment.label}</span>
-              {segment.id === "queue" && waitingCount > 0 ? (
-                <span
-                  className={cn(
-                    "pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none tabular-nums shadow-sm ring-1 ring-background",
-                    active
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground",
-                  )}
-                >
-                  {waitingCount > 99 ? "99+" : waitingCount}
-                </span>
-              ) : null}
-              {active ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute right-1 -bottom-px left-1 h-0.5 rounded bg-primary"
-                />
-              ) : null}
-            </button>
-          )
-        })}
-      </div>
-      <span
-        aria-hidden="true"
-        className="mx-1.5 my-2 w-px self-stretch bg-border/60"
-      />
+      {segments.map((segment) => {
+        const active = view === segment.id
+        return (
+          <button
+            key={segment.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={tabClass(active)}
+            onClick={() => onChange(segment.id)}
+          >
+            <span className="block truncate">{segment.label}</span>
+            {activeIndicator(active)}
+          </button>
+        )
+      })}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
             role="tab"
-            aria-selected={Boolean(activeMoreSegment)}
-            title={activeMoreSegment?.label ?? t("queueFilterMore")}
-            className={cn(
-              "relative h-8 w-24 shrink-0 rounded-md text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              activeMoreSegment
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground",
+            aria-selected={
+              view === CustomerInboxView.CustomerInboxViewCoworkers
+            }
+            title={selectedCoworker?.displayName ?? t("queueFilterColleague")}
+            className={tabClass(
+              view === CustomerInboxView.CustomerInboxViewCoworkers,
             )}
           >
             <span className="flex min-w-0 items-center justify-center gap-0.5">
-              <span className="truncate">
-                {activeMoreSegment?.label ?? t("queueFilterMore")}
-              </span>
+              <span className="truncate">{t("queueFilterColleague")}</span>
               <ChevronDownIcon className="size-3.5 opacity-70" />
             </span>
-            {activeMoreSegment ? (
-              <span
-                aria-hidden="true"
-                className="absolute right-0.5 -bottom-px left-0.5 h-0.5 rounded bg-primary"
-              />
-            ) : null}
+            {activeIndicator(
+              view === CustomerInboxView.CustomerInboxViewCoworkers,
+            )}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-28">
-          {moreSegments.map((segment) => (
+        <DropdownMenuContent align="center" className="min-w-48">
+          <DropdownMenuItem
+            className={cn(
+              view === CustomerInboxView.CustomerInboxViewCoworkers &&
+                !assigneeIdentityId &&
+                "bg-muted text-foreground",
+            )}
+            onSelect={() =>
+              onChange(CustomerInboxView.CustomerInboxViewCoworkers, "")
+            }
+          >
+            <span className="min-w-0 flex-1 truncate">
+              {t("queueFilterAllCoworkers")}
+            </span>
+            {view === CustomerInboxView.CustomerInboxViewCoworkers &&
+            !assigneeIdentityId ? (
+              <CheckIcon className="size-4" />
+            ) : null}
+          </DropdownMenuItem>
+          {coworkers.map((assignee) => (
             <DropdownMenuItem
-              key={segment.id}
+              key={assignee.identityId}
               className={cn(
-                filter === segment.id && "bg-muted text-foreground",
+                assigneeIdentityId === assignee.identityId &&
+                  "bg-muted text-foreground",
               )}
-              onSelect={() => onFilterChange(segment.id)}
+              onSelect={() =>
+                onChange(
+                  CustomerInboxView.CustomerInboxViewCoworkers,
+                  assignee.identityId,
+                )
+              }
             >
-              {segment.label}
+              <span className="min-w-0 flex-1 truncate">
+                {assignee.displayName}
+              </span>
+              {assignee.type ===
+              OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                <span className="text-xs text-muted-foreground">
+                  {t("queueFilterAiEmployee")}
+                </span>
+              ) : null}
+              {assigneeIdentityId === assignee.identityId ? (
+                <CheckIcon className="size-4" />
+              ) : null}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === CustomerInboxView.CustomerInboxViewClosed}
+        className={tabClass(
+          view === CustomerInboxView.CustomerInboxViewClosed,
+        )}
+        onClick={() => onChange(CustomerInboxView.CustomerInboxViewClosed)}
+      >
+        <span className="block truncate">{t("queueFilterClosed")}</span>
+        {activeIndicator(
+          view === CustomerInboxView.CustomerInboxViewClosed,
+        )}
+      </button>
     </div>
   )
 }
@@ -477,11 +594,13 @@ function InboxCustomerQueueFilter({
 function InboxConversationList({
   conversations,
   hasAnyConversation,
+  loading,
   selectedId,
   onSelect,
 }: {
   conversations: InboxConversation[]
   hasAnyConversation: boolean
+  loading: boolean
   selectedId?: string
   onSelect: (conversationId: string) => void
 }) {
@@ -489,6 +608,14 @@ function InboxConversationList({
   const conversationName = useConversationName()
   const formatTime = useConversationTime()
   useMinuteTick()
+
+  if (loading) {
+    return (
+      <LoadingIndicator className="min-h-0 flex-1 justify-center">
+        {t("messagesLoading")}
+      </LoadingIndicator>
+    )
+  }
 
   if (conversations.length === 0) {
     return hasAnyConversation ? (
@@ -579,12 +706,24 @@ function InboxConversationList({
 /** 组合当前 Conversation 工作区和独立联系人上下文栏。 */
 function ConversationMain({
   conversation,
+  onSessionMoved,
+  onConversationChanged,
   narrowViewport = false,
 }: {
   conversation: InboxConversation
+  onSessionMoved: (
+    conversation: CustomerInboxConversationData,
+    session: CustomerServiceSession,
+    view: CustomerInboxView,
+    assigneeIdentityId?: string,
+  ) => void
+  onConversationChanged: (
+    conversation: CustomerInboxConversationData | DirectInboxConversationData,
+  ) => void
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation("inbox")
+  const { identity } = useWorkspace()
   const isWideViewport = useIsWideViewport()
   const conversationName = useConversationName()
   const [contextSheetOpen, setContextSheetOpen] = useState(false)
@@ -602,6 +741,14 @@ function ConversationMain({
         t,
       )
     : ""
+  const canReply =
+    directConversation !== null ||
+    (customerConversation !== null &&
+      customerConversation.customer.serviceSessionStatus ===
+        ServiceSessionStatus.ServiceSessionStatusOpen &&
+      (!customerConversation.customer.assignee ||
+        customerConversation.customer.assignee.identityId ===
+          identity.user.identityId))
   const desktopContextVisible =
     customerConversation !== null && isWideViewport && !contextCollapsed
   const contextVisible = customerConversation
@@ -635,6 +782,16 @@ function ConversationMain({
           conversation={conversation}
           contactName={contactName}
           sessionStatus={sessionStatus}
+          currentIdentityId={identity.user.identityId}
+          onSessionMoved={(session, view, assigneeIdentityId) => {
+            if (!customerConversation) return
+            onSessionMoved(
+              customerConversation,
+              session,
+              view,
+              assigneeIdentityId,
+            )
+          }}
           contextVisible={contextVisible}
           narrowViewport={narrowViewport}
           onContextToggle={toggleContext}
@@ -642,6 +799,10 @@ function ConversationMain({
         <ConversationThread
           key={conversation.id}
           conversation={validConversation}
+          canReply={canReply}
+          onConversationChanged={() =>
+            onConversationChanged(validConversation)
+          }
         />
       </div>
       {customerConversation ? (
@@ -664,8 +825,12 @@ function ConversationMain({
 /** 协调当前会话时间线和回复区的即时消息。 */
 function ConversationThread({
   conversation,
+  canReply,
+  onConversationChanged,
 }: {
   conversation: CustomerInboxConversationData | DirectInboxConversationData
+  canReply: boolean
+  onConversationChanged: () => void
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
@@ -682,19 +847,22 @@ function ConversationThread({
         currentIdentityID={identity.user.identityId}
         outgoingMessages={outgoing.messages}
       />
-      {replySupported ? (
-        <ConversationComposer
-          conversationID={conversation.id}
-          conversationType={conversation.type}
-          onSending={outgoing.start}
-          onSent={outgoing.succeed}
-          onFailed={outgoing.fail}
-        />
-      ) : (
-        <div className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-5 text-center text-sm text-muted-foreground">
-          {t("channelReplyUnsupported")}
-        </div>
-      )}
+      {canReply ? (
+        replySupported ? (
+          <ConversationComposer
+            conversationID={conversation.id}
+            conversationType={conversation.type}
+            onSending={outgoing.start}
+            onSent={outgoing.succeed}
+            onFailed={outgoing.fail}
+            onSucceeded={onConversationChanged}
+          />
+        ) : (
+          <div className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-5 text-center text-sm text-muted-foreground">
+            {t("channelReplyUnsupported")}
+          </div>
+        )
+      ) : null}
     </>
   )
 }
@@ -702,24 +870,51 @@ function ConversationThread({
 /** 消息页中栏和当前会话。 */
 export function InboxPage({
   conversations,
+  listLoading,
+  scope,
+  customerView,
+  assigneeIdentityId,
+  selectedConversationId,
+  onSelectedConversationChange,
+  onQueryChange,
 }: {
   conversations: InboxConversation[]
+  listLoading: boolean
+  scope: InboxScope
+  customerView: CustomerInboxView
+  assigneeIdentityId: string
+  selectedConversationId: string
+  onSelectedConversationChange: (conversationId: string) => void
+  onQueryChange: (changes: {
+    scope?: InboxScope
+    customerView?: CustomerInboxView
+    assigneeIdentityId?: string
+  }) => void
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
   const isNarrowViewport = useIsNarrowViewport()
   const invalidate = useResourceInvalidator()
-  const [scope, setScope] = useState<InboxScope>("all")
   const [railCollapsed, setRailCollapsed] = useState(false)
-  const [queueFilter, setQueueFilter] = useState<CustomerQueueFilter>("mine")
   const [query, setQuery] = useState("")
-  const [selectedId, setSelectedId] = useState(() => conversations[0]?.id ?? "")
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [directDialogOpen, setDirectDialogOpen] = useState(false)
   const [startedConversations, setStartedConversations] = useState<
     DirectInboxConversationData[]
   >([])
+  const [selectedConversationSnapshot, setSelectedConversationSnapshot] =
+    useState<InboxConversation | null>(null)
   const conversationName = useConversationName()
+  const currentInboxQuery = inboxQuery(
+    scope,
+    customerView,
+    assigneeIdentityId,
+  )
+  const { data: customerServiceAssignees = [] } = useResource(
+    resourceKeys.customerServiceAssignees(),
+    () => listCustomerServiceAssignees(),
+    { enabled: scope === InboxScope.InboxScopeCustomer },
+  )
 
   const validConversations = useMemo(
     () =>
@@ -745,9 +940,9 @@ export function InboxPage({
   )
   const scopedConversations = useMemo(() => {
     switch (scope) {
-      case "customer":
+      case InboxScope.InboxScopeCustomer:
         return allConversations.filter(isCustomerInboxConversation)
-      case "internal":
+      case InboxScope.InboxScopeInternal:
         return allConversations.filter(isDirectInboxConversation)
       default:
         return allConversations
@@ -786,16 +981,6 @@ export function InboxPage({
   }, [isNarrowViewport])
 
   useEffect(() => {
-    if (
-      !scopedConversations.some(
-        (conversation) => conversation.id === selectedId,
-      )
-    ) {
-      setSelectedId(scopedConversations[0]?.id ?? "")
-    }
-  }, [scopedConversations, selectedId])
-
-  useEffect(() => {
     setStartedConversations((current) => {
       const pending = current.filter(
         (started) =>
@@ -807,18 +992,52 @@ export function InboxPage({
     })
   }, [validConversations])
 
+  const selectedPool = listLoading ? allConversations : scopedConversations
+  const selectedFromPool =
+    selectedPool.find(
+      (conversation) => conversation.id === selectedConversationId,
+    ) ?? (selectedConversationId ? undefined : selectedPool[0])
+  useEffect(() => {
+    if (selectedFromPool) setSelectedConversationSnapshot(selectedFromPool)
+  }, [selectedFromPool])
   const selectedConversation =
-    scopedConversations.find(
-      (conversation) => conversation.id === selectedId,
-    ) ?? scopedConversations[0]
+    selectedConversationSnapshot?.id === selectedConversationId
+      ? selectedConversationSnapshot
+      : selectedFromPool
 
   /** 选中一个会话。 */
   function selectConversation(conversationId: string) {
-    setSelectedId(conversationId)
+    onSelectedConversationChange(conversationId)
 
     if (isNarrowViewport) {
       setIsNarrowDetailOpen(true)
     }
+  }
+
+  /** 标旧受影响的精确查询，仅让最终可见视图立即重新读取。 */
+  function refreshAffectedInboxQueries(
+    queries: LoadInboxQuery[],
+    destination: LoadInboxQuery,
+  ) {
+    const destinationIdentity = inboxQueryIdentity(destination)
+    const affected = new Map(
+      queries.map((query) => [inboxQueryIdentity(query), query]),
+    )
+    affected.set(destinationIdentity, destination)
+    for (const [identity, query] of affected) {
+      if (identity === destinationIdentity) continue
+      void invalidate(resourceKeys.inbox(query), {
+        exact: true,
+        refetchType: "none",
+      })
+    }
+    void invalidate(resourceKeys.inbox(destination), { exact: true })
+    if (destinationIdentity === inboxQueryIdentity(currentInboxQuery)) return
+    onQueryChange({
+      scope: destination.scope,
+      customerView: destination.customerView,
+      assigneeIdentityId: destination.assigneeIdentityId,
+    })
   }
 
   /** 将新打开的内部单聊放入列表并选中。 */
@@ -829,10 +1048,106 @@ export function InboxPage({
       conversation,
       ...current.filter((item) => item.id !== conversation.id),
     ])
-    setScope("internal")
-    setSelectedId(conversation.id)
+    const destination = inboxQuery(InboxScope.InboxScopeInternal)
+    refreshAffectedInboxQueries(
+      [inboxQuery(InboxScope.InboxScopeAll), destination],
+      destination,
+    )
+    onSelectedConversationChange(conversation.id)
     setIsNarrowDetailOpen(isNarrowViewport)
-    void invalidate(resourceKeys.inbox())
+  }
+
+  /** 会话命令改变归属后刷新源、目标与全部视图。 */
+  function showMovedCustomerConversation(
+    conversation: CustomerInboxConversationData,
+    session: CustomerServiceSession,
+    view: CustomerInboxView,
+    nextAssigneeIdentityId = "",
+  ) {
+    setSelectedConversationSnapshot(
+      customerConversationWithServiceSession(conversation, session),
+    )
+    const destination =
+      scope === InboxScope.InboxScopeCustomer ||
+      view === CustomerInboxView.CustomerInboxViewClosed
+        ? inboxQuery(
+            InboxScope.InboxScopeCustomer,
+            view,
+            nextAssigneeIdentityId,
+          )
+        : currentInboxQuery
+    refreshAffectedInboxQueries(
+      [
+        inboxQuery(InboxScope.InboxScopeAll),
+        ...customerPlacementQueries(
+          conversation.customer.serviceSessionStatus,
+          conversation.customer.assignee?.identityId ?? "",
+          identity.user.identityId,
+        ),
+        ...customerPlacementQueries(
+          session.status,
+          session.assignee?.identityId ?? "",
+          identity.user.identityId,
+        ),
+      ],
+      destination,
+    )
+  }
+
+  /** 回复成功后只刷新会话会出现或排序变化的精确视图。 */
+  function refreshConversationAfterMessage(
+    conversation: CustomerInboxConversationData | DirectInboxConversationData,
+  ) {
+    if (isDirectInboxConversation(conversation)) {
+      refreshAffectedInboxQueries(
+        [
+          inboxQuery(InboxScope.InboxScopeAll),
+          inboxQuery(InboxScope.InboxScopeInternal),
+        ],
+        currentInboxQuery,
+      )
+      return
+    }
+    const implicitlyClaimed = !conversation.customer.assignee
+    if (implicitlyClaimed) {
+      setSelectedConversationSnapshot(
+        customerConversationWithServiceSession(conversation, {
+          id: conversation.customer.serviceSessionId,
+          status: ServiceSessionStatus.ServiceSessionStatusOpen,
+          assignee: {
+            identityId: identity.user.identityId,
+            type: OrganizationIdentityType.OrganizationIdentityTypeUser,
+            displayName: identity.user.displayName,
+            avatarUrl: identity.user.avatarUrl,
+          },
+        }),
+      )
+    }
+    const destination =
+      implicitlyClaimed && scope === InboxScope.InboxScopeCustomer
+        ? inboxQuery(
+            InboxScope.InboxScopeCustomer,
+            CustomerInboxView.CustomerInboxViewMine,
+          )
+        : currentInboxQuery
+    refreshAffectedInboxQueries(
+      [
+        inboxQuery(InboxScope.InboxScopeAll),
+        ...customerPlacementQueries(
+          conversation.customer.serviceSessionStatus,
+          conversation.customer.assignee?.identityId ?? "",
+          identity.user.identityId,
+        ),
+        ...(implicitlyClaimed
+          ? customerPlacementQueries(
+              ServiceSessionStatus.ServiceSessionStatusOpen,
+              identity.user.identityId,
+              identity.user.identityId,
+            )
+          : []),
+      ],
+      destination,
+    )
   }
 
   const pane = (
@@ -842,32 +1157,38 @@ export function InboxPage({
         onQueryChange={setQuery}
         railCollapsed={railCollapsed}
         onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
-        searchDisabled={allConversations.length === 0}
+        searchDisabled={listLoading || allConversations.length === 0}
         onStartDirect={() => setDirectDialogOpen(true)}
       />
       <div className="flex min-h-0 flex-1">
         {railCollapsed ? null : (
-          <InboxScopeRail scope={scope} onScopeChange={setScope} />
+          <InboxScopeRail
+            scope={scope}
+            onScopeChange={(nextScope) =>
+              onQueryChange({ scope: nextScope })
+            }
+          />
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {scope === "customer" ? (
+          {scope === InboxScope.InboxScopeCustomer ? (
             <InboxCustomerQueueFilter
-              filter={queueFilter}
-              onFilterChange={setQueueFilter}
-              waitingCount={
-                allConversations.filter(
-                  (conversation) =>
-                    isCustomerInboxConversation(conversation) &&
-                    conversation.customer.serviceSessionStatus ===
-                      ServiceSessionStatus.ServiceSessionStatusWaiting,
-                ).length
+              view={customerView}
+              assigneeIdentityId={assigneeIdentityId}
+              assignees={customerServiceAssignees}
+              currentIdentityId={identity.user.identityId}
+              onChange={(nextView, nextAssigneeIdentityId = "") =>
+                onQueryChange({
+                  customerView: nextView,
+                  assigneeIdentityId: nextAssigneeIdentityId,
+                })
               }
             />
           ) : null}
           <InboxConversationList
             conversations={visibleConversations}
             hasAnyConversation={scopedConversations.length > 0}
-            selectedId={selectedId}
+            loading={listLoading}
+            selectedId={selectedConversationId}
             onSelect={selectConversation}
           />
         </div>
@@ -886,7 +1207,11 @@ export function InboxPage({
       >
         {isNarrowViewport ? null : selectedConversation ? (
           <section className="min-h-0 flex-1">
-            <ConversationMain conversation={selectedConversation} />
+            <ConversationMain
+              conversation={selectedConversation}
+              onSessionMoved={showMovedCustomerConversation}
+              onConversationChanged={refreshConversationAfterMessage}
+            />
           </section>
         ) : (
           <div className="cervi-inbox-empty-main flex min-h-0 flex-1 items-center justify-center p-6">
@@ -918,6 +1243,8 @@ export function InboxPage({
             </SheetHeader>
             <ConversationMain
               conversation={selectedConversation}
+              onSessionMoved={showMovedCustomerConversation}
+              onConversationChanged={refreshConversationAfterMessage}
               narrowViewport
             />
           </SheetContent>

@@ -7,14 +7,32 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
 const inboxConversationTypeLimit = 50
+
+// LoadInput 定义统一收件箱范围和客户队列筛选。
+type LoadInput struct {
+	Scope              domain.InboxScope
+	CustomerView       domain.CustomerInboxView
+	AssigneeIdentityID string
+}
+
+// AssigneeSummary 定义客户会话负责人摘要。
+type AssigneeSummary struct {
+	IdentityID   string
+	Type         domain.OrganizationIdentityType
+	DisplayName  string
+	AvatarFileID *string
+}
 
 // CustomerConversationSummary 定义收件箱中的客户会话详情。
 type CustomerConversationSummary struct {
@@ -26,6 +44,8 @@ type CustomerConversationSummary struct {
 	Preview              *string
 	LastMessageAt        *time.Time
 	ServiceSessionStatus domain.ServiceSessionStatus
+	ServiceSessionID     string
+	Assignee             *AssigneeSummary
 }
 
 // DirectConversationSummary 定义收件箱中的内部单聊详情。
@@ -62,6 +82,11 @@ type customerConversationRow struct {
 	Preview              *string    `bun:"preview"`
 	LastMessageAt        *time.Time `bun:"last_message_at"`
 	ServiceSessionStatus string     `bun:"service_session_status"`
+	ServiceSessionID     string     `bun:"service_session_id"`
+	AssigneeIdentityID   *string    `bun:"assignee_identity_id"`
+	AssigneeType         *string    `bun:"assignee_type"`
+	AssigneeDisplayName  *string    `bun:"assignee_display_name"`
+	AssigneeAvatarFileID *string    `bun:"assignee_avatar_file_id"`
 	SortAt               *time.Time `bun:"sort_at"`
 }
 
@@ -82,25 +107,54 @@ func NewLoadInboxQuery(db *bun.DB) *LoadInboxQuery {
 }
 
 // Execute 分别读取客户会话和内部单聊后合并排序。
-func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]ConversationSummary, error) {
-	customers, err := q.loadCustomerConversations(ctx, identity.Organization.ID)
-	if err != nil {
+func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, error) {
+	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return nil, err
 	}
-	directs, err := q.loadDirectConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID)
-	if err != nil {
-		return nil, err
+	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
+	input.CustomerView = domain.CustomerInboxView(strings.TrimSpace(string(input.CustomerView)))
+	input.AssigneeIdentityID = strings.TrimSpace(input.AssigneeIdentityID)
+	if input.Scope == "" {
+		input.Scope = domain.InboxScopeAll
+	}
+	if input.Scope == domain.InboxScopeCustomer && input.CustomerView == "" {
+		input.CustomerView = domain.CustomerInboxViewQueue
+	}
+	if (input.Scope != domain.InboxScopeAll && input.Scope != domain.InboxScopeCustomer && input.Scope != domain.InboxScopeInternal) ||
+		(input.Scope == domain.InboxScopeCustomer && input.CustomerView != domain.CustomerInboxViewQueue && input.CustomerView != domain.CustomerInboxViewMine && input.CustomerView != domain.CustomerInboxViewCoworkers && input.CustomerView != domain.CustomerInboxViewClosed) ||
+		(input.AssigneeIdentityID != "" && (input.Scope != domain.InboxScopeCustomer || input.CustomerView != domain.CustomerInboxViewCoworkers || !common.ValidUUID(input.AssigneeIdentityID))) {
+		return nil, ErrQueryInvalid
+	}
+
+	customers := make([]customerConversationRow, 0)
+	directs := make([]directConversationRow, 0)
+	var err error
+	if input.Scope != domain.InboxScopeInternal {
+		customers, err = q.loadCustomerConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, input)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if input.Scope != domain.InboxScopeCustomer {
+		directs, err = q.loadDirectConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	result := make([]ConversationSummary, 0, len(customers)+len(directs))
 	for _, row := range customers {
+		var assignee *AssigneeSummary
+		if row.AssigneeIdentityID != nil && row.AssigneeType != nil && row.AssigneeDisplayName != nil {
+			assignee = &AssigneeSummary{IdentityID: *row.AssigneeIdentityID, Type: domain.OrganizationIdentityType(*row.AssigneeType), DisplayName: *row.AssigneeDisplayName, AvatarFileID: row.AssigneeAvatarFileID}
+		}
 		result = append(result, ConversationSummary{
 			ID: row.ID, Type: domain.ConversationTypeCustomer, sortAt: row.SortAt,
 			Customer: &CustomerConversationSummary{
 				Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
 				ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
 				Preview: row.Preview, LastMessageAt: row.LastMessageAt,
-				ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus),
+				ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,
 			},
 		})
 	}
@@ -135,10 +189,10 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	return result, nil
 }
 
-// loadCustomerConversations 读取最新处理批次未结束的客户会话。
-func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organizationID string) ([]customerConversationRow, error) {
+// loadCustomerConversations 按客户视图读取最新处理周期对应的会话。
+func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organizationID, currentIdentityID string, input LoadInput) ([]customerConversationRow, error) {
 	var rows []customerConversationRow
-	err := q.db.NewSelect().
+	query := q.db.NewSelect().
 		TableExpr("customer_conversations AS cc").
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("cv.title AS title").
@@ -149,21 +203,41 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("latest.status AS service_session_status").
+		ColumnExpr("latest.id::text AS service_session_id").
+		ColumnExpr("latest.assignee_identity_id::text AS assignee_identity_id").
+		ColumnExpr("assignee.type AS assignee_type").
+		ColumnExpr("assignee.display_name AS assignee_display_name").
+		ColumnExpr("assignee.avatar_file_id::text AS assignee_avatar_file_id").
 		ColumnExpr("cv.last_message_at AS sort_at").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cc.organization_id").
 		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cc.organization_id").
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
-		Join("JOIN LATERAL (SELECT ss.status FROM service_sessions AS ss WHERE ss.organization_id = cv.organization_id AND ss.conversation_id = cv.id ORDER BY ss.sequence DESC LIMIT 1) AS latest ON TRUE").
+		Join("JOIN LATERAL (SELECT ss.id, ss.status, ss.assignee_identity_id FROM service_sessions AS ss WHERE ss.organization_id = cv.organization_id AND ss.conversation_id = cv.id ORDER BY ss.sequence DESC LIMIT 1) AS latest ON TRUE").
+		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = latest.assignee_identity_id").
 		Where("cc.organization_id = ?", organizationID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer).
-		Where("latest.status IN (?)", bun.In([]domain.ServiceSessionStatus{
-			domain.ServiceSessionStatusWaiting,
-			domain.ServiceSessionStatusActive,
-			domain.ServiceSessionStatusPending,
-		})).
-		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
+		Where("cv.type = ?", domain.ConversationTypeCustomer)
+	if input.Scope == domain.InboxScopeAll {
+		query = query.Where("latest.status = ?", domain.ServiceSessionStatusOpen)
+	} else {
+		switch input.CustomerView {
+		case domain.CustomerInboxViewQueue:
+			query = query.Where("latest.status = ?", domain.ServiceSessionStatusOpen).Where("latest.assignee_identity_id IS NULL")
+		case domain.CustomerInboxViewMine:
+			query = query.Where("latest.status = ?", domain.ServiceSessionStatusOpen).Where("latest.assignee_identity_id = ?", currentIdentityID)
+		case domain.CustomerInboxViewCoworkers:
+			query = query.Where("latest.status = ?", domain.ServiceSessionStatusOpen).
+				Where("latest.assignee_identity_id IS NOT NULL").
+				Where("latest.assignee_identity_id <> ?", currentIdentityID)
+			if input.AssigneeIdentityID != "" {
+				query = query.Where("latest.assignee_identity_id = ?", input.AssigneeIdentityID)
+			}
+		case domain.CustomerInboxViewClosed:
+			query = query.Where("latest.status = ?", domain.ServiceSessionStatusClosed)
+		}
+	}
+	err := query.OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
 		Limit(inboxConversationTypeLimit).
 		Scan(ctx, &rows)
 	if err != nil {

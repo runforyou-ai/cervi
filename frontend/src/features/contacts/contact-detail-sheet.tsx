@@ -1,8 +1,8 @@
 /** 通讯录详情侧栏的共享框架。 */
 import { useRef, type ReactNode } from "react"
-import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Sheet,
@@ -53,10 +53,9 @@ export function ContactDetailSheet({
         <ScrollArea className="min-h-0 flex-1">
           <div className="p-6">
             {loading ? (
-              <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
-                <LoaderCircleIcon className="size-4 animate-spin" />
+              <LoadingIndicator className="min-h-40 justify-center">
                 {t("loading")}
-              </div>
+              </LoadingIndicator>
             ) : (
               children
             )}

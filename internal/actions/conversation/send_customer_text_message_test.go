@@ -29,7 +29,7 @@ func TestNormalizeCustomerTextMessageInput(t *testing.T) {
 	}
 }
 
-// TestPlanMemberReplySession 验证成员回复的领取和激活状态机。
+// TestPlanMemberReplySession 验证成员回复的领取规则。
 func TestPlanMemberReplySession(t *testing.T) {
 	currentIdentityID := "identity-current"
 	otherIdentityID := "identity-other"
@@ -38,17 +38,12 @@ func TestPlanMemberReplySession(t *testing.T) {
 		status     domain.ServiceSessionStatus
 		assignee   *string
 		wantAssign bool
-		wantActive bool
 		wantReason string
 		wantData   bool
 	}{
-		{name: "waiting public queue", status: domain.ServiceSessionStatusWaiting, wantAssign: true, wantActive: true},
-		{name: "pending public queue", status: domain.ServiceSessionStatusPending, wantAssign: true, wantActive: true},
-		{name: "active public queue", status: domain.ServiceSessionStatusActive, wantAssign: true},
-		{name: "waiting assigned to current", status: domain.ServiceSessionStatusWaiting, assignee: &currentIdentityID, wantActive: true},
-		{name: "pending assigned to current", status: domain.ServiceSessionStatusPending, assignee: &currentIdentityID, wantActive: true},
-		{name: "active assigned to current", status: domain.ServiceSessionStatusActive, assignee: &currentIdentityID},
-		{name: "assigned to other", status: domain.ServiceSessionStatusWaiting, assignee: &otherIdentityID, wantReason: ConflictReasonServiceSessionOwned},
+		{name: "open public queue", status: domain.ServiceSessionStatusOpen, wantAssign: true},
+		{name: "open assigned to current", status: domain.ServiceSessionStatusOpen, assignee: &currentIdentityID},
+		{name: "assigned to other", status: domain.ServiceSessionStatusOpen, assignee: &otherIdentityID, wantReason: ConflictReasonServiceSessionOwned},
 		{name: "closed", status: domain.ServiceSessionStatusClosed, assignee: &currentIdentityID, wantReason: ConflictReasonServiceSessionNotReplyable},
 		{name: "unknown", status: domain.ServiceSessionStatus("unknown"), wantData: true},
 	}
@@ -68,7 +63,7 @@ func TestPlanMemberReplySession(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || plan.assign != test.wantAssign || plan.activate != test.wantActive {
+			if err != nil || plan.assign != test.wantAssign {
 				t.Fatalf("plan = %#v, error = %v", plan, err)
 			}
 		})

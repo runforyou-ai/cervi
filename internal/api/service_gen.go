@@ -24,8 +24,13 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/preferences", s.updateUserPreferences)
 	router.PATCH("/work-status", s.updateUserWorkStatus)
 	router.GET("/inbox", s.loadInbox)
+	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
+	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
+	router.POST("/conversations/:conversationID/transfer", s.transferServiceSession)
+	router.POST("/conversations/:conversationID/close", s.closeServiceSession)
+	router.POST("/conversations/:conversationID/reopen", s.reopenServiceSession)
 	router.POST("/direct-conversations", s.startDirectConversation)
 	router.POST("/direct-conversations/:conversationID/messages", s.sendDirectTextMessage)
 	router.GET("/channels", s.listMessageChannels)
@@ -55,7 +60,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/users/:userID", s.getUser)
 	router.POST("/users", s.createUser)
 	router.PUT("/users/:userID", s.updateUser)
-	router.PATCH("/users/roles", s.updateUserRoles)
+	router.PATCH("/roles/assignments", s.updateRoleAssignments)
 	router.POST("/users/:userID/deactivate", s.deactivateUser)
 	router.POST("/users/:userID/reactivate", s.reactivateUser)
 	router.GET("/teams", s.listTeams)
@@ -197,7 +202,17 @@ func (s *Service) updateUserWorkStatus(c *gin.Context) {
 
 // loadInbox 返回当前用户的统一收件箱。
 func (s *Service) loadInbox(c *gin.Context) {
-	output, err := s.application.LoadInbox(c.Request.Context(), requestMeta(c))
+	input, ok := bindLoadInboxInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.LoadInbox(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listCustomerServiceAssignees 返回有效真人和 AI 客服。
+func (s *Service) listCustomerServiceAssignees(c *gin.Context) {
+	output, err := s.application.ListCustomerServiceAssignees(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -218,6 +233,34 @@ func (s *Service) sendCustomerTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendCustomerTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// claimServiceSession 领取或接管客户会话最新处理周期。
+func (s *Service) claimServiceSession(c *gin.Context) {
+	output, err := s.application.ClaimServiceSession(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// transferServiceSession 把当前负责的处理周期转给另一位客服。
+func (s *Service) transferServiceSession(c *gin.Context) {
+	var input appservice.TransferServiceSessionInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.TransferServiceSession(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// closeServiceSession 关闭客户会话最新处理周期。
+func (s *Service) closeServiceSession(c *gin.Context) {
+	output, err := s.application.CloseServiceSession(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// reopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+func (s *Service) reopenServiceSession(c *gin.Context) {
+	output, err := s.application.ReopenServiceSession(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -462,13 +505,13 @@ func (s *Service) updateUser(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateUserRoles 在一个事务中批量调整企业成员角色。
-func (s *Service) updateUserRoles(c *gin.Context) {
-	var input appservice.UserRoleChangesInput
+// updateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+func (s *Service) updateRoleAssignments(c *gin.Context) {
+	var input appservice.RoleAssignmentsInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	writeEmpty(c, s.application.UpdateUserRoles(c.Request.Context(), requestMeta(c), input))
+	writeEmpty(c, s.application.UpdateRoleAssignments(c.Request.Context(), requestMeta(c), input))
 }
 
 // deactivateUser 禁用企业成员账号。
@@ -966,6 +1009,15 @@ func bindKnowledgeDocumentSegmentListInputQuery(c *gin.Context) (appservice.Know
 		Status:   optionalEnum[appservice.KnowledgeDocumentSegmentIndexStatus](c.Query("status")),
 		Page:     page,
 		PageSize: pageSize,
+	}, true
+}
+
+// bindLoadInboxInputQuery 从查询参数解析 appservice.LoadInboxInput。
+func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
+	return appservice.LoadInboxInput{
+		Scope:              appservice.InboxScope(c.Query("scope")),
+		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 	}, true
 }
 

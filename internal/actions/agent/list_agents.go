@@ -58,6 +58,8 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 	agents := make([]ListItem, 0)
 	if err := applyFilters(base()).
 		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, a.status, oi.work_status, oi.created_at").
+		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
+		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").
 		OrderExpr("lower(oi.display_name) ASC, a.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).

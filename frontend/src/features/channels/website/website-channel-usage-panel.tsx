@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
-import { LoaderCircleIcon } from "lucide-react"
 import * as QRCode from "qrcode"
 import { toast } from "sonner"
 
@@ -15,6 +14,7 @@ import {
   type WebsiteChannelAccessData,
   type WebsiteChannelData,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -292,10 +292,9 @@ export function WebsiteChannelUsagePanel({
 
   if (!origin && !error) {
     return (
-      <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-        <LoaderCircleIcon className="size-4 animate-spin" />
+      <LoadingIndicator className="py-6">
         {t("loading")}
-      </div>
+      </LoadingIndicator>
     )
   }
 

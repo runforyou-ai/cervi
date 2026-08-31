@@ -129,6 +129,7 @@ export interface Agent {
     "id": string;
     "identityId": string;
     "displayName": string;
+    "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -199,6 +200,7 @@ export interface AgentListItem {
     "id": string;
     "identityId": string;
     "displayName": string;
+    "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -605,6 +607,7 @@ export enum ConversationType {
  */
 export interface CreateAgentInput {
     "displayName": string;
+    "roleId": string;
     "teamIds": string[] | null;
     "execution": AgentExecutionInput;
 }
@@ -663,6 +666,40 @@ export interface CustomerInboxConversation {
     "preview": string | null;
     "lastMessageAt": string | null;
     "serviceSessionStatus": ServiceSessionStatus;
+    "serviceSessionId": string;
+    "assignee": InboxAssignee | null;
+}
+
+/**
+ * CustomerInboxView 表示客户会话队列视图。
+ */
+export enum CustomerInboxView {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CustomerInboxViewQueue = "queue",
+    CustomerInboxViewMine = "mine",
+    CustomerInboxViewCoworkers = "coworkers",
+    CustomerInboxViewClosed = "closed",
+};
+
+/**
+ * CustomerServiceAssigneeList 定义客服筛选候选列表。
+ */
+export interface CustomerServiceAssigneeList {
+    "assignees": InboxAssignee[] | null;
+}
+
+/**
+ * CustomerServiceSession 定义客户会话最新客服处理周期。
+ */
+export interface CustomerServiceSession {
+    "id": string;
+    "status": ServiceSessionStatus;
+    "assignee": InboxAssignee | null;
+    "closedAt": string | null;
 }
 
 /**
@@ -790,6 +827,16 @@ export interface Inbox {
 }
 
 /**
+ * InboxAssignee 定义客户会话负责人摘要。
+ */
+export interface InboxAssignee {
+    "identityId": string;
+    "type": OrganizationIdentityType;
+    "displayName": string;
+    "avatarUrl": string;
+}
+
+/**
  * InboxConversation 定义成员统一收件箱列表项。
  */
 export interface InboxConversation {
@@ -798,6 +845,20 @@ export interface InboxConversation {
     "customer": CustomerInboxConversation | null;
     "direct": DirectInboxConversation | null;
 }
+
+/**
+ * InboxScope 表示统一收件箱读取范围。
+ */
+export enum InboxScope {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxScopeAll = "all",
+    InboxScopeCustomer = "customer",
+    InboxScopeInternal = "internal",
+};
 
 /**
  * InstallWorkspaceInput 定义企业初始化输入。
@@ -1124,6 +1185,15 @@ export interface KnowledgeRetrievalResult {
 }
 
 /**
+ * LoadInboxInput 定义统一收件箱查询条件。
+ */
+export interface LoadInboxInput {
+    "scope": InboxScope;
+    "customerView": CustomerInboxView;
+    "assigneeIdentityId": string;
+}
+
+/**
  * Locale 表示应用支持的本地化语言。
  */
 export enum Locale {
@@ -1386,6 +1456,21 @@ export interface Role {
 }
 
 /**
+ * RoleAssignmentInput 定义一个企业身份的目标角色。
+ */
+export interface RoleAssignmentInput {
+    "identityId": string;
+    "roleId": string;
+}
+
+/**
+ * RoleAssignmentsInput 定义一次批量角色调整。
+ */
+export interface RoleAssignmentsInput {
+    "assignments": RoleAssignmentInput[] | null;
+}
+
+/**
  * RoleInput 定义角色可编辑字段。
  */
 export interface RoleInput {
@@ -1466,9 +1551,7 @@ export enum ServiceSessionStatus {
      */
     $zero = "",
 
-    ServiceSessionStatusWaiting = "waiting",
-    ServiceSessionStatusActive = "active",
-    ServiceSessionStatusPending = "pending",
+    ServiceSessionStatusOpen = "open",
     ServiceSessionStatusClosed = "closed",
 };
 
@@ -1695,6 +1778,13 @@ export enum TelegramWebhookStatus {
 };
 
 /**
+ * TransferServiceSessionInput 定义客服处理周期转交目标。
+ */
+export interface TransferServiceSessionInput {
+    "assigneeIdentityId": string;
+}
+
+/**
  * UnreadIndicatorState 定义未读数量和托盘提醒条件。
  */
 export interface UnreadIndicatorState {
@@ -1708,6 +1798,7 @@ export interface UnreadIndicatorState {
  */
 export interface UpdateAgentInput {
     "displayName": string;
+    "roleId": string;
     "teamIds": string[] | null;
 }
 
@@ -1764,21 +1855,6 @@ export interface UserPreferencesInput {
     "timeZone": string;
     "messageNotificationsEnabled": boolean;
     "workspaceTabsEnabled": boolean;
-}
-
-/**
- * UserRoleChangeInput 定义一名企业成员的目标角色。
- */
-export interface UserRoleChangeInput {
-    "userId": string;
-    "roleId": string;
-}
-
-/**
- * UserRoleChangesInput 定义一次批量角色调整。
- */
-export interface UserRoleChangesInput {
-    "changes": UserRoleChangeInput[] | null;
 }
 
 /**

@@ -10,6 +10,7 @@ const maxSystemInstructionLength = 20000
 /** AI 员工表单校验文案。 */
 export interface AgentValidationMessages {
   nameRequired: string
+  roleRequired: string
   modelRequired: string
   instructionRequired: string
   instructionTooLong: string
@@ -21,16 +22,20 @@ function unicodeLength(value: string) {
 }
 
 /** 创建 AI 员工资料校验规则。 */
-export function createAgentProfileSchema(messages: { nameRequired: string }) {
+export function createAgentProfileSchema(messages: {
+  nameRequired: string
+  roleRequired: string
+}) {
   return z.object({
     displayName: z.string().trim().min(1, messages.nameRequired),
+    roleId: z.string().uuid(messages.roleRequired),
     teamIds: z.array(z.string().uuid()),
   })
 }
 
 /** 创建 AI 员工平台托管执行配置校验规则。 */
 export function createAgentManagedExecutionSchema(
-  messages: Omit<AgentValidationMessages, "nameRequired">,
+  messages: Omit<AgentValidationMessages, "nameRequired" | "roleRequired">,
 ) {
   return z.object({
     modelSelection: z

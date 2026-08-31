@@ -16,6 +16,7 @@ const (
 // CreateAgentInput 定义新增 AI 员工字段。
 type CreateAgentInput struct {
 	DisplayName string              `json:"displayName"`
+	RoleID      string              `json:"roleId"`
 	TeamIDs     []string            `json:"teamIds"`
 	Execution   AgentExecutionInput `json:"execution"`
 }
@@ -23,6 +24,7 @@ type CreateAgentInput struct {
 // UpdateAgentInput 定义 AI 员工可编辑字段。
 type UpdateAgentInput struct {
 	DisplayName string   `json:"displayName"`
+	RoleID      string   `json:"roleId"`
 	TeamIDs     []string `json:"teamIds"`
 }
 
@@ -57,6 +59,7 @@ type Agent struct {
 	ID          string         `json:"id"`
 	IdentityID  string         `json:"identityId"`
 	DisplayName string         `json:"displayName"`
+	Role        RoleSummary    `json:"role"`
 	Status      UserStatus     `json:"status"`
 	WorkStatus  WorkStatus     `json:"workStatus"`
 	Teams       []TeamSummary  `json:"teams"`
@@ -69,6 +72,7 @@ type AgentListItem struct {
 	ID          string                `json:"id"`
 	IdentityID  string                `json:"identityId"`
 	DisplayName string                `json:"displayName"`
+	Role        RoleSummary           `json:"role"`
 	Status      UserStatus            `json:"status"`
 	WorkStatus  WorkStatus            `json:"workStatus"`
 	Teams       []TeamSummary         `json:"teams"`

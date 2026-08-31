@@ -1,7 +1,6 @@
 /** 企业知识库新建和编辑页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import {
@@ -25,6 +24,7 @@ import {
   updateKnowledgeBase,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -272,10 +272,9 @@ export function KnowledgeBaseFormPage({
       <PageHeader title={title} />
       <PageContent>
         {loading ? (
-          <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {t("loading")}
-          </div>
+          </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
             <p className="text-sm text-muted-foreground">

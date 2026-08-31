@@ -1,6 +1,5 @@
 /** 消息渠道创建页和按类型扩展的编辑页。 */
 import { useEffect, useState } from "react"
-import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
   useNavigate,
@@ -20,6 +19,7 @@ import {
   type WebsiteChannelChatInterfaceInput,
   type WebsiteChannelData,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -421,10 +421,9 @@ export function MessageChannelFormPage({
       />
       <PageContent>
         {loading ? (
-          <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="min-h-48 justify-center">
             {t("loading")}
-          </div>
+          </LoadingIndicator>
         ) : mode === "edit" && !channel ? (
           <div className="flex min-h-48 items-center justify-center text-center">
             <div>

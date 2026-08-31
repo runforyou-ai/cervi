@@ -4,6 +4,7 @@ import {
   DeleteRole,
   GetRole,
   ListRoles,
+  UpdateRoleAssignments,
   UpdateRole,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
@@ -28,6 +29,7 @@ const listRolesBound = bind(ListRoles)
 const getRoleBound = bind(GetRole)
 const createRoleBound = bind(CreateRole)
 const updateRoleBound = bind(UpdateRole)
+const updateRoleAssignmentsBound = bind(UpdateRoleAssignments)
 
 /** 删除自定义角色。 */
 export const deleteRole = bind(DeleteRole)
@@ -55,6 +57,9 @@ export function createRole(input: RoleInput) {
 export function updateRole(roleId: string, input: RoleInput) {
   return updateRoleBound(roleId, input).then(normalizeRole)
 }
+
+/** 在一个事务中批量调整真人和 AI 员工角色。 */
+export const updateRoleAssignments = updateRoleAssignmentsBound
 
 /** 把角色中的可空权限切片转换为空数组。 */
 function normalizeRole(role: Role): RoleData {

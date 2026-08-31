@@ -40,11 +40,12 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: identity.Organization.ID,
 			Type:           string(domain.OrganizationIdentityTypeUser),
+			RoleID:         input.RoleID,
 			DisplayName:    input.DisplayName,
 			WorkStatus:     string(domain.WorkStatusWorking),
 		}
 		_, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "display_name", "work_status").Returning("id").Exec(ctx)
+			Column("organization_id", "type", "role_id", "display_name", "work_status").Returning("id").Exec(ctx)
 		if err != nil {
 			return err
 		}
@@ -53,13 +54,12 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			OrganizationID: identity.Organization.ID,
 			Email:          input.Email,
 			PasswordHash:   passwordHash,
-			RoleID:         input.RoleID,
 			Status:         string(domain.UserStatusActive),
 			Locale:         identity.User.Locale,
 			TimeZone:       identity.User.TimeZone,
 		}
 		_, err = tx.NewInsert().Model(user).
-			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone").Returning("id").Exec(ctx)
+			Column("identity_id", "organization_id", "email", "password_hash", "status", "locale", "time_zone").Returning("id").Exec(ctx)
 		if isUniqueViolation(err) {
 			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
 		}

@@ -50,7 +50,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			query = query.Where("u.status = ?", input.Status)
 		}
 		if input.RoleID != "" {
-			query = query.Where("u.role_id = ?", input.RoleID)
+			query = query.Where("oi.role_id = ?", input.RoleID)
 		}
 		if input.TeamID != "" {
 			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.identity_id = u.identity_id AND tm.team_id = ?)", input.TeamID)
@@ -76,7 +76,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		ColumnExpr("u.email, u.status, oi.display_name, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
-		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
+		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").
 		OrderExpr("lower(oi.display_name) ASC, u.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).

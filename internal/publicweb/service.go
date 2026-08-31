@@ -362,9 +362,7 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"loading":                   cervii18n.MessengerLoading,
 	"retry":                     cervii18n.MessengerRetry,
 	"requestFailed":             cervii18n.MessengerRequestFailed,
-	"sessionWaiting":            cervii18n.MessengerSessionWaiting,
-	"sessionActive":             cervii18n.MessengerSessionActive,
-	"sessionPending":            cervii18n.MessengerSessionPending,
+	"sessionOpen":               cervii18n.MessengerSessionOpen,
 	"sessionClosed":             cervii18n.MessengerSessionClosed,
 }
 

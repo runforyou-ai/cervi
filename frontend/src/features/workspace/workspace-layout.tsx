@@ -1,6 +1,5 @@
 /** Web 与桌面端工作台布局。 */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -12,6 +11,7 @@ import {
   type Organization,
   type CurrentUser,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import {
   activateNotificationPolicy,
@@ -302,9 +302,8 @@ export function WorkspaceLayout() {
   }
   if (!identity) {
     return (
-      <main className="flex min-h-svh items-center justify-center gap-2 text-sm text-muted-foreground">
-        <LoaderCircleIcon className="size-4 animate-spin" />
-        {t("loading")}
+      <main className="flex min-h-svh items-center justify-center">
+        <LoadingIndicator>{t("loading")}</LoadingIndicator>
       </main>
     )
   }

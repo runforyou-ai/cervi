@@ -20,12 +20,13 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 		return Agent{}, err
 	}
 	created, err := b.createAgent.Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: input.DisplayName, TeamIDs: input.TeamIDs,
+		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs,
 		Execution: agentExecutionInput(input.Execution),
 	})
 	if err != nil {
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAgentNameRequired,
+			agentaction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:               cervii18n.FieldMemberTeamInvalid,
 			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
@@ -106,10 +107,11 @@ func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agent
 	if err != nil {
 		return Agent{}, err
 	}
-	agent, err := b.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, TeamIDs: input.TeamIDs})
+	agent, err := b.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
 	if err != nil {
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired: cervii18n.FieldAgentNameRequired,
+			agentaction.ValidationRoleInvalid:         cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:         cervii18n.FieldMemberTeamInvalid,
 		})
 	}
@@ -193,7 +195,7 @@ func agentFromAction(agent agentaction.Agent) Agent {
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: agentExecutionFromAction(agent.Execution), CreatedAt: agent.CreatedAt}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: agentExecutionFromAction(agent.Execution), CreatedAt: agent.CreatedAt}
 }
 
 // agentListItemFromAction 转换 AI 员工目录项契约。
@@ -202,7 +204,7 @@ func agentListItemFromAction(agent agentaction.ListItem) AgentListItem {
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: agentExecutionSummaryFromAction(agent.Execution), CreatedAt: agent.CreatedAt}
+	return AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: agentExecutionSummaryFromAction(agent.Execution), CreatedAt: agent.CreatedAt}
 }
 
 // agentExecutionInput 转换 AI 员工执行配置输入。

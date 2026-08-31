@@ -16,6 +16,12 @@ type Input struct {
 	Permissions []domain.PermissionCode
 }
 
+// AssignmentInput 定义一个企业身份的目标角色。
+type AssignmentInput struct {
+	IdentityID string
+	RoleID     string
+}
+
 // Record 定义角色及其权限。
 type Record struct {
 	ID             string
