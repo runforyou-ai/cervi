@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"uuid"
 
-	"github.com/google/uuid"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -56,10 +56,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err != nil {
 			return err
 		}
-		revisionID, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
+		revisionID := uuid.NewV7()
 		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: identity.Organization.ID,
 			Type:           string(domain.OrganizationIdentityTypeAgent),

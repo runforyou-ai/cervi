@@ -167,7 +167,7 @@ func (b *Backend) absoluteContentURL(value string) string {
 	if state == nil {
 		return value
 	}
-	endpoint := *state.baseURL
+	endpoint := state.baseURL.Clone()
 	endpoint.Path = strings.TrimRight(state.baseURL.Path, "/") + "/" + strings.TrimLeft(value, "/")
 	endpoint.RawQuery = ""
 	endpoint.Fragment = ""

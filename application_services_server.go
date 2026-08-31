@@ -41,15 +41,15 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
 	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime)
-	if err := servertask.RegisterJSONWithTerminalFailure(tasks.Registry(), agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, err
 	}
 	scanExpired := fileaction.NewScanExpiredAction(appStorage.DB(), tasks)
 	deleteExpired := fileaction.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, resolveFileS3))
-	if err := servertask.RegisterJSON(tasks.Registry(), fileaction.ScanExpiredActionName, scanExpired.Execute); err != nil {
+	if err := tasks.Registry().RegisterJSON(fileaction.ScanExpiredActionName, scanExpired.Execute); err != nil {
 		return nil, err
 	}
-	if err := servertask.RegisterJSON(tasks.Registry(), fileaction.DeleteExpiredActionName, deleteExpired.Execute); err != nil {
+	if err := tasks.Registry().RegisterJSON(fileaction.DeleteExpiredActionName, deleteExpired.Execute); err != nil {
 		return nil, err
 	}
 	tasks.RegisterSchedule(servertask.ScheduleDefinition{

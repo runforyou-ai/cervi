@@ -14,7 +14,7 @@ import (
 
 // TestDifyAppProbe 验证 Dify 应用密钥通过应用信息接口探测。
 func TestDifyAppProbe(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/info" {
 			t.Fatalf("unexpected request path: %s", request.URL.Path)
 		}
@@ -24,7 +24,6 @@ func TestDifyAppProbe(t *testing.T) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"name":"客服应用","mode":"chat"}`))
 	}))
-	defer server.Close()
 
 	probe, err := NewRegistry(server.Client()).NewProbe(Config{
 		Type: domain.IntegrationConnectionTypeDify, APIURL: server.URL + "/v1", APIKey: "app-key",
@@ -40,7 +39,7 @@ func TestDifyAppProbe(t *testing.T) {
 // TestDifyKnowledgeProbeFallback 验证 Dify 知识库密钥回退到知识库列表接口。
 func TestDifyKnowledgeProbeFallback(t *testing.T) {
 	paths := make([]string, 0, 2)
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		paths = append(paths, request.URL.Path)
 		if authorization := request.Header.Get("Authorization"); authorization != "Bearer dataset-key" {
 			t.Fatalf("unexpected authorization header: %s", authorization)
@@ -55,7 +54,6 @@ func TestDifyKnowledgeProbeFallback(t *testing.T) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"data":[]}`))
 	}))
-	defer server.Close()
 
 	probe, err := NewRegistry(server.Client()).NewProbe(Config{
 		Type: domain.IntegrationConnectionTypeDify, APIURL: server.URL + "/v1", APIKey: "dataset-key",
@@ -74,7 +72,7 @@ func TestDifyKnowledgeProbeFallback(t *testing.T) {
 // TestDifyKnowledgeBaseLister 验证 Dify 知识库列表按页读取并保留文档模式。
 func TestDifyKnowledgeBaseLister(t *testing.T) {
 	pages := make([]string, 0, 2)
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/datasets" {
 			t.Fatalf("unexpected request path: %s", request.URL.Path)
 		}
@@ -96,7 +94,6 @@ func TestDifyKnowledgeBaseLister(t *testing.T) {
 			t.Fatalf("unexpected page: %s", page)
 		}
 	}))
-	defer server.Close()
 
 	items, err := NewDifyKnowledgeBaseLister(server.Client()).List(context.Background(), DifyKnowledgeBaseConfig{
 		APIURL: server.URL + "/v1", APIKey: "dataset-key",
@@ -116,7 +113,7 @@ func TestDifyKnowledgeBaseLister(t *testing.T) {
 
 // TestDifyKnowledgeDocumentLister 验证 Dify 知识文档查询参数和展示字段。
 func TestDifyKnowledgeDocumentLister(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v1/datasets/dataset-1/documents" {
 			t.Fatalf("unexpected request path: %s", request.URL.Path)
 		}
@@ -144,7 +141,6 @@ func TestDifyKnowledgeDocumentLister(t *testing.T) {
 			"page":2,"limit":20,"total":22,"has_more":false
 		}`))
 	}))
-	defer server.Close()
 
 	output, err := NewDifyKnowledgeDocumentLister(server.Client()).List(
 		context.Background(),
@@ -169,7 +165,7 @@ func TestDifyKnowledgeDocumentLister(t *testing.T) {
 
 // TestDifyKnowledgeDocumentDetailAndSegments 验证 Dify 文档详情与分段读取契约。
 func TestDifyKnowledgeDocumentDetailAndSegments(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if authorization := request.Header.Get("Authorization"); authorization != "Bearer dataset-key" {
 			t.Fatalf("unexpected authorization header: %s", authorization)
 		}
@@ -200,7 +196,6 @@ func TestDifyKnowledgeDocumentDetailAndSegments(t *testing.T) {
 			t.Fatalf("unexpected request path: %s", request.URL.Path)
 		}
 	}))
-	defer server.Close()
 
 	reader := NewDifyKnowledgeDocumentLister(server.Client())
 	config := DifyKnowledgeBaseConfig{APIURL: server.URL + "/v1", APIKey: "dataset-key"}
@@ -232,14 +227,13 @@ func TestDifyKnowledgeDocumentDetailAndSegments(t *testing.T) {
 
 // TestDifyKnowledgeDocumentDetailAllowsMissingWordCount 验证详情接口未返回字数时保留未知语义。
 func TestDifyKnowledgeDocumentDetailAllowsMissingWordCount(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{
 			"id":"document-1","name":"产品手册.pdf","display_status":"available",
 			"hit_count":12,"created_at":1787950000
 		}`))
 	}))
-	defer server.Close()
 
 	document, err := NewDifyKnowledgeDocumentLister(server.Client()).Get(
 		context.Background(),
@@ -254,14 +248,13 @@ func TestDifyKnowledgeDocumentDetailAllowsMissingWordCount(t *testing.T) {
 
 // TestDifyKnowledgeDocumentSegmentsRejectMissingState 验证分段缺少索引状态时按协议错误处理。
 func TestDifyKnowledgeDocumentSegmentsRejectMissingState(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{
 			"data":[{"id":"segment-1","position":1,"content":"内容","word_count":2,"hit_count":0}],
 			"page":1,"limit":20,"total":1
 		}`))
 	}))
-	defer server.Close()
 
 	_, err := NewDifyKnowledgeDocumentLister(server.Client()).ListSegments(
 		context.Background(),
@@ -278,7 +271,7 @@ func TestDifyKnowledgeDocumentSegmentsRejectMissingState(t *testing.T) {
 
 // TestDifyKnowledgeRetriever 验证 Dify 检索请求和命中分段映射。
 func TestDifyKnowledgeRetriever(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if authorization := request.Header.Get("Authorization"); authorization != "Bearer dataset-key" {
 			t.Fatalf("unexpected authorization header: %s", authorization)
 		}
@@ -319,7 +312,6 @@ func TestDifyKnowledgeRetriever(t *testing.T) {
 			]
 		}`))
 	}))
-	defer server.Close()
 
 	records, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
 		context.Background(),
@@ -344,7 +336,7 @@ func TestDifyKnowledgeRetriever(t *testing.T) {
 
 // TestDifyKnowledgeRetrieverUsesConfiguredModel 验证检索沿用知识库现有配置。
 func TestDifyKnowledgeRetrieverUsesConfiguredModel(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		if request.Method == http.MethodGet {
 			_, _ = writer.Write([]byte(`{
@@ -383,7 +375,6 @@ func TestDifyKnowledgeRetrieverUsesConfiguredModel(t *testing.T) {
 			}]
 		}`))
 	}))
-	defer server.Close()
 
 	records, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
 		context.Background(),
@@ -402,7 +393,7 @@ func TestDifyKnowledgeRetrieverUsesConfiguredModel(t *testing.T) {
 
 // TestDifyKnowledgeRetrieverReportsInvalidField 验证协议错误指出具体记录和字段。
 func TestDifyKnowledgeRetrieverReportsInvalidField(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		if request.Method == http.MethodGet {
 			_, _ = writer.Write([]byte(`{"indexing_technique":"high_quality","retrieval_model_dict":null}`))
@@ -424,7 +415,6 @@ func TestDifyKnowledgeRetrieverReportsInvalidField(t *testing.T) {
 			"records":[{"segment":{"id":"segment-1","document_id":"document-1","content":"内容"},"score":0.8}]
 		}`))
 	}))
-	defer server.Close()
 
 	_, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
 		context.Background(),
@@ -464,14 +454,13 @@ func TestDifyKnowledgeSearchMethod(t *testing.T) {
 // TestDifyKnowledgeRetrieverRejectsEconomySemanticSearch 验证经济模式不会静默改写用户选择。
 func TestDifyKnowledgeRetrieverRejectsEconomySemanticSearch(t *testing.T) {
 	postCalled := false
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		if request.Method == http.MethodPost {
 			postCalled = true
 		}
 		_, _ = writer.Write([]byte(`{"indexing_technique":"economy","retrieval_model_dict":null}`))
 	}))
-	defer server.Close()
 
 	_, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
 		context.Background(),
@@ -490,7 +479,7 @@ func TestDifyKnowledgeRetrieverRejectsEconomySemanticSearch(t *testing.T) {
 
 // TestN8NProbe 验证 n8n 探测使用公开工作流接口和 API 密钥请求头。
 func TestN8NProbe(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/instance/api/v1/workflows" {
 			t.Fatalf("unexpected request path: %s", request.URL.Path)
 		}
@@ -503,7 +492,6 @@ func TestN8NProbe(t *testing.T) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"data":[]}`))
 	}))
-	defer server.Close()
 
 	probe, err := NewRegistry(server.Client()).NewProbe(Config{
 		Type: domain.IntegrationConnectionTypeN8N, APIURL: server.URL + "/instance", APIKey: "n8n-key",

@@ -7,8 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -68,10 +68,7 @@ func (a *ImportAction) Execute(ctx context.Context, input ImportInput) (*serverm
 	if backend != domain.FileStorageBackendLocal && backend != domain.FileStorageBackendS3 {
 		return nil, fmt.Errorf("invalid imported file storage backend %q", backend)
 	}
-	fileID, err := uuid.NewV7()
-	if err != nil {
-		return nil, fmt.Errorf("generate imported file id: %w", err)
-	}
+	fileID := uuid.NewV7()
 	record := &servermodels.File{
 		ID: fileID.String(), OrganizationID: input.OrganizationID, CreatedByUserID: input.CreatedByUserID,
 		Purpose: string(domain.FilePurposeContactAvatar), ExternalID: &input.ExternalID, StorageBackend: string(backend),

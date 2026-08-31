@@ -190,8 +190,7 @@ func writeApplicationError(c *gin.Context, err error) bool {
 	if c.Request.Context().Err() != nil {
 		return true
 	}
-	var applicationError *appservice.Error
-	if errors.As(err, &applicationError) {
+	if applicationError, ok := errors.AsType[*appservice.Error](err); ok {
 		writeErrorBody(c, applicationError)
 		return true
 	}

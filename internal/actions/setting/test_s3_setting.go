@@ -11,11 +11,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 )
@@ -108,7 +108,7 @@ func (a *TestS3SettingAction) Execute(ctx context.Context, organizationID string
 
 // testS3ObjectFlow 使用正式请求语义验证浏览器直传和公开读取。
 func testS3ObjectFlow(ctx context.Context, config serverfilecontent.S3Config, publicBaseURL, organizationID string) (probeErr error) {
-	probeID := uuid.NewString()
+	probeID := uuid.New().String()
 	storageKey := "organizations/" + organizationID + "/files/" + probeID + ".txt"
 	payload := []byte("cervi-object-storage-probe:" + probeID)
 	signed, err := serverfilecontent.PresignPut(ctx, config, storageKey, "text/plain; charset=utf-8")

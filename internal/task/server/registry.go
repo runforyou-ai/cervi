@@ -60,8 +60,8 @@ func (r *Registry) lookupTerminalFailure(name string) (terminalFailureHandler, b
 }
 
 // RegisterJSON 注册使用强类型 JSON 输入的 Action。
-func RegisterJSON[T any](registry *Registry, name string, execute func(context.Context, T) error) error {
-	return registry.Register(name, func(ctx context.Context, payload json.RawMessage) error {
+func (r *Registry) RegisterJSON[T any](name string, execute func(context.Context, T) error) error {
+	return r.Register(name, func(ctx context.Context, payload json.RawMessage) error {
 		var input T
 		if err := json.Unmarshal(payload, &input); err != nil {
 			return task.Permanent(fmt.Errorf("decode %s payload: %w", name, err))
@@ -71,7 +71,7 @@ func RegisterJSON[T any](registry *Registry, name string, execute func(context.C
 }
 
 // RegisterJSONWithTerminalFailure 注册强类型 Action 及任务耗尽后的业务收尾。
-func RegisterJSONWithTerminalFailure[T any](registry *Registry, name string, execute func(context.Context, T) error, finalize func(context.Context, T, error) error) error {
+func (r *Registry) RegisterJSONWithTerminalFailure[T any](name string, execute func(context.Context, T) error, finalize func(context.Context, T, error) error) error {
 	if finalize == nil {
 		return fmt.Errorf("task action %q has nil terminal failure handler", name)
 	}
@@ -91,5 +91,5 @@ func RegisterJSONWithTerminalFailure[T any](registry *Registry, name string, exe
 			return finalize(ctx, input, runErr)
 		},
 	}
-	return registry.register(name, action)
+	return r.register(name, action)
 }

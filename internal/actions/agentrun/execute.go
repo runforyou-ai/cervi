@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -156,10 +156,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	if err != nil {
 		return fmt.Errorf("encode agent run usage: %w", err)
 	}
-	messageID, err := uuid.NewV7()
-	if err != nil {
-		return fmt.Errorf("generate agent response message id: %w", err)
-	}
+	messageID := uuid.NewV7()
 	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		state := &servermodels.ConversationAgentState{}
 		if err := tx.NewSelect().Model(state).

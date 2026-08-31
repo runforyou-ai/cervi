@@ -205,8 +205,7 @@ func (b *DirectBackend) currentUserError(ctx context.Context, meta RequestMeta, 
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, fieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, useraction.ErrAvatarFileNotFound) {
@@ -224,8 +223,7 @@ func (b *DirectBackend) userMutationError(ctx context.Context, meta RequestMeta,
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, userFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {

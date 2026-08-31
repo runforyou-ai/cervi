@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -100,10 +100,7 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 	if err != nil {
 		return DirectConversationSummary{}, err
 	}
-	ids, err := generateDirectConversationIDs()
-	if err != nil {
-		return DirectConversationSummary{}, fmt.Errorf("generate direct conversation ids: %w", err)
-	}
+	ids := generateDirectConversationIDs()
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result DirectConversationSummary
@@ -169,12 +166,10 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
-	messageID, err := uuid.NewV7()
-	if err != nil {
-		return ConversationMessage{}, fmt.Errorf("generate direct message id: %w", err)
-	}
+	messageID := uuid.NewV7()
 	originatedAt := time.Now().UTC()
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + normalized.ClientMessageID
+	var err error
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result ConversationMessage
@@ -424,17 +419,13 @@ func normalizeDirectTextMessageInput(input DirectTextMessageInput) (DirectTextMe
 }
 
 // generateDirectConversationIDs 预生成单聊创建事务使用的 UUIDv7。
-func generateDirectConversationIDs() (directConversationIDs, error) {
+func generateDirectConversationIDs() directConversationIDs {
 	values := make([]string, 5)
 	for index := range values {
-		value, err := uuid.NewV7()
-		if err != nil {
-			return directConversationIDs{}, err
-		}
-		values[index] = value.String()
+		values[index] = uuid.NewV7().String()
 	}
 	return directConversationIDs{
 		conversation: values[0], currentSubject: values[1], targetSubject: values[2],
 		currentParticipant: values[3], targetParticipant: values[4],
-	}, nil
+	}
 }

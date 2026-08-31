@@ -51,8 +51,7 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		Locale:           domain.Locale(input.Locale),
 		TimeZone:         input.TimeZone,
 	})
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return Auth{}, InvalidError(meta, cervii18n.ErrorValidationFailed, installationFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, installationaction.ErrAlreadyInstalled) {

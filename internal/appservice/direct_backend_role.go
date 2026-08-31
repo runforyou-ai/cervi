@@ -118,8 +118,7 @@ func (b *DirectBackend) UpdateRoleAssignments(ctx context.Context, meta RequestM
 
 // roleMutationError 转换角色写入校验和操作错误。
 func (b *DirectBackend) roleMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, roleFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, roleaction.ErrAdminImmutable) {

@@ -18,7 +18,7 @@ const testBotToken = "123456:test_token"
 
 // TestGetMe 验证 getMe 请求和机器人身份解析。
 func TestGetMe(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost || request.URL.Path != "/bot"+testBotToken+"/getMe" {
 			t.Fatalf("unexpected request: %s %s", request.Method, request.URL.Path)
 		}
@@ -32,7 +32,6 @@ func TestGetMe(t *testing.T) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"ok":true,"result":{"id":987654321,"is_bot":true,"first_name":"Cervi","last_name":"Support","username":"cervi_support_bot"}}`))
 	}))
-	defer server.Close()
 
 	bot, err := NewClient(server.Client(), WithBaseURL(server.URL)).GetMe(context.Background(), testBotToken)
 	if err != nil {
@@ -45,7 +44,7 @@ func TestGetMe(t *testing.T) {
 
 // TestGetUserProfilePhoto 验证只返回最新头像中的最大静态尺寸。
 func TestGetUserProfilePhoto(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost || request.URL.Path != "/bot"+testBotToken+"/getUserProfilePhotos" {
 			t.Fatalf("unexpected request: %s %s", request.Method, request.URL.Path)
 		}
@@ -58,7 +57,6 @@ func TestGetUserProfilePhoto(t *testing.T) {
 		}
 		_, _ = writer.Write([]byte(`{"ok":true,"result":{"total_count":1,"photos":[[{"file_id":"small","file_unique_id":"same","width":160,"height":160},{"file_id":"large","file_unique_id":"same","width":640,"height":640}]]}}`))
 	}))
-	defer server.Close()
 
 	photo, err := NewClient(server.Client(), WithBaseURL(server.URL)).GetUserProfilePhoto(context.Background(), testBotToken, 998877)
 	if err != nil {
@@ -71,10 +69,9 @@ func TestGetUserProfilePhoto(t *testing.T) {
 
 // TestGetUserProfilePhotoWithoutPhoto 验证没有头像时返回 nil。
 func TestGetUserProfilePhotoWithoutPhoto(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		_, _ = writer.Write([]byte(`{"ok":true,"result":{"total_count":0,"photos":[]}}`))
 	}))
-	defer server.Close()
 
 	photo, err := NewClient(server.Client(), WithBaseURL(server.URL)).GetUserProfilePhoto(context.Background(), testBotToken, 998877)
 	if err != nil || photo != nil {
@@ -85,7 +82,7 @@ func TestGetUserProfilePhotoWithoutPhoto(t *testing.T) {
 // TestDownloadPhoto 验证 getFile 后按魔数返回头像内容。
 func TestDownloadPhoto(t *testing.T) {
 	content := []byte{0xff, 0xd8, 0xff, 0x01}
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/bot" + testBotToken + "/getFile":
 			_, _ = writer.Write([]byte(`{"ok":true,"result":{"file_id":"avatar","file_size":4,"file_path":"photos/avatar.jpg"}}`))
@@ -96,7 +93,6 @@ func TestDownloadPhoto(t *testing.T) {
 			t.Fatalf("unexpected request path: %s", request.URL.Path)
 		}
 	}))
-	defer server.Close()
 
 	downloaded, err := NewClient(server.Client(), WithBaseURL(server.URL)).DownloadPhoto(context.Background(), testBotToken, "avatar")
 	if err != nil {
@@ -184,7 +180,7 @@ func TestFileURLRejectsParentPath(t *testing.T) {
 
 // TestSetWebhook 验证注册参数固定限制为私聊消息和成员状态并丢弃积压 Update。
 func TestSetWebhook(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/bot"+testBotToken+"/setWebhook" {
 			t.Fatalf("unexpected request path: %s", request.URL.Path)
 		}
@@ -198,7 +194,6 @@ func TestSetWebhook(t *testing.T) {
 		}
 		_, _ = writer.Write([]byte(`{"ok":true,"result":true}`))
 	}))
-	defer server.Close()
 
 	err := NewClient(server.Client(), WithBaseURL(server.URL)).SetWebhook(
 		context.Background(),
@@ -227,10 +222,9 @@ func TestGetMeResponseFailures(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 				_, _ = writer.Write([]byte(test.body))
 			}))
-			defer server.Close()
 
 			_, err := NewClient(server.Client(), WithBaseURL(server.URL)).GetMe(context.Background(), testBotToken)
 			_, kind, classified := connectiontest.Details(err)

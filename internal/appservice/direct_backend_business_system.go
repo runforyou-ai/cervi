@@ -106,8 +106,7 @@ func (b *DirectBackend) DeleteBusinessSystem(ctx context.Context, meta RequestMe
 
 // businessSystemMutationError 转换业务系统写入错误。
 func (b *DirectBackend) businessSystemMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, businessSystemFieldKeys(validationError.Fields))
 	}
 	return b.businessSystemError(ctx, meta, err, failureKey, organizationID, attributes...)

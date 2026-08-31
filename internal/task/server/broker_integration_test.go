@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
@@ -35,8 +35,8 @@ func TestWorkerPoolsIsolateAgentTasks(t *testing.T) {
 	runtime := New(store.DB(), natsConfig)
 	agentProbe := newWorkerPoolProbe(3)
 	standardProbe := newWorkerPoolProbe(5)
-	agentAction := "test.pool.agent." + uuid.NewString()
-	standardAction := "test.pool.standard." + uuid.NewString()
+	agentAction := "test.pool.agent." + uuid.New().String()
+	standardAction := "test.pool.standard." + uuid.New().String()
 	if err := runtime.Registry().Register(agentAction, agentProbe.handle); err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func publishTestTask(ctx context.Context, runtime *Runtime, task testBrokerTask)
 		ctx,
 		runtime.config.taskSubject(task.queue),
 		payload,
-		jetstream.WithMsgID(uuid.NewString()),
+		jetstream.WithMsgID(uuid.New().String()),
 	)
 	return err
 }
@@ -185,7 +185,7 @@ func testNATSConfig(t *testing.T) serverconfig.NATSConfig {
 	if url == "" {
 		t.Skip("TEST_NATS_URL is not set")
 	}
-	namespace := "test_tasks_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	namespace := "test_tasks_" + strings.ReplaceAll(uuid.New().String(), "-", "")
 	return serverconfig.NATSConfig{URL: url, Namespace: namespace}
 }
 

@@ -42,11 +42,11 @@ func TestChannelContractConversion(t *testing.T) {
 	if input.DefaultLocale != domain.LocaleEnglishUnitedStates || input.Name != "产品官网" || input.NewConversationTarget.Type != domain.ChannelRoutingTargetTypePublicQueue || input.FallbackTarget.Type != domain.ChannelRoutingTargetTypePublicQueue {
 		t.Fatalf("channel input conversion = %#v", input)
 	}
-	createInput := createChannelInput(CreateMessageChannelInput{MessageChannelInput: MessageChannelInput{Name: "Telegram 客服"}, Type: ChannelTypeTelegram})
+	createInput := createChannelInput(CreateMessageChannelInput{Name: "Telegram 客服", Type: ChannelTypeTelegram})
 	if createInput.Type != domain.ChannelTypeTelegram || createInput.Name != "Telegram 客服" {
 		t.Fatalf("channel create input conversion = %#v", createInput)
 	}
-	wechatCreateInput := createChannelInput(CreateMessageChannelInput{MessageChannelInput: MessageChannelInput{Name: "微信公众号客服"}, Type: ChannelTypeWeChatOfficialAccount})
+	wechatCreateInput := createChannelInput(CreateMessageChannelInput{Name: "微信公众号客服", Type: ChannelTypeWeChatOfficialAccount})
 	if wechatCreateInput.Type != domain.ChannelTypeWeChatOfficialAccount || wechatCreateInput.Name != "微信公众号客服" {
 		t.Fatalf("wechat official account create input conversion = %#v", wechatCreateInput)
 	}

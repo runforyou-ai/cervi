@@ -62,8 +62,7 @@ func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, er
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, s3SettingFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
