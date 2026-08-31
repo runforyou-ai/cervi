@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -77,10 +78,10 @@ func withTelegramBotLocks(ctx context.Context, conn bun.Conn, botIDs []int64, ex
 func releaseTelegramBotLocks(conn bun.Conn, botIDs []int64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	for index := len(botIDs) - 1; index >= 0; index-- {
-		key := strconv.FormatInt(botIDs[index], 10)
+	for _, botID := range slices.Backward(botIDs) {
+		key := strconv.FormatInt(botID, 10)
 		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock(hashtextextended(?, 1))", key); err != nil {
-			slog.Error("释放 Telegram Bot 锁失败", "bot_id", botIDs[index])
+			slog.Error("释放 Telegram Bot 锁失败", "bot_id", botID)
 			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 			return
 		}

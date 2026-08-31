@@ -7,8 +7,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -54,10 +54,7 @@ func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, co
 	if err != nil {
 		return fmt.Errorf("advance agent conversation input sequence: %w", err)
 	}
-	triggerID, err := uuid.NewV7()
-	if err != nil {
-		return fmt.Errorf("generate agent trigger id: %w", err)
-	}
+	triggerID := uuid.NewV7()
 	trigger := &servermodels.ConversationAgentTrigger{
 		ID: triggerID.String(), OrganizationID: organizationID, ConversationID: conversationID,
 		AgentIdentityID: agentIdentityID, TriggerSeq: sequence.DesiredSeq, TriggerMessageID: messageID,
@@ -86,10 +83,7 @@ func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, co
 
 // insertAndEnqueueRun 创建 Agent 业务运行并投递隔离 Worker。
 func insertAndEnqueueRun(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, agentIdentityID, revisionID string, startSeq int64) (string, error) {
-	runID, err := uuid.NewV7()
-	if err != nil {
-		return "", fmt.Errorf("generate agent run id: %w", err)
-	}
+	runID := uuid.NewV7()
 	run := &servermodels.AgentRun{
 		ID: runID.String(), OrganizationID: organizationID, ConversationID: conversationID,
 		AgentIdentityID: agentIdentityID, AgentRevisionID: revisionID, Status: string(domain.AgentRunStatusQueued),

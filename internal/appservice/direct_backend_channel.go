@@ -224,8 +224,7 @@ func (b *DirectBackend) channelMutationError(ctx context.Context, meta RequestMe
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
 	}
 	return b.channelError(ctx, meta, err, failureKey, organizationID, channelID)
@@ -299,8 +298,7 @@ func (b *DirectBackend) telegramConnectionError(ctx context.Context, meta Reques
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, channelaction.ErrNotFound) || errors.Is(err, common.ErrIdentityInvalid) {

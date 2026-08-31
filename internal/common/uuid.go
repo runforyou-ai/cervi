@@ -3,7 +3,7 @@ package common
 import (
 	"strings"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ValidUUID 判断记录标识是否为规范 UUID。

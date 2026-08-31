@@ -110,8 +110,7 @@ func bindWebsiteVisitorJSON(c *gin.Context, output any) bool {
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(output); err != nil {
-		var tooLarge *http.MaxBytesError
-		if errors.As(err, &tooLarge) {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 			writeApplicationError(c, appservice.InvalidError(websiteVisitorRequestMeta(c), cervii18n.ErrorValidationFailed, nil).WithStatus(http.StatusRequestEntityTooLarge))
 			return false
 		}

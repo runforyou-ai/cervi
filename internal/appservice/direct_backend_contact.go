@@ -23,8 +23,7 @@ func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, inpu
 		Query: input.Query, Stage: optionalDomain[ContactStage, domain.ContactStage](input.Stage), ChannelID: input.ChannelID, MethodType: optionalDomain[ContactMethodType, domain.ContactMethodType](input.MethodType),
 		Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
 	})
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return ContactList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
 	if err != nil {
@@ -113,8 +112,7 @@ func (b *DirectBackend) contactMutationError(ctx context.Context, meta RequestMe
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
 	return b.contactError(ctx, meta, err, failureKey)

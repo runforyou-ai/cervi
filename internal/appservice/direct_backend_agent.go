@@ -249,8 +249,7 @@ func (b *DirectBackend) agentError(ctx context.Context, meta RequestMeta, err er
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, fieldKeys))
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {

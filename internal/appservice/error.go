@@ -117,8 +117,7 @@ func SessionError(meta RequestMeta, state SessionState, messageKey cervii18n.Key
 
 // SessionStateOf 读取错误中的会话入口。
 func SessionStateOf(err error) SessionState {
-	var apiError *Error
-	if errors.As(err, &apiError) {
+	if apiError, ok := errors.AsType[*Error](err); ok {
 		return apiError.State
 	}
 	return ""

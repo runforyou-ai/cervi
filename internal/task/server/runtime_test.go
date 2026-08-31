@@ -33,7 +33,7 @@ func TestRegisterJSONMarksInvalidPayloadPermanent(t *testing.T) {
 		Value string `json:"value"`
 	}
 	registry := NewRegistry()
-	if err := RegisterJSON(registry, "test.action", func(context.Context, input) error { return nil }); err != nil {
+	if err := registry.RegisterJSON("test.action", func(context.Context, input) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	handler, exists := registry.lookup("test.action")
@@ -54,8 +54,7 @@ func TestRegisterJSONWithTerminalFailure(t *testing.T) {
 	registry := NewRegistry()
 	var finalized string
 	terminalErr := errors.New("attempts exhausted")
-	if err := RegisterJSONWithTerminalFailure(
-		registry,
+	if err := registry.RegisterJSONWithTerminalFailure(
 		"test.finalized_action",
 		func(context.Context, input) error { return nil },
 		func(_ context.Context, value input, runErr error) error {

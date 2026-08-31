@@ -25,7 +25,7 @@ func TestRegistryUsesProviderReadOnlyEndpoints(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method != http.MethodGet || request.URL.Path != test.wantPath {
 					t.Errorf("request = %s %s, want GET %s", request.Method, request.URL.Path, test.wantPath)
 				}
@@ -35,7 +35,6 @@ func TestRegistryUsesProviderReadOnlyEndpoints(t *testing.T) {
 				writer.Header().Set("Content-Type", "application/json")
 				_, _ = writer.Write([]byte(test.response))
 			}))
-			defer server.Close()
 
 			probe, err := NewRegistry(server.Client()).NewProbe(Config{
 				Brand: test.brand, APIKey: "test-key", APIURL: server.URL + test.basePath,
@@ -52,10 +51,9 @@ func TestRegistryUsesProviderReadOnlyEndpoints(t *testing.T) {
 
 // TestProbeClassifiesAuthenticationFailure 验证供应商拒绝密钥时返回统一认证错误。
 func TestProbeClassifiesAuthenticationFailure(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusUnauthorized)
 	}))
-	defer server.Close()
 	probe, err := NewRegistry(server.Client()).NewProbe(Config{
 		Brand: domain.AIProviderBrandDeepSeek, APIKey: "invalid-key", APIURL: server.URL,
 	})

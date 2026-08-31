@@ -120,8 +120,7 @@ func ClassifyTransportError(stage Stage, err error) error {
 	if err == nil {
 		return nil
 	}
-	var connectionError *Error
-	if errors.As(err, &connectionError) {
+	if _, ok := errors.AsType[*Error](err); ok {
 		return err
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
@@ -139,8 +138,7 @@ func ClassifyTransportError(stage Stage, err error) error {
 	if errors.As(err, &urlError) && urlError.Timeout() {
 		return NewError(stage, FailureTimeout, err)
 	}
-	var networkError net.Error
-	if errors.As(err, &networkError) {
+	if networkError, ok := errors.AsType[net.Error](err); ok {
 		if networkError.Timeout() {
 			return NewError(stage, FailureTimeout, err)
 		}

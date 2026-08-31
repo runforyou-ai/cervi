@@ -39,10 +39,7 @@ type InboundCustomerTextMessageResult struct {
 
 // ReceiveInboundCustomerTextMessage 在调用方事务中幂等写入客户文本消息。
 func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *servermodels.Channel, input InboundCustomerTextMessageInput) (InboundCustomerTextMessageResult, error) {
-	ids, err := generateIDs()
-	if err != nil {
-		return InboundCustomerTextMessageResult{}, fmt.Errorf("generate inbound customer message ids: %w", err)
-	}
+	ids := generateIDs()
 	ensured, err := contactaction.EnsureChannelIdentity(ctx, db, contactaction.EnsureChannelIdentityInput{
 		OrganizationID: channel.OrganizationID,
 		ChannelID:      channel.ID,
