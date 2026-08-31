@@ -12,6 +12,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -21,6 +23,13 @@ import (
 )
 
 type fixedTenantResolver string
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+// RoundTrip 执行测试指定的 HTTP 传输。
+func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return f(request)
+}
 
 // Resolve 只返回测试指定的企业访问地址。
 func (r fixedTenantResolver) Resolve(_ context.Context, accessHost string) (tenant.Scope, error) {
@@ -118,6 +127,54 @@ func TestProxyHostFollowsServerListener(t *testing.T) {
 		if actual := proxyHost(host); actual != expected {
 			t.Errorf("proxyHost(%q) = %q, want %q", host, actual, expected)
 		}
+	}
+}
+
+// TestHTTPSProxyRewritesTrustedHeaders 验证 HTTPS 反代保留租户域名并覆盖外部转发头。
+func TestHTTPSProxyRewritesTrustedHeaders(t *testing.T) {
+	service := NewHTTPSEntry(
+		serverconfig.TLSConfig{Mode: "auto", ACMEEmail: "dev@example.com"},
+		serverconfig.ServerConfig{Host: "0.0.0.0", Port: 8080},
+		autocert.DirCache(t.TempDir()),
+		nil,
+	)
+	var outbound *http.Request
+	service.proxy.Transport = roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		outbound = request.Clone(request.Context())
+		return &http.Response{
+			StatusCode: http.StatusNoContent,
+			Header:     make(http.Header),
+			Body:       http.NoBody,
+		}, nil
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "https://tenant.runforyou.app/api/health?ready=true", nil)
+	request.Host = "tenant.runforyou.app"
+	request.Header.Set("X-Forwarded-For", "203.0.113.10")
+	request.Header.Set("X-Forwarded-Proto", "http")
+	response := httptest.NewRecorder()
+	service.proxy.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("proxy status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+	if outbound == nil {
+		t.Fatal("expected proxy transport to receive a request")
+	}
+	if outbound.URL.Scheme != "http" || outbound.URL.Host != "127.0.0.1:8080" {
+		t.Fatalf("proxy target = %s://%s, want http://127.0.0.1:8080", outbound.URL.Scheme, outbound.URL.Host)
+	}
+	if outbound.URL.Path != "/api/health" || outbound.URL.RawQuery != "ready=true" {
+		t.Fatalf("proxy request URI = %q, want %q", outbound.URL.RequestURI(), "/api/health?ready=true")
+	}
+	if outbound.Host != "tenant.runforyou.app" {
+		t.Fatalf("proxy host = %q, want tenant.runforyou.app", outbound.Host)
+	}
+	if protocol := outbound.Header.Get("X-Forwarded-Proto"); protocol != "https" {
+		t.Fatalf("X-Forwarded-Proto = %q, want https", protocol)
+	}
+	if forwardedFor := outbound.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		t.Fatalf("X-Forwarded-For = %q, want empty", forwardedFor)
 	}
 }
 

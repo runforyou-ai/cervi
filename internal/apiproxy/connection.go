@@ -156,7 +156,7 @@ func probeServer(ctx context.Context, state *remoteState) (appservice.Installati
 
 // remoteEndpoint 拼接企业服务器 API 地址。
 func remoteEndpoint(baseURL *url.URL, path, rawQuery string) string {
-	endpoint := *baseURL
+	endpoint := baseURL.Clone()
 	endpoint.Path = strings.TrimRight(baseURL.Path, "/") + "/api" + path
 	endpoint.RawQuery = rawQuery
 	return endpoint.String()

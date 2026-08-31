@@ -6,8 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"uuid"
 
-	"github.com/google/uuid"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -111,7 +111,7 @@ func TestEnqueueInRollsBackWithBusinessTransaction(t *testing.T) {
 func TestEnqueueInKeepsActiveIdempotency(t *testing.T) {
 	ctx, db, runtime := newEnqueueTestRuntime(t)
 	actionName := registerEnqueueTestAction(t, runtime)
-	idempotencyKey := uuid.NewString()
+	idempotencyKey := uuid.New().String()
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -156,7 +156,7 @@ func TestEnqueueInKeepsActiveIdempotency(t *testing.T) {
 func TestEnqueueInRejectsInvalidInputBeforeWriting(t *testing.T) {
 	ctx, db, runtime := newEnqueueTestRuntime(t)
 	actionName := registerEnqueueTestAction(t, runtime)
-	unregisteredActionName := "test.unregistered." + uuid.NewString()
+	unregisteredActionName := "test.unregistered." + uuid.New().String()
 	cleanupEnqueuedActions(t, db, unregisteredActionName, actionName)
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -222,7 +222,7 @@ func newEnqueueTestRuntime(t *testing.T) (context.Context, *bun.DB, *Runtime) {
 // registerEnqueueTestAction 注册一个不会实际执行的测试 Action。
 func registerEnqueueTestAction(t *testing.T, runtime *Runtime) string {
 	t.Helper()
-	actionName := "test.enqueue." + uuid.NewString()
+	actionName := "test.enqueue." + uuid.New().String()
 	if err := runtime.Registry().Register(actionName, func(context.Context, json.RawMessage) error { return nil }); err != nil {
 		t.Fatal(err)
 	}

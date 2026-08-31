@@ -61,8 +61,7 @@ func (a *TestConnectionAction) ExecuteAndRecord(ctx context.Context, identity *s
 		return TestResult{}, testErr
 	}
 	// 配置本身不合法说明没有发生真实探测，直接返回校验错误，不刷新连接状态。
-	var validationErr *ValidationError
-	if errors.As(testErr, &validationErr) {
+	if _, ok := errors.AsType[*ValidationError](testErr); ok {
 		return TestResult{}, testErr
 	}
 	status := domain.IntegrationConnectionStatusAvailable

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -71,10 +71,8 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
-	ids, err := generateMemberMessageIDs()
-	if err != nil {
-		return ConversationMessage{}, fmt.Errorf("generate member message ids: %w", err)
-	}
+	ids := generateMemberMessageIDs()
+	var err error
 	originatedAt := time.Now().UTC()
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + normalized.ClientMessageID
 
@@ -201,16 +199,12 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 }
 
 // generateMemberMessageIDs 预生成一次事务重试期间稳定使用的 UUIDv7。
-func generateMemberMessageIDs() (memberMessageIDs, error) {
+func generateMemberMessageIDs() memberMessageIDs {
 	values := make([]string, 3)
 	for index := range values {
-		value, err := uuid.NewV7()
-		if err != nil {
-			return memberMessageIDs{}, err
-		}
-		values[index] = value.String()
+		values[index] = uuid.NewV7().String()
 	}
-	return memberMessageIDs{subject: values[0], participant: values[1], message: values[2]}, nil
+	return memberMessageIDs{subject: values[0], participant: values[1], message: values[2]}
 }
 
 // loadCustomerConversationForReply 读取当前企业的客户会话。

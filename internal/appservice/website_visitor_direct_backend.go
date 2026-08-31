@@ -137,8 +137,7 @@ func decodeWebsiteMessageCursor(value, conversationID string) (conversationactio
 // websiteVisitorError 把语言无关访客错误映射为本地化应用错误。
 func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error, failureKey cervii18n.Key, operation string, attributes ...any) error {
 	requestMeta := RequestMeta{Locale: meta.Locale}
-	var validation *conversationaction.ValidationError
-	if errors.As(err, &validation) {
+	if validation, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(requestMeta, cervii18n.ErrorValidationFailed, translateValidationFields(validation.Fields, websiteVisitorValidationKeys))
 	}
 	if errors.Is(err, conversationaction.ErrChannelNotFound) {
@@ -147,8 +146,7 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(requestMeta, cervii18n.ErrorWebsiteConversationNotFound)
 	}
-	var conflict *conversationaction.ConflictError
-	if errors.As(err, &conflict) {
+	if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		return ConflictError(requestMeta, cervii18n.ErrorWebsiteMessageConflict, conflict.Reason)
 	}
 	// 请求被取消不属于业务失败，不产生告警日志。

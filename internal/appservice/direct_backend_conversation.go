@@ -108,12 +108,10 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	}
-	var validationError *conversationaction.ValidationError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
-	var conflictError *conversationaction.ConflictError
-	if errors.As(err, &conflictError) {
+	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		messageKey := cervii18n.ErrorServiceSessionNotReplyable
 		switch conflictError.Reason {
 		case conversationaction.ConflictReasonServiceSessionOwned:
@@ -258,12 +256,10 @@ func directConversationError(ctx context.Context, meta RequestMeta, err error, o
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	}
-	var validationError *conversationaction.ValidationError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
-	var conflictError *conversationaction.ConflictError
-	if errors.As(err, &conflictError) {
+	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		return ConflictError(meta, cervii18n.ErrorDirectMessageConflict, conflictError.Reason)
 	}
 	slog.Warn("内部单聊命令失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
@@ -306,8 +302,7 @@ func conversationMessageError(ctx context.Context, meta RequestMeta, err error, 
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	}
-	var validationError *conversationaction.ValidationError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	slog.Warn("读取会话消息失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
@@ -325,12 +320,10 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	}
-	var validationError *conversationaction.ValidationError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
-	var conflictError *conversationaction.ConflictError
-	if errors.As(err, &conflictError) {
+	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		messageKey := cervii18n.ErrorCustomerMessageConflict
 		switch conflictError.Reason {
 		case conversationaction.ConflictReasonServiceSessionOwned:

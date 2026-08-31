@@ -16,14 +16,12 @@ import (
 // TestNormalizeCreateMessageChannelInput 验证消息渠道创建字段规范化和长度限制。
 func TestNormalizeCreateMessageChannelInput(t *testing.T) {
 	normalized, fields := normalizeCreateMessageChannelInput(CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite,
-		MessageChannelInput: MessageChannelInput{
-			Name:                  "  产品官网  ",
-			Description:           "  接收访客咨询  ",
-			DefaultLocale:         " zh-CN ",
-			NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-		},
+		Type:                  domain.ChannelTypeWebsite,
+		Name:                  "  产品官网  ",
+		Description:           "  接收访客咨询  ",
+		DefaultLocale:         " zh-CN ",
+		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
@@ -33,38 +31,32 @@ func TestNormalizeCreateMessageChannelInput(t *testing.T) {
 	}
 
 	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
-		Type: domain.ChannelTypeTelegram,
-		MessageChannelInput: MessageChannelInput{
-			Name:                  "Telegram 客服",
-			DefaultLocale:         domain.LocaleChineseSimplified,
-			NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-		},
+		Type:                  domain.ChannelTypeTelegram,
+		Name:                  "Telegram 客服",
+		DefaultLocale:         domain.LocaleChineseSimplified,
+		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if len(fields) != 0 {
 		t.Fatalf("telegram validation fields = %#v, want empty", fields)
 	}
 
 	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
-		Type: domain.ChannelTypeWeChatOfficialAccount,
-		MessageChannelInput: MessageChannelInput{
-			Name:                  "微信公众号客服",
-			DefaultLocale:         domain.LocaleChineseSimplified,
-			NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-		},
+		Type:                  domain.ChannelTypeWeChatOfficialAccount,
+		Name:                  "微信公众号客服",
+		DefaultLocale:         domain.LocaleChineseSimplified,
+		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if len(fields) != 0 {
 		t.Fatalf("wechat official account validation fields = %#v, want empty", fields)
 	}
 
 	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
-		Type: "email",
-		MessageChannelInput: MessageChannelInput{
-			Name:          strings.Repeat("鹿", 101),
-			Description:   strings.Repeat("行", 2001),
-			DefaultLocale: "fr-FR",
-		},
+		Type:          "email",
+		Name:          strings.Repeat("鹿", 101),
+		Description:   strings.Repeat("行", 2001),
+		DefaultLocale: "fr-FR",
 	})
 	if fields["type"] != ValidationTypeInvalid {
 		t.Fatalf("type validation = %q, want %q", fields["type"], ValidationTypeInvalid)

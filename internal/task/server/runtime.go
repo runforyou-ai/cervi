@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
@@ -47,7 +47,7 @@ type Runtime struct {
 func New(db *bun.DB, natsConfig serverconfig.NATSConfig) *Runtime {
 	return &Runtime{
 		config: newConfig(natsConfig), repository: newRepository(db), registry: NewRegistry(),
-		instanceID: uuid.NewString(),
+		instanceID: uuid.New().String(),
 	}
 }
 

@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -26,7 +26,7 @@ func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	scheduleKey := "test.schedule." + uuid.NewString()
+	scheduleKey := "test.schedule." + uuid.New().String()
 	db := store.DB()
 	t.Cleanup(func() {
 		if _, cleanupErr := db.NewDelete().Table("task_schedules").

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -146,19 +146,15 @@ func validWebsiteExternalID(value string) bool {
 }
 
 // generateIDs 为一次渠道消息写入生成 UUIDv7。
-func generateIDs() (generatedIDs, error) {
+func generateIDs() generatedIDs {
 	values := make([]string, 7)
 	for index := range values {
-		value, err := uuid.NewV7()
-		if err != nil {
-			return generatedIDs{}, err
-		}
-		values[index] = value.String()
+		values[index] = uuid.NewV7().String()
 	}
 	return generatedIDs{
 		contact: values[0], channelIdentity: values[1], subject: values[2], conversation: values[3],
 		participant: values[4], serviceSession: values[5], message: values[6],
-	}, nil
+	}
 }
 
 // loadWebsiteChannel 读取启用的网站渠道和路由配置。

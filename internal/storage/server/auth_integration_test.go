@@ -325,27 +325,23 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		staleIdentity.User = loggedIn.Identity.User
 		staleIdentity.User.ID = "00000000-0000-0000-0000-000000000000"
 		_, err := createChannel.Execute(context.Background(), &staleIdentity, channelaction.CreateMessageChannelInput{
-			Type: domain.ChannelTypeWebsite,
-			MessageChannelInput: channelaction.MessageChannelInput{
-				Name:                  "无效渠道",
-				DefaultLocale:         domain.LocaleChineseSimplified,
-				NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-				FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			},
+			Type:                  domain.ChannelTypeWebsite,
+			Name:                  "无效渠道",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
 		if !errors.Is(err, common.ErrIdentityInvalid) {
 			t.Fatalf("stale identity error = %v, want %v", err, common.ErrIdentityInvalid)
 		}
 
 		channel, err = createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
-			Type: domain.ChannelTypeWebsite,
-			MessageChannelInput: channelaction.MessageChannelInput{
-				Name:                  "产品官网",
-				Description:           "接收官网访客咨询",
-				DefaultLocale:         domain.LocaleChineseSimplified,
-				NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-				FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			},
+			Type:                  domain.ChannelTypeWebsite,
+			Name:                  "产品官网",
+			Description:           "接收官网访客咨询",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -363,13 +359,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 
 		telegramChannel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
-			Type: domain.ChannelTypeTelegram,
-			MessageChannelInput: channelaction.MessageChannelInput{
-				Name:                  "Telegram 客服",
-				DefaultLocale:         domain.LocaleChineseSimplified,
-				NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-				FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			},
+			Type:                  domain.ChannelTypeTelegram,
+			Name:                  "Telegram 客服",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -643,13 +637,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 
 		reusedBotChannel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
-			Type: domain.ChannelTypeTelegram,
-			MessageChannelInput: channelaction.MessageChannelInput{
-				Name:                  "Telegram 复用确认",
-				DefaultLocale:         domain.LocaleChineseSimplified,
-				NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-				FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			},
+			Type:                  domain.ChannelTypeTelegram,
+			Name:                  "Telegram 复用确认",
+			DefaultLocale:         domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -1226,7 +1218,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 
 		taskRuntime := servertask.New(db, serverconfig.NATSConfig{})
-		if err := servertask.RegisterJSON[agentrunaction.RunInput](taskRuntime.Registry(), agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error {
+		if err := taskRuntime.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error {
 			return nil
 		}); err != nil {
 			t.Fatal(err)

@@ -107,8 +107,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 					break
 				}
 				if event.Err != nil {
-					var cancelErr *adk.CancelError
-					if errors.As(event.Err, &cancelErr) {
+					if _, ok := errors.AsType[*adk.CancelError](event.Err); ok {
 						continue
 					}
 					return event.Err

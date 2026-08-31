@@ -7,8 +7,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"uuid"
 
-	"github.com/google/uuid"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -54,10 +54,7 @@ func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
-		revisionID, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
+		revisionID := uuid.NewV7()
 		execution, err := insertExecutionRevision(ctx, tx, identity, agentID, revisionID.String(), input, model)
 		if err != nil {
 			return err

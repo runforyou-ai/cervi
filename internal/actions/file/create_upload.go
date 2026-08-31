@@ -5,8 +5,8 @@ package file
 import (
 	"context"
 	"fmt"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -35,10 +35,7 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 	if backend != domain.FileStorageBackendLocal && backend != domain.FileStorageBackendS3 {
 		return nil, fmt.Errorf("invalid file storage backend %q", backend)
 	}
-	id, err := uuid.NewV7()
-	if err != nil {
-		return nil, fmt.Errorf("generate file id: %w", err)
-	}
+	id := uuid.NewV7()
 	record := &servermodels.File{
 		ID:              id.String(),
 		OrganizationID:  identity.Organization.ID,

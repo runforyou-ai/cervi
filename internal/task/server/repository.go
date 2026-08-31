@@ -11,8 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -73,7 +73,7 @@ func enqueueIn(ctx context.Context, db bun.IDB, actionName string, payload json.
 	if options.AvailableAt.IsZero() {
 		availableAt = now
 	}
-	runID := uuid.NewString()
+	runID := uuid.New().String()
 	var insertedID string
 	err := db.NewRaw(`
 		INSERT INTO task_runs (
@@ -116,7 +116,7 @@ func enqueueIn(ctx context.Context, db bun.IDB, actionName string, payload json.
 		return insertedID, nil
 	}
 	outbox := &servermodels.TaskOutbox{
-		TaskRunID: insertedID, MessageID: uuid.NewString(), QueueName: options.Queue,
+		TaskRunID: insertedID, MessageID: uuid.New().String(), QueueName: options.Queue,
 		AvailableAt: availableAt, CreatedAt: now, UpdatedAt: now,
 	}
 	if _, err := db.NewInsert().Model(outbox).Exec(ctx); err != nil {

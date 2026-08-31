@@ -82,8 +82,7 @@ func (b *DirectBackend) TestAIProviderConnection(ctx context.Context, meta Reque
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, aiProviderFieldKeys(validationError.Fields))
 	}
 	_, kind, classified := connectiontest.Details(err)
@@ -146,8 +145,7 @@ func (b *DirectBackend) DeleteAIProvider(ctx context.Context, meta RequestMeta, 
 
 // aiProviderMutationError 转换模型服务供应商写入错误。
 func (b *DirectBackend) aiProviderMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
-	var validationError *common.FieldError
-	if errors.As(err, &validationError) {
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, aiProviderFieldKeys(validationError.Fields))
 	}
 	return b.aiProviderError(ctx, meta, err, failureKey, organizationID, attributes...)

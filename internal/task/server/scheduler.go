@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -81,7 +81,7 @@ func (r *Runtime) syncSchedule(ctx context.Context, definition ScheduleDefinitio
 		nextRunAt = now
 	}
 	record := &servermodels.TaskSchedule{
-		ID: uuid.NewString(), ScheduleKey: definition.Key, ActionName: definition.ActionName,
+		ID: uuid.New().String(), ScheduleKey: definition.Key, ActionName: definition.ActionName,
 		QueueName: definition.Queue, Payload: payload, CronExpression: definition.CronExpression,
 		Timezone: definition.Timezone, Enabled: definition.Enabled, MaxAttempts: definition.MaxAttempts,
 		NextRunAt: nextRunAt, CreatedAt: now, UpdatedAt: now,
