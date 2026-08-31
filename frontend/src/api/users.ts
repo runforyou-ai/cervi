@@ -6,7 +6,6 @@ import {
   ListUsers,
   ReactivateUser,
   UpdateUser,
-  UpdateUserRoles,
   UpdateUserWorkStatus,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
@@ -38,9 +37,6 @@ const reactivateUserBound = bind(ReactivateUser)
 
 /** 修改当前用户主动设置的工作状态。 */
 export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
-
-/** 在一个事务中批量调整企业成员角色。 */
-export const updateUserRoles = bind(UpdateUserRoles)
 
 /** 读取企业成员详情。 */
 export function getUser(userId: string, signal?: AbortSignal) {

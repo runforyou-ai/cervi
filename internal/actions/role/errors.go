@@ -18,4 +18,10 @@ var (
 	ErrLimitReached = errors.New("role limit reached")
 	// ErrInUse 表示角色仍有关联成员。
 	ErrInUse = errors.New("role is in use")
+	// ErrAssignmentInvalid 表示角色归属调整参数无效。
+	ErrAssignmentInvalid = errors.New("role assignment invalid")
+	// ErrAgentAdministrator 表示 AI 员工不能使用管理员角色。
+	ErrAgentAdministrator = errors.New("agent cannot be administrator")
+	// ErrLastActiveAdministrator 表示企业至少需要保留一名账号正常的真人管理员。
+	ErrLastActiveAdministrator = errors.New("organization requires an active administrator")
 )

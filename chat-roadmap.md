@@ -219,12 +219,12 @@ external_sender         第三方平台发送者
 > [!WARNING]
 > Header 回传只维持当前页面内的嵌入访问；浏览器完全阻止第三方 Cookie 时，不承诺跨刷新恢复。阶段 1A 验证独立页和 HTTPS 挂件的首次访问与刷新恢复。
 
-公开访客端点是无认证入口，第一条有效文本即在事务中创建联系人、渠道身份、Conversation、ServiceSession 和 Message，必须规划防滥用能力，避免刷接口无限制造业务记录、污染客服收件箱和 CRM：
+公开访客端点的安全加固按当前阶段约束后置，不作为聊天主流程功能的前置条件；后续集中处理时覆盖以下边界：
 
 - 初始化、发送和历史接口按来源 IP 和渠道限速；发送接口同时按访客身份限制消息长度和发送频率。
 - 限制单个渠道身份同时保持的未回复 Conversation 数量，超出时拒绝创建新线程并提示继续已有线程。
 - 渠道停用即拒绝公共访问是紧急止血手段；限速和配额参数由渠道配置管理，不硬编码。
-- 阶段 1A 已上线的公开端点在后续 PR 补齐上述限制，先于外部渠道扩展交付，见第 13.5 节。
+- 阶段 1A 已上线的公开端点保持现状，直到安全加固阶段统一补齐上述限制。
 
 挂件接入 Realtime Gateway 后，公共换票端点校验该访客身份并签发第 10.12 节定义的短期一次性连接票据；Cookie 不直接用于 WebSocket 认证。
 
@@ -306,7 +306,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 ### 5.5 ServiceSession
 
-`ServiceSession` 表示一条客户 Conversation 上的一次客服处理过程，与客户可见线程分离。它保存等待、处理中、挂起、结束、负责人、团队、转接、响应指标和满意度等状态。
+`ServiceSession` 表示一条客户 Conversation 上的一次客服处理过程，与客户可见线程分离。持久状态只保留 `open` 和 `closed`；开放周期是否排队以及由谁负责，分别由 `assignee_identity_id` 是否为空及其指向表达。团队、转接记录、响应指标和满意度按实际需求另行建模，不把它们扩成同一状态枚举。
 
 一个客户 Conversation 可以先后产生多个服务批次，同一 Conversation 同时最多一个未结束批次。批次不切断 Conversation 消息历史，也不作为客户侧聊天列表和历史接口的主键。内部单聊、群聊和第三方账号会话不创建服务批次。
 
@@ -338,6 +338,7 @@ ticket_conversation_links
 现有内部通讯录结构方向保持不变：
 
 - `organization_identities.type = user | agent` 统一企业内部展示身份。
+- `organization_identities.role_id` 是真人和 AI 员工唯一的企业角色来源；`users` 与 `agents` 子类型只保留各自账号状态和专属配置。
 - `users.identity_id` 和 `agents.identity_id` 分别关联具体身份。
 - `team_members.identity_id` 继续只允许有效用户或智能体加入团队。
 
@@ -1247,14 +1248,14 @@ P3 typing、presence 等临时事件
 
 ### 阶段 1：外部客户单聊
 
-阶段 1 按可独立验收的子阶段交付：先在阶段 0 数据底座上完成网站文本闭环，再以 Telegram Bot 验证外部投递，随后扩展其他客服渠道、文件和客服处理能力。`ServiceSession` 随数据底座提前建立，但客户可见列表和历史始终以 Conversation 为线程；领取、转接、结束、指标和满意度仍在后续阶段交付。
+阶段 1 按可独立验收的子阶段交付：先在阶段 0 数据底座上完成网站文本闭环，再以 Telegram Bot 验证外部投递，随后扩展其他客服渠道、文件和客服处理能力。`ServiceSession` 随数据底座提前建立，但客户可见列表和历史始终以 Conversation 为线程；领取、接管、同事转交、关闭和重新打开已经交付，指标和满意度仍在后续阶段交付。
 
 #### 阶段 1A：网站客户文本闭环（双方文本轮询闭环已完成）
 
 - 网站访客通过第 4.5 节的渠道 Cookie 恢复身份，第一条有效文本消息创建 `stage = visitor` 联系人、渠道身份和长期客户会话。
 - 新草稿第一条有效文本创建 Conversation 和首个 `ServiceSession`；点击已有列表项发送时复用该 Conversation，并复用或续开它的 ServiceSession。访客会话列表以 Conversation 为列表项，ServiceSession 只提供最新处理状态摘要。
 - 网站消息 PR 已交付访客发送、Conversation 列表和完整历史读取（见第 13.3 节）；企业成员列表、历史和回复也已由后续独立 PR 交付。访客与成员当前打开的会话均使用 `after` 轮询新增消息，并在页面恢复可见后立即补拉。
-- 同一渠道身份可以同时拥有多条正在处理的 Conversation，每条 Conversation 同时最多一个 `status IN (waiting, active, pending)` 的 ServiceSession；`conversations.status = active` 不表示客服批次未结束。
+- 同一渠道身份可以同时拥有多条正在处理的 Conversation，每条 Conversation 同时最多一个 `status = open` 的 ServiceSession；`conversations.status = active` 不表示客服批次未结束。
 - 网站公开请求由现有 `/api` Gin Service 适配到未注册 Wails 绑定的访客应用服务和 Action；访客直接读取 Cervi 消息时间线，不创建 Delivery。
 - 本子阶段只实现文本，不包含文件、外部平台投递和统一实时基础设施。
 
@@ -1276,7 +1277,7 @@ P3 typing、presence 等临时事件
 #### 阶段 1D：文件与客服处理扩展
 
 - 文件消息复用项目既有临时上传流程，保存 Message 关联时在同一事务激活文件；不把文件内容塞入文本正文。
-- 在已经建立的 `ServiceSession` 上增加领取、转接、挂起、结束和处理闭环，再逐步增加指标和满意度。
+- 已建立的 `ServiceSession` 使用开放/关闭两态和负责人表达排队、领取、接管、同事转交、关闭与重新打开；显式重开后由操作人负责，不增加挂起状态，后续逐步增加指标和满意度。
 - `ServiceSession` 仍与长期 `CustomerConversation` 分离，文件读取仍按记录中的存储类型处理。
 
 阶段 1A 使用 HTTP 轮询。若需提前提供实时回复，整体前移 Realtime Gateway、会话同步序号、`realtime_outbox` 和 Protobuf 最小协议，并按第 10.12 节签发访客连接票据；不增加独立的 SSE 或 JSON WebSocket 协议。
@@ -1461,11 +1462,11 @@ GET /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
 
 PR5 以 Helmdesk 收件箱为样式和交互基线，把选中区拆为客户 Conversation 工作区和独立联系人上下文栏。会话头展示联系人、Conversation 标题和最新 ServiceSession 状态；右栏建立资料、AI 助手和业务三个页签，并在宽屏支持拖动调整宽度与收起，在较窄视口使用 Sheet。
 
-时间线仍只读取当前 Conversation，不按联系人拼接其他 Conversation。每条消息显示来源时间、真实发送主体头像和方向气泡；每个 ServiceSession 的 opening message 前显示批次序号、开始时间和状态，单个批次同样显示边界。回复区、转给同事和交给 AI 只保留禁用骨架，不调用业务接口。
+时间线仍只读取当前 Conversation，不按联系人拼接其他 Conversation。每条消息显示来源时间、真实发送主体头像和方向气泡；每个 ServiceSession 的 opening message 前显示批次序号、开始时间和状态，单个批次同样显示边界。该 PR 的回复区与处理操作只保留禁用骨架，后续 PR 已接通回复、领取、接管、同事转交、关闭和重新打开，并移除单独的「交给 AI」。
 
 ### 13.7 PR6：成员文本回复（本次交付）
 
-PR6 增加 `POST /api/conversations/{conversationID}/messages` 成员客户会话文本消息命令。消息使用 `mmsg:<organization_identity_id>:<client_message_id>` 永久幂等键；Action 在事务中锁定最新 ServiceSession，禁止抢占其他主体负责的批次，并在公共队列首次回复时由当前成员领取并激活。首次实际成员回复建立或恢复 ChatSubject 和 ConversationParticipant，写入 Message、首次响应时间以及 Conversation 和 ServiceSession 摘要。
+PR6 增加 `POST /api/conversations/{conversationID}/messages` 成员客户会话文本消息命令。消息使用 `mmsg:<organization_identity_id>:<client_message_id>` 永久幂等键；Action 在事务中锁定最新开放 ServiceSession，禁止直接回复其他主体负责的批次，并在公共队列首次回复时由当前成员隐式领取。首次实际成员回复建立或恢复 ChatSubject 和 ConversationParticipant，写入 Message、首次响应时间以及 Conversation 和 ServiceSession 摘要。
 
 网站渠道回复直接写入 Cervi 时间线，不创建 Delivery、异步任务或实时事件。前端启用工作区回复区，成功后立即合入成员时间线并刷新收件箱摘要；访客和成员自动补拉仍留给下一 PR。
 
@@ -1487,7 +1488,7 @@ Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 
 
 成员收件箱和当前 Customer/Direct 时间线每 3 秒轮询；Web 与桌面端只在消息路由所属工作区标签活动、页面可见且窗口聚焦时运行，移动端只在应用前台可见时运行，恢复前台后立即补拉。空 Direct 在没有 `after` 时轮询无游标最近页，得到第一条消息后安装游标；空增量响应保留旧游标，`before`、`after` 和本地发送结果按消息编号合并，切换会话后忽略旧结果。
 
-Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，群聊继续显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接、交给 AI 或客户上下文栏。移动端统一展示 Customer 与 Direct 摘要，Customer 仍保持只读摘要，Direct 支持发起、详情、历史、文本发送和前台轮询；移动端详情隐藏一级导航并独立处理底部安全区。
+Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，群聊继续显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接操作或客户上下文栏。移动端统一展示 Customer 与 Direct 摘要，Customer 仍保持只读摘要，Direct 支持发起、详情、历史、文本发送和前台轮询；移动端详情隐藏一级导航并独立处理底部安全区。
 
 ### 13.9 阶段 2C：Agent Direct、Eino 与计算器 Tool（本次交付）
 
@@ -1501,18 +1502,19 @@ Web、桌面端与移动端复用统一收件箱、Direct 时间线和前台轮�
 
 网站访客 Messenger 已在当前打开的 Conversation 中使用 `after` 每 3 秒补拉新增文本；页面不可见或嵌入挂件收起时停止轮询，恢复后立即补拉。访客发送结果与增量结果按 `(originated_at, id)` 有序去重合入，发送不自行推进服务端游标。
 
+当前聊天已经用 `open/closed + assignee_identity_id` 落地 ServiceSession 领取、接管、同事转交、关闭和重新打开；显式重开按 HelmDesk 语义分配给操作人并进入「我负责的」。收件箱提供「排队中 / 我负责的 / 同事 / 已关闭」四个真实查询视图，处理命令只精确失效源、目标和「全部」查询，非目标查询不立即重取，不再用前缀失效刷新多个列表。「同事」筛选和转交候选都使用角色为客服的真人与 AI 企业身份；AI 与真人共用负责人和转交语义，但不伪装成已经具备自动回复能力。
+
 当前聊天仍未实现以下能力，全部属于后续阶段：
 
-- ServiceSession 领取、转接、挂起和结束命令。
-- 客户队列按负责人、团队和关闭状态真实筛选。
-- 未读、实时、文件、外部平台投递、指标和满意度。
-- 第三方用户消息账号、受管访客、联邦和完整 Agent 策略与审计表。
+- AI 客服执行和自动回复。
+- 未读、实时、文件、外部平台投递、团队队列、指标和满意度。
+- 第三方用户消息账号、受管访客、联邦和完整 AI 客服策略与审计表。
 - `customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。
 
 后续按独立 PR 继续完成：
 
-1. 公开访客端点按第 4.5 节补齐防滥用限制：接口限速、消息长度与频率约束、未回复 Conversation 数量上限；先于外部渠道扩展交付。
-2. ServiceSession 显式领取、挂起和结束命令。
-3. 客户队列子筛选按状态和负责人落地，并与 URL 查询参数同步。
-4. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
-5. 未读、统一实时、文件、外部平台投递、转接、指标和满意度。
+1. 根据聊天主流程需要继续交付未读、统一实时、文件和外部平台投递。
+2. AI 客服运行能力完成后，直接消费现有负责人和转交结果，不增加 AI 专属会话状态。
+3. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
+4. 团队队列、指标和满意度按实际需求独立建模。
+5. 公开访客端点的限速与其他安全加固按当前阶段约束继续后置，不阻塞聊天功能开发。

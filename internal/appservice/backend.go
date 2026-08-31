@@ -46,13 +46,28 @@ type Backend interface {
 	UpdateUserWorkStatus(context.Context, RequestMeta, UserWorkStatusInput) (CurrentUser, error)
 	// LoadInbox 返回当前用户的统一收件箱。
 	//cervi:route GET /inbox
-	LoadInbox(context.Context, RequestMeta) (Inbox, error)
+	LoadInbox(context.Context, RequestMeta, LoadInboxInput) (Inbox, error)
+	// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
+	//cervi:route GET /inbox/assignees
+	ListCustomerServiceAssignees(context.Context, RequestMeta) (CustomerServiceAssigneeList, error)
 	// ListConversationMessages 返回成员可见的会话消息。
 	//cervi:route GET /conversations/:conversationID/messages
 	ListConversationMessages(context.Context, RequestMeta, string, ConversationMessageListInput) (ConversationMessageList, error)
 	// SendCustomerTextMessage 发送客户会话文本消息。
 	//cervi:route POST /conversations/:conversationID/messages
 	SendCustomerTextMessage(context.Context, RequestMeta, string, CustomerTextMessageInput) (ConversationMessage, error)
+	// ClaimServiceSession 领取或接管客户会话最新处理周期。
+	//cervi:route POST /conversations/:conversationID/claim
+	ClaimServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
+	// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+	//cervi:route POST /conversations/:conversationID/transfer
+	TransferServiceSession(context.Context, RequestMeta, string, TransferServiceSessionInput) (CustomerServiceSession, error)
+	// CloseServiceSession 关闭客户会话最新处理周期。
+	//cervi:route POST /conversations/:conversationID/close
+	CloseServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
+	// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+	//cervi:route POST /conversations/:conversationID/reopen
+	ReopenServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
 	// StartDirectConversation 发起或打开企业成员内部单聊。
 	//cervi:route POST /direct-conversations
 	StartDirectConversation(context.Context, RequestMeta, DirectConversationInput) (InboxConversation, error)
@@ -140,9 +155,9 @@ type Backend interface {
 	// UpdateUser 修改企业成员资料、角色和所属团队。
 	//cervi:route PUT /users/:userID
 	UpdateUser(context.Context, RequestMeta, string, UpdateUserInput) (User, error)
-	// UpdateUserRoles 在一个事务中批量调整企业成员角色。
-	//cervi:route PATCH /users/roles
-	UpdateUserRoles(context.Context, RequestMeta, UserRoleChangesInput) error
+	// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+	//cervi:route PATCH /roles/assignments
+	UpdateRoleAssignments(context.Context, RequestMeta, RoleAssignmentsInput) error
 	// DeactivateUser 禁用企业成员账号。
 	//cervi:route POST /users/:userID/deactivate
 	DeactivateUser(context.Context, RequestMeta, string) (User, error)

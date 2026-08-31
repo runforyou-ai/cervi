@@ -33,6 +33,19 @@ type CustomerTextMessageInput struct {
 	Body            string `json:"body"`
 }
 
+// TransferServiceSessionInput 定义客服处理周期转交目标。
+type TransferServiceSessionInput struct {
+	AssigneeIdentityID string `json:"assigneeIdentityId"`
+}
+
+// CustomerServiceSession 定义客户会话最新客服处理周期。
+type CustomerServiceSession struct {
+	ID       string               `json:"id"`
+	Status   ServiceSessionStatus `json:"status"`
+	Assignee *InboxAssignee       `json:"assignee"`
+	ClosedAt *time.Time           `json:"closedAt"`
+}
+
 // ConversationMessageSender 定义消息发送主体。
 type ConversationMessageSender struct {
 	ChatSubjectID string          `json:"chatSubjectId"`

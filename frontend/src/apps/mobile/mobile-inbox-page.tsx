@@ -4,7 +4,6 @@ import type { TFunction } from "i18next"
 import {
   BotIcon,
   GlobeIcon,
-  LoaderCircleIcon,
   MessageCircleIcon,
   MessagesSquareIcon,
   PlusIcon,
@@ -28,6 +27,7 @@ import {
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
@@ -37,10 +37,7 @@ import {
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
 import { resourceKeys } from "@/hooks/resource-keys"
-import {
-  useResource,
-  useResourceInvalidator,
-} from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 type MobileInboxConversation =
@@ -80,12 +77,8 @@ function sessionStatusLabel(
   t: TFunction<"inbox">,
 ) {
   switch (status) {
-    case ServiceSessionStatus.ServiceSessionStatusWaiting:
-      return t("sessionStatus.waiting")
-    case ServiceSessionStatus.ServiceSessionStatusActive:
-      return t("sessionStatus.active")
-    case ServiceSessionStatus.ServiceSessionStatusPending:
-      return t("sessionStatus.pending")
+    case ServiceSessionStatus.ServiceSessionStatusOpen:
+      return t("sessionStatus.open")
     case ServiceSessionStatus.ServiceSessionStatusClosed:
       return t("sessionStatus.closed")
     default:
@@ -97,9 +90,7 @@ function sessionStatusLabel(
 /** 返回客服处理状态的移动端颜色。 */
 function sessionStatusClass(status: ServiceSessionStatus) {
   switch (status) {
-    case ServiceSessionStatus.ServiceSessionStatusWaiting:
-      return "bg-warning/15 text-warning"
-    case ServiceSessionStatus.ServiceSessionStatusActive:
+    case ServiceSessionStatus.ServiceSessionStatusOpen:
       return "bg-primary/10 text-primary"
     default:
       return "bg-muted text-muted-foreground"
@@ -337,7 +328,6 @@ export function MobileInboxPage() {
   const { t: tInbox } = useTranslation("inbox")
   const { identity } = useMobileWorkspace()
   const navigate = useNavigate()
-  const invalidate = useResourceInvalidator()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })
@@ -363,9 +353,9 @@ export function MobileInboxPage() {
     previousPollingActiveRef.current = pollingActive
   }, [data, pollingActive, refresh])
 
-  /** 发起成功后直接进入 Direct 详情并刷新后台 Inbox 摘要。 */
+  /** 发起成功后同步 Inbox 摘要并直接进入 Direct 详情。 */
   function openStartedConversation(conversation: DirectInboxConversationData) {
-    void invalidate(resourceKeys.inbox())
+    void refresh()
     navigate(`/inbox/direct/${conversation.id}`, {
       state: { conversation },
     })
@@ -405,10 +395,9 @@ export function MobileInboxPage() {
       </header>
 
       {loading ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
-          <LoaderCircleIcon className="size-4 animate-spin" />
+        <LoadingIndicator className="min-h-0 flex-1 justify-center">
           {t("loading")}
-        </div>
+        </LoadingIndicator>
       ) : null}
 
       {!loading && !data ? (

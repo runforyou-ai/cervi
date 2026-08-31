@@ -1,7 +1,7 @@
 /** 对象存储设置表单。 */
 import { type MouseEvent, useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { EyeIcon, EyeOffIcon, LoaderCircleIcon } from "lucide-react"
+import { EyeIcon, EyeOffIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -15,6 +15,7 @@ import {
   testS3Setting,
   type StorageProviderId,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -300,10 +301,9 @@ export function StorageSettingsForm() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <LoaderCircleIcon className="size-4 animate-spin" />
+      <LoadingIndicator>
         {t("storage.loading")}
-      </div>
+      </LoadingIndicator>
     )
   }
 

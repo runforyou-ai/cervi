@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 
+	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -18,8 +19,8 @@ import (
 func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermodels.Organization, userID string) (*servermodels.Identity, error) {
 	identity := &servermodels.Identity{Organization: organization}
 	err := db.NewSelect().TableExpr("users AS u").
-		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.role_id::text, u.status, u.locale, u.time_zone, u.message_notifications_enabled, u.workspace_tabs_enabled").
-		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.display_name, oi.avatar_file_id::text, oi.work_status").
+		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.status, u.locale, u.time_zone, u.message_notifications_enabled, u.workspace_tabs_enabled").
+		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.role_id::text, oi.display_name, oi.avatar_file_id::text, oi.work_status").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Where("u.organization_id = ?", organization.ID).
 		Where("u.id = ?", userID).
@@ -28,7 +29,6 @@ func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermod
 			&identity.User.IdentityID,
 			&identity.User.OrganizationID,
 			&identity.User.Email,
-			&identity.User.RoleID,
 			&identity.User.Status,
 			&identity.User.Locale,
 			&identity.User.TimeZone,
@@ -37,6 +37,7 @@ func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermod
 			&identity.OrganizationIdentity.ID,
 			&identity.OrganizationIdentity.OrganizationID,
 			&identity.OrganizationIdentity.Type,
+			&identity.OrganizationIdentity.RoleID,
 			&identity.OrganizationIdentity.DisplayName,
 			&identity.OrganizationIdentity.AvatarFileID,
 			&identity.OrganizationIdentity.WorkStatus,
@@ -55,7 +56,7 @@ func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*
 		ColumnExpr("u.email, u.status, oi.display_name, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
-		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
+		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").
 		Where("u.id = ?", userID).
 		Where("u.organization_id = ?", organizationID).
 		Scan(ctx, user)
@@ -71,54 +72,21 @@ func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*
 
 // validateRoleID 校验并锁定当前企业的角色。
 func validateRoleID(ctx context.Context, db bun.IDB, organizationID, roleID string) error {
-	if !common.ValidUUID(roleID) {
+	_, err := roleaction.ValidateAssignment(ctx, db, organizationID, roleID, domain.OrganizationIdentityTypeUser)
+	if errors.Is(err, roleaction.ErrAssignmentInvalid) || errors.Is(err, roleaction.ErrAgentAdministrator) {
 		return &ValidationError{Fields: map[string]ValidationCode{"roleId": ValidationRoleInvalid}}
 	}
-	role := &servermodels.Role{}
-	err := db.NewSelect().Model(role).
-		Column("id").
-		Where("organization_id = ?", organizationID).
-		Where("id = ?", roleID).
-		For("KEY SHARE").
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return &ValidationError{Fields: map[string]ValidationCode{"roleId": ValidationRoleInvalid}}
-	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // lockAdministratorRole 锁定管理员角色以串行维护有效管理员数量。
 func lockAdministratorRole(ctx context.Context, db bun.IDB, organizationID string) (string, error) {
-	role := &servermodels.Role{}
-	err := db.NewSelect().Model(role).
-		Column("id").
-		Where("organization_id = ?", organizationID).
-		Where("kind = ?", domain.RoleKindAdmin).
-		For("UPDATE").
-		Scan(ctx)
-	if err != nil {
-		return "", err
-	}
-	return role.ID, nil
+	return roleaction.LockAdministratorRole(ctx, db, organizationID)
 }
 
 // ensureActiveAdministratorRemains 校验企业仍有正常状态的管理员。
 func ensureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizationID, administratorRoleID string) error {
-	count, err := db.NewSelect().TableExpr("users AS u").
-		Where("u.organization_id = ?", organizationID).
-		Where("u.role_id = ?", administratorRoleID).
-		Where("u.status = ?", domain.UserStatusActive).
-		Count(ctx)
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return ErrLastActiveAdministrator
-	}
-	return nil
+	return roleaction.EnsureActiveAdministratorRemains(ctx, db, organizationID, administratorRoleID)
 }
 
 // validateTeamIDs 规范化团队编号、去重并校验全部团队属于当前企业。

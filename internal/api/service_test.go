@@ -21,7 +21,7 @@ type testBackend struct {
 	lastUserList         appservice.UserListInput
 	lastCreateUser       appservice.CreateUserInput
 	lastUpdateUser       appservice.UpdateUserInput
-	lastRoleChanges      appservice.UserRoleChangesInput
+	lastRoleAssignments  appservice.RoleAssignmentsInput
 	lastTeamList         appservice.TeamListInput
 	lastTeamMemberList   appservice.TeamMemberListInput
 	lastTeam             appservice.TeamInput
@@ -35,9 +35,11 @@ type testBackend struct {
 	lastPassword         appservice.ChangePasswordInput
 	lastPreferences      appservice.UserPreferencesInput
 	lastWorkStatus       appservice.UserWorkStatusInput
+	lastInbox            appservice.LoadInboxInput
 	lastConversationID   string
 	lastConversationList appservice.ConversationMessageListInput
 	lastCustomerMessage  appservice.CustomerTextMessageInput
+	lastSessionTransfer  appservice.TransferServiceSessionInput
 	lastDirectStart      appservice.DirectConversationInput
 	lastDirectMessage    appservice.DirectTextMessageInput
 	lastDocumentBaseID   string
@@ -73,6 +75,19 @@ func (b *testBackend) LoadIdentity(_ context.Context, meta appservice.RequestMet
 	return testIdentity(), nil
 }
 
+// LoadInbox 记录收件箱查询输入。
+func (b *testBackend) LoadInbox(_ context.Context, meta appservice.RequestMeta, input appservice.LoadInboxInput) (appservice.Inbox, error) {
+	b.lastMeta = meta
+	b.lastInbox = input
+	return appservice.Inbox{Conversations: []appservice.InboxConversation{}}, nil
+}
+
+// ListCustomerServiceAssignees 返回测试客服候选。
+func (b *testBackend) ListCustomerServiceAssignees(_ context.Context, meta appservice.RequestMeta) (appservice.CustomerServiceAssigneeList, error) {
+	b.lastMeta = meta
+	return appservice.CustomerServiceAssigneeList{Assignees: []appservice.InboxAssignee{}}, nil
+}
+
 // ListConversationMessages 记录成员消息查询输入。
 func (b *testBackend) ListConversationMessages(_ context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageListInput) (appservice.ConversationMessageList, error) {
 	b.lastMeta = meta
@@ -87,6 +102,35 @@ func (b *testBackend) SendCustomerTextMessage(_ context.Context, meta appservice
 	b.lastConversationID = conversationID
 	b.lastCustomerMessage = input
 	return appservice.ConversationMessage{ID: input.ClientMessageID, Type: appservice.MessageTypeText, Body: input.Body}, nil
+}
+
+// ClaimServiceSession 记录领取的会话编号。
+func (b *testBackend) ClaimServiceSession(_ context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
+	b.lastMeta = meta
+	b.lastConversationID = conversationID
+	return appservice.CustomerServiceSession{ID: "session-1", Status: appservice.ServiceSessionStatusOpen}, nil
+}
+
+// TransferServiceSession 记录转交输入。
+func (b *testBackend) TransferServiceSession(_ context.Context, meta appservice.RequestMeta, conversationID string, input appservice.TransferServiceSessionInput) (appservice.CustomerServiceSession, error) {
+	b.lastMeta = meta
+	b.lastConversationID = conversationID
+	b.lastSessionTransfer = input
+	return appservice.CustomerServiceSession{ID: "session-1", Status: appservice.ServiceSessionStatusOpen}, nil
+}
+
+// CloseServiceSession 记录关闭的会话编号。
+func (b *testBackend) CloseServiceSession(_ context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
+	b.lastMeta = meta
+	b.lastConversationID = conversationID
+	return appservice.CustomerServiceSession{ID: "session-1", Status: appservice.ServiceSessionStatusClosed}, nil
+}
+
+// ReopenServiceSession 记录重新打开的会话编号。
+func (b *testBackend) ReopenServiceSession(_ context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
+	b.lastMeta = meta
+	b.lastConversationID = conversationID
+	return appservice.CustomerServiceSession{ID: "session-1", Status: appservice.ServiceSessionStatusOpen}, nil
 }
 
 // StartDirectConversation 记录内部单聊发起输入。
@@ -202,10 +246,10 @@ func (b *testBackend) UpdateUser(_ context.Context, meta appservice.RequestMeta,
 	return appservice.User{ID: userID, DisplayName: input.DisplayName, Email: input.Email, Role: appservice.RoleSummary{ID: input.RoleID}, Status: appservice.UserStatusActive, Teams: []appservice.TeamSummary{}}, nil
 }
 
-// UpdateUserRoles 记录批量角色调整输入。
-func (b *testBackend) UpdateUserRoles(_ context.Context, meta appservice.RequestMeta, input appservice.UserRoleChangesInput) error {
+// UpdateRoleAssignments 记录批量角色调整输入。
+func (b *testBackend) UpdateRoleAssignments(_ context.Context, meta appservice.RequestMeta, input appservice.RoleAssignmentsInput) error {
 	b.lastMeta = meta
-	b.lastRoleChanges = input
+	b.lastRoleAssignments = input
 	return nil
 }
 
@@ -513,10 +557,10 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 		t.Fatalf("status = %d, input = %#v", memberResponse.StatusCode, backend.lastCreateUser)
 	}
 
-	roleResponse := doJSON(t, http.MethodPatch, server.URL+"/users/roles", appservice.UserRoleChangesInput{Changes: []appservice.UserRoleChangeInput{{UserID: "0198ddee-c056-7bc5-a1d9-586f878ee967", RoleID: "0198ddee-c056-7bc5-a1d9-586f878ee966"}}}, "test-token")
+	roleResponse := doJSON(t, http.MethodPatch, server.URL+"/roles/assignments", appservice.RoleAssignmentsInput{Assignments: []appservice.RoleAssignmentInput{{IdentityID: "0198ddee-c056-7bc5-a1d9-586f878ee967", RoleID: "0198ddee-c056-7bc5-a1d9-586f878ee966"}}}, "test-token")
 	defer roleResponse.Body.Close()
-	if roleResponse.StatusCode != http.StatusNoContent || len(backend.lastRoleChanges.Changes) != 1 || backend.lastRoleChanges.Changes[0].UserID == "" {
-		t.Fatalf("status = %d, input = %#v", roleResponse.StatusCode, backend.lastRoleChanges)
+	if roleResponse.StatusCode != http.StatusNoContent || len(backend.lastRoleAssignments.Assignments) != 1 || backend.lastRoleAssignments.Assignments[0].IdentityID == "" {
+		t.Fatalf("status = %d, input = %#v", roleResponse.StatusCode, backend.lastRoleAssignments)
 	}
 
 	teamResponse := doJSON(t, http.MethodPost, server.URL+"/teams", appservice.TeamInput{Name: "客户成功", Description: "服务客户"}, "test-token")
@@ -541,6 +585,45 @@ func TestMemberAndTeamMutationsUseTypedContracts(t *testing.T) {
 	defer removeResponse.Body.Close()
 	if removeResponse.StatusCode != http.StatusOK || len(backend.lastTeamMembers.Members) != 1 || backend.lastTeamMembers.Members[0].IdentityType != appservice.OrganizationIdentityTypeAgent {
 		t.Fatalf("status = %d, input = %#v", removeResponse.StatusCode, backend.lastTeamMembers)
+	}
+}
+
+// TestInboxFiltersAndServiceSessionCommandsUseTypedContracts 验证客服视图与处理命令的 HTTP 契约。
+func TestInboxFiltersAndServiceSessionCommandsUseTypedContracts(t *testing.T) {
+	backend := &testBackend{}
+	server := httptest.NewServer(NewService(appservice.New(backend)))
+	defer server.Close()
+
+	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
+	const assigneeIdentityID = "0198ddee-c056-7bc5-a1d9-586f878ee967"
+	inboxResponse := doJSON(t, http.MethodGet, server.URL+"/inbox?scope=customer&customerView=coworkers&assigneeIdentityId="+assigneeIdentityID, nil, "test-token")
+	defer inboxResponse.Body.Close()
+	if inboxResponse.StatusCode != http.StatusOK || backend.lastInbox.Scope != appservice.InboxScopeCustomer || backend.lastInbox.CustomerView != appservice.CustomerInboxViewCoworkers || backend.lastInbox.AssigneeIdentityID != assigneeIdentityID {
+		t.Fatalf("status = %d, input = %#v", inboxResponse.StatusCode, backend.lastInbox)
+	}
+
+	claimResponse := doJSON(t, http.MethodPost, server.URL+"/conversations/"+conversationID+"/claim", nil, "test-token")
+	defer claimResponse.Body.Close()
+	if claimResponse.StatusCode != http.StatusOK || backend.lastConversationID != conversationID {
+		t.Fatalf("claim status = %d, conversation = %q", claimResponse.StatusCode, backend.lastConversationID)
+	}
+
+	transferResponse := doJSON(t, http.MethodPost, server.URL+"/conversations/"+conversationID+"/transfer", appservice.TransferServiceSessionInput{AssigneeIdentityID: assigneeIdentityID}, "test-token")
+	defer transferResponse.Body.Close()
+	if transferResponse.StatusCode != http.StatusOK || backend.lastConversationID != conversationID || backend.lastSessionTransfer.AssigneeIdentityID != assigneeIdentityID {
+		t.Fatalf("transfer status = %d, conversation = %q, input = %#v", transferResponse.StatusCode, backend.lastConversationID, backend.lastSessionTransfer)
+	}
+
+	closeResponse := doJSON(t, http.MethodPost, server.URL+"/conversations/"+conversationID+"/close", nil, "test-token")
+	defer closeResponse.Body.Close()
+	if closeResponse.StatusCode != http.StatusOK || backend.lastConversationID != conversationID {
+		t.Fatalf("close status = %d, conversation = %q", closeResponse.StatusCode, backend.lastConversationID)
+	}
+
+	reopenResponse := doJSON(t, http.MethodPost, server.URL+"/conversations/"+conversationID+"/reopen", nil, "test-token")
+	defer reopenResponse.Body.Close()
+	if reopenResponse.StatusCode != http.StatusOK || backend.lastConversationID != conversationID {
+		t.Fatalf("reopen status = %d, conversation = %q", reopenResponse.StatusCode, backend.lastConversationID)
 	}
 }
 

@@ -176,23 +176,6 @@ func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID
 	return userFromAction(*user), nil
 }
 
-// UpdateUserRoles 在一个事务中批量调整企业成员角色。
-func (b *DirectBackend) UpdateUserRoles(ctx context.Context, meta RequestMeta, input UserRoleChangesInput) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	changes := make([]useraction.RoleChangeInput, 0, len(input.Changes))
-	for _, change := range input.Changes {
-		changes = append(changes, useraction.RoleChangeInput{UserID: change.UserID, RoleID: change.RoleID})
-	}
-	if err := b.updateUserRoles.Execute(ctx, identity, changes); err != nil {
-		return b.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, "")
-	}
-	slog.Info("企业成员角色批量调整成功", "organization_id", identity.Organization.ID, "change_count", len(changes))
-	return nil
-}
-
 // DeactivateUser 禁用企业成员账号。
 func (b *DirectBackend) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
 	return b.changeUserStatus(ctx, meta, userID, domain.UserStatusInactive)
@@ -253,9 +236,6 @@ func (b *DirectBackend) userMutationError(ctx context.Context, meta RequestMeta,
 	}
 	if errors.Is(err, useraction.ErrLastActiveAdministrator) {
 		return InvalidError(meta, cervii18n.ErrorUserLastActiveAdministrator, nil)
-	}
-	if errors.Is(err, useraction.ErrRoleChangesInvalid) {
-		return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if userID != "" {

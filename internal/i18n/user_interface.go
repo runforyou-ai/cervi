@@ -63,8 +63,6 @@ const (
 	MessengerLoading                   Key = "messenger.loading"
 	MessengerRetry                     Key = "messenger.retry"
 	MessengerRequestFailed             Key = "messenger.request_failed"
-	MessengerSessionWaiting            Key = "messenger.session_waiting"
-	MessengerSessionActive             Key = "messenger.session_active"
-	MessengerSessionPending            Key = "messenger.session_pending"
+	MessengerSessionOpen               Key = "messenger.session_open"
 	MessengerSessionClosed             Key = "messenger.session_closed"
 )

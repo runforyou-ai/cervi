@@ -19,6 +19,7 @@ import {
   type DirectInboxConversationData,
   type MemberOption,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -137,10 +138,9 @@ export function StartDirectConversationDialog({
         </div>
         <ScrollArea className="min-h-64 rounded-md border">
           {loading ? (
-            <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <LoaderCircleIcon className="size-4 animate-spin" />
+            <LoadingIndicator className="min-h-64 justify-center">
               {t("directPickerLoading")}
-            </div>
+            </LoadingIndicator>
           ) : error ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-6 text-center">
               <p className="text-sm text-muted-foreground">

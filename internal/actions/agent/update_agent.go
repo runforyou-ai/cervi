@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -37,6 +38,13 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
+		_, err := roleaction.ValidateAssignment(ctx, tx, identity.Organization.ID, input.RoleID, domain.OrganizationIdentityTypeAgent)
+		if errors.Is(err, roleaction.ErrAssignmentInvalid) || errors.Is(err, roleaction.ErrAgentAdministrator) {
+			return &common.FieldError{Fields: map[string]common.FieldCode{"roleId": ValidationRoleInvalid}}
+		}
+		if err != nil {
+			return err
+		}
 		teamIDs, _, err := validateAndLoadTeams(ctx, tx, identity.Organization.ID, input.TeamIDs)
 		if err != nil {
 			return err
@@ -55,6 +63,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		}
 		_, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
+			Set("role_id = ?", input.RoleID).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", storedAgent.IdentityID).

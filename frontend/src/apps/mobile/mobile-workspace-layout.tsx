@@ -1,5 +1,5 @@
 /** 移动端登录后工作区和底部一级导航。 */
-import { InboxIcon, LoaderCircleIcon, UserRoundIcon } from "lucide-react"
+import { InboxIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
   Navigate,
@@ -10,6 +10,7 @@ import {
 } from "react-router"
 
 import type { Identity } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { cn } from "@/lib/utils"
@@ -72,9 +73,8 @@ export function MobileWorkspaceLayout() {
   }
   if (!identity) {
     return (
-      <main className="flex min-h-dvh items-center justify-center gap-2 text-sm text-muted-foreground">
-        <LoaderCircleIcon className="size-4 animate-spin" />
-        {t("loading")}
+      <main className="flex min-h-dvh items-center justify-center">
+        <LoadingIndicator>{t("loading")}</LoadingIndicator>
       </main>
     )
   }

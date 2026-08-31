@@ -66,9 +66,17 @@ func (b *Backend) UpdateUserWorkStatus(ctx context.Context, meta appservice.Requ
 }
 
 // LoadInbox 返回当前用户的统一收件箱。
-func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta) (appservice.Inbox, error) {
+func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta, input appservice.LoadInboxInput) (appservice.Inbox, error) {
 	var output appservice.Inbox
-	err := b.do(ctx, meta, http.MethodGet, "/inbox", nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/inbox", encodeLoadInboxInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
+func (b *Backend) ListCustomerServiceAssignees(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerServiceAssigneeList, error) {
+	var output appservice.CustomerServiceAssigneeList
+	err := b.do(ctx, meta, http.MethodGet, "/inbox/assignees", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -85,6 +93,38 @@ func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.
 func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ClaimServiceSession 领取或接管客户会话最新处理周期。
+func (b *Backend) ClaimServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
+	var output appservice.CustomerServiceSession
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/claim", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+func (b *Backend) TransferServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.TransferServiceSessionInput) (appservice.CustomerServiceSession, error) {
+	var output appservice.CustomerServiceSession
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/transfer", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CloseServiceSession 关闭客户会话最新处理周期。
+func (b *Backend) CloseServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
+	var output appservice.CustomerServiceSession
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/close", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+func (b *Backend) ReopenServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
+	var output appservice.CustomerServiceSession
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/reopen", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -318,9 +358,9 @@ func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, u
 	return output, err
 }
 
-// UpdateUserRoles 在一个事务中批量调整企业成员角色。
-func (b *Backend) UpdateUserRoles(ctx context.Context, meta appservice.RequestMeta, input appservice.UserRoleChangesInput) error {
-	return b.do(ctx, meta, http.MethodPatch, "/users/roles", nil, input, nil)
+// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+func (b *Backend) UpdateRoleAssignments(ctx context.Context, meta appservice.RequestMeta, input appservice.RoleAssignmentsInput) error {
+	return b.do(ctx, meta, http.MethodPatch, "/roles/assignments", nil, input, nil)
 }
 
 // DeactivateUser 禁用企业成员账号。
@@ -770,6 +810,15 @@ func encodeKnowledgeDocumentSegmentListInputQuery(input appservice.KnowledgeDocu
 	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeLoadInboxInputQuery 将 appservice.LoadInboxInput 编码为查询参数。
+func encodeLoadInboxInputQuery(input appservice.LoadInboxInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "scope", string(input.Scope))
+	setQuery(query, "customerView", string(input.CustomerView))
+	setQuery(query, "assigneeIdentityId", input.AssigneeIdentityID)
 	return query
 }
 

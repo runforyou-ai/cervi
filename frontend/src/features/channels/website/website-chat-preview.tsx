@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import type { WebsiteChannelChatInterfaceInput } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { resolveWebsiteChannelOrigin } from "@/features/channels/website/website-channel-access"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -145,9 +146,9 @@ export function WebsiteChatPreview({
                 </Button>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <LoadingIndicator>
                 {t("chatInterface.preview.loading")}
-              </p>
+              </LoadingIndicator>
             )}
           </div>
         ) : null}

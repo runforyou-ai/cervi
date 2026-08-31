@@ -12,6 +12,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  RoleKind,
   UserStatus,
   deactivateAgent,
   isApiError,
@@ -21,6 +22,7 @@ import {
   updateAgentExecution,
   updateAgentWorkStatus,
   type AgentData,
+  type RoleData,
   type Team,
 } from "@/api"
 import { StatusBadge } from "@/components/status-badge"
@@ -60,9 +62,11 @@ import {
 import { useDateTime } from "@/hooks/use-date-time"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { roleDisplayName } from "@/features/roles/role-labels"
 
 type EditingField =
   | "name"
+  | "role"
   | "accountStatus"
   | "workStatus"
   | "teams"
@@ -74,6 +78,7 @@ type EditingField =
 function valuesFromAgent(agent: AgentData): AgentProfileFormValues {
   return {
     displayName: agent.displayName,
+    roleId: agent.role.id,
     teamIds: agent.teams.map((team) => team.id),
   }
 }
@@ -94,11 +99,13 @@ function managedExecutionValuesFromAgent(
 /** 展示并编辑 AI 员工。 */
 export function AgentDetailView({
   agent,
+  roles,
   teams,
   onSaved,
   onNotFound,
 }: {
   agent: AgentData
+  roles: RoleData[]
   teams: Team[]
   onSaved: (agent: AgentData) => void
   onNotFound: () => void
@@ -114,6 +121,7 @@ export function AgentDetailView({
     () =>
       createAgentProfileSchema({
         nameRequired: t("agents.validation.nameRequired"),
+        roleRequired: t("members.validation.roleRequired"),
       }),
     [t],
   )
@@ -188,6 +196,7 @@ export function AgentDetailView({
     const current = valuesFromAgent(agent)
     if (
       draft.displayName === current.displayName &&
+      draft.roleId === current.roleId &&
       sameIDs(draft.teamIds, current.teamIds)
     ) {
       setEditing(null)
@@ -211,7 +220,7 @@ export function AgentDetailView({
       console.warn("保存 AI 员工失败", { agent_id: agentID, error })
       toast.error(
         isApiError(error)
-          ? apiErrorMessage(error, ["displayName", "teamIds"])
+          ? apiErrorMessage(error, ["displayName", "roleId", "teamIds"])
           : t("agents.form.networkError"),
       )
     } finally {
@@ -410,6 +419,9 @@ export function AgentDetailView({
   const empty = (
     <span className="text-muted-foreground">{t("detail.empty")}</span>
   )
+  const assignableRoles = roles.filter(
+    (role) => role.kind !== RoleKind.RoleKindAdmin,
+  )
 
   return (
     <div className="flex flex-col gap-7">
@@ -439,6 +451,42 @@ export function AgentDetailView({
                   }}
                   onKeyDown={handleTextKeyDown}
                 />
+              )}
+            />
+          </DetailEditRow>
+
+          <DetailEditRow
+            label={t("columns.role")}
+            value={roleDisplayName(agent.role, tCommon)}
+            editing={editing === "role"}
+            editEnabled={editing === null && !saving}
+            onEdit={() => startEditing("role")}
+          >
+            <Controller
+              name="roleId"
+              control={form.control}
+              render={({ field }) => (
+                <NativeSelect
+                  {...field}
+                  autoFocus
+                  disabled={saving}
+                  onChange={(event) => {
+                    const roleId = event.target.value
+                    field.onChange(roleId)
+                    void saveAgent({ ...form.getValues(), roleId })
+                  }}
+                  onBlur={() => {
+                    field.onBlur()
+                    if (!saveState.isSaving()) cancelEdit()
+                  }}
+                  onKeyDown={handleSelectKeyDown}
+                >
+                  {assignableRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {roleDisplayName(role, tCommon)}
+                    </option>
+                  ))}
+                </NativeSelect>
               )}
             />
           </DetailEditRow>

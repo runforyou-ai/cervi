@@ -1,6 +1,5 @@
 /** 外部知识库文档只读列表页。 */
 import { useEffect, useRef } from "react"
-import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, Navigate, useParams } from "react-router"
 
@@ -11,6 +10,7 @@ import {
   listKnowledgeDocuments,
   type KnowledgeDocumentStatusId,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import {
   ListToolbar,
   ListToolbarFilter,
@@ -197,10 +197,9 @@ export function KnowledgeDocumentListPage() {
       </ListToolbar>
       <PageContent>
         {showLoading ? (
-          <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {t("documents.loading")}
-          </div>
+          </LoadingIndicator>
         ) : error ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
             <p className="text-sm text-muted-foreground">

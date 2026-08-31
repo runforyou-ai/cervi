@@ -93,3 +93,14 @@ type RoleInput struct {
 	Description string           `json:"description"`
 	Permissions []PermissionCode `json:"permissions"`
 }
+
+// RoleAssignmentInput 定义一个企业身份的目标角色。
+type RoleAssignmentInput struct {
+	IdentityID string `json:"identityId"`
+	RoleID     string `json:"roleId"`
+}
+
+// RoleAssignmentsInput 定义一次批量角色调整。
+type RoleAssignmentsInput struct {
+	Assignments []RoleAssignmentInput `json:"assignments"`
+}

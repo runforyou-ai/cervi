@@ -1,7 +1,7 @@
 /** 按运行平台加载 Web、桌面端或移动端应用。 */
 import { lazy, Suspense } from "react"
-import { LoaderCircleIcon } from "lucide-react"
 
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { Toaster } from "@/components/ui/sonner"
 import { StartupBootstrap } from "@/features/startup/startup-bootstrap"
 import type { AppPlatform } from "@/platform/app-platform"
@@ -14,10 +14,9 @@ const MobileApp = lazy(() => import("@/apps/mobile/mobile-app"))
 function AppLoading() {
   return (
     <main className="flex min-h-dvh items-center justify-center">
-      <LoaderCircleIcon
-        aria-label="Loading"
-        className="size-5 animate-spin text-muted-foreground"
-      />
+      <LoadingIndicator>
+        <span className="sr-only">Loading</span>
+      </LoadingIndicator>
     </main>
   )
 }

@@ -22,8 +22,6 @@ import {
   conversationSendingIndicatorDelay,
   type OutgoingConversationDraft,
 } from "@/features/inbox/use-outgoing-conversation-messages"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 展示并提交成员会话文本编辑区。 */
@@ -33,16 +31,17 @@ export function ConversationComposer({
   onSending,
   onSent,
   onFailed,
+  onSucceeded,
 }: {
   conversationID: string
   conversationType: ConversationType
   onSending: (message: OutgoingConversationDraft) => void
   onSent: (clientMessageID: string, message: ConversationMessage) => void
   onFailed: (clientMessageID: string) => void
+  onSucceeded: () => void
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
-  const invalidate = useResourceInvalidator()
   const aliveRef = useRef(true)
   const schema = useMemo(
     () =>
@@ -87,7 +86,7 @@ export function ConversationComposer({
               clientMessageId: clientMessageID,
               body,
             })
-      void invalidate(resourceKeys.inbox())
+      onSucceeded()
       if (!aliveRef.current) return
       onSent(clientMessageID, message)
     } catch (error) {

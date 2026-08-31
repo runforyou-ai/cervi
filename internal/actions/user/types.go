@@ -37,12 +37,6 @@ type UpdateInput struct {
 	TeamIDs     []string
 }
 
-// RoleChangeInput 定义一名企业成员的目标角色。
-type RoleChangeInput struct {
-	UserID string
-	RoleID string
-}
-
 // ProfileInput 定义当前用户可编辑的个人资料字段。
 type ProfileInput struct {
 	DisplayName  string

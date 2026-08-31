@@ -119,7 +119,7 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 		session = &servermodels.ServiceSession{
 			ID: ids.serviceSession, OrganizationID: channel.OrganizationID,
 			ConversationID: conversation.ID, ContactChannelIdentityID: identity.ID,
-			Sequence: session.Sequence, Status: string(domain.ServiceSessionStatusWaiting),
+			Sequence: session.Sequence, Status: string(domain.ServiceSessionStatusOpen),
 			TeamID: route.teamID, AssigneeIdentityID: route.assigneeIdentityID,
 			OpeningMessageID: ids.message, LastMessageID: ids.message,
 			LastMessageAt: input.OriginatedAt, LastMessageSourceOrder: input.SourceOrder,
@@ -131,17 +131,6 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 			Exec(ctx); err != nil {
 			return InboundCustomerTextMessageResult{}, fmt.Errorf("create service session: %w", err)
 		}
-	} else if session.Status == string(domain.ServiceSessionStatusPending) {
-		if _, err := db.NewUpdate().Model(session).
-			Set("status = ?", domain.ServiceSessionStatusActive).
-			Set("status_changed_at = ?", input.OriginatedAt).
-			Set("updated_at = now()").
-			WherePK().
-			Where("organization_id = ?", channel.OrganizationID).
-			Exec(ctx); err != nil {
-			return InboundCustomerTextMessageResult{}, fmt.Errorf("resume pending service session: %w", err)
-		}
-		session.Status = string(domain.ServiceSessionStatusActive)
 	}
 
 	message := &servermodels.Message{

@@ -125,11 +125,12 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: organization.ID,
 			Type:           string(domain.OrganizationIdentityTypeUser),
+			RoleID:         adminRoleID,
 			DisplayName:    input.DisplayName,
 			WorkStatus:     string(domain.WorkStatusWorking),
 		}
 		if _, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "display_name", "work_status").
+			Column("organization_id", "type", "role_id", "display_name", "work_status").
 			Returning("id, work_status, work_status_updated_at").Exec(ctx); err != nil {
 			return err
 		}
@@ -138,14 +139,13 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			OrganizationID: organization.ID,
 			Email:          input.Email,
 			PasswordHash:   passwordHash,
-			RoleID:         adminRoleID,
 			Status:         string(domain.UserStatusActive),
 			Locale:         string(input.Locale),
 			TimeZone:       input.TimeZone,
 		}
 		if _, err := tx.NewInsert().
 			Model(user).
-			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status", "locale", "time_zone").
+			Column("identity_id", "organization_id", "email", "password_hash", "status", "locale", "time_zone").
 			Returning("id, message_notifications_enabled, workspace_tabs_enabled").
 			Exec(ctx); err != nil {
 			return err

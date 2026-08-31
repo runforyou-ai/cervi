@@ -47,9 +47,14 @@ export function useResource<T>(
   }
 }
 
-/** 返回按 key 前缀失效缓存的函数，供数据变更后跨页面刷新。 */
+type ResourceInvalidationOptions = {
+  exact?: boolean
+  refetchType?: "active" | "inactive" | "all" | "none"
+}
+
+/** 返回按 key 失效缓存的函数，供数据变更后刷新相关读取。 */
 export function useResourceInvalidator() {
   const client = useQueryClient()
-  return (keyPrefix: QueryKey) =>
-    client.invalidateQueries({ queryKey: keyPrefix })
+  return (key: QueryKey, options: ResourceInvalidationOptions = {}) =>
+    client.invalidateQueries({ queryKey: key, ...options })
 }

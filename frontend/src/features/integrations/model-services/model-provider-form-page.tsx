@@ -26,6 +26,7 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { FormValidationMessage } from "@/components/form/form-validation-message"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -382,10 +383,9 @@ export function ModelProviderFormPage({
       <PageHeader title={title} />
       <PageContent>
         {loading ? (
-          <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {t("modelServices.loading")}
-          </div>
+          </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
             <p className="text-sm text-muted-foreground">

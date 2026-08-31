@@ -45,7 +45,6 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		updatedUser := &servermodels.User{}
 		err = tx.NewUpdate().Model(updatedUser).
 			Set("email = ?", input.Email).
-			Set("role_id = ?", input.RoleID).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", userID).
@@ -62,6 +61,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		_, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
+			Set("role_id = ?", input.RoleID).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", updatedUser.IdentityID).

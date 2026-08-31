@@ -76,7 +76,7 @@ func TestBuildConversationMessageHistoryMarksSessionOpeningMessage(t *testing.T)
 	openingMessageID := rows[2].ID
 	sequence := int64(1)
 	startedAt := time.Unix(1, 0)
-	status := string(domain.ServiceSessionStatusActive)
+	status := string(domain.ServiceSessionStatusOpen)
 	for index := range rows {
 		rows[index].ServiceSessionOpeningMessageID = &openingMessageID
 		rows[index].ServiceSessionSequence = &sequence
@@ -88,7 +88,7 @@ func TestBuildConversationMessageHistoryMarksSessionOpeningMessage(t *testing.T)
 	if len(history.Messages) != 3 || history.Messages[0].SessionStart == nil {
 		t.Fatalf("messages = %#v", history.Messages)
 	}
-	if history.Messages[0].SessionStart.Sequence != sequence || history.Messages[0].SessionStart.StartedAt != startedAt || history.Messages[0].SessionStart.Status != domain.ServiceSessionStatusActive {
+	if history.Messages[0].SessionStart.Sequence != sequence || history.Messages[0].SessionStart.StartedAt != startedAt || history.Messages[0].SessionStart.Status != domain.ServiceSessionStatusOpen {
 		t.Fatalf("session start = %#v", history.Messages[0].SessionStart)
 	}
 	if history.Messages[1].SessionStart != nil || history.Messages[2].SessionStart != nil {
@@ -104,7 +104,7 @@ func TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage(t *testin
 	firstSequence, secondSequence := int64(1), int64(2)
 	firstStartedAt, secondStartedAt := time.Unix(1, 0), time.Unix(3, 0)
 	closedStatus := string(domain.ServiceSessionStatusClosed)
-	activeStatus := string(domain.ServiceSessionStatusActive)
+	openStatus := string(domain.ServiceSessionStatusOpen)
 	for index := 2; index < 4; index++ {
 		rows[index].ServiceSessionOpeningMessageID = &firstOpeningMessageID
 		rows[index].ServiceSessionSequence = &firstSequence
@@ -115,7 +115,7 @@ func TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage(t *testin
 		rows[index].ServiceSessionOpeningMessageID = &secondOpeningMessageID
 		rows[index].ServiceSessionSequence = &secondSequence
 		rows[index].ServiceSessionStartedAt = &secondStartedAt
-		rows[index].ServiceSessionStatus = &activeStatus
+		rows[index].ServiceSessionStatus = &openStatus
 	}
 
 	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})

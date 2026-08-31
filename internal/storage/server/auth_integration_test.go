@@ -22,6 +22,7 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
+	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
@@ -98,7 +99,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.OrganizationIdentity.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	if installed.Identity.Organization.AccessHost != accessHost {
@@ -879,26 +880,26 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if createdMember.IdentityID == "" || createdMember.IdentityID == createdMember.ID {
 			t.Fatalf("member identity id = %q, user id = %q", createdMember.IdentityID, createdMember.ID)
 		}
-		updateRoles := useraction.NewUpdateRolesAction(db)
-		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []useraction.RoleChangeInput{{UserID: loggedIn.Identity.User.ID, RoleID: memberRole.ID}}); !errors.Is(err, useraction.ErrLastActiveAdministrator) {
+		updateRoles := roleaction.NewUpdateAssignmentsAction(db)
+		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []roleaction.AssignmentInput{{IdentityID: loggedIn.Identity.OrganizationIdentity.ID, RoleID: memberRole.ID}}); !errors.Is(err, roleaction.ErrLastActiveAdministrator) {
 			t.Fatalf("remove last active administrator error = %v", err)
 		}
 		administratorAfterRollback, err := useraction.NewGetUserQuery(db).Execute(context.Background(), loggedIn.Identity, loggedIn.Identity.User.ID)
-		if err != nil || administratorAfterRollback.RoleID != loggedIn.Identity.User.RoleID {
+		if err != nil || administratorAfterRollback.RoleID != loggedIn.Identity.OrganizationIdentity.RoleID {
 			t.Fatalf("administrator after rollback = %#v, error = %v", administratorAfterRollback, err)
 		}
-		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []useraction.RoleChangeInput{
-			{UserID: loggedIn.Identity.User.ID, RoleID: memberRole.ID},
-			{UserID: createdMember.ID, RoleID: loggedIn.Identity.User.RoleID},
+		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []roleaction.AssignmentInput{
+			{IdentityID: loggedIn.Identity.OrganizationIdentity.ID, RoleID: memberRole.ID},
+			{IdentityID: createdMember.IdentityID, RoleID: loggedIn.Identity.OrganizationIdentity.RoleID},
 		}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive); !errors.Is(err, useraction.ErrLastActiveAdministrator) {
 			t.Fatalf("deactivate last active administrator error = %v", err)
 		}
-		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []useraction.RoleChangeInput{
-			{UserID: loggedIn.Identity.User.ID, RoleID: loggedIn.Identity.User.RoleID},
-			{UserID: createdMember.ID, RoleID: memberRole.ID},
+		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []roleaction.AssignmentInput{
+			{IdentityID: loggedIn.Identity.OrganizationIdentity.ID, RoleID: loggedIn.Identity.OrganizationIdentity.RoleID},
+			{IdentityID: createdMember.IdentityID, RoleID: memberRole.ID},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -1014,7 +1015,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		inbox := inboxaction.NewLoadInboxQuery(db)
 		for _, request := range requests {
-			items, loadErr := inbox.Execute(context.Background(), request.identity)
+			items, loadErr := inbox.Execute(context.Background(), request.identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 			if loadErr != nil {
 				t.Fatal(loadErr)
 			}
@@ -1070,6 +1071,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	// 覆盖 AI 员工的创建、执行配置修订、状态切换、团队与渠道联动及团队删除。
 	runStep("AI员工", func(t *testing.T) {
+		customerServiceRole := &servermodels.Role{}
+		if err := db.NewSelect().Model(customerServiceRole).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("kind = ?", domain.RoleKindCustomerService).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
 		provider := &servermodels.AIProvider{
 			OrganizationID: loggedIn.Identity.Organization.ID,
 			Brand:          string(domain.AIProviderBrandOpenAI),
@@ -1095,6 +1103,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		createdAgent, err := agentaction.NewCreateAgentAction(db).Execute(context.Background(), loggedIn.Identity, agentaction.CreateInput{
 			DisplayName: "接待智能体",
+			RoleID:      customerServiceRole.ID,
 			TeamIDs:     []string{team.ID},
 			Execution: agentaction.ExecutionInput{
 				Mode: domain.AgentExecutionModeManaged,
@@ -1106,8 +1115,22 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
+		if createdAgent.RoleID != customerServiceRole.ID || createdAgent.RoleKind != domain.RoleKindCustomerService || len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
 			t.Fatalf("created agent = %#v", createdAgent)
+		}
+		customerServiceAssignees, err := inboxaction.NewListCustomerServiceAssigneesQuery(db).Execute(context.Background(), loggedIn.Identity)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var agentListedAsCustomerService bool
+		for _, assignee := range customerServiceAssignees {
+			if assignee.IdentityID == createdAgent.IdentityID && assignee.Type == domain.OrganizationIdentityTypeAgent {
+				agentListedAsCustomerService = true
+				break
+			}
+		}
+		if !agentListedAsCustomerService {
+			t.Fatalf("AI customer service missing from assignees: %#v", customerServiceAssignees)
 		}
 		originalRevisionID := createdAgent.Execution.RevisionID
 		agentWithUpdatedExecution, err := agentaction.NewUpdateExecutionAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.ExecutionInput{
@@ -1135,6 +1158,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		updatedAgent, err := agentaction.NewUpdateAgentAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{
 			DisplayName: "售前智能体",
+			RoleID:      customerServiceRole.ID,
 			TeamIDs:     []string{team.ID},
 		})
 		if err != nil || updatedAgent.DisplayName != "售前智能体" {
@@ -1248,7 +1272,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := db.NewSelect().Model(taskRun).Where("tr.idempotency_key = ?", "agent:"+run.ID).Scan(context.Background()); err != nil || taskRun.MaxAttempts != 3 {
 			t.Fatalf("agent task run = %#v, error = %v", taskRun, err)
 		}
-		inboxBeforeRun, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity)
+		inboxBeforeRun, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1319,7 +1343,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || state.ProcessedSeq != 2 || run.Status != string(domain.AgentRunStatusSucceeded) || run.ResponseMessageID == nil || messageCount != 3 {
 			t.Fatalf("completed agent run = %#v, state = %#v, messages = %d, error = %v", run, state, messageCount, err)
 		}
-		inboxAfterRun, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity)
+		inboxAfterRun, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1549,10 +1573,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	runStep("邮箱冲突与头像重试", func(t *testing.T) {
 		otherIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: loggedIn.Identity.Organization.ID,
-			Type:           string(domain.OrganizationIdentityTypeUser), DisplayName: "其他成员", WorkStatus: string(domain.WorkStatusWorking),
+			Type:           string(domain.OrganizationIdentityTypeUser), RoleID: memberRole.ID, DisplayName: "其他成员", WorkStatus: string(domain.WorkStatusWorking),
 		}
 		if _, err := db.NewInsert().Model(otherIdentity).
-			Column("organization_id", "type", "display_name", "work_status").Returning("id").Exec(context.Background()); err != nil {
+			Column("organization_id", "type", "role_id", "display_name", "work_status").Returning("id").Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		otherUser := &servermodels.User{
@@ -1560,11 +1584,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			OrganizationID: loggedIn.Identity.Organization.ID,
 			Email:          "other@example.com",
 			PasswordHash:   "unused",
-			RoleID:         memberRole.ID,
 			Status:         string(domain.UserStatusActive),
 		}
 		if _, err := db.NewInsert().Model(otherUser).
-			Column("identity_id", "organization_id", "email", "password_hash", "role_id", "status").
+			Column("identity_id", "organization_id", "email", "password_hash", "status").
 			Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}

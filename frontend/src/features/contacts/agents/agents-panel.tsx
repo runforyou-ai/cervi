@@ -60,6 +60,7 @@ import { userStatusLabel } from "@/features/contacts/external/contact-labels"
 import { JoinedTeamsCell } from "@/features/contacts/joined-teams-cell"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { UserStatusBadge } from "@/features/contacts/user-status-badge"
+import { roleDisplayName } from "@/features/roles/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -77,6 +78,7 @@ export function AgentsPanel({
   teams: Team[]
 }) {
   const { t } = useTranslation("contacts")
+  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
@@ -126,6 +128,9 @@ export function AgentsPanel({
   function refreshAndClose() {
     closeDetail()
     void invalidate(resourceKeys.agents())
+    void invalidate(resourceKeys.roles())
+    void invalidate(resourceKeys.roleMembers())
+    void invalidate(resourceKeys.customerServiceAssignees())
   }
 
   /** 禁用 AI 员工账号或恢复为正常状态。 */
@@ -152,6 +157,7 @@ export function AgentsPanel({
       setChangingAgentStatus(null)
       void invalidate(resourceKeys.agent(saved.id))
       void invalidate(resourceKeys.agents())
+      void invalidate(resourceKeys.customerServiceAssignees())
     } catch (error) {
       if (recoverSession(error, navigate)) return
       console.warn("修改 AI 员工状态失败", {
@@ -235,6 +241,7 @@ export function AgentsPanel({
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead>{t("columns.name")}</TableHead>
+                <TableHead>{t("columns.role")}</TableHead>
                 <TableHead>{t("columns.joinedTeams")}</TableHead>
                 <TableHead>{t("columns.model")}</TableHead>
                 <TableHead>{t("columns.accountStatus")}</TableHead>
@@ -251,6 +258,7 @@ export function AgentsPanel({
                   <TableCell className="font-medium">
                     {agent.displayName}
                   </TableCell>
+                  <TableCell>{roleDisplayName(agent.role, tCommon)}</TableCell>
                   <TableCell className="max-w-xs">
                     <JoinedTeamsCell teams={agent.teams} />
                   </TableCell>
@@ -314,7 +322,7 @@ export function AgentsPanel({
               {agents.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="h-32 text-center text-muted-foreground"
                   >
                     {t("list.empty")}
@@ -337,6 +345,7 @@ export function AgentsPanel({
           <AgentDetailView
             key={detailAgent.id}
             agent={detailAgent}
+            roles={roles}
             teams={teams}
             onSaved={(saved) => {
               void invalidate(resourceKeys.agent(saved.id))
@@ -344,6 +353,9 @@ export function AgentsPanel({
               void invalidate(resourceKeys.teams())
               void invalidate(resourceKeys.teamMembers())
               void invalidate(resourceKeys.teamMemberCandidates())
+              void invalidate(resourceKeys.roles())
+              void invalidate(resourceKeys.roleMembers())
+              void invalidate(resourceKeys.customerServiceAssignees())
             }}
             onNotFound={refreshAndClose}
           />

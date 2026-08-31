@@ -46,7 +46,7 @@ func TestCustomerTextMessageErrorMapsConflicts(t *testing.T) {
 	}{
 		{reason: conversationaction.ConflictReasonIdempotencyMismatch, message: "这条消息与之前的发送内容不一致。"},
 		{reason: conversationaction.ConflictReasonServiceSessionOwned, message: "这条会话已由其他客服负责。"},
-		{reason: conversationaction.ConflictReasonServiceSessionNotReplyable, message: "当前客服处理周期无法回复。"},
+		{reason: conversationaction.ConflictReasonServiceSessionNotReplyable, message: "当前客服处理周期无法继续处理。"},
 		{reason: conversationaction.ConflictReasonChannelOutboundUnsupported, message: "当前消息渠道暂不支持回复。"},
 	}
 	for _, test := range tests {

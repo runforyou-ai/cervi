@@ -74,6 +74,8 @@ export function ContactCreateDialogs({
                 void invalidate(resourceKeys.teamMemberCandidates())
                 void invalidate(resourceKeys.teams())
                 void invalidate(resourceKeys.roles())
+                void invalidate(resourceKeys.roleMembers())
+                void invalidate(resourceKeys.customerServiceAssignees())
               }}
               onCancel={() => setParameters({ new: null })}
             />
@@ -103,6 +105,7 @@ export function ContactCreateDialogs({
           </DialogHeader>
           <AgentForm
             teams={teams}
+            roles={roles}
             defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
             onSaved={() => {
               setParameters({ newAgent: null })
@@ -110,6 +113,9 @@ export function ContactCreateDialogs({
               void invalidate(resourceKeys.teamMembers())
               void invalidate(resourceKeys.teamMemberCandidates())
               void invalidate(resourceKeys.teams())
+              void invalidate(resourceKeys.roles())
+              void invalidate(resourceKeys.roleMembers())
+              void invalidate(resourceKeys.customerServiceAssignees())
             }}
             onCancel={() => setParameters({ newAgent: null })}
           />

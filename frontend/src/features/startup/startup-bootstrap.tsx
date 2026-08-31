@@ -1,9 +1,9 @@
 /** 在业务路由挂载前完成统一启动检测。 */
 import { useCallback, useEffect, useState } from "react"
-import { LoaderCircleIcon } from "lucide-react"
 import { Navigate, useLocation } from "react-router"
 
 import { SessionState, type Startup } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { StartupProvider } from "@/contexts/startup-context"
 import { useStartupLoader } from "@/features/startup/use-startup-loader"
 
@@ -21,10 +21,9 @@ function resolveStartupPath(startup: Startup, pathname: string) {
 function StartupLoading() {
   return (
     <main className="flex min-h-dvh items-center justify-center">
-      <LoaderCircleIcon
-        aria-label="Loading"
-        className="size-5 animate-spin text-muted-foreground"
-      />
+      <LoadingIndicator>
+        <span className="sr-only">Loading</span>
+      </LoadingIndicator>
     </main>
   )
 }

@@ -66,7 +66,7 @@ func TestBackendRequiresEnterpriseServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"})
+	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, appservice.LoadInboxInput{})
 	var apiError *appservice.Error
 	if !errors.As(err, &apiError) || apiError.State != appservice.SessionStateConnect {
 		t.Fatalf("error = %#v, want connect session", err)
@@ -95,7 +95,7 @@ func TestBackendPreservesCancellation(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = backend.LoadInbox(ctx, appservice.RequestMeta{})
+	_, err = backend.LoadInbox(ctx, appservice.RequestMeta{}, appservice.LoadInboxInput{})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context canceled", err)
 	}
@@ -107,7 +107,7 @@ func TestBackendUnavailablePreservesConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"})
+	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, appservice.LoadInboxInput{})
 	var apiError *appservice.Error
 	if !errors.As(err, &apiError) || apiError.Kind != appservice.ErrorKindUnavailable || apiError.State != "" {
 		t.Fatalf("error = %#v, want unavailable without session state", err)
@@ -134,7 +134,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 							"title": "Telegram 会话", "contactName": "访客",
 							"contactAvatarUrl": contactAvatarURL,
 							"channelType":      "telegram", "channelName": "Telegram", "preview": "你好",
-							"lastMessageAt": time.Now(), "serviceSessionStatus": "waiting",
+							"lastMessageAt": time.Now(), "serviceSessionStatus": "open",
 						},
 					}},
 				})
@@ -350,7 +350,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inbox, err := backend.LoadInbox(context.Background(), meta)
+	inbox, err := backend.LoadInbox(context.Background(), meta, appservice.LoadInboxInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,7 +460,7 @@ func TestBackendClearsRejectedCredential(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"})
+	_, err = backend.LoadInbox(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, appservice.LoadInboxInput{})
 	var apiError *appservice.Error
 	if !errors.As(err, &apiError) || apiError.State != appservice.SessionStateLogin {
 		t.Fatalf("error = %#v, want login session", err)

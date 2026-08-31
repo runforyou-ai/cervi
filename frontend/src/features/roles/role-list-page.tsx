@@ -1,6 +1,6 @@
 /** 角色与权限列表页。 */
 import { useEffect, useRef, useState } from "react"
-import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
+import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -13,6 +13,7 @@ import {
   type PermissionDefinition,
   type RoleData,
 } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
@@ -140,10 +141,9 @@ export function RoleListPage() {
       </PageHeader>
       <PageContent>
         {showLoading ? (
-          <div className="flex min-h-48 items-center justify-center gap-2 rounded-lg border text-sm text-muted-foreground">
-            <LoaderCircleIcon className="size-4 animate-spin" />
+          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {t("roles.loading")}
-          </div>
+          </LoadingIndicator>
         ) : error ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
             <p className="text-sm text-muted-foreground">
