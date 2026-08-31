@@ -19,7 +19,7 @@ COMMENT ON COLUMN conversation_agent_states.agent_identity_id IS '目标 Agent �
 COMMENT ON COLUMN conversation_agent_states.desired_seq IS '已经持久化的最新输入序号';
 COMMENT ON COLUMN conversation_agent_states.processed_seq IS '已经得到明确终态的输入序号';
 
-CREATE INDEX conversation_agent_states_org_agent_updated_index
+CREATE INDEX conversation_agent_states_organization_agent_updated_index
     ON conversation_agent_states (organization_id, agent_identity_id, updated_at DESC);
 
 -- +goose Down

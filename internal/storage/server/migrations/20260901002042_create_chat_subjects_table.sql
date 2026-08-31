@@ -17,10 +17,10 @@ COMMENT ON COLUMN chat_subjects.organization_id IS '所属企业编号';
 COMMENT ON COLUMN chat_subjects.kind IS '聊天主体类型：organization_identity、contact';
 COMMENT ON COLUMN chat_subjects.source_id IS '主体来源记录编号';
 
-CREATE UNIQUE INDEX chat_subjects_org_kind_source_unique
+CREATE UNIQUE INDEX chat_subjects_organization_kind_source_unique
     ON chat_subjects (organization_id, kind, source_id);
 
-COMMENT ON INDEX chat_subjects_org_kind_source_unique
+COMMENT ON INDEX chat_subjects_organization_kind_source_unique
     IS '企业内聊天主体来源唯一索引';
 
 -- +goose Down

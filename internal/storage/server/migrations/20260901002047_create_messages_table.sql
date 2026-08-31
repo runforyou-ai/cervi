@@ -14,6 +14,7 @@ CREATE TABLE messages (
     thread_root_message_id uuid,
     idempotency_key        text,
     originated_at          timestamptz NOT NULL,
+    source_order           bigint NOT NULL DEFAULT 0,
     edited_at              timestamptz,
     deleted_at             timestamptz
 );
@@ -32,21 +33,23 @@ COMMENT ON COLUMN messages.reply_to_message_id IS '回复目标消息编号';
 COMMENT ON COLUMN messages.thread_root_message_id IS '讨论串根消息编号';
 COMMENT ON COLUMN messages.idempotency_key IS '消息写入幂等标识';
 COMMENT ON COLUMN messages.originated_at IS '消息在来源端发生时间';
+COMMENT ON COLUMN messages.source_order IS '同一来源时间内的平台消息顺序，站内消息为零';
 COMMENT ON COLUMN messages.edited_at IS '最后编辑时间';
 COMMENT ON COLUMN messages.deleted_at IS '删除时间';
 
-CREATE INDEX messages_org_conversation_originated_index
+CREATE INDEX messages_organization_conversation_originated_index
     ON messages (
         organization_id,
         conversation_id,
         originated_at DESC,
+        source_order DESC,
         id DESC
     );
 
-COMMENT ON INDEX messages_org_conversation_originated_index
-    IS '企业会话消息发生时间索引';
+COMMENT ON INDEX messages_organization_conversation_originated_index
+    IS '企业会话消息来源稳定顺序索引';
 
-CREATE INDEX messages_org_service_session_originated_index
+CREATE INDEX messages_organization_service_session_originated_index
     ON messages (
         organization_id,
         service_session_id,
@@ -55,7 +58,7 @@ CREATE INDEX messages_org_service_session_originated_index
     )
     WHERE service_session_id IS NOT NULL;
 
-COMMENT ON INDEX messages_org_service_session_originated_index
+COMMENT ON INDEX messages_organization_service_session_originated_index
     IS '企业客服处理周期消息发生时间索引';
 
 CREATE UNIQUE INDEX messages_organization_idempotency_unique

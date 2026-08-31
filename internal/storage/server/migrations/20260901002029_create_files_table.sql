@@ -7,6 +7,7 @@ CREATE TABLE files (
     organization_id     uuid NOT NULL,
     created_by_user_id  uuid NOT NULL,
     purpose             text NOT NULL,
+    external_id         text,
     storage_backend     text NOT NULL,
     storage_key         text NOT NULL,
     original_name       text NOT NULL,
@@ -25,6 +26,7 @@ COMMENT ON COLUMN files.updated_at IS '更新时间';
 COMMENT ON COLUMN files.organization_id IS '所属企业编号';
 COMMENT ON COLUMN files.created_by_user_id IS '上传用户编号';
 COMMENT ON COLUMN files.purpose IS '文件业务用途';
+COMMENT ON COLUMN files.external_id IS '外部来源的文件唯一标识';
 COMMENT ON COLUMN files.storage_backend IS '本地或对象存储类型';
 COMMENT ON COLUMN files.storage_key IS '文件在存储中的对象键';
 COMMENT ON COLUMN files.original_name IS '用户上传的原始文件名';
@@ -44,6 +46,10 @@ CREATE INDEX files_organization_status_created_index
 CREATE INDEX files_status_expires_index
     ON files (status, expires_at)
     WHERE expires_at IS NOT NULL;
+
+CREATE INDEX files_organization_purpose_external_id_index
+    ON files (organization_id, purpose, external_id)
+    WHERE external_id IS NOT NULL;
 
 -- +goose Down
 DROP TABLE files;

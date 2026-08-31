@@ -33,7 +33,7 @@ CREATE UNIQUE INDEX conversation_participants_org_conversation_subject_unique
 COMMENT ON INDEX conversation_participants_org_conversation_subject_unique
     IS '企业会话内聊天主体唯一索引';
 
-CREATE INDEX conversation_participants_org_subject_active_index
+CREATE INDEX conversation_participants_organization_subject_active_index
     ON conversation_participants (
         organization_id,
         subject_id,
@@ -41,7 +41,7 @@ CREATE INDEX conversation_participants_org_subject_active_index
         conversation_id
     );
 
-COMMENT ON INDEX conversation_participants_org_subject_active_index
+COMMENT ON INDEX conversation_participants_organization_subject_active_index
     IS '企业聊天主体参与会话状态索引';
 
 -- +goose Down

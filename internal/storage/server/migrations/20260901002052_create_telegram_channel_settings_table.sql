@@ -36,20 +36,5 @@ CREATE INDEX telegram_channel_settings_bot_id_index
     ON telegram_channel_settings (bot_id)
     WHERE bot_id IS NOT NULL;
 
--- main 已允许创建 Telegram 渠道；升级时为既有渠道补齐空设置，确保详情和启停可用。
-INSERT INTO telegram_channel_settings (
-    channel_id,
-    created_at,
-    updated_at,
-    organization_id
-)
-SELECT
-    id,
-    created_at,
-    updated_at,
-    organization_id
-FROM channels
-WHERE type = 'telegram';
-
 -- +goose Down
 DROP TABLE telegram_channel_settings;

@@ -39,7 +39,7 @@ CREATE UNIQUE INDEX agent_runs_conversation_active_unique
     ON agent_runs (conversation_id, agent_identity_id)
     WHERE status IN ('queued', 'running');
 
-CREATE INDEX agent_runs_org_conversation_created_index
+CREATE INDEX agent_runs_organization_conversation_created_index
     ON agent_runs (organization_id, conversation_id, created_at DESC);
 
 -- +goose Down
