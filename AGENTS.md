@@ -222,8 +222,8 @@ wails3 task build:server
 wails3 task build:docker CGO_ENABLED=0
 ```
 
-- 测试数据库名由当前 worktree 的 `POSTGRES_DB` 自动派生为 `<POSTGRES_DB>_test`，不在 `.env` 中重复配置。`test:server` 每次运行前重建测试数据库；同一 worktree 不得并行运行多个 `test:server`。
-- 服务端集成测试共享当前 worktree 的测试数据库。除企业安装测试外，不得假设独占空数据库；固定业务键必须在测试后清理，或使用每次运行唯一的值。
+- `test:server` 根据当前 worktree 的 `POSTGRES_DB` 使用 `<POSTGRES_DB>_test` 作为测试数据库，并在每次运行前重建；同一 worktree 同一时刻运行一次 `test:server`。
+- 服务端集成测试共享当前 worktree 的测试数据库。企业安装测试使用本轮新建的空数据库；其他集成测试通过唯一业务键或测试清理保持数据隔离。
 
 ### 代码组织
 
