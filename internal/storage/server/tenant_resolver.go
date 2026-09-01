@@ -14,7 +14,7 @@ import (
 
 var _ tenant.Resolver = (*TenantResolver)(nil)
 
-// TenantResolver 优先根据访问地址解析企业，并兼容升级前的唯一企业。
+// TenantResolver 根据访问地址解析企业。
 type TenantResolver struct {
 	db *bun.DB
 }
@@ -32,9 +32,6 @@ func (r *TenantResolver) Resolve(ctx context.Context, accessHost string) (tenant
 	}
 	organization := &servermodels.Organization{}
 	err := r.selectByAccessHost(ctx, organization, accessHost)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = r.selectByAccessHost(ctx, organization, "")
-	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return tenant.Scope{}, tenant.ErrNotFound
 	}

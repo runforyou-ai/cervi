@@ -194,28 +194,24 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if !otherStatus.Installed || otherStatus.OrganizationName != "另一家测试公司" {
 		t.Fatalf("other tenant status = %#v", otherStatus)
 	}
-	legacyOrganization := &servermodels.Organization{AccessHost: "", Name: "升级前企业"}
-	if _, err := db.NewInsert().Model(legacyOrganization).
+	emptyHostOrganization := &servermodels.Organization{AccessHost: "", Name: "空地址企业"}
+	if _, err := db.NewInsert().Model(emptyHostOrganization).
 		Column("access_host", "name").
 		Returning("id").
 		Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	legacyTenantContext := tenant.WithAccessHost(context.Background(), "legacy.cervi.test")
-	legacyStatus, err := status.Execute(legacyTenantContext)
-	if err != nil || !legacyStatus.Installed || legacyStatus.OrganizationName != legacyOrganization.Name {
-		t.Fatalf("legacy tenant status = %#v, error = %v", legacyStatus, err)
+	unboundTenantContext := tenant.WithAccessHost(context.Background(), "unbound.cervi.test")
+	unboundStatus, err := status.Execute(unboundTenantContext)
+	if err != nil || unboundStatus.Installed {
+		t.Fatalf("empty access host matched unbound tenant: status = %#v, error = %v", unboundStatus, err)
 	}
 	currentStatus, err = status.Execute(tenantContext)
 	if err != nil || currentStatus.OrganizationName != installed.Identity.Organization.Name {
-		t.Fatalf("exact tenant status with legacy fallback = %#v, error = %v", currentStatus, err)
+		t.Fatalf("exact tenant status = %#v, error = %v", currentStatus, err)
 	}
-	if _, err := db.NewDelete().Model(legacyOrganization).WherePK().Exec(context.Background()); err != nil {
+	if _, err := db.NewDelete().Model(emptyHostOrganization).WherePK().Exec(context.Background()); err != nil {
 		t.Fatal(err)
-	}
-	legacyStatus, err = status.Execute(legacyTenantContext)
-	if err != nil || legacyStatus.Installed {
-		t.Fatalf("removed legacy tenant status = %#v, error = %v", legacyStatus, err)
 	}
 
 	// 全局前置：解析安装令牌、登出并重新登录管理员，失败直接终止整个测试。
