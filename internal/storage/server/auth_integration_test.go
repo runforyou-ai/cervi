@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -1207,9 +1208,16 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("Telegram agent route error = %#v", err)
 		}
 
-		coordinator := agentrunaction.NewExecuteAction(db, nil, nil)
+		taskRuntime := servertask.New(db, serverconfig.NATSConfig{})
+		if err := taskRuntime.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error {
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		scheduler := agentrunaction.NewScheduler(taskRuntime)
+		coordinator := agentrunaction.NewExecuteAction(db, taskRuntime, nil)
 		claimServiceSession := conversationaction.NewClaimServiceSessionAction(db, coordinator)
-		transferServiceSession := conversationaction.NewTransferServiceSessionAction(db, coordinator)
+		transferServiceSession := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler)
 		closeServiceSession := conversationaction.NewCloseServiceSessionAction(db, coordinator)
 		if _, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, telegramConversationID); err != nil {
 			t.Fatal(err)
@@ -1269,12 +1277,17 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		websiteMessageInput := conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f80", Body: "需要 AI 接待",
-		})
+		}
+		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), websiteMessageInput)
 		if err != nil {
 			t.Fatal(err)
+		}
+		websiteRetried, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), websiteMessageInput)
+		if err != nil || websiteRetried.Message.ID != websiteInbound.Message.ID {
+			t.Fatalf("idempotent website message = %#v, error = %v", websiteRetried, err)
 		}
 		websiteSession := &servermodels.ServiceSession{}
 		if err := db.NewSelect().Model(websiteSession).
@@ -1307,8 +1320,18 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		websiteRunCount, err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
 			Where("agr.conversation_id = ?", websiteInbound.Conversation.ID).
 			Count(context.Background())
-		if err != nil || websiteTriggerCount != 0 || websiteRunCount != 0 {
+		if err != nil || websiteTriggerCount != 1 || websiteRunCount != 1 {
 			t.Fatalf("website agent route triggers = %d, runs = %d, error = %v", websiteTriggerCount, websiteRunCount, err)
+		}
+		initialWebsiteRun := &servermodels.AgentRun{}
+		if err := db.NewSelect().Model(initialWebsiteRun).
+			Where("agr.conversation_id = ?", websiteInbound.Conversation.ID).
+			Where("agr.status = ?", domain.AgentRunStatusQueued).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if initialWebsiteRun.TriggerType != string(domain.AgentTriggerTypeCustomerAuto) || initialWebsiteRun.ServiceSessionID == nil || *initialWebsiteRun.ServiceSessionID != websiteSession.ID || initialWebsiteRun.TriggerStartSeq != 1 || initialWebsiteRun.TriggerEndSeq != nil {
+			t.Fatalf("initial website agent run = %#v", initialWebsiteRun)
 		}
 		claimedWebsite, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
 		if err != nil || claimedWebsite.Assignee == nil || claimedWebsite.Assignee.IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
@@ -1371,7 +1394,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if !errors.As(err, &invalidRevisionTransferValidation) || invalidRevisionTransferValidation.Fields["assigneeIdentityId"] != conversationaction.ValidationTargetIdentityIDInvalid {
 			t.Fatalf("invalid revision agent transfer error = %#v", err)
 		}
-		invalidRevisionInbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		invalidRevisionInbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:abcdef0123456789abcdef0123456789",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f90", Body: "无效配置不应接待",
 		})
@@ -1456,13 +1479,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("working agent = %#v, error = %v", updatedAgent, err)
 		}
 
-		taskRuntime := servertask.New(db, serverconfig.NATSConfig{})
-		if err := taskRuntime.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error {
-			return nil
-		}); err != nil {
-			t.Fatal(err)
-		}
-		scheduler := agentrunaction.NewScheduler(taskRuntime)
 		agentConversation, err := conversationaction.NewStartDirectConversationAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.DirectConversationInput{
 			TargetIdentityID: createdAgent.IdentityID,
 		})
@@ -1502,27 +1518,30 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if run.TriggerType != string(domain.AgentTriggerTypeDirect) || run.ServiceSessionID != nil {
 			t.Fatalf("direct run trigger fields = %#v", run)
 		}
-		customerState := &servermodels.ConversationAgentState{
-			ConversationID: websiteInbound.Conversation.ID, OrganizationID: loggedIn.Identity.Organization.ID,
-			AgentIdentityID: createdAgent.IdentityID, DesiredSeq: 1,
-		}
-		if _, err := db.NewInsert().Model(customerState).
-			Column("conversation_id", "organization_id", "agent_identity_id", "desired_seq", "processed_seq").
-			Exec(context.Background()); err != nil {
+		websiteConversationID := websiteInbound.Conversation.ID
+		if _, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
+			ConversationID: &websiteConversationID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f81", Body: "接管前的新问题",
+		}); err != nil {
 			t.Fatal(err)
 		}
-		customerRunEnd := int64(1)
-		customerRun := &servermodels.AgentRun{
-			ID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f81", OrganizationID: loggedIn.Identity.Organization.ID,
-			ConversationID: websiteInbound.Conversation.ID, AgentIdentityID: createdAgent.IdentityID,
-			AgentRevisionID: agentWithUpdatedExecution.Execution.RevisionID,
-			TriggerType:     string(domain.AgentTriggerTypeCustomerAuto), ServiceSessionID: &websiteSession.ID,
-			Status: string(domain.AgentRunStatusQueued), TriggerStartSeq: 1, TriggerEndSeq: &customerRunEnd,
-		}
-		if _, err := db.NewInsert().Model(customerRun).
-			Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "trigger_type", "service_session_id", "status", "trigger_start_seq", "trigger_end_seq").
-			Exec(context.Background()); err != nil {
+		customerState := &servermodels.ConversationAgentState{}
+		if err := db.NewSelect().Model(customerState).
+			Where("cas.conversation_id = ?", websiteInbound.Conversation.ID).
+			Where("cas.agent_identity_id = ?", createdAgent.IdentityID).
+			Scan(context.Background()); err != nil {
 			t.Fatal(err)
+		}
+		customerRun := &servermodels.AgentRun{}
+		if err := db.NewSelect().Model(customerRun).
+			Where("agr.conversation_id = ?", websiteInbound.Conversation.ID).
+			Where("agr.agent_identity_id = ?", createdAgent.IdentityID).
+			Where("agr.status = ?", domain.AgentRunStatusQueued).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if customerState.DesiredSeq != 3 || customerState.ProcessedSeq != 2 || customerRun.TriggerStartSeq != 3 || customerRun.TriggerEndSeq != nil {
+			t.Fatalf("scheduled customer follow-up run = %#v, state = %#v", customerRun, customerState)
 		}
 		_, err = closeServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
 		var closeOwnedConflict *conversationaction.ConflictError
@@ -1548,7 +1567,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if customerRun.Status != string(domain.AgentRunStatusCancelled) || customerRun.ErrorCode == nil || *customerRun.ErrorCode != string(domain.AgentRunErrorCodeAssigneeChanged) || customerState.ProcessedSeq != customerState.DesiredSeq {
+		if customerRun.Status != string(domain.AgentRunStatusCancelled) || customerRun.ErrorCode == nil || *customerRun.ErrorCode != string(domain.AgentRunErrorCodeAssigneeChanged) || customerState.ProcessedSeq != 3 || customerState.ProcessedSeq != customerState.DesiredSeq {
 			t.Fatalf("cancelled customer run = %#v, state = %#v", customerRun, customerState)
 		}
 		if err := coordinator.Execute(context.Background(), agentrunaction.RunInput{RunID: customerRun.ID}); err != nil {
@@ -1556,6 +1575,85 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if err := coordinator.FinalizeFailure(context.Background(), agentrunaction.RunInput{RunID: customerRun.ID}, errors.New("task retry exhausted")); err != nil {
 			t.Fatalf("cancelled run finalizer error = %v", err)
+		}
+		transferredForCustomerRun, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
+			ConversationID: websiteInbound.Conversation.ID, AssigneeIdentityID: createdAgent.IdentityID,
+		})
+		if err != nil || transferredForCustomerRun.Assignee == nil || transferredForCustomerRun.Assignee.IdentityID != createdAgent.IdentityID {
+			t.Fatalf("transfer website session for customer run = %#v, error = %v", transferredForCustomerRun, err)
+		}
+		absorbingCustomerRun := &servermodels.AgentRun{}
+		if err := db.NewSelect().Model(absorbingCustomerRun).
+			Where("agr.conversation_id = ?", websiteInbound.Conversation.ID).
+			Where("agr.agent_identity_id = ?", createdAgent.IdentityID).
+			Where("agr.status = ?", domain.AgentRunStatusQueued).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		customerRuntime := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+			pending, err := feed.Peek(ctx, 0)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			if len(pending) != 1 || pending[0].Seq != 4 {
+				return agentruntime.RunResult{}, fmt.Errorf("unexpected initial customer trigger: %#v", pending)
+			}
+			firstClaim, err := feed.Claim(ctx, pending[0].Seq)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			if firstClaim.EndSeq != 4 || len(firstClaim.Messages) == 0 || firstClaim.Messages[len(firstClaim.Messages)-1].Content != "接管前的新问题" {
+				return agentruntime.RunResult{}, fmt.Errorf("unexpected initial customer claim: %#v", firstClaim)
+			}
+			if _, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+				ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
+				ConversationID: &websiteConversationID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f84", Body: "运行中的补充信息",
+			}); err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			followUps, err := feed.Peek(ctx, firstClaim.EndSeq)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			if len(followUps) != 1 || followUps[0].Seq != 5 {
+				return agentruntime.RunResult{}, fmt.Errorf("unexpected customer follow-up trigger: %#v", followUps)
+			}
+			finalClaim, err := feed.Claim(ctx, followUps[0].Seq)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			if finalClaim.EndSeq != 5 || len(finalClaim.Messages) == 0 || finalClaim.Messages[len(finalClaim.Messages)-1].Content != "运行中的补充信息" {
+				return agentruntime.RunResult{}, fmt.Errorf("unexpected final customer claim: %#v", finalClaim)
+			}
+			return agentruntime.RunResult{Content: "已结合补充信息回复", EndSeq: finalClaim.EndSeq, Usage: agentruntime.Usage{TotalTokens: 18}}, nil
+		}}
+		if err := agentrunaction.NewExecuteAction(db, taskRuntime, customerRuntime).Execute(context.Background(), agentrunaction.RunInput{RunID: absorbingCustomerRun.ID}); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.NewSelect().Model(absorbingCustomerRun).Where("agr.id = ?", absorbingCustomerRun.ID).Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.NewSelect().Model(customerState).
+			Where("cas.conversation_id = ?", customerState.ConversationID).
+			Where("cas.agent_identity_id = ?", customerState.AgentIdentityID).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		queuedCustomerRuns, err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
+			Where("agr.conversation_id = ?", websiteInbound.Conversation.ID).
+			Where("agr.status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
+			Count(context.Background())
+		if err != nil || absorbingCustomerRun.Status != string(domain.AgentRunStatusSucceeded) || absorbingCustomerRun.TriggerStartSeq != 4 || absorbingCustomerRun.TriggerEndSeq == nil || *absorbingCustomerRun.TriggerEndSeq != 5 || customerState.DesiredSeq != 5 || customerState.ProcessedSeq != 5 || queuedCustomerRuns != 0 {
+			t.Fatalf("absorbed customer run = %#v, state = %#v, active runs = %d, error = %v", absorbingCustomerRun, customerState, queuedCustomerRuns, err)
+		}
+		websiteMessages, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), conversationaction.MessageHistoryInput{
+			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: websiteInbound.Conversation.ID,
+		})
+		if err != nil || len(websiteMessages.Messages) == 0 || websiteMessages.Messages[len(websiteMessages.Messages)-1].Author != domain.MessageAuthorAgent || websiteMessages.Messages[len(websiteMessages.Messages)-1].Body != "已结合补充信息回复" {
+			t.Fatalf("website messages after customer run = %#v, error = %v", websiteMessages, err)
+		}
+		if _, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID); err != nil {
+			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(run).Where("agr.id = ?", run.ID).Scan(context.Background()); err != nil || run.Status != string(domain.AgentRunStatusQueued) {
 			t.Fatalf("direct run after customer takeover = %#v, error = %v", run, err)
@@ -1625,7 +1723,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := db.ExecContext(context.Background(), `
 			ALTER TABLE messages
 			ADD CONSTRAINT messages_reject_test_agent_response
-			CHECK (idempotency_key IS NULL OR idempotency_key NOT LIKE 'agent:%')
+			CHECK (idempotency_key IS NULL OR idempotency_key NOT LIKE 'agent:%') NOT VALID
 		`); err != nil {
 			t.Fatal(err)
 		}

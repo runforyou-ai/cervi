@@ -59,7 +59,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun)
 	boundService := appservice.New(directBackend)
-	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB())
+	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
 	getS3Setting := settingaction.NewGetS3SettingQuery(appStorage.DB())

@@ -151,7 +151,7 @@ type DirectBackend struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.DirectAgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	modelProviderRegistry := modelprovider.NewRegistry(modelprovider.NewHTTPClient())
 	connectorClient := connector.NewHTTPClient()
@@ -170,7 +170,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
 		claimServiceSession:               conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),
-		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator),
+		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
 		closeServiceSession:               conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),
 		reopenServiceSession:              conversationaction.NewReopenServiceSessionAction(db),
 		startDirectConversation:           conversationaction.NewStartDirectConversationAction(db),

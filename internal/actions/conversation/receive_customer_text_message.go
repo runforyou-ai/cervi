@@ -33,6 +33,7 @@ type InboundCustomerTextMessageResult struct {
 	Session              *servermodels.ServiceSession
 	Message              *servermodels.Message
 	ChannelIdentityID    string
+	Inserted             bool
 	CreatedConversation  bool
 	OpenedServiceSession bool
 }
@@ -164,7 +165,7 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, err
 	}
-	return inboundCustomerTextMessageResult(summary, session, message), nil
+	return inboundCustomerTextMessageResult(summary, session, message, true), nil
 }
 
 // loadInboundCustomerTextMessage 校验并返回已经写入的渠道文本消息。
@@ -210,15 +211,16 @@ func loadInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *se
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, true, err
 	}
-	return inboundCustomerTextMessageResult(summary, session, message), true, nil
+	return inboundCustomerTextMessageResult(summary, session, message, false), true, nil
 }
 
 // inboundCustomerTextMessageResult 构造渠道文本入站结果。
-func inboundCustomerTextMessageResult(summary ConversationSummary, session *servermodels.ServiceSession, message *servermodels.Message) InboundCustomerTextMessageResult {
+func inboundCustomerTextMessageResult(summary ConversationSummary, session *servermodels.ServiceSession, message *servermodels.Message, inserted bool) InboundCustomerTextMessageResult {
 	openedSession := session.OpeningMessageID == message.ID
 	return InboundCustomerTextMessageResult{
 		Summary: summary, Session: session, Message: message,
 		ChannelIdentityID:    session.ContactChannelIdentityID,
+		Inserted:             inserted,
 		CreatedConversation:  openedSession && session.Sequence == 1,
 		OpenedServiceSession: openedSession,
 	}

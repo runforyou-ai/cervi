@@ -37,7 +37,19 @@ var websiteMessageRetryableConstraintNames = map[string]struct{}{
 
 // ReceiveWebsiteCustomerTextMessageAction 持久化网站访客文本消息。
 type ReceiveWebsiteCustomerTextMessageAction struct {
-	db *bun.DB
+	db             *bun.DB
+	agentScheduler CustomerAgentMessageScheduler
+}
+
+// CustomerAgentMessageScheduler 把网站客户消息加入当前 AI 客服的持久输入流。
+type CustomerAgentMessageScheduler interface {
+	ScheduleCustomerAuto(context.Context, bun.IDB, string, string, string, string) (bool, error)
+}
+
+// AgentMessageScheduler 同时调度内部单聊和网站客户 Agent 输入。
+type AgentMessageScheduler interface {
+	DirectAgentMessageScheduler
+	CustomerAgentMessageScheduler
 }
 
 type generatedIDs struct {
@@ -57,8 +69,8 @@ type routeSnapshot struct {
 }
 
 // NewReceiveWebsiteCustomerTextMessageAction 创建网站访客文本消息操作。
-func NewReceiveWebsiteCustomerTextMessageAction(db *bun.DB) *ReceiveWebsiteCustomerTextMessageAction {
-	return &ReceiveWebsiteCustomerTextMessageAction{db: db}
+func NewReceiveWebsiteCustomerTextMessageAction(db *bun.DB, agentScheduler CustomerAgentMessageScheduler) *ReceiveWebsiteCustomerTextMessageAction {
+	return &ReceiveWebsiteCustomerTextMessageAction{db: db, agentScheduler: agentScheduler}
 }
 
 // Execute 在一个可重试事务中写入网站访客文本消息。
@@ -105,6 +117,22 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 	})
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
+	}
+	if !received.Inserted {
+		slog.Debug("网站访客消息幂等命中",
+			"channel_id", channel.ID,
+			"conversation_id", received.Message.ConversationID,
+			"message_id", received.Message.ID,
+		)
+		return receiveWebsiteCustomerTextMessageResult(received), nil
+	}
+	if a.agentScheduler == nil {
+		return ReceiveWebsiteCustomerTextMessageResult{}, errors.New("customer agent scheduler is unavailable")
+	}
+	if _, err := a.agentScheduler.ScheduleCustomerAuto(
+		ctx, tx, channel.OrganizationID, received.Message.ConversationID, received.Session.ID, received.Message.ID,
+	); err != nil {
+		return ReceiveWebsiteCustomerTextMessageResult{}, fmt.Errorf("schedule website customer agent: %w", err)
 	}
 	return receiveWebsiteCustomerTextMessageResult(received), nil
 }

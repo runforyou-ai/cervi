@@ -390,10 +390,10 @@ AI 调用不能依赖用户已读状态，也不能把模型请求、工具步�
 - 独立 `message_mentions` 关系记录 @ 事实；符合策略且首次持久化的消息在同一事务写入 `conversation_agent_triggers`。
 - 同一“会话 + 智能体”的 `trigger_seq` 由服务端锁定状态后单调分配，`desired_*` 与 `processed_*` 使用该序号；对应 Message 编号只作审计指针。`originated_at` 继续只负责聊天展示排序，不能决定 Agent 触发资格或水位。迟到的历史补拉默认不创建 Trigger，需要时通过独立总结或人工回放命令处理。
 - 每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run。新消息在已有 Run 执行期间只推进 `desired_*`；Run 结束时原子推进 `processed_*`，仍有差距则在同一事务创建下一 Run 并通过 `TxEnqueuer.EnqueueIn` 唤醒，不能因活动任务幂等丢失后续处理。
-- `agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话，`conversation_agent_states.paused_at` 表示仅暂停当前会话自动响应，三者不能混用。策略和状态中的 `agent_identity_id` 统一指向 `organization_identities.id`。
+- `agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话。P1b 网站 AI 客服只以 ServiceSession 的 `open/closed + assignee_identity_id` 表达当前客服状态，不增加 Agent 专属暂停状态；完整 P1 如引入通用会话响应策略，再定义其状态。`agent_identity_id` 统一指向 `organization_identities.id`。
 - 自动响应记录触发消息、精确输入快照、配置版本与快照、语义步骤、工具调用、输出消息、费用、失败、取消和人工接管，保证可审计和可恢复。
 
-首轮内部 AI 员工验证使用 Agent Direct 自动触发，并允许同一 Run 在 Eino 安全点吸收连续 Trigger；网站 AI 客服的合并策略在对应阶段确定。两者都只持久化一条最终文本 Message，不依赖流式实时能力。内部验证先开放一个无副作用计算器且不创建 Tool Invocation；任何业务、设备或副作用 Tool 仍须先落完整审计。最终 Message 使用 `agent:<agent_run_id>` 业务幂等键；输出消息、Run 终态与 `processed_*` 在同一事务提交。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
+首轮 Agent Direct 和网站 AI 客服都允许同一 Run 在 Eino 安全点吸收连续 Trigger，并只持久化一条最终文本 Message，不依赖流式实时能力。开发期 calculator 是可配置延时、且不创建 Tool Invocation 的临时纯函数测试 Tool，用于验证 Tool 完成后下一 Turn 读取最新输入，正式发布前删除；任何业务、设备或副作用 Tool 仍须先落完整审计。最终 Message 使用 `agent:<agent_run_id>` 业务幂等键；输出消息、Run 终态与 `processed_*` 在同一事务提交。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
 
 ## 8. 第三方用户消息账号接入预留
 
@@ -1309,7 +1309,9 @@ P3 typing、presence 等临时事件
 
 - 内部 AI 员工验证通过后立即交付网站 AI 客服。
 - Agent 作为客户会话参与者处理网站客户新消息，并把最终回复写入同一条 Cervi 消息时间线；访客通过 `after` 轮询读取。
-- 人工接手、暂停和恢复使用持久命令；写入最终回复前重新校验人工状态，阻止迟到的 AI 回复。
+- ServiceSession 的负责人是唯一客服状态：网站首次入站只在当前负责人是合格 Agent 时创建 `customer_auto` Trigger；转交给 Agent 时，最后消息来自客户则补触发，来自企业身份则等待下一条客户消息。
+- queued Run 只冻结起点，运行中到达的新消息在 Eino 下一个 Tool 或模型安全点由同一 Run 的下一 Turn Claim；最终仍只写入一条 Agent Message。
+- 人工接管、转交和关闭继续使用现有通用命令，不增加 AI 专属暂停、恢复或接管状态；写入最终回复前重新校验当前 ServiceSession、负责人、Agent 资格、Run Revision 和消费边界，阻止迟到回复。
 - 本子阶段只验收网站客户会话边界；Agent Runtime 由 `agent-roadmap.md` 定义，第三方平台仍使用各自的 Delivery。
 
 #### 阶段 2E：统一实时、通知与离线同步
@@ -1494,19 +1496,24 @@ Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，�
 
 本 PR 在既有 Direct 上允许选择活跃 AI 员工。用户文本首次持久化时，在同一事务推进 `conversation_agent_states`、创建 `conversation_agent_triggers`、单个活动 `agent_runs` 和隔离 Agent Worker 任务；消息幂等重放不重复触发。Run 成功或失败都推进明确的 `processed_seq`，Task 重试耗尽通过通用终态回调收敛业务 Run，避免活动索引永久卡住会话。
 
-Runtime 通过内部适配层精确锁定 Eino v0.10 Alpha，并优先使用 eino-ext 的 OpenAI 兼容模型组件。首个 Tool 只有无副作用四则运算计算器；TurnLoop 轮询持久 Trigger，通过 `Push + AnySafePoint` 并等待 preempt ack，保证 Tool 完成后、下一次模型规划前读取最新会话上下文。该重建方式只适用于可安全重放的计算器，不作为未来设备或副作用 Tool 的恢复模型。
+Runtime 通过内部适配层精确锁定 Eino v0.10 Alpha，并优先使用 eino-ext 的 OpenAI 兼容模型组件。开发期 Tool 只有无副作用四则运算 calculator，并支持可控延时测试并发；TurnLoop 轮询持久 Trigger，通过 `Push + AnySafePoint` 并等待 preempt ack，保证 Tool 完成后、下一次模型规划前读取最新会话上下文。calculator 正式发布前删除，该重建方式也不作为未来设备或副作用 Tool 的恢复模型。
 
 Web、桌面端与移动端复用统一收件箱、Direct 时间线和前台轮询，展示 Agent 类型及排队、运行、失败状态；移动端详情继续遵循前台运行与底部安全区约束。本 PR 不实现流式输出、Tool Invocation、审批、设备权限、本地 Agent Runtime、群聊 @Agent 或网站 AI 客服。
 
-### 13.10 当前共同边界与后续交付
+### 13.10 阶段 2D：网站 AI 客服（本次交付）
 
 网站访客 Messenger 已在当前打开的 Conversation 中使用 `after` 每 3 秒补拉新增文本；页面不可见或嵌入挂件收起时停止轮询，恢复后立即补拉。访客发送结果与增量结果按 `(originated_at, id)` 有序去重合入，发送不自行推进服务端游标。
 
-当前聊天已经用 `open/closed + assignee_identity_id` 落地 ServiceSession 领取、接管、同事转交、关闭和重新打开；显式重开按 HelmDesk 语义分配给操作人并进入「我负责的」。收件箱提供「排队中 / 我负责的 / 同事 / 已关闭」四个真实查询视图，处理命令只精确失效源、目标和「全部」查询，非目标查询不立即重取，不再用前缀失效刷新多个列表。「同事」筛选和转交候选都使用角色为客服的真人与 AI 企业身份；AI 与真人共用负责人和转交语义，但不伪装成已经具备自动回复能力。
+当前聊天用 `open/closed + assignee_identity_id` 作为唯一客服状态。网站消息首次持久化且当前负责人是合格 Agent 时，在同一事务创建 `customer_auto` Trigger，并在没有活动 Run 时创建 Run 和可靠 Task；幂等重放、真人负责人和公共队列不触发，Telegram 等第三方渠道也不触发。
+
+Customer Auto 复用 Eino TurnLoop 和安全点 Push，但使用独立的客户 Feed、上下文角色映射与完成门禁。queued Run 只冻结 `trigger_start_seq`；每次 Claim 按当前连续 Trigger 扩展 `trigger_end_seq`，因此 Tool 或模型执行期间到达的客户补充会在下一 Turn 进入同一 Run。最终完成边界之后到达的消息创建下一 Run。本 PR 用结构化日志记录每次 Claim 的前后边界，并通过 Eino 通用 Tool Middleware 记录实际 Tool 名称、调用编号、结果和耗时；临时 calculator 只补充同一调用编号的 `operation` 和 `delay_ms`。本阶段不增加 Step、Tool Invocation 或调用事件持久化，完整可观测事实留给后续独立 PR。
+
+Agent 回复以普通企业身份绑定当前 ServiceSession，使用 `agent:<run_id>` 幂等键，并在同一事务更新首次响应、Conversation 和 ServiceSession 三元组摘要、Run 终态和 `processed_seq`。写回前按 `ServiceSession -> State -> Run` 重新校验当前周期、负责人、website 能力、Agent 客服资格、Run 冻结 Revision 和消费边界；接管、关闭或换负责人后的迟到结果被抑制。
+
+真人与 AI 继续共用领取、接管、转交、关闭和重新打开命令。转交给 Agent 时最后一条来自客户会立即补 Trigger，最后一条来自企业身份则等待客户下一条消息；不增加 AI 专属暂停、恢复、接管、收件箱状态或前端页面。
 
 当前聊天仍未实现以下能力，全部属于后续阶段：
 
-- AI 客服执行和自动回复。
 - 未读、实时、文件、外部平台投递、团队队列、指标和满意度。
 - 第三方用户消息账号、受管访客、联邦和完整 AI 客服策略与审计表。
 - `customer_message_deliveries`、渠道发送 Gate、`conversation_sync_events`、用户 Mailbox、`realtime_outbox` 或实时 Protobuf Schema。
@@ -1514,7 +1521,6 @@ Web、桌面端与移动端复用统一收件箱、Direct 时间线和前台轮�
 后续按独立 PR 继续完成：
 
 1. 根据聊天主流程需要继续交付未读、统一实时、文件和外部平台投递。
-2. AI 客服运行能力完成后，直接消费现有负责人和转交结果，不增加 AI 专属会话状态。
-3. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
-4. 团队队列、指标和满意度按实际需求独立建模。
-5. 公开访客端点的限速与其他安全加固按当前阶段约束继续后置，不阻塞聊天功能开发。
+2. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
+3. 团队队列、指标和满意度按实际需求独立建模。
+4. 公开访客端点的限速与其他安全加固按当前阶段约束继续后置，不阻塞聊天功能开发。

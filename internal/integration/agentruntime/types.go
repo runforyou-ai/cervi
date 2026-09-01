@@ -47,6 +47,7 @@ type ModelConfig struct {
 
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
+	RunID       string
 	Name        string
 	Instruction string
 	Model       ModelConfig

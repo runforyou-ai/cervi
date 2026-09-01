@@ -174,7 +174,7 @@ ServiceSession -> ConversationAgentState -> AgentRun
 
 - website 入站消息调度；
 - 领取和接管，以及 Transfer/Close 中不放宽权限的防御性取消；
-- `customer_auto` Run 的 begin、complete 和 fail；
+- `customer_auto` Run 的 Claim、complete 和 fail；
 - 完成后判断是否需要创建下一 Run。
 
 Agent Direct 不读取 ServiceSession，继续使用 `State -> Run`，禁止执行过程中反向补锁 ServiceSession。
@@ -184,8 +184,9 @@ Agent Direct 不读取 ServiceSession，继续使用 `State -> Run`，禁止执�
 - 共用入站在选择 ServiceSession 时必须先 `FOR UPDATE` 锁定该 Conversation 的最新处理周期；无论向 open 周期追加，还是基于 closed 周期创建下一周期，都不能使用未加锁的快照；
 - Website Action 必须在同一事务且锁仍持有时重新读取负责人并调度；Telegram 只参与共用锁定和消息写入，不调度 Agent；
 - `cancelled`、`succeeded` 和 `failed` 都是终态，begin、complete、fail 和失败收敛都不能覆盖终态；
-- 在途 Run 存在时，新消息只推进 `desired_*`；
-- 创建 queued Run 时立即写入 `trigger_start_seq` 和冻结的 `trigger_end_seq = desired_seq`，不等待 Run 开始，也不使用 Direct Claim 扩大边界；
+- 在途 Run 存在时，新消息写入 Trigger 并推进 `desired_*`，不创建第二个 Run；
+- 创建 queued Run 时只冻结 `trigger_start_seq = processed_seq + 1`，`trigger_end_seq` 由每次 TurnLoop Claim 按当时连续可用的 `desired_seq` 扩展并绑定 Trigger；
+- Tool 或模型调用期间到达的新消息由 Eino 在下一个安全点 Push，下一 Turn 再次 Claim 最新连续边界，因此仍属于同一 Run；只有最终回复事务已经取得 ServiceSession 锁并越过完成边界后到达的消息才进入下一 Run；
 - customer_auto complete 或 fail 后，只有重新执行第 5 节资格判断仍成立且 `desired_* > processed_*` 时才能创建下一 Run，不复用 Direct 的无条件补 Run 逻辑；
 - Provider 失败推进当前批次后，不自动重跑同一序号；
 - 写回消息前必须在同一事务重新锁定并核验 ServiceSession、State 和 Run；
@@ -205,16 +206,16 @@ Website 和 Telegram 共用的入站逻辑负责在 `selectServiceSession` 中�
 
 ## 10. Customer Auto Runtime
 
-`customer_auto` 与 Agent Direct 共用运行账本，但使用独立执行器：
+`customer_auto` 与 Agent Direct 共用运行账本和 Eino TurnLoop，但使用独立的持久输入 Feed、客户上下文加载、资格门禁和写回逻辑：
 
-- 无 Tool；
-- 无 TurnLoop；
 - 非流式；
-- 一次模型调用只写入一条最终文本 Message；
-- 创建 queued Run 时一次性冻结当时 `[processed_seq + 1, desired_seq]` 范围；
-- Run 开始后到达的客户消息进入下一 Run。
+- 一个 Run 可以经过多次模型规划或测试 Tool 调用，但只写入一条最终文本 Message；
+- queued 时只冻结起点，每次 Claim 保存当前实际消费的连续 `[trigger_start_seq, trigger_end_seq]`；
+- 运行中到达的客户消息在下一个 Tool 或模型安全点进入同一 Run 的下一 Turn；
+- calculator 是开发期验证安全点和并发边界的临时测试 Tool，可通过 `delayMilliseconds` 控制执行时长，正式发布前删除；它不代表 P1b 开放产品 Tool；
+- 业务、设备和有副作用 Tool 仍不进入 P1b。
 
-Customer Auto Runtime 不复用 Direct 的 Claim、TurnLoop 或 fail 补 Run 逻辑。共享 begin、complete、fail 和失败收敛入口必须把 `cancelled` 视为已终结并成功返回，避免 Task 重试把已取消 Run 转为永久错误或重新激活。
+Customer Auto 复用通用 TurnLoop 的 Push 和安全点语义，不复用 Direct 的数据库 Claim、完成、失败和补 Run 逻辑。共享 begin、complete、fail 和失败收敛入口必须把 `cancelled` 视为已终结并成功返回，避免 Task 重试把已取消 Run 转为永久错误或重新激活。Provider 在首次 Claim 前失败时，失败边界至少推进到 `trigger_start_seq`；已有 Claim 时推进到 Run 已记录的 `trigger_end_seq`，不会对同一序号无限重试。
 
 客户会话上下文角色映射为：
 
@@ -223,7 +224,7 @@ Customer Auto Runtime 不复用 Direct 的 Claim、TurnLoop 或 fail 补 Run 逻
 
 客服上下文加载不能复用只读取 `organization_identity` 的 Direct 查询，否则客户消息会从模型上下文中消失。
 
-上下文按 Conversation 读取，可以包含旧 ServiceSession 的历史，但上界必须是本 Run 冻结末条 Trigger 对应的消息，条数上限沿用 Direct 的 100 条。不得把 `trigger_end_seq` 之后到达的新消息读入当前模型调用。
+上下文按 Conversation 读取，可以包含旧 ServiceSession 的历史；每次 Claim 的上界是本次 `trigger_end_seq` 对应消息的 `(originated_at, source_order, id)`，条数上限沿用 Direct 的 100 条。后到消息必须先形成新 Trigger 并被下一次 Claim 纳入，不能越过持久边界直接进入模型上下文。
 
 ## 11. 最终消息写回
 
@@ -233,7 +234,7 @@ Customer Auto Runtime 不复用 Direct 的 Claim、TurnLoop 或 fail 补 Run 逻
 2. ServiceSession 仍为 open；
 3. Run 的 `service_session_id` 与当前处理周期一致；
 4. 当前 `assignee_identity_id` 仍是该 Agent；
-5. Agent 身份、客服角色和 Revision 仍然有效；
+5. Agent 身份仍为 active 且仍具有客服角色，Run 冻结的 Revision 仍是有效的 managed v1 Revision；Agent 的 active Revision 后续切换不废弃本 Run；
 6. State 的批次边界仍与 Run 一致。
 
 核验通过后：
@@ -293,7 +294,8 @@ P1b 不增加独立的 AI 客服产品状态，原则上不需要新增收件箱
 
 - website 客户消息首次插入后的 `customer_auto` 调度；
 - 转交给 Agent 时对待回复客户消息补触发；
-- 一次性、无 Tool、无 TurnLoop 的 Customer Auto Runtime；
+- 复用 Eino TurnLoop、安全点 Push，并实现独立 Customer Feed、完成和失败路径；
+- 使用可控延时 calculator 覆盖 Tool 执行期间的连续消息并发测试，正式发布前删除该测试 Tool；
 - 客户上下文角色映射；
 - ServiceSession、负责人和 Run 的完成门禁；
 - Agent 参与者建立、最终消息写入、摘要和首响更新；
@@ -338,7 +340,8 @@ P1b 不增加独立的 AI 客服产品状态，原则上不需要新增收件箱
 ### 14.4 Runtime 与写回
 
 - 客户消息以 `user` 角色进入模型上下文，企业员工消息以 `assistant` 角色进入。
-- Run 开始后的新消息进入下一 Run，不改变当前冻结批次。
+- Run 运行期间的新消息在下一个安全点进入同一 Run 的下一 Turn，并扩展实际 `trigger_end_seq`。
+- 最终回复完成边界之后到达的新消息创建下一 Run，不丢失唤醒。
 - 失败不自动重跑同一序号，也不会让 Agent Run 永久停在 running。
 - cancelled Run 的 Task 重试成功收敛，不会恢复执行或被改写为永久错误。
 - 最终消息使用真实 Agent 企业身份并绑定 ServiceSession。
@@ -352,20 +355,23 @@ P1b 不增加独立的 AI 客服产品状态，原则上不需要新增收件箱
 以下情况记录结构化日志：
 
 - Run 开始和终结沿用 Direct 的结构化日志，并增加 `trigger_type = customer_auto`；
+- Customer Feed 每次 Claim 记录 `agent_run_id`、前后 Trigger 边界和上下文消息数，用于确认运行中输入是否在下一 Turn 纳入同一 Run；
+- Eino 通用 Tool Middleware 记录实际调用的开始、成功或失败、`agent_run_id`、`tool_name`、`tool_call_id` 和耗时，用于人工验证 Tool 安全点；
+- 临时 calculator 仅补充记录同一 `tool_call_id` 的非敏感执行配置 `operation` 和 `delay_ms`，不重复记录调用生命周期；
 - 取消在途 Run：`INFO`，包含 `agent_run_id`、`service_session_id`、`conversation_id` 和原因；
 - 因负责人变化或会话关闭抑制迟到写回：`WARN`；
 - Website 调度发现消息幂等命中时记录 `DEBUG`，避免第三方渠道重放产生高频 `INFO`；
 - 发现非法负责人、无效 Revision、终态被重复处理或锁后资格变化：`WARN`；
 - Provider 调用失败：沿用 Agent Run 失败日志并包含 Trigger 批次边界。
 
-日志不记录客户消息正文、模型完整上下文、访问令牌或 Provider 密钥。
+日志不记录客户消息正文、模型完整上下文、原始 Tool arguments、Tool 返回内容、calculator 操作数、访问令牌或 Provider 密钥。完整的 Step、Tool Invocation 和调用事件持久化留到后续可观测性 PR。
 
 ## 16. 非目标
 
 以下能力不进入 P1b：
 
 - Agent 专属暂停、恢复或人工接管状态；
-- 通用 Tool Policy 和有副作用工具；
+- 通用 Tool Policy、产品 Tool 和有副作用工具；
 - 流式输出和 Realtime；
 - Telegram 或其他第三方渠道 Delivery；
 - 群聊 `@Agent`；
@@ -385,6 +391,6 @@ P1b-2 实现时同步修订 `agent-roadmap.md` 和 `chat-roadmap.md`：
 - 明确自动执行直接消费通用负责人和转交结果；
 - 明确客户会话不增加 AI 专属状态；
 - 删除“同一消息对同一 Agent 永久只能产生一个 Trigger”的要求，改为由消息首次插入和 Trigger 序号保证单次调度幂等；
-- 明确 `customer_auto` 在创建 queued Run 时冻结输入批次，不在同一 Run 吸收后到消息；
+- 明确 `customer_auto` 在 queued 时只冻结起点，运行中消息在 Eino 安全点由同一 Run 的下一 Turn 吸收；
 - 删除聊天域把 `conversation_agent_states.paused_at` 作为 P1b 会话控制事实的描述；
 - 保留完整 P1 再引入通用响应策略、工具策略和完整审计模型。
