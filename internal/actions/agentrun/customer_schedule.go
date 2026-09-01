@@ -9,11 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -64,41 +62,11 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 		return false, nil
 	}
 
-	sequence, err := advanceCustomerAgentSequence(ctx, db, organizationID, conversationID, *session.AssigneeIdentityID)
-	if err != nil {
-		return false, err
-	}
-	trigger := &servermodels.ConversationAgentTrigger{
-		ID: uuid.NewV7().String(), OrganizationID: organizationID, ConversationID: conversationID,
-		AgentIdentityID: *session.AssigneeIdentityID, TriggerType: string(domain.AgentTriggerTypeCustomerAuto),
-		ServiceSessionID: &session.ID, TriggerSeq: sequence.DesiredSeq, TriggerMessageID: messageID,
-	}
-	if _, err := db.NewInsert().Model(trigger).
-		Column("id", "organization_id", "conversation_id", "agent_identity_id", "trigger_type", "service_session_id", "trigger_seq", "trigger_message_id").
-		Exec(ctx); err != nil {
-		return false, fmt.Errorf("create customer agent trigger: %w", err)
-	}
-
-	active := &servermodels.AgentRun{}
-	err = db.NewSelect().Model(active).
-		Where("agr.organization_id = ?", organizationID).
-		Where("agr.conversation_id = ?", conversationID).
-		Where("agr.agent_identity_id = ?", *session.AssigneeIdentityID).
-		Where("agr.status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
-		Scan(ctx)
-	if err == nil {
-		if active.TriggerType != string(domain.AgentTriggerTypeCustomerAuto) || active.ServiceSessionID == nil || *active.ServiceSessionID != session.ID {
-			return false, errors.New("active agent run does not match customer service session")
-		}
-		return true, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return false, fmt.Errorf("check active customer agent run: %w", err)
-	}
-	if _, err := insertAndEnqueueCustomerRun(
-		ctx, db, s.enqueuer, organizationID, conversationID, *session.AssigneeIdentityID,
-		eligibility.RevisionID, session.ID, sequence.ProcessedSeq+1,
-	); err != nil {
+	if err := s.scheduleInput(ctx, db, agentRunSpec{
+		OrganizationID: organizationID, ConversationID: conversationID,
+		AgentIdentityID: *session.AssigneeIdentityID, RevisionID: eligibility.RevisionID,
+		TriggerType: domain.AgentTriggerTypeCustomerAuto, ServiceSessionID: &session.ID,
+	}, messageID); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -118,52 +86,6 @@ func loadCustomerAssigneeType(ctx context.Context, db bun.IDB, session *servermo
 		return "", fmt.Errorf("load customer assignee identity type: %w", err)
 	}
 	return domain.OrganizationIdentityType(identityType), nil
-}
-
-// advanceCustomerAgentSequence 分配客户 Agent 的下一条连续触发序号。
-func advanceCustomerAgentSequence(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string) (conversationSequence, error) {
-	sequence := conversationSequence{}
-	err := db.NewRaw(`
-		INSERT INTO conversation_agent_states (
-			conversation_id, organization_id, agent_identity_id, desired_seq, processed_seq
-		)
-		VALUES (?, ?, ?, 1, 0)
-		ON CONFLICT (conversation_id, agent_identity_id) DO UPDATE
-		SET desired_seq = conversation_agent_states.desired_seq + 1,
-			updated_at = now()
-		WHERE conversation_agent_states.organization_id = EXCLUDED.organization_id
-		RETURNING desired_seq, processed_seq
-	`, conversationID, organizationID, agentIdentityID).Scan(ctx, &sequence)
-	if errors.Is(err, sql.ErrNoRows) {
-		return conversationSequence{}, errors.New("customer agent state does not match target agent")
-	}
-	if err != nil {
-		return conversationSequence{}, fmt.Errorf("advance customer agent input sequence: %w", err)
-	}
-	return sequence, nil
-}
-
-// insertAndEnqueueCustomerRun 创建客户 Agent 运行并投递隔离 Worker。
-func insertAndEnqueueCustomerRun(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, agentIdentityID, revisionID, serviceSessionID string, startSeq int64) (string, error) {
-	run := &servermodels.AgentRun{
-		ID: uuid.NewV7().String(), OrganizationID: organizationID, ConversationID: conversationID,
-		AgentIdentityID: agentIdentityID, AgentRevisionID: revisionID,
-		TriggerType: string(domain.AgentTriggerTypeCustomerAuto), ServiceSessionID: &serviceSessionID,
-		Status: string(domain.AgentRunStatusQueued), TriggerStartSeq: startSeq,
-	}
-	if _, err := db.NewInsert().Model(run).
-		Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "trigger_type", "service_session_id", "status", "trigger_start_seq").
-		Exec(ctx); err != nil {
-		return "", fmt.Errorf("create customer agent run: %w", err)
-	}
-	if _, err := enqueuer.EnqueueIn(ctx, db, RunActionName, RunInput{RunID: run.ID}, servertask.EnqueueOptions{
-		Queue: servertask.QueueAgent, MaxAttempts: 3,
-		IdempotencyKey: "agent:" + run.ID,
-		TriggerType:    servertask.TriggerBusiness,
-	}); err != nil {
-		return "", fmt.Errorf("enqueue customer agent run: %w", err)
-	}
-	return run.ID, nil
 }
 
 // lockLatestCustomerServiceSession 锁定会话当前最新客服处理周期。

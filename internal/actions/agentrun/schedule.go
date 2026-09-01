@@ -25,16 +25,74 @@ type conversationSequence struct {
 	ProcessedSeq int64 `bun:"processed_seq"`
 }
 
-// NewScheduler 创建 Agent 单聊运行调度器。
+type agentRunSpec struct {
+	OrganizationID   string
+	ConversationID   string
+	AgentIdentityID  string
+	RevisionID       string
+	TriggerType      domain.AgentTriggerType
+	ServiceSessionID *string
+}
+
+// NewScheduler 创建 Agent 运行调度器。
 func NewScheduler(enqueuer servertask.TxEnqueuer) *Scheduler {
 	return &Scheduler{enqueuer: enqueuer}
 }
 
 // Schedule 把一条新用户消息追加到 Agent 持久化输入流。
 func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID, revisionID, messageID string) error {
+	return s.scheduleInput(ctx, db, agentRunSpec{
+		OrganizationID: organizationID, ConversationID: conversationID,
+		AgentIdentityID: agentIdentityID, RevisionID: revisionID,
+		TriggerType: domain.AgentTriggerTypeDirect,
+	}, messageID)
+}
+
+// scheduleInput 追加一条持久输入并确保对应的 Agent Run 已投递。
+func (s *Scheduler) scheduleInput(ctx context.Context, db bun.IDB, spec agentRunSpec, messageID string) error {
 	if s == nil || s.enqueuer == nil {
 		return errors.New("agent run scheduler is unavailable")
 	}
+	if err := validateAgentRunScope(spec.TriggerType, spec.ServiceSessionID); err != nil {
+		return err
+	}
+	sequence, err := advanceAgentSequence(ctx, db, spec.OrganizationID, spec.ConversationID, spec.AgentIdentityID)
+	if err != nil {
+		return err
+	}
+	trigger := &servermodels.ConversationAgentTrigger{
+		ID: uuid.NewV7().String(), OrganizationID: spec.OrganizationID, ConversationID: spec.ConversationID,
+		AgentIdentityID: spec.AgentIdentityID, TriggerType: string(spec.TriggerType),
+		ServiceSessionID: spec.ServiceSessionID, TriggerSeq: sequence.DesiredSeq, TriggerMessageID: messageID,
+	}
+	if _, err := db.NewInsert().Model(trigger).
+		Column("id", "organization_id", "conversation_id", "agent_identity_id", "trigger_type", "service_session_id", "trigger_seq", "trigger_message_id").
+		Exec(ctx); err != nil {
+		return fmt.Errorf("create agent trigger: %w", err)
+	}
+
+	active := &servermodels.AgentRun{}
+	err = db.NewSelect().Model(active).
+		Where("agr.organization_id = ?", spec.OrganizationID).
+		Where("agr.conversation_id = ?", spec.ConversationID).
+		Where("agr.agent_identity_id = ?", spec.AgentIdentityID).
+		Where("agr.status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
+		Scan(ctx)
+	if err == nil {
+		if !agentRunMatchesSpec(active, spec) {
+			return errors.New("active agent run does not match scheduled input")
+		}
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("check active agent run: %w", err)
+	}
+	_, err = insertAndEnqueueRun(ctx, db, s.enqueuer, spec, sequence.ProcessedSeq+1)
+	return err
+}
+
+// advanceAgentSequence 分配会话 Agent 的下一条连续触发序号。
+func advanceAgentSequence(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string) (conversationSequence, error) {
 	sequence := conversationSequence{}
 	err := db.NewRaw(`
 		INSERT INTO conversation_agent_states (
@@ -48,49 +106,27 @@ func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, co
 		RETURNING desired_seq, processed_seq
 	`, conversationID, organizationID, agentIdentityID).Scan(ctx, &sequence)
 	if errors.Is(err, sql.ErrNoRows) {
-		return errors.New("agent conversation state does not match target agent")
+		return conversationSequence{}, errors.New("agent conversation state does not match target agent")
 	}
 	if err != nil {
-		return fmt.Errorf("advance agent conversation input sequence: %w", err)
+		return conversationSequence{}, fmt.Errorf("advance agent conversation input sequence: %w", err)
 	}
-	triggerID := uuid.NewV7()
-	trigger := &servermodels.ConversationAgentTrigger{
-		ID: triggerID.String(), OrganizationID: organizationID, ConversationID: conversationID,
-		AgentIdentityID: agentIdentityID, TriggerType: string(domain.AgentTriggerTypeDirect),
-		TriggerSeq: sequence.DesiredSeq, TriggerMessageID: messageID,
-	}
-	if _, err := db.NewInsert().Model(trigger).
-		Column("id", "organization_id", "conversation_id", "agent_identity_id", "trigger_type", "trigger_seq", "trigger_message_id").
-		Exec(ctx); err != nil {
-		return fmt.Errorf("create agent trigger: %w", err)
-	}
-
-	active, err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
-		Where("agr.organization_id = ?", organizationID).
-		Where("agr.conversation_id = ?", conversationID).
-		Where("agr.agent_identity_id = ?", agentIdentityID).
-		Where("agr.status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
-		Exists(ctx)
-	if err != nil {
-		return fmt.Errorf("check active agent run: %w", err)
-	}
-	if active {
-		return nil
-	}
-	_, err = insertAndEnqueueRun(ctx, db, s.enqueuer, organizationID, conversationID, agentIdentityID, revisionID, sequence.ProcessedSeq+1)
-	return err
+	return sequence, nil
 }
 
 // insertAndEnqueueRun 创建 Agent 业务运行并投递隔离 Worker。
-func insertAndEnqueueRun(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, agentIdentityID, revisionID string, startSeq int64) (string, error) {
-	runID := uuid.NewV7()
+func insertAndEnqueueRun(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, spec agentRunSpec, startSeq int64) (string, error) {
+	if err := validateAgentRunScope(spec.TriggerType, spec.ServiceSessionID); err != nil {
+		return "", err
+	}
 	run := &servermodels.AgentRun{
-		ID: runID.String(), OrganizationID: organizationID, ConversationID: conversationID,
-		AgentIdentityID: agentIdentityID, AgentRevisionID: revisionID, TriggerType: string(domain.AgentTriggerTypeDirect), Status: string(domain.AgentRunStatusQueued),
-		TriggerStartSeq: startSeq,
+		ID: uuid.NewV7().String(), OrganizationID: spec.OrganizationID, ConversationID: spec.ConversationID,
+		AgentIdentityID: spec.AgentIdentityID, AgentRevisionID: spec.RevisionID,
+		TriggerType: string(spec.TriggerType), ServiceSessionID: spec.ServiceSessionID,
+		Status: string(domain.AgentRunStatusQueued), TriggerStartSeq: startSeq,
 	}
 	if _, err := db.NewInsert().Model(run).
-		Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "trigger_type", "status", "trigger_start_seq").
+		Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "trigger_type", "service_session_id", "status", "trigger_start_seq").
 		Exec(ctx); err != nil {
 		return "", fmt.Errorf("create agent run: %w", err)
 	}
@@ -102,4 +138,15 @@ func insertAndEnqueueRun(ctx context.Context, db bun.IDB, enqueuer servertask.Tx
 		return "", fmt.Errorf("enqueue agent run: %w", err)
 	}
 	return run.ID, nil
+}
+
+// agentRunMatchesSpec 判断活动运行是否消费同一类输入。
+func agentRunMatchesSpec(run *servermodels.AgentRun, spec agentRunSpec) bool {
+	if run.TriggerType != string(spec.TriggerType) {
+		return false
+	}
+	if run.ServiceSessionID == nil || spec.ServiceSessionID == nil {
+		return run.ServiceSessionID == nil && spec.ServiceSessionID == nil
+	}
+	return *run.ServiceSessionID == *spec.ServiceSessionID
 }
