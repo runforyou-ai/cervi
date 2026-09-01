@@ -77,7 +77,7 @@ AgentExecutionContext
 
 该上下文是后台执行的授权输入，不是登录 Identity，也不携带用户 Bearer Token。`initiated_by_user_id` 只记录内部触发或人工操作的审计来源；P1b 网站客户自动触发时允许为空，任何阶段都不能据此继承该用户的全部权限或伪造用户调用。
 
-P1a 和 P1b 不开放工具，执行上下文只允许读取 Agent 作为有效参与者可见的当前会话输入、读取同企业 Revision 指定的模型，并以 Agent 参与者身份写入最终消息。后续 Tool Adapter、Gateway 和 Executor 继续校验组织、会话、Agent、策略、工具、资源和设备范围。
+P1a 和 P1b 不开放产品 Tool，执行上下文只允许读取 Agent 作为有效参与者可见的当前会话输入、读取同企业 Revision 指定的模型，并以 Agent 参与者身份写入最终消息。开发期 calculator 是验证 Eino Tool 闭环和安全点并发的临时纯函数测试 Tool，可配置执行延时，正式发布前删除。后续 Tool Adapter、Gateway 和 Executor 继续校验组织、会话、Agent、策略、工具、资源和设备范围。
 
 ### 3.3 前期服务端是大脑，客户端是受控执行器
 
@@ -206,7 +206,7 @@ Revision 负责长期配置历史，Run 快照负责证明本次执行实际使�
 
 ### 6.1 策略和状态
 
-目标对象按阶段落地：P1a 增加 State 和 Trigger，P1b 增加最小 Policy，完整 P1 补齐工具与响应策略：
+目标对象按阶段落地：P1a 增加 State 和 Trigger，P1b 继续以 ServiceSession 当前负责人派生执行资格，不创建 Policy；完整 P1 有真实的通用响应与工具策略需求时再增加 Policy：
 
 ```text
 conversation_agent_policies
@@ -244,7 +244,7 @@ conversation_agent_states
 | `agent_direct` | 发给 Agent 的内部单聊自动触发，群聊仍需 @ | P1a 固定使用，作为内部 AI 员工验证入口 |
 | `customer_auto` | 符合客户路由和会话策略的新客户消息自动触发 | P1b 先用于网站客户；第三方渠道仍需对应 Delivery |
 
-首轮启用 P1a 的 `agent_direct` 和 P1b 的 `customer_auto`。P1a 先固定支持运行中连续消息补入；`mention` 和通用 `response_policy` 在基础群聊与完整 P1 中实现。
+首轮启用 P1a 的 `agent_direct` 和 P1b 的 `customer_auto`，两者都固定支持运行中连续消息在下一个 Eino 安全点补入同一 Run；`mention` 和通用 `response_policy` 在基础群聊与完整 P1 中实现。
 
 ### 6.2 服务端持久触发事实
 
@@ -264,11 +264,11 @@ conversation_agent_triggers
 
 约束与规则：
 
-- 同一企业内 `(conversation_id, agent_identity_id, trigger_seq)` 唯一；同一 `(conversation_id, agent_identity_id, trigger_message_id)` 只能产生一个触发事实。
+- 同一企业内 `(conversation_id, agent_identity_id, trigger_seq)` 唯一。入站消息首次插入保证一次调度不重复；同一客户消息在负责人离开后重新转回该 Agent 时可以获得新的 Trigger 序号。
 - 只有本次事务首次写入的 Message 可以创建触发事实；消息业务幂等重放返回原结果，不再次推进序号或唤醒 Agent。
 - `trigger_type` 记录 `mention`、`agent_direct` 或 `customer_auto` 等实际入口，不从消息时间推断。
 - Agent、系统消息和历史补拉默认不创建自动触发事实；人工回放必须使用显式持久命令。
-- 会话暂停或人工接手期间的新消息不创建自动触发事实，恢复自动响应只处理恢复后的新消息。
+- P1b 只在当前开放 ServiceSession 的负责人是合格 Agent 时创建 `customer_auto`；真人接管后自然不再触发，不增加 AI 专属暂停或恢复状态。完整 P1 的通用策略另行定义。
 - `originated_at` 可以早于已经展示的消息，仍不影响本次新触发事实的资格和 `trigger_seq`；它继续只用于消息时间线排序。
 - 触发事实是恢复和审计依据，NATS Delivery、进程内事件和当前 WebSocket 连接都不能代替它。
 
@@ -283,11 +283,11 @@ conversation_agent_triggers
 3. 若当前没有在途 Run，则创建 `queued` Run，并通过 `TxEnqueuer.EnqueueIn` 在同一事务写入唤醒任务。
 4. 若已有在途 Run，不重复创建；当前 Run 结束时必须再次检查游标差距。
 5. Run 完成事务推进 `processed_*` 到本次实际纳入输入的 `trigger_end_seq`。
-6. 如果 `desired_* > processed_*`，且当前固定入口仍有效或 Policy 已启用并且未暂停，则在同一事务创建下一 Run 并入队。
+6. 如果 `desired_* > processed_*`，且当前固定入口仍有效；或完整 P1 的 Policy 已启用，则在同一事务创建下一 Run 并入队。
 
 这样可以同时保证单 Agent 上下文串行和运行期间新消息不丢失。
 
-P1a 的 Agent 单聊允许一个 Run 在 Eino 安全点吸收连续触发；P1b 是否合并客户输入由实现时的响应策略确定。任何合并都必须保存实际 `trigger_start_seq/trigger_end_seq` 并按该边界推进状态，不能只提高水位而丢失 Trigger 关系。
+P1a Agent 单聊和 P1b 网站 AI 客服都允许一个 Run 在 Eino 安全点吸收连续触发。queued Run 只冻结 `trigger_start_seq`；每个 Turn 在 Claim 时扩展并保存实际 `trigger_end_seq`，按该边界推进状态，不能只提高水位而丢失 Trigger 关系。最终完成事务越过边界后到达的消息进入下一 Run。
 
 迟到的历史补拉默认只进入消息时间线，不创建触发事实，也不推进自动响应的 `desired_*`；需要时由独立总结或人工回放操作处理。
 
@@ -325,13 +325,13 @@ agent_runs
 规则：
 
 - 一次 Run 对应一次有界的服务端 Agent 循环，不对应 Conversation 的常驻进程。
-- P1a 的 Agent 单聊允许 `trigger_end_seq >= trigger_start_seq`；其余入口只有在显式响应策略允许时才能合并，并保存实际消费的连续序号范围。
+- P1a Agent 单聊和 P1b `customer_auto` 允许 `trigger_end_seq >= trigger_start_seq`，并保存实际消费的连续序号范围；其他入口只有在显式响应策略允许时才能合并。
 - `initiated_by_user_id` 只用于审计：内部用户触发或发起操作时有值，网站客户和其他非登录主体自动触发时允许为空，不代表继承该用户权限。
 - `input_snapshot` 保存实际传给模型的有序输入、消息编号、内容版本或哈希、摘要引用和 schema 版本，不能只保存起止消息编号。
 - 输入快照按审计需求保存必要内容并限制大小；敏感字段按产品策略处理。
 - Agent 输出仍以 Agent 参与者身份创建 `messages`，并使用 `agent:<agent_run_id>` 作为业务幂等键；同一个 Run 最多持久化一条最终输出。
-- 输出消息、Run 终态和 `processed_*` 的推进必须原子提交；提交前重新锁定 Run 和 `conversation_agent_states`，确认 Run 尚未终结，并复核 Agent、参与者、当前固定入口或 Policy，以及暂停/人工接手状态。
-- 人工接手或暂停事务将已有在途 Run 置为 `cancelled`，并分别记录 `error_code = human_takeover` 或 `manual_pause`；同时将 `processed_*` 推进到事务读取的 `desired_*`。已有 Trigger 保留用于审计，但不在恢复后补发；迟到的模型结果不得写入客户时间线。
+- 输出消息、Run 终态和 `processed_*` 的推进必须原子提交；提交前重新锁定 Run 和 `conversation_agent_states`。P1b 还必须先锁定当前 ServiceSession，确认仍为 open、负责人未变、Agent 仍合格且 Run 冻结的 Revision 有效；active Revision 的后续切换不废弃合法在途 Run。
+- P1b 的通用接管或关闭事务将原 Agent 的已有在途 Run 置为 `cancelled`，分别记录 `error_code = assignee_changed` 或 `session_closed`，并将 `processed_*` 推进到事务读取的 `desired_*`。已有 Trigger 保留用于审计，迟到的模型结果不得写入客户时间线；不增加 Agent 专属暂停、恢复或接管命令。
 - 业务失败先写入 `agent_runs`，Task Handler 随后正常结束；只有基础设施级临时失败才触发 `task_runs` 重试，避免任务重试、模型重试和工具重试相乘。
 - 模型拒绝、超时或规范化业务错误形成 Run 终态时，本次 `trigger_end_seq` 同样得到明确处理结果并推进 `processed_*`，不因游标差距自动对同一触发进行无界模型重试；显式“重试回复”以后使用新的持久命令和 Run 表达。
 - `token_and_cost_usage` 在 P1a 和 P1b 只记录模型返回的输入/输出 Token；耗时由 Run 时间字段或既有 usage 结构记录，不计算金额。完整 P1 在具备价格快照后记录费用。
@@ -490,11 +490,11 @@ Eino 不负责：
 
 发起、取消和人工接管 Agent Run 都是持久命令，统一经过 `appservice.Service` 和 Action。服务端 Web 使用 `DirectBackend`；桌面端和移动端经 API Proxy 与 Gin 调用服务端的 `appservice.Service(DirectBackend)`；网站请求也由 Gin 适配。Realtime WebSocket 只承载流式展示和进度。
 
-P1a 和 P1b 先使用以下有界接入集；Tool、Middleware、流式事件投影和 `AIStream*` 从完整 P1 开始启用。
+P1a 和 P1b 先使用以下有界接入集；产品 Tool、Middleware、流式事件投影和 `AIStream*` 从完整 P1 开始启用。calculator 仅是开发期测试工具。
 
-### 9.3 P1a 内部 Agent 单聊有界接入集
+### 9.3 P1a/P1b Eino 有界接入集
 
-P1a 的 Eino Adapter 只负责：
+P1a/P1b 的 Eino Adapter 只负责：
 
 - 将不可变 Revision 和已经认领的 Conversation 消息转换为 ChatModelAgent 输入。
 - 在有超时且有最大轮数的 TurnLoop 中执行，通过 `Push + AnySafePoint` 在 Tool 结束后的下一次规划前吸收新 Trigger。
@@ -502,7 +502,7 @@ P1a 的 Eino Adapter 只负责：
 - 返回输入/输出 Token、耗时和规范化错误；不计算金额。
 - 不创建 Tool Invocation、审批、设备、MCP、Session、Checkpoint 或本地 Runtime，也不发布 token delta。
 
-计算器是本切片唯一允许不建 Tool Invocation 的纯函数验证工具；后续任何读取业务数据、调用设备或产生副作用的 Tool 必须先进入完整 P1/P1.5 的策略和审计事实。P1b 的人工接手和暂停仍须先写持久业务状态，再对正在执行的 `context` 发出尽力取消。
+计算器是本切片唯一允许不建 Tool Invocation 的临时纯函数验证工具，并支持可控延时以覆盖 Tool 执行期间到达新消息的安全点行为；正式发布前删除。本切片用结构化日志记录 Customer Claim 边界，由 Eino 通用 Tool Middleware 记录真实调用的名称、调用编号、结果和耗时，calculator 只补充同一调用编号的非敏感 `operation` 和 `delay_ms`，不提前增加持久 Step 或 Tool Invocation；完整调用事件持久化由后续可观测性 PR 交付。后续任何读取业务数据、调用设备或产生副作用的 Tool 必须先进入完整 P1/P1.5 的策略和审计事实。P1b 的通用接管或关闭先写持久业务状态，再对正在执行的 `context` 发出尽力取消。
 
 ### 9.4 P1 最小接入集
 
@@ -805,13 +805,14 @@ Cervi Gateway
 P1a 验证成功后立即交付网站客户自动响应：
 
 - 依赖 `chat-roadmap.md` 的网站客户文本闭环、网站访客恢复凭据、客户 Conversation 和网站轮询，不依赖 Telegram Bot、微信公众号或其他第三方渠道 Delivery。
-- 网站渠道配置默认 Agent；创建客户 Conversation 时生成固定为 `customer_auto` 的最小 Policy。新网站客户 Message 首次持久化时写入 Trigger、Run 和 Task。
+- 网站渠道路由快照可以把新 ServiceSession 的负责人设置为合格 Agent；不创建最小 Policy。新网站客户 Message 首次持久化时写入 Trigger，并在没有在途 Run 时原子创建 Run 和 Task；真人负责人和公共队列不触发。
 - Agent 最终回复仍是统一 Cervi Message。网站访客通过既有授权轮询直接读取该 Message，因此“写入 Message 并可被网站读取”就是网站路径的交付闭环，不创建外部 Delivery。
-- 提供经过 `appservice.Service` 和 Action 的人工接手、暂停和恢复命令。接手或暂停先锁定 Policy/State，将已有在途 Run 置为 `cancelled` 并记录对应 `error_code`，再将 `processed_*` 推进到当前 `desired_*`；对模型调用发出尽力取消，暂停期间不创建新 Trigger，迟到结果不得写入时间线。
-- 人工接手在该切片只停止当前会话的 AI 自动回复并允许成员继续回复。
-- 仍保持一次模型调用、一条最终文本、无工具、无流式、无设备、无审批，只记录 Token、耗时和错误，不计算金额。
+- ServiceSession 的 `open/closed + assignee_identity_id` 是唯一客服状态。成员使用现有 Claim 接管，现有 Transfer 转交；最后一条来自 contact 时转交给 Agent 会补 Trigger，来自企业身份时等待客户下一条消息。不增加 AI 专属暂停、恢复、接管或状态。
+- `customer_auto` 复用 Eino TurnLoop：queued 时只冻结起点，Tool 或模型执行期间到达的新消息在下一个安全点由同一 Run 的下一 Turn Claim，最终只写一条文本 Message；完成边界后到达的消息进入下一 Run。
+- 完成前按 `ServiceSession -> State -> Run` 重新校验负责人、渠道、Agent 资格、Run Revision 和实际消费边界，接管、关闭或换负责人后的迟到结果不得写入。
+- 不流式输出、无设备、无审批，只记录 Token、耗时和错误，不计算金额；calculator 仅用于开发期延时并发测试，正式发布前删除。
 
-验收边界：符合绑定规则的网站客户新消息会自动得到一条可由访客轮询读取的 AI 回复；消息重放和 Task 重复不重复回复；人工接手或暂停与模型完成并发时结果可确定且不会在人工接手后迟到发言；网站闭环在没有 Realtime 和第三方 Delivery 的情况下成立。
+验收边界：符合负责人规则的网站客户新消息会自动得到一条可由访客轮询读取的 AI 回复；消息重放和 Task 重复不重复回复；运行中连续消息由同一 Run 在下一个安全点处理；接管、关闭、换负责人与模型完成并发时结果可确定且不会迟到发言；网站闭环在没有 Realtime 和第三方 Delivery 的情况下成立。
 
 ### P1：纯服务端、只读或强幂等 Agent（完整能力）
 
@@ -879,7 +880,6 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 | Eino 最终版本 | 开始 P1a 实施时根据正式发布状态选择并精确锁定 |
 | 完整触发模式默认值与消息合并 | P1a/P1b 验证后进入完整 P1 策略配置 |
 | CheckpointStore | 业务事实无法安全重建 Runner 中间状态 |
-| TurnLoop | 同一 Run 需要 Push、抢占或长期 idle |
 | SessionStore | 单 Run 内存在明确的框架工作集或 Middleware 回放需求 |
 | Automemory | 产品定义了跨 Run 的长期记忆及用户可管理语义 |
 | BackgroundTask Store | 同 Run 子代理或长工具需要框架级租约 |
@@ -900,7 +900,7 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 - 是否只以服务端持久 Trigger 和 `trigger_seq` 判断新触发，避免把 `originated_at`、UUID 或历史补拉当作触发水位。
 - 是否可能因 Task 至少一次执行产生重复模型输出或重复副作用。
 - 是否使用 `agent:<agent_run_id>` 收敛最终 Message，并覆盖 Provider 返回后、最终事务前崩溃和重复 Task 的竞争。
-- P1a/P1b 是否仍保持一次模型调用、最终文本、无工具、无流式，且没有把完整 Realtime 误设为前置。
+- P1a/P1b 是否仍保持有界 TurnLoop、一条最终文本、无产品 Tool、无流式，且没有把完整 Realtime 误设为前置；calculator 是否仅用于开发测试并计划在正式发布前删除。
 - 后台执行是否使用 `AgentExecutionContext` 显式授权，而不是伪造用户或继承触发用户的全部权限。
 - 是否把流式事件、日志或 Eino 内部状态误写成永久 Step。
 - 是否能区分确定成功、确定失败、取消请求和结果未知。

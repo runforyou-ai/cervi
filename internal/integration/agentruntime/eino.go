@@ -21,6 +21,8 @@ const (
 	triggerPollInterval = 200 * time.Millisecond
 )
 
+type runIDContextKey struct{}
+
 // EinoRuntime 使用标准 Message TurnLoop 执行 Agent。
 type EinoRuntime struct {
 	newModel modelFactory
@@ -41,6 +43,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if feed == nil {
 		return RunResult{}, errors.New("agent input feed is required")
 	}
+	ctx = context.WithValue(ctx, runIDContextKey{}, request.RunID)
 	maxTurns := request.MaxTurns
 	if maxTurns <= 0 {
 		maxTurns = defaultMaxTurns
@@ -51,7 +54,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
-		ToolsConfig:   adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: r.tools}},
+		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
+			Tools: r.tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolLoggingMiddleware()},
+		}},
 		MaxIterations: maxTurns,
 	})
 	if err != nil {
@@ -205,6 +210,12 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, errors.New("agent run stopped without a stable response")
 	}
 	return RunResult{Content: finalContent, EndSeq: endSeq, Usage: usage}, nil
+}
+
+// runIDFromContext 返回当前 Runtime 传给组件的 Agent Run 编号。
+func runIDFromContext(ctx context.Context) string {
+	runID, _ := ctx.Value(runIDContextKey{}).(string)
+	return runID
 }
 
 // pushPending 把数据库中的新 Trigger 放入 TurnLoop，并按需请求安全点抢占。

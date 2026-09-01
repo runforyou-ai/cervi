@@ -74,14 +74,25 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if execution.MaxOutputTokens > 0 && execution.MaxOutputTokens < int64(maxOutputTokens) {
 		maxOutputTokens = int(execution.MaxOutputTokens)
 	}
-	feed := &databaseInputFeed{db: a.db, execution: execution}
+	var feed agentruntime.InputFeed
+	switch domain.AgentTriggerType(execution.Run.TriggerType) {
+	case domain.AgentTriggerTypeDirect:
+		feed = &databaseInputFeed{db: a.db, execution: execution}
+	case domain.AgentTriggerTypeCustomerAuto:
+		feed = &customerInputFeed{db: a.db, execution: execution}
+	default:
+		return task.Permanent(fmt.Errorf("unsupported agent trigger type %q", execution.Run.TriggerType))
+	}
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
-		Name: execution.AgentName, Instruction: execution.Instruction,
+		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: execution.Instruction,
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
 		},
 	}, feed)
+	if errors.Is(err, errCustomerRunSuppressed) {
+		return nil
+	}
 	if err == nil {
 		if completeErr := a.complete(ctx, execution, result); completeErr != nil {
 			if ctx.Err() != nil {
@@ -187,6 +198,12 @@ func agentRunStatusTerminal(status string) bool {
 
 // complete 原子写入最终回复、推进消费序号并补投递竞态中的后续输入。
 func (a *ExecuteAction) complete(ctx context.Context, execution executionContext, result agentruntime.RunResult) error {
+	if domain.AgentTriggerType(execution.Run.TriggerType) == domain.AgentTriggerTypeCustomerAuto {
+		return a.completeCustomer(ctx, execution, result)
+	}
+	if domain.AgentTriggerType(execution.Run.TriggerType) != domain.AgentTriggerTypeDirect {
+		return fmt.Errorf("unsupported agent trigger type %q", execution.Run.TriggerType)
+	}
 	var status string
 	if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
 		Column("status").Where("agr.id = ?", execution.Run.ID).Scan(ctx, &status); err != nil {
@@ -298,6 +315,12 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 	}
 	if agentRunStatusTerminal(initial.Status) {
 		return true, nil
+	}
+	if domain.AgentTriggerType(initial.TriggerType) == domain.AgentTriggerTypeCustomerAuto {
+		return a.failCustomer(ctx, initial, message)
+	}
+	if domain.AgentTriggerType(initial.TriggerType) != domain.AgentTriggerTypeDirect {
+		return false, fmt.Errorf("unsupported agent trigger type %q", initial.TriggerType)
 	}
 	terminal := false
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {

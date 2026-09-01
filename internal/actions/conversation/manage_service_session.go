@@ -90,11 +90,12 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 type TransferServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
+	scheduler   CustomerAgentMessageScheduler
 }
 
 // NewTransferServiceSessionAction 创建客服处理周期转交操作。
-func NewTransferServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator) *TransferServiceSessionAction {
-	return &TransferServiceSessionAction{db: db, coordinator: coordinator}
+func NewTransferServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator, scheduler CustomerAgentMessageScheduler) *TransferServiceSessionAction {
+	return &TransferServiceSessionAction{db: db, coordinator: coordinator, scheduler: scheduler}
 }
 
 // Execute 校验当前负责人和目标客服后保存转交。
@@ -158,6 +159,26 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 			return err
 		}
 		session.AssigneeIdentityID = &target.ID
+		if domain.OrganizationIdentityType(target.Type) == domain.OrganizationIdentityTypeAgent {
+			kind, messageID, err := loadServiceSessionLastMessageSender(ctx, tx, session)
+			if err != nil {
+				return err
+			}
+			if kind == domain.ChatSubjectKindContact {
+				if a.scheduler == nil {
+					return errors.New("customer agent scheduler is unavailable")
+				}
+				scheduled, err := a.scheduler.ScheduleCustomerAuto(
+					ctx, tx, session.OrganizationID, session.ConversationID, session.ID, messageID,
+				)
+				if err != nil {
+					return err
+				}
+				if !scheduled {
+					return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
+				}
+			}
+		}
 		output = serviceSessionResult(session, target)
 		return nil
 	})
@@ -166,6 +187,33 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 	}
 	finishServiceSessionAgentCancellation(a.coordinator, cancelledRunIDs, cancelledSession, domain.AgentRunErrorCodeAssigneeChanged)
 	return output, nil
+}
+
+// loadServiceSessionLastMessageSender 读取当前处理周期最后消息的发送主体类型。
+func loadServiceSessionLastMessageSender(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (domain.ChatSubjectKind, string, error) {
+	row := struct {
+		MessageID string `bun:"message_id"`
+		Kind      string `bun:"kind"`
+	}{}
+	err := db.NewSelect().
+		TableExpr("messages AS msg").
+		ColumnExpr("msg.id AS message_id, cs.kind AS kind").
+		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
+		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Where("msg.organization_id = ?", session.OrganizationID).
+		Where("msg.conversation_id = ?", session.ConversationID).
+		Where("msg.service_session_id = ?", session.ID).
+		Where("msg.id = ?", session.LastMessageID).
+		Where("msg.deleted_at IS NULL").
+		Scan(ctx, &row)
+	if err != nil {
+		return "", "", fmt.Errorf("load service session last message sender: %w", err)
+	}
+	kind := domain.ChatSubjectKind(row.Kind)
+	if kind != domain.ChatSubjectKindContact && kind != domain.ChatSubjectKindOrganizationIdentity {
+		return "", "", ErrDataInvariant
+	}
+	return kind, row.MessageID, nil
 }
 
 // CloseServiceSessionAction 关闭客户会话最新处理周期。

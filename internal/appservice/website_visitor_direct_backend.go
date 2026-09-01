@@ -25,10 +25,10 @@ type WebsiteVisitorDirectBackend struct {
 }
 
 // NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端。
-func NewWebsiteVisitorDirectBackend(db *bun.DB) *WebsiteVisitorDirectBackend {
+func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler) *WebsiteVisitorDirectBackend {
 	return &WebsiteVisitorDirectBackend{
 		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
-		sendTextMessage:   conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db),
+		sendTextMessage:   conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, agentScheduler),
 		listMessages:      conversationaction.NewListWebsiteMessagesQuery(db),
 	}
 }
