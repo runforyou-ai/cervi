@@ -312,6 +312,7 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"messages":                  cervii18n.MessengerMessages,
 	"help":                      cervii18n.MessengerHelp,
 	"message":                   cervii18n.MessengerMessage,
+	"resizeMessageInput":        cervii18n.MessengerResizeMessageInput,
 	"close":                     cervii18n.MessengerClose,
 	"attach":                    cervii18n.MessengerAttach,
 	"emoji":                     cervii18n.MessengerEmoji,

@@ -92,6 +92,7 @@ const inbox = {
   conversationReopenSuccess: "Conversation reopened and assigned to you",
   conversationActionError: "Could not update the conversation. Try again.",
   replyLabel: "Reply",
+  composerResize: "Resize message input",
   attachmentAdd: "Add attachment",
   messageBodyRequired: "Enter a message",
   messageBodyTooLong: "Messages can contain up to 4,000 characters",

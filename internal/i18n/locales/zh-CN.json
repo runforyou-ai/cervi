@@ -47,6 +47,7 @@
   "messenger.messages": "消息",
   "messenger.help": "帮助",
   "messenger.message": "消息",
+  "messenger.resize_message_input": "调整消息输入框高度",
   "messenger.close": "关闭聊天",
   "messenger.attach": "添加附件",
   "messenger.emoji": "选择表情",
