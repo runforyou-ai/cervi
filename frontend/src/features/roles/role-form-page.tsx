@@ -225,10 +225,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         })
         void invalidateResource(resourceKeys.roles())
         void invalidateResource(resourceKeys.role())
-        void invalidateResource(resourceKeys.users())
-        void invalidateResource(resourceKeys.agents())
         void invalidateResource(resourceKeys.roleMembers())
-        void invalidateResource(resourceKeys.customerServiceAssignees())
       }
       if (!mounted.current) return
       form.reset(values)

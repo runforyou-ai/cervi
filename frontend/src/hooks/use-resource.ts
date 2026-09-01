@@ -7,8 +7,9 @@ import { recoverSession } from "@/lib/session-navigation"
 
 /**
  * 读取一份以 key 标识的页面数据。
- * key 相同的调用在多标签间共享缓存；load 收到的 signal 只用于忽略过期结果，
- * 不取消 Wails 绑定调用。带会话状态的读取错误统一导航回对应入口。
+ * key 相同的调用可以在多标签间复用缓存，但不保证跨标签自动同步变更；
+ * load 收到的 signal 只用于忽略过期结果，不取消 Wails 绑定调用。
+ * 带会话状态的读取错误统一导航回对应入口。
  * 跨业务域的选项类数据用 staleTime: 0 让每次挂载都重新读取。
  */
 export function useResource<T>(

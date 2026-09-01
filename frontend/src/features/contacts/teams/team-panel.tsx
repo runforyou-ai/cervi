@@ -127,14 +127,6 @@ export function TeamPanel({
     setSelectedTeamMemberIdentityIDs(new Set())
   }, [currentPage, query, teamId, workStatus])
 
-  /** 团队或成员关系变化后，失效内嵌所属团队的成员和 AI 员工缓存。 */
-  function invalidateMembershipCaches() {
-    void invalidate(resourceKeys.users())
-    void invalidate(resourceKeys.user())
-    void invalidate(resourceKeys.agents())
-    void invalidate(resourceKeys.agent())
-  }
-
   /** 当前用户使用工作台中的即时状态，其他团队成员使用列表结果。 */
   function identityWorkStatus(member: TeamMember) {
     return member.identityType ===
@@ -152,7 +144,6 @@ export function TeamPanel({
     try {
       await deleteTeam(deletingTeamID)
       void invalidate(resourceKeys.teams())
-      invalidateMembershipCaches()
       setDeletingTeam(null)
       toast.success(t("teams.delete.success"))
       if (teamId === deletingTeamID) {
@@ -191,7 +182,6 @@ export function TeamPanel({
       setSelectedTeamMemberIdentityIDs(new Set())
       void invalidate(resourceKeys.teamMembers(teamId))
       void invalidate(resourceKeys.teamMemberCandidates(teamId))
-      invalidateMembershipCaches()
     } catch (error) {
       if (recoverSession(error, navigate)) return
       console.warn("移出团队成员失败", error)
@@ -479,7 +469,6 @@ export function TeamPanel({
               team={selectedTeam}
               onSaved={() => {
                 void invalidate(resourceKeys.teams())
-                invalidateMembershipCaches()
                 setParameters({ editTeam: null })
               }}
               onCancel={() => setParameters({ editTeam: null })}
@@ -508,7 +497,6 @@ export function TeamPanel({
                 void invalidate(resourceKeys.teams())
                 setParameters({ addMembers: null })
                 void invalidate(resourceKeys.teamMembers(teamId))
-                invalidateMembershipCaches()
               }}
               onCancel={() => setParameters({ addMembers: null })}
             />

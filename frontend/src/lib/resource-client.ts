@@ -4,7 +4,8 @@ import { QueryClient } from "@tanstack/react-query"
 /**
  * 进程级查询客户端。
  * 业务错误不重试；窗口聚焦不自动刷新；结果默认在页面存活期间常驻，
- * 由调用方通过 refresh、invalidateResource 或按 key 指定 staleTime 主动失效。
+ * 由当前页面通过 refresh、invalidateResource 或按 key 指定 staleTime 主动失效。
+ * 保活标签共享查询缓存以复用结果，但写操作不负责维持其他标签的数据一致性。
  */
 export const resourceClient = new QueryClient({
   defaultOptions: {

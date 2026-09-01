@@ -52,7 +52,7 @@ import {
   messageChannelTypeDefinitions,
 } from "@/features/channels/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -129,7 +129,6 @@ function MessageChannelRow({
 export function MessageChannelListPage() {
   const { t } = useTranslation("channels")
   const navigate = useNavigate()
-  const invalidate = useResourceInvalidator()
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
   const [enabledStatus, setEnabledStatus] =
@@ -168,7 +167,6 @@ export function MessageChannelListPage() {
         ? await deactivateMessageChannel(channel.id)
         : await activateMessageChannel(channel.id)
       void refresh()
-      void invalidate(resourceKeys.channelOptions())
       console.info("消息渠道状态已更新", {
         channel_id: channel.id,
         channel_type: channel.type,

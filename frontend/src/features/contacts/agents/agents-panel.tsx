@@ -128,9 +128,6 @@ export function AgentsPanel({
   function refreshAndClose() {
     closeDetail()
     void invalidate(resourceKeys.agents())
-    void invalidate(resourceKeys.roles())
-    void invalidate(resourceKeys.roleMembers())
-    void invalidate(resourceKeys.customerServiceAssignees())
   }
 
   /** 禁用 AI 员工账号或恢复为正常状态。 */
@@ -157,7 +154,6 @@ export function AgentsPanel({
       setChangingAgentStatus(null)
       void invalidate(resourceKeys.agent(saved.id))
       void invalidate(resourceKeys.agents())
-      void invalidate(resourceKeys.customerServiceAssignees())
     } catch (error) {
       if (recoverSession(error, navigate)) return
       console.warn("修改 AI 员工状态失败", {
@@ -350,12 +346,6 @@ export function AgentsPanel({
             onSaved={(saved) => {
               void invalidate(resourceKeys.agent(saved.id))
               void invalidate(resourceKeys.agents())
-              void invalidate(resourceKeys.teams())
-              void invalidate(resourceKeys.teamMembers())
-              void invalidate(resourceKeys.teamMemberCandidates())
-              void invalidate(resourceKeys.roles())
-              void invalidate(resourceKeys.roleMembers())
-              void invalidate(resourceKeys.customerServiceAssignees())
             }}
             onNotFound={refreshAndClose}
           />

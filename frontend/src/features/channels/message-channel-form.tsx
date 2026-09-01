@@ -94,7 +94,6 @@ export function MessageChannelForm({
         })
         onUpdated?.(updated)
         void invalidateResource(resourceKeys.messageChannels())
-        void invalidateResource(resourceKeys.channelOptions())
         console.info("消息渠道已保存", {
           channel_id: channel.id,
           channel_type: channel.type,
@@ -105,7 +104,6 @@ export function MessageChannelForm({
 
       const created = await createMessageChannel(values)
       void invalidateResource(resourceKeys.messageChannels())
-      void invalidateResource(resourceKeys.channelOptions())
       console.info("消息渠道已创建", {
         channel_id: created.id,
         channel_type: created.type,

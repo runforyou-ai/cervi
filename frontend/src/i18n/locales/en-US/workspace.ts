@@ -24,7 +24,7 @@ const workspace = {
     closeTab: "Close tab",
     closeOthers: "Close other tabs",
     closeRight: "Close tabs to the right",
-    reload: "Reload",
+    reset: "Reset page",
     pin: "Pin",
     unpin: "Unpin",
     pinnedTab: "{{title}}, pinned",

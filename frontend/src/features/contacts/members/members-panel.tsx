@@ -164,7 +164,6 @@ export function MembersPanel({
       setChangingUserStatus(null)
       void invalidate(resourceKeys.user(saved.id))
       void invalidate(resourceKeys.users())
-      void invalidate(resourceKeys.customerServiceAssignees())
     } catch (error) {
       if (recoverSession(error, navigate)) return
       console.warn("修改企业成员账号状态失败", {
@@ -375,12 +374,6 @@ export function MembersPanel({
             onSaved={(saved) => {
               void invalidate(resourceKeys.user(saved.id))
               void invalidate(resourceKeys.users())
-              void invalidate(resourceKeys.roles())
-              void invalidate(resourceKeys.teams())
-              void invalidate(resourceKeys.teamMembers())
-              void invalidate(resourceKeys.teamMemberCandidates())
-              void invalidate(resourceKeys.roleMembers())
-              void invalidate(resourceKeys.customerServiceAssignees())
               if (saved.id === identity.user.id) {
                 updateWorkspaceUser({
                   ...identity.user,

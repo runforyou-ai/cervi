@@ -43,6 +43,18 @@ export function ContactCreateDialogs({
   const creatingAgent = searchParams.get("newAgent") === "1"
   const creatingTeam = searchParams.get("newTeam") === "1"
 
+  /** 新建企业身份后只刷新当前通讯录范围依赖的列表。 */
+  function invalidateCurrentScope(identityType: "member" | "agent") {
+    if (scope === "team" && selectedTeam) {
+      void invalidate(resourceKeys.teamMembers(selectedTeam.id))
+      void invalidate(resourceKeys.teams())
+      return
+    }
+    void invalidate(
+      identityType === "member" ? resourceKeys.users() : resourceKeys.agents(),
+    )
+  }
+
   return (
     <>
       <Dialog
@@ -69,13 +81,7 @@ export function ContactCreateDialogs({
               defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
               onSaved={() => {
                 setParameters({ new: null })
-                void invalidate(resourceKeys.users())
-                void invalidate(resourceKeys.teamMembers())
-                void invalidate(resourceKeys.teamMemberCandidates())
-                void invalidate(resourceKeys.teams())
-                void invalidate(resourceKeys.roles())
-                void invalidate(resourceKeys.roleMembers())
-                void invalidate(resourceKeys.customerServiceAssignees())
+                invalidateCurrentScope("member")
               }}
               onCancel={() => setParameters({ new: null })}
             />
@@ -109,13 +115,7 @@ export function ContactCreateDialogs({
             defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
             onSaved={() => {
               setParameters({ newAgent: null })
-              void invalidate(resourceKeys.agents())
-              void invalidate(resourceKeys.teamMembers())
-              void invalidate(resourceKeys.teamMemberCandidates())
-              void invalidate(resourceKeys.teams())
-              void invalidate(resourceKeys.roles())
-              void invalidate(resourceKeys.roleMembers())
-              void invalidate(resourceKeys.customerServiceAssignees())
+              invalidateCurrentScope("agent")
             }}
             onCancel={() => setParameters({ newAgent: null })}
           />
