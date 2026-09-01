@@ -24,7 +24,7 @@ func TestRunnerPreservesClassifiedFailure(t *testing.T) {
 func TestRunnerOwnsTimeout(t *testing.T) {
 	runner := NewRunner(20 * time.Millisecond)
 	err := runner.Run(context.Background(), Target{
-		Category: CategoryMCP, Adapter: "http", Location: LocationServer,
+		Category: CategoryConnector, Adapter: "http", Location: LocationServer,
 	}, ProbeFunc(func(ctx context.Context) error {
 		<-ctx.Done()
 		return ctx.Err()

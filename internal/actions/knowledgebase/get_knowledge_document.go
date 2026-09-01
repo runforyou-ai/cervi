@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/integration/connector"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -34,9 +33,6 @@ func (q *GetKnowledgeDocumentQuery) Execute(
 	identity *servermodels.Identity,
 	knowledgeBaseID, documentID string,
 ) (DocumentDetailRecord, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return DocumentDetailRecord{}, err
-	}
 	documentID = strings.TrimSpace(documentID)
 	access, err := loadDifyKnowledgeAccess(ctx, q.db, identity.Organization.ID, knowledgeBaseID)
 	if err != nil {

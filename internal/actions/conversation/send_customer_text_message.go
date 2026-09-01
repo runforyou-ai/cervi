@@ -64,9 +64,6 @@ func NewSendCustomerTextMessageAction(db *bun.DB) *SendCustomerTextMessageAction
 
 // Execute 在一个可重试事务中写入成员客户会话回复。
 func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input CustomerTextMessageInput) (ConversationMessage, error) {
-	if err := identityaction.Validate(ctx, a.db, identity); err != nil {
-		return ConversationMessage{}, err
-	}
 	normalized, fields := normalizeCustomerTextMessageInput(input)
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
@@ -100,6 +97,9 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 
 // executeTransaction 执行一次完整的成员客户会话回复事务。
 func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input CustomerTextMessageInput, ids memberMessageIDs, originatedAt time.Time, idempotencyKey string) (ConversationMessage, error) {
+	if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+		return ConversationMessage{}, err
+	}
 	conversation, err := loadCustomerConversationForReply(ctx, tx, identity.Organization.ID, input.ConversationID)
 	if err != nil {
 		return ConversationMessage{}, err

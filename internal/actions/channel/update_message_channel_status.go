@@ -28,28 +28,35 @@ func (a *UpdateMessageChannelStatusAction) Execute(ctx context.Context, identity
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
-	if err := identityaction.Validate(ctx, a.db, identity); err != nil {
+	var channel *servermodels.Channel
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		channel = &servermodels.Channel{}
+		result, err := tx.NewUpdate().
+			Model(channel).
+			Set("enabled = ?", enabled).
+			Set("updated_at = now()").
+			Where("c.id = ?", channelID).
+			Where("c.organization_id = ?", identity.Organization.ID).
+			Where("c.type IN (?)", bun.In(domain.MessageChannelTypes())).
+			Returning("*").
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("update message channel status: %w", err)
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("read updated message channel count: %w", err)
+		}
+		if rows == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
-	}
-	channel := &servermodels.Channel{}
-	result, err := a.db.NewUpdate().
-		Model(channel).
-		Set("enabled = ?", enabled).
-		Set("updated_at = now()").
-		Where("c.id = ?", channelID).
-		Where("c.organization_id = ?", identity.Organization.ID).
-		Where("c.type IN (?)", bun.In(domain.MessageChannelTypes())).
-		Returning("*").
-		Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("update message channel status: %w", err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("read updated message channel count: %w", err)
-	}
-	if rows == 0 {
-		return nil, ErrNotFound
 	}
 	return messageChannelRecord(channel), nil
 }

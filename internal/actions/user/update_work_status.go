@@ -33,7 +33,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 	}
 	var updatedIdentity *servermodels.Identity
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		storedUser := &servermodels.User{}

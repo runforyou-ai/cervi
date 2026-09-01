@@ -27,7 +27,7 @@ func (a *CreateTeamAction) Execute(ctx context.Context, identity *servermodels.I
 	}
 	record := &TeamRecord{}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		team := &servermodels.Team{OrganizationID: identity.Organization.ID, Name: input.Name, Description: input.Description, CreatedByUserID: identity.User.ID}

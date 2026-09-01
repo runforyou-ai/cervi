@@ -50,9 +50,6 @@ func (a *TestConnectionAction) Execute(ctx context.Context, input ConnectionInpu
 
 // ExecuteAndRecord 测试配置并记录当前企业中已保存连接器的状态。
 func (a *TestConnectionAction) ExecuteAndRecord(ctx context.Context, identity *servermodels.Identity, connectionID string, input ConnectionInput) (TestResult, error) {
-	if err := identityaction.Validate(ctx, a.db, identity); err != nil {
-		return TestResult{}, err
-	}
 	if !common.ValidUUID(connectionID) {
 		return TestResult{}, ErrNotFound
 	}
@@ -69,19 +66,28 @@ func (a *TestConnectionAction) ExecuteAndRecord(ctx context.Context, identity *s
 		status = domain.IntegrationConnectionStatusUnavailable
 	}
 	testedAt := time.Now().UTC()
-	result, updateErr := a.db.NewUpdate().
-		Model((*servermodels.IntegrationConnection)(nil)).
-		Set("status = ?", status).
-		Set("last_tested_at = ?", testedAt).
-		Set("updated_at = now()").
-		Where("id = ?", connectionID).
-		Where("organization_id = ?", identity.Organization.ID).
-		Exec(ctx)
+	updateErr := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		result, err := tx.NewUpdate().
+			Model((*servermodels.IntegrationConnection)(nil)).
+			Set("status = ?", status).
+			Set("last_tested_at = ?", testedAt).
+			Set("updated_at = now()").
+			Where("id = ?", connectionID).
+			Where("organization_id = ?", identity.Organization.ID).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("record integration connection test: %w", err)
+		}
+		if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
 	if updateErr != nil {
-		return TestResult{}, fmt.Errorf("record integration connection test: %w", updateErr)
-	}
-	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
-		return TestResult{}, ErrNotFound
+		return TestResult{}, updateErr
 	}
 	return TestResult{Status: status, TestedAt: testedAt}, testErr
 }

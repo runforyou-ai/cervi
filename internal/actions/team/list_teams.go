@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -22,9 +21,6 @@ func NewListTeamsQuery(db *bun.DB) *ListTeamsQuery { return &ListTeamsQuery{db: 
 
 // Execute 返回满足条件的团队分页列表。
 func (q *ListTeamsQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListInput) (ListOutput, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return ListOutput{}, err
-	}
 	input.Query = strings.TrimSpace(input.Query)
 	var pageValid bool
 	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)

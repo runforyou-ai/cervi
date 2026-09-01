@@ -38,7 +38,7 @@ func (a *UpdateWebsiteChannelAccessAction) Execute(ctx context.Context, identity
 
 	setting := &servermodels.WebsiteChannelSetting{}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		channel := &servermodels.Channel{}

@@ -1,6 +1,6 @@
 //go:build server
 
-package organization
+package server
 
 import (
 	"context"

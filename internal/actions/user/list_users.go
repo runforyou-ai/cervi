@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -39,9 +38,6 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		(input.RoleID != "" && !common.ValidUUID(input.RoleID)) ||
 		(input.TeamID != "" && !common.ValidUUID(input.TeamID)) {
 		return ListOutput{}, ErrQueryInvalid
-	}
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return ListOutput{}, err
 	}
 
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {

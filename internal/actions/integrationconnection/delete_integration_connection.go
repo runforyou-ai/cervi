@@ -24,7 +24,7 @@ func NewDeleteIntegrationConnectionAction(db *bun.DB) *DeleteIntegrationConnecti
 // Execute 删除未被业务数据使用的连接器。
 func (a *DeleteIntegrationConnectionAction) Execute(ctx context.Context, identity *servermodels.Identity, connectionID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		connection, err := loadConnection(ctx, tx, identity.Organization.ID, connectionID, true)

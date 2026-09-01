@@ -5,7 +5,6 @@ package channel
 import (
 	"context"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -33,9 +32,6 @@ func (a *TestTelegramConnectionAction) Execute(ctx context.Context, identity *se
 	input, fields := normalizeTelegramConnectionTestInput(input)
 	if len(fields) > 0 {
 		return &ValidationError{Fields: fields}
-	}
-	if err := identityaction.Validate(ctx, a.db, identity); err != nil {
-		return err
 	}
 	if _, err := loadTelegramChannelDetail(ctx, a.db, identity.Organization.ID, channelID, false); err != nil {
 		return err

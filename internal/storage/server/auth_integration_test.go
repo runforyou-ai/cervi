@@ -92,7 +92,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	db := store.DB()
 	const accessHost = "cervi.test"
 	tenantContext := tenant.WithAccessHost(context.Background(), accessHost)
-	tenantResolver := organizationaction.NewTenantResolver(db)
+	tenantResolver := NewTenantResolver(db)
 	status := installationaction.NewStatusQuery(tenantResolver)
 	alreadyInstalled, err := status.Execute(tenantContext)
 	if err != nil {

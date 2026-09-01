@@ -46,9 +46,6 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 
 	var detail *TelegramChannelDetail
 	err = withTelegramChannelLock(ctx, a.db, channelID, func(conn bun.Conn) error {
-		if err := identityaction.Validate(ctx, conn, identity); err != nil {
-			return err
-		}
 		current, err := loadTelegramChannelDetail(ctx, conn, identity.Organization.ID, channelID, false)
 		if err != nil {
 			return err
@@ -69,6 +66,9 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 			var enabled bool
 			var secret string
 			err := conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+				if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+					return err
+				}
 				channel := &servermodels.Channel{}
 				if err := tx.NewSelect().
 					Model(channel).

@@ -25,7 +25,7 @@ func NewDeleteRoleAction(db *bun.DB) *DeleteRoleAction {
 // Execute 删除当前企业中的自定义角色及其权限。
 func (a *DeleteRoleAction) Execute(ctx context.Context, identity *servermodels.Identity, roleID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		role, err := loadRole(ctx, tx, identity.Organization.ID, roleID, true)

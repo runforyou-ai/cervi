@@ -24,7 +24,7 @@ func NewDeleteBusinessSystemAction(db *bun.DB) *DeleteBusinessSystemAction {
 // Execute 删除当前企业中的业务系统。
 func (a *DeleteBusinessSystemAction) Execute(ctx context.Context, identity *servermodels.Identity, businessSystemID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		businessSystem, err := loadBusinessSystem(ctx, tx, identity.Organization.ID, businessSystemID, true)

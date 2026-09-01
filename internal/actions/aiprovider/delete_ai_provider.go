@@ -24,7 +24,7 @@ func NewDeleteAIProviderAction(db *bun.DB) *DeleteAIProviderAction {
 // Execute 删除模型服务供应商及其模型目录。
 func (a *DeleteAIProviderAction) Execute(ctx context.Context, identity *servermodels.Identity, providerID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		provider, err := loadProvider(ctx, tx, identity.Organization.ID, providerID, true)

@@ -1,6 +1,6 @@
 //go:build server
 
-package api
+package ingress
 
 import (
 	"bytes"

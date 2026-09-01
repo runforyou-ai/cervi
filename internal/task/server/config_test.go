@@ -34,9 +34,6 @@ func TestConfigBuildsIsolatedConsumerNames(t *testing.T) {
 	if config.streamName() != "CERVI_FEATURE_ONE_TASKS" {
 		t.Fatalf("stream name = %q", config.streamName())
 	}
-	if config.legacyConsumerName() != "CERVI_FEATURE_ONE_WORKERS" {
-		t.Fatalf("legacy consumer name = %q", config.legacyConsumerName())
-	}
 	if config.consumerName(workerPoolStandard) != "CERVI_FEATURE_ONE_STANDARD_WORKERS" {
 		t.Fatalf("standard consumer name = %q", config.consumerName(workerPoolStandard))
 	}

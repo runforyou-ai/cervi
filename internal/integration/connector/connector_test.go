@@ -516,7 +516,7 @@ func TestProbeDoesNotFollowRedirects(t *testing.T) {
 	}))
 	defer origin.Close()
 
-	probe, err := NewRegistry(NewHTTPClient()).NewProbe(Config{
+	probe, err := NewRegistry(connectiontest.NewHTTPClient()).NewProbe(Config{
 		Type: domain.IntegrationConnectionTypeN8N, APIURL: origin.URL, APIKey: "n8n-key",
 	})
 	if err != nil {

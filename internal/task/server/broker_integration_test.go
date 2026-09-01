@@ -29,8 +29,7 @@ func TestWorkerPoolsIsolateAgentTasks(t *testing.T) {
 	t.Cleanup(func() { _ = store.Close() })
 
 	natsConfig := testNATSConfig(t)
-	config := newConfig(natsConfig)
-	createLegacyTaskConsumer(t, ctx, config)
+	cleanupTaskStream(t, natsConfig)
 
 	runtime := New(store.DB(), natsConfig)
 	agentProbe := newWorkerPoolProbe(3)
@@ -107,6 +106,30 @@ func TestWorkerPoolsIsolateAgentTasks(t *testing.T) {
 		t.Fatal(err)
 	}
 	restartStopped = true
+}
+
+// cleanupTaskStream 在测试结束后删除独立命名空间的 JetStream 资源。
+func cleanupTaskStream(t *testing.T, natsConfig serverconfig.NATSConfig) {
+	t.Helper()
+	config := newConfig(natsConfig)
+	t.Cleanup(func() {
+		connection, err := nats.Connect(config.URL, nats.Timeout(config.StartupTimeout))
+		if err != nil {
+			t.Errorf("连接 NATS 清理测试 Stream 失败: %v", err)
+			return
+		}
+		defer connection.Close()
+		js, err := jetstream.New(connection)
+		if err != nil {
+			t.Errorf("创建 JetStream 客户端清理测试 Stream 失败: %v", err)
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), taskBrokerOperationTimeout)
+		defer cancel()
+		if err := js.DeleteStream(ctx, config.streamName()); err != nil && !errors.Is(err, jetstream.ErrStreamNotFound) {
+			t.Errorf("删除测试 Stream 失败: %v", err)
+		}
+	})
 }
 
 type testBrokerTask struct {
@@ -189,62 +212,9 @@ func testNATSConfig(t *testing.T) serverconfig.NATSConfig {
 	return serverconfig.NATSConfig{URL: url, Namespace: namespace}
 }
 
-// createLegacyTaskConsumer 创建旧版 Catch-all Consumer 并在测试后删除 Stream。
-func createLegacyTaskConsumer(t *testing.T, ctx context.Context, config runtimeConfig) {
-	t.Helper()
-	connection, err := nats.Connect(config.URL, nats.Timeout(config.StartupTimeout))
-	if err != nil {
-		t.Fatal(err)
-	}
-	js, err := jetstream.New(connection)
-	if err != nil {
-		connection.Close()
-		t.Fatal(err)
-	}
-	if _, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
-		Name: config.streamName(), Subjects: []string{config.subjectPrefix() + ".>"},
-		Retention: jetstream.WorkQueuePolicy, MaxBytes: config.MaxBytes, MaxAge: config.MaxAge,
-		Discard: jetstream.DiscardNew, Storage: jetstream.FileStorage, Replicas: config.Replicas,
-		Duplicates: taskMessageDuplicateWindow,
-	}); err != nil {
-		connection.Close()
-		t.Fatal(err)
-	}
-	if _, err := js.CreateOrUpdateConsumer(ctx, config.streamName(), jetstream.ConsumerConfig{
-		Name: config.legacyConsumerName(), Durable: config.legacyConsumerName(),
-		AckPolicy: jetstream.AckExplicitPolicy, AckWait: leaseDuration, MaxDeliver: -1,
-		FilterSubject: config.subjectPrefix() + ".>", MaxAckPending: taskPoolMaxAckPending, Replicas: config.Replicas,
-	}); err != nil {
-		connection.Close()
-		t.Fatal(err)
-	}
-	connection.Close()
-	t.Cleanup(func() {
-		cleanupConnection, connectErr := nats.Connect(config.URL, nats.Timeout(config.StartupTimeout))
-		if connectErr != nil {
-			t.Errorf("连接 NATS 清理测试 Stream 失败: %v", connectErr)
-			return
-		}
-		defer cleanupConnection.Close()
-		cleanupJS, jsErr := jetstream.New(cleanupConnection)
-		if jsErr != nil {
-			t.Errorf("创建 JetStream 客户端清理测试 Stream 失败: %v", jsErr)
-			return
-		}
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), taskBrokerOperationTimeout)
-		defer cleanupCancel()
-		if deleteErr := cleanupJS.DeleteStream(cleanupCtx, config.streamName()); deleteErr != nil {
-			t.Errorf("删除测试 Stream 失败: %v", deleteErr)
-		}
-	})
-}
-
-// assertWorkerConsumers 验证旧 Consumer 已被两个互不重叠的 Worker Pool 替代。
+// assertWorkerConsumers 验证两个 Worker Pool 使用互不重叠的过滤条件。
 func assertWorkerConsumers(t *testing.T, ctx context.Context, runtime *Runtime) {
 	t.Helper()
-	if _, err := runtime.jetstream.Consumer(ctx, runtime.config.streamName(), runtime.config.legacyConsumerName()); !errors.Is(err, jetstream.ErrConsumerNotFound) {
-		t.Fatalf("旧任务 Consumer 仍然存在: %v", err)
-	}
 	for _, pool := range runtime.config.WorkerPools {
 		consumer, err := runtime.jetstream.Consumer(ctx, runtime.config.streamName(), runtime.config.consumerName(pool.Name))
 		if err != nil {

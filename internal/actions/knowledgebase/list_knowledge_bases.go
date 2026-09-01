@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -24,9 +23,6 @@ func NewListKnowledgeBasesQuery(db *bun.DB) *ListKnowledgeBasesQuery {
 
 // Execute 返回当前企业的全部知识库。
 func (q *ListKnowledgeBasesQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]Record, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	models := make([]servermodels.KnowledgeBase, 0)
 	if err := q.db.NewSelect().
 		Model(&models).

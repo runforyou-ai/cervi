@@ -43,7 +43,7 @@ func (a *CreateMessageChannelAction) Execute(ctx context.Context, identity *serv
 		channel.Description = &input.Description
 	}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, input.Type, "newConversationTarget", input.NewConversationTarget); err != nil {

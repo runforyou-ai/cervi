@@ -21,9 +21,6 @@ const (
 	CategoryObjectStorage Category = "object_storage"
 	CategoryModelProvider Category = "model_provider"
 	CategoryConnector     Category = "connector"
-	CategoryAgentRuntime  Category = "agent_runtime"
-	CategoryTranslation   Category = "translation"
-	CategoryMCP           Category = "mcp"
 	CategoryTelegram      Category = "telegram"
 )
 
@@ -32,7 +29,6 @@ type Location string
 
 const (
 	LocationServer Location = "server"
-	LocationDevice Location = "device"
 )
 
 // Stage 标识外部连接失败阶段。

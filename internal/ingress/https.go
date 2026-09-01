@@ -1,6 +1,7 @@
 //go:build server
 
-package api
+// Package ingress 实现企业服务端的公网流量入口。
+package ingress
 
 import (
 	"context"

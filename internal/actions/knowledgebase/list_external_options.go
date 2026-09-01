@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connector"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -34,9 +33,6 @@ func (q *ListExternalOptionsQuery) Execute(
 	identity *servermodels.Identity,
 	connectionID string,
 ) ([]ExternalOptionRecord, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	configuration, err := loadDifyConfiguration(ctx, q.db, identity.Organization.ID, connectionID)
 	if err != nil {
 		return nil, err

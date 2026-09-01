@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,9 +22,6 @@ func NewGetIntegrationConnectionQuery(db *bun.DB) *GetIntegrationConnectionQuery
 
 // Execute 返回连接器及其认证配置。
 func (q *GetIntegrationConnectionQuery) Execute(ctx context.Context, identity *servermodels.Identity, connectionID string) (*Record, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	connection, err := loadConnection(ctx, q.db, identity.Organization.ID, connectionID, false)
 	if err != nil {
 		return nil, fmt.Errorf("get integration connection: %w", err)

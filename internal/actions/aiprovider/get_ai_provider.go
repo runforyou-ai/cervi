@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,9 +22,6 @@ func NewGetAIProviderQuery(db *bun.DB) *GetAIProviderQuery {
 
 // Execute 返回模型服务供应商及其模型目录。
 func (q *GetAIProviderQuery) Execute(ctx context.Context, identity *servermodels.Identity, providerID string) (*Record, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	provider, err := loadProvider(ctx, q.db, identity.Organization.ID, providerID, false)
 	if err != nil {
 		return nil, fmt.Errorf("get AI provider: %w", err)

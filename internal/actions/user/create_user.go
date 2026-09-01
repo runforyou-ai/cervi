@@ -31,7 +31,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 	}
 	var output *User
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {

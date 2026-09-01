@@ -1,10 +1,12 @@
 //go:build server
 
-// Package identity 提供 Action 层共用的当前身份校验。
+// Package identity 提供 Action 层共用的身份查询和当前用户写入守卫。
 package identity
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -12,8 +14,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// Validate 校验当前企业用户账号仍可用。
-func Validate(ctx context.Context, db bun.IDB, identity *servermodels.Identity) error {
+// LockActiveUser 校验当前身份并锁定有效用户账号，供写事务复用。
+func LockActiveUser(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
 	if identity == nil ||
 		!common.ValidUUID(identity.Organization.ID) ||
 		!common.ValidUUID(identity.OrganizationIdentity.ID) ||
@@ -25,18 +27,21 @@ func Validate(ctx context.Context, db bun.IDB, identity *servermodels.Identity) 
 		identity.User.OrganizationID != identity.Organization.ID {
 		return common.ErrIdentityInvalid
 	}
-	active, err := db.NewSelect().
-		Model((*servermodels.User)(nil)).
+	user := &servermodels.User{}
+	err := tx.NewSelect().
+		Model(user).
+		Column("id").
 		Where("id = ?", identity.User.ID).
 		Where("identity_id = ?", identity.User.IdentityID).
 		Where("organization_id = ?", identity.Organization.ID).
 		Where("status = ?", domain.UserStatusActive).
-		Exists(ctx)
+		For("NO KEY UPDATE").
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return common.ErrIdentityInvalid
+	}
 	if err != nil {
 		return err
-	}
-	if !active {
-		return common.ErrIdentityInvalid
 	}
 	return nil
 }

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -29,9 +28,6 @@ func (q *ListMemberCandidatesQuery) Execute(ctx context.Context, identity *serve
 	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
 	if !pageValid {
 		return MemberCandidateOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
-	}
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return MemberCandidateOutput{}, err
 	}
 	if _, err := loadTeam(ctx, q.db, identity.Organization.ID, teamID); err != nil {
 		return MemberCandidateOutput{}, err
