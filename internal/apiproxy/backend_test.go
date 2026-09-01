@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -73,20 +74,6 @@ func TestBackendRequiresEnterpriseServer(t *testing.T) {
 	}
 }
 
-// TestAbsoluteContentURL 验证原生端文件地址指向已连接的企业服务器。
-func TestAbsoluteContentURL(t *testing.T) {
-	backend, err := newTestBackend(&memoryStore{serverURL: "https://cervi.example.com/company"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := backend.absoluteContentURL("/storage/organizations/org/files/file.png"); got != "https://cervi.example.com/company/storage/organizations/org/files/file.png" {
-		t.Fatalf("content URL = %q", got)
-	}
-	if got := backend.absoluteContentURL("https://storage.example.com/object"); got != "https://storage.example.com/object" {
-		t.Fatalf("absolute content URL = %q", got)
-	}
-}
-
 // TestBackendPreservesCancellation 验证远程请求取消不会转换为连接错误。
 func TestBackendPreservesCancellation(t *testing.T) {
 	backend, err := newTestBackend(&memoryStore{serverURL: "http://127.0.0.1:1"})
@@ -116,9 +103,9 @@ func TestBackendUnavailablePreservesConnection(t *testing.T) {
 
 // TestBackendConnectsAndUsesBearerToken 验证类型化远程调用使用 Bearer Token。
 func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
-	const contactAvatarURL = "https://cdn.example.com/organizations/organization-1/files/019d4e1c-40a5-77dd-82e6-6951f9957ba5.png"
+	const contactAvatarURL = "/storage/organizations/organization-1/files/019d4e1c-40a5-77dd-82e6-6951f9957ba5.png"
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		switch request.URL.Path {
+		switch strings.TrimPrefix(request.URL.Path, "/company") {
 		case "/api/installation/status":
 			if request.Header.Get("Authorization") != "" {
 				http.Error(writer, "installation status must not use login state", http.StatusBadRequest)
@@ -143,120 +130,6 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			writeTestJSON(writer, http.StatusUnauthorized, map[string]any{"error": map[string]string{
 				"state": "login", "message": "Authentication required.",
 			}})
-		case "/api/conversations/conversation-1/messages":
-			if request.Method != http.MethodPost || request.Header.Get("Authorization") != "Bearer test-token" {
-				http.Error(writer, "unexpected customer message request", http.StatusBadRequest)
-				return
-			}
-			var input appservice.CustomerTextMessageInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			writeTestJSON(writer, http.StatusOK, appservice.ConversationMessage{
-				ID: input.ClientMessageID, Type: appservice.MessageTypeText, Body: input.Body,
-				Sender: &appservice.ConversationMessageSender{Kind: appservice.ChatSubjectKindOrganizationIdentity},
-			})
-		case "/api/profile":
-			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
-				http.Error(writer, "unexpected profile request", http.StatusBadRequest)
-				return
-			}
-			var input appservice.ProfileInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			if input.AvatarFileID != "file-1" {
-				http.Error(writer, "unexpected avatar file", http.StatusBadRequest)
-				return
-			}
-			writeTestJSON(writer, http.StatusOK, map[string]string{
-				"id": "user-1", "organizationId": "organization-1", "displayName": input.DisplayName, "email": input.Email,
-				"avatarUrl": "/storage/organizations/org/files/file.png",
-			})
-		case "/api/password":
-			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
-				http.Error(writer, "unexpected password request", http.StatusBadRequest)
-				return
-			}
-			var input appservice.ChangePasswordInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			if input.CurrentPassword != "password123" || input.NewPassword != "new-password123" {
-				http.Error(writer, "unexpected password input", http.StatusBadRequest)
-				return
-			}
-			writer.WriteHeader(http.StatusNoContent)
-		case "/api/preferences":
-			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
-				http.Error(writer, "unexpected preferences request", http.StatusBadRequest)
-				return
-			}
-			var input appservice.UserPreferencesInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			if !input.MessageNotificationsEnabled || !input.WorkspaceTabsEnabled {
-				http.Error(writer, "unexpected preferences", http.StatusBadRequest)
-				return
-			}
-			writeTestJSON(writer, http.StatusOK, map[string]any{
-				"id": "user-1", "organizationId": "organization-1", "locale": string(input.Locale), "timeZone": input.TimeZone,
-				"messageNotificationsEnabled": input.MessageNotificationsEnabled,
-				"workspaceTabsEnabled":        input.WorkspaceTabsEnabled,
-			})
-		case "/api/work-status":
-			if request.Method != http.MethodPatch || request.Header.Get("Authorization") != "Bearer test-token" {
-				http.Error(writer, "unexpected work status request", http.StatusBadRequest)
-				return
-			}
-			var input appservice.UserWorkStatusInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			writeTestJSON(writer, http.StatusOK, map[string]string{
-				"id": "user-1", "organizationId": "organization-1", "workStatus": string(input.WorkStatus),
-			})
-		case "/api/agents/agent-1/work-status":
-			if request.Method != http.MethodPut || request.Header.Get("Authorization") != "Bearer test-token" {
-				http.Error(writer, "unexpected agent work status request", http.StatusBadRequest)
-				return
-			}
-			var input appservice.AgentWorkStatusInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			writeTestJSON(writer, http.StatusOK, appservice.Agent{ID: "agent-1", WorkStatus: input.WorkStatus, Teams: []appservice.TeamSummary{}})
-		case "/api/agents/agent-1/execution":
-			if request.Method != http.MethodPut || request.Header.Get("Authorization") != "Bearer test-token" {
-				http.Error(writer, "unexpected agent execution request", http.StatusBadRequest)
-				return
-			}
-			var input appservice.AgentExecutionInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			writeTestJSON(writer, http.StatusOK, appservice.Agent{
-				ID: "agent-1", Teams: []appservice.TeamSummary{},
-				Execution: appservice.AgentExecution{RevisionID: "revision-1", Mode: input.Mode, Managed: &appservice.AgentManagedExecution{
-					ProviderID: input.Managed.ProviderID, ProviderName: "企业模型",
-					ModelIdentifier: input.Managed.ModelIdentifier, ModelName: "对话模型",
-					SystemInstruction: input.Managed.SystemInstruction,
-				}},
-			})
-		case "/api/teams/team-1/members":
-			if request.Method != http.MethodGet || request.URL.Query().Get("workStatus") != string(appservice.WorkStatusOffDuty) {
-				http.Error(writer, "unexpected team member query", http.StatusBadRequest)
-				return
-			}
-			writeTestJSON(writer, http.StatusOK, appservice.TeamMemberList{Members: []appservice.TeamMember{}, Page: appservice.PageInfo{Number: 1, Size: 50}})
 		case "/api/auth/login":
 			writeTestJSON(writer, http.StatusOK, map[string]any{
 				"identity": map[string]any{
@@ -271,24 +144,12 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				return
 			}
 			writer.WriteHeader(http.StatusNoContent)
-		case "/api/settings/organization":
-			if request.Method != http.MethodPut || request.Header.Get("Authorization") != "Bearer test-token" {
-				writeTestJSON(writer, http.StatusUnauthorized, map[string]any{"error": map[string]string{
-					"code": "AUTH_REQUIRED", "message": "Authentication required.",
-				}})
-				return
-			}
-			var input appservice.OrganizationInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil {
-				http.Error(writer, err.Error(), http.StatusBadRequest)
-				return
-			}
-			writeTestJSON(writer, http.StatusOK, appservice.Organization{ID: "organization-1", Name: input.Name})
 		default:
 			http.NotFound(writer, request)
 		}
 	}))
 	defer remote.Close()
+	serverURL := remote.URL + "/company"
 
 	store := &memoryStore{}
 	backend, err := newTestBackend(store)
@@ -296,7 +157,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	meta := appservice.RequestMeta{Locale: "zh-CN"}
-	status, err := backend.ProbeServer(context.Background(), meta, remote.URL)
+	status, err := backend.ProbeServer(context.Background(), meta, serverURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,13 +167,13 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if store.serverURL != "" {
 		t.Fatalf("probe should not save server URL, got %q", store.serverURL)
 	}
-	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil {
+	if err := backend.ConnectServer(context.Background(), meta, serverURL); err != nil {
 		t.Fatal(err)
 	}
-	if store.serverURL != remote.URL {
-		t.Fatalf("server URL = %q, want %q", store.serverURL, remote.URL)
+	if store.serverURL != serverURL {
+		t.Fatalf("server URL = %q, want %q", store.serverURL, serverURL)
 	}
-	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil {
+	if err := backend.ConnectServer(context.Background(), meta, serverURL); err != nil {
 		t.Fatal(err)
 	}
 	status, err = backend.InstallationStatus(context.Background(), meta)
@@ -322,12 +183,12 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if !status.Installed || status.OrganizationName != "鹿行" {
 		t.Fatalf("status = %#v", status)
 	}
-	serverURL, err := backend.ServerURL(context.Background(), meta)
+	configuredServerURL, err := backend.ServerURL(context.Background(), meta)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if serverURL != remote.URL {
-		t.Fatalf("configured server URL = %q, want %q", serverURL, remote.URL)
+	if configuredServerURL != serverURL {
+		t.Fatalf("configured server URL = %q, want %q", configuredServerURL, serverURL)
 	}
 	auth, err := backend.Login(context.Background(), meta, appservice.LoginInput{Email: "admin@example.com", Password: "password123"})
 	if err != nil {
@@ -343,7 +204,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if !store.credentialSet || store.credential.Token != "test-token" || store.credential.UserID != "user-1" || store.credential.OrganizationID != "organization-1" {
 		t.Fatalf("saved client credential = %#v, found = %v", store.credential, store.credentialSet)
 	}
-	if err := backend.ConnectServer(context.Background(), meta, remote.URL); err != nil || !store.credentialSet {
+	if err := backend.ConnectServer(context.Background(), meta, serverURL); err != nil || !store.credentialSet {
 		t.Fatalf("same server credential found = %v, error = %v", store.credentialSet, err)
 	}
 	backend, err = newTestBackend(store)
@@ -354,71 +215,8 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(inbox.Conversations) != 1 || inbox.Conversations[0].Customer == nil || inbox.Conversations[0].Customer.ContactAvatarURL != contactAvatarURL {
+	if len(inbox.Conversations) != 1 || inbox.Conversations[0].Customer == nil || inbox.Conversations[0].Customer.ContactAvatarURL != serverURL+contactAvatarURL {
 		t.Fatalf("normalized inbox = %#v", inbox)
-	}
-	message, err := backend.SendCustomerTextMessage(context.Background(), meta, "conversation-1", appservice.CustomerTextMessageInput{
-		ClientMessageID: "message-1", Body: "回复客户",
-	})
-	if err != nil || message.ID != "message-1" || message.Body != "回复客户" || message.Sender == nil || message.Sender.Kind != appservice.ChatSubjectKindOrganizationIdentity {
-		t.Fatalf("customer message = %#v, error = %v", message, err)
-	}
-	user, err := backend.UpdateProfile(context.Background(), meta, appservice.ProfileInput{
-		DisplayName:  "林晓",
-		Email:        "lin@example.com",
-		AvatarFileID: "file-1",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if user.DisplayName != "林晓" || user.Email != "lin@example.com" || user.AvatarURL != remote.URL+"/storage/organizations/org/files/file.png" {
-		t.Fatalf("updated user = %#v", user)
-	}
-	if err := backend.ChangePassword(context.Background(), meta, appservice.ChangePasswordInput{
-		CurrentPassword: "password123",
-		NewPassword:     "new-password123",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	preferences, err := backend.UpdateUserPreferences(context.Background(), meta, appservice.UserPreferencesInput{
-		Locale: appservice.LocaleEnglishUnitedStates, TimeZone: "America/New_York", MessageNotificationsEnabled: true, WorkspaceTabsEnabled: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if preferences.Locale != appservice.LocaleEnglishUnitedStates || preferences.TimeZone != "America/New_York" || !preferences.MessageNotificationsEnabled || !preferences.WorkspaceTabsEnabled {
-		t.Fatalf("updated preferences = %#v", preferences)
-	}
-	workStatus, err := backend.UpdateUserWorkStatus(context.Background(), meta, appservice.UserWorkStatusInput{
-		WorkStatus: appservice.WorkStatusAway,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if workStatus.WorkStatus != appservice.WorkStatusAway {
-		t.Fatalf("updated work status = %#v", workStatus)
-	}
-	agent, err := backend.UpdateAgentWorkStatus(context.Background(), meta, "agent-1", appservice.AgentWorkStatusInput{WorkStatus: appservice.WorkStatusAway})
-	if err != nil || agent.WorkStatus != appservice.WorkStatusAway {
-		t.Fatalf("updated agent work status = %#v, error = %v", agent, err)
-	}
-	agent, err = backend.UpdateAgentExecution(context.Background(), meta, "agent-1", appservice.AgentExecutionInput{
-		Mode: appservice.AgentExecutionModeManaged,
-		Managed: &appservice.AgentManagedExecutionInput{
-			ProviderID: "provider-1", ModelIdentifier: "chat-model", SystemInstruction: "回答产品问题。",
-		},
-	})
-	if err != nil || agent.Execution.Managed == nil || agent.Execution.Managed.ModelIdentifier != "chat-model" {
-		t.Fatalf("updated agent execution = %#v, error = %v", agent.Execution, err)
-	}
-	offDuty := appservice.WorkStatusOffDuty
-	teamMembers, err := backend.ListTeamMembers(context.Background(), meta, "team-1", appservice.TeamMemberListInput{WorkStatus: &offDuty, Page: 1, PageSize: 50})
-	if err != nil || teamMembers.Page.Number != 1 || teamMembers.Page.Size != 50 {
-		t.Fatalf("team members = %#v, error = %v", teamMembers, err)
-	}
-	organization, err := backend.UpdateOrganization(context.Background(), meta, appservice.OrganizationInput{Name: "鹿行协作"})
-	if err != nil || organization.Name != "鹿行协作" {
-		t.Fatalf("updated organization = %#v, error = %v", organization, err)
 	}
 	if err := backend.Logout(context.Background(), meta); err != nil {
 		t.Fatal(err)

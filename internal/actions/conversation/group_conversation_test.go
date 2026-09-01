@@ -3,52 +3,41 @@
 package conversation
 
 import (
+	"context"
+	"errors"
 	"fmt"
-	"strings"
 	"testing"
+
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// TestNormalizeGroupConversationInput 验证群聊名称和初始成员编号归一化。
-func TestNormalizeGroupConversationInput(t *testing.T) {
-	currentIdentityID := "0198ddee-c056-7bc5-a1d9-586f878ee966"
-	memberIdentityID := "0198DDF0-A234-7F01-8D99-E3E0AF0F5F65"
-	normalized, fields := normalizeGroupConversationInput(currentIdentityID, GroupConversationInput{
-		Title:             "  产品讨论  ",
-		MemberIdentityIDs: []string{memberIdentityID},
-	})
-	if len(fields) != 0 || normalized.Title != "产品讨论" || normalized.MemberIdentityIDs[0] != strings.ToLower(memberIdentityID) {
-		t.Fatalf("normalized = %#v, fields = %#v", normalized, fields)
-	}
-}
-
-// TestNormalizeGroupConversationInputRejectsInvalidMembers 验证群聊拒绝自己、重复成员和空成员集合。
-func TestNormalizeGroupConversationInputRejectsInvalidMembers(t *testing.T) {
+// TestCreateGroupConversationRejectsInvalidMembers 验证群聊创建拒绝无效的初始成员集合。
+func TestCreateGroupConversationRejectsInvalidMembers(t *testing.T) {
 	currentIdentityID := "0198ddee-c056-7bc5-a1d9-586f878ee966"
 	memberIdentityID := "0198ddf0-a234-7f01-8d99-e3e0af0f5f65"
-	tests := []GroupConversationInput{
-		{Title: "产品讨论"},
-		{Title: "产品讨论", MemberIdentityIDs: []string{currentIdentityID}},
-		{Title: "产品讨论", MemberIdentityIDs: []string{memberIdentityID, memberIdentityID}},
+	oversizedMembers := make([]string, 0, 100)
+	for index := 0; index < 100; index++ {
+		oversizedMembers = append(oversizedMembers, fmt.Sprintf("0198ddf0-a234-7f01-8d99-%012x", index))
 	}
-	for _, input := range tests {
-		_, fields := normalizeGroupConversationInput(currentIdentityID, input)
-		if _, invalid := fields["memberIdentityIds"]; !invalid {
-			t.Fatalf("input = %#v, fields = %#v", input, fields)
-		}
+	tests := []struct {
+		name  string
+		input GroupConversationInput
+		code  ValidationCode
+	}{
+		{name: "空成员", input: GroupConversationInput{Title: "产品讨论"}, code: ValidationGroupMembersRequired},
+		{name: "包含自己", input: GroupConversationInput{Title: "产品讨论", MemberIdentityIDs: []string{currentIdentityID}}, code: ValidationGroupMemberIDsInvalid},
+		{name: "重复成员", input: GroupConversationInput{Title: "产品讨论", MemberIdentityIDs: []string{memberIdentityID, memberIdentityID}}, code: ValidationGroupMemberIDsInvalid},
+		{name: "超过人数上限", input: GroupConversationInput{Title: "大型群聊", MemberIdentityIDs: oversizedMembers}, code: ValidationGroupMembersTooMany},
 	}
-}
-
-// TestNormalizeGroupConversationInputRejectsOversizedGroup 验证群聊初始参与者总数不超过一百人。
-func TestNormalizeGroupConversationInputRejectsOversizedGroup(t *testing.T) {
-	members := make([]string, 0, maxGroupParticipantCount)
-	for index := 0; index < maxGroupParticipantCount; index++ {
-		members = append(members, fmt.Sprintf("0198ddf0-a234-7f01-8d99-%012x", index))
-	}
-	_, fields := normalizeGroupConversationInput("0198ddee-c056-7bc5-a1d9-586f878ee966", GroupConversationInput{
-		Title:             "大型群聊",
-		MemberIdentityIDs: members,
-	})
-	if fields["memberIdentityIds"] != ValidationGroupMembersTooMany {
-		t.Fatalf("validation fields = %#v", fields)
+	identity := &servermodels.Identity{OrganizationIdentity: servermodels.OrganizationIdentity{ID: currentIdentityID}}
+	action := NewCreateGroupConversationAction(nil)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := action.Execute(context.Background(), identity, test.input)
+			var validationError *ValidationError
+			if !errors.As(err, &validationError) || validationError.Fields["memberIdentityIds"] != test.code {
+				t.Fatalf("error = %#v, want memberIdentityIds %q", err, test.code)
+			}
+		})
 	}
 }

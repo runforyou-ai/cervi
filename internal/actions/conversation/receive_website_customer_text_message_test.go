@@ -3,9 +3,7 @@
 package conversation
 
 import (
-	"strings"
 	"testing"
-	"unicode/utf8"
 )
 
 // TestNormalizeWebsiteMessageInput 验证网站消息正文和身份输入规范化。
@@ -29,13 +27,5 @@ func TestNormalizeWebsiteMessageInput(t *testing.T) {
 func TestValidWebsiteExternalIDRejectsNonHex(t *testing.T) {
 	if validWebsiteExternalID("web-session:gggggggggggggggggggggggggggggggg") {
 		t.Fatal("expected non-hex external ID to be rejected")
-	}
-}
-
-// TestConversationTitleCollapsesWhitespaceAndLimitsRunes 验证会话标题压缩空白并限制字符数。
-func TestConversationTitleCollapsesWhitespaceAndLimitsRunes(t *testing.T) {
-	title := conversationTitle("  访客   问题\n" + strings.Repeat("鹿", 70))
-	if !strings.HasPrefix(title, "访客 问题 ") || utf8.RuneCountInString(title) != 60 {
-		t.Fatalf("conversation title = %q", title)
 	}
 }

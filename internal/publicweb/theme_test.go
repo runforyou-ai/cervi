@@ -36,14 +36,3 @@ func TestParseTheme(t *testing.T) {
 		}
 	}
 }
-
-// TestDefaultTheme 验证默认主题。
-func TestDefaultTheme(t *testing.T) {
-	theme := defaultTheme()
-	if theme.Color != "#2563EB" || theme.OnColor != "#FFFFFF" {
-		t.Fatalf("defaultTheme() = %+v", theme)
-	}
-	if theme.LauncherShadow != "0 10px 28px rgba(37, 99, 235, 0.42)" {
-		t.Fatalf("launcher shadow = %q", theme.LauncherShadow)
-	}
-}

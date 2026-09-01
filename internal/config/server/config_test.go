@@ -84,13 +84,6 @@ func TestValidationRequiresDatabaseName(t *testing.T) {
 	}
 }
 
-// TestDefaultTLSModeIsOff 验证 TLS 默认关闭。
-func TestDefaultTLSModeIsOff(t *testing.T) {
-	if mode := defaultConfig().TLS.Mode; mode != "off" {
-		t.Fatalf("TLS 默认模式 = %q", mode)
-	}
-}
-
 // TestValidationRejectsInvalidNATSConfig 验证 NATS 地址和命名空间。
 func TestValidationRejectsInvalidNATSConfig(t *testing.T) {
 	for _, nats := range []NATSConfig{

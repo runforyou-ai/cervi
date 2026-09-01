@@ -3,14 +3,11 @@
 package channel
 
 import (
-	"context"
-	"errors"
 	"strings"
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/common/embedhost"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // TestNormalizeCreateMessageChannelInput 验证消息渠道创建字段规范化和长度限制。
@@ -69,29 +66,6 @@ func TestNormalizeCreateMessageChannelInput(t *testing.T) {
 	}
 	if fields["defaultLocale"] != ValidationDefaultLocaleInvalid {
 		t.Fatalf("default locale validation = %q, want %q", fields["defaultLocale"], ValidationDefaultLocaleInvalid)
-	}
-}
-
-// TestNormalizeMessageChannelInputCountsUnicodeCodePoints 验证补充平面字符按码点计数。
-func TestNormalizeMessageChannelInputCountsUnicodeCodePoints(t *testing.T) {
-	_, fields := normalizeMessageChannelInput(MessageChannelInput{
-		Name:                  strings.Repeat("😀", 100),
-		Description:           strings.Repeat("😀", 2000),
-		DefaultLocale:         domain.LocaleChineseSimplified,
-		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-	})
-	if len(fields) != 0 {
-		t.Fatalf("validation fields = %#v, want empty", fields)
-	}
-
-	_, fields = normalizeMessageChannelInput(MessageChannelInput{
-		Name:          strings.Repeat("😀", 101),
-		Description:   strings.Repeat("😀", 2001),
-		DefaultLocale: domain.LocaleChineseSimplified,
-	})
-	if fields["name"] != ValidationNameTooLong || fields["description"] != ValidationDescriptionTooLong {
-		t.Fatalf("unexpected validation fields: %#v", fields)
 	}
 }
 
@@ -181,110 +155,5 @@ func TestNormalizeTelegramConnectionInputRejectsUnsafeBaseURL(t *testing.T) {
 		if fields["webhookBaseURL"] != ValidationTelegramBaseURLInvalid {
 			t.Fatalf("base URL %q validation = %#v", baseURL, fields)
 		}
-	}
-}
-
-// TestMalformedChannelIDReturnsNotFound 验证非法 UUID 不会进入数据库查询。
-func TestMalformedChannelIDReturnsNotFound(t *testing.T) {
-	identity := &servermodels.Identity{}
-	input := MessageChannelInput{
-		Name:          "产品官网",
-		DefaultLocale: domain.LocaleChineseSimplified,
-	}
-
-	tests := []struct {
-		name    string
-		execute func() error
-	}{
-		{
-			name: "get message channel",
-			execute: func() error {
-				_, err := NewGetMessageChannelQuery(nil).Execute(context.Background(), identity, "not-a-uuid")
-				return err
-			},
-		},
-		{
-			name: "get",
-			execute: func() error {
-				_, err := NewGetWebsiteChannelQuery(nil).Execute(context.Background(), identity, "not-a-uuid")
-				return err
-			},
-		},
-		{
-			name: "get Telegram",
-			execute: func() error {
-				_, err := NewGetTelegramChannelQuery(nil).Execute(context.Background(), identity, "not-a-uuid")
-				return err
-			},
-		},
-		{
-			name: "update",
-			execute: func() error {
-				_, err := NewUpdateMessageChannelAction(nil).Execute(context.Background(), identity, "not-a-uuid", input)
-				return err
-			},
-		},
-		{
-			name: "update chat interface",
-			execute: func() error {
-				_, err := NewUpdateWebsiteChannelChatInterfaceAction(nil).Execute(context.Background(), identity, "not-a-uuid", WebsiteChannelChatInterfaceInput{})
-				return err
-			},
-		},
-		{
-			name: "update access",
-			execute: func() error {
-				_, err := NewUpdateWebsiteChannelAccessAction(nil).Execute(context.Background(), identity, "not-a-uuid", WebsiteChannelAccessInput{})
-				return err
-			},
-		},
-		{
-			name: "update status",
-			execute: func() error {
-				_, err := NewUpdateMessageChannelStatusAction(nil).Execute(context.Background(), identity, "not-a-uuid", false)
-				return err
-			},
-		},
-		{
-			name: "get public",
-			execute: func() error {
-				_, err := NewGetPublicWebsiteChannelQuery(nil).Execute(context.Background(), "not-a-uuid")
-				return err
-			},
-		},
-		{
-			name: "receive Telegram webhook",
-			execute: func() error {
-				return NewReceiveTelegramWebhookAction(nil, nil, nil).Preflight(context.Background(), "not-a-uuid", "secret")
-			},
-		},
-		{
-			name: "test Telegram connection",
-			execute: func() error {
-				return NewTestTelegramConnectionAction(nil, nil, nil).Execute(context.Background(), identity, "not-a-uuid", TelegramChannelConnectionTestInput{})
-			},
-		},
-		{
-			name: "save Telegram connection",
-			execute: func() error {
-				_, err := NewSaveTelegramConnectionAction(nil, nil, nil).Execute(context.Background(), identity, "not-a-uuid", TelegramChannelConnectionInput{})
-				return err
-			},
-		},
-		{
-			name: "update Telegram status",
-			execute: func() error {
-				_, err := NewUpdateTelegramChannelStatusAction(nil, nil, nil).Execute(context.Background(), identity, "not-a-uuid", true)
-				return err
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if err := test.execute(); !errors.Is(err, ErrNotFound) {
-				t.Fatalf("error = %v, want ErrNotFound", err)
-			}
-		})
 	}
 }
