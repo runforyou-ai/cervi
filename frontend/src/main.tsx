@@ -12,11 +12,15 @@ import "@/index.css"
 import { resourceClient } from "@/lib/resource-client"
 import { resolveAppPlatform, type AppPlatform } from "@/platform/app-platform"
 
-/** Web 端启用浏览器默认右键菜单。 */
+/** Web 和桌面端禁用原生右键菜单。 */
 function applyPlatformContextMenu(platform: AppPlatform) {
-  if (platform === "web") {
-    document.documentElement.style.setProperty("--default-contextmenu", "show")
+  if (platform === "mobile") {
+    return
   }
+
+  document.addEventListener("contextmenu", (event) => {
+    event.preventDefault()
+  })
 }
 
 /** 启动前端应用。 */
