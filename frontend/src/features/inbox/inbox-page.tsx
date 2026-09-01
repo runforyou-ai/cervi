@@ -53,7 +53,10 @@ import { useUserTimeZone } from "@/contexts/user-preferences"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { previousDayKey } from "@/features/inbox/calendar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { ConversationComposer } from "@/features/inbox/conversation-composer"
+import {
+  ConversationComposer,
+  ConversationComposerUnavailable,
+} from "@/features/inbox/conversation-composer"
 import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
 import {
   ConversationAvatar,
@@ -62,7 +65,10 @@ import {
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
 import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
-import { useOutgoingConversationMessages } from "@/features/inbox/use-outgoing-conversation-messages"
+import {
+  useOutgoingConversationMessages,
+  type OutgoingConversationDraft,
+} from "@/features/inbox/use-outgoing-conversation-messages"
 import {
   useIsNarrowViewport,
   useIsWideViewport,
@@ -762,22 +768,32 @@ function ConversationMain({
         t,
       )
     : ""
-  const canReply =
-    directConversation !== null ||
-    groupConversation !== null ||
-    (customerConversation !== null &&
-      customerConversation.customer.serviceSessionStatus ===
-        ServiceSessionStatus.ServiceSessionStatusOpen &&
-      (!customerConversation.customer.assignee ||
-        customerConversation.customer.assignee.identityId ===
-          identity.user.identityId))
-  const desktopContextVisible =
-    customerConversation !== null && isWideViewport && !contextCollapsed
-  const contextVisible = customerConversation
-    ? isWideViewport
-      ? desktopContextVisible
-      : contextSheetOpen
-    : false
+  const replyDisabledReason = customerConversation
+    ? customerConversation.customer.serviceSessionStatus ===
+      ServiceSessionStatus.ServiceSessionStatusClosed
+      ? t("replyClosedUnavailable")
+      : customerConversation.customer.assignee &&
+          customerConversation.customer.assignee.identityId !==
+            identity.user.identityId
+        ? t("replyAssignedUnavailable", {
+            name: customerConversation.customer.assignee.displayName,
+          })
+        : null
+    : null
+  const contextTitle = customerConversation
+    ? t("contextTitleBar")
+    : directConversation
+      ? t("contextDirectTitleBar")
+      : t("contextGroupTitleBar")
+  const contextDescription = customerConversation
+    ? t("contextDescription")
+    : directConversation
+      ? t("contextDirectDescription")
+      : t("contextGroupDescription")
+  const desktopContextVisible = isWideViewport && !contextCollapsed
+  const contextVisible = isWideViewport
+    ? desktopContextVisible
+    : contextSheetOpen
 
   useEffect(() => {
     if (isWideViewport) {
@@ -816,31 +832,32 @@ function ConversationMain({
             )
           }}
           contextVisible={contextVisible}
+          contextTitle={contextTitle}
           narrowViewport={narrowViewport}
           onContextToggle={toggleContext}
         />
         <ConversationThread
           key={conversation.id}
           conversation={validConversation}
-          canReply={canReply}
+          replyDisabledReason={replyDisabledReason}
           onConversationChanged={() =>
             onConversationChanged(validConversation)
           }
         />
       </div>
-      {customerConversation ? (
-        <ConversationContextPane
-          conversation={customerConversation}
-          contactName={contactName}
-          sessionStatus={sessionStatus}
-          desktopVisible={desktopContextVisible}
-          sheetOpen={!isWideViewport && contextSheetOpen}
-          onDesktopToggle={() =>
-            setContextCollapsed((collapsed) => !collapsed)
-          }
-          onSheetOpenChange={setContextSheetOpen}
-        />
-      ) : null}
+      <ConversationContextPane
+        conversation={validConversation}
+        displayName={contactName}
+        sessionStatus={sessionStatus}
+        title={contextTitle}
+        description={contextDescription}
+        desktopVisible={desktopContextVisible}
+        sheetOpen={!isWideViewport && contextSheetOpen}
+        onDesktopToggle={() =>
+          setContextCollapsed((collapsed) => !collapsed)
+        }
+        onSheetOpenChange={setContextSheetOpen}
+      />
     </div>
   )
 }
@@ -848,19 +865,24 @@ function ConversationMain({
 /** 协调当前会话时间线和回复区的即时消息。 */
 function ConversationThread({
   conversation,
-  canReply,
+  replyDisabledReason,
   onConversationChanged,
 }: {
   conversation:
     | CustomerInboxConversationData
     | DirectInboxConversationData
     | GroupInboxConversationData
-  canReply: boolean
+  replyDisabledReason: string | null
   onConversationChanged: () => void
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
   const outgoing = useOutgoingConversationMessages()
+  const [retryDraft, setRetryDraft] =
+    useState<OutgoingConversationDraft | null>(null)
+  const messageSending = outgoing.messages.some(
+    (message) => message.status === "sending",
+  )
   const replySupported =
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation) ||
@@ -872,24 +894,31 @@ function ConversationThread({
         conversationID={conversation.id}
         conversationType={conversation.type}
         currentIdentityID={identity.user.identityId}
+        workspaceLayout
         outgoingMessages={outgoing.messages}
+        onRetryFailedMessage={setRetryDraft}
+        retryFailedMessageDisabled={messageSending}
       />
-      {canReply ? (
-        replySupported ? (
-          <ConversationComposer
-            conversationID={conversation.id}
-            conversationType={conversation.type}
-            onSending={outgoing.start}
-            onSent={outgoing.succeed}
-            onFailed={outgoing.fail}
-            onSucceeded={onConversationChanged}
-          />
-        ) : (
-          <div className="shrink-0 border-t border-border/60 bg-muted/20 px-4 py-5 text-center text-sm text-muted-foreground">
-            {t("channelReplyUnsupported")}
-          </div>
-        )
-      ) : null}
+      {!replySupported || replyDisabledReason ? (
+        <ConversationComposerUnavailable
+          conversationID={conversation.id}
+          reason={replyDisabledReason ?? t("channelReplyUnsupported")}
+        />
+      ) : (
+        <ConversationComposer
+          conversationID={conversation.id}
+          conversationType={conversation.type}
+          submitOnEnter
+          refocusAfterSubmit
+          retryFailedMessage
+          retryDraft={retryDraft}
+          onRetryDraftHandled={() => setRetryDraft(null)}
+          onSending={outgoing.start}
+          onSent={outgoing.succeed}
+          onFailed={outgoing.fail}
+          onSucceeded={onConversationChanged}
+        />
+      )}
     </>
   )
 }
@@ -898,6 +927,8 @@ function ConversationThread({
 export function InboxPage({
   conversations,
   listLoading,
+  listError,
+  onListRefresh,
   scope,
   customerView,
   assigneeIdentityId,
@@ -907,15 +938,22 @@ export function InboxPage({
 }: {
   conversations: InboxConversation[]
   listLoading: boolean
+  listError: boolean
+  onListRefresh: () => void
   scope: InboxScope
   customerView: CustomerInboxView
   assigneeIdentityId: string
   selectedConversationId: string
-  onSelectedConversationChange: (conversationId: string) => void
+  onSelectedConversationChange: (
+    conversationId: string,
+    replace?: boolean,
+  ) => void
   onQueryChange: (changes: {
     scope?: InboxScope
     customerView?: CustomerInboxView
     assigneeIdentityId?: string
+    conversationId?: string
+    replace?: boolean
   }) => void
 }) {
   const { t } = useTranslation("inbox")
@@ -1035,8 +1073,31 @@ export function InboxPage({
   useEffect(() => {
     if (selectedFromPool) setSelectedConversationSnapshot(selectedFromPool)
   }, [selectedFromPool])
+  useEffect(() => {
+    if (
+      listLoading ||
+      (selectedConversationId &&
+        scopedConversations.some(
+          (conversation) => conversation.id === selectedConversationId,
+        ))
+    ) {
+      return
+    }
+    const nextConversationID = scopedConversations[0]?.id ?? ""
+    if (nextConversationID === selectedConversationId) return
+    setSelectedConversationSnapshot(null)
+    onSelectedConversationChange(nextConversationID, true)
+  }, [
+    listLoading,
+    onSelectedConversationChange,
+    scopedConversations,
+    selectedConversationId,
+  ])
   const selectedConversation =
-    selectedConversationSnapshot?.id === selectedConversationId
+    selectedConversationSnapshot?.id === selectedConversationId &&
+    selectedPool.some(
+      (conversation) => conversation.id === selectedConversationId,
+    )
       ? selectedConversationSnapshot
       : selectedFromPool
 
@@ -1053,6 +1114,7 @@ export function InboxPage({
   function refreshAffectedInboxQueries(
     queries: LoadInboxQuery[],
     destination: LoadInboxQuery,
+    nextConversationId?: string,
   ) {
     const destinationIdentity = inboxQueryIdentity(destination)
     const affected = new Map(
@@ -1067,11 +1129,18 @@ export function InboxPage({
       })
     }
     void invalidate(resourceKeys.inbox(destination), { exact: true })
-    if (destinationIdentity === inboxQueryIdentity(currentInboxQuery)) return
+    if (destinationIdentity === inboxQueryIdentity(currentInboxQuery)) {
+      if (nextConversationId) {
+        onSelectedConversationChange(nextConversationId)
+      }
+      return
+    }
     onQueryChange({
       scope: destination.scope,
       customerView: destination.customerView,
       assigneeIdentityId: destination.assigneeIdentityId,
+      conversationId: nextConversationId,
+      replace: nextConversationId ? false : undefined,
     })
   }
 
@@ -1087,8 +1156,8 @@ export function InboxPage({
     refreshAffectedInboxQueries(
       [inboxQuery(InboxScope.InboxScopeAll), destination],
       destination,
+      conversation.id,
     )
-    onSelectedConversationChange(conversation.id)
     setIsNarrowDetailOpen(isNarrowViewport)
   }
 
@@ -1202,6 +1271,15 @@ export function InboxPage({
         onStartDirect={() => setDirectDialogOpen(true)}
         onCreateGroup={() => setGroupDialogOpen(true)}
       />
+      {listError ? (
+        <button
+          type="button"
+          className="min-h-9 w-full shrink-0 border-b bg-warning/10 px-3 py-2 text-center text-xs text-warning"
+          onClick={onListRefresh}
+        >
+          {t("inboxRefreshError")}
+        </button>
+      ) : null}
       <div className="flex min-h-0 flex-1">
         {railCollapsed ? null : (
           <InboxScopeRail

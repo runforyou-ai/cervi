@@ -1,5 +1,11 @@
 /** 提交成员可回复会话的文本消息。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -29,6 +35,11 @@ import { recoverSession } from "@/lib/session-navigation"
 export function ConversationComposer({
   conversationID,
   conversationType,
+  submitOnEnter = false,
+  refocusAfterSubmit = false,
+  retryFailedMessage = false,
+  retryDraft = null,
+  onRetryDraftHandled,
   onSending,
   onSent,
   onFailed,
@@ -36,6 +47,11 @@ export function ConversationComposer({
 }: {
   conversationID: string
   conversationType: ConversationType
+  submitOnEnter?: boolean
+  refocusAfterSubmit?: boolean
+  retryFailedMessage?: boolean
+  retryDraft?: OutgoingConversationDraft | null
+  onRetryDraftHandled?: () => void
   onSending: (message: OutgoingConversationDraft) => void
   onSent: (clientMessageID: string, message: ConversationMessage) => void
   onFailed: (clientMessageID: string) => void
@@ -58,6 +74,9 @@ export function ConversationComposer({
     defaultValues: { body: "" },
   })
   const inputID = `conversation-reply-${conversationID}`
+  const retryRef = useRef<OutgoingConversationDraft | null>(null)
+  const refocusPendingRef = useRef(false)
+  const { isSubmitting } = form.formState
 
   useEffect(() => {
     aliveRef.current = true
@@ -66,15 +85,42 @@ export function ConversationComposer({
     }
   }, [])
 
+  useEffect(() => {
+    if (!retryFailedMessage || !retryDraft) return
+    onRetryDraftHandled?.()
+    if (isSubmitting) return
+    retryRef.current = retryDraft
+    form.setValue("body", retryDraft.body, { shouldDirty: true })
+    form.setFocus("body")
+  }, [
+    form,
+    isSubmitting,
+    onRetryDraftHandled,
+    retryDraft,
+    retryFailedMessage,
+  ])
+
+  useEffect(() => {
+    if (isSubmitting || !refocusPendingRef.current) return
+    refocusPendingRef.current = false
+    form.setFocus("body")
+  }, [form, isSubmitting])
+
   /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
     const body = values.body.trim()
-    const clientMessageID = window.crypto.randomUUID()
-    onSending({
-      clientMessageID,
+    const retry =
+      retryFailedMessage && retryRef.current?.body === body
+        ? retryRef.current
+        : null
+    const draft = {
+      clientMessageID: retry?.clientMessageID ?? window.crypto.randomUUID(),
       body,
-      originatedAt: new Date().toISOString(),
-    })
+      originatedAt: retry?.originatedAt ?? new Date().toISOString(),
+    }
+    retryRef.current = null
+    onSending(draft)
+    const { clientMessageID } = draft
     form.resetField("body")
     try {
       const input = { clientMessageId: clientMessageID, body }
@@ -94,6 +140,7 @@ export function ConversationComposer({
       }
       onSucceeded()
       if (!aliveRef.current) return
+      refocusPendingRef.current = refocusAfterSubmit
       onSent(clientMessageID, message)
     } catch (error) {
       if (recoverSession(error, navigate)) return
@@ -102,11 +149,32 @@ export function ConversationComposer({
         conversationId: conversationID,
         error,
       })
+      if (retryFailedMessage) {
+        retryRef.current = draft
+        form.setValue("body", body, { shouldDirty: true })
+      }
+      refocusPendingRef.current = refocusAfterSubmit
       onFailed(clientMessageID)
     }
   }
 
-  const { isSubmitting } = form.formState
+  /** 在桌面键盘上提交消息，并保留 Shift+Enter 换行。 */
+  function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (
+      !submitOnEnter ||
+      event.key !== "Enter" ||
+      event.shiftKey ||
+      event.keyCode === 229 ||
+      event.nativeEvent.isComposing
+    ) {
+      return
+    }
+    event.preventDefault()
+    if (!form.formState.isSubmitting) {
+      void form.handleSubmit(send)()
+    }
+  }
+
   const [showSubmitting, setShowSubmitting] = useState(false)
 
   useEffect(() => {
@@ -144,6 +212,7 @@ export function ConversationComposer({
           required
           aria-invalid={form.formState.errors.body ? true : undefined}
           className="min-h-20 resize-none rounded-none border-0 bg-transparent py-2 shadow-none focus-visible:ring-0"
+          onKeyDown={submitFromKeyboard}
         />
         <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
           <Button
@@ -167,5 +236,51 @@ export function ConversationComposer({
         </div>
       </div>
     </form>
+  )
+}
+
+/** 展示保持工作区高度稳定的不可用回复区。 */
+export function ConversationComposerUnavailable({
+  conversationID,
+  reason,
+}: {
+  conversationID: string
+  reason: string
+}) {
+  const { t } = useTranslation("inbox")
+  const inputID = `conversation-reply-${conversationID}`
+  const reasonID = `${inputID}-reason`
+
+  return (
+    <div
+      data-slot="conversation-composer"
+      data-conversation-id={conversationID}
+      aria-disabled="true"
+      className="shrink-0 border-t border-border/60 bg-background p-3"
+    >
+      <div className="overflow-hidden rounded-xl border border-input bg-muted/25 shadow-xs">
+        <label
+          htmlFor={inputID}
+          className="block px-3 pt-2.5 text-xs font-medium text-muted-foreground"
+        >
+          {t("replyLabel")}
+        </label>
+        <Textarea
+          id={inputID}
+          disabled
+          rows={3}
+          aria-describedby={reasonID}
+          className="min-h-20 resize-none rounded-none border-0 bg-transparent py-2 shadow-none disabled:opacity-100"
+        />
+        <div className="flex min-h-8 items-center justify-between gap-3 px-3 pb-2.5">
+          <p id={reasonID} className="text-xs text-muted-foreground">
+            {reason}
+          </p>
+          <Button type="button" size="sm" disabled>
+            {t("messageSend")}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }

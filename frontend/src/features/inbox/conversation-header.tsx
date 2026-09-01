@@ -44,7 +44,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { GroupParticipantDialog } from "@/features/inbox/group-participant-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -153,6 +152,7 @@ export function ConversationHeader({
   currentIdentityId,
   onSessionMoved,
   contextVisible,
+  contextTitle,
   narrowViewport = false,
   onContextToggle,
 }: {
@@ -166,6 +166,7 @@ export function ConversationHeader({
     assigneeIdentityId?: string,
   ) => void
   contextVisible: boolean
+  contextTitle: string
   narrowViewport?: boolean
   onContextToggle: () => void
 }) {
@@ -274,11 +275,9 @@ export function ConversationHeader({
             </span>
           </div>
         ) : group ? (
-          <GroupParticipantDialog
-            conversationID={conversation.id}
-            title={group.title}
-            memberCount={group.memberCount}
-          />
+          <p className="text-xs text-muted-foreground">
+            {t("groupMemberCount", { count: group.memberCount })}
+          </p>
         ) : agentRunLabel ? (
           <div className="text-xs text-muted-foreground">
             {agentRunLabel}
@@ -537,9 +536,23 @@ export function ConversationHeader({
             title={contextActionLabel}
             onClick={onContextToggle}
           >
-            {t("contextTitleBar")}
+            {contextTitle}
           </Button>
         </div>
+      ) : null}
+      {!customer ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0 text-muted-foreground xl:hidden"
+          aria-label={contextActionLabel}
+          aria-pressed={contextVisible}
+          title={contextActionLabel}
+          onClick={onContextToggle}
+        >
+          {contextTitle}
+        </Button>
       ) : null}
       </header>
       <AlertDialog
