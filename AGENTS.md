@@ -213,13 +213,17 @@ wails3 task make:migration NAME=create_example_table
 
 # 服务端运行与测试
 wails3 task run:server
-go test ./...
-go test -tags server ./...
+wails3 task test:server
+wails3 task test:desktop
+wails3 task test
 
 # 服务端与容器构建
 wails3 task build:server
 wails3 task build:docker CGO_ENABLED=0
 ```
+
+- `test:server` 根据当前 worktree 的 `POSTGRES_DB` 使用 `<POSTGRES_DB>_test` 作为测试数据库，并在每次运行前重建；同一 worktree 同一时刻运行一次 `test:server`。
+- 服务端集成测试共享当前 worktree 的测试数据库。企业安装测试使用本轮新建的空数据库；其他集成测试通过唯一业务键或测试清理保持数据隔离。
 
 ### 代码组织
 

@@ -61,8 +61,10 @@ tasks:
         msg: "请在 .env 中配置 POSTGRES_USER"
       - sh: '{{if .POSTGRES_PASSWORD}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置 POSTGRES_PASSWORD"
-      - sh: '{{if regexMatch "^[a-z][a-z0-9_]*$" .POSTGRES_DB}}true{{else}}false{{end}}'
-        msg: "请在 .env 中配置有效的 POSTGRES_DB"
+      - sh: '{{if regexMatch "^[a-z][a-z0-9_]{0,57}$" .POSTGRES_DB}}true{{else}}false{{end}}'
+        msg: "POSTGRES_DB 必须以小写字母开头，只包含小写字母、数字和下划线，且不超过 58 个字符"
+      - sh: '{{if regexMatch "_test$" .POSTGRES_DB}}false{{else}}true{{end}}'
+        msg: "POSTGRES_DB 不得以 _test 结尾，该后缀保留给当前工作区测试数据库"
       - sh: '{{if regexMatch "^(disable|allow|prefer|require|verify-ca|verify-full)$" .POSTGRES_SSLMODE}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置有效的 POSTGRES_SSLMODE"
     cmds:
@@ -105,6 +107,27 @@ tasks:
           createdb -U "{{.POSTGRES_USER}}" "{{.POSTGRES_DB}}"
         echo "已创建数据库 {{.POSTGRES_DB}}"
 
+  db:test:reset:
+    internal: true
+    silent: true
+    summary: 重建当前工作区测试数据库
+    deps:
+      - env:check:database
+    preconditions:
+      - sh: docker info >/dev/null 2>&1
+        msg: "Docker 未运行，无法连接 PostgreSQL 容器"
+    cmds:
+      - |
+        set -euo pipefail
+        test_database="{{.POSTGRES_DB}}_test"
+        docker compose exec -T postgres \
+          dropdb --force --if-exists -U "{{.POSTGRES_USER}}" \
+          --maintenance-db postgres "$test_database"
+        docker compose exec -T postgres \
+          createdb -U "{{.POSTGRES_USER}}" \
+          --maintenance-db postgres "$test_database"
+        echo "已重建测试数据库 $test_database"
+
   db:list:
     silent: true
     summary: 查看共享 PostgreSQL 中的数据库
@@ -142,6 +165,40 @@ tasks:
     summary: Builds and runs the Docker image
     cmds:
       - task: common:run:docker
+
+  test:
+    summary: 运行服务端和当前平台桌面端测试
+    cmds:
+      - task: test:server
+      - task: test:desktop
+
+  test:server:
+    silent: true
+    summary: 使用当前工作区测试数据库运行服务端测试
+    deps:
+      - db:test:reset
+    preconditions:
+      - sh: '{{if .NATS_URL}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 NATS_URL"
+    cmds:
+      - go test -count=1 -tags=server ./...
+    env:
+      CGO_ENABLED: "0"
+      TEST_POSTGRES_HOST: "{{.POSTGRES_HOST}}"
+      TEST_POSTGRES_PORT: "{{.POSTGRES_PORT}}"
+      TEST_POSTGRES_USER: "{{.POSTGRES_USER}}"
+      TEST_POSTGRES_PASSWORD: "{{.POSTGRES_PASSWORD}}"
+      TEST_POSTGRES_DB: "{{.POSTGRES_DB}}_test"
+      TEST_POSTGRES_SSLMODE: "{{.POSTGRES_SSLMODE}}"
+      TEST_NATS_URL: "{{.NATS_URL}}"
+
+  test:desktop:
+    silent: true
+    summary: 运行当前平台桌面端测试
+    cmds:
+      - go test -count=1 ./...
+    env:
+      CGO_ENABLED: "1"
 
   migrate:
     summary: 执行待运行的服务端迁移

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1910,12 +1911,16 @@ func testDatabaseConfig(t *testing.T) serverconfig.DatabaseConfig {
 	if err != nil {
 		t.Fatalf("TEST_POSTGRES_PORT is invalid: %v", err)
 	}
+	databaseName := os.Getenv("TEST_POSTGRES_DB")
+	if !strings.HasSuffix(databaseName, "_test") {
+		t.Fatalf("TEST_POSTGRES_DB must end with _test")
+	}
 	return serverconfig.DatabaseConfig{
 		Host:     host,
 		Port:     port,
 		User:     os.Getenv("TEST_POSTGRES_USER"),
 		Password: os.Getenv("TEST_POSTGRES_PASSWORD"),
-		Name:     os.Getenv("TEST_POSTGRES_DB"),
+		Name:     databaseName,
 		SSLMode:  os.Getenv("TEST_POSTGRES_SSLMODE"),
 	}
 }

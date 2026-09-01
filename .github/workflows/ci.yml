@@ -116,10 +116,13 @@ jobs:
           CGO_ENABLED: "0"
         run: go vet -tags=server ./...
 
+      - name: Start integration test dependencies
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait postgres nats
+
       - name: Test Go server build
-        env:
-          CGO_ENABLED: "0"
-        run: go test -tags=server ./...
+        run: '"$(go env GOPATH)/bin/wails3" task test:server'
 
       - name: Build production server
         env:
@@ -134,9 +137,7 @@ jobs:
           .
 
       - name: Test Go Linux desktop build
-        env:
-          CGO_ENABLED: "1"
-        run: go test ./...
+        run: '"$(go env GOPATH)/bin/wails3" task test:desktop'
 
   container:
     name: Container
