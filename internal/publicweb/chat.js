@@ -6,7 +6,9 @@
   var input = document.getElementById("cv-input");
 
   var MAX_ATTACHMENT_COUNT = 10;
-  var COMPOSER_MAX_HEIGHT = 160;
+  var COMPOSER_MAX_HEIGHT = 200;
+  var COMPOSER_MIN_HEIGHT = 26;
+  var COMPOSER_KEYBOARD_RESIZE_STEP = 16;
   var MESSAGE_POLL_INTERVAL = 3000;
   var previewMode = messenger.getAttribute("data-preview") === "true";
   var channelID = messenger.getAttribute("data-channel-id");
@@ -51,11 +53,14 @@
   var sendButton = document.getElementById("cv-send");
   var fileInput = document.getElementById("cv-file-input");
   var composerMain = document.getElementById("cv-composer-main");
+  var composerResize = document.getElementById("cv-composer-resize");
   var recording = document.getElementById("cv-recording");
   var recordTime = document.getElementById("cv-record-time");
   var intro = document.getElementById("cv-conversation-intro");
   var unreadDot = document.getElementById("cv-unread-dot");
   var emojis = window.CERVI_COMPOSER_EMOJIS;
+  var composerManualHeight = null;
+  var composerResizeStart = null;
   if (parentOrigin === "null") {
     parentOrigin = "";
   }
@@ -299,10 +304,75 @@
 
   function autosize() {
     input.style.height = "auto";
+    var contentHeight = Math.min(
+      input.scrollHeight,
+      COMPOSER_MAX_HEIGHT,
+    );
     input.style.height =
-      Math.min(input.scrollHeight, COMPOSER_MAX_HEIGHT) + "px";
+      Math.max(contentHeight, composerManualHeight || 0) + "px";
+    var renderedHeight = input.getBoundingClientRect().height;
     input.style.overflowY =
-      input.scrollHeight > COMPOSER_MAX_HEIGHT ? "auto" : "hidden";
+      input.scrollHeight > renderedHeight ? "auto" : "hidden";
+  }
+
+  // 应用访客选择的消息输入框高度。
+  function setComposerManualHeight(height) {
+    composerManualHeight = Math.min(
+      COMPOSER_MAX_HEIGHT,
+      Math.max(COMPOSER_MIN_HEIGHT, height),
+    );
+    autosize();
+  }
+
+  // 在清空消息内容前保留输入框当前高度。
+  function preserveComposerHeight() {
+    setComposerManualHeight(input.getBoundingClientRect().height);
+  }
+
+  // 开始拖动访客消息输入框。
+  function startComposerResize(event) {
+    event.preventDefault();
+    composerResize.setPointerCapture(event.pointerId);
+    composerResizeStart = {
+      pointerY: event.clientY,
+      inputHeight: input.getBoundingClientRect().height,
+    };
+  }
+
+  // 按指针位置调整访客消息输入框高度。
+  function resizeComposer(event) {
+    if (
+      !composerResizeStart ||
+      !composerResize.hasPointerCapture(event.pointerId)
+    ) {
+      return;
+    }
+    setComposerManualHeight(
+      composerResizeStart.inputHeight +
+        composerResizeStart.pointerY -
+        event.clientY,
+    );
+  }
+
+  // 结束拖动访客消息输入框。
+  function stopComposerResize(event) {
+    composerResizeStart = null;
+    if (composerResize.hasPointerCapture(event.pointerId)) {
+      composerResize.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  // 使用方向键调整访客消息输入框高度。
+  function resizeComposerFromKeyboard(event) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+      return;
+    }
+    event.preventDefault();
+    var direction = event.key === "ArrowUp" ? 1 : -1;
+    setComposerManualHeight(
+      input.getBoundingClientRect().height +
+        direction * COMPOSER_KEYBOARD_RESIZE_STEP,
+    );
   }
 
   function updateSendState() {
@@ -606,6 +676,7 @@
       return;
     }
     appendVisitorMessage(text, []);
+    preserveComposerHeight();
     input.value = "";
     autosize();
     updateSendState();
@@ -1018,6 +1089,7 @@
         }
         if (conversation === activeConversation) {
           if (input.value.trim() === text) {
+            preserveComposerHeight();
             input.value = "";
           } else {
             conversation.draft = input.value;
@@ -1462,6 +1534,11 @@
     event.preventDefault();
     sendMessage();
   });
+  composerResize.addEventListener("pointerdown", startComposerResize);
+  composerResize.addEventListener("pointermove", resizeComposer);
+  composerResize.addEventListener("pointerup", stopComposerResize);
+  composerResize.addEventListener("pointercancel", stopComposerResize);
+  composerResize.addEventListener("keydown", resizeComposerFromKeyboard);
   input.addEventListener("paste", function (event) {
     if (!previewMode) {
       return;

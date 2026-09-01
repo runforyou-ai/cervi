@@ -426,6 +426,13 @@ func assertMessengerPage(t *testing.T, body string, embed bool) {
 	if !strings.Contains(body, `id="cv-input"`) || !strings.Contains(body, "<textarea") {
 		t.Fatal("missing composer textarea")
 	}
+	if !strings.Contains(body, `id="cv-composer-resize"`) || !strings.Contains(body, `aria-label="调整消息输入框高度"`) {
+		t.Fatal("missing accessible composer resize handle")
+	}
+	resizeHandleStyles := pageElement(body, ".cv-composer-resize {", "}")
+	if !strings.Contains(resizeHandleStyles, "right: 0;") || !strings.Contains(resizeHandleStyles, "left: 0;") || strings.Contains(body, ".cv-composer-resize::after") {
+		t.Fatal("composer resize handle must cover the full top edge without a visible grip")
+	}
 	if !strings.Contains(body, `aria-label="消息"`) || strings.Contains(body, `<label for="cv-input">`) {
 		t.Fatal("composer must keep an accessible name without a visible label")
 	}
@@ -441,8 +448,8 @@ func assertMessengerPage(t *testing.T, body string, embed bool) {
 	if !strings.Contains(body, "bottom: calc(100% + 8px)") || !strings.Contains(body, "left: -41px") {
 		t.Fatal("emoji picker must open above its composer button")
 	}
-	if !strings.Contains(body, "max-height: 160px") || !strings.Contains(body, "resize: none") {
-		t.Fatal("composer textarea must grow with multiline content")
+	if !strings.Contains(body, "COMPOSER_MAX_HEIGHT = 200") || !strings.Contains(body, "max-height: 200px") || !strings.Contains(body, "cursor: row-resize") || !strings.Contains(body, "setPointerCapture") || !strings.Contains(body, "preserveComposerHeight") {
+		t.Fatal("composer textarea must grow with content and support vertical resizing")
 	}
 	if !strings.Contains(body, `data-new-conversation`) || !strings.Contains(body, `data-resume-conversation`) {
 		t.Fatal("missing new and recent conversation entry contracts")

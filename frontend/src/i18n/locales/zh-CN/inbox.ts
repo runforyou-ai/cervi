@@ -89,6 +89,7 @@ const inbox = {
   conversationReopenSuccess: "会话已重新打开并由你负责",
   conversationActionError: "无法更新会话，请重试",
   replyLabel: "回复",
+  composerResize: "调整消息输入框高度",
   attachmentAdd: "添加附件",
   messageBodyRequired: "请输入消息内容",
   messageBodyTooLong: "消息最多 4000 个字符",

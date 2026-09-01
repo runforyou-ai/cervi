@@ -47,6 +47,7 @@
   "messenger.messages": "Messages",
   "messenger.help": "Help",
   "messenger.message": "Message",
+  "messenger.resize_message_input": "Resize message input",
   "messenger.close": "Close chat",
   "messenger.attach": "Attach file",
   "messenger.emoji": "Choose emoji",

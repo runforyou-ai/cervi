@@ -616,12 +616,26 @@ summary:focus-visible {
   background: #fff;
   box-shadow: 0 4px 20px -16px rgba(15, 23, 42, 0.45);
 }
-.cv-composer-main { display: flex; flex-direction: column; padding: 10px 10px 8px 14px; }
+.cv-composer-main { position: relative; display: flex; flex-direction: column; padding: 10px 10px 8px 14px; }
+.cv-composer-resize {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: row-resize;
+  touch-action: none;
+  transform: translateY(-50%);
+}
 #cv-input {
   display: block;
   width: 100%;
   min-height: 26px;
-  max-height: 160px;
+  max-height: 200px;
   flex: 0 0 auto;
   margin: 1px 0 3px;
   padding: 0 2px 0 0;
