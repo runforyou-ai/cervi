@@ -144,6 +144,7 @@ export function MessageChannelForm({
   }
 
   const { isSubmitting } = form.formState
+  const channelType = form.watch("type")
 
   return (
     <form
@@ -228,7 +229,10 @@ export function MessageChannelForm({
         />
 
         {!channel ? (
-          <ChannelReceptionSettingsFields control={form.control} />
+          <ChannelReceptionSettingsFields
+            control={form.control}
+            channelType={channelType}
+          />
         ) : null}
 
       </FieldGroup>

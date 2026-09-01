@@ -33,18 +33,16 @@ func (q *ListCustomerServiceAssigneesQuery) Execute(ctx context.Context, identit
 	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
 		return nil, err
 	}
-	assignees := make([]CustomerServiceAssignee, 0)
-	err := q.db.NewSelect().TableExpr("organization_identities AS oi").
-		ColumnExpr("oi.id::text AS identity_id, oi.type, oi.display_name, oi.avatar_file_id::text").
-		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id AND r.kind = ?", domain.RoleKindCustomerService).
-		Join("LEFT JOIN users AS u ON u.identity_id = oi.id AND u.organization_id = oi.organization_id").
-		Join("LEFT JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id").
-		Where("oi.organization_id = ?", identity.Organization.ID).
-		Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
-		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
-		Scan(ctx, &assignees)
+	identities, err := identityaction.ListActiveCustomerServiceIdentities(ctx, q.db, identity.Organization.ID)
 	if err != nil {
 		return nil, fmt.Errorf("list customer service assignees: %w", err)
+	}
+	assignees := make([]CustomerServiceAssignee, 0, len(identities))
+	for _, item := range identities {
+		assignees = append(assignees, CustomerServiceAssignee{
+			IdentityID: item.ID, Type: domain.OrganizationIdentityType(item.Type),
+			DisplayName: item.DisplayName, AvatarFileID: item.AvatarFileID,
+		})
 	}
 	return assignees, nil
 }

@@ -18,12 +18,15 @@ type AgentRun struct {
 	ConversationID    string          `bun:"conversation_id"`
 	AgentIdentityID   string          `bun:"agent_identity_id"`
 	AgentRevisionID   string          `bun:"agent_revision_id"`
+	TriggerType       string          `bun:"trigger_type"`
+	ServiceSessionID  *string         `bun:"service_session_id"`
 	Status            string          `bun:"status"`
 	TriggerStartSeq   int64           `bun:"trigger_start_seq"`
 	TriggerEndSeq     *int64          `bun:"trigger_end_seq"`
 	ResponseMessageID *string         `bun:"response_message_id"`
 	Usage             json.RawMessage `bun:"usage,type:jsonb"`
 	LastError         *string         `bun:"last_error"`
+	ErrorCode         *string         `bun:"error_code"`
 	StartedAt         *time.Time      `bun:"started_at"`
 	CompletedAt       *time.Time      `bun:"completed_at"`
 	CreatedAt         time.Time       `bun:"created_at"`

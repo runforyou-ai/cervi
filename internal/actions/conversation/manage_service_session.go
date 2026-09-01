@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -17,12 +18,21 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// ServiceSessionAgentRunCoordinator 在客服事务内收敛原负责人的 Agent 执行。
+type ServiceSessionAgentRunCoordinator interface {
+	CancelForServiceSession(context.Context, bun.IDB, string, string, string, domain.AgentRunErrorCode) ([]string, error)
+	CancelRunContexts([]string)
+}
+
 // ClaimServiceSessionAction 领取或接管客户会话最新处理周期。
-type ClaimServiceSessionAction struct{ db *bun.DB }
+type ClaimServiceSessionAction struct {
+	db          *bun.DB
+	coordinator ServiceSessionAgentRunCoordinator
+}
 
 // NewClaimServiceSessionAction 创建客服处理周期领取操作。
-func NewClaimServiceSessionAction(db *bun.DB) *ClaimServiceSessionAction {
-	return &ClaimServiceSessionAction{db: db}
+func NewClaimServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator) *ClaimServiceSessionAction {
+	return &ClaimServiceSessionAction{db: db, coordinator: coordinator}
 }
 
 // Execute 把未关闭处理周期负责人设置为当前身份。
@@ -32,6 +42,8 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 		return ServiceSessionResult{}, &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
 	var output ServiceSessionResult
+	var cancelledRunIDs []string
+	var cancelledSession *servermodels.ServiceSession
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
@@ -42,6 +54,16 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		now := time.Now().UTC()
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
+			if session.AssigneeIdentityID != nil {
+				cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
+					ctx, tx, session.OrganizationID, session.ConversationID,
+					*session.AssigneeIdentityID, domain.AgentRunErrorCodeAssigneeChanged,
+				)
+				if err != nil {
+					return err
+				}
+				cancelledSession = session
+			}
 			if _, err := tx.NewUpdate().Model(session).
 				Set("assignee_identity_id = ?", identity.OrganizationIdentity.ID).
 				Set("assigned_at = COALESCE(assigned_at, ?)", now).
@@ -60,15 +82,19 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 	if err != nil {
 		return ServiceSessionResult{}, fmt.Errorf("claim service session: %w", err)
 	}
+	finishServiceSessionAgentCancellation(a.coordinator, cancelledRunIDs, cancelledSession, domain.AgentRunErrorCodeAssigneeChanged)
 	return output, nil
 }
 
 // TransferServiceSessionAction 把当前负责的处理周期转给另一位客服。
-type TransferServiceSessionAction struct{ db *bun.DB }
+type TransferServiceSessionAction struct {
+	db          *bun.DB
+	coordinator ServiceSessionAgentRunCoordinator
+}
 
 // NewTransferServiceSessionAction 创建客服处理周期转交操作。
-func NewTransferServiceSessionAction(db *bun.DB) *TransferServiceSessionAction {
-	return &TransferServiceSessionAction{db: db}
+func NewTransferServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator) *TransferServiceSessionAction {
+	return &TransferServiceSessionAction{db: db, coordinator: coordinator}
 }
 
 // Execute 校验当前负责人和目标客服后保存转交。
@@ -87,6 +113,8 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		return ServiceSessionResult{}, &ValidationError{Fields: fields}
 	}
 	var output ServiceSessionResult
+	var cancelledRunIDs []string
+	var cancelledSession *servermodels.ServiceSession
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
@@ -98,13 +126,28 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
 		}
-		target, err := loadActiveCustomerServiceIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
+		channelType, err := loadServiceSessionChannelType(ctx, tx, session)
+		if err != nil {
+			return err
+		}
+		target, err := identityaction.LockActiveCustomerServiceIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
 		}
 		if err != nil {
 			return err
 		}
+		if domain.OrganizationIdentityType(target.Type) == domain.OrganizationIdentityTypeAgent && !domain.ChannelSupportsAgentAssignee(channelType) {
+			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
+		}
+		cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
+			ctx, tx, session.OrganizationID, session.ConversationID,
+			*session.AssigneeIdentityID, domain.AgentRunErrorCodeAssigneeChanged,
+		)
+		if err != nil {
+			return err
+		}
+		cancelledSession = session
 		if _, err := tx.NewUpdate().Model(session).
 			Set("assignee_identity_id = ?", target.ID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", time.Now().UTC()).
@@ -121,15 +164,19 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 	if err != nil {
 		return ServiceSessionResult{}, fmt.Errorf("transfer service session: %w", err)
 	}
+	finishServiceSessionAgentCancellation(a.coordinator, cancelledRunIDs, cancelledSession, domain.AgentRunErrorCodeAssigneeChanged)
 	return output, nil
 }
 
 // CloseServiceSessionAction 关闭客户会话最新处理周期。
-type CloseServiceSessionAction struct{ db *bun.DB }
+type CloseServiceSessionAction struct {
+	db          *bun.DB
+	coordinator ServiceSessionAgentRunCoordinator
+}
 
 // NewCloseServiceSessionAction 创建客服处理周期关闭操作。
-func NewCloseServiceSessionAction(db *bun.DB) *CloseServiceSessionAction {
-	return &CloseServiceSessionAction{db: db}
+func NewCloseServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator) *CloseServiceSessionAction {
+	return &CloseServiceSessionAction{db: db, coordinator: coordinator}
 }
 
 // Execute 关闭公共队列或当前身份负责的处理周期。
@@ -139,6 +186,8 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		return ServiceSessionResult{}, &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
 	var output ServiceSessionResult
+	var cancelledRunIDs []string
+	var cancelledSession *servermodels.ServiceSession
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
@@ -149,6 +198,16 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		if session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
+		}
+		if session.AssigneeIdentityID != nil {
+			cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
+				ctx, tx, session.OrganizationID, session.ConversationID,
+				*session.AssigneeIdentityID, domain.AgentRunErrorCodeSessionClosed,
+			)
+			if err != nil {
+				return err
+			}
+			cancelledSession = session
 		}
 		now := time.Now().UTC()
 		if _, err := tx.NewUpdate().Model(session).
@@ -177,6 +236,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 	if err != nil {
 		return ServiceSessionResult{}, fmt.Errorf("close service session: %w", err)
 	}
+	finishServiceSessionAgentCancellation(a.coordinator, cancelledRunIDs, cancelledSession, domain.AgentRunErrorCodeSessionClosed)
 	return output, nil
 }
 
@@ -263,18 +323,16 @@ func lockLatestCustomerServiceSession(ctx context.Context, db bun.IDB, organizat
 	return session, nil
 }
 
-// loadActiveCustomerServiceIdentity 读取有效的真人或 AI 客服身份。
-func loadActiveCustomerServiceIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
-	target := &servermodels.OrganizationIdentity{}
-	err := db.NewSelect().Model(target).
-		Column("oi.id", "oi.type", "oi.display_name", "oi.avatar_file_id").
-		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id AND r.kind = ?", domain.RoleKindCustomerService).
-		Where("oi.organization_id = ?", organizationID).
-		Where("oi.id = ?", identityID).
-		Where("((oi.type = ? AND EXISTS (SELECT 1 FROM users AS u WHERE u.organization_id = oi.organization_id AND u.identity_id = oi.id AND u.status = ?)) OR (oi.type = ? AND EXISTS (SELECT 1 FROM agents AS a WHERE a.organization_id = oi.organization_id AND a.identity_id = oi.id AND a.status = ?)))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
-		For("KEY SHARE OF oi").
-		Scan(ctx)
-	return target, err
+// loadServiceSessionChannelType 返回客服处理周期所属的消息渠道类型。
+func loadServiceSessionChannelType(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (domain.ChannelType, error) {
+	var channelType domain.ChannelType
+	err := db.NewSelect().TableExpr("contact_channel_identities AS cci").
+		ColumnExpr("c.type").
+		Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
+		Where("cci.id = ?", session.ContactChannelIdentityID).
+		Where("cci.organization_id = ?", session.OrganizationID).
+		Scan(ctx, &channelType)
+	return channelType, err
 }
 
 // loadAssigneeIdentity 读取处理周期负责人身份。
@@ -295,4 +353,20 @@ func serviceSessionResult(session *servermodels.ServiceSession, assignee *server
 		resultAssignee = &ServiceSessionAssignee{IdentityID: assignee.ID, Type: domain.OrganizationIdentityType(assignee.Type), DisplayName: assignee.DisplayName, AvatarFileID: assignee.AvatarFileID}
 	}
 	return ServiceSessionResult{ID: session.ID, Status: domain.ServiceSessionStatus(session.Status), Assignee: resultAssignee, ClosedAt: session.ClosedAt}
+}
+
+// finishServiceSessionAgentCancellation 在事务提交后取消本进程中的模型调用并记录结果。
+func finishServiceSessionAgentCancellation(coordinator ServiceSessionAgentRunCoordinator, runIDs []string, session *servermodels.ServiceSession, reason domain.AgentRunErrorCode) {
+	if len(runIDs) == 0 {
+		return
+	}
+	coordinator.CancelRunContexts(runIDs)
+	for _, runID := range runIDs {
+		slog.Info("已取消客服会话 Agent 运行",
+			"agent_run_id", runID,
+			"service_session_id", session.ID,
+			"conversation_id", session.ConversationID,
+			"reason", reason,
+		)
+	}
 }

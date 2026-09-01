@@ -46,10 +46,10 @@ func (a *CreateMessageChannelAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.Validate(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "newConversationTarget", input.NewConversationTarget); err != nil {
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, input.Type, "newConversationTarget", input.NewConversationTarget); err != nil {
 			return err
 		}
-		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, "fallbackTarget", input.FallbackTarget); err != nil {
+		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, input.Type, "fallbackTarget", input.FallbackTarget); err != nil {
 			return err
 		}
 
