@@ -72,10 +72,6 @@ func (r *Runtime) connectBroker(ctx context.Context) error {
 		connection.Close()
 		return fmt.Errorf("ensure JetStream task stream: %w", err)
 	}
-	if err := js.DeleteConsumer(ctx, r.config.streamName(), r.config.legacyConsumerName()); err != nil && !errors.Is(err, jetstream.ErrConsumerNotFound) {
-		connection.Close()
-		return fmt.Errorf("delete legacy JetStream task consumer: %w", err)
-	}
 	pools := make([]workerPoolRuntime, 0, len(r.config.WorkerPools))
 	for _, pool := range r.config.WorkerPools {
 		consumer, err := js.CreateOrUpdateConsumer(ctx, r.config.streamName(), jetstream.ConsumerConfig{

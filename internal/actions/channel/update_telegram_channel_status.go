@@ -35,9 +35,6 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 	}
 	var output *MessageChannelRecord
 	err := withTelegramChannelLock(ctx, a.db, channelID, func(conn bun.Conn) error {
-		if err := identityaction.Validate(ctx, conn, identity); err != nil {
-			return err
-		}
 		current, err := loadTelegramChannelDetail(ctx, conn, identity.Organization.ID, channelID, false)
 		if err != nil {
 			return err
@@ -53,6 +50,9 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 			var webhookURL string
 			var secret string
 			err := conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+				if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+					return err
+				}
 				detail, err := loadTelegramChannelDetail(ctx, tx, identity.Organization.ID, channelID, true)
 				if err != nil {
 					return err

@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,9 +22,6 @@ func NewGetContactQuery(db *bun.DB) *GetContactQuery {
 
 // Execute 返回当前企业中未删除的联系人详情。
 func (q *GetContactQuery) Execute(ctx context.Context, identity *servermodels.Identity, contactID string) (*ContactDetail, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	return loadContactDetail(ctx, q.db, identity.Organization.ID, contactID)
 }
 

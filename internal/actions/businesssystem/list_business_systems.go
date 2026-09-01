@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,9 +22,6 @@ func NewListBusinessSystemsQuery(db *bun.DB) *ListBusinessSystemsQuery {
 
 // Execute 返回当前企业的业务系统列表。
 func (q *ListBusinessSystemsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]Record, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	records := make([]servermodels.BusinessSystem, 0)
 	if err := q.db.NewSelect().
 		Model(&records).

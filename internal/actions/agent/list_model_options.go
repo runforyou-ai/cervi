@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -22,9 +21,6 @@ func NewListModelOptionsQuery(db *bun.DB) *ListModelOptionsQuery {
 
 // Execute 返回当前企业可用于 AI 员工的文本对话模型。
 func (q *ListModelOptionsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]ModelOption, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	options := make([]ModelOption, 0)
 	if err := q.db.NewSelect().TableExpr("ai_provider_models AS aipm").
 		ColumnExpr("aip.id::text AS provider_id, aip.name AS provider_name, aipm.identifier AS model_identifier, aipm.name AS model_name").

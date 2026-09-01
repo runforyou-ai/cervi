@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -44,9 +43,6 @@ func NewListOptionsQuery(db *bun.DB) *ListOptionsQuery { return &ListOptionsQuer
 
 // Execute 返回当前企业中可分配的用户和 AI 员工身份。
 func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListOptionsInput) (ListOptionsOutput, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return ListOptionsOutput{}, err
-	}
 	input.Query = strings.TrimSpace(input.Query)
 	var pageValid bool
 	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)

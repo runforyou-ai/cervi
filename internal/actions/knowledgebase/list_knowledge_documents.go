@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connector"
@@ -46,9 +45,6 @@ func (q *ListKnowledgeDocumentsQuery) Execute(
 	}
 	if len(fields) > 0 {
 		return DocumentListOutput{}, &common.FieldError{Fields: fields}
-	}
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return DocumentListOutput{}, err
 	}
 	access, err := loadDifyKnowledgeAccess(ctx, q.db, identity.Organization.ID, knowledgeBaseID)
 	if err != nil {

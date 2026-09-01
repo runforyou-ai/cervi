@@ -28,7 +28,7 @@ func (a *UpdateRoleAction) Execute(ctx context.Context, identity *servermodels.I
 	var normalized Input
 	var memberCounts map[string]int
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		var err error

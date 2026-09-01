@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,9 +23,6 @@ func NewListRolesQuery(db *bun.DB) *ListRolesQuery {
 
 // Execute 返回角色和预定义权限目录。
 func (q *ListRolesQuery) Execute(ctx context.Context, identity *servermodels.Identity) (ListOutput, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return ListOutput{}, err
-	}
 	roles := make([]servermodels.Role, 0)
 	if err := q.db.NewSelect().
 		Model(&roles).

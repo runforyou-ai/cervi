@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -31,9 +30,6 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
 	if !pageValid || (input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) {
 		return ListOutput{}, ErrQueryInvalid
-	}
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return ListOutput{}, err
 	}
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.

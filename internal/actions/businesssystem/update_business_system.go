@@ -29,7 +29,7 @@ func (a *UpdateBusinessSystemAction) Execute(ctx context.Context, identity *serv
 	}
 	var businessSystem *servermodels.BusinessSystem
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		current, err := loadBusinessSystem(ctx, tx, identity.Organization.ID, businessSystemID, true)

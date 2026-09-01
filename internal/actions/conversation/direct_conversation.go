@@ -84,9 +84,6 @@ func NewSendDirectTextMessageAction(db *bun.DB, agentScheduler DirectAgentMessag
 
 // Execute 发起或打开当前成员与目标成员的长期单聊。
 func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, input DirectConversationInput) (DirectConversationSummary, error) {
-	if err := identityaction.Validate(ctx, a.db, identity); err != nil {
-		return DirectConversationSummary{}, err
-	}
 	targetIdentityID, valid := common.NormalizeUUID(input.TargetIdentityID)
 	if !valid {
 		return DirectConversationSummary{}, &ValidationError{Fields: map[string]ValidationCode{
@@ -105,6 +102,9 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result DirectConversationSummary
 		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+				return err
+			}
 			if err := lockDirectIdentityPair(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, target.IdentityID); err != nil {
 				return err
 			}
@@ -159,9 +159,6 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 
 // Execute 在可重试事务中写入内部单聊文本消息。
 func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input DirectTextMessageInput) (ConversationMessage, error) {
-	if err := identityaction.Validate(ctx, a.db, identity); err != nil {
-		return ConversationMessage{}, err
-	}
 	normalized, fields := normalizeDirectTextMessageInput(input)
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
@@ -174,6 +171,9 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result ConversationMessage
 		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+				return err
+			}
 			sendContext, err := loadDirectSendContext(ctx, tx, identity, normalized.ConversationID)
 			if err != nil {
 				return err

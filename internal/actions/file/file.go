@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -40,17 +41,11 @@ func NewGetQuery(db *bun.DB) *GetQuery {
 
 // Execute 返回当前企业中的指定文件。
 func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity, fileID string) (*servermodels.File, error) {
-	if !validIdentity(identity) {
-		return nil, common.ErrIdentityInvalid
-	}
 	return get(ctx, q.db, identity.Organization.ID, fileID, "")
 }
 
 // ExecuteByStorageKey 返回当前企业中使用指定存储键的文件。
 func (q *GetQuery) ExecuteByStorageKey(ctx context.Context, identity *servermodels.Identity, storageKey string) (*servermodels.File, error) {
-	if !validIdentity(identity) {
-		return nil, common.ErrIdentityInvalid
-	}
 	record := &servermodels.File{}
 	err := q.db.NewSelect().Model(record).
 		ColumnExpr("f.*").
@@ -69,9 +64,6 @@ func (q *GetQuery) ExecuteByStorageKey(ctx context.Context, identity *servermode
 
 // ListActiveLocations 批量返回当前企业已关联文件的存储位置。
 func (q *GetQuery) ListActiveLocations(ctx context.Context, identity *servermodels.Identity, fileIDs []string) ([]Location, error) {
-	if !validIdentity(identity) {
-		return nil, common.ErrIdentityInvalid
-	}
 	fileIDs, valid := common.NormalizeUUIDs(fileIDs)
 	if !valid {
 		return nil, ErrFileNotFound
@@ -103,32 +95,39 @@ func NewMarkUploadedAction(db *bun.DB) *MarkUploadedAction {
 
 // Execute 保存文件上传结果并返回最新记录。
 func (a *MarkUploadedAction) Execute(ctx context.Context, identity *servermodels.Identity, fileID, etag string) (*servermodels.File, error) {
-	if !validIdentity(identity) {
-		return nil, common.ErrIdentityInvalid
-	}
-	record := &servermodels.File{}
-	// 过期时间统一使用数据库时钟，与同一语句里 expires_at > now() 的比较保持同源。
-	query := a.db.NewUpdate().Model(record).
-		Set("status = ?", domain.FileStatusUploaded).
-		Set("etag = ?", common.OptionalString(strings.TrimSpace(etag))).
-		Set("uploaded_at = now()").
-		Set("expires_at = now() + make_interval(secs => ?)", temporaryFileLifetime.Seconds()).
-		Set("updated_at = now()").
-		Where("f.id = ?", fileID).
-		Where("f.organization_id = ?", identity.Organization.ID).
-		Where("f.status = ?", domain.FileStatusPending).
-		Where("f.expires_at > now()").
-		Returning("*")
-	result, err := query.Exec(ctx)
+	var record *servermodels.File
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		record = &servermodels.File{}
+		// 过期时间统一使用数据库时钟，与同一语句里 expires_at > now() 的比较保持同源。
+		result, err := tx.NewUpdate().Model(record).
+			Set("status = ?", domain.FileStatusUploaded).
+			Set("etag = ?", common.OptionalString(strings.TrimSpace(etag))).
+			Set("uploaded_at = now()").
+			Set("expires_at = now() + make_interval(secs => ?)", temporaryFileLifetime.Seconds()).
+			Set("updated_at = now()").
+			Where("f.id = ?", fileID).
+			Where("f.organization_id = ?", identity.Organization.ID).
+			Where("f.status = ?", domain.FileStatusPending).
+			Where("f.expires_at > now()").
+			Returning("*").
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("mark file uploaded: %w", err)
+		}
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("read marked file count: %w", err)
+		}
+		if rows == 0 {
+			return ErrFileNotFound
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("mark file uploaded: %w", err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return nil, fmt.Errorf("read marked file count: %w", err)
-	}
-	if rows == 0 {
-		return nil, ErrFileNotFound
+		return nil, err
 	}
 	return record, nil
 }

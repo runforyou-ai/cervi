@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,9 +23,6 @@ func NewListAIProvidersQuery(db *bun.DB) *ListAIProvidersQuery {
 
 // Execute 返回当前企业的模型服务供应商列表。
 func (q *ListAIProvidersQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]Summary, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	providers := make([]servermodels.AIProvider, 0)
 	if err := q.db.NewSelect().
 		Model(&providers).

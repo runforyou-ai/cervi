@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connector"
@@ -45,9 +44,6 @@ func (q *RetrieveKnowledgeBaseQuery) Execute(
 	input, fields := normalizeRetrievalInput(input)
 	if len(fields) > 0 {
 		return nil, &common.FieldError{Fields: fields}
-	}
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
 	}
 	access, err := loadDifyKnowledgeAccess(ctx, q.db, identity.Organization.ID, knowledgeBaseID)
 	if err != nil {

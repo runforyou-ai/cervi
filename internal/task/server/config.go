@@ -61,11 +61,6 @@ func (c runtimeConfig) streamName() string {
 	return "CERVI_" + strings.ToUpper(c.Namespace) + "_TASKS"
 }
 
-// legacyConsumerName 返回拆分 Worker Pool 前使用的 Consumer 名称。
-func (c runtimeConfig) legacyConsumerName() string {
-	return "CERVI_" + strings.ToUpper(c.Namespace) + "_WORKERS"
-}
-
 // consumerName 生成指定 Worker Pool 的 Consumer 名称。
 func (c runtimeConfig) consumerName(pool string) string {
 	return "CERVI_" + strings.ToUpper(c.Namespace) + "_" + strings.ToUpper(pool) + "_WORKERS"

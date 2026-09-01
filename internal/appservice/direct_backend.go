@@ -153,12 +153,13 @@ type DirectBackend struct {
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
 func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.DirectAgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
-	modelProviderRegistry := modelprovider.NewRegistry(modelprovider.NewHTTPClient())
-	connectorClient := connector.NewHTTPClient()
+	connectionClient := connectiontest.NewHTTPClient()
+	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
+	connectorClient := connectionClient
 	connectorRegistry := connector.NewRegistry(connectorClient)
 	difyKnowledgeDocuments := connector.NewDifyKnowledgeDocumentLister(connectorClient)
 	difyKnowledgeRetriever := connector.NewDifyKnowledgeRetriever(connectorClient)
-	telegramAPI := telegram.NewClient(connectiontest.NewHTTPClient())
+	telegramAPI := telegram.NewClient(connectionClient)
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),

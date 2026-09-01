@@ -32,22 +32,12 @@ type Registry struct {
 	factories map[domain.IntegrationConnectionType]Factory
 }
 
-// NewHTTPClient 创建不跟随重定向的连接器客户端。
-func NewHTTPClient() *http.Client {
-	return connectiontest.NewHTTPClient()
-}
-
 // NewRegistry 创建内置连接器注册表。
 func NewRegistry(client HTTPDoer) *Registry {
-	registry := &Registry{factories: make(map[domain.IntegrationConnectionType]Factory)}
-	registry.Register(domain.IntegrationConnectionTypeDify, newDifyFactory(client))
-	registry.Register(domain.IntegrationConnectionTypeN8N, newN8NFactory(client))
-	return registry
-}
-
-// Register 在应用组装阶段注册或替换连接器工厂。
-func (r *Registry) Register(connectorType domain.IntegrationConnectionType, factory Factory) {
-	r.factories[connectorType] = factory
+	return &Registry{factories: map[domain.IntegrationConnectionType]Factory{
+		domain.IntegrationConnectionTypeDify: newDifyFactory(client),
+		domain.IntegrationConnectionTypeN8N:  newN8NFactory(client),
+	}}
 }
 
 // NewProbe 返回指定类型的连接器探测器。

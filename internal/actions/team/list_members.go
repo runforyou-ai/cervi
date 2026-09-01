@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -57,9 +56,6 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 	}
 	if input.WorkStatus != "" && input.WorkStatus != domain.WorkStatusWorking && input.WorkStatus != domain.WorkStatusAway && input.WorkStatus != domain.WorkStatusOffDuty {
 		return MemberListOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusInvalid}}
-	}
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return MemberListOutput{}, err
 	}
 	if _, err := loadTeam(ctx, q.db, identity.Organization.ID, teamID); err != nil {
 		return MemberListOutput{}, err

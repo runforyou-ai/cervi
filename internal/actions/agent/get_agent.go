@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -19,9 +18,6 @@ func NewGetAgentQuery(db *bun.DB) *GetAgentQuery { return &GetAgentQuery{db: db}
 
 // Execute 返回当前企业的指定 AI 员工。
 func (q *GetAgentQuery) Execute(ctx context.Context, identity *servermodels.Identity, agentID string) (*Agent, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	agent, err := loadAgent(ctx, q.db, identity.Organization.ID, agentID)
 	if err != nil {
 		return nil, fmt.Errorf("get agent: %w", err)

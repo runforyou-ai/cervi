@@ -10,7 +10,6 @@ import (
 	"slices"
 	"time"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -48,9 +47,6 @@ func NewListConversationMessagesQuery(db *bun.DB) *ListConversationMessagesQuery
 
 // Execute 按会话类型授权并返回当前成员可见的消息页。
 func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ConversationMessageHistoryInput) (ConversationMessageHistory, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return ConversationMessageHistory{}, err
-	}
 	if fields := validateConversationMessageHistoryInput(input); len(fields) > 0 {
 		return ConversationMessageHistory{}, &ValidationError{Fields: fields}
 	}

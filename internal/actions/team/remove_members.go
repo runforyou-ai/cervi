@@ -25,7 +25,7 @@ func NewRemoveMembersAction(db *bun.DB) *RemoveMembersAction {
 func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, members []MemberIdentity) (*TeamRecord, error) {
 	var team *TeamRecord
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		if _, err := loadTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {

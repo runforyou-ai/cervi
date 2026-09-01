@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -108,9 +107,6 @@ func NewLoadInboxQuery(db *bun.DB) *LoadInboxQuery {
 
 // Execute 分别读取客户会话和内部单聊后合并排序。
 func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, error) {
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
-	}
 	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
 	input.CustomerView = domain.CustomerInboxView(strings.TrimSpace(string(input.CustomerView)))
 	input.AssigneeIdentityID = strings.TrimSpace(input.AssigneeIdentityID)

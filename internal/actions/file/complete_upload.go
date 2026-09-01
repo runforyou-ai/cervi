@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -27,9 +26,6 @@ func NewCompleteUploadAction(db *bun.DB) *CompleteUploadAction {
 
 // Execute 按文件当前状态推进上传流程：已激活或已上传且未过期时幂等返回，待上传时核验内容后标记完成。
 func (a *CompleteUploadAction) Execute(ctx context.Context, identity *servermodels.Identity, fileID string, stat StatFunc) (*servermodels.File, error) {
-	if !validIdentity(identity) {
-		return nil, common.ErrIdentityInvalid
-	}
 	record, err := get(ctx, a.db, identity.Organization.ID, fileID, "")
 	if err != nil {
 		return nil, err

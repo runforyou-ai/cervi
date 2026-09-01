@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -27,9 +26,6 @@ func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.
 	input, fields := normalizeListInput(input)
 	if len(fields) > 0 {
 		return ListOutput{}, &ValidationError{Fields: fields}
-	}
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return ListOutput{}, err
 	}
 
 	countQuery := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), identity.Organization.ID, input)

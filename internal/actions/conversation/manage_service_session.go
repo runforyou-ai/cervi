@@ -45,7 +45,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
@@ -116,7 +116,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, input.ConversationID)
@@ -189,7 +189,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
@@ -256,7 +256,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 	}
 	var output ServiceSessionResult
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		session, err := lockLatestCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)

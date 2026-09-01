@@ -4,12 +4,10 @@ package setting
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -30,50 +28,19 @@ func (a *SaveS3SettingAction) Execute(ctx context.Context, identity *servermodel
 	if len(fields) > 0 {
 		return S3Setting{}, &ValidationError{Fields: fields}
 	}
-	if identity == nil ||
-		!common.ValidUUID(identity.Organization.ID) ||
-		!common.ValidUUID(identity.User.ID) ||
-		identity.User.OrganizationID != identity.Organization.ID {
-		return S3Setting{}, common.ErrIdentityInvalid
-	}
-
 	value, err := json.Marshal(input)
 	if err != nil {
 		return S3Setting{}, fmt.Errorf("encode S3 setting: %w", err)
 	}
-	record := &servermodels.Setting{
-		OrganizationID: identity.Organization.ID,
-		Key:            s3SettingKey,
-		Value:          value,
-	}
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		organization := &servermodels.Organization{}
-		if err := tx.NewSelect().
-			Model(organization).
-			Column("id").
-			Where("o.id = ?", identity.Organization.ID).
-			For("KEY SHARE").
-			Scan(ctx); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return common.ErrIdentityInvalid
-			}
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-
-		user := &servermodels.User{}
-		if err := tx.NewSelect().
-			Model(user).
-			Column("id").
-			Where("u.id = ?", identity.User.ID).
-			Where("u.organization_id = ?", identity.Organization.ID).
-			For("KEY SHARE").
-			Scan(ctx); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return common.ErrIdentityInvalid
-			}
-			return err
+		record := &servermodels.Setting{
+			OrganizationID: identity.Organization.ID,
+			Key:            s3SettingKey,
+			Value:          value,
 		}
-
 		_, err := tx.NewInsert().
 			Model(record).
 			Column("organization_id", "key", "value").
@@ -83,9 +50,6 @@ func (a *SaveS3SettingAction) Execute(ctx context.Context, identity *servermodel
 			Exec(ctx)
 		return err
 	})
-	if errors.Is(err, common.ErrIdentityInvalid) {
-		return S3Setting{}, common.ErrIdentityInvalid
-	}
 	if err != nil {
 		return S3Setting{}, fmt.Errorf("save S3 setting: %w", err)
 	}

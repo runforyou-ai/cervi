@@ -23,7 +23,7 @@ func NewDeleteKnowledgeGroupAction(db *bun.DB) *DeleteKnowledgeGroupAction {
 func (a *DeleteKnowledgeGroupAction) Execute(ctx context.Context, identity *servermodels.Identity, knowledgeBaseID, groupID string) (*Record, error) {
 	var output *Record
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		group, err := loadKnowledgeGroup(ctx, tx, identity.Organization.ID, knowledgeBaseID, groupID)

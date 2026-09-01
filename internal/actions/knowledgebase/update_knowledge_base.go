@@ -33,7 +33,7 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 	}
 	var record Record
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.Validate(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		if err := validateDifyConnection(ctx, tx, identity.Organization.ID, input.IntegrationConnectionID); err != nil {

@@ -33,23 +33,13 @@ type Registry struct {
 	factories map[domain.AIProviderBrand]Factory
 }
 
-// NewHTTPClient 创建不会跟随重定向泄露凭据的探测客户端。
-func NewHTTPClient() *http.Client {
-	return connectiontest.NewHTTPClient()
-}
-
 // NewRegistry 创建内置供应商品牌注册表。
 func NewRegistry(client HTTPDoer) *Registry {
-	registry := &Registry{factories: make(map[domain.AIProviderBrand]Factory)}
-	registry.Register(domain.AIProviderBrandDeepSeek, newOpenAICompatibleFactory(client))
-	registry.Register(domain.AIProviderBrandOpenAI, newOpenAICompatibleFactory(client))
-	registry.Register(domain.AIProviderBrandAlibaba, newAlibabaFactory(client))
-	return registry
-}
-
-// Register 在应用组装阶段注册或替换一个供应商探测器工厂。
-func (r *Registry) Register(brand domain.AIProviderBrand, factory Factory) {
-	r.factories[brand] = factory
+	return &Registry{factories: map[domain.AIProviderBrand]Factory{
+		domain.AIProviderBrandDeepSeek: newOpenAICompatibleFactory(client),
+		domain.AIProviderBrandOpenAI:   newOpenAICompatibleFactory(client),
+		domain.AIProviderBrandAlibaba:  newAlibabaFactory(client),
+	}}
 }
 
 // NewProbe 返回指定品牌的连接探测器。

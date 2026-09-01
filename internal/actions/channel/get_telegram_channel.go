@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -35,9 +34,6 @@ func NewGetTelegramChannelQuery(db *bun.DB) *GetTelegramChannelQuery {
 func (q *GetTelegramChannelQuery) Execute(ctx context.Context, identity *servermodels.Identity, channelID string) (*TelegramChannelDetail, error) {
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
-	}
-	if err := identityaction.Validate(ctx, q.db, identity); err != nil {
-		return nil, err
 	}
 	return loadTelegramChannelDetail(ctx, q.db, identity.Organization.ID, channelID, false)
 }

@@ -8,12 +8,12 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
-	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/ingress"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -27,8 +27,8 @@ import (
 
 // applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
 func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
-	tenantResolver := organizationaction.NewTenantResolver(appStorage.DB())
-	httpsEntry := api.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()), tenantResolver)
+	tenantResolver := serverstorage.NewTenantResolver(appStorage.DB())
+	httpsEntry := ingress.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()), tenantResolver)
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func newFileContentS3ConfigResolver(db *bun.DB) serverfilecontent.S3ConfigResolv
 
 // httpsLifecycle 将 HTTPS 入口接入 Wails 服务生命周期。
 type httpsLifecycle struct {
-	service *api.HTTPSEntry
+	service *ingress.HTTPSEntry
 }
 
 // ServiceStartup 启动 HTTPS 入口。
