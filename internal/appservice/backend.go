@@ -74,6 +74,15 @@ type Backend interface {
 	// SendDirectTextMessage 发送内部单聊文本消息。
 	//cervi:route POST /direct-conversations/:conversationID/messages
 	SendDirectTextMessage(context.Context, RequestMeta, string, DirectTextMessageInput) (ConversationMessage, error)
+	// CreateGroupConversation 创建企业内部群聊。
+	//cervi:route POST /group-conversations status=201
+	CreateGroupConversation(context.Context, RequestMeta, GroupConversationInput) (InboxConversation, error)
+	// GetGroupConversation 返回当前成员可见的群聊资料。
+	//cervi:route GET /group-conversations/:conversationID
+	GetGroupConversation(context.Context, RequestMeta, string) (GroupConversation, error)
+	// SendGroupTextMessage 发送企业内部群聊文本消息。
+	//cervi:route POST /group-conversations/:conversationID/messages
+	SendGroupTextMessage(context.Context, RequestMeta, string, GroupTextMessageInput) (ConversationMessage, error)
 	// ListMessageChannels 返回消息渠道列表。
 	//cervi:route GET /channels
 	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)

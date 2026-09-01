@@ -21,6 +21,14 @@ const (
 	MessageTypeText MessageType = MessageType(domain.MessageTypeText)
 )
 
+// GroupParticipantRole 表示群聊成员角色。
+type GroupParticipantRole string
+
+const (
+	GroupParticipantRoleOwner  GroupParticipantRole = GroupParticipantRole(domain.ConversationParticipantRoleOwner)
+	GroupParticipantRoleMember GroupParticipantRole = GroupParticipantRole(domain.ConversationParticipantRoleMember)
+)
+
 // ConversationMessageListInput 定义成员消息查询方向。
 type ConversationMessageListInput struct {
 	Before string `json:"before" query:"before"`
@@ -86,6 +94,33 @@ type DirectConversationInput struct {
 
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。
 type DirectTextMessageInput struct {
+	ClientMessageID string `json:"clientMessageId"`
+	Body            string `json:"body"`
+}
+
+// GroupConversationInput 定义群聊标题和创建时加入的成员。
+type GroupConversationInput struct {
+	Title             string   `json:"title"`
+	MemberIdentityIDs []string `json:"memberIdentityIds"`
+}
+
+// GroupParticipant 定义群聊当前有效成员。
+type GroupParticipant struct {
+	IdentityID  string               `json:"identityId"`
+	DisplayName string               `json:"displayName"`
+	AvatarURL   string               `json:"avatarUrl"`
+	Role        GroupParticipantRole `json:"role"`
+}
+
+// GroupConversation 定义群聊资料和当前有效成员。
+type GroupConversation struct {
+	ID           string             `json:"id"`
+	Title        string             `json:"title"`
+	Participants []GroupParticipant `json:"participants"`
+}
+
+// GroupTextMessageInput 定义成员发送的群聊文本消息。
+type GroupTextMessageInput struct {
 	ClientMessageID string `json:"clientMessageId"`
 	Body            string `json:"body"`
 }

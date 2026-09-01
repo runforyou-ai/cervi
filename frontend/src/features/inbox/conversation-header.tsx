@@ -1,4 +1,4 @@
-/** 客户会话头与联系人头像。 */
+/** 成员会话头与会话头像。 */
 import { useEffect, useState } from "react"
 import {
   BotIcon,
@@ -9,6 +9,7 @@ import {
   MoreHorizontalIcon,
   SendIcon,
   UserRoundIcon,
+  UsersRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -23,6 +24,7 @@ import {
   isApiError,
   isCustomerInboxConversation,
   isDirectInboxConversation,
+  isGroupInboxConversation,
   OrganizationIdentityType,
   listCustomerServiceAssignees,
   reopenServiceSession,
@@ -42,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import { GroupParticipantDialog } from "@/features/inbox/group-participant-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,8 +88,14 @@ export function ConversationAvatar({
   const direct = isDirectInboxConversation(conversation)
     ? conversation.direct
     : null
+  const group = isGroupInboxConversation(conversation)
+    ? conversation.group
+    : null
   const badge = customer ? sourceBadges[customer.channelType] : undefined
-  const contactName = customer?.contactName?.trim() || direct?.peerName.trim()
+  const contactName =
+    customer?.contactName?.trim() ||
+    direct?.peerName.trim() ||
+    group?.title.trim()
   const avatarURL = customer?.contactAvatarUrl ?? ""
   const [avatarFailed, setAvatarFailed] = useState(false)
   const directAgent =
@@ -111,6 +120,8 @@ export function ConversationAvatar({
             draggable={false}
             onError={() => setAvatarFailed(true)}
           />
+        ) : group ? (
+          <UsersRoundIcon className="size-4.5" />
         ) : directAgent ? (
           <BotIcon className="size-4.5" />
         ) : contactName ? (
@@ -167,6 +178,9 @@ export function ConversationHeader({
     : null
   const direct = isDirectInboxConversation(conversation)
     ? conversation.direct
+    : null
+  const group = isGroupInboxConversation(conversation)
+    ? conversation.group
     : null
   const agentRunLabel = agentRunStatusLabel(
     direct?.agentRunStatus ?? null,
@@ -259,6 +273,12 @@ export function ConversationHeader({
               {customer.title}
             </span>
           </div>
+        ) : group ? (
+          <GroupParticipantDialog
+            conversationID={conversation.id}
+            title={group.title}
+            memberCount={group.memberCount}
+          />
         ) : agentRunLabel ? (
           <div className="text-xs text-muted-foreground">
             {agentRunLabel}

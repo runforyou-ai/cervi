@@ -17,6 +17,11 @@ const (
 	ValidationExternalIDInvalid       ValidationCode = "external_id_invalid"
 	ValidationConversationIDInvalid   ValidationCode = "conversation_id_invalid"
 	ValidationTargetIdentityIDInvalid ValidationCode = "target_identity_id_invalid"
+	ValidationGroupTitleRequired      ValidationCode = "group_title_required"
+	ValidationGroupTitleTooLong       ValidationCode = "group_title_too_long"
+	ValidationGroupMembersRequired    ValidationCode = "group_members_required"
+	ValidationGroupMembersTooMany     ValidationCode = "group_members_too_many"
+	ValidationGroupMemberIDsInvalid   ValidationCode = "group_member_ids_invalid"
 	ValidationClientMessageIDInvalid  ValidationCode = "client_message_id_invalid"
 	ValidationBodyRequired            ValidationCode = "body_required"
 	ValidationBodyTooLong             ValidationCode = "body_too_long"
@@ -181,6 +186,41 @@ type DirectConversationSummary struct {
 
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。
 type DirectTextMessageInput struct {
+	ConversationID  string
+	ClientMessageID string
+	Body            string
+}
+
+// GroupConversationInput 定义企业成员创建群聊的标题和初始成员。
+type GroupConversationInput struct {
+	Title             string
+	MemberIdentityIDs []string
+}
+
+// GroupConversationSummary 定义企业内部群聊摘要。
+type GroupConversationSummary struct {
+	ID          string
+	Title       string
+	MemberCount int
+}
+
+// GroupParticipant 定义群聊中的当前有效成员。
+type GroupParticipant struct {
+	IdentityID   string
+	DisplayName  string
+	AvatarFileID *string
+	Role         domain.ConversationParticipantRole
+}
+
+// GroupConversation 定义群聊资料和当前有效成员。
+type GroupConversation struct {
+	ID           string
+	Title        string
+	Participants []GroupParticipant
+}
+
+// GroupTextMessageInput 定义成员发送的群聊文本消息。
+type GroupTextMessageInput struct {
 	ConversationID  string
 	ClientMessageID string
 	Body            string

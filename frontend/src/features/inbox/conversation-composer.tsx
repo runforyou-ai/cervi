@@ -1,4 +1,4 @@
-/** 提交 Customer 或 Direct 会话的成员文本消息。 */
+/** 提交成员可回复会话的文本消息。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
@@ -10,6 +10,7 @@ import {
   ConversationType,
   sendCustomerTextMessage,
   sendDirectTextMessage,
+  sendGroupTextMessage,
   type ConversationMessage,
 } from "@/api"
 import { Button } from "@/components/ui/button"
@@ -76,16 +77,21 @@ export function ConversationComposer({
     })
     form.resetField("body")
     try {
-      const message =
-        conversationType === ConversationType.ConversationTypeDirect
-          ? await sendDirectTextMessage(conversationID, {
-              clientMessageId: clientMessageID,
-              body,
-            })
-          : await sendCustomerTextMessage(conversationID, {
-              clientMessageId: clientMessageID,
-              body,
-            })
+      const input = { clientMessageId: clientMessageID, body }
+      let message: ConversationMessage
+      switch (conversationType) {
+        case ConversationType.ConversationTypeDirect:
+          message = await sendDirectTextMessage(conversationID, input)
+          break
+        case ConversationType.ConversationTypeGroup:
+          message = await sendGroupTextMessage(conversationID, input)
+          break
+        case ConversationType.ConversationTypeCustomer:
+          message = await sendCustomerTextMessage(conversationID, input)
+          break
+        default:
+          throw new Error("不支持的会话类型")
+      }
       onSucceeded()
       if (!aliveRef.current) return
       onSent(clientMessageID, message)

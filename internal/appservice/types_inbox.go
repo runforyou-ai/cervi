@@ -69,6 +69,7 @@ type ConversationType string
 const (
 	ConversationTypeCustomer ConversationType = ConversationType(domain.ConversationTypeCustomer)
 	ConversationTypeDirect   ConversationType = ConversationType(domain.ConversationTypeDirect)
+	ConversationTypeGroup    ConversationType = ConversationType(domain.ConversationTypeGroup)
 )
 
 // CustomerInboxConversation 定义客户会话摘要。
@@ -95,12 +96,21 @@ type DirectInboxConversation struct {
 	AgentRunStatus *AgentRunStatus          `json:"agentRunStatus"`
 }
 
+// GroupInboxConversation 定义企业群聊摘要。
+type GroupInboxConversation struct {
+	Title         string     `json:"title"`
+	Preview       *string    `json:"preview"`
+	LastMessageAt *time.Time `json:"lastMessageAt"`
+	MemberCount   int        `json:"memberCount"`
+}
+
 // InboxConversation 定义成员统一收件箱列表项。
 type InboxConversation struct {
 	ID       string                     `json:"id"`
 	Type     ConversationType           `json:"type"`
 	Customer *CustomerInboxConversation `json:"customer"`
 	Direct   *DirectInboxConversation   `json:"direct"`
+	Group    *GroupInboxConversation    `json:"group"`
 }
 
 // Inbox 定义成员收件箱查询结果。

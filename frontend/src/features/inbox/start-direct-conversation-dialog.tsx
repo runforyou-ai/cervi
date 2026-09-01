@@ -13,7 +13,6 @@ import { toast } from "sonner"
 import {
   isApiError,
   isDirectInboxConversation,
-  listMemberOptions,
   OrganizationIdentityType,
   startDirectConversation,
   type DirectInboxConversationData,
@@ -30,29 +29,11 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-
-const memberOptionPageSize = 100
-
-/** 分页读取全部可用企业身份候选项。 */
-async function listAllMemberOptions() {
-  const members: MemberOption[] = []
-  let page = 1
-  let pages = 1
-  do {
-    const output = await listMemberOptions({
-      page,
-      pageSize: memberOptionPageSize,
-    })
-    members.push(...output.members)
-    pages = Math.ceil(output.page.total / memberOptionPageSize)
-    page += 1
-  } while (page <= pages)
-  return members
-}
 
 /** 选择一位活跃企业成员并发起或打开单聊。 */
 export function StartDirectConversationDialog({
@@ -71,7 +52,7 @@ export function StartDirectConversationDialog({
   const [query, setQuery] = useState("")
   const [startingIdentityID, setStartingIdentityID] = useState("")
   const { data, loading, error, refresh } = useResource(
-    resourceKeys.directMemberOptions(),
+    resourceKeys.memberOptions(),
     listAllMemberOptions,
     { enabled: open, staleTime: 0 },
   )

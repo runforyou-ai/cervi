@@ -33,6 +33,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/reopen", s.reopenServiceSession)
 	router.POST("/direct-conversations", s.startDirectConversation)
 	router.POST("/direct-conversations/:conversationID/messages", s.sendDirectTextMessage)
+	router.POST("/group-conversations", s.createGroupConversation)
+	router.GET("/group-conversations/:conversationID", s.getGroupConversation)
+	router.POST("/group-conversations/:conversationID/messages", s.sendGroupTextMessage)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
 	router.GET("/channels/telegram/:channelID", s.getTelegramChannel)
@@ -281,6 +284,32 @@ func (s *Service) sendDirectTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendDirectTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createGroupConversation 创建企业内部群聊。
+func (s *Service) createGroupConversation(c *gin.Context) {
+	var input appservice.GroupConversationInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateGroupConversation(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// getGroupConversation 返回当前成员可见的群聊资料。
+func (s *Service) getGroupConversation(c *gin.Context) {
+	output, err := s.application.GetGroupConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// sendGroupTextMessage 发送企业内部群聊文本消息。
+func (s *Service) sendGroupTextMessage(c *gin.Context) {
+	var input appservice.GroupTextMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendGroupTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

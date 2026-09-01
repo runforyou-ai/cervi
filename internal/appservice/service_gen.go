@@ -89,6 +89,21 @@ func (s *Service) SendDirectTextMessage(ctx context.Context, meta RequestMeta, c
 	return s.backend.SendDirectTextMessage(ctx, meta, conversationID, input)
 }
 
+// CreateGroupConversation 创建企业内部群聊。
+func (s *Service) CreateGroupConversation(ctx context.Context, meta RequestMeta, input GroupConversationInput) (InboxConversation, error) {
+	return s.backend.CreateGroupConversation(ctx, meta, input)
+}
+
+// GetGroupConversation 返回当前成员可见的群聊资料。
+func (s *Service) GetGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) (GroupConversation, error) {
+	return s.backend.GetGroupConversation(ctx, meta, conversationID)
+}
+
+// SendGroupTextMessage 发送企业内部群聊文本消息。
+func (s *Service) SendGroupTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input GroupTextMessageInput) (ConversationMessage, error) {
+	return s.backend.SendGroupTextMessage(ctx, meta, conversationID, input)
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (s *Service) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
 	return s.backend.ListMessageChannels(ctx, meta)

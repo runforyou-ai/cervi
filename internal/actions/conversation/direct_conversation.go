@@ -399,23 +399,32 @@ func loadDirectSendContext(ctx context.Context, db bun.IDB, identity *servermode
 
 // normalizeDirectTextMessageInput 规范化并校验内部单聊文本消息输入。
 func normalizeDirectTextMessageInput(input DirectTextMessageInput) (DirectTextMessageInput, map[string]ValidationCode) {
+	conversationID, clientMessageID, body, fields := normalizeInternalTextMessageInput(input.ConversationID, input.ClientMessageID, input.Body)
+	input.ConversationID = conversationID
+	input.ClientMessageID = clientMessageID
+	input.Body = body
+	return input, fields
+}
+
+// normalizeInternalTextMessageInput 规范化内部会话文本消息输入。
+func normalizeInternalTextMessageInput(conversationID, clientMessageID, body string) (string, string, string, map[string]ValidationCode) {
 	fields := map[string]ValidationCode{}
-	input.Body = strings.TrimSpace(input.Body)
+	body = strings.TrimSpace(body)
 	var valid bool
-	input.ConversationID, valid = common.NormalizeUUID(input.ConversationID)
+	conversationID, valid = common.NormalizeUUID(conversationID)
 	if !valid {
 		fields["conversationId"] = ValidationConversationIDInvalid
 	}
-	input.ClientMessageID, valid = common.NormalizeUUID(input.ClientMessageID)
+	clientMessageID, valid = common.NormalizeUUID(clientMessageID)
 	if !valid {
 		fields["clientMessageId"] = ValidationClientMessageIDInvalid
 	}
-	if input.Body == "" {
+	if body == "" {
 		fields["body"] = ValidationBodyRequired
-	} else if utf8.RuneCountInString(input.Body) > 4000 {
+	} else if utf8.RuneCountInString(body) > 4000 {
 		fields["body"] = ValidationBodyTooLong
 	}
-	return input, fields
+	return conversationID, clientMessageID, body, fields
 }
 
 // generateDirectConversationIDs 预生成单聊创建事务使用的 UUIDv7。

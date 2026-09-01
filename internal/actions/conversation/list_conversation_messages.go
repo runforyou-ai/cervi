@@ -129,7 +129,7 @@ func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *ser
 			return ErrConversationNotFound
 		}
 		return nil
-	case domain.ConversationTypeDirect:
+	case domain.ConversationTypeDirect, domain.ConversationTypeGroup:
 		available, err := db.NewSelect().
 			TableExpr("conversation_participants AS cp").
 			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
@@ -140,7 +140,7 @@ func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *ser
 			Where("cs.source_id = ?", identity.OrganizationIdentity.ID).
 			Exists(ctx)
 		if err != nil {
-			return fmt.Errorf("check direct conversation access: %w", err)
+			return fmt.Errorf("check internal conversation access: %w", err)
 		}
 		if !available {
 			return ErrConversationNotFound
