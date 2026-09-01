@@ -36,6 +36,7 @@ import {
   resolveWorkspaceLocation,
   type ResolvedWorkspaceTab,
 } from "@/features/workspace/workspace-page-routes"
+import { resourceClient } from "@/lib/resource-client"
 import { cn } from "@/lib/utils"
 
 type WorkspaceTabState = {
@@ -382,7 +383,7 @@ export function WorkspaceTabs({
   const navigationType = useNavigationType()
   const pendingActivationRef = useRef<string | null>(null)
   const tabButtonRefs = useRef(new Map<string, HTMLButtonElement>())
-  const [resetRevisionById, setResetRevisionById] = useState<
+  const [reloadRevisionById, setReloadRevisionById] = useState<
     Readonly<Record<string, number>>
   >({})
   const [state, dispatch] = useReducer(workspaceTabReducer, {
@@ -484,13 +485,15 @@ export function WorkspaceTabs({
     dispatch({ type: "pin", id, pinned })
   }
 
-  /** 重置指定标签的页面状态，保留各标签已有的查询缓存。 */
-  function resetTab(id: string) {
-    setResetRevisionById((current) => ({
+  /** 重新挂载指定标签并失效查询缓存，保留其他标签的页面实例。 */
+  function reloadTab(id: string) {
+    /* 缓存默认永久新鲜，重挂载不会自动重取，这里显式失效全部查询。 */
+    void resourceClient.invalidateQueries()
+    setReloadRevisionById((current) => ({
       ...current,
       [id]: (current[id] ?? 0) + 1,
     }))
-    console.info("工作台标签页面状态已重置", { tab_id: id })
+    console.info("工作台标签已重新加载", { tab_id: id })
   }
 
   /** 只保留指定标签，并在需要时将它激活。 */
@@ -563,8 +566,8 @@ export function WorkspaceTabs({
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onSelect={() => resetTab(tab.id)}>
-                  {t("tabs.reset")}
+                <ContextMenuItem onSelect={() => reloadTab(tab.id)}>
+                  {t("tabs.reload")}
                 </ContextMenuItem>
                 <ContextMenuItem
                   onSelect={() =>
@@ -603,7 +606,7 @@ export function WorkspaceTabs({
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {state.tabs.map((tab) => (
           <WorkspaceTabPane
-            key={`${tab.id}:${resetRevisionById[tab.id] ?? 0}`}
+            key={`${tab.id}:${reloadRevisionById[tab.id] ?? 0}`}
             tab={tab}
             active={tab.id === state.activeId}
             context={context}

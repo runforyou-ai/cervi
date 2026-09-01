@@ -24,7 +24,7 @@ const workspace = {
     closeTab: "关闭标签",
     closeOthers: "关闭其他标签",
     closeRight: "关闭右侧标签",
-    reset: "重置页面",
+    reload: "重新加载",
     pin: "固定",
     unpin: "取消固定",
     pinnedTab: "{{title}}，已固定",
