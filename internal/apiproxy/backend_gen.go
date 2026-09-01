@@ -161,6 +161,43 @@ func (b *Backend) GetGroupConversation(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
+// UpdateGroupConversation 修改群聊名称。
+func (b *Backend) UpdateGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationTitleInput) (appservice.GroupConversation, error) {
+	var output appservice.GroupConversation
+	err := b.do(ctx, meta, http.MethodPatch, "/group-conversations/"+url.PathEscape(conversationID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// AddGroupConversationMembers 批量增加群聊成员。
+func (b *Backend) AddGroupConversationMembers(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationMembersInput) (appservice.GroupConversation, error) {
+	var output appservice.GroupConversation
+	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/members", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// RemoveGroupConversationMember 移除单个群聊成员。
+func (b *Backend) RemoveGroupConversationMember(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationMemberInput) (appservice.GroupConversation, error) {
+	var output appservice.GroupConversation
+	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/members/remove", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// TransferGroupConversationOwner 转让群主。
+func (b *Backend) TransferGroupConversationOwner(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationOwnerInput) (appservice.GroupConversation, error) {
+	var output appservice.GroupConversation
+	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/owner/transfer", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// LeaveGroupConversation 退出群聊并按需转让群主。
+func (b *Backend) LeaveGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationLeaveInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/leave", nil, input, nil)
+}
+
 // SendGroupTextMessage 发送企业内部群聊文本消息。
 func (b *Backend) SendGroupTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage

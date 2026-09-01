@@ -80,6 +80,21 @@ type Backend interface {
 	// GetGroupConversation 返回当前成员可见的群聊资料。
 	//cervi:route GET /group-conversations/:conversationID
 	GetGroupConversation(context.Context, RequestMeta, string) (GroupConversation, error)
+	// UpdateGroupConversation 修改群聊名称。
+	//cervi:route PATCH /group-conversations/:conversationID
+	UpdateGroupConversation(context.Context, RequestMeta, string, GroupConversationTitleInput) (GroupConversation, error)
+	// AddGroupConversationMembers 批量增加群聊成员。
+	//cervi:route POST /group-conversations/:conversationID/members
+	AddGroupConversationMembers(context.Context, RequestMeta, string, GroupConversationMembersInput) (GroupConversation, error)
+	// RemoveGroupConversationMember 移除单个群聊成员。
+	//cervi:route POST /group-conversations/:conversationID/members/remove
+	RemoveGroupConversationMember(context.Context, RequestMeta, string, GroupConversationMemberInput) (GroupConversation, error)
+	// TransferGroupConversationOwner 转让群主。
+	//cervi:route POST /group-conversations/:conversationID/owner/transfer
+	TransferGroupConversationOwner(context.Context, RequestMeta, string, GroupConversationOwnerInput) (GroupConversation, error)
+	// LeaveGroupConversation 退出群聊并按需转让群主。
+	//cervi:route POST /group-conversations/:conversationID/leave
+	LeaveGroupConversation(context.Context, RequestMeta, string, GroupConversationLeaveInput) error
 	// SendGroupTextMessage 发送企业内部群聊文本消息。
 	//cervi:route POST /group-conversations/:conversationID/messages
 	SendGroupTextMessage(context.Context, RequestMeta, string, GroupTextMessageInput) (ConversationMessage, error)

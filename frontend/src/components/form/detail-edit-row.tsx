@@ -1,8 +1,9 @@
-/** 联系人详情通用的字段级展示和编辑操作。 */
+/** 详情页通用的字段级展示和编辑操作。 */
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 /** 详情行，支持进入字段编辑。 */
 export function DetailEditRow({
@@ -10,6 +11,7 @@ export function DetailEditRow({
   value,
   editing,
   editEnabled,
+  compact = false,
   onEdit,
   children,
 }: {
@@ -17,15 +19,26 @@ export function DetailEditRow({
   value: ReactNode
   editing: boolean
   editEnabled: boolean
+  compact?: boolean
   onEdit: () => void
   children: ReactNode
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("common")
   const showEdit = !editing && editEnabled
 
   return (
-    <div className="group rounded-md px-2 py-2.5 transition-colors hover:bg-muted/50 focus-within:bg-muted/50">
-      <div className="flex min-h-9 items-start gap-3">
+    <div
+      className={cn(
+        "group rounded-md px-2 transition-colors hover:bg-muted/50 focus-within:bg-muted/50",
+        compact ? "py-1.5" : "py-2.5",
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-start gap-3",
+          compact ? "min-h-8" : "min-h-9",
+        )}
+      >
         <div className="w-28 shrink-0 pt-1 text-sm text-muted-foreground">
           {label}
         </div>
@@ -42,10 +55,10 @@ export function DetailEditRow({
               variant="ghost"
               size="sm"
               className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-              aria-label={t("detail.editField", { field: label })}
+              aria-label={t("actions.editField", { field: label })}
               onClick={onEdit}
             >
-              {t("detail.edit")}
+              {t("actions.edit")}
             </Button>
           ) : null}
         </div>
@@ -64,14 +77,14 @@ export function DetailEditActions({
   onSave: () => void
   onCancel: () => void
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("common")
   return (
     <div className="mt-3 flex items-center gap-2">
       <Button size="sm" disabled={saving} onClick={onSave}>
-        {saving ? t("form.saving") : t("form.save")}
+        {saving ? t("actions.saving") : t("actions.save")}
       </Button>
       <Button variant="outline" size="sm" disabled={saving} onClick={onCancel}>
-        {t("form.cancel")}
+        {t("actions.cancel")}
       </Button>
     </div>
   )

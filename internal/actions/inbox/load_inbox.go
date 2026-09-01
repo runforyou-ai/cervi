@@ -60,6 +60,7 @@ type DirectConversationSummary struct {
 // GroupConversationSummary 定义收件箱中的企业群聊详情。
 type GroupConversationSummary struct {
 	Title         string
+	Status        domain.ConversationStatus
 	Preview       *string
 	LastMessageAt *time.Time
 	MemberCount   int
@@ -112,6 +113,7 @@ type directConversationRow struct {
 type groupConversationRow struct {
 	ID            string     `bun:"id"`
 	Title         string     `bun:"title"`
+	Status        string     `bun:"status"`
 	Preview       *string    `bun:"preview"`
 	LastMessageAt *time.Time `bun:"last_message_at"`
 	MemberCount   int        `bun:"member_count"`
@@ -195,7 +197,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		result = append(result, ConversationSummary{
 			ID: row.ID, Type: domain.ConversationTypeGroup, sortAt: row.SortAt,
 			Group: &GroupConversationSummary{
-				Title: row.Title, Preview: row.Preview,
+				Title: row.Title, Status: domain.ConversationStatus(row.Status), Preview: row.Preview,
 				LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount,
 			},
 		})
@@ -332,6 +334,7 @@ func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizatio
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("cv.title AS title").
+		ColumnExpr("cv.status AS status").
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("members.member_count AS member_count").
@@ -342,7 +345,7 @@ func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizatio
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeGroup).
-		Where("cv.status = ?", domain.ConversationStatusActive).
+		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
 		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
 		Limit(inboxConversationTypeLimit).
 		Scan(ctx, &rows)

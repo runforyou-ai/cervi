@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // SendCustomerTextMessage 发送成员客户会话文本消息。
@@ -192,7 +194,7 @@ func (b *DirectBackend) CreateGroupConversation(ctx context.Context, meta Reques
 	return InboxConversation{
 		ID: summary.ID, Type: ConversationTypeGroup,
 		Group: &GroupInboxConversation{
-			Title: summary.Title, MemberCount: summary.MemberCount,
+			Title: summary.Title, Status: ConversationStatus(summary.Status), MemberCount: summary.MemberCount,
 		},
 	}, nil
 }
@@ -207,6 +209,96 @@ func (b *DirectBackend) GetGroupConversation(ctx context.Context, meta RequestMe
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "get")
 	}
+	result, err := b.groupConversationFromAction(ctx, identity, record)
+	if err != nil {
+		slog.Warn("读取群聊成员头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+		return GroupConversation{}, FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
+	}
+	return result, nil
+}
+
+// UpdateGroupConversation 修改群聊名称。
+func (b *DirectBackend) UpdateGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationTitleInput) (GroupConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return GroupConversation{}, err
+	}
+	record, err := b.updateGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationTitleInput{ConversationID: conversationID, Title: input.Title})
+	if err != nil {
+		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "update")
+	}
+	slog.Info("企业群聊名称已修改", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
+	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+}
+
+// AddGroupConversationMembers 批量增加群聊成员。
+func (b *DirectBackend) AddGroupConversationMembers(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationMembersInput) (GroupConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return GroupConversation{}, err
+	}
+	record, err := b.addGroupConversationMembers.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: conversationID, MemberIdentityIDs: input.MemberIdentityIDs})
+	if err != nil {
+		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "add_members")
+	}
+	slog.Info("企业群聊成员已增加", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID, "added_count", len(input.MemberIdentityIDs))
+	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+}
+
+// RemoveGroupConversationMember 移除单个群聊成员。
+func (b *DirectBackend) RemoveGroupConversationMember(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationMemberInput) (GroupConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return GroupConversation{}, err
+	}
+	record, err := b.removeGroupConversationMember.Execute(ctx, identity, conversationaction.GroupConversationMemberInput{ConversationID: conversationID, MemberIdentityID: input.MemberIdentityID})
+	if err != nil {
+		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "remove_member")
+	}
+	slog.Info("企业群聊成员已移除", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID, "member_identity_id", input.MemberIdentityID)
+	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+}
+
+// TransferGroupConversationOwner 转让群主。
+func (b *DirectBackend) TransferGroupConversationOwner(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationOwnerInput) (GroupConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return GroupConversation{}, err
+	}
+	record, err := b.transferGroupConversationOwner.Execute(ctx, identity, conversationaction.GroupConversationOwnerInput{ConversationID: conversationID, OwnerIdentityID: input.OwnerIdentityID})
+	if err != nil {
+		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "transfer_owner")
+	}
+	slog.Info("企业群聊群主已转让", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID, "owner_identity_id", input.OwnerIdentityID)
+	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+}
+
+// LeaveGroupConversation 退出群聊并按需转让群主。
+func (b *DirectBackend) LeaveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationLeaveInput) error {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	err = b.leaveGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationLeaveInput{ConversationID: conversationID, SuccessorIdentityID: input.SuccessorIdentityID})
+	if err != nil {
+		return groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "leave")
+	}
+	slog.Info("企业群聊退出或解散操作已完成", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
+	return nil
+}
+
+// groupConversationMutationResult 转换群聊管理命令结果。
+func (b *DirectBackend) groupConversationMutationResult(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record conversationaction.GroupConversation, conversationID string) (GroupConversation, error) {
+	result, err := b.groupConversationFromAction(ctx, identity, record)
+	if err != nil {
+		slog.Warn("读取群聊管理结果头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+		return GroupConversation{}, FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
+	}
+	return result, nil
+}
+
+// groupConversationFromAction 转换群聊资料并生成成员头像地址。
+func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identity *servermodels.Identity, record conversationaction.GroupConversation) (GroupConversation, error) {
 	avatarFileIDs := make([]string, 0, len(record.Participants))
 	for _, participant := range record.Participants {
 		if participant.AvatarFileID != nil {
@@ -215,8 +307,7 @@ func (b *DirectBackend) GetGroupConversation(ctx context.Context, meta RequestMe
 	}
 	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
-		slog.Warn("读取群聊成员头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-		return GroupConversation{}, FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
+		return GroupConversation{}, err
 	}
 	participants := make([]GroupParticipant, 0, len(record.Participants))
 	for _, participant := range record.Participants {
@@ -225,7 +316,10 @@ func (b *DirectBackend) GetGroupConversation(ctx context.Context, meta RequestMe
 			AvatarURL: optionalFileURL(avatarURLs, participant.AvatarFileID), Role: GroupParticipantRole(participant.Role),
 		})
 	}
-	return GroupConversation{ID: record.ID, Title: record.Title, Participants: participants}, nil
+	return GroupConversation{
+		ID: record.ID, Title: record.Title, Status: ConversationStatus(record.Status),
+		CreatedAt: record.CreatedAt, Participants: participants,
+	}, nil
 }
 
 // SendGroupTextMessage 发送企业内部群聊文本消息。
@@ -312,10 +406,24 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			Status:    ServiceSessionStatus(message.SessionStart.Status),
 		}
 	}
+	var systemEvent *ConversationSystemEvent
+	if message.SystemEvent != nil {
+		targets := make([]ConversationSystemEventParticipant, 0, len(message.SystemEvent.Targets))
+		for _, target := range message.SystemEvent.Targets {
+			targets = append(targets, ConversationSystemEventParticipant{IdentityID: target.IdentityID, DisplayName: target.DisplayName})
+		}
+		systemEvent = &ConversationSystemEvent{
+			Type: ConversationSystemEventType(message.SystemEvent.Type),
+			Actor: ConversationSystemEventParticipant{
+				IdentityID: message.SystemEvent.Actor.IdentityID, DisplayName: message.SystemEvent.Actor.DisplayName,
+			},
+			Targets: targets, PreviousTitle: message.SystemEvent.PreviousTitle, Title: message.SystemEvent.Title,
+		}
+	}
 	return ConversationMessage{
 		ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, CreatedAt: message.CreatedAt,
-		Sender: sender, SessionStart: sessionStart,
+		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 	}
 }
 
@@ -357,6 +465,9 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 	if errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorGroupMemberNotFound)
 	}
+	if errors.Is(err, conversationaction.ErrGroupOwnerRequired) {
+		return FailedError(meta, cervii18n.ErrorGroupOwnerRequired).WithStatus(http.StatusForbidden)
+	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	}
@@ -364,7 +475,18 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
-		return ConflictError(meta, cervii18n.ErrorGroupMessageConflict, conflictError.Reason)
+		messageKey := cervii18n.ErrorGroupMessageConflict
+		switch conflictError.Reason {
+		case conversationaction.ConflictReasonGroupMemberAlreadyActive:
+			messageKey = cervii18n.ErrorGroupMemberAlreadyActive
+		case conversationaction.ConflictReasonGroupMemberNotActive:
+			messageKey = cervii18n.ErrorGroupMemberNotActive
+		case conversationaction.ConflictReasonGroupOwnerCannotBeRemoved:
+			messageKey = cervii18n.ErrorGroupOwnerCannotBeRemoved
+		case conversationaction.ConflictReasonGroupSuccessorRequired:
+			messageKey = cervii18n.ErrorGroupSuccessorRequired
+		}
+		return ConflictError(meta, messageKey, conflictError.Reason)
 	}
 	slog.Warn("企业群聊命令失败", "organization_id", organizationID, "conversation_id", conversationID, "operation", operation, "error", err)
 	switch operation {
@@ -372,8 +494,12 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 		return FailedError(meta, cervii18n.ErrorGroupConversationCreateFailed)
 	case "get":
 		return FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
-	default:
+	case "leave":
+		return FailedError(meta, cervii18n.ErrorGroupConversationLeaveFailed)
+	case "send":
 		return FailedError(meta, cervii18n.ErrorGroupMessageSendFailed)
+	default:
+		return FailedError(meta, cervii18n.ErrorGroupConversationUpdateFailed)
 	}
 }
 
@@ -459,4 +585,7 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationGroupMembersRequired:    cervii18n.FieldGroupMembersRequired,
 	conversationaction.ValidationGroupMembersTooMany:     cervii18n.FieldGroupMembersTooMany,
 	conversationaction.ValidationGroupMemberIDsInvalid:   cervii18n.FieldGroupMemberIDsInvalid,
+	conversationaction.ValidationGroupMemberIDInvalid:    cervii18n.FieldGroupMemberIDInvalid,
+	conversationaction.ValidationGroupOwnerIDInvalid:     cervii18n.FieldGroupOwnerIDInvalid,
+	conversationaction.ValidationGroupSuccessorIDInvalid: cervii18n.FieldGroupSuccessorIDInvalid,
 }

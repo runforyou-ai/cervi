@@ -16,7 +16,10 @@ import {
   type ContactInput,
   type ContactMethodInput,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import {
+  DetailEditActions,
+  DetailEditRow,
+} from "@/components/form/detail-edit-row"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -27,12 +30,9 @@ import {
   createContactSchema,
   type ContactFormValues,
 } from "@/features/contacts/external/contact-schema"
-import {
-  DetailEditActions,
-  DetailEditRow,
-} from "@/features/contacts/detail-edit-row"
 import { useDateTime } from "@/hooks/use-date-time"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { recoverSession } from "@/lib/session-navigation"
 
 type EditingSection = "name" | "stage" | "methods" | "notes" | null
 

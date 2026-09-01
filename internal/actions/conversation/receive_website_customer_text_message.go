@@ -421,7 +421,7 @@ func updateSessionSummary(ctx context.Context, db bun.IDB, session *servermodels
 	return nil
 }
 
-// updateConversationSummary 按消息稳定顺序推进客户线程摘要。
+// updateConversationSummary 按消息稳定顺序推进会话摘要。
 func updateConversationSummary(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) error {
 	_, err := db.NewUpdate().Model(conversation).
 		Set("last_message_id = ?", message.ID).

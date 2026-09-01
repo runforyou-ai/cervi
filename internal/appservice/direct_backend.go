@@ -61,6 +61,11 @@ type DirectBackend struct {
 	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
 	createGroupConversation           *conversationaction.CreateGroupConversationAction
 	getGroupConversation              *conversationaction.GetGroupConversationQuery
+	updateGroupConversation           *conversationaction.UpdateGroupConversationAction
+	addGroupConversationMembers       *conversationaction.AddGroupConversationMembersAction
+	removeGroupConversationMember     *conversationaction.RemoveGroupConversationMemberAction
+	transferGroupConversationOwner    *conversationaction.TransferGroupConversationOwnerAction
+	leaveGroupConversation            *conversationaction.LeaveGroupConversationAction
 	sendGroupTextMessage              *conversationaction.SendGroupTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
@@ -181,6 +186,11 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db, agentScheduler),
 		createGroupConversation:           conversationaction.NewCreateGroupConversationAction(db),
 		getGroupConversation:              conversationaction.NewGetGroupConversationQuery(db),
+		updateGroupConversation:           conversationaction.NewUpdateGroupConversationAction(db),
+		addGroupConversationMembers:       conversationaction.NewAddGroupConversationMembersAction(db),
+		removeGroupConversationMember:     conversationaction.NewRemoveGroupConversationMemberAction(db),
+		transferGroupConversationOwner:    conversationaction.NewTransferGroupConversationOwnerAction(db),
+		leaveGroupConversation:            conversationaction.NewLeaveGroupConversationAction(db),
 		sendGroupTextMessage:              conversationaction.NewSendGroupTextMessageAction(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),

@@ -99,6 +99,31 @@ func (s *Service) GetGroupConversation(ctx context.Context, meta RequestMeta, co
 	return s.backend.GetGroupConversation(ctx, meta, conversationID)
 }
 
+// UpdateGroupConversation 修改群聊名称。
+func (s *Service) UpdateGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationTitleInput) (GroupConversation, error) {
+	return s.backend.UpdateGroupConversation(ctx, meta, conversationID, input)
+}
+
+// AddGroupConversationMembers 批量增加群聊成员。
+func (s *Service) AddGroupConversationMembers(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationMembersInput) (GroupConversation, error) {
+	return s.backend.AddGroupConversationMembers(ctx, meta, conversationID, input)
+}
+
+// RemoveGroupConversationMember 移除单个群聊成员。
+func (s *Service) RemoveGroupConversationMember(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationMemberInput) (GroupConversation, error) {
+	return s.backend.RemoveGroupConversationMember(ctx, meta, conversationID, input)
+}
+
+// TransferGroupConversationOwner 转让群主。
+func (s *Service) TransferGroupConversationOwner(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationOwnerInput) (GroupConversation, error) {
+	return s.backend.TransferGroupConversationOwner(ctx, meta, conversationID, input)
+}
+
+// LeaveGroupConversation 退出群聊并按需转让群主。
+func (s *Service) LeaveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationLeaveInput) error {
+	return s.backend.LeaveGroupConversation(ctx, meta, conversationID, input)
+}
+
 // SendGroupTextMessage 发送企业内部群聊文本消息。
 func (s *Service) SendGroupTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input GroupTextMessageInput) (ConversationMessage, error) {
 	return s.backend.SendGroupTextMessage(ctx, meta, conversationID, input)

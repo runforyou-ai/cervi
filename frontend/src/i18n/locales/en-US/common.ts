@@ -5,6 +5,11 @@ const common = {
   actions: {
     close: "Close",
     back: "Back",
+    edit: "Edit",
+    editField: "Edit {{field}}",
+    save: "Save",
+    saving: "Saving…",
+    cancel: "Cancel",
   },
   comingSoon: "Soon",
   workStatuses: {

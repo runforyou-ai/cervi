@@ -145,7 +145,10 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 			return nil
 		})
 		if err == nil {
-			return GroupConversationSummary{ID: conversationID, Title: normalized.Title, MemberCount: len(normalized.MemberIdentityIDs) + 1}, nil
+			return GroupConversationSummary{
+				ID: conversationID, Title: normalized.Title,
+				Status: domain.ConversationStatusActive, MemberCount: len(normalized.MemberIdentityIDs) + 1,
+			}, nil
 		}
 		constraint, retryable := retryableUniqueViolation(err, map[string]struct{}{
 			"chat_subjects_organization_kind_source_unique": {},
@@ -160,25 +163,36 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 	return GroupConversationSummary{}, fmt.Errorf("create group conversation retries exhausted: %w", err)
 }
 
-// Execute 返回当前成员可见的群聊资料和有效参与者。
+// Execute 委托共用查询返回当前成员可见的群聊。
 func (q *GetGroupConversationQuery) Execute(ctx context.Context, identity *servermodels.Identity, conversationID string) (GroupConversation, error) {
+	return loadGroupConversation(ctx, q.db, identity, conversationID)
+}
+
+// loadGroupConversation 返回当前成员可见的群聊资料和有效参与者。
+func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (GroupConversation, error) {
 	conversationID, valid := common.NormalizeUUID(conversationID)
 	if !valid {
 		return GroupConversation{}, &ValidationError{Fields: map[string]ValidationCode{
 			"conversationId": ValidationConversationIDInvalid,
 		}}
 	}
-	var title string
-	err := q.db.NewSelect().
+	var summary struct {
+		Title     string    `bun:"title"`
+		Status    string    `bun:"status"`
+		CreatedAt time.Time `bun:"created_at"`
+	}
+	err := db.NewSelect().
 		TableExpr("conversations AS cv").
-		ColumnExpr("cv.title").
+		ColumnExpr("cv.title AS title").
+		ColumnExpr("cv.status AS status").
+		ColumnExpr("cv.created_at AS created_at").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		Where("cv.organization_id = ?", identity.Organization.ID).
 		Where("cv.id = ?", conversationID).
 		Where("cv.type = ?", domain.ConversationTypeGroup).
-		Where("cv.status = ?", domain.ConversationStatusActive).
-		Scan(ctx, &title)
+		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
+		Scan(ctx, &summary)
 	if errors.Is(err, sql.ErrNoRows) {
 		return GroupConversation{}, ErrConversationNotFound
 	}
@@ -187,7 +201,7 @@ func (q *GetGroupConversationQuery) Execute(ctx context.Context, identity *serve
 	}
 
 	rows := make([]groupParticipantRow, 0)
-	if err := q.db.NewSelect().
+	if err := db.NewSelect().
 		TableExpr("conversation_participants AS cp").
 		ColumnExpr("cs.source_id AS identity_id").
 		ColumnExpr("oi.display_name AS display_name").
@@ -209,7 +223,10 @@ func (q *GetGroupConversationQuery) Execute(ctx context.Context, identity *serve
 			AvatarFileID: row.AvatarFileID, Role: domain.ConversationParticipantRole(row.Role),
 		})
 	}
-	return GroupConversation{ID: conversationID, Title: title, Participants: participants}, nil
+	return GroupConversation{
+		ID: conversationID, Title: summary.Title, Status: domain.ConversationStatus(summary.Status),
+		CreatedAt: summary.CreatedAt, Participants: participants,
+	}, nil
 }
 
 // Execute 在可重试事务中写入群聊文本消息。

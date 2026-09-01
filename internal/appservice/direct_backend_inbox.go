@@ -75,7 +75,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 		}
 		if summary.Group != nil {
 			conversation.Group = &GroupInboxConversation{
-				Title: summary.Group.Title, Preview: summary.Group.Preview,
+				Title: summary.Group.Title, Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview,
 				LastMessageAt: summary.Group.LastMessageAt, MemberCount: summary.Group.MemberCount,
 			}
 		}

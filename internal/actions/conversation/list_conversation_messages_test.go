@@ -24,7 +24,10 @@ func TestBuildConversationMessageHistoryMarksSessionOpeningMessage(t *testing.T)
 		rows[index].ServiceSessionStatus = &status
 	}
 
-	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	history, err := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(history.Messages) != 3 || history.Messages[0].SessionStart == nil {
 		t.Fatalf("messages = %#v", history.Messages)
 	}
@@ -58,7 +61,10 @@ func TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage(t *testin
 		rows[index].ServiceSessionStatus = &openStatus
 	}
 
-	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	history, err := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if history.Messages[0].SessionStart == nil || history.Messages[0].SessionStart.Sequence != firstSequence {
 		t.Fatalf("first session start = %#v", history.Messages[0].SessionStart)
 	}

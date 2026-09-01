@@ -551,6 +551,7 @@ export interface ConversationMessage {
     "createdAt": string;
     "sender": ConversationMessageSender | null;
     "sessionStart": ConversationMessageSessionStart | null;
+    "systemEvent": ConversationSystemEvent | null;
 }
 
 /**
@@ -588,6 +589,55 @@ export interface ConversationMessageSessionStart {
     "startedAt": string;
     "status": ServiceSessionStatus;
 }
+
+/**
+ * ConversationStatus 表示会话生命周期状态。
+ */
+export enum ConversationStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ConversationStatusActive = "active",
+    ConversationStatusArchived = "archived",
+};
+
+/**
+ * ConversationSystemEvent 定义成员可见的系统事件。
+ */
+export interface ConversationSystemEvent {
+    "type": ConversationSystemEventType;
+    "actor": ConversationSystemEventParticipant;
+    "targets": ConversationSystemEventParticipant[] | null;
+    "previousTitle": string | null;
+    "title": string | null;
+}
+
+/**
+ * ConversationSystemEventParticipant 定义系统事件中的成员快照。
+ */
+export interface ConversationSystemEventParticipant {
+    "identityId": string;
+    "displayName": string;
+}
+
+/**
+ * ConversationSystemEventType 表示会话系统事件类型。
+ */
+export enum ConversationSystemEventType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ConversationSystemEventGroupRenamed = "group_renamed",
+    ConversationSystemEventGroupMembersAdded = "group_members_added",
+    ConversationSystemEventGroupMemberRemoved = "group_member_removed",
+    ConversationSystemEventGroupMemberLeft = "group_member_left",
+    ConversationSystemEventGroupOwnerTransferred = "group_owner_transferred",
+    ConversationSystemEventGroupDissolved = "group_dissolved",
+};
 
 /**
  * ConversationType 表示统一收件箱会话类型。
@@ -818,6 +868,8 @@ export interface FileUploadRequest {
 export interface GroupConversation {
     "id": string;
     "title": string;
+    "status": ConversationStatus;
+    "createdAt": string;
     "participants": GroupParticipant[] | null;
 }
 
@@ -830,10 +882,46 @@ export interface GroupConversationInput {
 }
 
 /**
+ * GroupConversationLeaveInput 定义当前成员退出群聊参数。
+ */
+export interface GroupConversationLeaveInput {
+    "successorIdentityId": string;
+}
+
+/**
+ * GroupConversationMemberInput 定义群聊单个成员操作参数。
+ */
+export interface GroupConversationMemberInput {
+    "memberIdentityId": string;
+}
+
+/**
+ * GroupConversationMembersInput 定义群聊批量增员参数。
+ */
+export interface GroupConversationMembersInput {
+    "memberIdentityIds": string[] | null;
+}
+
+/**
+ * GroupConversationOwnerInput 定义群主转让参数。
+ */
+export interface GroupConversationOwnerInput {
+    "ownerIdentityId": string;
+}
+
+/**
+ * GroupConversationTitleInput 定义群聊名称修改参数。
+ */
+export interface GroupConversationTitleInput {
+    "title": string;
+}
+
+/**
  * GroupInboxConversation 定义企业群聊摘要。
  */
 export interface GroupInboxConversation {
     "title": string;
+    "status": ConversationStatus;
     "preview": string | null;
     "lastMessageAt": string | null;
     "memberCount": number;
@@ -1357,6 +1445,7 @@ export enum MessageType {
     $zero = "",
 
     MessageTypeText = "text",
+    MessageTypeSystem = "system",
 };
 
 /**

@@ -22,6 +22,9 @@ const (
 	ValidationGroupMembersRequired    ValidationCode = "group_members_required"
 	ValidationGroupMembersTooMany     ValidationCode = "group_members_too_many"
 	ValidationGroupMemberIDsInvalid   ValidationCode = "group_member_ids_invalid"
+	ValidationGroupMemberIDInvalid    ValidationCode = "group_member_id_invalid"
+	ValidationGroupOwnerIDInvalid     ValidationCode = "group_owner_id_invalid"
+	ValidationGroupSuccessorIDInvalid ValidationCode = "group_successor_id_invalid"
 	ValidationClientMessageIDInvalid  ValidationCode = "client_message_id_invalid"
 	ValidationBodyRequired            ValidationCode = "body_required"
 	ValidationBodyTooLong             ValidationCode = "body_too_long"
@@ -39,6 +42,14 @@ const (
 	ConflictReasonChannelOutboundUnsupported = "channel_outbound_unsupported"
 	// ConflictReasonServiceSessionAlreadyOpen 表示客服处理周期已经打开。
 	ConflictReasonServiceSessionAlreadyOpen = "service_session_already_open"
+	// ConflictReasonGroupMemberAlreadyActive 表示成员已经在群聊中。
+	ConflictReasonGroupMemberAlreadyActive = "group_member_already_active"
+	// ConflictReasonGroupMemberNotActive 表示目标不是当前有效群成员。
+	ConflictReasonGroupMemberNotActive = "group_member_not_active"
+	// ConflictReasonGroupOwnerCannotBeRemoved 表示群主不能通过移除成员操作退出。
+	ConflictReasonGroupOwnerCannotBeRemoved = "group_owner_cannot_be_removed"
+	// ConflictReasonGroupSuccessorRequired 表示群主退出前必须指定继任者。
+	ConflictReasonGroupSuccessorRequired = "group_successor_required"
 )
 
 // ServiceSessionAssignee 定义客服处理周期负责人。
@@ -137,6 +148,21 @@ type ConversationMessageSessionStart struct {
 	Status    domain.ServiceSessionStatus
 }
 
+// ConversationSystemEventParticipant 定义系统事件中的成员快照。
+type ConversationSystemEventParticipant struct {
+	IdentityID  string `json:"identityId"`
+	DisplayName string `json:"displayName"`
+}
+
+// ConversationSystemEvent 定义会话系统事件及其审计载荷。
+type ConversationSystemEvent struct {
+	Type          domain.ConversationSystemEventType   `json:"-"`
+	Actor         ConversationSystemEventParticipant   `json:"actor"`
+	Targets       []ConversationSystemEventParticipant `json:"targets"`
+	PreviousTitle *string                              `json:"previousTitle,omitempty"`
+	Title         *string                              `json:"title,omitempty"`
+}
+
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
 	ID           string
@@ -146,6 +172,7 @@ type ConversationMessage struct {
 	CreatedAt    time.Time
 	Sender       *ConversationMessageSender
 	SessionStart *ConversationMessageSessionStart
+	SystemEvent  *ConversationSystemEvent
 }
 
 // ConversationMessageHistoryInput 定义成员消息历史查询方向。
@@ -197,10 +224,41 @@ type GroupConversationInput struct {
 	MemberIdentityIDs []string
 }
 
+// GroupConversationTitleInput 定义群聊名称修改参数。
+type GroupConversationTitleInput struct {
+	ConversationID string
+	Title          string
+}
+
+// GroupConversationMembersInput 定义群聊批量增员参数。
+type GroupConversationMembersInput struct {
+	ConversationID    string
+	MemberIdentityIDs []string
+}
+
+// GroupConversationMemberInput 定义群聊单个成员操作参数。
+type GroupConversationMemberInput struct {
+	ConversationID   string
+	MemberIdentityID string
+}
+
+// GroupConversationOwnerInput 定义群主转让参数。
+type GroupConversationOwnerInput struct {
+	ConversationID  string
+	OwnerIdentityID string
+}
+
+// GroupConversationLeaveInput 定义当前成员退出群聊参数。
+type GroupConversationLeaveInput struct {
+	ConversationID      string
+	SuccessorIdentityID string
+}
+
 // GroupConversationSummary 定义企业内部群聊摘要。
 type GroupConversationSummary struct {
 	ID          string
 	Title       string
+	Status      domain.ConversationStatus
 	MemberCount int
 }
 
@@ -216,6 +274,8 @@ type GroupParticipant struct {
 type GroupConversation struct {
 	ID           string
 	Title        string
+	Status       domain.ConversationStatus
+	CreatedAt    time.Time
 	Participants []GroupParticipant
 }
 
