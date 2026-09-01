@@ -1077,6 +1077,126 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 	})
 
+	// 覆盖群聊创建、成员资料、双方收件箱、成员授权和幂等文本消息。
+	runStep("企业成员基础群聊", func(t *testing.T) {
+		memberLogin, err := login.Execute(context.Background(), authaction.LoginInput{
+			OrganizationID: loggedIn.Identity.Organization.ID,
+			Email:          createdMember.Email,
+			Password:       "password123",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		observer, err := useraction.NewCreateUserAction(db).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
+			DisplayName: "群聊旁观者", Email: "group-observer@example.com", Password: "password123", RoleID: memberRole.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		observerLogin, err := login.Execute(context.Background(), authaction.LoginInput{
+			OrganizationID: loggedIn.Identity.Organization.ID,
+			Email:          observer.Email,
+			Password:       "password123",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		create := conversationaction.NewCreateGroupConversationAction(db)
+		group, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+			Title:             "  产品讨论  ",
+			MemberIdentityIDs: []string{memberLogin.Identity.OrganizationIdentity.ID},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if group.Title != "产品讨论" || group.MemberCount != 2 {
+			t.Fatalf("group conversation = %#v", group)
+		}
+		if _, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+			Title:             "跨企业群聊",
+			MemberIdentityIDs: []string{otherInstalled.Identity.OrganizationIdentity.ID},
+		}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
+			t.Fatalf("cross-organization group member error = %v", err)
+		}
+
+		get := conversationaction.NewGetGroupConversationQuery(db)
+		for _, currentIdentity := range []*servermodels.Identity{loggedIn.Identity, memberLogin.Identity} {
+			detail, getErr := get.Execute(context.Background(), currentIdentity, group.ID)
+			if getErr != nil {
+				t.Fatal(getErr)
+			}
+			if detail.Title != group.Title || len(detail.Participants) != 2 || detail.Participants[0].IdentityID != loggedIn.Identity.OrganizationIdentity.ID || detail.Participants[0].Role != domain.ConversationParticipantRoleOwner || detail.Participants[1].IdentityID != memberLogin.Identity.OrganizationIdentity.ID || detail.Participants[1].Role != domain.ConversationParticipantRoleMember {
+				t.Fatalf("group detail = %#v", detail)
+			}
+		}
+		if _, err := get.Execute(context.Background(), otherInstalled.Identity, group.ID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("cross-organization group detail error = %v", err)
+		}
+		if _, err := get.Execute(context.Background(), observerLogin.Identity, group.ID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("non-participant group detail error = %v", err)
+		}
+
+		inbox := inboxaction.NewLoadInboxQuery(db)
+		for _, currentIdentity := range []*servermodels.Identity{loggedIn.Identity, memberLogin.Identity} {
+			items, loadErr := inbox.Execute(context.Background(), currentIdentity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+			if loadErr != nil {
+				t.Fatal(loadErr)
+			}
+			found := false
+			for _, item := range items {
+				if item.ID == group.ID && item.Type == domain.ConversationTypeGroup && item.Group != nil && item.Group.Title == group.Title && item.Group.MemberCount == 2 && item.Group.LastMessageAt == nil {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("group conversation missing from inbox: %#v", items)
+			}
+		}
+
+		send := conversationaction.NewSendGroupTextMessageAction(db)
+		input := conversationaction.GroupTextMessageInput{
+			ConversationID:  group.ID,
+			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f67",
+			Body:            "你好，群聊",
+		}
+		message, err := send.Execute(context.Background(), memberLogin.Identity, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		replayed, err := send.Execute(context.Background(), memberLogin.Identity, input)
+		if err != nil || replayed.ID != message.ID {
+			t.Fatalf("replayed group message = %#v, error = %v", replayed, err)
+		}
+		if message.Sender == nil || message.Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
+			t.Fatalf("group message sender = %#v", message.Sender)
+		}
+		history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID})
+		if err != nil || len(history.Messages) != 1 || history.Messages[0].ID != message.ID || history.Messages[0].Sender == nil || history.Messages[0].Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
+			t.Fatalf("group message history = %#v, error = %v", history, err)
+		}
+		if _, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), otherInstalled.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("cross-organization group history error = %v", err)
+		}
+		if _, err := send.Execute(context.Background(), observerLogin.Identity, conversationaction.GroupTextMessageInput{
+			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f68", Body: "旁观者消息",
+		}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("non-participant group send error = %v", err)
+		}
+		if _, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), observerLogin.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("non-participant group history error = %v", err)
+		}
+		if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, observer.ID, domain.UserStatusInactive); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+			Title: "停用成员群聊", MemberIdentityIDs: []string{observer.IdentityID},
+		}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
+			t.Fatalf("inactive group member error = %v", err)
+		}
+	})
+
 	// 覆盖 AI 员工的创建、执行配置修订、状态切换、团队与渠道联动及团队删除。
 	runStep("AI员工", func(t *testing.T) {
 		customerServiceRole := &servermodels.Role{}
@@ -1125,6 +1245,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if createdAgent.RoleID != customerServiceRole.ID || createdAgent.RoleKind != domain.RoleKindCustomerService || len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
 			t.Fatalf("created agent = %#v", createdAgent)
+		}
+		if _, err := conversationaction.NewCreateGroupConversationAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+			Title: "AI 群聊", MemberIdentityIDs: []string{createdAgent.IdentityID},
+		}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
+			t.Fatalf("agent group member error = %v", err)
 		}
 		customerServiceAssignees, err := inboxaction.NewListCustomerServiceAssigneesQuery(db).Execute(context.Background(), loggedIn.Identity)
 		if err != nil {

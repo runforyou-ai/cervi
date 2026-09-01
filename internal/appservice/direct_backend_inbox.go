@@ -73,6 +73,12 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 				Preview: summary.Direct.Preview, LastMessageAt: summary.Direct.LastMessageAt, AgentRunStatus: agentRunStatus,
 			}
 		}
+		if summary.Group != nil {
+			conversation.Group = &GroupInboxConversation{
+				Title: summary.Group.Title, Preview: summary.Group.Preview,
+				LastMessageAt: summary.Group.LastMessageAt, MemberCount: summary.Group.MemberCount,
+			}
+		}
 		conversations = append(conversations, conversation)
 	}
 	return Inbox{Conversations: conversations}, nil

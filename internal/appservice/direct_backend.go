@@ -59,6 +59,9 @@ type DirectBackend struct {
 	reopenServiceSession              *conversationaction.ReopenServiceSessionAction
 	startDirectConversation           *conversationaction.StartDirectConversationAction
 	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
+	createGroupConversation           *conversationaction.CreateGroupConversationAction
+	getGroupConversation              *conversationaction.GetGroupConversationQuery
+	sendGroupTextMessage              *conversationaction.SendGroupTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
 	getTelegramChannel                *channelaction.GetTelegramChannelQuery
@@ -176,6 +179,9 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		reopenServiceSession:              conversationaction.NewReopenServiceSessionAction(db),
 		startDirectConversation:           conversationaction.NewStartDirectConversationAction(db),
 		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db, agentScheduler),
+		createGroupConversation:           conversationaction.NewCreateGroupConversationAction(db),
+		getGroupConversation:              conversationaction.NewGetGroupConversationQuery(db),
+		sendGroupTextMessage:              conversationaction.NewSendGroupTextMessageAction(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getTelegramChannel:                channelaction.NewGetTelegramChannelQuery(db),

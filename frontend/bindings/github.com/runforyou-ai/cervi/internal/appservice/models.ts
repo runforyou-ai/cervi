@@ -600,6 +600,7 @@ export enum ConversationType {
 
     ConversationTypeCustomer = "customer",
     ConversationTypeDirect = "direct",
+    ConversationTypeGroup = "group",
 };
 
 /**
@@ -812,6 +813,64 @@ export interface FileUploadRequest {
 }
 
 /**
+ * GroupConversation 定义群聊资料和当前有效成员。
+ */
+export interface GroupConversation {
+    "id": string;
+    "title": string;
+    "participants": GroupParticipant[] | null;
+}
+
+/**
+ * GroupConversationInput 定义群聊标题和创建时加入的成员。
+ */
+export interface GroupConversationInput {
+    "title": string;
+    "memberIdentityIds": string[] | null;
+}
+
+/**
+ * GroupInboxConversation 定义企业群聊摘要。
+ */
+export interface GroupInboxConversation {
+    "title": string;
+    "preview": string | null;
+    "lastMessageAt": string | null;
+    "memberCount": number;
+}
+
+/**
+ * GroupParticipant 定义群聊当前有效成员。
+ */
+export interface GroupParticipant {
+    "identityId": string;
+    "displayName": string;
+    "avatarUrl": string;
+    "role": GroupParticipantRole;
+}
+
+/**
+ * GroupParticipantRole 表示群聊成员角色。
+ */
+export enum GroupParticipantRole {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    GroupParticipantRoleOwner = "owner",
+    GroupParticipantRoleMember = "member",
+};
+
+/**
+ * GroupTextMessageInput 定义成员发送的群聊文本消息。
+ */
+export interface GroupTextMessageInput {
+    "clientMessageId": string;
+    "body": string;
+}
+
+/**
  * Identity 定义当前用户及其所属企业。
  */
 export interface Identity {
@@ -844,6 +903,7 @@ export interface InboxConversation {
     "type": ConversationType;
     "customer": CustomerInboxConversation | null;
     "direct": DirectInboxConversation | null;
+    "group": GroupInboxConversation | null;
 }
 
 /**

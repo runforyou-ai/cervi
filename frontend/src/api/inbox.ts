@@ -2,12 +2,15 @@
 import {
   ClaimServiceSession,
   CloseServiceSession,
+  CreateGroupConversation,
+  GetGroupConversation,
   ListConversationMessages,
   ListCustomerServiceAssignees,
   LoadInbox,
   ReopenServiceSession,
   SendCustomerTextMessage,
   SendDirectTextMessage,
+  SendGroupTextMessage,
   StartDirectConversation,
   TransferServiceSession,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -20,6 +23,11 @@ import type {
   DirectInboxConversation,
   DirectConversationInput,
   DirectTextMessageInput,
+  GroupConversation,
+  GroupConversationInput,
+  GroupInboxConversation,
+  GroupParticipant,
+  GroupTextMessageInput,
   Inbox,
   InboxConversation,
   LoadInboxInput,
@@ -48,12 +56,25 @@ export type CustomerInboxConversationData = InboxConversation & {
   type: ConversationType.ConversationTypeCustomer
   customer: CustomerInboxConversation
   direct: null
+  group: null
 }
 
 export type DirectInboxConversationData = InboxConversation & {
   type: ConversationType.ConversationTypeDirect
   customer: null
   direct: DirectInboxConversation
+  group: null
+}
+
+export type GroupInboxConversationData = InboxConversation & {
+  type: ConversationType.ConversationTypeGroup
+  customer: null
+  direct: null
+  group: GroupInboxConversation
+}
+
+export type GroupConversationData = Omit<GroupConversation, "participants"> & {
+  participants: GroupParticipant[]
 }
 
 const loadInboxBound = bind(LoadInbox)
@@ -61,6 +82,9 @@ const listConversationMessagesBound = bind(ListConversationMessages)
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
 const startDirectConversationBound = bind(StartDirectConversation)
 const sendDirectTextMessageBound = bind(SendDirectTextMessage)
+const createGroupConversationBound = bind(CreateGroupConversation)
+const getGroupConversationBound = bind(GetGroupConversation)
+const sendGroupTextMessageBound = bind(SendGroupTextMessage)
 const listCustomerServiceAssigneesBound = bind(ListCustomerServiceAssignees)
 const claimServiceSessionBound = bind(ClaimServiceSession)
 const transferServiceSessionBound = bind(TransferServiceSession)
@@ -76,7 +100,8 @@ export function isCustomerInboxConversation(
   return (
     conversation.type === ConversationType.ConversationTypeCustomer &&
     conversation.customer !== null &&
-    conversation.direct === null
+    conversation.direct === null &&
+    conversation.group === null
   )
 }
 
@@ -87,7 +112,20 @@ export function isDirectInboxConversation(
   return (
     conversation.type === ConversationType.ConversationTypeDirect &&
     conversation.customer === null &&
-    conversation.direct !== null
+    conversation.direct !== null &&
+    conversation.group === null
+  )
+}
+
+/** 判断统一收件箱项是否为结构完整的企业群聊。 */
+export function isGroupInboxConversation(
+  conversation: InboxConversation,
+): conversation is GroupInboxConversationData {
+  return (
+    conversation.type === ConversationType.ConversationTypeGroup &&
+    conversation.customer === null &&
+    conversation.direct === null &&
+    conversation.group !== null
   )
 }
 
@@ -169,4 +207,25 @@ export function sendDirectTextMessage(
   input: DirectTextMessageInput,
 ) {
   return sendDirectTextMessageBound(conversationID, input)
+}
+
+/** 创建企业内部群聊。 */
+export function createGroupConversation(input: GroupConversationInput) {
+  return createGroupConversationBound(input)
+}
+
+/** 读取企业内部群聊资料和当前成员。 */
+export async function getGroupConversation(
+  conversationID: string,
+): Promise<GroupConversationData> {
+  const result = await getGroupConversationBound(conversationID)
+  return { ...result, participants: asList(result.participants) }
+}
+
+/** 发送企业内部群聊文本消息。 */
+export function sendGroupTextMessage(
+  conversationID: string,
+  input: GroupTextMessageInput,
+) {
+  return sendGroupTextMessageBound(conversationID, input)
 }

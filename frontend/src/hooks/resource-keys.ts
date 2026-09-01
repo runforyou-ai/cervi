@@ -27,8 +27,11 @@ export const resourceKeys = {
   /** 单个会话的初始消息页。 */
   conversationMessages: (conversationId?: string) =>
     itemKey("conversation-messages", conversationId),
-  /** 发起内部单聊时使用的成员候选项。 */
-  directMemberOptions: () => ["direct-member-options"],
+  /** 发起内部会话时使用的成员候选项。 */
+  memberOptions: () => ["member-options"],
+  /** 单个群聊资料和当前成员。 */
+  groupConversation: (conversationId?: string) =>
+    itemKey("group-conversation", conversationId),
   /** 消息渠道列表。 */
   messageChannels: () => ["message-channels"],
   /** 单个消息渠道，按类型与 ID 标识。 */

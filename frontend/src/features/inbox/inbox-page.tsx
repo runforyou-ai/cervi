@@ -22,17 +22,18 @@ import {
   ServiceSessionStatus,
   isCustomerInboxConversation,
   isDirectInboxConversation,
+  isGroupInboxConversation,
   listCustomerServiceAssignees,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
   type DirectInboxConversationData,
+  type GroupInboxConversationData,
   type InboxAssignee,
   type InboxConversation,
   type LoadInboxQuery,
 } from "@/api"
 import { PageSplit } from "@/components/page-split"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -59,6 +60,7 @@ import {
   ConversationHeader,
 } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
+import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
 import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
 import { useOutgoingConversationMessages } from "@/features/inbox/use-outgoing-conversation-messages"
 import {
@@ -68,6 +70,10 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
+
+type InternalInboxConversationData =
+  | DirectInboxConversationData
+  | GroupInboxConversationData
 
 /** 使用与服务端一致的普通字符串 id 倒序。 */
 function compareIDsDescending(first: string, second: string) {
@@ -84,12 +90,16 @@ function compareInboxConversations(
     ? first.customer
     : isDirectInboxConversation(first)
       ? first.direct
-      : null
+      : isGroupInboxConversation(first)
+        ? first.group
+        : null
   const secondSummary = isCustomerInboxConversation(second)
     ? second.customer
     : isDirectInboxConversation(second)
       ? second.direct
-      : null
+      : isGroupInboxConversation(second)
+        ? second.group
+        : null
   const firstTime = firstSummary?.lastMessageAt
   const secondTime = secondSummary?.lastMessageAt
   if (!firstTime || !secondTime) {
@@ -215,6 +225,9 @@ function useConversationName() {
       if (isCustomerInboxConversation(conversation)) {
         return conversation.customer.contactName?.trim() || t("anonymousVisitor")
       }
+      if (isGroupInboxConversation(conversation)) {
+        return conversation.group.title.trim() || t("unknownSender")
+      }
       return t("unknownSender")
     },
     [t],
@@ -295,6 +308,7 @@ function InboxPaneTop({
   onRailToggle,
   searchDisabled,
   onStartDirect,
+  onCreateGroup,
 }: {
   query: string
   onQueryChange: (query: string) => void
@@ -302,9 +316,9 @@ function InboxPaneTop({
   onRailToggle: () => void
   searchDisabled: boolean
   onStartDirect: () => void
+  onCreateGroup: () => void
 }) {
   const { t } = useTranslation("inbox")
-  const { t: tCommon } = useTranslation("common")
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -380,11 +394,10 @@ function InboxPaneTop({
               {t("newDirectConversation")}
             </span>
           </DropdownMenuItem>
-          <DropdownMenuItem disabled className="gap-2">
+          <DropdownMenuItem className="gap-2" onSelect={onCreateGroup}>
             <span className="min-w-0 flex-1 truncate">
               {t("newGroupConversation")}
             </span>
-            <StatusBadge variant="muted">{tCommon("comingSoon")}</StatusBadge>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -634,7 +647,9 @@ function InboxConversationList({
             ? conversation.customer
             : isDirectInboxConversation(conversation)
               ? conversation.direct
-              : null
+              : isGroupInboxConversation(conversation)
+                ? conversation.group
+                : null
           if (!summary) return null
           const agentRunLabel = agentRunStatusLabel(
             isDirectInboxConversation(conversation)
@@ -718,7 +733,10 @@ function ConversationMain({
     assigneeIdentityId?: string,
   ) => void
   onConversationChanged: (
-    conversation: CustomerInboxConversationData | DirectInboxConversationData,
+    conversation:
+      | CustomerInboxConversationData
+      | DirectInboxConversationData
+      | GroupInboxConversationData,
   ) => void
   narrowViewport?: boolean
 }) {
@@ -735,6 +753,9 @@ function ConversationMain({
   const directConversation = isDirectInboxConversation(conversation)
     ? conversation
     : null
+  const groupConversation = isGroupInboxConversation(conversation)
+    ? conversation
+    : null
   const sessionStatus = customerConversation
     ? sessionStatusLabel(
         customerConversation.customer.serviceSessionStatus,
@@ -743,6 +764,7 @@ function ConversationMain({
     : ""
   const canReply =
     directConversation !== null ||
+    groupConversation !== null ||
     (customerConversation !== null &&
       customerConversation.customer.serviceSessionStatus ===
         ServiceSessionStatus.ServiceSessionStatusOpen &&
@@ -772,7 +794,8 @@ function ConversationMain({
     setContextSheetOpen((open) => !open)
   }
 
-  const validConversation = customerConversation ?? directConversation
+  const validConversation =
+    customerConversation ?? directConversation ?? groupConversation
   if (!validConversation) return null
 
   return (
@@ -828,7 +851,10 @@ function ConversationThread({
   canReply,
   onConversationChanged,
 }: {
-  conversation: CustomerInboxConversationData | DirectInboxConversationData
+  conversation:
+    | CustomerInboxConversationData
+    | DirectInboxConversationData
+    | GroupInboxConversationData
   canReply: boolean
   onConversationChanged: () => void
 }) {
@@ -837,6 +863,7 @@ function ConversationThread({
   const outgoing = useOutgoingConversationMessages()
   const replySupported =
     isDirectInboxConversation(conversation) ||
+    isGroupInboxConversation(conversation) ||
     conversation.customer.channelType === ChannelType.ChannelTypeWebsite
 
   return (
@@ -899,8 +926,9 @@ export function InboxPage({
   const [query, setQuery] = useState("")
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [directDialogOpen, setDirectDialogOpen] = useState(false)
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [startedConversations, setStartedConversations] = useState<
-    DirectInboxConversationData[]
+    InternalInboxConversationData[]
   >([])
   const [selectedConversationSnapshot, setSelectedConversationSnapshot] =
     useState<InboxConversation | null>(null)
@@ -921,7 +949,8 @@ export function InboxPage({
       conversations.filter(
         (conversation) =>
           isCustomerInboxConversation(conversation) ||
-          isDirectInboxConversation(conversation),
+          isDirectInboxConversation(conversation) ||
+          isGroupInboxConversation(conversation),
       ),
     [conversations],
   )
@@ -943,7 +972,11 @@ export function InboxPage({
       case InboxScope.InboxScopeCustomer:
         return allConversations.filter(isCustomerInboxConversation)
       case InboxScope.InboxScopeInternal:
-        return allConversations.filter(isDirectInboxConversation)
+        return allConversations.filter(
+          (conversation) =>
+            isDirectInboxConversation(conversation) ||
+            isGroupInboxConversation(conversation),
+        )
       default:
         return allConversations
     }
@@ -967,7 +1000,9 @@ export function InboxPage({
               conversation.direct.peerName,
               conversation.direct.preview ?? "",
             ]
-          : []
+          : isGroupInboxConversation(conversation)
+            ? [conversation.group.title, conversation.group.preview ?? ""]
+            : []
       return values.some((value) =>
         value.toLocaleLowerCase().includes(normalizedQuery),
       )
@@ -1040,9 +1075,9 @@ export function InboxPage({
     })
   }
 
-  /** 将新打开的内部单聊放入列表并选中。 */
+  /** 将新建或新打开的内部会话放入列表并选中。 */
   function showStartedConversation(
-    conversation: DirectInboxConversationData,
+    conversation: InternalInboxConversationData,
   ) {
     setStartedConversations((current) => [
       conversation,
@@ -1096,9 +1131,15 @@ export function InboxPage({
 
   /** 回复成功后只刷新会话会出现或排序变化的精确视图。 */
   function refreshConversationAfterMessage(
-    conversation: CustomerInboxConversationData | DirectInboxConversationData,
+    conversation:
+      | CustomerInboxConversationData
+      | DirectInboxConversationData
+      | GroupInboxConversationData,
   ) {
-    if (isDirectInboxConversation(conversation)) {
+    if (
+      isDirectInboxConversation(conversation) ||
+      isGroupInboxConversation(conversation)
+    ) {
       refreshAffectedInboxQueries(
         [
           inboxQuery(InboxScope.InboxScopeAll),
@@ -1159,6 +1200,7 @@ export function InboxPage({
         onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
         searchDisabled={listLoading || allConversations.length === 0}
         onStartDirect={() => setDirectDialogOpen(true)}
+        onCreateGroup={() => setGroupDialogOpen(true)}
       />
       <div className="flex min-h-0 flex-1">
         {railCollapsed ? null : (
@@ -1256,6 +1298,12 @@ export function InboxPage({
         currentIdentityID={identity.user.identityId}
         onOpenChange={setDirectDialogOpen}
         onStarted={showStartedConversation}
+      />
+      <CreateGroupConversationDialog
+        open={groupDialogOpen}
+        currentIdentityID={identity.user.identityId}
+        onOpenChange={setGroupDialogOpen}
+        onCreated={showStartedConversation}
       />
     </>
   )

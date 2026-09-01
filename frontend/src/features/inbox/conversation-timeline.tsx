@@ -1,4 +1,4 @@
-/** Customer 与 Direct Conversation 共用的成员消息时间线。 */
+/** Customer、Direct 与 Group Conversation 共用的成员消息时间线。 */
 import {
   Fragment,
   useCallback,
@@ -374,14 +374,19 @@ export function ConversationTimeline({
             const date = new Date(message.originatedAt)
             const incoming = message.local
               ? false
-              : conversationType === ConversationType.ConversationTypeDirect
+              : conversationType !== ConversationType.ConversationTypeCustomer
                 ? !message.sender ||
                   message.sender.sourceId !== currentIdentityID
                 : !message.sender ||
                   message.sender.kind ===
                     ChatSubjectKind.ChatSubjectKindContact
+            const sentByCurrentIdentity =
+              !message.local &&
+              conversationType !==
+                ConversationType.ConversationTypeCustomer &&
+              message.sender?.sourceId === currentIdentityID
             const senderName =
-              (message.local
+              (message.local || sentByCurrentIdentity
                 ? t("messageSenderYou")
                 : message.sender?.displayName?.trim()) ||
               (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
@@ -437,6 +442,12 @@ export function ConversationTimeline({
                     >
                       {formatMessageTime(dateFormatters.messageTime, date)}
                     </time>
+                    {conversationType ===
+                    ConversationType.ConversationTypeGroup ? (
+                      <span className="max-w-full truncate text-xs font-medium text-foreground">
+                        {senderName}
+                      </span>
+                    ) : null}
                     <div className="relative max-w-full">
                       <span
                         className={cn(

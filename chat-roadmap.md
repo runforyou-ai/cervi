@@ -1294,9 +1294,14 @@ P3 typing、presence 等临时事件
 
 #### 阶段 2B：基础群聊与协作事实
 
-- 实现群聊创建、基础成员管理、引用、@ 提醒和已读持久事实。
-- 增加对应 appservice 契约和页面，不要求统一实时协议已经完成。
-- 通知和临时状态可以先通过刷新降级，阶段 2E 再接入统一实时和离线同步。
+阶段 2B 按以下独立 PR 依次交付，不把创建、成员变化、消息关系和已读事实塞入同一轮改动：
+
+1. G1 基础群聊文本闭环：创建群聊和固定初始成员，接入统一收件箱、成员只读资料、历史、文本发送以及 Web、桌面端轮询；首轮只允许有效真人用户，不接入 Agent。移动端群聊交互由后续独立 PR 设计和交付。
+2. G2 群资料与成员管理：改名、增员、移除、退出、群主转让、参与者行复用，以及成员变化的系统事件和审计边界。
+3. G3 引用与 @ 提醒：开放同会话消息引用，增加类型化提醒关系和参与者校验。
+4. G4 已读持久事实：使用独立用户会话状态保存已读水位，不把个人视图状态写入参与者关系。
+
+通知和临时状态可以先通过刷新降级，阶段 2E 再接入统一实时和离线同步。未读实时扇出、用户 Mailbox 和统一实时协议不进入 G4。群聊 `@Agent` 在 G2 与 G3 完成后交付，不让 Agent 对普通群消息形成隐含响应规则。
 
 #### 阶段 2C：内部 Agent 最小聊天事实与 AI 员工验证
 
@@ -1484,13 +1489,13 @@ GET  /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
 
 阶段 2A 交付时发起单聊只接受当前企业的活跃用户身份；阶段 2C 扩展为同时接受活跃 Agent 身份，仍不接受自己、联系人、跨企业或停用身份。服务端在校验完成后，使用规范文本 `cervi:direct:<organization_id>:<min_identity_id>:<max_identity_id>` 的稳定 `bigint` 哈希取得事务级 advisory lock；锁内取得双方 `organization_identity` ChatSubject，并只复用类型为 `direct`、同企业、Participant 总数恰好为 2 且主体集合精确匹配的 Conversation。锁在创建 ChatSubject 前取得，Direct 创建统一经过该 Action，不增加主体配对关系表。已有归档会话只在显式发起时恢复为 `active`。
 
-Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 Participant 或恢复归档 Conversation；消息继续使用 `mmsg:<organization_identity_id>:<client_message_id>` 幂等键，且不关联 ServiceSession。成员历史查询按 Conversation 类型严格分叉：Customer 保持企业与客户扩展授权，Direct 要求当前身份是未离开的 Participant，其他类型不开放。
+Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 Participant 或恢复归档 Conversation；消息继续使用 `mmsg:<organization_identity_id>:<client_message_id>` 幂等键，且不关联 ServiceSession。成员历史查询按 Conversation 类型严格分叉：Customer 保持企业与客户扩展授权，Direct 要求当前身份是未离开的 Participant；阶段 2A 交付时其他类型不开放，阶段 2B-G1 已按相同 Participant 规则开放 Group。
 
 统一 Inbox 使用 `type + customer?/direct?` 信封。Customer 与 Direct 分别最多读取 50 条，合并后不再截断；Direct 使用最后消息左连接，空会话返回可空预览与时间，合并按 `last_message_at DESC NULLS LAST, id DESC` 排序，空会话沉底。消息发送者的 `sourceId` 明确定义为 `chat_subjects.source_id`：Customer 中联系人靠左、所有企业身份靠右；Direct 中 `sourceId == CurrentUser.identityId` 靠右，对方靠左。
 
 成员收件箱和当前 Customer/Direct 时间线每 3 秒轮询；Web 与桌面端只在消息路由所属工作区标签活动、页面可见且窗口聚焦时运行，移动端只在应用前台可见时运行，恢复前台后立即补拉。空 Direct 在没有 `after` 时轮询无游标最近页，得到第一条消息后安装游标；空增量响应保留旧游标，`before`、`after` 和本地发送结果按消息编号合并，切换会话后忽略旧结果。
 
-Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，群聊继续显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接操作或客户上下文栏。移动端统一展示 Customer 与 Direct 摘要，Customer 仍保持只读摘要，Direct 支持发起、详情、历史、文本发送和前台轮询；移动端详情隐藏一级导航并独立处理底部安全区。
+阶段 2A 交付时，Web 与桌面端收件箱以 `inbox-sidebar-prototype.html` 为交互基线，范围固定为「全部 / 客户 / 内部」，Direct 属于「内部」且不增加形态子筛选；成员单聊选择器已启用，当时群聊仍显示“即将推出”。Direct 主区不展示客户渠道角标、ServiceSession、转接操作或客户上下文栏。移动端统一展示 Customer 与 Direct 摘要，Customer 仍保持只读摘要，Direct 支持发起、详情、历史、文本发送和前台轮询；移动端详情隐藏一级导航并独立处理底部安全区。
 
 ### 13.9 阶段 2C：Agent Direct、Eino 与计算器 Tool（本次交付）
 
@@ -1512,6 +1517,16 @@ Agent 回复以普通企业身份绑定当前 ServiceSession，使用 `agent:<ru
 
 真人与 AI 继续共用领取、接管、转交、关闭和重新打开命令。转交给 Agent 时最后一条来自客户会立即补 Trigger，最后一条来自企业身份则等待客户下一条消息；不增加 AI 专属暂停、恢复、接管、收件箱状态或前端页面。
 
+### 13.11 阶段 2B-G1：企业成员基础群聊（本次交付）
+
+本 PR 在既有 Conversation、ChatSubject 和 Participant 数据底座上增加企业成员基础群聊文本闭环，不新增迁移。创建接口接收群聊名称和初始成员，当前身份自动成为 `owner`，其他成员为 `member`；首轮只允许同企业 active user，拒绝 Agent、联系人、停用身份、跨企业身份和重复成员。一个群聊最多包含 100 名初始参与者，同一成员集合可以创建多条群聊，不复用 Direct 的主体对收敛和 advisory lock。
+
+统一 Inbox 扩展为 `type + customer?/direct?/group?` 信封，Group 进入现有「全部 / 内部」范围，并与 Customer、Direct 各自最多读取 50 条后统一排序；尚无消息的群聊同样可见。成员历史和群聊资料要求当前身份是未退出的 `organization_identity` Participant；群聊资料首轮只读，返回当前有效成员和 owner。文本消息使用独立群聊命令，沿用成员消息幂等键、稳定时间线游标和 Conversation 摘要更新，不关联 ServiceSession，也不创建 Agent Trigger 或 Run。
+
+Web 和桌面端支持创建、列表、只读查看成员、历史、文本发送和前台轮询。移动端群聊入口、列表、详情和交互由后续独立 PR 设计和交付；群资料修改、成员变更、系统消息、引用、@、已读、文件、Agent 成员和统一实时留给后续 G2 至 G4 与阶段 2E。
+
+### 13.12 当前共同边界与后续交付
+
 当前聊天仍未实现以下能力，全部属于后续阶段：
 
 - 未读、实时、文件、外部平台投递、团队队列、指标和满意度。
@@ -1520,7 +1535,9 @@ Agent 回复以普通企业身份绑定当前 ServiceSession，使用 `agent:<ru
 
 后续按独立 PR 继续完成：
 
-1. 根据聊天主流程需要继续交付未读、统一实时、文件和外部平台投递。
-2. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
-3. 团队队列、指标和满意度按实际需求独立建模。
-4. 公开访客端点的限速与其他安全加固按当前阶段约束继续后置，不阻塞聊天功能开发。
+1. 按阶段 2B 的 G2 至 G4 继续交付群资料与成员管理、引用、@ 提醒和已读事实，再接入群聊 `@Agent`。
+2. 以独立 PR 设计和交付移动端群聊入口、列表、详情和触屏交互，不直接照搬桌面端工作区。
+3. 根据聊天主流程需要继续交付未读、统一实时、文件和外部平台投递。
+4. 根据真实产品需要增加网站渠道“只允许一个入站会话”的可选策略；默认多会话保持 Conversation 公开主键。
+5. 团队队列、指标和满意度按实际需求独立建模。
+6. 公开访客端点的限速与其他安全加固按当前阶段约束继续后置，不阻塞聊天功能开发。

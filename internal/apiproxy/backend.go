@@ -141,6 +141,10 @@ func (b *Backend) normalizeOutput(output any) {
 				customer.ContactAvatarURL = b.absoluteContentURL(customer.ContactAvatarURL)
 			}
 		}
+	case *appservice.GroupConversation:
+		for index := range value.Participants {
+			value.Participants[index].AvatarURL = b.absoluteContentURL(value.Participants[index].AvatarURL)
+		}
 	}
 }
 

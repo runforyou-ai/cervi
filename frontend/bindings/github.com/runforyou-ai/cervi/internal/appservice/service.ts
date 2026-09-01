@@ -106,6 +106,13 @@ export function CreateFileUpload(meta: $models.RequestMeta, input: $models.FileU
 }
 
 /**
+ * CreateGroupConversation 创建企业内部群聊。
+ */
+export function CreateGroupConversation(meta: $models.RequestMeta, input: $models.GroupConversationInput): $CancellablePromise<$models.InboxConversation> {
+    return $Call.ByID(4060539042, meta, input);
+}
+
+/**
  * CreateIntegrationConnection 创建外部系统连接器。
  */
 export function CreateIntegrationConnection(meta: $models.RequestMeta, input: $models.IntegrationConnectionInput): $CancellablePromise<$models.IntegrationConnection> {
@@ -257,6 +264,13 @@ export function GetBusinessSystem(meta: $models.RequestMeta, businessSystemID: s
  */
 export function GetContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
     return $Call.ByID(1550866366, meta, contactID);
+}
+
+/**
+ * GetGroupConversation 返回当前成员可见的群聊资料。
+ */
+export function GetGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
+    return $Call.ByID(2704575274, meta, conversationID);
 }
 
 /**
@@ -614,6 +628,13 @@ export function SendCustomerTextMessage(meta: $models.RequestMeta, conversationI
  */
 export function SendDirectTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.DirectTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
     return $Call.ByID(1058328585, meta, conversationID, input);
+}
+
+/**
+ * SendGroupTextMessage 发送企业内部群聊文本消息。
+ */
+export function SendGroupTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.GroupTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(4169063283, meta, conversationID, input);
 }
 
 /**

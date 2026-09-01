@@ -145,6 +145,30 @@ func (b *Backend) SendDirectTextMessage(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// CreateGroupConversation 创建企业内部群聊。
+func (b *Backend) CreateGroupConversation(ctx context.Context, meta appservice.RequestMeta, input appservice.GroupConversationInput) (appservice.InboxConversation, error) {
+	var output appservice.InboxConversation
+	err := b.do(ctx, meta, http.MethodPost, "/group-conversations", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetGroupConversation 返回当前成员可见的群聊资料。
+func (b *Backend) GetGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.GroupConversation, error) {
+	var output appservice.GroupConversation
+	err := b.do(ctx, meta, http.MethodGet, "/group-conversations/"+url.PathEscape(conversationID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// SendGroupTextMessage 发送企业内部群聊文本消息。
+func (b *Backend) SendGroupTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupTextMessageInput) (appservice.ConversationMessage, error) {
+	var output appservice.ConversationMessage
+	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList

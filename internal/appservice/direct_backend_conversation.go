@@ -172,6 +172,83 @@ func (b *DirectBackend) SendDirectTextMessage(ctx context.Context, meta RequestM
 	return conversationMessageFromAction(message), nil
 }
 
+// CreateGroupConversation 创建只包含有效真人成员的企业内部群聊。
+func (b *DirectBackend) CreateGroupConversation(ctx context.Context, meta RequestMeta, input GroupConversationInput) (InboxConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return InboxConversation{}, err
+	}
+	summary, err := b.createGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationInput{
+		Title: input.Title, MemberIdentityIDs: input.MemberIdentityIDs,
+	})
+	if err != nil {
+		return InboxConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, "", "create")
+	}
+	slog.Info("企业内部群聊已创建",
+		"organization_id", identity.Organization.ID,
+		"conversation_id", summary.ID,
+		"member_count", summary.MemberCount,
+	)
+	return InboxConversation{
+		ID: summary.ID, Type: ConversationTypeGroup,
+		Group: &GroupInboxConversation{
+			Title: summary.Title, MemberCount: summary.MemberCount,
+		},
+	}, nil
+}
+
+// GetGroupConversation 返回当前成员可见的群聊资料和有效成员。
+func (b *DirectBackend) GetGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) (GroupConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return GroupConversation{}, err
+	}
+	record, err := b.getGroupConversation.Execute(ctx, identity, conversationID)
+	if err != nil {
+		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "get")
+	}
+	avatarFileIDs := make([]string, 0, len(record.Participants))
+	for _, participant := range record.Participants {
+		if participant.AvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *participant.AvatarFileID)
+		}
+	}
+	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	if err != nil {
+		slog.Warn("读取群聊成员头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+		return GroupConversation{}, FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
+	}
+	participants := make([]GroupParticipant, 0, len(record.Participants))
+	for _, participant := range record.Participants {
+		participants = append(participants, GroupParticipant{
+			IdentityID: participant.IdentityID, DisplayName: participant.DisplayName,
+			AvatarURL: optionalFileURL(avatarURLs, participant.AvatarFileID), Role: GroupParticipantRole(participant.Role),
+		})
+	}
+	return GroupConversation{ID: record.ID, Title: record.Title, Participants: participants}, nil
+}
+
+// SendGroupTextMessage 发送企业内部群聊文本消息。
+func (b *DirectBackend) SendGroupTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input GroupTextMessageInput) (ConversationMessage, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return ConversationMessage{}, err
+	}
+	message, err := b.sendGroupTextMessage.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
+		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body,
+	})
+	if err != nil {
+		return ConversationMessage{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "send")
+	}
+	slog.Info("企业内部群聊文本消息已保存",
+		"organization_id", identity.Organization.ID,
+		"conversation_id", conversationID,
+		"message_id", message.ID,
+		"sender_identity_id", identity.OrganizationIdentity.ID,
+	)
+	return conversationMessageFromAction(message), nil
+}
+
 // ListConversationMessages 返回成员可见的会话消息。
 func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
 	identity, err := b.authenticate(ctx, meta)
@@ -269,6 +346,37 @@ func directConversationError(ctx context.Context, meta RequestMeta, err error, o
 	return FailedError(meta, cervii18n.ErrorDirectMessageSendFailed)
 }
 
+// groupConversationError 转换企业群聊命令错误。
+func groupConversationError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID, operation string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorGroupMemberNotFound)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+	}
+	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
+		return ConflictError(meta, cervii18n.ErrorGroupMessageConflict, conflictError.Reason)
+	}
+	slog.Warn("企业群聊命令失败", "organization_id", organizationID, "conversation_id", conversationID, "operation", operation, "error", err)
+	switch operation {
+	case "create":
+		return FailedError(meta, cervii18n.ErrorGroupConversationCreateFailed)
+	case "get":
+		return FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
+	default:
+		return FailedError(meta, cervii18n.ErrorGroupMessageSendFailed)
+	}
+}
+
 // encodeConversationMessageCursor 编码绑定会话的成员消息游标。
 func encodeConversationMessageCursor(conversationID string, point conversationaction.MessageCursorPoint) string {
 	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + strconv.FormatInt(point.SourceOrder, 10) + "." + point.ID
@@ -346,4 +454,9 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationBodyTooLong:             cervii18n.FieldMessageBodyTooLong,
 	conversationaction.ValidationCursorInvalid:           cervii18n.FieldMessageCursorInvalid,
 	conversationaction.ValidationTargetIdentityIDInvalid: cervii18n.FieldTargetIdentityIDInvalid,
+	conversationaction.ValidationGroupTitleRequired:      cervii18n.FieldGroupTitleRequired,
+	conversationaction.ValidationGroupTitleTooLong:       cervii18n.FieldGroupTitleTooLong,
+	conversationaction.ValidationGroupMembersRequired:    cervii18n.FieldGroupMembersRequired,
+	conversationaction.ValidationGroupMembersTooMany:     cervii18n.FieldGroupMembersTooMany,
+	conversationaction.ValidationGroupMemberIDsInvalid:   cervii18n.FieldGroupMemberIDsInvalid,
 }

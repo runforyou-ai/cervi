@@ -57,12 +57,21 @@ type DirectConversationSummary struct {
 	AgentRunStatus *domain.AgentRunStatus
 }
 
+// GroupConversationSummary 定义收件箱中的企业群聊详情。
+type GroupConversationSummary struct {
+	Title         string
+	Preview       *string
+	LastMessageAt *time.Time
+	MemberCount   int
+}
+
 // ConversationSummary 定义统一收件箱会话信封。
 type ConversationSummary struct {
 	ID       string
 	Type     domain.ConversationType
 	Customer *CustomerConversationSummary
 	Direct   *DirectConversationSummary
+	Group    *GroupConversationSummary
 	sortAt   *time.Time
 }
 
@@ -100,12 +109,21 @@ type directConversationRow struct {
 	SortAt         *time.Time `bun:"sort_at"`
 }
 
+type groupConversationRow struct {
+	ID            string     `bun:"id"`
+	Title         string     `bun:"title"`
+	Preview       *string    `bun:"preview"`
+	LastMessageAt *time.Time `bun:"last_message_at"`
+	MemberCount   int        `bun:"member_count"`
+	SortAt        *time.Time `bun:"sort_at"`
+}
+
 // NewLoadInboxQuery 创建成员收件箱查询。
 func NewLoadInboxQuery(db *bun.DB) *LoadInboxQuery {
 	return &LoadInboxQuery{db: db}
 }
 
-// Execute 分别读取客户会话和内部单聊后合并排序。
+// Execute 分别读取客户会话、内部单聊和群聊后合并排序。
 func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, error) {
 	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
 	input.CustomerView = domain.CustomerInboxView(strings.TrimSpace(string(input.CustomerView)))
@@ -124,6 +142,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 
 	customers := make([]customerConversationRow, 0)
 	directs := make([]directConversationRow, 0)
+	groups := make([]groupConversationRow, 0)
 	var err error
 	if input.Scope != domain.InboxScopeInternal {
 		customers, err = q.loadCustomerConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, input)
@@ -136,9 +155,13 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		if err != nil {
 			return nil, err
 		}
+		groups, err = q.loadGroupConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	result := make([]ConversationSummary, 0, len(customers)+len(directs))
+	result := make([]ConversationSummary, 0, len(customers)+len(directs)+len(groups))
 	for _, row := range customers {
 		var assignee *AssigneeSummary
 		if row.AssigneeIdentityID != nil && row.AssigneeType != nil && row.AssigneeDisplayName != nil {
@@ -165,6 +188,15 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			Direct: &DirectConversationSummary{
 				PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName,
 				Preview: row.Preview, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
+			},
+		})
+	}
+	for _, row := range groups {
+		result = append(result, ConversationSummary{
+			ID: row.ID, Type: domain.ConversationTypeGroup, sortAt: row.SortAt,
+			Group: &GroupConversationSummary{
+				Title: row.Title, Preview: row.Preview,
+				LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount,
 			},
 		})
 	}
@@ -289,6 +321,33 @@ func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizati
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("list direct inbox conversations: %w", err)
+	}
+	return rows, nil
+}
+
+// loadGroupConversations 读取当前成员参与的企业群聊，包括尚无消息的新群聊。
+func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizationID, identityID string) ([]groupConversationRow, error) {
+	var rows []groupConversationRow
+	err := q.db.NewSelect().
+		TableExpr("conversations AS cv").
+		ColumnExpr("cv.id AS id").
+		ColumnExpr("cv.title AS title").
+		ColumnExpr("msg.body AS preview").
+		ColumnExpr("cv.last_message_at AS last_message_at").
+		ColumnExpr("members.member_count AS member_count").
+		ColumnExpr("cv.last_message_at AS sort_at").
+		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
+		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
+		Join("JOIN LATERAL (SELECT count(*) AS member_count FROM conversation_participants AS member_cp WHERE member_cp.organization_id = cv.organization_id AND member_cp.conversation_id = cv.id AND member_cp.left_at IS NULL) AS members ON TRUE").
+		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
+		Where("cv.organization_id = ?", organizationID).
+		Where("cv.type = ?", domain.ConversationTypeGroup).
+		Where("cv.status = ?", domain.ConversationStatusActive).
+		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
+		Limit(inboxConversationTypeLimit).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("list group inbox conversations: %w", err)
 	}
 	return rows, nil
 }
