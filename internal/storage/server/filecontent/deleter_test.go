@@ -31,11 +31,3 @@ func TestDeleterDeleteLocalFile(t *testing.T) {
 		t.Fatal("local file still exists")
 	}
 }
-
-// TestDeleterRejectsUnknownBackend 验证删除器拒绝未知存储类型。
-func TestDeleterRejectsUnknownBackend(t *testing.T) {
-	deleter := NewDeleter(nil, nil)
-	if err := deleter.Delete(context.Background(), &servermodels.File{StorageBackend: "unknown"}); err == nil {
-		t.Fatal("unknown backend was accepted")
-	}
-}

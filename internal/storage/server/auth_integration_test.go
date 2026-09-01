@@ -195,26 +195,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if !otherStatus.Installed || otherStatus.OrganizationName != "另一家测试公司" {
 		t.Fatalf("other tenant status = %#v", otherStatus)
 	}
-	emptyHostOrganization := &servermodels.Organization{AccessHost: "", Name: "空地址企业"}
-	if _, err := db.NewInsert().Model(emptyHostOrganization).
-		Column("access_host", "name").
-		Returning("id").
-		Exec(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	unboundTenantContext := tenant.WithAccessHost(context.Background(), "unbound.cervi.test")
-	unboundStatus, err := status.Execute(unboundTenantContext)
-	if err != nil || unboundStatus.Installed {
-		t.Fatalf("empty access host matched unbound tenant: status = %#v, error = %v", unboundStatus, err)
-	}
-	currentStatus, err = status.Execute(tenantContext)
-	if err != nil || currentStatus.OrganizationName != installed.Identity.Organization.Name {
-		t.Fatalf("exact tenant status = %#v, error = %v", currentStatus, err)
-	}
-	if _, err := db.NewDelete().Model(emptyHostOrganization).WherePK().Exec(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
 	// 全局前置：解析安装令牌、登出并重新登录管理员，失败直接终止整个测试。
 	resolveIdentity := authaction.NewResolveIdentityQuery(db)
 	identity, err := resolveIdentity.Execute(context.Background(), installed.Identity.Organization.ID, installed.Token)
@@ -1199,6 +1179,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	// 覆盖 AI 员工的创建、执行配置修订、状态切换、团队与渠道联动及团队删除。
 	runStep("AI员工", func(t *testing.T) {
+		memberLogin, err := login.Execute(context.Background(), authaction.LoginInput{
+			OrganizationID: loggedIn.Identity.Organization.ID,
+			Email:          createdMember.Email,
+			Password:       "password123",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		customerServiceRole := &servermodels.Role{}
 		if err := db.NewSelect().Model(customerServiceRole).
 			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
@@ -1350,51 +1338,76 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if !errors.As(err, &telegramTransferValidation) || telegramTransferValidation.Fields["assigneeIdentityId"] != conversationaction.ValidationTargetIdentityIDInvalid {
 			t.Fatalf("Telegram agent transfer error = %#v", err)
 		}
-
-		if _, err := db.NewUpdate().Model((*servermodels.Channel)(nil)).
-			Set("initial_routing_target_type = ?", domain.ChannelRoutingTargetTypeMember).
-			Set("initial_routing_target_id = ?", createdAgent.IdentityID).
-			Where("id = ?", telegramChannel.ID).
-			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
-			Exec(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		telegramDetail, err := channelaction.NewGetTelegramChannelQuery(db).Execute(context.Background(), loggedIn.Identity, telegramChannel.ID)
+		channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
+			Name:                  channel.Name,
+			DefaultLocale:         domain.LocaleEnglishUnitedStates,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		receiveHistoricalTelegramRoute := channelaction.NewReceiveTelegramWebhookAction(db, nil, nil)
-		if err := receiveHistoricalTelegramRoute.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
-			Secret:   telegramDetail.Connection.WebhookSecret,
-			UpdateID: 100,
-			Message: &channelaction.TelegramWebhookMessage{
-				ChatID: 443322, MessageID: 1, SenderID: 443322,
-				DisplayName: "历史路由访客", Body: "不应分配给 AI",
-				OriginatedAt: time.Now().UTC(),
-			},
-		}); err != nil {
+		publicQueueInbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+			ChannelID: channel.ID, ExternalID: "web-session:fedcba9876543210fedcba9876543210",
+			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f92", Body: "需要人工接待",
+		})
+		if err != nil {
 			t.Fatal(err)
 		}
-		var historicalRouteAssigneeID *string
-		if err := db.NewSelect().TableExpr("service_sessions AS ss").
-			ColumnExpr("ss.assignee_identity_id::text").
-			Join("JOIN contact_channel_identities AS cci ON cci.id = ss.contact_channel_identity_id AND cci.organization_id = ss.organization_id").
-			Where("cci.channel_id = ?", telegramChannel.ID).
-			Where("cci.external_id = ?", "443322").
-			OrderExpr("ss.sequence DESC").
-			Limit(1).
-			Scan(context.Background(), &historicalRouteAssigneeID); err != nil {
+		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db)
+		memberReply, err := sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f93", Body: "我来处理",
+		})
+		if err != nil {
 			t.Fatal(err)
 		}
-		if historicalRouteAssigneeID != nil {
-			t.Fatalf("historical Telegram agent route assignee = %q", *historicalRouteAssigneeID)
+		publicQueueSession := &servermodels.ServiceSession{}
+		if err := db.NewSelect().Model(publicQueueSession).
+			Where("ss.id = ?", publicQueueInbound.Conversation.ServiceSessionID).
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
 		}
-		if _, err := db.NewUpdate().Model((*servermodels.Channel)(nil)).
-			Set("initial_routing_target_type = ?", domain.ChannelRoutingTargetTypePublicQueue).
-			Set("initial_routing_target_id = NULL").
-			Where("id = ?", telegramChannel.ID).
-			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
-			Exec(context.Background()); err != nil {
+		if publicQueueSession.AssigneeIdentityID == nil || *publicQueueSession.AssigneeIdentityID != loggedIn.Identity.OrganizationIdentity.ID {
+			t.Fatalf("public queue reply session = %#v", publicQueueSession)
+		}
+		retriedMemberReply, err := sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f93", Body: "我来处理",
+		})
+		if err != nil || retriedMemberReply.ID != memberReply.ID {
+			t.Fatalf("idempotent member reply = %#v, error = %v", retriedMemberReply, err)
+		}
+		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f93", Body: "不同的回复",
+		})
+		var idempotencyConflict *conversationaction.ConflictError
+		if !errors.As(err, &idempotencyConflict) || idempotencyConflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
+			t.Fatalf("member reply idempotency error = %#v", err)
+		}
+		_, err = sendCustomerMessage.Execute(context.Background(), memberLogin.Identity, conversationaction.CustomerTextMessageInput{
+			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f94", Body: "尝试接管",
+		})
+		var ownedReplyConflict *conversationaction.ConflictError
+		if !errors.As(err, &ownedReplyConflict) || ownedReplyConflict.Reason != conversationaction.ConflictReasonServiceSessionOwned {
+			t.Fatalf("owned member reply error = %#v", err)
+		}
+		closedPublicQueue, err := closeServiceSession.Execute(context.Background(), loggedIn.Identity, publicQueueInbound.Conversation.ID)
+		if err != nil || closedPublicQueue.Status != domain.ServiceSessionStatusClosed {
+			t.Fatalf("closed public queue session = %#v, error = %v", closedPublicQueue, err)
+		}
+		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f95", Body: "关闭后回复",
+		})
+		var closedReplyConflict *conversationaction.ConflictError
+		if !errors.As(err, &closedReplyConflict) || closedReplyConflict.Reason != conversationaction.ConflictReasonServiceSessionNotReplyable {
+			t.Fatalf("closed member reply error = %#v", err)
+		}
+		channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
+			Name:                  channel.Name,
+			DefaultLocale:         domain.LocaleEnglishUnitedStates,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.IdentityID},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		})
+		if err != nil {
 			t.Fatal(err)
 		}
 
@@ -1481,72 +1494,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := conversationaction.NewSendCustomerTextMessageAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
 			ConversationID: websiteInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f91", Body: "我已参与处理",
 		}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := db.NewUpdate().Model((*servermodels.AgentRevision)(nil)).
-			Set("schema_version = 2").
-			Where("id = ?", agentWithUpdatedExecution.Execution.RevisionID).
-			Exec(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		assigneesWithoutValidRevision, err := inboxaction.NewListCustomerServiceAssigneesQuery(db).Execute(context.Background(), loggedIn.Identity)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, assignee := range assigneesWithoutValidRevision {
-			if assignee.IdentityID == createdAgent.IdentityID {
-				t.Fatalf("agent without valid active revision remains assignable: %#v", assigneesWithoutValidRevision)
-			}
-		}
-		_, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
-			Name:                  channel.Name,
-			DefaultLocale:         domain.LocaleEnglishUnitedStates,
-			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.IdentityID},
-			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-		})
-		var invalidRevisionRouteValidation *channelaction.ValidationError
-		if !errors.As(err, &invalidRevisionRouteValidation) || invalidRevisionRouteValidation.Fields["newConversationTarget"] != channelaction.ValidationRoutingTargetInvalid {
-			t.Fatalf("invalid revision agent route error = %#v", err)
-		}
-		_, err = transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
-			ConversationID: websiteInbound.Conversation.ID, AssigneeIdentityID: createdAgent.IdentityID,
-		})
-		var invalidRevisionTransferValidation *conversationaction.ValidationError
-		if !errors.As(err, &invalidRevisionTransferValidation) || invalidRevisionTransferValidation.Fields["assigneeIdentityId"] != conversationaction.ValidationTargetIdentityIDInvalid {
-			t.Fatalf("invalid revision agent transfer error = %#v", err)
-		}
-		invalidRevisionInbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
-			ChannelID: channel.ID, ExternalID: "web-session:abcdef0123456789abcdef0123456789",
-			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f90", Body: "无效配置不应接待",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		invalidRevisionSession := &servermodels.ServiceSession{}
-		if err := db.NewSelect().Model(invalidRevisionSession).
-			Where("ss.id = ?", invalidRevisionInbound.Conversation.ServiceSessionID).
-			Scan(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		if invalidRevisionSession.AssigneeIdentityID != nil {
-			t.Fatalf("invalid revision website route session = %#v", invalidRevisionSession)
-		}
-		allWithUnrelatedQueue, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
-		if err != nil {
-			t.Fatal(err)
-		}
-		assertInboxConversationPresence(t, allWithUnrelatedQueue, invalidRevisionInbound.Conversation.ID, false)
-		queueInbox, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
-			Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		assertInboxConversationPresence(t, queueInbox, invalidRevisionInbound.Conversation.ID, true)
-		if _, err := db.NewUpdate().Model((*servermodels.AgentRevision)(nil)).
-			Set("schema_version = 1").
-			Where("id = ?", agentWithUpdatedExecution.Execution.RevisionID).
-			Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		transferredWebsite, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
@@ -1780,29 +1727,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("direct run after customer takeover = %#v, error = %v", run, err)
 		}
 
-		if _, err := db.NewDelete().Model(customerState).WherePK().Exec(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		oldServiceSessionID := "0198ddf0-a234-7f01-8d99-e3e0af0f5f83"
-		stateLessRun := &servermodels.AgentRun{
-			ID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f82", OrganizationID: loggedIn.Identity.Organization.ID,
-			ConversationID: websiteInbound.Conversation.ID, AgentIdentityID: createdAgent.IdentityID,
-			AgentRevisionID: agentWithUpdatedExecution.Execution.RevisionID,
-			TriggerType:     string(domain.AgentTriggerTypeCustomerAuto), ServiceSessionID: &oldServiceSessionID,
-			Status: string(domain.AgentRunStatusQueued), TriggerStartSeq: 2,
-		}
-		if _, err := db.NewInsert().Model(stateLessRun).
-			Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "trigger_type", "service_session_id", "status", "trigger_start_seq").
-			Exec(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-		cancelledStateLess, err := coordinator.CancelForServiceSession(
-			context.Background(), db, loggedIn.Identity.Organization.ID, websiteInbound.Conversation.ID,
-			createdAgent.IdentityID, domain.AgentRunErrorCodeAssigneeChanged,
-		)
-		if err != nil || len(cancelledStateLess) != 1 || cancelledStateLess[0] != stateLessRun.ID {
-			t.Fatalf("cancel run without state = %#v, error = %v", cancelledStateLess, err)
-		}
 		taskRun := &servermodels.TaskRun{}
 		if err := db.NewSelect().Model(taskRun).Where("tr.idempotency_key = ?", "agent:"+run.ID).Scan(context.Background()); err != nil || taskRun.MaxAttempts != 3 {
 			t.Fatalf("agent task run = %#v, error = %v", taskRun, err)

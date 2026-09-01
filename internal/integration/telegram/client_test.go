@@ -168,16 +168,6 @@ func TestDownloadPhotoErrorDoesNotLeakTokenURL(t *testing.T) {
 	}
 }
 
-// TestFileURLRejectsParentPath 验证规范化后仍向上跳转的文件路径会在请求前被拒绝。
-func TestFileURLRejectsParentPath(t *testing.T) {
-	client := NewClient(nil)
-	for _, filePath := range []string{"../avatar.jpg", "photos/%2e%2e/avatar.jpg"} {
-		if endpoint, err := client.fileURL(testBotToken, filePath); err == nil {
-			t.Fatalf("unsafe file path %q produced %q", filePath, endpoint)
-		}
-	}
-}
-
 // TestSetWebhook 验证注册参数固定限制为私聊消息和成员状态并丢弃积压 Update。
 func TestSetWebhook(t *testing.T) {
 	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

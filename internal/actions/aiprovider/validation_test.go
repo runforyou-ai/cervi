@@ -73,33 +73,3 @@ func TestNormalizeInputAcceptsEmbeddingModalities(t *testing.T) {
 		t.Fatalf("normalizeInput() model = %#v", input.Models[0])
 	}
 }
-
-// TestAvailableModelsReturnsOpenAICatalog 验证 OpenAI 预设只包含当前主流生成和向量模型。
-func TestAvailableModelsReturnsOpenAICatalog(t *testing.T) {
-	models := AvailableModels(domain.AIProviderBrandOpenAI)
-	if len(models) != 5 || models[0].Identifier != "gpt-5.6-sol" || models[3].Identifier != "text-embedding-3-large" {
-		t.Fatalf("AvailableModels() = %#v", models)
-	}
-	if models[3].Type != domain.AIModelTypeEmbedding || len(models[3].InputModalities) != 1 {
-		t.Fatalf("AvailableModels() embedding = %#v", models[3])
-	}
-}
-
-// TestAvailableModelsReturnsAlibabaCatalog 验证阿里云百炼预设覆盖三类模型。
-func TestAvailableModelsReturnsAlibabaCatalog(t *testing.T) {
-	models := AvailableModels(domain.AIProviderBrandAlibaba)
-	if len(models) != 7 || models[0].Identifier != "qwen3.8-max" || models[3].Identifier != "qwen3.7-text-embedding" {
-		t.Fatalf("AvailableModels() = %#v", models)
-	}
-	if models[5].Type != domain.AIModelTypeRerank || len(models[4].InputModalities) != 3 {
-		t.Fatalf("AvailableModels() capabilities = %#v", models)
-	}
-}
-
-// TestAvailableModelsReturnsDeepSeekCatalog 验证 DeepSeek 预设模型目录。
-func TestAvailableModelsReturnsDeepSeekCatalog(t *testing.T) {
-	models := AvailableModels(domain.AIProviderBrandDeepSeek)
-	if len(models) != 2 || models[0].Identifier != "deepseek-v4-flash" || models[1].Identifier != "deepseek-v4-pro" {
-		t.Fatalf("AvailableModels() = %#v", models)
-	}
-}

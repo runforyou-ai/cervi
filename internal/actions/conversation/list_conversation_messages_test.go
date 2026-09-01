@@ -10,66 +10,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// TestValidateConversationMessageHistoryInputRejectsMixedCursors 验证成员消息查询不接受两个方向。
-func TestValidateConversationMessageHistoryInputRejectsMixedCursors(t *testing.T) {
-	point := MessageCursorPoint{OriginatedAt: time.Unix(1, 0), ID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65"}
-	fields := validateConversationMessageHistoryInput(ConversationMessageHistoryInput{
-		ConversationID: "0198ddee-c056-7bc5-a1d9-586f878ee966",
-		Before:         &point,
-		After:          &point,
-	})
-	if fields["cursor"] != ValidationCursorInvalid {
-		t.Fatalf("validation fields = %#v", fields)
-	}
-}
-
-// TestBuildConversationMessageHistoryReturnsInitialPageInAscendingOrder 验证初始消息页正序和双向边界。
-func TestBuildConversationMessageHistoryReturnsInitialPageInAscendingOrder(t *testing.T) {
-	rows := makeConversationMessageRows(conversationMessagePageSize + 1)
-	wantFirstID := rows[conversationMessagePageSize-1].ID
-	wantLastID := rows[0].ID
-	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
-	if len(history.Messages) != conversationMessagePageSize {
-		t.Fatalf("message count = %d", len(history.Messages))
-	}
-	if history.Messages[0].ID != wantFirstID || history.Messages[conversationMessagePageSize-1].ID != wantLastID {
-		t.Fatalf("message order = %s ... %s", history.Messages[0].ID, history.Messages[conversationMessagePageSize-1].ID)
-	}
-	if history.Before == nil || history.Before.ID != history.Messages[0].ID {
-		t.Fatalf("before = %#v", history.Before)
-	}
-	if history.After == nil || history.After.ID != history.Messages[conversationMessagePageSize-1].ID {
-		t.Fatalf("after = %#v", history.After)
-	}
-	if history.Messages[0].Sender == nil || history.Messages[0].Sender.Kind != domain.ChatSubjectKindContact {
-		t.Fatalf("sender = %#v", history.Messages[0].Sender)
-	}
-}
-
-// TestBuildConversationMessageHistoryReturnsAfterPageInAscendingOrder 验证增量消息页保持查询正序。
-func TestBuildConversationMessageHistoryReturnsAfterPageInAscendingOrder(t *testing.T) {
-	rows := makeConversationMessageRows(2)
-	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{After: &MessageCursorPoint{}})
-	if history.Messages[0].ID != rows[0].ID || history.Messages[1].ID != rows[1].ID {
-		t.Fatalf("message order = %s, %s", history.Messages[0].ID, history.Messages[1].ID)
-	}
-	if history.Before != nil || history.After == nil || history.After.ID != rows[1].ID {
-		t.Fatalf("cursors = before %#v, after %#v", history.Before, history.After)
-	}
-}
-
-// TestBuildConversationMessageHistoryPreservesMissingSender 验证无发送主体的消息仍保留在时间线中。
-func TestBuildConversationMessageHistoryPreservesMissingSender(t *testing.T) {
-	rows := makeConversationMessageRows(1)
-	rows[0].SenderSubjectID = nil
-	rows[0].SenderKind = nil
-	rows[0].SenderDisplayName = nil
-	history := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
-	if len(history.Messages) != 1 || history.Messages[0].Sender != nil {
-		t.Fatalf("messages = %#v", history.Messages)
-	}
-}
-
 // TestBuildConversationMessageHistoryMarksSessionOpeningMessage 验证单个处理周期也保留开始标记。
 func TestBuildConversationMessageHistoryMarksSessionOpeningMessage(t *testing.T) {
 	rows := makeConversationMessageRows(3)

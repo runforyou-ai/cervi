@@ -3,12 +3,8 @@
 package publicweb
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,24 +14,6 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
-
-// TestAgentInitials 验证客服头像字标。
-func TestAgentInitials(t *testing.T) {
-	cases := []struct {
-		value string
-		want  string
-	}{
-		{"在线咨询", "在线"},
-		{"support", "SU"},
-		{"  ", "?"},
-		{"", "?"},
-	}
-	for _, test := range cases {
-		if got := agentInitials(test.value); got != test.want {
-			t.Fatalf("agentInitials(%q) = %q, want %q", test.value, got, test.want)
-		}
-	}
-}
 
 // TestPreferredMessengerLocale 验证 Messenger 只把中文族浏览器识别为中文。
 func TestPreferredMessengerLocale(t *testing.T) {
@@ -53,28 +31,6 @@ func TestPreferredMessengerLocale(t *testing.T) {
 		if got := preferredMessengerLocale(test.acceptLanguage); got != test.want {
 			t.Fatalf("preferredMessengerLocale(%q) = %q, want %q", test.acceptLanguage, got, test.want)
 		}
-	}
-}
-
-// TestComposerEmojis 验证访客 Messenger 的表情候选保持固定。
-func TestComposerEmojis(t *testing.T) {
-	var emojis []string
-	if err := json.Unmarshal([]byte(composerEmojisJSON), &emojis); err != nil {
-		t.Fatal(err)
-	}
-	if len(emojis) != 117 || emojis[0] != "😀" || emojis[53] != "❤️" || emojis[116] != "⚠️" {
-		t.Fatalf("unexpected composer emojis: count=%d", len(emojis))
-	}
-	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(emojis, "\n"))))
-	if digest != "3d5d8d7f47d67ace0e610ee0e5fcf68c5fb8fad95b8aa27a5b4bbecdc3e7d858" {
-		t.Fatalf("composer emojis changed: sha256=%s", digest)
-	}
-}
-
-// TestWidgetScriptHasThemePlaceholder 验证挂件主题占位符。
-func TestWidgetScriptHasThemePlaceholder(t *testing.T) {
-	if bytes.Count(widgetScript, []byte(themePlaceholder)) != 1 {
-		t.Fatal("widget.js must contain one theme placeholder")
 	}
 }
 

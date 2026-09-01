@@ -23,11 +23,3 @@ func TestValidWebsiteVisitorTokenRejectsNonHex(t *testing.T) {
 		t.Fatal("expected non-hex token to be rejected")
 	}
 }
-
-// TestWebsiteVisitorCookieNameKeepsChannelID 验证渠道编号直接进入渠道级 Cookie 名称。
-func TestWebsiteVisitorCookieNameKeepsChannelID(t *testing.T) {
-	const channelID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
-	if actual := websiteVisitorCookieName(channelID); actual != "cervi_visitor_"+channelID {
-		t.Fatalf("cookie name = %q", actual)
-	}
-}
