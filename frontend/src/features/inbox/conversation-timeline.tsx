@@ -1,4 +1,4 @@
-/** Customer、Direct 与 Group Conversation 共用的成员消息时间线。 */
+/** 客服、单聊与群聊共用的成员消息时间线。 */
 import {
   Fragment,
   useCallback,
@@ -23,11 +23,15 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
+import { previousDayKey } from "@/features/inbox/calendar"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
-import type { OutgoingConversationMessage } from "@/features/inbox/use-outgoing-conversation-messages"
+import type {
+  OutgoingConversationDraft,
+  OutgoingConversationMessage,
+} from "@/features/inbox/use-outgoing-conversation-messages"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -53,8 +57,32 @@ type TimelineMessage = Pick<
   ConversationMessage,
   "id" | "body" | "originatedAt" | "sender" | "sessionStart"
 > & {
+  clientMessageID: string | null
   local: boolean
   deliveryStatus: "sending" | "failed" | null
+}
+
+const timelineBottomThreshold = 48
+const timelineGroupInterval = 5 * 60 * 1000
+
+/** 判断时间线是否已经接近底部。 */
+function timelineNearBottom(viewport: HTMLElement) {
+  return (
+    viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <=
+    timelineBottomThreshold
+  )
+}
+
+/** 返回视觉分组使用的稳定发送者标识。 */
+function timelineSenderKey(
+  message: TimelineMessage,
+  currentIdentityID: string,
+) {
+  if (message.local) {
+    return `${ChatSubjectKind.ChatSubjectKindOrganizationIdentity}:${currentIdentityID}`
+  }
+  if (!message.sender) return `unknown:${message.id}`
+  return `${message.sender.kind}:${message.sender.sourceId}`
 }
 
 /** 合并服务端消息和当前页面的即时发送状态。 */
@@ -68,6 +96,7 @@ function mergeTimelineMessages(
   const messages: TimelineMessage[] = mergeMessages(current, saved).map(
     (message) => ({
       ...message,
+      clientMessageID: null,
       local: false,
       deliveryStatus: null,
     }),
@@ -80,6 +109,7 @@ function mergeTimelineMessages(
       originatedAt: message.originatedAt,
       sender: null,
       sessionStart: null,
+      clientMessageID: message.clientMessageID,
       local: true,
       deliveryStatus:
         message.status === "failed"
@@ -103,7 +133,7 @@ function timelineViewport(root: HTMLDivElement | null) {
   )
 }
 
-/** 按 Helmdesk 的 MM-DD HH:mm 格式显示用户时区中的消息时间。 */
+/** 按 MM-DD HH:mm 格式显示用户时区中的消息时间。 */
 function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
   const parts = Object.fromEntries(
     formatter
@@ -120,13 +150,19 @@ export function ConversationTimeline({
   conversationType,
   currentIdentityID,
   requireWindowFocus = true,
+  workspaceLayout = false,
   outgoingMessages,
+  onRetryFailedMessage,
+  retryFailedMessageDisabled = false,
 }: {
   conversationID: string
   conversationType: ConversationType
   currentIdentityID: string
   requireWindowFocus?: boolean
+  workspaceLayout?: boolean
   outgoingMessages: OutgoingConversationMessage[]
+  onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
+  retryFailedMessageDisabled?: boolean
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -138,12 +174,18 @@ export function ConversationTimeline({
   const pollingRequestRef = useRef(false)
   const timelineRef = useRef<ConversationMessageListData | null>(null)
   const initialScrollRef = useRef(true)
-  const previousScrollHeightRef = useRef<number | null>(null)
+  const prependScrollHeightRef = useRef<number | null>(null)
+  const handledPrependRevisionRef = useRef(0)
   const previousSentCountRef = useRef(0)
+  const previousMessageCountRef = useRef(0)
+  const nearBottomRef = useRef(true)
   const [timeline, setTimeline] =
     useState<ConversationMessageListData | null>(null)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [earlierError, setEarlierError] = useState(false)
+  const [pollingError, setPollingError] = useState(false)
+  const [newMessagesAvailable, setNewMessagesAvailable] = useState(false)
+  const [prependRevision, setPrependRevision] = useState(0)
   const { data, loading, error, refresh } = useResource(
     resourceKeys.conversationMessages(conversationID),
     (signal) => listConversationMessages(conversationID, undefined, signal),
@@ -158,7 +200,13 @@ export function ConversationTimeline({
   const dateFormatters = useMemo(() => {
     const locale = i18n.resolvedLanguage
     return {
-      messageTime: new Intl.DateTimeFormat("en-US", {
+      clock: new Intl.DateTimeFormat(locale, {
+        timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+      }),
+      sessionTime: new Intl.DateTimeFormat("en-US", {
         timeZone,
         month: "2-digit",
         day: "2-digit",
@@ -171,8 +219,36 @@ export function ConversationTimeline({
         dateStyle: "medium",
         timeStyle: "short",
       }),
+      dayKey: new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }),
+      monthDay: new Intl.DateTimeFormat(locale, {
+        timeZone,
+        month: "long",
+        day: "numeric",
+      }),
+      fullDate: new Intl.DateTimeFormat(locale, {
+        timeZone,
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
     }
   }, [i18n.resolvedLanguage, timeZone])
+
+  /** 按用户时区显示时间线日期分隔。 */
+  function formatDayLabel(date: Date) {
+    const day = dateFormatters.dayKey.format(date)
+    const today = dateFormatters.dayKey.format(new Date())
+    if (day === today) return t("today")
+    if (day === previousDayKey(today)) return t("yesterday")
+    return day.slice(0, 4) === today.slice(0, 4)
+      ? dateFormatters.monthDay.format(date)
+      : dateFormatters.fullDate.format(date)
+  }
 
   useEffect(() => {
     aliveRef.current = true
@@ -211,15 +287,25 @@ export function ConversationTimeline({
         after ? { before: "", after } : undefined,
       )
       if (!aliveRef.current) return
+      setPollingError(false)
       setTimeline((current) => {
         if (!current || (after && current.after !== after)) return current
+        if (page.messages.length === 0) return current
+        const messages = mergeMessages(current.messages, page.messages)
+        const nextAfter =
+          page.after && page.after !== current.after
+            ? page.after
+            : current.after
+        if (
+          messages.length === current.messages.length &&
+          nextAfter === current.after
+        ) {
+          return current
+        }
         return {
-          messages: mergeMessages(current.messages, page.messages),
+          messages,
           before: current.before ?? page.before,
-          after:
-            page.messages.length > 0 && page.after
-              ? page.after
-              : current.after,
+          after: nextAfter,
         }
       })
     } catch (pollError) {
@@ -228,6 +314,7 @@ export function ConversationTimeline({
         conversationId: conversationID,
         error: pollError,
       })
+      setPollingError(true)
     } finally {
       pollingRequestRef.current = false
     }
@@ -244,28 +331,85 @@ export function ConversationTimeline({
     return () => window.clearInterval(timer)
   }, [pollMessages, pollingActive, timelineReady])
 
+  useEffect(() => {
+    const viewport = timelineViewport(scrollRootRef.current)
+    if (!viewport) return
+    const activeViewport: HTMLElement = viewport
+
+    /** 记录用户是否仍在查看时间线底部。 */
+    function syncBottomState() {
+      const nearBottom = timelineNearBottom(activeViewport)
+      nearBottomRef.current = nearBottom
+      if (nearBottom) setNewMessagesAvailable(false)
+    }
+
+    syncBottomState()
+    activeViewport.addEventListener("scroll", syncBottomState, {
+      passive: true,
+    })
+    return () =>
+      activeViewport.removeEventListener("scroll", syncBottomState)
+  }, [currentPage])
+
   useLayoutEffect(() => {
     const viewport = timelineViewport(scrollRootRef.current)
     if (!viewport) return
     const sentCountIncreased =
       outgoingMessages.length > previousSentCountRef.current
+    const messageCountIncreased =
+      visibleMessages.length > previousMessageCountRef.current
+    const prependChanged =
+      prependRevision !== handledPrependRevisionRef.current
     previousSentCountRef.current = outgoingMessages.length
+    previousMessageCountRef.current = visibleMessages.length
     if (initialScrollRef.current && currentPage) {
       initialScrollRef.current = false
       viewport.scrollTop = viewport.scrollHeight
+      nearBottomRef.current = true
       return
+    }
+    if (prependChanged) {
+      handledPrependRevisionRef.current = prependRevision
+      const previousScrollHeight = prependScrollHeightRef.current
+      prependScrollHeightRef.current = null
+      if (!sentCountIncreased && previousScrollHeight !== null) {
+        viewport.scrollTop += viewport.scrollHeight - previousScrollHeight
+        return
+      }
     }
     if (sentCountIncreased) {
       viewport.scrollTop = viewport.scrollHeight
+      nearBottomRef.current = true
+      setNewMessagesAvailable(false)
       return
     }
-    if (previousScrollHeightRef.current !== null) {
-      viewport.scrollTop +=
-        viewport.scrollHeight - previousScrollHeightRef.current
-      previousScrollHeightRef.current = null
+    if (workspaceLayout && messageCountIncreased) {
+      if (nearBottomRef.current) {
+        viewport.scrollTop = viewport.scrollHeight
+      } else {
+        setNewMessagesAvailable(true)
+      }
       return
     }
-  }, [currentPage, outgoingMessages.length])
+    if (workspaceLayout && nearBottomRef.current) {
+      viewport.scrollTop = viewport.scrollHeight
+    }
+  }, [
+    currentPage,
+    outgoingMessages.length,
+    prependRevision,
+    visibleMessages.length,
+    workspaceLayout,
+  ])
+
+  /** 滚动到最新消息。 */
+  function scrollToLatest() {
+    const viewport = timelineViewport(scrollRootRef.current)
+    if (!viewport) return
+    viewport.scrollTop = viewport.scrollHeight
+    nearBottomRef.current = true
+    setNewMessagesAvailable(false)
+  }
 
   /** 加载并前插一页更早消息。 */
   async function loadEarlier() {
@@ -273,8 +417,6 @@ export function ConversationTimeline({
     if (!before || loadingEarlier) return
     const request = beforeRequestRef.current + 1
     beforeRequestRef.current = request
-    const viewport = timelineViewport(scrollRootRef.current)
-    previousScrollHeightRef.current = viewport?.scrollHeight ?? null
     setLoadingEarlier(true)
     setEarlierError(false)
     try {
@@ -283,18 +425,21 @@ export function ConversationTimeline({
         after: "",
       })
       if (!aliveRef.current || beforeRequestRef.current !== request) return
+      const base = timelineRef.current
+      if (!base || base.before !== before) return
+      const viewport = timelineViewport(scrollRootRef.current)
+      prependScrollHeightRef.current = viewport?.scrollHeight ?? null
       setTimeline((current) => {
-        const base = current
-        if (!base || base.before !== before) return current
+        if (!current || current.before !== before) return current
         return {
-          messages: mergeMessages(earlierPage.messages, base.messages),
+          messages: mergeMessages(earlierPage.messages, current.messages),
           before: earlierPage.before,
-          after: base.after,
+          after: current.after,
         }
       })
+      setPrependRevision((current) => current + 1)
     } catch (requestError) {
       if (!aliveRef.current || beforeRequestRef.current !== request) return
-      previousScrollHeightRef.current = null
       if (recoverSession(requestError, navigate)) return
       setEarlierError(true)
       console.warn("加载更早会话消息失败", {
@@ -306,6 +451,29 @@ export function ConversationTimeline({
         setLoadingEarlier(false)
       }
     }
+  }
+
+  /** 判断相邻消息是否属于同一个紧凑展示组。 */
+  function messagesShareGroup(
+    previous: TimelineMessage | undefined,
+    next: TimelineMessage | undefined,
+  ) {
+    if (!previous || !next || next.sessionStart) return false
+    if (
+      timelineSenderKey(previous, currentIdentityID) !==
+      timelineSenderKey(next, currentIdentityID)
+    ) {
+      return false
+    }
+    if (
+      dateFormatters.dayKey.format(new Date(previous.originatedAt)) !==
+      dateFormatters.dayKey.format(new Date(next.originatedAt))
+    ) {
+      return false
+    }
+    const interval =
+      Date.parse(next.originatedAt) - Date.parse(previous.originatedAt)
+    return interval >= 0 && interval <= timelineGroupInterval
   }
 
   if (loading && !currentPage && outgoingMessages.length === 0) {
@@ -345,159 +513,271 @@ export function ConversationTimeline({
   }
 
   return (
-    <ScrollArea ref={scrollRootRef} className="min-h-0 flex-1 bg-background">
-      <div className="flex w-full flex-col px-4 pb-3 md:px-6">
-        {currentPage?.before || earlierError ? (
-          <div className="flex items-center justify-center py-2">
-            {currentPage?.before ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={loadingEarlier}
-                onClick={() => void loadEarlier()}
-              >
-                {loadingEarlier
-                  ? t("messagesLoadingEarlier")
-                  : t("messagesLoadEarlier")}
-              </Button>
-            ) : null}
-            {earlierError ? (
-              <span className="ml-2 text-xs text-destructive" role="status">
-                {t("messagesLoadEarlierError")}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="grid gap-3">
-          {visibleMessages.map((message, index) => {
-            const date = new Date(message.originatedAt)
-            const incoming = message.local
-              ? false
-              : conversationType !== ConversationType.ConversationTypeCustomer
-                ? !message.sender ||
-                  message.sender.sourceId !== currentIdentityID
-                : !message.sender ||
-                  message.sender.kind ===
-                    ChatSubjectKind.ChatSubjectKindContact
-            const sentByCurrentIdentity =
-              !message.local &&
-              conversationType !==
-                ConversationType.ConversationTypeCustomer &&
-              message.sender?.sourceId === currentIdentityID
-            const senderName =
-              (message.local || sentByCurrentIdentity
-                ? t("messageSenderYou")
-                : message.sender?.displayName?.trim()) ||
-              (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
-                ? t("anonymousVisitor")
-                : t("unknownSender"))
-            const senderInitial =
-              Array.from(senderName)[0]?.toLocaleUpperCase() ?? "?"
-
-            return (
-              <Fragment key={message.id}>
-                {message.sessionStart ? (
-                  <div
-                    className={cn(
-                      "flex items-center gap-3 text-xs font-semibold text-foreground",
-                      index > 0 && "mt-3",
-                    )}
-                  >
-                    <span className="h-px flex-1 bg-border" />
-                    <span className="rounded-full border border-primary bg-background px-3 py-1 text-primary">
-                      {t("sessionBoundary", {
-                        sequence: message.sessionStart.sequence,
-                        time: formatMessageTime(
-                          dateFormatters.messageTime,
-                          new Date(message.sessionStart.startedAt),
-                        ),
-                      })}{" "}
-                      ·{" "}
-                      {message.sessionStart.status ===
-                      ServiceSessionStatus.ServiceSessionStatusClosed
-                        ? t("sessionBoundaryClosed")
-                        : t("sessionBoundaryOngoing")}
-                    </span>
-                    <span className="h-px flex-1 bg-border" />
-                  </div>
-                ) : null}
-                <article
-                  className={cn(
-                    "flex items-start gap-2",
-                    incoming ? "justify-start" : "justify-end",
-                  )}
-                  aria-label={`${senderName} ${dateFormatters.full.format(date)}`}
+    <div className="relative min-h-0 flex-1 bg-background">
+      <ScrollArea
+        ref={scrollRootRef}
+        className={cn(
+          "h-full min-h-0 bg-background",
+          workspaceLayout &&
+            "[&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!min-h-full [&>[data-slot=scroll-area-viewport]>div]:!flex-col",
+        )}
+      >
+        <div
+          className={cn(
+            "flex w-full flex-col px-4 pb-3 md:px-6",
+            workspaceLayout && "flex-1 justify-end",
+          )}
+        >
+          {currentPage?.before || earlierError ? (
+            <div className="flex items-center justify-center py-2">
+              {currentPage?.before ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={loadingEarlier}
+                  onClick={() => void loadEarlier()}
                 >
-                  <div
-                    className={cn(
-                      "flex max-w-[75%] flex-col gap-1",
-                      incoming ? "ml-10 items-start" : "mr-10 items-end",
-                    )}
-                  >
-                    <time
-                      dateTime={message.originatedAt}
-                      title={dateFormatters.full.format(date)}
-                      className="text-[11px] text-muted-foreground/80"
-                    >
-                      {formatMessageTime(dateFormatters.messageTime, date)}
-                    </time>
-                    {conversationType ===
-                    ConversationType.ConversationTypeGroup ? (
-                      <span className="max-w-full truncate text-xs font-medium text-foreground">
-                        {senderName}
-                      </span>
-                    ) : null}
-                    <div className="relative max-w-full">
-                      <span
-                        className={cn(
-                          "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
-                          incoming
-                            ? "right-full mr-2 border bg-background text-foreground"
-                            : "left-full ml-2 bg-primary text-primary-foreground",
-                        )}
-                        title={senderName}
-                        aria-hidden="true"
+                  {loadingEarlier
+                    ? t("messagesLoadingEarlier")
+                    : t("messagesLoadEarlier")}
+                </Button>
+              ) : null}
+              {earlierError ? (
+                <span className="ml-2 text-xs text-destructive" role="status">
+                  {t("messagesLoadEarlierError")}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex flex-col">
+            {visibleMessages.map((message, index) => {
+              const previous = visibleMessages[index - 1]
+              const next = visibleMessages[index + 1]
+              const date = new Date(message.originatedAt)
+              const day = dateFormatters.dayKey.format(date)
+              const startsDay =
+                workspaceLayout &&
+                (!previous ||
+                  dateFormatters.dayKey.format(
+                    new Date(previous.originatedAt),
+                  ) !== day)
+              const startsGroup = workspaceLayout
+                ? !messagesShareGroup(previous, message)
+                : true
+              const endsGroup = workspaceLayout
+                ? !messagesShareGroup(message, next)
+                : true
+              const incoming = message.local
+                ? false
+                : conversationType !==
+                    ConversationType.ConversationTypeCustomer
+                  ? !message.sender ||
+                    message.sender.sourceId !== currentIdentityID
+                  : !message.sender ||
+                    message.sender.kind ===
+                      ChatSubjectKind.ChatSubjectKindContact
+              const sentByCurrentIdentity =
+                !message.local &&
+                conversationType !==
+                  ConversationType.ConversationTypeCustomer &&
+                message.sender?.sourceId === currentIdentityID
+              const senderName =
+                (message.local || sentByCurrentIdentity
+                  ? t("messageSenderYou")
+                  : message.sender?.displayName?.trim()) ||
+                (message.sender?.kind ===
+                ChatSubjectKind.ChatSubjectKindContact
+                  ? t("anonymousVisitor")
+                  : t("unknownSender"))
+              const senderInitial =
+                Array.from(senderName)[0]?.toLocaleUpperCase() ?? "?"
+              const failedDraft =
+                message.deliveryStatus === "failed" &&
+                message.clientMessageID
+                  ? {
+                      clientMessageID: message.clientMessageID,
+                      body: message.body,
+                      originatedAt: message.originatedAt,
+                    }
+                  : null
+
+              return (
+                <Fragment key={message.id}>
+                  {startsDay ? (
+                    <div className="my-3 flex items-center justify-center">
+                      <time
+                        dateTime={day}
+                        className="rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground"
                       >
-                        {senderInitial}
-                      </span>
-                      <div
-                        className={cn(
-                          "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words whitespace-pre-wrap [overflow-wrap:anywhere]",
-                          incoming
-                            ? "rounded-bl-sm border bg-background text-foreground shadow-xs"
-                            : "rounded-br-sm bg-primary text-primary-foreground",
-                        )}
-                      >
-                        {message.body}
-                      </div>
+                        {formatDayLabel(date)}
+                      </time>
                     </div>
-                    {message.deliveryStatus ? (
-                      <span
-                        className={cn(
-                          "text-[11px]",
-                          message.deliveryStatus === "failed"
-                            ? "text-destructive"
-                            : "text-muted-foreground",
-                        )}
-                        role={
-                          message.deliveryStatus === "failed"
-                            ? "status"
-                            : undefined
-                        }
-                      >
-                        {message.deliveryStatus === "failed"
-                          ? t("messageSendError")
-                          : t("messageSending")}
+                  ) : null}
+                  {message.sessionStart ? (
+                    <div className="my-3 flex items-center gap-3 text-xs font-semibold text-foreground">
+                      <span className="h-px flex-1 bg-border" />
+                      <span className="rounded-full border border-primary bg-background px-3 py-1 text-primary">
+                        {t("sessionBoundary", {
+                          sequence: message.sessionStart.sequence,
+                          time: formatMessageTime(
+                            dateFormatters.sessionTime,
+                            new Date(message.sessionStart.startedAt),
+                          ),
+                        })}{" "}
+                        ·{" "}
+                        {message.sessionStart.status ===
+                        ServiceSessionStatus.ServiceSessionStatusClosed
+                          ? t("sessionBoundaryClosed")
+                          : t("sessionBoundaryOngoing")}
                       </span>
-                    ) : null}
-                  </div>
-                </article>
-              </Fragment>
-            )
-          })}
+                      <span className="h-px flex-1 bg-border" />
+                    </div>
+                  ) : null}
+                  <article
+                    className={cn(
+                      "flex items-start gap-2",
+                      index > 0 && (startsGroup ? "mt-3" : "mt-1"),
+                      incoming ? "justify-start" : "justify-end",
+                    )}
+                    aria-label={`${senderName} ${dateFormatters.full.format(date)}`}
+                  >
+                    <div
+                      className={cn(
+                        "flex max-w-[75%] flex-col gap-1",
+                        incoming ? "ml-10 items-start" : "mr-10 items-end",
+                      )}
+                    >
+                      {!workspaceLayout ? (
+                        <time
+                          dateTime={message.originatedAt}
+                          title={dateFormatters.full.format(date)}
+                          className="text-[11px] text-muted-foreground/80"
+                        >
+                          {formatMessageTime(
+                            dateFormatters.sessionTime,
+                            date,
+                          )}
+                        </time>
+                      ) : null}
+                      {conversationType ===
+                        ConversationType.ConversationTypeGroup &&
+                      (!workspaceLayout || incoming) &&
+                      startsGroup ? (
+                        <span className="max-w-full truncate text-xs font-medium text-foreground">
+                          {senderName}
+                        </span>
+                      ) : null}
+                      <div className="relative max-w-full">
+                        {endsGroup ? (
+                          <span
+                            className={cn(
+                              "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
+                              incoming
+                                ? "right-full mr-2 border bg-background text-foreground"
+                                : "left-full ml-2 bg-primary text-primary-foreground",
+                            )}
+                            title={senderName}
+                            aria-hidden="true"
+                          >
+                            {senderInitial}
+                          </span>
+                        ) : null}
+                        <div
+                          className={cn(
+                            "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
+                            workspaceLayout && "flex items-end gap-2",
+                            incoming
+                              ? cn(
+                                  "border bg-background text-foreground shadow-xs",
+                                  endsGroup && "rounded-bl-sm",
+                                )
+                              : cn(
+                                  "bg-primary text-primary-foreground",
+                                  endsGroup && "rounded-br-sm",
+                                ),
+                          )}
+                        >
+                          <span className="min-w-0 whitespace-pre-wrap">
+                            {message.body}
+                          </span>
+                          {workspaceLayout ? (
+                            <time
+                              dateTime={message.originatedAt}
+                              title={dateFormatters.full.format(date)}
+                              className={cn(
+                                "shrink-0 translate-y-0.5 text-[10px]",
+                                incoming
+                                  ? "text-muted-foreground"
+                                  : "text-primary-foreground/75",
+                              )}
+                            >
+                              {dateFormatters.clock.format(date)}
+                            </time>
+                          ) : null}
+                        </div>
+                      </div>
+                      {failedDraft && onRetryFailedMessage ? (
+                        <div
+                          className="flex items-center gap-1.5 text-[11px] text-destructive"
+                          role="status"
+                        >
+                          <span>{t("messageSendError")}</span>
+                          <button
+                            type="button"
+                            className="underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                            disabled={retryFailedMessageDisabled}
+                            onClick={() => onRetryFailedMessage(failedDraft)}
+                          >
+                            {t("messageRetry")}
+                          </button>
+                        </div>
+                      ) : message.deliveryStatus ? (
+                        <span
+                          className={cn(
+                            "text-[11px]",
+                            message.deliveryStatus === "failed"
+                              ? "text-destructive"
+                              : "text-muted-foreground",
+                          )}
+                          role={
+                            message.deliveryStatus === "failed"
+                              ? "status"
+                              : undefined
+                          }
+                        >
+                          {message.deliveryStatus === "failed"
+                            ? t("messageSendError")
+                            : t("messageSending")}
+                        </span>
+                      ) : null}
+                    </div>
+                  </article>
+                </Fragment>
+              )
+            })}
+          </div>
         </div>
-      </div>
-    </ScrollArea>
+      </ScrollArea>
+      {workspaceLayout && pollingError ? (
+        <button
+          type="button"
+          className="absolute top-2 left-1/2 z-10 min-h-8 -translate-x-1/2 rounded-full border bg-background/95 px-3 text-xs text-warning shadow-sm backdrop-blur"
+          onClick={() => void pollMessages()}
+        >
+          {t("messagesRefreshError")}
+        </button>
+      ) : null}
+      {workspaceLayout && newMessagesAvailable ? (
+        <Button
+          type="button"
+          size="sm"
+          className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-md"
+          onClick={scrollToLatest}
+        >
+          {t("messagesNew")}
+        </Button>
+      ) : null}
+    </div>
   )
 }

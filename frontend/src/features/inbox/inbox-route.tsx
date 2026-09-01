@@ -1,5 +1,5 @@
 /** 消息列表路由。 */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
@@ -29,8 +29,8 @@ export function InboxRoute() {
   const pollingActive = useMemberChatPollingActive()
   const previousPollingActiveRef = useRef(pollingActive)
   const previousDataRef = useRef<InboxData | null>(null)
-  const [selectedConversationId, setSelectedConversationId] = useState("")
   const [searchParams, setSearchParams] = useSearchParams()
+  const selectedConversationId = searchParams.get("conversation") ?? ""
   const scope =
     optionalWailsEnum(InboxScope, searchParams.get("scope")) ??
     InboxScope.InboxScopeAll
@@ -73,11 +73,6 @@ export function InboxRoute() {
     })
   }, [applyUnreadSnapshot, beginUnreadSnapshot, data])
 
-  useEffect(() => {
-    if (!data || selectedConversationId) return
-    setSelectedConversationId(data.conversations[0]?.id ?? "")
-  }, [data, selectedConversationId])
-
   if (showLoading && !visibleData) {
     return (
       <LoadingIndicator className="flex-1 justify-center">
@@ -111,39 +106,62 @@ export function InboxRoute() {
     scope?: InboxScope
     customerView?: CustomerInboxView
     assigneeIdentityId?: string
+    conversationId?: string
+    replace?: boolean
   }) {
-    const next = new URLSearchParams(searchParams)
     const nextScope = changes.scope ?? scope
     const nextView = changes.customerView ?? customerView
-    if (nextScope === InboxScope.InboxScopeAll) next.delete("scope")
-    else next.set("scope", nextScope)
-    if (nextScope === InboxScope.InboxScopeCustomer) {
-      if (nextView === CustomerInboxView.CustomerInboxViewQueue)
+    const nextAssignee = changes.assigneeIdentityId ?? assigneeIdentityId
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (nextScope === InboxScope.InboxScopeAll) next.delete("scope")
+      else next.set("scope", nextScope)
+      if (nextScope === InboxScope.InboxScopeCustomer) {
+        if (nextView === CustomerInboxView.CustomerInboxViewQueue)
+          next.delete("view")
+        else next.set("view", nextView)
+        if (
+          nextView === CustomerInboxView.CustomerInboxViewCoworkers &&
+          nextAssignee
+        )
+          next.set("assignee", nextAssignee)
+        else next.delete("assignee")
+      } else {
         next.delete("view")
-      else next.set("view", nextView)
-      const nextAssignee = changes.assigneeIdentityId ?? assigneeIdentityId
-      if (
-        nextView === CustomerInboxView.CustomerInboxViewCoworkers &&
-        nextAssignee
-      )
-        next.set("assignee", nextAssignee)
-      else next.delete("assignee")
-    } else {
-      next.delete("view")
-      next.delete("assignee")
-    }
-    setSearchParams(next, { replace: true })
+        next.delete("assignee")
+      }
+      if (changes.conversationId !== undefined) {
+        if (changes.conversationId) {
+          next.set("conversation", changes.conversationId)
+        } else {
+          next.delete("conversation")
+        }
+      }
+      return next
+    }, { replace: changes.replace ?? true })
+  }
+
+  /** 将当前会话同步到地址，支持刷新和前进后退恢复。 */
+  function selectConversation(conversationId: string, replace = false) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (conversationId) next.set("conversation", conversationId)
+      else next.delete("conversation")
+      return next
+    }, { replace })
   }
 
   return (
     <InboxPage
       conversations={visibleData.conversations}
       listLoading={showLoading}
+      listError={Boolean(error)}
+      onListRefresh={() => void refresh()}
       scope={scope}
       customerView={customerView}
       assigneeIdentityId={assigneeIdentityId}
       selectedConversationId={selectedConversationId}
-      onSelectedConversationChange={setSelectedConversationId}
+      onSelectedConversationChange={selectConversation}
       onQueryChange={updateQuery}
     />
   )

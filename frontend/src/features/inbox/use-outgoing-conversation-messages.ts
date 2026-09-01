@@ -45,10 +45,21 @@ export function useOutgoingConversationMessages() {
 
   /** 立即展示一次新发送。 */
   function start(message: OutgoingConversationDraft) {
-    setMessages((current) => [
-      ...current,
-      { ...message, status: "sending", showSending: false, saved: null },
-    ])
+    setMessages((current) => {
+      const next = {
+        ...message,
+        status: "sending" as const,
+        showSending: false,
+        saved: null,
+      }
+      return current.some(
+        (item) => item.clientMessageID === message.clientMessageID,
+      )
+        ? current.map((item) =>
+            item.clientMessageID === message.clientMessageID ? next : item,
+          )
+        : [...current, next]
+    })
     const timer = window.setTimeout(() => {
       delayTimersRef.current.delete(message.clientMessageID)
       setMessages((current) =>

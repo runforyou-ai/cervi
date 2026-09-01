@@ -1,4 +1,4 @@
-/** 客户会话联系人上下文栏。 */
+/** 客服、单聊与群聊共用的会话资料栏。 */
 import {
   BotIcon,
   BriefcaseBusinessIcon,
@@ -8,11 +8,20 @@ import {
   MessageCircleIcon,
   MessagesSquareIcon,
   SendIcon,
+  UserRoundIcon,
+  UsersRoundIcon,
 } from "lucide-react"
 import { useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useTranslation } from "react-i18next"
 
-import { ChannelType, type CustomerInboxConversationData } from "@/api"
+import {
+  ChannelType,
+  OrganizationIdentityType,
+  isCustomerInboxConversation,
+  isDirectInboxConversation,
+  isGroupInboxConversation,
+  type InboxConversation,
+} from "@/api"
 import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
@@ -28,6 +37,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { ConversationAvatar } from "@/features/inbox/conversation-header"
+import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import { GroupParticipantList } from "@/features/inbox/group-participant-list"
 import { cn } from "@/lib/utils"
 
 const contextPanelMinWidth = 320
@@ -71,21 +82,105 @@ function ContextPlaceholder({
   )
 }
 
-/** 展示当前联系人摘要，并为资料、AI 和业务上下文预留独立页签。 */
+/** 展示单聊或群聊的基础资料。 */
+function InternalConversationProfile({
+  conversation,
+  displayName,
+}: {
+  conversation: InboxConversation
+  displayName: string
+}) {
+  const { t } = useTranslation("inbox")
+  const direct = isDirectInboxConversation(conversation)
+    ? conversation.direct
+    : null
+  const group = isGroupInboxConversation(conversation)
+    ? conversation.group
+    : null
+  const identityType =
+    direct?.peerType ===
+    OrganizationIdentityType.OrganizationIdentityTypeAgent
+      ? t("contextIdentityAgent")
+      : t("contextIdentityMember")
+  const agentStatus = agentRunStatusLabel(direct?.agentRunStatus ?? null, t)
+
+  return (
+    <dl className="space-y-2 text-sm">
+      <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
+        <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
+          {t("contextContactName")}
+        </dt>
+        <dd className="flex min-h-8 min-w-0 items-center gap-2">
+          <ConversationAvatar
+            conversation={conversation}
+            className="size-7 rounded-full text-xs"
+          />
+          <span className="min-w-0 truncate" title={displayName}>
+            {displayName}
+          </span>
+        </dd>
+      </div>
+      {direct ? (
+        <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
+          <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
+            {t("contextIdentityType")}
+          </dt>
+          <dd className="flex min-h-8 items-center">{identityType}</dd>
+        </div>
+      ) : null}
+      {direct && agentStatus ? (
+        <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
+          <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
+            {t("contextAgentStatus")}
+          </dt>
+          <dd className="flex min-h-8 items-center">{agentStatus}</dd>
+        </div>
+      ) : null}
+      {group ? (
+        <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
+          <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
+            {t("contextGroupMemberCount")}
+          </dt>
+          <dd className="flex min-h-8 items-center">
+            {t("groupMemberCount", { count: group.memberCount })}
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  )
+}
+
+/** 展示当前会话摘要和类型对应的资料内容。 */
 function ConversationContextContent({
   conversation,
-  contactName,
+  displayName,
   sessionStatus,
   sheet = false,
 }: {
-  conversation: CustomerInboxConversationData
-  contactName: string
+  conversation: InboxConversation
+  displayName: string
   sessionStatus: string
   sheet?: boolean
 }) {
   const { t } = useTranslation("inbox")
-  const ChannelIcon =
-    channelIcons[conversation.customer.channelType] ?? MessagesSquareIcon
+  const customer = isCustomerInboxConversation(conversation)
+    ? conversation.customer
+    : null
+  const direct = isDirectInboxConversation(conversation)
+    ? conversation.direct
+    : null
+  const group = isGroupInboxConversation(conversation)
+    ? conversation.group
+    : null
+  const HeaderIcon = customer
+    ? (channelIcons[customer.channelType] ?? MessagesSquareIcon)
+    : group
+      ? UsersRoundIcon
+      : direct?.peerType ===
+          OrganizationIdentityType.OrganizationIdentityTypeAgent
+        ? BotIcon
+        : UserRoundIcon
+  const headerTitle = customer?.channelName ?? displayName
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
@@ -96,106 +191,186 @@ function ConversationContextContent({
         )}
       >
         <div className="flex items-center gap-2">
-          <ChannelIcon className="size-4 shrink-0 text-muted-foreground" />
+          <HeaderIcon className="size-4 shrink-0 text-muted-foreground" />
           <span
             className="min-w-0 truncate text-sm font-medium text-foreground"
-            title={conversation.customer.channelName}
+            title={headerTitle}
           >
-            {conversation.customer.channelName}
+            {headerTitle}
           </span>
         </div>
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>
-            {t("contextReceptionStatus")}：
-            <span className="text-foreground">{sessionStatus}</span>
-          </span>
-          <span
-            className="min-w-0 truncate"
-            title={conversation.customer.title}
-          >
-            {t("contextConversationLabel")}：
-            <span className="text-foreground">
-              {conversation.customer.title}
+        {customer ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              {t("contextReceptionStatus")}：
+              <span className="text-foreground">{sessionStatus}</span>
             </span>
-          </span>
-        </div>
+            <span className="min-w-0 truncate" title={customer.title}>
+              {t("contextConversationLabel")}：
+              <span className="text-foreground">{customer.title}</span>
+            </span>
+          </div>
+        ) : group ? (
+          <p className="text-xs text-muted-foreground">
+            {t("groupMemberCount", { count: group.memberCount })}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {direct?.peerType ===
+            OrganizationIdentityType.OrganizationIdentityTypeAgent
+              ? t("contextIdentityAgent")
+              : t("contextIdentityMember")}
+          </p>
+        )}
       </div>
 
-      <Tabs defaultValue="profile" className="min-h-0 flex-1">
-        <TabsList
-          aria-label={t("contextTabsLabel")}
-          className="h-auto shrink-0 justify-start gap-1 px-3 py-2"
+      {customer ? (
+        <Tabs
+          key={conversation.id}
+          defaultValue="profile"
+          className="min-h-0 flex-1"
         >
-          <TabsTrigger
+          <TabsList
+            aria-label={t("contextTabsLabel")}
+            className="h-auto shrink-0 justify-start gap-1 px-3 py-2"
+          >
+            <TabsTrigger
+              value="profile"
+              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              {t("contextProfileTab")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="assistant"
+              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              {t("contextAssistantTab")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="business"
+              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              {t("contextBusinessTab")}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent
             value="profile"
-            className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="mt-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3"
           >
-            {t("contextProfileTab")}
-          </TabsTrigger>
-          <TabsTrigger
+            <section className="space-y-4">
+              <dl className="space-y-2 text-sm">
+                <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
+                  <dt className="flex min-h-8 min-w-0 items-center text-xs text-muted-foreground">
+                    {t("contextContactName")}
+                  </dt>
+                  <dd className="flex min-h-8 min-w-0 items-center gap-2">
+                    <ConversationAvatar
+                      conversation={conversation}
+                      className="size-7 rounded-full text-xs"
+                    />
+                    <span className="min-w-0 truncate" title={displayName}>
+                      {displayName}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+              <Separator />
+              <p className="text-xs leading-5 text-muted-foreground">
+                {t("contextContactDetailsPlaceholder")}
+              </p>
+            </section>
+          </TabsContent>
+
+          <TabsContent
             value="assistant"
-            className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="mt-0 min-h-0 flex-1 overflow-hidden"
           >
-            {t("contextAssistantTab")}
-          </TabsTrigger>
-          <TabsTrigger
+            <ContextPlaceholder
+              icon={BotIcon}
+              title={t("contextAssistantTitle")}
+              description={t("contextAssistantDescription")}
+            />
+          </TabsContent>
+
+          <TabsContent
             value="business"
-            className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            className="mt-0 min-h-0 flex-1 overflow-hidden"
           >
-            {t("contextBusinessTab")}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent
-          value="profile"
-          className="mt-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3"
+            <ContextPlaceholder
+              icon={BriefcaseBusinessIcon}
+              title={t("contextBusinessTitle")}
+              description={t("contextBusinessDescription")}
+            />
+          </TabsContent>
+        </Tabs>
+      ) : group ? (
+        <Tabs
+          key={conversation.id}
+          defaultValue="profile"
+          className="min-h-0 flex-1"
         >
-          <section className="space-y-4">
-            <dl className="space-y-2 text-sm">
-              <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-                <dt className="flex min-h-8 min-w-0 items-center text-xs text-muted-foreground">
-                  {t("contextContactName")}
-                </dt>
-                <dd className="flex min-h-8 min-w-0 items-center gap-2">
-                  <ConversationAvatar
-                    conversation={conversation}
-                    className="size-7 rounded-full text-xs"
-                  />
-                  <span className="min-w-0 truncate" title={contactName}>
-                    {contactName}
-                  </span>
-                </dd>
-              </div>
-            </dl>
-            <Separator />
-            <p className="text-xs leading-5 text-muted-foreground">
-              {t("contextContactDetailsPlaceholder")}
-            </p>
-          </section>
-        </TabsContent>
-
-        <TabsContent
-          value="assistant"
-          className="mt-0 min-h-0 flex-1 overflow-hidden"
+          <TabsList
+            aria-label={t("contextTabsLabel")}
+            className="h-auto shrink-0 justify-start gap-1 px-3 py-2"
+          >
+            <TabsTrigger
+              value="profile"
+              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              {t("contextGroupProfileTab")}
+            </TabsTrigger>
+            <TabsTrigger
+              value="members"
+              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              {t("contextGroupMembersTab")}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent
+            value="profile"
+            className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3"
+          >
+            <InternalConversationProfile
+              conversation={conversation}
+              displayName={displayName}
+            />
+          </TabsContent>
+          <TabsContent
+            value="members"
+            className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5"
+          >
+            <GroupParticipantList conversationID={conversation.id} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <Tabs
+          key={conversation.id}
+          defaultValue="profile"
+          className="min-h-0 flex-1"
         >
-          <ContextPlaceholder
-            icon={BotIcon}
-            title={t("contextAssistantTitle")}
-            description={t("contextAssistantDescription")}
-          />
-        </TabsContent>
-
-        <TabsContent
-          value="business"
-          className="mt-0 min-h-0 flex-1 overflow-hidden"
-        >
-          <ContextPlaceholder
-            icon={BriefcaseBusinessIcon}
-            title={t("contextBusinessTitle")}
-            description={t("contextBusinessDescription")}
-          />
-        </TabsContent>
-      </Tabs>
+          <TabsList
+            aria-label={t("contextTabsLabel")}
+            className="h-auto shrink-0 justify-start gap-1 px-3 py-2"
+          >
+            <TabsTrigger
+              value="profile"
+              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              {t("contextProfileTab")}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent
+            value="profile"
+            className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3"
+          >
+            <InternalConversationProfile
+              conversation={conversation}
+              displayName={displayName}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   )
 }
@@ -203,16 +378,20 @@ function ConversationContextContent({
 /** 在宽屏常驻栏和较窄视口 Sheet 中复用联系人上下文。 */
 export function ConversationContextPane({
   conversation,
-  contactName,
+  displayName,
   sessionStatus,
+  title,
+  description,
   desktopVisible,
   sheetOpen,
   onDesktopToggle,
   onSheetOpenChange,
 }: {
-  conversation: CustomerInboxConversationData
-  contactName: string
+  conversation: InboxConversation
+  displayName: string
   sessionStatus: string
+  title: string
+  description: string
   desktopVisible: boolean
   sheetOpen: boolean
   onDesktopToggle: () => void
@@ -298,7 +477,7 @@ export function ConversationContextPane({
       >
         <ConversationContextContent
           conversation={conversation}
-          contactName={contactName}
+          displayName={displayName}
           sessionStatus={sessionStatus}
         />
       </aside>
@@ -306,12 +485,12 @@ export function ConversationContextPane({
       <Sheet open={sheetOpen} onOpenChange={onSheetOpenChange}>
         <SheetContent className="data-[side=right]:w-full gap-0 p-0 sm:max-w-sm">
           <SheetHeader className="sr-only">
-            <SheetTitle>{t("contextTitleBar")}</SheetTitle>
-            <SheetDescription>{t("contextDescription")}</SheetDescription>
+            <SheetTitle>{title}</SheetTitle>
+            <SheetDescription>{description}</SheetDescription>
           </SheetHeader>
           <ConversationContextContent
             conversation={conversation}
-            contactName={contactName}
+            displayName={displayName}
             sessionStatus={sessionStatus}
             sheet
           />
