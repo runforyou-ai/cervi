@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -74,15 +75,11 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if execution.MaxOutputTokens > 0 && execution.MaxOutputTokens < int64(maxOutputTokens) {
 		maxOutputTokens = int(execution.MaxOutputTokens)
 	}
-	var feed agentruntime.InputFeed
-	switch domain.AgentTriggerType(execution.Run.TriggerType) {
-	case domain.AgentTriggerTypeDirect:
-		feed = &databaseInputFeed{db: a.db, execution: execution}
-	case domain.AgentTriggerTypeCustomerAuto:
-		feed = &customerInputFeed{db: a.db, execution: execution}
-	default:
-		return task.Permanent(fmt.Errorf("unsupported agent trigger type %q", execution.Run.TriggerType))
+	policy, _, err := a.policyForRun(&execution.Run)
+	if err != nil {
+		return task.Permanent(err)
 	}
+	feed := &databaseInputFeed{db: a.db, execution: execution, policy: policy}
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
 		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: execution.Instruction,
 		Model: agentruntime.ModelConfig{
@@ -90,11 +87,11 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
 		},
 	}, feed)
-	if errors.Is(err, errCustomerRunSuppressed) {
+	if errors.Is(err, errAgentRunSuppressed) {
 		return nil
 	}
 	if err == nil {
-		if completeErr := a.complete(ctx, execution, result); completeErr != nil {
+		if completeErr := a.complete(ctx, execution, policy, result); completeErr != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -196,22 +193,115 @@ func agentRunStatusTerminal(status string) bool {
 		status == string(domain.AgentRunStatusCancelled)
 }
 
-// complete 原子写入最终回复、推进消费序号并补投递竞态中的后续输入。
-func (a *ExecuteAction) complete(ctx context.Context, execution executionContext, result agentruntime.RunResult) error {
-	if domain.AgentTriggerType(execution.Run.TriggerType) == domain.AgentTriggerTypeCustomerAuto {
-		return a.completeCustomer(ctx, execution, result)
+type directRunPolicy struct {
+	enqueuer servertask.TxEnqueuer
+}
+
+// policyForRun 根据持久化触发类型选择运行策略和输入范围。
+func (a *ExecuteAction) policyForRun(run *servermodels.AgentRun) (agentRunPolicy, agentRunScope, error) {
+	scope, err := agentRunScopeFor(run)
+	if err != nil {
+		return nil, agentRunScope{}, err
 	}
-	if domain.AgentTriggerType(execution.Run.TriggerType) != domain.AgentTriggerTypeDirect {
-		return fmt.Errorf("unsupported agent trigger type %q", execution.Run.TriggerType)
+	switch domain.AgentTriggerType(run.TriggerType) {
+	case domain.AgentTriggerTypeDirect:
+		return directRunPolicy{enqueuer: a.enqueuer}, scope, nil
+	case domain.AgentTriggerTypeCustomerAuto:
+		return customerRunPolicy{enqueuer: a.enqueuer}, scope, nil
+	default:
+		return nil, agentRunScope{}, fmt.Errorf("unsupported agent trigger type %q", run.TriggerType)
 	}
-	var status string
-	if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
-		Column("status").Where("agr.id = ?", execution.Run.ID).Scan(ctx, &status); err != nil {
+}
+
+// lockContext 返回普通 Agent 不需要额外锁定的策略上下文。
+func (p directRunPolicy) lockContext(context.Context, bun.IDB, *servermodels.AgentRun) (agentRunPolicyContext, error) {
+	return agentRunPolicyContext{}, nil
+}
+
+// prepareLocked 确认普通 Agent 可以继续执行。
+func (p directRunPolicy) prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error) {
+	return true, nil
+}
+
+// loadMessages 按会话稳定顺序读取普通 Agent 上下文。
+func (p directRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
+	return loadClaimedConversationMessages(ctx, db, run, endSeq)
+}
+
+// persistResponse 写入普通 Agent 回复并更新会话摘要。
+func (p directRunPolicy) persistResponse(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, run *servermodels.AgentRun, messageID, content string) error {
+	var participantID string
+	if err := db.NewSelect().TableExpr("conversation_participants AS cp").
+		ColumnExpr("cp.id").
+		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Where("cp.organization_id = ?", run.OrganizationID).
+		Where("cp.conversation_id = ?", run.ConversationID).
+		Where("cp.left_at IS NULL").
+		Where("cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Where("cs.source_id = ?", run.AgentIdentityID).
+		Scan(ctx, &participantID); err != nil {
+		return fmt.Errorf("load agent conversation participant: %w", err)
+	}
+	message, err := insertAgentResponseMessage(ctx, db, run, messageID, participantID, content, nil)
+	if err != nil {
 		return err
 	}
-	if agentRunStatusTerminal(status) {
-		return nil
+	return updateConversationAfterAgentResponse(ctx, db, message)
+}
+
+// enqueueNext 为普通 Agent 的剩余输入创建下一次运行。
+func (p directRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, run *servermodels.AgentRun, startSeq int64) error {
+	var revisionID string
+	if err := db.NewSelect().Model((*servermodels.Agent)(nil)).
+		Column("active_revision_id").
+		Where("a.identity_id = ?", run.AgentIdentityID).
+		Where("a.organization_id = ?", run.OrganizationID).
+		Scan(ctx, &revisionID); err != nil {
+		return fmt.Errorf("load next agent run revision: %w", err)
 	}
+	_, err := insertAndEnqueueRun(ctx, db, p.enqueuer, agentRunSpec{
+		OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
+		AgentIdentityID: run.AgentIdentityID, RevisionID: revisionID,
+		TriggerType: domain.AgentTriggerTypeDirect,
+	}, startSeq)
+	return err
+}
+
+// insertAgentResponseMessage 写入一条带运行幂等键的 Agent 回复。
+func insertAgentResponseMessage(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, messageID, participantID, content string, serviceSessionID *string) (*servermodels.Message, error) {
+	idempotencyKey := "agent:" + run.ID
+	message := &servermodels.Message{
+		ID: messageID, OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
+		ServiceSessionID: serviceSessionID, SenderParticipantID: &participantID,
+		Type: string(domain.MessageTypeText), Body: content, IdempotencyKey: &idempotencyKey,
+		OriginatedAt: time.Now().UTC(),
+	}
+	if _, err := db.NewInsert().Model(message).
+		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
+		Returning("*").Exec(ctx); err != nil {
+		return nil, fmt.Errorf("create agent response message: %w", err)
+	}
+	return message, nil
+}
+
+// updateConversationAfterAgentResponse 按消息稳定顺序更新会话摘要。
+func updateConversationAfterAgentResponse(ctx context.Context, db bun.IDB, message *servermodels.Message) error {
+	if _, err := db.NewUpdate().Model((*servermodels.Conversation)(nil)).
+		Set("last_message_id = ?", message.ID).
+		Set("last_message_at = ?", message.OriginatedAt).
+		Set("last_message_source_order = ?", message.SourceOrder).
+		Set("updated_at = now()").
+		Where("id = ?", message.ConversationID).
+		Where("organization_id = ?", message.OrganizationID).
+		Where("last_message_at IS NULL OR (last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("update conversation after agent response: %w", err)
+	}
+	return nil
+}
+
+// complete 按运行策略抑制失效结果或原子写入回复并推进消费序号。
+func (a *ExecuteAction) complete(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult) error {
 	content := strings.TrimSpace(result.Content)
 	if content == "" || result.EndSeq <= 0 {
 		return errors.New("agent runtime returned an invalid result")
@@ -220,65 +310,39 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	if err != nil {
 		return fmt.Errorf("encode agent run usage: %w", err)
 	}
-	messageID := uuid.NewV7()
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		state := &servermodels.ConversationAgentState{}
-		if err := tx.NewSelect().Model(state).
-			Where("cas.conversation_id = ?", execution.Run.ConversationID).
-			Where("cas.organization_id = ?", execution.Run.OrganizationID).
-			Where("cas.agent_identity_id = ?", execution.Run.AgentIdentityID).
-			For("UPDATE").Scan(ctx); err != nil {
-			return fmt.Errorf("lock agent conversation state for completion: %w", err)
-		}
-		run := &servermodels.AgentRun{}
-		if err := tx.NewSelect().Model(run).Where("agr.id = ?", execution.Run.ID).For("UPDATE").Scan(ctx); err != nil {
+	messageID := uuid.NewV7().String()
+	suppressed := false
+	completed := false
+	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		locked, err := lockAgentRun(ctx, tx, policy, &execution.Run)
+		if err != nil {
 			return fmt.Errorf("lock agent run for completion: %w", err)
 		}
+		policyContext, state, run := locked.PolicyContext, locked.State, locked.Run
 		if agentRunStatusTerminal(run.Status) {
 			return nil
 		}
-		if run.Status != string(domain.AgentRunStatusRunning) || run.TriggerEndSeq == nil || *run.TriggerEndSeq != result.EndSeq {
+		allowed, err := policy.prepareLocked(ctx, tx, policyContext, run)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			suppressed = true
+			return nil
+		}
+		if run.Status != string(domain.AgentRunStatusRunning) || run.TriggerEndSeq == nil ||
+			*run.TriggerEndSeq != result.EndSeq || run.TriggerStartSeq != state.ProcessedSeq+1 {
 			return errors.New("agent run completion boundary is inconsistent")
 		}
-		var participantID string
-		if err := tx.NewSelect().TableExpr("conversation_participants AS cp").
-			ColumnExpr("cp.id").
-			Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
-			Where("cp.organization_id = ?", run.OrganizationID).
-			Where("cp.conversation_id = ?", run.ConversationID).
-			Where("cp.left_at IS NULL").
-			Where("cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-			Where("cs.source_id = ?", execution.Run.AgentIdentityID).
-			Scan(ctx, &participantID); err != nil {
-			return fmt.Errorf("load agent conversation participant: %w", err)
-		}
-		idempotencyKey := "agent:" + run.ID
-		originatedAt := time.Now().UTC()
-		message := &servermodels.Message{
-			ID: messageID.String(), OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
-			SenderParticipantID: &participantID, Type: string(domain.MessageTypeText), Body: content,
-			IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
-		}
-		if _, err := tx.NewInsert().Model(message).
-			Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
-			Returning("created_at").Exec(ctx); err != nil {
-			return fmt.Errorf("create agent response message: %w", err)
-		}
-		if _, err := tx.NewUpdate().Model((*servermodels.Conversation)(nil)).
-			Set("last_message_id = ?", message.ID).
-			Set("last_message_at = ?", message.OriginatedAt).
-			Set("updated_at = now()").
-			Where("id = ?", run.ConversationID).
-			Where("organization_id = ?", run.OrganizationID).
-			Where("last_message_at IS NULL OR (last_message_at, last_message_id) < (?, ?)", message.OriginatedAt, message.ID).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("update conversation after agent response: %w", err)
+		if err := policy.persistResponse(ctx, tx, policyContext, run, messageID, content); err != nil {
+			return err
 		}
 		if _, err := tx.NewUpdate().Model(run).
 			Set("status = ?", domain.AgentRunStatusSucceeded).
-			Set("response_message_id = ?", message.ID).
+			Set("response_message_id = ?", messageID).
 			Set("usage = ?::jsonb", string(usage)).
 			Set("last_error = NULL").
+			Set("error_code = NULL").
 			Set("completed_at = now()").
 			Set("updated_at = now()").
 			WherePK().Exec(ctx); err != nil {
@@ -290,23 +354,53 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("advance processed agent input sequence: %w", err)
 		}
-		if state.DesiredSeq <= result.EndSeq {
-			return nil
+		if state.DesiredSeq > result.EndSeq {
+			if err := policy.enqueueNext(ctx, tx, policyContext, run, result.EndSeq+1); err != nil {
+				return err
+			}
 		}
-		var revisionID string
-		if err := tx.NewSelect().Model((*servermodels.Agent)(nil)).
-			Column("active_revision_id").
-			Where("a.identity_id = ?", run.AgentIdentityID).
-			Where("a.organization_id = ?", run.OrganizationID).
-			Scan(ctx, &revisionID); err != nil {
-			return fmt.Errorf("load next agent run revision: %w", err)
-		}
-		_, err := insertAndEnqueueRun(ctx, tx, a.enqueuer, run.OrganizationID, run.ConversationID, run.AgentIdentityID, revisionID, result.EndSeq+1)
-		return err
+		completed = true
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+	if suppressed {
+		logSuppressedRun(execution)
+	}
+	if completed {
+		logCompletedRun(execution, result.EndSeq, messageID)
+	}
+	return nil
 }
 
-// fail 标记最终失败，并为执行期间刚到达的新输入补建下一次运行。
+// logSuppressedRun 记录客服门禁抑制的迟到结果。
+func logSuppressedRun(execution executionContext) {
+	if execution.Run.ServiceSessionID == nil {
+		return
+	}
+	slog.Warn("网站客户 Agent 迟到结果已抑制",
+		"agent_run_id", execution.Run.ID,
+		"conversation_id", execution.Run.ConversationID,
+	)
+}
+
+// logCompletedRun 记录关联客服周期的 Agent 完成结果。
+func logCompletedRun(execution executionContext, endSeq int64, messageID string) {
+	if execution.Run.ServiceSessionID == nil {
+		return
+	}
+	slog.Info("网站客户 Agent 运行完成",
+		"agent_run_id", execution.Run.ID,
+		"conversation_id", execution.Run.ConversationID,
+		"service_session_id", *execution.Run.ServiceSessionID,
+		"trigger_start_seq", execution.Run.TriggerStartSeq,
+		"trigger_end_seq", endSeq,
+		"response_message_id", messageID,
+	)
+}
+
+// fail 按运行策略取消失效运行或标记失败，并为剩余输入补建下一次运行。
 func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (bool, error) {
 	message := truncateRunError(runErr)
 	initial := &servermodels.AgentRun{}
@@ -316,27 +410,26 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 	if agentRunStatusTerminal(initial.Status) {
 		return true, nil
 	}
-	if domain.AgentTriggerType(initial.TriggerType) == domain.AgentTriggerTypeCustomerAuto {
-		return a.failCustomer(ctx, initial, message)
-	}
-	if domain.AgentTriggerType(initial.TriggerType) != domain.AgentTriggerTypeDirect {
-		return false, fmt.Errorf("unsupported agent trigger type %q", initial.TriggerType)
+	policy, scope, err := a.policyForRun(initial)
+	if err != nil {
+		return false, err
 	}
 	terminal := false
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		state := &servermodels.ConversationAgentState{}
-		if err := tx.NewSelect().Model(state).
-			Where("cas.conversation_id = ?", initial.ConversationID).
-			Where("cas.organization_id = ?", initial.OrganizationID).
-			Where("cas.agent_identity_id = ?", initial.AgentIdentityID).
-			For("UPDATE").Scan(ctx); err != nil {
-			return err
+	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		locked, err := lockAgentRun(ctx, tx, policy, initial)
+		if err != nil {
+			return fmt.Errorf("lock agent run for failure: %w", err)
 		}
-		run := &servermodels.AgentRun{}
-		if err := tx.NewSelect().Model(run).Where("agr.id = ?", runID).For("UPDATE").Scan(ctx); err != nil {
-			return err
-		}
+		policyContext, state, run := locked.PolicyContext, locked.State, locked.Run
 		if agentRunStatusTerminal(run.Status) {
+			terminal = true
+			return nil
+		}
+		allowed, err := policy.prepareLocked(ctx, tx, policyContext, run)
+		if err != nil {
+			return err
+		}
+		if !allowed {
 			terminal = true
 			return nil
 		}
@@ -350,17 +443,8 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 		if run.TriggerStartSeq != state.ProcessedSeq+1 || failureEnd < run.TriggerStartSeq || failureEnd > state.DesiredSeq {
 			return errors.New("agent run failure boundary is inconsistent")
 		}
-		var failedSeqs []int64
-		if err := tx.NewRaw(`
-			UPDATE conversation_agent_triggers
-			SET agent_run_id = ?
-			WHERE organization_id = ?
-				AND conversation_id = ?
-				AND agent_identity_id = ?
-				AND trigger_seq > ?
-				AND trigger_seq <= ?
-			RETURNING trigger_seq
-		`, run.ID, run.OrganizationID, run.ConversationID, run.AgentIdentityID, state.ProcessedSeq, failureEnd).Scan(ctx, &failedSeqs); err != nil {
+		failedSeqs, err := assignAgentTriggers(ctx, tx, run, scope, state.ProcessedSeq, failureEnd)
+		if err != nil {
 			return err
 		}
 		if int64(len(failedSeqs)) != failureEnd-state.ProcessedSeq {
@@ -370,6 +454,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 			Set("status = ?", domain.AgentRunStatusFailed).
 			Set("trigger_end_seq = ?", failureEnd).
 			Set("last_error = ?", message).
+			Set("error_code = NULL").
 			Set("completed_at = now()").
 			Set("updated_at = now()").
 			WherePK().
@@ -382,17 +467,12 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 			WherePK().Exec(ctx); err != nil {
 			return err
 		}
-		if state.DesiredSeq <= failureEnd {
-			return nil
+		if state.DesiredSeq > failureEnd {
+			if err := policy.enqueueNext(ctx, tx, policyContext, run, failureEnd+1); err != nil {
+				return err
+			}
 		}
-		var revisionID string
-		if err := tx.NewSelect().Model((*servermodels.Agent)(nil)).
-			Column("active_revision_id").Where("a.identity_id = ?", run.AgentIdentityID).Where("a.organization_id = ?", run.OrganizationID).
-			Scan(ctx, &revisionID); err != nil {
-			return err
-		}
-		_, err := insertAndEnqueueRun(ctx, tx, a.enqueuer, run.OrganizationID, run.ConversationID, run.AgentIdentityID, revisionID, failureEnd+1)
-		return err
+		return nil
 	})
 	return terminal, err
 }
