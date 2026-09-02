@@ -397,7 +397,6 @@
   "field.telegram_webhook_base_url_invalid": "The current company server address is invalid.",
   "field.server_url_complete": "Enter the complete company server address.",
   "field.server_url_base_only": "Enter a base address without credentials, query parameters, or fragments.",
-  "field.server_url_https_required": "Use an HTTPS company server address.",
   "field.server_url_not_cervi": "Confirm that this address points to a Cervi company server.",
   "field.visitor_token_invalid": "The chat identity is invalid. Refresh and try again.",
   "field.channel_id_invalid": "The channel identifier is invalid.",

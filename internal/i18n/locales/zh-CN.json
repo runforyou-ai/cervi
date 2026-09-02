@@ -397,7 +397,6 @@
   "field.telegram_webhook_base_url_invalid": "当前企业服务器地址无效。",
   "field.server_url_complete": "请填写完整的企业服务器地址。",
   "field.server_url_base_only": "请填写不含账号、查询参数和页面片段的基础地址。",
-  "field.server_url_https_required": "请使用 HTTPS 企业服务器地址。",
   "field.server_url_not_cervi": "请确认地址指向 Cervi 企业服务器。",
   "field.visitor_token_invalid": "聊天身份无效，请刷新后重试。",
   "field.channel_id_invalid": "渠道编号无效。",

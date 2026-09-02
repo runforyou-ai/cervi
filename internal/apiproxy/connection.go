@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -102,26 +101,14 @@ func newRemoteState(baseURL *url.URL) *remoteState {
 func parseServerURL(value string) (*url.URL, error) {
 	value = strings.TrimSpace(value)
 	parsed, err := url.ParseRequestURI(value)
-	if err != nil || parsed.Host == "" {
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLComplete}
 	}
 	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLBaseOnly}
 	}
-	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname())) {
-		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLHTTPSRequired}
-	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return parsed, nil
-}
-
-// isLoopbackHost 判断主机是否为回环地址。
-func isLoopbackHost(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 // probeServer 读取企业服务器的初始化状态和公开企业名称。
