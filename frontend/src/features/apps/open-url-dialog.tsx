@@ -19,7 +19,7 @@ import {
 import { FieldGroup } from "@/components/ui/field"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { openExternalPage } from "@/platform/open-external-page"
+import { openExternalPage } from "@/platform/external-navigation"
 
 const urlMaxLength = 2048
 

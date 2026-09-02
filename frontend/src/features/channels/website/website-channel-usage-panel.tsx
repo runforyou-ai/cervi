@@ -45,7 +45,7 @@ import {
   type WebsiteChannelAccessFormValues,
 } from "@/features/channels/website/website-channel-access-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { openExternalURL } from "@/platform/open-external-url"
+import { openExternalURL } from "@/platform/external-navigation"
 
 /** 网站渠道接入方式子页签。 */
 export type WebsiteChannelAccessTab = "embed" | "link"

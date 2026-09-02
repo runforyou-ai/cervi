@@ -9,7 +9,7 @@ import {
   type UnreadIndicatorState,
 } from "@/api"
 import { isDesktopMacOS, resolveAppPlatform } from "@/platform/app-platform"
-import { openExternalURL } from "@/platform/open-external-url"
+import { openExternalURL } from "@/platform/external-navigation"
 
 const notificationPreferencesStoragePrefix = "cervi.notifications"
 const macOSNotificationSettingsURL =
