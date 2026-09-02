@@ -65,5 +65,5 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 
 // storageKey 返回以文件编号命名的存储键。
 func storageKey(organizationID, fileID, contentType string) string {
-	return "organizations/" + organizationID + "/files/" + fileID + avatarFileExtensions[contentType]
+	return "organizations/" + organizationID + "/files/" + fileID + imageFileExtensions[contentType]
 }

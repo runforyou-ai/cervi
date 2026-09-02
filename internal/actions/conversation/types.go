@@ -13,22 +13,26 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationChannelIDInvalid        ValidationCode = "channel_id_invalid"
-	ValidationExternalIDInvalid       ValidationCode = "external_id_invalid"
-	ValidationConversationIDInvalid   ValidationCode = "conversation_id_invalid"
-	ValidationTargetIdentityIDInvalid ValidationCode = "target_identity_id_invalid"
-	ValidationGroupTitleRequired      ValidationCode = "group_title_required"
-	ValidationGroupTitleTooLong       ValidationCode = "group_title_too_long"
-	ValidationGroupMembersRequired    ValidationCode = "group_members_required"
-	ValidationGroupMembersTooMany     ValidationCode = "group_members_too_many"
-	ValidationGroupMemberIDsInvalid   ValidationCode = "group_member_ids_invalid"
-	ValidationGroupMemberIDInvalid    ValidationCode = "group_member_id_invalid"
-	ValidationGroupOwnerIDInvalid     ValidationCode = "group_owner_id_invalid"
-	ValidationGroupSuccessorIDInvalid ValidationCode = "group_successor_id_invalid"
-	ValidationClientMessageIDInvalid  ValidationCode = "client_message_id_invalid"
-	ValidationBodyRequired            ValidationCode = "body_required"
-	ValidationBodyTooLong             ValidationCode = "body_too_long"
-	ValidationCursorInvalid           ValidationCode = "cursor_invalid"
+	ValidationChannelIDInvalid         ValidationCode = "channel_id_invalid"
+	ValidationExternalIDInvalid        ValidationCode = "external_id_invalid"
+	ValidationConversationIDInvalid    ValidationCode = "conversation_id_invalid"
+	ValidationTargetIdentityIDInvalid  ValidationCode = "target_identity_id_invalid"
+	ValidationGroupTitleRequired       ValidationCode = "group_title_required"
+	ValidationGroupTitleTooLong        ValidationCode = "group_title_too_long"
+	ValidationGroupDescriptionTooLong  ValidationCode = "group_description_too_long"
+	ValidationGroupImageFileIDInvalid  ValidationCode = "group_image_file_id_invalid"
+	ValidationGroupMembersRequired     ValidationCode = "group_members_required"
+	ValidationGroupMembersTooMany      ValidationCode = "group_members_too_many"
+	ValidationGroupMemberIDsInvalid    ValidationCode = "group_member_ids_invalid"
+	ValidationGroupMemberIDInvalid     ValidationCode = "group_member_id_invalid"
+	ValidationGroupOwnerIDInvalid      ValidationCode = "group_owner_id_invalid"
+	ValidationGroupSuccessorIDInvalid  ValidationCode = "group_successor_id_invalid"
+	ValidationClientMessageIDInvalid   ValidationCode = "client_message_id_invalid"
+	ValidationReplyToMessageIDInvalid  ValidationCode = "reply_to_message_id_invalid"
+	ValidationMentionSubjectIDsInvalid ValidationCode = "mention_subject_ids_invalid"
+	ValidationBodyRequired             ValidationCode = "body_required"
+	ValidationBodyTooLong              ValidationCode = "body_too_long"
+	ValidationCursorInvalid            ValidationCode = "cursor_invalid"
 )
 
 const (
@@ -50,6 +54,10 @@ const (
 	ConflictReasonGroupOwnerCannotBeRemoved = "group_owner_cannot_be_removed"
 	// ConflictReasonGroupSuccessorRequired 表示群主退出前必须指定继任者。
 	ConflictReasonGroupSuccessorRequired = "group_successor_required"
+	// ConflictReasonGroupReplyTargetInvalid 表示引用目标不是当前群聊中的有效文本消息。
+	ConflictReasonGroupReplyTargetInvalid = "group_reply_target_invalid"
+	// ConflictReasonGroupMentionTargetInvalid 表示提醒目标不是当前群聊中的有效参与者。
+	ConflictReasonGroupMentionTargetInvalid = "group_mention_target_invalid"
 )
 
 // ServiceSessionAssignee 定义客服处理周期负责人。
@@ -141,6 +149,21 @@ type ConversationMessageSender struct {
 	DisplayName   *string
 }
 
+// ConversationMessageReference 定义引用消息的一层摘要。
+type ConversationMessageReference struct {
+	ID     string
+	Body   string
+	Sender *ConversationMessageSender
+}
+
+// ConversationMessageMention 定义消息提醒的聊天主体。
+type ConversationMessageMention struct {
+	ChatSubjectID string
+	Kind          domain.ChatSubjectKind
+	SourceID      string
+	DisplayName   *string
+}
+
 // ConversationMessageSessionStart 定义客服处理周期开始标记。
 type ConversationMessageSessionStart struct {
 	Sequence  int64
@@ -173,6 +196,8 @@ type ConversationMessage struct {
 	Sender       *ConversationMessageSender
 	SessionStart *ConversationMessageSessionStart
 	SystemEvent  *ConversationSystemEvent
+	ReplyTo      *ConversationMessageReference
+	Mentions     []ConversationMessageMention
 }
 
 // ConversationMessageHistoryInput 定义成员消息历史查询方向。
@@ -218,16 +243,20 @@ type DirectTextMessageInput struct {
 	Body            string
 }
 
-// GroupConversationInput 定义企业成员创建群聊的标题和初始成员。
+// GroupConversationInput 定义企业成员创建群聊的资料和初始成员。
 type GroupConversationInput struct {
 	Title             string
+	Description       string
+	ImageFileID       string
 	MemberIdentityIDs []string
 }
 
-// GroupConversationTitleInput 定义群聊名称修改参数。
-type GroupConversationTitleInput struct {
+// GroupConversationProfileInput 定义群聊资料修改参数。
+type GroupConversationProfileInput struct {
 	ConversationID string
 	Title          string
+	Description    string
+	ImageFileID    *string
 }
 
 // GroupConversationMembersInput 定义群聊批量增员参数。
@@ -260,20 +289,24 @@ type GroupConversationSummary struct {
 	Title       string
 	Status      domain.ConversationStatus
 	MemberCount int
+	ImageFileID *string
 }
 
 // GroupParticipant 定义群聊中的当前有效成员。
 type GroupParticipant struct {
-	IdentityID   string
-	DisplayName  string
-	AvatarFileID *string
-	Role         domain.ConversationParticipantRole
+	ChatSubjectID string
+	IdentityID    string
+	DisplayName   string
+	AvatarFileID  *string
+	Role          domain.ConversationParticipantRole
 }
 
 // GroupConversation 定义群聊资料和当前有效成员。
 type GroupConversation struct {
 	ID           string
 	Title        string
+	Description  string
+	ImageFileID  *string
 	Status       domain.ConversationStatus
 	CreatedAt    time.Time
 	Participants []GroupParticipant
@@ -281,7 +314,9 @@ type GroupConversation struct {
 
 // GroupTextMessageInput 定义成员发送的群聊文本消息。
 type GroupTextMessageInput struct {
-	ConversationID  string
-	ClientMessageID string
-	Body            string
+	ConversationID    string
+	ClientMessageID   string
+	Body              string
+	ReplyToMessageID  string
+	MentionSubjectIDs []string
 }

@@ -9,7 +9,6 @@ import {
   MoreHorizontalIcon,
   SendIcon,
   UserRoundIcon,
-  UsersRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -45,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import { GroupAvatar } from "@/features/inbox/group-avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,7 +112,9 @@ export function ConversationAvatar({
           className,
         )}
       >
-        {avatarURL && !avatarFailed ? (
+        {group ? (
+          <GroupAvatar imageURL={group.imageUrl} />
+        ) : avatarURL && !avatarFailed ? (
           <img
             src={avatarURL}
             alt=""
@@ -120,8 +122,6 @@ export function ConversationAvatar({
             draggable={false}
             onError={() => setAvatarFailed(true)}
           />
-        ) : group ? (
-          <UsersRoundIcon className="size-4.5" />
         ) : directAgent ? (
           <BotIcon className="size-4.5" />
         ) : contactName ? (
@@ -255,37 +255,48 @@ export function ConversationHeader({
         className="size-9 rounded-full"
       />
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="w-fit max-w-full">
           <h2
-            className="min-w-0 flex-1 truncate text-sm font-semibold"
+            data-slot="conversation-header-title"
+            className="w-fit max-w-full truncate text-sm font-semibold"
             title={contactName}
           >
             {contactName}
           </h2>
-        </div>
-        {customer ? (
-          <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-            <span className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]">
-              {sessionStatus}
-            </span>
-            <span
-              className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
-              title={customer.title}
+          {customer ? (
+            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+              <span
+                data-slot="conversation-header-detail"
+                className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]"
+              >
+                {sessionStatus}
+              </span>
+              <span
+                data-slot="conversation-header-detail"
+                className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
+                title={customer.title}
+              >
+                {customer.title}
+              </span>
+            </div>
+          ) : group ? (
+            <p
+              data-slot="conversation-header-detail"
+              className="w-fit max-w-full text-xs text-muted-foreground"
             >
-              {customer.title}
-            </span>
-          </div>
-        ) : group ? (
-          <p className="text-xs text-muted-foreground">
-            {group.status === ConversationStatus.ConversationStatusArchived
-              ? t("groupDissolved")
-              : t("groupMemberCount", { count: group.memberCount })}
-          </p>
-        ) : agentRunLabel ? (
-          <div className="text-xs text-muted-foreground">
-            {agentRunLabel}
-          </div>
-        ) : null}
+              {group.status === ConversationStatus.ConversationStatusArchived
+                ? t("groupDissolved")
+                : t("groupMemberCount", { count: group.memberCount })}
+            </p>
+          ) : agentRunLabel ? (
+            <div
+              data-slot="conversation-header-detail"
+              className="w-fit max-w-full text-xs text-muted-foreground"
+            >
+              {agentRunLabel}
+            </div>
+          ) : null}
+        </div>
       </div>
       {customer ? (
         <div
@@ -533,7 +544,7 @@ export function ConversationHeader({
             type="button"
             variant="outline"
             size="sm"
-            className="text-muted-foreground xl:hidden"
+            className="text-muted-foreground 2xl:hidden"
             aria-label={contextActionLabel}
             aria-pressed={contextVisible}
             title={contextActionLabel}
@@ -548,7 +559,7 @@ export function ConversationHeader({
           type="button"
           variant="outline"
           size="sm"
-          className="shrink-0 text-muted-foreground xl:hidden"
+          className="shrink-0 text-muted-foreground 2xl:hidden"
           aria-label={contextActionLabel}
           aria-pressed={contextVisible}
           title={contextActionLabel}

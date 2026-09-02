@@ -43,7 +43,7 @@ export function createAgentManagedExecutionSchema(
       .min(1, messages.instructionRequired)
       .refine(
         (value) => {
-          // 返回 Unicode 字符数。
+          // 校验系统指令的 Unicode 字符数上限。
           return [...value].length <= maxSystemInstructionLength
         },
         messages.instructionTooLong,

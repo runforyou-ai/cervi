@@ -203,8 +203,8 @@ const channels = {
     saved: "聊天界面已保存。",
     form: {
       title: "聊天标题",
-      subtitle: "副标题（选填）",
-      greetingMessage: "欢迎语（选填）",
+      subtitle: "副标题",
+      greetingMessage: "欢迎语",
       themeColor: "主题色",
       colorPicker: "选择主题色",
     },

@@ -552,6 +552,8 @@ export interface ConversationMessage {
     "sender": ConversationMessageSender | null;
     "sessionStart": ConversationMessageSessionStart | null;
     "systemEvent": ConversationSystemEvent | null;
+    "replyTo": ConversationMessageReference | null;
+    "mentions": ConversationMessageMention[] | null;
 }
 
 /**
@@ -569,6 +571,25 @@ export interface ConversationMessageList {
 export interface ConversationMessageListInput {
     "before": string;
     "after": string;
+}
+
+/**
+ * ConversationMessageMention 定义消息提醒的聊天主体。
+ */
+export interface ConversationMessageMention {
+    "chatSubjectId": string;
+    "kind": ChatSubjectKind;
+    "sourceId": string;
+    "displayName": string | null;
+}
+
+/**
+ * ConversationMessageReference 定义引用消息的一层摘要。
+ */
+export interface ConversationMessageReference {
+    "id": string;
+    "body": string;
+    "sender": ConversationMessageSender | null;
 }
 
 /**
@@ -833,6 +854,7 @@ export enum FilePurpose {
     $zero = "",
 
     FilePurposeUserAvatar = "user_avatar",
+    FilePurposeGroupImage = "group_image",
 };
 
 /**
@@ -868,16 +890,20 @@ export interface FileUploadRequest {
 export interface GroupConversation {
     "id": string;
     "title": string;
+    "description": string;
+    "imageUrl": string;
     "status": ConversationStatus;
     "createdAt": string;
     "participants": GroupParticipant[] | null;
 }
 
 /**
- * GroupConversationInput 定义群聊标题和创建时加入的成员。
+ * GroupConversationInput 定义群聊资料和创建时加入的成员。
  */
 export interface GroupConversationInput {
     "title": string;
+    "description": string;
+    "imageFileId": string;
     "memberIdentityIds": string[] | null;
 }
 
@@ -910,10 +936,16 @@ export interface GroupConversationOwnerInput {
 }
 
 /**
- * GroupConversationTitleInput 定义群聊名称修改参数。
+ * GroupConversationProfileInput 定义群聊资料修改参数。
  */
-export interface GroupConversationTitleInput {
+export interface GroupConversationProfileInput {
     "title": string;
+    "description": string;
+
+    /**
+     * ImageFileID 为 nil 时保留当前图片，非 nil 时关联新图片。
+     */
+    "imageFileId": string | null;
 }
 
 /**
@@ -921,6 +953,7 @@ export interface GroupConversationTitleInput {
  */
 export interface GroupInboxConversation {
     "title": string;
+    "imageUrl": string;
     "status": ConversationStatus;
     "preview": string | null;
     "lastMessageAt": string | null;
@@ -931,6 +964,7 @@ export interface GroupInboxConversation {
  * GroupParticipant 定义群聊当前有效成员。
  */
 export interface GroupParticipant {
+    "chatSubjectId": string;
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
@@ -956,6 +990,8 @@ export enum GroupParticipantRole {
 export interface GroupTextMessageInput {
     "clientMessageId": string;
     "body": string;
+    "replyToMessageId": string;
+    "mentionSubjectIds": string[] | null;
 }
 
 /**
@@ -964,6 +1000,15 @@ export interface GroupTextMessageInput {
 export interface Identity {
     "organization": Organization;
     "user": CurrentUser;
+}
+
+/**
+ * ImageFile 定义原生端选择的图片文件。
+ */
+export interface ImageFile {
+    "name": string;
+    "contentType": string;
+    "dataBase64": string;
 }
 
 /**
@@ -1563,15 +1608,6 @@ export enum PermissionResource {
     PermissionResourceOrganization = "organization",
     PermissionResourceStorage = "storage",
 };
-
-/**
- * ProfileImageFile 定义原生端选择的用户头像文件。
- */
-export interface ProfileImageFile {
-    "name": string;
-    "contentType": string;
-    "dataBase64": string;
-}
 
 /**
  * ProfileInput 定义当前用户可编辑的个人资料字段。

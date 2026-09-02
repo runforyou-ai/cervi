@@ -34,7 +34,7 @@ import type {
   GroupConversationMemberInput,
   GroupConversationMembersInput,
   GroupConversationOwnerInput,
-  GroupConversationTitleInput,
+  GroupConversationProfileInput,
   GroupInboxConversation,
   GroupParticipant,
   GroupTextMessageInput,
@@ -59,7 +59,11 @@ export type ConversationMessageListData = Omit<
   ConversationMessageList,
   "messages"
 > & {
-  messages: ConversationMessage[]
+  messages: ConversationMessageData[]
+}
+
+export type ConversationMessageData = Omit<ConversationMessage, "mentions"> & {
+  mentions: NonNullable<ConversationMessage["mentions"]>
 }
 
 export type CustomerInboxConversationData = InboxConversation & {
@@ -112,17 +116,19 @@ const reopenServiceSessionBound = bind(ReopenServiceSession)
 
 export type LoadInboxQuery = Partial<LoadInboxInput>
 
-/** 归一化消息中的可空系统事件成员列表。 */
+/** 归一化消息中的提醒和系统事件成员列表。 */
 function normalizeConversationMessage(
   message: ConversationMessage,
-): ConversationMessage {
-  if (!message.systemEvent) return message
+): ConversationMessageData {
   return {
     ...message,
-    systemEvent: {
-      ...message.systemEvent,
-      targets: asList(message.systemEvent.targets),
-    },
+    mentions: asList(message.mentions),
+    systemEvent: message.systemEvent
+      ? {
+          ...message.systemEvent,
+          targets: asList(message.systemEvent.targets),
+        }
+      : null,
   }
 }
 
@@ -225,11 +231,12 @@ export async function listConversationMessages(
 }
 
 /** 发送成员客户会话文本消息。 */
-export function sendCustomerTextMessage(
+export async function sendCustomerTextMessage(
   conversationID: string,
   input: CustomerTextMessageInput,
 ) {
-  return sendCustomerTextMessageBound(conversationID, input)
+  const message = await sendCustomerTextMessageBound(conversationID, input)
+  return normalizeConversationMessage(message)
 }
 
 /** 发起或打开企业成员内部单聊。 */
@@ -238,11 +245,12 @@ export function startDirectConversation(input: DirectConversationInput) {
 }
 
 /** 发送企业成员内部单聊文本消息。 */
-export function sendDirectTextMessage(
+export async function sendDirectTextMessage(
   conversationID: string,
   input: DirectTextMessageInput,
 ) {
-  return sendDirectTextMessageBound(conversationID, input)
+  const message = await sendDirectTextMessageBound(conversationID, input)
+  return normalizeConversationMessage(message)
 }
 
 /** 创建企业内部群聊。 */
@@ -258,10 +266,10 @@ export async function getGroupConversation(
   return { ...result, participants: asList(result.participants) }
 }
 
-/** 修改企业内部群聊名称。 */
+/** 修改企业内部群聊资料。 */
 export async function updateGroupConversation(
   conversationID: string,
-  input: GroupConversationTitleInput,
+  input: GroupConversationProfileInput,
 ): Promise<GroupConversationData> {
   const result = await updateGroupConversationBound(conversationID, input)
   return { ...result, participants: asList(result.participants) }
@@ -312,9 +320,10 @@ export function leaveGroupConversation(
 }
 
 /** 发送企业内部群聊文本消息。 */
-export function sendGroupTextMessage(
+export async function sendGroupTextMessage(
   conversationID: string,
   input: GroupTextMessageInput,
 ) {
-  return sendGroupTextMessageBound(conversationID, input)
+  const message = await sendGroupTextMessageBound(conversationID, input)
+  return normalizeConversationMessage(message)
 }

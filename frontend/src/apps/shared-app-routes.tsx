@@ -5,9 +5,12 @@ import { LoginPage } from "@/features/auth/login-page"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
 import { WorkspaceLayout } from "@/features/workspace/workspace-layout"
+import { usePreventPageSelectAll } from "@/hooks/use-prevent-page-select-all"
 
 /** 按平台注册入口页面，并把工作台页面交给标签宿主管理。 */
 export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
+  usePreventPageSelectAll()
+
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/inbox" replace />} />

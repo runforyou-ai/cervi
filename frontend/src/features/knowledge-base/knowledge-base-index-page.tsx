@@ -10,8 +10,13 @@ export function KnowledgeBaseIndexPage() {
   const { t } = useTranslation("knowledgeBase")
 
   return (
-    <PageContent className="flex items-center justify-center">
-      <div className="flex max-w-sm flex-col items-center text-center">
+    <PageContent
+      className="cervi-knowledge-base-index flex items-center justify-center"
+    >
+      <div
+        data-slot="empty-state-content"
+        className="flex max-w-sm flex-col items-center text-center"
+      >
         <p className="text-sm text-muted-foreground">
           {t("selection.empty")}
         </p>

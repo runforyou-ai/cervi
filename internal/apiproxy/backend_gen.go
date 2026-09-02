@@ -161,8 +161,8 @@ func (b *Backend) GetGroupConversation(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
-// UpdateGroupConversation 修改群聊名称。
-func (b *Backend) UpdateGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationTitleInput) (appservice.GroupConversation, error) {
+// UpdateGroupConversation 修改群聊资料。
+func (b *Backend) UpdateGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationProfileInput) (appservice.GroupConversation, error) {
 	var output appservice.GroupConversation
 	err := b.do(ctx, meta, http.MethodPatch, "/group-conversations/"+url.PathEscape(conversationID), nil, input, &output)
 	b.normalizeOutput(&output)

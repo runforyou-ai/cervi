@@ -36,7 +36,7 @@ func applicationServices(
 	}
 	service := appservice.New(
 		backend,
-		appservice.WithProfileImageSelector(appservicenative.NewProfileImageSelector()),
+		appservice.WithImageSelector(appservicenative.NewImageSelector()),
 		appservice.WithNativeLocaleUpdater(nativeLocaleUpdater),
 		appservice.WithNativeNotification(notification),
 		appservice.WithUnreadIndicator(unreadIndicator),

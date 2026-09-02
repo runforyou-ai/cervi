@@ -24,7 +24,9 @@ import {
   isCustomerInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
+  getGroupConversation,
   listCustomerServiceAssignees,
+  type ConversationMessageReference,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
   type DirectInboxConversationData,
@@ -341,7 +343,10 @@ function InboxPaneTop({
   }, [])
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-3">
+    <div
+      data-slot="inbox-pane-header"
+      className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-3"
+    >
       <Button
         variant="ghost"
         size="icon"
@@ -929,6 +934,9 @@ function ConversationThread({
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
   const outgoing = useOutgoingConversationMessages()
+  const [replyTo, setReplyTo] = useState<ConversationMessageReference | null>(
+    null,
+  )
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
   const messageSending = outgoing.messages.some(
@@ -938,6 +946,14 @@ function ConversationThread({
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation) ||
     conversation.customer.channelType === ChannelType.ChannelTypeWebsite
+  const groupConversation = isGroupInboxConversation(conversation)
+    ? conversation
+    : null
+  const groupResource = useResource(
+    resourceKeys.groupConversation(groupConversation?.id ?? ""),
+    () => getGroupConversation(groupConversation?.id ?? ""),
+    { enabled: Boolean(groupConversation) },
+  )
 
   return (
     <>
@@ -950,6 +966,12 @@ function ConversationThread({
         onRetryFailedMessage={setRetryDraft}
         retryFailedMessageDisabled={
           messageSending || !replySupported || Boolean(replyDisabledReason)
+        }
+        groupParticipants={groupResource.data?.participants}
+        onReplyMessage={
+          groupConversation && !replyDisabledReason
+            ? setReplyTo
+            : undefined
         }
       />
       {!replySupported || replyDisabledReason ? (
@@ -965,7 +987,11 @@ function ConversationThread({
           refocusAfterSubmit
           retryFailedMessage
           retryDraft={retryDraft}
+          replyTo={replyTo}
+          groupParticipants={groupResource.data?.participants}
+          currentIdentityID={identity.user.identityId}
           onRetryDraftHandled={() => setRetryDraft(null)}
+          onReplyToChange={setReplyTo}
           onSending={outgoing.start}
           onSent={outgoing.succeed}
           onFailed={outgoing.fail}

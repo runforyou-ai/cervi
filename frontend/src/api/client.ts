@@ -63,10 +63,9 @@ export async function call<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   try {
-    // 返回 Web 端请求令牌。
+    // Web 端从本地存储读取未过期令牌。
     let token = ""
     if (resolveAppPlatform() === "web") {
-      // 读取未过期的登录令牌。
       const value = window.localStorage.getItem(tokenStorageKey)
       if (value) {
         const stored = JSON.parse(value) as StoredToken

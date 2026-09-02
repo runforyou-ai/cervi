@@ -10,21 +10,21 @@ import (
 
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
 type Service struct {
-	backend              Backend
-	profileImageSelector ProfileImageSelector
-	nativeLocaleUpdater  NativeLocaleUpdater
-	nativeNotification   NativeNotification
-	unreadIndicator      UnreadIndicator
-	externalPageOpener   ExternalPageOpener
+	backend             Backend
+	imageSelector       ImageSelector
+	nativeLocaleUpdater NativeLocaleUpdater
+	nativeNotification  NativeNotification
+	unreadIndicator     UnreadIndicator
+	externalPageOpener  ExternalPageOpener
 }
 
 // Option 配置平台专属的应用服务能力。
 type Option func(*Service)
 
-// WithProfileImageSelector 注入原生端头像文件选择器。
-func WithProfileImageSelector(selector ProfileImageSelector) Option {
+// WithImageSelector 注入原生端图片文件选择器。
+func WithImageSelector(selector ImageSelector) Option {
 	return func(service *Service) {
-		service.profileImageSelector = selector
+		service.imageSelector = selector
 	}
 }
 
@@ -111,12 +111,12 @@ func (s *Service) setNativeLocale(locale Locale) {
 	}
 }
 
-// SelectProfileImage 在原生端选择并读取用户头像图片。
-func (s *Service) SelectProfileImage(ctx context.Context, meta RequestMeta) (ProfileImageFile, error) {
-	if s.profileImageSelector == nil {
-		return ProfileImageFile{}, methodNotAllowedError(meta, "SelectProfileImage")
+// SelectImage 在原生端选择并读取图片。
+func (s *Service) SelectImage(ctx context.Context, meta RequestMeta) (ImageFile, error) {
+	if s.imageSelector == nil {
+		return ImageFile{}, methodNotAllowedError(meta, "SelectImage")
 	}
-	return s.profileImageSelector.SelectProfileImage(ctx, meta)
+	return s.imageSelector.SelectImage(ctx, meta)
 }
 
 // OpenExternalPage 在原生端应用内新窗口打开外部页面。

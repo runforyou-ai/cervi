@@ -432,6 +432,7 @@ export function AgentDetailView({
             value={agent.displayName || empty}
             editing={editing === "name"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("name")}
           >
             <Controller
@@ -457,6 +458,7 @@ export function AgentDetailView({
             value={roleDisplayName(agent.role, tCommon)}
             editing={editing === "role"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("role")}
           >
             <Controller
@@ -504,6 +506,7 @@ export function AgentDetailView({
             }
             editing={editing === "accountStatus"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("accountStatus")}
           >
             <Controller
@@ -545,6 +548,7 @@ export function AgentDetailView({
               !saving &&
               agent.status === UserStatus.UserStatusActive
             }
+            required
             onEdit={() => startEditing("workStatus")}
           >
             <Controller
@@ -589,6 +593,7 @@ export function AgentDetailView({
             value={`${agent.execution.managed.providerName} · ${agent.execution.managed.modelName}`}
             editing={editing === "executionModel"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("executionModel")}
           >
             <AgentModelField
@@ -618,6 +623,7 @@ export function AgentDetailView({
             }
             editing={editing === "systemInstruction"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("systemInstruction")}
           >
             <Controller

@@ -3,7 +3,7 @@ import * as React from "react"
 
 const NARROW_VIEWPORT_BREAKPOINT = 768
 const NARROW_VIEWPORT_QUERY = `(max-width: ${NARROW_VIEWPORT_BREAKPOINT - 1}px)`
-const WIDE_VIEWPORT_BREAKPOINT = 1280
+const WIDE_VIEWPORT_BREAKPOINT = 1536
 const WIDE_VIEWPORT_QUERY = `(min-width: ${WIDE_VIEWPORT_BREAKPOINT}px)`
 
 /** 监听指定媒体查询是否匹配。 */

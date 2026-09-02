@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -102,20 +101,11 @@ func newRemoteState(baseURL *url.URL) *remoteState {
 func parseServerURL(value string) (*url.URL, error) {
 	value = strings.TrimSpace(value)
 	parsed, err := url.ParseRequestURI(value)
-	if err != nil || parsed.Host == "" {
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLComplete}
 	}
 	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLBaseOnly}
-	}
-	// 判断主机是否为回环地址。
-	host := parsed.Hostname()
-	loopback := strings.EqualFold(host, "localhost")
-	if ip := net.ParseIP(host); ip != nil {
-		loopback = loopback || ip.IsLoopback()
-	}
-	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && loopback) {
-		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLHTTPSRequired}
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return parsed, nil
