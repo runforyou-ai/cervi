@@ -161,7 +161,7 @@ export function KnowledgeBaseLayout() {
         paneWidth="md"
         paneVariant="nav"
         paneOnNarrow={indexActive ? "fill" : "hide"}
-        paneClassName="cervi-knowledge-base-pane md:w-68"
+        paneClassName="md:w-68"
         mainClassName={cn(indexActive && "hidden md:flex")}
         pane={
           <PagePaneNav

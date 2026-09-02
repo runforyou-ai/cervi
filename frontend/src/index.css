@@ -302,7 +302,6 @@ body,
   [data-slot="conversation-header"],
   [data-slot="inbox-pane-header"],
   .cervi-knowledge-base-index,
-  .cervi-knowledge-base-pane,
   .cervi-workspace-tabs,
   .cervi-inbox-empty-main
 ) {
@@ -332,15 +331,14 @@ body,
 [data-native-os="darwin"] :is(
   .cervi-workspace-rail :is(a, button),
   .cervi-workspace-tabs button,
-  [data-slot="page-split-pane"]:not(.cervi-knowledge-base-pane),
+  [data-slot="page-split-pane"],
   [data-slot="page-header-title"],
   [data-slot="page-header"] :is(a, button, input, select),
   [data-slot="conversation-actions"],
   [data-slot="conversation-header-title"],
+  [data-slot="conversation-header-detail"],
   [data-slot="conversation-header"] :is(a, button, input, select),
   [data-slot="inbox-pane-header"] :is(a, button, input, select),
-  .cervi-knowledge-base-pane :is(a, button, input, select, [role="button"]),
-  .cervi-knowledge-base-pane [data-slot="scroll-area-scrollbar"],
   :is(.cervi-inbox-empty-main, .cervi-knowledge-base-index)
     [data-slot="empty-state-content"]
 ) {

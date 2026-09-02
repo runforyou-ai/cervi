@@ -255,22 +255,24 @@ export function ConversationHeader({
         className="size-9 rounded-full"
       />
       <div className="min-w-0 flex-1">
-        <div
-          data-slot="conversation-header-title"
-          className="w-fit max-w-full"
-        >
+        <div className="w-fit max-w-full">
           <h2
-            className="truncate text-sm font-semibold"
+            data-slot="conversation-header-title"
+            className="w-fit max-w-full truncate text-sm font-semibold"
             title={contactName}
           >
             {contactName}
           </h2>
           {customer ? (
             <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              <span className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]">
+              <span
+                data-slot="conversation-header-detail"
+                className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]"
+              >
                 {sessionStatus}
               </span>
               <span
+                data-slot="conversation-header-detail"
                 className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
                 title={customer.title}
               >
@@ -278,13 +280,19 @@ export function ConversationHeader({
               </span>
             </div>
           ) : group ? (
-            <p className="text-xs text-muted-foreground">
+            <p
+              data-slot="conversation-header-detail"
+              className="w-fit max-w-full text-xs text-muted-foreground"
+            >
               {group.status === ConversationStatus.ConversationStatusArchived
                 ? t("groupDissolved")
                 : t("groupMemberCount", { count: group.memberCount })}
             </p>
           ) : agentRunLabel ? (
-            <div className="text-xs text-muted-foreground">
+            <div
+              data-slot="conversation-header-detail"
+              className="w-fit max-w-full text-xs text-muted-foreground"
+            >
               {agentRunLabel}
             </div>
           ) : null}
