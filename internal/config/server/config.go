@@ -138,7 +138,13 @@ func applyEnvironment(config *Config) error {
 
 // validate 校验服务端配置。
 func (config Config) validate() error {
-	if !validServerHost(config.Server.Host) {
+	// 校验监听主机名、IPv4 地址和带方括号的 IPv6 地址。
+	host := config.Server.Host
+	validHost := host != "" && !strings.ContainsAny(host, "/\\ \t\r\n")
+	if validHost && strings.Contains(host, ":") {
+		validHost = len(host) >= 3 && host[0] == '[' && host[len(host)-1] == ']' && net.ParseIP(host[1:len(host)-1]) != nil
+	}
+	if !validHost {
 		return fmt.Errorf("服务监听地址无效")
 	}
 	if config.Server.Port < 1 || config.Server.Port > 65535 {
@@ -181,20 +187,6 @@ func (config Config) validate() error {
 		return fmt.Errorf("必须配置本地文件存储目录")
 	}
 	return nil
-}
-
-// validServerHost 校验监听主机名、IPv4 地址和带方括号的 IPv6 地址。
-func validServerHost(host string) bool {
-	if host == "" || strings.ContainsAny(host, "/\\ \t\r\n") {
-		return false
-	}
-	if !strings.Contains(host, ":") {
-		return true
-	}
-	if len(host) < 3 || host[0] != '[' || host[len(host)-1] != ']' {
-		return false
-	}
-	return net.ParseIP(host[1:len(host)-1]) != nil
 }
 
 // applyStringEnvironment 覆盖非空字符串环境变量。

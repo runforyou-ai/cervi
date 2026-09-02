@@ -38,7 +38,10 @@ func parseTheme(value string) theme {
 	if !themeColorPattern.MatchString(normalized) {
 		normalized = channelaction.DefaultWebsiteChannelThemeColor
 	}
-	r, g, b := hexRGB(normalized)
+	// 解析已校验的六位十六进制颜色。
+	parsedColor, _ := strconv.ParseUint(normalized[1:], 16, 32)
+	color := int(parsedColor)
+	r, g, b := (color>>16)&0xFF, (color>>8)&0xFF, color&0xFF
 	themeL := relativeLuminance(r, g, b)
 	whiteC := contrastRatio(themeL, relativeLuminance(255, 255, 255))
 	darkC := contrastRatio(themeL, relativeLuminance(0x1c, 0x19, 0x17))
@@ -74,24 +77,6 @@ func (t theme) rootCSS() string {
 		t.Focus,
 		page,
 	)
-}
-
-// hostCSS 返回挂件主题变量。
-func (t theme) hostCSS() string {
-	return fmt.Sprintf(
-		":host{--cv-theme:%s;--cv-on-theme:%s;--cv-focus:%s;--cv-launcher-shadow:%s}",
-		t.Color,
-		t.OnColor,
-		t.Focus,
-		t.LauncherShadow,
-	)
-}
-
-// hexRGB 解析已校验的六位十六进制颜色。
-func hexRGB(hex string) (int, int, int) {
-	value, _ := strconv.ParseUint(hex[1:], 16, 32)
-	color := int(value)
-	return (color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF
 }
 
 // relativeLuminance 计算 sRGB 相对亮度。

@@ -257,7 +257,13 @@ func parseSignature(item *method, functionType *ast.FuncType) error {
 	if err := validateLeadingParams(functionType.Params.List); err != nil {
 		return err
 	}
-	pathParams := pathParamNames(item.route.path)
+	// 读取路径中的占位符名称。
+	var pathParams []string
+	for _, segment := range strings.Split(item.route.path, "/") {
+		if strings.HasPrefix(segment, ":") {
+			pathParams = append(pathParams, segment[1:])
+		}
+	}
 	pathIndex := 0
 	for index, parameter := range functionType.Params.List {
 		if index < 2 {
@@ -325,17 +331,6 @@ func validateLeadingParams(params []*ast.Field) error {
 		return fmt.Errorf("second parameter must be RequestMeta")
 	}
 	return nil
-}
-
-// pathParamNames 返回路径中的占位符名称。
-func pathParamNames(path string) []string {
-	var names []string
-	for _, segment := range strings.Split(path, "/") {
-		if strings.HasPrefix(segment, ":") {
-			names = append(names, segment[1:])
-		}
-	}
-	return names
 }
 
 // typeString 返回接口签名中允许的类型名。
@@ -511,17 +506,6 @@ var httpMethodConstants = map[string]string{
 	"DELETE": "http.MethodDelete",
 }
 
-// statusConstant 返回 net/http 中的状态码常量名。
-func statusConstant(status int) string {
-	switch status {
-	case 200:
-		return "http.StatusOK"
-	case 201:
-		return "http.StatusCreated"
-	}
-	return strconv.Itoa(status)
-}
-
 // generateService 生成 appservice.Service 的纯委托方法。
 func generateService(methods []method) []byte {
 	builder := &strings.Builder{}
@@ -599,7 +583,15 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct) []byte {
 			fmt.Fprintf(builder, "\twriteEmpty(c, %s)\n", call)
 		} else {
 			fmt.Fprintf(builder, "\toutput, err := %s\n", call)
-			fmt.Fprintf(builder, "\twriteResult(c, %s, output, err)\n", statusConstant(item.route.status))
+			// 返回 net/http 中的状态码常量名。
+			status := strconv.Itoa(item.route.status)
+			switch item.route.status {
+			case 200:
+				status = "http.StatusOK"
+			case 201:
+				status = "http.StatusCreated"
+			}
+			fmt.Fprintf(builder, "\twriteResult(c, %s, output, err)\n", status)
 		}
 		builder.WriteString("}\n\n")
 	}

@@ -78,13 +78,10 @@ func (c runtimeConfig) filterSubject(pool string) string {
 
 // taskSubject 生成指定逻辑队列的发布 Subject。
 func (c runtimeConfig) taskSubject(queue string) string {
-	return c.subjectPrefix() + "." + workerPoolForQueue(queue) + "." + queue
-}
-
-// workerPoolForQueue 返回逻辑队列所属的 Worker Pool。
-func workerPoolForQueue(queue string) string {
+	// 返回逻辑队列所属的 Worker Pool。
+	pool := workerPoolStandard
 	if queue == QueueAgent {
-		return workerPoolAgent
+		pool = workerPoolAgent
 	}
-	return workerPoolStandard
+	return c.subjectPrefix() + "." + pool + "." + queue
 }

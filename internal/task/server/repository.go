@@ -50,22 +50,6 @@ type repository struct {
 	db *bun.DB
 }
 
-// newRepository 创建任务仓储。
-func newRepository(db *bun.DB) *repository {
-	return &repository{db: db}
-}
-
-// enqueue 在独立事务内创建任务运行记录和发件箱消息。
-func (r *repository) enqueue(ctx context.Context, actionName string, payload json.RawMessage, options EnqueueOptions) (string, error) {
-	var runID string
-	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		var enqueueErr error
-		runID, enqueueErr = enqueueIn(ctx, tx, actionName, payload, options, "")
-		return enqueueErr
-	})
-	return runID, err
-}
-
 // enqueueIn 在已有事务内创建任务运行记录和发件箱消息。
 func enqueueIn(ctx context.Context, db bun.IDB, actionName string, payload json.RawMessage, options EnqueueOptions, scheduleKey string) (string, error) {
 	now := time.Now().UTC()
@@ -221,19 +205,6 @@ func (r *repository) claimRun(ctx context.Context, runID, workerID string) (*ser
 	}
 	if err != nil {
 		return nil, fmt.Errorf("claim task run: %w", err)
-	}
-	return &record, nil
-}
-
-// getRun 读取任务当前状态。
-func (r *repository) getRun(ctx context.Context, runID string) (*servermodels.TaskRun, error) {
-	var record servermodels.TaskRun
-	err := r.db.NewSelect().Model(&record).Where("tr.id = ?", runID).Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get task run: %w", err)
 	}
 	return &record, nil
 }

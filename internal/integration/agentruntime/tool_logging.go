@@ -47,9 +47,3 @@ func toolLoggingMiddleware() compose.ToolMiddleware {
 		},
 	}
 }
-
-// toolCallMetadataFromContext 返回当前 Tool 实现可用于安全日志的调用标识。
-func toolCallMetadataFromContext(ctx context.Context) toolCallMetadata {
-	metadata, _ := ctx.Value(toolCallContextKey{}).(toolCallMetadata)
-	return metadata
-}

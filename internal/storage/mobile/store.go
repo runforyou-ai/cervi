@@ -51,7 +51,14 @@ func openSQLite(ctx context.Context, databasePath string) (*bun.DB, error) {
 		return nil, fmt.Errorf("create SQLite data directory: %w", err)
 	}
 
-	sqlDB, err := sql.Open(sqliteDriverName, sqliteDataSourceName(databasePath))
+	// 拼接带连接参数的 SQLite 数据源地址。
+	query := url.Values{
+		"_busy_timeout": {"5000"},
+		"_foreign_keys": {"on"},
+		"_journal_mode": {"WAL"},
+		"mode":          {"rwc"},
+	}
+	sqlDB, err := sql.Open(sqliteDriverName, databasePath+"?"+query.Encode())
 	if err != nil {
 		return nil, fmt.Errorf("open SQLite: %w", err)
 	}
@@ -66,15 +73,4 @@ func openSQLite(ctx context.Context, databasePath string) (*bun.DB, error) {
 		return nil, fmt.Errorf("protect SQLite database file: %w", err)
 	}
 	return db, nil
-}
-
-// sqliteDataSourceName 拼接带连接参数的 SQLite 数据源地址。
-func sqliteDataSourceName(databasePath string) string {
-	query := url.Values{
-		"_busy_timeout": {"5000"},
-		"_foreign_keys": {"on"},
-		"_journal_mode": {"WAL"},
-		"mode":          {"rwc"},
-	}
-	return databasePath + "?" + query.Encode()
 }

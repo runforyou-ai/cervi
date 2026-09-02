@@ -365,24 +365,17 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	if err != nil {
 		return err
 	}
-	if suppressed {
-		logSuppressedRun(execution)
+	if suppressed && execution.Run.ServiceSessionID != nil {
+		// 记录客服门禁抑制的迟到结果。
+		slog.Warn("网站客户 Agent 迟到结果已抑制",
+			"agent_run_id", execution.Run.ID,
+			"conversation_id", execution.Run.ConversationID,
+		)
 	}
 	if completed {
 		logCompletedRun(execution, result.EndSeq, messageID)
 	}
 	return nil
-}
-
-// logSuppressedRun 记录客服门禁抑制的迟到结果。
-func logSuppressedRun(execution executionContext) {
-	if execution.Run.ServiceSessionID == nil {
-		return
-	}
-	slog.Warn("网站客户 Agent 迟到结果已抑制",
-		"agent_run_id", execution.Run.ID,
-		"conversation_id", execution.Run.ConversationID,
-	)
 }
 
 // logCompletedRun 记录关联客服周期的 Agent 完成结果。
@@ -402,7 +395,15 @@ func logCompletedRun(execution executionContext, endSeq int64, messageID string)
 
 // fail 按运行策略取消失效运行或标记失败，并为剩余输入补建下一次运行。
 func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (bool, error) {
-	message := truncateRunError(runErr)
+	// 限制持久化错误详情长度。
+	message := "agent run failed"
+	if runErr != nil {
+		runes := []rune(runErr.Error())
+		if len(runes) > agentRunErrorMaxRunes {
+			runes = runes[:agentRunErrorMaxRunes]
+		}
+		message = string(runes)
+	}
 	initial := &servermodels.AgentRun{}
 	if err := a.db.NewSelect().Model(initial).Where("agr.id = ?", runID).Scan(ctx); err != nil {
 		return false, err
@@ -484,16 +485,4 @@ func (a *ExecuteAction) FinalizeFailure(ctx context.Context, input RunInput, run
 	}
 	_, err := a.fail(ctx, input.RunID, runErr)
 	return err
-}
-
-// truncateRunError 限制持久化错误详情长度。
-func truncateRunError(err error) string {
-	if err == nil {
-		return "agent run failed"
-	}
-	runes := []rune(err.Error())
-	if len(runes) > agentRunErrorMaxRunes {
-		runes = runes[:agentRunErrorMaxRunes]
-	}
-	return string(runes)
 }

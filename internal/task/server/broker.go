@@ -4,6 +4,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -185,10 +186,13 @@ func (r *Runtime) runExpiringMessageRecovery(ctx context.Context) {
 	defer r.waitGroup.Done()
 	ticker := time.NewTicker(expiringMessageRecoveryInterval)
 	defer ticker.Stop()
+	// 在消息保留期结束前留出一次安全重建窗口。
+	margin := min(taskMessageDuplicateWindow, r.config.MaxAge/10)
+	recoveryAge := r.config.MaxAge - margin
 	for {
 		recovered, err := r.repository.recoverExpiringMessages(
 			ctx,
-			time.Now().UTC().Add(-messageRecoveryAge(r.config.MaxAge)),
+			time.Now().UTC().Add(-recoveryAge),
 			expiringMessageRecoveryBatch,
 		)
 		if err != nil {
@@ -207,12 +211,6 @@ func (r *Runtime) runExpiringMessageRecovery(ctx context.Context) {
 		case <-ticker.C:
 		}
 	}
-}
-
-// messageRecoveryAge 在消息保留期结束前留出一次安全重建窗口。
-func messageRecoveryAge(maxAge time.Duration) time.Duration {
-	margin := min(taskMessageDuplicateWindow, maxAge/10)
-	return maxAge - margin
 }
 
 // publishOne 发布一条发件箱消息。
@@ -406,7 +404,17 @@ func taskFinalizationContext(ctx context.Context) (context.Context, context.Canc
 
 // handleUnclaimedMessage 根据数据库状态处理重复或暂不可执行的消息。
 func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, message jetstream.Msg) {
-	run, err := r.repository.getRun(ctx, runID)
+	// 读取任务当前状态。
+	var record servermodels.TaskRun
+	err := r.repository.db.NewSelect().Model(&record).Where("tr.id = ?", runID).Scan(ctx)
+	var run *servermodels.TaskRun
+	if err == nil {
+		run = &record
+	} else if errors.Is(err, sql.ErrNoRows) {
+		err = nil
+	} else {
+		err = fmt.Errorf("get task run: %w", err)
+	}
 	if err != nil {
 		_ = message.NakWithDelay(taskNakRetryDelay)
 		return

@@ -9,15 +9,6 @@ type StartupLoadState =
 
 let startupRequest: Promise<Startup> | null = null
 
-/** 复用当前启动检测请求。 */
-function requestStartup() {
-  startupRequest ??= loadStartup().catch((error: unknown) => {
-    startupRequest = null
-    throw error
-  })
-  return startupRequest
-}
-
 /** 启动时检测一次当前平台能否进入应用。 */
 export function useStartupLoader() {
   const [state, setState] = useState<StartupLoadState>({
@@ -26,7 +17,12 @@ export function useStartupLoader() {
 
   useEffect(() => {
     let stale = false
-    void requestStartup().then(
+    // 复用当前启动检测请求。
+    startupRequest ??= loadStartup().catch((error: unknown) => {
+      startupRequest = null
+      throw error
+    })
+    void startupRequest.then(
       (startup) => {
         if (!stale) setState({ status: "loaded", startup })
       },

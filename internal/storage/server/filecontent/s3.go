@@ -62,10 +62,20 @@ func PresignPut(ctx context.Context, config S3Config, key, contentType string) (
 	}
 	headers := presigned.SignedHeader.Clone()
 	headers.Set("Content-Type", contentType)
+	// 将签名请求头转换成前端契约。
+	flattenedHeaders := make(map[string]string, len(headers))
+	for name, values := range headers {
+		if http.CanonicalHeaderKey(name) == "Host" {
+			continue
+		}
+		if len(values) > 0 {
+			flattenedHeaders[name] = values[0]
+		}
+	}
 	return SignedRequest{
 		Method:  http.MethodPut,
 		URL:     presigned.URL,
-		Headers: flattenHeaders(headers),
+		Headers: flattenedHeaders,
 	}, nil
 }
 
@@ -94,18 +104,4 @@ func newS3Client(config S3Config) *s3.Client {
 		Credentials:  aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(config.AccessKeyID, config.SecretAccessKey, "")),
 		UsePathStyle: config.ForcePathStyle,
 	})
-}
-
-// flattenHeaders 将签名请求头转换成前端契约。
-func flattenHeaders(headers http.Header) map[string]string {
-	result := make(map[string]string, len(headers))
-	for name, values := range headers {
-		if http.CanonicalHeaderKey(name) == "Host" {
-			continue
-		}
-		if len(values) > 0 {
-			result[name] = values[0]
-		}
-	}
-	return result
 }

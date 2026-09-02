@@ -144,20 +144,6 @@ function ReceptionTargetField<
   )
 }
 
-/** 分页读取全部团队接待候选项。 */
-async function listAllTeams() {
-  const teams: Team[] = []
-  let page = 1
-  let pages = 1
-  do {
-    const output = await listTeams({ page, pageSize: receptionOptionPageSize })
-    teams.push(...output.teams)
-    pages = Math.ceil(output.page.total / receptionOptionPageSize)
-    page += 1
-  } while (page <= pages)
-  return teams
-}
-
 /** 渲染可被不同渠道表单复用的接待设置字段。 */
 export function ChannelReceptionSettingsFields<
   TValues extends FieldValues & ChannelReceptionSettingsFormValues,
@@ -173,7 +159,22 @@ export function ChannelReceptionSettingsFields<
     resourceKeys.channelReceptionOptions(),
     async () => {
       const [teams, assignees] = await Promise.all([
-        listAllTeams(),
+        (async () => {
+          // 分页读取全部团队接待候选项。
+          const teams: Team[] = []
+          let page = 1
+          let pages = 1
+          do {
+            const output = await listTeams({
+              page,
+              pageSize: receptionOptionPageSize,
+            })
+            teams.push(...output.teams)
+            pages = Math.ceil(output.page.total / receptionOptionPageSize)
+            page += 1
+          } while (page <= pages)
+          return teams
+        })(),
         listCustomerServiceAssignees(),
       ])
       return { teams, assignees }

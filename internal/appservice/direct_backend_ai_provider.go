@@ -174,9 +174,14 @@ func (b *DirectBackend) aiProviderError(ctx context.Context, meta RequestMeta, e
 func aiProviderInput(input AIProviderInput) aiprovideraction.Input {
 	models := make([]aiprovideraction.Model, 0, len(input.Models))
 	for _, model := range input.Models {
+		// 转换模型输入模态到领域值。
+		inputModalities := make([]domain.AIModelInputModality, 0, len(model.InputModalities))
+		for _, modality := range model.InputModalities {
+			inputModalities = append(inputModalities, domain.AIModelInputModality(modality))
+		}
 		models = append(models, aiprovideraction.Model{
 			Identifier: model.Identifier, Name: model.Name, Type: domain.AIModelType(model.Type),
-			InputModalities: aiModelInputModalitiesToDomain(model.InputModalities),
+			InputModalities: inputModalities,
 			ContextWindow:   model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
 		})
 	}
@@ -197,31 +202,18 @@ func aiProviderFromAction(input aiprovideraction.Record) AIProvider {
 func aiProviderModelsFromAction(input []aiprovideraction.Model) []AIProviderModel {
 	models := make([]AIProviderModel, 0, len(input))
 	for _, model := range input {
+		// 转换领域模型输入模态到应用契约。
+		inputModalities := make([]AIModelInputModality, 0, len(model.InputModalities))
+		for _, modality := range model.InputModalities {
+			inputModalities = append(inputModalities, AIModelInputModality(modality))
+		}
 		models = append(models, AIProviderModel{
 			Identifier: model.Identifier, Name: model.Name, Type: AIModelType(model.Type),
-			InputModalities: aiModelInputModalitiesFromDomain(model.InputModalities),
+			InputModalities: inputModalities,
 			ContextWindow:   model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
 		})
 	}
 	return models
-}
-
-// aiModelInputModalitiesToDomain 转换模型输入模态到领域值。
-func aiModelInputModalitiesToDomain(input []AIModelInputModality) []domain.AIModelInputModality {
-	output := make([]domain.AIModelInputModality, 0, len(input))
-	for _, modality := range input {
-		output = append(output, domain.AIModelInputModality(modality))
-	}
-	return output
-}
-
-// aiModelInputModalitiesFromDomain 转换领域模型输入模态到应用契约。
-func aiModelInputModalitiesFromDomain(input []domain.AIModelInputModality) []AIModelInputModality {
-	output := make([]AIModelInputModality, 0, len(input))
-	for _, modality := range input {
-		output = append(output, AIModelInputModality(modality))
-	}
-	return output
 }
 
 // aiProviderFieldKeys 映射模型服务供应商校验错误。

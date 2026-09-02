@@ -33,7 +33,14 @@ func organizationFromModel(organization servermodels.Organization) Organization 
 
 // currentUserFromIdentity 把存储身份转换为当前用户契约并补齐头像地址。
 func (b *DirectBackend) currentUserFromIdentity(ctx context.Context, identity *servermodels.Identity) (CurrentUser, error) {
-	user := currentUserContract(identity)
+	// 执行不访问存储的当前用户契约转换。
+	storedUser := identity.User
+	organizationIdentity := identity.OrganizationIdentity
+	user := CurrentUser{
+		ID: storedUser.ID, IdentityID: storedUser.IdentityID, OrganizationID: storedUser.OrganizationID, Email: storedUser.Email, DisplayName: organizationIdentity.DisplayName,
+		RoleID: organizationIdentity.RoleID, Status: UserStatus(storedUser.Status), Locale: Locale(storedUser.Locale), TimeZone: storedUser.TimeZone, MessageNotificationsEnabled: storedUser.MessageNotificationsEnabled, WorkspaceTabsEnabled: storedUser.WorkspaceTabsEnabled,
+		WorkStatus: WorkStatus(organizationIdentity.WorkStatus),
+	}
 	fileID := identity.OrganizationIdentity.AvatarFileID
 	if fileID == nil || *fileID == "" {
 		return user, nil
@@ -44,17 +51,6 @@ func (b *DirectBackend) currentUserFromIdentity(ctx context.Context, identity *s
 	}
 	user.AvatarURL = urls[*fileID]
 	return user, nil
-}
-
-// currentUserContract 执行不访问存储的当前用户契约转换。
-func currentUserContract(identity *servermodels.Identity) CurrentUser {
-	user := identity.User
-	organizationIdentity := identity.OrganizationIdentity
-	return CurrentUser{
-		ID: user.ID, IdentityID: user.IdentityID, OrganizationID: user.OrganizationID, Email: user.Email, DisplayName: organizationIdentity.DisplayName,
-		RoleID: organizationIdentity.RoleID, Status: UserStatus(user.Status), Locale: Locale(user.Locale), TimeZone: user.TimeZone, MessageNotificationsEnabled: user.MessageNotificationsEnabled, WorkspaceTabsEnabled: user.WorkspaceTabsEnabled,
-		WorkStatus: WorkStatus(organizationIdentity.WorkStatus),
-	}
 }
 
 // activeFileURLs 批量解析当前企业已关联文件的公开地址。

@@ -32,9 +32,17 @@ func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *ser
 
 // prepareLocked 校验客户运行仍属于当前负责人，并收敛已经失效的运行。
 func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun) (bool, error) {
-	eligible, err := validateCurrentCustomerRun(ctx, db, policyContext.ServiceSession, run)
-	if err != nil {
-		return false, err
+	// 校验运行仍属于当前开放周期和有效 AI 客服。
+	session := policyContext.ServiceSession
+	eligible := false
+	if run.ServiceSessionID != nil && *run.ServiceSessionID == session.ID &&
+		domain.ServiceSessionStatus(session.Status) == domain.ServiceSessionStatusOpen &&
+		session.AssigneeIdentityID != nil && *session.AssigneeIdentityID == run.AgentIdentityID {
+		_, current, err := loadCustomerAgentEligibility(ctx, db, session, run.AgentRevisionID)
+		if err != nil {
+			return false, err
+		}
+		eligible = current
 	}
 	if eligible {
 		return true, nil
@@ -121,17 +129,6 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		messages = append(messages, agentruntime.Message{Role: role, Content: row.Body})
 	}
 	return messages, nil
-}
-
-// validateCurrentCustomerRun 校验运行仍属于当前开放周期和有效 AI 客服。
-func validateCurrentCustomerRun(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, run *servermodels.AgentRun) (bool, error) {
-	if run.ServiceSessionID == nil || *run.ServiceSessionID != session.ID ||
-		domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen ||
-		session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != run.AgentIdentityID {
-		return false, nil
-	}
-	_, eligible, err := loadCustomerAgentEligibility(ctx, db, session, run.AgentRevisionID)
-	return eligible, err
 }
 
 // suppressCustomerRun 把资格变化后的客户运行收敛为取消终态。

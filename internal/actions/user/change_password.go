@@ -27,7 +27,15 @@ func NewChangePasswordAction(db *bun.DB) *ChangePasswordAction {
 
 // Execute 在事务内核验当前密码并保存新密码。
 func (a *ChangePasswordAction) Execute(ctx context.Context, identity *servermodels.Identity, input ChangePasswordInput) error {
-	if fields := validateChangePasswordInput(input); len(fields) > 0 {
+	// 校验新密码长度。
+	fields := make(map[string]ValidationCode)
+	switch err := commonpassword.Validate(input.NewPassword); {
+	case errors.Is(err, commonpassword.ErrTooShort):
+		fields["newPassword"] = ValidationPasswordTooShort
+	case errors.Is(err, commonpassword.ErrTooLong):
+		fields["newPassword"] = ValidationPasswordTooLong
+	}
+	if len(fields) > 0 {
 		return &ValidationError{Fields: fields}
 	}
 	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {

@@ -83,7 +83,21 @@ func (b *DirectBackend) ListAgents(ctx context.Context, meta RequestMeta, input 
 	}
 	agents := make([]AgentListItem, 0, len(output.Agents))
 	for _, agent := range output.Agents {
-		agents = append(agents, agentListItemFromAction(agent))
+		// 转换 AI 员工目录项契约。
+		teams := make([]TeamSummary, 0, len(agent.Teams))
+		for _, team := range agent.Teams {
+			teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
+		}
+		// 转换 AI 员工执行配置摘要契约。
+		var managed *AgentManagedExecutionSummary
+		if agent.Execution.Managed != nil {
+			managed = &AgentManagedExecutionSummary{
+				ProviderID: agent.Execution.Managed.ProviderID, ProviderName: agent.Execution.Managed.ProviderName,
+				ModelIdentifier: agent.Execution.Managed.ModelIdentifier, ModelName: agent.Execution.Managed.ModelName,
+			}
+		}
+		execution := AgentExecutionSummary{RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
+		agents = append(agents, AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, CreatedAt: agent.CreatedAt})
 	}
 	return AgentList{Agents: agents, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
@@ -195,16 +209,17 @@ func agentFromAction(agent agentaction.Agent) Agent {
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: agentExecutionFromAction(agent.Execution), CreatedAt: agent.CreatedAt}
-}
-
-// agentListItemFromAction 转换 AI 员工目录项契约。
-func agentListItemFromAction(agent agentaction.ListItem) AgentListItem {
-	teams := make([]TeamSummary, 0, len(agent.Teams))
-	for _, team := range agent.Teams {
-		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
+	// 转换 AI 员工执行配置契约。
+	var managed *AgentManagedExecution
+	if agent.Execution.Managed != nil {
+		managed = &AgentManagedExecution{
+			ProviderID: agent.Execution.Managed.ProviderID, ProviderName: agent.Execution.Managed.ProviderName,
+			ModelIdentifier: agent.Execution.Managed.ModelIdentifier, ModelName: agent.Execution.Managed.ModelName,
+			SystemInstruction: agent.Execution.Managed.SystemInstruction,
+		}
 	}
-	return AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: agentExecutionSummaryFromAction(agent.Execution), CreatedAt: agent.CreatedAt}
+	execution := AgentExecution{RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, CreatedAt: agent.CreatedAt}
 }
 
 // agentExecutionInput 转换 AI 员工执行配置输入。
@@ -217,31 +232,6 @@ func agentExecutionInput(input AgentExecutionInput) agentaction.ExecutionInput {
 		}
 	}
 	return agentaction.ExecutionInput{Mode: domain.AgentExecutionMode(input.Mode), Managed: managed}
-}
-
-// agentExecutionFromAction 转换 AI 员工执行配置契约。
-func agentExecutionFromAction(execution agentaction.Execution) AgentExecution {
-	var managed *AgentManagedExecution
-	if execution.Managed != nil {
-		managed = &AgentManagedExecution{
-			ProviderID: execution.Managed.ProviderID, ProviderName: execution.Managed.ProviderName,
-			ModelIdentifier: execution.Managed.ModelIdentifier, ModelName: execution.Managed.ModelName,
-			SystemInstruction: execution.Managed.SystemInstruction,
-		}
-	}
-	return AgentExecution{RevisionID: execution.RevisionID, Mode: AgentExecutionMode(execution.Mode), Managed: managed}
-}
-
-// agentExecutionSummaryFromAction 转换 AI 员工执行配置摘要契约。
-func agentExecutionSummaryFromAction(execution agentaction.ExecutionSummary) AgentExecutionSummary {
-	var managed *AgentManagedExecutionSummary
-	if execution.Managed != nil {
-		managed = &AgentManagedExecutionSummary{
-			ProviderID: execution.Managed.ProviderID, ProviderName: execution.Managed.ProviderName,
-			ModelIdentifier: execution.Managed.ModelIdentifier, ModelName: execution.Managed.ModelName,
-		}
-	}
-	return AgentExecutionSummary{RevisionID: execution.RevisionID, Mode: AgentExecutionMode(execution.Mode), Managed: managed}
 }
 
 // agentError 转换 AI 员工领域错误并记录未处理故障。

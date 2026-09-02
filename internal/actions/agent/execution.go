@@ -137,17 +137,6 @@ func loadManagedExecutionModel(ctx context.Context, db bun.IDB, organizationID s
 	return model, nil
 }
 
-// loadStoredManagedExecutionModel 读取已保存平台托管配置当前对应的模型目录项。
-func loadStoredManagedExecutionModel(ctx context.Context, db bun.IDB, organizationID, providerID, modelIdentifier string) (ModelOption, error) {
-	model := ModelOption{}
-	if err := managedExecutionModelQuery(db, organizationID, providerID, modelIdentifier).Scan(ctx, &model); errors.Is(err, sql.ErrNoRows) {
-		return ModelOption{}, fmt.Errorf("managed execution model %q/%q is unavailable", providerID, modelIdentifier)
-	} else if err != nil {
-		return ModelOption{}, err
-	}
-	return model, nil
-}
-
 // managedExecutionModelQuery 构造平台托管执行配置的模型目录查询。
 func managedExecutionModelQuery(db bun.IDB, organizationID, providerID, modelIdentifier string) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("ai_provider_models AS aipm").
@@ -239,8 +228,11 @@ func loadAgentExecution(ctx context.Context, db bun.IDB, organizationID, agentID
 	if err != nil {
 		return Execution{}, err
 	}
-	model, err := loadStoredManagedExecutionModel(ctx, db, organizationID, execution.Managed.ProviderID, execution.Managed.ModelIdentifier)
-	if err != nil {
+	// 读取已保存平台托管配置当前对应的模型目录项。
+	model := ModelOption{}
+	if err := managedExecutionModelQuery(db, organizationID, execution.Managed.ProviderID, execution.Managed.ModelIdentifier).Scan(ctx, &model); errors.Is(err, sql.ErrNoRows) {
+		return Execution{}, fmt.Errorf("managed execution model %q/%q is unavailable", execution.Managed.ProviderID, execution.Managed.ModelIdentifier)
+	} else if err != nil {
 		return Execution{}, err
 	}
 	execution.Managed.ProviderName = model.ProviderName

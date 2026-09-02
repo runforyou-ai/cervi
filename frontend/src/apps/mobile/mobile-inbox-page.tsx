@@ -87,16 +87,6 @@ function sessionStatusLabel(
   }
 }
 
-/** 返回客服处理状态的移动端颜色。 */
-function sessionStatusClass(status: ServiceSessionStatus) {
-  switch (status) {
-    case ServiceSessionStatus.ServiceSessionStatusOpen:
-      return "bg-primary/10 text-primary"
-    default:
-      return "bg-muted text-muted-foreground"
-  }
-}
-
 /** 按移动端消息列表习惯格式化最近消息时间。 */
 function useConversationTime() {
   const { t, i18n } = useTranslation("inbox")
@@ -245,6 +235,12 @@ function MobileConversationRow({
     directConversation?.direct.agentRunStatus ?? null,
     t,
   )
+  // 返回客服处理状态的移动端颜色。
+  const customerSessionStatusClass =
+    customerConversation?.customer.serviceSessionStatus ===
+    ServiceSessionStatus.ServiceSessionStatusOpen
+      ? "bg-primary/10 text-primary"
+      : "bg-muted text-muted-foreground"
 
   if (!summary) return null
   const preview = summary.preview ?? t("messagesEmpty")
@@ -288,9 +284,7 @@ function MobileConversationRow({
             <span
               className={cn(
                 "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-                sessionStatusClass(
-                  customerConversation.customer.serviceSessionStatus,
-                ),
+                customerSessionStatusClass,
               )}
             >
               {sessionStatusLabel(

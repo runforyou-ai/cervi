@@ -127,8 +127,14 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
 		}
-		channelType, err := loadServiceSessionChannelType(ctx, tx, session)
-		if err != nil {
+		// 读取客服处理周期所属的消息渠道类型。
+		var channelType domain.ChannelType
+		if err := tx.NewSelect().TableExpr("contact_channel_identities AS cci").
+			ColumnExpr("c.type").
+			Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
+			Where("cci.id = ?", session.ContactChannelIdentityID).
+			Where("cci.organization_id = ?", session.OrganizationID).
+			Scan(ctx, &channelType); err != nil {
 			return err
 		}
 		target, err := identityaction.LockActiveCustomerServiceIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
@@ -273,8 +279,13 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		session.ClosedAt = &now
 		var assignee *servermodels.OrganizationIdentity
 		if session.AssigneeIdentityID != nil {
-			assignee, err = loadAssigneeIdentity(ctx, tx, identity.Organization.ID, *session.AssigneeIdentityID)
-			if err != nil {
+			// 读取处理周期负责人身份。
+			assignee = &servermodels.OrganizationIdentity{}
+			if err := tx.NewSelect().Model(assignee).
+				Column("oi.id", "oi.type", "oi.display_name", "oi.avatar_file_id").
+				Where("oi.organization_id = ?", identity.Organization.ID).
+				Where("oi.id = ?", *session.AssigneeIdentityID).
+				Scan(ctx); err != nil {
 				return err
 			}
 		}
@@ -369,29 +380,6 @@ func lockLatestCustomerServiceSession(ctx context.Context, db bun.IDB, organizat
 		return nil, err
 	}
 	return session, nil
-}
-
-// loadServiceSessionChannelType 返回客服处理周期所属的消息渠道类型。
-func loadServiceSessionChannelType(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (domain.ChannelType, error) {
-	var channelType domain.ChannelType
-	err := db.NewSelect().TableExpr("contact_channel_identities AS cci").
-		ColumnExpr("c.type").
-		Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
-		Where("cci.id = ?", session.ContactChannelIdentityID).
-		Where("cci.organization_id = ?", session.OrganizationID).
-		Scan(ctx, &channelType)
-	return channelType, err
-}
-
-// loadAssigneeIdentity 读取处理周期负责人身份。
-func loadAssigneeIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
-	assignee := &servermodels.OrganizationIdentity{}
-	err := db.NewSelect().Model(assignee).
-		Column("oi.id", "oi.type", "oi.display_name", "oi.avatar_file_id").
-		Where("oi.organization_id = ?", organizationID).
-		Where("oi.id = ?", identityID).
-		Scan(ctx)
-	return assignee, err
 }
 
 // serviceSessionResult 转换客服处理周期命令结果。

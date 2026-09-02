@@ -60,7 +60,17 @@ func Normalize(value string) (string, bool) {
 			return "", false
 		}
 	}
-	if !validHostname(host) {
+	// 校验 ASCII 主机名。
+	validHost := len(host) <= MaxHostLength
+	if validHost {
+		for _, label := range strings.Split(host, ".") {
+			if !hostLabelPattern.MatchString(label) {
+				validHost = false
+				break
+			}
+		}
+	}
+	if !validHost {
 		return "", false
 	}
 
@@ -108,7 +118,15 @@ func Allows(allowed []string, requestHost string) bool {
 		return false
 	}
 	for _, pattern := range allowed {
-		if pattern == "*" || matches(host, pattern) {
+		// 判断主机是否命中精确或子域名配置。
+		matched := host == pattern
+		if strings.HasPrefix(pattern, "*.") {
+			suffix := strings.TrimPrefix(pattern, "*")
+			matched = strings.HasSuffix(host, suffix) && host != strings.TrimPrefix(suffix, ".")
+		} else if strings.HasPrefix(pattern, ".") {
+			matched = strings.HasSuffix(host, pattern) && host != strings.TrimPrefix(pattern, ".")
+		}
+		if pattern == "*" || matched {
 			return true
 		}
 	}
@@ -131,30 +149,4 @@ func FrameAncestors(allowed []string) string {
 		sources = append(sources, value)
 	}
 	return strings.Join(sources, " ")
-}
-
-// validHostname 校验 ASCII 主机名。
-func validHostname(value string) bool {
-	if len(value) > MaxHostLength {
-		return false
-	}
-	labels := strings.Split(value, ".")
-	for _, label := range labels {
-		if !hostLabelPattern.MatchString(label) {
-			return false
-		}
-	}
-	return true
-}
-
-// matches 判断主机是否命中精确或子域名配置。
-func matches(host string, pattern string) bool {
-	if strings.HasPrefix(pattern, "*.") {
-		suffix := strings.TrimPrefix(pattern, "*")
-		return strings.HasSuffix(host, suffix) && host != strings.TrimPrefix(suffix, ".")
-	}
-	if strings.HasPrefix(pattern, ".") {
-		return strings.HasSuffix(host, pattern) && host != strings.TrimPrefix(pattern, ".")
-	}
-	return host == pattern
 }

@@ -186,19 +186,15 @@ export const defaultWorkspaceTab = {
   titleKey: "tabs.routes.inbox",
 } satisfies ResolvedWorkspaceTab
 
-/** 规范化工作台路径，避免同一页面生成重复标签。 */
-function normalizePathname(pathname: string) {
-  if (pathname === "/") {
-    return pathname
-  }
-  return pathname.replace(/\/+$/, "") || "/"
-}
-
 /** 把当前地址解析为规范标签；未知地址回到消息页。 */
 export function resolveWorkspaceLocation(
   location: Pick<Location, "pathname" | "search" | "hash">,
 ): ResolvedWorkspaceLocation {
-  const pathname = normalizePathname(location.pathname)
+  // 规范化工作台路径，避免同一页面生成重复标签。
+  const pathname =
+    location.pathname === "/"
+      ? location.pathname
+      : location.pathname.replace(/\/+$/, "") || "/"
   const redirectedPathname = workspaceRedirects[pathname]
   if (redirectedPathname) {
     return {

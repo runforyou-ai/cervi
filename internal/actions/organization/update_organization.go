@@ -5,8 +5,11 @@ package organization
 import (
 	"context"
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,7 +26,14 @@ func NewUpdateOrganizationAction(db *bun.DB) *UpdateOrganizationAction {
 
 // Execute 校验并修改当前用户所属企业的通用设置。
 func (a *UpdateOrganizationAction) Execute(ctx context.Context, identity *servermodels.Identity, input Input) (*servermodels.Organization, error) {
-	input, fields := normalizeInput(input)
+	// 归一化并校验企业通用设置。
+	input.Name = strings.TrimSpace(input.Name)
+	fields := make(map[string]ValidationCode)
+	if input.Name == "" {
+		fields["name"] = ValidationNameRequired
+	} else if utf8.RuneCountInString(input.Name) > domain.OrganizationNameMaxLength {
+		fields["name"] = ValidationNameTooLong
+	}
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}

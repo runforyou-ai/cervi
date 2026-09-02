@@ -108,20 +108,17 @@ func parseServerURL(value string) (*url.URL, error) {
 	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLBaseOnly}
 	}
-	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname())) {
+	// 判断主机是否为回环地址。
+	host := parsed.Hostname()
+	loopback := strings.EqualFold(host, "localhost")
+	if ip := net.ParseIP(host); ip != nil {
+		loopback = loopback || ip.IsLoopback()
+	}
+	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && loopback) {
 		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLHTTPSRequired}
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return parsed, nil
-}
-
-// isLoopbackHost 判断主机是否为回环地址。
-func isLoopbackHost(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 // probeServer 读取企业服务器的初始化状态和公开企业名称。

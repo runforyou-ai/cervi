@@ -16,11 +16,6 @@ export interface AgentValidationMessages {
   instructionTooLong: string
 }
 
-/** 返回 Unicode 字符数。 */
-function unicodeLength(value: string) {
-  return [...value].length
-}
-
 /** 创建 AI 员工资料校验规则。 */
 export function createAgentProfileSchema(messages: {
   nameRequired: string
@@ -47,7 +42,10 @@ export function createAgentManagedExecutionSchema(
       .trim()
       .min(1, messages.instructionRequired)
       .refine(
-        (value) => unicodeLength(value) <= maxSystemInstructionLength,
+        (value) => {
+          // 返回 Unicode 字符数。
+          return [...value].length <= maxSystemInstructionLength
+        },
         messages.instructionTooLong,
       ),
   })

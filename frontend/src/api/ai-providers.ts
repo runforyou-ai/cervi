@@ -73,7 +73,20 @@ export function listAIProviders() {
   return listAIProvidersBound().then(
     (output): AIProviderListData => ({
       ...output,
-      providers: asList(output.providers).map(normalizeAIProviderSummary),
+      providers: asList(output.providers).map(
+        (provider): AIProviderSummaryData => ({
+          // 归一化模型服务供应商列表项。
+          ...provider,
+          brand: provider.brand as AIProviderBrandId,
+          models: asList(provider.models).map(
+            (model): AIProviderModelSummaryData => ({
+              // 归一化供应商列表中的模型目录摘要。
+              ...model,
+              type: model.type as AIModelTypeId,
+            }),
+          ),
+        }),
+      ),
     }),
   )
 }
@@ -113,24 +126,6 @@ function normalizeAIProvider(provider: AIProvider): AIProviderData {
     brand: provider.brand as AIProviderBrandId,
     models: asList(provider.models).map(normalizeAIProviderModel),
   }
-}
-
-/** 归一化模型服务供应商列表项。 */
-function normalizeAIProviderSummary(
-  provider: AIProviderSummary,
-): AIProviderSummaryData {
-  return {
-    ...provider,
-    brand: provider.brand as AIProviderBrandId,
-    models: asList(provider.models).map(normalizeAIProviderModelSummary),
-  }
-}
-
-/** 归一化供应商列表中的模型目录摘要。 */
-function normalizeAIProviderModelSummary(
-  model: AIProviderModelSummary,
-): AIProviderModelSummaryData {
-  return { ...model, type: model.type as AIModelTypeId }
 }
 
 /** 归一化模型目录项。 */

@@ -46,7 +46,16 @@ func (b *DirectBackend) ChangePassword(ctx context.Context, meta RequestMeta, in
 		NewPassword:     input.NewPassword,
 	})
 	if err != nil {
-		return b.currentUserError(ctx, meta, err, cervii18n.ErrorPasswordUpdateFailed, passwordFieldKeys, identity.Organization.ID, identity.User.ID)
+		return b.currentUserError(ctx, meta, err, cervii18n.ErrorPasswordUpdateFailed,
+			// 把密码校验错误码映射为本地化文案键。
+			func(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+				keys := map[common.FieldCode]cervii18n.Key{
+					useraction.ValidationCurrentPasswordIncorrect: cervii18n.FieldCurrentPasswordIncorrect,
+					useraction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
+					useraction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
+				}
+				return translateValidationFields(fields, keys)
+			}, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("密码修改成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
 	return nil
@@ -273,16 +282,6 @@ func profileFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 		useraction.ValidationDisplayNameRequired: cervii18n.FieldDisplayNameRequired,
 		useraction.ValidationEmailInvalid:        cervii18n.FieldEmailInvalid,
 		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
-	}
-	return translateValidationFields(fields, keys)
-}
-
-// passwordFieldKeys 把密码校验错误码映射为本地化文案键。
-func passwordFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		useraction.ValidationCurrentPasswordIncorrect: cervii18n.FieldCurrentPasswordIncorrect,
-		useraction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
-		useraction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
 	}
 	return translateValidationFields(fields, keys)
 }

@@ -38,20 +38,16 @@ func (b *DirectBackend) organizationMutationError(ctx context.Context, meta Requ
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return InvalidError(meta, cervii18n.ErrorValidationFailed, organizationFieldKeys(validationError.Fields))
+		// 把企业通用设置校验错误码映射为本地化文案键。
+		keys := map[common.FieldCode]cervii18n.Key{
+			organizationaction.ValidationNameRequired: cervii18n.FieldOrganizationNameRequired,
+			organizationaction.ValidationNameTooLong:  cervii18n.FieldOrganizationNameTooLong,
+		}
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	slog.Warn("企业设置操作失败", "organization_id", organizationID, "failure", failureKey, "error", err)
 	return FailedError(meta, failureKey)
-}
-
-// organizationFieldKeys 把企业通用设置校验错误码映射为本地化文案键。
-func organizationFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		organizationaction.ValidationNameRequired: cervii18n.FieldOrganizationNameRequired,
-		organizationaction.ValidationNameTooLong:  cervii18n.FieldOrganizationNameTooLong,
-	}
-	return translateValidationFields(fields, keys)
 }

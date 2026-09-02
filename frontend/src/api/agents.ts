@@ -122,54 +122,50 @@ export function listAgents(query: AgentListQuery, signal?: AbortSignal) {
       pageSize: query.pageSize ?? 50,
     },
     signal,
-  ).then((output) => ({
+  ).then((output): AgentListData => ({
     ...output,
-    agents: asList(output.agents).map(normalizeAgentListItem),
+    agents: asList(output.agents).map((agent): AgentListItemData => {
+      // 归一化 AI 员工目录项所属团队和执行配置。
+      const execution = agent.execution
+      // 归一化 AI 员工平台托管执行配置摘要。
+      if (
+        execution.mode !== AgentExecutionMode.AgentExecutionModeManaged ||
+        execution.managed === undefined ||
+        execution.managed === null
+      ) {
+        throw new Error(`Unsupported agent execution mode: ${execution.mode}`)
+      }
+      return {
+        ...agent,
+        teams: asList(agent.teams),
+        execution: {
+          ...execution,
+          mode: execution.mode,
+          managed: execution.managed,
+        },
+      }
+    }),
   }))
-}
-
-/** 归一化 AI 员工平台托管执行配置。 */
-function normalizeAgentExecution(
-  execution: Agent["execution"],
-): ManagedAgentExecutionData {
-  if (
-    execution.mode !== AgentExecutionMode.AgentExecutionModeManaged ||
-    execution.managed === undefined ||
-    execution.managed === null
-  ) {
-    throw new Error(`Unsupported agent execution mode: ${execution.mode}`)
-  }
-  return { ...execution, mode: execution.mode, managed: execution.managed }
-}
-
-/** 归一化 AI 员工平台托管执行配置摘要。 */
-function normalizeAgentExecutionSummary(
-  execution: AgentListItem["execution"],
-): ManagedAgentExecutionSummaryData {
-  if (
-    execution.mode !== AgentExecutionMode.AgentExecutionModeManaged ||
-    execution.managed === undefined ||
-    execution.managed === null
-  ) {
-    throw new Error(`Unsupported agent execution mode: ${execution.mode}`)
-  }
-  return { ...execution, mode: execution.mode, managed: execution.managed }
 }
 
 /** 归一化 AI 员工所属团队和执行配置。 */
 function normalizeAgent(agent: Agent): AgentData {
-  return {
-    ...agent,
-    teams: asList(agent.teams),
-    execution: normalizeAgentExecution(agent.execution),
+  // 归一化 AI 员工平台托管执行配置。
+  const execution = agent.execution
+  if (
+    execution.mode !== AgentExecutionMode.AgentExecutionModeManaged ||
+    execution.managed === undefined ||
+    execution.managed === null
+  ) {
+    throw new Error(`Unsupported agent execution mode: ${execution.mode}`)
   }
-}
-
-/** 归一化 AI 员工目录项所属团队和执行配置。 */
-function normalizeAgentListItem(agent: AgentListItem): AgentListItemData {
   return {
     ...agent,
     teams: asList(agent.teams),
-    execution: normalizeAgentExecutionSummary(agent.execution),
+    execution: {
+      ...execution,
+      mode: execution.mode,
+      managed: execution.managed,
+    },
   }
 }

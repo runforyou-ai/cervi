@@ -69,20 +69,20 @@ type httpProbe struct {
 func (p *httpProbe) Run(ctx context.Context) error {
 	err := connectiontest.ReadHTTPResponse(ctx, p.client, p.primary.request, p.primary.validate)
 	for _, candidate := range p.fallbacks {
-		if err == nil || !supportsFallback(err) {
+		if err == nil {
+			return nil
+		}
+		// 判断当前失败是否允许尝试兼容接口。
+		_, kind, classified := connectiontest.Details(err)
+		supportsFallback := classified && (kind == connectiontest.FailureUnauthorized ||
+			kind == connectiontest.FailureForbidden ||
+			kind == connectiontest.FailureNotFound)
+		if !supportsFallback {
 			return err
 		}
 		err = connectiontest.ReadHTTPResponse(ctx, p.client, candidate.request, candidate.validate)
 	}
 	return err
-}
-
-// supportsFallback 判断当前失败是否允许尝试兼容接口。
-func supportsFallback(err error) bool {
-	_, kind, classified := connectiontest.Details(err)
-	return classified && (kind == connectiontest.FailureUnauthorized ||
-		kind == connectiontest.FailureForbidden ||
-		kind == connectiontest.FailureNotFound)
 }
 
 // newDifyFactory 创建同时兼容 Dify 应用密钥和知识库密钥的探测器。

@@ -197,7 +197,16 @@ func (c *Client) DownloadPhoto(ctx context.Context, token, fileID string) (Downl
 	if len(data) == 0 || len(data) > maxAvatarSize {
 		return DownloadedPhoto{}, protocolError()
 	}
-	contentType := avatarContentType(data)
+	// 按文件魔数识别允许的静态头像格式。
+	contentType := ""
+	switch {
+	case len(data) >= 3 && data[0] == 0xff && data[1] == 0xd8 && data[2] == 0xff:
+		contentType = "image/jpeg"
+	case len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}):
+		contentType = "image/png"
+	case len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP":
+		contentType = "image/webp"
+	}
 	if contentType == "" {
 		return DownloadedPhoto{}, protocolError()
 	}
@@ -325,20 +334,6 @@ func (c *Client) fileURL(token, filePath string) (string, error) {
 	base.Fragment = ""
 	base.Path = strings.TrimRight(base.Path, "/") + "/file/bot" + token + "/" + reference.Path
 	return base.String(), nil
-}
-
-// avatarContentType 按文件魔数识别允许的静态头像格式。
-func avatarContentType(data []byte) string {
-	switch {
-	case len(data) >= 3 && data[0] == 0xff && data[1] == 0xd8 && data[2] == 0xff:
-		return "image/jpeg"
-	case len(data) >= 8 && bytes.Equal(data[:8], []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}):
-		return "image/png"
-	case len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP":
-		return "image/webp"
-	default:
-		return ""
-	}
 }
 
 // safeTransportError 保留错误分类但移除可能包含 Token URL 的原始错误。

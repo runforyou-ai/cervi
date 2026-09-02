@@ -194,10 +194,18 @@ func (a *ReceiveTelegramWebhookAction) refreshTelegramContactAvatar(
 	if err != nil {
 		return err
 	}
+	// 返回已校验头像内容的固定文件名。
+	fileName := "telegram-avatar.jpg"
+	switch downloaded.ContentType {
+	case "image/png":
+		fileName = "telegram-avatar.png"
+	case "image/webp":
+		fileName = "telegram-avatar.webp"
+	}
 	imported, err := a.avatarFiles.Execute(ctx, fileaction.ImportInput{
 		OrganizationID: organizationID, CreatedByUserID: createdByUserID,
 		ExternalID:  photo.UniqueID,
-		FileName:    telegramAvatarFileName(downloaded.ContentType),
+		FileName:    fileName,
 		ContentType: downloaded.ContentType, Data: downloaded.Data,
 	})
 	if err != nil {
@@ -309,18 +317,6 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 		}
 		return nil
 	})
-}
-
-// telegramAvatarFileName 返回已校验头像内容的固定文件名。
-func telegramAvatarFileName(contentType string) string {
-	switch contentType {
-	case "image/png":
-		return "telegram-avatar.png"
-	case "image/webp":
-		return "telegram-avatar.webp"
-	default:
-		return "telegram-avatar.jpg"
-	}
 }
 
 // loadActiveTelegramWebhookSetting 读取启用渠道当前可接收回调的设置。

@@ -107,7 +107,17 @@ func (b *DirectBackend) DeleteBusinessSystem(ctx context.Context, meta RequestMe
 // businessSystemMutationError 转换业务系统写入错误。
 func (b *DirectBackend) businessSystemMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return InvalidError(meta, cervii18n.ErrorValidationFailed, businessSystemFieldKeys(validationError.Fields))
+		// 映射业务系统校验错误。
+		keys := map[common.FieldCode]cervii18n.Key{
+			businesssystemaction.ValidationNameRequired:       cervii18n.FieldBusinessSystemNameRequired,
+			businesssystemaction.ValidationNameTooLong:        cervii18n.FieldBusinessSystemNameTooLong,
+			businesssystemaction.ValidationNameDuplicate:      cervii18n.FieldBusinessSystemNameDuplicate,
+			businesssystemaction.ValidationDescriptionTooLong: cervii18n.FieldBusinessSystemDescriptionTooLong,
+			businesssystemaction.ValidationURLRequired:        cervii18n.FieldBusinessSystemURLRequired,
+			businesssystemaction.ValidationURLInvalid:         cervii18n.FieldBusinessSystemURLInvalid,
+			businesssystemaction.ValidationURLTooLong:         cervii18n.FieldBusinessSystemURLTooLong,
+		}
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	return b.businessSystemError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
@@ -141,18 +151,4 @@ func businessSystemFromAction(input businesssystemaction.Record) BusinessSystem 
 		ID: input.ID, Name: input.Name, Description: input.Description, URL: input.URL, Enabled: input.Enabled,
 		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
-}
-
-// businessSystemFieldKeys 映射业务系统校验错误。
-func businessSystemFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		businesssystemaction.ValidationNameRequired:       cervii18n.FieldBusinessSystemNameRequired,
-		businesssystemaction.ValidationNameTooLong:        cervii18n.FieldBusinessSystemNameTooLong,
-		businesssystemaction.ValidationNameDuplicate:      cervii18n.FieldBusinessSystemNameDuplicate,
-		businesssystemaction.ValidationDescriptionTooLong: cervii18n.FieldBusinessSystemDescriptionTooLong,
-		businesssystemaction.ValidationURLRequired:        cervii18n.FieldBusinessSystemURLRequired,
-		businesssystemaction.ValidationURLInvalid:         cervii18n.FieldBusinessSystemURLInvalid,
-		businesssystemaction.ValidationURLTooLong:         cervii18n.FieldBusinessSystemURLTooLong,
-	}
-	return translateValidationFields(fields, keys)
 }

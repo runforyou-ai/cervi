@@ -5,16 +5,6 @@ type ServerConnectionTranslator = (
   key: "serverUrlRequired" | "serverUrlInvalid",
 ) => string
 
-/** 判断企业服务器地址是否为有效的 http(s) URL。 */
-function isValidServerUrl(value: string) {
-  try {
-    const url = new URL(value)
-    return Boolean(url.hostname) && ["http:", "https:"].includes(url.protocol)
-  } catch {
-    return false
-  }
-}
-
 /** 创建企业服务器地址表单校验。 */
 export function createServerConnectionSchema(t: ServerConnectionTranslator) {
   return z.object({
@@ -22,7 +12,18 @@ export function createServerConnectionSchema(t: ServerConnectionTranslator) {
       .string()
       .trim()
       .min(1, t("serverUrlRequired"))
-      .refine(isValidServerUrl, t("serverUrlInvalid")),
+      .refine((value) => {
+        // 判断企业服务器地址是否为有效的 http(s) URL。
+        try {
+          const url = new URL(value)
+          return (
+            Boolean(url.hostname) &&
+            ["http:", "https:"].includes(url.protocol)
+          )
+        } catch {
+          return false
+        }
+      }, t("serverUrlInvalid")),
   })
 }
 

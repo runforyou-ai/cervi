@@ -97,7 +97,15 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 	if err != nil {
 		return DirectConversationSummary{}, err
 	}
-	ids := generateDirectConversationIDs()
+	// 预生成单聊创建事务使用的 UUIDv7。
+	values := make([]string, 5)
+	for index := range values {
+		values[index] = uuid.NewV7().String()
+	}
+	ids := directConversationIDs{
+		conversation: values[0], currentSubject: values[1], targetSubject: values[2],
+		currentParticipant: values[3], targetParticipant: values[4],
+	}
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result DirectConversationSummary
@@ -105,8 +113,12 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 				return err
 			}
-			if err := lockDirectIdentityPair(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, target.IdentityID); err != nil {
-				return err
+			// 串行化同企业同一规范化身份对的单聊创建。
+			keyText := directIdentityPairLockText(identity.Organization.ID, identity.OrganizationIdentity.ID, target.IdentityID)
+			hash := sha256.Sum256([]byte(keyText))
+			lockKey := int64(binary.BigEndian.Uint64(hash[:8]))
+			if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(?)", lockKey); err != nil {
+				return fmt.Errorf("lock direct identity pair: %w", err)
 			}
 			currentSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.currentSubject)
 			if err != nil {
@@ -247,17 +259,6 @@ func loadDirectTarget(ctx context.Context, db bun.IDB, organizationID, identityI
 		return directTargetRow{}, fmt.Errorf("load direct target: %w", err)
 	}
 	return row, nil
-}
-
-// lockDirectIdentityPair 串行化同企业同一规范化身份对的单聊创建。
-func lockDirectIdentityPair(ctx context.Context, db bun.IDB, organizationID, firstIdentityID, secondIdentityID string) error {
-	keyText := directIdentityPairLockText(organizationID, firstIdentityID, secondIdentityID)
-	hash := sha256.Sum256([]byte(keyText))
-	lockKey := int64(binary.BigEndian.Uint64(hash[:8]))
-	if _, err := db.ExecContext(ctx, "SELECT pg_advisory_xact_lock(?)", lockKey); err != nil {
-		return fmt.Errorf("lock direct identity pair: %w", err)
-	}
-	return nil
 }
 
 // directIdentityPairLockText 生成与发起方向无关的稳定锁文本。
@@ -425,16 +426,4 @@ func normalizeInternalTextMessageInput(conversationID, clientMessageID, body str
 		fields["body"] = ValidationBodyTooLong
 	}
 	return conversationID, clientMessageID, body, fields
-}
-
-// generateDirectConversationIDs 预生成单聊创建事务使用的 UUIDv7。
-func generateDirectConversationIDs() directConversationIDs {
-	values := make([]string, 5)
-	for index := range values {
-		values[index] = uuid.NewV7().String()
-	}
-	return directConversationIDs{
-		conversation: values[0], currentSubject: values[1], targetSubject: values[2],
-		currentParticipant: values[3], targetParticipant: values[4],
-	}
 }

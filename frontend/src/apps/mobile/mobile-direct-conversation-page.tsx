@@ -39,18 +39,6 @@ type MobileDirectLocationState = {
   conversation?: InboxConversation
 }
 
-/** 从路由状态读取本次打开的 Direct 摘要。 */
-function directConversationFromState(
-  state: unknown,
-  conversationID: string,
-): DirectInboxConversationData | null {
-  const candidate = (state as MobileDirectLocationState | null)?.conversation
-  return candidate?.id === conversationID &&
-    isDirectInboxConversation(candidate)
-    ? candidate
-    : null
-}
-
 /** 展示当前 Direct 的移动端头部。 */
 function MobileDirectHeader({
   conversation,
@@ -108,10 +96,15 @@ export function MobileDirectConversationPage() {
   const invalidate = useResourceInvalidator()
   const location = useLocation()
   const { conversationID = "" } = useParams()
-  const stateConversation = useMemo(
-    () => directConversationFromState(location.state, conversationID),
-    [conversationID, location.state],
-  )
+  const stateConversation = useMemo(() => {
+    // 从路由状态读取本次打开的 Direct 摘要。
+    const candidate = (location.state as MobileDirectLocationState | null)
+      ?.conversation
+    return candidate?.id === conversationID &&
+      isDirectInboxConversation(candidate)
+      ? candidate
+      : null
+  }, [conversationID, location.state])
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })

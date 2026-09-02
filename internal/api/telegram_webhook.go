@@ -46,14 +46,6 @@ type TelegramWebhookReceiver interface {
 	Execute(context.Context, string, channelaction.TelegramWebhookInput) error
 }
 
-// registerTelegramWebhookRoutes 注册无需 Bearer Token 的 Telegram 回调。
-func (s *Service) registerTelegramWebhookRoutes(router *gin.Engine) {
-	if s.telegramWebhook == nil {
-		return
-	}
-	router.POST("/public/telegram-channels/:channelID/webhook", s.receiveTelegramWebhook)
-}
-
 // receiveTelegramWebhook 认证 Telegram Update 并返回裸 HTTP 状态码。
 func (s *Service) receiveTelegramWebhook(c *gin.Context) {
 	channelID := c.Param("channelID")
@@ -73,7 +65,9 @@ func (s *Service) receiveTelegramWebhook(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	if err := ensureJSONEnd(decoder); err != nil {
+	// 拒绝一个请求体中的多段 JSON。
+	var trailing json.RawMessage
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -139,19 +133,6 @@ func normalizeTelegramWebhookMessage(message telegramWebhookMessage) (*channelac
 		SenderID: message.From.ID, DisplayName: displayName,
 		Body: body, OriginatedAt: originatedAt,
 	}, ""
-}
-
-// ensureJSONEnd 拒绝一个请求体中的多段 JSON。
-func ensureJSONEnd(decoder *json.Decoder) error {
-	var trailing json.RawMessage
-	err := decoder.Decode(&trailing)
-	if errors.Is(err, io.EOF) {
-		return nil
-	}
-	if err == nil {
-		return errors.New("unexpected trailing JSON")
-	}
-	return err
 }
 
 // writeTelegramWebhookError 映射公开回调错误并返回是否已经响应。

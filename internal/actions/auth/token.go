@@ -109,18 +109,3 @@ func resolveIdentity(ctx context.Context, db bun.IDB, organizationID string, val
 	}
 	return identity, nil
 }
-
-// revokeToken 删除令牌记录。
-func revokeToken(ctx context.Context, db *bun.DB, organizationID string, value string) error {
-	if !common.ValidUUID(organizationID) {
-		return ErrIdentityNotFound
-	}
-	_, err := db.ExecContext(ctx, `
-		DELETE FROM tokens AS token
-		USING users AS u
-		WHERE token.user_id = u.id
-		  AND u.organization_id = ?
-		  AND token.token_hash = ?
-	`, organizationID, token.Hash(value))
-	return err
-}

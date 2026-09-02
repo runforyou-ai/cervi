@@ -71,7 +71,11 @@ func (p *notificationProvider) CheckNotificationPermission(_ context.Context, _ 
 		slog.Warn("检查桌面通知权限失败", "error", err)
 		return "", err
 	}
-	return checkedNotificationPermission(authorized), nil
+	// 转换桌面通知授权状态。
+	if authorized {
+		return appservice.NotificationPermissionStatusGranted, nil
+	}
+	return appservice.NotificationPermissionStatusPrompt, nil
 }
 
 // RequestNotificationPermission 请求当前桌面系统允许发送通知。
@@ -84,7 +88,11 @@ func (p *notificationProvider) RequestNotificationPermission(_ context.Context, 
 		slog.Warn("申请桌面通知权限失败", "error", err)
 		return "", err
 	}
-	status := requestedNotificationPermission(authorized)
+	// 转换桌面通知授权结果。
+	status := appservice.NotificationPermissionStatusDenied
+	if authorized {
+		status = appservice.NotificationPermissionStatusGranted
+	}
 	slog.Info("桌面通知权限申请完成", "status", status)
 	return status, nil
 }
@@ -94,23 +102,14 @@ func (p *notificationProvider) SendMessageNotification(_ context.Context, _ apps
 	if !p.ready.Load() {
 		return errors.New("notification service unavailable")
 	}
-	err := p.service.SendNotification(notificationOptions(
-		input.ID,
-		input.Title,
-		input.Body,
-		input.SoundEnabled,
-	))
+	// 创建桌面通知参数。
+	options := notifications.NotificationOptions{ID: input.ID, Title: input.Title, Body: input.Body}
+	if !input.SoundEnabled {
+		options.Sound = &notifications.NotificationSound{Silent: true}
+	}
+	err := p.service.SendNotification(options)
 	if err != nil {
 		slog.Warn("投递桌面通知失败", "notification_id", input.ID, "sound_enabled", input.SoundEnabled, "error", err)
 	}
 	return err
-}
-
-// notificationOptions 创建桌面通知参数。
-func notificationOptions(id string, title string, body string, soundEnabled bool) notifications.NotificationOptions {
-	options := notifications.NotificationOptions{ID: id, Title: title, Body: body}
-	if !soundEnabled {
-		options.Sound = &notifications.NotificationSound{Silent: true}
-	}
-	return options
 }

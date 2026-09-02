@@ -46,7 +46,10 @@ type Runtime struct {
 // New 创建服务端任务运行时。
 func New(db *bun.DB, natsConfig serverconfig.NATSConfig) *Runtime {
 	return &Runtime{
-		config: newConfig(natsConfig), repository: newRepository(db), registry: NewRegistry(),
+		config: newConfig(natsConfig),
+		// 创建任务仓储。
+		repository: &repository{db: db},
+		registry:   NewRegistry(),
 		instanceID: uuid.New().String(),
 	}
 }
@@ -67,7 +70,14 @@ func (r *Runtime) Enqueue(ctx context.Context, actionName string, payload any, o
 	if err != nil {
 		return "", err
 	}
-	return r.repository.enqueue(ctx, actionName, encoded, normalized)
+	// 在独立事务内创建任务运行记录和发件箱消息。
+	var runID string
+	err = r.repository.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var enqueueErr error
+		runID, enqueueErr = enqueueIn(ctx, tx, actionName, encoded, normalized, "")
+		return enqueueErr
+	})
+	return runID, err
 }
 
 // EnqueueIn 将 Action 输入加入调用方已经开启的业务事务。

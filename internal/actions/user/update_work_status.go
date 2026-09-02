@@ -27,7 +27,13 @@ func NewUpdateWorkStatusAction(db *bun.DB) *UpdateWorkStatusAction {
 
 // Execute 校验并保存当前用户的工作状态。
 func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkStatusInput) (*servermodels.Identity, error) {
-	fields := validateWorkStatusInput(input)
+	// 校验工作状态。
+	fields := make(map[string]ValidationCode)
+	if input.WorkStatus != domain.WorkStatusWorking &&
+		input.WorkStatus != domain.WorkStatusAway &&
+		input.WorkStatus != domain.WorkStatusOffDuty {
+		fields["workStatus"] = ValidationWorkStatusInvalid
+	}
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}

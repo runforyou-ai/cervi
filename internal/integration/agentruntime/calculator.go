@@ -41,7 +41,8 @@ func calculate(ctx context.Context, input calculatorInput) (calculatorOutput, er
 	if input.DelayMilliseconds < 0 || delay > calculatorMaxDelay {
 		return calculatorOutput{}, errors.New("calculator delay must be between 0 and 30000 milliseconds")
 	}
-	toolCall := toolCallMetadataFromContext(ctx)
+	// 读取当前 Tool 实现可用于安全日志的调用标识。
+	toolCall, _ := ctx.Value(toolCallContextKey{}).(toolCallMetadata)
 	slog.Info("Calculator Tool 执行配置",
 		"agent_run_id", runIDFromContext(ctx),
 		"tool_call_id", toolCall.CallID,

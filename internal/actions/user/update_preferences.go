@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	commontimezone "github.com/runforyou-ai/cervi/internal/common/timezone"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -23,7 +25,14 @@ func NewUpdatePreferencesAction(db *bun.DB) *UpdatePreferencesAction {
 
 // Execute 在事务内校验并保存当前用户的偏好设置。
 func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *servermodels.Identity, input PreferencesInput) (*servermodels.Identity, error) {
-	fields := validatePreferencesInput(input)
+	// 校验用户偏好设置。
+	fields := make(map[string]ValidationCode)
+	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
+		fields["locale"] = ValidationLocaleInvalid
+	}
+	if !commontimezone.Valid(input.TimeZone) {
+		fields["timeZone"] = ValidationTimeZoneInvalid
+	}
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}

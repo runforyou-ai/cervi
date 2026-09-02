@@ -63,7 +63,15 @@ func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, er
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return InvalidError(meta, cervii18n.ErrorValidationFailed, s3SettingFieldKeys(validationError.Fields))
+		// 把对象存储配置校验错误码映射为本地化文案键。
+		keys := map[common.FieldCode]cervii18n.Key{
+			settingaction.ValidationEndpointRequired: cervii18n.FieldS3EndpointRequired, settingaction.ValidationEndpointInvalid: cervii18n.FieldS3EndpointInvalid,
+			settingaction.ValidationPublicBaseURLRequired: cervii18n.FieldS3PublicBaseURLRequired, settingaction.ValidationPublicBaseURLInvalid: cervii18n.FieldS3PublicBaseURLInvalid,
+			settingaction.ValidationProviderInvalid: cervii18n.FieldS3ProviderInvalid, settingaction.ValidationRegionRequired: cervii18n.FieldS3RegionRequired,
+			settingaction.ValidationBucketRequired: cervii18n.FieldS3BucketRequired, settingaction.ValidationAccessKeyIDRequired: cervii18n.FieldS3AccessKeyIDRequired,
+			settingaction.ValidationSecretAccessKeyRequired: cervii18n.FieldS3SecretAccessKeyRequired,
+		}
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
@@ -113,16 +121,4 @@ func s3SettingFromAction(input settingaction.S3Setting) S3Setting {
 		Enabled: input.Enabled, Provider: StorageProvider(input.Provider), Endpoint: input.Endpoint, PublicBaseURL: input.PublicBaseURL, Region: input.Region,
 		Bucket: input.Bucket, AccessKeyID: input.AccessKeyID, SecretAccessKey: input.SecretAccessKey, ForcePathStyle: input.ForcePathStyle,
 	}
-}
-
-// s3SettingFieldKeys 把对象存储配置校验错误码映射为本地化文案键。
-func s3SettingFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		settingaction.ValidationEndpointRequired: cervii18n.FieldS3EndpointRequired, settingaction.ValidationEndpointInvalid: cervii18n.FieldS3EndpointInvalid,
-		settingaction.ValidationPublicBaseURLRequired: cervii18n.FieldS3PublicBaseURLRequired, settingaction.ValidationPublicBaseURLInvalid: cervii18n.FieldS3PublicBaseURLInvalid,
-		settingaction.ValidationProviderInvalid: cervii18n.FieldS3ProviderInvalid, settingaction.ValidationRegionRequired: cervii18n.FieldS3RegionRequired,
-		settingaction.ValidationBucketRequired: cervii18n.FieldS3BucketRequired, settingaction.ValidationAccessKeyIDRequired: cervii18n.FieldS3AccessKeyIDRequired,
-		settingaction.ValidationSecretAccessKeyRequired: cervii18n.FieldS3SecretAccessKeyRequired,
-	}
-	return translateValidationFields(fields, keys)
 }

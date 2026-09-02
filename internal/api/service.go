@@ -65,11 +65,31 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 	router.Use(gin.Recovery())
 
 	service.registerGeneratedRoutes(router)
-	router.POST("/install", service.install)
-	router.GET("/contacts", service.listContacts)
-	router.GET("/contacts/trash", service.listDeletedContacts)
+	// 创建企业管理员并返回登录令牌。
+	router.POST("/install", func(c *gin.Context) {
+		var input appservice.InstallWorkspaceInput
+		if !bindJSON(c, &input) {
+			return
+		}
+		auth, err := service.application.InstallWorkspace(c.Request.Context(), requestMeta(c), input)
+		if writeApplicationError(c, err) {
+			return
+		}
+		c.JSON(http.StatusCreated, auth)
+	})
+	// 返回联系人列表。
+	router.GET("/contacts", func(c *gin.Context) {
+		service.writeContactList(c, false)
+	})
+	// 返回回收站中的联系人列表。
+	router.GET("/contacts/trash", func(c *gin.Context) {
+		service.writeContactList(c, true)
+	})
 	service.registerWebsiteVisitorRoutes(router)
-	service.registerTelegramWebhookRoutes(router)
+	// 注册无需 Bearer Token 的 Telegram 回调。
+	if service.telegramWebhook != nil {
+		router.POST("/public/telegram-channels/:channelID/webhook", service.receiveTelegramWebhook)
+	}
 
 	service.router = router
 	return service
@@ -78,29 +98,6 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 // ServeHTTP 将 HTTP 请求交给 Gin 路由处理。
 func (s *Service) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	s.router.ServeHTTP(writer, request)
-}
-
-// install 创建企业管理员并返回登录令牌。
-func (s *Service) install(c *gin.Context) {
-	var input appservice.InstallWorkspaceInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	auth, err := s.application.InstallWorkspace(c.Request.Context(), requestMeta(c), input)
-	if writeApplicationError(c, err) {
-		return
-	}
-	c.JSON(http.StatusCreated, auth)
-}
-
-// listContacts 返回联系人列表。
-func (s *Service) listContacts(c *gin.Context) {
-	s.writeContactList(c, false)
-}
-
-// listDeletedContacts 返回回收站中的联系人列表。
-func (s *Service) listDeletedContacts(c *gin.Context) {
-	s.writeContactList(c, true)
 }
 
 // writeContactList 按回收站开关返回联系人列表。

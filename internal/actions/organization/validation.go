@@ -4,11 +4,7 @@
 package organization
 
 import (
-	"strings"
-	"unicode/utf8"
-
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识企业通用设置的校验结果。
@@ -26,16 +22,4 @@ type ValidationError = common.FieldError
 type Input struct {
 	Name              string
 	AllowArbitraryURL bool
-}
-
-// normalizeInput 归一化并校验企业通用设置。
-func normalizeInput(input Input) (Input, map[string]ValidationCode) {
-	input.Name = strings.TrimSpace(input.Name)
-	fields := make(map[string]ValidationCode)
-	if input.Name == "" {
-		fields["name"] = ValidationNameRequired
-	} else if utf8.RuneCountInString(input.Name) > domain.OrganizationNameMaxLength {
-		fields["name"] = ValidationNameTooLong
-	}
-	return input, fields
 }

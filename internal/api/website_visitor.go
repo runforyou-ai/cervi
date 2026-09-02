@@ -61,7 +61,16 @@ func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 		return
 	}
 	if issued {
-		s.setWebsiteVisitorCookie(c, channelID, token)
+		// 设置渠道级长期访客 Cookie。
+		secure := c.Request.TLS != nil || (s.trustForwardedProto && strings.EqualFold(strings.TrimSpace(strings.Split(c.GetHeader("X-Forwarded-Proto"), ",")[0]), "https"))
+		sameSite := http.SameSiteLaxMode
+		if secure {
+			sameSite = http.SameSiteNoneMode
+		}
+		http.SetCookie(c.Writer, &http.Cookie{
+			Name: websiteVisitorCookieName(channelID), Value: token, Path: "/", HttpOnly: true,
+			Secure: secure, SameSite: sameSite, MaxAge: websiteVisitorCookieAge,
+		})
 	}
 	writeWebsiteVisitorResult(c, http.StatusOK, result)
 }
@@ -157,19 +166,6 @@ func generateWebsiteVisitorToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(value), nil
-}
-
-// setWebsiteVisitorCookie 设置渠道级长期访客 Cookie。
-func (s *Service) setWebsiteVisitorCookie(c *gin.Context, channelID, token string) {
-	secure := c.Request.TLS != nil || (s.trustForwardedProto && strings.EqualFold(strings.TrimSpace(strings.Split(c.GetHeader("X-Forwarded-Proto"), ",")[0]), "https"))
-	sameSite := http.SameSiteLaxMode
-	if secure {
-		sameSite = http.SameSiteNoneMode
-	}
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name: websiteVisitorCookieName(channelID), Value: token, Path: "/", HttpOnly: true,
-		Secure: secure, SameSite: sameSite, MaxAge: websiteVisitorCookieAge,
-	})
 }
 
 // websiteVisitorCookieName 返回渠道级访客 Cookie 名称。
