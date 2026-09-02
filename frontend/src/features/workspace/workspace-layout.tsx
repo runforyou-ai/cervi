@@ -326,14 +326,16 @@ export function WorkspaceLayout() {
           onLogout={handleLogout}
           loggingOut={loggingOut}
         />
-        {identity.user.workspaceTabsEnabled ? (
-          <WorkspaceTabs currentTab={currentTab} context={workspaceContext} />
-        ) : (
-          <WorkspaceSinglePage
-            href={currentTab.href}
-            context={workspaceContext}
-          />
-        )}
+        <div className="m-1.5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+          {identity.user.workspaceTabsEnabled ? (
+            <WorkspaceTabs currentTab={currentTab} context={workspaceContext} />
+          ) : (
+            <WorkspaceSinglePage
+              href={currentTab.href}
+              context={workspaceContext}
+            />
+          )}
+        </div>
       </div>
     </UserPreferencesProvider>
   )

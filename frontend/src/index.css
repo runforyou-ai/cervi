@@ -67,7 +67,7 @@
 }
 
 /*
-  主题采用统一浅色层级：一级图标轨、二级导航和内容区通过轻微背景差与边框区分。
+  主题采用统一浅色层级：一级图标轨、二级导航和内容区通过轻微背景差、间距与阴影区分。
   交互色统一使用品牌蓝，背景与边框保持中性灰阶。
 */
 :root {
@@ -262,6 +262,22 @@ body,
 
 [data-native-os="darwin"]:has(.cervi-workspace-shell) > .cervi-window-drag-region {
   display: none;
+}
+
+/* 工作台底层以轻渐变连接一级栏和主内容区内缩间隙。 */
+.cervi-workspace-shell {
+  background:
+    radial-gradient(
+      ellipse 240px 420px at left top,
+      color-mix(in oklab, var(--sidebar-primary) 6%, transparent) 0%,
+      transparent 100%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--sidebar), var(--sidebar-primary) 2%) 0%,
+      var(--sidebar) 52%,
+      color-mix(in oklab, var(--sidebar), var(--sidebar-primary) 3%) 100%
+    );
 }
 
 /* 工作台只允许一级栏、页头空白和空会话主区拖动窗口。 */
