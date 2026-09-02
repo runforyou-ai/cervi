@@ -60,6 +60,7 @@ type DirectConversationSummary struct {
 // GroupConversationSummary 定义收件箱中的企业群聊详情。
 type GroupConversationSummary struct {
 	Title         string
+	ImageFileID   *string
 	Status        domain.ConversationStatus
 	Preview       *string
 	LastMessageAt *time.Time
@@ -113,6 +114,7 @@ type directConversationRow struct {
 type groupConversationRow struct {
 	ID            string     `bun:"id"`
 	Title         string     `bun:"title"`
+	ImageFileID   *string    `bun:"image_file_id"`
 	Status        string     `bun:"status"`
 	Preview       *string    `bun:"preview"`
 	LastMessageAt *time.Time `bun:"last_message_at"`
@@ -197,7 +199,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		result = append(result, ConversationSummary{
 			ID: row.ID, Type: domain.ConversationTypeGroup, sortAt: row.SortAt,
 			Group: &GroupConversationSummary{
-				Title: row.Title, Status: domain.ConversationStatus(row.Status), Preview: row.Preview,
+				Title: row.Title, ImageFileID: row.ImageFileID, Status: domain.ConversationStatus(row.Status), Preview: row.Preview,
 				LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount,
 			},
 		})
@@ -334,6 +336,7 @@ func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizatio
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("cv.title AS title").
+		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("cv.last_message_at AS last_message_at").

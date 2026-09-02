@@ -1,8 +1,8 @@
 package i18n
 
 const (
-	DialogProfileImageTitle  Key = "dialog.profile_image_title"
-	DialogProfileImageChoose Key = "dialog.profile_image_choose"
+	DialogImageTitle  Key = "dialog.image_title"
+	DialogImageChoose Key = "dialog.image_choose"
 
 	MessengerPreviewTitle              Key = "messenger.preview_title"
 	MessengerPreviewStageLabel         Key = "messenger.preview_stage_label"

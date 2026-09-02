@@ -124,12 +124,16 @@ function FieldLabel({
       {...props}
     >
       {children}
-      {required ? (
-        <span aria-hidden="true" className="text-destructive">
-          *
-        </span>
-      ) : null}
+      {required ? <FieldRequiredMark /> : null}
     </Label>
+  )
+}
+
+function FieldRequiredMark() {
+  return (
+    <span aria-hidden="true" className="text-destructive">
+      *
+    </span>
   )
 }
 
@@ -245,6 +249,7 @@ function FieldError({
 export {
   Field,
   FieldLabel,
+  FieldRequiredMark,
   FieldDescription,
   FieldError,
   FieldGroup,

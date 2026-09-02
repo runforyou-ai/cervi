@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// maxAvatarByteSize 是头像文件的最大字节数。
-	maxAvatarByteSize int64 = 5 * 1024 * 1024
+	// maxImageByteSize 是图片文件的最大字节数。
+	maxImageByteSize int64 = 5 * 1024 * 1024
 	// maxFileNameLength 是文件名的最大字符数。
 	maxFileNameLength = 255
 )
@@ -33,7 +33,7 @@ const (
 // ValidationError 表示文件字段校验失败。
 type ValidationError = common.FieldError
 
-var avatarFileExtensions = map[string]string{
+var imageFileExtensions = map[string]string{
 	"image/jpeg": ".jpg",
 	"image/png":  ".png",
 	"image/webp": ".webp",
@@ -49,7 +49,16 @@ type UploadInput struct {
 
 // normalizeUploadInput 规范化并校验待上传文件元数据。
 func normalizeUploadInput(input UploadInput) (UploadInput, map[string]ValidationCode) {
-	return normalizeFileInput(input, domain.FilePurposeUserAvatar)
+	switch input.Purpose {
+	case domain.FilePurposeUserAvatar:
+		return normalizeFileInput(input, domain.FilePurposeUserAvatar)
+	case domain.FilePurposeGroupImage:
+		return normalizeFileInput(input, domain.FilePurposeGroupImage)
+	default:
+		normalized, fields := normalizeFileInput(input, domain.FilePurposeUserAvatar)
+		fields["purpose"] = ValidationPurposeInvalid
+		return normalized, fields
+	}
 }
 
 // normalizeFileInput 按指定的单一用途规范化文件元数据。
@@ -68,10 +77,10 @@ func normalizeFileInput(input UploadInput, purpose domain.FilePurpose) (UploadIn
 	if input.Purpose != purpose {
 		fields["purpose"] = ValidationPurposeInvalid
 	}
-	if _, exists := avatarFileExtensions[input.ContentType]; !exists {
+	if _, exists := imageFileExtensions[input.ContentType]; !exists {
 		fields["contentType"] = ValidationContentTypeInvalid
 	}
-	if input.ByteSize <= 0 || input.ByteSize > maxAvatarByteSize {
+	if input.ByteSize <= 0 || input.ByteSize > maxImageByteSize {
 		fields["byteSize"] = ValidationByteSizeInvalid
 	}
 	return input, fields

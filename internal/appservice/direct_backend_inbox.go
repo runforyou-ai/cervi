@@ -31,6 +31,9 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 	}
 	avatarFileIDs := make([]string, 0, len(summaries))
 	for _, summary := range summaries {
+		if summary.Group != nil && summary.Group.ImageFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *summary.Group.ImageFileID)
+		}
 		if summary.Customer == nil {
 			continue
 		}
@@ -43,7 +46,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 	}
 	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
-		slog.Warn("读取收件箱联系人头像失败", "organization_id", identity.Organization.ID, "error", err)
+		slog.Warn("读取收件箱会话图片失败", "organization_id", identity.Organization.ID, "error", err)
 		return Inbox{}, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
 	}
 	conversations := make([]InboxConversation, 0, len(summaries))
@@ -75,7 +78,8 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 		}
 		if summary.Group != nil {
 			conversation.Group = &GroupInboxConversation{
-				Title: summary.Group.Title, Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview,
+				Title: summary.Group.Title, ImageURL: optionalFileURL(avatarURLs, summary.Group.ImageFileID),
+				Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview,
 				LastMessageAt: summary.Group.LastMessageAt, MemberCount: summary.Group.MemberCount,
 			}
 		}
