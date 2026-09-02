@@ -203,7 +203,7 @@ export function WorkspaceNavigation({
   }
 
   return (
-    <aside className="cervi-workspace-rail flex h-full w-[68px] shrink-0 flex-col text-sidebar-foreground">
+    <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
       <div className="flex justify-center px-3 pt-2.5 pb-1.5">
         <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
           <DropdownMenuTrigger asChild>

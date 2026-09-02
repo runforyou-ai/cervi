@@ -266,6 +266,8 @@ body,
 
 /* 工作台底层以轻渐变连接一级栏和主内容区内缩间隙。 */
 .cervi-workspace-shell {
+  --cervi-workspace-rail-width: 68px;
+  --cervi-workspace-content-inset: 6px;
   background:
     radial-gradient(
       ellipse 240px 420px at left top,
@@ -280,7 +282,15 @@ body,
     );
 }
 
-/* 工作台只允许一级栏、页头空白和空会话主区拖动窗口。 */
+.cervi-workspace-rail {
+  width: var(--cervi-workspace-rail-width);
+}
+
+.cervi-workspace-content-frame {
+  margin: var(--cervi-workspace-content-inset);
+}
+
+/* 工作台一级栏、页面顶部和空态主区用于拖动窗口。 */
 [data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-rail {
   --wails-draggable: drag;
   padding-top: var(--cervi-macos-titlebar-height);
@@ -289,19 +299,44 @@ body,
 [data-native-os="darwin"][data-window-fullscreen="false"] :is(
   [data-slot="page-header"],
   [data-slot="page-header-actions"],
+  [data-slot="conversation-header"],
+  [data-slot="inbox-pane-header"],
+  .cervi-knowledge-base-index,
+  .cervi-knowledge-base-pane,
   .cervi-workspace-tabs,
   .cervi-inbox-empty-main
 ) {
   --wails-draggable: drag;
 }
 
+/* 主内容卡片上方的内缩间隙保持可拖动。 */
+.cervi-workspace-top-drag-region {
+  display: none;
+}
+
+[data-native-os="darwin"][data-window-fullscreen="false"]
+  .cervi-workspace-top-drag-region {
+  --wails-draggable: drag;
+  position: absolute;
+  inset: 0 0 auto var(--cervi-workspace-rail-width);
+  z-index: 20;
+  display: block;
+  height: var(--cervi-workspace-content-inset);
+}
+
 [data-native-os="darwin"] :is(
   .cervi-workspace-rail :is(a, button),
   .cervi-workspace-tabs button,
-  [data-slot="page-split-pane"],
+  [data-slot="page-split-pane"]:not(.cervi-knowledge-base-pane),
   [data-slot="page-header-title"],
   [data-slot="page-header"] :is(a, button, input, select),
-  .cervi-inbox-empty-main [data-slot="empty-state-content"]
+  [data-slot="conversation-actions"],
+  [data-slot="conversation-header"] :is(a, button, input, select),
+  [data-slot="inbox-pane-header"] :is(a, button, input, select),
+  .cervi-knowledge-base-pane :is(a, button, input, select, [role="button"]),
+  .cervi-knowledge-base-pane [data-slot="scroll-area-scrollbar"],
+  :is(.cervi-inbox-empty-main, .cervi-knowledge-base-index)
+    [data-slot="empty-state-content"]
 ) {
   --wails-draggable: no-drag;
 }

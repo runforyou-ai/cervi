@@ -319,14 +319,18 @@ export function WorkspaceLayout() {
 
   return (
     <UserPreferencesProvider user={identity.user}>
-      <div className="cervi-workspace-shell flex h-svh min-h-0 w-full overflow-hidden">
+      <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
         <WorkspaceNavigation
           identity={identity}
           onUserUpdated={updateUser}
           onLogout={handleLogout}
           loggingOut={loggingOut}
         />
-        <div className="m-1.5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+        <div
+          aria-hidden="true"
+          className="cervi-workspace-top-drag-region"
+        />
+        <div className="cervi-workspace-content-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
           {identity.user.workspaceTabsEnabled ? (
             <WorkspaceTabs currentTab={currentTab} context={workspaceContext} />
           ) : (
