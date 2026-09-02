@@ -9,7 +9,7 @@ Congratulations on generating your Wails3 application! This README will guide yo
 2. To run your application in development mode, use the following command:
 
    ```
-   wails3 dev
+   wails3 task dev
    ```
 
    This will start your application and enable hot-reloading for both frontend and backend changes.
@@ -53,7 +53,7 @@ Take a moment to familiarize yourself with your project structure:
 
 1. Modify the frontend in the `frontend/` directory to create your desired UI.
 2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
+3. Use `wails3 task dev` to see your changes in real-time, or `wails3 task dev:mcp` when desktop MCP is needed.
 4. When ready, build your application with `wails3 build`.
 
 Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
