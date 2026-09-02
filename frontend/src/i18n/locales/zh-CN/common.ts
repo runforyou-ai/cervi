@@ -5,6 +5,11 @@ const common = {
   actions: {
     close: "关闭",
     back: "返回",
+    edit: "修改",
+    editField: "修改{{field}}",
+    save: "保存",
+    saving: "正在保存…",
+    cancel: "取消",
   },
   comingSoon: "即将支持",
   workStatuses: {

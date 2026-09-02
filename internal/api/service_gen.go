@@ -35,6 +35,11 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/direct-conversations/:conversationID/messages", s.sendDirectTextMessage)
 	router.POST("/group-conversations", s.createGroupConversation)
 	router.GET("/group-conversations/:conversationID", s.getGroupConversation)
+	router.PATCH("/group-conversations/:conversationID", s.updateGroupConversation)
+	router.POST("/group-conversations/:conversationID/members", s.addGroupConversationMembers)
+	router.POST("/group-conversations/:conversationID/members/remove", s.removeGroupConversationMember)
+	router.POST("/group-conversations/:conversationID/owner/transfer", s.transferGroupConversationOwner)
+	router.POST("/group-conversations/:conversationID/leave", s.leaveGroupConversation)
 	router.POST("/group-conversations/:conversationID/messages", s.sendGroupTextMessage)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
@@ -301,6 +306,55 @@ func (s *Service) createGroupConversation(c *gin.Context) {
 func (s *Service) getGroupConversation(c *gin.Context) {
 	output, err := s.application.GetGroupConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateGroupConversation 修改群聊名称。
+func (s *Service) updateGroupConversation(c *gin.Context) {
+	var input appservice.GroupConversationTitleInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateGroupConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// addGroupConversationMembers 批量增加群聊成员。
+func (s *Service) addGroupConversationMembers(c *gin.Context) {
+	var input appservice.GroupConversationMembersInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.AddGroupConversationMembers(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// removeGroupConversationMember 移除单个群聊成员。
+func (s *Service) removeGroupConversationMember(c *gin.Context) {
+	var input appservice.GroupConversationMemberInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RemoveGroupConversationMember(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// transferGroupConversationOwner 转让群主。
+func (s *Service) transferGroupConversationOwner(c *gin.Context) {
+	var input appservice.GroupConversationOwnerInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.TransferGroupConversationOwner(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// leaveGroupConversation 退出群聊并按需转让群主。
+func (s *Service) leaveGroupConversation(c *gin.Context) {
+	var input appservice.GroupConversationLeaveInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.LeaveGroupConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input))
 }
 
 // sendGroupTextMessage 发送企业内部群聊文本消息。

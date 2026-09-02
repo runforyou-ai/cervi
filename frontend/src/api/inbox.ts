@@ -1,18 +1,23 @@
 /** 成员收件箱与会话消息调用归一化。 */
 import {
+  AddGroupConversationMembers,
   ClaimServiceSession,
   CloseServiceSession,
   CreateGroupConversation,
   GetGroupConversation,
+  LeaveGroupConversation,
   ListConversationMessages,
   ListCustomerServiceAssignees,
   LoadInbox,
   ReopenServiceSession,
+  RemoveGroupConversationMember,
   SendCustomerTextMessage,
   SendDirectTextMessage,
   SendGroupTextMessage,
   StartDirectConversation,
   TransferServiceSession,
+  TransferGroupConversationOwner,
+  UpdateGroupConversation,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   CustomerInboxConversation,
@@ -25,6 +30,11 @@ import type {
   DirectTextMessageInput,
   GroupConversation,
   GroupConversationInput,
+  GroupConversationLeaveInput,
+  GroupConversationMemberInput,
+  GroupConversationMembersInput,
+  GroupConversationOwnerInput,
+  GroupConversationTitleInput,
   GroupInboxConversation,
   GroupParticipant,
   GroupTextMessageInput,
@@ -84,6 +94,15 @@ const startDirectConversationBound = bind(StartDirectConversation)
 const sendDirectTextMessageBound = bind(SendDirectTextMessage)
 const createGroupConversationBound = bind(CreateGroupConversation)
 const getGroupConversationBound = bind(GetGroupConversation)
+const updateGroupConversationBound = bind(UpdateGroupConversation)
+const addGroupConversationMembersBound = bind(AddGroupConversationMembers)
+const removeGroupConversationMemberBound = bind(
+  RemoveGroupConversationMember,
+)
+const transferGroupConversationOwnerBound = bind(
+  TransferGroupConversationOwner,
+)
+const leaveGroupConversationBound = bind(LeaveGroupConversation)
 const sendGroupTextMessageBound = bind(SendGroupTextMessage)
 const listCustomerServiceAssigneesBound = bind(ListCustomerServiceAssignees)
 const claimServiceSessionBound = bind(ClaimServiceSession)
@@ -92,6 +111,20 @@ const closeServiceSessionBound = bind(CloseServiceSession)
 const reopenServiceSessionBound = bind(ReopenServiceSession)
 
 export type LoadInboxQuery = Partial<LoadInboxInput>
+
+/** 归一化消息中的可空系统事件成员列表。 */
+function normalizeConversationMessage(
+  message: ConversationMessage,
+): ConversationMessage {
+  if (!message.systemEvent) return message
+  return {
+    ...message,
+    systemEvent: {
+      ...message.systemEvent,
+      targets: asList(message.systemEvent.targets),
+    },
+  }
+}
 
 /** 判断统一收件箱项是否为结构完整的客户会话。 */
 export function isCustomerInboxConversation(
@@ -185,7 +218,10 @@ export async function listConversationMessages(
     input,
     signal,
   )
-  return { ...result, messages: asList(result.messages) }
+  return {
+    ...result,
+    messages: asList(result.messages).map(normalizeConversationMessage),
+  }
 }
 
 /** 发送成员客户会话文本消息。 */
@@ -220,6 +256,59 @@ export async function getGroupConversation(
 ): Promise<GroupConversationData> {
   const result = await getGroupConversationBound(conversationID)
   return { ...result, participants: asList(result.participants) }
+}
+
+/** 修改企业内部群聊名称。 */
+export async function updateGroupConversation(
+  conversationID: string,
+  input: GroupConversationTitleInput,
+): Promise<GroupConversationData> {
+  const result = await updateGroupConversationBound(conversationID, input)
+  return { ...result, participants: asList(result.participants) }
+}
+
+/** 批量增加企业内部群聊成员。 */
+export async function addGroupConversationMembers(
+  conversationID: string,
+  input: GroupConversationMembersInput,
+): Promise<GroupConversationData> {
+  const result = await addGroupConversationMembersBound(
+    conversationID,
+    input,
+  )
+  return { ...result, participants: asList(result.participants) }
+}
+
+/** 移除企业内部群聊成员。 */
+export async function removeGroupConversationMember(
+  conversationID: string,
+  input: GroupConversationMemberInput,
+): Promise<GroupConversationData> {
+  const result = await removeGroupConversationMemberBound(
+    conversationID,
+    input,
+  )
+  return { ...result, participants: asList(result.participants) }
+}
+
+/** 转让企业内部群聊群主。 */
+export async function transferGroupConversationOwner(
+  conversationID: string,
+  input: GroupConversationOwnerInput,
+): Promise<GroupConversationData> {
+  const result = await transferGroupConversationOwnerBound(
+    conversationID,
+    input,
+  )
+  return { ...result, participants: asList(result.participants) }
+}
+
+/** 退出企业内部群聊。 */
+export function leaveGroupConversation(
+  conversationID: string,
+  input: GroupConversationLeaveInput,
+) {
+  return leaveGroupConversationBound(conversationID, input)
 }
 
 /** 发送企业内部群聊文本消息。 */

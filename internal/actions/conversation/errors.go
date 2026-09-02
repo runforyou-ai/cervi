@@ -15,8 +15,10 @@ var (
 	ErrConversationNotFound = errors.New("conversation not found")
 	// ErrDirectTargetNotFound 表示内部单聊目标不存在或不可用。
 	ErrDirectTargetNotFound = errors.New("direct conversation target not found")
-	// ErrGroupMemberNotFound 表示群聊初始成员不存在或不可用。
+	// ErrGroupMemberNotFound 表示待加入群聊的成员不存在或不可用。
 	ErrGroupMemberNotFound = errors.New("group conversation member not found")
+	// ErrGroupOwnerRequired 表示当前成员不是群主。
+	ErrGroupOwnerRequired = errors.New("group conversation owner required")
 	// ErrDataInvariant 表示聊天持久关系不完整或互相矛盾。
 	ErrDataInvariant = errors.New("conversation data invariant violated")
 )

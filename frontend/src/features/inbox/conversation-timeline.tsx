@@ -13,11 +13,15 @@ import { useNavigate } from "react-router"
 
 import {
   ChatSubjectKind,
+  ConversationSystemEventType,
   ConversationType,
+  MessageType,
   ServiceSessionStatus,
   listConversationMessages,
   type ConversationMessage,
   type ConversationMessageListData,
+  type ConversationSystemEvent,
+  type ConversationSystemEventParticipant,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
@@ -55,7 +59,13 @@ function mergeMessages(
 
 type TimelineMessage = Pick<
   ConversationMessage,
-  "id" | "body" | "originatedAt" | "sender" | "sessionStart"
+  | "id"
+  | "type"
+  | "body"
+  | "originatedAt"
+  | "sender"
+  | "sessionStart"
+  | "systemEvent"
 > & {
   clientMessageID: string | null
   local: boolean
@@ -105,10 +115,12 @@ function mergeTimelineMessages(
     if (message.saved) continue
     messages.push({
       id: `local:${message.clientMessageID}`,
+      type: MessageType.MessageTypeText,
       body: message.body,
       originatedAt: message.originatedAt,
       sender: null,
       sessionStart: null,
+      systemEvent: null,
       clientMessageID: message.clientMessageID,
       local: true,
       deliveryStatus:
@@ -248,6 +260,58 @@ export function ConversationTimeline({
     return day.slice(0, 4) === today.slice(0, 4)
       ? dateFormatters.monthDay.format(date)
       : dateFormatters.fullDate.format(date)
+  }
+
+  /** 按当前语言连接系统事件中的成员姓名。 */
+  function formatGroupParticipantNames(names: string[]) {
+    if (names.length < 2) return names[0] ?? ""
+    if (names.length === 2) {
+      return names.join(t("groupSystemListPairSeparator"))
+    }
+    const previousNames = names
+      .slice(0, -1)
+      .join(t("groupSystemListSeparator"))
+    return `${previousNames}${t("groupSystemListFinalSeparator")}${names[names.length - 1]}`
+  }
+
+  /** 将类型化群聊系统事件转换为当前语言的时间线文案。 */
+  function formatGroupSystemEvent(event: ConversationSystemEvent) {
+    const participantName = (
+      participant: ConversationSystemEventParticipant,
+    ) =>
+      participant.identityId === currentIdentityID
+        ? t("messageSenderYou")
+        : participant.displayName
+    const actor = participantName(event.actor)
+    const targets = formatGroupParticipantNames(
+      (event.targets ?? []).map(participantName),
+    )
+    switch (event.type) {
+      case ConversationSystemEventType.ConversationSystemEventGroupRenamed:
+        return t("groupSystemRenamed", {
+          actor,
+          previousTitle: event.previousTitle,
+          title: event.title,
+        })
+      case ConversationSystemEventType.ConversationSystemEventGroupMembersAdded:
+        return t("groupSystemMembersAdded", { actor, targets })
+      case ConversationSystemEventType.ConversationSystemEventGroupMemberRemoved:
+        return t("groupSystemMemberRemoved", {
+          actor,
+          target: targets,
+        })
+      case ConversationSystemEventType.ConversationSystemEventGroupMemberLeft:
+        return t("groupSystemMemberLeft", { actor })
+      case ConversationSystemEventType.ConversationSystemEventGroupOwnerTransferred:
+        return t("groupSystemOwnerTransferred", {
+          actor,
+          target: targets,
+        })
+      case ConversationSystemEventType.ConversationSystemEventGroupDissolved:
+        return t("groupSystemDissolved", { actor })
+      default:
+        return t("groupSystemUpdated")
+    }
   }
 
   useEffect(() => {
@@ -458,7 +522,15 @@ export function ConversationTimeline({
     previous: TimelineMessage | undefined,
     next: TimelineMessage | undefined,
   ) {
-    if (!previous || !next || next.sessionStart) return false
+    if (
+      !previous ||
+      !next ||
+      next.sessionStart ||
+      previous.type === MessageType.MessageTypeSystem ||
+      next.type === MessageType.MessageTypeSystem
+    ) {
+      return false
+    }
     if (
       timelineSenderKey(previous, currentIdentityID) !==
       timelineSenderKey(next, currentIdentityID)
@@ -601,6 +673,10 @@ export function ConversationTimeline({
                       originatedAt: message.originatedAt,
                     }
                   : null
+              const systemEvent = message.systemEvent
+              const systemEventText = systemEvent
+                ? formatGroupSystemEvent(systemEvent)
+                : null
 
               return (
                 <Fragment key={message.id}>
@@ -634,6 +710,22 @@ export function ConversationTimeline({
                       <span className="h-px flex-1 bg-border" />
                     </div>
                   ) : null}
+                  {message.type === MessageType.MessageTypeSystem &&
+                  systemEventText ? (
+                    <div
+                      className={cn(
+                        "flex justify-center px-10 text-center",
+                        index > 0 && "mt-3",
+                      )}
+                    >
+                      <span
+                        className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground"
+                        title={dateFormatters.full.format(date)}
+                      >
+                        {systemEventText}
+                      </span>
+                    </div>
+                  ) : (
                   <article
                     className={cn(
                       "flex items-start gap-2",
@@ -753,6 +845,7 @@ export function ConversationTimeline({
                       ) : null}
                     </div>
                   </article>
+                  )}
                 </Fragment>
               )
             })}

@@ -17,6 +17,7 @@ import { toast } from "sonner"
 
 import {
   ChannelType,
+  ConversationStatus,
   CustomerInboxView,
   ServiceSessionStatus,
   claimServiceSession,
@@ -276,7 +277,9 @@ export function ConversationHeader({
           </div>
         ) : group ? (
           <p className="text-xs text-muted-foreground">
-            {t("groupMemberCount", { count: group.memberCount })}
+            {group.status === ConversationStatus.ConversationStatusArchived
+              ? t("groupDissolved")
+              : t("groupMemberCount", { count: group.memberCount })}
           </p>
         ) : agentRunLabel ? (
           <div className="text-xs text-muted-foreground">

@@ -5,6 +5,7 @@ package conversation
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -24,20 +25,22 @@ type ListConversationMessagesQuery struct {
 }
 
 type conversationMessageRow struct {
-	ID                             string     `bun:"id"`
-	Type                           string     `bun:"type"`
-	Body                           string     `bun:"body"`
-	OriginatedAt                   time.Time  `bun:"originated_at"`
-	SourceOrder                    int64      `bun:"source_order"`
-	CreatedAt                      time.Time  `bun:"created_at"`
-	SenderSubjectID                *string    `bun:"sender_subject_id"`
-	SenderKind                     *string    `bun:"sender_kind"`
-	SenderSourceID                 *string    `bun:"sender_source_id"`
-	SenderDisplayName              *string    `bun:"sender_display_name"`
-	ServiceSessionOpeningMessageID *string    `bun:"service_session_opening_message_id"`
-	ServiceSessionSequence         *int64     `bun:"service_session_sequence"`
-	ServiceSessionStartedAt        *time.Time `bun:"service_session_started_at"`
-	ServiceSessionStatus           *string    `bun:"service_session_status"`
+	ID                             string          `bun:"id"`
+	Type                           string          `bun:"type"`
+	Body                           string          `bun:"body"`
+	SystemEventType                *string         `bun:"system_event_type"`
+	SystemEventPayload             json.RawMessage `bun:"system_event_payload"`
+	OriginatedAt                   time.Time       `bun:"originated_at"`
+	SourceOrder                    int64           `bun:"source_order"`
+	CreatedAt                      time.Time       `bun:"created_at"`
+	SenderSubjectID                *string         `bun:"sender_subject_id"`
+	SenderKind                     *string         `bun:"sender_kind"`
+	SenderSourceID                 *string         `bun:"sender_source_id"`
+	SenderDisplayName              *string         `bun:"sender_display_name"`
+	ServiceSessionOpeningMessageID *string         `bun:"service_session_opening_message_id"`
+	ServiceSessionSequence         *int64          `bun:"service_session_sequence"`
+	ServiceSessionStartedAt        *time.Time      `bun:"service_session_started_at"`
+	ServiceSessionStatus           *string         `bun:"service_session_status"`
 }
 
 // NewListConversationMessagesQuery 创建成员消息历史查询。
@@ -60,6 +63,8 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
+		ColumnExpr("msg.system_event_type AS system_event_type").
+		ColumnExpr("msg.system_event_payload AS system_event_payload").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.source_order AS source_order").
 		ColumnExpr("msg.created_at AS created_at").
@@ -80,7 +85,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.conversation_id = ?", input.ConversationID).
-		Where("msg.type = ?", domain.MessageTypeText).
+		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem})).
 		Where("msg.deleted_at IS NULL")
 	if input.Before != nil {
 		query = query.Where("(msg.originated_at, msg.source_order, msg.id) < (?, ?, ?)", input.Before.OriginatedAt, input.Before.SourceOrder, input.Before.ID).
@@ -96,7 +101,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 	if err := query.Limit(conversationMessagePageSize+1).Scan(ctx, &rows); err != nil {
 		return ConversationMessageHistory{}, fmt.Errorf("list conversation messages: %w", err)
 	}
-	return buildConversationMessageHistory(rows, input), nil
+	return buildConversationMessageHistory(rows, input)
 }
 
 // authorizeConversationHistory 对不同会话类型应用各自的成员可见性规则。
@@ -169,7 +174,7 @@ func validateConversationMessageHistoryInput(input ConversationMessageHistoryInp
 }
 
 // buildConversationMessageHistory 构造正序成员消息页。
-func buildConversationMessageHistory(rows []conversationMessageRow, input ConversationMessageHistoryInput) ConversationMessageHistory {
+func buildConversationMessageHistory(rows []conversationMessageRow, input ConversationMessageHistoryInput) (ConversationMessageHistory, error) {
 	hasMore := len(rows) > conversationMessagePageSize
 	if hasMore {
 		rows = rows[:conversationMessagePageSize]
@@ -183,6 +188,16 @@ func buildConversationMessageHistory(rows []conversationMessageRow, input Conver
 		message := ConversationMessage{
 			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
 			OriginatedAt: row.OriginatedAt, CreatedAt: row.CreatedAt,
+		}
+		if message.Type == domain.MessageTypeSystem {
+			if row.SystemEventType == nil || len(row.SystemEventPayload) == 0 {
+				return ConversationMessageHistory{}, fmt.Errorf("load conversation system event: %w", ErrDataInvariant)
+			}
+			event := &ConversationSystemEvent{Type: domain.ConversationSystemEventType(*row.SystemEventType)}
+			if err := json.Unmarshal(row.SystemEventPayload, event); err != nil {
+				return ConversationMessageHistory{}, fmt.Errorf("decode conversation system event: %w", err)
+			}
+			message.SystemEvent = event
 		}
 		if row.SenderSubjectID != nil && row.SenderKind != nil && row.SenderSourceID != nil {
 			message.Sender = &ConversationMessageSender{
@@ -204,7 +219,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow, input Conver
 
 	result := ConversationMessageHistory{Messages: messages}
 	if len(rows) == 0 {
-		return result
+		return result, nil
 	}
 	first := MessageCursorPoint{OriginatedAt: rows[0].OriginatedAt, SourceOrder: rows[0].SourceOrder, ID: rows[0].ID}
 	last := MessageCursorPoint{OriginatedAt: rows[len(rows)-1].OriginatedAt, SourceOrder: rows[len(rows)-1].SourceOrder, ID: rows[len(rows)-1].ID}
@@ -221,5 +236,5 @@ func buildConversationMessageHistory(rows []conversationMessageRow, input Conver
 		}
 		result.After = &last
 	}
-	return result
+	return result, nil
 }

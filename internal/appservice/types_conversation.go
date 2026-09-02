@@ -18,7 +18,28 @@ const (
 type MessageType string
 
 const (
-	MessageTypeText MessageType = MessageType(domain.MessageTypeText)
+	MessageTypeText   MessageType = MessageType(domain.MessageTypeText)
+	MessageTypeSystem MessageType = MessageType(domain.MessageTypeSystem)
+)
+
+// ConversationStatus 表示会话生命周期状态。
+type ConversationStatus string
+
+const (
+	ConversationStatusActive   ConversationStatus = ConversationStatus(domain.ConversationStatusActive)
+	ConversationStatusArchived ConversationStatus = ConversationStatus(domain.ConversationStatusArchived)
+)
+
+// ConversationSystemEventType 表示会话系统事件类型。
+type ConversationSystemEventType string
+
+const (
+	ConversationSystemEventGroupRenamed          ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupRenamed)
+	ConversationSystemEventGroupMembersAdded     ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupMembersAdded)
+	ConversationSystemEventGroupMemberRemoved    ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupMemberRemoved)
+	ConversationSystemEventGroupMemberLeft       ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupMemberLeft)
+	ConversationSystemEventGroupOwnerTransferred ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupOwnerTransferred)
+	ConversationSystemEventGroupDissolved        ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupDissolved)
 )
 
 // GroupParticipantRole 表示群聊成员角色。
@@ -69,6 +90,21 @@ type ConversationMessageSessionStart struct {
 	Status    ServiceSessionStatus `json:"status"`
 }
 
+// ConversationSystemEventParticipant 定义系统事件中的成员快照。
+type ConversationSystemEventParticipant struct {
+	IdentityID  string `json:"identityId"`
+	DisplayName string `json:"displayName"`
+}
+
+// ConversationSystemEvent 定义成员可见的系统事件。
+type ConversationSystemEvent struct {
+	Type          ConversationSystemEventType          `json:"type"`
+	Actor         ConversationSystemEventParticipant   `json:"actor"`
+	Targets       []ConversationSystemEventParticipant `json:"targets"`
+	PreviousTitle *string                              `json:"previousTitle"`
+	Title         *string                              `json:"title"`
+}
+
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
 	ID           string                           `json:"id"`
@@ -78,6 +114,7 @@ type ConversationMessage struct {
 	CreatedAt    time.Time                        `json:"createdAt"`
 	Sender       *ConversationMessageSender       `json:"sender"`
 	SessionStart *ConversationMessageSessionStart `json:"sessionStart"`
+	SystemEvent  *ConversationSystemEvent         `json:"systemEvent"`
 }
 
 // ConversationMessageList 定义成员消息页。
@@ -104,6 +141,31 @@ type GroupConversationInput struct {
 	MemberIdentityIDs []string `json:"memberIdentityIds"`
 }
 
+// GroupConversationTitleInput 定义群聊名称修改参数。
+type GroupConversationTitleInput struct {
+	Title string `json:"title"`
+}
+
+// GroupConversationMembersInput 定义群聊批量增员参数。
+type GroupConversationMembersInput struct {
+	MemberIdentityIDs []string `json:"memberIdentityIds"`
+}
+
+// GroupConversationMemberInput 定义群聊单个成员操作参数。
+type GroupConversationMemberInput struct {
+	MemberIdentityID string `json:"memberIdentityId"`
+}
+
+// GroupConversationOwnerInput 定义群主转让参数。
+type GroupConversationOwnerInput struct {
+	OwnerIdentityID string `json:"ownerIdentityId"`
+}
+
+// GroupConversationLeaveInput 定义当前成员退出群聊参数。
+type GroupConversationLeaveInput struct {
+	SuccessorIdentityID string `json:"successorIdentityId"`
+}
+
 // GroupParticipant 定义群聊当前有效成员。
 type GroupParticipant struct {
 	IdentityID  string               `json:"identityId"`
@@ -116,6 +178,8 @@ type GroupParticipant struct {
 type GroupConversation struct {
 	ID           string             `json:"id"`
 	Title        string             `json:"title"`
+	Status       ConversationStatus `json:"status"`
+	CreatedAt    time.Time          `json:"createdAt"`
 	Participants []GroupParticipant `json:"participants"`
 }
 

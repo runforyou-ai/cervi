@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
+  ConversationStatus,
   CustomerInboxView,
   InboxScope,
   OrganizationIdentityType,
@@ -663,7 +664,18 @@ function InboxConversationList({
               : null,
             t,
           )
-          const preview = summary.preview ?? t("messagesEmpty")
+          const groupDissolved =
+            isGroupInboxConversation(conversation) &&
+            conversation.group.status ===
+              ConversationStatus.ConversationStatusArchived
+          const preview =
+            groupDissolved
+              ? t("groupDissolved")
+              : summary.preview?.trim() ||
+                (isGroupInboxConversation(conversation) &&
+                summary.lastMessageAt
+                  ? t("groupSystemUpdated")
+                  : t("messagesEmpty"))
           const formattedTime = formatTime(summary.lastMessageAt)
           return (
             <button
@@ -729,6 +741,7 @@ function ConversationMain({
   conversation,
   onSessionMoved,
   onConversationChanged,
+  onGroupLeft,
   narrowViewport = false,
 }: {
   conversation: InboxConversation
@@ -744,6 +757,7 @@ function ConversationMain({
       | DirectInboxConversationData
       | GroupInboxConversationData,
   ) => void
+  onGroupLeft: (conversationID: string) => void
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation("inbox")
@@ -752,15 +766,36 @@ function ConversationMain({
   const conversationName = useConversationName()
   const [contextSheetOpen, setContextSheetOpen] = useState(false)
   const [contextCollapsed, setContextCollapsed] = useState(false)
-  const contactName = conversationName(conversation)
-  const customerConversation = isCustomerInboxConversation(conversation)
+  const sourceGroupConversation = isGroupInboxConversation(conversation)
     ? conversation
     : null
-  const directConversation = isDirectInboxConversation(conversation)
-    ? conversation
+  const [groupSummaryDraft, setGroupSummaryDraft] = useState<{
+    conversationID: string
+    summary: GroupInboxConversationData["group"]
+  } | null>(null)
+  const activeGroupSummary = sourceGroupConversation
+    ? groupSummaryDraft?.conversationID === conversation.id
+      ? groupSummaryDraft.summary
+      : sourceGroupConversation.group
     : null
-  const groupConversation = isGroupInboxConversation(conversation)
-    ? conversation
+
+  const displayedConversation: InboxConversation =
+    sourceGroupConversation && activeGroupSummary
+      ? { ...sourceGroupConversation, group: activeGroupSummary }
+      : conversation
+  const contactName = conversationName(displayedConversation)
+  const customerConversation = isCustomerInboxConversation(
+    displayedConversation,
+  )
+    ? displayedConversation
+    : null
+  const directConversation = isDirectInboxConversation(
+    displayedConversation,
+  )
+    ? displayedConversation
+    : null
+  const groupConversation = isGroupInboxConversation(displayedConversation)
+    ? displayedConversation
     : null
   const sessionStatus = customerConversation
     ? sessionStatusLabel(
@@ -779,7 +814,10 @@ function ConversationMain({
             name: customerConversation.customer.assignee.displayName,
           })
         : null
-    : null
+    : groupConversation?.group.status ===
+        ConversationStatus.ConversationStatusArchived
+      ? t("groupDissolvedUnavailable")
+      : null
   const contextTitle = customerConversation
     ? t("contextTitleBar")
     : directConversation
@@ -818,7 +856,7 @@ function ConversationMain({
     <div className="flex h-full min-h-0 bg-background">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ConversationHeader
-          conversation={conversation}
+          conversation={validConversation}
           contactName={contactName}
           sessionStatus={sessionStatus}
           currentIdentityId={identity.user.identityId}
@@ -848,7 +886,20 @@ function ConversationMain({
       <ConversationContextPane
         conversation={validConversation}
         displayName={contactName}
-        sessionStatus={sessionStatus}
+        currentIdentityID={identity.user.identityId}
+        onGroupSummaryChange={(changes) => {
+          if (!sourceGroupConversation) return
+          setGroupSummaryDraft((current) => ({
+            conversationID: conversation.id,
+            summary: {
+              ...(current?.conversationID === conversation.id
+                ? current.summary
+                : sourceGroupConversation.group),
+              ...changes,
+            },
+          }))
+        }}
+        onGroupLeft={() => onGroupLeft(conversation.id)}
         title={contextTitle}
         description={contextDescription}
         desktopVisible={desktopContextVisible}
@@ -897,7 +948,9 @@ function ConversationThread({
         workspaceLayout
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
-        retryFailedMessageDisabled={messageSending}
+        retryFailedMessageDisabled={
+          messageSending || !replySupported || Boolean(replyDisabledReason)
+        }
       />
       {!replySupported || replyDisabledReason ? (
         <ConversationComposerUnavailable
@@ -968,6 +1021,9 @@ export function InboxPage({
   const [startedConversations, setStartedConversations] = useState<
     InternalInboxConversationData[]
   >([])
+  const [leftGroupConversationIDs, setLeftGroupConversationIDs] = useState<
+    Set<string>
+  >(new Set())
   const [selectedConversationSnapshot, setSelectedConversationSnapshot] =
     useState<InboxConversation | null>(null)
   const conversationName = useConversationName()
@@ -986,11 +1042,12 @@ export function InboxPage({
     () =>
       conversations.filter(
         (conversation) =>
-          isCustomerInboxConversation(conversation) ||
-          isDirectInboxConversation(conversation) ||
-          isGroupInboxConversation(conversation),
+          !leftGroupConversationIDs.has(conversation.id) &&
+          (isCustomerInboxConversation(conversation) ||
+            isDirectInboxConversation(conversation) ||
+            isGroupInboxConversation(conversation)),
       ),
-    [conversations],
+    [conversations, leftGroupConversationIDs],
   )
   const allConversations = useMemo(
     () =>
@@ -1064,6 +1121,20 @@ export function InboxPage({
       return pending.length === current.length ? current : pending
     })
   }, [validConversations])
+
+  useEffect(() => {
+    const listedIDs = new Set(
+      conversations.map((conversation) => conversation.id),
+    )
+    setLeftGroupConversationIDs((current) => {
+      const pending = new Set(
+        [...current].filter((conversationID) =>
+          listedIDs.has(conversationID),
+        ),
+      )
+      return pending.size === current.size ? current : pending
+    })
+  }, [conversations])
 
   const selectedPool = listLoading ? allConversations : scopedConversations
   const selectedFromPool =
@@ -1260,6 +1331,22 @@ export function InboxPage({
     )
   }
 
+  /** 群聊退出后立即切换到下一条仍可访问的会话。 */
+  function showConversationAfterGroupLeft(conversationID: string) {
+    setLeftGroupConversationIDs((current) =>
+      new Set(current).add(conversationID),
+    )
+    setStartedConversations((current) =>
+      current.filter((conversation) => conversation.id !== conversationID),
+    )
+    setSelectedConversationSnapshot(null)
+    setIsNarrowDetailOpen(false)
+    const nextConversationID = scopedConversations.find(
+      (conversation) => conversation.id !== conversationID,
+    )?.id
+    onSelectedConversationChange(nextConversationID ?? "", true)
+  }
+
   const pane = (
     <div className="flex min-h-0 flex-1 flex-col">
       <InboxPaneTop
@@ -1331,6 +1418,7 @@ export function InboxPage({
               conversation={selectedConversation}
               onSessionMoved={showMovedCustomerConversation}
               onConversationChanged={refreshConversationAfterMessage}
+              onGroupLeft={showConversationAfterGroupLeft}
             />
           </section>
         ) : (
@@ -1365,6 +1453,7 @@ export function InboxPage({
               conversation={selectedConversation}
               onSessionMoved={showMovedCustomerConversation}
               onConversationChanged={refreshConversationAfterMessage}
+              onGroupLeft={showConversationAfterGroupLeft}
               narrowViewport
             />
           </SheetContent>

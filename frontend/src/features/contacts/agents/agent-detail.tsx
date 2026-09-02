@@ -25,7 +25,13 @@ import {
   type RoleData,
   type Team,
 } from "@/api"
+import { DetailEditRow } from "@/components/form/detail-edit-row"
 import { StatusBadge } from "@/components/status-badge"
+import {
+  selectableWorkStatuses,
+  WorkStatusBadge,
+  workStatusLabel,
+} from "@/components/work-status"
 import { Field, FieldDescription } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -49,20 +55,11 @@ import {
   type AccountStatusFormValues,
 } from "@/features/contacts/account-status-schema"
 import { userStatusLabel } from "@/features/contacts/external/contact-labels"
-import { DetailEditRow } from "@/features/contacts/detail-edit-row"
-import {
-  sameIDs,
-  useImmediateSave,
-} from "@/features/contacts/use-immediate-save"
-import {
-  selectableWorkStatuses,
-  WorkStatusBadge,
-  workStatusLabel,
-} from "@/components/work-status"
+import { roleDisplayName } from "@/features/roles/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
+import { sameIDs, useImmediateSave } from "@/hooks/use-immediate-save"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { roleDisplayName } from "@/features/roles/role-labels"
 
 type EditingField =
   | "name"

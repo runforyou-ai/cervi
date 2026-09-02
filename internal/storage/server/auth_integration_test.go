@@ -1167,6 +1167,82 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), observerLogin.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 			t.Fatalf("non-participant group history error = %v", err)
 		}
+
+		leave := conversationaction.NewLeaveGroupConversationAction(db)
+		managedGroup, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+			Title: "群主退出测试", MemberIdentityIDs: []string{memberLogin.Identity.OrganizationIdentity.ID},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = leave.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationLeaveInput{ConversationID: managedGroup.ID})
+		var conflictError *conversationaction.ConflictError
+		if !errors.As(err, &conflictError) || conflictError.Reason != conversationaction.ConflictReasonGroupSuccessorRequired {
+			t.Fatalf("owner leave without successor error = %#v", err)
+		}
+		err = leave.Execute(context.Background(), memberLogin.Identity, conversationaction.GroupConversationLeaveInput{
+			ConversationID: managedGroup.ID, SuccessorIdentityID: observerLogin.Identity.OrganizationIdentity.ID,
+		})
+		var validationError *conversationaction.ValidationError
+		if !errors.As(err, &validationError) || validationError.Fields["successorIdentityId"] != conversationaction.ValidationGroupSuccessorIDInvalid {
+			t.Fatalf("member leave with successor error = %#v", err)
+		}
+		if err := leave.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationLeaveInput{
+			ConversationID: managedGroup.ID, SuccessorIdentityID: memberLogin.Identity.OrganizationIdentity.ID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		transferredGroup, err := get.Execute(context.Background(), memberLogin.Identity, managedGroup.ID)
+		if err != nil || transferredGroup.Status != domain.ConversationStatusActive || len(transferredGroup.Participants) != 1 || transferredGroup.Participants[0].Role != domain.ConversationParticipantRoleOwner {
+			t.Fatalf("transferred group = %#v, error = %v", transferredGroup, err)
+		}
+		if _, err := get.Execute(context.Background(), loggedIn.Identity, managedGroup.ID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("former owner group detail error = %v", err)
+		}
+
+		dissolvedGroup, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+			Title: "群聊解散测试", MemberIdentityIDs: []string{memberLogin.Identity.OrganizationIdentity.ID},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		remainingGroup, err := conversationaction.NewRemoveGroupConversationMemberAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationMemberInput{
+			ConversationID: dissolvedGroup.ID, MemberIdentityID: memberLogin.Identity.OrganizationIdentity.ID,
+		})
+		if err != nil || len(remainingGroup.Participants) != 1 {
+			t.Fatalf("remaining group = %#v, error = %v", remainingGroup, err)
+		}
+		if err := leave.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationLeaveInput{ConversationID: dissolvedGroup.ID}); err != nil {
+			t.Fatal(err)
+		}
+		dissolvedDetail, err := get.Execute(context.Background(), loggedIn.Identity, dissolvedGroup.ID)
+		if err != nil || dissolvedDetail.Status != domain.ConversationStatusArchived || len(dissolvedDetail.Participants) != 1 || dissolvedDetail.Participants[0].IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
+			t.Fatalf("dissolved group detail = %#v, error = %v", dissolvedDetail, err)
+		}
+		dissolvedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: dissolvedGroup.ID})
+		if err != nil || len(dissolvedHistory.Messages) != 2 || dissolvedHistory.Messages[1].SystemEvent == nil || dissolvedHistory.Messages[1].SystemEvent.Type != domain.ConversationSystemEventGroupDissolved {
+			t.Fatalf("dissolved group history = %#v, error = %v", dissolvedHistory, err)
+		}
+		if _, err := send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+			ConversationID: dissolvedGroup.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f69", Body: "解散后发送",
+		}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("send dissolved group error = %v", err)
+		}
+		items, err := inbox.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		foundDissolved := false
+		for _, item := range items {
+			if item.ID == dissolvedGroup.ID && item.Group != nil && item.Group.Status == domain.ConversationStatusArchived {
+				foundDissolved = true
+				break
+			}
+		}
+		if !foundDissolved {
+			t.Fatalf("dissolved group missing from inbox: %#v", items)
+		}
+
 		if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, observer.ID, domain.UserStatusInactive); err != nil {
 			t.Fatal(err)
 		}

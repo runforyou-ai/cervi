@@ -98,10 +98,11 @@ type DirectInboxConversation struct {
 
 // GroupInboxConversation 定义企业群聊摘要。
 type GroupInboxConversation struct {
-	Title         string     `json:"title"`
-	Preview       *string    `json:"preview"`
-	LastMessageAt *time.Time `json:"lastMessageAt"`
-	MemberCount   int        `json:"memberCount"`
+	Title         string             `json:"title"`
+	Status        ConversationStatus `json:"status"`
+	Preview       *string            `json:"preview"`
+	LastMessageAt *time.Time         `json:"lastMessageAt"`
+	MemberCount   int                `json:"memberCount"`
 }
 
 // InboxConversation 定义成员统一收件箱列表项。

@@ -22,6 +22,13 @@ export function ActivateMessageChannel(meta: $models.RequestMeta, channelID: str
 }
 
 /**
+ * AddGroupConversationMembers 批量增加群聊成员。
+ */
+export function AddGroupConversationMembers(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMembersInput): $CancellablePromise<$models.GroupConversation> {
+    return $Call.ByID(2648272946, meta, conversationID, input);
+}
+
+/**
  * AddTeamMembers 将企业身份批量加入团队。
  */
 export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
@@ -351,6 +358,13 @@ export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromi
 }
 
 /**
+ * LeaveGroupConversation 退出群聊并按需转让群主。
+ */
+export function LeaveGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationLeaveInput): $CancellablePromise<void> {
+    return $Call.ByID(43150167, meta, conversationID, input);
+}
+
+/**
  * ListAIProviders 返回当前企业的模型服务供应商列表。
  */
 export function ListAIProviders(meta: $models.RequestMeta): $CancellablePromise<$models.AIProviderList> {
@@ -561,6 +575,13 @@ export function ReactivateUser(meta: $models.RequestMeta, userID: string): $Canc
 }
 
 /**
+ * RemoveGroupConversationMember 移除单个群聊成员。
+ */
+export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {
+    return $Call.ByID(3264103052, meta, conversationID, input);
+}
+
+/**
  * RemoveTeamMembers 将企业身份批量移出团队。
  */
 export function RemoveTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
@@ -687,6 +708,13 @@ export function TestTelegramChannelConnection(meta: $models.RequestMeta, channel
 }
 
 /**
+ * TransferGroupConversationOwner 转让群主。
+ */
+export function TransferGroupConversationOwner(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationOwnerInput): $CancellablePromise<$models.GroupConversation> {
+    return $Call.ByID(637753570, meta, conversationID, input);
+}
+
+/**
  * TransferServiceSession 把当前负责的处理周期转给另一位客服。
  */
 export function TransferServiceSession(meta: $models.RequestMeta, conversationID: string, input: $models.TransferServiceSessionInput): $CancellablePromise<$models.CustomerServiceSession> {
@@ -733,6 +761,13 @@ export function UpdateBusinessSystem(meta: $models.RequestMeta, businessSystemID
  */
 export function UpdateContact(meta: $models.RequestMeta, contactID: string, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(183062653, meta, contactID, input);
+}
+
+/**
+ * UpdateGroupConversation 修改群聊名称。
+ */
+export function UpdateGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationTitleInput): $CancellablePromise<$models.GroupConversation> {
+    return $Call.ByID(1492390913, meta, conversationID, input);
 }
 
 /**
