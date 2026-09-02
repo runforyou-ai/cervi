@@ -396,7 +396,7 @@ export function ConversationContextPane({
 
       <aside
         className={cn(
-          "relative hidden h-full min-h-0 min-w-0 shrink-0 overflow-hidden bg-background xl:block",
+          "cervi-conversation-context-pane relative hidden h-full min-h-0 min-w-0 shrink-0 overflow-hidden bg-background xl:block",
           !desktopVisible && "xl:hidden",
         )}
         style={{ width: contextPanelWidth }}

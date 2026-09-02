@@ -309,6 +309,11 @@ body,
   --wails-draggable: drag;
 }
 
+[data-native-os="darwin"][data-window-fullscreen="false"]
+  .cervi-conversation-context-pane [data-slot="tabs-list"] {
+  --wails-draggable: drag;
+}
+
 /* 主内容卡片上方的内缩间隙保持可拖动。 */
 .cervi-workspace-top-drag-region {
   display: none;
@@ -331,6 +336,7 @@ body,
   [data-slot="page-header-title"],
   [data-slot="page-header"] :is(a, button, input, select),
   [data-slot="conversation-actions"],
+  [data-slot="conversation-header-title"],
   [data-slot="conversation-header"] :is(a, button, input, select),
   [data-slot="inbox-pane-header"] :is(a, button, input, select),
   .cervi-knowledge-base-pane :is(a, button, input, select, [role="button"]),
@@ -338,6 +344,11 @@ body,
   :is(.cervi-inbox-empty-main, .cervi-knowledge-base-index)
     [data-slot="empty-state-content"]
 ) {
+  --wails-draggable: no-drag;
+}
+
+[data-native-os="darwin"]
+  .cervi-conversation-context-pane [data-slot="tabs-trigger"] {
   --wails-draggable: no-drag;
 }
 
