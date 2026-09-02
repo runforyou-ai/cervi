@@ -281,7 +281,6 @@ const (
 	FieldQueryPositiveInteger             Key = "field.query_positive_integer"
 	FieldServerURLComplete                Key = "field.server_url_complete"
 	FieldServerURLBaseOnly                Key = "field.server_url_base_only"
-	FieldServerURLHTTPSRequired           Key = "field.server_url_https_required"
 	FieldServerURLNotCervi                Key = "field.server_url_not_cervi"
 	FieldVisitorTokenInvalid              Key = "field.visitor_token_invalid"
 	FieldChannelIDInvalid                 Key = "field.channel_id_invalid"
