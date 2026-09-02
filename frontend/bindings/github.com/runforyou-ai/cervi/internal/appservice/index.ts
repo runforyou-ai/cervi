@@ -90,6 +90,8 @@ export type {
     ConversationMessage,
     ConversationMessageList,
     ConversationMessageListInput,
+    ConversationMessageMention,
+    ConversationMessageReference,
     ConversationMessageSender,
     ConversationMessageSessionStart,
     ConversationSystemEvent,

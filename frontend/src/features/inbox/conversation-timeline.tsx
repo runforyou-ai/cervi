@@ -10,6 +10,7 @@ import {
 } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
+import { toast } from "sonner"
 
 import {
   ChatSubjectKind,
@@ -18,16 +19,24 @@ import {
   MessageType,
   ServiceSessionStatus,
   listConversationMessages,
-  type ConversationMessage,
+  type ConversationMessageData,
   type ConversationMessageListData,
+  type ConversationMessageReference,
   type ConversationSystemEvent,
   type ConversationSystemEventParticipant,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
+import { mentionTokenPattern } from "@/features/inbox/mention-token"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
@@ -43,10 +52,10 @@ import { cn } from "@/lib/utils"
 
 /** 按稳定消息顺序合并并去重时间线。 */
 function mergeMessages(
-  earlier: ConversationMessage[],
-  current: ConversationMessage[],
+  earlier: ConversationMessageData[],
+  current: ConversationMessageData[],
 ) {
-  const messages = new Map<string, ConversationMessage>()
+  const messages = new Map<string, ConversationMessageData>()
   for (const message of [...earlier, ...current]) {
     messages.set(message.id, message)
   }
@@ -58,7 +67,7 @@ function mergeMessages(
 }
 
 type TimelineMessage = Pick<
-  ConversationMessage,
+  ConversationMessageData,
   | "id"
   | "type"
   | "body"
@@ -66,8 +75,11 @@ type TimelineMessage = Pick<
   | "sender"
   | "sessionStart"
   | "systemEvent"
+  | "replyTo"
+  | "mentions"
 > & {
   clientMessageID: string | null
+  mentionSubjectIDs: string[]
   local: boolean
   deliveryStatus: "sending" | "failed" | null
 }
@@ -97,7 +109,7 @@ function timelineSenderKey(
 
 /** 合并服务端消息和当前页面的即时发送状态。 */
 function mergeTimelineMessages(
-  current: ConversationMessage[],
+  current: ConversationMessageData[],
   outgoing: OutgoingConversationMessage[],
 ) {
   const saved = outgoing.flatMap((message) =>
@@ -107,6 +119,7 @@ function mergeTimelineMessages(
     (message) => ({
       ...message,
       clientMessageID: null,
+      mentionSubjectIDs: [],
       local: false,
       deliveryStatus: null,
     }),
@@ -121,7 +134,10 @@ function mergeTimelineMessages(
       sender: null,
       sessionStart: null,
       systemEvent: null,
+      replyTo: message.replyTo,
+      mentions: [],
       clientMessageID: message.clientMessageID,
+      mentionSubjectIDs: message.mentionSubjectIDs,
       local: true,
       deliveryStatus:
         message.status === "failed"
@@ -136,6 +152,28 @@ function mergeTimelineMessages(
       Date.parse(left.originatedAt) - Date.parse(right.originatedAt)
     return timeDifference || left.id.localeCompare(right.id)
   })
+}
+
+/** 在消息正文中强调服务端确认的结构化提醒。 */
+function renderMessageBody(message: TimelineMessage) {
+  const names = message.mentions
+    .map((mention) => mention.displayName?.trim() ?? "")
+    .filter((name, index, values) => name && values.indexOf(name) === index)
+    .sort((left, right) => right.length - left.length)
+  if (names.length === 0) return message.body
+  const mentioned = new Set(names.map((name) => `@${name}`))
+  const parts = message.body.split(
+    new RegExp(`(${mentionTokenPattern(names)})`, "gu"),
+  )
+  return parts.map((part, index) =>
+    mentioned.has(part) ? (
+      <span key={`${part}:${index}`} className="font-semibold underline">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  )
 }
 
 /** 返回时间线滚动视口。 */
@@ -166,6 +204,7 @@ export function ConversationTimeline({
   outgoingMessages,
   onRetryFailedMessage,
   retryFailedMessageDisabled = false,
+  onReplyMessage,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -175,6 +214,7 @@ export function ConversationTimeline({
   outgoingMessages: OutgoingConversationMessage[]
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
   retryFailedMessageDisabled?: boolean
+  onReplyMessage?: (message: ConversationMessageReference) => void
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -208,6 +248,17 @@ export function ConversationTimeline({
     currentPage?.messages ?? [],
     outgoingMessages,
   )
+
+  /** 复制一条文本消息的正文。 */
+  async function copyMessageText(body: string) {
+    try {
+      await navigator.clipboard.writeText(body)
+      toast.success(t("messageCopySuccess"))
+    } catch (copyError) {
+      console.warn("复制消息文本失败", copyError)
+      toast.error(t("messageCopyError"))
+    }
+  }
 
   const dateFormatters = useMemo(() => {
     const locale = i18n.resolvedLanguage
@@ -671,6 +722,8 @@ export function ConversationTimeline({
                       clientMessageID: message.clientMessageID,
                       body: message.body,
                       originatedAt: message.originatedAt,
+                      replyTo: message.replyTo,
+                      mentionSubjectIDs: message.mentionSubjectIDs,
                     }
                   : null
               const systemEvent = message.systemEvent
@@ -726,125 +779,196 @@ export function ConversationTimeline({
                       </span>
                     </div>
                   ) : (
-                  <article
-                    className={cn(
-                      "flex items-start gap-2",
-                      index > 0 && (startsGroup ? "mt-3" : "mt-1"),
-                      incoming ? "justify-start" : "justify-end",
-                    )}
-                    aria-label={`${senderName} ${dateFormatters.full.format(date)}`}
-                  >
-                    <div
-                      className={cn(
-                        "flex max-w-[75%] flex-col gap-1",
-                        incoming ? "ml-10 items-start" : "mr-10 items-end",
-                      )}
-                    >
-                      {!workspaceLayout ? (
-                        <time
-                          dateTime={message.originatedAt}
-                          title={dateFormatters.full.format(date)}
-                          className="text-[11px] text-muted-foreground/80"
-                        >
-                          {formatMessageTime(
-                            dateFormatters.sessionTime,
-                            date,
-                          )}
-                        </time>
-                      ) : null}
-                      {conversationType ===
-                        ConversationType.ConversationTypeGroup &&
-                      (!workspaceLayout || incoming) &&
-                      startsGroup ? (
-                        <span className="max-w-full truncate text-xs font-medium text-foreground">
-                          {senderName}
-                        </span>
-                      ) : null}
-                      <div className="relative max-w-full">
-                        {endsGroup ? (
-                          <span
-                            className={cn(
-                              "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
-                              incoming
-                                ? "right-full mr-2 border bg-background text-foreground"
-                                : "left-full ml-2 bg-primary text-primary-foreground",
-                            )}
-                            title={senderName}
-                            aria-hidden="true"
-                          >
-                            {senderInitial}
-                          </span>
-                        ) : null}
+                    <ContextMenu>
+                      <article
+                        className={cn(
+                          "flex items-start gap-2",
+                          index > 0 && (startsGroup ? "mt-3" : "mt-1"),
+                          incoming ? "justify-start" : "justify-end",
+                        )}
+                        aria-label={`${senderName} ${dateFormatters.full.format(date)}`}
+                      >
                         <div
                           className={cn(
-                            "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
-                            workspaceLayout && "flex items-end gap-2",
-                            incoming
-                              ? cn(
-                                  "border bg-background text-foreground shadow-xs",
-                                  endsGroup && "rounded-bl-sm",
-                                )
-                              : cn(
-                                  "bg-primary text-primary-foreground",
-                                  endsGroup && "rounded-br-sm",
-                                ),
+                            "flex max-w-[75%] flex-col gap-1",
+                            incoming ? "ml-10 items-start" : "mr-10 items-end",
                           )}
                         >
-                          <span className="min-w-0 whitespace-pre-wrap">
-                            {message.body}
-                          </span>
-                          {workspaceLayout ? (
+                          {!workspaceLayout ? (
                             <time
                               dateTime={message.originatedAt}
                               title={dateFormatters.full.format(date)}
-                              className={cn(
-                                "shrink-0 translate-y-0.5 text-[10px]",
-                                incoming
-                                  ? "text-muted-foreground"
-                                  : "text-primary-foreground/75",
-                              )}
+                              className="text-[11px] text-muted-foreground/80"
                             >
-                              {dateFormatters.clock.format(date)}
+                              {formatMessageTime(
+                                dateFormatters.sessionTime,
+                                date,
+                              )}
                             </time>
                           ) : null}
+                          {conversationType ===
+                            ConversationType.ConversationTypeGroup &&
+                          (!workspaceLayout || incoming) &&
+                          startsGroup ? (
+                            <span className="max-w-full truncate text-xs font-medium text-foreground">
+                              {senderName}
+                            </span>
+                          ) : null}
+                          <div className="relative max-w-full">
+                            {endsGroup ? (
+                              <span
+                                className={cn(
+                                  "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
+                                  incoming
+                                    ? "right-full mr-2 border bg-background text-foreground"
+                                    : "left-full ml-2 bg-primary text-primary-foreground",
+                                )}
+                                title={senderName}
+                                aria-hidden="true"
+                              >
+                                {senderInitial}
+                              </span>
+                            ) : null}
+                            <ContextMenuTrigger asChild>
+                              <div className="group/message relative max-w-full">
+                                {!message.local && onReplyMessage ? (
+                                  <button
+                                    type="button"
+                                    className={cn(
+                                        "pointer-events-none absolute top-0 z-10 rounded-md border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100",
+                                        incoming ? "left-full" : "right-full",
+                                    )}
+                                    onClick={() =>
+                                      onReplyMessage({
+                                        id: message.id,
+                                        body: message.body,
+                                        sender: message.sender,
+                                      })
+                                    }
+                                  >
+                                    {t("messageReply")}
+                                  </button>
+                                ) : null}
+                                <div
+                                  className={cn(
+                                    "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
+                                    incoming
+                                      ? cn(
+                                          "border bg-background text-foreground shadow-xs",
+                                          endsGroup && "rounded-bl-sm",
+                                        )
+                                      : cn(
+                                          "bg-primary text-primary-foreground",
+                                          endsGroup && "rounded-br-sm",
+                                        ),
+                                  )}
+                                >
+                                  {message.replyTo ? (
+                                    <div
+                                      className={cn(
+                                        "mb-1.5 border-l-2 pl-2 text-xs",
+                                        incoming
+                                          ? "border-primary text-muted-foreground"
+                                          : "border-primary-foreground/60 text-primary-foreground/75",
+                                      )}
+                                    >
+                                      <p className="font-medium">
+                                        {message.replyTo.sender?.displayName?.trim() ||
+                                          t("unknownSender")}
+                                      </p>
+                                      <p className="line-clamp-2 whitespace-pre-wrap">
+                                        {message.replyTo.body}
+                                      </p>
+                                    </div>
+                                  ) : null}
+                                  <div
+                                    className={cn(
+                                      "min-w-0",
+                                      workspaceLayout &&
+                                        "flex items-end gap-2",
+                                    )}
+                                  >
+                                    <span className="min-w-0 whitespace-pre-wrap">
+                                      {renderMessageBody(message)}
+                                    </span>
+                                    {workspaceLayout ? (
+                                      <time
+                                        dateTime={message.originatedAt}
+                                        title={dateFormatters.full.format(date)}
+                                        className={cn(
+                                          "shrink-0 translate-y-0.5 text-[10px]",
+                                          incoming
+                                            ? "text-muted-foreground"
+                                            : "text-primary-foreground/75",
+                                        )}
+                                      >
+                                        {dateFormatters.clock.format(date)}
+                                      </time>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            </ContextMenuTrigger>
+                          </div>
+                          {failedDraft && onRetryFailedMessage ? (
+                            <div
+                              className="flex items-center gap-1.5 text-[11px] text-destructive"
+                              role="status"
+                            >
+                              <span>{t("messageSendError")}</span>
+                              <button
+                                type="button"
+                                className="underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                                disabled={retryFailedMessageDisabled}
+                                onClick={() =>
+                                  onRetryFailedMessage(failedDraft)
+                                }
+                              >
+                                {t("messageRetry")}
+                              </button>
+                            </div>
+                          ) : message.deliveryStatus ? (
+                            <span
+                              className={cn(
+                                "text-[11px]",
+                                message.deliveryStatus === "failed"
+                                  ? "text-destructive"
+                                  : "text-muted-foreground",
+                              )}
+                              role={
+                                message.deliveryStatus === "failed"
+                                  ? "status"
+                                  : undefined
+                              }
+                            >
+                              {message.deliveryStatus === "failed"
+                                ? t("messageSendError")
+                                : t("messageSending")}
+                            </span>
+                          ) : null}
                         </div>
-                      </div>
-                      {failedDraft && onRetryFailedMessage ? (
-                        <div
-                          className="flex items-center gap-1.5 text-[11px] text-destructive"
-                          role="status"
-                        >
-                          <span>{t("messageSendError")}</span>
-                          <button
-                            type="button"
-                            className="underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
-                            disabled={retryFailedMessageDisabled}
-                            onClick={() => onRetryFailedMessage(failedDraft)}
+                      </article>
+                      <ContextMenuContent>
+                        {!message.local && onReplyMessage ? (
+                          <ContextMenuItem
+                            onSelect={() =>
+                              onReplyMessage({
+                                id: message.id,
+                                body: message.body,
+                                sender: message.sender,
+                              })
+                            }
                           >
-                            {t("messageRetry")}
-                          </button>
-                        </div>
-                      ) : message.deliveryStatus ? (
-                        <span
-                          className={cn(
-                            "text-[11px]",
-                            message.deliveryStatus === "failed"
-                              ? "text-destructive"
-                              : "text-muted-foreground",
-                          )}
-                          role={
-                            message.deliveryStatus === "failed"
-                              ? "status"
-                              : undefined
-                          }
+                            {t("messageReply")}
+                          </ContextMenuItem>
+                        ) : null}
+                        <ContextMenuItem
+                          onSelect={() => void copyMessageText(message.body)}
                         >
-                          {message.deliveryStatus === "failed"
-                            ? t("messageSendError")
-                            : t("messageSending")}
-                        </span>
-                      ) : null}
-                    </div>
-                  </article>
+                          {t("messageCopyText")}
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
                   )}
                 </Fragment>
               )

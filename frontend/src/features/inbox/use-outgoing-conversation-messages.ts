@@ -1,7 +1,10 @@
 /** 管理当前页面尚未确认和已经确认的成员发送消息。 */
 import { useEffect, useRef, useState } from "react"
 
-import type { ConversationMessage } from "@/api"
+import type {
+  ConversationMessageData,
+  ConversationMessageReference,
+} from "@/api"
 
 export const conversationSendingIndicatorDelay = 300
 
@@ -9,15 +12,14 @@ export type OutgoingConversationDraft = {
   clientMessageID: string
   body: string
   originatedAt: string
+  replyTo: ConversationMessageReference | null
+  mentionSubjectIDs: string[]
 }
 
-export type OutgoingConversationMessage = {
-  clientMessageID: string
-  body: string
-  originatedAt: string
+export type OutgoingConversationMessage = OutgoingConversationDraft & {
   status: "sending" | "sent" | "failed"
   showSending: boolean
-  saved: ConversationMessage | null
+  saved: ConversationMessageData | null
 }
 
 /** 保存当前页面的即时发送状态，不执行重试。 */
@@ -75,7 +77,10 @@ export function useOutgoingConversationMessages() {
   }
 
   /** 用服务端消息替换发送中的本地消息。 */
-  function succeed(clientMessageID: string, saved: ConversationMessage) {
+  function succeed(
+    clientMessageID: string,
+    saved: ConversationMessageData,
+  ) {
     clearSendingDelay(clientMessageID)
     setMessages((current) =>
       current.map((message) =>

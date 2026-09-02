@@ -37,6 +37,12 @@ type conversationMessageRow struct {
 	SenderKind                     *string         `bun:"sender_kind"`
 	SenderSourceID                 *string         `bun:"sender_source_id"`
 	SenderDisplayName              *string         `bun:"sender_display_name"`
+	ReplyToMessageID               *string         `bun:"reply_to_message_id"`
+	ReplyToBody                    *string         `bun:"reply_to_body"`
+	ReplyToSenderSubjectID         *string         `bun:"reply_to_sender_subject_id"`
+	ReplyToSenderKind              *string         `bun:"reply_to_sender_kind"`
+	ReplyToSenderSourceID          *string         `bun:"reply_to_sender_source_id"`
+	ReplyToSenderDisplayName       *string         `bun:"reply_to_sender_display_name"`
 	ServiceSessionOpeningMessageID *string         `bun:"service_session_opening_message_id"`
 	ServiceSessionSequence         *int64          `bun:"service_session_sequence"`
 	ServiceSessionStartedAt        *time.Time      `bun:"service_session_started_at"`
@@ -72,6 +78,12 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		ColumnExpr("cs.kind AS sender_kind").
 		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) WHEN cs.kind = ? THEN oi.display_name END AS sender_display_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
+		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
+		ColumnExpr("reply_msg.body AS reply_to_body").
+		ColumnExpr("reply_cs.id AS reply_to_sender_subject_id").
+		ColumnExpr("reply_cs.kind AS reply_to_sender_kind").
+		ColumnExpr("reply_cs.source_id AS reply_to_sender_source_id").
+		ColumnExpr("reply_oi.display_name AS reply_to_sender_display_name").
 		ColumnExpr("ss.opening_message_id AS service_session_opening_message_id").
 		ColumnExpr("ss.sequence AS service_session_sequence").
 		ColumnExpr("ss.created_at AS service_session_started_at").
@@ -83,6 +95,10 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN contacts AS c ON c.id = cs.source_id AND c.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN messages AS reply_msg ON reply_msg.organization_id = msg.organization_id AND reply_msg.conversation_id = msg.conversation_id AND reply_msg.id = msg.reply_to_message_id AND reply_msg.type = ? AND reply_msg.deleted_at IS NULL", domain.MessageTypeText).
+		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.organization_id = reply_msg.organization_id AND reply_cp.conversation_id = reply_msg.conversation_id AND reply_cp.id = reply_msg.sender_participant_id").
+		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.organization_id = reply_cp.organization_id AND reply_cs.id = reply_cp.subject_id").
+		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.organization_id = reply_cs.organization_id AND reply_oi.id = reply_cs.source_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.conversation_id = ?", input.ConversationID).
 		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem})).
@@ -101,7 +117,14 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 	if err := query.Limit(conversationMessagePageSize+1).Scan(ctx, &rows); err != nil {
 		return ConversationMessageHistory{}, fmt.Errorf("list conversation messages: %w", err)
 	}
-	return buildConversationMessageHistory(rows, input)
+	history, err := buildConversationMessageHistory(rows, input)
+	if err != nil {
+		return ConversationMessageHistory{}, err
+	}
+	if err := loadConversationMessageMentions(ctx, q.db, identity.Organization.ID, history.Messages); err != nil {
+		return ConversationMessageHistory{}, err
+	}
+	return history, nil
 }
 
 // authorizeConversationHistory 对不同会话类型应用各自的成员可见性规则。
@@ -205,6 +228,20 @@ func buildConversationMessageHistory(rows []conversationMessageRow, input Conver
 				Kind:          domain.ChatSubjectKind(*row.SenderKind),
 				SourceID:      *row.SenderSourceID,
 				DisplayName:   row.SenderDisplayName,
+			}
+		}
+		if row.ReplyToMessageID != nil {
+			if row.ReplyToBody == nil || row.ReplyToSenderSubjectID == nil || row.ReplyToSenderKind == nil || row.ReplyToSenderSourceID == nil {
+				return ConversationMessageHistory{}, fmt.Errorf("load conversation reply reference: %w", ErrDataInvariant)
+			}
+			message.ReplyTo = &ConversationMessageReference{
+				ID: *row.ReplyToMessageID, Body: *row.ReplyToBody,
+				Sender: &ConversationMessageSender{
+					ChatSubjectID: *row.ReplyToSenderSubjectID,
+					Kind:          domain.ChatSubjectKind(*row.ReplyToSenderKind),
+					SourceID:      *row.ReplyToSenderSourceID,
+					DisplayName:   row.ReplyToSenderDisplayName,
+				},
 			}
 		}
 		if row.ServiceSessionOpeningMessageID != nil && *row.ServiceSessionOpeningMessageID == row.ID {
