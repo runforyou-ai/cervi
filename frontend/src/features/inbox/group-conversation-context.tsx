@@ -12,6 +12,7 @@ import { toast } from "sonner"
 import {
   addGroupConversationMembers,
   ConversationStatus,
+  FilePurpose,
   getGroupConversation,
   GroupParticipantRole,
   isApiError,
@@ -20,12 +21,18 @@ import {
   transferGroupConversationOwner,
   updateGroupConversation,
   type GroupConversationData,
+  type GroupConversationProfileInput,
   type MemberOption,
+  uploadFile,
 } from "@/api"
-import { DetailEditRow } from "@/components/form/detail-edit-row"
+import {
+  DetailEditActions,
+  DetailEditRow,
+} from "@/components/form/detail-edit-row"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Tabs,
   TabsContent,
@@ -33,6 +40,10 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { GroupParticipantList } from "@/features/inbox/group-participant-list"
+import {
+  GroupAvatar,
+  GroupImagePicker,
+} from "@/features/inbox/group-avatar"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -41,6 +52,7 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 const groupTitleMaxLength = 100
+const groupDescriptionMaxLength = 500
 
 /** 展示群资料中的只读字段。 */
 function ReadonlyGroupRow({
@@ -61,23 +73,26 @@ function ReadonlyGroupRow({
   )
 }
 
-/** 展示群资料并按通讯录详情模式即时修改群名称。 */
+/** 展示群资料并允许群主修改图片、名称和描述。 */
 function GroupConversationProfile({
   group,
   createdAt,
   canManage,
-  onRename,
+  onUpdate,
 }: {
   group: GroupConversationData
   createdAt: string | null
   canManage: boolean
-  onRename: (title: string) => Promise<void>
+  onUpdate: (input: GroupConversationProfileInput) => Promise<void>
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing] = useState<"title" | "description" | null>(null)
   const [title, setTitle] = useState(group.title)
+  const [description, setDescription] = useState(group.description)
+  const [imagePreviewURL, setImagePreviewURL] = useState("")
+  const [imageSaving, setImageSaving] = useState(false)
   const saveState = useImmediateSave()
   const owner = group.participants.find(
     (participant) =>
@@ -87,12 +102,20 @@ function GroupConversationProfile({
 
   useEffect(() => {
     setTitle(group.title)
-  }, [group.title])
+    setDescription(group.description)
+  }, [group.description, group.title])
 
-  /** 放弃尚未提交的群名称。 */
+  useEffect(() => {
+    return () => {
+      if (imagePreviewURL) URL.revokeObjectURL(imagePreviewURL)
+    }
+  }, [imagePreviewURL])
+
+  /** 放弃尚未提交的群资料字段。 */
   function cancelEdit() {
     setTitle(group.title)
-    setEditing(false)
+    setDescription(group.description)
+    setEditing(null)
   }
 
   /** 保存群名称并退出编辑。 */
@@ -111,19 +134,23 @@ function GroupConversationProfile({
     const request = saveState.begin()
     if (request === null) return
     try {
-      await onRename(nextTitle)
+      await onUpdate({
+        title: nextTitle,
+        description: group.description,
+        imageFileId: null,
+      })
       if (!saveState.isCurrent(request)) return
       setTitle(nextTitle)
-      setEditing(false)
+      setEditing(null)
     } catch (error) {
       if (!saveState.isCurrent(request)) return
       if (recoverSession(error, navigate)) return
-      console.warn("修改群聊名称失败", error)
+      console.warn("修改群聊资料失败", error)
       cancelEdit()
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error, ["title"])
-          : t("groupRenameError"),
+          : t("groupProfileSaveError"),
       )
     } finally {
       saveState.finish(request)
@@ -144,17 +171,128 @@ function GroupConversationProfile({
     }
   }
 
+  /** 保存群描述并退出编辑。 */
+  async function saveDescription() {
+    const nextDescription = description.trim()
+    if (nextDescription === group.description) {
+      cancelEdit()
+      return
+    }
+    const request = saveState.begin()
+    if (request === null) return
+    try {
+      await onUpdate({
+        title: group.title,
+        description: nextDescription,
+        imageFileId: null,
+      })
+      if (!saveState.isCurrent(request)) return
+      setDescription(nextDescription)
+      setEditing(null)
+    } catch (error) {
+      if (!saveState.isCurrent(request)) return
+      if (recoverSession(error, navigate)) return
+      console.warn("修改群聊描述失败", error)
+      cancelEdit()
+      toast.error(
+        isApiError(error)
+          ? apiErrorMessage(error, ["description"])
+          : t("groupProfileSaveError"),
+      )
+    } finally {
+      saveState.finish(request)
+    }
+  }
+
+  /** 处理群描述编辑快捷键。 */
+  function handleDescriptionKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (event.key !== "Escape") return
+    event.preventDefault()
+    event.stopPropagation()
+    cancelEdit()
+  }
+
+  /** 上传并关联新选择的群图片。 */
+  async function changeImage(file: File) {
+    const request = saveState.begin()
+    if (request === null) return
+    const previewURL = URL.createObjectURL(file)
+    setImagePreviewURL(previewURL)
+    setImageSaving(true)
+    let uploading = true
+    try {
+      const uploaded = await uploadFile(
+        file,
+        FilePurpose.FilePurposeGroupImage,
+      )
+      if (!saveState.isCurrent(request)) return
+      uploading = false
+      await onUpdate({
+        title: group.title,
+        description: group.description,
+        imageFileId: uploaded.id,
+      })
+      if (!saveState.isCurrent(request)) return
+      setImagePreviewURL("")
+    } catch (error) {
+      if (!saveState.isCurrent(request)) return
+      if (recoverSession(error, navigate)) return
+      console.warn(uploading ? "上传群聊图片失败" : "修改群聊图片失败", error)
+      setImagePreviewURL("")
+      toast.error(
+        isApiError(error)
+          ? apiErrorMessage(error, ["imageFileId"])
+          : t(
+              uploading
+                ? "groupImageUploadError"
+                : "groupProfileSaveError",
+            ),
+      )
+    } finally {
+      if (saveState.isCurrent(request)) setImageSaving(false)
+      saveState.finish(request)
+    }
+  }
+
+  const profileSaving = saveState.saving || imageSaving
+  const profileBusy = profileSaving || editing !== null
+
   return (
     <div className="space-y-0.5">
+      <div className="flex min-h-20 items-start gap-3 px-2 py-1.5 text-sm">
+        <div className="w-28 shrink-0 pt-1 text-muted-foreground">
+          {t("groupImageLabel")}
+        </div>
+        <div className="min-w-0 flex-1">
+          {canManage ? (
+            <GroupImagePicker
+              imageURL={imagePreviewURL || group.imageUrl}
+              className="size-16 rounded-xl"
+              disabled={profileBusy}
+              loading={imageSaving}
+              onSelect={(file) => void changeImage(file)}
+            />
+          ) : (
+            <GroupAvatar
+              imageURL={group.imageUrl}
+              className="size-16 rounded-xl"
+            />
+          )}
+        </div>
+        <div className="w-14 shrink-0" />
+      </div>
       <DetailEditRow
         label={t("groupTitleLabel")}
         value={group.title}
-        editing={editing}
-        editEnabled={canManage && !saveState.saving}
+        editing={editing === "title"}
+        editEnabled={canManage && !profileBusy}
+        required
         compact
         onEdit={() => {
           setTitle(group.title)
-          setEditing(true)
+          setEditing("title")
         }}
       >
         <Input
@@ -170,6 +308,34 @@ function GroupConversationProfile({
           }}
           onBlur={(event) => void saveTitle(event.currentTarget)}
           onKeyDown={handleTitleKeyDown}
+        />
+      </DetailEditRow>
+      <DetailEditRow
+        label={t("groupDescriptionLabel")}
+        value={group.description || t("groupDescriptionEmpty")}
+        editing={editing === "description"}
+        editEnabled={canManage && !profileBusy}
+        compact
+        onEdit={() => {
+          setDescription(group.description)
+          setEditing("description")
+        }}
+      >
+        <Textarea
+          autoFocus
+          value={description}
+          rows={4}
+          maxLength={groupDescriptionMaxLength}
+          disabled={saveState.saving}
+          aria-label={t("groupDescriptionLabel")}
+          className="min-h-24 resize-y"
+          onChange={(event) => setDescription(event.target.value)}
+          onKeyDown={handleDescriptionKeyDown}
+        />
+        <DetailEditActions
+          saving={saveState.saving}
+          onSave={() => void saveDescription()}
+          onCancel={cancelEdit}
         />
       </DetailEditRow>
       <ReadonlyGroupRow label={t("groupOwner")}>
@@ -234,6 +400,7 @@ export function GroupConversationContext({
   onDraftChange: (group: GroupConversationData) => void
   onSummaryChange: (changes: {
     title?: string
+    imageUrl?: string
     memberCount?: number
     status?: GroupConversationData["status"]
   }) => void
@@ -261,6 +428,7 @@ export function GroupConversationContext({
     onDraftChange(result)
     onSummaryChange({
       title: result.title,
+      imageUrl: result.imageUrl,
       memberCount: result.participants.length,
     })
     void invalidate(resourceKeys.groupConversation(conversationID), {
@@ -273,9 +441,9 @@ export function GroupConversationContext({
     void invalidate(resourceKeys.inbox())
   }
 
-  /** 修改群名称并采用服务端事实。 */
-  async function renameGroup(title: string) {
-    const result = await updateGroupConversation(conversationID, { title })
+  /** 修改群资料并采用服务端事实。 */
+  async function updateGroup(input: GroupConversationProfileInput) {
+    const result = await updateGroupConversation(conversationID, input)
     applyGroupResult(result)
   }
 
@@ -371,7 +539,7 @@ export function GroupConversationContext({
             group={group}
             createdAt={group.createdAt}
             canManage={canManage}
-            onRename={renameGroup}
+            onUpdate={updateGroup}
           />
         ) : (
           <GroupResourceState

@@ -19,6 +19,8 @@ const (
 	ValidationTargetIdentityIDInvalid ValidationCode = "target_identity_id_invalid"
 	ValidationGroupTitleRequired      ValidationCode = "group_title_required"
 	ValidationGroupTitleTooLong       ValidationCode = "group_title_too_long"
+	ValidationGroupDescriptionTooLong ValidationCode = "group_description_too_long"
+	ValidationGroupImageFileIDInvalid ValidationCode = "group_image_file_id_invalid"
 	ValidationGroupMembersRequired    ValidationCode = "group_members_required"
 	ValidationGroupMembersTooMany     ValidationCode = "group_members_too_many"
 	ValidationGroupMemberIDsInvalid   ValidationCode = "group_member_ids_invalid"
@@ -218,16 +220,20 @@ type DirectTextMessageInput struct {
 	Body            string
 }
 
-// GroupConversationInput 定义企业成员创建群聊的标题和初始成员。
+// GroupConversationInput 定义企业成员创建群聊的资料和初始成员。
 type GroupConversationInput struct {
 	Title             string
+	Description       string
+	ImageFileID       string
 	MemberIdentityIDs []string
 }
 
-// GroupConversationTitleInput 定义群聊名称修改参数。
-type GroupConversationTitleInput struct {
+// GroupConversationProfileInput 定义群聊资料修改参数。
+type GroupConversationProfileInput struct {
 	ConversationID string
 	Title          string
+	Description    string
+	ImageFileID    *string
 }
 
 // GroupConversationMembersInput 定义群聊批量增员参数。
@@ -260,6 +266,7 @@ type GroupConversationSummary struct {
 	Title       string
 	Status      domain.ConversationStatus
 	MemberCount int
+	ImageFileID *string
 }
 
 // GroupParticipant 定义群聊中的当前有效成员。
@@ -274,6 +281,8 @@ type GroupParticipant struct {
 type GroupConversation struct {
 	ID           string
 	Title        string
+	Description  string
+	ImageFileID  *string
 	Status       domain.ConversationStatus
 	CreatedAt    time.Time
 	Participants []GroupParticipant

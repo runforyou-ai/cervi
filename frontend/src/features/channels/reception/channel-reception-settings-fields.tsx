@@ -65,7 +65,7 @@ function ReceptionTargetField<
             const invalid = typeFieldState.invalid || idFieldState.invalid
             return (
               <Field data-invalid={invalid}>
-                <FieldLabel htmlFor={`${name}-type`}>
+                <FieldLabel htmlFor={`${name}-type`} required>
                   {t(
                     isFallback ? "routing.fallback" : "routing.newConversation",
                   )}

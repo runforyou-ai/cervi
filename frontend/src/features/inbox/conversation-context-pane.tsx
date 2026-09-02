@@ -145,6 +145,7 @@ function ConversationContextContent({
   onGroupDraftChange: (group: GroupConversationData) => void
   onGroupSummaryChange: (changes: {
     title?: string
+    imageUrl?: string
     memberCount?: number
     status?: GroupConversationData["status"]
   }) => void
@@ -304,6 +305,7 @@ export function ConversationContextPane({
   currentIdentityID: string
   onGroupSummaryChange: (changes: {
     title?: string
+    imageUrl?: string
     memberCount?: number
     status?: GroupConversationData["status"]
   }) => void

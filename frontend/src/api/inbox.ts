@@ -34,7 +34,7 @@ import type {
   GroupConversationMemberInput,
   GroupConversationMembersInput,
   GroupConversationOwnerInput,
-  GroupConversationTitleInput,
+  GroupConversationProfileInput,
   GroupInboxConversation,
   GroupParticipant,
   GroupTextMessageInput,
@@ -258,10 +258,10 @@ export async function getGroupConversation(
   return { ...result, participants: asList(result.participants) }
 }
 
-/** 修改企业内部群聊名称。 */
+/** 修改企业内部群聊资料。 */
 export async function updateGroupConversation(
   conversationID: string,
-  input: GroupConversationTitleInput,
+  input: GroupConversationProfileInput,
 ): Promise<GroupConversationData> {
   const result = await updateGroupConversationBound(conversationID, input)
   return { ...result, participants: asList(result.participants) }

@@ -99,8 +99,8 @@ func (s *Service) GetGroupConversation(ctx context.Context, meta RequestMeta, co
 	return s.backend.GetGroupConversation(ctx, meta, conversationID)
 }
 
-// UpdateGroupConversation 修改群聊名称。
-func (s *Service) UpdateGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationTitleInput) (GroupConversation, error) {
+// UpdateGroupConversation 修改群聊资料。
+func (s *Service) UpdateGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationProfileInput) (GroupConversation, error) {
 	return s.backend.UpdateGroupConversation(ctx, meta, conversationID, input)
 }
 

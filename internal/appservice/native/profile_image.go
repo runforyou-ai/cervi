@@ -19,33 +19,33 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-const maxProfileImageByteSize int64 = 5 * 1024 * 1024
+const maxImageByteSize int64 = 5 * 1024 * 1024
 
-var profileImageContentTypes = map[string]string{
+var imageContentTypes = map[string]string{
 	".jpg":  "image/jpeg",
 	".jpeg": "image/jpeg",
 	".png":  "image/png",
 	".webp": "image/webp",
 }
 
-// ProfileImageSelector 使用 Wails 原生对话框选择头像文件。
-type ProfileImageSelector struct{}
+// ImageSelector 使用 Wails 原生对话框选择图片文件。
+type ImageSelector struct{}
 
-// NewProfileImageSelector 创建原生头像文件选择器。
-func NewProfileImageSelector() *ProfileImageSelector {
-	return &ProfileImageSelector{}
+// NewImageSelector 创建原生图片文件选择器。
+func NewImageSelector() *ImageSelector {
+	return &ImageSelector{}
 }
 
-// SelectProfileImage 选择并读取用户头像图片。
-func (*ProfileImageSelector) SelectProfileImage(_ context.Context, meta appservice.RequestMeta) (appservice.ProfileImageFile, error) {
+// SelectImage 选择并读取图片。
+func (*ImageSelector) SelectImage(_ context.Context, meta appservice.RequestMeta) (appservice.ImageFile, error) {
 	app := application.Get()
 	if app == nil {
-		return appservice.ProfileImageFile{}, errors.New("application is not initialized")
+		return appservice.ImageFile{}, errors.New("application is not initialized")
 	}
 
 	messages := cervii18n.LocalizeMap(string(meta.Locale), map[string]cervii18n.Key{
-		"title":  cervii18n.DialogProfileImageTitle,
-		"choose": cervii18n.DialogProfileImageChoose,
+		"title":  cervii18n.DialogImageTitle,
+		"choose": cervii18n.DialogImageChoose,
 	})
 	title, buttonText := messages["title"], messages["choose"]
 	path, err := app.Dialog.OpenFile().
@@ -58,42 +58,42 @@ func (*ProfileImageSelector) SelectProfileImage(_ context.Context, meta appservi
 		SetButtonText(buttonText).
 		PromptForSingleSelection()
 	if err != nil {
-		slog.Warn("打开头像文件选择器失败", "error", err)
-		return appservice.ProfileImageFile{}, fmt.Errorf("select profile image: %w", err)
+		slog.Warn("打开图片文件选择器失败", "error", err)
+		return appservice.ImageFile{}, fmt.Errorf("select image: %w", err)
 	}
 	if path == "" {
-		return appservice.ProfileImageFile{}, nil
+		return appservice.ImageFile{}, nil
 	}
 
-	selected, err := readProfileImageFile(path)
+	selected, err := readImageFile(path)
 	if err != nil {
-		slog.Warn("读取头像文件失败", "file_name", filepath.Base(path), "error", err)
-		return appservice.ProfileImageFile{}, err
+		slog.Warn("读取图片文件失败", "file_name", filepath.Base(path), "error", err)
+		return appservice.ImageFile{}, err
 	}
 	return selected, nil
 }
 
-// readProfileImageFile 校验并读取头像图片。
-func readProfileImageFile(path string) (appservice.ProfileImageFile, error) {
-	contentType, allowed := profileImageContentTypes[strings.ToLower(filepath.Ext(path))]
+// readImageFile 校验并读取图片。
+func readImageFile(path string) (appservice.ImageFile, error) {
+	contentType, allowed := imageContentTypes[strings.ToLower(filepath.Ext(path))]
 	if !allowed {
-		return appservice.ProfileImageFile{}, errors.New("unsupported profile image type")
+		return appservice.ImageFile{}, errors.New("unsupported image type")
 	}
 	info, err := os.Stat(path)
 	if err != nil {
-		return appservice.ProfileImageFile{}, fmt.Errorf("stat profile image: %w", err)
+		return appservice.ImageFile{}, fmt.Errorf("stat image: %w", err)
 	}
-	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxProfileImageByteSize {
-		return appservice.ProfileImageFile{}, errors.New("invalid profile image size")
+	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxImageByteSize {
+		return appservice.ImageFile{}, errors.New("invalid image size")
 	}
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return appservice.ProfileImageFile{}, fmt.Errorf("read profile image: %w", err)
+		return appservice.ImageFile{}, fmt.Errorf("read image: %w", err)
 	}
 	if http.DetectContentType(content) != contentType {
-		return appservice.ProfileImageFile{}, errors.New("profile image content does not match its extension")
+		return appservice.ImageFile{}, errors.New("image content does not match its extension")
 	}
-	return appservice.ProfileImageFile{
+	return appservice.ImageFile{
 		Name:        filepath.Base(path),
 		ContentType: contentType,
 		DataBase64:  base64.StdEncoding.EncodeToString(content),

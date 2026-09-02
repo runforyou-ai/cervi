@@ -1,5 +1,5 @@
 /** 企业内部群聊创建表单。 */
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, SearchIcon, UserRoundIcon } from "lucide-react"
 import { useController, useForm } from "react-hook-form"
@@ -10,10 +10,12 @@ import { z } from "zod"
 
 import {
   createGroupConversation,
+  FilePurpose,
   isApiError,
   isGroupInboxConversation,
   OrganizationIdentityType,
   type GroupInboxConversationData,
+  uploadFile,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,8 +25,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
+import { GroupImagePicker } from "@/features/inbox/group-avatar"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -32,12 +37,23 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 const groupTitleMaxLength = 100
+const groupDescriptionMaxLength = 500
 const groupAdditionalMemberMaxCount = 99
+
+type PendingGroupImage = {
+  requestID: number
+  file: File
+  previewURL: string
+  status: "uploading" | "uploaded" | "failed"
+  fileID: string
+  upload?: Promise<string>
+}
 
 /** 创建群聊表单校验规则。 */
 function createGroupConversationSchema(messages: {
   titleRequired: string
   titleTooLong: string
+  descriptionTooLong: string
   membersRequired: string
   membersTooMany: string
 }) {
@@ -47,6 +63,10 @@ function createGroupConversationSchema(messages: {
       .trim()
       .min(1, messages.titleRequired)
       .max(groupTitleMaxLength, messages.titleTooLong),
+    description: z
+      .string()
+      .trim()
+      .max(groupDescriptionMaxLength, messages.descriptionTooLong),
     memberIdentityIds: z
       .array(z.string())
       .min(1, messages.membersRequired)
@@ -73,11 +93,15 @@ export function CreateGroupConversationDialog({
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const [query, setQuery] = useState("")
+  const imageRequestID = useRef(0)
+  const [pendingImage, setPendingImage] =
+    useState<PendingGroupImage | null>(null)
   const schema = useMemo(
     () =>
       createGroupConversationSchema({
         titleRequired: t("groupTitleRequired"),
         titleTooLong: t("groupTitleTooLong"),
+        descriptionTooLong: t("groupDescriptionTooLong"),
         membersRequired: t("groupMembersRequired"),
         membersTooMany: t("groupMembersTooMany"),
       }),
@@ -86,8 +110,21 @@ export function CreateGroupConversationDialog({
   const form = useForm<GroupConversationValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: { title: "", memberIdentityIds: [] },
+    defaultValues: { title: "", description: "", memberIdentityIds: [] },
   })
+
+  useEffect(() => {
+    const previewURL = pendingImage?.previewURL
+    return () => {
+      if (previewURL) URL.revokeObjectURL(previewURL)
+    }
+  }, [pendingImage?.previewURL])
+
+  useEffect(() => {
+    return () => {
+      imageRequestID.current += 1
+    }
+  }, [])
   const { field: memberIdentityIDsField } = useController({
     control: form.control,
     name: "memberIdentityIds",
@@ -110,11 +147,82 @@ export function CreateGroupConversationDialog({
     )
   }, [currentIdentityID, data, query])
 
+  /** 跟踪当前候选群图片的上传结果。 */
+  function monitorImageUpload(
+    candidate: PendingGroupImage,
+    upload: Promise<string>,
+  ) {
+    void upload.then(
+      (fileID) => {
+        if (imageRequestID.current !== candidate.requestID) return
+        setPendingImage((current) =>
+          current?.requestID === candidate.requestID
+            ? { ...current, status: "uploaded", fileID, upload: undefined }
+            : current,
+        )
+      },
+      (error) => {
+        if (imageRequestID.current !== candidate.requestID) return
+        setPendingImage((current) =>
+          current?.requestID === candidate.requestID
+            ? { ...current, status: "failed", upload: undefined }
+            : current,
+        )
+        console.warn("上传群聊图片失败", error)
+        if (!recoverSession(error, navigate)) {
+          toast.error(t("groupImageUploadError"))
+        }
+      },
+    )
+  }
+
+  /** 立即上传候选群图片并保留创建群聊所需的文件编号。 */
+  function startImageUpload(candidate: PendingGroupImage) {
+    const upload = uploadFile(
+      candidate.file,
+      FilePurpose.FilePurposeGroupImage,
+    ).then((file) => file.id)
+    const uploading = { ...candidate, status: "uploading" as const, upload }
+    setPendingImage(uploading)
+    monitorImageUpload(uploading, upload)
+    return upload
+  }
+
+  /** 预览并上传新选择的群图片。 */
+  function prepareImage(file: File) {
+    const candidate: PendingGroupImage = {
+      requestID: imageRequestID.current + 1,
+      file,
+      previewURL: URL.createObjectURL(file),
+      status: "uploading",
+      fileID: "",
+    }
+    imageRequestID.current = candidate.requestID
+    startImageUpload(candidate)
+  }
+
+  /** 移除尚未提交的候选群图片。 */
+  function discardImage() {
+    imageRequestID.current += 1
+    setPendingImage(null)
+  }
+
   /** 创建群聊并关闭表单。 */
   async function create(values: GroupConversationValues) {
+    let uploadingImage = false
     try {
+      let imageFileId = pendingImage?.fileID ?? ""
+      if (pendingImage && !imageFileId) {
+        uploadingImage = true
+        imageFileId = await (
+          pendingImage.upload ?? startImageUpload(pendingImage)
+        )
+        uploadingImage = false
+      }
       const conversation = await createGroupConversation({
         title: values.title.trim(),
+        description: values.description.trim(),
+        imageFileId,
         memberIdentityIds: values.memberIdentityIds,
       })
       if (!isGroupInboxConversation(conversation)) {
@@ -125,9 +233,15 @@ export function CreateGroupConversationDialog({
     } catch (createError) {
       if (recoverSession(createError, navigate)) return
       console.warn("创建企业内部群聊失败", { error: createError })
+      if (uploadingImage) return
       toast.error(
         isApiError(createError)
-          ? apiErrorMessage(createError, ["title", "memberIdentityIds"])
+          ? apiErrorMessage(createError, [
+              "title",
+              "description",
+              "imageFileId",
+              "memberIdentityIds",
+            ])
           : t("groupCreateError"),
       )
     }
@@ -138,6 +252,8 @@ export function CreateGroupConversationDialog({
     if (!nextOpen) {
       form.reset()
       setQuery("")
+      imageRequestID.current += 1
+      setPendingImage(null)
     }
     onOpenChange(nextOpen)
   }
@@ -146,21 +262,45 @@ export function CreateGroupConversationDialog({
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="max-h-[min(46rem,calc(100svh-2rem))] overflow-hidden">
+      <DialogContent className="grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("groupCreateTitle")}</DialogTitle>
           <DialogDescription>{t("groupCreateDescription")}</DialogDescription>
         </DialogHeader>
         <form
-          className="min-h-0 space-y-9"
+          className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-9 overflow-hidden"
           onSubmit={form.handleSubmit(create)}
           noValidate
         >
-          <div className="grid min-h-0 gap-5">
+          <div className="grid min-h-0 gap-5 overflow-y-auto pr-1">
             <div className="space-y-1.5">
-              <label htmlFor="group-title" className="text-sm font-medium">
+              <span className="block text-sm font-medium">
+                {t("groupImageLabel")}
+              </span>
+              <div className="flex items-center gap-3">
+                <GroupImagePicker
+                  imageURL={pendingImage?.previewURL}
+                  disabled={form.formState.isSubmitting}
+                  loading={pendingImage?.status === "uploading"}
+                  onSelect={prepareImage}
+                />
+                {pendingImage ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={form.formState.isSubmitting}
+                    onClick={discardImage}
+                  >
+                    {t("groupImageDiscard")}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <FieldLabel htmlFor="group-title" required>
                 {t("groupTitleLabel")}
-              </label>
+              </FieldLabel>
               <Input
                 {...form.register("title")}
                 id="group-title"
@@ -169,14 +309,23 @@ export function CreateGroupConversationDialog({
                 required
               />
             </div>
+            <div className="space-y-1.5">
+              <FieldLabel htmlFor="group-description">
+                {t("groupDescriptionLabel")}
+              </FieldLabel>
+              <Textarea
+                {...form.register("description")}
+                id="group-description"
+                rows={3}
+                maxLength={groupDescriptionMaxLength}
+                className="min-h-20 resize-y"
+              />
+            </div>
             <div className="grid min-h-0 gap-2">
               <div className="flex items-center justify-between gap-3">
-                <label
-                  htmlFor="group-member-search"
-                  className="text-sm font-medium"
-                >
+                <FieldLabel htmlFor="group-member-search" required>
                   {t("groupMembersLabel")}
-                </label>
+                </FieldLabel>
                 <span className="text-xs text-muted-foreground">
                   {t("groupMembersSelected", {
                     count: selectedIdentityIDs.length,
@@ -267,7 +416,7 @@ export function CreateGroupConversationDialog({
               </ScrollArea>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex shrink-0 justify-end gap-2">
             <Button
               type="button"
               variant="outline"

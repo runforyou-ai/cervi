@@ -36,7 +36,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldRequiredMark,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import {
@@ -377,6 +382,9 @@ export function ModelProviderFormPage({
       : t("modelServices.form.editTitle")
   const modelErrorMessage = modelValidationMessage(form.formState.errors.models)
   const watchedModels = form.watch("models")
+  const hasChatModel = watchedModels.some(
+    (model) => model.type === AIModelType.AIModelTypeChat,
+  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -507,12 +515,42 @@ export function ModelProviderFormPage({
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead>{t("modelServices.models.columns.type")}</TableHead>
-                      <TableHead>{t("modelServices.models.columns.identifier")}</TableHead>
-                      <TableHead>{t("modelServices.models.columns.name")}</TableHead>
-                      <TableHead>{t("modelServices.models.columns.inputModalities")}</TableHead>
-                      <TableHead>{t("modelServices.models.columns.contextWindow")}</TableHead>
-                      <TableHead>{t("modelServices.models.columns.maxOutputTokens")}</TableHead>
+                      <TableHead>
+                        <span className="inline-flex items-center gap-1">
+                          {t("modelServices.models.columns.type")}
+                          <FieldRequiredMark />
+                        </span>
+                      </TableHead>
+                      <TableHead>
+                        <span className="inline-flex items-center gap-1">
+                          {t("modelServices.models.columns.identifier")}
+                          <FieldRequiredMark />
+                        </span>
+                      </TableHead>
+                      <TableHead>
+                        <span className="inline-flex items-center gap-1">
+                          {t("modelServices.models.columns.name")}
+                          <FieldRequiredMark />
+                        </span>
+                      </TableHead>
+                      <TableHead>
+                        <span className="inline-flex items-center gap-1">
+                          {t("modelServices.models.columns.inputModalities")}
+                          <FieldRequiredMark />
+                        </span>
+                      </TableHead>
+                      <TableHead>
+                        <span className="inline-flex items-center gap-1">
+                          {t("modelServices.models.columns.contextWindow")}
+                          <FieldRequiredMark />
+                        </span>
+                      </TableHead>
+                      <TableHead>
+                        <span className="inline-flex items-center gap-1">
+                          {t("modelServices.models.columns.maxOutputTokens")}
+                          {hasChatModel ? <FieldRequiredMark /> : null}
+                        </span>
+                      </TableHead>
                       <TableHead className="text-right">
                         {t("modelServices.models.columns.actions")}
                       </TableHead>

@@ -19,6 +19,8 @@ type Conversation struct {
 	Type                   string     `bun:"type"`
 	Status                 string     `bun:"status"`
 	Title                  *string    `bun:"title"`
+	Description            *string    `bun:"description"`
+	ImageFileID            *string    `bun:"image_file_id"`
 	CreatedBySubjectID     *string    `bun:"created_by_subject_id"`
 	LastMessageID          *string    `bun:"last_message_id"`
 	LastMessageAt          *time.Time `bun:"last_message_at"`

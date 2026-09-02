@@ -9,7 +9,6 @@ import {
   MoreHorizontalIcon,
   SendIcon,
   UserRoundIcon,
-  UsersRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -45,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import { GroupAvatar } from "@/features/inbox/group-avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,7 +112,9 @@ export function ConversationAvatar({
           className,
         )}
       >
-        {avatarURL && !avatarFailed ? (
+        {group ? (
+          <GroupAvatar imageURL={group.imageUrl} />
+        ) : avatarURL && !avatarFailed ? (
           <img
             src={avatarURL}
             alt=""
@@ -120,8 +122,6 @@ export function ConversationAvatar({
             draggable={false}
             onError={() => setAvatarFailed(true)}
           />
-        ) : group ? (
-          <UsersRoundIcon className="size-4.5" />
         ) : directAgent ? (
           <BotIcon className="size-4.5" />
         ) : contactName ? (

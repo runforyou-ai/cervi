@@ -214,8 +214,8 @@ const channels = {
     saved: "Chat interface saved.",
     form: {
       title: "Chat title",
-      subtitle: "Subtitle (optional)",
-      greetingMessage: "Greeting (optional)",
+      subtitle: "Subtitle",
+      greetingMessage: "Greeting",
       themeColor: "Theme color",
       colorPicker: "Choose theme color",
     },

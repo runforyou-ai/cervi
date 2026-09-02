@@ -289,6 +289,8 @@ const (
 	FieldTargetIdentityIDInvalid          Key = "field.target_identity_id_invalid"
 	FieldGroupTitleRequired               Key = "field.group_title_required"
 	FieldGroupTitleTooLong                Key = "field.group_title_too_long"
+	FieldGroupDescriptionTooLong          Key = "field.group_description_too_long"
+	FieldGroupImageFileIDInvalid          Key = "field.group_image_file_id_invalid"
 	FieldGroupMembersRequired             Key = "field.group_members_required"
 	FieldGroupMembersTooMany              Key = "field.group_members_too_many"
 	FieldGroupMemberIDsInvalid            Key = "field.group_member_ids_invalid"

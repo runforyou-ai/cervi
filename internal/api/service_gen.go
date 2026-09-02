@@ -308,9 +308,9 @@ func (s *Service) getGroupConversation(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateGroupConversation 修改群聊名称。
+// updateGroupConversation 修改群聊资料。
 func (s *Service) updateGroupConversation(c *gin.Context) {
-	var input appservice.GroupConversationTitleInput
+	var input appservice.GroupConversationProfileInput
 	if !bindJSON(c, &input) {
 		return
 	}
