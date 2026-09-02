@@ -631,10 +631,10 @@ export function SaveTelegramChannelConnection(meta: $models.RequestMeta, channel
 }
 
 /**
- * SelectProfileImage 在原生端选择并读取用户头像图片。
+ * SelectImage 在原生端选择并读取图片。
  */
-export function SelectProfileImage(meta: $models.RequestMeta): $CancellablePromise<$models.ProfileImageFile> {
-    return $Call.ByID(1937167372, meta);
+export function SelectImage(meta: $models.RequestMeta): $CancellablePromise<$models.ImageFile> {
+    return $Call.ByID(1896757263, meta);
 }
 
 /**
@@ -764,9 +764,9 @@ export function UpdateContact(meta: $models.RequestMeta, contactID: string, inpu
 }
 
 /**
- * UpdateGroupConversation 修改群聊名称。
+ * UpdateGroupConversation 修改群聊资料。
  */
-export function UpdateGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationTitleInput): $CancellablePromise<$models.GroupConversation> {
+export function UpdateGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationProfileInput): $CancellablePromise<$models.GroupConversation> {
     return $Call.ByID(1492390913, meta, conversationID, input);
 }
 

@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
+import { FieldRequiredMark } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
 
 /** 详情行，支持进入字段编辑。 */
@@ -11,6 +12,7 @@ export function DetailEditRow({
   value,
   editing,
   editEnabled,
+  required = false,
   compact = false,
   onEdit,
   children,
@@ -19,6 +21,7 @@ export function DetailEditRow({
   value: ReactNode
   editing: boolean
   editEnabled: boolean
+  required?: boolean
   compact?: boolean
   onEdit: () => void
   children: ReactNode
@@ -39,8 +42,9 @@ export function DetailEditRow({
           compact ? "min-h-8" : "min-h-9",
         )}
       >
-        <div className="w-28 shrink-0 pt-1 text-sm text-muted-foreground">
-          {label}
+        <div className="flex w-28 shrink-0 items-start gap-1 pt-1 text-sm text-muted-foreground">
+          <span>{label}</span>
+          {required ? <FieldRequiredMark /> : null}
         </div>
         <div className="min-w-0 flex-1">
           {editing ? (

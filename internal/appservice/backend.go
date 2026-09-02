@@ -80,9 +80,9 @@ type Backend interface {
 	// GetGroupConversation 返回当前成员可见的群聊资料。
 	//cervi:route GET /group-conversations/:conversationID
 	GetGroupConversation(context.Context, RequestMeta, string) (GroupConversation, error)
-	// UpdateGroupConversation 修改群聊名称。
+	// UpdateGroupConversation 修改群聊资料。
 	//cervi:route PATCH /group-conversations/:conversationID
-	UpdateGroupConversation(context.Context, RequestMeta, string, GroupConversationTitleInput) (GroupConversation, error)
+	UpdateGroupConversation(context.Context, RequestMeta, string, GroupConversationProfileInput) (GroupConversation, error)
 	// AddGroupConversationMembers 批量增加群聊成员。
 	//cervi:route POST /group-conversations/:conversationID/members
 	AddGroupConversationMembers(context.Context, RequestMeta, string, GroupConversationMembersInput) (GroupConversation, error)
@@ -364,9 +364,9 @@ type ServerConnector interface {
 	ConnectServer(context.Context, RequestMeta, string) error
 }
 
-// ProfileImageSelector 由支持原生文件对话框的平台实现。
-type ProfileImageSelector interface {
-	SelectProfileImage(context.Context, RequestMeta) (ProfileImageFile, error)
+// ImageSelector 由支持原生文件对话框的平台实现。
+type ImageSelector interface {
+	SelectImage(context.Context, RequestMeta) (ImageFile, error)
 }
 
 // ExternalPageOpener 由支持多窗口的平台实现，在应用内新窗口打开外部页面。

@@ -42,9 +42,11 @@ type TransferGroupConversationOwnerAction struct{ db *bun.DB }
 type LeaveGroupConversationAction struct{ db *bun.DB }
 
 type lockedGroupConversationRow struct {
-	Title                string `bun:"title"`
-	CurrentParticipantID string `bun:"current_participant_id"`
-	CurrentRole          string `bun:"current_role"`
+	Title                string  `bun:"title"`
+	Description          string  `bun:"description"`
+	ImageFileID          *string `bun:"image_file_id"`
+	CurrentParticipantID string  `bun:"current_participant_id"`
+	CurrentRole          string  `bun:"current_role"`
 }
 
 type activeGroupParticipantRow struct {
@@ -79,9 +81,9 @@ func NewLeaveGroupConversationAction(db *bun.DB) *LeaveGroupConversationAction {
 	return &LeaveGroupConversationAction{db: db}
 }
 
-// Execute 修改群聊名称并记录系统事件。
-func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationTitleInput) (GroupConversation, error) {
-	conversationID, title, fields := normalizeGroupTitleInput(input.ConversationID, input.Title)
+// Execute 修改群聊资料，并在名称变化时记录系统事件。
+func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationProfileInput) (GroupConversation, error) {
+	normalized, fields := normalizeGroupProfileInput(input)
 	if len(fields) > 0 {
 		return GroupConversation{}, &ValidationError{Fields: fields}
 	}
@@ -90,25 +92,43 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		group, err := lockGroupConversation(ctx, tx, identity, conversationID)
+		group, err := lockGroupConversation(ctx, tx, identity, normalized.ConversationID)
 		if err != nil {
 			return err
 		}
 		if err := requireGroupOwner(group); err != nil {
 			return err
 		}
-		if group.Title != title {
+		nextImageFileID := group.ImageFileID
+		imageChanged := false
+		if normalized.ImageFileID != nil {
+			nextImageFileID, err = activateGroupImage(ctx, tx, identity.Organization.ID, *normalized.ImageFileID, group.ImageFileID)
+			if err != nil {
+				return err
+			}
+			imageChanged = group.ImageFileID == nil || *group.ImageFileID != *normalized.ImageFileID
+		}
+		if group.Title != normalized.Title || group.Description != normalized.Description || imageChanged {
 			if _, err := tx.NewUpdate().Model((*servermodels.Conversation)(nil)).
-				Set("title = ?", title).
+				Set("title = ?", normalized.Title).
+				Set("description = ?", common.OptionalString(normalized.Description)).
+				Set("image_file_id = ?", nextImageFileID).
 				Set("updated_at = now()").
 				Where("organization_id = ?", identity.Organization.ID).
-				Where("id = ?", conversationID).
+				Where("id = ?", normalized.ConversationID).
 				Exec(ctx); err != nil {
-				return fmt.Errorf("update group conversation title: %w", err)
+				return fmt.Errorf("update group conversation profile: %w", err)
 			}
+			if imageChanged {
+				if err := retireGroupImage(ctx, tx, identity.Organization.ID, group.ImageFileID, nextImageFileID); err != nil {
+					return err
+				}
+			}
+		}
+		if group.Title != normalized.Title {
 			previousTitle := group.Title
-			eventTitle := title
-			if err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+			eventTitle := normalized.Title
+			if err := createGroupSystemEvent(ctx, tx, identity, normalized.ConversationID, ConversationSystemEvent{
 				Type:          domain.ConversationSystemEventGroupRenamed,
 				Actor:         groupActorSnapshot(identity),
 				PreviousTitle: &previousTitle,
@@ -117,7 +137,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 				return err
 			}
 		}
-		result, err = loadGroupConversation(ctx, tx, identity, conversationID)
+		result, err = loadGroupConversation(ctx, tx, identity, normalized.ConversationID)
 		return err
 	})
 	if err != nil {
@@ -366,20 +386,32 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 	return nil
 }
 
-// normalizeGroupTitleInput 规范化群聊名称修改参数。
-func normalizeGroupTitleInput(conversationID, title string) (string, string, map[string]ValidationCode) {
+// normalizeGroupProfileInput 规范化群聊资料修改参数。
+func normalizeGroupProfileInput(input GroupConversationProfileInput) (GroupConversationProfileInput, map[string]ValidationCode) {
 	fields := map[string]ValidationCode{}
-	normalizedConversationID, valid := common.NormalizeUUID(conversationID)
+	normalizedConversationID, valid := common.NormalizeUUID(input.ConversationID)
 	if !valid {
 		fields["conversationId"] = ValidationConversationIDInvalid
 	}
-	title = strings.TrimSpace(title)
-	if title == "" {
+	input.ConversationID = normalizedConversationID
+	input.Title = strings.TrimSpace(input.Title)
+	input.Description = strings.TrimSpace(input.Description)
+	if input.Title == "" {
 		fields["title"] = ValidationGroupTitleRequired
-	} else if utf8.RuneCountInString(title) > maxGroupTitleLength {
+	} else if utf8.RuneCountInString(input.Title) > maxGroupTitleLength {
 		fields["title"] = ValidationGroupTitleTooLong
 	}
-	return normalizedConversationID, title, fields
+	if utf8.RuneCountInString(input.Description) > maxGroupDescriptionLength {
+		fields["description"] = ValidationGroupDescriptionTooLong
+	}
+	if input.ImageFileID != nil {
+		imageFileID, imageFileIDValid := common.NormalizeUUID(strings.TrimSpace(*input.ImageFileID))
+		if !imageFileIDValid {
+			fields["imageFileId"] = ValidationGroupImageFileIDInvalid
+		}
+		input.ImageFileID = &imageFileID
+	}
+	return input, fields
 }
 
 // normalizeGroupMembersInput 规范化群聊批量增员参数。
@@ -432,6 +464,8 @@ func lockGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 	err := db.NewSelect().
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.title AS title").
+		ColumnExpr("COALESCE(cv.description, '') AS description").
+		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("mine.id AS current_participant_id").
 		ColumnExpr("mine.role AS current_role").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").

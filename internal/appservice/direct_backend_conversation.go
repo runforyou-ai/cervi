@@ -181,7 +181,8 @@ func (b *DirectBackend) CreateGroupConversation(ctx context.Context, meta Reques
 		return InboxConversation{}, err
 	}
 	summary, err := b.createGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationInput{
-		Title: input.Title, MemberIdentityIDs: input.MemberIdentityIDs,
+		Title: input.Title, Description: input.Description, ImageFileID: input.ImageFileID,
+		MemberIdentityIDs: input.MemberIdentityIDs,
 	})
 	if err != nil {
 		return InboxConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, "", "create")
@@ -191,10 +192,19 @@ func (b *DirectBackend) CreateGroupConversation(ctx context.Context, meta Reques
 		"conversation_id", summary.ID,
 		"member_count", summary.MemberCount,
 	)
+	imageFileIDs := make([]string, 0, 1)
+	if summary.ImageFileID != nil {
+		imageFileIDs = append(imageFileIDs, *summary.ImageFileID)
+	}
+	imageURLs, imageErr := b.activeFileURLs(ctx, identity, imageFileIDs)
+	if imageErr != nil {
+		slog.Warn("读取新建群聊图片失败", "organization_id", identity.Organization.ID, "conversation_id", summary.ID, "error", imageErr)
+	}
 	return InboxConversation{
 		ID: summary.ID, Type: ConversationTypeGroup,
 		Group: &GroupInboxConversation{
-			Title: summary.Title, Status: ConversationStatus(summary.Status), MemberCount: summary.MemberCount,
+			Title: summary.Title, ImageURL: optionalFileURL(imageURLs, summary.ImageFileID),
+			Status: ConversationStatus(summary.Status), MemberCount: summary.MemberCount,
 		},
 	}, nil
 }
@@ -211,23 +221,25 @@ func (b *DirectBackend) GetGroupConversation(ctx context.Context, meta RequestMe
 	}
 	result, err := b.groupConversationFromAction(ctx, identity, record)
 	if err != nil {
-		slog.Warn("读取群聊成员头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+		slog.Warn("读取群聊图片或成员头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
 		return GroupConversation{}, FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
 	}
 	return result, nil
 }
 
-// UpdateGroupConversation 修改群聊名称。
-func (b *DirectBackend) UpdateGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationTitleInput) (GroupConversation, error) {
+// UpdateGroupConversation 修改群聊资料。
+func (b *DirectBackend) UpdateGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationProfileInput) (GroupConversation, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return GroupConversation{}, err
 	}
-	record, err := b.updateGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationTitleInput{ConversationID: conversationID, Title: input.Title})
+	record, err := b.updateGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationProfileInput{
+		ConversationID: conversationID, Title: input.Title, Description: input.Description, ImageFileID: input.ImageFileID,
+	})
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "update")
 	}
-	slog.Info("企业群聊名称已修改", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
+	slog.Info("企业群聊资料已修改", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
 	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
 }
 
@@ -291,15 +303,18 @@ func (b *DirectBackend) LeaveGroupConversation(ctx context.Context, meta Request
 func (b *DirectBackend) groupConversationMutationResult(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record conversationaction.GroupConversation, conversationID string) (GroupConversation, error) {
 	result, err := b.groupConversationFromAction(ctx, identity, record)
 	if err != nil {
-		slog.Warn("读取群聊管理结果头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+		slog.Warn("读取群聊管理结果图片失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
 		return GroupConversation{}, FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
 	}
 	return result, nil
 }
 
-// groupConversationFromAction 转换群聊资料并生成成员头像地址。
+// groupConversationFromAction 转换群聊资料并生成群图片和成员头像地址。
 func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identity *servermodels.Identity, record conversationaction.GroupConversation) (GroupConversation, error) {
-	avatarFileIDs := make([]string, 0, len(record.Participants))
+	avatarFileIDs := make([]string, 0, len(record.Participants)+1)
+	if record.ImageFileID != nil {
+		avatarFileIDs = append(avatarFileIDs, *record.ImageFileID)
+	}
 	for _, participant := range record.Participants {
 		if participant.AvatarFileID != nil {
 			avatarFileIDs = append(avatarFileIDs, *participant.AvatarFileID)
@@ -317,7 +332,8 @@ func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identit
 		})
 	}
 	return GroupConversation{
-		ID: record.ID, Title: record.Title, Status: ConversationStatus(record.Status),
+		ID: record.ID, Title: record.Title, Description: record.Description,
+		ImageURL: optionalFileURL(avatarURLs, record.ImageFileID), Status: ConversationStatus(record.Status),
 		CreatedAt: record.CreatedAt, Participants: participants,
 	}, nil
 }
@@ -484,6 +500,9 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 	if errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorGroupMemberNotFound)
 	}
+	if errors.Is(err, conversationaction.ErrGroupImageFileNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
+	}
 	if errors.Is(err, conversationaction.ErrGroupOwnerRequired) {
 		return FailedError(meta, cervii18n.ErrorGroupOwnerRequired).WithStatus(http.StatusForbidden)
 	}
@@ -607,6 +626,8 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationTargetIdentityIDInvalid:  cervii18n.FieldTargetIdentityIDInvalid,
 	conversationaction.ValidationGroupTitleRequired:       cervii18n.FieldGroupTitleRequired,
 	conversationaction.ValidationGroupTitleTooLong:        cervii18n.FieldGroupTitleTooLong,
+	conversationaction.ValidationGroupDescriptionTooLong:  cervii18n.FieldGroupDescriptionTooLong,
+	conversationaction.ValidationGroupImageFileIDInvalid:  cervii18n.FieldGroupImageFileIDInvalid,
 	conversationaction.ValidationGroupMembersRequired:     cervii18n.FieldGroupMembersRequired,
 	conversationaction.ValidationGroupMembersTooMany:      cervii18n.FieldGroupMembersTooMany,
 	conversationaction.ValidationGroupMemberIDsInvalid:    cervii18n.FieldGroupMemberIDsInvalid,

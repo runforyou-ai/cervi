@@ -3,7 +3,7 @@ import {
   ChangePassword,
   GetS3Setting,
   SaveS3Setting,
-  SelectProfileImage,
+  SelectImage,
   TestS3Setting,
   UpdateOrganization,
   UpdateProfile,
@@ -29,8 +29,8 @@ export const testS3Setting = bind(TestS3Setting)
 /** 修改当前用户的头像、姓名和邮箱。 */
 export const updateProfile = bind(UpdateProfile)
 
-/** 使用原生文件对话框选择用户头像图片。 */
-export const selectProfileImage = bind(SelectProfileImage)
+/** 使用原生文件对话框选择图片。 */
+export const selectImage = bind(SelectImage)
 
 /** 修改当前用户的登录密码。 */
 export const changePassword = bind(ChangePassword)

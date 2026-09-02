@@ -343,7 +343,10 @@ function InboxPaneTop({
   }, [])
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-3">
+    <div
+      data-slot="inbox-pane-header"
+      className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-3"
+    >
       <Button
         variant="ghost"
         size="icon"
@@ -964,6 +967,7 @@ function ConversationThread({
         retryFailedMessageDisabled={
           messageSending || !replySupported || Boolean(replyDisabledReason)
         }
+        groupParticipants={groupResource.data?.participants}
         onReplyMessage={
           groupConversation && !replyDisabledReason
             ? setReplyTo

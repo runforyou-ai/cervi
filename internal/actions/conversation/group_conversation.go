@@ -23,8 +23,9 @@ import (
 )
 
 const (
-	maxGroupTitleLength      = 100
-	maxGroupParticipantCount = 100
+	maxGroupTitleLength       = 100
+	maxGroupDescriptionLength = 500
+	maxGroupParticipantCount  = 100
 )
 
 var groupMessageRetryableConstraintNames = map[string]struct{}{
@@ -106,6 +107,13 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 			if err != nil {
 				return err
 			}
+			var imageFileID *string
+			if normalized.ImageFileID != "" {
+				imageFileID, err = activateGroupImage(ctx, tx, identity.Organization.ID, normalized.ImageFileID, nil)
+				if err != nil {
+					return err
+				}
+			}
 			creatorSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, subjectIDs[identity.OrganizationIdentity.ID])
 			if err != nil {
 				return err
@@ -114,10 +122,11 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 			conversation := &servermodels.Conversation{
 				ID: conversationID, OrganizationID: identity.Organization.ID,
 				Type: string(domain.ConversationTypeGroup), Status: string(domain.ConversationStatusActive),
-				Title: &normalized.Title, CreatedBySubjectID: &createdBySubjectID,
+				Title: &normalized.Title, Description: common.OptionalString(normalized.Description),
+				ImageFileID: imageFileID, CreatedBySubjectID: &createdBySubjectID,
 			}
 			if _, err := tx.NewInsert().Model(conversation).
-				Column("id", "organization_id", "type", "status", "title", "created_by_subject_id").
+				Column("id", "organization_id", "type", "status", "title", "description", "image_file_id", "created_by_subject_id").
 				Exec(ctx); err != nil {
 				return fmt.Errorf("create group conversation: %w", err)
 			}
@@ -150,6 +159,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 			return GroupConversationSummary{
 				ID: conversationID, Title: normalized.Title,
 				Status: domain.ConversationStatusActive, MemberCount: len(normalized.MemberIdentityIDs) + 1,
+				ImageFileID: common.OptionalString(normalized.ImageFileID),
 			}, nil
 		}
 		constraint, retryable := retryableUniqueViolation(err, map[string]struct{}{
@@ -179,13 +189,17 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		}}
 	}
 	var summary struct {
-		Title     string    `bun:"title"`
-		Status    string    `bun:"status"`
-		CreatedAt time.Time `bun:"created_at"`
+		Title       string    `bun:"title"`
+		Description string    `bun:"description"`
+		ImageFileID *string   `bun:"image_file_id"`
+		Status      string    `bun:"status"`
+		CreatedAt   time.Time `bun:"created_at"`
 	}
 	err := db.NewSelect().
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.title AS title").
+		ColumnExpr("COALESCE(cv.description, '') AS description").
+		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
 		ColumnExpr("cv.created_at AS created_at").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
@@ -228,7 +242,8 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		})
 	}
 	return GroupConversation{
-		ID: conversationID, Title: summary.Title, Status: domain.ConversationStatus(summary.Status),
+		ID: conversationID, Title: summary.Title, Description: summary.Description, ImageFileID: summary.ImageFileID,
+		Status:    domain.ConversationStatus(summary.Status),
 		CreatedAt: summary.CreatedAt, Participants: participants,
 	}, nil
 }
@@ -344,14 +359,26 @@ func normalizeGroupTextMessageInput(input GroupTextMessageInput) (GroupTextMessa
 	return input, fields
 }
 
-// normalizeGroupConversationInput 规范化并校验群聊标题和初始成员。
+// normalizeGroupConversationInput 规范化并校验群聊资料和初始成员。
 func normalizeGroupConversationInput(currentIdentityID string, input GroupConversationInput) (GroupConversationInput, map[string]ValidationCode) {
 	fields := map[string]ValidationCode{}
 	input.Title = strings.TrimSpace(input.Title)
+	input.Description = strings.TrimSpace(input.Description)
+	input.ImageFileID = strings.TrimSpace(input.ImageFileID)
 	if input.Title == "" {
 		fields["title"] = ValidationGroupTitleRequired
 	} else if utf8.RuneCountInString(input.Title) > maxGroupTitleLength {
 		fields["title"] = ValidationGroupTitleTooLong
+	}
+	if utf8.RuneCountInString(input.Description) > maxGroupDescriptionLength {
+		fields["description"] = ValidationGroupDescriptionTooLong
+	}
+	if input.ImageFileID != "" {
+		var valid bool
+		input.ImageFileID, valid = common.NormalizeUUID(input.ImageFileID)
+		if !valid {
+			fields["imageFileId"] = ValidationGroupImageFileIDInvalid
+		}
 	}
 	if len(input.MemberIdentityIDs) == 0 {
 		fields["memberIdentityIds"] = ValidationGroupMembersRequired

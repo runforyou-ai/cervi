@@ -24,6 +24,7 @@ import {
   type ConversationMessageReference,
   type ConversationSystemEvent,
   type ConversationSystemEventParticipant,
+  type GroupParticipant,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
@@ -111,7 +112,14 @@ function timelineSenderKey(
 function mergeTimelineMessages(
   current: ConversationMessageData[],
   outgoing: OutgoingConversationMessage[],
+  groupParticipants: GroupParticipant[] = [],
 ) {
+  const participantsBySubjectID = new Map(
+    groupParticipants.map((participant) => [
+      participant.chatSubjectId,
+      participant,
+    ]),
+  )
   const saved = outgoing.flatMap((message) =>
     message.saved ? [message.saved] : [],
   )
@@ -135,7 +143,19 @@ function mergeTimelineMessages(
       sessionStart: null,
       systemEvent: null,
       replyTo: message.replyTo,
-      mentions: [],
+      mentions: message.mentionSubjectIDs.flatMap((subjectID) => {
+        const participant = participantsBySubjectID.get(subjectID)
+        return participant
+          ? [
+              {
+                chatSubjectId: participant.chatSubjectId,
+                kind: ChatSubjectKind.ChatSubjectKindOrganizationIdentity,
+                sourceId: participant.identityId,
+                displayName: participant.displayName,
+              },
+            ]
+          : []
+      }),
       clientMessageID: message.clientMessageID,
       mentionSubjectIDs: message.mentionSubjectIDs,
       local: true,
@@ -154,7 +174,7 @@ function mergeTimelineMessages(
   })
 }
 
-/** 在消息正文中强调服务端确认的结构化提醒。 */
+/** 在消息正文中强调结构化提醒。 */
 function renderMessageBody(message: TimelineMessage) {
   const names = message.mentions
     .map((mention) => mention.displayName?.trim() ?? "")
@@ -205,6 +225,7 @@ export function ConversationTimeline({
   onRetryFailedMessage,
   retryFailedMessageDisabled = false,
   onReplyMessage,
+  groupParticipants,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -215,6 +236,7 @@ export function ConversationTimeline({
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
   retryFailedMessageDisabled?: boolean
   onReplyMessage?: (message: ConversationMessageReference) => void
+  groupParticipants?: GroupParticipant[]
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -247,6 +269,7 @@ export function ConversationTimeline({
   const visibleMessages = mergeTimelineMessages(
     currentPage?.messages ?? [],
     outgoingMessages,
+    groupParticipants,
   )
 
   /** 复制一条文本消息的正文。 */

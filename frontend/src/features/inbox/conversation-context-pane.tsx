@@ -145,6 +145,7 @@ function ConversationContextContent({
   onGroupDraftChange: (group: GroupConversationData) => void
   onGroupSummaryChange: (changes: {
     title?: string
+    imageUrl?: string
     memberCount?: number
     status?: GroupConversationData["status"]
   }) => void
@@ -304,6 +305,7 @@ export function ConversationContextPane({
   currentIdentityID: string
   onGroupSummaryChange: (changes: {
     title?: string
+    imageUrl?: string
     memberCount?: number
     status?: GroupConversationData["status"]
   }) => void
@@ -316,7 +318,7 @@ export function ConversationContextPane({
   onSheetOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation("inbox")
-  const [contextPanelWidth, setContextPanelWidth] = useState(380)
+  const [contextPanelWidth, setContextPanelWidth] = useState(contextPanelMinWidth)
   const [groupDraft, setGroupDraft] = useState<{
     conversationID: string
     group: GroupConversationData
@@ -357,7 +359,7 @@ export function ConversationContextPane({
     <>
       <div
         className={cn(
-          "relative hidden h-full min-h-0 w-4 shrink-0 bg-background xl:block",
+          "relative hidden h-full min-h-0 w-4 shrink-0 bg-background 2xl:block",
           desktopVisible && "border-l",
         )}
       >
@@ -396,8 +398,8 @@ export function ConversationContextPane({
 
       <aside
         className={cn(
-          "relative hidden h-full min-h-0 min-w-0 shrink-0 overflow-hidden bg-background xl:block",
-          !desktopVisible && "xl:hidden",
+          "cervi-conversation-context-pane relative hidden h-full min-h-0 min-w-0 shrink-0 overflow-hidden bg-background 2xl:block",
+          !desktopVisible && "2xl:hidden",
         )}
         style={{ width: contextPanelWidth }}
       >
@@ -415,7 +417,7 @@ export function ConversationContextPane({
       </aside>
 
       <Sheet open={sheetOpen} onOpenChange={onSheetOpenChange}>
-        <SheetContent className="data-[side=right]:w-full gap-0 p-0 sm:max-w-sm">
+        <SheetContent className="w-[320px] max-w-full gap-0 p-0 sm:max-w-[320px]">
           <SheetHeader className="sr-only">
             <SheetTitle>{title}</SheetTitle>
             <SheetDescription>{description}</SheetDescription>

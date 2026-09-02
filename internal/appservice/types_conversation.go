@@ -152,15 +152,20 @@ type DirectTextMessageInput struct {
 	Body            string `json:"body"`
 }
 
-// GroupConversationInput 定义群聊标题和创建时加入的成员。
+// GroupConversationInput 定义群聊资料和创建时加入的成员。
 type GroupConversationInput struct {
 	Title             string   `json:"title"`
+	Description       string   `json:"description"`
+	ImageFileID       string   `json:"imageFileId"`
 	MemberIdentityIDs []string `json:"memberIdentityIds"`
 }
 
-// GroupConversationTitleInput 定义群聊名称修改参数。
-type GroupConversationTitleInput struct {
-	Title string `json:"title"`
+// GroupConversationProfileInput 定义群聊资料修改参数。
+type GroupConversationProfileInput struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	// ImageFileID 为 nil 时保留当前图片，非 nil 时关联新图片。
+	ImageFileID *string `json:"imageFileId"`
 }
 
 // GroupConversationMembersInput 定义群聊批量增员参数。
@@ -196,6 +201,8 @@ type GroupParticipant struct {
 type GroupConversation struct {
 	ID           string             `json:"id"`
 	Title        string             `json:"title"`
+	Description  string             `json:"description"`
+	ImageURL     string             `json:"imageUrl"`
 	Status       ConversationStatus `json:"status"`
 	CreatedAt    time.Time          `json:"createdAt"`
 	Participants []GroupParticipant `json:"participants"`

@@ -14,6 +14,7 @@ type FilePurpose string
 const (
 	FilePurposeUserAvatar    FilePurpose = "user_avatar"
 	FilePurposeContactAvatar FilePurpose = "contact_avatar"
+	FilePurposeGroupImage    FilePurpose = "group_image"
 )
 
 // FileStatus 定义文件生命周期状态。

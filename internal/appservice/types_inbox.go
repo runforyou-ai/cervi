@@ -99,6 +99,7 @@ type DirectInboxConversation struct {
 // GroupInboxConversation 定义企业群聊摘要。
 type GroupInboxConversation struct {
 	Title         string             `json:"title"`
+	ImageURL      string             `json:"imageUrl"`
 	Status        ConversationStatus `json:"status"`
 	Preview       *string            `json:"preview"`
 	LastMessageAt *time.Time         `json:"lastMessageAt"`

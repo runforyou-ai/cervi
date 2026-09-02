@@ -291,6 +291,7 @@ export function MemberDetailView({
             value={user.displayName || empty}
             editing={editing === "name"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("name")}
           >
             <Controller
@@ -316,6 +317,7 @@ export function MemberDetailView({
             value={user.email || empty}
             editing={editing === "email"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("email")}
           >
             <Controller
@@ -342,6 +344,7 @@ export function MemberDetailView({
             value={roleDisplayName(user.role, tCommon)}
             editing={editing === "role"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("role")}
           >
             <Controller
@@ -392,6 +395,7 @@ export function MemberDetailView({
             }
             editing={editing === "accountStatus"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("accountStatus")}
           >
             <Controller

@@ -7,6 +7,7 @@ type FilePurpose string
 
 const (
 	FilePurposeUserAvatar FilePurpose = FilePurpose(domain.FilePurposeUserAvatar)
+	FilePurposeGroupImage FilePurpose = FilePurpose(domain.FilePurposeGroupImage)
 )
 
 // FileUploadInput 定义创建上传所需的文件元数据。
@@ -39,8 +40,8 @@ type FileUpload struct {
 	Request FileUploadRequest `json:"request"`
 }
 
-// ProfileImageFile 定义原生端选择的用户头像文件。
-type ProfileImageFile struct {
+// ImageFile 定义原生端选择的图片文件。
+type ImageFile struct {
 	Name        string `json:"name"`
 	ContentType string `json:"contentType"`
 	DataBase64  string `json:"dataBase64"`

@@ -228,6 +228,7 @@ export function ContactDetailView({
             }
             editing={editing === "stage"}
             editEnabled={editing === null && !saving}
+            required
             onEdit={() => startEditing("stage")}
           >
             <NativeSelect {...form.register("stage")} autoFocus value={stage}>

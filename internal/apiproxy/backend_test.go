@@ -346,13 +346,15 @@ func TestBackendRejectsNonCerviServer(t *testing.T) {
 	}
 }
 
-// TestParseServerURLRequiresHTTPSOutsideLoopback 验证非回环地址必须使用 HTTPS。
-func TestParseServerURLRequiresHTTPSOutsideLoopback(t *testing.T) {
-	if _, err := parseServerURL("http://cervi.example.com"); err == nil {
-		t.Fatal("expected non-HTTPS remote address to be rejected")
+// TestParseServerURLAcceptsHTTPAndHTTPS 验证企业服务器可以使用 HTTP 或 HTTPS。
+func TestParseServerURLAcceptsHTTPAndHTTPS(t *testing.T) {
+	for _, value := range []string{"http://cervi.example.com", "https://cervi.example.com"} {
+		if _, err := parseServerURL(value); err != nil {
+			t.Fatalf("server URL %q was rejected: %v", value, err)
+		}
 	}
-	if _, err := parseServerURL("http://127.0.0.1:8080"); err != nil {
-		t.Fatalf("loopback development address was rejected: %v", err)
+	if _, err := parseServerURL("ftp://cervi.example.com"); err == nil {
+		t.Fatal("expected unsupported server URL scheme to be rejected")
 	}
 }
 

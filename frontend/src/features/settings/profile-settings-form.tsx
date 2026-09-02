@@ -10,7 +10,7 @@ import { toast } from "sonner"
 import {
   FilePurpose,
   isApiError,
-  selectProfileImage,
+  selectImage,
   updateProfile,
   uploadFile,
   type CurrentUser,
@@ -161,7 +161,7 @@ export function ProfileSettingsForm({
     }
     setSelectingAvatar(true)
     try {
-      const selected = await selectProfileImage()
+      const selected = await selectImage()
       if (!selected.name) {
         return
       }
