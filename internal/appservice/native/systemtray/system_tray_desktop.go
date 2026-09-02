@@ -40,7 +40,10 @@ func (c *Controller) Setup(options Options) {
 		options.Window.Show().Focus()
 	}
 
-	locale := c.currentLocale()
+	// 读取控制器当前使用的语言。
+	c.mu.Lock()
+	locale := c.locale
+	c.mu.Unlock()
 	texts := textsForLocale(locale)
 	applicationMenu := newLocalizedApplicationMenu(options.App, locale)
 	trayMenu := options.App.Menu.New()
@@ -101,7 +104,9 @@ func (c *Controller) SetLocale(locale appservice.Locale) {
 		window.SetTitle(texts.ProductName)
 	}
 	if applicationMenu != nil {
-		applicationMenu.setLocale(locale)
+		// 更新 macOS 原生应用菜单并立即刷新屏幕顶部菜单栏。
+		applicationMenu.applyLocale(locale)
+		applicationMenu.menu.Update()
 	}
 	if tray != nil {
 		tray.SetTooltip(texts.ProductName)
@@ -128,11 +133,4 @@ func (c *Controller) SetUnreadState(state appservice.UnreadIndicatorState) error
 		return nil
 	}
 	return unread.SetUnreadState(state)
-}
-
-// currentLocale 返回控制器当前使用的语言。
-func (c *Controller) currentLocale() appservice.Locale {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.locale
 }

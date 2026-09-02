@@ -37,7 +37,10 @@ func NewLocalObjectService(db *bun.DB, local *serverfilecontent.LocalStore, tena
 
 // ServeHTTP 处理本地对象请求。
 func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	allowLocalObjectCrossOrigin(writer)
+	// 允许原生端 WebView 直传和读取企业服务器对象。
+	writer.Header().Set("Access-Control-Allow-Origin", "*")
+	writer.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, OPTIONS")
+	writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 	if request.Method == http.MethodOptions {
 		writer.WriteHeader(http.StatusNoContent)
 		return
@@ -49,7 +52,9 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	}
 	switch request.Method {
 	case http.MethodGet, http.MethodHead:
-		s.serveLocalObject(writer, request)
+		// 通过最终对象目录的静态文件服务输出不可变文件。
+		writer.Header().Set("X-Content-Type-Options", "nosniff")
+		s.objects.ServeHTTP(&localObjectResponseWriter{ResponseWriter: writer}, request)
 	case http.MethodPut:
 		s.uploadLocalObject(writer, request, storageKey)
 	default:
@@ -82,7 +87,13 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 	}
 	record, err := s.getFile.ExecuteByStorageKey(request.Context(), identity, storageKey)
 	if err != nil {
-		writeLocalObjectError(writer, err)
+		// 输出本地对象元数据错误。
+		if errors.Is(err, fileaction.ErrFileNotFound) {
+			http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			return
+		}
+		slog.Warn("读取文件元数据失败", "error", err)
+		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	if record.StorageBackend != string(domain.FileStorageBackendLocal) || record.Status != string(domain.FileStatusPending) || record.Expired {
@@ -99,12 +110,6 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 		return
 	}
 	writer.WriteHeader(http.StatusNoContent)
-}
-
-// serveLocalObject 通过最终对象目录的静态文件服务输出不可变文件。
-func (s *LocalObjectService) serveLocalObject(writer http.ResponseWriter, request *http.Request) {
-	writer.Header().Set("X-Content-Type-Options", "nosniff")
-	s.objects.ServeHTTP(&localObjectResponseWriter{ResponseWriter: writer}, request)
 }
 
 // localObjectResponseWriter 只为已命中的静态对象添加不可变缓存策略。
@@ -147,21 +152,4 @@ func localObjectStorageKey(requestPath string) (string, bool) {
 		return "", false
 	}
 	return storageKey, true
-}
-
-// allowLocalObjectCrossOrigin 允许原生端 WebView 直传和读取企业服务器对象。
-func allowLocalObjectCrossOrigin(writer http.ResponseWriter) {
-	writer.Header().Set("Access-Control-Allow-Origin", "*")
-	writer.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, OPTIONS")
-	writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-}
-
-// writeLocalObjectError 输出本地对象元数据错误。
-func writeLocalObjectError(writer http.ResponseWriter, err error) {
-	if errors.Is(err, fileaction.ErrFileNotFound) {
-		http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-		return
-	}
-	slog.Warn("读取文件元数据失败", "error", err)
-	http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }

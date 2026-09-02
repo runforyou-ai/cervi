@@ -63,7 +63,27 @@ export async function call<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   try {
-    const result = await operation(requestMeta())
+    // Web 端从本地存储读取未过期令牌。
+    let token = ""
+    if (resolveAppPlatform() === "web") {
+      const value = window.localStorage.getItem(tokenStorageKey)
+      if (value) {
+        const stored = JSON.parse(value) as StoredToken
+        if (Date.parse(stored.expiresAt) <= Date.now()) {
+          clearWebToken()
+        } else {
+          token = stored.token
+        }
+      }
+    }
+    // 组装当前请求的令牌和语言。
+    const result = await operation({
+      token,
+      locale:
+        (i18n.resolvedLanguage ?? fallbackLanguage) === "en-US"
+          ? Locale.LocaleEnglishUnitedStates
+          : Locale.LocaleChineseSimplified,
+    })
     if (signal?.aborted) {
       throw abortError()
     }
@@ -111,34 +131,6 @@ export function clearWebToken() {
   if (resolveAppPlatform() === "web") {
     window.localStorage.removeItem(tokenStorageKey)
   }
-}
-
-/** 组装当前请求的令牌和语言。 */
-function requestMeta(): RequestMeta {
-  return {
-    token: requestToken(),
-    locale:
-      (i18n.resolvedLanguage ?? fallbackLanguage) === "en-US"
-        ? Locale.LocaleEnglishUnitedStates
-        : Locale.LocaleChineseSimplified,
-  }
-}
-
-/** 返回 Web 端请求令牌。 */
-function requestToken() {
-  return resolveAppPlatform() === "web" ? loadWebToken() : ""
-}
-
-/** 读取未过期的登录令牌。 */
-function loadWebToken() {
-  const value = window.localStorage.getItem(tokenStorageKey)
-  if (!value) return ""
-  const stored = JSON.parse(value) as StoredToken
-  if (Date.parse(stored.expiresAt) <= Date.now()) {
-    clearWebToken()
-    return ""
-  }
-  return stored.token
 }
 
 /** 把应用服务异常转换为前端错误。 */

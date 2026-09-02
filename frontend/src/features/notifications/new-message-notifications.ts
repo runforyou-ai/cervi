@@ -27,16 +27,6 @@ type NotificationPolicy = {
 let activeNotificationPolicy: NotificationPolicy | null = null
 let messageNotificationQueue: Promise<void> = Promise.resolve()
 
-/** 判断两个通知设备范围是否相同。 */
-function isSameScope(
-  left: NotificationDeviceScope,
-  right: NotificationDeviceScope,
-) {
-  return (
-    left.organizationId === right.organizationId && left.userId === right.userId
-  )
-}
-
 /** 判断当前会话策略是否仍允许发送通知。 */
 function canDeliverWithPolicy(
   scope: NotificationDeviceScope,
@@ -44,7 +34,9 @@ function canDeliverWithPolicy(
 ) {
   return (
     activeNotificationPolicy?.attentionEnabled === true &&
-    isSameScope(activeNotificationPolicy.scope, scope) &&
+    // 判断两个通知设备范围是否相同。
+    activeNotificationPolicy.scope.organizationId === scope.organizationId &&
+    activeNotificationPolicy.scope.userId === scope.userId &&
     activeNotificationPolicy.token === token
   )
 }

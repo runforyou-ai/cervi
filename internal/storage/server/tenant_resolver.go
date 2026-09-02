@@ -31,7 +31,13 @@ func (r *TenantResolver) Resolve(ctx context.Context, accessHost string) (tenant
 		return tenant.Scope{}, tenant.ErrNotFound
 	}
 	organization := &servermodels.Organization{}
-	err := r.selectByAccessHost(ctx, organization, accessHost)
+	// 按规范化访问地址读取企业。
+	err := r.db.NewSelect().
+		Model(organization).
+		Column("id", "name").
+		Where("o.access_host = ?", accessHost).
+		Limit(1).
+		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return tenant.Scope{}, tenant.ErrNotFound
 	}
@@ -42,14 +48,4 @@ func (r *TenantResolver) Resolve(ctx context.Context, accessHost string) (tenant
 		OrganizationID:   organization.ID,
 		OrganizationName: organization.Name,
 	}, nil
-}
-
-// selectByAccessHost 按规范化访问地址读取企业。
-func (r *TenantResolver) selectByAccessHost(ctx context.Context, organization *servermodels.Organization, accessHost string) error {
-	return r.db.NewSelect().
-		Model(organization).
-		Column("id", "name").
-		Where("o.access_host = ?", accessHost).
-		Limit(1).
-		Scan(ctx)
 }

@@ -96,15 +96,6 @@ func normalizeS3Setting(input S3Setting) (S3Setting, map[string]ValidationCode) 
 	return input, fields
 }
 
-// defaultS3Setting 返回尚未配置时使用的初始 S3 配置。
-func defaultS3Setting() S3Setting {
-	return S3Setting{
-		Provider: domain.StorageProviderGeneric,
-		Endpoint: "https://s3.us-east-1.amazonaws.com",
-		Region:   "us-east-1",
-	}
-}
-
 // validEndpoint 判断对象存储服务地址是否完整有效。
 func validEndpoint(value string) bool {
 	return common.ValidHTTPBaseURL(value)

@@ -165,7 +165,16 @@ func (b *DirectBackend) teamError(ctx context.Context, meta RequestMeta, err err
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return InvalidError(meta, cervii18n.ErrorValidationFailed, teamFieldKeys(validationError.Fields))
+		// 把团队校验错误码映射为本地化文案键。
+		keys := map[common.FieldCode]cervii18n.Key{
+			teamaction.ValidationNameRequired:       cervii18n.FieldTeamNameRequired,
+			teamaction.ValidationNameTooLong:        cervii18n.FieldTeamNameTooLong,
+			teamaction.ValidationNameDuplicate:      cervii18n.FieldTeamNameDuplicate,
+			teamaction.ValidationDescriptionTooLong: cervii18n.FieldTeamDescriptionTooLong,
+			teamaction.ValidationQueryInvalid:       cervii18n.FieldTeamQueryInvalid,
+			teamaction.ValidationWorkStatusInvalid:  cervii18n.FieldWorkStatusInvalid,
+		}
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
@@ -190,17 +199,4 @@ func (b *DirectBackend) teamError(ctx context.Context, meta RequestMeta, err err
 // teamFromAction 转换团队契约。
 func teamFromAction(team teamaction.TeamRecord) Team {
 	return Team{ID: team.ID, Name: team.Name, Description: team.Description, MemberCount: team.MemberCount, CreatedAt: team.CreatedAt, UpdatedAt: team.UpdatedAt}
-}
-
-// teamFieldKeys 把团队校验错误码映射为本地化文案键。
-func teamFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		teamaction.ValidationNameRequired:       cervii18n.FieldTeamNameRequired,
-		teamaction.ValidationNameTooLong:        cervii18n.FieldTeamNameTooLong,
-		teamaction.ValidationNameDuplicate:      cervii18n.FieldTeamNameDuplicate,
-		teamaction.ValidationDescriptionTooLong: cervii18n.FieldTeamDescriptionTooLong,
-		teamaction.ValidationQueryInvalid:       cervii18n.FieldTeamQueryInvalid,
-		teamaction.ValidationWorkStatusInvalid:  cervii18n.FieldWorkStatusInvalid,
-	}
-	return translateValidationFields(fields, keys)
 }

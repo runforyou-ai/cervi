@@ -42,7 +42,13 @@ const listMessageChannelsBound = bind(ListMessageChannels)
 
 /** 读取网站渠道详情。 */
 export function getWebsiteChannel(channelId: string, signal?: AbortSignal) {
-  return getWebsiteChannelBound(channelId, signal).then(normalizeWebsiteChannel)
+  return getWebsiteChannelBound(channelId, signal).then(
+    (channel): WebsiteChannelData => ({
+      // 归一化网站渠道详情。
+      ...channel,
+      access: normalizeWebsiteChannelAccess(channel.access),
+    }),
+  )
 }
 
 /** 读取消息渠道基础信息。 */
@@ -116,11 +122,4 @@ function normalizeWebsiteChannelAccess(
   access: GeneratedWebsiteChannelAccess,
 ): WebsiteChannelAccessData {
   return { ...access, allowedHosts: asList(access.allowedHosts) }
-}
-
-/** 归一化网站渠道详情。 */
-function normalizeWebsiteChannel(
-  channel: GeneratedWebsiteChannel,
-): WebsiteChannelData {
-  return { ...channel, access: normalizeWebsiteChannelAccess(channel.access) }
 }

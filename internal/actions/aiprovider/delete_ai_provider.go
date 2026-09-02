@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -31,7 +32,13 @@ func (a *DeleteAIProviderAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
-		inUse, err := providerInUse(ctx, tx, identity.Organization.ID, provider.ID)
+		// 判断供应商是否被 AI 员工使用。
+		inUse, err := tx.NewSelect().TableExpr("agents AS a").
+			Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.organization_id = a.organization_id AND ar.agent_id = a.id").
+			Where("a.organization_id = ?", identity.Organization.ID).
+			Where("ar.execution_mode = ?", domain.AgentExecutionModeManaged).
+			Where("ar.configuration #>> '{model,providerId}' = ?", provider.ID).
+			Exists(ctx)
 		if err != nil {
 			return err
 		}

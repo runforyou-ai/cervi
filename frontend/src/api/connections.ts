@@ -63,7 +63,12 @@ export function listIntegrationConnections() {
     (output): IntegrationConnectionListData => ({
       ...output,
       connections: asList(output.connections).map(
-        normalizeIntegrationConnectionSummary,
+        (connection): IntegrationConnectionSummaryData => ({
+          // 归一化连接器列表项中的枚举值。
+          ...connection,
+          type: connection.type as IntegrationConnectionTypeId,
+          status: connection.status as IntegrationConnectionStatusId,
+        }),
       ),
     }),
   )
@@ -103,17 +108,6 @@ export const deleteIntegrationConnection = bind(DeleteIntegrationConnection)
 function normalizeIntegrationConnection(
   connection: IntegrationConnection,
 ): IntegrationConnectionData {
-  return {
-    ...connection,
-    type: connection.type as IntegrationConnectionTypeId,
-    status: connection.status as IntegrationConnectionStatusId,
-  }
-}
-
-/** 归一化连接器列表项中的枚举值。 */
-function normalizeIntegrationConnectionSummary(
-  connection: IntegrationConnectionSummary,
-): IntegrationConnectionSummaryData {
   return {
     ...connection,
     type: connection.type as IntegrationConnectionTypeId,

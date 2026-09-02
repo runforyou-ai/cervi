@@ -74,12 +74,6 @@ func newLocalizedApplicationMenu(app *application.App, locale appservice.Locale)
 	return controller
 }
 
-// setLocale 更新 macOS 原生应用菜单并立即刷新屏幕顶部菜单栏。
-func (m *localizedApplicationMenu) setLocale(locale appservice.Locale) {
-	m.applyLocale(locale)
-	m.menu.Update()
-}
-
 // applyLocale 更新应用菜单模型中的全部本地化标签。
 func (m *localizedApplicationMenu) applyLocale(locale appservice.Locale) {
 	labels := cervii18n.LocalizeMap(string(locale), applicationMenuMessageKeys)

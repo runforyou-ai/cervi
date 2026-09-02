@@ -9,7 +9,7 @@ import {
   type UnreadIndicatorState,
 } from "@/api"
 import { isDesktopMacOS, resolveAppPlatform } from "@/platform/app-platform"
-import { openExternalURL } from "@/platform/open-external-url"
+import { openExternalURL } from "@/platform/external-navigation"
 
 const notificationPreferencesStoragePrefix = "cervi.notifications"
 const macOSNotificationSettingsURL =
@@ -93,15 +93,6 @@ export function setNotificationSoundEnabled(
   })
 }
 
-/** 返回当前设备的本地日期。 */
-function currentDeviceCalendarDate() {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  const day = String(now.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
 /** 返回当前端的通知权限状态。 */
 export async function checkNotificationPermission(): Promise<
   NotificationPermissionState
@@ -161,7 +152,12 @@ export function requestNotificationPermissionFromMessageMenu(
   scope: NotificationDeviceScope,
 ) {
   const preferences = readNotificationDevicePreferences(scope)
-  const today = currentDeviceCalendarDate()
+  // 返回当前设备的本地日期。
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  const today = `${year}-${month}-${day}`
   if (preferences.permissionMenuClickedOn === today) {
     return Promise.resolve(null)
   }

@@ -68,7 +68,17 @@ func loadTelegramChannelDetail(ctx context.Context, db bun.IDB, organizationID, 
 	} else if err != nil {
 		return nil, fmt.Errorf("get Telegram channel settings: %w", err)
 	}
-	connection := telegramChannelSettingRecord(setting)
+	// 把 Telegram 设置存储模型转换为传输结构。
+	connection := TelegramChannelSettingRecord{
+		BotToken:           optionalStringValue(setting.BotToken),
+		BotID:              setting.BotID,
+		BotUsername:        setting.BotUsername,
+		BotDisplayName:     setting.BotDisplayName,
+		WebhookBaseURL:     optionalStringValue(setting.WebhookBaseURL),
+		WebhookSecret:      optionalStringValue(setting.WebhookSecret),
+		WebhookStatus:      setting.WebhookStatus,
+		WebhookConnectedAt: setting.WebhookConnectedAt,
+	}
 	if connection.WebhookBaseURL != "" {
 		webhookURL, err := telegramWebhookURL(connection.WebhookBaseURL, channelID)
 		if err != nil {

@@ -373,7 +373,17 @@ const (
 //go:embed locales/*.json
 var localeFiles embed.FS
 
-var bundle = loadBundle()
+// 加载嵌入到二进制中的翻译词条。
+var bundle = func() *goi18n.Bundle {
+	bundle := goi18n.NewBundle(language.AmericanEnglish)
+	if _, err := bundle.LoadMessageFileFS(localeFiles, "locales/en-US.json"); err != nil {
+		panic(err)
+	}
+	if _, err := bundle.LoadMessageFileFS(localeFiles, "locales/zh-CN.json"); err != nil {
+		panic(err)
+	}
+	return bundle
+}()
 
 // Localize 根据语言偏好返回本地化文案和最终匹配的语言；词条缺失或本地化失败时记录错误并回退返回键本身。
 func Localize(acceptLanguage string, key Key) (string, string) {
@@ -402,16 +412,4 @@ func LocalizeMap[K comparable](acceptLanguage string, keys map[K]Key) map[K]stri
 		messages[name] = message
 	}
 	return messages
-}
-
-// loadBundle 加载嵌入到二进制中的翻译词条。
-func loadBundle() *goi18n.Bundle {
-	bundle := goi18n.NewBundle(language.AmericanEnglish)
-	if _, err := bundle.LoadMessageFileFS(localeFiles, "locales/en-US.json"); err != nil {
-		panic(err)
-	}
-	if _, err := bundle.LoadMessageFileFS(localeFiles, "locales/zh-CN.json"); err != nil {
-		panic(err)
-	}
-	return bundle
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -112,10 +113,12 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 					}
 				}
 				status := string(domain.TelegramWebhookStatusWaiting)
+				// 合并 getMe 返回的机器人姓名。
+				botDisplayName := strings.TrimSpace(strings.TrimSpace(bot.FirstName) + " " + strings.TrimSpace(bot.LastName))
 				setting.BotToken = optionalTelegramString(input.BotToken)
 				setting.BotID = &bot.ID
 				setting.BotUsername = optionalTelegramString(bot.Username)
-				setting.BotDisplayName = optionalTelegramString(telegramBotDisplayName(bot))
+				setting.BotDisplayName = optionalTelegramString(botDisplayName)
 				setting.WebhookBaseURL = optionalTelegramString(input.WebhookBaseURL)
 				setting.WebhookConnectedAt = nil
 				if enabled {

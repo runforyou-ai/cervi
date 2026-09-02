@@ -13,26 +13,23 @@ func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, e
 	if connector, ok := s.backend.(ServerConnector); ok {
 		startup, err = s.loadNativeStartup(ctx, meta, connector)
 	} else {
-		startup, err = s.loadWebStartup(ctx, meta)
+		// 根据企业初始化状态选择 Web 启动入口。
+		status, statusErr := s.backend.InstallationStatus(ctx, meta)
+		if statusErr != nil {
+			return Startup{}, statusErr
+		}
+		name := strings.TrimSpace(status.OrganizationName)
+		if !status.Installed || name == "" {
+			startup = Startup{State: SessionStateSetup}
+		} else {
+			startup = Startup{State: SessionStateReady, OrganizationName: name}
+		}
 	}
 	if err != nil {
 		return Startup{}, err
 	}
 	slog.Info("应用启动检测完成", "state", startup.State)
 	return startup, nil
-}
-
-// loadWebStartup 根据企业初始化状态选择 Web 启动入口。
-func (s *Service) loadWebStartup(ctx context.Context, meta RequestMeta) (Startup, error) {
-	status, err := s.backend.InstallationStatus(ctx, meta)
-	if err != nil {
-		return Startup{}, err
-	}
-	name := strings.TrimSpace(status.OrganizationName)
-	if !status.Installed || name == "" {
-		return Startup{State: SessionStateSetup}, nil
-	}
-	return Startup{State: SessionStateReady, OrganizationName: name}, nil
 }
 
 // loadNativeStartup 检测原生端已保存企业服务器的连通和初始化状态。

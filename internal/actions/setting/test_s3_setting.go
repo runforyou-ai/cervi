@@ -128,7 +128,15 @@ func testS3ObjectFlow(ctx context.Context, config serverfilecontent.S3Config, pu
 	}()
 
 	httpClient := connectiontest.NewHTTPClient()
-	requestedHeaders := probeRequestHeaderNames(signed.Headers)
+	// 返回浏览器预检需要声明的正式上传请求头。
+	requestedHeaders := make([]string, 0, len(signed.Headers))
+	for name := range signed.Headers {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name != "" && name != "host" {
+			requestedHeaders = append(requestedHeaders, name)
+		}
+	}
+	sort.Strings(requestedHeaders)
 	if err := testS3PutPreflight(ctx, httpClient, signed.URL, requestedHeaders); err != nil {
 		return newS3TestError(S3TestFailureCORS, err)
 	}
@@ -217,19 +225,6 @@ func getS3PublicProbe(ctx context.Context, client connectiontest.HTTPDoer, publi
 		return s3ProbeProtocolError("public object response does not match the uploaded probe")
 	}
 	return nil
-}
-
-// probeRequestHeaderNames 返回浏览器预检需要声明的正式上传请求头。
-func probeRequestHeaderNames(headers map[string]string) []string {
-	names := make([]string, 0, len(headers))
-	for name := range headers {
-		name = strings.ToLower(strings.TrimSpace(name))
-		if name != "" && name != "host" {
-			names = append(names, name)
-		}
-	}
-	sort.Strings(names)
-	return names
 }
 
 // corsAllowsOrigin 判断响应是否允许指定浏览器来源。

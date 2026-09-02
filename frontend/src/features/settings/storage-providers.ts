@@ -271,18 +271,14 @@ export const storageProviders = Object.values(storageProvidersById)
 
 /** 读取指定对象存储提供商配置。 */
 export function getStorageProvider(id: StorageProvider) {
-  if (!isStorageProviderId(id)) {
+  // 判断取值是否为支持的对象存储提供商。
+  if (!(id in storageProvidersById)) {
     throw new Error(`Unsupported storage provider: ${id}`)
   }
-  return storageProvidersById[id]
+  return storageProvidersById[id as StorageProviderId]
 }
 
 /** 读取提供商下的指定区域。 */
 export function getStorageRegion(provider: StorageProviderConfig, id: string) {
   return provider.regions.find((region) => region.id === id)
-}
-
-/** 判断取值是否为支持的对象存储提供商。 */
-function isStorageProviderId(id: StorageProvider): id is StorageProviderId {
-  return id in storageProvidersById
 }

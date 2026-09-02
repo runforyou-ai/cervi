@@ -9,8 +9,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
-	commontimezone "github.com/runforyou-ai/cervi/internal/common/timezone"
-	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识用户字段校验结果。
@@ -53,19 +51,6 @@ func normalizeCreateInput(input CreateInput) (CreateInput, map[string]Validation
 	return input, fields
 }
 
-// normalizeUpdateInput 规范化并校验企业成员字段。
-func normalizeUpdateInput(input UpdateInput) (UpdateInput, map[string]ValidationCode) {
-	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
-	input.DisplayName = profile.DisplayName
-	input.Email = profile.Email
-	var roleIDValid bool
-	input.RoleID, roleIDValid = common.NormalizeUUID(input.RoleID)
-	if !roleIDValid {
-		fields["roleId"] = ValidationRoleInvalid
-	}
-	return input, fields
-}
-
 // normalizeProfileInput 规范化并校验个人资料输入。
 func normalizeProfileInput(input ProfileInput) (ProfileInput, map[string]ValidationCode) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
@@ -80,39 +65,4 @@ func normalizeProfileInput(input ProfileInput) (ProfileInput, map[string]Validat
 		fields["email"] = ValidationEmailInvalid
 	}
 	return input, fields
-}
-
-// validateChangePasswordInput 校验新密码长度。
-func validateChangePasswordInput(input ChangePasswordInput) map[string]ValidationCode {
-	fields := make(map[string]ValidationCode)
-	switch err := commonpassword.Validate(input.NewPassword); {
-	case errors.Is(err, commonpassword.ErrTooShort):
-		fields["newPassword"] = ValidationPasswordTooShort
-	case errors.Is(err, commonpassword.ErrTooLong):
-		fields["newPassword"] = ValidationPasswordTooLong
-	}
-	return fields
-}
-
-// validatePreferencesInput 校验用户偏好设置。
-func validatePreferencesInput(input PreferencesInput) map[string]ValidationCode {
-	fields := make(map[string]ValidationCode)
-	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
-		fields["locale"] = ValidationLocaleInvalid
-	}
-	if !commontimezone.Valid(input.TimeZone) {
-		fields["timeZone"] = ValidationTimeZoneInvalid
-	}
-	return fields
-}
-
-// validateWorkStatusInput 校验工作状态。
-func validateWorkStatusInput(input WorkStatusInput) map[string]ValidationCode {
-	fields := make(map[string]ValidationCode)
-	if input.WorkStatus != domain.WorkStatusWorking &&
-		input.WorkStatus != domain.WorkStatusAway &&
-		input.WorkStatus != domain.WorkStatusOffDuty {
-		fields["workStatus"] = ValidationWorkStatusInvalid
-	}
-	return fields
 }

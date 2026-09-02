@@ -51,7 +51,7 @@ import {
   type StorageSettingsFormValues,
 } from "@/features/settings/storage-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { openExternalURL } from "@/platform/open-external-url"
+import { openExternalURL } from "@/platform/external-navigation"
 
 const customRegionOption = "__custom__"
 

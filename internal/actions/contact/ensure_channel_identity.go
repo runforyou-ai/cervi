@@ -39,9 +39,14 @@ func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelI
 		For("UPDATE").
 		Scan(ctx)
 	if err == nil {
-		contact, loadErr := loadAutomaticContact(ctx, db, input.OrganizationID, identity.ContactID)
-		if loadErr != nil {
-			return EnsuredChannelIdentity{}, loadErr
+		// 读取渠道身份所属的同企业联系人。
+		contact := &servermodels.Contact{}
+		if err := db.NewSelect().
+			Model(contact).
+			Where("ct.organization_id = ?", input.OrganizationID).
+			Where("ct.id = ?", identity.ContactID).
+			Scan(ctx); err != nil {
+			return EnsuredChannelIdentity{}, fmt.Errorf("load channel identity contact: %w", err)
 		}
 		if contact.DeletedAt != nil {
 			if _, updateErr := db.NewUpdate().
@@ -87,17 +92,4 @@ func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelI
 		return EnsuredChannelIdentity{}, fmt.Errorf("create channel identity: %w", err)
 	}
 	return EnsuredChannelIdentity{Contact: contact, Identity: identity}, nil
-}
-
-// loadAutomaticContact 读取渠道身份所属的同企业联系人。
-func loadAutomaticContact(ctx context.Context, db bun.IDB, organizationID, contactID string) (*servermodels.Contact, error) {
-	contact := &servermodels.Contact{}
-	if err := db.NewSelect().
-		Model(contact).
-		Where("ct.organization_id = ?", organizationID).
-		Where("ct.id = ?", contactID).
-		Scan(ctx); err != nil {
-		return nil, fmt.Errorf("load channel identity contact: %w", err)
-	}
-	return contact, nil
 }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -38,7 +39,12 @@ func (q *GetS3SettingQuery) ExecuteForOrganization(ctx context.Context, organiza
 		Where("key = ?", s3SettingKey).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return defaultS3Setting(), nil
+		// 返回尚未配置时使用的初始 S3 配置。
+		return S3Setting{
+			Provider: domain.StorageProviderGeneric,
+			Endpoint: "https://s3.us-east-1.amazonaws.com",
+			Region:   "us-east-1",
+		}, nil
 	}
 	if err != nil {
 		return S3Setting{}, fmt.Errorf("get S3 setting: %w", err)

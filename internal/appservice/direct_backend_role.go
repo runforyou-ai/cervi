@@ -119,7 +119,13 @@ func (b *DirectBackend) UpdateRoleAssignments(ctx context.Context, meta RequestM
 // roleMutationError 转换角色写入校验和操作错误。
 func (b *DirectBackend) roleMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return InvalidError(meta, cervii18n.ErrorValidationFailed, roleFieldKeys(validationError.Fields))
+		// 把角色校验错误码映射为本地化文案键。
+		keys := map[common.FieldCode]cervii18n.Key{
+			roleaction.ValidationNameRequired: cervii18n.FieldRoleNameRequired, roleaction.ValidationNameTooLong: cervii18n.FieldRoleNameTooLong,
+			roleaction.ValidationNameDuplicate: cervii18n.FieldRoleNameDuplicate, roleaction.ValidationDescriptionTooLong: cervii18n.FieldRoleDescriptionTooLong,
+			roleaction.ValidationPermissionsInvalid: cervii18n.FieldRolePermissionsInvalid,
+		}
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	if errors.Is(err, roleaction.ErrAdminImmutable) {
 		return InvalidError(meta, cervii18n.ErrorRoleAdminImmutable, nil)
@@ -168,14 +174,4 @@ func roleFromAction(input roleaction.Record) Role {
 		ID: input.ID, Kind: RoleKind(input.Kind), Name: input.Name, Description: input.Description,
 		Permissions: permissions, MemberCount: input.MemberCount, CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
-}
-
-// roleFieldKeys 把角色校验错误码映射为本地化文案键。
-func roleFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		roleaction.ValidationNameRequired: cervii18n.FieldRoleNameRequired, roleaction.ValidationNameTooLong: cervii18n.FieldRoleNameTooLong,
-		roleaction.ValidationNameDuplicate: cervii18n.FieldRoleNameDuplicate, roleaction.ValidationDescriptionTooLong: cervii18n.FieldRoleDescriptionTooLong,
-		roleaction.ValidationPermissionsInvalid: cervii18n.FieldRolePermissionsInvalid,
-	}
-	return translateValidationFields(fields, keys)
 }

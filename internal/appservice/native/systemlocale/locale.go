@@ -16,7 +16,16 @@ func Detect() appservice.Locale {
 
 // resolve 把操作系统语言值映射为应用支持的语言。
 func resolve(value string) appservice.Locale {
-	value = normalizeLocale(value)
+	// 把操作系统常见语言格式转换成 BCP 47 标签。
+	value = strings.TrimSpace(value)
+	if index := strings.IndexAny(value, ".@"); index >= 0 {
+		value = value[:index]
+	}
+	if value == "C" || value == "POSIX" || value == "" {
+		value = "en-US"
+	} else {
+		value = strings.ReplaceAll(value, "_", "-")
+	}
 	tag, err := language.Parse(value)
 	if err != nil {
 		return appservice.LocaleEnglishUnitedStates
@@ -45,16 +54,4 @@ func preferredLanguageFromEnvironment() string {
 		}
 	}
 	return ""
-}
-
-// normalizeLocale 把操作系统常见语言格式转换成 BCP 47 标签。
-func normalizeLocale(value string) string {
-	value = strings.TrimSpace(value)
-	if index := strings.IndexAny(value, ".@"); index >= 0 {
-		value = value[:index]
-	}
-	if value == "C" || value == "POSIX" || value == "" {
-		return "en-US"
-	}
-	return strings.ReplaceAll(value, "_", "-")
 }

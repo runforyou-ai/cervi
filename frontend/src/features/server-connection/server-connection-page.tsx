@@ -15,16 +15,13 @@ function AnchoredCenter({ children }: { children: ReactNode }) {
       return
     }
 
-    const lockOffset = (height: number) => {
-      compactHeightRef.current = height
-      setOffset(Math.max(24, (window.innerHeight - height) / 2))
-    }
-
     const sync = () => {
       const height = node.offsetHeight
       const compact = compactHeightRef.current
       if (compact == null || height <= compact + 1) {
-        lockOffset(height)
+        // 按未展开高度锁定连接页的垂直偏移。
+        compactHeightRef.current = height
+        setOffset(Math.max(24, (window.innerHeight - height) / 2))
       }
     }
 

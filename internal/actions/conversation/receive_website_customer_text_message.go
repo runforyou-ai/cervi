@@ -251,7 +251,13 @@ func selectTargetConversation(ctx context.Context, db bun.IDB, organizationID, c
 
 // createCustomerConversation 创建客户线程及其渠道身份关系。
 func createCustomerConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID, body, conversationID string) (*servermodels.Conversation, bool, error) {
-	title := conversationTitle(body)
+	// 从首条正文派生稳定会话标题。
+	value := strings.Join(strings.Fields(body), " ")
+	runes := []rune(value)
+	if len(runes) > 60 {
+		runes = runes[:60]
+	}
+	title := string(runes)
 	conversation := &servermodels.Conversation{
 		ID: conversationID, OrganizationID: organizationID, Type: string(domain.ConversationTypeCustomer),
 		Status: string(domain.ConversationStatusActive), Title: &title,
@@ -268,16 +274,6 @@ func createCustomerConversation(ctx context.Context, db bun.IDB, organizationID,
 		return nil, false, fmt.Errorf("create customer conversation relation: %w", err)
 	}
 	return conversation, true, nil
-}
-
-// conversationTitle 从首条正文派生稳定会话标题。
-func conversationTitle(body string) string {
-	value := strings.Join(strings.Fields(body), " ")
-	runes := []rune(value)
-	if len(runes) > 60 {
-		runes = runes[:60]
-	}
-	return string(runes)
 }
 
 // ensureContactParticipant 取得或恢复联系人参与者。

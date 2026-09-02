@@ -23,7 +23,15 @@ func NewUpdateUserAction(db *bun.DB) *UpdateUserAction { return &UpdateUserActio
 
 // Execute 修改企业成员资料、角色和所属团队。
 func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, input UpdateInput) (*User, error) {
-	input, fields := normalizeUpdateInput(input)
+	// 规范化并校验企业成员字段。
+	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
+	input.DisplayName = profile.DisplayName
+	input.Email = profile.Email
+	var roleIDValid bool
+	input.RoleID, roleIDValid = common.NormalizeUUID(input.RoleID)
+	if !roleIDValid {
+		fields["roleId"] = ValidationRoleInvalid
+	}
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}

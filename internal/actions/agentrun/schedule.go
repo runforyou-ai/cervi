@@ -79,7 +79,14 @@ func (s *Scheduler) scheduleInput(ctx context.Context, db bun.IDB, spec agentRun
 		Where("agr.status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
 		Scan(ctx)
 	if err == nil {
-		if !agentRunMatchesSpec(active, spec) {
+		// 判断活动运行是否消费同一类输入。
+		matches := active.TriggerType == string(spec.TriggerType)
+		if active.ServiceSessionID == nil || spec.ServiceSessionID == nil {
+			matches = matches && active.ServiceSessionID == nil && spec.ServiceSessionID == nil
+		} else {
+			matches = matches && *active.ServiceSessionID == *spec.ServiceSessionID
+		}
+		if !matches {
 			return errors.New("active agent run does not match scheduled input")
 		}
 		return nil
@@ -138,15 +145,4 @@ func insertAndEnqueueRun(ctx context.Context, db bun.IDB, enqueuer servertask.Tx
 		return "", fmt.Errorf("enqueue agent run: %w", err)
 	}
 	return run.ID, nil
-}
-
-// agentRunMatchesSpec 判断活动运行是否消费同一类输入。
-func agentRunMatchesSpec(run *servermodels.AgentRun, spec agentRunSpec) bool {
-	if run.TriggerType != string(spec.TriggerType) {
-		return false
-	}
-	if run.ServiceSessionID == nil || spec.ServiceSessionID == nil {
-		return run.ServiceSessionID == nil && spec.ServiceSessionID == nil
-	}
-	return *run.ServiceSessionID == *spec.ServiceSessionID
 }

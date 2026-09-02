@@ -70,10 +70,16 @@ func (p *httpProbe) Run(ctx context.Context) error {
 // newOpenAICompatibleFactory 创建 OpenAI 兼容模型列表探测器工厂。
 func newOpenAICompatibleFactory(client HTTPDoer) Factory {
 	return func(config Config) (connectiontest.Probe, error) {
-		request, err := newRequest(config)
+		// 创建 OpenAI 兼容的模型列表请求。
+		requestURL, err := connectiontest.AppendPath(config.APIURL, "models")
 		if err != nil {
-			return nil, err
+			return nil, connectiontest.InvalidConfigError(err)
 		}
+		request, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		setHeaders(request, config.APIKey)
 		return &httpProbe{client: client, request: request, validate: connectiontest.ValidateDataList}, nil
 	}
 }
@@ -92,20 +98,6 @@ func newAlibabaFactory(client HTTPDoer) Factory {
 		setHeaders(request, config.APIKey)
 		return &httpProbe{client: client, request: request, validate: validateAlibabaModelList}, nil
 	}
-}
-
-// newRequest 创建 OpenAI 兼容的模型列表请求。
-func newRequest(config Config) (*http.Request, error) {
-	requestURL, err := connectiontest.AppendPath(config.APIURL, "models")
-	if err != nil {
-		return nil, connectiontest.InvalidConfigError(err)
-	}
-	request, err := http.NewRequest(http.MethodGet, requestURL, nil)
-	if err != nil {
-		return nil, connectiontest.InvalidConfigError(err)
-	}
-	setHeaders(request, config.APIKey)
-	return request, nil
 }
 
 // setHeaders 设置模型服务探测的通用请求头。

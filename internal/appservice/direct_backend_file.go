@@ -62,7 +62,16 @@ func (b *DirectBackend) CompleteFileUpload(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
-	contentURL, err := b.fileURLForRecord(ctx, record)
+	// 按文件记录和所属企业设置生成公开地址。
+	publicBaseURL := ""
+	if record.StorageBackend == string(domain.FileStorageBackendS3) {
+		setting, settingErr := b.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
+		if settingErr != nil {
+			return File{}, b.fileOperationError(ctx, meta, settingErr, cervii18n.ErrorFileUploadCompleteFailed)
+		}
+		publicBaseURL = setting.PublicBaseURL
+	}
+	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, publicBaseURL)
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
@@ -83,19 +92,6 @@ func (b *DirectBackend) fileUploadRequest(ctx context.Context, meta RequestMeta,
 		return FileUploadRequest{}, fmt.Errorf("presign S3 file upload: %w", err)
 	}
 	return FileUploadRequest{Method: signed.Method, URL: signed.URL, Headers: signed.Headers}, nil
-}
-
-// fileURLForRecord 按文件记录和所属企业设置生成公开地址。
-func (b *DirectBackend) fileURLForRecord(ctx context.Context, record *servermodels.File) (string, error) {
-	publicBaseURL := ""
-	if record.StorageBackend == string(domain.FileStorageBackendS3) {
-		setting, err := b.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-		if err != nil {
-			return "", err
-		}
-		publicBaseURL = setting.PublicBaseURL
-	}
-	return fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, publicBaseURL)
 }
 
 // statFile 按文件记录的存储类型核验内容。
@@ -124,7 +120,14 @@ func (b *DirectBackend) fileOperationError(ctx context.Context, meta RequestMeta
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return InvalidError(meta, cervii18n.ErrorValidationFailed, fileFieldKeys(validationError.Fields))
+		// 映射文件字段校验文案。
+		keys := map[common.FieldCode]cervii18n.Key{
+			fileaction.ValidationFileNameRequired:   cervii18n.FieldFileNameRequired,
+			fileaction.ValidationContentTypeInvalid: cervii18n.FieldFileContentTypeInvalid,
+			fileaction.ValidationByteSizeInvalid:    cervii18n.FieldFileByteSizeInvalid,
+			fileaction.ValidationPurposeInvalid:     cervii18n.FieldFilePurposeInvalid,
+		}
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
@@ -139,17 +142,6 @@ func (b *DirectBackend) fileOperationError(ctx context.Context, meta RequestMeta
 // fileFromModel 把存储文件转换为应用契约。
 func fileFromModel(record *servermodels.File, contentURL string) File {
 	return File{ID: record.ID, Name: record.OriginalName, ContentType: record.ContentType, ByteSize: record.ByteSize, ContentURL: contentURL}
-}
-
-// fileFieldKeys 返回文件字段校验文案。
-func fileFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		fileaction.ValidationFileNameRequired:   cervii18n.FieldFileNameRequired,
-		fileaction.ValidationContentTypeInvalid: cervii18n.FieldFileContentTypeInvalid,
-		fileaction.ValidationByteSizeInvalid:    cervii18n.FieldFileByteSizeInvalid,
-		fileaction.ValidationPurposeInvalid:     cervii18n.FieldFilePurposeInvalid,
-	}
-	return translateValidationFields(fields, keys)
 }
 
 // s3FileConfig 转换文件存储使用的 S3 配置。

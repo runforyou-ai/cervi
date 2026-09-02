@@ -186,15 +186,6 @@ func (s agentRunScope) applySelect(query *bun.SelectQuery) {
 		Where("cat.service_session_id IS NOT DISTINCT FROM ?", s.ServiceSessionID)
 }
 
-// lockAgentState 锁定一次运行对应的会话输入状态。
-func lockAgentState(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, state *servermodels.ConversationAgentState) error {
-	return db.NewSelect().Model(state).
-		Where("cas.conversation_id = ?", run.ConversationID).
-		Where("cas.organization_id = ?", run.OrganizationID).
-		Where("cas.agent_identity_id = ?", run.AgentIdentityID).
-		For("UPDATE").Scan(ctx)
-}
-
 // lockAgentRun 按策略上下文、输入状态、运行记录的顺序取得事务锁。
 func lockAgentRun(ctx context.Context, db bun.IDB, policy agentRunPolicy, initial *servermodels.AgentRun) (lockedAgentRun, error) {
 	policyContext, err := policy.lockContext(ctx, db, initial)
@@ -202,7 +193,12 @@ func lockAgentRun(ctx context.Context, db bun.IDB, policy agentRunPolicy, initia
 		return lockedAgentRun{}, err
 	}
 	state := &servermodels.ConversationAgentState{}
-	if err := lockAgentState(ctx, db, initial, state); err != nil {
+	// 锁定一次运行对应的会话输入状态。
+	if err := db.NewSelect().Model(state).
+		Where("cas.conversation_id = ?", initial.ConversationID).
+		Where("cas.organization_id = ?", initial.OrganizationID).
+		Where("cas.agent_identity_id = ?", initial.AgentIdentityID).
+		For("UPDATE").Scan(ctx); err != nil {
 		return lockedAgentRun{}, err
 	}
 	run := &servermodels.AgentRun{}

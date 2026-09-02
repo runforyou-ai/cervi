@@ -41,14 +41,6 @@ const contextPanelMinWidth = 320
 const contextPanelMaxWidth = 640
 const contextPanelToggleWidth = 16
 
-/** 把联系人上下文栏宽度限制在桌面可用范围内。 */
-function clampContextPanelWidth(width: number) {
-  return Math.min(
-    contextPanelMaxWidth,
-    Math.max(contextPanelMinWidth, width),
-  )
-}
-
 /** 展示尚无数据的上下文页签。 */
 function ContextPlaceholder({
   icon: Icon,
@@ -328,24 +320,6 @@ export function ConversationContextPane({
       ? groupDraft.group
       : null
 
-  /** 开始拖动联系人上下文栏。 */
-  function startContextPanelResize(
-    event: ReactPointerEvent<HTMLButtonElement>,
-  ) {
-    event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  /** 按指针位置调整联系人上下文栏宽度。 */
-  function resizeContextPanel(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
-    setContextPanelWidth(
-      clampContextPanelWidth(
-        window.innerWidth - event.clientX - contextPanelToggleWidth,
-      ),
-    )
-  }
-
   /** 结束拖动联系人上下文栏。 */
   function stopContextPanelResize(
     event: ReactPointerEvent<HTMLButtonElement>,
@@ -368,8 +342,22 @@ export function ConversationContextPane({
             type="button"
             className="absolute top-0 left-0 z-20 h-full w-2 -translate-x-1 cursor-col-resize touch-none"
             aria-label={t("contextResize")}
-            onPointerDown={startContextPanelResize}
-            onPointerMove={resizeContextPanel}
+            onPointerDown={(event) => {
+              // 开始拖动联系人上下文栏。
+              event.preventDefault()
+              event.currentTarget.setPointerCapture(event.pointerId)
+            }}
+            onPointerMove={(event) => {
+              if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+                return
+              }
+              // 按指针位置调整并限制联系人上下文栏宽度。
+              const width = Math.max(
+                contextPanelMinWidth,
+                window.innerWidth - event.clientX - contextPanelToggleWidth,
+              )
+              setContextPanelWidth(Math.min(contextPanelMaxWidth, width))
+            }}
             onPointerUp={stopContextPanelResize}
             onPointerCancel={stopContextPanelResize}
           />

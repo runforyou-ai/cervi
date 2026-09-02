@@ -19,7 +19,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { openExternalPage } from "@/platform/open-external-page"
+import { openExternalPage } from "@/platform/external-navigation"
 
 /** 陈列启用的业务系统并支持打开自定义网址。 */
 export function AppsPage() {

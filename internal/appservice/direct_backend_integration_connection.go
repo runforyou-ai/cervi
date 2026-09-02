@@ -54,8 +54,25 @@ func (b *DirectBackend) TestIntegrationConnection(ctx context.Context, meta Requ
 	if _, err := b.authenticate(ctx, meta); err != nil {
 		return err
 	}
-	if err := b.testIntegrationConnection.Execute(ctx, integrationConnectionTestInput(input)); err != nil {
-		return b.integrationConnectionTestError(ctx, meta, err)
+	// 转换连接器测试输入。
+	actionInput := integrationconnectionaction.ConnectionInput{
+		Type: domain.IntegrationConnectionType(input.Type),
+		Configuration: integrationconnectionaction.Configuration{
+			APIURL: input.Configuration.APIURL, APIKey: input.Configuration.APIKey,
+		},
+	}
+	if err := b.testIntegrationConnection.Execute(ctx, actionInput); err != nil {
+		// 转换连接器测试错误。
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if validationError, ok := errors.AsType[*common.FieldError](err); ok {
+			return InvalidError(meta, cervii18n.ErrorValidationFailed, integrationConnectionFieldKeys(validationError.Fields))
+		}
+		if errors.Is(err, integrationconnectionaction.ErrNotFound) {
+			return NotFoundError(meta, cervii18n.ErrorIntegrationConnectionNotFound)
+		}
+		return integrationConnectionRemoteError(meta, err)
 	}
 	return nil
 }
@@ -132,20 +149,6 @@ func (b *DirectBackend) integrationConnectionMutationError(ctx context.Context, 
 	return b.integrationConnectionError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
-// integrationConnectionTestError 转换连接器测试错误。
-func (b *DirectBackend) integrationConnectionTestError(ctx context.Context, meta RequestMeta, err error) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return InvalidError(meta, cervii18n.ErrorValidationFailed, integrationConnectionFieldKeys(validationError.Fields))
-	}
-	if errors.Is(err, integrationconnectionaction.ErrNotFound) {
-		return NotFoundError(meta, cervii18n.ErrorIntegrationConnectionNotFound)
-	}
-	return integrationConnectionRemoteError(meta, err)
-}
-
 // integrationConnectionRemoteError 转换外部连接访问错误。
 func integrationConnectionRemoteError(meta RequestMeta, err error) error {
 	_, kind, classified := connectiontest.Details(err)
@@ -188,16 +191,6 @@ func (b *DirectBackend) integrationConnectionError(ctx context.Context, meta Req
 func integrationConnectionInput(input IntegrationConnectionInput) integrationconnectionaction.Input {
 	return integrationconnectionaction.Input{
 		Type: domain.IntegrationConnectionType(input.Type), Name: input.Name, Description: input.Description,
-		Configuration: integrationconnectionaction.Configuration{
-			APIURL: input.Configuration.APIURL, APIKey: input.Configuration.APIKey,
-		},
-	}
-}
-
-// integrationConnectionTestInput 转换连接器测试输入。
-func integrationConnectionTestInput(input IntegrationConnectionTestInput) integrationconnectionaction.ConnectionInput {
-	return integrationconnectionaction.ConnectionInput{
-		Type: domain.IntegrationConnectionType(input.Type),
 		Configuration: integrationconnectionaction.Configuration{
 			APIURL: input.Configuration.APIURL, APIKey: input.Configuration.APIKey,
 		},

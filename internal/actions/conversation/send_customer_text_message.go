@@ -68,7 +68,12 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
-	ids := generateMemberMessageIDs()
+	// 预生成一次事务重试期间稳定使用的 UUIDv7。
+	values := make([]string, 3)
+	for index := range values {
+		values[index] = uuid.NewV7().String()
+	}
+	ids := memberMessageIDs{subject: values[0], participant: values[1], message: values[2]}
 	var err error
 	originatedAt := time.Now().UTC()
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + normalized.ClientMessageID
@@ -115,14 +120,23 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		return saved, err
 	}
 
-	plan, err := planMemberReplySession(domain.ServiceSessionStatus(session.Status), session.AssigneeIdentityID, identity.OrganizationIdentity.ID)
-	if err != nil {
-		return ConversationMessage{}, err
+	// 计算成员回复对应的客服周期状态迁移。
+	status := domain.ServiceSessionStatus(session.Status)
+	if status == domain.ServiceSessionStatusClosed {
+		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
 	}
+	if status != domain.ServiceSessionStatusOpen {
+		return ConversationMessage{}, ErrDataInvariant
+	}
+	if session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
+		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonServiceSessionOwned}
+	}
+	plan := memberReplySessionPlan{assign: session.AssigneeIdentityID == nil}
 	if err := applyMemberReplySessionPlan(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt, plan); err != nil {
 		return ConversationMessage{}, err
 	}
-	subject, err := ensureMemberChatSubject(ctx, tx, identity, ids.subject)
+	// 取得或创建当前企业成员的聊天主体。
+	subject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.subject)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
@@ -142,8 +156,14 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		Exec(ctx); err != nil {
 		return ConversationMessage{}, fmt.Errorf("create member customer message: %w", err)
 	}
-	if err := recordFirstMemberResponse(ctx, tx, session, originatedAt); err != nil {
-		return ConversationMessage{}, err
+	// 只记录客服处理周期的首次成员响应时间。
+	if _, err := tx.NewUpdate().Model(session).
+		Set("first_response_at = COALESCE(first_response_at, ?)", originatedAt).
+		Set("updated_at = now()").
+		WherePK().
+		Where("organization_id = ?", session.OrganizationID).
+		Exec(ctx); err != nil {
+		return ConversationMessage{}, fmt.Errorf("record first member response: %w", err)
 	}
 	if err := updateSessionSummary(ctx, tx, session, message); err != nil {
 		return ConversationMessage{}, err
@@ -196,15 +216,6 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 		fields["body"] = ValidationBodyTooLong
 	}
 	return input, fields
-}
-
-// generateMemberMessageIDs 预生成一次事务重试期间稳定使用的 UUIDv7。
-func generateMemberMessageIDs() memberMessageIDs {
-	values := make([]string, 3)
-	for index := range values {
-		values[index] = uuid.NewV7().String()
-	}
-	return memberMessageIDs{subject: values[0], participant: values[1], message: values[2]}
 }
 
 // loadCustomerConversationForReply 读取当前企业的客户会话。
@@ -274,7 +285,16 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	if err != nil {
 		return ConversationMessage{}, false, fmt.Errorf("load idempotent member message: %w", err)
 	}
-	if !memberMessageMatches(row, identity.OrganizationIdentity.ID, conversationID, body, requireServiceSession) {
+	// 校验幂等消息对应完整的成员发送意图。
+	serviceSessionMatches := row.ServiceSessionID == nil && row.JoinedServiceSessionID == nil
+	if requireServiceSession {
+		serviceSessionMatches = row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID
+	}
+	messageMatches := row.ConversationID == conversationID && row.Body == body && row.Type == string(domain.MessageTypeText) && row.DeletedAt == nil &&
+		serviceSessionMatches &&
+		row.SenderParticipantID != nil && row.SenderSubjectID != nil && row.SenderSubjectKind != nil && row.SenderSubjectSourceID != nil &&
+		*row.SenderSubjectKind == string(domain.ChatSubjectKindOrganizationIdentity) && *row.SenderSubjectSourceID == identity.OrganizationIdentity.ID
+	if !messageMatches {
 		return ConversationMessage{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	message := &servermodels.Message{
@@ -283,32 +303,6 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt,
 	}
 	return memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName), true, nil
-}
-
-// memberMessageMatches 校验幂等消息对应完整的成员发送意图。
-func memberMessageMatches(row idempotentMemberMessageRow, identityID, conversationID, body string, requireServiceSession bool) bool {
-	serviceSessionMatches := row.ServiceSessionID == nil && row.JoinedServiceSessionID == nil
-	if requireServiceSession {
-		serviceSessionMatches = row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID
-	}
-	return row.ConversationID == conversationID && row.Body == body && row.Type == string(domain.MessageTypeText) && row.DeletedAt == nil &&
-		serviceSessionMatches &&
-		row.SenderParticipantID != nil && row.SenderSubjectID != nil && row.SenderSubjectKind != nil && row.SenderSubjectSourceID != nil &&
-		*row.SenderSubjectKind == string(domain.ChatSubjectKindOrganizationIdentity) && *row.SenderSubjectSourceID == identityID
-}
-
-// planMemberReplySession 计算成员回复对应的客服周期状态迁移。
-func planMemberReplySession(status domain.ServiceSessionStatus, assigneeIdentityID *string, identityID string) (memberReplySessionPlan, error) {
-	if status == domain.ServiceSessionStatusClosed {
-		return memberReplySessionPlan{}, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
-	}
-	if status != domain.ServiceSessionStatusOpen {
-		return memberReplySessionPlan{}, ErrDataInvariant
-	}
-	if assigneeIdentityID != nil && *assigneeIdentityID != identityID {
-		return memberReplySessionPlan{}, &ConflictError{Reason: ConflictReasonServiceSessionOwned}
-	}
-	return memberReplySessionPlan{assign: assigneeIdentityID == nil}, nil
 }
 
 // applyMemberReplySessionPlan 应用成员回复对应的客服周期状态迁移。
@@ -335,11 +329,6 @@ func applyMemberReplySessionPlan(ctx context.Context, db bun.IDB, session *serve
 		}
 	}
 	return nil
-}
-
-// ensureMemberChatSubject 取得或创建当前企业成员的聊天主体。
-func ensureMemberChatSubject(ctx context.Context, db bun.IDB, identity *servermodels.Identity, subjectID string) (*servermodels.ChatSubject, error) {
-	return ensureOrganizationIdentityChatSubject(ctx, db, identity.Organization.ID, identity.OrganizationIdentity.ID, subjectID)
 }
 
 // ensureMemberConversationParticipant 取得、创建或恢复当前成员的会话参与者。
@@ -379,19 +368,6 @@ func ensureMemberConversationParticipant(ctx context.Context, db bun.IDB, organi
 		return nil, fmt.Errorf("create member conversation participant: %w", err)
 	}
 	return participant, nil
-}
-
-// recordFirstMemberResponse 只记录客服处理周期的首次成员响应时间。
-func recordFirstMemberResponse(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, originatedAt time.Time) error {
-	if _, err := db.NewUpdate().Model(session).
-		Set("first_response_at = COALESCE(first_response_at, ?)", originatedAt).
-		Set("updated_at = now()").
-		WherePK().
-		Where("organization_id = ?", session.OrganizationID).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("record first member response: %w", err)
-	}
-	return nil
 }
 
 // memberConversationMessage 构造成员消息时间线结果。

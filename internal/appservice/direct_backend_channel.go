@@ -112,7 +112,12 @@ func (b *DirectBackend) CreateMessageChannel(ctx context.Context, meta RequestMe
 	if err != nil {
 		return MessageChannelSummary{}, err
 	}
-	channel, err := b.createMessageChannel.Execute(ctx, identity, createChannelInput(input))
+	// 转换消息渠道创建输入。
+	actionInput := channelaction.CreateMessageChannelInput{
+		MessageChannelInput: channelInput(input.MessageChannelInput),
+		Type:                domain.ChannelType(input.Type),
+	}
+	channel, err := b.createMessageChannel.Execute(ctx, identity, actionInput)
 	if err != nil {
 		return MessageChannelSummary{}, b.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelCreateFailed, identity.Organization.ID, "")
 	}
@@ -325,14 +330,6 @@ func channelInput(input MessageChannelInput) channelaction.MessageChannelInput {
 		Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale),
 		NewConversationTarget: channelRoutingTargetInput(input.NewConversationTarget),
 		FallbackTarget:        channelRoutingTargetInput(input.FallbackTarget),
-	}
-}
-
-// createChannelInput 转换消息渠道创建输入。
-func createChannelInput(input CreateMessageChannelInput) channelaction.CreateMessageChannelInput {
-	return channelaction.CreateMessageChannelInput{
-		MessageChannelInput: channelInput(input.MessageChannelInput),
-		Type:                domain.ChannelType(input.Type),
 	}
 }
 

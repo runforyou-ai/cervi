@@ -126,20 +126,6 @@ func websiteChannelSettingRecord(setting *servermodels.WebsiteChannelSetting) We
 	}
 }
 
-// telegramChannelSettingRecord 把 Telegram 设置存储模型转换为传输结构。
-func telegramChannelSettingRecord(setting *servermodels.TelegramChannelSetting) TelegramChannelSettingRecord {
-	return TelegramChannelSettingRecord{
-		BotToken:           optionalStringValue(setting.BotToken),
-		BotID:              setting.BotID,
-		BotUsername:        setting.BotUsername,
-		BotDisplayName:     setting.BotDisplayName,
-		WebhookBaseURL:     optionalStringValue(setting.WebhookBaseURL),
-		WebhookSecret:      optionalStringValue(setting.WebhookSecret),
-		WebhookStatus:      setting.WebhookStatus,
-		WebhookConnectedAt: setting.WebhookConnectedAt,
-	}
-}
-
 // optionalStringValue 返回可空字符串的实际值。
 func optionalStringValue(value *string) string {
 	if value == nil {

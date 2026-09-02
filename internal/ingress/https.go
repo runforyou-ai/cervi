@@ -261,7 +261,9 @@ func (s *HTTPSEntry) serveHTTP(writer http.ResponseWriter, request *http.Request
 		return
 	}
 	s.rememberAllowedHost(host)
-	redirectToHTTPS(writer, request, host)
+	// 把公网 HTTP 请求跳转到相同域名和路径的 HTTPS 地址。
+	target := url.URL{Scheme: "https", Host: host, Path: request.URL.Path, RawQuery: request.URL.RawQuery}
+	http.Redirect(writer, request, target.String(), http.StatusTemporaryRedirect)
 }
 
 // rememberAllowedHost 缓存已确认的公网域名；达到上限时整体清空重建，避免恶意 Host 头刷量挤掉合法新域名的签发授权。
@@ -366,10 +368,4 @@ func requestHost(value string) (string, bool) {
 		strings.HasSuffix(host, ".internal") ||
 		strings.HasSuffix(host, ".home.arpa")
 	return host, local
-}
-
-// redirectToHTTPS 把公网 HTTP 请求跳转到相同域名和路径的 HTTPS 地址。
-func redirectToHTTPS(writer http.ResponseWriter, request *http.Request, host string) {
-	target := url.URL{Scheme: "https", Host: host, Path: request.URL.Path, RawQuery: request.URL.RawQuery}
-	http.Redirect(writer, request, target.String(), http.StatusTemporaryRedirect)
 }

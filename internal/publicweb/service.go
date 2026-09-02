@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -80,7 +81,17 @@ func (s *EmbedService) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 	case request.URL.Path == "/widget.js":
 		s.writeWidgetScript(writer, request)
 	case request.URL.Path == "/preview/frame":
-		if err := writePage(writer, previewView(request), http.StatusOK); err != nil {
+		// 返回管理界面使用的 Messenger 预览页。
+		locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
+		page := baseView("preview", defaultTheme(), locale)
+		page.Preview = true
+		page.ShowWidgetControls = true
+		// 预览框同时允许管理端顶层和同源预览宿主页。
+		page.FrameAncestors = "* wails:"
+		page.Title, _ = cervii18n.Localize(string(locale), cervii18n.MessengerDefaultTitle)
+		page.Subtitle = page.Copy["defaultResponse"]
+		page.Greeting = page.Copy["conversationPrompt"]
+		if err := writePage(writer, page, http.StatusOK); err != nil {
 			slog.Warn("写入网站渠道 Messenger 预览框失败", "error", err)
 		}
 	case strings.HasPrefix(request.URL.Path, "/widget/"):
@@ -173,7 +184,17 @@ func (s *EmbedService) writeWidgetScript(writer http.ResponseWriter, request *ht
 		}
 		theme = parseTheme(channel.ThemeColor)
 	}
-	writeWidgetJavaScript(writer, http.StatusOK, cacheControl, channelID, scriptWithTheme(theme))
+	// 生成挂件主题变量。
+	hostCSS := fmt.Sprintf(
+		":host{--cv-theme:%s;--cv-on-theme:%s;--cv-focus:%s;--cv-launcher-shadow:%s}",
+		theme.Color,
+		theme.OnColor,
+		theme.Focus,
+		theme.LauncherShadow,
+	)
+	// 生成包含主题变量的挂件脚本。
+	script := bytes.Replace(widgetScript, []byte(themePlaceholder), []byte(hostCSS), 1)
+	writeWidgetJavaScript(writer, http.StatusOK, cacheControl, channelID, script)
 }
 
 // writeWidgetJavaScript 写入网站嵌入脚本响应。
@@ -188,16 +209,21 @@ func writeWidgetJavaScript(writer http.ResponseWriter, status int, cacheControl 
 	}
 }
 
-// scriptWithTheme 生成包含主题变量的挂件脚本。
-func scriptWithTheme(theme theme) []byte {
-	return bytes.Replace(widgetScript, []byte(themePlaceholder), []byte(theme.hostCSS()), 1)
-}
-
 // writeChatPage 渲染公开聊天页。
 func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Lookup, channelID string, entry string) {
 	channel, err := lookup(request.Context(), channelID)
 	if errors.Is(err, channelaction.ErrNotFound) {
-		if err := writePage(writer, notFoundView(request, entry), http.StatusNotFound); err != nil {
+		// 返回聊天入口不存在时的页面。
+		locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
+		page := baseView(entry, defaultTheme(), locale)
+		page.NotFound = true
+		messages := cervii18n.LocalizeMap(string(locale), map[string]cervii18n.Key{
+			"title":   cervii18n.MessengerUnavailableTitle,
+			"message": cervii18n.MessengerUnavailableMessage,
+		})
+		page.Title = messages["title"]
+		page.EmptyMessage = messages["message"]
+		if err := writePage(writer, page, http.StatusNotFound); err != nil {
 			slog.Warn("写入网站渠道不可用页面失败", "channel_id", channelID, "entry", entry, "error", err)
 			return
 		}
@@ -212,7 +238,13 @@ func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Loo
 	if entry == "embed" {
 		host := embedRequestHost(request)
 		if !embedhost.Allows(channel.AllowedEmbedHosts, host) {
-			writeEmbedFrameForbidden(writer)
+			// 拒绝未允许的网站加载聊天框。
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			writer.Header().Set("Cache-Control", "no-store")
+			writer.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
+			writer.Header().Set("Vary", "Origin, Referer")
+			writer.Header().Set("X-Content-Type-Options", "nosniff")
+			writer.WriteHeader(http.StatusForbidden)
 			slog.Info("网站渠道拒绝未允许的嵌入聊天框来源", "channel_id", channel.ID, "host", host)
 			return
 		}
@@ -255,37 +287,19 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 	return page
 }
 
-// previewView 返回管理界面使用的 Messenger 预览页。
-func previewView(request *http.Request) pageView {
-	locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
-	page := baseView("preview", defaultTheme(), locale)
-	page.Preview = true
-	page.ShowWidgetControls = true
-	// 预览框同时允许管理端顶层和同源预览宿主页。
-	page.FrameAncestors = "* wails:"
-	page.Title, _ = cervii18n.Localize(string(locale), cervii18n.MessengerDefaultTitle)
-	page.Subtitle = page.Copy["defaultResponse"]
-	page.Greeting = page.Copy["conversationPrompt"]
-	return page
-}
-
-// notFoundView 返回聊天入口不存在时的页面。
-func notFoundView(request *http.Request, entry string) pageView {
-	locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
-	page := baseView(entry, defaultTheme(), locale)
-	page.NotFound = true
-	messages := cervii18n.LocalizeMap(string(locale), map[string]cervii18n.Key{
-		"title":   cervii18n.MessengerUnavailableTitle,
-		"message": cervii18n.MessengerUnavailableMessage,
-	})
-	page.Title = messages["title"]
-	page.EmptyMessage = messages["message"]
-	return page
-}
-
 // baseView 填充聊天页共用内容。
 func baseView(entry string, theme theme, locale domain.Locale) pageView {
-	messengerText := localizedMessengerCopy(locale)
+	// 返回按映射表本地化后的 Messenger 固定文案。
+	messengerText := cervii18n.LocalizeMap(string(locale), messengerCopyMessageKeys)
+	// 返回客服名称开头的两个字标。
+	characters := []rune(strings.ToUpper(strings.TrimSpace(messengerText["defaultAgentName"])))
+	initials := "?"
+	if len(characters) > 0 {
+		if len(characters) > 2 {
+			characters = characters[:2]
+		}
+		initials = string(characters)
+	}
 	page := pageView{
 		Shell:              entry,
 		ShowWidgetControls: entry == "embed",
@@ -293,7 +307,7 @@ func baseView(entry string, theme theme, locale domain.Locale) pageView {
 		Agent: serviceAgentView{
 			Name:       messengerText["defaultAgentName"],
 			LastActive: messengerText["defaultAgentLastActive"],
-			Initials:   agentInitials(messengerText["defaultAgentName"]),
+			Initials:   initials,
 		},
 		ThemeCSS:       template.CSS(theme.rootCSS()),
 		MessengerCSS:   template.CSS(messengerCSS),
@@ -367,11 +381,6 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"sessionClosed":             cervii18n.MessengerSessionClosed,
 }
 
-// localizedMessengerCopy 返回按映射表本地化后的 Messenger 固定文案。
-func localizedMessengerCopy(locale domain.Locale) map[string]string {
-	return cervii18n.LocalizeMap(string(locale), messengerCopyMessageKeys)
-}
-
 // embedRequestHost 从公开嵌入请求中读取宿主网站主机。
 func embedRequestHost(request *http.Request) string {
 	for _, value := range []string{request.Header.Get("Origin"), request.Referer()} {
@@ -381,28 +390,6 @@ func embedRequestHost(request *http.Request) string {
 		}
 	}
 	return ""
-}
-
-// writeEmbedFrameForbidden 拒绝未允许的网站加载聊天框。
-func writeEmbedFrameForbidden(writer http.ResponseWriter) {
-	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-	writer.Header().Set("Cache-Control", "no-store")
-	writer.Header().Set("Content-Security-Policy", "frame-ancestors 'none'")
-	writer.Header().Set("Vary", "Origin, Referer")
-	writer.Header().Set("X-Content-Type-Options", "nosniff")
-	writer.WriteHeader(http.StatusForbidden)
-}
-
-// agentInitials 返回客服名称开头的两个字标。
-func agentInitials(value string) string {
-	characters := []rune(strings.ToUpper(strings.TrimSpace(value)))
-	if len(characters) == 0 {
-		return "?"
-	}
-	if len(characters) > 2 {
-		characters = characters[:2]
-	}
-	return string(characters)
 }
 
 // preferredMessengerLocale 按浏览器首选语言选择 Messenger 支持的语言。
