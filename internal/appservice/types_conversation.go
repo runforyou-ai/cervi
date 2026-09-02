@@ -83,6 +83,21 @@ type ConversationMessageSender struct {
 	DisplayName   *string         `json:"displayName"`
 }
 
+// ConversationMessageReference 定义引用消息的一层摘要。
+type ConversationMessageReference struct {
+	ID     string                     `json:"id"`
+	Body   string                     `json:"body"`
+	Sender *ConversationMessageSender `json:"sender"`
+}
+
+// ConversationMessageMention 定义消息提醒的聊天主体。
+type ConversationMessageMention struct {
+	ChatSubjectID string          `json:"chatSubjectId"`
+	Kind          ChatSubjectKind `json:"kind"`
+	SourceID      string          `json:"sourceId"`
+	DisplayName   *string         `json:"displayName"`
+}
+
 // ConversationMessageSessionStart 定义客服处理周期开始标记。
 type ConversationMessageSessionStart struct {
 	Sequence  int64                `json:"sequence"`
@@ -115,6 +130,8 @@ type ConversationMessage struct {
 	Sender       *ConversationMessageSender       `json:"sender"`
 	SessionStart *ConversationMessageSessionStart `json:"sessionStart"`
 	SystemEvent  *ConversationSystemEvent         `json:"systemEvent"`
+	ReplyTo      *ConversationMessageReference    `json:"replyTo"`
+	Mentions     []ConversationMessageMention     `json:"mentions"`
 }
 
 // ConversationMessageList 定义成员消息页。
@@ -173,10 +190,11 @@ type GroupConversationLeaveInput struct {
 
 // GroupParticipant 定义群聊当前有效成员。
 type GroupParticipant struct {
-	IdentityID  string               `json:"identityId"`
-	DisplayName string               `json:"displayName"`
-	AvatarURL   string               `json:"avatarUrl"`
-	Role        GroupParticipantRole `json:"role"`
+	ChatSubjectID string               `json:"chatSubjectId"`
+	IdentityID    string               `json:"identityId"`
+	DisplayName   string               `json:"displayName"`
+	AvatarURL     string               `json:"avatarUrl"`
+	Role          GroupParticipantRole `json:"role"`
 }
 
 // GroupConversation 定义群聊资料和当前有效成员。
@@ -192,6 +210,8 @@ type GroupConversation struct {
 
 // GroupTextMessageInput 定义成员发送的群聊文本消息。
 type GroupTextMessageInput struct {
-	ClientMessageID string `json:"clientMessageId"`
-	Body            string `json:"body"`
+	ClientMessageID   string   `json:"clientMessageId"`
+	Body              string   `json:"body"`
+	ReplyToMessageID  string   `json:"replyToMessageId"`
+	MentionSubjectIDs []string `json:"mentionSubjectIds"`
 }

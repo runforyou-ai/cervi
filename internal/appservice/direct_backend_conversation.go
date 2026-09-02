@@ -327,7 +327,7 @@ func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identit
 	participants := make([]GroupParticipant, 0, len(record.Participants))
 	for _, participant := range record.Participants {
 		participants = append(participants, GroupParticipant{
-			IdentityID: participant.IdentityID, DisplayName: participant.DisplayName,
+			ChatSubjectID: participant.ChatSubjectID, IdentityID: participant.IdentityID, DisplayName: participant.DisplayName,
 			AvatarURL: optionalFileURL(avatarURLs, participant.AvatarFileID), Role: GroupParticipantRole(participant.Role),
 		})
 	}
@@ -346,6 +346,7 @@ func (b *DirectBackend) SendGroupTextMessage(ctx context.Context, meta RequestMe
 	}
 	message, err := b.sendGroupTextMessage.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body,
+		ReplyToMessageID: input.ReplyToMessageID, MentionSubjectIDs: input.MentionSubjectIDs,
 	})
 	if err != nil {
 		return ConversationMessage{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "send")
@@ -405,15 +406,7 @@ func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta Reque
 
 // conversationMessageFromAction 转换成员会话消息契约。
 func conversationMessageFromAction(message conversationaction.ConversationMessage) ConversationMessage {
-	var sender *ConversationMessageSender
-	if message.Sender != nil {
-		sender = &ConversationMessageSender{
-			ChatSubjectID: message.Sender.ChatSubjectID,
-			Kind:          ChatSubjectKind(message.Sender.Kind),
-			SourceID:      message.Sender.SourceID,
-			DisplayName:   message.Sender.DisplayName,
-		}
-	}
+	sender := conversationMessageSenderFromAction(message.Sender)
 	var sessionStart *ConversationMessageSessionStart
 	if message.SessionStart != nil {
 		sessionStart = &ConversationMessageSessionStart{
@@ -436,10 +429,36 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			Targets: targets, PreviousTitle: message.SystemEvent.PreviousTitle, Title: message.SystemEvent.Title,
 		}
 	}
+	var replyTo *ConversationMessageReference
+	if message.ReplyTo != nil {
+		replyTo = &ConversationMessageReference{
+			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body,
+			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender),
+		}
+	}
+	mentions := make([]ConversationMessageMention, 0, len(message.Mentions))
+	for _, mention := range message.Mentions {
+		mentions = append(mentions, ConversationMessageMention{
+			ChatSubjectID: mention.ChatSubjectID, Kind: ChatSubjectKind(mention.Kind),
+			SourceID: mention.SourceID, DisplayName: mention.DisplayName,
+		})
+	}
 	return ConversationMessage{
 		ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, CreatedAt: message.CreatedAt,
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
+		ReplyTo: replyTo, Mentions: mentions,
+	}
+}
+
+// conversationMessageSenderFromAction 转换消息发送主体。
+func conversationMessageSenderFromAction(sender *conversationaction.ConversationMessageSender) *ConversationMessageSender {
+	if sender == nil {
+		return nil
+	}
+	return &ConversationMessageSender{
+		ChatSubjectID: sender.ChatSubjectID, Kind: ChatSubjectKind(sender.Kind),
+		SourceID: sender.SourceID, DisplayName: sender.DisplayName,
 	}
 }
 
@@ -504,6 +523,10 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 			messageKey = cervii18n.ErrorGroupOwnerCannotBeRemoved
 		case conversationaction.ConflictReasonGroupSuccessorRequired:
 			messageKey = cervii18n.ErrorGroupSuccessorRequired
+		case conversationaction.ConflictReasonGroupReplyTargetInvalid:
+			messageKey = cervii18n.ErrorGroupReplyTargetInvalid
+		case conversationaction.ConflictReasonGroupMentionTargetInvalid:
+			messageKey = cervii18n.ErrorGroupMentionTargetInvalid
 		}
 		return ConflictError(meta, messageKey, conflictError.Reason)
 	}
@@ -593,20 +616,22 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 }
 
 var conversationMessageValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{
-	conversationaction.ValidationConversationIDInvalid:   cervii18n.FieldConversationIDInvalid,
-	conversationaction.ValidationClientMessageIDInvalid:  cervii18n.FieldClientMessageIDInvalid,
-	conversationaction.ValidationBodyRequired:            cervii18n.FieldMessageBodyRequired,
-	conversationaction.ValidationBodyTooLong:             cervii18n.FieldMessageBodyTooLong,
-	conversationaction.ValidationCursorInvalid:           cervii18n.FieldMessageCursorInvalid,
-	conversationaction.ValidationTargetIdentityIDInvalid: cervii18n.FieldTargetIdentityIDInvalid,
-	conversationaction.ValidationGroupTitleRequired:      cervii18n.FieldGroupTitleRequired,
-	conversationaction.ValidationGroupTitleTooLong:       cervii18n.FieldGroupTitleTooLong,
-	conversationaction.ValidationGroupDescriptionTooLong: cervii18n.FieldGroupDescriptionTooLong,
-	conversationaction.ValidationGroupImageFileIDInvalid: cervii18n.FieldGroupImageFileIDInvalid,
-	conversationaction.ValidationGroupMembersRequired:    cervii18n.FieldGroupMembersRequired,
-	conversationaction.ValidationGroupMembersTooMany:     cervii18n.FieldGroupMembersTooMany,
-	conversationaction.ValidationGroupMemberIDsInvalid:   cervii18n.FieldGroupMemberIDsInvalid,
-	conversationaction.ValidationGroupMemberIDInvalid:    cervii18n.FieldGroupMemberIDInvalid,
-	conversationaction.ValidationGroupOwnerIDInvalid:     cervii18n.FieldGroupOwnerIDInvalid,
-	conversationaction.ValidationGroupSuccessorIDInvalid: cervii18n.FieldGroupSuccessorIDInvalid,
+	conversationaction.ValidationConversationIDInvalid:    cervii18n.FieldConversationIDInvalid,
+	conversationaction.ValidationClientMessageIDInvalid:   cervii18n.FieldClientMessageIDInvalid,
+	conversationaction.ValidationReplyToMessageIDInvalid:  cervii18n.FieldReplyToMessageIDInvalid,
+	conversationaction.ValidationMentionSubjectIDsInvalid: cervii18n.FieldMentionSubjectIDsInvalid,
+	conversationaction.ValidationBodyRequired:             cervii18n.FieldMessageBodyRequired,
+	conversationaction.ValidationBodyTooLong:              cervii18n.FieldMessageBodyTooLong,
+	conversationaction.ValidationCursorInvalid:            cervii18n.FieldMessageCursorInvalid,
+	conversationaction.ValidationTargetIdentityIDInvalid:  cervii18n.FieldTargetIdentityIDInvalid,
+	conversationaction.ValidationGroupTitleRequired:       cervii18n.FieldGroupTitleRequired,
+	conversationaction.ValidationGroupTitleTooLong:        cervii18n.FieldGroupTitleTooLong,
+	conversationaction.ValidationGroupDescriptionTooLong:  cervii18n.FieldGroupDescriptionTooLong,
+	conversationaction.ValidationGroupImageFileIDInvalid:  cervii18n.FieldGroupImageFileIDInvalid,
+	conversationaction.ValidationGroupMembersRequired:     cervii18n.FieldGroupMembersRequired,
+	conversationaction.ValidationGroupMembersTooMany:      cervii18n.FieldGroupMembersTooMany,
+	conversationaction.ValidationGroupMemberIDsInvalid:    cervii18n.FieldGroupMemberIDsInvalid,
+	conversationaction.ValidationGroupMemberIDInvalid:     cervii18n.FieldGroupMemberIDInvalid,
+	conversationaction.ValidationGroupOwnerIDInvalid:      cervii18n.FieldGroupOwnerIDInvalid,
+	conversationaction.ValidationGroupSuccessorIDInvalid:  cervii18n.FieldGroupSuccessorIDInvalid,
 }

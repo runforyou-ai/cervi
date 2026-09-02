@@ -1156,6 +1156,72 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || len(history.Messages) != 1 || history.Messages[0].ID != message.ID || history.Messages[0].Sender == nil || history.Messages[0].Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
 			t.Fatalf("group message history = %#v, error = %v", history, err)
 		}
+		groupDetail, err := get.Execute(context.Background(), loggedIn.Identity, group.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ownerSubjectID, memberSubjectID string
+		for _, participant := range groupDetail.Participants {
+			if participant.IdentityID == loggedIn.Identity.OrganizationIdentity.ID {
+				ownerSubjectID = participant.ChatSubjectID
+			}
+			if participant.IdentityID == memberLogin.Identity.OrganizationIdentity.ID {
+				memberSubjectID = participant.ChatSubjectID
+			}
+		}
+		if ownerSubjectID == "" || memberSubjectID == "" {
+			t.Fatalf("group member chat subject missing: %#v", groupDetail.Participants)
+		}
+		relationInput := conversationaction.GroupTextMessageInput{
+			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f75",
+			Body: "请看前一条", ReplyToMessageID: message.ID, MentionSubjectIDs: []string{memberSubjectID},
+		}
+		relationMessage, err := send.Execute(context.Background(), loggedIn.Identity, relationInput)
+		if err != nil || relationMessage.ReplyTo == nil || relationMessage.ReplyTo.ID != message.ID || len(relationMessage.Mentions) != 1 || relationMessage.Mentions[0].ChatSubjectID != memberSubjectID {
+			t.Fatalf("group relation message = %#v, error = %v", relationMessage, err)
+		}
+		replayedRelation, err := send.Execute(context.Background(), loggedIn.Identity, relationInput)
+		if err != nil || replayedRelation.ID != relationMessage.ID || replayedRelation.ReplyTo == nil || len(replayedRelation.Mentions) != 1 {
+			t.Fatalf("replayed group relation message = %#v, error = %v", replayedRelation, err)
+		}
+		changedRelationInput := relationInput
+		changedRelationInput.MentionSubjectIDs = nil
+		_, err = send.Execute(context.Background(), loggedIn.Identity, changedRelationInput)
+		var relationConflict *conversationaction.ConflictError
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
+			t.Fatalf("changed idempotent group relation error = %#v", err)
+		}
+		changedRelationInput = relationInput
+		changedRelationInput.ReplyToMessageID = relationMessage.ID
+		_, err = send.Execute(context.Background(), loggedIn.Identity, changedRelationInput)
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
+			t.Fatalf("changed idempotent group reply error = %#v", err)
+		}
+		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f76",
+			Body: "无效引用", ReplyToMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f77",
+		})
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonGroupReplyTargetInvalid {
+			t.Fatalf("invalid group reply error = %#v", err)
+		}
+		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f78",
+			Body: "无效提醒", MentionSubjectIDs: []string{observerLogin.Identity.OrganizationIdentity.ID},
+		})
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonGroupMentionTargetInvalid {
+			t.Fatalf("invalid group mention error = %#v", err)
+		}
+		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f79",
+			Body: "提醒自己", MentionSubjectIDs: []string{ownerSubjectID},
+		})
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonGroupMentionTargetInvalid {
+			t.Fatalf("self group mention error = %#v", err)
+		}
+		history, err = conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID})
+		if err != nil || len(history.Messages) != 2 || history.Messages[1].ReplyTo == nil || history.Messages[1].ReplyTo.ID != message.ID || len(history.Messages[1].Mentions) != 1 || history.Messages[1].Mentions[0].ChatSubjectID != memberSubjectID {
+			t.Fatalf("group relation history = %#v, error = %v", history, err)
+		}
 		if _, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), otherInstalled.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 			t.Fatalf("cross-organization group history error = %v", err)
 		}

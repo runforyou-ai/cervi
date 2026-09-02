@@ -433,7 +433,6 @@ export function GroupConversationContext({
     })
     void invalidate(resourceKeys.groupConversation(conversationID), {
       exact: true,
-      refetchType: "none",
     })
     void invalidate(resourceKeys.conversationMessages(conversationID), {
       exact: true,

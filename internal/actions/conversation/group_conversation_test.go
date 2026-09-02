@@ -41,3 +41,27 @@ func TestCreateGroupConversationRejectsInvalidMembers(t *testing.T) {
 		})
 	}
 }
+
+// TestNormalizeGroupTextMessageInput 验证群聊引用和提醒参数归一化。
+func TestNormalizeGroupTextMessageInput(t *testing.T) {
+	firstSubjectID := "0198ddf0-a234-7f01-8d99-e3e0af0f5f65"
+	secondSubjectID := "0198ddf0-a234-7f01-8d99-e3e0af0f5f64"
+	normalized, fields := normalizeGroupTextMessageInput(GroupTextMessageInput{
+		ConversationID:  "0198ddee-c056-7bc5-a1d9-586f878ee966",
+		ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f67",
+		Body:            "  测试消息  ", ReplyToMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f68",
+		MentionSubjectIDs: []string{firstSubjectID, secondSubjectID},
+	})
+	if len(fields) != 0 || normalized.Body != "测试消息" || normalized.MentionSubjectIDs[0] != secondSubjectID || normalized.MentionSubjectIDs[1] != firstSubjectID {
+		t.Fatalf("normalized = %#v, fields = %#v", normalized, fields)
+	}
+	_, fields = normalizeGroupTextMessageInput(GroupTextMessageInput{
+		ConversationID:  "0198ddee-c056-7bc5-a1d9-586f878ee966",
+		ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f67",
+		Body:            "测试消息", ReplyToMessageID: "invalid",
+		MentionSubjectIDs: []string{firstSubjectID, firstSubjectID},
+	})
+	if fields["replyToMessageId"] != ValidationReplyToMessageIDInvalid || fields["mentionSubjectIds"] != ValidationMentionSubjectIDsInvalid {
+		t.Fatalf("fields = %#v", fields)
+	}
+}

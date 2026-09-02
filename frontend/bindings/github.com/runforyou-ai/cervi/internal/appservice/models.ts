@@ -552,6 +552,8 @@ export interface ConversationMessage {
     "sender": ConversationMessageSender | null;
     "sessionStart": ConversationMessageSessionStart | null;
     "systemEvent": ConversationSystemEvent | null;
+    "replyTo": ConversationMessageReference | null;
+    "mentions": ConversationMessageMention[] | null;
 }
 
 /**
@@ -569,6 +571,25 @@ export interface ConversationMessageList {
 export interface ConversationMessageListInput {
     "before": string;
     "after": string;
+}
+
+/**
+ * ConversationMessageMention 定义消息提醒的聊天主体。
+ */
+export interface ConversationMessageMention {
+    "chatSubjectId": string;
+    "kind": ChatSubjectKind;
+    "sourceId": string;
+    "displayName": string | null;
+}
+
+/**
+ * ConversationMessageReference 定义引用消息的一层摘要。
+ */
+export interface ConversationMessageReference {
+    "id": string;
+    "body": string;
+    "sender": ConversationMessageSender | null;
 }
 
 /**
@@ -943,6 +964,7 @@ export interface GroupInboxConversation {
  * GroupParticipant 定义群聊当前有效成员。
  */
 export interface GroupParticipant {
+    "chatSubjectId": string;
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
@@ -968,6 +990,8 @@ export enum GroupParticipantRole {
 export interface GroupTextMessageInput {
     "clientMessageId": string;
     "body": string;
+    "replyToMessageId": string;
+    "mentionSubjectIds": string[] | null;
 }
 
 /**
