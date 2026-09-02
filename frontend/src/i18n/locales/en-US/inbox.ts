@@ -12,7 +12,7 @@ const inbox = {
   scopeInternal: "Internal",
   queueFilterLabel: "Customer queue filter",
   queueFilterQueue: "Queue",
-  queueFilterMine: "Assigned to me",
+  queueFilterMine: "Mime",
   queueFilterColleague: "Teammates",
   queueFilterAllCoworkers: "All",
   queueFilterAiEmployee: "AI",

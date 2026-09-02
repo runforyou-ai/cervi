@@ -544,7 +544,7 @@ export function ConversationHeader({
             type="button"
             variant="outline"
             size="sm"
-            className="text-muted-foreground xl:hidden"
+            className="text-muted-foreground 2xl:hidden"
             aria-label={contextActionLabel}
             aria-pressed={contextVisible}
             title={contextActionLabel}
@@ -559,7 +559,7 @@ export function ConversationHeader({
           type="button"
           variant="outline"
           size="sm"
-          className="shrink-0 text-muted-foreground xl:hidden"
+          className="shrink-0 text-muted-foreground 2xl:hidden"
           aria-label={contextActionLabel}
           aria-pressed={contextVisible}
           title={contextActionLabel}
