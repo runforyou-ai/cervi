@@ -5,12 +5,11 @@ import {
   useState,
   type ChangeEvent,
 } from "react"
-import { LoaderCircleIcon } from "lucide-react"
+import { LoaderCircleIcon, UsersRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { selectImage } from "@/api"
-import defaultGroupAvatarURL from "@/assets/default-group-avatar.png"
 import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
@@ -23,7 +22,7 @@ const maxGroupImageByteSize = 5 * 1024 * 1024
 const groupImageFileAccept =
   ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
 
-/** 展示自定义群图片，并在缺失或加载失败时回退到默认图片。 */
+/** 展示自定义群图片，并在缺失或加载失败时回退到默认群组图标。 */
 export function GroupAvatar({
   imageURL,
   className,
@@ -35,9 +34,23 @@ export function GroupAvatar({
 
   useEffect(() => setFailed(false), [imageURL])
 
+  if (!imageURL || failed) {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn(
+          "flex size-full items-center justify-center bg-primary/10 text-primary",
+          className,
+        )}
+      >
+        <UsersRoundIcon className="size-[45%]" />
+      </span>
+    )
+  }
+
   return (
     <img
-      src={imageURL && !failed ? imageURL : defaultGroupAvatarURL}
+      src={imageURL}
       alt=""
       className={cn("size-full object-cover", className)}
       draggable={false}

@@ -108,7 +108,7 @@ export function ConversationAvatar({
     <div className="relative shrink-0">
       <div
         className={cn(
-          "flex size-10 items-center justify-center overflow-hidden rounded-lg bg-muted text-sm font-medium text-muted-foreground",
+          "flex size-10 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-sm font-medium text-primary",
           className,
         )}
       >
