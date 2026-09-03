@@ -769,8 +769,15 @@ function ConversationMain({
   const { identity } = useWorkspace()
   const isWideViewport = useIsWideViewport()
   const conversationName = useConversationName()
-  const [contextSheetOpen, setContextSheetOpen] = useState(false)
-  const [contextCollapsed, setContextCollapsed] = useState(false)
+  const [contextCollapsed, setContextCollapsed] = useState(
+    () => !isWideViewport,
+  )
+
+  useEffect(() => {
+    // 跨过响应式断点时恢复当前宽度对应的默认状态。
+    setContextCollapsed(!isWideViewport)
+  }, [isWideViewport])
+
   const sourceGroupConversation = isGroupInboxConversation(conversation)
     ? conversation
     : null
@@ -823,36 +830,6 @@ function ConversationMain({
         ConversationStatus.ConversationStatusArchived
       ? t("groupDissolvedUnavailable")
       : null
-  const contextTitle = customerConversation
-    ? t("contextTitleBar")
-    : directConversation
-      ? t("contextDirectTitleBar")
-      : t("contextGroupTitleBar")
-  const contextDescription = customerConversation
-    ? t("contextDescription")
-    : directConversation
-      ? t("contextDirectDescription")
-      : t("contextGroupDescription")
-  const desktopContextVisible = isWideViewport && !contextCollapsed
-  const contextVisible = isWideViewport
-    ? desktopContextVisible
-    : contextSheetOpen
-
-  useEffect(() => {
-    if (isWideViewport) {
-      setContextSheetOpen(false)
-    }
-  }, [isWideViewport])
-
-  /** 切换当前视口使用的上下文栏。 */
-  function toggleContext() {
-    if (isWideViewport) {
-      setContextCollapsed((collapsed) => !collapsed)
-      return
-    }
-    setContextSheetOpen((open) => !open)
-  }
-
   const validConversation =
     customerConversation ?? directConversation ?? groupConversation
   if (!validConversation) return null
@@ -874,10 +851,7 @@ function ConversationMain({
               assigneeIdentityId,
             )
           }}
-          contextVisible={contextVisible}
-          contextTitle={contextTitle}
           narrowViewport={narrowViewport}
-          onContextToggle={toggleContext}
         />
         <ConversationThread
           key={conversation.id}
@@ -905,14 +879,8 @@ function ConversationMain({
           }))
         }}
         onGroupLeft={() => onGroupLeft(conversation.id)}
-        title={contextTitle}
-        description={contextDescription}
-        desktopVisible={desktopContextVisible}
-        sheetOpen={!isWideViewport && contextSheetOpen}
-        onDesktopToggle={() =>
-          setContextCollapsed((collapsed) => !collapsed)
-        }
-        onSheetOpenChange={setContextSheetOpen}
+        visible={!contextCollapsed}
+        onToggle={() => setContextCollapsed((collapsed) => !collapsed)}
       />
     </div>
   )

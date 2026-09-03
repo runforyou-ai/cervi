@@ -20,13 +20,6 @@ import {
   type InboxConversation,
 } from "@/api"
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import {
   Tabs,
   TabsContent,
   TabsList,
@@ -128,7 +121,6 @@ function ConversationContextContent({
   onGroupDraftChange,
   onGroupSummaryChange,
   onGroupLeft,
-  sheet = false,
 }: {
   conversation: InboxConversation
   displayName: string
@@ -142,7 +134,6 @@ function ConversationContextContent({
     status?: GroupConversationData["status"]
   }) => void
   onGroupLeft: () => void
-  sheet?: boolean
 }) {
   const { t } = useTranslation("inbox")
   const customer = isCustomerInboxConversation(conversation)
@@ -152,12 +143,7 @@ function ConversationContextContent({
     ? conversation.group
     : null
   return (
-    <div
-      className={cn(
-        "flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background",
-        sheet && "[&_[data-slot=tabs-list]]:pr-12",
-      )}
-    >
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
       {customer ? (
         <Tabs
           key={conversation.id}
@@ -278,19 +264,15 @@ function ConversationContextContent({
   )
 }
 
-/** 在宽屏常驻栏和较窄视口 Sheet 中复用联系人上下文。 */
+/** 展示可调整宽度和收起状态的会话资料栏。 */
 export function ConversationContextPane({
   conversation,
   displayName,
   currentIdentityID,
   onGroupSummaryChange,
   onGroupLeft,
-  title,
-  description,
-  desktopVisible,
-  sheetOpen,
-  onDesktopToggle,
-  onSheetOpenChange,
+  visible,
+  onToggle,
 }: {
   conversation: InboxConversation
   displayName: string
@@ -302,12 +284,8 @@ export function ConversationContextPane({
     status?: GroupConversationData["status"]
   }) => void
   onGroupLeft: () => void
-  title: string
-  description: string
-  desktopVisible: boolean
-  sheetOpen: boolean
-  onDesktopToggle: () => void
-  onSheetOpenChange: (open: boolean) => void
+  visible: boolean
+  onToggle: () => void
 }) {
   const { t } = useTranslation("inbox")
   const [contextPanelWidth, setContextPanelWidth] = useState(contextPanelMinWidth)
@@ -333,11 +311,11 @@ export function ConversationContextPane({
     <>
       <div
         className={cn(
-          "relative hidden h-full min-h-0 w-4 shrink-0 bg-background 2xl:block",
-          desktopVisible && "border-l",
+          "relative h-full min-h-0 w-4 shrink-0 bg-background",
+          visible && "border-l",
         )}
       >
-        {desktopVisible ? (
+        {visible ? (
           <button
             type="button"
             className="absolute top-0 left-0 z-20 h-full w-2 -translate-x-1 cursor-col-resize touch-none"
@@ -366,17 +344,15 @@ export function ConversationContextPane({
           type="button"
           className={cn(
             "absolute top-1/2 left-0 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center border border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground",
-            desktopVisible
+            visible
               ? "rounded-r-md border-l-0"
               : "rounded-l-md border-r-0",
           )}
-          aria-label={
-            desktopVisible ? t("contextClose") : t("contextOpen")
-          }
-          title={desktopVisible ? t("contextClose") : t("contextOpen")}
-          onClick={onDesktopToggle}
+          aria-label={visible ? t("contextClose") : t("contextOpen")}
+          title={visible ? t("contextClose") : t("contextOpen")}
+          onClick={onToggle}
         >
-          {desktopVisible ? (
+          {visible ? (
             <ChevronRightIcon className="size-3" />
           ) : (
             <ChevronLeftIcon className="size-3" />
@@ -386,8 +362,8 @@ export function ConversationContextPane({
 
       <aside
         className={cn(
-          "cervi-conversation-context-pane relative hidden h-full min-h-0 min-w-0 shrink-0 overflow-hidden bg-background 2xl:block",
-          !desktopVisible && "2xl:hidden",
+          "cervi-conversation-context-pane relative h-full min-h-0 min-w-0 shrink-0 overflow-hidden bg-background",
+          !visible && "hidden",
         )}
         style={{ width: contextPanelWidth }}
       >
@@ -403,27 +379,6 @@ export function ConversationContextPane({
           onGroupLeft={onGroupLeft}
         />
       </aside>
-
-      <Sheet open={sheetOpen} onOpenChange={onSheetOpenChange}>
-        <SheetContent className="w-[320px] max-w-full gap-0 p-0 sm:max-w-[320px]">
-          <SheetHeader className="sr-only">
-            <SheetTitle>{title}</SheetTitle>
-            <SheetDescription>{description}</SheetDescription>
-          </SheetHeader>
-          <ConversationContextContent
-            conversation={conversation}
-            displayName={displayName}
-            currentIdentityID={currentIdentityID}
-            groupDraft={activeGroupDraft}
-            onGroupDraftChange={(group) =>
-              setGroupDraft({ conversationID: conversation.id, group })
-            }
-            onGroupSummaryChange={onGroupSummaryChange}
-            onGroupLeft={onGroupLeft}
-            sheet
-          />
-        </SheetContent>
-      </Sheet>
     </>
   )
 }
