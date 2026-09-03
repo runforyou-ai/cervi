@@ -102,6 +102,7 @@ cervi/
 ```bash
 # 桌面端开发
 wails3 task dev
+wails3 task dev:mcp
 
 # 移动端依赖与运行
 wails3 task ios:install:deps
@@ -115,7 +116,7 @@ wails3 generate bindings -clean=true -ts -i
 wails3 task common:build:frontend
 ```
 
-桌面端启动后，桌面 MCP 按 Wails3 默认配置可用。
+需要使用桌面 MCP 时通过 `wails3 task dev:mcp` 启动；普通 `dev` 不启用 MCP。
 
 ### 代码组织
 
