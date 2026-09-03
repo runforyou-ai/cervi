@@ -31,7 +31,6 @@ wails3 task setup:docker
 - 客户端统一使用平台 Task，目标架构只传 `ARCH`，不要自行调用底层构建工具或设置 `GOOS`、`GOARCH`、`CGO_ENABLED`。客户端固定启用 CGO；纯静态服务端镜像使用 `CGO_ENABLED=0`。
 - `darwin:build`、`windows:build` 和 `linux:build` 会按宿主环境选择原生或 Docker 工具链。交叉编译只生成二进制或未签名应用包；正式桌面安装包在目标系统或同平台 Runner 构建。Linux 不支持异架构桌面端交叉编译，Windows 宿主不支持交叉构建其他平台，WSL 按 Linux 处理。
 - macOS 的 DMG、签名和公证在 macOS 完成；Windows 安装包在原生 Windows 或 Windows Runner 完成；iOS 在 macOS 完成。服务端多平台归档由 `.github/workflows/release.yml` 的 `server-assets` 作业生成。
-- 仅当用户明确要求提交代码或提交 PR 时，才运行与任务相关的测试和构建；其他情况不运行测试、`go vet` 或构建。
 
 各平台构建和打包统一使用以下 Task：
 

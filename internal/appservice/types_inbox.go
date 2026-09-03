@@ -108,14 +108,19 @@ type GroupInboxConversation struct {
 
 // InboxConversation 定义成员统一收件箱列表项。
 type InboxConversation struct {
-	ID       string                     `json:"id"`
-	Type     ConversationType           `json:"type"`
-	Customer *CustomerInboxConversation `json:"customer"`
-	Direct   *DirectInboxConversation   `json:"direct"`
-	Group    *GroupInboxConversation    `json:"group"`
+	ID                   string                     `json:"id"`
+	Type                 ConversationType           `json:"type"`
+	UnreadCount          int                        `json:"unreadCount"`
+	MentionedUnreadCount int                        `json:"mentionedUnreadCount"`
+	LastMessageID        *string                    `json:"lastMessageId"`
+	LastReadMessageID    *string                    `json:"lastReadMessageId"`
+	Customer             *CustomerInboxConversation `json:"customer"`
+	Direct               *DirectInboxConversation   `json:"direct"`
+	Group                *GroupInboxConversation    `json:"group"`
 }
 
 // Inbox 定义成员收件箱查询结果。
 type Inbox struct {
 	Conversations []InboxConversation `json:"conversations"`
+	UnreadCount   int                 `json:"unreadCount"`
 }

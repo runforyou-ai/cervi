@@ -7,6 +7,7 @@ import {
   GetGroupConversation,
   LeaveGroupConversation,
   ListConversationMessages,
+  MarkConversationRead,
   ListCustomerServiceAssignees,
   LoadInbox,
   ReopenServiceSession,
@@ -41,6 +42,7 @@ import type {
   Inbox,
   InboxConversation,
   LoadInboxInput,
+  MarkConversationReadInput,
   TransferServiceSessionInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import {
@@ -93,6 +95,7 @@ export type GroupConversationData = Omit<GroupConversation, "participants"> & {
 
 const loadInboxBound = bind(LoadInbox)
 const listConversationMessagesBound = bind(ListConversationMessages)
+const markConversationReadBound = bind(MarkConversationRead)
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
 const startDirectConversationBound = bind(StartDirectConversation)
 const sendDirectTextMessageBound = bind(SendDirectTextMessage)
@@ -228,6 +231,14 @@ export async function listConversationMessages(
     ...result,
     messages: asList(result.messages).map(normalizeConversationMessage),
   }
+}
+
+/** 单调推进当前用户的原生会话已读水位。 */
+export function markConversationRead(
+  conversationID: string,
+  input: MarkConversationReadInput,
+) {
+  return markConversationReadBound(conversationID, input)
 }
 
 /** 发送成员客户会话文本消息。 */

@@ -221,6 +221,12 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 			if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
 				return err
 			}
+			if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
+				OrganizationID: identity.Organization.ID, ConversationID: normalized.ConversationID,
+				UserID: identity.User.ID, LastReadMessageID: message.ID,
+			}, message); err != nil {
+				return err
+			}
 			result = memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
 			return nil
 		})

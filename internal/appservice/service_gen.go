@@ -54,6 +54,11 @@ func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta
 	return s.backend.ListConversationMessages(ctx, meta, conversationID, input)
 }
 
+// MarkConversationRead 单调推进当前用户的原生会话已读水位。
+func (s *Service) MarkConversationRead(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
+	return s.backend.MarkConversationRead(ctx, meta, conversationID, input)
+}
+
 // SendCustomerTextMessage 发送客户会话文本消息。
 func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
 	return s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input)

@@ -1003,7 +1003,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		inbox := inboxaction.NewLoadInboxQuery(db)
 		for _, request := range requests {
-			items, loadErr := inbox.Execute(context.Background(), request.identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+			items, _, loadErr := inbox.Execute(context.Background(), request.identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 			if loadErr != nil {
 				t.Fatal(loadErr)
 			}
@@ -1119,7 +1119,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		inbox := inboxaction.NewLoadInboxQuery(db)
 		for _, currentIdentity := range []*servermodels.Identity{loggedIn.Identity, memberLogin.Identity} {
-			items, loadErr := inbox.Execute(context.Background(), currentIdentity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+			items, _, loadErr := inbox.Execute(context.Background(), currentIdentity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
 			if loadErr != nil {
 				t.Fatal(loadErr)
 			}
@@ -1152,6 +1152,15 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if message.Sender == nil || message.Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
 			t.Fatalf("group message sender = %#v", message.Sender)
 		}
+		ownerInbox, _, err := inbox.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range ownerInbox {
+			if item.ID == group.ID && (item.UnreadCount != 1 || item.LastReadMessageID != nil) {
+				t.Fatalf("owner unread group = %#v", item)
+			}
+		}
 		history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID})
 		if err != nil || len(history.Messages) != 1 || history.Messages[0].ID != message.ID || history.Messages[0].Sender == nil || history.Messages[0].Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
 			t.Fatalf("group message history = %#v, error = %v", history, err)
@@ -1183,6 +1192,28 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		replayedRelation, err := send.Execute(context.Background(), loggedIn.Identity, relationInput)
 		if err != nil || replayedRelation.ID != relationMessage.ID || replayedRelation.ReplyTo == nil || len(replayedRelation.Mentions) != 1 {
 			t.Fatalf("replayed group relation message = %#v, error = %v", replayedRelation, err)
+		}
+		memberInbox, _, err := inbox.Execute(context.Background(), memberLogin.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range memberInbox {
+			if item.ID == group.ID && (item.UnreadCount != 1 || item.MentionedUnreadCount != 1 || item.LastReadMessageID == nil || *item.LastReadMessageID != message.ID) {
+				t.Fatalf("member unread group = %#v", item)
+			}
+		}
+		readState, err := conversationaction.NewMarkConversationReadAction(db).Execute(context.Background(), memberLogin.Identity, group.ID, relationMessage.ID)
+		if err != nil || readState.LastReadMessageID != relationMessage.ID {
+			t.Fatalf("marked group read state = %#v, error = %v", readState, err)
+		}
+		memberInbox, _, err = inbox.Execute(context.Background(), memberLogin.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range memberInbox {
+			if item.ID == group.ID && (item.UnreadCount != 0 || item.MentionedUnreadCount != 0 || item.LastReadMessageID == nil || *item.LastReadMessageID != relationMessage.ID) {
+				t.Fatalf("member read group = %#v", item)
+			}
 		}
 		changedRelationInput := relationInput
 		changedRelationInput.MentionSubjectIDs = nil
@@ -1294,7 +1325,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 			t.Fatalf("send dissolved group error = %v", err)
 		}
-		items, err := inbox.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		items, _, err := inbox.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1575,12 +1606,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("website agent route session = %#v", websiteSession)
 		}
 		inboxQuery := inboxaction.NewLoadInboxQuery(db)
-		allBeforeWebsiteClaim, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		allBeforeWebsiteClaim, _, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 		if err != nil {
 			t.Fatal(err)
 		}
 		assertInboxConversationPresence(t, allBeforeWebsiteClaim, websiteInbound.Conversation.ID, false)
-		coworkerInboxBeforeWebsiteClaim, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
+		coworkerInboxBeforeWebsiteClaim, _, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
 			Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers,
 		})
 		if err != nil {
@@ -1613,7 +1644,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || claimedWebsite.Assignee == nil || claimedWebsite.Assignee.IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
 			t.Fatalf("claim agent session without state = %#v, error = %v", claimedWebsite, err)
 		}
-		allAfterWebsiteClaim, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		allAfterWebsiteClaim, _, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1624,7 +1655,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || transferredWithoutReply.Assignee == nil || transferredWithoutReply.Assignee.IdentityID != createdAgent.IdentityID {
 			t.Fatalf("transfer unparticipated website session = %#v, error = %v", transferredWithoutReply, err)
 		}
-		allAfterTransferWithoutReply, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		allAfterTransferWithoutReply, _, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1644,7 +1675,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || transferredWebsite.Assignee == nil || transferredWebsite.Assignee.IdentityID != createdAgent.IdentityID {
 			t.Fatalf("transfer website session to agent = %#v, error = %v", transferredWebsite, err)
 		}
-		allAfterWebsiteTransfer, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		allAfterWebsiteTransfer, _, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1873,7 +1904,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := db.NewSelect().Model(taskRun).Where("tr.idempotency_key = ?", "agent:"+run.ID).Scan(context.Background()); err != nil || taskRun.MaxAttempts != 3 {
 			t.Fatalf("agent task run = %#v, error = %v", taskRun, err)
 		}
-		inboxBeforeRun, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{})
+		inboxBeforeRun, _, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1944,7 +1975,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || state.ProcessedSeq != 2 || run.Status != string(domain.AgentRunStatusSucceeded) || run.ResponseMessageID == nil || messageCount != 3 {
 			t.Fatalf("completed agent run = %#v, state = %#v, messages = %d, error = %v", run, state, messageCount, err)
 		}
-		inboxAfterRun, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{})
+		inboxAfterRun, _, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2033,12 +2064,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || closedWebsite.Status != domain.ServiceSessionStatusClosed {
 			t.Fatalf("closed participated website session = %#v, error = %v", closedWebsite, err)
 		}
-		allAfterWebsiteClose, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		allAfterWebsiteClose, _, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 		if err != nil {
 			t.Fatal(err)
 		}
 		assertInboxConversationPresence(t, allAfterWebsiteClose, websiteInbound.Conversation.ID, false)
-		closedInbox, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
+		closedInbox, _, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
 			Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewClosed,
 		})
 		if err != nil {

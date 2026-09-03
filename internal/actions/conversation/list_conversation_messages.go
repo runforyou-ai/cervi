@@ -210,7 +210,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow, input Conver
 	for _, row := range rows {
 		message := ConversationMessage{
 			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
-			OriginatedAt: row.OriginatedAt, CreatedAt: row.CreatedAt,
+			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
 		}
 		if message.Type == domain.MessageTypeSystem {
 			if row.SystemEventType == nil || len(row.SystemEventPayload) == 0 {

@@ -89,6 +89,14 @@ func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.
 	return output, err
 }
 
+// MarkConversationRead 单调推进当前用户的原生会话已读水位。
+func (b *Backend) MarkConversationRead(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.MarkConversationReadInput) (appservice.ConversationReadState, error) {
+	var output appservice.ConversationReadState
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/read", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // SendCustomerTextMessage 发送客户会话文本消息。
 func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage

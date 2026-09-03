@@ -404,6 +404,37 @@ func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta Reque
 	return result, nil
 }
 
+// MarkConversationRead 单调推进当前用户的原生会话已读水位。
+func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return ConversationReadState{}, err
+	}
+	state, err := b.markConversationRead.Execute(ctx, identity, conversationID, input.LastReadMessageID)
+	if err != nil {
+		return ConversationReadState{}, conversationReadError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	return ConversationReadState{LastReadMessageID: state.LastReadMessageID, LastReadAt: state.LastReadAt}, nil
+}
+
+// conversationReadError 转换会话已读水位更新错误。
+func conversationReadError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+	}
+	slog.Warn("更新会话已读水位失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
+	return FailedError(meta, cervii18n.ErrorConversationReadUpdateFailed)
+}
+
 // conversationMessageFromAction 转换成员会话消息契约。
 func conversationMessageFromAction(message conversationaction.ConversationMessage) ConversationMessage {
 	sender := conversationMessageSenderFromAction(message.Sender)
@@ -445,7 +476,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	}
 	return ConversationMessage{
 		ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
-		OriginatedAt: message.OriginatedAt, CreatedAt: message.CreatedAt,
+		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt,
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions,
 	}
@@ -618,6 +649,7 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 var conversationMessageValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{
 	conversationaction.ValidationConversationIDInvalid:    cervii18n.FieldConversationIDInvalid,
 	conversationaction.ValidationClientMessageIDInvalid:   cervii18n.FieldClientMessageIDInvalid,
+	conversationaction.ValidationLastReadMessageIDInvalid: cervii18n.FieldClientMessageIDInvalid,
 	conversationaction.ValidationReplyToMessageIDInvalid:  cervii18n.FieldReplyToMessageIDInvalid,
 	conversationaction.ValidationMentionSubjectIDsInvalid: cervii18n.FieldMentionSubjectIDsInvalid,
 	conversationaction.ValidationBodyRequired:             cervii18n.FieldMessageBodyRequired,

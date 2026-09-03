@@ -548,6 +548,7 @@ export interface ConversationMessage {
     "type": MessageType;
     "body": string;
     "originatedAt": string;
+    "sourceOrder": number;
     "createdAt": string;
     "sender": ConversationMessageSender | null;
     "sessionStart": ConversationMessageSessionStart | null;
@@ -609,6 +610,14 @@ export interface ConversationMessageSessionStart {
     "sequence": number;
     "startedAt": string;
     "status": ServiceSessionStatus;
+}
+
+/**
+ * ConversationReadState 定义用户会话的已读水位。
+ */
+export interface ConversationReadState {
+    "lastReadMessageId": string;
+    "lastReadAt": string;
 }
 
 /**
@@ -1016,6 +1025,7 @@ export interface ImageFile {
  */
 export interface Inbox {
     "conversations": InboxConversation[] | null;
+    "unreadCount": number;
 }
 
 /**
@@ -1034,6 +1044,10 @@ export interface InboxAssignee {
 export interface InboxConversation {
     "id": string;
     "type": ConversationType;
+    "unreadCount": number;
+    "mentionedUnreadCount": number;
+    "lastMessageId": string | null;
+    "lastReadMessageId": string | null;
     "customer": CustomerInboxConversation | null;
     "direct": DirectInboxConversation | null;
     "group": GroupInboxConversation | null;
@@ -1405,6 +1419,13 @@ export enum Locale {
 export interface LoginInput {
     "email": string;
     "password": string;
+}
+
+/**
+ * MarkConversationReadInput 定义用户确认已读的消息水位。
+ */
+export interface MarkConversationReadInput {
+    "lastReadMessageId": string;
 }
 
 /**
