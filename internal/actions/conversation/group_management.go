@@ -210,6 +210,18 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 			}); err != nil {
 				return err
 			}
+			// 新成员从本轮加入事件开始记录已读，离开期间的历史不形成未读。
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id)
+				SELECT u.organization_id, cv.id, u.id, cv.last_message_id
+				FROM users AS u
+				JOIN conversations AS cv ON cv.organization_id = u.organization_id AND cv.id = ?
+				WHERE u.organization_id = ? AND u.identity_id IN (?)
+				ON CONFLICT (organization_id, conversation_id, user_id) DO UPDATE
+				SET last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = now(), updated_at = now()
+			`, conversationID, identity.Organization.ID, bun.In(memberIDs)); err != nil {
+				return fmt.Errorf("initialize added group member read states: %w", err)
+			}
 			result, err = loadGroupConversation(ctx, tx, identity, conversationID)
 			return err
 		})
@@ -643,6 +655,13 @@ func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermod
 	}
 	conversation := &servermodels.Conversation{ID: conversationID, OrganizationID: identity.Organization.ID}
 	if err := updateConversationSummary(ctx, db, conversation, message); err != nil {
+		return err
+	}
+	state := &servermodels.ConversationUserState{
+		OrganizationID: identity.Organization.ID, ConversationID: conversationID,
+		UserID: identity.User.ID, LastReadMessageID: message.ID,
+	}
+	if err := advanceConversationUserReadState(ctx, db, state, message); err != nil {
 		return err
 	}
 	return nil

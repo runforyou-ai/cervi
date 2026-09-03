@@ -28,6 +28,7 @@ const (
 	ValidationGroupOwnerIDInvalid      ValidationCode = "group_owner_id_invalid"
 	ValidationGroupSuccessorIDInvalid  ValidationCode = "group_successor_id_invalid"
 	ValidationClientMessageIDInvalid   ValidationCode = "client_message_id_invalid"
+	ValidationLastReadMessageIDInvalid ValidationCode = "last_read_message_id_invalid"
 	ValidationReplyToMessageIDInvalid  ValidationCode = "reply_to_message_id_invalid"
 	ValidationMentionSubjectIDsInvalid ValidationCode = "mention_subject_ids_invalid"
 	ValidationBodyRequired             ValidationCode = "body_required"
@@ -107,6 +108,7 @@ type Message struct {
 	Author       domain.MessageAuthor
 	Body         string
 	OriginatedAt time.Time
+	SourceOrder  int64
 	CreatedAt    time.Time
 }
 
@@ -192,6 +194,7 @@ type ConversationMessage struct {
 	Type         domain.MessageType
 	Body         string
 	OriginatedAt time.Time
+	SourceOrder  int64
 	CreatedAt    time.Time
 	Sender       *ConversationMessageSender
 	SessionStart *ConversationMessageSessionStart

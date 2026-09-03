@@ -143,7 +143,7 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 		}
 		messages = append(messages, Message{
 			ID: row.ID, Author: author, Body: row.Body,
-			OriginatedAt: row.OriginatedAt, CreatedAt: row.CreatedAt,
+			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
 		})
 	}
 	result := MessageHistory{Messages: messages}

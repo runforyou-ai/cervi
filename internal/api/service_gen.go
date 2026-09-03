@@ -26,6 +26,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/inbox", s.loadInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
+	router.POST("/conversations/:conversationID/read", s.markConversationRead)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
 	router.POST("/conversations/:conversationID/transfer", s.transferServiceSession)
@@ -231,6 +232,16 @@ func (s *Service) listConversationMessages(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListConversationMessages(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// markConversationRead 单调推进当前用户的原生会话已读水位。
+func (s *Service) markConversationRead(c *gin.Context) {
+	var input appservice.MarkConversationReadInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.MarkConversationRead(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

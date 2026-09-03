@@ -547,6 +547,13 @@ export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
 }
 
 /**
+ * MarkConversationRead 单调推进当前用户的原生会话已读水位。
+ */
+export function MarkConversationRead(meta: $models.RequestMeta, conversationID: string, input: $models.MarkConversationReadInput): $CancellablePromise<$models.ConversationReadState> {
+    return $Call.ByID(3314752344, meta, conversationID, input);
+}
+
+/**
  * OpenExternalPage 在原生端应用内新窗口打开外部页面。
  */
 export function OpenExternalPage(meta: $models.RequestMeta, input: $models.ExternalPageInput): $CancellablePromise<void> {

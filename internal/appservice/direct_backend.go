@@ -52,6 +52,7 @@ type DirectBackend struct {
 	loadInbox                         *inboxaction.LoadInboxQuery
 	listCustomerServiceAssignees      *inboxaction.ListCustomerServiceAssigneesQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
+	markConversationRead              *conversationaction.MarkConversationReadAction
 	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
 	claimServiceSession               *conversationaction.ClaimServiceSessionAction
 	transferServiceSession            *conversationaction.TransferServiceSessionAction
@@ -177,6 +178,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
 		listCustomerServiceAssignees:      inboxaction.NewListCustomerServiceAssigneesQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
+		markConversationRead:              conversationaction.NewMarkConversationReadAction(db),
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
 		claimServiceSession:               conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),
 		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),

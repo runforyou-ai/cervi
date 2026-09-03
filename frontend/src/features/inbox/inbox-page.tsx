@@ -26,6 +26,7 @@ import {
   isGroupInboxConversation,
   getGroupConversation,
   listCustomerServiceAssignees,
+  markConversationRead,
   type ConversationMessageReference,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
@@ -38,6 +39,12 @@ import {
 import { PageSplit } from "@/components/page-split"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -622,12 +629,14 @@ function InboxConversationList({
   loading,
   selectedId,
   onSelect,
+  onMarkRead,
 }: {
   conversations: InboxConversation[]
   hasAnyConversation: boolean
   loading: boolean
   selectedId?: string
   onSelect: (conversationId: string) => void
+  onMarkRead: (conversation: InboxConversation) => void
 }) {
   const { t } = useTranslation("inbox")
   const conversationName = useConversationName()
@@ -682,9 +691,11 @@ function InboxConversationList({
                   ? t("groupSystemUpdated")
                   : t("messagesEmpty"))
           const formattedTime = formatTime(summary.lastMessageAt)
+          const hasUnread = conversation.unreadCount > 0
           return (
-            <button
-              key={conversation.id}
+            <ContextMenu key={conversation.id}>
+              <ContextMenuTrigger asChild>
+                <button
               type="button"
               aria-pressed={selectedId === conversation.id}
               aria-label={name}
@@ -695,8 +706,18 @@ function InboxConversationList({
                   : "hover:bg-muted",
               )}
               onClick={() => onSelect(conversation.id)}
-            >
-              <ConversationAvatar conversation={conversation} />
+                >
+              <span className="relative shrink-0">
+                <ConversationAvatar conversation={conversation} />
+                {hasUnread ? (
+                  <span className="absolute -top-1.5 -right-1.5 flex min-w-5 items-center justify-center gap-0.5 rounded-full bg-destructive px-1 text-[10px] font-semibold leading-5 text-destructive-foreground ring-2 ring-background">
+                    {conversation.mentionedUnreadCount > 0 ? "@" : null}
+                    {conversation.unreadCount > 99
+                      ? "99+"
+                      : conversation.unreadCount}
+                  </span>
+                ) : null}
+              </span>
               <span className="min-w-0 flex-1 overflow-hidden">
                 <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                   <span className="flex min-w-0 items-center gap-2">
@@ -709,18 +730,20 @@ function InboxConversationList({
                       </span>
                     ) : null}
                   </span>
-                  {formattedTime ? (
-                    <time
-                      dateTime={summary.lastMessageAt ?? undefined}
-                      className={cn(
-                        "shrink-0 text-xs text-muted-foreground",
-                        selectedId === conversation.id &&
-                          "text-accent-foreground/75",
-                      )}
-                    >
-                      {formattedTime}
-                    </time>
-                  ) : null}
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    {formattedTime ? (
+                      <time
+                        dateTime={summary.lastMessageAt ?? undefined}
+                        className={cn(
+                          "shrink-0 text-xs text-muted-foreground",
+                          selectedId === conversation.id &&
+                            "text-accent-foreground/75",
+                        )}
+                      >
+                        {formattedTime}
+                      </time>
+                    ) : null}
+                  </span>
                 </span>
                 <span
                   title={preview}
@@ -733,7 +756,16 @@ function InboxConversationList({
                   {preview}
                 </span>
               </span>
-            </button>
+                </button>
+              </ContextMenuTrigger>
+              {hasUnread && conversation.lastMessageId ? (
+                <ContextMenuContent>
+                  <ContextMenuItem onSelect={() => onMarkRead(conversation)}>
+                    {t("conversationMarkRead")}
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              ) : null}
+            </ContextMenu>
           )
         })}
       </div>
@@ -923,6 +955,24 @@ function ConversationThread({
     { enabled: Boolean(groupConversation) },
   )
 
+  /** 保存当前已看到的最新内部消息并刷新收件箱未读摘要。 */
+  const markRead = useCallback(
+    (messageID: string) => {
+      if (isCustomerInboxConversation(conversation)) return
+      void markConversationRead(conversation.id, {
+        lastReadMessageId: messageID,
+      })
+        .then(() => onConversationChanged())
+        .catch((error: unknown) =>
+          console.warn("标记会话已读失败", {
+            conversationId: conversation.id,
+            error,
+          }),
+        )
+    },
+    [conversation, onConversationChanged],
+  )
+
   return (
     <>
       <ConversationTimeline
@@ -940,6 +990,14 @@ function ConversationThread({
           groupConversation && !replyDisabledReason
             ? setReplyTo
             : undefined
+        }
+        onReadMessage={
+          isCustomerInboxConversation(conversation) ? undefined : markRead
+        }
+        readThroughMessageID={
+          isCustomerInboxConversation(conversation)
+            ? undefined
+            : conversation.lastReadMessageId
         }
       />
       {!replySupported || replyDisabledReason ? (
@@ -1166,6 +1224,29 @@ export function InboxPage({
       ? selectedConversationSnapshot
       : selectedFromPool
 
+  /** 切入另一条内部会话时直接把当前最后消息标为已读。 */
+  useEffect(() => {
+    if (
+      !selectedConversation ||
+      (!isDirectInboxConversation(selectedConversation) &&
+        !isGroupInboxConversation(selectedConversation)) ||
+      !selectedConversation.lastMessageId ||
+      selectedConversation.unreadCount === 0
+    ) {
+      return
+    }
+    void markConversationRead(selectedConversation.id, {
+      lastReadMessageId: selectedConversation.lastMessageId,
+    })
+      .then(() => refreshConversationAfterMessage(selectedConversation))
+      .catch((error: unknown) =>
+        console.warn("进入会话时标记已读失败", {
+          conversationId: selectedConversation.id,
+          error,
+        }),
+      )
+  }, [selectedConversation?.id])
+
   /** 选中一个会话。 */
   function selectConversation(conversationId: string) {
     onSelectedConversationChange(conversationId)
@@ -1173,6 +1254,28 @@ export function InboxPage({
     if (isNarrowViewport) {
       setIsNarrowDetailOpen(true)
     }
+  }
+
+  /** 不打开会话并把列表项推进到当前最后消息。 */
+  function markConversationAsRead(conversation: InboxConversation) {
+    if (
+      (!isDirectInboxConversation(conversation) &&
+        !isGroupInboxConversation(conversation)) ||
+      !conversation.lastMessageId ||
+      conversation.unreadCount === 0
+    ) {
+      return
+    }
+    void markConversationRead(conversation.id, {
+      lastReadMessageId: conversation.lastMessageId,
+    })
+      .then(() => refreshConversationAfterMessage(conversation))
+      .catch((error: unknown) =>
+        console.warn("标记列表会话已读失败", {
+          conversationId: conversation.id,
+          error,
+        }),
+      )
   }
 
   /** 标旧受影响的精确查询，仅让最终可见视图立即重新读取。 */
@@ -1391,6 +1494,7 @@ export function InboxPage({
             loading={listLoading}
             selectedId={selectedConversationId}
             onSelect={selectConversation}
+            onMarkRead={markConversationAsRead}
           />
         </div>
       </div>

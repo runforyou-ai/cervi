@@ -126,6 +126,7 @@ type ConversationMessage struct {
 	Type         MessageType                      `json:"type"`
 	Body         string                           `json:"body"`
 	OriginatedAt time.Time                        `json:"originatedAt"`
+	SourceOrder  int64                            `json:"sourceOrder"`
 	CreatedAt    time.Time                        `json:"createdAt"`
 	Sender       *ConversationMessageSender       `json:"sender"`
 	SessionStart *ConversationMessageSessionStart `json:"sessionStart"`
@@ -139,6 +140,17 @@ type ConversationMessageList struct {
 	Messages []ConversationMessage `json:"messages"`
 	Before   *string               `json:"before"`
 	After    *string               `json:"after"`
+}
+
+// MarkConversationReadInput 定义用户确认已读的消息水位。
+type MarkConversationReadInput struct {
+	LastReadMessageID string `json:"lastReadMessageId"`
+}
+
+// ConversationReadState 定义用户会话的已读水位。
+type ConversationReadState struct {
+	LastReadMessageID string    `json:"lastReadMessageId"`
+	LastReadAt        time.Time `json:"lastReadAt"`
 }
 
 // DirectConversationInput 定义成员发起内部单聊的目标。

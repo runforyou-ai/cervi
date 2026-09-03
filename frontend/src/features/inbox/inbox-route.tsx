@@ -66,8 +66,7 @@ export function InboxRoute() {
   useEffect(() => {
     if (!data) return
     const unreadRevision = beginUnreadSnapshot()
-    /* 未读事实属于后续阶段，当前快照恒为零。 */
-    applyUnreadSnapshot(0, unreadRevision)
+    applyUnreadSnapshot(data.unreadCount, unreadRevision)
     console.info("消息已加载", {
       conversation_count: data.conversations.length,
     })

@@ -1,6 +1,5 @@
 /** 客服、单聊与群聊共用的成员消息时间线。 */
 import {
-  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -63,7 +62,11 @@ function mergeMessages(
   return [...messages.values()].sort((left, right) => {
     const timeDifference =
       Date.parse(left.originatedAt) - Date.parse(right.originatedAt)
-    return timeDifference || left.id.localeCompare(right.id)
+    return (
+      timeDifference ||
+      left.sourceOrder - right.sourceOrder ||
+      left.id.localeCompare(right.id)
+    )
   })
 }
 
@@ -73,6 +76,7 @@ type TimelineMessage = Pick<
   | "type"
   | "body"
   | "originatedAt"
+  | "sourceOrder"
   | "sender"
   | "sessionStart"
   | "systemEvent"
@@ -139,6 +143,7 @@ function mergeTimelineMessages(
       type: MessageType.MessageTypeText,
       body: message.body,
       originatedAt: message.originatedAt,
+      sourceOrder: 0,
       sender: null,
       sessionStart: null,
       systemEvent: null,
@@ -170,7 +175,11 @@ function mergeTimelineMessages(
   return messages.sort((left, right) => {
     const timeDifference =
       Date.parse(left.originatedAt) - Date.parse(right.originatedAt)
-    return timeDifference || left.id.localeCompare(right.id)
+    return (
+      timeDifference ||
+      left.sourceOrder - right.sourceOrder ||
+      left.id.localeCompare(right.id)
+    )
   })
 }
 
@@ -226,6 +235,8 @@ export function ConversationTimeline({
   retryFailedMessageDisabled = false,
   onReplyMessage,
   groupParticipants,
+  onReadMessage,
+  readThroughMessageID,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -237,6 +248,8 @@ export function ConversationTimeline({
   retryFailedMessageDisabled?: boolean
   onReplyMessage?: (message: ConversationMessageReference) => void
   groupParticipants?: GroupParticipant[]
+  onReadMessage?: (messageID: string) => void
+  readThroughMessageID?: string | null
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -253,12 +266,22 @@ export function ConversationTimeline({
   const previousSentCountRef = useRef(0)
   const previousMessageCountRef = useRef(0)
   const nearBottomRef = useRef(true)
+  const readMessageIDRef = useRef("")
+  const seenMessageIDsRef = useRef(new Set<string>())
+  const newMessageIDsRef = useRef(new Set<string>())
+  const readTimerRef = useRef<number | null>(null)
+  const pendingReadMessageIDRef = useRef("")
   const [timeline, setTimeline] =
     useState<ConversationMessageListData | null>(null)
   const [loadingEarlier, setLoadingEarlier] = useState(false)
   const [earlierError, setEarlierError] = useState(false)
   const [pollingError, setPollingError] = useState(false)
-  const [newMessagesAvailable, setNewMessagesAvailable] = useState(false)
+  const [newMessageCount, setNewMessageCount] = useState(0)
+  const [readingActive, setReadingActive] = useState(
+    () =>
+      document.visibilityState === "visible" &&
+      (!requireWindowFocus || document.hasFocus()),
+  )
   const [prependRevision, setPrependRevision] = useState(0)
   const { data, loading, error, refresh } = useResource(
     resourceKeys.conversationMessages(conversationID),
@@ -270,6 +293,43 @@ export function ConversationTimeline({
     currentPage?.messages ?? [],
     outgoingMessages,
     groupParticipants,
+  )
+
+  /** 合并滚动期间连续产生的已读水位写入。 */
+  const queueReadMessage = useCallback(
+    (messageID: string, immediate = false) => {
+      pendingReadMessageIDRef.current = messageID
+      if (readTimerRef.current !== null) {
+        window.clearTimeout(readTimerRef.current)
+      }
+      const flush = () => {
+        readTimerRef.current = null
+        const pendingID = pendingReadMessageIDRef.current
+        pendingReadMessageIDRef.current = ""
+        if (pendingID) onReadMessage?.(pendingID)
+      }
+      if (immediate) flush()
+      else readTimerRef.current = window.setTimeout(flush, 250)
+    },
+    [onReadMessage],
+  )
+
+  /** 将当前会话的本地已读水位推进到指定消息。 */
+  const markLatestRead = useCallback(
+    (messageID: string | undefined) => {
+      if (
+        !messageID ||
+        !onReadMessage ||
+        messageID === readMessageIDRef.current
+      ) {
+        return
+      }
+      readMessageIDRef.current = messageID
+      newMessageIDsRef.current.clear()
+      setNewMessageCount(0)
+      queueReadMessage(messageID, true)
+    },
+    [onReadMessage, queueReadMessage],
   )
 
   /** 复制一条文本消息的正文。 */
@@ -393,8 +453,54 @@ export function ConversationTimeline({
     return () => {
       aliveRef.current = false
       beforeRequestRef.current += 1
+      if (readTimerRef.current !== null) {
+        window.clearTimeout(readTimerRef.current)
+      }
     }
   }, [])
+
+  /** 切换会话时清空上一条时间线及其已读水位。 */
+  useEffect(() => {
+    setTimeline(null)
+    timelineRef.current = null
+    readMessageIDRef.current = ""
+    seenMessageIDsRef.current.clear()
+    newMessageIDsRef.current.clear()
+    initialScrollRef.current = true
+    nearBottomRef.current = true
+    setNewMessageCount(0)
+  }, [conversationID])
+
+  useEffect(() => {
+    if (!readThroughMessageID || readMessageIDRef.current) return
+    readMessageIDRef.current = readThroughMessageID
+  }, [conversationID, readThroughMessageID])
+
+  useEffect(() => {
+    /** 根据页面和窗口状态更新已读门禁。 */
+    function syncReadingActive() {
+      setReadingActive(
+        document.visibilityState === "visible" &&
+          (!requireWindowFocus || document.hasFocus()),
+      )
+    }
+
+    document.addEventListener("visibilitychange", syncReadingActive)
+    window.addEventListener("focus", syncReadingActive)
+    window.addEventListener("blur", syncReadingActive)
+    return () => {
+      document.removeEventListener("visibilitychange", syncReadingActive)
+      window.removeEventListener("focus", syncReadingActive)
+      window.removeEventListener("blur", syncReadingActive)
+    }
+  }, [requireWindowFocus])
+
+  useEffect(() => {
+    if (!readingActive || !nearBottomRef.current) return
+    const messages = timelineRef.current?.messages ?? []
+    const latest = messages[messages.length - 1]
+    markLatestRead(latest?.id)
+  }, [markLatestRead, readingActive])
 
   useEffect(() => {
     if (!data) return
@@ -426,6 +532,17 @@ export function ConversationTimeline({
       )
       if (!aliveRef.current) return
       setPollingError(false)
+      if (!nearBottomRef.current) {
+        for (const message of page.messages) {
+          if (
+            message.type === MessageType.MessageTypeSystem ||
+            message.sender?.sourceId !== currentIdentityID
+          ) {
+            newMessageIDsRef.current.add(message.id)
+          }
+        }
+        setNewMessageCount(newMessageIDsRef.current.size)
+      }
       setTimeline((current) => {
         if (!current || (after && current.after !== after)) return current
         if (page.messages.length === 0) return current
@@ -456,7 +573,7 @@ export function ConversationTimeline({
     } finally {
       pollingRequestRef.current = false
     }
-  }, [conversationID, navigate])
+  }, [conversationID, currentIdentityID, navigate])
 
   const timelineReady = timeline !== null
   useEffect(() => {
@@ -478,20 +595,29 @@ export function ConversationTimeline({
     function syncBottomState() {
       const nearBottom = timelineNearBottom(activeViewport)
       nearBottomRef.current = nearBottom
-      if (nearBottom) setNewMessagesAvailable(false)
     }
 
-    syncBottomState()
     activeViewport.addEventListener("scroll", syncBottomState, {
       passive: true,
     })
     return () =>
       activeViewport.removeEventListener("scroll", syncBottomState)
-  }, [currentPage])
+  }, [conversationID])
 
   useLayoutEffect(() => {
     const viewport = timelineViewport(scrollRootRef.current)
     if (!viewport) return
+    const activeViewport: HTMLElement = viewport
+    const messages = currentPage?.messages ?? []
+    const latestMessageID = messages[messages.length - 1]?.id
+
+    /** 保持时间线贴底并同步最新已读水位。 */
+    function followLatest() {
+      activeViewport.scrollTop = activeViewport.scrollHeight
+      nearBottomRef.current = true
+      if (readingActive) markLatestRead(latestMessageID)
+    }
+
     const sentCountIncreased =
       outgoingMessages.length > previousSentCountRef.current
     const messageCountIncreased =
@@ -502,8 +628,7 @@ export function ConversationTimeline({
     previousMessageCountRef.current = visibleMessages.length
     if (initialScrollRef.current && currentPage) {
       initialScrollRef.current = false
-      viewport.scrollTop = viewport.scrollHeight
-      nearBottomRef.current = true
+      followLatest()
       return
     }
     if (prependChanged) {
@@ -516,29 +641,86 @@ export function ConversationTimeline({
       }
     }
     if (sentCountIncreased) {
-      viewport.scrollTop = viewport.scrollHeight
-      nearBottomRef.current = true
-      setNewMessagesAvailable(false)
+      followLatest()
       return
     }
     if (workspaceLayout && messageCountIncreased) {
       if (nearBottomRef.current) {
-        viewport.scrollTop = viewport.scrollHeight
+        followLatest()
       } else {
-        setNewMessagesAvailable(true)
+        setNewMessageCount(newMessageIDsRef.current.size)
       }
       return
     }
     if (workspaceLayout && nearBottomRef.current) {
-      viewport.scrollTop = viewport.scrollHeight
+      followLatest()
     }
   }, [
     currentPage,
+    markLatestRead,
     outgoingMessages.length,
     prependRevision,
+    readingActive,
     visibleMessages.length,
     workspaceLayout,
   ])
+
+  /** 根据消息节点可见性连续推进已读水位。 */
+  useEffect(() => {
+    const viewport = timelineViewport(scrollRootRef.current)
+    const messages = currentPage?.messages ?? []
+    if (!viewport || !readingActive || !onReadMessage || messages.length === 0) {
+      return
+    }
+    const byID = new Map(messages.map((message) => [message.id, message]))
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const messageID = (entry.target as HTMLElement).dataset.messageId
+          const message = messageID ? byID.get(messageID) : undefined
+          if (!message || !entry.isIntersecting) continue
+          if (
+            message.type === MessageType.MessageTypeSystem ||
+            entry.intersectionRect.height >=
+              Math.min(entry.boundingClientRect.height * 0.5, 32)
+          ) {
+            seenMessageIDsRef.current.add(message.id)
+            newMessageIDsRef.current.delete(message.id)
+          }
+        }
+        setNewMessageCount(newMessageIDsRef.current.size)
+
+        const currentIndex = readMessageIDRef.current
+          ? messages.findIndex(
+              (message) => message.id === readMessageIDRef.current,
+            )
+          : -1
+        if (readMessageIDRef.current && currentIndex < 0) return
+        let nextReadID = readMessageIDRef.current
+        for (const message of messages.slice(currentIndex + 1)) {
+          const sentByCurrentUser =
+            message.sender?.sourceId === currentIdentityID
+          if (
+            !sentByCurrentUser &&
+            !seenMessageIDsRef.current.has(message.id)
+          ) {
+            break
+          }
+          nextReadID = message.id
+        }
+        if (!nextReadID || nextReadID === readMessageIDRef.current) return
+        readMessageIDRef.current = nextReadID
+        queueReadMessage(nextReadID)
+      },
+      { root: viewport, threshold: [0, 0.25, 0.5, 1] },
+    )
+    for (const node of viewport.querySelectorAll<HTMLElement>(
+      "[data-message-id]",
+    )) {
+      observer.observe(node)
+    }
+    return () => observer.disconnect()
+  }, [currentPage, currentIdentityID, onReadMessage, queueReadMessage, readingActive])
 
   /** 滚动到最新消息。 */
   function scrollToLatest() {
@@ -546,7 +728,14 @@ export function ConversationTimeline({
     if (!viewport) return
     viewport.scrollTop = viewport.scrollHeight
     nearBottomRef.current = true
-    setNewMessagesAvailable(false)
+    newMessageIDsRef.current.clear()
+    setNewMessageCount(0)
+    const messages = currentPage?.messages ?? []
+    const latest = messages[messages.length - 1]
+    if (latest && onReadMessage) {
+      readMessageIDRef.current = latest.id
+      queueReadMessage(latest.id, true)
+    }
   }
 
   /** 加载并前插一页更早消息。 */
@@ -755,7 +944,10 @@ export function ConversationTimeline({
                 : null
 
               return (
-                <Fragment key={message.id}>
+                <div
+                  key={message.id}
+                  data-message-id={message.local ? undefined : message.id}
+                >
                   {startsDay ? (
                     <div className="my-3 flex items-center justify-center">
                       <time
@@ -993,7 +1185,7 @@ export function ConversationTimeline({
                       </ContextMenuContent>
                     </ContextMenu>
                   )}
-                </Fragment>
+                </div>
               )
             })}
           </div>
@@ -1008,14 +1200,14 @@ export function ConversationTimeline({
           {t("messagesRefreshError")}
         </button>
       ) : null}
-      {workspaceLayout && newMessagesAvailable ? (
+      {workspaceLayout && newMessageCount > 0 ? (
         <Button
           type="button"
           size="sm"
-          className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-md"
+          className="absolute right-4 bottom-3 z-10 rounded-full shadow-md"
           onClick={scrollToLatest}
         >
-          {t("messagesNew")}
+          {t("messagesNew", { count: newMessageCount })}
         </Button>
       ) : null}
     </div>

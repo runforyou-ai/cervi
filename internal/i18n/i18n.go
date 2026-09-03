@@ -158,6 +158,7 @@ const (
 	ErrorInboxLoadFailed                  Key = "error.inbox_load_failed"
 	ErrorConversationNotFound             Key = "error.conversation_not_found"
 	ErrorConversationMessageListFailed    Key = "error.conversation_message_list_failed"
+	ErrorConversationReadUpdateFailed     Key = "error.conversation_read_update_failed"
 	ErrorCustomerMessageSendFailed        Key = "error.customer_message_send_failed"
 	ErrorCustomerMessageConflict          Key = "error.customer_message_conflict"
 	ErrorDirectConversationStartFailed    Key = "error.direct_conversation_start_failed"
