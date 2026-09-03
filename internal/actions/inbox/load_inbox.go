@@ -237,7 +237,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	return result, totalUnread, nil
 }
 
-// loadCustomerConversations 按客户视图读取最新处理周期对应的会话。
+// loadCustomerConversations 按客户视图读取当前处理周期对应的会话。
 func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organizationID, currentIdentityID string, input LoadInput) ([]customerConversationRow, error) {
 	var rows []customerConversationRow
 	query := q.db.NewSelect().
@@ -251,9 +251,9 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("cv.last_message_id::text AS last_message_id").
-		ColumnExpr("latest.status AS service_session_status").
-		ColumnExpr("latest.id::text AS service_session_id").
-		ColumnExpr("latest.assignee_identity_id::text AS assignee_identity_id").
+		ColumnExpr("current.status AS service_session_status").
+		ColumnExpr("current.id::text AS service_session_id").
+		ColumnExpr("current.assignee_identity_id::text AS assignee_identity_id").
 		ColumnExpr("assignee.type AS assignee_type").
 		ColumnExpr("assignee.display_name AS assignee_display_name").
 		ColumnExpr("assignee.avatar_file_id::text AS assignee_avatar_file_id").
@@ -263,15 +263,15 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cc.organization_id").
 		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cc.organization_id").
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
-		Join("JOIN LATERAL (SELECT ss.id, ss.status, ss.assignee_identity_id FROM service_sessions AS ss WHERE ss.organization_id = cv.organization_id AND ss.conversation_id = cv.id ORDER BY ss.sequence DESC LIMIT 1) AS latest ON TRUE").
-		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = latest.assignee_identity_id").
+		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
+		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = current.assignee_identity_id").
 		Where("cc.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer)
 	if input.Scope == domain.InboxScopeAll {
 		query = query.
-			Where("latest.status = ?", domain.ServiceSessionStatusOpen).
+			Where("current.status = ?", domain.ServiceSessionStatusOpen).
 			Where(`(
-				latest.assignee_identity_id = ?
+				current.assignee_identity_id = ?
 				OR EXISTS (
 					SELECT 1
 					FROM conversation_participants AS related_cp
@@ -287,18 +287,18 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 	} else {
 		switch input.CustomerView {
 		case domain.CustomerInboxViewQueue:
-			query = query.Where("latest.status = ?", domain.ServiceSessionStatusOpen).Where("latest.assignee_identity_id IS NULL")
+			query = query.Where("current.status = ?", domain.ServiceSessionStatusOpen).Where("current.assignee_identity_id IS NULL")
 		case domain.CustomerInboxViewMine:
-			query = query.Where("latest.status = ?", domain.ServiceSessionStatusOpen).Where("latest.assignee_identity_id = ?", currentIdentityID)
+			query = query.Where("current.status = ?", domain.ServiceSessionStatusOpen).Where("current.assignee_identity_id = ?", currentIdentityID)
 		case domain.CustomerInboxViewCoworkers:
-			query = query.Where("latest.status = ?", domain.ServiceSessionStatusOpen).
-				Where("latest.assignee_identity_id IS NOT NULL").
-				Where("latest.assignee_identity_id <> ?", currentIdentityID)
+			query = query.Where("current.status = ?", domain.ServiceSessionStatusOpen).
+				Where("current.assignee_identity_id IS NOT NULL").
+				Where("current.assignee_identity_id <> ?", currentIdentityID)
 			if input.AssigneeIdentityID != "" {
-				query = query.Where("latest.assignee_identity_id = ?", input.AssigneeIdentityID)
+				query = query.Where("current.assignee_identity_id = ?", input.AssigneeIdentityID)
 			}
 		case domain.CustomerInboxViewClosed:
-			query = query.Where("latest.status = ?", domain.ServiceSessionStatusClosed)
+			query = query.Where("current.status = ?", domain.ServiceSessionStatusClosed)
 		}
 	}
 	err := query.OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
@@ -316,7 +316,7 @@ func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizati
 	err := q.db.NewSelect().
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
-		ColumnExpr("peer_cs.source_id AS peer_identity_id").
+		ColumnExpr("peer_oi.id AS peer_identity_id").
 		ColumnExpr("peer_oi.type AS peer_type").
 		ColumnExpr("peer_oi.display_name AS peer_name").
 		ColumnExpr("msg.body AS preview").
@@ -326,11 +326,8 @@ func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizati
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("cv.last_message_at AS sort_at").
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
-		Join("JOIN conversation_participants AS peer ON peer.organization_id = cv.organization_id AND peer.conversation_id = cv.id AND peer.subject_id <> mine.subject_id AND peer.left_at IS NULL").
-		Join("JOIN chat_subjects AS peer_cs ON peer_cs.organization_id = peer.organization_id AND peer_cs.id = peer.subject_id AND peer_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = peer_cs.organization_id AND peer_oi.id = peer_cs.source_id").
+		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
+		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identityID).
 		Join("LEFT JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id").
 		Join("LEFT JOIN agents AS peer_a ON peer_a.organization_id = peer_oi.organization_id AND peer_a.identity_id = peer_oi.id").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
@@ -349,8 +346,8 @@ func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizati
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeDirect).
 		Where("cv.status = ?", domain.ConversationStatusActive).
+		Where("? IN (dc.first_identity_id, dc.second_identity_id)", identityID).
 		Where("((peer_oi.type = ? AND peer_u.status = ?) OR (peer_oi.type = ? AND peer_a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
-		Where("(SELECT count(*) FROM conversation_participants AS all_cp WHERE all_cp.organization_id = cv.organization_id AND all_cp.conversation_id = cv.id) = 2").
 		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
 		Limit(inboxConversationTypeLimit).
 		Scan(ctx, &rows)

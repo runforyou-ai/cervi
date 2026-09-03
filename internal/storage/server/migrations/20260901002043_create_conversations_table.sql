@@ -14,15 +14,6 @@ CREATE TABLE conversations (
     last_message_source_order bigint NOT NULL DEFAULT 0
 );
 
-CREATE INDEX conversations_organization_type_status_last_message_index
-    ON conversations (
-        organization_id,
-        type,
-        status,
-        last_message_at DESC NULLS LAST,
-        id DESC
-    );
-
 COMMENT ON TABLE conversations IS '聊天会话';
 COMMENT ON COLUMN conversations.id IS '会话编号';
 COMMENT ON COLUMN conversations.created_at IS '创建时间';
@@ -35,8 +26,6 @@ COMMENT ON COLUMN conversations.created_by_subject_id IS '创建聊天主体编�
 COMMENT ON COLUMN conversations.last_message_id IS '会话最后消息编号';
 COMMENT ON COLUMN conversations.last_message_at IS '会话最后消息发生时间';
 COMMENT ON COLUMN conversations.last_message_source_order IS '最后消息的来源内顺序';
-COMMENT ON INDEX conversations_organization_type_status_last_message_index
-    IS '企业会话按类型、状态和最后消息排序索引';
 
 -- +goose Down
 DROP TABLE conversations;

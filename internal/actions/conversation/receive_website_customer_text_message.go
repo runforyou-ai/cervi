@@ -315,19 +315,9 @@ func ensureContactParticipant(ctx context.Context, db bun.IDB, organizationID, c
 
 // selectServiceSession 选择线程当前批次或计算下一个批次序号。
 func selectServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID, channelIdentityID string) (*servermodels.ServiceSession, bool, error) {
-	session := &servermodels.ServiceSession{}
-	err := db.NewSelect().Model(session).
-		Where("ss.organization_id = ?", organizationID).
-		Where("ss.conversation_id = ?", conversationID).
-		OrderExpr("ss.sequence DESC").
-		Limit(1).
-		For("UPDATE").
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, false, ErrDataInvariant
-	}
+	session, err := lockCurrentServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, false, fmt.Errorf("load latest service session: %w", err)
+		return nil, false, err
 	}
 	if session.ContactChannelIdentityID != channelIdentityID {
 		return nil, false, ErrDataInvariant
@@ -448,7 +438,7 @@ func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessage
 	}
 }
 
-// loadConversationSummary 读取客户线程当前最后消息和最新客服周期摘要。
+// loadConversationSummary 读取客户线程当前最后消息和当前客服周期摘要。
 func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, conversationID, channelIdentityID string) (ConversationSummary, error) {
 	row := conversationSummaryRow{}
 	err := db.NewSelect().
@@ -457,15 +447,16 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("msg.body AS preview").
-		ColumnExpr("latest.id AS service_session_id").
-		ColumnExpr("latest.status AS service_session_status").
+		ColumnExpr("current.id AS service_session_id").
+		ColumnExpr("current.status AS service_session_status").
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
-		Join("JOIN LATERAL (SELECT ss.id, ss.status, ss.contact_channel_identity_id FROM service_sessions AS ss WHERE ss.organization_id = cv.organization_id AND ss.conversation_id = cv.id ORDER BY ss.sequence DESC LIMIT 1) AS latest ON TRUE").
+		Join("JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.id = ?", conversationID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer).
 		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
-		Where("latest.contact_channel_identity_id = ?", channelIdentityID).
+		Where("current.contact_channel_identity_id = ?", channelIdentityID).
 		Scan(ctx, &row)
 	if err != nil {
 		return ConversationSummary{}, fmt.Errorf("load customer conversation summary: %w", err)

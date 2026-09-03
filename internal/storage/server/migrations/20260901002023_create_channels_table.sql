@@ -17,9 +17,6 @@ CREATE TABLE channels (
     enabled                        boolean NOT NULL DEFAULT true
 );
 
-CREATE INDEX channels_organization_type_enabled_index
-    ON channels (organization_id, type, enabled);
-
 COMMENT ON TABLE channels IS '企业消息渠道';
 COMMENT ON COLUMN channels.id IS '渠道编号';
 COMMENT ON COLUMN channels.created_at IS '创建时间';

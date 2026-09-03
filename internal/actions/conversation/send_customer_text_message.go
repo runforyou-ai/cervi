@@ -112,7 +112,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err := ensureCustomerConversationOutboundSupported(ctx, tx, identity.Organization.ID, conversation.ID); err != nil {
 		return ConversationMessage{}, err
 	}
-	session, err := lockLatestServiceSessionForReply(ctx, tx, identity.Organization.ID, conversation.ID)
+	session, err := lockCurrentServiceSession(ctx, tx, identity.Organization.ID, conversation.ID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
@@ -236,21 +236,35 @@ func loadCustomerConversationForReply(ctx context.Context, db bun.IDB, organizat
 	return conversation, nil
 }
 
-// lockLatestServiceSessionForReply 锁定客户会话最新客服处理周期。
-func lockLatestServiceSessionForReply(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	session := &servermodels.ServiceSession{}
-	err := db.NewSelect().Model(session).
-		Where("ss.organization_id = ?", organizationID).
-		Where("ss.conversation_id = ?", conversationID).
-		OrderExpr("ss.sequence DESC").
-		Limit(1).
+// lockCurrentServiceSession 锁定客户会话当前客服处理周期。
+func lockCurrentServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
+	customer := &servermodels.CustomerConversation{}
+	err := db.NewSelect().Model(customer).
+		Where("cc.organization_id = ?", organizationID).
+		Where("cc.conversation_id = ?", conversationID).
 		For("UPDATE").
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrDataInvariant
 	}
 	if err != nil {
-		return nil, fmt.Errorf("lock latest service session for reply: %w", err)
+		return nil, fmt.Errorf("lock customer conversation: %w", err)
+	}
+	if customer.CurrentServiceSessionID == nil {
+		return nil, ErrDataInvariant
+	}
+	session := &servermodels.ServiceSession{}
+	err = db.NewSelect().Model(session).
+		Where("ss.organization_id = ?", organizationID).
+		Where("ss.conversation_id = ?", conversationID).
+		Where("ss.id = ?", *customer.CurrentServiceSessionID).
+		For("UPDATE").
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrDataInvariant
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lock current service session: %w", err)
 	}
 	return session, nil
 }

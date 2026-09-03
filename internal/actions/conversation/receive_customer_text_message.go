@@ -129,6 +129,14 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 			Exec(ctx); err != nil {
 			return InboundCustomerTextMessageResult{}, fmt.Errorf("create service session: %w", err)
 		}
+		if _, err := db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
+			Set("current_service_session_id = ?", session.ID).
+			Set("updated_at = now()").
+			Where("organization_id = ?", channel.OrganizationID).
+			Where("conversation_id = ?", conversation.ID).
+			Exec(ctx); err != nil {
+			return InboundCustomerTextMessageResult{}, fmt.Errorf("update current service session: %w", err)
+		}
 	}
 
 	message := &servermodels.Message{

@@ -17,4 +17,5 @@ type CustomerConversation struct {
 	UpdatedAt                time.Time `bun:"updated_at"`
 	OrganizationID           string    `bun:"organization_id"`
 	ContactChannelIdentityID string    `bun:"contact_channel_identity_id"`
+	CurrentServiceSessionID  *string   `bun:"current_service_session_id"`
 }

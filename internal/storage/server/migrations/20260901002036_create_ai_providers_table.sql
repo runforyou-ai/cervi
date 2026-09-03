@@ -14,9 +14,6 @@ CREATE TABLE ai_providers (
 CREATE UNIQUE INDEX ai_providers_organization_name_unique
     ON ai_providers (organization_id, lower(name));
 
-CREATE INDEX ai_providers_organization_created_at_index
-    ON ai_providers (organization_id, created_at);
-
 COMMENT ON TABLE ai_providers IS '企业 AI 供应商';
 COMMENT ON COLUMN ai_providers.id IS '供应商编号';
 COMMENT ON COLUMN ai_providers.created_at IS '添加时间';

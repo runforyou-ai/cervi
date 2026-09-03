@@ -9,9 +9,6 @@ CREATE TABLE role_permissions (
     organization_id  uuid NOT NULL
 );
 
-CREATE INDEX role_permissions_organization_role_index
-    ON role_permissions (organization_id, role_id);
-
 COMMENT ON TABLE role_permissions IS '角色权限关联';
 COMMENT ON COLUMN role_permissions.role_id IS '角色编号';
 COMMENT ON COLUMN role_permissions.permission IS '预定义权限代码';

@@ -18,9 +18,6 @@ CREATE UNIQUE INDEX roles_organization_custom_name_unique
     ON roles (organization_id, lower(name))
     WHERE kind = 'custom';
 
-CREATE INDEX roles_organization_created_at_index
-    ON roles (organization_id, created_at);
-
 COMMENT ON TABLE roles IS '企业角色';
 COMMENT ON COLUMN roles.id IS '角色编号';
 COMMENT ON COLUMN roles.created_at IS '创建时间';
