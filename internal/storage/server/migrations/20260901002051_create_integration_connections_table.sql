@@ -16,9 +16,6 @@ CREATE TABLE integration_connections (
 CREATE UNIQUE INDEX integration_connections_organization_name_unique
     ON integration_connections (organization_id, lower(name));
 
-CREATE INDEX integration_connections_organization_created_at_index
-    ON integration_connections (organization_id, created_at);
-
 COMMENT ON TABLE integration_connections IS '企业外部系统连接器';
 COMMENT ON COLUMN integration_connections.id IS '连接编号';
 COMMENT ON COLUMN integration_connections.created_at IS '添加时间';

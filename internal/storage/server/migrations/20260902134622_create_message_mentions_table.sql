@@ -12,9 +12,6 @@ CREATE TABLE message_mentions (
 CREATE UNIQUE INDEX message_mentions_organization_message_subject_unique
     ON message_mentions (organization_id, message_id, subject_id);
 
-CREATE INDEX message_mentions_organization_subject_message_index
-    ON message_mentions (organization_id, subject_id, message_id);
-
 COMMENT ON TABLE message_mentions IS '消息提醒关系';
 COMMENT ON COLUMN message_mentions.id IS '消息提醒关系编号';
 COMMENT ON COLUMN message_mentions.created_at IS '创建时间';
@@ -24,8 +21,6 @@ COMMENT ON COLUMN message_mentions.message_id IS '消息编号';
 COMMENT ON COLUMN message_mentions.subject_id IS '被提醒聊天主体编号';
 COMMENT ON INDEX message_mentions_organization_message_subject_unique
     IS '企业消息内被提醒聊天主体唯一索引';
-COMMENT ON INDEX message_mentions_organization_subject_message_index
-    IS '企业聊天主体被提醒消息查询索引';
 
 -- +goose Down
 DROP TABLE message_mentions;

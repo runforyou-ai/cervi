@@ -19,10 +19,6 @@ CREATE TABLE task_schedules (
 CREATE UNIQUE INDEX task_schedules_key_unique
     ON task_schedules (schedule_key);
 
-CREATE INDEX task_schedules_due_index
-    ON task_schedules (next_run_at, schedule_key)
-    WHERE enabled = true;
-
 COMMENT ON TABLE task_schedules IS '服务端定时 Action 计划';
 COMMENT ON COLUMN task_schedules.id IS '计划编号';
 COMMENT ON COLUMN task_schedules.created_at IS '创建时间';

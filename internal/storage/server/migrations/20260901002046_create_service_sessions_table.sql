@@ -36,22 +36,6 @@ CREATE UNIQUE INDEX service_sessions_organization_conversation_open_unique
     ON service_sessions (organization_id, conversation_id)
     WHERE status = 'open';
 
-CREATE INDEX service_sessions_organization_conversation_last_message_index
-    ON service_sessions (
-        organization_id,
-        conversation_id,
-        last_message_at DESC,
-        id DESC
-    );
-
-CREATE INDEX service_sessions_org_channel_identity_last_message_index
-    ON service_sessions (
-        organization_id,
-        contact_channel_identity_id,
-        last_message_at DESC,
-        id DESC
-    );
-
 COMMENT ON TABLE service_sessions IS '客户会话客服处理周期';
 COMMENT ON COLUMN service_sessions.id IS '客服处理周期编号';
 COMMENT ON COLUMN service_sessions.created_at IS '创建时间';
@@ -78,10 +62,6 @@ COMMENT ON INDEX service_sessions_organization_opening_message_unique
     IS '企业客服处理周期首条消息唯一索引';
 COMMENT ON INDEX service_sessions_organization_conversation_open_unique
     IS '企业客户会话未结束处理周期唯一索引';
-COMMENT ON INDEX service_sessions_organization_conversation_last_message_index
-    IS '企业客户会话处理周期最后消息索引';
-COMMENT ON INDEX service_sessions_org_channel_identity_last_message_index
-    IS '企业渠道身份处理周期最后消息索引';
 
 -- +goose Down
 DROP TABLE service_sessions;

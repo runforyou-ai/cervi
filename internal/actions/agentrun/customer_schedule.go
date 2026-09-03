@@ -24,7 +24,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 	if s == nil || s.enqueuer == nil {
 		return false, errors.New("agent run scheduler is unavailable")
 	}
-	session, err := lockLatestCustomerServiceSession(ctx, db, organizationID, conversationID)
+	session, err := lockCurrentCustomerServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return false, err
 	}
@@ -88,18 +88,29 @@ func loadCustomerAssigneeType(ctx context.Context, db bun.IDB, session *servermo
 	return domain.OrganizationIdentityType(identityType), nil
 }
 
-// lockLatestCustomerServiceSession 锁定会话当前最新客服处理周期。
-func lockLatestCustomerServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	session := &servermodels.ServiceSession{}
-	err := db.NewSelect().Model(session).
-		Where("ss.organization_id = ?", organizationID).
-		Where("ss.conversation_id = ?", conversationID).
-		OrderExpr("ss.sequence DESC").
-		Limit(1).
+// lockCurrentCustomerServiceSession 锁定会话当前客服处理周期。
+func lockCurrentCustomerServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
+	customer := &servermodels.CustomerConversation{}
+	err := db.NewSelect().Model(customer).
+		Where("cc.organization_id = ?", organizationID).
+		Where("cc.conversation_id = ?", conversationID).
 		For("UPDATE").
 		Scan(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("lock latest customer service session: %w", err)
+		return nil, fmt.Errorf("lock customer conversation: %w", err)
+	}
+	if customer.CurrentServiceSessionID == nil {
+		return nil, errors.New("customer conversation has no current service session")
+	}
+	session := &servermodels.ServiceSession{}
+	err = db.NewSelect().Model(session).
+		Where("ss.organization_id = ?", organizationID).
+		Where("ss.conversation_id = ?", conversationID).
+		Where("ss.id = ?", *customer.CurrentServiceSessionID).
+		For("UPDATE").
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("lock current customer service session: %w", err)
 	}
 	return session, nil
 }

@@ -12,9 +12,6 @@ CREATE TABLE website_channel_settings (
     allowed_embed_hosts text[] NOT NULL DEFAULT '{}'::text[]
 );
 
-CREATE INDEX website_channel_settings_organization_channel_index
-    ON website_channel_settings (organization_id, channel_id);
-
 COMMENT ON TABLE website_channel_settings IS '网站渠道聊天界面设置';
 COMMENT ON COLUMN website_channel_settings.channel_id IS '渠道编号';
 COMMENT ON COLUMN website_channel_settings.created_at IS '创建时间';

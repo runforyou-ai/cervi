@@ -21,9 +21,9 @@ type customerRunPolicy struct {
 	enqueuer servertask.TxEnqueuer
 }
 
-// lockContext 锁定客户 Agent 所属会话的最新客服周期。
+// lockContext 锁定客户 Agent 所属会话的当前客服周期。
 func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentRunPolicyContext, error) {
-	session, err := lockLatestCustomerServiceSession(ctx, db, run.OrganizationID, run.ConversationID)
+	session, err := lockCurrentCustomerServiceSession(ctx, db, run.OrganizationID, run.ConversationID)
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}

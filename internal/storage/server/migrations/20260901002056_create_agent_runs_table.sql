@@ -22,9 +22,6 @@ CREATE UNIQUE INDEX agent_runs_conversation_active_unique
     ON agent_runs (conversation_id, agent_identity_id)
     WHERE status IN ('queued', 'running');
 
-CREATE INDEX agent_runs_organization_conversation_created_index
-    ON agent_runs (organization_id, conversation_id, created_at DESC);
-
 COMMENT ON TABLE agent_runs IS 'Agent 业务运行';
 COMMENT ON COLUMN agent_runs.id IS '运行编号';
 COMMENT ON COLUMN agent_runs.created_at IS '创建时间';

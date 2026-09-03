@@ -16,12 +16,6 @@ CREATE TABLE contact_channel_identities (
 CREATE UNIQUE INDEX contact_channel_identities_channel_external_unique
     ON contact_channel_identities (channel_id, external_id);
 
-CREATE INDEX contact_channel_identities_organization_contact_index
-    ON contact_channel_identities (organization_id, contact_id);
-
-CREATE INDEX contact_channel_identities_organization_channel_contact_index
-    ON contact_channel_identities (organization_id, channel_id, contact_id);
-
 COMMENT ON TABLE contact_channel_identities IS '联系人在外部渠道中的身份';
 COMMENT ON COLUMN contact_channel_identities.id IS '渠道身份编号';
 COMMENT ON COLUMN contact_channel_identities.created_at IS '创建时间';

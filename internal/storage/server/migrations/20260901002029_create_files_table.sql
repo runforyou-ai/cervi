@@ -22,17 +22,6 @@ CREATE TABLE files (
 CREATE UNIQUE INDEX files_storage_key_unique
     ON files (storage_key);
 
-CREATE INDEX files_organization_status_created_index
-    ON files (organization_id, status, created_at DESC);
-
-CREATE INDEX files_status_expires_index
-    ON files (status, expires_at)
-    WHERE expires_at IS NOT NULL;
-
-CREATE INDEX files_organization_purpose_external_id_index
-    ON files (organization_id, purpose, external_id)
-    WHERE external_id IS NOT NULL;
-
 COMMENT ON TABLE files IS '企业上传文件元数据';
 COMMENT ON COLUMN files.id IS '文件编号';
 COMMENT ON COLUMN files.created_at IS '创建时间';

@@ -4,9 +4,7 @@ package conversation
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -106,6 +104,12 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 		conversation: values[0], currentSubject: values[1], targetSubject: values[2],
 		currentParticipant: values[3], targetParticipant: values[4],
 	}
+	// 双方始终按规范化身份顺序创建聊天主体。
+	firstIdentityID, secondIdentityID := normalizeDirectIdentityPair(identity.OrganizationIdentity.ID, target.IdentityID)
+	firstSubjectID, secondSubjectID := ids.currentSubject, ids.targetSubject
+	if firstIdentityID != identity.OrganizationIdentity.ID {
+		firstSubjectID, secondSubjectID = secondSubjectID, firstSubjectID
+	}
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result DirectConversationSummary
@@ -113,27 +117,24 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 				return err
 			}
-			// 串行化同企业同一规范化身份对的单聊创建。
-			keyText := directIdentityPairLockText(identity.Organization.ID, identity.OrganizationIdentity.ID, target.IdentityID)
-			hash := sha256.Sum256([]byte(keyText))
-			lockKey := int64(binary.BigEndian.Uint64(hash[:8]))
-			if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(?)", lockKey); err != nil {
-				return fmt.Errorf("lock direct identity pair: %w", err)
-			}
-			currentSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.currentSubject)
+			firstSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, firstIdentityID, firstSubjectID)
 			if err != nil {
 				return err
 			}
-			targetSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, target.IdentityID, ids.targetSubject)
+			secondSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, secondIdentityID, secondSubjectID)
 			if err != nil {
 				return err
 			}
-			conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, currentSubject.ID, targetSubject.ID)
+			currentSubject, targetSubject := firstSubject, secondSubject
+			if firstIdentityID != identity.OrganizationIdentity.ID {
+				currentSubject, targetSubject = secondSubject, firstSubject
+			}
+			conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, target.IdentityID)
 			if err != nil {
 				return err
 			}
 			if conversation == nil {
-				conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, currentSubject.ID, targetSubject.ID, ids)
+				conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, target.IdentityID, currentSubject.ID, targetSubject.ID, ids)
 				if err != nil {
 					return err
 				}
@@ -157,7 +158,8 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 			return result, nil
 		}
 		constraint, retryable := retryableUniqueViolation(err, map[string]struct{}{
-			"chat_subjects_organization_kind_source_unique": {},
+			"chat_subjects_organization_kind_source_unique":          {},
+			"direct_conversations_organization_identity_pair_unique": {},
 		})
 		if !retryable {
 			return DirectConversationSummary{}, err
@@ -267,11 +269,11 @@ func loadDirectTarget(ctx context.Context, db bun.IDB, organizationID, identityI
 	return row, nil
 }
 
-// directIdentityPairLockText 生成与发起方向无关的稳定锁文本。
-func directIdentityPairLockText(organizationID, firstIdentityID, secondIdentityID string) string {
+// normalizeDirectIdentityPair 按稳定顺序排列单聊双方身份。
+func normalizeDirectIdentityPair(firstIdentityID, secondIdentityID string) (string, string) {
 	identityIDs := []string{firstIdentityID, secondIdentityID}
 	sort.Strings(identityIDs)
-	return "cervi:direct:" + organizationID + ":" + identityIDs[0] + ":" + identityIDs[1]
+	return identityIDs[0], identityIDs[1]
 }
 
 // ensureOrganizationIdentityChatSubject 取得或创建企业身份聊天主体。
@@ -300,32 +302,28 @@ func ensureOrganizationIdentityChatSubject(ctx context.Context, db bun.IDB, orga
 	return subject, nil
 }
 
-// findDirectConversation 查找规范主体对唯一的长期单聊。
-func findDirectConversation(ctx context.Context, db bun.IDB, organizationID, firstSubjectID, secondSubjectID string) (*servermodels.Conversation, error) {
-	var conversations []servermodels.Conversation
-	err := db.NewSelect().Model(&conversations).
-		Join("JOIN conversation_participants AS first_cp ON first_cp.organization_id = cv.organization_id AND first_cp.conversation_id = cv.id AND first_cp.subject_id = ?", firstSubjectID).
-		Join("JOIN conversation_participants AS second_cp ON second_cp.organization_id = cv.organization_id AND second_cp.conversation_id = cv.id AND second_cp.subject_id = ?", secondSubjectID).
+// findDirectConversation 查找规范身份对唯一的长期单聊。
+func findDirectConversation(ctx context.Context, db bun.IDB, organizationID, firstIdentityID, secondIdentityID string) (*servermodels.Conversation, error) {
+	firstIdentityID, secondIdentityID = normalizeDirectIdentityPair(firstIdentityID, secondIdentityID)
+	conversation := &servermodels.Conversation{}
+	err := db.NewSelect().Model(conversation).
+		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeDirect).
-		Where("(SELECT count(*) FROM conversation_participants AS all_cp WHERE all_cp.organization_id = cv.organization_id AND all_cp.conversation_id = cv.id) = 2").
-		OrderExpr("cv.id ASC").
-		Limit(2).
+		Where("dc.first_identity_id = ?", firstIdentityID).
+		Where("dc.second_identity_id = ?", secondIdentityID).
 		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("find direct conversation: %w", err)
 	}
-	if len(conversations) > 1 {
-		return nil, ErrDataInvariant
-	}
-	if len(conversations) == 0 {
-		return nil, nil
-	}
-	return &conversations[0], nil
+	return conversation, nil
 }
 
 // createDirectConversation 创建内部单聊和双方参与者。
-func createDirectConversation(ctx context.Context, db bun.IDB, organizationID, currentSubjectID, targetSubjectID string, ids directConversationIDs) (*servermodels.Conversation, error) {
+func createDirectConversation(ctx context.Context, db bun.IDB, organizationID, currentIdentityID, targetIdentityID, currentSubjectID, targetSubjectID string, ids directConversationIDs) (*servermodels.Conversation, error) {
 	conversation := &servermodels.Conversation{
 		ID: ids.conversation, OrganizationID: organizationID,
 		Type: string(domain.ConversationTypeDirect), Status: string(domain.ConversationStatusActive),
@@ -335,6 +333,16 @@ func createDirectConversation(ctx context.Context, db bun.IDB, organizationID, c
 		Column("id", "organization_id", "type", "status", "created_by_subject_id").
 		Exec(ctx); err != nil {
 		return nil, fmt.Errorf("create direct conversation: %w", err)
+	}
+	firstIdentityID, secondIdentityID := normalizeDirectIdentityPair(currentIdentityID, targetIdentityID)
+	relation := &servermodels.DirectConversation{
+		ConversationID: conversation.ID, OrganizationID: organizationID,
+		FirstIdentityID: firstIdentityID, SecondIdentityID: secondIdentityID,
+	}
+	if _, err := db.NewInsert().Model(relation).
+		Column("conversation_id", "organization_id", "first_identity_id", "second_identity_id").
+		Exec(ctx); err != nil {
+		return nil, fmt.Errorf("create direct conversation relation: %w", err)
 	}
 	participants := []*servermodels.ConversationParticipant{
 		{ID: ids.currentParticipant, OrganizationID: organizationID, ConversationID: conversation.ID, SubjectID: currentSubjectID, Role: string(domain.ConversationParticipantRoleMember)},
@@ -381,19 +389,18 @@ func loadDirectSendContext(ctx context.Context, db bun.IDB, identity *servermode
 		ColumnExpr("peer_oi.type AS peer_type").
 		ColumnExpr("peer_oi.id AS peer_identity_id").
 		ColumnExpr("peer_a.active_revision_id AS peer_revision_id").
+		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
-		Join("JOIN conversation_participants AS peer ON peer.organization_id = cv.organization_id AND peer.conversation_id = cv.id AND peer.subject_id <> mine.subject_id AND peer.left_at IS NULL").
-		Join("JOIN chat_subjects AS peer_cs ON peer_cs.organization_id = peer.organization_id AND peer_cs.id = peer.subject_id AND peer_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = peer_cs.organization_id AND peer_oi.id = peer_cs.source_id").
+		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identity.OrganizationIdentity.ID).
 		Join("LEFT JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id").
 		Join("LEFT JOIN agents AS peer_a ON peer_a.organization_id = peer_oi.organization_id AND peer_a.identity_id = peer_oi.id").
 		Where("cv.organization_id = ?", identity.Organization.ID).
 		Where("cv.id = ?", conversationID).
 		Where("cv.type = ?", domain.ConversationTypeDirect).
 		Where("cv.status = ?", domain.ConversationStatusActive).
+		Where("? IN (dc.first_identity_id, dc.second_identity_id)", identity.OrganizationIdentity.ID).
 		Where("((peer_oi.type = ? AND peer_u.status = ?) OR (peer_oi.type = ? AND peer_a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
-		Where("(SELECT count(*) FROM conversation_participants AS all_cp WHERE all_cp.organization_id = cv.organization_id AND all_cp.conversation_id = cv.id) = 2").
 		Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return directSendContextRow{}, ErrConversationNotFound
