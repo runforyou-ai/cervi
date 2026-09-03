@@ -152,10 +152,7 @@ export function ConversationHeader({
   sessionStatus,
   currentIdentityId,
   onSessionMoved,
-  contextVisible,
-  contextTitle,
   narrowViewport = false,
-  onContextToggle,
 }: {
   conversation: InboxConversation
   contactName: string
@@ -166,10 +163,7 @@ export function ConversationHeader({
     view: CustomerInboxView,
     assigneeIdentityId?: string,
   ) => void
-  contextVisible: boolean
-  contextTitle: string
   narrowViewport?: boolean
-  onContextToggle: () => void
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -208,10 +202,6 @@ export function ConversationHeader({
         assignee.type !==
           OrganizationIdentityType.OrganizationIdentityTypeAgent),
   )
-  const contextActionLabel = contextVisible
-    ? t("contextClose")
-    : t("contextOpen")
-
   /** 执行客服处理周期命令并通知上层刷新受影响视图。 */
   async function runSessionOperation(
     nextOperation: string,
@@ -540,33 +530,7 @@ export function ConversationHeader({
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="text-muted-foreground 2xl:hidden"
-            aria-label={contextActionLabel}
-            aria-pressed={contextVisible}
-            title={contextActionLabel}
-            onClick={onContextToggle}
-          >
-            {contextTitle}
-          </Button>
         </div>
-      ) : null}
-      {!customer ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0 text-muted-foreground 2xl:hidden"
-          aria-label={contextActionLabel}
-          aria-pressed={contextVisible}
-          title={contextActionLabel}
-          onClick={onContextToggle}
-        >
-          {contextTitle}
-        </Button>
       ) : null}
       </header>
       <AlertDialog
