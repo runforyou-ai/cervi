@@ -176,7 +176,7 @@ function MobileConversationAvatar({
     <div className="relative shrink-0">
       <div
         className={cn(
-          "flex size-11 items-center justify-center overflow-hidden bg-muted text-sm font-medium text-muted-foreground",
+          "flex size-11 items-center justify-center overflow-hidden bg-primary/10 text-sm font-medium text-primary",
           directConversation ? "rounded-full" : "rounded-xl",
         )}
       >
