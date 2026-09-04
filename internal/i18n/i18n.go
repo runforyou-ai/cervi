@@ -13,6 +13,12 @@ import (
 type Key string
 
 const (
+	ErrorConversationMessageUnavailable     Key = "error.conversation_message_unavailable"
+	ErrorConversationMentionTargetInvalid   Key = "error.conversation_mention_target_invalid"
+	ErrorConversationMentionProgressChanged Key = "error.conversation_mention_progress_changed"
+)
+
+const (
 	AppProductName                        Key = "app.product_name"
 	AppTrayOpen                           Key = "app.tray_open"
 	AppTrayQuit                           Key = "app.tray_quit"

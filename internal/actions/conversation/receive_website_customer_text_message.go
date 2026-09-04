@@ -409,15 +409,19 @@ func updateSessionSummary(ctx context.Context, db bun.IDB, session *servermodels
 
 // updateConversationSummary 按消息稳定顺序推进会话摘要。
 func updateConversationSummary(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) error {
-	_, err := db.NewUpdate().Model(conversation).
+	query := db.NewUpdate().Model(conversation).
 		Set("last_message_id = ?", message.ID).
 		Set("last_message_at = ?", message.OriginatedAt).
 		Set("last_message_source_order = ?", message.SourceOrder).
 		Set("updated_at = now()").
 		WherePK().
-		Where("organization_id = ?", message.OrganizationID).
-		Where("last_message_at IS NULL OR (last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID).
-		Exec(ctx)
+		Where("organization_id = ?", message.OrganizationID)
+	if message.ConversationSequence != nil {
+		query = query.Where("message_sequence = ?", *message.ConversationSequence)
+	} else {
+		query = query.Where("last_message_at IS NULL OR (last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID)
+	}
+	_, err := query.Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("update conversation summary: %w", err)
 	}

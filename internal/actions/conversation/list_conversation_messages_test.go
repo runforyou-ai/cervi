@@ -4,6 +4,7 @@ package conversation
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -24,7 +25,8 @@ func TestBuildConversationMessageHistoryMarksSessionOpeningMessage(t *testing.T)
 		rows[index].ServiceSessionStatus = &status
 	}
 
-	history, err := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	slices.Reverse(rows)
+	history, err := buildConversationMessageHistory(rows)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +63,8 @@ func TestBuildConversationMessageHistoryMarksEachSessionOpeningMessage(t *testin
 		rows[index].ServiceSessionStatus = &openStatus
 	}
 
-	history, err := buildConversationMessageHistory(rows, ConversationMessageHistoryInput{})
+	slices.Reverse(rows)
+	history, err := buildConversationMessageHistory(rows)
 	if err != nil {
 		t.Fatal(err)
 	}

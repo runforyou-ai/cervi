@@ -541,9 +541,33 @@ export interface ContactSummary {
 }
 
 /**
+ * ConversationMentionReview 定义连续确认后的服务端水位。
+ */
+export interface ConversationMentionReview {
+    "reviewedThroughMessageId": string | null;
+    "reviewedThroughSequence": string;
+    "outcome": ConversationMentionReviewOutcome;
+}
+
+/**
+ * ConversationMentionReviewOutcome 定义提及确认结果。
+ */
+export enum ConversationMentionReviewOutcome {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ConversationMentionReviewed = "reviewed",
+    ConversationMentionAlreadyReviewed = "alreadyReviewed",
+    ConversationMentionUnavailable = "unavailable",
+};
+
+/**
  * ConversationMessage 定义成员可见的会话消息。
  */
 export interface ConversationMessage {
+    "conversationSequence": string | null;
     "id": string;
     "type": MessageType;
     "body": string;
@@ -562,6 +586,8 @@ export interface ConversationMessage {
  * ConversationMessageList 定义成员消息页。
  */
 export interface ConversationMessageList {
+    "hasEarlier": boolean;
+    "hasLater": boolean;
     "messages": ConversationMessage[] | null;
     "before": string | null;
     "after": string | null;
@@ -589,6 +615,7 @@ export interface ConversationMessageMention {
  * ConversationMessageReference 定义引用消息的一层摘要。
  */
 export interface ConversationMessageReference {
+    "deleted": boolean;
     "id": string;
     "body": string;
     "sender": ConversationMessageSender | null;
@@ -611,6 +638,17 @@ export interface ConversationMessageSessionStart {
     "sequence": number;
     "startedAt": string;
     "status": ServiceSessionStatus;
+}
+
+/**
+ * ConversationNavigationState 定义群聊可见尾端和提及查看进度。
+ */
+export interface ConversationNavigationState {
+    "pendingMentionCount": number;
+    "reviewedThroughMessageId": string | null;
+    "reviewedThroughSequence": string;
+    "latestMessageId": string | null;
+    "latestSequence": string;
 }
 
 /**
@@ -1439,6 +1477,13 @@ export interface LoginInput {
 }
 
 /**
+ * MarkConversationMentionReviewedInput 定义待确认的提及目标。
+ */
+export interface MarkConversationMentionReviewedInput {
+    "messageId": string;
+}
+
+/**
  * MarkConversationReadInput 定义用户确认已读的消息水位。
  */
 export interface MarkConversationReadInput {
@@ -1583,6 +1628,14 @@ export interface PageInfo {
     "number": number;
     "size": number;
     "total": number;
+}
+
+/**
+ * PendingConversationMentions 定义本轮固定提及目标及序号上界。
+ */
+export interface PendingConversationMentions {
+    "messageIds": string[] | null;
+    "lastTargetSequence": string | null;
 }
 
 /**

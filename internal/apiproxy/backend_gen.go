@@ -89,6 +89,38 @@ func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.
 	return output, err
 }
 
+// GetConversationMessageContext 返回目标消息及其前后上下文。
+func (b *Backend) GetConversationMessageContext(ctx context.Context, meta appservice.RequestMeta, conversationID string, messageID string) (appservice.ConversationMessageList, error) {
+	var output appservice.ConversationMessageList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/messages/"+url.PathEscape(messageID)+"/context", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetConversationNavigationState 返回群聊提及进度和最新可见消息。
+func (b *Backend) GetConversationNavigationState(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationNavigationState, error) {
+	var output appservice.ConversationNavigationState
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/navigation", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListPendingConversationMentions 返回本轮待查看提及目标。
+func (b *Backend) ListPendingConversationMentions(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.PendingConversationMentions, error) {
+	var output appservice.PendingConversationMentions
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/mentions/pending", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// MarkConversationMentionReviewed 连续确认群聊提及。
+func (b *Backend) MarkConversationMentionReviewed(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.MarkConversationMentionReviewedInput) (appservice.ConversationMentionReview, error) {
+	var output appservice.ConversationMentionReview
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/mentions/review", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // MarkConversationRead 单调推进当前用户的原生会话已读水位。
 func (b *Backend) MarkConversationRead(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.MarkConversationReadInput) (appservice.ConversationReadState, error) {
 	var output appservice.ConversationReadState

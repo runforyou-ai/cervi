@@ -26,6 +26,10 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/inbox", s.loadInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
+	router.GET("/conversations/:conversationID/messages/:messageID/context", s.getConversationMessageContext)
+	router.GET("/conversations/:conversationID/navigation", s.getConversationNavigationState)
+	router.GET("/conversations/:conversationID/mentions/pending", s.listPendingConversationMentions)
+	router.POST("/conversations/:conversationID/mentions/review", s.markConversationMentionReviewed)
 	router.POST("/conversations/:conversationID/read", s.markConversationRead)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
@@ -233,6 +237,34 @@ func (s *Service) listConversationMessages(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListConversationMessages(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getConversationMessageContext 返回目标消息及其前后上下文。
+func (s *Service) getConversationMessageContext(c *gin.Context) {
+	output, err := s.application.GetConversationMessageContext(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("messageID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getConversationNavigationState 返回群聊提及进度和最新可见消息。
+func (s *Service) getConversationNavigationState(c *gin.Context) {
+	output, err := s.application.GetConversationNavigationState(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listPendingConversationMentions 返回本轮待查看提及目标。
+func (s *Service) listPendingConversationMentions(c *gin.Context) {
+	output, err := s.application.ListPendingConversationMentions(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// markConversationMentionReviewed 连续确认群聊提及。
+func (s *Service) markConversationMentionReviewed(c *gin.Context) {
+	var input appservice.MarkConversationMentionReviewedInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.MarkConversationMentionReviewed(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

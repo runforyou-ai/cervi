@@ -27,6 +27,24 @@ export const resourceKeys = {
   /** 单个会话的初始消息页。 */
   conversationMessages: (conversationId?: string) =>
     itemKey("conversation-messages", conversationId),
+  /** 成员消息前后分页。 */
+  conversationMessagePage: (
+    conversationId: string,
+    parameters?: KeyParameters,
+  ) => scopedListKey("conversation-message-pages", conversationId, parameters),
+  /** 目标消息上下文。 */
+  conversationMessageContext: (conversationId: string, messageId?: string) =>
+    scopedListKey(
+      "conversation-message-context",
+      conversationId,
+      messageId ? { messageId } : undefined,
+    ),
+  /** 当前群聊的提及进度。 */
+  conversationNavigation: (conversationId: string) =>
+    itemKey("conversation-navigation", conversationId),
+  /** 开始一轮导航时读取的提及队列。 */
+  conversationMentions: (conversationId: string) =>
+    itemKey("conversation-mentions", conversationId),
   /** 发起内部会话时使用的成员候选项。 */
   memberOptions: () => ["member-options"],
   /** 单个群聊资料和当前成员。 */

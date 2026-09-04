@@ -931,6 +931,7 @@ function ConversationThread({
   replyDisabledReason: string | null
   onConversationChanged: () => void
 }) {
+  const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
   const outgoing = useOutgoingConversationMessages()
@@ -976,6 +977,7 @@ function ConversationThread({
   return (
     <>
       <ConversationTimeline
+        prepareSendRef={prepareSendRef}
         conversationID={conversation.id}
         conversationType={conversation.type}
         currentIdentityID={identity.user.identityId}
@@ -1007,6 +1009,7 @@ function ConversationThread({
         />
       ) : (
         <ConversationComposer
+          onBeforeSend={() => prepareSendRef.current?.() ?? Promise.resolve(true)}
           conversationID={conversation.id}
           conversationType={conversation.type}
           submitOnEnter
@@ -1223,29 +1226,6 @@ export function InboxPage({
     )
       ? selectedConversationSnapshot
       : selectedFromPool
-
-  /** 切入另一条内部会话时直接把当前最后消息标为已读。 */
-  useEffect(() => {
-    if (
-      !selectedConversation ||
-      (!isDirectInboxConversation(selectedConversation) &&
-        !isGroupInboxConversation(selectedConversation)) ||
-      !selectedConversation.lastMessageId ||
-      selectedConversation.unreadCount === 0
-    ) {
-      return
-    }
-    void markConversationRead(selectedConversation.id, {
-      lastReadMessageId: selectedConversation.lastMessageId,
-    })
-      .then(() => refreshConversationAfterMessage(selectedConversation))
-      .catch((error: unknown) =>
-        console.warn("进入会话时标记已读失败", {
-          conversationId: selectedConversation.id,
-          error,
-        }),
-      )
-  }, [selectedConversation?.id])
 
   /** 选中一个会话。 */
   function selectConversation(conversationId: string) {

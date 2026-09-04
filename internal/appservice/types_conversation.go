@@ -85,9 +85,10 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
-	ID     string                     `json:"id"`
-	Body   string                     `json:"body"`
-	Sender *ConversationMessageSender `json:"sender"`
+	Deleted bool                       `json:"deleted"`
+	ID      string                     `json:"id"`
+	Body    string                     `json:"body"`
+	Sender  *ConversationMessageSender `json:"sender"`
 }
 
 // ConversationMessageMention 定义消息提醒的聊天主体。
@@ -122,25 +123,28 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	ID           string                           `json:"id"`
-	Type         MessageType                      `json:"type"`
-	Body         string                           `json:"body"`
-	OriginatedAt time.Time                        `json:"originatedAt"`
-	SourceOrder  int64                            `json:"sourceOrder"`
-	CreatedAt    time.Time                        `json:"createdAt"`
-	Sender       *ConversationMessageSender       `json:"sender"`
-	SessionStart *ConversationMessageSessionStart `json:"sessionStart"`
-	SystemEvent  *ConversationSystemEvent         `json:"systemEvent"`
-	ReplyTo      *ConversationMessageReference    `json:"replyTo"`
-	Mentions     []ConversationMessageMention     `json:"mentions"`
-	MentionAll   bool                             `json:"mentionAll"`
+	ConversationSequence *string                          `json:"conversationSequence"`
+	ID                   string                           `json:"id"`
+	Type                 MessageType                      `json:"type"`
+	Body                 string                           `json:"body"`
+	OriginatedAt         time.Time                        `json:"originatedAt"`
+	SourceOrder          int64                            `json:"sourceOrder"`
+	CreatedAt            time.Time                        `json:"createdAt"`
+	Sender               *ConversationMessageSender       `json:"sender"`
+	SessionStart         *ConversationMessageSessionStart `json:"sessionStart"`
+	SystemEvent          *ConversationSystemEvent         `json:"systemEvent"`
+	ReplyTo              *ConversationMessageReference    `json:"replyTo"`
+	Mentions             []ConversationMessageMention     `json:"mentions"`
+	MentionAll           bool                             `json:"mentionAll"`
 }
 
 // ConversationMessageList 定义成员消息页。
 type ConversationMessageList struct {
-	Messages []ConversationMessage `json:"messages"`
-	Before   *string               `json:"before"`
-	After    *string               `json:"after"`
+	HasEarlier bool                  `json:"hasEarlier"`
+	HasLater   bool                  `json:"hasLater"`
+	Messages   []ConversationMessage `json:"messages"`
+	Before     *string               `json:"before"`
+	After      *string               `json:"after"`
 }
 
 // MarkConversationReadInput 定义用户确认已读的消息水位。
@@ -238,4 +242,40 @@ type ConversationNotificationSettingsInput struct {
 // ConversationNotificationSettings 定义当前用户保存后的会话提醒设置。
 type ConversationNotificationSettings struct {
 	Muted bool `json:"muted"`
+}
+
+// ConversationNavigationState 定义群聊可见尾端和提及查看进度。
+type ConversationNavigationState struct {
+	PendingMentionCount      int     `json:"pendingMentionCount"`
+	ReviewedThroughMessageID *string `json:"reviewedThroughMessageId"`
+	ReviewedThroughSequence  string  `json:"reviewedThroughSequence"`
+	LatestMessageID          *string `json:"latestMessageId"`
+	LatestSequence           string  `json:"latestSequence"`
+}
+
+// PendingConversationMentions 定义本轮固定提及目标及序号上界。
+type PendingConversationMentions struct {
+	MessageIDs         []string `json:"messageIds"`
+	LastTargetSequence *string  `json:"lastTargetSequence"`
+}
+
+// MarkConversationMentionReviewedInput 定义待确认的提及目标。
+type MarkConversationMentionReviewedInput struct {
+	MessageID string `json:"messageId"`
+}
+
+// ConversationMentionReviewOutcome 定义提及确认结果。
+type ConversationMentionReviewOutcome string
+
+const (
+	ConversationMentionReviewed        ConversationMentionReviewOutcome = "reviewed"
+	ConversationMentionAlreadyReviewed ConversationMentionReviewOutcome = "alreadyReviewed"
+	ConversationMentionUnavailable     ConversationMentionReviewOutcome = "unavailable"
+)
+
+// ConversationMentionReview 定义连续确认后的服务端水位。
+type ConversationMentionReview struct {
+	ReviewedThroughMessageID *string                          `json:"reviewedThroughMessageId"`
+	ReviewedThroughSequence  string                           `json:"reviewedThroughSequence"`
+	Outcome                  ConversationMentionReviewOutcome `json:"outcome"`
 }

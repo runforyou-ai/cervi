@@ -122,9 +122,10 @@ type ReceiveWebsiteCustomerTextMessageResult struct {
 
 // MessageCursorPoint 定义消息分页稳定边界。
 type MessageCursorPoint struct {
-	OriginatedAt time.Time
-	SourceOrder  int64
-	ID           string
+	ConversationSequence *int64
+	OriginatedAt         time.Time
+	SourceOrder          int64
+	ID                   string
 }
 
 // MessageHistoryInput 定义消息历史查询方向。
@@ -153,9 +154,10 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
-	ID     string
-	Body   string
-	Sender *ConversationMessageSender
+	Deleted bool
+	ID      string
+	Body    string
+	Sender  *ConversationMessageSender
 }
 
 // ConversationMessageMention 定义消息提醒的聊天主体。
@@ -190,32 +192,36 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	ID           string
-	Type         domain.MessageType
-	Body         string
-	OriginatedAt time.Time
-	SourceOrder  int64
-	CreatedAt    time.Time
-	Sender       *ConversationMessageSender
-	SessionStart *ConversationMessageSessionStart
-	SystemEvent  *ConversationSystemEvent
-	ReplyTo      *ConversationMessageReference
-	Mentions     []ConversationMessageMention
-	MentionAll   bool
+	ConversationSequence *int64
+	ID                   string
+	Type                 domain.MessageType
+	Body                 string
+	OriginatedAt         time.Time
+	SourceOrder          int64
+	CreatedAt            time.Time
+	Sender               *ConversationMessageSender
+	SessionStart         *ConversationMessageSessionStart
+	SystemEvent          *ConversationSystemEvent
+	ReplyTo              *ConversationMessageReference
+	Mentions             []ConversationMessageMention
+	MentionAll           bool
 }
 
 // ConversationMessageHistoryInput 定义成员消息历史查询方向。
 type ConversationMessageHistoryInput struct {
-	ConversationID string
-	Before         *MessageCursorPoint
-	After          *MessageCursorPoint
+	ConversationID  string
+	Before          *MessageCursorPoint
+	After           *MessageCursorPoint
+	AroundMessageID string
 }
 
 // ConversationMessageHistory 定义成员消息历史和下一页边界。
 type ConversationMessageHistory struct {
-	Messages []ConversationMessage
-	Before   *MessageCursorPoint
-	After    *MessageCursorPoint
+	HasEarlier bool
+	HasLater   bool
+	Messages   []ConversationMessage
+	Before     *MessageCursorPoint
+	After      *MessageCursorPoint
 }
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。

@@ -1,14 +1,7 @@
 /** 客服、单聊与群聊共用的成员消息时间线。 */
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -17,9 +10,8 @@ import {
   ConversationType,
   MessageType,
   ServiceSessionStatus,
-  listConversationMessages,
+  isApiError,
   type ConversationMessageData,
-  type ConversationMessageListData,
   type ConversationMessageReference,
   type ConversationSystemEvent,
   type ConversationSystemEventParticipant,
@@ -37,38 +29,20 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
 import { mentionTokenPattern } from "@/features/inbox/mention-token"
-import {
-  memberChatPollingInterval,
-  useMemberChatPollingActive,
-} from "@/features/inbox/use-member-chat-polling"
+import { useMemberChatPollingActive } from "@/features/inbox/use-member-chat-polling"
 import type {
   OutgoingConversationDraft,
   OutgoingConversationMessage,
 } from "@/features/inbox/use-outgoing-conversation-messages"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
-/** 按稳定消息顺序合并并去重时间线。 */
-function mergeMessages(
-  earlier: ConversationMessageData[],
-  current: ConversationMessageData[],
-) {
-  const messages = new Map<string, ConversationMessageData>()
-  for (const message of [...earlier, ...current]) {
-    messages.set(message.id, message)
-  }
-  return [...messages.values()].sort((left, right) => {
-    const timeDifference =
-      Date.parse(left.originatedAt) - Date.parse(right.originatedAt)
-    return (
-      timeDifference ||
-      left.sourceOrder - right.sourceOrder ||
-      left.id.localeCompare(right.id)
-    )
-  })
-}
+import { compareConversationMessages } from "./conversation-window"
+import { useConversationTimeline } from "./use-conversation-timeline"
+import { useConversationReading } from "./use-conversation-reading"
+import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
+import { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
+import { ConversationMentionNavigator } from "./conversation-mention-navigator"
 
 type TimelineMessage = Pick<
   ConversationMessageData,
@@ -77,6 +51,7 @@ type TimelineMessage = Pick<
   | "body"
   | "originatedAt"
   | "sourceOrder"
+  | "conversationSequence"
   | "sender"
   | "sessionStart"
   | "systemEvent"
@@ -89,16 +64,7 @@ type TimelineMessage = Pick<
   deliveryStatus: "sending" | "failed" | null
 }
 
-const timelineBottomThreshold = 48
 const timelineGroupInterval = 5 * 60 * 1000
-
-/** 判断时间线是否已经接近底部。 */
-function timelineNearBottom(viewport: HTMLElement) {
-  return (
-    viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <=
-    timelineBottomThreshold
-  )
-}
 
 /** 返回视觉分组使用的稳定发送者标识。 */
 function timelineSenderKey(
@@ -124,26 +90,26 @@ function mergeTimelineMessages(
       participant,
     ]),
   )
-  const saved = outgoing.flatMap((message) =>
-    message.saved ? [message.saved] : [],
-  )
-  const messages: TimelineMessage[] = mergeMessages(current, saved).map(
-    (message) => ({
-      ...message,
-      clientMessageID: null,
-      mentionSubjectIDs: [],
-      local: false,
-      deliveryStatus: null,
-    }),
-  )
+  const messages: TimelineMessage[] = current.map((message) => ({
+    ...message,
+    clientMessageID: null,
+    mentionSubjectIDs: [],
+    local: false,
+    deliveryStatus: null,
+  }))
   for (const message of outgoing) {
-    if (message.saved) continue
+    if (
+      message.saved &&
+      current.some((saved) => saved.id === message.saved?.id)
+    )
+      continue
     messages.push({
       id: `local:${message.clientMessageID}`,
       type: MessageType.MessageTypeText,
       body: message.body,
       originatedAt: message.originatedAt,
       sourceOrder: 0,
+      conversationSequence: null,
       sender: null,
       sessionStart: null,
       systemEvent: null,
@@ -167,19 +133,15 @@ function mergeTimelineMessages(
       deliveryStatus:
         message.status === "failed"
           ? "failed"
-          : message.showSending
+          : message.showSending && !message.saved
             ? "sending"
             : null,
     })
   }
+  // 服务端消息只来自连续窗口，尚未补入窗口的发送结果继续作为本地项目展示。
   return messages.sort((left, right) => {
-    const timeDifference =
-      Date.parse(left.originatedAt) - Date.parse(right.originatedAt)
-    return (
-      timeDifference ||
-      left.sourceOrder - right.sourceOrder ||
-      left.id.localeCompare(right.id)
-    )
+    if (left.local !== right.local) return left.local ? 1 : -1
+    return compareConversationMessages(left, right)
   })
 }
 
@@ -205,13 +167,6 @@ function renderMessageBody(message: TimelineMessage) {
   )
 }
 
-/** 返回时间线滚动视口。 */
-function timelineViewport(root: HTMLDivElement | null) {
-  return root?.querySelector<HTMLElement>(
-    '[data-slot="scroll-area-viewport"]',
-  )
-}
-
 /** 按 MM-DD HH:mm 格式显示用户时区中的消息时间。 */
 function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
   const parts = Object.fromEntries(
@@ -224,7 +179,7 @@ function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
 }
 
 /** 展示成员可见的会话历史和当前页面已发送消息。 */
-export function ConversationTimeline({
+function ConversationTimelineContent({
   conversationID,
   conversationType,
   currentIdentityID,
@@ -237,6 +192,7 @@ export function ConversationTimeline({
   groupParticipants,
   onReadMessage,
   readThroughMessageID,
+  prepareSendRef,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -250,87 +206,140 @@ export function ConversationTimeline({
   groupParticipants?: GroupParticipant[]
   onReadMessage?: (messageID: string) => void
   readThroughMessageID?: string | null
+  prepareSendRef?: RefObject<(() => Promise<boolean>) | null>
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
   const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
   const scrollRootRef = useRef<HTMLDivElement>(null)
-  const aliveRef = useRef(true)
-  const beforeRequestRef = useRef(0)
-  const pollingRequestRef = useRef(false)
-  const timelineRef = useRef<ConversationMessageListData | null>(null)
-  const initialScrollRef = useRef(true)
-  const prependScrollHeightRef = useRef<number | null>(null)
-  const handledPrependRevisionRef = useRef(0)
-  const previousSentCountRef = useRef(0)
-  const previousMessageCountRef = useRef(0)
-  const nearBottomRef = useRef(true)
-  const readMessageIDRef = useRef("")
-  const seenMessageIDsRef = useRef(new Set<string>())
-  const newMessageIDsRef = useRef(new Set<string>())
-  const readTimerRef = useRef<number | null>(null)
-  const pendingReadMessageIDRef = useRef("")
-  const [timeline, setTimeline] =
-    useState<ConversationMessageListData | null>(null)
-  const [loadingEarlier, setLoadingEarlier] = useState(false)
-  const [earlierError, setEarlierError] = useState(false)
-  const [pollingError, setPollingError] = useState(false)
-  const [newMessageCount, setNewMessageCount] = useState(0)
-  const [readingActive, setReadingActive] = useState(
-    () =>
-      document.visibilityState === "visible" &&
-      (!requireWindowFocus || document.hasFocus()),
-  )
-  const [prependRevision, setPrependRevision] = useState(0)
-  const { data, loading, error, refresh } = useResource(
-    resourceKeys.conversationMessages(conversationID),
-    (signal) => listConversationMessages(conversationID, undefined, signal),
-    { refetchOnWindowFocus: false },
-  )
-  const currentPage = timeline ?? data ?? null
+  const [, setSearchParams] = useSearchParams()
+  const timeline = useConversationTimeline(conversationID, pollingActive)
+  const currentPage = timeline.page
+  const { loading, error, refresh } = timeline
   const visibleMessages = mergeTimelineMessages(
     currentPage?.messages ?? [],
-    outgoingMessages,
+    timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
+  const reading = useConversationReading({
+    root: scrollRootRef,
+    page: currentPage,
+    mode: timeline.mode,
+    switching: timeline.switching,
+    readingActive: pollingActive,
+    identityID: currentIdentityID,
+    visibleCount: visibleMessages.length,
+    sentCount: outgoingMessages.length,
+    onReadMessage,
+    readThroughMessageID,
+  })
+  const location = useConversationMessageNavigation({
+    root: scrollRootRef,
+    page: currentPage,
+    readingActive: pollingActive,
+    openWindow: timeline.openWindow,
+    cancelWindowUpdate: timeline.cancelWindowUpdate,
+  })
 
-  /** 合并滚动期间连续产生的已读水位写入。 */
-  const queueReadMessage = useCallback(
-    (messageID: string, immediate = false) => {
-      pendingReadMessageIDRef.current = messageID
-      if (readTimerRef.current !== null) {
-        window.clearTimeout(readTimerRef.current)
-      }
-      const flush = () => {
-        readTimerRef.current = null
-        const pendingID = pendingReadMessageIDRef.current
-        pendingReadMessageIDRef.current = ""
-        if (pendingID) onReadMessage?.(pendingID)
-      }
-      if (immediate) flush()
-      else readTimerRef.current = window.setTimeout(flush, 250)
-    },
-    [onReadMessage],
-  )
+  /** 当前成员失去会话访问权时恢复到会话列表。 */
+  const handleUnavailable = useCallback(() => {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        next.delete("conversation")
+        return next
+      },
+      { replace: true },
+    )
+  }, [setSearchParams])
+  const mentions = useConversationMentionNavigation({
+    conversationID,
+    enabled: conversationType === ConversationType.ConversationTypeGroup,
+    pollingActive,
+    locate: location.locate,
+    cancel: location.cancel,
+    onUnavailable: handleUnavailable,
+  })
 
-  /** 将当前会话的本地已读水位推进到指定消息。 */
-  const markLatestRead = useCallback(
-    (messageID: string | undefined) => {
-      if (
-        !messageID ||
-        !onReadMessage ||
-        messageID === readMessageIDRef.current
-      ) {
-        return
-      }
-      readMessageIDRef.current = messageID
-      newMessageIDsRef.current.clear()
-      setNewMessageCount(0)
-      queueReadMessage(messageID, true)
-    },
-    [onReadMessage, queueReadMessage],
-  )
+  /** 读取最新窗口成功后结束本轮并恢复贴底。 */
+  const returnToLatest = useCallback(async () => {
+    mentions.pause()
+    try {
+      if (!(await timeline.openWindow())) return false
+      mentions.close()
+      reading.followLatest()
+      return true
+    } catch (error) {
+      if (isApiError(error) && error.reason === "conversation_unavailable")
+        handleUnavailable()
+      else if (!recoverSession(error, navigate))
+        toast.error(
+          error instanceof Error ? error.message : t("messagesLoadError"),
+        )
+      return false
+    }
+  }, [
+    mentions.pause,
+    mentions.close,
+    timeline.openWindow,
+    reading.followLatest,
+    handleUnavailable,
+    navigate,
+    t,
+  ])
+
+  useEffect(() => {
+    if (!prepareSendRef) return
+    prepareSendRef.current = () =>
+      timeline.mode === "latest" && !timeline.switching
+        ? Promise.resolve(true)
+        : returnToLatest()
+    return () => {
+      prepareSendRef.current = null
+    }
+  }, [prepareSendRef, returnToLatest, timeline.mode, timeline.switching])
+
+  /** 引用跳转暂停提及确认，失败保留原窗口。 */
+  async function followReference(messageID: string) {
+    mentions.pause()
+    try {
+      await location.locate(messageID)
+    } catch (error) {
+      if (isApiError(error) && error.reason === "message_unavailable") {
+        timeline.markReferenceUnavailable(messageID)
+        toast.message(t("messageOriginalDeleted"))
+      } else if (
+        isApiError(error) &&
+        error.reason === "conversation_unavailable"
+      )
+        handleUnavailable()
+      else if (!recoverSession(error, navigate))
+        toast.error(
+          error instanceof Error ? error.message : t("messagesLoadError"),
+        )
+    }
+  }
+
+  /** 加载相邻历史页并保持可见消息位置。 */
+  async function loadPage(direction: "before" | "after") {
+    reading.preservePosition()
+    try {
+      await timeline.loadPage(direction)
+    } catch (error) {
+      reading.cancelPreservedPosition()
+      if (isApiError(error) && error.reason === "conversation_unavailable")
+        handleUnavailable()
+      else if (!recoverSession(error, navigate))
+        toast.error(
+          t(
+            direction === "before"
+              ? "messagesLoadEarlierError"
+              : "messagesLoadLaterError",
+          ),
+        )
+    }
+  }
 
   /** 复制一条文本消息的正文。 */
   async function copyMessageText(body: string) {
@@ -402,9 +411,7 @@ export function ConversationTimeline({
     if (names.length === 2) {
       return names.join(t("groupSystemListPairSeparator"))
     }
-    const previousNames = names
-      .slice(0, -1)
-      .join(t("groupSystemListSeparator"))
+    const previousNames = names.slice(0, -1).join(t("groupSystemListSeparator"))
     return `${previousNames}${t("groupSystemListFinalSeparator")}${names[names.length - 1]}`
   }
 
@@ -445,338 +452,6 @@ export function ConversationTimeline({
         return t("groupSystemDissolved", { actor })
       default:
         return t("groupSystemUpdated")
-    }
-  }
-
-  useEffect(() => {
-    aliveRef.current = true
-    return () => {
-      aliveRef.current = false
-      beforeRequestRef.current += 1
-      if (readTimerRef.current !== null) {
-        window.clearTimeout(readTimerRef.current)
-      }
-    }
-  }, [])
-
-  /** 切换会话时清空上一条时间线及其已读水位。 */
-  useEffect(() => {
-    setTimeline(null)
-    timelineRef.current = null
-    readMessageIDRef.current = ""
-    seenMessageIDsRef.current.clear()
-    newMessageIDsRef.current.clear()
-    initialScrollRef.current = true
-    nearBottomRef.current = true
-    setNewMessageCount(0)
-  }, [conversationID])
-
-  useEffect(() => {
-    if (!readThroughMessageID || readMessageIDRef.current) return
-    readMessageIDRef.current = readThroughMessageID
-  }, [conversationID, readThroughMessageID])
-
-  useEffect(() => {
-    /** 根据页面和窗口状态更新已读门禁。 */
-    function syncReadingActive() {
-      setReadingActive(
-        document.visibilityState === "visible" &&
-          (!requireWindowFocus || document.hasFocus()),
-      )
-    }
-
-    document.addEventListener("visibilitychange", syncReadingActive)
-    window.addEventListener("focus", syncReadingActive)
-    window.addEventListener("blur", syncReadingActive)
-    return () => {
-      document.removeEventListener("visibilitychange", syncReadingActive)
-      window.removeEventListener("focus", syncReadingActive)
-      window.removeEventListener("blur", syncReadingActive)
-    }
-  }, [requireWindowFocus])
-
-  useEffect(() => {
-    if (!readingActive || !nearBottomRef.current) return
-    const messages = timelineRef.current?.messages ?? []
-    const latest = messages[messages.length - 1]
-    markLatestRead(latest?.id)
-  }, [markLatestRead, readingActive])
-
-  useEffect(() => {
-    if (!data) return
-    setTimeline((current) =>
-      current
-        ? {
-            messages: mergeMessages(current.messages, data.messages),
-            before: current.before,
-            after: current.after ?? data.after,
-          }
-        : data,
-    )
-  }, [data])
-
-  useEffect(() => {
-    timelineRef.current = timeline
-  }, [timeline])
-
-  /** 增量读取当前会话的新消息；空会话使用无游标最近页。 */
-  const pollMessages = useCallback(async () => {
-    const base = timelineRef.current
-    if (!base || pollingRequestRef.current) return
-    pollingRequestRef.current = true
-    const after = base.after
-    try {
-      const page = await listConversationMessages(
-        conversationID,
-        after ? { before: "", after } : undefined,
-      )
-      if (!aliveRef.current) return
-      setPollingError(false)
-      if (!nearBottomRef.current) {
-        for (const message of page.messages) {
-          if (
-            message.type === MessageType.MessageTypeSystem ||
-            message.sender?.sourceId !== currentIdentityID
-          ) {
-            newMessageIDsRef.current.add(message.id)
-          }
-        }
-        setNewMessageCount(newMessageIDsRef.current.size)
-      }
-      setTimeline((current) => {
-        if (!current || (after && current.after !== after)) return current
-        if (page.messages.length === 0) return current
-        const messages = mergeMessages(current.messages, page.messages)
-        const nextAfter =
-          page.after && page.after !== current.after
-            ? page.after
-            : current.after
-        if (
-          messages.length === current.messages.length &&
-          nextAfter === current.after
-        ) {
-          return current
-        }
-        return {
-          messages,
-          before: current.before ?? page.before,
-          after: nextAfter,
-        }
-      })
-    } catch (pollError) {
-      if (!aliveRef.current || recoverSession(pollError, navigate)) return
-      console.warn("轮询成员会话消息失败", {
-        conversationId: conversationID,
-        error: pollError,
-      })
-      setPollingError(true)
-    } finally {
-      pollingRequestRef.current = false
-    }
-  }, [conversationID, currentIdentityID, navigate])
-
-  const timelineReady = timeline !== null
-  useEffect(() => {
-    if (!pollingActive || !timelineReady) return
-    void pollMessages()
-    const timer = window.setInterval(
-      () => void pollMessages(),
-      memberChatPollingInterval,
-    )
-    return () => window.clearInterval(timer)
-  }, [pollMessages, pollingActive, timelineReady])
-
-  useEffect(() => {
-    const viewport = timelineViewport(scrollRootRef.current)
-    if (!viewport) return
-    const activeViewport: HTMLElement = viewport
-
-    /** 记录用户是否仍在查看时间线底部。 */
-    function syncBottomState() {
-      const nearBottom = timelineNearBottom(activeViewport)
-      nearBottomRef.current = nearBottom
-    }
-
-    activeViewport.addEventListener("scroll", syncBottomState, {
-      passive: true,
-    })
-    return () =>
-      activeViewport.removeEventListener("scroll", syncBottomState)
-  }, [conversationID])
-
-  useLayoutEffect(() => {
-    const viewport = timelineViewport(scrollRootRef.current)
-    if (!viewport) return
-    const activeViewport: HTMLElement = viewport
-    const messages = currentPage?.messages ?? []
-    const latestMessageID = messages[messages.length - 1]?.id
-
-    /** 保持时间线贴底并同步最新已读水位。 */
-    function followLatest() {
-      activeViewport.scrollTop = activeViewport.scrollHeight
-      nearBottomRef.current = true
-      if (readingActive) markLatestRead(latestMessageID)
-    }
-
-    const sentCountIncreased =
-      outgoingMessages.length > previousSentCountRef.current
-    const messageCountIncreased =
-      visibleMessages.length > previousMessageCountRef.current
-    const prependChanged =
-      prependRevision !== handledPrependRevisionRef.current
-    previousSentCountRef.current = outgoingMessages.length
-    previousMessageCountRef.current = visibleMessages.length
-    if (initialScrollRef.current && currentPage) {
-      initialScrollRef.current = false
-      followLatest()
-      return
-    }
-    if (prependChanged) {
-      handledPrependRevisionRef.current = prependRevision
-      const previousScrollHeight = prependScrollHeightRef.current
-      prependScrollHeightRef.current = null
-      if (!sentCountIncreased && previousScrollHeight !== null) {
-        viewport.scrollTop += viewport.scrollHeight - previousScrollHeight
-        return
-      }
-    }
-    if (sentCountIncreased) {
-      followLatest()
-      return
-    }
-    if (workspaceLayout && messageCountIncreased) {
-      if (nearBottomRef.current) {
-        followLatest()
-      } else {
-        setNewMessageCount(newMessageIDsRef.current.size)
-      }
-      return
-    }
-    if (workspaceLayout && nearBottomRef.current) {
-      followLatest()
-    }
-  }, [
-    currentPage,
-    markLatestRead,
-    outgoingMessages.length,
-    prependRevision,
-    readingActive,
-    visibleMessages.length,
-    workspaceLayout,
-  ])
-
-  /** 根据消息节点可见性连续推进已读水位。 */
-  useEffect(() => {
-    const viewport = timelineViewport(scrollRootRef.current)
-    const messages = currentPage?.messages ?? []
-    if (!viewport || !readingActive || !onReadMessage || messages.length === 0) {
-      return
-    }
-    const byID = new Map(messages.map((message) => [message.id, message]))
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const messageID = (entry.target as HTMLElement).dataset.messageId
-          const message = messageID ? byID.get(messageID) : undefined
-          if (!message || !entry.isIntersecting) continue
-          if (
-            message.type === MessageType.MessageTypeSystem ||
-            entry.intersectionRect.height >=
-              Math.min(entry.boundingClientRect.height * 0.5, 32)
-          ) {
-            seenMessageIDsRef.current.add(message.id)
-            newMessageIDsRef.current.delete(message.id)
-          }
-        }
-        setNewMessageCount(newMessageIDsRef.current.size)
-
-        const currentIndex = readMessageIDRef.current
-          ? messages.findIndex(
-              (message) => message.id === readMessageIDRef.current,
-            )
-          : -1
-        if (readMessageIDRef.current && currentIndex < 0) return
-        let nextReadID = readMessageIDRef.current
-        for (const message of messages.slice(currentIndex + 1)) {
-          const sentByCurrentUser =
-            message.sender?.sourceId === currentIdentityID
-          if (
-            !sentByCurrentUser &&
-            !seenMessageIDsRef.current.has(message.id)
-          ) {
-            break
-          }
-          nextReadID = message.id
-        }
-        if (!nextReadID || nextReadID === readMessageIDRef.current) return
-        readMessageIDRef.current = nextReadID
-        queueReadMessage(nextReadID)
-      },
-      { root: viewport, threshold: [0, 0.25, 0.5, 1] },
-    )
-    for (const node of viewport.querySelectorAll<HTMLElement>(
-      "[data-message-id]",
-    )) {
-      observer.observe(node)
-    }
-    return () => observer.disconnect()
-  }, [currentPage, currentIdentityID, onReadMessage, queueReadMessage, readingActive])
-
-  /** 滚动到最新消息。 */
-  function scrollToLatest() {
-    const viewport = timelineViewport(scrollRootRef.current)
-    if (!viewport) return
-    viewport.scrollTop = viewport.scrollHeight
-    nearBottomRef.current = true
-    newMessageIDsRef.current.clear()
-    setNewMessageCount(0)
-    const messages = currentPage?.messages ?? []
-    const latest = messages[messages.length - 1]
-    if (latest && onReadMessage) {
-      readMessageIDRef.current = latest.id
-      queueReadMessage(latest.id, true)
-    }
-  }
-
-  /** 加载并前插一页更早消息。 */
-  async function loadEarlier() {
-    const before = timelineRef.current?.before
-    if (!before || loadingEarlier) return
-    const request = beforeRequestRef.current + 1
-    beforeRequestRef.current = request
-    setLoadingEarlier(true)
-    setEarlierError(false)
-    try {
-      const earlierPage = await listConversationMessages(conversationID, {
-        before,
-        after: "",
-      })
-      if (!aliveRef.current || beforeRequestRef.current !== request) return
-      const base = timelineRef.current
-      if (!base || base.before !== before) return
-      const viewport = timelineViewport(scrollRootRef.current)
-      prependScrollHeightRef.current = viewport?.scrollHeight ?? null
-      setTimeline((current) => {
-        if (!current || current.before !== before) return current
-        return {
-          messages: mergeMessages(earlierPage.messages, current.messages),
-          before: earlierPage.before,
-          after: current.after,
-        }
-      })
-      setPrependRevision((current) => current + 1)
-    } catch (requestError) {
-      if (!aliveRef.current || beforeRequestRef.current !== request) return
-      if (recoverSession(requestError, navigate)) return
-      setEarlierError(true)
-      console.warn("加载更早会话消息失败", {
-        conversationId: conversationID,
-        error: requestError,
-      })
-    } finally {
-      if (aliveRef.current && beforeRequestRef.current === request) {
-        setLoadingEarlier(false)
-      }
     }
   }
 
@@ -839,14 +514,6 @@ export function ConversationTimeline({
     )
   }
 
-  if (visibleMessages.length === 0) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6 text-sm text-muted-foreground">
-        {t("messagesEmpty")}
-      </div>
-    )
-  }
-
   return (
     <div className="relative min-h-0 flex-1 bg-background">
       <ScrollArea
@@ -863,21 +530,23 @@ export function ConversationTimeline({
             workspaceLayout && "flex-1 justify-end",
           )}
         >
-          {currentPage?.before || earlierError ? (
+          {currentPage?.hasEarlier || timeline.pageError === "before" ? (
             <div className="flex items-center justify-center py-2">
-              {currentPage?.before ? (
+              {currentPage?.hasEarlier ? (
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={loadingEarlier}
-                  onClick={() => void loadEarlier()}
+                  disabled={
+                    Boolean(timeline.loadingDirection) || timeline.switching
+                  }
+                  onClick={() => void loadPage("before")}
                 >
-                  {loadingEarlier
+                  {timeline.loadingDirection === "before"
                     ? t("messagesLoadingEarlier")
                     : t("messagesLoadEarlier")}
                 </Button>
               ) : null}
-              {earlierError ? (
+              {timeline.pageError === "before" ? (
                 <span className="ml-2 text-xs text-destructive" role="status">
                   {t("messagesLoadEarlierError")}
                 </span>
@@ -885,6 +554,11 @@ export function ConversationTimeline({
             </div>
           ) : null}
 
+          {visibleMessages.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              {t("messagesEmpty")}
+            </div>
+          ) : null}
           <div className="flex flex-col">
             {visibleMessages.map((message, index) => {
               const previous = visibleMessages[index - 1]
@@ -905,8 +579,7 @@ export function ConversationTimeline({
                 : true
               const incoming = message.local
                 ? false
-                : conversationType !==
-                    ConversationType.ConversationTypeCustomer
+                : conversationType !== ConversationType.ConversationTypeCustomer
                   ? !message.sender ||
                     message.sender.sourceId !== currentIdentityID
                   : !message.sender ||
@@ -921,15 +594,13 @@ export function ConversationTimeline({
                 (message.local || sentByCurrentIdentity
                   ? t("messageSenderYou")
                   : message.sender?.displayName?.trim()) ||
-                (message.sender?.kind ===
-                ChatSubjectKind.ChatSubjectKindContact
+                (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
                   ? t("anonymousVisitor")
                   : t("unknownSender"))
               const senderInitial =
                 Array.from(senderName)[0]?.toLocaleUpperCase() ?? "?"
               const failedDraft =
-                message.deliveryStatus === "failed" &&
-                message.clientMessageID
+                message.deliveryStatus === "failed" && message.clientMessageID
                   ? {
                       clientMessageID: message.clientMessageID,
                       body: message.body,
@@ -944,10 +615,7 @@ export function ConversationTimeline({
                 : null
 
               return (
-                <div
-                  key={message.id}
-                  data-message-id={message.local ? undefined : message.id}
-                >
+                <div key={message.id}>
                   {startsDay ? (
                     <div className="my-3 flex items-center justify-center">
                       <time
@@ -981,6 +649,8 @@ export function ConversationTimeline({
                   {message.type === MessageType.MessageTypeSystem &&
                   systemEventText ? (
                     <div
+                      data-message-id={message.local ? undefined : message.id}
+                      tabIndex={-1}
                       className={cn(
                         "flex justify-center px-10 text-center",
                         index > 0 && "mt-3",
@@ -996,7 +666,11 @@ export function ConversationTimeline({
                   ) : (
                     <ContextMenu>
                       <article
+                        data-message-id={message.local ? undefined : message.id}
+                        tabIndex={-1}
                         className={cn(
+                          location.highlightedID === message.id &&
+                            "message-location-highlight",
                           "flex items-start gap-2",
                           index > 0 && (startsGroup ? "mt-3" : "mt-1"),
                           incoming ? "justify-start" : "justify-end",
@@ -1055,6 +729,7 @@ export function ConversationTimeline({
                                         id: message.id,
                                         body: message.body,
                                         sender: message.sender,
+                                        deleted: false,
                                       })
                                     }
                                   >
@@ -1076,28 +751,45 @@ export function ConversationTimeline({
                                   )}
                                 >
                                   {message.replyTo ? (
-                                    <div
+                                    <button
+                                      type="button"
+                                      disabled={message.replyTo.deleted}
+                                      onClick={() =>
+                                        void followReference(
+                                          message.replyTo!.id,
+                                        )
+                                      }
                                       className={cn(
-                                        "mb-1.5 border-l-2 pl-2 text-xs",
+                                        "mb-1.5 block w-full border-l-2 pl-2 text-left text-xs focus-visible:outline focus-visible:outline-2",
                                         incoming
                                           ? "border-primary text-muted-foreground"
                                           : "border-primary-foreground/60 text-primary-foreground/75",
                                       )}
+                                      aria-label={
+                                        message.replyTo.deleted
+                                          ? t("messageOriginalDeleted")
+                                          : t("messageGoToOriginal")
+                                      }
                                     >
-                                      <p className="font-medium">
-                                        {message.replyTo.sender?.displayName?.trim() ||
-                                          t("unknownSender")}
-                                      </p>
-                                      <p className="line-clamp-2 whitespace-pre-wrap">
-                                        {message.replyTo.body}
-                                      </p>
-                                    </div>
+                                      {message.replyTo.deleted ? (
+                                        t("messageOriginalDeleted")
+                                      ) : (
+                                        <>
+                                          <span className="block font-medium">
+                                            {message.replyTo.sender?.displayName?.trim() ||
+                                              t("unknownSender")}
+                                          </span>
+                                          <span className="line-clamp-2 whitespace-pre-wrap">
+                                            {message.replyTo.body}
+                                          </span>
+                                        </>
+                                      )}
+                                    </button>
                                   ) : null}
                                   <div
                                     className={cn(
                                       "min-w-0",
-                                      workspaceLayout &&
-                                        "flex items-end gap-2",
+                                      workspaceLayout && "flex items-end gap-2",
                                     )}
                                   >
                                     <span className="min-w-0 whitespace-pre-wrap">
@@ -1168,6 +860,7 @@ export function ConversationTimeline({
                                 id: message.id,
                                 body: message.body,
                                 sender: message.sender,
+                                deleted: false,
                               })
                             }
                           >
@@ -1186,27 +879,58 @@ export function ConversationTimeline({
               )
             })}
           </div>
+          {currentPage?.hasLater && timeline.mode === "anchor" ? (
+            <div className="flex justify-center py-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={
+                  Boolean(timeline.loadingDirection) || timeline.switching
+                }
+                onClick={() => void loadPage("after")}
+              >
+                {timeline.loadingDirection === "after"
+                  ? t("messagesLoadingLater")
+                  : t("messagesLoadLater")}
+              </Button>
+              {timeline.pageError === "after" ? (
+                <span className="ml-2 text-xs text-destructive" role="status">
+                  {t("messagesLoadLaterError")}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </ScrollArea>
-      {workspaceLayout && pollingError ? (
+      {workspaceLayout &&
+      timeline.pollingError &&
+      timeline.mode === "latest" ? (
         <button
           type="button"
           className="absolute top-2 left-1/2 z-10 min-h-8 -translate-x-1/2 rounded-full border bg-background/95 px-3 text-xs text-warning shadow-sm backdrop-blur"
-          onClick={() => void pollMessages()}
+          onClick={() => void timeline.poll()}
         >
           {t("messagesRefreshError")}
         </button>
       ) : null}
-      {workspaceLayout && newMessageCount > 0 ? (
-        <Button
-          type="button"
-          size="sm"
-          className="absolute right-4 bottom-3 z-10 rounded-full shadow-md"
-          onClick={scrollToLatest}
-        >
-          {t("messagesNew", { count: newMessageCount })}
-        </Button>
-      ) : null}
+      <ConversationMentionNavigator
+        navigation={mentions}
+        showLatest={
+          timeline.mode === "anchor" ||
+          !reading.atBottom ||
+          reading.newCount > 0
+        }
+        newCount={timeline.mode === "latest" ? reading.newCount : 0}
+        busy={timeline.switching}
+        onLatest={() => void returnToLatest()}
+      />
     </div>
   )
+}
+
+/** 切换会话时重新建立独立的窗口、定位和阅读状态。 */
+export function ConversationTimeline(
+  props: Parameters<typeof ConversationTimelineContent>[0],
+) {
+  return <ConversationTimelineContent key={props.conversationID} {...props} />
 }

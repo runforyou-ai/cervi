@@ -418,3 +418,19 @@ body,
     var(--sidebar-accent) 10px
   );
 }
+
+@keyframes message-location-highlight {
+  0%, 20% { background-color: color-mix(in oklch, var(--primary) 20%, transparent); }
+  100% { background-color: transparent; }
+}
+
+.message-location-highlight {
+  animation: message-location-highlight 2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-location-highlight {
+    animation: none;
+    background-color: color-mix(in oklch, var(--primary) 16%, transparent);
+  }
+}

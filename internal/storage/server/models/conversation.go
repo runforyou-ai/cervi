@@ -22,6 +22,7 @@ type Conversation struct {
 	Description            *string    `bun:"description"`
 	ImageFileID            *string    `bun:"image_file_id"`
 	CreatedBySubjectID     *string    `bun:"created_by_subject_id"`
+	MessageSequence        int64      `bun:"message_sequence"`
 	LastMessageID          *string    `bun:"last_message_id"`
 	LastMessageAt          *time.Time `bun:"last_message_at"`
 	LastMessageSourceOrder int64      `bun:"last_message_source_order"`

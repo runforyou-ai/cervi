@@ -1,5 +1,18 @@
 /** 美式英语·收件箱文案。 */
 const inbox = {
+  messagesLoadingLater: "Loading newer messages",
+  messagesLoadLaterError: "Unable to load newer messages",
+  messageOriginalDeleted: "Original message deleted",
+  messageGoToOriginal: "Go to original message",
+  mentionNavigation: "Mention navigation",
+  mentionPendingCount: "Review {{count}} mentions",
+  mentionPrevious: "Previous",
+  mentionNext: "Next",
+  mentionResume: "Continue reviewing",
+  mentionNavigationError: "Unable to review mentions. Try again.",
+  messagesBackToLatest: "Back to latest",
+  messagesLoadLater: "Load newer messages",
+
   searchLabel: "Search conversations",
   searchShortcut: "Search (Ctrl/⌘+K)",
   searchClear: "Clear search",
