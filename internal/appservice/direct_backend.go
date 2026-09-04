@@ -53,6 +53,7 @@ type DirectBackend struct {
 	listCustomerServiceAssignees      *inboxaction.ListCustomerServiceAssigneesQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	markConversationRead              *conversationaction.MarkConversationReadAction
+	updateConversationNotifications   *conversationaction.UpdateConversationNotificationSettingsAction
 	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
 	claimServiceSession               *conversationaction.ClaimServiceSessionAction
 	transferServiceSession            *conversationaction.TransferServiceSessionAction
@@ -160,14 +161,14 @@ type DirectBackend struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator, knowledgeSearch *knowledgebaseaction.SearchService) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
 	connectorClient := connectionClient
 	connectorRegistry := connector.NewRegistry(connectorClient)
 	difyKnowledgeDocuments := connector.NewDifyKnowledgeDocumentLister(connectorClient)
-	difyKnowledgeRetriever := connector.NewDifyKnowledgeRetriever(connectorClient)
+	difyKnowledgeBaseGetter := connector.NewDifyKnowledgeBaseGetter(connectorClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	return &DirectBackend{
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
@@ -179,6 +180,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		listCustomerServiceAssignees:      inboxaction.NewListCustomerServiceAssigneesQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		markConversationRead:              conversationaction.NewMarkConversationReadAction(db),
+		updateConversationNotifications:   conversationaction.NewUpdateConversationNotificationSettingsAction(db),
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
 		claimServiceSession:               conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),
 		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
@@ -231,8 +233,8 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, difyKnowledgeDocuments),
 		getKnowledgeDocument:              knowledgebaseaction.NewGetKnowledgeDocumentQuery(db, difyKnowledgeDocuments),
 		listKnowledgeDocumentSegments:     knowledgebaseaction.NewListKnowledgeDocumentSegmentsQuery(db, difyKnowledgeDocuments),
-		retrieveKnowledgeBase:             knowledgebaseaction.NewRetrieveKnowledgeBaseQuery(db, difyKnowledgeRetriever),
-		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
+		retrieveKnowledgeBase:             knowledgebaseaction.NewRetrieveKnowledgeBaseQuery(knowledgeSearch),
+		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db, difyKnowledgeBaseGetter),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),
 		deleteKnowledgeBase:               knowledgebaseaction.NewDeleteKnowledgeBaseAction(db),

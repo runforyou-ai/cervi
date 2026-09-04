@@ -15,13 +15,6 @@ CREATE TABLE telegram_channel_settings (
     webhook_connected_at  timestamptz
 );
 
-CREATE INDEX telegram_channel_settings_organization_channel_index
-    ON telegram_channel_settings (organization_id, channel_id);
-
-CREATE INDEX telegram_channel_settings_bot_id_index
-    ON telegram_channel_settings (bot_id)
-    WHERE bot_id IS NOT NULL;
-
 COMMENT ON TABLE telegram_channel_settings IS 'Telegram 渠道连接设置';
 COMMENT ON COLUMN telegram_channel_settings.channel_id IS '渠道编号';
 COMMENT ON COLUMN telegram_channel_settings.created_at IS '创建时间';

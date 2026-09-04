@@ -8,7 +8,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// DirectConversation 表示企业内部单聊的规范化身份对。
+// DirectConversation 表示内部单聊的规范化身份对。
 type DirectConversation struct {
 	bun.BaseModel `bun:"table:direct_conversations,alias:dc"`
 

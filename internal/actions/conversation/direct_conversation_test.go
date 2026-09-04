@@ -7,16 +7,14 @@ import (
 	"testing"
 )
 
-// TestDirectIdentityPairLockTextNormalizesDirection 验证双方发起使用同一稳定锁文本。
-func TestDirectIdentityPairLockTextNormalizesDirection(t *testing.T) {
-	organizationID := "0198ddee-c056-7bc5-a1d9-586f878ee966"
+// TestNormalizeDirectIdentityPair 验证双方发起得到同一规范化身份对。
+func TestNormalizeDirectIdentityPair(t *testing.T) {
 	firstIdentityID := "0198ddf0-a234-7f01-8d99-e3e0af0f5f65"
 	secondIdentityID := "0198ddf0-a234-7f01-8d99-e3e0af0f5f66"
-	forward := directIdentityPairLockText(organizationID, firstIdentityID, secondIdentityID)
-	reverse := directIdentityPairLockText(organizationID, secondIdentityID, firstIdentityID)
-	want := "cervi:direct:" + organizationID + ":" + firstIdentityID + ":" + secondIdentityID
-	if forward != want || reverse != want {
-		t.Fatalf("lock texts = %q and %q, want %q", forward, reverse, want)
+	forwardFirst, forwardSecond := normalizeDirectIdentityPair(firstIdentityID, secondIdentityID)
+	reverseFirst, reverseSecond := normalizeDirectIdentityPair(secondIdentityID, firstIdentityID)
+	if forwardFirst != firstIdentityID || forwardSecond != secondIdentityID || reverseFirst != firstIdentityID || reverseSecond != secondIdentityID {
+		t.Fatalf("normalized pairs = (%q, %q) and (%q, %q)", forwardFirst, forwardSecond, reverseFirst, reverseSecond)
 	}
 }
 

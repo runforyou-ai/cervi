@@ -212,8 +212,8 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 			}
 			// 新成员从本轮加入事件开始记录已读，离开期间的历史不形成未读。
 			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id)
-				SELECT u.organization_id, cv.id, u.id, cv.last_message_id
+				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id, last_read_at)
+				SELECT u.organization_id, cv.id, u.id, cv.last_message_id, now()
 				FROM users AS u
 				JOIN conversations AS cv ON cv.organization_id = u.organization_id AND cv.id = ?
 				WHERE u.organization_id = ? AND u.identity_id IN (?)
@@ -659,7 +659,7 @@ func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermod
 	}
 	state := &servermodels.ConversationUserState{
 		OrganizationID: identity.Organization.ID, ConversationID: conversationID,
-		UserID: identity.User.ID, LastReadMessageID: message.ID,
+		UserID: identity.User.ID, LastReadMessageID: &message.ID,
 	}
 	if err := advanceConversationUserReadState(ctx, db, state, message); err != nil {
 		return err

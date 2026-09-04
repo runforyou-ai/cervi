@@ -220,11 +220,7 @@ func (b *DirectBackend) RetrieveKnowledgeBase(
 		ctx,
 		identity,
 		knowledgeBaseID,
-		knowledgebaseaction.RetrievalInput{
-			Query: input.Query, Method: domain.KnowledgeRetrievalMethod(input.Method),
-			RerankingEnabled: input.RerankingEnabled, TopK: input.TopK,
-			ScoreThresholdEnabled: input.ScoreThresholdEnabled, ScoreThreshold: input.ScoreThreshold,
-		},
+		knowledgebaseaction.RetrievalInput{Query: input.Query},
 	)
 	if err != nil {
 		return KnowledgeRetrievalResult{}, b.knowledgeRetrievalError(
@@ -243,11 +239,6 @@ func (b *DirectBackend) RetrieveKnowledgeBase(
 	slog.Info("Dify 知识库检索成功",
 		"organization_id", identity.Organization.ID,
 		"knowledge_base_id", knowledgeBaseID,
-		"method", input.Method,
-		"reranking_enabled", input.RerankingEnabled,
-		"top_k", input.TopK,
-		"score_threshold_enabled", input.ScoreThresholdEnabled,
-		"score_threshold", input.ScoreThreshold,
 		"result_count", len(output),
 		"duration_ms", time.Since(startedAt).Milliseconds(),
 	)
@@ -422,11 +413,6 @@ func (b *DirectBackend) knowledgeRetrievalError(
 	return b.knowledgeRemoteReadError(
 		ctx, meta, err, cervii18n.ErrorKnowledgeRetrievalFailed,
 		organizationID, knowledgeBaseID, "", "Dify 知识库检索失败",
-		"method", input.Method,
-		"reranking_enabled", input.RerankingEnabled,
-		"top_k", input.TopK,
-		"score_threshold_enabled", input.ScoreThresholdEnabled,
-		"score_threshold", input.ScoreThreshold,
 		"duration_ms", duration.Milliseconds(),
 	)
 }
@@ -469,7 +455,7 @@ func (b *DirectBackend) knowledgeRemoteReadError(
 			connectiontest.FailureUnavailable:
 			return integrationConnectionRemoteError(meta, err)
 		default:
-			return FailedError(meta, failureKey)
+			return FailedError(meta, failureKey).WithReason(err.Error())
 		}
 	}
 	return b.knowledgeBaseError(ctx, meta, err, failureKey, organizationID, knowledgeBaseID)
@@ -477,11 +463,29 @@ func (b *DirectBackend) knowledgeRemoteReadError(
 
 // knowledgeBaseFromAction 转换知识库契约。
 func knowledgeBaseFromAction(record knowledgebaseaction.Record) KnowledgeBase {
+	var externalConfiguration *ExternalKnowledgeBaseConfiguration
+	if record.ExternalConfiguration != nil {
+		externalConfiguration = &ExternalKnowledgeBaseConfiguration{
+			IndexingTechnique:      record.ExternalConfiguration.IndexingTechnique,
+			DocumentCount:          record.ExternalConfiguration.DocumentCount,
+			WordCount:              record.ExternalConfiguration.WordCount,
+			EmbeddingModel:         record.ExternalConfiguration.EmbeddingModel,
+			EmbeddingModelProvider: record.ExternalConfiguration.EmbeddingModelProvider,
+			RetrievalMethod:        record.ExternalConfiguration.RetrievalMethod,
+			TopK:                   record.ExternalConfiguration.TopK,
+			ScoreThresholdEnabled:  record.ExternalConfiguration.ScoreThresholdEnabled,
+			ScoreThreshold:         record.ExternalConfiguration.ScoreThreshold,
+			RerankingEnabled:       record.ExternalConfiguration.RerankingEnabled,
+			RerankingModel:         record.ExternalConfiguration.RerankingModel,
+			RerankingProvider:      record.ExternalConfiguration.RerankingProvider,
+		}
+	}
 	return KnowledgeBase{
 		ID: record.ID, Name: record.Name, Category: KnowledgeBaseCategory(record.Category), Description: record.Description,
 		IntegrationConnectionID: record.IntegrationConnectionID, ExternalResourceID: record.ExternalResourceID,
-		Groups:    knowledgeGroupsFromAction(record.Groups),
-		CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
+		ExternalConfiguration: externalConfiguration,
+		Groups:                knowledgeGroupsFromAction(record.Groups),
+		CreatedAt:             record.CreatedAt, UpdatedAt: record.UpdatedAt,
 	}
 }
 
@@ -504,25 +508,22 @@ func knowledgeGroupsFromAction(records []knowledgebaseaction.GroupRecord) []Know
 // knowledgeBaseFieldKeys 把知识库校验错误码映射为本地化文案键。
 func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		knowledgebaseaction.ValidationNameRequired:                   cervii18n.FieldKnowledgeBaseNameRequired,
-		knowledgebaseaction.ValidationNameTooLong:                    cervii18n.FieldKnowledgeBaseNameTooLong,
-		knowledgebaseaction.ValidationNameDuplicate:                  cervii18n.FieldKnowledgeBaseNameDuplicate,
-		knowledgebaseaction.ValidationCategoryInvalid:                cervii18n.FieldKnowledgeBaseCategoryInvalid,
-		knowledgebaseaction.ValidationDescriptionTooLong:             cervii18n.FieldKnowledgeBaseDescriptionTooLong,
-		knowledgebaseaction.ValidationIntegrationConnectionInvalid:   cervii18n.FieldKnowledgeBaseIntegrationConnectionInvalid,
-		knowledgebaseaction.ValidationExternalResourceRequired:       cervii18n.FieldKnowledgeBaseExternalResourceRequired,
-		knowledgebaseaction.ValidationExternalResourceTooLong:        cervii18n.FieldKnowledgeBaseExternalResourceTooLong,
-		knowledgebaseaction.ValidationExternalResourceDuplicate:      cervii18n.FieldKnowledgeBaseExternalResourceDuplicate,
-		knowledgebaseaction.ValidationGroupNameRequired:              cervii18n.FieldKnowledgeGroupNameRequired,
-		knowledgebaseaction.ValidationGroupNameTooLong:               cervii18n.FieldKnowledgeGroupNameTooLong,
-		knowledgebaseaction.ValidationGroupNameDuplicate:             cervii18n.FieldKnowledgeGroupNameDuplicate,
-		knowledgebaseaction.ValidationGroupParentInvalid:             cervii18n.FieldKnowledgeGroupParentInvalid,
-		knowledgebaseaction.ValidationDocumentQueryInvalid:           cervii18n.FieldKnowledgeDocumentQueryInvalid,
-		knowledgebaseaction.ValidationRetrievalQueryRequired:         cervii18n.FieldKnowledgeRetrievalQueryRequired,
-		knowledgebaseaction.ValidationRetrievalQueryTooLong:          cervii18n.FieldKnowledgeRetrievalQueryTooLong,
-		knowledgebaseaction.ValidationRetrievalMethodInvalid:         cervii18n.FieldKnowledgeRetrievalMethodInvalid,
-		knowledgebaseaction.ValidationRetrievalTopKInvalid:           cervii18n.FieldKnowledgeRetrievalTopKInvalid,
-		knowledgebaseaction.ValidationRetrievalScoreThresholdInvalid: cervii18n.FieldKnowledgeRetrievalScoreThresholdInvalid,
+		knowledgebaseaction.ValidationNameRequired:                 cervii18n.FieldKnowledgeBaseNameRequired,
+		knowledgebaseaction.ValidationNameTooLong:                  cervii18n.FieldKnowledgeBaseNameTooLong,
+		knowledgebaseaction.ValidationNameDuplicate:                cervii18n.FieldKnowledgeBaseNameDuplicate,
+		knowledgebaseaction.ValidationCategoryInvalid:              cervii18n.FieldKnowledgeBaseCategoryInvalid,
+		knowledgebaseaction.ValidationDescriptionTooLong:           cervii18n.FieldKnowledgeBaseDescriptionTooLong,
+		knowledgebaseaction.ValidationIntegrationConnectionInvalid: cervii18n.FieldKnowledgeBaseIntegrationConnectionInvalid,
+		knowledgebaseaction.ValidationExternalResourceRequired:     cervii18n.FieldKnowledgeBaseExternalResourceRequired,
+		knowledgebaseaction.ValidationExternalResourceTooLong:      cervii18n.FieldKnowledgeBaseExternalResourceTooLong,
+		knowledgebaseaction.ValidationExternalResourceDuplicate:    cervii18n.FieldKnowledgeBaseExternalResourceDuplicate,
+		knowledgebaseaction.ValidationGroupNameRequired:            cervii18n.FieldKnowledgeGroupNameRequired,
+		knowledgebaseaction.ValidationGroupNameTooLong:             cervii18n.FieldKnowledgeGroupNameTooLong,
+		knowledgebaseaction.ValidationGroupNameDuplicate:           cervii18n.FieldKnowledgeGroupNameDuplicate,
+		knowledgebaseaction.ValidationGroupParentInvalid:           cervii18n.FieldKnowledgeGroupParentInvalid,
+		knowledgebaseaction.ValidationDocumentQueryInvalid:         cervii18n.FieldKnowledgeDocumentQueryInvalid,
+		knowledgebaseaction.ValidationRetrievalQueryRequired:       cervii18n.FieldKnowledgeRetrievalQueryRequired,
+		knowledgebaseaction.ValidationRetrievalQueryTooLong:        cervii18n.FieldKnowledgeRetrievalQueryTooLong,
 	}
 	return translateValidationFields(fields, keys)
 }

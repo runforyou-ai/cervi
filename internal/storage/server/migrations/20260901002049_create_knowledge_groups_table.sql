@@ -23,9 +23,6 @@ CREATE UNIQUE INDEX knowledge_groups_default_unique
     ON knowledge_groups (knowledge_base_id)
     WHERE is_default = true;
 
-CREATE INDEX knowledge_groups_tree_index
-    ON knowledge_groups (knowledge_base_id, parent_id, sort_order, id);
-
 COMMENT ON TABLE knowledge_groups IS '知识库分组';
 COMMENT ON COLUMN knowledge_groups.id IS '分组编号';
 COMMENT ON COLUMN knowledge_groups.created_at IS '创建时间';

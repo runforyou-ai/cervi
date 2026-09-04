@@ -17,10 +17,6 @@ CREATE UNIQUE INDEX conversation_agent_triggers_conversation_agent_seq_unique
 CREATE UNIQUE INDEX conversation_agent_triggers_conversation_agent_message_unique
     ON conversation_agent_triggers (conversation_id, agent_identity_id, trigger_message_id);
 
-CREATE INDEX conversation_agent_triggers_run_seq_index
-    ON conversation_agent_triggers (agent_run_id, trigger_seq)
-    WHERE agent_run_id IS NOT NULL;
-
 COMMENT ON TABLE conversation_agent_triggers IS '会话 Agent 用户输入触发记录';
 COMMENT ON COLUMN conversation_agent_triggers.id IS '触发记录编号';
 COMMENT ON COLUMN conversation_agent_triggers.created_at IS '创建时间';

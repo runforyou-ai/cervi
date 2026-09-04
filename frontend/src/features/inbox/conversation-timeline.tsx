@@ -1048,13 +1048,10 @@ export function ConversationTimeline({
                             ) : null}
                             <ContextMenuTrigger asChild>
                               <div className="group/message relative max-w-full">
-                                {!message.local && onReplyMessage ? (
+                                {incoming && onReplyMessage ? (
                                   <button
                                     type="button"
-                                    className={cn(
-                                        "pointer-events-none absolute top-0 z-10 rounded-md border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100",
-                                        incoming ? "left-full" : "right-full",
-                                    )}
+                                    className="pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                                     onClick={() =>
                                       onReplyMessage({
                                         id: message.id,
@@ -1071,7 +1068,7 @@ export function ConversationTimeline({
                                     "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
                                     incoming
                                       ? cn(
-                                          "border bg-background text-foreground shadow-xs",
+                                          "border bg-muted text-foreground shadow-xs",
                                           endsGroup && "rounded-bl-sm",
                                         )
                                       : cn(

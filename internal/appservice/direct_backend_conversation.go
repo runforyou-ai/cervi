@@ -347,7 +347,7 @@ func (b *DirectBackend) SendGroupTextMessage(ctx context.Context, meta RequestMe
 	}
 	message, err := b.sendGroupTextMessage.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body,
-		ReplyToMessageID: input.ReplyToMessageID, MentionSubjectIDs: input.MentionSubjectIDs,
+		ReplyToMessageID: input.ReplyToMessageID, MentionSubjectIDs: input.MentionSubjectIDs, MentionAll: input.MentionAll,
 	})
 	if err != nil {
 		return ConversationMessage{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "send")
@@ -418,6 +418,38 @@ func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMe
 	return ConversationReadState{LastReadMessageID: state.LastReadMessageID, LastReadAt: state.LastReadAt}, nil
 }
 
+// UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
+func (b *DirectBackend) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return ConversationNotificationSettings{}, err
+	}
+	settings, err := b.updateConversationNotifications.Execute(ctx, identity, conversationID, input.Muted)
+	if err != nil {
+		return ConversationNotificationSettings{}, conversationNotificationSettingsError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	slog.Info("会话提醒设置已保存", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "user_id", identity.User.ID, "muted", settings.Muted)
+	return ConversationNotificationSettings{Muted: settings.Muted}, nil
+}
+
+// conversationNotificationSettingsError 转换会话提醒设置更新错误。
+func conversationNotificationSettingsError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+	}
+	slog.Warn("更新会话提醒设置失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
+	return FailedError(meta, cervii18n.ErrorConversationNotifyUpdateFailed)
+}
+
 // conversationReadError 转换会话已读水位更新错误。
 func conversationReadError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
 	if ctx.Err() != nil {
@@ -479,7 +511,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt,
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
-		ReplyTo: replyTo, Mentions: mentions,
+		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
 	}
 }
 

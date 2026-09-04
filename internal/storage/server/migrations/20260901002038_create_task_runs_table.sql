@@ -22,16 +22,6 @@ CREATE TABLE task_runs (
     last_error          text
 );
 
-CREATE INDEX task_runs_status_available_index
-    ON task_runs (status, available_at, created_at);
-
-CREATE INDEX task_runs_action_created_index
-    ON task_runs (action_name, created_at DESC);
-
-CREATE INDEX task_runs_published_recovery_index
-    ON task_runs (published_at, created_at)
-    WHERE status IN ('published', 'running', 'retrying');
-
 CREATE UNIQUE INDEX task_runs_active_idempotency_unique
     ON task_runs (action_name, idempotency_key)
     WHERE idempotency_key IS NOT NULL

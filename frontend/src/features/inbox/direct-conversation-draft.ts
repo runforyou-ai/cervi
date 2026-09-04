@@ -16,6 +16,7 @@ export function createDirectConversationDraft(
     type: ConversationType.ConversationTypeDirect,
     unreadCount: 0,
     mentionedUnreadCount: 0,
+    muted: false,
     lastMessageId: null,
     lastReadMessageId: null,
     customer: null,

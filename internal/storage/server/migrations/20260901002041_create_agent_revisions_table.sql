@@ -11,9 +11,6 @@ CREATE TABLE agent_revisions (
     created_by_user_id  uuid NOT NULL
 );
 
-CREATE INDEX agent_revisions_organization_agent_index
-    ON agent_revisions (organization_id, agent_id, created_at DESC);
-
 COMMENT ON TABLE agent_revisions IS 'AI 员工不可变配置版本';
 COMMENT ON COLUMN agent_revisions.id IS '配置版本编号';
 COMMENT ON COLUMN agent_revisions.created_at IS '创建时间';

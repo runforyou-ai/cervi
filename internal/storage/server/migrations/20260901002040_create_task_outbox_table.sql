@@ -11,9 +11,6 @@ CREATE TABLE task_outbox (
     last_error          text
 );
 
-CREATE INDEX task_outbox_available_index
-    ON task_outbox (available_at, created_at);
-
 COMMENT ON TABLE task_outbox IS '等待可靠发布到 NATS 的任务消息';
 COMMENT ON COLUMN task_outbox.task_run_id IS '关联任务运行编号';
 COMMENT ON COLUMN task_outbox.created_at IS '创建时间';

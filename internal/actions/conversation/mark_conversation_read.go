@@ -66,19 +66,20 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 
 		state := &servermodels.ConversationUserState{
 			OrganizationID: identity.Organization.ID, ConversationID: conversationID,
-			UserID: identity.User.ID, LastReadMessageID: messageID,
+			UserID: identity.User.ID, LastReadMessageID: &messageID,
 		}
 		if err := advanceConversationUserReadState(ctx, tx, state, &target); err != nil {
 			return err
 		}
-		if err := tx.NewSelect().Model(state).
+		if err := tx.NewSelect().
+			TableExpr("conversation_user_states AS cus").
+			ColumnExpr("cus.last_read_message_id, cus.last_read_at").
 			Where("cus.organization_id = ?", identity.Organization.ID).
 			Where("cus.conversation_id = ?", conversationID).
 			Where("cus.user_id = ?", identity.User.ID).
-			Scan(ctx); err != nil {
+			Scan(ctx, &result); err != nil {
 			return fmt.Errorf("load current conversation read state: %w", err)
 		}
-		result = ConversationReadState{LastReadMessageID: state.LastReadMessageID, LastReadAt: state.LastReadAt}
 		return nil
 	})
 	if err != nil {
@@ -89,13 +90,15 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 
 // advanceConversationUserReadState 按消息稳定顺序单调推进用户已读水位。
 func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *servermodels.ConversationUserState, message *servermodels.Message) error {
+	readAt := time.Now().UTC()
+	state.LastReadAt = &readAt
 	if _, err := db.NewInsert().Model(state).
-		Column("organization_id", "conversation_id", "user_id", "last_read_message_id").
+		Column("organization_id", "conversation_id", "user_id", "last_read_message_id", "last_read_at").
 		On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
 		Set("last_read_message_id = EXCLUDED.last_read_message_id").
 		Set("last_read_at = now()").
 		Set("updated_at = now()").
-		Where(`EXISTS (
+		Where(`cus.last_read_message_id IS NULL OR EXISTS (
 			SELECT 1 FROM messages AS current_message
 			WHERE current_message.organization_id = cus.organization_id
 				AND current_message.conversation_id = cus.conversation_id

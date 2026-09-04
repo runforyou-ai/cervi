@@ -275,9 +275,8 @@ func TestDifyKnowledgeRetriever(t *testing.T) {
 		if authorization := request.Header.Get("Authorization"); authorization != "Bearer dataset-key" {
 			t.Fatalf("unexpected authorization header: %s", authorization)
 		}
-		if request.URL.Path == "/v1/datasets/dataset-1" && request.Method == http.MethodGet {
-			writer.Header().Set("Content-Type", "application/json")
-			_, _ = writer.Write([]byte(`{"indexing_technique":"economy","retrieval_model_dict":null}`))
+		if request.URL.Path == "/v1/datasets/dataset-1" {
+			_, _ = writer.Write([]byte(`{"retrieval_model_dict":{"search_method":"keyword_search","reranking_enable":false,"top_k":4,"score_threshold_enabled":false}}`))
 			return
 		}
 		if request.Method != http.MethodPost || request.URL.Path != "/v1/datasets/dataset-1/retrieve" {
@@ -291,17 +290,9 @@ func TestDifyKnowledgeRetriever(t *testing.T) {
 		if err := json.Unmarshal(body["query"], &query); err != nil || query != "如何安装？" || len(body) != 2 {
 			t.Fatalf("unexpected request body: %#v", body)
 		}
-		var retrievalModel struct {
-			SearchMethod          string  `json:"search_method"`
-			RerankingEnable       bool    `json:"reranking_enable"`
-			TopK                  int     `json:"top_k"`
-			ScoreThresholdEnabled bool    `json:"score_threshold_enabled"`
-			ScoreThreshold        float64 `json:"score_threshold"`
-		}
-		if err := json.Unmarshal(body["retrieval_model"], &retrievalModel); err != nil ||
-			retrievalModel.SearchMethod != "keyword_search" || !retrievalModel.RerankingEnable ||
-			retrievalModel.TopK != 6 || !retrievalModel.ScoreThresholdEnabled || retrievalModel.ScoreThreshold != 0.75 {
-			t.Fatalf("unexpected retrieval model: %#v", retrievalModel)
+		var retrievalModel map[string]any
+		if err := json.Unmarshal(body["retrieval_model"], &retrievalModel); err != nil || retrievalModel["search_method"] != "keyword_search" {
+			t.Fatalf("unexpected retrieval model: %#v, error: %v", retrievalModel, err)
 		}
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{
@@ -318,10 +309,7 @@ func TestDifyKnowledgeRetriever(t *testing.T) {
 		DifyKnowledgeBaseConfig{APIURL: server.URL + "/v1", APIKey: "dataset-key"},
 		"dataset-1",
 		"如何安装？",
-		domain.KnowledgeRetrievalOptions{
-			Method: domain.KnowledgeRetrievalMethodKeyword, RerankingEnabled: true,
-			TopK: 6, ScoreThresholdEnabled: true, ScoreThreshold: 0.75,
-		},
+		json.RawMessage(`{"search_method":"keyword_search","reranking_enable":false,"top_k":4,"score_threshold_enabled":false}`),
 	)
 	if err != nil {
 		t.Fatalf("retrieve knowledge base: %v", err)
@@ -334,39 +322,21 @@ func TestDifyKnowledgeRetriever(t *testing.T) {
 	}
 }
 
-// TestDifyKnowledgeRetrieverUsesConfiguredModel 验证检索沿用知识库现有配置。
+// TestDifyKnowledgeRetrieverUsesConfiguredModel 验证检索显式使用知识库现有配置。
 func TestDifyKnowledgeRetrieverUsesConfiguredModel(t *testing.T) {
 	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		if request.Method == http.MethodGet {
-			_, _ = writer.Write([]byte(`{
-				"indexing_technique":"high_quality",
-				"retrieval_model_dict":{
-					"search_method":"hybrid_search","reranking_enable":false,"top_k":7,"score_threshold_enabled":false,
-					"reranking_model":{"reranking_provider_name":"provider","reranking_model_name":"model"},
-					"weights":{"weight_type":"semantic_first"}
-				}
-			}`))
+			_, _ = writer.Write([]byte(`{"retrieval_model_dict":{"search_method":"semantic_search","reranking_enable":false,"top_k":8,"score_threshold_enabled":false}}`))
 			return
 		}
-		var body struct {
-			RetrievalModel struct {
-				SearchMethod          string         `json:"search_method"`
-				RerankingEnable       bool           `json:"reranking_enable"`
-				TopK                  int            `json:"top_k"`
-				ScoreThresholdEnabled bool           `json:"score_threshold_enabled"`
-				ScoreThreshold        float64        `json:"score_threshold"`
-				RerankingModel        map[string]any `json:"reranking_model"`
-				Weights               map[string]any `json:"weights"`
-			} `json:"retrieval_model"`
-		}
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil ||
-			body.RetrievalModel.SearchMethod != "semantic_search" || !body.RetrievalModel.RerankingEnable ||
-			body.RetrievalModel.TopK != 12 || !body.RetrievalModel.ScoreThresholdEnabled ||
-			body.RetrievalModel.ScoreThreshold != 0.4 ||
-			body.RetrievalModel.RerankingModel["reranking_model_name"] != "model" ||
-			body.RetrievalModel.Weights["weight_type"] != "semantic_first" {
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil || len(body) != 2 {
 			t.Fatalf("unexpected request body: %#v, error: %v", body, err)
+		}
+		var retrievalModel map[string]any
+		if err := json.Unmarshal(body["retrieval_model"], &retrievalModel); err != nil || retrievalModel["search_method"] != "semantic_search" || retrievalModel["top_k"] != float64(8) {
+			t.Fatalf("unexpected retrieval model: %#v, error: %v", retrievalModel, err)
 		}
 		_, _ = writer.Write([]byte(`{
 			"records":[{
@@ -381,12 +351,9 @@ func TestDifyKnowledgeRetrieverUsesConfiguredModel(t *testing.T) {
 		DifyKnowledgeBaseConfig{APIURL: server.URL, APIKey: "dataset-key"},
 		"dataset-1",
 		"测试",
-		domain.KnowledgeRetrievalOptions{
-			Method: domain.KnowledgeRetrievalMethodSemantic, RerankingEnabled: true,
-			TopK: 12, ScoreThresholdEnabled: true, ScoreThreshold: 0.4,
-		},
+		json.RawMessage(`{"search_method":"semantic_search","reranking_enable":false,"top_k":8,"score_threshold_enabled":false}`),
 	)
-	if err != nil || len(records) != 1 || records[0].Score == nil || *records[0].Score != 0 {
+	if err != nil || len(records) != 1 || records[0].Score != nil {
 		t.Fatalf("records = %#v, error = %v", records, err)
 	}
 }
@@ -396,20 +363,8 @@ func TestDifyKnowledgeRetrieverReportsInvalidField(t *testing.T) {
 	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		if request.Method == http.MethodGet {
-			_, _ = writer.Write([]byte(`{"indexing_technique":"high_quality","retrieval_model_dict":null}`))
+			_, _ = writer.Write([]byte(`{"retrieval_model_dict":{"search_method":"keyword_search","reranking_enable":false,"top_k":4,"score_threshold_enabled":false}}`))
 			return
-		}
-		var body map[string]json.RawMessage
-		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
-			t.Fatalf("decode request body: %v", err)
-		}
-		var model struct {
-			SearchMethod string `json:"search_method"`
-			TopK         int    `json:"top_k"`
-		}
-		if err := json.Unmarshal(body["retrieval_model"], &model); err != nil ||
-			model.SearchMethod != "keyword_search" || model.TopK != 4 {
-			t.Fatalf("unexpected retrieval model: %s", body["retrieval_model"])
 		}
 		_, _ = writer.Write([]byte(`{
 			"records":[{"segment":{"id":"segment-1","document_id":"document-1","content":"内容"},"score":0.8}]
@@ -421,9 +376,7 @@ func TestDifyKnowledgeRetrieverReportsInvalidField(t *testing.T) {
 		DifyKnowledgeBaseConfig{APIURL: server.URL, APIKey: "dataset-key"},
 		"dataset-1",
 		"测试",
-		domain.KnowledgeRetrievalOptions{
-			Method: domain.KnowledgeRetrievalMethodKeyword, TopK: 4, ScoreThreshold: 0.5,
-		},
+		json.RawMessage(`{"search_method":"keyword_search","reranking_enable":false,"top_k":4,"score_threshold_enabled":false}`),
 	)
 	_, kind, classified := connectiontest.Details(err)
 	if !classified || kind != connectiontest.FailureProtocol ||
@@ -432,27 +385,8 @@ func TestDifyKnowledgeRetrieverReportsInvalidField(t *testing.T) {
 	}
 }
 
-// TestDifyKnowledgeSearchMethod 验证统一检索方式完整映射到 Dify。
-func TestDifyKnowledgeSearchMethod(t *testing.T) {
-	tests := map[domain.KnowledgeRetrievalMethod]string{
-		domain.KnowledgeRetrievalMethodKeyword:  difyKnowledgeSearchMethodKeyword,
-		domain.KnowledgeRetrievalMethodSemantic: difyKnowledgeSearchMethodSemantic,
-		domain.KnowledgeRetrievalMethodFullText: difyKnowledgeSearchMethodFullText,
-		domain.KnowledgeRetrievalMethodHybrid:   difyKnowledgeSearchMethodHybrid,
-	}
-	for method, expected := range tests {
-		actual, valid := difyKnowledgeSearchMethod(method)
-		if !valid || actual != expected {
-			t.Fatalf("method %q: actual = %q, valid = %v", method, actual, valid)
-		}
-	}
-	if _, valid := difyKnowledgeSearchMethod("future"); valid {
-		t.Fatal("unsupported method should fail")
-	}
-}
-
-// TestDifyKnowledgeRetrieverRejectsEconomySemanticSearch 验证经济模式不会静默改写用户选择。
-func TestDifyKnowledgeRetrieverRejectsEconomySemanticSearch(t *testing.T) {
+// TestDifyKnowledgeRetrieverRejectsMissingRetrievalConfiguration 验证知识库详情缺少检索配置时返回协议错误。
+func TestDifyKnowledgeRetrieverRejectsMissingRetrievalConfiguration(t *testing.T) {
 	postCalled := false
 	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
@@ -462,17 +396,13 @@ func TestDifyKnowledgeRetrieverRejectsEconomySemanticSearch(t *testing.T) {
 		_, _ = writer.Write([]byte(`{"indexing_technique":"economy","retrieval_model_dict":null}`))
 	}))
 
-	_, err := NewDifyKnowledgeRetriever(server.Client()).Retrieve(
+	_, err := NewDifyKnowledgeBaseGetter(server.Client()).Get(
 		context.Background(),
 		DifyKnowledgeBaseConfig{APIURL: server.URL, APIKey: "dataset-key"},
 		"dataset-1",
-		"测试",
-		domain.KnowledgeRetrievalOptions{
-			Method: domain.KnowledgeRetrievalMethodSemantic, TopK: 4, ScoreThreshold: 0.5,
-		},
 	)
 	_, kind, classified := connectiontest.Details(err)
-	if !classified || kind != connectiontest.FailureInvalidConfig || postCalled {
+	if !classified || kind != connectiontest.FailureProtocol || postCalled {
 		t.Fatalf("error = %v, kind = %q, post called = %v", err, kind, postCalled)
 	}
 }

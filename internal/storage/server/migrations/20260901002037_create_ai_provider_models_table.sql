@@ -14,9 +14,6 @@ CREATE TABLE ai_provider_models (
     max_output_tokens  bigint NOT NULL
 );
 
-CREATE INDEX ai_provider_models_organization_provider_index
-    ON ai_provider_models (organization_id, provider_id);
-
 COMMENT ON TABLE ai_provider_models IS '模型服务供应商模型目录';
 COMMENT ON COLUMN ai_provider_models.provider_id IS '供应商编号';
 COMMENT ON COLUMN ai_provider_models.identifier IS '模型标识';

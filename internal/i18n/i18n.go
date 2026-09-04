@@ -159,6 +159,7 @@ const (
 	ErrorConversationNotFound             Key = "error.conversation_not_found"
 	ErrorConversationMessageListFailed    Key = "error.conversation_message_list_failed"
 	ErrorConversationReadUpdateFailed     Key = "error.conversation_read_update_failed"
+	ErrorConversationNotifyUpdateFailed   Key = "error.conversation_notification_update_failed"
 	ErrorCustomerMessageSendFailed        Key = "error.customer_message_send_failed"
 	ErrorCustomerMessageConflict          Key = "error.customer_message_conflict"
 	ErrorDirectTargetNotFound             Key = "error.direct_target_not_found"
@@ -365,9 +366,6 @@ const (
 	FieldKnowledgeDocumentQueryInvalid             Key = "field.knowledge_document_query_invalid"
 	FieldKnowledgeRetrievalQueryRequired           Key = "field.knowledge_retrieval_query_required"
 	FieldKnowledgeRetrievalQueryTooLong            Key = "field.knowledge_retrieval_query_too_long"
-	FieldKnowledgeRetrievalMethodInvalid           Key = "field.knowledge_retrieval_method_invalid"
-	FieldKnowledgeRetrievalTopKInvalid             Key = "field.knowledge_retrieval_top_k_invalid"
-	FieldKnowledgeRetrievalScoreThresholdInvalid   Key = "field.knowledge_retrieval_score_threshold_invalid"
 )
 
 //go:embed locales/*.json

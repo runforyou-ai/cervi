@@ -24,7 +24,7 @@ type ServiceSessionAgentRunCoordinator interface {
 	CancelRunContexts([]string)
 }
 
-// ClaimServiceSessionAction 领取或接管客户会话最新处理周期。
+// ClaimServiceSessionAction 领取或接管客户会话当前处理周期。
 type ClaimServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
@@ -222,7 +222,7 @@ func loadServiceSessionLastMessageSender(ctx context.Context, db bun.IDB, sessio
 	return kind, row.MessageID, nil
 }
 
-// CloseServiceSessionAction 关闭客户会话最新处理周期。
+// CloseServiceSessionAction 关闭客户会话当前处理周期。
 type CloseServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
@@ -307,7 +307,7 @@ func NewReopenServiceSessionAction(db *bun.DB) *ReopenServiceSessionAction {
 	return &ReopenServiceSessionAction{db: db}
 }
 
-// Execute 重新打开最新处理周期并分配给当前身份。
+// Execute 重新打开当前处理周期并分配给当前身份。
 func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID string) (ServiceSessionResult, error) {
 	conversationID, valid := common.NormalizeUUID(conversationID)
 	if !valid {
@@ -318,7 +318,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		session, err := lockLatestCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		session, err := lockCurrentCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
@@ -360,7 +360,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 
 // lockOpenServiceSession 锁定客户会话最新且未关闭的客服处理周期。
 func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	session, err := lockLatestCustomerServiceSession(ctx, db, organizationID, conversationID)
+	session, err := lockCurrentCustomerServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, err
 	}
@@ -370,12 +370,12 @@ func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, con
 	return session, nil
 }
 
-// lockLatestCustomerServiceSession 校验客户会话并锁定最新处理周期。
-func lockLatestCustomerServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
+// lockCurrentCustomerServiceSession 校验客户会话并锁定当前处理周期。
+func lockCurrentCustomerServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
 	if _, err := loadCustomerConversationForReply(ctx, db, organizationID, conversationID); err != nil {
 		return nil, err
 	}
-	session, err := lockLatestServiceSessionForReply(ctx, db, organizationID, conversationID)
+	session, err := lockCurrentServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, err
 	}

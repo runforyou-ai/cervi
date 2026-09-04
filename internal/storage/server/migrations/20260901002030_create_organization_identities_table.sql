@@ -13,15 +13,6 @@ CREATE TABLE organization_identities (
     work_status_updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX organization_identities_organization_type_index
-    ON organization_identities (organization_id, type);
-
-CREATE INDEX organization_identities_organization_name_index
-    ON organization_identities (organization_id, lower(display_name));
-
-CREATE INDEX organization_identities_organization_role_index
-    ON organization_identities (organization_id, role_id);
-
 COMMENT ON TABLE organization_identities IS '企业身份';
 COMMENT ON COLUMN organization_identities.id IS '身份编号';
 COMMENT ON COLUMN organization_identities.created_at IS '创建时间';

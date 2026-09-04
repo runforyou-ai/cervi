@@ -97,6 +97,14 @@ func (b *Backend) MarkConversationRead(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
+// UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
+func (b *Backend) UpdateConversationNotificationSettings(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationNotificationSettingsInput) (appservice.ConversationNotificationSettings, error) {
+	var output appservice.ConversationNotificationSettings
+	err := b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/notification-settings", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // SendCustomerTextMessage 发送客户会话文本消息。
 func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage

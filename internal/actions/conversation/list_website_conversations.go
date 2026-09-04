@@ -69,14 +69,14 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("msg.body AS preview").
-		ColumnExpr("latest.id AS service_session_id").
-		ColumnExpr("latest.status AS service_session_status").
+		ColumnExpr("current.id AS service_session_id").
+		ColumnExpr("current.status AS service_session_status").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
-		Join("JOIN LATERAL (SELECT ss.id, ss.status, ss.contact_channel_identity_id FROM service_sessions AS ss WHERE ss.organization_id = cv.organization_id AND ss.conversation_id = cv.id ORDER BY ss.sequence DESC LIMIT 1) AS latest ON TRUE").
+		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
 		Where("cc.organization_id = ?", channel.OrganizationID).
 		Where("cc.contact_channel_identity_id = ?", identity.ID).
-		Where("latest.contact_channel_identity_id = ?", identity.ID).
+		Where("current.contact_channel_identity_id = ?", identity.ID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer).
 		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
 		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").

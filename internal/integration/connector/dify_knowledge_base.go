@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"time"
 
@@ -28,6 +29,82 @@ type DifyKnowledgeBase struct {
 type DifyKnowledgeBaseConfig struct {
 	APIURL string
 	APIKey string
+}
+
+// DifyKnowledgeBaseRetrievalModel 定义 Dify 知识库检索配置。
+type DifyKnowledgeBaseRetrievalModel struct {
+	SearchMethod          string   `json:"search_method"`
+	TopK                  int      `json:"top_k"`
+	ScoreThresholdEnabled bool     `json:"score_threshold_enabled"`
+	ScoreThreshold        *float64 `json:"score_threshold"`
+	RerankingEnable       bool     `json:"reranking_enable"`
+	RerankingModel        struct {
+		Provider string `json:"reranking_provider_name"`
+		Name     string `json:"reranking_model_name"`
+	} `json:"reranking_model"`
+}
+
+// DifyKnowledgeBaseDetail 定义 Dify 返回的知识库配置。
+type DifyKnowledgeBaseDetail struct {
+	IndexingTechnique      string
+	DocumentCount          int
+	WordCount              int
+	EmbeddingModel         string
+	EmbeddingModelProvider string
+	RetrievalModel         DifyKnowledgeBaseRetrievalModel
+	RetrievalModelJSON     json.RawMessage
+}
+
+// DifyKnowledgeBaseGetter 读取 Dify 知识库详情。
+type DifyKnowledgeBaseGetter struct {
+	client connectiontest.HTTPDoer
+}
+
+// NewDifyKnowledgeBaseGetter 创建 Dify 知识库详情读取器。
+func NewDifyKnowledgeBaseGetter(client connectiontest.HTTPDoer) *DifyKnowledgeBaseGetter {
+	return &DifyKnowledgeBaseGetter{client: client}
+}
+
+// Get 返回 Dify 知识库完整配置。
+func (g *DifyKnowledgeBaseGetter) Get(ctx context.Context, config DifyKnowledgeBaseConfig, datasetID string) (DifyKnowledgeBaseDetail, error) {
+	ctx, cancel := context.WithTimeout(ctx, difyKnowledgeBaseTimeout)
+	defer cancel()
+	request, err := newRequest(config.APIURL, "datasets/"+url.PathEscape(datasetID), config.APIKey, "Authorization", "Bearer ")
+	if err != nil {
+		return DifyKnowledgeBaseDetail{}, err
+	}
+	var detail DifyKnowledgeBaseDetail
+	err = connectiontest.ReadHTTPResponse(ctx, g.client, request, func(body io.Reader) error {
+		var payload struct {
+			IndexingTechnique      string          `json:"indexing_technique"`
+			DocumentCount          int             `json:"document_count"`
+			WordCount              int             `json:"word_count"`
+			EmbeddingModel         string          `json:"embedding_model"`
+			EmbeddingModelProvider string          `json:"embedding_model_provider"`
+			RetrievalModel         json.RawMessage `json:"retrieval_model_dict"`
+		}
+		if err := json.NewDecoder(body).Decode(&payload); err != nil {
+			return fmt.Errorf("decode dify knowledge base response: %w", err)
+		}
+		if len(payload.RetrievalModel) == 0 || string(payload.RetrievalModel) == "null" {
+			return errors.New("dify knowledge base response does not contain retrieval_model_dict")
+		}
+		var retrievalModel DifyKnowledgeBaseRetrievalModel
+		if err := json.Unmarshal(payload.RetrievalModel, &retrievalModel); err != nil {
+			return fmt.Errorf("decode dify knowledge base retrieval model: %w", err)
+		}
+		detail = DifyKnowledgeBaseDetail{
+			IndexingTechnique: payload.IndexingTechnique, DocumentCount: payload.DocumentCount,
+			WordCount: payload.WordCount, EmbeddingModel: payload.EmbeddingModel,
+			EmbeddingModelProvider: payload.EmbeddingModelProvider,
+			RetrievalModel:         retrievalModel, RetrievalModelJSON: payload.RetrievalModel,
+		}
+		return nil
+	})
+	if err != nil {
+		return DifyKnowledgeBaseDetail{}, err
+	}
+	return detail, nil
 }
 
 // DifyKnowledgeBaseLister 读取 Dify 连接可访问的知识库。

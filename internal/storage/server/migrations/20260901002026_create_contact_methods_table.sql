@@ -13,12 +13,6 @@ CREATE TABLE contact_methods (
     is_primary        boolean NOT NULL DEFAULT false
 );
 
-CREATE INDEX contact_methods_organization_contact_index
-    ON contact_methods (organization_id, contact_id);
-
-CREATE INDEX contact_methods_organization_type_value_index
-    ON contact_methods (organization_id, type, normalized_value);
-
 CREATE UNIQUE INDEX contact_methods_contact_type_value_unique
     ON contact_methods (contact_id, type, normalized_value);
 

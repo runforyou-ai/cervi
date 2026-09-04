@@ -10,9 +10,6 @@ CREATE TABLE conversation_agent_states (
     processed_seq      bigint NOT NULL DEFAULT 0
 );
 
-CREATE INDEX conversation_agent_states_organization_agent_updated_index
-    ON conversation_agent_states (organization_id, agent_identity_id, updated_at DESC);
-
 COMMENT ON TABLE conversation_agent_states IS '会话 Agent 输入序号状态';
 COMMENT ON COLUMN conversation_agent_states.conversation_id IS '会话编号';
 COMMENT ON COLUMN conversation_agent_states.created_at IS '创建时间';

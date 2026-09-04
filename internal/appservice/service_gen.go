@@ -59,6 +59,11 @@ func (s *Service) MarkConversationRead(ctx context.Context, meta RequestMeta, co
 	return s.backend.MarkConversationRead(ctx, meta, conversationID, input)
 }
 
+// UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
+func (s *Service) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
+	return s.backend.UpdateConversationNotificationSettings(ctx, meta, conversationID, input)
+}
+
 // SendCustomerTextMessage 发送客户会话文本消息。
 func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
 	return s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input)

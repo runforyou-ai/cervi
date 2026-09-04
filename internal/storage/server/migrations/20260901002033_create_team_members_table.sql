@@ -12,9 +12,6 @@ CREATE TABLE team_members (
 CREATE UNIQUE INDEX team_members_organization_team_identity_unique
     ON team_members (organization_id, team_id, identity_id);
 
-CREATE INDEX team_members_organization_identity_index
-    ON team_members (organization_id, identity_id, team_id);
-
 COMMENT ON TABLE team_members IS '团队成员关系';
 COMMENT ON COLUMN team_members.id IS '关系编号';
 COMMENT ON COLUMN team_members.created_at IS '创建时间';
