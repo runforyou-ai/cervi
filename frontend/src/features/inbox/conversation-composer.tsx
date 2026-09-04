@@ -22,6 +22,7 @@ import {
   sendGroupTextMessage,
   type ConversationMessageData,
   type ConversationMessageReference,
+  type DirectTextMessageInput,
   type GroupParticipant,
 } from "@/api"
 import { Button } from "@/components/ui/button"
@@ -82,6 +83,7 @@ export function ConversationComposer({
   onSent,
   onFailed,
   onSucceeded,
+  sendDirectMessage,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -98,6 +100,9 @@ export function ConversationComposer({
   onSent: (clientMessageID: string, message: ConversationMessageData) => void
   onFailed: (clientMessageID: string) => void
   onSucceeded: () => void
+  sendDirectMessage?: (
+    input: DirectTextMessageInput,
+  ) => Promise<ConversationMessageData>
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -293,7 +298,9 @@ export function ConversationComposer({
       let message: ConversationMessageData
       switch (conversationType) {
         case ConversationType.ConversationTypeDirect:
-          message = await sendDirectTextMessage(conversationID, messageInput)
+          message = sendDirectMessage
+            ? await sendDirectMessage(messageInput)
+            : await sendDirectTextMessage(conversationID, messageInput)
           break
         case ConversationType.ConversationTypeGroup:
           message = await sendGroupTextMessage(conversationID, {

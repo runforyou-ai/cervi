@@ -237,6 +237,7 @@ export function ConversationTimeline({
   groupParticipants,
   onReadMessage,
   readThroughMessageID,
+  enabled = true,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -250,6 +251,7 @@ export function ConversationTimeline({
   groupParticipants?: GroupParticipant[]
   onReadMessage?: (messageID: string) => void
   readThroughMessageID?: string | null
+  enabled?: boolean
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -286,7 +288,7 @@ export function ConversationTimeline({
   const { data, loading, error, refresh } = useResource(
     resourceKeys.conversationMessages(conversationID),
     (signal) => listConversationMessages(conversationID, undefined, signal),
-    { refetchOnWindowFocus: false },
+    { enabled, refetchOnWindowFocus: false },
   )
   const currentPage = timeline ?? data ?? null
   const visibleMessages = mergeTimelineMessages(

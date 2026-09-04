@@ -27,6 +27,7 @@ import {
   getGroupConversation,
   listCustomerServiceAssignees,
   markConversationRead,
+  sendFirstDirectTextMessage,
   type ConversationMessageReference,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
@@ -35,6 +36,7 @@ import {
   type InboxAssignee,
   type InboxConversation,
   type LoadInboxQuery,
+  type MemberOption,
 } from "@/api"
 import { PageSplit } from "@/components/page-split"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -74,7 +76,11 @@ import {
 } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
-import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
+import {
+  createDirectConversationDraft,
+  isDirectConversationDraftID,
+} from "@/features/inbox/direct-conversation-draft"
+import { DirectConversationPickerDialog } from "@/features/inbox/direct-conversation-picker-dialog"
 import {
   useOutgoingConversationMessages,
   type OutgoingConversationDraft,
@@ -86,6 +92,7 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
+import { resourceClient } from "@/lib/resource-client"
 
 type InternalInboxConversationData =
   | DirectInboxConversationData
@@ -779,6 +786,7 @@ function ConversationMain({
   onSessionMoved,
   onConversationChanged,
   onGroupLeft,
+  onDirectStarted,
   narrowViewport = false,
 }: {
   conversation: InboxConversation
@@ -795,6 +803,7 @@ function ConversationMain({
       | GroupInboxConversationData,
   ) => void
   onGroupLeft: (conversationID: string) => void
+  onDirectStarted: (conversation: DirectInboxConversationData) => void
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation("inbox")
@@ -892,6 +901,7 @@ function ConversationMain({
           onConversationChanged={() =>
             onConversationChanged(validConversation)
           }
+          onDirectStarted={onDirectStarted}
         />
       </div>
       <ConversationContextPane
@@ -923,6 +933,7 @@ function ConversationThread({
   conversation,
   replyDisabledReason,
   onConversationChanged,
+  onDirectStarted,
 }: {
   conversation:
     | CustomerInboxConversationData
@@ -930,6 +941,7 @@ function ConversationThread({
     | GroupInboxConversationData
   replyDisabledReason: string | null
   onConversationChanged: () => void
+  onDirectStarted: (conversation: DirectInboxConversationData) => void
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
@@ -949,6 +961,9 @@ function ConversationThread({
   const groupConversation = isGroupInboxConversation(conversation)
     ? conversation
     : null
+  const directDraft =
+    isDirectInboxConversation(conversation) &&
+    isDirectConversationDraftID(conversation.id)
   const groupResource = useResource(
     resourceKeys.groupConversation(groupConversation?.id ?? ""),
     () => getGroupConversation(groupConversation?.id ?? ""),
@@ -999,6 +1014,7 @@ function ConversationThread({
             ? undefined
             : conversation.lastReadMessageId
         }
+        enabled={!directDraft}
       />
       {!replySupported || replyDisabledReason ? (
         <ConversationComposerUnavailable
@@ -1022,6 +1038,22 @@ function ConversationThread({
           onSent={outgoing.succeed}
           onFailed={outgoing.fail}
           onSucceeded={onConversationChanged}
+          sendDirectMessage={
+            directDraft && isDirectInboxConversation(conversation)
+              ? async (input) => {
+                  const result = await sendFirstDirectTextMessage({
+                    targetIdentityId: conversation.direct.peerIdentityId,
+                    ...input,
+                  })
+                  resourceClient.setQueryData(
+                    resourceKeys.conversationMessages(result.conversation.id),
+                    { messages: [result.message], before: null, after: null },
+                  )
+                  onDirectStarted(result.conversation)
+                  return result.message
+                }
+              : undefined
+          }
         />
       )}
     </>
@@ -1132,9 +1164,12 @@ export function InboxPage({
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const visibleConversations = useMemo(() => {
     if (!normalizedQuery) {
-      return scopedConversations
+      return scopedConversations.filter(
+        (conversation) => !isDirectConversationDraftID(conversation.id),
+      )
     }
     return scopedConversations.filter((conversation) => {
+      if (isDirectConversationDraftID(conversation.id)) return false
       const values = isCustomerInboxConversation(conversation)
         ? [
             conversationName(conversation),
@@ -1188,7 +1223,11 @@ export function InboxPage({
     })
   }, [conversations])
 
-  const selectedPool = listLoading ? allConversations : scopedConversations
+  const selectedPool = (listLoading ? allConversations : scopedConversations).filter(
+    (conversation) =>
+      !isDirectConversationDraftID(conversation.id) ||
+      conversation.id === selectedConversationId,
+  )
   const selectedFromPool =
     selectedPool.find(
       (conversation) => conversation.id === selectedConversationId,
@@ -1206,7 +1245,9 @@ export function InboxPage({
     ) {
       return
     }
-    const nextConversationID = scopedConversations[0]?.id ?? ""
+    const nextConversationID = scopedConversations.find(
+      (conversation) => !isDirectConversationDraftID(conversation.id),
+    )?.id ?? ""
     if (nextConversationID === selectedConversationId) return
     setSelectedConversationSnapshot(null)
     onSelectedConversationChange(nextConversationID, true)
@@ -1318,7 +1359,11 @@ export function InboxPage({
   ) {
     setStartedConversations((current) => [
       conversation,
-      ...current.filter((item) => item.id !== conversation.id),
+      ...current.filter(
+        (item) =>
+          item.id !== conversation.id &&
+          !isDirectConversationDraftID(item.id),
+      ),
     ])
     const destination = inboxQuery(InboxScope.InboxScopeInternal)
     refreshAffectedInboxQueries(
@@ -1326,6 +1371,33 @@ export function InboxPage({
       destination,
       conversation.id,
     )
+    setIsNarrowDetailOpen(isNarrowViewport)
+  }
+
+  /** 在主区打开不持久化的单聊草稿。 */
+  function showDirectDraft(member: MemberOption) {
+    const existing = validConversations.find(
+      (conversation) =>
+        isDirectInboxConversation(conversation) &&
+        conversation.direct.peerIdentityId === member.id,
+    )
+    if (existing) {
+      onQueryChange({
+        scope: InboxScope.InboxScopeInternal,
+        conversationId: existing.id,
+      })
+      setIsNarrowDetailOpen(isNarrowViewport)
+      return
+    }
+    const conversation = createDirectConversationDraft(member)
+    setStartedConversations((current) => [
+      conversation,
+      ...current.filter((item) => !isDirectConversationDraftID(item.id)),
+    ])
+    onQueryChange({
+      scope: InboxScope.InboxScopeInternal,
+      conversationId: conversation.id,
+    })
     setIsNarrowDetailOpen(isNarrowViewport)
   }
 
@@ -1490,7 +1562,7 @@ export function InboxPage({
           ) : null}
           <InboxConversationList
             conversations={visibleConversations}
-            hasAnyConversation={scopedConversations.length > 0}
+            hasAnyConversation={visibleConversations.length > 0}
             loading={listLoading}
             selectedId={selectedConversationId}
             onSelect={selectConversation}
@@ -1517,6 +1589,7 @@ export function InboxPage({
               onSessionMoved={showMovedCustomerConversation}
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
+              onDirectStarted={showStartedConversation}
             />
           </section>
         ) : (
@@ -1552,17 +1625,18 @@ export function InboxPage({
               onSessionMoved={showMovedCustomerConversation}
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
+              onDirectStarted={showStartedConversation}
               narrowViewport
             />
           </SheetContent>
         </Sheet>
       ) : null}
 
-      <StartDirectConversationDialog
+      <DirectConversationPickerDialog
         open={directDialogOpen}
         currentIdentityID={identity.user.identityId}
         onOpenChange={setDirectDialogOpen}
-        onStarted={showStartedConversation}
+        onSelected={showDirectDraft}
       />
       <CreateGroupConversationDialog
         open={groupDialogOpen}

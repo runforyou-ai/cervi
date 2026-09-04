@@ -27,9 +27,10 @@ var directMessageRetryableConstraintNames = map[string]struct{}{
 	"messages_organization_idempotency_unique": {},
 }
 
-// StartDirectConversationAction 发起或打开企业成员内部单聊。
-type StartDirectConversationAction struct {
-	db *bun.DB
+// SendFirstDirectTextMessageAction 发送首条单聊消息并按需创建长期会话。
+type SendFirstDirectTextMessageAction struct {
+	db             *bun.DB
+	agentScheduler DirectAgentMessageScheduler
 }
 
 // SendDirectTextMessageAction 持久化企业成员内部单聊文本消息。
@@ -72,9 +73,9 @@ type directSendContextRow struct {
 	PeerRevisionID *string                         `bun:"peer_revision_id"`
 }
 
-// NewStartDirectConversationAction 创建内部单聊发起操作。
-func NewStartDirectConversationAction(db *bun.DB) *StartDirectConversationAction {
-	return &StartDirectConversationAction{db: db}
+// NewSendFirstDirectTextMessageAction 创建首条单聊消息发送操作。
+func NewSendFirstDirectTextMessageAction(db *bun.DB, agentScheduler DirectAgentMessageScheduler) *SendFirstDirectTextMessageAction {
+	return &SendFirstDirectTextMessageAction{db: db, agentScheduler: agentScheduler}
 }
 
 // NewSendDirectTextMessageAction 创建内部单聊发送操作。
@@ -82,20 +83,32 @@ func NewSendDirectTextMessageAction(db *bun.DB, agentScheduler DirectAgentMessag
 	return &SendDirectTextMessageAction{db: db, agentScheduler: agentScheduler}
 }
 
-// Execute 发起或打开当前成员与目标成员的长期单聊。
-func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, input DirectConversationInput) (DirectConversationSummary, error) {
+// Execute 发送首条单聊消息并按需创建当前成员与目标成员的长期单聊。
+func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error) {
 	targetIdentityID, valid := common.NormalizeUUID(input.TargetIdentityID)
+	clientMessageID, clientMessageIDValid := common.NormalizeUUID(input.ClientMessageID)
+	body := strings.TrimSpace(input.Body)
+	fields := map[string]ValidationCode{}
 	if !valid {
-		return DirectConversationSummary{}, &ValidationError{Fields: map[string]ValidationCode{
-			"targetIdentityId": ValidationTargetIdentityIDInvalid,
-		}}
+		fields["targetIdentityId"] = ValidationTargetIdentityIDInvalid
+	}
+	if !clientMessageIDValid {
+		fields["clientMessageId"] = ValidationClientMessageIDInvalid
+	}
+	if body == "" {
+		fields["body"] = ValidationBodyRequired
+	} else if utf8.RuneCountInString(body) > 4000 {
+		fields["body"] = ValidationBodyTooLong
+	}
+	if len(fields) > 0 {
+		return FirstDirectTextMessageResult{}, &ValidationError{Fields: fields}
 	}
 	if targetIdentityID == identity.OrganizationIdentity.ID {
-		return DirectConversationSummary{}, ErrDirectTargetNotFound
+		return FirstDirectTextMessageResult{}, ErrDirectTargetNotFound
 	}
 	target, err := loadDirectTarget(ctx, a.db, identity.Organization.ID, targetIdentityID)
 	if err != nil {
-		return DirectConversationSummary{}, err
+		return FirstDirectTextMessageResult{}, err
 	}
 	// 预生成单聊创建事务使用的 UUIDv7。
 	values := make([]string, 5)
@@ -108,7 +121,7 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 	}
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
-		var result DirectConversationSummary
+		var result FirstDirectTextMessageResult
 		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 				return err
@@ -128,12 +141,12 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 			if err != nil {
 				return err
 			}
-			conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, currentSubject.ID, targetSubject.ID)
+			conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, target.IdentityID)
 			if err != nil {
 				return err
 			}
 			if conversation == nil {
-				conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, currentSubject.ID, targetSubject.ID, ids)
+				conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, target.IdentityID, currentSubject.ID, targetSubject.ID, ids)
 				if err != nil {
 					return err
 				}
@@ -150,23 +163,35 @@ func (a *StartDirectConversationAction) Execute(ctx context.Context, identity *s
 			} else if conversation.Status != string(domain.ConversationStatusActive) {
 				return ErrDataInvariant
 			}
-			result, err = loadDirectConversationSummary(ctx, tx, identity.Organization.ID, conversation.ID, target)
-			return err
+			message, err := sendDirectTextMessage(ctx, tx, identity, DirectTextMessageInput{
+				ConversationID: conversation.ID, ClientMessageID: clientMessageID, Body: body,
+			}, a.agentScheduler)
+			if err != nil {
+				return err
+			}
+			summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, conversation.ID, target)
+			if err != nil {
+				return err
+			}
+			result = FirstDirectTextMessageResult{Conversation: summary, Message: message}
+			return nil
 		})
 		if err == nil {
 			return result, nil
 		}
 		constraint, retryable := retryableUniqueViolation(err, map[string]struct{}{
 			"chat_subjects_organization_kind_source_unique": {},
+			"direct_conversations_org_identity_pair_unique": {},
+			"messages_organization_idempotency_unique":      {},
 		})
 		if !retryable {
-			return DirectConversationSummary{}, err
+			return FirstDirectTextMessageResult{}, err
 		}
 		if attempt < maxWriteAttempts-1 {
-			slog.Info("内部单聊发起重试", "target_identity_id", targetIdentityID, "attempt", attempt+2, "constraint", constraint)
+			slog.Info("内部单聊首条消息写入重试", "target_identity_id", targetIdentityID, "attempt", attempt+2, "constraint", constraint)
 		}
 	}
-	return DirectConversationSummary{}, fmt.Errorf("start direct conversation retries exhausted: %w", err)
+	return FirstDirectTextMessageResult{}, fmt.Errorf("send first direct text message retries exhausted: %w", err)
 }
 
 // Execute 在可重试事务中写入内部单聊文本消息。
@@ -175,9 +200,6 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
-	messageID := uuid.NewV7()
-	originatedAt := time.Now().UTC()
-	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + normalized.ClientMessageID
 	var err error
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
@@ -186,49 +208,9 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 				return err
 			}
-			sendContext, err := loadDirectSendContext(ctx, tx, identity, normalized.ConversationID)
-			if err != nil {
-				return err
-			}
-			if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, normalized.ConversationID, normalized.Body, idempotencyKey, false); err != nil || found {
-				result = saved
-				return err
-			}
-			message := &servermodels.Message{
-				ID: messageID.String(), OrganizationID: identity.Organization.ID,
-				ConversationID: normalized.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
-				Type: string(domain.MessageTypeText), Body: normalized.Body,
-				IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
-			}
-			if _, err := tx.NewInsert().Model(message).
-				Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
-				Returning("*").
-				Exec(ctx); err != nil {
-				return fmt.Errorf("create direct text message: %w", err)
-			}
-			if sendContext.PeerType == domain.OrganizationIdentityTypeAgent {
-				if a.agentScheduler == nil || sendContext.PeerIdentityID == "" || sendContext.PeerRevisionID == nil {
-					return ErrDataInvariant
-				}
-				if err := a.agentScheduler.Schedule(
-					ctx, tx, identity.Organization.ID, normalized.ConversationID,
-					sendContext.PeerIdentityID, *sendContext.PeerRevisionID, message.ID,
-				); err != nil {
-					return fmt.Errorf("schedule agent direct message: %w", err)
-				}
-			}
-			conversation := &servermodels.Conversation{ID: normalized.ConversationID, OrganizationID: identity.Organization.ID}
-			if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
-				return err
-			}
-			if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
-				OrganizationID: identity.Organization.ID, ConversationID: normalized.ConversationID,
-				UserID: identity.User.ID, LastReadMessageID: message.ID,
-			}, message); err != nil {
-				return err
-			}
-			result = memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
-			return nil
+			var sendErr error
+			result, sendErr = sendDirectTextMessage(ctx, tx, identity, normalized, a.agentScheduler)
+			return sendErr
 		})
 		if err == nil {
 			return result, nil
@@ -242,6 +224,49 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 		}
 	}
 	return ConversationMessage{}, fmt.Errorf("send direct message retries exhausted: %w", err)
+}
+
+// sendDirectTextMessage 在当前事务中幂等写入单聊文本消息。
+func sendDirectTextMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input DirectTextMessageInput, agentScheduler DirectAgentMessageScheduler) (ConversationMessage, error) {
+	sendContext, err := loadDirectSendContext(ctx, db, identity, input.ConversationID)
+	if err != nil {
+		return ConversationMessage{}, err
+	}
+	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
+	if saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, idempotencyKey, false); err != nil || found {
+		return saved, err
+	}
+	message := &servermodels.Message{
+		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID,
+		ConversationID: input.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
+		Type: string(domain.MessageTypeText), Body: input.Body,
+		IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
+	}
+	if _, err := db.NewInsert().Model(message).
+		Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
+		Returning("*").
+		Exec(ctx); err != nil {
+		return ConversationMessage{}, fmt.Errorf("create direct text message: %w", err)
+	}
+	if sendContext.PeerType == domain.OrganizationIdentityTypeAgent {
+		if agentScheduler == nil || sendContext.PeerIdentityID == "" || sendContext.PeerRevisionID == nil {
+			return ConversationMessage{}, ErrDataInvariant
+		}
+		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.PeerIdentityID, *sendContext.PeerRevisionID, message.ID); err != nil {
+			return ConversationMessage{}, fmt.Errorf("schedule agent direct message: %w", err)
+		}
+	}
+	conversation := &servermodels.Conversation{ID: input.ConversationID, OrganizationID: identity.Organization.ID}
+	if err := updateConversationSummary(ctx, db, conversation, message); err != nil {
+		return ConversationMessage{}, err
+	}
+	if err := advanceConversationUserReadState(ctx, db, &servermodels.ConversationUserState{
+		OrganizationID: identity.Organization.ID, ConversationID: input.ConversationID,
+		UserID: identity.User.ID, LastReadMessageID: message.ID,
+	}, message); err != nil {
+		return ConversationMessage{}, err
+	}
+	return memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName), nil
 }
 
 // loadDirectTarget 读取同企业可发起单聊的活跃成员身份。
@@ -300,23 +325,22 @@ func ensureOrganizationIdentityChatSubject(ctx context.Context, db bun.IDB, orga
 	return subject, nil
 }
 
-// findDirectConversation 查找规范主体对唯一的长期单聊。
-func findDirectConversation(ctx context.Context, db bun.IDB, organizationID, firstSubjectID, secondSubjectID string) (*servermodels.Conversation, error) {
+// findDirectConversation 查找规范身份对唯一的长期单聊。
+func findDirectConversation(ctx context.Context, db bun.IDB, organizationID, firstIdentityID, secondIdentityID string) (*servermodels.Conversation, error) {
+	if firstIdentityID > secondIdentityID {
+		firstIdentityID, secondIdentityID = secondIdentityID, firstIdentityID
+	}
 	var conversations []servermodels.Conversation
 	err := db.NewSelect().Model(&conversations).
-		Join("JOIN conversation_participants AS first_cp ON first_cp.organization_id = cv.organization_id AND first_cp.conversation_id = cv.id AND first_cp.subject_id = ?", firstSubjectID).
-		Join("JOIN conversation_participants AS second_cp ON second_cp.organization_id = cv.organization_id AND second_cp.conversation_id = cv.id AND second_cp.subject_id = ?", secondSubjectID).
+		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeDirect).
-		Where("(SELECT count(*) FROM conversation_participants AS all_cp WHERE all_cp.organization_id = cv.organization_id AND all_cp.conversation_id = cv.id) = 2").
-		OrderExpr("cv.id ASC").
-		Limit(2).
+		Where("dc.first_identity_id = ?", firstIdentityID).
+		Where("dc.second_identity_id = ?", secondIdentityID).
+		Limit(1).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("find direct conversation: %w", err)
-	}
-	if len(conversations) > 1 {
-		return nil, ErrDataInvariant
 	}
 	if len(conversations) == 0 {
 		return nil, nil
@@ -325,7 +349,7 @@ func findDirectConversation(ctx context.Context, db bun.IDB, organizationID, fir
 }
 
 // createDirectConversation 创建内部单聊和双方参与者。
-func createDirectConversation(ctx context.Context, db bun.IDB, organizationID, currentSubjectID, targetSubjectID string, ids directConversationIDs) (*servermodels.Conversation, error) {
+func createDirectConversation(ctx context.Context, db bun.IDB, organizationID, currentIdentityID, targetIdentityID, currentSubjectID, targetSubjectID string, ids directConversationIDs) (*servermodels.Conversation, error) {
 	conversation := &servermodels.Conversation{
 		ID: ids.conversation, OrganizationID: organizationID,
 		Type: string(domain.ConversationTypeDirect), Status: string(domain.ConversationStatusActive),
@@ -335,6 +359,19 @@ func createDirectConversation(ctx context.Context, db bun.IDB, organizationID, c
 		Column("id", "organization_id", "type", "status", "created_by_subject_id").
 		Exec(ctx); err != nil {
 		return nil, fmt.Errorf("create direct conversation: %w", err)
+	}
+	firstIdentityID, secondIdentityID := currentIdentityID, targetIdentityID
+	if firstIdentityID > secondIdentityID {
+		firstIdentityID, secondIdentityID = secondIdentityID, firstIdentityID
+	}
+	relation := &servermodels.DirectConversation{
+		ConversationID: conversation.ID, OrganizationID: organizationID,
+		FirstIdentityID: firstIdentityID, SecondIdentityID: secondIdentityID,
+	}
+	if _, err := db.NewInsert().Model(relation).
+		Column("conversation_id", "organization_id", "first_identity_id", "second_identity_id").
+		Exec(ctx); err != nil {
+		return nil, fmt.Errorf("create direct conversation relation: %w", err)
 	}
 	participants := []*servermodels.ConversationParticipant{
 		{ID: ids.currentParticipant, OrganizationID: organizationID, ConversationID: conversation.ID, SubjectID: currentSubjectID, Role: string(domain.ConversationParticipantRoleMember)},

@@ -24,6 +24,7 @@ import {
   type CustomerInboxConversationData,
   type DirectInboxConversationData,
   type InboxConversation,
+  type MemberOption,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
@@ -31,7 +32,8 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
+import { createDirectConversationDraft } from "@/features/inbox/direct-conversation-draft"
+import { DirectConversationPickerDialog } from "@/features/inbox/direct-conversation-picker-dialog"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
@@ -347,9 +349,14 @@ export function MobileInboxPage() {
     previousPollingActiveRef.current = pollingActive
   }, [data, pollingActive, refresh])
 
-  /** 发起成功后同步 Inbox 摘要并直接进入 Direct 详情。 */
-  function openStartedConversation(conversation: DirectInboxConversationData) {
-    void refresh()
+  /** 打开不持久化的移动端单聊草稿。 */
+  function openDirectDraft(member: MemberOption) {
+    const existing = conversations.find(
+      (conversation) =>
+        isDirectInboxConversation(conversation) &&
+        conversation.direct.peerIdentityId === member.id,
+    )
+    const conversation = existing ?? createDirectConversationDraft(member)
     navigate(`/inbox/direct/${conversation.id}`, {
       state: { conversation },
     })
@@ -453,11 +460,11 @@ export function MobileInboxPage() {
         </>
       ) : null}
 
-      <StartDirectConversationDialog
+      <DirectConversationPickerDialog
         open={directDialogOpen}
         currentIdentityID={identity.user.identityId}
         onOpenChange={setDirectDialogOpen}
-        onStarted={openStartedConversation}
+        onSelected={openDirectDraft}
       />
     </section>
   )

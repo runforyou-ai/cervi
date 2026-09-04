@@ -659,6 +659,13 @@ export function SendDirectTextMessage(meta: $models.RequestMeta, conversationID:
 }
 
 /**
+ * SendFirstDirectTextMessage 向目标身份发送首条单聊消息并按需创建长期会话。
+ */
+export function SendFirstDirectTextMessage(meta: $models.RequestMeta, input: $models.FirstDirectTextMessageInput): $CancellablePromise<$models.FirstDirectTextMessageResult> {
+    return $Call.ByID(3790712855, meta, input);
+}
+
+/**
  * SendGroupTextMessage 发送企业内部群聊文本消息。
  */
 export function SendGroupTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.GroupTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
@@ -677,13 +684,6 @@ export function SendMessageNotification(meta: $models.RequestMeta, input: $model
  */
 export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string> {
     return $Call.ByID(791180750, meta);
-}
-
-/**
- * StartDirectConversation 发起或打开企业成员内部单聊。
- */
-export function StartDirectConversation(meta: $models.RequestMeta, input: $models.DirectConversationInput): $CancellablePromise<$models.InboxConversation> {
-    return $Call.ByID(1906625364, meta, input);
 }
 
 /**

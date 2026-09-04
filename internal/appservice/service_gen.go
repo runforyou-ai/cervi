@@ -84,9 +84,9 @@ func (s *Service) ReopenServiceSession(ctx context.Context, meta RequestMeta, co
 	return s.backend.ReopenServiceSession(ctx, meta, conversationID)
 }
 
-// StartDirectConversation 发起或打开企业成员内部单聊。
-func (s *Service) StartDirectConversation(ctx context.Context, meta RequestMeta, input DirectConversationInput) (InboxConversation, error) {
-	return s.backend.StartDirectConversation(ctx, meta, input)
+// SendFirstDirectTextMessage 向目标身份发送首条单聊消息并按需创建长期会话。
+func (s *Service) SendFirstDirectTextMessage(ctx context.Context, meta RequestMeta, input FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error) {
+	return s.backend.SendFirstDirectTextMessage(ctx, meta, input)
 }
 
 // SendDirectTextMessage 发送内部单聊文本消息。

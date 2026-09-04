@@ -1,21 +1,13 @@
-/** 企业成员内部单聊发起选择器。 */
+/** 企业成员内部单聊对象选择器。 */
 import { useMemo, useState } from "react"
 import {
   BotIcon,
-  LoaderCircleIcon,
   SearchIcon,
   UserRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
-import { toast } from "sonner"
-
 import {
-  isApiError,
-  isDirectInboxConversation,
   OrganizationIdentityType,
-  startDirectConversation,
-  type DirectInboxConversationData,
   type MemberOption,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -32,25 +24,21 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 
-/** 选择一位活跃企业成员并发起或打开单聊。 */
-export function StartDirectConversationDialog({
+/** 选择一位活跃企业成员。 */
+export function DirectConversationPickerDialog({
   open,
   currentIdentityID,
   onOpenChange,
-  onStarted,
+  onSelected,
 }: {
   open: boolean
   currentIdentityID: string
   onOpenChange: (open: boolean) => void
-  onStarted: (conversation: DirectInboxConversationData) => void
+  onSelected: (member: MemberOption) => void
 }) {
   const { t } = useTranslation("inbox")
-  const navigate = useNavigate()
   const [query, setQuery] = useState("")
-  const [startingIdentityID, setStartingIdentityID] = useState("")
   const { data, loading, error, refresh } = useResource(
     resourceKeys.memberOptions(),
     listAllMemberOptions,
@@ -66,33 +54,11 @@ export function StartDirectConversationDialog({
     )
   }, [currentIdentityID, data, query])
 
-  /** 发起或打开所选成员的长期单聊。 */
-  async function start(member: MemberOption) {
-    setStartingIdentityID(member.id)
-    try {
-      const conversation = await startDirectConversation({
-        targetIdentityId: member.id,
-      })
-      if (!isDirectInboxConversation(conversation)) {
-        throw new Error("内部单聊响应结构无效")
-      }
-      onStarted(conversation)
-      setQuery("")
-      onOpenChange(false)
-    } catch (startError) {
-      if (recoverSession(startError, navigate)) return
-      console.warn("发起企业成员内部单聊失败", {
-        targetIdentityId: member.id,
-        error: startError,
-      })
-      toast.error(
-        isApiError(startError)
-          ? apiErrorMessage(startError, ["targetIdentityId"])
-          : t("directStartError"),
-      )
-    } finally {
-      setStartingIdentityID("")
-    }
+  /** 打开所选成员的本地单聊草稿。 */
+  function start(member: MemberOption) {
+    onSelected(member)
+    setQuery("")
+    onOpenChange(false)
   }
 
   return (
@@ -147,9 +113,8 @@ export function StartDirectConversationDialog({
                 <button
                   key={member.id}
                   type="button"
-                  disabled={startingIdentityID !== ""}
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
-                  onClick={() => void start(member)}
+                  onClick={() => start(member)}
                 >
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
                     {member.type ===
@@ -169,9 +134,6 @@ export function StartDirectConversationDialog({
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {t("directPickerAgent")}
                     </span>
-                  ) : null}
-                  {startingIdentityID === member.id ? (
-                    <LoaderCircleIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
                   ) : null}
                 </button>
               ))}

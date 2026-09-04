@@ -241,7 +241,6 @@
   "error.conversation_read_update_failed": "Could not update the conversation read state. Try again.",
   "error.customer_message_send_failed": "Could not send the message. Try again.",
   "error.customer_message_conflict": "This message does not match the content previously sent with the same identifier.",
-  "error.direct_conversation_start_failed": "Could not start the internal chat. Try again.",
   "error.direct_target_not_found": "This available teammate could not be found.",
   "error.direct_message_send_failed": "Could not send the internal message. Try again.",
   "error.direct_message_conflict": "This message does not match the content previously sent with the same identifier.",

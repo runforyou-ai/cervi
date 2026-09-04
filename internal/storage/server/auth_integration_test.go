@@ -949,23 +949,24 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		start := conversationaction.NewStartDirectConversationAction(db)
+		start := conversationaction.NewSendFirstDirectTextMessageAction(db, nil)
 		startGate := make(chan struct{})
-		startResults := make(chan conversationaction.DirectConversationSummary, 2)
+		startResults := make(chan conversationaction.FirstDirectTextMessageResult, 2)
 		startErrors := make(chan error, 2)
 		requests := []struct {
 			identity *servermodels.Identity
 			targetID string
+			clientID string
 		}{
-			{identity: loggedIn.Identity, targetID: memberLogin.Identity.OrganizationIdentity.ID},
-			{identity: memberLogin.Identity, targetID: loggedIn.Identity.OrganizationIdentity.ID},
+			{identity: loggedIn.Identity, targetID: memberLogin.Identity.OrganizationIdentity.ID, clientID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f63"},
+			{identity: memberLogin.Identity, targetID: loggedIn.Identity.OrganizationIdentity.ID, clientID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f64"},
 		}
 		for _, request := range requests {
 			request := request
 			go func() {
 				<-startGate
-				summary, executeErr := start.Execute(context.Background(), request.identity, conversationaction.DirectConversationInput{TargetIdentityID: request.targetID})
-				startResults <- summary
+				result, executeErr := start.Execute(context.Background(), request.identity, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: request.targetID, ClientMessageID: request.clientID, Body: "并发首发"})
+				startResults <- result
 				startErrors <- executeErr
 			}()
 		}
@@ -976,11 +977,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			if executeErr := <-startErrors; executeErr != nil {
 				t.Fatal(executeErr)
 			}
-			summary := <-startResults
+			result := <-startResults
 			if conversationID == "" {
-				conversationID = summary.ID
-			} else if summary.ID != conversationID {
-				t.Fatalf("concurrent direct conversation ids = %q and %q", conversationID, summary.ID)
+				conversationID = result.Conversation.ID
+			} else if result.Conversation.ID != conversationID {
+				t.Fatalf("concurrent direct conversation ids = %q and %q", conversationID, result.Conversation.ID)
 			}
 		}
 
@@ -991,6 +992,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Count(context.Background())
 		if err != nil || conversationCount != 1 {
 			t.Fatalf("direct conversation count = %d, error = %v", conversationCount, err)
+		}
+		directRelationCount, err := db.NewSelect().
+			Model((*servermodels.DirectConversation)(nil)).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Count(context.Background())
+		if err != nil || directRelationCount != 1 {
+			t.Fatalf("direct conversation relation count = %d, error = %v", directRelationCount, err)
 		}
 		participantCount, err := db.NewSelect().
 			Model((*servermodels.ConversationParticipant)(nil)).
@@ -1009,7 +1017,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 			found := false
 			for _, item := range items {
-				if item.ID == conversationID && item.Type == domain.ConversationTypeDirect && item.Direct != nil && item.Direct.PeerIdentityID == request.targetID && item.Direct.LastMessageAt == nil {
+				if item.ID == conversationID && item.Type == domain.ConversationTypeDirect && item.Direct != nil && item.Direct.PeerIdentityID == request.targetID && item.Direct.LastMessageAt != nil {
 					found = true
 					break
 				}
@@ -1032,7 +1040,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("direct message sender = %#v", message.Sender)
 		}
 		history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID})
-		if err != nil || len(history.Messages) != 1 || history.Messages[0].ID != message.ID || history.Messages[0].Sender == nil || history.Messages[0].Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
+		if err != nil || len(history.Messages) != 3 {
 			t.Fatalf("direct message history = %#v, error = %v", history, err)
 		}
 
@@ -1051,8 +1059,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if !errors.Is(err, conversationaction.ErrConversationNotFound) {
 			t.Fatalf("send archived direct error = %v, want conversation not found", err)
 		}
-		reopened, err := start.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectConversationInput{TargetIdentityID: memberLogin.Identity.OrganizationIdentity.ID})
-		if err != nil || reopened.ID != conversationID {
+		reopened, err := start.Execute(context.Background(), loggedIn.Identity, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: memberLogin.Identity.OrganizationIdentity.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f67", Body: "重新发起"})
+		if err != nil || reopened.Conversation.ID != conversationID {
 			t.Fatalf("reopened direct conversation = %#v, error = %v", reopened, err)
 		}
 	})
@@ -1720,23 +1728,21 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("working agent = %#v, error = %v", updatedAgent, err)
 		}
 
-		agentConversation, err := conversationaction.NewStartDirectConversationAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.DirectConversationInput{
-			TargetIdentityID: createdAgent.IdentityID,
+		agentStart, err := conversationaction.NewSendFirstDirectTextMessageAction(db, scheduler).Execute(context.Background(), loggedIn.Identity, conversationaction.FirstDirectTextMessageInput{
+			TargetIdentityID: createdAgent.IdentityID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7",
 		})
-		if err != nil || agentConversation.PeerType != domain.OrganizationIdentityTypeAgent {
-			t.Fatalf("agent direct conversation = %#v, error = %v", agentConversation, err)
+		if err != nil || agentStart.Conversation.PeerType != domain.OrganizationIdentityTypeAgent {
+			t.Fatalf("agent direct conversation = %#v, error = %v", agentStart.Conversation, err)
 		}
+		agentConversation := agentStart.Conversation
 		sendAgentMessage := conversationaction.NewSendDirectTextMessageAction(db, scheduler)
-		firstAgentMessage := conversationaction.DirectTextMessageInput{
-			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7",
-		}
-		firstSaved, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, firstAgentMessage)
+		firstAgentMessage := conversationaction.FirstDirectTextMessageInput{TargetIdentityID: createdAgent.IdentityID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7"}
+		firstRetriedResult, err := conversationaction.NewSendFirstDirectTextMessageAction(db, scheduler).Execute(context.Background(), loggedIn.Identity, firstAgentMessage)
 		if err != nil {
 			t.Fatal(err)
 		}
-		firstRetried, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, firstAgentMessage)
-		if err != nil || firstRetried.ID != firstSaved.ID {
-			t.Fatalf("idempotent agent message = %#v, error = %v", firstRetried, err)
+		if firstRetriedResult.Message.ID != agentStart.Message.ID {
+			t.Fatalf("idempotent agent message = %#v", firstRetriedResult.Message)
 		}
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f71", Body: "只给我最终结果",

@@ -310,7 +310,7 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 	return rows, nil
 }
 
-// loadDirectConversations 读取当前成员参与的内部单聊，包括尚无消息的新会话。
+// loadDirectConversations 读取当前成员参与的内部单聊。
 func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizationID, identityID, userID string) ([]directConversationRow, error) {
 	var rows []directConversationRow
 	err := q.db.NewSelect().
@@ -326,6 +326,7 @@ func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizati
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("cv.last_message_at AS sort_at").
+		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
 		Join("JOIN conversation_participants AS peer ON peer.organization_id = cv.organization_id AND peer.conversation_id = cv.id AND peer.subject_id <> mine.subject_id AND peer.left_at IS NULL").

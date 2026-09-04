@@ -58,7 +58,7 @@ type DirectBackend struct {
 	transferServiceSession            *conversationaction.TransferServiceSessionAction
 	closeServiceSession               *conversationaction.CloseServiceSessionAction
 	reopenServiceSession              *conversationaction.ReopenServiceSessionAction
-	startDirectConversation           *conversationaction.StartDirectConversationAction
+	sendFirstDirectTextMessage        *conversationaction.SendFirstDirectTextMessageAction
 	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
 	createGroupConversation           *conversationaction.CreateGroupConversationAction
 	getGroupConversation              *conversationaction.GetGroupConversationQuery
@@ -184,7 +184,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
 		closeServiceSession:               conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),
 		reopenServiceSession:              conversationaction.NewReopenServiceSessionAction(db),
-		startDirectConversation:           conversationaction.NewStartDirectConversationAction(db),
+		sendFirstDirectTextMessage:        conversationaction.NewSendFirstDirectTextMessageAction(db, agentScheduler),
 		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db, agentScheduler),
 		createGroupConversation:           conversationaction.NewCreateGroupConversationAction(db),
 		getGroupConversation:              conversationaction.NewGetGroupConversationQuery(db),

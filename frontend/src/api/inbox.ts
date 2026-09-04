@@ -13,9 +13,9 @@ import {
   ReopenServiceSession,
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
+  SendFirstDirectTextMessage,
   SendDirectTextMessage,
   SendGroupTextMessage,
-  StartDirectConversation,
   TransferServiceSession,
   TransferGroupConversationOwner,
   UpdateGroupConversation,
@@ -27,7 +27,7 @@ import type {
   ConversationMessageListInput,
   CustomerTextMessageInput,
   DirectInboxConversation,
-  DirectConversationInput,
+  FirstDirectTextMessageInput,
   DirectTextMessageInput,
   GroupConversation,
   GroupConversationInput,
@@ -97,7 +97,7 @@ const loadInboxBound = bind(LoadInbox)
 const listConversationMessagesBound = bind(ListConversationMessages)
 const markConversationReadBound = bind(MarkConversationRead)
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
-const startDirectConversationBound = bind(StartDirectConversation)
+const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
 const sendDirectTextMessageBound = bind(SendDirectTextMessage)
 const createGroupConversationBound = bind(CreateGroupConversation)
 const getGroupConversationBound = bind(GetGroupConversation)
@@ -250,9 +250,16 @@ export async function sendCustomerTextMessage(
   return normalizeConversationMessage(message)
 }
 
-/** 发起或打开企业成员内部单聊。 */
-export function startDirectConversation(input: DirectConversationInput) {
-  return startDirectConversationBound(input)
+/** 发送首条单聊消息并返回最终会话。 */
+export async function sendFirstDirectTextMessage(
+  input: FirstDirectTextMessageInput,
+) {
+  const result = await sendFirstDirectTextMessageBound(input)
+  return {
+    ...result,
+    conversation: result.conversation as DirectInboxConversationData,
+    message: normalizeConversationMessage(result.message),
+  }
 }
 
 /** 发送企业成员内部单聊文本消息。 */

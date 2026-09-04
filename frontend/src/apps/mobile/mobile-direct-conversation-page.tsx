@@ -17,6 +17,7 @@ import {
   ConversationType,
   isDirectInboxConversation,
   loadInbox,
+  sendFirstDirectTextMessage,
   OrganizationIdentityType,
   type DirectInboxConversationData,
   type InboxConversation,
@@ -26,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import { isDirectConversationDraftID } from "@/features/inbox/direct-conversation-draft"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import {
   memberChatPollingInterval,
@@ -34,6 +36,7 @@ import {
 import { useOutgoingConversationMessages } from "@/features/inbox/use-outgoing-conversation-messages"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { resourceClient } from "@/lib/resource-client"
 
 type MobileDirectLocationState = {
   conversation?: InboxConversation
@@ -92,6 +95,7 @@ function MobileDirectHeader({
 /** 加载并显示移动端 Direct 历史和文本发送区。 */
 export function MobileDirectConversationPage() {
   const { t } = useTranslation("inbox")
+  const navigate = useNavigate()
   const { identity } = useMobileWorkspace()
   const invalidate = useResourceInvalidator()
   const location = useLocation()
@@ -118,8 +122,12 @@ export function MobileDirectConversationPage() {
     },
   )
   const outgoing = useOutgoingConversationMessages()
+  const directDraft = isDirectConversationDraftID(conversationID)
 
   if (!conversationID) return <Navigate to="/inbox" replace />
+  if (directDraft && !stateConversation) {
+    return <Navigate to="/inbox" replace />
+  }
 
   const matchedConversation = data?.conversations.find(
     (conversation) => conversation.id === conversationID,
@@ -148,6 +156,7 @@ export function MobileDirectConversationPage() {
             currentIdentityID={identity.user.identityId}
             requireWindowFocus={false}
             outgoingMessages={outgoing.messages}
+            enabled={!directDraft}
           />
           <ConversationComposer
             conversationID={conversationID}
@@ -158,6 +167,27 @@ export function MobileDirectConversationPage() {
             onSending={outgoing.start}
             onSent={outgoing.succeed}
             onFailed={outgoing.fail}
+            sendDirectMessage={
+              directDraft && conversation
+                ? async (input) => {
+                    const result = await sendFirstDirectTextMessage({
+                      targetIdentityId: conversation.direct.peerIdentityId,
+                      ...input,
+                    })
+                    resourceClient.setQueryData(
+                      resourceKeys.conversationMessages(
+                        result.conversation.id,
+                      ),
+                      { messages: [result.message], before: null, after: null },
+                    )
+                    navigate(`/inbox/direct/${result.conversation.id}`, {
+                      replace: true,
+                      state: { conversation: result.conversation },
+                    })
+                    return result.message
+                  }
+                : undefined
+            }
           />
         </>
       )}

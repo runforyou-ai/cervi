@@ -137,10 +137,10 @@ func (b *Backend) ReopenServiceSession(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
-// StartDirectConversation 发起或打开企业成员内部单聊。
-func (b *Backend) StartDirectConversation(ctx context.Context, meta appservice.RequestMeta, input appservice.DirectConversationInput) (appservice.InboxConversation, error) {
-	var output appservice.InboxConversation
-	err := b.do(ctx, meta, http.MethodPost, "/direct-conversations", nil, input, &output)
+// SendFirstDirectTextMessage 向目标身份发送首条单聊消息并按需创建长期会话。
+func (b *Backend) SendFirstDirectTextMessage(ctx context.Context, meta appservice.RequestMeta, input appservice.FirstDirectTextMessageInput) (appservice.FirstDirectTextMessageResult, error) {
+	var output appservice.FirstDirectTextMessageResult
+	err := b.do(ctx, meta, http.MethodPost, "/direct-conversations/messages", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
