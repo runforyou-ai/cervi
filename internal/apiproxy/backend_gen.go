@@ -153,6 +153,14 @@ func (b *Backend) SendFirstDirectTextMessage(ctx context.Context, meta appservic
 	return output, err
 }
 
+// FindDirectConversation 按目标身份查找当前成员的活跃单聊。
+func (b *Backend) FindDirectConversation(ctx context.Context, meta appservice.RequestMeta, targetIdentityID string) (appservice.DirectConversationLookup, error) {
+	var output appservice.DirectConversationLookup
+	err := b.do(ctx, meta, http.MethodGet, "/direct-conversations/by-target/"+url.PathEscape(targetIdentityID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // SendDirectTextMessage 发送内部单聊文本消息。
 func (b *Backend) SendDirectTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.DirectTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage

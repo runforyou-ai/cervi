@@ -25,6 +25,7 @@ const inbox = {
   directPickerSearch: "Search members",
   directPickerLoading: "Loading members",
   directPickerLoadError: "Could not load members",
+  directLookupError: "Could not open the internal chat. Try again.",
   directPickerEmpty: "No available members match your search",
   directPickerAgent: "AI agent",
   groupCreateTitle: "New group chat",

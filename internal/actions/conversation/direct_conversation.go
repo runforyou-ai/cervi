@@ -31,6 +31,11 @@ type SendFirstDirectTextMessageAction struct {
 	agentScheduler DirectAgentMessageScheduler
 }
 
+// FindDirectConversationQuery 按目标身份查找当前成员的活跃长期单聊。
+type FindDirectConversationQuery struct {
+	db *bun.DB
+}
+
 // SendDirectTextMessageAction 持久化企业成员内部单聊文本消息。
 type SendDirectTextMessageAction struct {
 	db             *bun.DB
@@ -74,6 +79,32 @@ type directSendContextRow struct {
 // NewSendFirstDirectTextMessageAction 创建首条单聊消息发送操作。
 func NewSendFirstDirectTextMessageAction(db *bun.DB, agentScheduler DirectAgentMessageScheduler) *SendFirstDirectTextMessageAction {
 	return &SendFirstDirectTextMessageAction{db: db, agentScheduler: agentScheduler}
+}
+
+// NewFindDirectConversationQuery 创建内部单聊查找查询。
+func NewFindDirectConversationQuery(db *bun.DB) *FindDirectConversationQuery {
+	return &FindDirectConversationQuery{db: db}
+}
+
+// Execute 返回当前成员与目标身份的活跃长期单聊。
+func (q *FindDirectConversationQuery) Execute(ctx context.Context, identity *servermodels.Identity, targetIdentityID string) (*DirectConversationSummary, error) {
+	targetIdentityID, valid := common.NormalizeUUID(targetIdentityID)
+	if !valid || targetIdentityID == identity.OrganizationIdentity.ID {
+		return nil, ErrDirectTargetNotFound
+	}
+	target, err := loadDirectTarget(ctx, q.db, identity.Organization.ID, targetIdentityID)
+	if err != nil {
+		return nil, err
+	}
+	conversation, err := findDirectConversation(ctx, q.db, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
+	if err != nil || conversation == nil || conversation.Status != string(domain.ConversationStatusActive) {
+		return nil, err
+	}
+	summary, err := loadDirectConversationSummary(ctx, q.db, identity.Organization.ID, conversation.ID, target)
+	if err != nil {
+		return nil, err
+	}
+	return &summary, nil
 }
 
 // NewSendDirectTextMessageAction 创建内部单聊发送操作。

@@ -145,13 +145,38 @@ func (b *DirectBackend) SendFirstDirectTextMessage(ctx context.Context, meta Req
 		"target_identity_id", result.Conversation.PeerIdentityID,
 		"message_id", result.Message.ID,
 	)
-	return FirstDirectTextMessageResult{Conversation: InboxConversation{
-		ID: result.Conversation.ID, Type: ConversationTypeDirect,
+	return FirstDirectTextMessageResult{
+		Conversation: directInboxConversationFromSummary(result.Conversation),
+		Message:      conversationMessageFromAction(result.Message),
+	}, nil
+}
+
+// FindDirectConversation 按目标身份查找当前成员的活跃单聊。
+func (b *DirectBackend) FindDirectConversation(ctx context.Context, meta RequestMeta, targetIdentityID string) (DirectConversationLookup, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return DirectConversationLookup{}, err
+	}
+	summary, err := b.findDirectConversation.Execute(ctx, identity, targetIdentityID)
+	if err != nil {
+		return DirectConversationLookup{}, directConversationError(ctx, meta, err, identity.Organization.ID, targetIdentityID, "find")
+	}
+	if summary == nil {
+		return DirectConversationLookup{}, nil
+	}
+	conversation := directInboxConversationFromSummary(*summary)
+	return DirectConversationLookup{Conversation: &conversation}, nil
+}
+
+// directInboxConversationFromSummary 把单聊摘要转换为统一收件箱会话。
+func directInboxConversationFromSummary(summary conversationaction.DirectConversationSummary) InboxConversation {
+	return InboxConversation{
+		ID: summary.ID, Type: ConversationTypeDirect,
 		Direct: &DirectInboxConversation{
-			PeerIdentityID: result.Conversation.PeerIdentityID, PeerType: OrganizationIdentityType(result.Conversation.PeerType), PeerName: result.Conversation.PeerName,
-			Preview: result.Conversation.Preview, LastMessageAt: result.Conversation.LastMessageAt,
+			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName,
+			Preview: summary.Preview, LastMessageAt: summary.LastMessageAt,
 		},
-	}, Message: conversationMessageFromAction(result.Message)}, nil
+	}
 }
 
 // SendDirectTextMessage 发送内部单聊文本消息。

@@ -25,6 +25,7 @@ const inbox = {
   directPickerSearch: "搜索成员",
   directPickerLoading: "正在读取成员",
   directPickerLoadError: "读取成员失败",
+  directLookupError: "无法打开内部单聊，请重试",
   directPickerEmpty: "没有匹配的可用成员",
   directPickerAgent: "AI 员工",
   groupCreateTitle: "创建群聊",

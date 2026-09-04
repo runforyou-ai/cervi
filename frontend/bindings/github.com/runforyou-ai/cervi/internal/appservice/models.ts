@@ -807,6 +807,13 @@ export interface CustomerTextMessageInput {
 }
 
 /**
+ * DirectConversationLookup 定义按目标身份查找单聊的结果。
+ */
+export interface DirectConversationLookup {
+    "conversation": InboxConversation | null;
+}
+
+/**
  * DirectInboxConversation 定义内部单聊摘要。
  */
 export interface DirectInboxConversation {

@@ -1008,6 +1008,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || participantCount != 2 {
 			t.Fatalf("direct participant count = %d, error = %v", participantCount, err)
 		}
+		findDirect := conversationaction.NewFindDirectConversationQuery(db)
+		for _, request := range requests {
+			foundConversation, findErr := findDirect.Execute(context.Background(), request.identity, request.targetID)
+			if findErr != nil || foundConversation == nil || foundConversation.ID != conversationID {
+				t.Fatalf("found direct conversation = %#v, error = %v", foundConversation, findErr)
+			}
+		}
 
 		inbox := inboxaction.NewLoadInboxQuery(db)
 		for _, request := range requests {

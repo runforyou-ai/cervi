@@ -106,6 +106,7 @@ export type {
     CustomerServiceAssigneeList,
     CustomerServiceSession,
     CustomerTextMessageInput,
+    DirectConversationLookup,
     DirectInboxConversation,
     DirectTextMessageInput,
     ExternalKnowledgeBaseConfiguration,

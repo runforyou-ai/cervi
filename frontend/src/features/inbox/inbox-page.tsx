@@ -29,6 +29,7 @@ import {
   markConversationRead,
   sendFirstDirectTextMessage,
   type ConversationMessageReference,
+  type ConversationMessageListData,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
   type DirectInboxConversationData,
@@ -1045,9 +1046,18 @@ function ConversationThread({
                     targetIdentityId: conversation.direct.peerIdentityId,
                     ...input,
                   })
-                  resourceClient.setQueryData(
+                  resourceClient.setQueryData<ConversationMessageListData>(
                     resourceKeys.conversationMessages(result.conversation.id),
-                    { messages: [result.message], before: null, after: null },
+                    (current) => ({
+                      messages: [
+                        ...(current?.messages.filter(
+                          (message) => message.id !== result.message.id,
+                        ) ?? []),
+                        result.message,
+                      ],
+                      before: current?.before ?? null,
+                      after: current?.after ?? null,
+                    }),
                   )
                   onDirectStarted(result.conversation)
                   return result.message
@@ -1375,12 +1385,10 @@ export function InboxPage({
   }
 
   /** 在主区打开不持久化的单聊草稿。 */
-  function showDirectDraft(member: MemberOption) {
-    const existing = validConversations.find(
-      (conversation) =>
-        isDirectInboxConversation(conversation) &&
-        conversation.direct.peerIdentityId === member.id,
-    )
+  function showDirectDraft(
+    member: MemberOption,
+    existing: DirectInboxConversationData | null,
+  ) {
     if (existing) {
       onQueryChange({
         scope: InboxScope.InboxScopeInternal,

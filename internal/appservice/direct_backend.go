@@ -60,6 +60,7 @@ type DirectBackend struct {
 	closeServiceSession               *conversationaction.CloseServiceSessionAction
 	reopenServiceSession              *conversationaction.ReopenServiceSessionAction
 	sendFirstDirectTextMessage        *conversationaction.SendFirstDirectTextMessageAction
+	findDirectConversation            *conversationaction.FindDirectConversationQuery
 	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
 	createGroupConversation           *conversationaction.CreateGroupConversationAction
 	getGroupConversation              *conversationaction.GetGroupConversationQuery
@@ -187,6 +188,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		closeServiceSession:               conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),
 		reopenServiceSession:              conversationaction.NewReopenServiceSessionAction(db),
 		sendFirstDirectTextMessage:        conversationaction.NewSendFirstDirectTextMessageAction(db, agentScheduler),
+		findDirectConversation:            conversationaction.NewFindDirectConversationQuery(db),
 		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db, agentScheduler),
 		createGroupConversation:           conversationaction.NewCreateGroupConversationAction(db),
 		getGroupConversation:              conversationaction.NewGetGroupConversationQuery(db),

@@ -20,6 +20,7 @@ import {
   sendFirstDirectTextMessage,
   OrganizationIdentityType,
   type DirectInboxConversationData,
+  type ConversationMessageListData,
   type InboxConversation,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
@@ -174,11 +175,20 @@ export function MobileDirectConversationPage() {
                       targetIdentityId: conversation.direct.peerIdentityId,
                       ...input,
                     })
-                    resourceClient.setQueryData(
+                    resourceClient.setQueryData<ConversationMessageListData>(
                       resourceKeys.conversationMessages(
                         result.conversation.id,
                       ),
-                      { messages: [result.message], before: null, after: null },
+                      (current) => ({
+                        messages: [
+                          ...(current?.messages.filter(
+                            (message) => message.id !== result.message.id,
+                          ) ?? []),
+                          result.message,
+                        ],
+                        before: current?.before ?? null,
+                        after: current?.after ?? null,
+                      }),
                     )
                     navigate(`/inbox/direct/${result.conversation.id}`, {
                       replace: true,

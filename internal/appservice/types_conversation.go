@@ -167,6 +167,11 @@ type FirstDirectTextMessageResult struct {
 	Message      ConversationMessage `json:"message"`
 }
 
+// DirectConversationLookup 定义按目标身份查找单聊的结果。
+type DirectConversationLookup struct {
+	Conversation *InboxConversation `json:"conversation"`
+}
+
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。
 type DirectTextMessageInput struct {
 	ClientMessageID string `json:"clientMessageId"`

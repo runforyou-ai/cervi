@@ -246,6 +246,13 @@ export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $Cancella
 }
 
 /**
+ * FindDirectConversation 按目标身份查找当前成员的活跃单聊。
+ */
+export function FindDirectConversation(meta: $models.RequestMeta, targetIdentityID: string): $CancellablePromise<$models.DirectConversationLookup> {
+    return $Call.ByID(2365759803, meta, targetIdentityID);
+}
+
+/**
  * GetAIProvider 返回当前企业中的模型服务供应商详情。
  */
 export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<$models.AIProvider> {

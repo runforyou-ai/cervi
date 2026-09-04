@@ -4,6 +4,7 @@ import {
   ClaimServiceSession,
   CloseServiceSession,
   CreateGroupConversation,
+  FindDirectConversation,
   GetGroupConversation,
   LeaveGroupConversation,
   ListConversationMessages,
@@ -106,6 +107,7 @@ const listConversationMessagesBound = bind(ListConversationMessages)
 const markConversationReadBound = bind(MarkConversationRead)
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
 const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
+const findDirectConversationBound = bind(FindDirectConversation)
 const sendDirectTextMessageBound = bind(SendDirectTextMessage)
 const createGroupConversationBound = bind(CreateGroupConversation)
 const getGroupConversationBound = bind(GetGroupConversation)
@@ -279,6 +281,12 @@ export async function sendFirstDirectTextMessage(
     conversation: result.conversation as DirectInboxConversationData,
     message: normalizeConversationMessage(result.message),
   }
+}
+
+/** 按目标身份查找当前成员的活跃单聊。 */
+export async function findDirectConversation(targetIdentityID: string) {
+  const result = await findDirectConversationBound(targetIdentityID)
+  return result.conversation as DirectInboxConversationData | null
 }
 
 /** 发送企业成员内部单聊文本消息。 */

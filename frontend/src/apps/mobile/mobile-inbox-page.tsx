@@ -350,12 +350,10 @@ export function MobileInboxPage() {
   }, [data, pollingActive, refresh])
 
   /** 打开不持久化的移动端单聊草稿。 */
-  function openDirectDraft(member: MemberOption) {
-    const existing = conversations.find(
-      (conversation) =>
-        isDirectInboxConversation(conversation) &&
-        conversation.direct.peerIdentityId === member.id,
-    )
+  function openDirectDraft(
+    member: MemberOption,
+    existing: DirectInboxConversationData | null,
+  ) {
     const conversation = existing ?? createDirectConversationDraft(member)
     navigate(`/inbox/direct/${conversation.id}`, {
       state: { conversation },

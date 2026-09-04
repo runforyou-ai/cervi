@@ -94,6 +94,11 @@ func (s *Service) SendFirstDirectTextMessage(ctx context.Context, meta RequestMe
 	return s.backend.SendFirstDirectTextMessage(ctx, meta, input)
 }
 
+// FindDirectConversation 按目标身份查找当前成员的活跃单聊。
+func (s *Service) FindDirectConversation(ctx context.Context, meta RequestMeta, targetIdentityID string) (DirectConversationLookup, error) {
+	return s.backend.FindDirectConversation(ctx, meta, targetIdentityID)
+}
+
 // SendDirectTextMessage 发送内部单聊文本消息。
 func (s *Service) SendDirectTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input DirectTextMessageInput) (ConversationMessage, error) {
 	return s.backend.SendDirectTextMessage(ctx, meta, conversationID, input)

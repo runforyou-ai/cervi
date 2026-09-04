@@ -34,6 +34,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/close", s.closeServiceSession)
 	router.POST("/conversations/:conversationID/reopen", s.reopenServiceSession)
 	router.POST("/direct-conversations/messages", s.sendFirstDirectTextMessage)
+	router.GET("/direct-conversations/by-target/:targetIdentityID", s.findDirectConversation)
 	router.POST("/direct-conversations/:conversationID/messages", s.sendDirectTextMessage)
 	router.POST("/group-conversations", s.createGroupConversation)
 	router.GET("/group-conversations/:conversationID", s.getGroupConversation)
@@ -301,6 +302,12 @@ func (s *Service) sendFirstDirectTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendFirstDirectTextMessage(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// findDirectConversation 按目标身份查找当前成员的活跃单聊。
+func (s *Service) findDirectConversation(c *gin.Context) {
+	output, err := s.application.FindDirectConversation(c.Request.Context(), requestMeta(c), c.Param("targetIdentityID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
