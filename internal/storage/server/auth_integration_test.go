@@ -1019,6 +1019,15 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 		}
 
+		notificationSettings := conversationaction.NewUpdateConversationNotificationSettingsAction(db)
+		settings, err := notificationSettings.Execute(context.Background(), loggedIn.Identity, conversationID, true)
+		if err != nil || !settings.Muted {
+			t.Fatalf("mute empty direct = %#v, error = %v", settings, err)
+		}
+		_, countsBeforeDirectMessage, err := inbox.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil {
+			t.Fatal(err)
+		}
 		send := conversationaction.NewSendDirectTextMessageAction(db, nil)
 		message, err := send.Execute(context.Background(), memberLogin.Identity, conversationaction.DirectTextMessageInput{
 			ConversationID:  conversationID,
@@ -1030,6 +1039,26 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if message.Sender == nil || message.Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
 			t.Fatalf("direct message sender = %#v", message.Sender)
+		}
+		directItems, countsAfterDirectMessage, err := inbox.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range directItems {
+			if item.ID == conversationID && (!item.Muted || item.UnreadCount != 1) {
+				t.Fatalf("muted direct unread = %#v", item)
+			}
+		}
+		if countsAfterDirectMessage.Unread != countsBeforeDirectMessage.Unread+1 || countsAfterDirectMessage.Attention != countsBeforeDirectMessage.Attention {
+			t.Fatalf("muted direct counts = %#v, before = %#v", countsAfterDirectMessage, countsBeforeDirectMessage)
+		}
+		settings, err = notificationSettings.Execute(context.Background(), loggedIn.Identity, conversationID, false)
+		if err != nil || settings.Muted {
+			t.Fatalf("unmute direct = %#v, error = %v", settings, err)
+		}
+		_, countsAfterDirectUnmute, err := inbox.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil || countsAfterDirectUnmute.Attention != countsAfterDirectMessage.Attention+1 {
+			t.Fatalf("unmuted direct counts = %#v, error = %v", countsAfterDirectUnmute, err)
 		}
 		history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID})
 		if err != nil || len(history.Messages) != 1 || history.Messages[0].ID != message.ID || history.Messages[0].Sender == nil || history.Messages[0].Sender.SourceID != memberLogin.Identity.OrganizationIdentity.ID {
@@ -1118,6 +1147,21 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 
 		inbox := inboxaction.NewLoadInboxQuery(db)
+		notificationSettings := conversationaction.NewUpdateConversationNotificationSettingsAction(db)
+		settings, err := notificationSettings.Execute(context.Background(), memberLogin.Identity, group.ID, true)
+		if err != nil || !settings.Muted {
+			t.Fatalf("mute empty group = %#v, error = %v", settings, err)
+		}
+		settings, err = notificationSettings.Execute(context.Background(), memberLogin.Identity, group.ID, false)
+		if err != nil || settings.Muted {
+			t.Fatalf("unmute empty group = %#v, error = %v", settings, err)
+		}
+		if _, err := notificationSettings.Execute(context.Background(), observerLogin.Identity, group.ID, true); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("non-participant group mute error = %v", err)
+		}
+		if _, err := notificationSettings.Execute(context.Background(), otherInstalled.Identity, group.ID, true); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			t.Fatalf("cross-organization group mute error = %v", err)
+		}
 		for _, currentIdentity := range []*servermodels.Identity{loggedIn.Identity, memberLogin.Identity} {
 			items, _, loadErr := inbox.Execute(context.Background(), currentIdentity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
 			if loadErr != nil {
@@ -1228,6 +1272,67 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
 			t.Fatalf("changed idempotent group reply error = %#v", err)
 		}
+		settings, err = notificationSettings.Execute(context.Background(), memberLogin.Identity, group.ID, true)
+		if err != nil || !settings.Muted {
+			t.Fatalf("mute group = %#v, error = %v", settings, err)
+		}
+		beforeAttentionItems, beforeAttentionCounts, err := inbox.Execute(context.Background(), memberLogin.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var beforeGroupUnread int
+		for _, item := range beforeAttentionItems {
+			if item.ID == group.ID {
+				beforeGroupUnread = item.UnreadCount
+			}
+		}
+		ordinaryMutedMessage, err := send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f80", Body: "静音后的普通消息",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mentionAllInput := conversationaction.GroupTextMessageInput{
+			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f81", Body: "请所有人查看", MentionSubjectIDs: []string{memberSubjectID}, MentionAll: true,
+		}
+		mentionAllMessage, err := send.Execute(context.Background(), loggedIn.Identity, mentionAllInput)
+		if err != nil || !mentionAllMessage.MentionAll {
+			t.Fatalf("mention all message = %#v, error = %v", mentionAllMessage, err)
+		}
+		replayedMentionAll, err := send.Execute(context.Background(), loggedIn.Identity, mentionAllInput)
+		if err != nil || replayedMentionAll.ID != mentionAllMessage.ID || !replayedMentionAll.MentionAll {
+			t.Fatalf("replayed mention all message = %#v, error = %v", replayedMentionAll, err)
+		}
+		changedMentionAll := mentionAllInput
+		changedMentionAll.MentionAll = false
+		_, err = send.Execute(context.Background(), loggedIn.Identity, changedMentionAll)
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
+			t.Fatalf("changed idempotent mention all error = %#v", err)
+		}
+		afterAttentionItems, afterAttentionCounts, err := inbox.Execute(context.Background(), memberLogin.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range afterAttentionItems {
+			if item.ID == group.ID && (!item.Muted || item.UnreadCount != beforeGroupUnread+2 || item.MentionedUnreadCount != 1) {
+				t.Fatalf("muted group unread = %#v", item)
+			}
+		}
+		if afterAttentionCounts.Unread != beforeAttentionCounts.Unread+2 || afterAttentionCounts.Attention != beforeAttentionCounts.Attention+1 {
+			t.Fatalf("muted group counts = %#v, before = %#v", afterAttentionCounts, beforeAttentionCounts)
+		}
+		history, err = conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), memberLogin.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID})
+		if err != nil || len(history.Messages) < 2 || history.Messages[len(history.Messages)-2].ID != ordinaryMutedMessage.ID || history.Messages[len(history.Messages)-1].ID != mentionAllMessage.ID || !history.Messages[len(history.Messages)-1].MentionAll {
+			t.Fatalf("mention all history = %#v, error = %v", history, err)
+		}
+		settings, err = notificationSettings.Execute(context.Background(), memberLogin.Identity, group.ID, false)
+		if err != nil || settings.Muted {
+			t.Fatalf("unmute group = %#v, error = %v", settings, err)
+		}
+		_, afterGroupUnmuteCounts, err := inbox.Execute(context.Background(), memberLogin.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+		if err != nil || afterGroupUnmuteCounts.Attention != afterAttentionCounts.Attention+1 {
+			t.Fatalf("unmuted group counts = %#v, error = %v", afterGroupUnmuteCounts, err)
+		}
 		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f76",
 			Body: "无效引用", ReplyToMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f77",
@@ -1250,7 +1355,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("self group mention error = %#v", err)
 		}
 		history, err = conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID})
-		if err != nil || len(history.Messages) != 2 || history.Messages[1].ReplyTo == nil || history.Messages[1].ReplyTo.ID != message.ID || len(history.Messages[1].Mentions) != 1 || history.Messages[1].Mentions[0].ChatSubjectID != memberSubjectID {
+		if err != nil || len(history.Messages) != 4 || history.Messages[1].ReplyTo == nil || history.Messages[1].ReplyTo.ID != message.ID || len(history.Messages[1].Mentions) != 1 || history.Messages[1].Mentions[0].ChatSubjectID != memberSubjectID || !history.Messages[3].MentionAll {
 			t.Fatalf("group relation history = %#v, error = %v", history, err)
 		}
 		if _, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), otherInstalled.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
@@ -1338,6 +1443,24 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if !foundDissolved {
 			t.Fatalf("dissolved group missing from inbox: %#v", items)
+		}
+
+		addedGroup, err := conversationaction.NewAddGroupConversationMembersAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationMembersInput{
+			ConversationID: group.ID, MemberIdentityIDs: []string{observerLogin.Identity.OrganizationIdentity.ID},
+		})
+		if err != nil || len(addedGroup.Participants) != 3 {
+			t.Fatalf("added group member = %#v, error = %v", addedGroup, err)
+		}
+		observerState := &servermodels.ConversationUserState{}
+		if err := db.NewSelect().Model(observerState).
+			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
+			Where("conversation_id = ?", group.ID).
+			Where("user_id = ?", observerLogin.Identity.User.ID).
+			Scan(context.Background()); err != nil || observerState.LastReadMessageID == nil || observerState.LastReadAt == nil {
+			t.Fatalf("added group member read state = %#v, error = %v", observerState, err)
+		}
+		if _, err := conversationaction.NewMarkConversationReadAction(db).Execute(context.Background(), observerLogin.Identity, group.ID, *observerState.LastReadMessageID); err != nil {
+			t.Fatalf("mark added group member read: %v", err)
 		}
 
 		if _, err := useraction.NewUpdateStatusAction(db).Execute(context.Background(), loggedIn.Identity, observer.ID, domain.UserStatusInactive); err != nil {

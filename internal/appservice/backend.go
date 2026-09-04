@@ -56,6 +56,9 @@ type Backend interface {
 	// MarkConversationRead 单调推进当前用户的原生会话已读水位。
 	//cervi:route POST /conversations/:conversationID/read
 	MarkConversationRead(context.Context, RequestMeta, string, MarkConversationReadInput) (ConversationReadState, error)
+	// UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
+	//cervi:route PATCH /conversations/:conversationID/notification-settings
+	UpdateConversationNotificationSettings(context.Context, RequestMeta, string, ConversationNotificationSettingsInput) (ConversationNotificationSettings, error)
 	// SendCustomerTextMessage 发送客户会话文本消息。
 	//cervi:route POST /conversations/:conversationID/messages
 	SendCustomerTextMessage(context.Context, RequestMeta, string, CustomerTextMessageInput) (ConversationMessage, error)

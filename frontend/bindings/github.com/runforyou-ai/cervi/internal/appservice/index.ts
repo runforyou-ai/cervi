@@ -93,6 +93,8 @@ export type {
     ConversationMessageReference,
     ConversationMessageSender,
     ConversationMessageSessionStart,
+    ConversationNotificationSettings,
+    ConversationNotificationSettingsInput,
     ConversationReadState,
     ConversationSystemEvent,
     ConversationSystemEventParticipant,

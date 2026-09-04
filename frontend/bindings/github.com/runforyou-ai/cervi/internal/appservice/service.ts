@@ -771,6 +771,13 @@ export function UpdateContact(meta: $models.RequestMeta, contactID: string, inpu
 }
 
 /**
+ * UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
+ */
+export function UpdateConversationNotificationSettings(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationNotificationSettingsInput): $CancellablePromise<$models.ConversationNotificationSettings> {
+    return $Call.ByID(379824806, meta, conversationID, input);
+}
+
+/**
  * UpdateGroupConversation 修改群聊资料。
  */
 export function UpdateGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationProfileInput): $CancellablePromise<$models.GroupConversation> {

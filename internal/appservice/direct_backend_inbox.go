@@ -18,7 +18,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 	if err != nil {
 		return Inbox{}, err
 	}
-	summaries, unreadCount, err := b.loadInbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScope(input.Scope), CustomerView: domain.CustomerInboxView(input.CustomerView), AssigneeIdentityID: input.AssigneeIdentityID})
+	summaries, unreadCounts, err := b.loadInbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScope(input.Scope), CustomerView: domain.CustomerInboxView(input.CustomerView), AssigneeIdentityID: input.AssigneeIdentityID})
 	if err != nil {
 		if ctx.Err() != nil {
 			return Inbox{}, ctx.Err()
@@ -51,7 +51,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 	}
 	conversations := make([]InboxConversation, 0, len(summaries))
 	for _, summary := range summaries {
-		conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, LastMessageID: summary.LastMessageID, LastReadMessageID: summary.LastReadMessageID}
+		conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, LastMessageID: summary.LastMessageID, LastReadMessageID: summary.LastReadMessageID}
 		if summary.Customer != nil {
 			var assignee *InboxAssignee
 			if summary.Customer.Assignee != nil {
@@ -85,7 +85,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 		}
 		conversations = append(conversations, conversation)
 	}
-	return Inbox{Conversations: conversations, UnreadCount: unreadCount}, nil
+	return Inbox{Conversations: conversations, UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention}, nil
 }
 
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。

@@ -389,7 +389,7 @@ func memberConversationMessage(message *servermodels.Message, subjectID, sourceI
 	name := displayName
 	return ConversationMessage{
 		ID: message.ID, Type: domain.MessageTypeText, Body: message.Body,
-		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt,
+		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,
 			SourceID: sourceID, DisplayName: &name,

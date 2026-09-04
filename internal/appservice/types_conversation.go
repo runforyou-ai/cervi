@@ -133,6 +133,7 @@ type ConversationMessage struct {
 	SystemEvent  *ConversationSystemEvent         `json:"systemEvent"`
 	ReplyTo      *ConversationMessageReference    `json:"replyTo"`
 	Mentions     []ConversationMessageMention     `json:"mentions"`
+	MentionAll   bool                             `json:"mentionAll"`
 }
 
 // ConversationMessageList 定义成员消息页。
@@ -226,4 +227,15 @@ type GroupTextMessageInput struct {
 	Body              string   `json:"body"`
 	ReplyToMessageID  string   `json:"replyToMessageId"`
 	MentionSubjectIDs []string `json:"mentionSubjectIds"`
+	MentionAll        bool     `json:"mentionAll"`
+}
+
+// ConversationNotificationSettingsInput 定义当前用户的会话提醒设置。
+type ConversationNotificationSettingsInput struct {
+	Muted bool `json:"muted"`
+}
+
+// ConversationNotificationSettings 定义当前用户保存后的会话提醒设置。
+type ConversationNotificationSettings struct {
+	Muted bool `json:"muted"`
 }
