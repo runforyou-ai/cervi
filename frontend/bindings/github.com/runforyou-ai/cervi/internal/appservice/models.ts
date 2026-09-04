@@ -555,6 +555,7 @@ export interface ConversationMessage {
     "systemEvent": ConversationSystemEvent | null;
     "replyTo": ConversationMessageReference | null;
     "mentions": ConversationMessageMention[] | null;
+    "mentionAll": boolean;
 }
 
 /**
@@ -610,6 +611,20 @@ export interface ConversationMessageSessionStart {
     "sequence": number;
     "startedAt": string;
     "status": ServiceSessionStatus;
+}
+
+/**
+ * ConversationNotificationSettings 定义当前用户保存后的会话提醒设置。
+ */
+export interface ConversationNotificationSettings {
+    "muted": boolean;
+}
+
+/**
+ * ConversationNotificationSettingsInput 定义当前用户的会话提醒设置。
+ */
+export interface ConversationNotificationSettingsInput {
+    "muted": boolean;
 }
 
 /**
@@ -1001,6 +1016,7 @@ export interface GroupTextMessageInput {
     "body": string;
     "replyToMessageId": string;
     "mentionSubjectIds": string[] | null;
+    "mentionAll": boolean;
 }
 
 /**
@@ -1026,6 +1042,7 @@ export interface ImageFile {
 export interface Inbox {
     "conversations": InboxConversation[] | null;
     "unreadCount": number;
+    "attentionUnreadCount": number;
 }
 
 /**
@@ -1046,6 +1063,7 @@ export interface InboxConversation {
     "type": ConversationType;
     "unreadCount": number;
     "mentionedUnreadCount": number;
+    "muted": boolean;
     "lastMessageId": string | null;
     "lastReadMessageId": string | null;
     "customer": CustomerInboxConversation | null;

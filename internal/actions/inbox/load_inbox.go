@@ -73,6 +73,7 @@ type ConversationSummary struct {
 	Type                 domain.ConversationType
 	UnreadCount          int
 	MentionedUnreadCount int
+	Muted                bool
 	LastMessageID        *string
 	LastReadMessageID    *string
 	Customer             *CustomerConversationSummary
@@ -84,6 +85,12 @@ type ConversationSummary struct {
 // LoadInboxQuery 读取当前企业的统一收件箱。
 type LoadInboxQuery struct {
 	db *bun.DB
+}
+
+// UnreadCounts 定义内部会话的客观未读和提醒未读总数。
+type UnreadCounts struct {
+	Unread    int `bun:"unread_count"`
+	Attention int `bun:"attention_unread_count"`
 }
 
 type customerConversationRow struct {
@@ -117,6 +124,7 @@ type directConversationRow struct {
 	UnreadCount       int        `bun:"unread_count"`
 	LastMessageID     *string    `bun:"last_message_id"`
 	LastReadMessageID *string    `bun:"last_read_message_id"`
+	Muted             bool       `bun:"muted"`
 }
 
 type groupConversationRow struct {
@@ -132,6 +140,7 @@ type groupConversationRow struct {
 	MentionedUnreadCount int        `bun:"mentioned_unread_count"`
 	LastMessageID        *string    `bun:"last_message_id"`
 	LastReadMessageID    *string    `bun:"last_read_message_id"`
+	Muted                bool       `bun:"muted"`
 }
 
 // NewLoadInboxQuery 创建成员收件箱查询。
@@ -140,7 +149,7 @@ func NewLoadInboxQuery(db *bun.DB) *LoadInboxQuery {
 }
 
 // Execute 分别读取客户会话、内部单聊和群聊后合并排序。
-func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, int, error) {
+func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, UnreadCounts, error) {
 	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
 	input.CustomerView = domain.CustomerInboxView(strings.TrimSpace(string(input.CustomerView)))
 	input.AssigneeIdentityID = strings.TrimSpace(input.AssigneeIdentityID)
@@ -153,7 +162,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	if (input.Scope != domain.InboxScopeAll && input.Scope != domain.InboxScopeCustomer && input.Scope != domain.InboxScopeInternal) ||
 		(input.Scope == domain.InboxScopeCustomer && input.CustomerView != domain.CustomerInboxViewQueue && input.CustomerView != domain.CustomerInboxViewMine && input.CustomerView != domain.CustomerInboxViewCoworkers && input.CustomerView != domain.CustomerInboxViewClosed) ||
 		(input.AssigneeIdentityID != "" && (input.Scope != domain.InboxScopeCustomer || input.CustomerView != domain.CustomerInboxViewCoworkers || !common.ValidUUID(input.AssigneeIdentityID))) {
-		return nil, 0, ErrQueryInvalid
+		return nil, UnreadCounts{}, ErrQueryInvalid
 	}
 
 	customers := make([]customerConversationRow, 0)
@@ -163,17 +172,17 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	if input.Scope != domain.InboxScopeInternal {
 		customers, err = q.loadCustomerConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, input)
 		if err != nil {
-			return nil, 0, err
+			return nil, UnreadCounts{}, err
 		}
 	}
 	if input.Scope != domain.InboxScopeCustomer {
 		directs, err = q.loadDirectConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
 		if err != nil {
-			return nil, 0, err
+			return nil, UnreadCounts{}, err
 		}
 		groups, err = q.loadGroupConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
 		if err != nil {
-			return nil, 0, err
+			return nil, UnreadCounts{}, err
 		}
 	}
 
@@ -200,7 +209,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			agentRunStatus = &status
 		}
 		result = append(result, ConversationSummary{
-			ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
+			ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
 			Direct: &DirectConversationSummary{
 				PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName,
 				Preview: row.Preview, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
@@ -209,7 +218,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	}
 	for _, row := range groups {
 		result = append(result, ConversationSummary{
-			ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
+			ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
 			Group: &GroupConversationSummary{
 				Title: row.Title, ImageFileID: row.ImageFileID, Status: domain.ConversationStatus(row.Status), Preview: row.Preview,
 				LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount,
@@ -230,11 +239,11 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		}
 		return firstTime.After(*secondTime)
 	})
-	totalUnread, err := q.loadTotalUnreadCount(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
+	unreadCounts, err := q.loadUnreadCounts(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
 	if err != nil {
-		return nil, 0, err
+		return nil, UnreadCounts{}, err
 	}
-	return result, totalUnread, nil
+	return result, unreadCounts, nil
 }
 
 // loadCustomerConversations 按客户视图读取最新处理周期对应的会话。
@@ -325,6 +334,7 @@ func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizati
 		ColumnExpr("latest_agent_run.status AS agent_run_status").
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
+		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("cv.last_message_at AS sort_at").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
@@ -376,6 +386,7 @@ func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizatio
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("unread.mentioned_unread_count AS mentioned_unread_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
+		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("cv.last_message_at AS sort_at").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
@@ -384,7 +395,7 @@ func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizatio
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
 		Join(`JOIN LATERAL (
 			SELECT count(*) AS unread_count,
-				count(*) FILTER (WHERE mention.message_id IS NOT NULL) AS mentioned_unread_count
+				count(*) FILTER (WHERE mention.message_id IS NOT NULL OR unread_msg.mention_all) AS mentioned_unread_count
 			FROM messages AS unread_msg
 			LEFT JOIN messages AS read_msg ON read_msg.organization_id = state.organization_id AND read_msg.conversation_id = state.conversation_id AND read_msg.id = state.last_read_message_id
 			LEFT JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.id = unread_msg.sender_participant_id
@@ -406,10 +417,27 @@ func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizatio
 	return rows, nil
 }
 
-// loadTotalUnreadCount 统计不受列表范围和条数限制的内部消息未读总数。
-func (q *LoadInboxQuery) loadTotalUnreadCount(ctx context.Context, organizationID, identityID, userID string) (int, error) {
-	count, err := q.db.NewSelect().
+// loadUnreadCounts 统计不受列表范围和条数限制的内部客观未读和提醒未读。
+func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, identityID, userID string) (UnreadCounts, error) {
+	counts := UnreadCounts{}
+	err := q.db.NewSelect().
 		TableExpr("messages AS msg").
+		ColumnExpr("count(*) AS unread_count").
+		ColumnExpr(`count(*) FILTER (WHERE
+			NOT COALESCE(state.muted, false)
+			OR (
+				cv.type = ?
+				AND (
+					msg.mention_all
+					OR EXISTS (
+						SELECT 1 FROM message_mentions AS attention_mention
+						WHERE attention_mention.organization_id = msg.organization_id
+							AND attention_mention.message_id = msg.id
+							AND attention_mention.subject_id = mine.subject_id
+					)
+				)
+			)
+		) AS attention_unread_count`, domain.ConversationTypeGroup).
 		Join("JOIN conversations AS cv ON cv.organization_id = msg.organization_id AND cv.id = msg.conversation_id AND cv.type IN (?, ?)", domain.ConversationTypeDirect, domain.ConversationTypeGroup).
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
@@ -442,9 +470,9 @@ func (q *LoadInboxQuery) loadTotalUnreadCount(ctx context.Context, organizationI
 		Where("msg.deleted_at IS NULL").
 		Where("msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?", identityID).
 		Where("read_msg.id IS NULL OR (msg.originated_at, msg.source_order, msg.id) > (read_msg.originated_at, read_msg.source_order, read_msg.id)").
-		Count(ctx)
+		Scan(ctx, &counts)
 	if err != nil {
-		return 0, fmt.Errorf("count internal unread messages: %w", err)
+		return UnreadCounts{}, fmt.Errorf("count internal unread messages: %w", err)
 	}
-	return count, nil
+	return counts, nil
 }

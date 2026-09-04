@@ -27,6 +27,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.POST("/conversations/:conversationID/read", s.markConversationRead)
+	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
 	router.POST("/conversations/:conversationID/transfer", s.transferServiceSession)
@@ -242,6 +243,16 @@ func (s *Service) markConversationRead(c *gin.Context) {
 		return
 	}
 	output, err := s.application.MarkConversationRead(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
+func (s *Service) updateConversationNotificationSettings(c *gin.Context) {
+	var input appservice.ConversationNotificationSettingsInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateConversationNotificationSettings(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

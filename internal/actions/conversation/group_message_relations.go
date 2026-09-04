@@ -187,10 +187,11 @@ func loadIdempotentGroupMessage(ctx context.Context, db bun.IDB, identity *serve
 	}
 	var stored struct {
 		ReplyToMessageID *string `bun:"reply_to_message_id"`
+		MentionAll       bool    `bun:"mention_all"`
 	}
 	if err := db.NewSelect().
 		TableExpr("messages AS msg").
-		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
+		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id, msg.mention_all AS mention_all").
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.id = ?", saved.ID).
 		Scan(ctx, &stored); err != nil {
@@ -210,7 +211,7 @@ func loadIdempotentGroupMessage(ctx context.Context, db bun.IDB, identity *serve
 	if stored.ReplyToMessageID != nil {
 		storedReply = *stored.ReplyToMessageID
 	}
-	if storedReply != input.ReplyToMessageID || !slices.Equal(storedMentionSubjectIDs, input.MentionSubjectIDs) {
+	if storedReply != input.ReplyToMessageID || stored.MentionAll != input.MentionAll || !slices.Equal(storedMentionSubjectIDs, input.MentionSubjectIDs) {
 		return ConversationMessage{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	if storedReply != "" {
@@ -223,6 +224,7 @@ func loadIdempotentGroupMessage(ctx context.Context, db bun.IDB, identity *serve
 	if err != nil {
 		return ConversationMessage{}, true, err
 	}
+	saved.MentionAll = stored.MentionAll
 	return saved, true, nil
 }
 

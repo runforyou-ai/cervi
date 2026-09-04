@@ -38,6 +38,7 @@ type conversationMessageRow struct {
 	SenderSourceID                 *string         `bun:"sender_source_id"`
 	SenderDisplayName              *string         `bun:"sender_display_name"`
 	ReplyToMessageID               *string         `bun:"reply_to_message_id"`
+	MentionAll                     bool            `bun:"mention_all"`
 	ReplyToBody                    *string         `bun:"reply_to_body"`
 	ReplyToSenderSubjectID         *string         `bun:"reply_to_sender_subject_id"`
 	ReplyToSenderKind              *string         `bun:"reply_to_sender_kind"`
@@ -79,6 +80,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) WHEN cs.kind = ? THEN oi.display_name END AS sender_display_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
+		ColumnExpr("msg.mention_all AS mention_all").
 		ColumnExpr("reply_msg.body AS reply_to_body").
 		ColumnExpr("reply_cs.id AS reply_to_sender_subject_id").
 		ColumnExpr("reply_cs.kind AS reply_to_sender_kind").
@@ -210,7 +212,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow, input Conver
 	for _, row := range rows {
 		message := ConversationMessage{
 			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
-			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
+			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll,
 		}
 		if message.Type == domain.MessageTypeSystem {
 			if row.SystemEventType == nil || len(row.SystemEventPayload) == 0 {

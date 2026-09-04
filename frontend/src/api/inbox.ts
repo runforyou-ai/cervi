@@ -19,12 +19,15 @@ import {
   TransferServiceSession,
   TransferGroupConversationOwner,
   UpdateGroupConversation,
+  UpdateConversationNotificationSettings,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   CustomerInboxConversation,
   ConversationMessage,
   ConversationMessageList,
   ConversationMessageListInput,
+  ConversationNotificationSettings,
+  ConversationNotificationSettingsInput,
   CustomerTextMessageInput,
   DirectInboxConversation,
   DirectConversationInput,
@@ -93,6 +96,11 @@ export type GroupConversationData = Omit<GroupConversation, "participants"> & {
   participants: GroupParticipant[]
 }
 
+export type GroupTextMessageDataInput = Omit<
+  GroupTextMessageInput,
+  "mentionAll"
+>
+
 const loadInboxBound = bind(LoadInbox)
 const listConversationMessagesBound = bind(ListConversationMessages)
 const markConversationReadBound = bind(MarkConversationRead)
@@ -102,6 +110,9 @@ const sendDirectTextMessageBound = bind(SendDirectTextMessage)
 const createGroupConversationBound = bind(CreateGroupConversation)
 const getGroupConversationBound = bind(GetGroupConversation)
 const updateGroupConversationBound = bind(UpdateGroupConversation)
+const updateConversationNotificationSettingsBound = bind(
+  UpdateConversationNotificationSettings,
+)
 const addGroupConversationMembersBound = bind(AddGroupConversationMembers)
 const removeGroupConversationMemberBound = bind(
   RemoveGroupConversationMember,
@@ -118,6 +129,14 @@ const closeServiceSessionBound = bind(CloseServiceSession)
 const reopenServiceSessionBound = bind(ReopenServiceSession)
 
 export type LoadInboxQuery = Partial<LoadInboxInput>
+
+/** 保存当前用户的原生会话提醒设置。 */
+export function updateConversationNotificationSettings(
+  conversationID: string,
+  input: ConversationNotificationSettingsInput,
+): Promise<ConversationNotificationSettings> {
+  return updateConversationNotificationSettingsBound(conversationID, input)
+}
 
 /** 归一化消息中的提醒和系统事件成员列表。 */
 function normalizeConversationMessage(
@@ -333,8 +352,11 @@ export function leaveGroupConversation(
 /** 发送企业内部群聊文本消息。 */
 export async function sendGroupTextMessage(
   conversationID: string,
-  input: GroupTextMessageInput,
+  input: GroupTextMessageDataInput,
 ) {
-  const message = await sendGroupTextMessageBound(conversationID, input)
+  const message = await sendGroupTextMessageBound(conversationID, {
+    ...input,
+    mentionAll: false,
+  })
   return normalizeConversationMessage(message)
 }

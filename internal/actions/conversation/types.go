@@ -201,6 +201,7 @@ type ConversationMessage struct {
 	SystemEvent  *ConversationSystemEvent
 	ReplyTo      *ConversationMessageReference
 	Mentions     []ConversationMessageMention
+	MentionAll   bool
 }
 
 // ConversationMessageHistoryInput 定义成员消息历史查询方向。
@@ -322,4 +323,10 @@ type GroupTextMessageInput struct {
 	Body              string
 	ReplyToMessageID  string
 	MentionSubjectIDs []string
+	MentionAll        bool
+}
+
+// ConversationNotificationSettings 定义当前用户的会话提醒设置。
+type ConversationNotificationSettings struct {
+	Muted bool
 }

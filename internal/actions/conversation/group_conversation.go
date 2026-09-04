@@ -288,11 +288,11 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 			message := &servermodels.Message{
 				ID: messageID.String(), OrganizationID: identity.Organization.ID,
 				ConversationID: normalized.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
-				Type: string(domain.MessageTypeText), Body: normalized.Body, ReplyToMessageID: replyToMessageID,
+				Type: string(domain.MessageTypeText), Body: normalized.Body, ReplyToMessageID: replyToMessageID, MentionAll: normalized.MentionAll,
 				IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
 			}
 			if _, err := tx.NewInsert().Model(message).
-				Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "idempotency_key", "originated_at").
+				Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "mention_all", "idempotency_key", "originated_at").
 				Returning("*").
 				Exec(ctx); err != nil {
 				return fmt.Errorf("create group text message: %w", err)
@@ -306,13 +306,14 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 			}
 			if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
 				OrganizationID: identity.Organization.ID, ConversationID: normalized.ConversationID,
-				UserID: identity.User.ID, LastReadMessageID: message.ID,
+				UserID: identity.User.ID, LastReadMessageID: &message.ID,
 			}, message); err != nil {
 				return err
 			}
 			result = memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
 			result.ReplyTo = reply
 			result.Mentions = mentions
+			result.MentionAll = normalized.MentionAll
 			return nil
 		})
 		if err == nil {

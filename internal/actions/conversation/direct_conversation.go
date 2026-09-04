@@ -223,7 +223,7 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 			}
 			if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
 				OrganizationID: identity.Organization.ID, ConversationID: normalized.ConversationID,
-				UserID: identity.User.ID, LastReadMessageID: message.ID,
+				UserID: identity.User.ID, LastReadMessageID: &message.ID,
 			}, message); err != nil {
 				return err
 			}

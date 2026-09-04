@@ -112,6 +112,7 @@ type InboxConversation struct {
 	Type                 ConversationType           `json:"type"`
 	UnreadCount          int                        `json:"unreadCount"`
 	MentionedUnreadCount int                        `json:"mentionedUnreadCount"`
+	Muted                bool                       `json:"muted"`
 	LastMessageID        *string                    `json:"lastMessageId"`
 	LastReadMessageID    *string                    `json:"lastReadMessageId"`
 	Customer             *CustomerInboxConversation `json:"customer"`
@@ -121,6 +122,7 @@ type InboxConversation struct {
 
 // Inbox 定义成员收件箱查询结果。
 type Inbox struct {
-	Conversations []InboxConversation `json:"conversations"`
-	UnreadCount   int                 `json:"unreadCount"`
+	Conversations        []InboxConversation `json:"conversations"`
+	UnreadCount          int                 `json:"unreadCount"`
+	AttentionUnreadCount int                 `json:"attentionUnreadCount"`
 }
