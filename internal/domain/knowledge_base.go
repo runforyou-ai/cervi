@@ -11,8 +11,6 @@ const (
 	KnowledgeGroupNameMaxLength = 120
 	// KnowledgeRetrievalQueryMaxLength 是知识库检索内容允许的最大字符数。
 	KnowledgeRetrievalQueryMaxLength = 250
-	// KnowledgeRetrievalTopKMax 是知识库单次检索允许返回的最大分段数。
-	KnowledgeRetrievalTopKMax = 100
 )
 
 // KnowledgeBaseCategory 表示知识库内容类型。
@@ -22,25 +20,6 @@ const (
 	KnowledgeBaseCategoryStandard KnowledgeBaseCategory = "standard"
 	KnowledgeBaseCategoryQA       KnowledgeBaseCategory = "qa"
 )
-
-// KnowledgeRetrievalMethod 表示知识库检索方式。
-type KnowledgeRetrievalMethod string
-
-const (
-	KnowledgeRetrievalMethodKeyword  KnowledgeRetrievalMethod = "keyword"
-	KnowledgeRetrievalMethodSemantic KnowledgeRetrievalMethod = "semantic"
-	KnowledgeRetrievalMethodFullText KnowledgeRetrievalMethod = "full_text"
-	KnowledgeRetrievalMethodHybrid   KnowledgeRetrievalMethod = "hybrid"
-)
-
-// KnowledgeRetrievalOptions 定义各类知识库共用的检索参数。
-type KnowledgeRetrievalOptions struct {
-	Method                KnowledgeRetrievalMethod
-	RerankingEnabled      bool
-	TopK                  int
-	ScoreThresholdEnabled bool
-	ScoreThreshold        float64
-}
 
 // KnowledgeDocumentStatus 表示知识文档的统一状态。
 type KnowledgeDocumentStatus string

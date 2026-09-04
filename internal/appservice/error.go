@@ -69,6 +69,12 @@ func (e *Error) WithState(state SessionState) *Error {
 	return e
 }
 
+// WithReason 附加可向调用方展示的具体错误原因。
+func (e *Error) WithReason(reason string) *Error {
+	e.Reason = reason
+	return e
+}
+
 // MarshalError 将业务错误写入 Wails RuntimeError 的 cause。
 func MarshalError(err error) []byte {
 	var apiError *Error

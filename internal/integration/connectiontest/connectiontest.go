@@ -144,8 +144,11 @@ func ClassifyTransportError(stage Stage, err error) error {
 }
 
 // HTTPStatusError 按外部服务响应状态规范化探测错误。
-func HTTPStatusError(status int) *Error {
+func HTTPStatusError(status int, details ...string) *Error {
 	cause := fmt.Errorf("unexpected HTTP status %d", status)
+	if len(details) > 0 && details[0] != "" {
+		cause = fmt.Errorf("unexpected HTTP status %d: %s", status, details[0])
+	}
 	switch status {
 	case http.StatusUnauthorized:
 		return NewError(StageAuthenticate, FailureUnauthorized, cause)

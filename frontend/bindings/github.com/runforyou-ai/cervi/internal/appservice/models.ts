@@ -810,6 +810,24 @@ export interface DirectTextMessageInput {
 }
 
 /**
+ * ExternalKnowledgeBaseConfiguration 定义外部知识库的主要运行配置。
+ */
+export interface ExternalKnowledgeBaseConfiguration {
+    "indexingTechnique": string;
+    "documentCount": number;
+    "wordCount": number;
+    "embeddingModel": string;
+    "embeddingModelProvider": string;
+    "retrievalMethod": string;
+    "topK": number;
+    "scoreThresholdEnabled": boolean;
+    "scoreThreshold": number | null;
+    "rerankingEnabled": boolean;
+    "rerankingModel": string;
+    "rerankingProvider": string;
+}
+
+/**
  * ExternalKnowledgeBaseOption 定义外部知识库选择项。
  */
 export interface ExternalKnowledgeBaseOption {
@@ -1168,6 +1186,7 @@ export interface KnowledgeBase {
     "description": string;
     "integrationConnectionId": string;
     "externalResourceId": string;
+    "externalConfiguration": ExternalKnowledgeBaseConfiguration | null;
     "groups": KnowledgeGroup[] | null;
     "createdAt": string;
     "updatedAt": string;
@@ -1335,27 +1354,7 @@ export interface KnowledgeGroupInput {
  */
 export interface KnowledgeRetrievalInput {
     "query": string;
-    "method": KnowledgeRetrievalMethod;
-    "rerankingEnabled": boolean;
-    "topK": number;
-    "scoreThresholdEnabled": boolean;
-    "scoreThreshold": number;
 }
-
-/**
- * KnowledgeRetrievalMethod 表示知识库检索方式。
- */
-export enum KnowledgeRetrievalMethod {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    KnowledgeRetrievalMethodKeyword = "keyword",
-    KnowledgeRetrievalMethodSemantic = "semantic",
-    KnowledgeRetrievalMethodFullText = "full_text",
-    KnowledgeRetrievalMethodHybrid = "hybrid",
-};
 
 /**
  * KnowledgeRetrievalRecord 定义知识库检索命中项。

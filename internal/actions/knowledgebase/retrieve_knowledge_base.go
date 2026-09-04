@@ -7,31 +7,18 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connector"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
-
-type difyKnowledgeRetriever interface {
-	Retrieve(
-		context.Context,
-		connector.DifyKnowledgeBaseConfig,
-		string,
-		string,
-		domain.KnowledgeRetrievalOptions,
-	) ([]connector.DifyKnowledgeRetrievalRecord, error)
-}
 
 // RetrieveKnowledgeBaseQuery 检索外部知识库。
 type RetrieveKnowledgeBaseQuery struct {
-	db        *bun.DB
-	retriever difyKnowledgeRetriever
+	search *SearchService
 }
 
 // NewRetrieveKnowledgeBaseQuery 创建知识库检索查询。
-func NewRetrieveKnowledgeBaseQuery(db *bun.DB, retriever difyKnowledgeRetriever) *RetrieveKnowledgeBaseQuery {
-	return &RetrieveKnowledgeBaseQuery{db: db, retriever: retriever}
+func NewRetrieveKnowledgeBaseQuery(search *SearchService) *RetrieveKnowledgeBaseQuery {
+	return &RetrieveKnowledgeBaseQuery{search: search}
 }
 
 // Execute 返回当前企业指定外部知识库的检索命中项。
@@ -45,19 +32,16 @@ func (q *RetrieveKnowledgeBaseQuery) Execute(
 	if len(fields) > 0 {
 		return nil, &common.FieldError{Fields: fields}
 	}
-	access, err := loadDifyKnowledgeAccess(ctx, q.db, identity.Organization.ID, knowledgeBaseID)
+	search, err := q.search.ForKnowledgeBase(ctx, identity.Organization.ID, knowledgeBaseID)
 	if err != nil {
 		return nil, err
 	}
-	records, err := q.retriever.Retrieve(ctx, access.Config, access.DatasetID, input.Query, domain.KnowledgeRetrievalOptions{
-		Method: input.Method, RerankingEnabled: input.RerankingEnabled, TopK: input.TopK,
-		ScoreThresholdEnabled: input.ScoreThresholdEnabled, ScoreThreshold: input.ScoreThreshold,
-	})
+	result, err := search(ctx, knowledgeretrieval.Request{Queries: []string{input.Query}})
 	if err != nil {
 		return nil, fmt.Errorf("retrieve external knowledge base: %w", err)
 	}
-	output := make([]RetrievalRecord, 0, len(records))
-	for _, record := range records {
+	output := make([]RetrievalRecord, 0, len(result.Records))
+	for _, record := range result.Records {
 		output = append(output, RetrievalRecord{
 			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
 			SegmentID: record.SegmentID, Position: record.Position,

@@ -31,9 +31,26 @@ type Record struct {
 	Description             string                       `bun:"description"`
 	IntegrationConnectionID string
 	ExternalResourceID      string
+	ExternalConfiguration   *ExternalConfigurationRecord
 	Groups                  []GroupRecord
 	CreatedAt               time.Time `bun:"created_at"`
 	UpdatedAt               time.Time `bun:"updated_at"`
+}
+
+// ExternalConfigurationRecord 定义外部知识库的主要运行配置。
+type ExternalConfigurationRecord struct {
+	IndexingTechnique      string
+	DocumentCount          int
+	WordCount              int
+	EmbeddingModel         string
+	EmbeddingModelProvider string
+	RetrievalMethod        string
+	TopK                   int
+	ScoreThresholdEnabled  bool
+	ScoreThreshold         *float64
+	RerankingEnabled       bool
+	RerankingModel         string
+	RerankingProvider      string
 }
 
 // ExternalOptionRecord 定义外部知识库选择项。
@@ -107,12 +124,7 @@ type DocumentSegmentListOutput struct {
 
 // RetrievalInput 定义知识库检索条件。
 type RetrievalInput struct {
-	Query                 string
-	Method                domain.KnowledgeRetrievalMethod
-	RerankingEnabled      bool
-	TopK                  int
-	ScoreThresholdEnabled bool
-	ScoreThreshold        float64
+	Query string
 }
 
 // RetrievalRecord 定义知识库检索命中项。

@@ -365,9 +365,6 @@ const (
 	FieldKnowledgeDocumentQueryInvalid             Key = "field.knowledge_document_query_invalid"
 	FieldKnowledgeRetrievalQueryRequired           Key = "field.knowledge_retrieval_query_required"
 	FieldKnowledgeRetrievalQueryTooLong            Key = "field.knowledge_retrieval_query_too_long"
-	FieldKnowledgeRetrievalMethodInvalid           Key = "field.knowledge_retrieval_method_invalid"
-	FieldKnowledgeRetrievalTopKInvalid             Key = "field.knowledge_retrieval_top_k_invalid"
-	FieldKnowledgeRetrievalScoreThresholdInvalid   Key = "field.knowledge_retrieval_score_threshold_invalid"
 )
 
 //go:embed locales/*.json

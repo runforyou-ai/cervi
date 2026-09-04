@@ -32,11 +32,12 @@ const (
 
 // ExecuteAction 执行并收尾一次 Agent 业务运行。
 type ExecuteAction struct {
-	db          *bun.DB
-	enqueuer    servertask.TxEnqueuer
-	runtime     agentruntime.Runtime
-	runningMu   sync.Mutex
-	runningRuns map[string]*runningAgentRun
+	db                     *bun.DB
+	enqueuer               servertask.TxEnqueuer
+	runtime                agentruntime.Runtime
+	knowledgeSearchFactory knowledgeSearchFactory
+	runningMu              sync.Mutex
+	runningRuns            map[string]*runningAgentRun
 }
 
 type executionContext struct {
@@ -51,8 +52,8 @@ type executionContext struct {
 }
 
 // NewExecuteAction 创建 Agent Worker Action。
-func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime) *ExecuteAction {
-	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, runningRuns: make(map[string]*runningAgentRun)}
+func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, knowledgeSearchFactory knowledgeSearchFactory) *ExecuteAction {
+	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, knowledgeSearchFactory: knowledgeSearchFactory, runningRuns: make(map[string]*runningAgentRun)}
 }
 
 // Execute 运行 TurnLoop，并只保存吸收完当前输入后的稳定回复。
@@ -80,12 +81,17 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		return task.Permanent(err)
 	}
 	feed := &databaseInputFeed{db: a.db, execution: execution, policy: policy}
+	knowledgeSearch, err := a.knowledgeSearchForRun(runCtx, execution.Run.OrganizationID)
+	if err != nil {
+		return task.Permanent(err)
+	}
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
 		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: execution.Instruction,
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
 		},
+		KnowledgeSearch: knowledgeSearch,
 	}, feed)
 	if errors.Is(err, errAgentRunSuppressed) {
 		return nil

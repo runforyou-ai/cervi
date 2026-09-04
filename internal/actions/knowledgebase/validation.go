@@ -3,7 +3,6 @@
 package knowledgebase
 
 import (
-	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -12,25 +11,22 @@ import (
 )
 
 const (
-	ValidationNameRequired                   common.FieldCode = "KNOWLEDGE_BASE_NAME_REQUIRED"
-	ValidationNameTooLong                    common.FieldCode = "KNOWLEDGE_BASE_NAME_TOO_LONG"
-	ValidationNameDuplicate                  common.FieldCode = "KNOWLEDGE_BASE_NAME_DUPLICATE"
-	ValidationCategoryInvalid                common.FieldCode = "KNOWLEDGE_BASE_CATEGORY_INVALID"
-	ValidationDescriptionTooLong             common.FieldCode = "KNOWLEDGE_BASE_DESCRIPTION_TOO_LONG"
-	ValidationIntegrationConnectionInvalid   common.FieldCode = "KNOWLEDGE_BASE_INTEGRATION_CONNECTION_INVALID"
-	ValidationExternalResourceRequired       common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_REQUIRED"
-	ValidationExternalResourceTooLong        common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_TOO_LONG"
-	ValidationExternalResourceDuplicate      common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_DUPLICATE"
-	ValidationGroupNameRequired              common.FieldCode = "KNOWLEDGE_GROUP_NAME_REQUIRED"
-	ValidationGroupNameTooLong               common.FieldCode = "KNOWLEDGE_GROUP_NAME_TOO_LONG"
-	ValidationGroupNameDuplicate             common.FieldCode = "KNOWLEDGE_GROUP_NAME_DUPLICATE"
-	ValidationGroupParentInvalid             common.FieldCode = "KNOWLEDGE_GROUP_PARENT_INVALID"
-	ValidationDocumentQueryInvalid           common.FieldCode = "KNOWLEDGE_DOCUMENT_QUERY_INVALID"
-	ValidationRetrievalQueryRequired         common.FieldCode = "KNOWLEDGE_RETRIEVAL_QUERY_REQUIRED"
-	ValidationRetrievalQueryTooLong          common.FieldCode = "KNOWLEDGE_RETRIEVAL_QUERY_TOO_LONG"
-	ValidationRetrievalMethodInvalid         common.FieldCode = "KNOWLEDGE_RETRIEVAL_METHOD_INVALID"
-	ValidationRetrievalTopKInvalid           common.FieldCode = "KNOWLEDGE_RETRIEVAL_TOP_K_INVALID"
-	ValidationRetrievalScoreThresholdInvalid common.FieldCode = "KNOWLEDGE_RETRIEVAL_SCORE_THRESHOLD_INVALID"
+	ValidationNameRequired                 common.FieldCode = "KNOWLEDGE_BASE_NAME_REQUIRED"
+	ValidationNameTooLong                  common.FieldCode = "KNOWLEDGE_BASE_NAME_TOO_LONG"
+	ValidationNameDuplicate                common.FieldCode = "KNOWLEDGE_BASE_NAME_DUPLICATE"
+	ValidationCategoryInvalid              common.FieldCode = "KNOWLEDGE_BASE_CATEGORY_INVALID"
+	ValidationDescriptionTooLong           common.FieldCode = "KNOWLEDGE_BASE_DESCRIPTION_TOO_LONG"
+	ValidationIntegrationConnectionInvalid common.FieldCode = "KNOWLEDGE_BASE_INTEGRATION_CONNECTION_INVALID"
+	ValidationExternalResourceRequired     common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_REQUIRED"
+	ValidationExternalResourceTooLong      common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_TOO_LONG"
+	ValidationExternalResourceDuplicate    common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_DUPLICATE"
+	ValidationGroupNameRequired            common.FieldCode = "KNOWLEDGE_GROUP_NAME_REQUIRED"
+	ValidationGroupNameTooLong             common.FieldCode = "KNOWLEDGE_GROUP_NAME_TOO_LONG"
+	ValidationGroupNameDuplicate           common.FieldCode = "KNOWLEDGE_GROUP_NAME_DUPLICATE"
+	ValidationGroupParentInvalid           common.FieldCode = "KNOWLEDGE_GROUP_PARENT_INVALID"
+	ValidationDocumentQueryInvalid         common.FieldCode = "KNOWLEDGE_DOCUMENT_QUERY_INVALID"
+	ValidationRetrievalQueryRequired       common.FieldCode = "KNOWLEDGE_RETRIEVAL_QUERY_REQUIRED"
+	ValidationRetrievalQueryTooLong        common.FieldCode = "KNOWLEDGE_RETRIEVAL_QUERY_TOO_LONG"
 )
 
 // normalizeInput 规范化并校验知识库字段。
@@ -90,22 +86,6 @@ func normalizeRetrievalInput(input RetrievalInput) (RetrievalInput, map[string]c
 		fields["query"] = ValidationRetrievalQueryRequired
 	} else if utf8.RuneCountInString(input.Query) > domain.KnowledgeRetrievalQueryMaxLength {
 		fields["query"] = ValidationRetrievalQueryTooLong
-	}
-	switch input.Method {
-	case domain.KnowledgeRetrievalMethodKeyword,
-		domain.KnowledgeRetrievalMethodSemantic,
-		domain.KnowledgeRetrievalMethodFullText,
-		domain.KnowledgeRetrievalMethodHybrid:
-	default:
-		fields["method"] = ValidationRetrievalMethodInvalid
-	}
-	if input.TopK < 1 || input.TopK > domain.KnowledgeRetrievalTopKMax {
-		fields["topK"] = ValidationRetrievalTopKInvalid
-	}
-	if input.ScoreThresholdEnabled &&
-		(math.IsNaN(input.ScoreThreshold) || math.IsInf(input.ScoreThreshold, 0) ||
-			input.ScoreThreshold < 0 || input.ScoreThreshold > 1) {
-		fields["scoreThreshold"] = ValidationRetrievalScoreThresholdInvalid
 	}
 	return input, fields
 }

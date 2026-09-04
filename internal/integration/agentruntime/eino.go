@@ -52,10 +52,18 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
+	tools := append([]tool.BaseTool(nil), r.tools...)
+	if request.KnowledgeSearch != nil {
+		knowledgeTool, toolErr := newKnowledgeSearchTool(request.KnowledgeSearch)
+		if toolErr != nil {
+			return RunResult{}, fmt.Errorf("create knowledge search tool: %w", toolErr)
+		}
+		tools = append(tools, knowledgeTool)
+	}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
-			Tools: r.tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolLoggingMiddleware()},
+			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolLoggingMiddleware()},
 		}},
 		MaxIterations: maxTurns,
 	})

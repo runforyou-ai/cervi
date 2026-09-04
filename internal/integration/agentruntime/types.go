@@ -3,7 +3,11 @@
 // Package agentruntime 使用 Eino 执行平台托管 Agent。
 package agentruntime
 
-import "context"
+import (
+	"context"
+
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+)
 
 // MessageRole 定义模型上下文消息角色。
 type MessageRole string
@@ -45,13 +49,17 @@ type ModelConfig struct {
 	MaxOutputTokens int
 }
 
+// KnowledgeSearch 检索本次 Agent Run 获准使用的知识库。
+type KnowledgeSearch func(context.Context, knowledgeretrieval.Request) (knowledgeretrieval.Result, error)
+
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
-	RunID       string
-	Name        string
-	Instruction string
-	Model       ModelConfig
-	MaxTurns    int
+	RunID           string
+	Name            string
+	Instruction     string
+	Model           ModelConfig
+	KnowledgeSearch KnowledgeSearch
+	MaxTurns        int
 }
 
 // Usage 定义一次业务运行累计的模型用量。
