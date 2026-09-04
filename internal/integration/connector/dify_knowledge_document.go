@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -302,6 +303,54 @@ func (l *DifyKnowledgeDocumentLister) ListSegments(
 		})
 	}
 	return DifyKnowledgeDocumentSegmentPage{Segments: segments, Total: *payload.Total}, nil
+}
+
+// ListSegmentsAround 读取指定分段前后的连续内容。
+func (l *DifyKnowledgeDocumentLister) ListSegmentsAround(
+	ctx context.Context,
+	config DifyKnowledgeBaseConfig,
+	datasetID, documentID, segmentID string,
+	position, before, after int,
+) ([]DifyKnowledgeDocumentSegment, error) {
+	const pageSize = 100
+	start := position - before
+	if start < 1 {
+		start = 1
+	}
+	end := position + after
+	firstPage := (start-1)/pageSize + 1
+	lastPage := (end-1)/pageSize + 1
+	segments := make([]DifyKnowledgeDocumentSegment, 0, end-start+1)
+	centerFound := false
+	for page := firstPage; page <= lastPage; page++ {
+		result, err := l.ListSegments(ctx, config, datasetID, documentID, DifyKnowledgeDocumentSegmentListInput{
+			Page: page, PageSize: pageSize,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, segment := range result.Segments {
+			if segment.Position < start || segment.Position > end {
+				continue
+			}
+			segments = append(segments, segment)
+			if segment.ID == segmentID && segment.Position == position {
+				centerFound = true
+			}
+		}
+		if result.Total == 0 || page >= (result.Total-1)/pageSize+1 {
+			break
+		}
+	}
+	if !centerFound {
+		return nil, connectiontest.NewError(
+			connectiontest.StageCapability,
+			connectiontest.FailureNotFound,
+			errors.New("dify knowledge cursor segment was not found"),
+		)
+	}
+	sort.Slice(segments, func(i, j int) bool { return segments[i].Position < segments[j].Position })
+	return segments, nil
 }
 
 // difyKnowledgeDocumentPath 返回经过路径转义的 Dify 知识文档地址。

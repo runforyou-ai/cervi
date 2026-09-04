@@ -126,6 +126,31 @@ export function KnowledgeDocumentListPage() {
   const retrievalOpen =
     searchParams.get("retrieval") === "1" &&
     Boolean(detail.data?.integrationConnectionId)
+  const externalConfiguration = detail.data?.externalConfiguration
+  const indexingTechniqueLabel = externalConfiguration
+    ? (({
+        economy: t("documents.metadata.indexingTechnique.economy"),
+        high_quality: t("documents.metadata.indexingTechnique.high_quality"),
+      } as Record<string, string>)[externalConfiguration.indexingTechnique] ??
+      externalConfiguration.indexingTechnique)
+    : ""
+  const retrievalMethodLabel = externalConfiguration
+    ? (({
+        keyword_search: t(
+          "documents.metadata.retrievalMethod.keyword_search",
+        ),
+        semantic_search: t(
+          "documents.metadata.retrievalMethod.semantic_search",
+        ),
+        full_text_search: t(
+          "documents.metadata.retrievalMethod.full_text_search",
+        ),
+        hybrid_search: t(
+          "documents.metadata.retrievalMethod.hybrid_search",
+        ),
+      } as Record<string, string>)[externalConfiguration.retrievalMethod] ??
+      externalConfiguration.retrievalMethod)
+    : ""
 
   /** 把超出总页数的地址收回最后一页。 */
   useEffect(() => {
@@ -166,6 +191,86 @@ export function KnowledgeDocumentListPage() {
           </Button>
         ) : null}
       </PageHeader>
+      {externalConfiguration ? (
+        <dl className="grid shrink-0 gap-x-8 gap-y-3 border-b px-4 py-4 text-sm sm:grid-cols-3 sm:px-6 xl:grid-cols-6">
+          <div>
+            <dt className="text-muted-foreground">
+              {t("documents.metadata.indexingTechnique.label")}
+            </dt>
+            <dd className="mt-1 font-medium">{indexingTechniqueLabel}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("documents.metadata.retrievalMethod.label")}
+            </dt>
+            <dd className="mt-1 font-medium">{retrievalMethodLabel}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("documents.metadata.documentCount")}
+            </dt>
+            <dd className="mt-1 font-medium">
+              {externalConfiguration.documentCount}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("documents.metadata.wordCount")}
+            </dt>
+            <dd className="mt-1 font-medium">
+              {externalConfiguration.wordCount}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("documents.metadata.topK")}
+            </dt>
+            <dd className="mt-1 font-medium">
+              {externalConfiguration.topK}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("documents.metadata.scoreThreshold")}
+            </dt>
+            <dd className="mt-1 font-medium">
+              {externalConfiguration.scoreThresholdEnabled
+                ? (externalConfiguration.scoreThreshold ?? "—")
+                : t("documents.metadata.disabled")}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("documents.metadata.embeddingModel")}
+            </dt>
+            <dd className="mt-1 font-medium">
+              {externalConfiguration.embeddingModel
+                ? [
+                    externalConfiguration.embeddingModelProvider,
+                    externalConfiguration.embeddingModel,
+                  ]
+                    .filter(Boolean)
+                    .join(" / ")
+                : t("documents.metadata.notUsed")}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              {t("documents.metadata.reranking")}
+            </dt>
+            <dd className="mt-1 font-medium">
+              {externalConfiguration.rerankingEnabled
+                ? [
+                    externalConfiguration.rerankingProvider,
+                    externalConfiguration.rerankingModel,
+                  ]
+                    .filter(Boolean)
+                    .join(" / ") || t("documents.metadata.enabled")
+                : t("documents.metadata.disabled")}
+            </dd>
+          </div>
+        </dl>
+      ) : null}
       <ListToolbar>
         <ListToolbarSearch
           value={search}

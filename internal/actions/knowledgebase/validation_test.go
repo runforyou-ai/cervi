@@ -126,32 +126,21 @@ func TestNormalizeDocumentSegmentListInput(t *testing.T) {
 // TestNormalizeRetrievalInput 验证检索内容会被去除首尾空白并限制长度。
 func TestNormalizeRetrievalInput(t *testing.T) {
 	input, fields := normalizeRetrievalInput(RetrievalInput{
-		Query: "  如何安装？  ", Method: domain.KnowledgeRetrievalMethodHybrid,
-		TopK: 10, ScoreThresholdEnabled: true, ScoreThreshold: 0.6,
+		Query: "  如何安装？  ",
 	})
 	if len(fields) != 0 || input.Query != "如何安装？" {
 		t.Fatalf("input = %#v, fields = %#v", input, fields)
 	}
 	_, fields = normalizeRetrievalInput(RetrievalInput{
-		Query: "   ", Method: domain.KnowledgeRetrievalMethodKeyword, TopK: 4, ScoreThreshold: 0.5,
+		Query: "   ",
 	})
 	if fields["query"] != ValidationRetrievalQueryRequired {
 		t.Fatalf("fields = %#v", fields)
 	}
 	_, fields = normalizeRetrievalInput(RetrievalInput{
-		Query:  strings.Repeat("问", domain.KnowledgeRetrievalQueryMaxLength+1),
-		Method: domain.KnowledgeRetrievalMethodKeyword, TopK: 4, ScoreThreshold: 0.5,
+		Query: strings.Repeat("问", domain.KnowledgeRetrievalQueryMaxLength+1),
 	})
 	if fields["query"] != ValidationRetrievalQueryTooLong {
-		t.Fatalf("fields = %#v", fields)
-	}
-	_, fields = normalizeRetrievalInput(RetrievalInput{
-		Query: "测试", Method: "future", TopK: 0,
-		ScoreThresholdEnabled: true, ScoreThreshold: 1.1,
-	})
-	if fields["method"] != ValidationRetrievalMethodInvalid ||
-		fields["topK"] != ValidationRetrievalTopKInvalid ||
-		fields["scoreThreshold"] != ValidationRetrievalScoreThresholdInvalid {
 		t.Fatalf("fields = %#v", fields)
 	}
 }

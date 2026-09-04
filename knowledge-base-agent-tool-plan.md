@@ -15,10 +15,10 @@
 
 ## 2. 核心决策
 
-1. 一个 Agent 可绑定多个知识库，每个知识库在本次 Run 中生成一个独立 Tool。
+1. 每个 Run 生成一个统一知识检索 Tool，知识库范围通过闭包注入；MVP 默认使用当前企业全部知识库，后续由 Agent 配置收窄范围。
 2. Tool 只向 LLM 暴露 `queries` 数组，不暴露检索参数。
 3. LLM 自行决定数组长度和查询内容，Tool 描述不提供“简单问题一条、复杂问题多条”等生成规则。
-4. 每个查询仍是一次独立的后端检索；Tool 层负责有界并发、去重、融合和裁剪。
+4. 每个查询仍是一次独立的后端检索；MVP 由 Tool 层直接并发执行并负责去重和融合，上线前再补并发与输出预算。
 5. Dify 检索请求只传 `query`，由 Dify 使用知识库中保存的检索配置。
 6. 多查询编排位于统一检索器之上，不进入 Dify 连接器，因而可以直接复用于本地知识库。
 
@@ -26,21 +26,21 @@
 
 ### 3.1 Tool 生成
 
-Agent Revision 保存允许使用的知识库编号。Run 开始时，服务端按 `organization_id` 边界重新加载这些知识库，并为每个仍然有效的知识库创建 Tool。Tool 是本次 Run 的动态依赖，不加入进程级全局 Tool 列表。
+Run 开始时，服务端按 `organization_id` 加载本次可用知识库，并通过闭包注入统一 Tool。MVP 使用当前企业全部知识库；后续 Agent Revision 保存允许使用的知识库编号后，只调整范围加载参数，不修改 Tool 契约和检索实现。Tool 是本次 Run 的动态依赖，不加入进程级全局 Tool 列表。
 
-Tool 名使用稳定、无歧义的知识库编号，例如：
-
-```text
-search_knowledge_base_0199a0c8d7937bdc9bd2f9f621ec1c84
-```
-
-Tool 描述保持精简，只帮助模型区分知识库用途：
+Tool 名固定为：
 
 ```text
-检索知识库“员工手册”：包含考勤、休假和报销制度。
+search_knowledge
 ```
 
-没有知识库描述时只保留名称。描述中不加入查询数量、查询改写方法或检索参数说明。
+Tool 描述保持精简：
+
+```text
+检索当前企业知识库中的相关资料，可以提供多种不同表达的查询。
+```
+
+描述中不展开知识库清单、查询改写规则或检索参数。
 
 ### 3.2 输入
 
@@ -76,7 +76,7 @@ JSON Schema 只提供必要字段说明和资源边界：
 }
 ```
 
-`maxItems`、单条长度和服务端并发限制用于保护资源，不用于指导 LLM 应生成多少条查询。250 字符是 Cervi 统一检索契约的产品边界，不是 Dify 专属参数，本地知识库沿用相同限制。
+单条 250 字符是 Cervi 统一检索契约的现有产品边界，不是 Dify 专属参数，本地知识库沿用相同限制。
 
 服务端不依赖模型遵守 JSON Schema，并再次执行以下校验和规范化：
 
@@ -114,11 +114,11 @@ Tool 返回融合后的分段和必要引用信息：
 
 ```text
 Agent Run
-  -> 按 Revision 和 organization_id 解析可用知识库
-  -> 为每个知识库创建动态 Tool
+  -> 按 organization_id 解析可用知识库
+  -> 通过闭包把知识库范围注入统一 Tool
   -> LLM 调用 Tool，传入 queries
   -> MultiQueryRetriever
-       -> 有界并发调用 KnowledgeRetriever.Retrieve(query)
+       -> 并发调用 KnowledgeRetriever.Retrieve(query)
        -> 合并、去重、排序和裁剪
   -> DifyRetriever 或 LocalRetriever
 ```
@@ -136,16 +136,6 @@ type KnowledgeRetriever interface {
 ```
 
 连接器使用类型化错误向编排层提供稳定分类：`canceled`、`unauthorized`、`forbidden`、`not_found`、`invalid_config`、`rate_limited`、`timeout`、`network`、`tls`、`unavailable` 和 `protocol`。Dify 与本地实现都必须映射到这些分类，编排层不解析错误文本。
-
-多查询执行边界通过显式选项传入：
-
-```go
-type MultiQueryOptions struct {
-	MaxConcurrency     int
-	MaxRecords         int
-	MaxSerializedBytes int
-}
-```
 
 `MultiQueryRetriever` 是与 Agent SDK、Dify 和本地索引实现无关的编排层。Eino 适配器只负责把动态 Tool 接入本次 Run，不承载知识库授权和检索业务。
 
@@ -183,9 +173,9 @@ Embedding、Rerank、鉴权或知识库配置错误由 Dify 返回，Cervi 将�
 
 ### 6.1 并发
 
-每个唯一执行项携带规范化查询、首次出现下标和全部原始下标，按首次出现顺序排列，最大并发数为 3。每个并发任务调用一次单查询 `KnowledgeRetriever`，结果必须保存到对应执行槽位，不能按请求完成顺序改变查询排名或下标。只有一个唯一执行项时保持后端原始结果顺序。
+每个唯一执行项携带规范化查询、首次出现下标和全部原始下标，按首次出现顺序排列。MVP 为每个“知识库 + 查询”直接并发调用一次单查询 `KnowledgeRetriever`，结果保存到对应执行槽位，不能按请求完成顺序改变查询排名或下标。并发限制在上线前专项补充。
 
-调用共享父 `context`；父调用取消或超时时，整个 Tool 调用取消，所有子调用停止，不返回部分成功。鉴权、知识库不存在和配置错误同样立即终止整个调用；单条查询的可重试错误不会取消其他查询。并发限制只控制峰值请求数，不改变每条查询使用的知识库配置。
+调用共享父 `context`；单个知识库检索失败时记录警告并保留其他知识库的成功结果，全部失败时返回错误。
 
 ### 6.2 分段去重
 
@@ -216,9 +206,9 @@ RRF 分数相同时依次比较：
 
 只有一个唯一执行项时保持后端原始结果顺序。
 
-### 6.4 输出预算
+### 6.4 上线前输出预算
 
-知识库 Top K 是单条查询的召回深度，Tool 输出预算是进入模型上下文的结果上限，两者互不覆盖。
+MVP 直接返回融合结果。正式上线前再增加进入模型上下文的结果条数和序列化字节预算。
 
 Agent Tool 在创建编排器时显式提供分段条数上限和序列化后 UTF-8 字节预算，这些值不加入 Tool 参数和描述。候选完成融合排序后，按顺序追加完整分段；达到任一上限时停止。预算包含 JSON 结构、文档信息、正文和查询下标。
 
@@ -252,23 +242,22 @@ LocalRetriever
 
 ## 9. 实现 PR 拆分
 
-### PR 1：收敛知识库检索执行契约
+### PR 1：支持 Agent 检索企业知识
 
 - 增加统一的单查询 `KnowledgeRetriever` 和多查询编排器。
 - Dify 检索请求改为只传 `query`，移除 Cervi 对 Dify 检索参数的覆盖。
-- 确保 Dify 返回后不再应用 Cervi 侧的 Score Threshold 或结果重排。
-- 简化现有检索测试契约和页面，只保留查询输入。
-- 实现类型化错误分类、并发、原始下标映射、去重、RRF、显式输出预算和部分失败结果。
-- 覆盖单查询、多查询、重复分段、稳定排序、取消和部分失败测试。
+- Run 开始时加载当前企业全部知识库，通过闭包注入统一 `search_knowledge` Tool。
+- 并发执行知识库与查询的组合，按知识库和分段去重并使用 RRF 融合。
+- 保留 calculator 作为上线前的长期测试 Tool。
+- MVP 只实现贯通流程所需的参数校验和错误返回，不提前增加配额、复杂重试、降级和输出预算。
+- 覆盖多查询、多知识库、重复分段、稳定排序和组织隔离测试。
 
-### PR 2：接入 Agent 动态 Tool
+### PR 2：配置 Agent 知识库范围
 
 - Agent Revision 增加知识库绑定配置，管理界面支持选择同一 `organization_id` 下的知识库。
-- Run 开始时解析可用知识库并生成本次 Run 的 Tool 列表。
-- 将 `queries` Schema 和精简 Tool 描述接入 Eino ChatModelAgent。
-- Tool Adapter 使用 `AgentExecutionContext` 调用多查询编排器。
-- 记录 Tool 调用日志、错误和 Run 用量，并确保没有知识库时不注册空 Tool。
-- 覆盖多知识库选择、`organization_id` 隔离、失效绑定和模型 Tool 调用闭环测试。
+- Run 开始时把默认企业范围替换为 Revision 绑定范围。
+- Tool 闭包、输入契约、多查询执行和 RRF 融合保持不变。
+- 覆盖多知识库选择、`organization_id` 隔离和失效绑定测试。
 
 ### 后续：本地知识库
 
@@ -280,8 +269,8 @@ LocalRetriever
 - LLM 只能看到知识库用途和 `queries`，查询数量与表达方式由模型自行决定。
 - Tool 描述不包含固定查询数量、查询改写模板或检索参数建议。
 - Dify 请求体只包含 `query`，实际检索方式和 Top K 与 Dify 知识库配置一致。
-- 多条查询有界并发执行，重复分段只返回一次，输出顺序稳定。
+- 多条查询并发执行，重复分段只返回一次，输出顺序稳定。
 - 单条查询时结果顺序与后端一致，多条查询时按 RRF 融合。
-- 检索候选数量不会直接膨胀为模型上下文，最终结果受独立输出预算限制。
+- 上线前专项补充检索并发与模型上下文输出预算。
 - Dify 与本地知识库可以替换实现而不改变 Agent Tool Schema。
-- Agent 只能检索 Revision 已绑定且属于同一 `organization_id` 的知识库。
+- MVP Agent 只能检索当前 `organization_id` 的知识库；范围配置完成后只能检索 Revision 已绑定的知识库。

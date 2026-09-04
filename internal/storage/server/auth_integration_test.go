@@ -1497,7 +1497,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		scheduler := agentrunaction.NewScheduler(taskRuntime)
-		coordinator := agentrunaction.NewExecuteAction(db, taskRuntime, nil)
+		coordinator := agentrunaction.NewExecuteAction(db, taskRuntime, nil, nil)
 		claimServiceSession := conversationaction.NewClaimServiceSessionAction(db, coordinator)
 		transferServiceSession := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler)
 		closeServiceSession := conversationaction.NewCloseServiceSessionAction(db, coordinator)
@@ -1868,7 +1868,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 			return agentruntime.RunResult{Content: "已结合补充信息回复", EndSeq: finalClaim.EndSeq, Usage: agentruntime.Usage{TotalTokens: 18}}, nil
 		}}
-		if err := agentrunaction.NewExecuteAction(db, taskRuntime, customerRuntime).Execute(context.Background(), agentrunaction.RunInput{RunID: absorbingCustomerRun.ID}); err != nil {
+		if err := agentrunaction.NewExecuteAction(db, taskRuntime, customerRuntime, nil).Execute(context.Background(), agentrunaction.RunInput{RunID: absorbingCustomerRun.ID}); err != nil {
 			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(absorbingCustomerRun).Where("agr.id = ?", absorbingCustomerRun.ID).Scan(context.Background()); err != nil {
@@ -1937,7 +1937,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}}, nil
 		}}
-		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime)
+		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime, nil)
 		if _, err := db.ExecContext(context.Background(), `
 			ALTER TABLE messages
 			ADD CONSTRAINT messages_reject_test_agent_response
@@ -2006,7 +2006,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 			return agentruntime.RunResult{}, errors.New("model rejected input")
 		}}
-		if err := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime).Execute(context.Background(), agentrunaction.RunInput{RunID: failedRun.ID}); err == nil {
+		if err := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime, nil).Execute(context.Background(), agentrunaction.RunInput{RunID: failedRun.ID}); err == nil {
 			t.Fatal("failing agent run succeeded")
 		}
 		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
@@ -2034,7 +2034,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if exhaustedRun.TriggerStartSeq != 4 {
 			t.Fatalf("agent run after failure starts at %d, want 4", exhaustedRun.TriggerStartSeq)
 		}
-		finalizer := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime)
+		finalizer := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime, nil)
 		if err := finalizer.FinalizeFailure(context.Background(), agentrunaction.RunInput{RunID: exhaustedRun.ID}, errors.New("task attempts exhausted")); err != nil {
 			t.Fatal(err)
 		}

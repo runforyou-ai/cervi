@@ -14,16 +14,6 @@ const (
 	KnowledgeBaseCategoryQA       KnowledgeBaseCategory = KnowledgeBaseCategory(domain.KnowledgeBaseCategoryQA)
 )
 
-// KnowledgeRetrievalMethod 表示知识库检索方式。
-type KnowledgeRetrievalMethod string
-
-const (
-	KnowledgeRetrievalMethodKeyword  KnowledgeRetrievalMethod = KnowledgeRetrievalMethod(domain.KnowledgeRetrievalMethodKeyword)
-	KnowledgeRetrievalMethodSemantic KnowledgeRetrievalMethod = KnowledgeRetrievalMethod(domain.KnowledgeRetrievalMethodSemantic)
-	KnowledgeRetrievalMethodFullText KnowledgeRetrievalMethod = KnowledgeRetrievalMethod(domain.KnowledgeRetrievalMethodFullText)
-	KnowledgeRetrievalMethodHybrid   KnowledgeRetrievalMethod = KnowledgeRetrievalMethod(domain.KnowledgeRetrievalMethodHybrid)
-)
-
 // KnowledgeDocumentStatus 表示知识文档的统一状态。
 type KnowledgeDocumentStatus string
 
@@ -75,15 +65,32 @@ type KnowledgeGroup struct {
 
 // KnowledgeBase 定义知识库详情。
 type KnowledgeBase struct {
-	ID                      string                `json:"id"`
-	Name                    string                `json:"name"`
-	Category                KnowledgeBaseCategory `json:"category"`
-	Description             string                `json:"description"`
-	IntegrationConnectionID string                `json:"integrationConnectionId"`
-	ExternalResourceID      string                `json:"externalResourceId"`
-	Groups                  []KnowledgeGroup      `json:"groups"`
-	CreatedAt               time.Time             `json:"createdAt"`
-	UpdatedAt               time.Time             `json:"updatedAt"`
+	ID                      string                              `json:"id"`
+	Name                    string                              `json:"name"`
+	Category                KnowledgeBaseCategory               `json:"category"`
+	Description             string                              `json:"description"`
+	IntegrationConnectionID string                              `json:"integrationConnectionId"`
+	ExternalResourceID      string                              `json:"externalResourceId"`
+	ExternalConfiguration   *ExternalKnowledgeBaseConfiguration `json:"externalConfiguration"`
+	Groups                  []KnowledgeGroup                    `json:"groups"`
+	CreatedAt               time.Time                           `json:"createdAt"`
+	UpdatedAt               time.Time                           `json:"updatedAt"`
+}
+
+// ExternalKnowledgeBaseConfiguration 定义外部知识库的主要运行配置。
+type ExternalKnowledgeBaseConfiguration struct {
+	IndexingTechnique      string   `json:"indexingTechnique"`
+	DocumentCount          int      `json:"documentCount"`
+	WordCount              int      `json:"wordCount"`
+	EmbeddingModel         string   `json:"embeddingModel"`
+	EmbeddingModelProvider string   `json:"embeddingModelProvider"`
+	RetrievalMethod        string   `json:"retrievalMethod"`
+	TopK                   int      `json:"topK"`
+	ScoreThresholdEnabled  bool     `json:"scoreThresholdEnabled"`
+	ScoreThreshold         *float64 `json:"scoreThreshold"`
+	RerankingEnabled       bool     `json:"rerankingEnabled"`
+	RerankingModel         string   `json:"rerankingModel"`
+	RerankingProvider      string   `json:"rerankingProvider"`
 }
 
 // KnowledgeBaseList 定义知识库列表。
@@ -163,12 +170,7 @@ type KnowledgeDocumentSegmentList struct {
 
 // KnowledgeRetrievalInput 定义知识库检索条件。
 type KnowledgeRetrievalInput struct {
-	Query                 string                   `json:"query"`
-	Method                KnowledgeRetrievalMethod `json:"method"`
-	RerankingEnabled      bool                     `json:"rerankingEnabled"`
-	TopK                  int                      `json:"topK"`
-	ScoreThresholdEnabled bool                     `json:"scoreThresholdEnabled"`
-	ScoreThreshold        float64                  `json:"scoreThreshold"`
+	Query string `json:"query"`
 }
 
 // KnowledgeRetrievalRecord 定义知识库检索命中项。
