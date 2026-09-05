@@ -1,73 +1,32 @@
-/** 移动端登录后工作区和底部一级导航。 */
-import { InboxIcon, UserRoundIcon } from "lucide-react"
+/** 移动端身份入口、一级导航和详情布局。 */
+import { createContext, useContext } from "react"
+import { ContactRoundIcon, InboxIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import {
-  Navigate,
-  NavLink,
-  Outlet,
-  useMatch,
-  useOutletContext,
-} from "react-router"
+import { Navigate, NavLink, Outlet } from "react-router"
 
 import type { Identity } from "@/api"
+import {
+  MobileNavigationProvider,
+  useMobileNavigation,
+} from "@/apps/mobile/mobile-navigation"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { cn } from "@/lib/utils"
 
-type MobileWorkspaceContext = {
-  identity: Identity
-}
+const MobileWorkspaceContext = createContext<Identity | null>(null)
 
-const mobileTabs = [
-  { path: "/inbox", labelKey: "tabs.inbox", icon: InboxIcon },
-  { path: "/me", labelKey: "tabs.me", icon: UserRoundIcon },
-] as const
-
-/** 渲染一个移动端一级导航入口。 */
-function MobileTab({
-  path,
-  label,
-  icon: Icon,
-}: {
-  path: string
-  label: string
-  icon: typeof InboxIcon
-}) {
-  return (
-    <NavLink
-      to={path}
-      replace
-      className={({ isActive }) =>
-        cn(
-          "flex min-h-14 flex-col items-center justify-center gap-0.5 px-3 text-[11px] font-medium text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-          isActive && "text-primary",
-        )
-      }
-    >
-      <Icon className="size-5" />
-      <span>{label}</span>
-    </NavLink>
-  )
-}
-
-/** 加载一次当前身份并渲染移动端工作区。 */
+/** 加载当前身份并为所有移动端页面提供公共上下文。 */
 export function MobileWorkspaceLayout() {
   const { t } = useTranslation("mobile")
   const { status, identity, redirectPath } = useIdentityLoader()
-  const directConversationOpen =
-    useMatch("/inbox/direct/:conversationID") !== null
-
   if (status === "anonymous") return <Navigate to="/login" replace />
-  if (status === "redirect" && redirectPath) {
+  if (status === "redirect" && redirectPath)
     return <Navigate to={redirectPath} replace />
-  }
   if (status === "failed") {
     return (
-      <main className="flex min-h-dvh items-center justify-center px-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          {t("identityLoadError")}
-        </p>
+      <main className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-muted-foreground">
+        {t("identityLoadError")}
       </main>
     )
   }
@@ -78,41 +37,72 @@ export function MobileWorkspaceLayout() {
       </main>
     )
   }
-
   return (
-    <UserPreferencesProvider user={identity.user}>
-      <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)]">
-        <div
-          className={cn(
-            "min-h-0 flex-1 overflow-hidden",
-            directConversationOpen && "pb-[env(safe-area-inset-bottom)]",
-          )}
-        >
-          <Outlet context={{ identity } satisfies MobileWorkspaceContext} />
+    <MobileWorkspaceContext value={identity}>
+      <UserPreferencesProvider user={identity.user}>
+        <MobileNavigationProvider>
+          <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)]">
+            <Outlet />
+          </div>
+        </MobileNavigationProvider>
+      </UserPreferencesProvider>
+    </MobileWorkspaceContext>
+  )
+}
+
+/** 为一级页面显示固定底部导航。 */
+export function MobileTabLayout() {
+  const { t } = useTranslation("mobile")
+  const { inboxURL } = useMobileNavigation()
+  const tabs = [
+    { path: inboxURL, label: t("tabs.inbox"), icon: InboxIcon },
+    { path: "/contacts", label: t("tabs.contacts"), icon: ContactRoundIcon },
+    { path: "/me", label: t("tabs.me"), icon: UserRoundIcon },
+  ]
+  return (
+    <>
+      <main className="min-h-0 flex-1 overflow-hidden">
+        <Outlet />
+      </main>
+      <nav
+        aria-label={t("tabs.label")}
+        className="shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom)]"
+      >
+        <div className="grid grid-cols-3">
+          {tabs.map(({ path, label, icon: Icon }) => (
+            <NavLink
+              key={label}
+              to={path}
+              replace
+              className={({ isActive }) =>
+                cn(
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 px-3 text-[11px] font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                  isActive && "text-primary",
+                )
+              }
+            >
+              <Icon className="size-5" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
         </div>
-        {directConversationOpen ? null : (
-          <nav
-            aria-label={t("tabs.label")}
-            className="shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom)]"
-          >
-            <div className="grid grid-cols-2">
-              {mobileTabs.map((tab) => (
-                <MobileTab
-                  key={tab.path}
-                  path={tab.path}
-                  label={t(tab.labelKey)}
-                  icon={tab.icon}
-                />
-              ))}
-            </div>
-          </nav>
-        )}
-      </div>
-    </UserPreferencesProvider>
+      </nav>
+    </>
+  )
+}
+
+/** 为详情页面保留底部安全区并隐藏一级导航。 */
+export function MobileDetailLayout() {
+  return (
+    <main className="min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+      <Outlet />
+    </main>
   )
 }
 
 /** 返回移动端工作区中的当前身份。 */
 export function useMobileWorkspace() {
-  return useOutletContext<MobileWorkspaceContext>()
+  const identity = useContext(MobileWorkspaceContext)
+  if (!identity) throw new Error("移动端页面必须位于登录工作区内")
+  return { identity }
 }

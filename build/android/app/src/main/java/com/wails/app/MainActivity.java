@@ -812,10 +812,18 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
+        if (webView == null) {
             super.onBackPressed();
+            return;
         }
+        // 先由页面关闭菜单或弹层，未处理时再执行页面返回。
+        webView.evaluateJavascript(
+            "window.dispatchEvent(new Event('cervi:back', {cancelable: true}))",
+            result -> {
+                if ("false".equals(result)) return;
+                if (webView.canGoBack()) webView.goBack();
+                else super.onBackPressed();
+            }
+        );
     }
 }
