@@ -1,20 +1,13 @@
 /** 移动端企业成员内部单聊详情。 */
 import { useMemo } from "react"
-import {
-  ArrowLeftIcon,
-  BotIcon,
-  UserRoundIcon,
-} from "lucide-react"
+import { BotIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import {
-  Navigate,
-  useLocation,
-  useNavigate,
-  useParams,
-} from "react-router"
+import { Navigate, useLocation, useParams } from "react-router"
 
 import {
   ConversationType,
+  CustomerInboxView,
+  InboxScope,
   isDirectInboxConversation,
   loadInbox,
   OrganizationIdentityType,
@@ -22,7 +15,8 @@ import {
   type InboxConversation,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
-import { Button } from "@/components/ui/button"
+import { MobilePageHeader } from "@/apps/mobile/mobile-page"
+import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
@@ -34,6 +28,12 @@ import {
 import { useOutgoingConversationMessages } from "@/features/inbox/use-outgoing-conversation-messages"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+
+const directInboxQuery = {
+  scope: InboxScope.InboxScopeInternal,
+  customerView: CustomerInboxView.CustomerInboxViewQueue,
+  assigneeIdentityId: "",
+}
 
 type MobileDirectLocationState = {
   conversation?: InboxConversation
@@ -47,9 +47,8 @@ function MobileDirectHeader({
   conversation: DirectInboxConversationData | null
   peerName: string
 }) {
-  const { t } = useTranslation("common")
   const { t: tInbox } = useTranslation("inbox")
-  const navigate = useNavigate()
+  const { inboxURL } = useMobileNavigation()
   const initial = Array.from(peerName)[0]?.toLocaleUpperCase()
   const directAgent =
     conversation?.direct.peerType ===
@@ -60,32 +59,32 @@ function MobileDirectHeader({
   )
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b px-2">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-lg"
-        aria-label={t("actions.back")}
-        onClick={() => navigate("/inbox", { replace: true })}
-      >
-        <ArrowLeftIcon />
-      </Button>
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-        {directAgent ? (
-          <BotIcon className="size-4" />
-        ) : initial ? (
-          initial
-        ) : (
-          <UserRoundIcon className="size-4" />
-        )}
-      </span>
-      <div className="min-w-0 flex-1">
-        <h1 className="truncate text-base font-semibold">{peerName}</h1>
-        {agentRunLabel ? (
-          <p className="text-xs text-muted-foreground">{agentRunLabel}</p>
-        ) : null}
-      </div>
-    </header>
+    <MobilePageHeader
+      backTo={inboxURL}
+      title={
+        <span className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
+            {directAgent ? (
+              <BotIcon className="size-4" />
+            ) : initial ? (
+              initial
+            ) : (
+              <UserRoundIcon className="size-4" />
+            )}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-base font-semibold">
+              {peerName}
+            </span>
+            {agentRunLabel ? (
+              <span className="block text-xs font-normal text-muted-foreground">
+                {agentRunLabel}
+              </span>
+            ) : null}
+          </span>
+        </span>
+      }
+    />
   )
 }
 
@@ -93,6 +92,7 @@ function MobileDirectHeader({
 export function MobileDirectConversationPage() {
   const { t } = useTranslation("inbox")
   const { identity } = useMobileWorkspace()
+  const { inboxURL } = useMobileNavigation()
   const invalidate = useResourceInvalidator()
   const location = useLocation()
   const { conversationID = "" } = useParams()
@@ -109,8 +109,8 @@ export function MobileDirectConversationPage() {
     requireWindowFocus: false,
   })
   const { data, loading } = useResource(
-    resourceKeys.inbox(),
-    () => loadInbox(),
+    resourceKeys.inbox(directInboxQuery),
+    () => loadInbox(directInboxQuery),
     {
       staleTime: 0,
       refetchInterval: pollingActive ? memberChatPollingInterval : false,
@@ -119,13 +119,13 @@ export function MobileDirectConversationPage() {
   )
   const outgoing = useOutgoingConversationMessages()
 
-  if (!conversationID) return <Navigate to="/inbox" replace />
+  if (!conversationID) return <Navigate to={inboxURL} replace />
 
   const matchedConversation = data?.conversations.find(
     (conversation) => conversation.id === conversationID,
   )
   if (matchedConversation && !isDirectInboxConversation(matchedConversation)) {
-    return <Navigate to="/inbox" replace />
+    return <Navigate to={inboxURL} replace />
   }
   const conversation =
     (matchedConversation && isDirectInboxConversation(matchedConversation)
@@ -152,9 +152,7 @@ export function MobileDirectConversationPage() {
           <ConversationComposer
             conversationID={conversationID}
             conversationType={ConversationType.ConversationTypeDirect}
-            onSucceeded={() =>
-              void invalidate(resourceKeys.inbox(), { exact: true })
-            }
+            onSucceeded={() => void invalidate(resourceKeys.inbox())}
             onSending={outgoing.start}
             onSent={outgoing.succeed}
             onFailed={outgoing.fail}

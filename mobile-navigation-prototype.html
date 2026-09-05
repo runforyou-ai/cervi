@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cervi 移动端导航原型</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #eff2f6;
+        color: #202329;
+        font:
+          15px/1.5 -apple-system,
+          BlinkMacSystemFont,
+          "PingFang SC",
+          sans-serif;
+      }
+      button,
+      a,
+      select,
+      textarea {
+        font: inherit;
+      }
+      button,
+      a {
+        touch-action: manipulation;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+        background: none;
+        border: 0;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      textarea:focus-visible,
+      select:focus-visible {
+        outline: 2px solid #3186e6;
+        outline-offset: -2px;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .caption {
+        text-align: center;
+        font-size: 13px;
+        color: #687282;
+        margin: 16px;
+      }
+      .phone {
+        width: min(100%, 390px);
+        height: min(844px, calc(100dvh - 65px));
+        min-height: 480px;
+        margin: 0 auto;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid #dce1e7;
+        border-radius: 24px;
+        position: relative;
+        box-shadow: 0 8px 40px #21354710;
+      }
+      .status {
+        height: 30px;
+        flex-shrink: 0;
+        display: flex;
+        justify-content: space-between;
+        padding: 5px 22px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      #app {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        flex-direction: column;
+      }
+      header {
+        height: 56px;
+        flex-shrink: 0;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 16px;
+      }
+      h1 {
+        font-size: 19px;
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      header button {
+        min-height: 44px;
+        font-size: 14px;
+      }
+      .tabs {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-bottom: 1px solid #eee;
+        padding: 0 16px;
+      }
+      .tabs button {
+        height: 44px;
+        font-size: 14px;
+        color: #6e7681;
+        border-bottom: 2px solid transparent;
+      }
+      .tabs .active {
+        border-color: #3186e6;
+        color: #3186e6;
+        font-weight: 600;
+      }
+      .strip {
+        height: 44px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #eee;
+        padding: 0 16px;
+        font-size: 12px;
+        color: #737b86;
+      }
+      .strip button {
+        padding: 0;
+        min-height: 44px;
+        text-align: left;
+      }
+      .scroll {
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+        overscroll-behavior: contain;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid #eee;
+        min-height: 72px;
+        width: 100%;
+        text-align: left;
+      }
+      .row button {
+        min-height: 44px;
+      }
+      .avatar {
+        height: 44px;
+        width: 44px;
+        flex-shrink: 0;
+        background: #e9f2fd;
+        color: #3186e6;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .round {
+        border-radius: 50%;
+      }
+      .info {
+        flex: 1;
+        min-width: 0;
+      }
+      .rowtop {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 500;
+      }
+      .time,
+      .hint {
+        font-size: 12px;
+        color: #828994;
+      }
+      .preview {
+        margin-top: 3px;
+        color: #737b86;
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .hint {
+        margin-top: 4px;
+      }
+      .row:active {
+        background: #f6f7f9;
+      }
+      .bottom {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid #eee;
+        padding-bottom: 18px;
+      }
+      .bottom button {
+        height: 57px;
+        font-size: 12px;
+        color: #777f8b;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+      }
+      .bottom .active {
+        color: #3186e6;
+        font-weight: 600;
+      }
+      .navicon {
+        font-size: 19px;
+        line-height: 24px;
+      }
+      .empty {
+        display: flex;
+        flex: 1;
+        min-height: 260px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+      }
+      .empty p {
+        margin: 6px 0;
+        font-size: 14px;
+        color: #737b86;
+      }
+      .primary {
+        background: #3186e6;
+        color: #fff;
+        border-radius: 8px;
+        min-height: 44px;
+        padding: 10px 18px;
+      }
+      .outline {
+        border: 1px solid #dfe3e8;
+        border-radius: 8px;
+        min-height: 44px;
+        padding: 10px 18px;
+      }
+      .profile {
+        margin: 24px 16px;
+        border: 1px solid #e2e5e9;
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .profile .avatar {
+        margin: 24px auto;
+        width: 64px;
+        height: 64px;
+        font-size: 24px;
+      }
+      .field {
+        padding: 12px 16px;
+        border-top: 1px solid #eee;
+      }
+      .label {
+        font-size: 12px;
+        color: #737b86;
+      }
+      .value {
+        margin-top: 4px;
+      }
+      .me-actions {
+        margin: 24px 16px;
+      }
+      .me-actions button {
+        width: 100%;
+        margin-top: 36px;
+      }
+      .messages {
+        padding: 20px 16px;
+      }
+      .bubble {
+        max-width: 80%;
+        padding: 10px 13px;
+        background: #f2f4f7;
+        border-radius: 14px;
+        margin-bottom: 18px;
+        font-size: 14px;
+      }
+      .bubble.self {
+        margin-left: auto;
+        background: #e8f2ff;
+      }
+      .composer {
+        padding: 12px 16px 26px;
+        border-top: 1px solid #eee;
+        display: flex;
+        align-items: end;
+        gap: 10px;
+      }
+      .composer textarea {
+        resize: none;
+        min-width: 0;
+        flex: 1;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        height: 68px;
+      }
+      .composer label {
+        display: block;
+        font-size: 12px;
+        color: #737b86;
+        margin-bottom: 6px;
+      }
+      .composer .input {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      dialog {
+        position: fixed;
+        inset: auto 0 0;
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+        max-height: 85%;
+        border: 0;
+        border-radius: 18px 18px 0 0;
+        padding: 0 0 24px;
+        background: #fff;
+        color: inherit;
+      }
+      dialog::backdrop {
+        background: #18212d66;
+      }
+      dialog h2 {
+        font-size: 17px;
+        margin: 0;
+        flex: 1;
+      }
+      .panel-body {
+        padding: 20px 16px;
+      }
+      .views {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .views button {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        min-height: 44px;
+      }
+      .views .active {
+        background: #3186e6;
+        border-color: #3186e6;
+        color: #fff;
+      }
+      .panel-body > button {
+        width: 100%;
+        margin-top: 36px;
+      }
+      .assignee {
+        display: block;
+        margin-top: 20px;
+        font-size: 14px;
+      }
+      .assignee select {
+        display: block;
+        width: 100%;
+        height: 44px;
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 8px;
+        margin-top: 8px;
+        padding: 0 10px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 430px) {
+        .caption {
+          margin: 8px;
+        }
+        .phone {
+          height: calc(100dvh - 44px);
+          border-radius: 0;
+          border: 0;
+        }
+        .status {
+          height: 26px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p class="caption">Cervi 移动端交互原型 · 演示数据</p>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>●●●　▰</span></div>
+      <div id="app"></div>
+      <dialog id="filter">
+        <header>
+          <h2>客户队列筛选</h2>
+          <button data-action="cancel-filter">取消</button>
+        </header>
+        <div class="panel-body">
+          <div class="views" id="views"></div>
+          <label class="assignee" id="assignee-row"
+            >负责人<select id="assignee">
+              <option>全部同事</option>
+              <option>陈嘉</option>
+              <option>AI 客服</option>
+            </select></label
+          ><button class="primary" data-action="apply-filter">应用筛选</button>
+        </div>
+      </dialog>
+      <dialog id="logout">
+        <header><h2>退出当前账号？</h2></header>
+        <div class="panel-body">
+          <p>退出后需要重新登录，企业服务器连接将保留。</p>
+          <button class="outline" data-action="cancel-logout">取消</button
+          ><button class="primary" data-action="demo-logout">退出登录</button>
+        </div>
+      </dialog>
+    </div>
+    <script>
+      /** 保存原型中的导航、筛选和滚动状态。 */
+      const app = document.getElementById("app")
+      const filter = document.getElementById("filter")
+      const logout = document.getElementById("logout")
+      const scopes = ["全部", "客户", "内部"]
+      const views = ["排队中", "我负责的", "同事", "已关闭"]
+      const categories = ["企业成员", "AI 员工", "团队", "外部联系人"]
+      const state = {
+        tab: "消息",
+        scope: "全部",
+        view: "排队中",
+        assignee: "全部同事",
+        detail: "",
+        draftView: "排队中",
+        scroll: new Map(),
+      }
+      const conversations = [
+        {
+          name: "陈嘉",
+          type: "direct",
+          preview: "导航方案我看过了，我们下午一起确认。",
+          time: "5 分钟前",
+          avatar: "陈",
+        },
+        {
+          name: "产品讨论组",
+          type: "group",
+          preview: "林然：移动端第一版先把导航定下来。",
+          time: "12 分钟前",
+          avatar: "群",
+        },
+        {
+          name: "林女士",
+          type: "customer",
+          preview: "请问如何连接企业服务器？",
+          time: "18 分钟前",
+          avatar: "林",
+          view: "排队中",
+        },
+        {
+          name: "AI 助手",
+          type: "direct",
+          preview: "已整理好今天的工作安排。",
+          time: "25 分钟前",
+          avatar: "AI",
+        },
+        {
+          name: "周先生",
+          type: "customer",
+          preview: "好的，问题已经解决了，谢谢。",
+          time: "昨天",
+          avatar: "周",
+          view: "已关闭",
+        },
+        {
+          name: "王女士",
+          type: "customer",
+          preview: "可以再发一次操作说明吗？",
+          time: "昨天",
+          avatar: "王",
+          view: "我负责的",
+        },
+        {
+          name: "赵先生",
+          type: "customer",
+          preview: "收到，我先试一下。",
+          time: "昨天",
+          avatar: "赵",
+          view: "同事",
+          assignee: "陈嘉",
+        },
+      ]
+      /** 按当前模块和筛选保存列表位置。 */
+      function scrollKey() {
+        return state.tab + state.scope + state.view + state.assignee
+      }
+      /** 绘制当前页面及其固定导航。 */
+      function render() {
+        let content = ""
+        if (state.detail) {
+          content = `<header><button data-action="back" aria-label="返回">‹ 返回</button><h1>${state.detail}</h1></header>`
+          if (
+            conversations.some(
+              (c) => c.type === "direct" && c.name === state.detail,
+            )
+          ) {
+            content +=
+              '<div class="scroll messages"><div class="hint" style="text-align:center;margin-bottom:20px">今天 09:36</div><div class="bubble">导航方案我看过了，我们下午一起确认。</div><div class="bubble self">好的，我先把消息分类和通讯录入口整理好。</div><div class="hint">此处演示聊天布局，发送功能未接入。</div></div><div class="composer"><div class="input"><label for="message">消息</label><textarea id="message"></textarea></div><button class="primary" data-action="demo-send">发送</button></div>'
+          } else
+            content +=
+              '<div class="empty"><strong>暂未开放</strong><p>该移动端功能暂未开放。</p></div>'
+        } else {
+          content = `<header><h1>${state.tab}</h1>${state.tab === "消息" ? '<button data-action="refresh">刷新</button>' : ""}</header>`
+          if (state.tab === "消息") {
+            content +=
+              '<nav class="tabs" aria-label="消息分类">' +
+              scopes
+                .map(
+                  (s) =>
+                    `<button data-scope="${s}" class="${s === state.scope ? "active" : ""}" aria-pressed="${s === state.scope}">${s}</button>`,
+                )
+                .join("") +
+              "</nav>"
+            if (state.scope === "客户") {
+              content += `<div class="strip"><button data-action="filter">筛选：${state.view}${state.view === "同事" ? " · " + state.assignee : ""}</button></div>`
+            }
+            content += '<div class="scroll">'
+            const rows = conversations.filter(
+              (c) =>
+                state.scope === "全部" ||
+                (state.scope === "内部"
+                  ? c.type !== "customer"
+                  : c.type === "customer" &&
+                    c.view === state.view &&
+                    (state.view !== "同事" ||
+                      state.assignee === "全部同事" ||
+                      c.assignee === state.assignee)),
+            )
+            content += rows
+              .map(
+                (c) =>
+                  `<${c.type === "direct" ? "button" : "div"} class="row" ${c.type === "direct" ? `data-detail="${c.name}"` : ""}><span class="avatar ${c.type === "direct" ? "round" : ""}">${c.avatar}</span><span class="info"><span class="rowtop"><span class="name">${c.name}</span><span class="time">${c.time}</span></span><span class="preview" style="display:block">${c.preview}</span>${c.type === "direct" ? "" : `<span class="hint" style="display:block">${c.type === "group" ? "群聊详情暂未开放" : "仅查看摘要 · 网站客服 · " + c.view}</span>`}</span></${c.type === "direct" ? "button" : "div"}>`,
+              )
+              .join("")
+            if (!rows.length)
+              content +=
+                '<div class="empty"><strong>暂无会话</strong><p>当前分类和筛选条件下没有会话。</p></div>'
+            content += "</div>"
+          } else if (state.tab === "通讯录") {
+            content +=
+              '<div class="scroll">' +
+              categories
+                .map(
+                  (c, i) =>
+                    `<button class="row" data-detail="${c}"><span class="avatar">${["人", "AI", "团", "外"][i]}</span><span class="name">${c}</span><span class="hint">暂未开放　›</span></button>`,
+                )
+                .join("") +
+              "</div>"
+          } else {
+            content +=
+              '<div class="scroll"><div class="profile"><div class="avatar">林</div><div class="field"><div class="label">姓名</div><div class="value">林然</div></div><div class="field"><div class="label">邮箱</div><div class="value">linran@example.com</div></div><div class="field"><div class="label">当前企业</div><div class="value">鹿行科技</div></div></div><button class="row" data-detail="个人设置"><span class="name">个人设置</span><span>›</span></button><div class="me-actions"><button class="outline" data-action="logout">退出登录</button></div></div>'
+          }
+          content +=
+            '<nav class="bottom" aria-label="主导航">' +
+            ["消息", "通讯录", "我的"]
+              .map(
+                (t, i) =>
+                  `<button data-tab="${t}" class="${t === state.tab ? "active" : ""}"><span class="navicon" aria-hidden="true">${["☷", "☷", "○"][i]}</span>${t}</button>`,
+              )
+              .join("") +
+            "</nav>"
+        }
+        app.innerHTML = content
+        const scroll = app.querySelector(".scroll")
+        if (scroll && !state.detail) {
+          scroll.scrollTop = state.scroll.get(scrollKey()) || 0
+          scroll.onscroll = () =>
+            state.scroll.set(scrollKey(), scroll.scrollTop)
+        }
+      }
+      /** 将顶层面板对齐到原型手机的可视边界。 */
+      function openPanel(panel) {
+        const bounds = document.querySelector(".phone").getBoundingClientRect()
+        panel.style.left = `${bounds.left}px`
+        panel.style.bottom = `${window.innerHeight - bounds.bottom}px`
+        panel.style.width = `${bounds.width}px`
+        panel.showModal()
+      }
+      /** 更新筛选面板中的草稿选项。 */
+      function renderFilter() {
+        document.getElementById("views").innerHTML = views
+          .map(
+            (v) =>
+              `<button data-view="${v}" class="${v === state.draftView ? "active" : ""}" aria-pressed="${v === state.draftView}">${v}</button>`,
+          )
+          .join("")
+        document.getElementById("assignee-row").hidden =
+          state.draftView !== "同事"
+      }
+      /** 处理原型中的导航、面板和演示操作。 */
+      document.addEventListener("click", (event) => {
+        const b = event.target.closest("button")
+        if (!b) return
+        if (b.dataset.tab) {
+          state.tab = b.dataset.tab
+          render()
+        }
+        if (b.dataset.scope) {
+          state.scope = b.dataset.scope
+          if (state.scope !== "客户") {
+            state.view = "排队中"
+            state.assignee = "全部同事"
+          }
+          render()
+        }
+        if (b.dataset.detail) {
+          state.detail = b.dataset.detail
+          render()
+        }
+        if (b.dataset.view) {
+          state.draftView = b.dataset.view
+          renderFilter()
+        }
+        switch (b.dataset.action) {
+          case "back":
+            state.detail = ""
+            render()
+            break
+          case "filter":
+            state.draftView = state.view
+            document.getElementById("assignee").value = state.assignee
+            renderFilter()
+            openPanel(filter)
+            break
+          case "cancel-filter":
+            filter.close()
+            break
+          case "apply-filter":
+            state.view = state.draftView
+            state.assignee = document.getElementById("assignee").value
+            filter.close()
+            render()
+            break
+          case "logout":
+            openPanel(logout)
+            break
+          case "cancel-logout":
+            logout.close()
+            break
+          case "demo-logout":
+            logout.close()
+            break
+          case "refresh":
+            b.textContent = "已刷新"
+            break
+          case "demo-send":
+            document.getElementById("message").focus()
+            break
+        }
+      })
+      render()
+    </script>
+  </body>
+</html>

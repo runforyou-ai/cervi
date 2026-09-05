@@ -1,14 +1,30 @@
 /** 移动端当前用户基础资料页面。 */
 import { useState } from "react"
-import { LoaderCircleIcon } from "lucide-react"
+import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { logout } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { UserAvatar } from "@/components/user-avatar"
 import { Button } from "@/components/ui/button"
+import {
+  MobilePageHeader,
+  MobilePageState,
+  MobileScrollArea,
+} from "@/apps/mobile/mobile-page"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 /** 展示当前用户基础资料和退出操作。 */
 export function MobileMePage() {
@@ -34,12 +50,8 @@ export function MobileMePage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <header className="flex h-14 shrink-0 items-center border-b px-4">
-        <h1 className="text-lg font-semibold tracking-tight">
-          {t("me.title")}
-        </h1>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
+      <MobilePageHeader title={t("me.title")} />
+      <MobileScrollArea storageKey="me" className="px-4 py-6">
         <div className="mx-auto max-w-lg">
           <section aria-labelledby="mobile-profile-title">
             <h2
@@ -72,25 +84,74 @@ export function MobileMePage() {
                     {identity.user.email}
                   </dd>
                 </div>
+                <div className="py-4">
+                  <dt className="text-xs text-muted-foreground">
+                    {t("me.organization")}
+                  </dt>
+                  <dd className="mt-1 break-words text-sm font-medium">
+                    {identity.organization.name}
+                  </dd>
+                </div>
               </dl>
             </div>
           </section>
 
-          <div className="mt-8">
-            <Button
-              className="h-11 w-full"
-              variant="destructive"
-              disabled={loggingOut}
-              onClick={handleLogout}
-            >
-              {loggingOut ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : null}
-              {loggingOut ? t("loggingOut") : t("logout")}
-            </Button>
+          <Link
+            to="/me/settings"
+            state={{ mobileBack: true }}
+            className="mt-6 flex min-h-14 items-center justify-between gap-3 border-y text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {t("me.settings")}
+            <ChevronRightIcon className="size-4 text-muted-foreground" />
+          </Link>
+          <div className="mt-9">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  className="min-h-11 w-full"
+                  variant="outline"
+                  disabled={loggingOut}
+                >
+                  {loggingOut ? t("loggingOut") : t("logout")}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t("me.logoutTitle")}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t("me.logoutDescription")}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="min-h-11">
+                    {t("cancel")}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="min-h-11"
+                    onClick={() => void handleLogout()}
+                  >
+                    {t("logout")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
-      </div>
+      </MobileScrollArea>
+    </section>
+  )
+}
+
+/** 保留个人设置的独立页面入口。 */
+export function MobileSettingsPage() {
+  const { t } = useTranslation("mobile")
+  return (
+    <section className="flex h-full min-h-0 flex-col">
+      <MobilePageHeader title={t("me.settings")} backTo="/me" />
+      <MobilePageState
+        title={t("unavailable")}
+        description={t("me.settingsUnavailable")}
+      />
     </section>
   )
 }
