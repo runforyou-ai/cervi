@@ -262,6 +262,15 @@ function ConversationTimelineContent({
     onUnavailable: handleUnavailable,
   })
 
+  // 区分当前窗口底部与会话尾端，历史浏览意图不决定按钮是否显示。
+  const windowLastSequence =
+    currentPage?.messages[currentPage.messages.length - 1]?.conversationSequence
+  const hasLaterMessages = Boolean(
+    currentPage?.hasLater ||
+    (windowLastSequence &&
+      BigInt(mentions.latestSequence) > BigInt(windowLastSequence)),
+  )
+
   /** 读取最新窗口成功后结束本轮并恢复贴底。 */
   const returnToLatest = useCallback(async () => {
     mentions.pause()
@@ -916,9 +925,9 @@ function ConversationTimelineContent({
       <ConversationMentionNavigator
         navigation={mentions}
         showLatest={
-          timeline.mode === "anchor" ||
           !reading.atBottom ||
-          reading.newCount > 0
+          hasLaterMessages ||
+          (timeline.mode === "latest" && reading.newCount > 0)
         }
         newCount={timeline.mode === "latest" ? reading.newCount : 0}
         busy={timeline.switching}

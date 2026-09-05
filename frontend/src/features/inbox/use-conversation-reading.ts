@@ -90,19 +90,33 @@ export function useConversationReading({
     [],
   )
 
+  /** 按视口实际尺寸同步位置，覆盖滚动和消息内容高度变化。 */
+  const syncViewportPosition = useCallback(() => {
+    const viewport = conversationViewport(root.current)
+    if (!viewport) return
+    const bottom =
+      viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 48
+    setAtBottom(bottom)
+    return bottom
+  }, [root])
+
   useEffect(() => {
     const viewport = conversationViewport(root.current)
     if (!viewport) return
-    /** 记录视口是否贴近底部，不改变用户滚动位置。 */
-    function onScroll() {
-      if (!viewport) return
-      nearBottom.current =
-        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 48
-      setAtBottom(nearBottom.current)
+    syncViewportPosition()
+    // 仅滚动更新贴底跟随意图，尺寸变化只同步按钮状态。
+    const onScroll = () => {
+      nearBottom.current = syncViewportPosition() ?? nearBottom.current
     }
     viewport.addEventListener("scroll", onScroll, { passive: true })
-    return () => viewport.removeEventListener("scroll", onScroll)
-  }, [root, Boolean(page)])
+    const observer = new ResizeObserver(syncViewportPosition)
+    observer.observe(viewport)
+    if (viewport.firstElementChild) observer.observe(viewport.firstElementChild)
+    return () => {
+      viewport.removeEventListener("scroll", onScroll)
+      observer.disconnect()
+    }
+  }, [root, Boolean(page), syncViewportPosition])
 
   useLayoutEffect(() => {
     const viewport = conversationViewport(root.current)
@@ -136,6 +150,7 @@ export function useConversationReading({
       newMessages.current.clear()
       setNewCount(0)
     }
+    syncViewportPosition()
     if (
       mode === "latest" &&
       !switching &&
@@ -175,6 +190,7 @@ export function useConversationReading({
     identityID,
     queueRead,
     followRevision,
+    syncViewportPosition,
   ])
 
   useEffect(() => {
