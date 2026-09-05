@@ -87,6 +87,11 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/teams/:teamID/member-candidates", s.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", s.addTeamMembers)
 	router.POST("/teams/:teamID/members/remove", s.removeTeamMembers)
+	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries", s.listKnowledgeQAEntries)
+	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.getKnowledgeQAEntry)
+	router.POST("/knowledge-bases/:knowledgeBaseID/qa-entries", s.createKnowledgeQAEntry)
+	router.PUT("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.updateKnowledgeQAEntry)
+	router.DELETE("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.deleteKnowledgeQAEntry)
 	router.GET("/knowledge-bases", s.listKnowledgeBases)
 	router.GET("/integration-connections/:connectionID/knowledge-bases", s.listExternalKnowledgeBaseOptions)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
@@ -755,6 +760,47 @@ func (s *Service) removeTeamMembers(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listKnowledgeQAEntries 返回分组中的本地问答列表。
+func (s *Service) listKnowledgeQAEntries(c *gin.Context) {
+	input, ok := bindKnowledgeQAListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListKnowledgeQAEntries(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getKnowledgeQAEntry 返回完整的本地问答。
+func (s *Service) getKnowledgeQAEntry(c *gin.Context) {
+	output, err := s.application.GetKnowledgeQAEntry(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("entryID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createKnowledgeQAEntry 创建本地问答。
+func (s *Service) createKnowledgeQAEntry(c *gin.Context) {
+	var input appservice.KnowledgeQAInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateKnowledgeQAEntry(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateKnowledgeQAEntry 修改本地问答。
+func (s *Service) updateKnowledgeQAEntry(c *gin.Context) {
+	var input appservice.KnowledgeQAInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateKnowledgeQAEntry(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("entryID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteKnowledgeQAEntry 删除本地问答。
+func (s *Service) deleteKnowledgeQAEntry(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteKnowledgeQAEntry(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("entryID")))
+}
+
 // listKnowledgeBases 返回当前企业的知识库列表。
 func (s *Service) listKnowledgeBases(c *gin.Context) {
 	output, err := s.application.ListKnowledgeBases(c.Request.Context(), requestMeta(c))
@@ -854,7 +900,7 @@ func (s *Service) updateKnowledgeGroup(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// deleteKnowledgeGroup 删除不含子分组的知识库分组。
+// deleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
 func (s *Service) deleteKnowledgeGroup(c *gin.Context) {
 	output, err := s.application.DeleteKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("groupID"))
 	writeResult(c, http.StatusOK, output, err)
@@ -1161,6 +1207,24 @@ func bindKnowledgeDocumentSegmentListInputQuery(c *gin.Context) (appservice.Know
 	return appservice.KnowledgeDocumentSegmentListInput{
 		Keyword:  c.Query("keyword"),
 		Status:   optionalEnum[appservice.KnowledgeDocumentSegmentIndexStatus](c.Query("status")),
+		Page:     page,
+		PageSize: pageSize,
+	}, true
+}
+
+// bindKnowledgeQAListInputQuery 从查询参数解析 appservice.KnowledgeQAListInput。
+func bindKnowledgeQAListInputQuery(c *gin.Context) (appservice.KnowledgeQAListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.KnowledgeQAListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 20)
+	if !ok {
+		return appservice.KnowledgeQAListInput{}, false
+	}
+	return appservice.KnowledgeQAListInput{
+		GroupID:  c.Query("groupId"),
+		Keyword:  c.Query("keyword"),
 		Page:     page,
 		PageSize: pageSize,
 	}, true

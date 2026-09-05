@@ -13,6 +13,8 @@ import { ConnectorFormPage } from "@/features/integrations/connectors/connector-
 import { ConnectorListPage } from "@/features/integrations/connectors/connector-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
+import { KnowledgeQAListPage } from "@/features/knowledge-base/knowledge-qa-list-page"
+import { KnowledgeQAFormPage } from "@/features/knowledge-base/knowledge-qa-form-page"
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
 import { KnowledgeBaseIndexPage } from "@/features/knowledge-base/knowledge-base-index-page"
 import { KnowledgeBaseLayout } from "@/features/knowledge-base/knowledge-base-layout"
@@ -67,6 +69,21 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+  },
+  {
+    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa/new",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+  },
+  {
+    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa/:entryId/edit",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+  },
+  {
+    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa",
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
   },
@@ -286,9 +303,18 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
       <Route path="/knowledge-bases" element={<KnowledgeBaseLayout />}>
         <Route index element={<KnowledgeBaseIndexPage />} />
         <Route
-          path="new"
-          element={<KnowledgeBaseFormPage mode="create" />}
+          path=":knowledgeBaseId/groups/:groupId/qa"
+          element={<KnowledgeQAListPage />}
         />
+        <Route
+          path=":knowledgeBaseId/groups/:groupId/qa/new"
+          element={<KnowledgeQAFormPage mode="create" />}
+        />
+        <Route
+          path=":knowledgeBaseId/groups/:groupId/qa/:entryId/edit"
+          element={<KnowledgeQAFormPage mode="edit" />}
+        />
+        <Route path="new" element={<KnowledgeBaseFormPage mode="create" />} />
         <Route
           path=":knowledgeBaseId/documents/:documentId"
           element={<KnowledgeDocumentPage />}

@@ -333,7 +333,7 @@ func (b *DirectBackend) UpdateKnowledgeGroup(ctx context.Context, meta RequestMe
 	return knowledgeBaseFromAction(*record), nil
 }
 
-// DeleteKnowledgeGroup 删除不含子分组的知识库分组。
+// DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
 func (b *DirectBackend) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID, groupID string) (KnowledgeBase, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -357,6 +357,15 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, knowledgebaseaction.ErrQANotFound) {
+		return NotFoundError(meta, cervii18n.ErrorKnowledgeQANotFound)
+	}
+	if errors.Is(err, knowledgebaseaction.ErrQAUnsupported) {
+		return InvalidError(meta, cervii18n.ErrorKnowledgeQAUnsupported, nil)
+	}
+	if errors.Is(err, knowledgebaseaction.ErrBaseHasContent) {
+		return InvalidError(meta, cervii18n.ErrorKnowledgeBaseHasContent, nil)
 	}
 	if errors.Is(err, knowledgebaseaction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorKnowledgeBaseNotFound)
@@ -508,6 +517,10 @@ func knowledgeGroupsFromAction(records []knowledgebaseaction.GroupRecord) []Know
 // knowledgeBaseFieldKeys 把知识库校验错误码映射为本地化文案键。
 func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
+		knowledgebaseaction.ValidationQAQuestionRequired:           cervii18n.FieldKnowledgeQAQuestionRequired,
+		knowledgebaseaction.ValidationQAAnswerRequired:             cervii18n.FieldKnowledgeQAAnswerRequired,
+		knowledgebaseaction.ValidationQAGroupInvalid:               cervii18n.FieldKnowledgeQAGroupInvalid,
+		knowledgebaseaction.ValidationQAContentInvalid:             cervii18n.FieldKnowledgeQAContentInvalid,
 		knowledgebaseaction.ValidationNameRequired:                 cervii18n.FieldKnowledgeBaseNameRequired,
 		knowledgebaseaction.ValidationNameTooLong:                  cervii18n.FieldKnowledgeBaseNameTooLong,
 		knowledgebaseaction.ValidationNameDuplicate:                cervii18n.FieldKnowledgeBaseNameDuplicate,

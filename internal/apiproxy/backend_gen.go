@@ -562,6 +562,43 @@ func (b *Backend) RemoveTeamMembers(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
+// ListKnowledgeQAEntries 返回分组中的本地问答列表。
+func (b *Backend) ListKnowledgeQAEntries(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeQAListInput) (appservice.KnowledgeQAList, error) {
+	var output appservice.KnowledgeQAList
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries", encodeKnowledgeQAListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetKnowledgeQAEntry 返回完整的本地问答。
+func (b *Backend) GetKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, entryID string) (appservice.KnowledgeQAEntry, error) {
+	var output appservice.KnowledgeQAEntry
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateKnowledgeQAEntry 创建本地问答。
+func (b *Backend) CreateKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeQAInput) (appservice.KnowledgeQAEntry, error) {
+	var output appservice.KnowledgeQAEntry
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateKnowledgeQAEntry 修改本地问答。
+func (b *Backend) UpdateKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, entryID string, input appservice.KnowledgeQAInput) (appservice.KnowledgeQAEntry, error) {
+	var output appservice.KnowledgeQAEntry
+	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteKnowledgeQAEntry 删除本地问答。
+func (b *Backend) DeleteKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, entryID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID), nil, nil, nil)
+}
+
 // ListKnowledgeBases 返回当前企业的知识库列表。
 func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.RequestMeta) (appservice.KnowledgeBaseList, error) {
 	var output appservice.KnowledgeBaseList
@@ -655,7 +692,7 @@ func (b *Backend) UpdateKnowledgeGroup(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
-// DeleteKnowledgeGroup 删除不含子分组的知识库分组。
+// DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
 func (b *Backend) DeleteKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, groupID string) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase
 	err := b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, nil, &output)
@@ -930,6 +967,16 @@ func encodeKnowledgeDocumentSegmentListInputQuery(input appservice.KnowledgeDocu
 	query := url.Values{}
 	setQuery(query, "keyword", input.Keyword)
 	setOptionalQuery(query, "status", input.Status)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeKnowledgeQAListInputQuery 将 appservice.KnowledgeQAListInput 编码为查询参数。
+func encodeKnowledgeQAListInputQuery(input appservice.KnowledgeQAListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "groupId", input.GroupID)
+	setQuery(query, "keyword", input.Keyword)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query

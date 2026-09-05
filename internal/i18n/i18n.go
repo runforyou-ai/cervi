@@ -13,6 +13,17 @@ import (
 type Key string
 
 const (
+	ErrorKnowledgeQANotFound         Key = "error.knowledge_qa_not_found"
+	ErrorKnowledgeQAUnsupported      Key = "error.knowledge_qa_unsupported"
+	ErrorKnowledgeBaseHasContent     Key = "error.knowledge_base_has_content"
+	ErrorKnowledgeQAReadFailed       Key = "error.knowledge_qa_read_failed"
+	ErrorKnowledgeQASaveFailed       Key = "error.knowledge_qa_save_failed"
+	ErrorKnowledgeQADeleteFailed     Key = "error.knowledge_qa_delete_failed"
+	FieldKnowledgeQAQuestionRequired Key = "field.knowledge_qa_question_required"
+	FieldKnowledgeQAAnswerRequired   Key = "field.knowledge_qa_answer_required"
+	FieldKnowledgeQAGroupInvalid     Key = "field.knowledge_qa_group_invalid"
+	FieldKnowledgeQAContentInvalid   Key = "field.knowledge_qa_content_invalid"
+
 	ErrorConversationMessageUnavailable   Key = "error.conversation_message_unavailable"
 	ErrorConversationMentionTargetInvalid Key = "error.conversation_mention_target_invalid"
 )

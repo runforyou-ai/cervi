@@ -28,6 +28,7 @@ wails3 task setup:docker
 ```
 
 - 每个 worktree 使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间；PostgreSQL 和 NATS 仅在主工作区共享启动。
+- 每次测试或界面验证结束后，关闭本次启动的服务端、客户端、Vite、MCP 等进程及其子进程，并确认对应端口已释放；用户明确要求保留运行时除外。只清理本次启动的进程，不关闭其他 worktree 的进程或共享的 PostgreSQL、NATS 服务。
 - 客户端统一使用平台 Task，目标架构只传 `ARCH`，不要自行调用底层构建工具或设置 `GOOS`、`GOARCH`、`CGO_ENABLED`。客户端固定启用 CGO；纯静态服务端镜像使用 `CGO_ENABLED=0`。
 - `darwin:build`、`windows:build` 和 `linux:build` 会按宿主环境选择原生或 Docker 工具链。交叉编译只生成二进制或未签名应用包；正式桌面安装包在目标系统或同平台 Runner 构建。Linux 不支持异架构桌面端交叉编译，Windows 宿主不支持交叉构建其他平台，WSL 按 Linux 处理。
 - macOS 的 DMG、签名和公证在 macOS 完成；Windows 安装包在原生 Windows 或 Windows Runner 完成；iOS 在 macOS 完成。服务端多平台归档由 `.github/workflows/release.yml` 的 `server-assets` 作业生成。
@@ -181,6 +182,7 @@ frontend/
 ### 界面控制
 
 - 当前任务涉及桌面端时，必要时应主动使用 Wails MCP 获取页面信息并完成相关验证，无需另行请求授权。
+- 通过 MCP 验证界面时，遇到需要用户手动完成的步骤（如输入账号密码、验证码或授权确认），应说明当前步骤并暂停相关操作，等待用户完成后继续验证；不得仅因此放弃界面验证或将其标记为无法完成。
 - 除桌面端任务中的 Wails MCP 验证外，未经用户当次明确授权，不得控制浏览器、桌面应用或系统界面。
 - 默认使用命令行验证；需要界面验证时，由用户操作并反馈结果，授权不得跨任务沿用。
 

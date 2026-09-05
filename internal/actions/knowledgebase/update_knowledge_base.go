@@ -36,6 +36,19 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
+		stored, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID)
+		if err != nil {
+			return err
+		}
+		if stored.Category != string(input.Category) || (stored.IntegrationConnectionID == nil) != (input.IntegrationConnectionID == "") {
+			occupied, err := tx.NewSelect().Model((*servermodels.KnowledgeQAEntry)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exists(ctx)
+			if err != nil {
+				return err
+			}
+			if occupied {
+				return ErrBaseHasContent
+			}
+		}
 		if err := validateDifyConnection(ctx, tx, identity.Organization.ID, input.IntegrationConnectionID); err != nil {
 			return err
 		}

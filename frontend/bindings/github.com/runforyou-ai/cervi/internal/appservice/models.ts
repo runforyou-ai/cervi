@@ -1447,6 +1447,67 @@ export interface KnowledgeGroupInput {
 }
 
 /**
+ * KnowledgeQAEntry 定义完整问答详情。
+ */
+export interface KnowledgeQAEntry {
+    "id": string;
+    "groupId": string;
+    "question": string;
+    "similarQuestions": KnowledgeQASimilarQuestion[] | null;
+    "answer": string;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * KnowledgeQAInput 定义整条问答的编辑字段。
+ */
+export interface KnowledgeQAInput {
+    "groupId": string;
+    "question": string;
+    "similarQuestions": KnowledgeQASimilarQuestion[] | null;
+    "answer": string;
+}
+
+/**
+ * KnowledgeQAList 定义问答分页结果。
+ */
+export interface KnowledgeQAList {
+    "entries": KnowledgeQASummary[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * KnowledgeQAListInput 定义分组中的问答查询条件。
+ */
+export interface KnowledgeQAListInput {
+    "groupId": string;
+    "keyword": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * KnowledgeQASimilarQuestion 定义带稳定编号的相似问题，新问题的编号为空。
+ */
+export interface KnowledgeQASimilarQuestion {
+    "id": string;
+    "content": string;
+}
+
+/**
+ * KnowledgeQASummary 定义问答列表项。
+ */
+export interface KnowledgeQASummary {
+    "id": string;
+    "groupId": string;
+    "question": string;
+    "similarQuestions": string[] | null;
+    "answer": string;
+    "createdAt": string;
+}
+
+/**
  * KnowledgeRetrievalInput 定义知识库检索条件。
  */
 export interface KnowledgeRetrievalInput {

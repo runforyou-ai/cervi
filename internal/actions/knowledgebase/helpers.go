@@ -247,3 +247,17 @@ func rowsAffectedOne(result sql.Result, notFound error) error {
 	}
 	return nil
 }
+
+// lockKnowledgeBase 串行化同一知识库的内容、分组和归属变更。
+func lockKnowledgeBase(ctx context.Context, db bun.IDB, organizationID, knowledgeBaseID string) (*servermodels.KnowledgeBase, error) {
+	if !common.ValidUUID(knowledgeBaseID) {
+		return nil, ErrNotFound
+	}
+	record := &servermodels.KnowledgeBase{}
+	err := db.NewSelect().Model(record).Where("kb.id = ?", knowledgeBaseID).
+		Where("kb.organization_id = ?", organizationID).For("UPDATE").Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return record, err
+}
