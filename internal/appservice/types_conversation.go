@@ -179,8 +179,9 @@ type DirectConversationLookup struct {
 
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。
 type DirectTextMessageInput struct {
-	ClientMessageID string `json:"clientMessageId"`
-	Body            string `json:"body"`
+	ClientMessageID  string `json:"clientMessageId"`
+	Body             string `json:"body"`
+	ReplyToMessageID string `json:"replyToMessageId"`
 }
 
 // GroupConversationInput 定义群聊资料和创建时加入的成员。

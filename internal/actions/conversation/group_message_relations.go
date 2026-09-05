@@ -4,8 +4,6 @@ package conversation
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -13,16 +11,6 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-type groupMessageRelationSenderRow struct {
-	Deleted       bool    `bun:"deleted"`
-	MessageID     string  `bun:"message_id"`
-	Body          string  `bun:"body"`
-	ChatSubjectID *string `bun:"chat_subject_id"`
-	Kind          *string `bun:"kind"`
-	SourceID      *string `bun:"source_id"`
-	DisplayName   *string `bun:"display_name"`
-}
 
 type groupMentionTargetRow struct {
 	MessageID     string  `bun:"message_id"`
@@ -71,59 +59,6 @@ func loadConversationMessageMentions(ctx context.Context, db bun.IDB, organizati
 		})
 	}
 	return nil
-}
-
-// loadGroupReplyTarget 校验并读取同一群聊中的文本引用目标。
-func loadGroupReplyTarget(ctx context.Context, db bun.IDB, organizationID, conversationID, messageID string) (*ConversationMessageReference, error) {
-	if messageID == "" {
-		return nil, nil
-	}
-	reference, err := loadMessageReference(ctx, db, organizationID, conversationID, messageID)
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && reference.Deleted) {
-		return nil, &ConflictError{Reason: ConflictReasonGroupReplyTargetInvalid}
-	}
-	if err != nil {
-		return nil, err
-	}
-	return reference, nil
-}
-
-// loadMessageReference 读取文本消息引用，并将软删除表示为不可用摘要。
-func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conversationID, messageID string) (*ConversationMessageReference, error) {
-	row := groupMessageRelationSenderRow{}
-	err := db.NewSelect().
-		TableExpr("messages AS msg").
-		ColumnExpr("msg.id AS message_id").
-		ColumnExpr("CASE WHEN msg.deleted_at IS NULL THEN msg.body ELSE '' END AS body").
-		ColumnExpr("msg.deleted_at IS NOT NULL AS deleted").
-		ColumnExpr("cs.id AS chat_subject_id").
-		ColumnExpr("cs.kind AS kind").
-		ColumnExpr("cs.source_id AS source_id").
-		ColumnExpr("oi.display_name AS display_name").
-		Join("LEFT JOIN conversation_participants AS cp ON cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id AND cp.id = msg.sender_participant_id").
-		Join("LEFT JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
-		Join("LEFT JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Where("msg.organization_id = ?", organizationID).
-		Where("msg.conversation_id = ?", conversationID).
-		Where("msg.id = ?", messageID).
-		Where("msg.type = ?", domain.MessageTypeText).
-		Scan(ctx, &row)
-	if err != nil {
-		return nil, err
-	}
-	if row.Deleted {
-		return &ConversationMessageReference{ID: row.MessageID, Deleted: true}, nil
-	}
-	if row.ChatSubjectID == nil || row.Kind == nil || row.SourceID == nil {
-		return nil, ErrDataInvariant
-	}
-	return &ConversationMessageReference{
-		ID: row.MessageID, Body: row.Body,
-		Sender: &ConversationMessageSender{
-			ChatSubjectID: *row.ChatSubjectID, Kind: domain.ChatSubjectKind(*row.Kind),
-			SourceID: *row.SourceID, DisplayName: row.DisplayName,
-		},
-	}, nil
 }
 
 // loadGroupMentionTargets 校验提醒目标是当前群聊中的有效参与者。
@@ -183,23 +118,22 @@ func createMessageMentions(ctx context.Context, db bun.IDB, organizationID, mess
 	return nil
 }
 
-// loadIdempotentGroupMessage 校验引用和提醒在内的完整群消息意图。
+// loadIdempotentGroupMessage 校验群消息的完整发送意图。
 func loadIdempotentGroupMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input GroupTextMessageInput, idempotencyKey string) (ConversationMessage, bool, error) {
-	saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, idempotencyKey, false)
+	saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, false)
 	if err != nil || !found {
 		return saved, found, err
 	}
 	var stored struct {
-		ReplyToMessageID *string `bun:"reply_to_message_id"`
-		MentionAll       bool    `bun:"mention_all"`
+		MentionAll bool `bun:"mention_all"`
 	}
 	if err := db.NewSelect().
 		TableExpr("messages AS msg").
-		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id, msg.mention_all AS mention_all").
+		ColumnExpr("msg.mention_all AS mention_all").
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.id = ?", saved.ID).
 		Scan(ctx, &stored); err != nil {
-		return ConversationMessage{}, true, fmt.Errorf("load idempotent group reply: %w", err)
+		return ConversationMessage{}, true, fmt.Errorf("load idempotent group mention all: %w", err)
 	}
 	storedMentionSubjectIDs := make([]string, 0)
 	if err := db.NewSelect().
@@ -211,18 +145,8 @@ func loadIdempotentGroupMessage(ctx context.Context, db bun.IDB, identity *serve
 		Scan(ctx, &storedMentionSubjectIDs); err != nil {
 		return ConversationMessage{}, true, fmt.Errorf("load idempotent group mentions: %w", err)
 	}
-	storedReply := ""
-	if stored.ReplyToMessageID != nil {
-		storedReply = *stored.ReplyToMessageID
-	}
-	if storedReply != input.ReplyToMessageID || stored.MentionAll != input.MentionAll || !slices.Equal(storedMentionSubjectIDs, input.MentionSubjectIDs) {
+	if stored.MentionAll != input.MentionAll || !slices.Equal(storedMentionSubjectIDs, input.MentionSubjectIDs) {
 		return ConversationMessage{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
-	}
-	if storedReply != "" {
-		saved.ReplyTo, err = loadMessageReference(ctx, db, identity.Organization.ID, input.ConversationID, storedReply)
-		if err != nil {
-			return ConversationMessage{}, true, fmt.Errorf("load idempotent group reply reference: %w", err)
-		}
 	}
 	saved.Mentions, err = loadPersistedMessageMentions(ctx, db, identity.Organization.ID, saved.ID)
 	if err != nil {

@@ -878,6 +878,7 @@ export interface DirectInboxConversation {
 export interface DirectTextMessageInput {
     "clientMessageId": string;
     "body": string;
+    "replyToMessageId": string;
 }
 
 /**

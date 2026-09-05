@@ -194,7 +194,7 @@ const (
 	ErrorGroupSuccessorRequired           Key = "error.group_successor_required"
 	ErrorGroupMessageSendFailed           Key = "error.group_message_send_failed"
 	ErrorGroupMessageConflict             Key = "error.group_message_conflict"
-	ErrorGroupReplyTargetInvalid          Key = "error.group_reply_target_invalid"
+	ErrorReplyTargetInvalid               Key = "error.reply_target_invalid"
 	ErrorGroupMentionTargetInvalid        Key = "error.group_mention_target_invalid"
 	ErrorServiceSessionOwned              Key = "error.service_session_owned"
 	ErrorServiceSessionNotReplyable       Key = "error.service_session_not_replyable"

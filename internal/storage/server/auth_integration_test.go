@@ -1362,7 +1362,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f76",
 			Body: "无效引用", ReplyToMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f77",
 		})
-		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonGroupReplyTargetInvalid {
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 			t.Fatalf("invalid group reply error = %#v", err)
 		}
 		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
@@ -2205,6 +2205,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil || nextRun.TriggerStartSeq != 5 {
 			t.Fatalf("agent run after exhausted task = %#v, error = %v", nextRun, err)
 		}
+
+		t.Run("Agent 单聊引用", func(t *testing.T) {
+			testAgentDirectReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
 
 		t.Run("Agent 知识库范围", func(t *testing.T) {
 			testAgentKnowledgeScopes(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)

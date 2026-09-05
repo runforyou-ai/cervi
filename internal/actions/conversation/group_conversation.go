@@ -265,7 +265,7 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 			result = saved
 			return err
 		}
-		reply, err := loadGroupReplyTarget(ctx, tx, identity.Organization.ID, normalized.ConversationID, normalized.ReplyToMessageID)
+		reply, err := loadConversationReplyTarget(ctx, tx, identity.Organization.ID, normalized.ConversationID, normalized.ReplyToMessageID)
 		if err != nil {
 			return err
 		}

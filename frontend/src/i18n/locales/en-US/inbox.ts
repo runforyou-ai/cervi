@@ -8,6 +8,7 @@ const inbox = {
   mentionPendingCount: "Review {{count}} mentions",
   mentionPrevious: "Previous",
   mentionNext: "Next",
+  mentionClose: "Finish viewing",
   mentionResume: "Continue reviewing",
   mentionNavigationError: "Unable to review mentions. Try again.",
   messagesBackToLatest: "Back to latest",

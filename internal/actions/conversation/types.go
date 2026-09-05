@@ -55,8 +55,8 @@ const (
 	ConflictReasonGroupOwnerCannotBeRemoved = "group_owner_cannot_be_removed"
 	// ConflictReasonGroupSuccessorRequired 表示群主退出前必须指定继任者。
 	ConflictReasonGroupSuccessorRequired = "group_successor_required"
-	// ConflictReasonGroupReplyTargetInvalid 表示引用目标不是当前群聊中的有效文本消息。
-	ConflictReasonGroupReplyTargetInvalid = "group_reply_target_invalid"
+	// ConflictReasonReplyTargetInvalid 表示引用目标不是当前会话中的有效文本消息。
+	ConflictReasonReplyTargetInvalid = "reply_target_invalid"
 	// ConflictReasonGroupMentionTargetInvalid 表示提醒目标不是当前群聊中的有效参与者。
 	ConflictReasonGroupMentionTargetInvalid = "group_mention_target_invalid"
 )
@@ -256,9 +256,10 @@ type DirectConversationSummary struct {
 
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。
 type DirectTextMessageInput struct {
-	ConversationID  string
-	ClientMessageID string
-	Body            string
+	ConversationID   string
+	ClientMessageID  string
+	Body             string
+	ReplyToMessageID string
 }
 
 // GroupConversationInput 定义企业成员创建群聊的资料和初始成员。

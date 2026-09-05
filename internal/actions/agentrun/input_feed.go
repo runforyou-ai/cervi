@@ -4,6 +4,7 @@ package agentrun
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -256,8 +257,21 @@ func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermode
 }
 
 type claimedMessageRow struct {
-	Body           string `bun:"body"`
-	SenderSourceID string `bun:"sender_source_id"`
+	Body             string  `bun:"body"`
+	SenderSourceID   string  `bun:"sender_source_id"`
+	ReplyToMessageID *string `bun:"reply_to_message_id"`
+	ReplyBody        string  `bun:"reply_body"`
+	ReplySenderID    string  `bun:"reply_sender_id"`
+	ReplySenderName  string  `bun:"reply_sender_name"`
+	ReplyDeleted     bool    `bun:"reply_deleted"`
+}
+
+type claimedMessageReference struct {
+	MessageID  string `json:"messageId"`
+	SenderID   string `json:"senderIdentityId,omitempty"`
+	SenderName string `json:"senderName,omitempty"`
+	Body       string `json:"body,omitempty"`
+	Deleted    bool   `json:"deleted,omitempty"`
 }
 
 // loadClaimedConversationMessages 读取不越过已认领 Trigger 的最近会话上下文。
@@ -270,8 +284,17 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 	if err := db.NewSelect().TableExpr("messages AS msg").
 		ColumnExpr("msg.body").
 		ColumnExpr("cs.source_id AS sender_source_id").
+		ColumnExpr("msg.reply_to_message_id").
+		ColumnExpr("CASE WHEN reply.deleted_at IS NULL THEN COALESCE(reply.body, '') ELSE '' END AS reply_body").
+		ColumnExpr("COALESCE(reply_cs.source_id::text, '') AS reply_sender_id").
+		ColumnExpr("COALESCE(reply_oi.display_name, '') AS reply_sender_name").
+		ColumnExpr("reply.deleted_at IS NOT NULL AS reply_deleted").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type = ?", domain.MessageTypeText).
+		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
+		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id").
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
 		Where("msg.type = ?", domain.MessageTypeText).
@@ -289,7 +312,20 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		if row.SenderSourceID == run.AgentIdentityID {
 			role = agentruntime.MessageRoleAssistant
 		}
-		messages = append(messages, agentruntime.Message{Role: role, Content: row.Body})
+		content := row.Body
+		// 以结构化正文携带一层引用，原消息不占用新的对话角色。
+		if row.ReplyToMessageID != nil {
+			reference := claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
+			if !row.ReplyDeleted {
+				reference.SenderID, reference.SenderName, reference.Body = row.ReplySenderID, row.ReplySenderName, row.ReplyBody
+			}
+			encoded, _ := json.Marshal(struct {
+				Body    string                  `json:"body"`
+				ReplyTo claimedMessageReference `json:"replyTo"`
+			}{Body: row.Body, ReplyTo: reference})
+			content = string(encoded)
+		}
+		messages = append(messages, agentruntime.Message{Role: role, Content: content})
 	}
 	return messages, nil
 }
