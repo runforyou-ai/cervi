@@ -102,7 +102,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 	f.send(t, f.member, "自己的所有人消息", true)
 	last := f.send(t, f.owner, "普通消息", false)
 	queue, err := pending.Execute(ctx, f.member, f.groupID)
-	if err != nil || !slices.Equal(queue.MessageIDs, []string{first.ID, second.ID}) || queue.LastTargetSequence == nil || *queue.LastTargetSequence != *second.ConversationSequence {
+	if err != nil || !slices.Equal(queue.MessageIDs, []string{first.ID, second.ID}) || queue.LastTargetSequence == nil || *queue.LastTargetSequence != *second.GroupMessageSequence {
 		t.Fatalf("queue=%+v err=%v", queue, err)
 	}
 	if _, err := read.Execute(ctx, f.member, f.groupID, last.ID); err != nil {
@@ -134,7 +134,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, err = review.Execute(ctx, f.member, f.groupID, second.ID)
-	if err != nil || result.Outcome != "unavailable" || result.ReviewedThroughSequence != *first.ConversationSequence {
+	if err != nil || result.Outcome != "unavailable" || result.ReviewedThroughSequence != *first.GroupMessageSequence {
 		t.Fatalf("deleted review=%+v err=%v", result, err)
 	}
 	third := f.send(t, f.owner, "删除后继续", false, f.subjectID)
@@ -258,7 +258,7 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 		}
 	}
 	var sequences []int64
-	if err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Column("conversation_sequence").Where("conversation_id = ?", f.groupID).Order("conversation_sequence ASC").Scan(ctx, &sequences); err != nil {
+	if err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Column("group_message_sequence").Where("conversation_id = ?", f.groupID).Order("group_message_sequence ASC").Scan(ctx, &sequences); err != nil {
 		t.Fatal(err)
 	}
 	if len(sequences) != 78 {
@@ -274,7 +274,7 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID})
-	if err != nil || *latest.Messages[len(latest.Messages)-1].ConversationSequence != 78 {
+	if err != nil || *latest.Messages[len(latest.Messages)-1].GroupMessageSequence != 78 {
 		t.Fatalf("latest order err=%v", err)
 	}
 }
@@ -345,7 +345,7 @@ func TestGroupSequenceCommitBarrier(t *testing.T) {
 	}
 	release.Do(func() { close(barrier.release) })
 	first, second := <-firstDone, <-secondDone
-	if first.err != nil || second.err != nil || *first.message.ConversationSequence != 1 || *second.message.ConversationSequence != 2 {
+	if first.err != nil || second.err != nil || *first.message.GroupMessageSequence != 1 || *second.message.GroupMessageSequence != 2 {
 		t.Fatalf("commit order: %+v %+v", first, second)
 	}
 	// 两端同时确认同一条提醒，恰好一次推进且两次都成功。

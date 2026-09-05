@@ -496,7 +496,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	}
 	return ConversationMessage{
 		ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
-		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, ConversationSequence: conversationSequenceString(message.ConversationSequence),
+		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, GroupMessageSequence: groupMessageSequenceString(message.GroupMessageSequence),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
 	}
@@ -598,8 +598,8 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 
 // encodeConversationMessageCursor 编码绑定会话的成员消息游标。
 func encodeConversationMessageCursor(conversationID string, point conversationaction.MessageCursorPoint) string {
-	if point.ConversationSequence != nil {
-		return conversationID + ".group." + strconv.FormatInt(*point.ConversationSequence, 10) + "." + point.ID
+	if point.GroupMessageSequence != nil {
+		return conversationID + ".group." + strconv.FormatInt(*point.GroupMessageSequence, 10) + "." + point.ID
 	}
 	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + strconv.FormatInt(point.SourceOrder, 10) + "." + point.ID
 }
@@ -615,7 +615,7 @@ func decodeConversationMessageCursor(value, conversationID string) (conversation
 		if err != nil || sequence <= 0 {
 			return conversationaction.MessageCursorPoint{}, false
 		}
-		return conversationaction.MessageCursorPoint{ID: parts[3], ConversationSequence: &sequence}, true
+		return conversationaction.MessageCursorPoint{ID: parts[3], GroupMessageSequence: &sequence}, true
 	}
 	originatedAt, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil || originatedAt <= 0 {

@@ -282,14 +282,14 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 			return err
 		}
 		message := &servermodels.Message{
-			ConversationSequence: &sequence,
+			GroupMessageSequence: &sequence,
 			ID:                   messageID.String(), OrganizationID: identity.Organization.ID,
 			ConversationID: normalized.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
 			Type: string(domain.MessageTypeText), Body: normalized.Body, ReplyToMessageID: replyToMessageID, MentionAll: normalized.MentionAll,
 			IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
 		}
 		if _, err := tx.NewInsert().Model(message).
-			Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "mention_all", "idempotency_key", "originated_at", "conversation_sequence").
+			Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "mention_all", "idempotency_key", "originated_at", "group_message_sequence").
 			Returning("*").
 			Exec(ctx); err != nil {
 			return fmt.Errorf("create group text message: %w", err)

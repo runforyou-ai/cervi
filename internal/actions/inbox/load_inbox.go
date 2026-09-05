@@ -400,7 +400,7 @@ func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizatio
 			LEFT JOIN message_mentions AS mention ON mention.organization_id = unread_msg.organization_id AND mention.message_id = unread_msg.id AND mention.subject_id = mine.subject_id
 			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id AND unread_msg.deleted_at IS NULL
 				AND (unread_msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?)
-				AND (read_msg.id IS NULL OR unread_msg.conversation_sequence > read_msg.conversation_sequence)
+				AND (read_msg.id IS NULL OR unread_msg.group_message_sequence > read_msg.group_message_sequence)
 		) AS unread ON TRUE`, identityID).
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeGroup).
@@ -466,7 +466,7 @@ func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, i
 			domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
 		Where("msg.deleted_at IS NULL").
 		Where("msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?", identityID).
-		Where("read_msg.id IS NULL OR (cv.type = ? AND msg.conversation_sequence > read_msg.conversation_sequence) OR (cv.type = ? AND (msg.originated_at, msg.source_order, msg.id) > (read_msg.originated_at, read_msg.source_order, read_msg.id))", domain.ConversationTypeGroup, domain.ConversationTypeDirect).
+		Where("read_msg.id IS NULL OR (cv.type = ? AND msg.group_message_sequence > read_msg.group_message_sequence) OR (cv.type = ? AND (msg.originated_at, msg.source_order, msg.id) > (read_msg.originated_at, read_msg.source_order, read_msg.id))", domain.ConversationTypeGroup, domain.ConversationTypeDirect).
 		Scan(ctx, &counts)
 	if err != nil {
 		return UnreadCounts{}, fmt.Errorf("count internal unread messages: %w", err)

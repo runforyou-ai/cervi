@@ -6,7 +6,7 @@ import type {
 
 type MessageOrder = Pick<
   ConversationMessageData,
-  "id" | "originatedAt" | "sourceOrder" | "conversationSequence"
+  "id" | "originatedAt" | "sourceOrder" | "groupMessageSequence"
 >
 
 /** 无损比较群序号，其他消息保留来源时间的小数秒精度。 */
@@ -15,11 +15,11 @@ export function compareConversationMessages(
   right: MessageOrder,
 ) {
   if (
-    left.conversationSequence !== null &&
-    right.conversationSequence !== null
+    left.groupMessageSequence !== null &&
+    right.groupMessageSequence !== null
   ) {
-    const a = BigInt(left.conversationSequence)
-    const b = BigInt(right.conversationSequence)
+    const a = BigInt(left.groupMessageSequence)
+    const b = BigInt(right.groupMessageSequence)
     return a < b ? -1 : a > b ? 1 : 0
   }
   const milliseconds =

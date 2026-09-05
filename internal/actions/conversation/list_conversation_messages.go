@@ -33,7 +33,7 @@ type conversationMessageRow struct {
 	SystemEventType                *string         `bun:"system_event_type"`
 	SystemEventPayload             json.RawMessage `bun:"system_event_payload"`
 	OriginatedAt                   time.Time       `bun:"originated_at"`
-	ConversationSequence           *int64          `bun:"conversation_sequence"`
+	GroupMessageSequence           *int64          `bun:"group_message_sequence"`
 	SourceOrder                    int64           `bun:"source_order"`
 	CreatedAt                      time.Time       `bun:"created_at"`
 	SenderSubjectID                *string         `bun:"sender_subject_id"`
@@ -75,7 +75,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		}
 		group := conversationType == domain.ConversationTypeGroup
 		for _, cursor := range []*MessageCursorPoint{input.Before, input.After} {
-			if cursor != nil && (cursor.ConversationSequence != nil) != group {
+			if cursor != nil && (cursor.GroupMessageSequence != nil) != group {
 				return &ValidationError{Fields: map[string]ValidationCode{"cursor": ValidationCursorInvalid}}
 			}
 		}
@@ -116,7 +116,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("msg.system_event_payload AS system_event_payload").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.source_order AS source_order").
-		ColumnExpr("msg.conversation_sequence AS conversation_sequence").
+		ColumnExpr("msg.group_message_sequence AS group_message_sequence").
 		ColumnExpr("msg.created_at AS created_at").
 		ColumnExpr("cs.id AS sender_subject_id").
 		ColumnExpr("cs.kind AS sender_kind").
@@ -153,8 +153,8 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 
 // messageCursorCondition 根据游标类型构造时间线边界。
 func messageCursorCondition(point MessageCursorPoint, operator string) schema.QueryWithArgs {
-	if point.ConversationSequence != nil {
-		return bun.SafeQuery("msg.conversation_sequence "+operator+" ?", *point.ConversationSequence)
+	if point.GroupMessageSequence != nil {
+		return bun.SafeQuery("msg.group_message_sequence "+operator+" ?", *point.GroupMessageSequence)
 	}
 	return bun.SafeQuery("(msg.originated_at, msg.source_order, msg.id) "+operator+" (?, ?, ?)", point.OriginatedAt, point.SourceOrder, point.ID)
 }
@@ -163,7 +163,7 @@ func messageCursorCondition(point MessageCursorPoint, operator string) schema.Qu
 func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input ConversationMessageHistoryInput, group bool) ([]conversationMessageRow, error) {
 	order := "msg.originated_at, msg.source_order, msg.id"
 	if group {
-		order = "msg.conversation_sequence"
+		order = "msg.group_message_sequence"
 	}
 	var rows []conversationMessageRow
 	if input.AroundMessageID != "" {
@@ -175,8 +175,8 @@ func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *serve
 		if err != nil {
 			return nil, err
 		}
-		point := MessageCursorPoint{ID: target.ID, OriginatedAt: target.OriginatedAt, SourceOrder: target.SourceOrder, ConversationSequence: target.ConversationSequence}
-		if group && target.ConversationSequence == nil {
+		point := MessageCursorPoint{ID: target.ID, OriginatedAt: target.OriginatedAt, SourceOrder: target.SourceOrder, GroupMessageSequence: target.GroupMessageSequence}
+		if group && target.GroupMessageSequence == nil {
 			return nil, ErrDataInvariant
 		}
 		if err := conversationMessagesQuery(db, identity, input.ConversationID).Where("?", messageCursorCondition(point, "<")).OrderExpr(orderDescending(order)).Limit(25).Scan(ctx, &rows); err != nil {
@@ -207,7 +207,7 @@ func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *serve
 	}
 	if group {
 		for _, row := range rows {
-			if row.ConversationSequence == nil {
+			if row.GroupMessageSequence == nil {
 				return nil, ErrDataInvariant
 			}
 		}
@@ -282,7 +282,7 @@ func validateConversationMessageHistoryInput(input ConversationMessageHistoryInp
 		fields["cursor"] = ValidationCursorInvalid
 	}
 	for _, cursor := range []*MessageCursorPoint{input.Before, input.After} {
-		if cursor != nil && (!common.ValidUUID(cursor.ID) || (cursor.ConversationSequence == nil && (cursor.OriginatedAt.IsZero() || cursor.SourceOrder < 0)) || (cursor.ConversationSequence != nil && *cursor.ConversationSequence <= 0)) {
+		if cursor != nil && (!common.ValidUUID(cursor.ID) || (cursor.GroupMessageSequence == nil && (cursor.OriginatedAt.IsZero() || cursor.SourceOrder < 0)) || (cursor.GroupMessageSequence != nil && *cursor.GroupMessageSequence <= 0)) {
 			fields["cursor"] = ValidationCursorInvalid
 		}
 	}
@@ -295,7 +295,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	for _, row := range rows {
 		message := ConversationMessage{
 			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
-			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, ConversationSequence: row.ConversationSequence,
+			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, GroupMessageSequence: row.GroupMessageSequence,
 		}
 		if message.Type == domain.MessageTypeSystem {
 			if row.SystemEventType == nil || len(row.SystemEventPayload) == 0 {
@@ -347,7 +347,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	}
 	first := rows[0]
 	last := rows[len(rows)-1]
-	result.Before = &MessageCursorPoint{OriginatedAt: first.OriginatedAt, SourceOrder: first.SourceOrder, ID: first.ID, ConversationSequence: first.ConversationSequence}
-	result.After = &MessageCursorPoint{OriginatedAt: last.OriginatedAt, SourceOrder: last.SourceOrder, ID: last.ID, ConversationSequence: last.ConversationSequence}
+	result.Before = &MessageCursorPoint{OriginatedAt: first.OriginatedAt, SourceOrder: first.SourceOrder, ID: first.ID, GroupMessageSequence: first.GroupMessageSequence}
+	result.After = &MessageCursorPoint{OriginatedAt: last.OriginatedAt, SourceOrder: last.SourceOrder, ID: last.ID, GroupMessageSequence: last.GroupMessageSequence}
 	return result, nil
 }

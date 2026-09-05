@@ -416,8 +416,8 @@ func updateConversationSummary(ctx context.Context, db bun.IDB, conversation *se
 		Set("updated_at = now()").
 		WherePK().
 		Where("organization_id = ?", message.OrganizationID)
-	if message.ConversationSequence != nil {
-		query = query.Where("message_sequence = ?", *message.ConversationSequence)
+	if message.GroupMessageSequence != nil {
+		query = query.Where("last_group_message_sequence = ?", *message.GroupMessageSequence)
 	} else {
 		query = query.Where("last_message_at IS NULL OR (last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID)
 	}

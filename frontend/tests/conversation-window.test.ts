@@ -18,7 +18,7 @@ function message(
 ): ConversationMessageData {
   return {
     id,
-    conversationSequence: sequence,
+    groupMessageSequence: sequence,
     originatedAt,
     sourceOrder: 0,
   } as ConversationMessageData

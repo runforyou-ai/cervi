@@ -96,8 +96,8 @@ func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *se
 	readAt := time.Now().UTC()
 	state.LastReadAt = &readAt
 	orderCondition := bun.SafeQuery("(current_message.originated_at, current_message.source_order, current_message.id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID)
-	if message.ConversationSequence != nil {
-		orderCondition = bun.SafeQuery("current_message.conversation_sequence < ?", *message.ConversationSequence)
+	if message.GroupMessageSequence != nil {
+		orderCondition = bun.SafeQuery("current_message.group_message_sequence < ?", *message.GroupMessageSequence)
 	}
 	if _, err := db.NewInsert().Model(state).
 		Column("organization_id", "conversation_id", "user_id", "last_read_message_id", "last_read_at").

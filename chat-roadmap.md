@@ -280,14 +280,14 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 消息同时保存两个时间：
 
 - `originated_at`：消息在业务来源产生的时间；所有会话使用它展示时间，单聊和客户会话还使用它排序。
-- `conversation_sequence`：仅群聊使用的事务写入序号，由锁定的 `conversations.message_sequence` 分配；文本和系统消息共用递增顺序。
+- `group_message_sequence`：仅群聊使用的事务写入序号，由锁定的 `conversations.last_group_message_sequence` 分配；文本和系统消息共用递增顺序。
 - `created_at`：当前 Cervi 服务器入库时间，用于审计、同步诊断和任务处理。
 
 网站实时入站没有可信的客户端业务时间，因此使用服务器首次接收时间作为 `originated_at`；Telegram 等能提供稳定来源时间的平台使用远端时间。Telegram 历史补拉不能用补拉入库时间重排历史。
 
 单聊和客户会话历史使用 `before` 游标按 `(originated_at DESC, source_order DESC, id DESC)` 向更早记录扫描；首个网站轮询闭环使用 `after` 游标按同一三元边界正序扫描更新记录。`source_order` 对没有平台顺序的网站和站内消息为 `0`，Telegram 私聊使用同一 Chat 内的 `message_id`。无游标和 `before` 查询在数据库倒序读取后反转，所有响应数组统一按正序返回，便于客户端直接展示或追加。游标由服务端编码 Conversation 编号和三元组，方向由查询参数表达，客户端不自行拼接。UUIDv7 `id` 只提供当前服务器中的最终稳定分页分界，不代表第三方平台的来源顺序。
 
-群聊按 `conversation_sequence` 读取历史、计算未读并推进普通已读与提及查看水位，序号在 JSON 中使用十进制字符串。群聊游标绑定会话、序号和消息 ID；来源时间及 UUID 不决定群聊顺序。所有群聊写入与成员变化先锁定会话，并在等待锁后重新检查成员资格，事务提交后不会出现更小序号的新消息。
+群聊按 `group_message_sequence` 读取历史、计算未读并推进普通已读与提及查看水位，序号在 JSON 中使用十进制字符串。群聊游标绑定会话、序号和消息 ID；来源时间及 UUID 不决定群聊顺序。所有群聊写入与成员变化先锁定会话，并在等待锁后重新检查成员资格，事务提交后不会出现更小序号的新消息。
 
 会话的 `last_message_at`、`last_message_source_order` 和 `last_message_id` 成组指向当前已知顺序最大的消息，并在同一事务按对应顺序只向前推进：群聊采用消息序号，其他会话采用三元组。补拉旧消息不能把会话顶到列表顶部或让时间倒退；编辑消息不改变它们，删除最后一条消息也不回退它们，此时 `last_message_id` 允许指向已删除消息，仅继续充当排序水位。会话预览跳过已删除消息：指向消息已删除时按时间线回退查询最近一条未删除消息，不得展示已删除内容。迟到消息会插入正确时间位置，但已经发出的游标不保证自动包含窗口中间新插入的消息，客户端完成补拉后需要刷新当前窗口。
 

@@ -51,7 +51,7 @@ type TimelineMessage = Pick<
   | "body"
   | "originatedAt"
   | "sourceOrder"
-  | "conversationSequence"
+  | "groupMessageSequence"
   | "sender"
   | "sessionStart"
   | "systemEvent"
@@ -109,7 +109,7 @@ function mergeTimelineMessages(
       body: message.body,
       originatedAt: message.originatedAt,
       sourceOrder: 0,
-      conversationSequence: null,
+      groupMessageSequence: null,
       sender: null,
       sessionStart: null,
       systemEvent: null,
@@ -264,7 +264,7 @@ function ConversationTimelineContent({
 
   // 区分当前窗口底部与会话尾端，历史浏览意图不决定按钮是否显示。
   const windowLastSequence =
-    currentPage?.messages[currentPage.messages.length - 1]?.conversationSequence
+    currentPage?.messages[currentPage.messages.length - 1]?.groupMessageSequence
   const hasLaterMessages = Boolean(
     currentPage?.hasLater ||
     (windowLastSequence &&

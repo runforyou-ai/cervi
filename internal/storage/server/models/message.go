@@ -29,7 +29,7 @@ type Message struct {
 	ThreadRootMessageID  *string         `bun:"thread_root_message_id"`
 	IdempotencyKey       *string         `bun:"idempotency_key"`
 	OriginatedAt         time.Time       `bun:"originated_at"`
-	ConversationSequence *int64          `bun:"conversation_sequence"`
+	GroupMessageSequence *int64          `bun:"group_message_sequence"`
 	SourceOrder          int64           `bun:"source_order"`
 	EditedAt             *time.Time      `bun:"edited_at"`
 	DeletedAt            *time.Time      `bun:"deleted_at"`

@@ -122,7 +122,7 @@ type ReceiveWebsiteCustomerTextMessageResult struct {
 
 // MessageCursorPoint 定义消息分页稳定边界。
 type MessageCursorPoint struct {
-	ConversationSequence *int64
+	GroupMessageSequence *int64
 	OriginatedAt         time.Time
 	SourceOrder          int64
 	ID                   string
@@ -192,7 +192,7 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	ConversationSequence *int64
+	GroupMessageSequence *int64
 	ID                   string
 	Type                 domain.MessageType
 	Body                 string

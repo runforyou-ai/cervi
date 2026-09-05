@@ -123,7 +123,7 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	ConversationSequence *string                          `json:"conversationSequence"`
+	GroupMessageSequence *string                          `json:"groupMessageSequence"`
 	ID                   string                           `json:"id"`
 	Type                 MessageType                      `json:"type"`
 	Body                 string                           `json:"body"`

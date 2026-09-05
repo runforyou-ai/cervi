@@ -45,7 +45,7 @@ func (b *DirectBackend) ListPendingConversationMentions(ctx context.Context, met
 	if err != nil {
 		return PendingConversationMentions{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	return PendingConversationMentions{MessageIDs: pending.MessageIDs, LastTargetSequence: conversationSequenceString(pending.LastTargetSequence)}, nil
+	return PendingConversationMentions{MessageIDs: pending.MessageIDs, LastTargetSequence: groupMessageSequenceString(pending.LastTargetSequence)}, nil
 }
 
 // MarkConversationMentionReviewed 确认最早有效提及并返回权威水位。
@@ -61,8 +61,8 @@ func (b *DirectBackend) MarkConversationMentionReviewed(ctx context.Context, met
 	return ConversationMentionReview{ReviewedThroughMessageID: result.ReviewedThroughMessageID, ReviewedThroughSequence: strconv.FormatInt(result.ReviewedThroughSequence, 10), Outcome: ConversationMentionReviewOutcome(result.Outcome)}, nil
 }
 
-// conversationSequenceString 无损转换可空消息序号。
-func conversationSequenceString(sequence *int64) *string {
+// groupMessageSequenceString 无损转换可空消息序号。
+func groupMessageSequenceString(sequence *int64) *string {
 	if sequence == nil {
 		return nil
 	}

@@ -567,7 +567,7 @@ export enum ConversationMentionReviewOutcome {
  * ConversationMessage 定义成员可见的会话消息。
  */
 export interface ConversationMessage {
-    "conversationSequence": string | null;
+    "groupMessageSequence": string | null;
     "id": string;
     "type": MessageType;
     "body": string;

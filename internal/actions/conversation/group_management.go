@@ -652,13 +652,13 @@ func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermod
 	}
 	eventType := string(event.Type)
 	message := &servermodels.Message{
-		ConversationSequence: &sequence,
+		GroupMessageSequence: &sequence,
 		ID:                   uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: conversationID,
 		Type: string(domain.MessageTypeSystem), Body: "", SystemEventType: &eventType, SystemEventPayload: payload,
 		OriginatedAt: time.Now().UTC(),
 	}
 	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "type", "body", "system_event_type", "system_event_payload", "originated_at", "conversation_sequence").
+		Column("id", "organization_id", "conversation_id", "type", "body", "system_event_type", "system_event_payload", "originated_at", "group_message_sequence").
 		Exec(ctx); err != nil {
 		return nil, fmt.Errorf("create group system event: %w", err)
 	}

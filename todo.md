@@ -52,11 +52,11 @@ Web 与桌面端群聊支持点击引用定位原消息，并通过消息区域�
 
 | 表 | 字段 | 规则 |
 | --- | --- | --- |
-| `conversations` | `message_sequence bigint NOT NULL DEFAULT 0` | 群聊已分配的最大消息序号；空群为 0 |
-| `messages` | `conversation_sequence bigint NULL` | 群聊文本与系统消息必须有值，从 1 开始；当前其他会话类型为空 |
+| `conversations` | `last_group_message_sequence bigint NOT NULL DEFAULT 0` | 群聊已分配的最大消息序号；空群为 0 |
+| `messages` | `group_message_sequence bigint NULL` | 群聊文本与系统消息必须有值，从 1 开始；当前其他会话类型为空 |
 | `conversation_user_states` | `last_reviewed_mention_message_id uuid NULL` | 连续确认水位指向的消息；初始空群为空，也允许指向本轮入群系统消息 |
 
-为非空 `conversation_sequence` 建立 `(organization_id, conversation_id, conversation_sequence)` 唯一索引，作为业务顺序约束。保留现有幂等唯一索引，不增加普通查询索引。
+为非空 `group_message_sequence` 建立 `(organization_id, conversation_id, group_message_sequence)` 唯一索引，作为业务顺序约束。保留现有幂等唯一索引，不增加普通查询索引。
 
 序号在数据库和 Action 中使用 `int64`，在 appservice DTO 中以可空十进制字符串传输。前端使用生成字段，比较时按整数处理，禁止转为可能丢失精度的 JavaScript `number`。
 
@@ -178,7 +178,7 @@ Action 锁定当前用户、会话及用户会话状态后，按以下顺序处�
 
 上下文 Query 先授权并校验目标属于该会话，返回目标及前后各最多 25 条可见消息；边缘不足时不强行补足另一侧。共用基础消息查询、DTO 组装、引用、提及和系统事件加载，不复制整套关系 JOIN。
 
-`ConversationMessage` 增加可空 `conversationSequence` 字符串字段，群聊消息必须返回。历史页、上下文、发送回包和系统消息都复用同一契约及转换，前端不另外声明顺序模型。
+`ConversationMessage` 增加可空 `groupMessageSequence` 字符串字段，群聊消息必须返回。历史页、上下文、发送回包和系统消息都复用同一契约及转换，前端不另外声明顺序模型。
 
 目标已删除或不存在返回消息不可用；无权访问会话返回会话不可访问。普通时间线继续排除已删除主消息，序号不连续不代表丢页。
 
