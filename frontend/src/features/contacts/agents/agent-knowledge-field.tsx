@@ -79,9 +79,11 @@ export function AgentKnowledgeField({
           <span className={option.unavailable ? "text-destructive" : undefined}>{option.name}</span>
         </label>
       ))}
-      <p className="text-sm text-muted-foreground">
-        {options.length === 0 ? t("agents.execution.knowledgeEmpty") : t("agents.execution.knowledgeHint")}
-      </p>
+      {options.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {t("agents.execution.knowledgeEmpty")}
+        </p>
+      ) : null}
     </div>
   )
 }
