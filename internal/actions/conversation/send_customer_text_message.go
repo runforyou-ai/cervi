@@ -42,6 +42,7 @@ type memberReplySessionPlan struct {
 }
 
 type idempotentMemberMessageRow struct {
+	ReplyToMessageID       *string    `bun:"reply_to_message_id"`
 	GroupMessageSequence   *int64     `bun:"group_message_sequence"`
 	ID                     string     `bun:"id"`
 	CreatedAt              time.Time  `bun:"created_at"`
@@ -117,7 +118,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, idempotencyKey, true); err != nil || found {
+	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, "", idempotencyKey, true); err != nil || found {
 		return saved, err
 	}
 
@@ -271,7 +272,7 @@ func lockCurrentServiceSession(ctx context.Context, db bun.IDB, organizationID, 
 }
 
 // loadIdempotentMemberMessage 校验并返回已经保存的成员消息。
-func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID, body, idempotencyKey string, requireServiceSession bool) (ConversationMessage, bool, error) {
+func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID, body, replyToMessageID, idempotencyKey string, requireServiceSession bool) (ConversationMessage, bool, error) {
 	row := idempotentMemberMessageRow{}
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
@@ -282,6 +283,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ColumnExpr("msg.sender_participant_id AS sender_participant_id").
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
+		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.deleted_at AS deleted_at").
 		ColumnExpr("msg.group_message_sequence AS group_message_sequence").
@@ -302,11 +304,15 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		return ConversationMessage{}, false, fmt.Errorf("load idempotent member message: %w", err)
 	}
 	// 校验幂等消息对应完整的成员发送意图。
+	storedReply := ""
+	if row.ReplyToMessageID != nil {
+		storedReply = *row.ReplyToMessageID
+	}
 	serviceSessionMatches := row.ServiceSessionID == nil && row.JoinedServiceSessionID == nil
 	if requireServiceSession {
 		serviceSessionMatches = row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID
 	}
-	messageMatches := row.ConversationID == conversationID && row.Body == body && row.Type == string(domain.MessageTypeText) && row.DeletedAt == nil &&
+	messageMatches := storedReply == replyToMessageID && row.ConversationID == conversationID && row.Body == body && row.Type == string(domain.MessageTypeText) && row.DeletedAt == nil &&
 		serviceSessionMatches &&
 		row.SenderParticipantID != nil && row.SenderSubjectID != nil && row.SenderSubjectKind != nil && row.SenderSubjectSourceID != nil &&
 		*row.SenderSubjectKind == string(domain.ChatSubjectKindOrganizationIdentity) && *row.SenderSubjectSourceID == identity.OrganizationIdentity.ID
@@ -318,7 +324,14 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ServiceSessionID: row.ServiceSessionID, SenderParticipantID: row.SenderParticipantID,
 		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, GroupMessageSequence: row.GroupMessageSequence,
 	}
-	return memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName), true, nil
+	result := memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
+	if storedReply != "" {
+		result.ReplyTo, err = loadMessageReference(ctx, db, identity.Organization.ID, conversationID, storedReply)
+		if err != nil {
+			return ConversationMessage{}, true, fmt.Errorf("load idempotent message reference: %w", err)
+		}
+	}
+	return result, true, nil
 }
 
 // applyMemberReplySessionPlan 应用成员回复对应的客服周期状态迁移。

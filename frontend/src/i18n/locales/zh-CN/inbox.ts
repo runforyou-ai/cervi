@@ -8,6 +8,7 @@ const inbox = {
   mentionPendingCount: "查看 {{count}} 条提及",
   mentionPrevious: "上一条",
   mentionNext: "下一条",
+  mentionClose: "结束查看",
   mentionResume: "继续查看",
   mentionNavigationError: "无法查看提及，请重试",
   messagesBackToLatest: "回到最新消息",

@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils"
 
 import { compareConversationMessages } from "./conversation-window"
 import { useConversationTimeline } from "./use-conversation-timeline"
+import { useConversationViewport } from "./use-conversation-viewport"
 import { useConversationReading } from "./use-conversation-reading"
 import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
 import { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
@@ -243,17 +244,13 @@ function ConversationTimelineContent({
     timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
-  const reading = useConversationReading({
+  const viewport = useConversationViewport({
     root: scrollRootRef,
     page: currentPage,
     mode: timeline.mode,
     switching: timeline.switching,
-    readingActive: pollingActive,
-    identityID: currentIdentityID,
     visibleCount: visibleMessages.length,
     sentCount: outgoingMessages.length,
-    onReadMessage,
-    readThroughMessageID,
   })
   const location = useConversationMessageNavigation({
     root: scrollRootRef,
@@ -261,6 +258,19 @@ function ConversationTimelineContent({
     readingActive: pollingActive,
     openWindow: timeline.openWindow,
     cancelWindowUpdate: timeline.cancelWindowUpdate,
+    viewport,
+  })
+  const reading = useConversationReading({
+    root: scrollRootRef,
+    page: currentPage,
+    mode: timeline.mode,
+    switching: timeline.switching || location.locating,
+    readingActive: pollingActive,
+    identityID: currentIdentityID,
+    atBottom: viewport.atBottom,
+    getAtBottom: viewport.getAtBottom,
+    onReadMessage,
+    readThroughMessageID,
   })
 
   /** 当前成员失去会话访问权时恢复到会话列表。 */
@@ -294,7 +304,7 @@ function ConversationTimelineContent({
     onUnavailable: handleUnavailable,
   })
 
-  // 区分当前窗口底部与会话尾端，历史浏览意图不决定按钮是否显示。
+  // 结合分页边界和群聊尾端序号判断是否仍有后续消息。
   const windowLastSequence =
     currentPage?.messages[currentPage.messages.length - 1]?.groupMessageSequence
   const hasLaterMessages = Boolean(
@@ -309,7 +319,7 @@ function ConversationTimelineContent({
     try {
       if (!(await timeline.openWindow())) return false
       mentions.close()
-      reading.followLatest()
+      viewport.followLatest()
       return true
     } catch (error) {
       if (isApiError(error) && error.reason === "conversation_unavailable")
@@ -324,7 +334,7 @@ function ConversationTimelineContent({
     mentions.pause,
     mentions.close,
     timeline.openWindow,
-    reading.followLatest,
+    viewport.followLatest,
     handleUnavailable,
     navigate,
     t,
@@ -364,11 +374,9 @@ function ConversationTimelineContent({
 
   /** 加载相邻历史页并保持可见消息位置。 */
   async function loadPage(direction: "before" | "after") {
-    reading.preservePosition()
     try {
-      await timeline.loadPage(direction)
+      await timeline.loadPage(direction, viewport.preservePosition)
     } catch (error) {
-      reading.cancelPreservedPosition()
       if (isApiError(error) && error.reason === "conversation_unavailable")
         handleUnavailable()
       else if (!recoverSession(error, navigate))
@@ -957,12 +965,7 @@ function ConversationTimelineContent({
       ) : null}
       <ConversationMentionNavigator
         navigation={mentions}
-        showLatest={
-          (!mentionNavigation && timeline.mode === "anchor") ||
-          !reading.atBottom ||
-          hasLaterMessages ||
-          (timeline.mode === "latest" && reading.newCount > 0)
-        }
+        showLatest={!viewport.atBottom || hasLaterMessages}
         newCount={timeline.mode === "latest" ? reading.newCount : 0}
         busy={timeline.switching}
         onLatest={() => void returnToLatest()}

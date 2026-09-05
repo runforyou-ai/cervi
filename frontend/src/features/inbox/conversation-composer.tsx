@@ -138,6 +138,11 @@ export function ConversationComposer({
   } | null>(null)
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
+  const activeReplyTo =
+    conversationType === ConversationType.ConversationTypeGroup ||
+    conversationType === ConversationType.ConversationTypeDirect
+      ? replyTo
+      : null
   const replyToRef = useRef(replyTo)
   replyToRef.current = replyTo
   const [mentionSubjectIDs, setMentionSubjectIDs] = useState<string[]>([])
@@ -309,10 +314,6 @@ export function ConversationComposer({
       ? { ...mentionAllToken, start: mentionAllToken.start - leadingWhitespace }
       : null
     const normalizedMentionSubjectIDs = [...mentionSubjectIDs].sort()
-    const activeReplyTo =
-      conversationType === ConversationType.ConversationTypeGroup
-        ? replyTo
-        : null
     const retry =
       retryFailedMessage &&
       retryRef.current?.body === body &&
@@ -342,11 +343,16 @@ export function ConversationComposer({
       const messageInput = { clientMessageId: clientMessageID, body }
       let message: ConversationMessageData
       switch (conversationType) {
-        case ConversationType.ConversationTypeDirect:
+        case ConversationType.ConversationTypeDirect: {
+          const directInput = {
+            ...messageInput,
+            replyToMessageId: activeReplyTo?.id ?? "",
+          }
           message = sendDirectMessage
-            ? await sendDirectMessage(messageInput)
-            : await sendDirectTextMessage(conversationID, messageInput)
+            ? await sendDirectMessage(directInput)
+            : await sendDirectTextMessage(conversationID, directInput)
           break
+        }
         case ConversationType.ConversationTypeGroup:
           message = await sendGroupTextMessage(conversationID, {
             ...messageInput,
@@ -552,19 +558,18 @@ export function ConversationComposer({
           onKeyDown={resizeInputFromKeyboard}
         />
         <div className="overflow-hidden rounded-xl border border-input bg-muted/15 shadow-xs">
-          {conversationType === ConversationType.ConversationTypeGroup &&
-          replyTo ? (
+          {activeReplyTo ? (
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
               <div className="min-w-0">
                 <p className="font-medium text-foreground">
                   {t("messageReplyingTo", {
                     name:
-                      replyTo.sender?.displayName?.trim() ||
+                      activeReplyTo.sender?.displayName?.trim() ||
                       t("unknownSender"),
                   })}
                 </p>
                 <p className="truncate text-muted-foreground">
-                  {replyTo.body}
+                  {activeReplyTo.body}
                 </p>
               </div>
               <button

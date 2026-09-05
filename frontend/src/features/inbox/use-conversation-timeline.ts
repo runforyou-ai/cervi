@@ -93,9 +93,13 @@ export function useConversationTimeline(
     setLoadingDirection(null)
   }, [])
 
-  /** 切换浏览窗口；定位已有消息只改变浏览意图。 */
+  /** 只为窗口外的目标读取上下文，连续窗口到达尾端后恢复增量读取。 */
   const openWindow = useCallback(
     async (messageID?: string) => {
+      if (
+        messageID &&
+        pageRef.current?.messages.some((message) => message.id === messageID)
+      ) return true
       const revision = ++generation.current
       const previousMode = modeRef.current
       setSwitching(true)
@@ -109,14 +113,14 @@ export function useConversationTimeline(
             (signal) =>
               listConversationMessages(conversationID, undefined, signal),
           )
-        else if (!next?.messages.some((message) => message.id === messageID))
+        else
           next = await read(
             resourceKeys.conversationMessageContext(conversationID, messageID),
             (signal) =>
               getConversationMessageContext(conversationID, messageID, signal),
           )
         if (generation.current !== revision) return false
-        modeRef.current = messageID ? "anchor" : "latest"
+        modeRef.current = messageID && next?.hasLater ? "anchor" : "latest"
         setMode(modeRef.current)
         setPage(next)
         return true
@@ -133,7 +137,7 @@ export function useConversationTimeline(
 
   /** 只把匹配当前端点的历史页合入窗口。 */
   const loadPage = useCallback(
-    async (direction: "before" | "after") => {
+    async (direction: "before" | "after", preservePosition: () => void) => {
       const base = pageRef.current
       if (
         !base ||
@@ -158,11 +162,13 @@ export function useConversationTimeline(
             listConversationMessages(conversationID, parameters, signal),
         )
         if (generation.current !== revision) return
-        setPage((current) =>
-          current?.[direction] === cursor
-            ? mergeConversationPage(current, next, direction)
-            : current,
-        )
+        if (pageRef.current?.[direction] !== cursor) return
+        preservePosition()
+        setPage(mergeConversationPage(pageRef.current, next, direction))
+        if (direction === "after" && !next.hasLater) {
+          modeRef.current = "latest"
+          setMode("latest")
+        }
       } catch (error) {
         if (generation.current === revision) {
           setPageError(direction)
