@@ -4,7 +4,6 @@ import {
   CrownIcon,
   MoreHorizontalIcon,
   SearchIcon,
-  UserRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -16,6 +15,7 @@ import {
   type GroupParticipant,
   type MemberOption,
 } from "@/api"
+import { ProfileAvatar } from "@/components/profile-avatar"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,20 +53,11 @@ function GroupParticipantAvatar({
   participant: GroupParticipant
 }) {
   return (
-    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-medium text-muted-foreground">
-      {participant.avatarUrl ? (
-        <img
-          src={participant.avatarUrl}
-          alt=""
-          className="size-full object-cover"
-          draggable={false}
-        />
-      ) : participant.displayName ? (
-        Array.from(participant.displayName)[0]?.toLocaleUpperCase()
-      ) : (
-        <UserRoundIcon className="size-4" />
-      )}
-    </span>
+    <ProfileAvatar
+      imageURL={participant.avatarUrl}
+      name={participant.displayName}
+      className="size-9"
+    />
   )
 }
 

@@ -44,6 +44,7 @@ import {
   type LoadInboxQuery,
   type MemberOption,
 } from "@/api"
+import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { PageSplit } from "@/components/page-split"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
@@ -77,10 +78,7 @@ import {
   ConversationComposerUnavailable,
 } from "@/features/inbox/conversation-composer"
 import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
-import {
-  ConversationAvatar,
-  ConversationHeader,
-} from "@/features/inbox/conversation-header"
+import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
@@ -1132,7 +1130,7 @@ function ConversationThread({
         prepareSendRef={prepareSendRef}
         conversationID={conversationID}
         conversationType={conversationType}
-        currentIdentityID={identity.user.identityId}
+        currentUser={identity.user}
         workspaceLayout
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}

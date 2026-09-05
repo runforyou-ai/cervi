@@ -631,6 +631,8 @@ export interface ConversationMessageSender {
     "kind": ChatSubjectKind;
     "sourceId": string;
     "displayName": string | null;
+    "avatarUrl": string;
+    "identityType": OrganizationIdentityType | null;
 }
 
 /**
@@ -867,6 +869,7 @@ export interface DirectInboxConversation {
     "peerIdentityId": string;
     "peerType": OrganizationIdentityType;
     "peerName": string;
+    "peerAvatarUrl": string;
     "preview": string | null;
     "lastMessageAt": string | null;
     "agentRunStatus": AgentRunStatus | null;

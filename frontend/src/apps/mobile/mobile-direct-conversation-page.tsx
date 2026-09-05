@@ -1,6 +1,5 @@
 /** 移动端企业成员内部单聊详情。 */
 import { useMemo } from "react"
-import { BotIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useParams } from "react-router"
 
@@ -9,7 +8,6 @@ import {
   InboxScope,
   isDirectInboxConversation,
   loadInbox,
-  OrganizationIdentityType,
   type DirectInboxConversationData,
   type InboxConversation,
 } from "@/api"
@@ -17,6 +15,8 @@ import { MobileDirectThread } from "@/apps/mobile/mobile-direct-thread"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { ProfileAvatar } from "@/components/profile-avatar"
+import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
   memberChatPollingInterval,
@@ -49,10 +49,6 @@ function MobileDirectHeader({
   const location = useLocation()
   const memberUserID = (location.state as MobileDirectLocationState | null)
     ?.memberUserID
-  const initial = Array.from(peerName)[0]?.toLocaleUpperCase()
-  const directAgent =
-    conversation?.direct.peerType ===
-    OrganizationIdentityType.OrganizationIdentityTypeAgent
   const agentRunLabel = agentRunStatusLabel(
     conversation?.direct.agentRunStatus ?? null,
     tInbox,
@@ -63,15 +59,11 @@ function MobileDirectHeader({
       backTo={memberUserID ? `/contacts/employees/${memberUserID}` : inboxURL}
       title={
         <span className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-            {directAgent ? (
-              <BotIcon className="size-4" />
-            ) : initial ? (
-              initial
-            ) : (
-              <UserRoundIcon className="size-4" />
-            )}
-          </span>
+          {conversation ? (
+            <ConversationAvatar conversation={conversation} className="size-9" />
+          ) : (
+            <ProfileAvatar name={peerName} className="size-9" />
+          )}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-base font-semibold">
               {peerName}

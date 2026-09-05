@@ -173,7 +173,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
 		return ConversationMessage{}, err
 	}
-	return memberConversationMessage(message, subject.ID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName), nil
+	return memberConversationMessage(message, subject.ID, identity.OrganizationIdentity), nil
 }
 
 // ensureCustomerConversationOutboundSupported 校验客户会话来源渠道已实现外发。
@@ -324,7 +324,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ServiceSessionID: row.ServiceSessionID, SenderParticipantID: row.SenderParticipantID,
 		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, GroupMessageSequence: row.GroupMessageSequence,
 	}
-	result := memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
+	result := memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity)
 	if storedReply != "" {
 		result.ReplyTo, err = loadMessageReference(ctx, db, identity.Organization.ID, conversationID, storedReply)
 		if err != nil {
@@ -400,14 +400,15 @@ func ensureMemberConversationParticipant(ctx context.Context, db bun.IDB, organi
 }
 
 // memberConversationMessage 构造成员消息时间线结果。
-func memberConversationMessage(message *servermodels.Message, subjectID, sourceID, displayName string) ConversationMessage {
-	name := displayName
+func memberConversationMessage(message *servermodels.Message, subjectID string, identity servermodels.OrganizationIdentity) ConversationMessage {
+	name := identity.DisplayName
+	identityType := domain.OrganizationIdentityType(identity.Type)
 	return ConversationMessage{
 		ID: message.ID, Type: domain.MessageTypeText, Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll, GroupMessageSequence: message.GroupMessageSequence,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,
-			SourceID: sourceID, DisplayName: &name,
+			SourceID: identity.ID, DisplayName: &name, AvatarFileID: identity.AvatarFileID, IdentityType: &identityType,
 		},
 	}
 }
