@@ -54,7 +54,7 @@ function ToolValue({ value }: { value: string }) {
             <Popover.Trigger asChild>
               <button
                 type="button"
-                className="rounded-sm text-primary hover:underline focus-visible:outline focus-visible:outline-ring"
+                className="rounded-sm text-muted-foreground hover:underline focus-visible:outline focus-visible:outline-ring"
               >
                 {t("agentToolMore")}
               </button>
