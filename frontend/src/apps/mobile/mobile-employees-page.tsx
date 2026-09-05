@@ -162,6 +162,7 @@ function MobileEmployeePage({
     const element = sentinel.current
     if (!element || !last || !autoLoad || !hasMore || error || refreshing)
       return
+    // 各页使用 Fragment，哨兵始终是列表滚动容器的直接子节点。
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) onLoadMore(page)
@@ -203,7 +204,7 @@ function MobileEmployeePage({
       {data && page === 1 && data.users.length === 0 && !error ? (
         <MobilePageState title={t("contacts.empty")} />
       ) : null}
-      {data ? (
+      {data && data.users.length > 0 ? (
         <ul className="divide-y border-b">
           {data.users.map((user) => (
             <li key={user.id}>
@@ -232,15 +233,13 @@ function MobileEmployeePage({
           ))}
         </ul>
       ) : null}
-      {last && data && !error ? (
+      {last && data && !error && (page > 1 || data.users.length > 0) ? (
         <div
           ref={sentinel}
           className="flex h-14 items-center justify-center text-sm text-muted-foreground"
           role="status"
         >
-          {!hasMore && (page > 1 || data.users.length > 0)
-            ? t("contacts.allLoaded")
-            : null}
+          {!hasMore ? t("contacts.allLoaded") : null}
         </div>
       ) : null}
     </>
