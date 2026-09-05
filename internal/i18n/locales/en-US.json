@@ -243,6 +243,7 @@
   "error.customer_message_send_failed": "Could not send the message. Try again.",
   "error.customer_message_conflict": "This message does not match the content previously sent with the same identifier.",
   "error.direct_target_not_found": "This available teammate could not be found.",
+  "error.direct_conversation_lookup_failed": "Could not open the internal chat. Please try again.",
   "error.direct_message_send_failed": "Could not send the internal message. Try again.",
   "error.direct_message_conflict": "This message does not match the content previously sent with the same identifier.",
   "error.group_conversation_create_failed": "Could not create the group chat. Try again.",

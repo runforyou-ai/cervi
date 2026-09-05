@@ -1,17 +1,16 @@
 /** 企业成员内部单聊对象选择器。 */
-import { useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   BotIcon,
   LoaderCircleIcon,
-  SearchIcon,
   UserRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 import {
   findDirectConversation,
   isApiError,
+  sessionPath,
   OrganizationIdentityType,
   type DirectInboxConversationData,
   type MemberOption,
@@ -25,13 +24,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 
 /** 选择一位活跃企业成员。 */
 export function DirectConversationPickerDialog({
@@ -49,70 +46,54 @@ export function DirectConversationPickerDialog({
   ) => void
 }) {
   const { t } = useTranslation("inbox")
-  const navigate = useNavigate()
-  const [query, setQuery] = useState("")
-  const [openingIdentityID, setOpeningIdentityID] = useState("")
+  const [selectedMember, setSelectedMember] = useState<MemberOption | null>(null)
   const { data, loading, error, refresh } = useResource(
     resourceKeys.memberOptions(),
     listAllMemberOptions,
     { enabled: open, staleTime: 0 },
   )
-  const candidates = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase()
-    return (data ?? []).filter(
-      (member) =>
-        member.id !== currentIdentityID &&
-        (!normalizedQuery ||
-          member.displayName.toLocaleLowerCase().includes(normalizedQuery)),
-    )
-  }, [currentIdentityID, data, query])
+  const lookup = useResource(
+    resourceKeys.directConversation(selectedMember?.id ?? ""),
+    () => findDirectConversation(selectedMember?.id ?? ""),
+    { enabled: open && Boolean(selectedMember), staleTime: 0 },
+  )
+  const candidates = (data ?? []).filter(
+    (member) => member.id !== currentIdentityID,
+  )
 
-  /** 打开所选成员的本地单聊草稿。 */
-  async function openConversation(member: MemberOption) {
-    setOpeningIdentityID(member.id)
-    try {
-      const conversation = await findDirectConversation(member.id)
-      onSelected(member, conversation)
-      setQuery("")
-      onOpenChange(false)
-    } catch (lookupError) {
-      if (recoverSession(lookupError, navigate)) return
-      console.warn("查找企业成员内部单聊失败", {
-        targetIdentityId: member.id,
-        error: lookupError,
-      })
+  useEffect(() => {
+    if (!open) setSelectedMember(null)
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !selectedMember || lookup.loading || lookup.refreshing) return
+    if (lookup.error) {
+      setSelectedMember(null)
+      if (isApiError(lookup.error) && sessionPath(lookup.error.state)) return
+      console.warn("查找企业成员内部单聊失败", lookup.error)
       toast.error(
-        isApiError(lookupError)
-          ? apiErrorMessage(lookupError, ["targetIdentityId"])
+        isApiError(lookup.error)
+          ? apiErrorMessage(lookup.error, ["targetIdentityId"])
           : t("directLookupError"),
       )
-    } finally {
-      setOpeningIdentityID("")
+      return
     }
-  }
+    if (lookup.data === undefined) return
+    onSelected(selectedMember, lookup.data)
+    setSelectedMember(null)
+    onOpenChange(false)
+  }, [
+    lookup.data, lookup.error, lookup.loading, lookup.refreshing,
+    onOpenChange, onSelected, open, selectedMember, t,
+  ])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="grid max-h-[min(42rem,calc(100svh-2rem))] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden">
+      <DialogContent className="grid max-h-[min(42rem,calc(100svh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t("directPickerTitle")}</DialogTitle>
           <DialogDescription>{t("directPickerDescription")}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-1.5">
-          <label htmlFor="direct-member-search" className="text-sm font-medium">
-            {t("directPickerSearch")}
-          </label>
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="direct-member-search"
-              value={query}
-              autoComplete="off"
-              className="pl-9"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </div>
-        </div>
         <ScrollArea className="min-h-64 rounded-md border">
           {loading ? (
             <LoadingIndicator className="min-h-64 justify-center">
@@ -143,9 +124,9 @@ export function DirectConversationPickerDialog({
                 <button
                   key={member.id}
                   type="button"
-                  disabled={openingIdentityID !== ""}
+                  disabled={Boolean(selectedMember)}
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
-                  onClick={() => void openConversation(member)}
+                  onClick={() => setSelectedMember(member)}
                 >
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
                     {member.type ===
@@ -166,7 +147,7 @@ export function DirectConversationPickerDialog({
                       {t("directPickerAgent")}
                     </span>
                   ) : null}
-                  {openingIdentityID === member.id ? (
+                  {selectedMember?.id === member.id ? (
                     <LoaderCircleIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
                   ) : null}
                 </button>

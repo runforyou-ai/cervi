@@ -163,6 +163,7 @@ const (
 	ErrorCustomerMessageSendFailed        Key = "error.customer_message_send_failed"
 	ErrorCustomerMessageConflict          Key = "error.customer_message_conflict"
 	ErrorDirectTargetNotFound             Key = "error.direct_target_not_found"
+	ErrorDirectConversationLookupFailed   Key = "error.direct_conversation_lookup_failed"
 	ErrorDirectMessageSendFailed          Key = "error.direct_message_send_failed"
 	ErrorDirectMessageConflict            Key = "error.direct_message_conflict"
 	ErrorGroupConversationCreateFailed    Key = "error.group_conversation_create_failed"

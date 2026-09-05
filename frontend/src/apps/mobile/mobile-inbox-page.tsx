@@ -6,7 +6,6 @@ import {
   GlobeIcon,
   MessageCircleIcon,
   MessagesSquareIcon,
-  PlusIcon,
   RefreshCwIcon,
   SendIcon,
   UserRoundIcon,
@@ -24,16 +23,12 @@ import {
   type CustomerInboxConversationData,
   type DirectInboxConversationData,
   type InboxConversation,
-  type MemberOption,
 } from "@/api"
-import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { createDirectConversationDraft } from "@/features/inbox/direct-conversation-draft"
-import { DirectConversationPickerDialog } from "@/features/inbox/direct-conversation-picker-dialog"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
@@ -321,14 +316,11 @@ function MobileConversationRow({
 /** 加载并显示移动端统一会话摘要。 */
 export function MobileInboxPage() {
   const { t } = useTranslation("mobile")
-  const { t: tInbox } = useTranslation("inbox")
-  const { identity } = useMobileWorkspace()
   const navigate = useNavigate()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })
   const previousPollingActiveRef = useRef(pollingActive)
-  const [directDialogOpen, setDirectDialogOpen] = useState(false)
   const { data, loading, refreshing, error, refresh } = useResource(
     resourceKeys.inbox(),
     () => loadInbox(),
@@ -349,17 +341,6 @@ export function MobileInboxPage() {
     previousPollingActiveRef.current = pollingActive
   }, [data, pollingActive, refresh])
 
-  /** 打开不持久化的移动端单聊草稿。 */
-  function openDirectDraft(
-    member: MemberOption,
-    existing: DirectInboxConversationData | null,
-  ) {
-    const conversation = existing ?? createDirectConversationDraft(member)
-    navigate(`/inbox/direct/${conversation.id}`, {
-      state: { conversation },
-    })
-  }
-
   /** 进入已有 Direct 详情。 */
   function openDirectConversation(conversation: DirectInboxConversationData) {
     navigate(`/inbox/direct/${conversation.id}`, {
@@ -375,14 +356,6 @@ export function MobileInboxPage() {
         </h1>
         <Button
           className="ml-auto"
-          variant="ghost"
-          size="icon-lg"
-          aria-label={tInbox("newDirectConversation")}
-          onClick={() => setDirectDialogOpen(true)}
-        >
-          <PlusIcon />
-        </Button>
-        <Button
           variant="ghost"
           size="icon-lg"
           disabled={loading || refreshing}
@@ -457,13 +430,6 @@ export function MobileInboxPage() {
           )}
         </>
       ) : null}
-
-      <DirectConversationPickerDialog
-        open={directDialogOpen}
-        currentIdentityID={identity.user.identityId}
-        onOpenChange={setDirectDialogOpen}
-        onSelected={openDirectDraft}
-      />
     </section>
   )
 }

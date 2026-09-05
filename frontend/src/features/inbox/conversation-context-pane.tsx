@@ -18,6 +18,7 @@ import {
   isGroupInboxConversation,
   type GroupConversationData,
   type InboxConversation,
+  type MemberOption,
 } from "@/api"
 import {
   Tabs,
@@ -26,6 +27,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { ConversationAvatar } from "@/features/inbox/conversation-header"
+import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
 import { cn } from "@/lib/utils"
@@ -60,17 +62,20 @@ function ContextPlaceholder({
 /** 展示单聊的基础资料。 */
 function InternalConversationProfile({
   conversation,
+  directTarget,
   displayName,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversation | null
+  directTarget: MemberOption | null
   displayName: string
 }) {
   const { t } = useTranslation("inbox")
-  const direct = isDirectInboxConversation(conversation)
-    ? conversation.direct
-    : null
+  const direct =
+    conversation && isDirectInboxConversation(conversation)
+      ? conversation.direct
+      : null
   const identityType =
-    direct?.peerType ===
+    (direct?.peerType ?? directTarget?.type) ===
     OrganizationIdentityType.OrganizationIdentityTypeAgent
       ? t("contextIdentityAgent")
       : t("contextIdentityMember")
@@ -83,16 +88,20 @@ function InternalConversationProfile({
           {t("contextContactName")}
         </dt>
         <dd className="flex min-h-8 min-w-0 items-center gap-2">
-          <ConversationAvatar
-            conversation={conversation}
-            className="size-7 rounded-full text-xs"
-          />
+          {conversation ? (
+            <ConversationAvatar
+              conversation={conversation}
+              className="size-7 rounded-full text-xs"
+            />
+          ) : directTarget ? (
+            <DirectConversationDraftAvatar member={directTarget} className="size-7 text-xs" />
+          ) : null}
           <span className="min-w-0 truncate" title={displayName}>
             {displayName}
           </span>
         </dd>
       </div>
-      {direct ? (
+      {direct || directTarget ? (
         <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
           <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
             {t("contextIdentityType")}
@@ -115,6 +124,7 @@ function InternalConversationProfile({
 /** 展示当前会话摘要和类型对应的资料内容。 */
 function ConversationContextContent({
   conversation,
+  directTarget,
   displayName,
   currentIdentityID,
   groupDraft,
@@ -122,7 +132,8 @@ function ConversationContextContent({
   onGroupSummaryChange,
   onGroupLeft,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversation | null
+  directTarget: MemberOption | null
   displayName: string
   currentIdentityID: string
   groupDraft: GroupConversationData | null
@@ -136,15 +147,13 @@ function ConversationContextContent({
   onGroupLeft: () => void
 }) {
   const { t } = useTranslation("inbox")
-  const customer = isCustomerInboxConversation(conversation)
-    ? conversation.customer
-    : null
-  const group = isGroupInboxConversation(conversation)
-    ? conversation.group
-    : null
+  const customer =
+    conversation && isCustomerInboxConversation(conversation) ? conversation.customer : null
+  const group =
+    conversation && isGroupInboxConversation(conversation) ? conversation.group : null
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
-      {customer ? (
+      {conversation && customer ? (
         <Tabs
           key={conversation.id}
           defaultValue="profile"
@@ -223,7 +232,7 @@ function ConversationContextContent({
             />
           </TabsContent>
         </Tabs>
-      ) : group ? (
+      ) : conversation && group ? (
         <GroupConversationContext
           conversationID={conversation.id}
           currentIdentityID={currentIdentityID}
@@ -234,7 +243,7 @@ function ConversationContextContent({
         />
       ) : (
         <Tabs
-          key={conversation.id}
+          key={conversation?.id ?? directTarget?.id}
           defaultValue="profile"
           className="min-h-0 flex-1"
         >
@@ -255,6 +264,7 @@ function ConversationContextContent({
           >
             <InternalConversationProfile
               conversation={conversation}
+              directTarget={directTarget}
               displayName={displayName}
             />
           </TabsContent>
@@ -267,6 +277,7 @@ function ConversationContextContent({
 /** 展示可调整宽度和收起状态的会话资料栏。 */
 export function ConversationContextPane({
   conversation,
+  directTarget,
   displayName,
   currentIdentityID,
   onGroupSummaryChange,
@@ -274,7 +285,8 @@ export function ConversationContextPane({
   visible,
   onToggle,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversation | null
+  directTarget: MemberOption | null
   displayName: string
   currentIdentityID: string
   onGroupSummaryChange: (changes: {
@@ -294,7 +306,7 @@ export function ConversationContextPane({
     group: GroupConversationData
   } | null>(null)
   const activeGroupDraft =
-    groupDraft?.conversationID === conversation.id
+    groupDraft && groupDraft.conversationID === conversation?.id
       ? groupDraft.group
       : null
 
@@ -369,11 +381,12 @@ export function ConversationContextPane({
       >
         <ConversationContextContent
           conversation={conversation}
+          directTarget={directTarget}
           displayName={displayName}
           currentIdentityID={currentIdentityID}
           groupDraft={activeGroupDraft}
           onGroupDraftChange={(group) =>
-            setGroupDraft({ conversationID: conversation.id, group })
+            setGroupDraft({ conversationID: group.id, group })
           }
           onGroupSummaryChange={onGroupSummaryChange}
           onGroupLeft={onGroupLeft}

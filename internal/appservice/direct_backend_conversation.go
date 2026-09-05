@@ -571,7 +571,10 @@ func directConversationError(ctx context.Context, meta RequestMeta, err error, o
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		return ConflictError(meta, cervii18n.ErrorDirectMessageConflict, conflictError.Reason)
 	}
-	slog.Warn("内部单聊命令失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
+	slog.Warn("内部单聊操作失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
+	if operation == "find" {
+		return FailedError(meta, cervii18n.ErrorDirectConversationLookupFailed)
+	}
 	return FailedError(meta, cervii18n.ErrorDirectMessageSendFailed)
 }
 

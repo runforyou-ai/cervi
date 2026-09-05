@@ -1,9 +1,5 @@
 /** 美式英语·收件箱文案。 */
 const inbox = {
-  searchLabel: "Search conversations",
-  searchShortcut: "Search (Ctrl/⌘+K)",
-  searchClear: "Clear search",
-  searchEmpty: "No conversations match your search",
   scopeRailLabel: "Message scopes",
   scopeRailCollapse: "Collapse the scope rail",
   scopeRailExpand: "Expand the scope rail",
@@ -22,11 +18,10 @@ const inbox = {
   newGroupConversation: "New group chat",
   directPickerTitle: "New internal chat",
   directPickerDescription: "Choose a company member or AI agent.",
-  directPickerSearch: "Search members",
   directPickerLoading: "Loading members",
   directPickerLoadError: "Could not load members",
   directLookupError: "Could not open the internal chat. Try again.",
-  directPickerEmpty: "No available members match your search",
+  directPickerEmpty: "No available members",
   directPickerAgent: "AI agent",
   groupCreateTitle: "New group chat",
   groupCreateDescription: "Add group details and select its initial members.",
