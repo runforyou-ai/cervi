@@ -29,6 +29,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
 import { mentionTokenPattern } from "@/features/inbox/mention-token"
+import { resources, supportedLanguages } from "@/i18n/resources"
 import { useMemberChatPollingActive } from "@/features/inbox/use-member-chat-polling"
 import type {
   OutgoingConversationDraft,
@@ -57,14 +58,19 @@ type TimelineMessage = Pick<
   | "systemEvent"
   | "replyTo"
   | "mentions"
+  | "mentionAll"
 > & {
   clientMessageID: string | null
   mentionSubjectIDs: string[]
+  mentionAllToken: OutgoingConversationDraft["mentionAllToken"]
   local: boolean
   deliveryStatus: "sending" | "failed" | null
 }
 
 const timelineGroupInterval = 5 * 60 * 1000
+const mentionAllNames = supportedLanguages.map(
+  (language) => resources[language].inbox.messageMentionAll,
+)
 
 /** 返回视觉分组使用的稳定发送者标识。 */
 function timelineSenderKey(
@@ -94,6 +100,7 @@ function mergeTimelineMessages(
     ...message,
     clientMessageID: null,
     mentionSubjectIDs: [],
+    mentionAllToken: null,
     local: false,
     deliveryStatus: null,
   }))
@@ -129,6 +136,8 @@ function mergeTimelineMessages(
       }),
       clientMessageID: message.clientMessageID,
       mentionSubjectIDs: message.mentionSubjectIDs,
+      mentionAll: message.mentionAll,
+      mentionAllToken: message.mentionAllToken,
       local: true,
       deliveryStatus:
         message.status === "failed"
@@ -147,8 +156,10 @@ function mergeTimelineMessages(
 
 /** 在消息正文中强调结构化提醒。 */
 function renderMessageBody(message: TimelineMessage) {
-  const names = message.mentions
-    .map((mention) => mention.displayName?.trim() ?? "")
+  const names = [
+    ...message.mentions.map((mention) => mention.displayName?.trim() ?? ""),
+    ...(message.mentionAll ? mentionAllNames : []),
+  ]
     .filter((name, index, values) => name && values.indexOf(name) === index)
     .sort((left, right) => right.length - left.length)
   if (names.length === 0) return message.body
@@ -625,6 +636,8 @@ function ConversationTimelineContent({
                       originatedAt: message.originatedAt,
                       replyTo: message.replyTo,
                       mentionSubjectIDs: message.mentionSubjectIDs,
+                      mentionAll: message.mentionAll,
+                      mentionAllToken: message.mentionAllToken,
                     }
                   : null
               const systemEvent = message.systemEvent

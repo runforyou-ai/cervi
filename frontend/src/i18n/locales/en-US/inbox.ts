@@ -155,6 +155,7 @@ const inbox = {
   messageReplyingTo: "Replying to {{name}}",
   messageReplyCancel: "Cancel reply",
   messageMentionCandidates: "Group members to mention",
+  messageMentionAll: "Everyone",
   messageCopyText: "Copy text",
   messageCopySuccess: "Message text copied",
   messageCopyError: "Could not copy message text",

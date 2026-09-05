@@ -5,6 +5,7 @@ import type {
   ConversationMessageData,
   ConversationMessageReference,
 } from "@/api"
+import type { MentionAllToken } from "@/features/inbox/mention-token"
 
 export const conversationSendingIndicatorDelay = 300
 
@@ -14,6 +15,8 @@ export type OutgoingConversationDraft = {
   originatedAt: string
   replyTo: ConversationMessageReference | null
   mentionSubjectIDs: string[]
+  mentionAll: boolean
+  mentionAllToken: MentionAllToken | null
 }
 
 export type OutgoingConversationMessage = OutgoingConversationDraft & {
