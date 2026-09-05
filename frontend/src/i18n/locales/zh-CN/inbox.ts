@@ -181,7 +181,6 @@ const inbox = {
   replyLabel: "回复",
   composerResize: "调整消息输入框高度",
   attachmentAdd: "添加附件",
-  messageBodyRequired: "请输入消息内容",
   messageBodyTooLong: "消息最多 4000 个字符",
   messageSend: "发送",
   messageSenderYou: "我",
