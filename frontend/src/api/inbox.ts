@@ -104,11 +104,6 @@ export type GroupConversationData = Omit<GroupConversation, "participants"> & {
   participants: GroupParticipant[]
 }
 
-export type GroupTextMessageDataInput = Omit<
-  GroupTextMessageInput,
-  "mentionAll"
->
-
 const loadInboxBound = bind(LoadInbox)
 const listConversationMessagesBound = bind(ListConversationMessages)
 const markConversationReadBound = bind(MarkConversationRead)
@@ -399,12 +394,9 @@ export function leaveGroupConversation(
 /** 发送企业内部群聊文本消息。 */
 export async function sendGroupTextMessage(
   conversationID: string,
-  input: GroupTextMessageDataInput,
+  input: GroupTextMessageInput,
 ) {
-  const message = await sendGroupTextMessageBound(conversationID, {
-    ...input,
-    mentionAll: false,
-  })
+  const message = await sendGroupTextMessageBound(conversationID, input)
   return normalizeConversationMessage(message)
 }
 

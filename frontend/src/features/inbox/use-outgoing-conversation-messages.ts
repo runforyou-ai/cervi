@@ -14,6 +14,7 @@ export type OutgoingConversationDraft = {
   originatedAt: string
   replyTo: ConversationMessageReference | null
   mentionSubjectIDs: string[]
+  mentionAll: boolean
 }
 
 export type OutgoingConversationMessage = OutgoingConversationDraft & {

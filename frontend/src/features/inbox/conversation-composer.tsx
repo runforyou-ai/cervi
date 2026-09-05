@@ -43,6 +43,10 @@ const conversationComposerMaxHeight = 200
 const conversationComposerMinHeight = 80
 const conversationComposerKeyboardResizeStep = 16
 
+type MentionCandidate =
+  | { kind: "all"; displayName: string }
+  | { kind: "member"; displayName: string; participant: GroupParticipant }
+
 /** 统计正文中仍然存在的完整 @ 姓名标记。 */
 function countMentionTokens(body: string, displayName: string) {
   return Array.from(
@@ -134,6 +138,7 @@ export function ConversationComposer({
   const replyToRef = useRef(replyTo)
   replyToRef.current = replyTo
   const [mentionSubjectIDs, setMentionSubjectIDs] = useState<string[]>([])
+  const [mentionAll, setMentionAll] = useState(false)
   const [mentionQuery, setMentionQuery] = useState<{
     start: number
     value: string
@@ -157,6 +162,7 @@ export function ConversationComposer({
     retryRef.current = retryDraft
     form.setValue("body", retryDraft.body, { shouldDirty: true })
     setMentionSubjectIDs(retryDraft.mentionSubjectIDs)
+    setMentionAll(retryDraft.mentionAll)
     onReplyToChange?.(retryDraft.replyTo)
     resizeComposerInput(inputRef.current, manualInputHeightRef.current)
     form.setFocus("body")
@@ -169,22 +175,35 @@ export function ConversationComposer({
     retryFailedMessage,
   ])
 
-  const mentionCandidates = useMemo(() => {
+  const mentionCandidates = useMemo<MentionCandidate[]>(() => {
     if (!mentionQuery || !groupParticipants) return []
     const query = mentionQuery.value.toLocaleLowerCase()
-    return groupParticipants
-      .filter(
-        (participant) =>
-          participant.identityId !== currentIdentityID &&
-          !mentionSubjectIDs.includes(participant.chatSubjectId) &&
-          participant.displayName.toLocaleLowerCase().includes(query),
-      )
-      .slice(0, 8)
+    const candidates: MentionCandidate[] = []
+    if (!mentionAll && t("messageMentionAll").toLocaleLowerCase().includes(query)) {
+      candidates.push({ kind: "all", displayName: t("messageMentionAll") })
+    }
+    candidates.push(
+      ...groupParticipants
+        .filter(
+          (participant) =>
+            participant.identityId !== currentIdentityID &&
+            !mentionSubjectIDs.includes(participant.chatSubjectId) &&
+            participant.displayName.toLocaleLowerCase().includes(query),
+        )
+        .map((participant) => ({
+          kind: "member" as const,
+          displayName: participant.displayName,
+          participant,
+        })),
+    )
+    return candidates.slice(0, 8)
   }, [
     currentIdentityID,
     groupParticipants,
     mentionQuery,
     mentionSubjectIDs,
+    mentionAll,
+    t,
   ])
 
   /** 根据光标前文本更新 @ 候选查询。 */
@@ -229,22 +248,25 @@ export function ConversationComposer({
     })
   }
 
-  /** 插入选中的群成员并记录稳定聊天主体。 */
-  function selectMention(participant: GroupParticipant) {
+  /** 插入选中的群成员或启用独立的所有人提醒标记。 */
+  function selectMention(candidate: MentionCandidate) {
     const query = mentionQuery
     const input = inputRef.current
     if (!query || !input) return
     const body = form.getValues("body")
     const caret = input.selectionStart ?? body.length
-    const token = `@${participant.displayName} `
+    const token = candidate.kind === "all" ? "" : `@${candidate.displayName} `
     const nextBody = `${body.slice(0, query.start)}${token}${body.slice(caret)}`
     const nextCaret = query.start + token.length
     form.setValue("body", nextBody, { shouldDirty: true })
-    setMentionSubjectIDs((current) =>
-      current.includes(participant.chatSubjectId)
-        ? current
-        : [...current, participant.chatSubjectId],
-    )
+    if (candidate.kind === "all") {
+      setMentionAll(true)
+    } else {
+      const subjectID = candidate.participant.chatSubjectId
+      setMentionSubjectIDs((current) =>
+        current.includes(subjectID) ? current : [...current, subjectID],
+      )
+    }
     setMentionQuery(null)
     window.requestAnimationFrame(() => {
       input.focus()
@@ -279,6 +301,7 @@ export function ConversationComposer({
       retryFailedMessage &&
       retryRef.current?.body === body &&
       retryRef.current.replyTo?.id === activeReplyTo?.id &&
+      retryRef.current.mentionAll === mentionAll &&
       retryRef.current.mentionSubjectIDs.join("\u0000") ===
         normalizedMentionSubjectIDs.join("\u0000")
         ? retryRef.current
@@ -289,6 +312,7 @@ export function ConversationComposer({
       originatedAt: retry?.originatedAt ?? new Date().toISOString(),
       replyTo: activeReplyTo,
       mentionSubjectIDs: normalizedMentionSubjectIDs,
+      mentionAll,
     }
     retryRef.current = null
     onSending(draft)
@@ -311,6 +335,7 @@ export function ConversationComposer({
             ...messageInput,
             replyToMessageId: activeReplyTo?.id ?? "",
             mentionSubjectIds: normalizedMentionSubjectIDs,
+            mentionAll,
           })
           break
         case ConversationType.ConversationTypeCustomer:
@@ -322,6 +347,7 @@ export function ConversationComposer({
       onSucceeded()
       if (!aliveRef.current) return
       setMentionSubjectIDs([])
+      setMentionAll(false)
       setMentionQuery(null)
       if (replyToRef.current?.id === activeReplyTo?.id) {
         onReplyToChange?.(null)
@@ -478,17 +504,21 @@ export function ConversationComposer({
             aria-label={t("messageMentionCandidates")}
             className="absolute bottom-full left-2 z-30 mb-1 max-h-56 min-w-56 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
           >
-            {mentionCandidates.map((participant, index) => (
+            {mentionCandidates.map((candidate, index) => (
               <button
-                key={participant.chatSubjectId}
+                key={
+                  candidate.kind === "all"
+                    ? "all"
+                    : candidate.participant.chatSubjectId
+                }
                 type="button"
                 role="option"
                 aria-selected={index === activeMentionIndex}
                 className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent"
                 onPointerDown={(event) => event.preventDefault()}
-                onClick={() => selectMention(participant)}
+                onClick={() => selectMention(candidate)}
               >
-                {participant.displayName}
+                {candidate.displayName}
               </button>
             ))}
           </div>
@@ -525,6 +555,23 @@ export function ConversationComposer({
                 onClick={() => onReplyToChange?.(null)}
               >
                 {t("messageReplyCancel")}
+              </button>
+            </div>
+          ) : null}
+          {mentionAll ? (
+            <div className="flex items-center gap-2 px-3 pt-2 text-xs">
+              <span className="font-semibold">@{t("messageMentionAll")}</span>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                aria-label={t("messageMentionAllRemove")}
+                onClick={() => {
+                  setMentionAll(false)
+                  form.setFocus("body")
+                }}
+              >
+                {t("messageMentionRemove")}
               </button>
             </div>
           ) : null}

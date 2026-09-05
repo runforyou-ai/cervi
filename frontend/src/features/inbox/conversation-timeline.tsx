@@ -57,6 +57,7 @@ type TimelineMessage = Pick<
   | "systemEvent"
   | "replyTo"
   | "mentions"
+  | "mentionAll"
 > & {
   clientMessageID: string | null
   mentionSubjectIDs: string[]
@@ -129,6 +130,7 @@ function mergeTimelineMessages(
       }),
       clientMessageID: message.clientMessageID,
       mentionSubjectIDs: message.mentionSubjectIDs,
+      mentionAll: message.mentionAll,
       local: true,
       deliveryStatus:
         message.status === "failed"
@@ -625,6 +627,7 @@ function ConversationTimelineContent({
                       originatedAt: message.originatedAt,
                       replyTo: message.replyTo,
                       mentionSubjectIDs: message.mentionSubjectIDs,
+                      mentionAll: message.mentionAll,
                     }
                   : null
               const systemEvent = message.systemEvent
@@ -811,6 +814,11 @@ function ConversationTimelineContent({
                                     )}
                                   >
                                     <span className="min-w-0 whitespace-pre-wrap">
+                                      {message.mentionAll ? (
+                                        <span className="font-semibold underline">
+                                          @{t("messageMentionAll")}{" "}
+                                        </span>
+                                      ) : null}
                                       {renderMessageBody(message)}
                                     </span>
                                     {workspaceLayout ? (
