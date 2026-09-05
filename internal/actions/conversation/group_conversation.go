@@ -28,10 +28,6 @@ const (
 	maxGroupParticipantCount  = 100
 )
 
-var groupMessageRetryableConstraintNames = map[string]struct{}{
-	"messages_organization_idempotency_unique": {},
-}
-
 // CreateGroupConversationAction 创建企业内部群聊和初始成员关系。
 type CreateGroupConversationAction struct {
 	db *bun.DB
@@ -248,86 +244,79 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 	}, nil
 }
 
-// Execute 在可重试事务中写入群聊文本消息。
+// Execute 在会话锁内幂等写入群聊文本消息。
 func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupTextMessageInput) (ConversationMessage, error) {
 	normalized, fields := normalizeGroupTextMessageInput(input)
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
 	messageID := uuid.NewV7()
-	originatedAt := time.Now().UTC()
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + normalized.ClientMessageID
-	var err error
-
-	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
-		var result ConversationMessage
-		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-				return err
-			}
-			sendContext, err := loadGroupSendContext(ctx, tx, identity, normalized.ConversationID)
-			if err != nil {
-				return err
-			}
-			if saved, found, err := loadIdempotentGroupMessage(ctx, tx, identity, normalized, idempotencyKey); err != nil || found {
-				result = saved
-				return err
-			}
-			reply, err := loadGroupReplyTarget(ctx, tx, identity.Organization.ID, normalized.ConversationID, normalized.ReplyToMessageID)
-			if err != nil {
-				return err
-			}
-			mentions, err := loadGroupMentionTargets(ctx, tx, identity.Organization.ID, normalized.ConversationID, sendContext.SubjectID, normalized.MentionSubjectIDs)
-			if err != nil {
-				return err
-			}
-			var replyToMessageID *string
-			if reply != nil {
-				replyToMessageID = &reply.ID
-			}
-			message := &servermodels.Message{
-				ID: messageID.String(), OrganizationID: identity.Organization.ID,
-				ConversationID: normalized.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
-				Type: string(domain.MessageTypeText), Body: normalized.Body, ReplyToMessageID: replyToMessageID, MentionAll: normalized.MentionAll,
-				IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
-			}
-			if _, err := tx.NewInsert().Model(message).
-				Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "mention_all", "idempotency_key", "originated_at").
-				Returning("*").
-				Exec(ctx); err != nil {
-				return fmt.Errorf("create group text message: %w", err)
-			}
-			if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
-				return err
-			}
-			conversation := &servermodels.Conversation{ID: normalized.ConversationID, OrganizationID: identity.Organization.ID}
-			if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
-				return err
-			}
-			if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
-				OrganizationID: identity.Organization.ID, ConversationID: normalized.ConversationID,
-				UserID: identity.User.ID, LastReadMessageID: &message.ID,
-			}, message); err != nil {
-				return err
-			}
-			result = memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
-			result.ReplyTo = reply
-			result.Mentions = mentions
-			result.MentionAll = normalized.MentionAll
-			return nil
-		})
-		if err == nil {
-			return result, nil
+	var result ConversationMessage
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
 		}
-		constraint, retryable := retryableUniqueViolation(err, groupMessageRetryableConstraintNames)
-		if !retryable {
-			return ConversationMessage{}, err
+		sendContext, err := loadGroupSendContext(ctx, tx, identity, normalized.ConversationID)
+		if err != nil {
+			return err
 		}
-		if attempt < maxWriteAttempts-1 {
-			slog.Info("企业群聊消息写入重试", "conversation_id", normalized.ConversationID, "attempt", attempt+2, "constraint", constraint)
+		if saved, found, err := loadIdempotentGroupMessage(ctx, tx, identity, normalized, idempotencyKey); err != nil || found {
+			result = saved
+			return err
 		}
+		reply, err := loadGroupReplyTarget(ctx, tx, identity.Organization.ID, normalized.ConversationID, normalized.ReplyToMessageID)
+		if err != nil {
+			return err
+		}
+		mentions, err := loadGroupMentionTargets(ctx, tx, identity.Organization.ID, normalized.ConversationID, sendContext.SubjectID, normalized.MentionSubjectIDs)
+		if err != nil {
+			return err
+		}
+		var replyToMessageID *string
+		if reply != nil {
+			replyToMessageID = &reply.ID
+		}
+		sequence, err := nextGroupMessageSequence(ctx, tx, identity.Organization.ID, normalized.ConversationID)
+		if err != nil {
+			return err
+		}
+		message := &servermodels.Message{
+			GroupMessageSequence: &sequence,
+			ID:                   messageID.String(), OrganizationID: identity.Organization.ID,
+			ConversationID: normalized.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
+			Type: string(domain.MessageTypeText), Body: normalized.Body, ReplyToMessageID: replyToMessageID, MentionAll: normalized.MentionAll,
+			IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
+		}
+		if _, err := tx.NewInsert().Model(message).
+			Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "mention_all", "idempotency_key", "originated_at", "group_message_sequence").
+			Returning("*").
+			Exec(ctx); err != nil {
+			return fmt.Errorf("create group text message: %w", err)
+		}
+		if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
+			return err
+		}
+		conversation := &servermodels.Conversation{ID: normalized.ConversationID, OrganizationID: identity.Organization.ID}
+		if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
+			return err
+		}
+		if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
+			OrganizationID: identity.Organization.ID, ConversationID: normalized.ConversationID,
+			UserID: identity.User.ID, LastReadMessageID: &message.ID,
+		}, message); err != nil {
+			return err
+		}
+		result = memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
+		result.ReplyTo = reply
+		result.Mentions = mentions
+		result.MentionAll = normalized.MentionAll
+		return nil
+	})
+	if err != nil {
+		return ConversationMessage{}, fmt.Errorf("send group message: %w", err)
 	}
-	return ConversationMessage{}, fmt.Errorf("send group message retries exhausted: %w", err)
+	return result, nil
 }
 
 // normalizeGroupTextMessageInput 规范化群聊文本、引用和提醒参数。
@@ -433,6 +422,9 @@ func loadActiveGroupMembers(ctx context.Context, db bun.IDB, organizationID stri
 
 // loadGroupSendContext 校验群聊及当前成员关系并返回发送上下文。
 func loadGroupSendContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (groupSendContextRow, error) {
+	if _, err := lockConversationMember(ctx, db, identity, conversationID); err != nil {
+		return groupSendContextRow{}, err
+	}
 	row := groupSendContextRow{}
 	err := db.NewSelect().
 		TableExpr("conversations AS cv").

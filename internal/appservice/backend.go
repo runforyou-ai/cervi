@@ -53,6 +53,18 @@ type Backend interface {
 	// ListConversationMessages 返回成员可见的会话消息。
 	//cervi:route GET /conversations/:conversationID/messages
 	ListConversationMessages(context.Context, RequestMeta, string, ConversationMessageListInput) (ConversationMessageList, error)
+	// GetConversationMessageContext 返回目标消息及其前后上下文。
+	//cervi:route GET /conversations/:conversationID/messages/:messageID/context
+	GetConversationMessageContext(context.Context, RequestMeta, string, string) (ConversationMessageList, error)
+	// GetConversationNavigationState 返回群聊提及进度和最新可见消息。
+	//cervi:route GET /conversations/:conversationID/navigation
+	GetConversationNavigationState(context.Context, RequestMeta, string) (ConversationNavigationState, error)
+	// ListPendingConversationMentions 返回本轮待查看提及目标。
+	//cervi:route GET /conversations/:conversationID/mentions/pending
+	ListPendingConversationMentions(context.Context, RequestMeta, string) (PendingConversationMentions, error)
+	// MarkConversationMentionReviewed 连续确认群聊提及。
+	//cervi:route POST /conversations/:conversationID/mentions/review
+	MarkConversationMentionReviewed(context.Context, RequestMeta, string, MarkConversationMentionReviewedInput) (ConversationMentionReview, error)
 	// MarkConversationRead 单调推进当前用户的原生会话已读水位。
 	//cervi:route POST /conversations/:conversationID/read
 	MarkConversationRead(context.Context, RequestMeta, string, MarkConversationReadInput) (ConversationReadState, error)

@@ -80,6 +80,7 @@ export function ConversationComposer({
   onRetryDraftHandled,
   onReplyToChange,
   onSending,
+  onBeforeSend,
   onSent,
   onFailed,
   onSucceeded,
@@ -96,6 +97,7 @@ export function ConversationComposer({
   currentIdentityID?: string
   onRetryDraftHandled?: () => void
   onReplyToChange?: (message: ConversationMessageReference | null) => void
+  onBeforeSend?: () => Promise<boolean>
   onSending: (message: OutgoingConversationDraft) => void
   onSent: (clientMessageID: string, message: ConversationMessageData) => void
   onFailed: (clientMessageID: string) => void
@@ -265,6 +267,8 @@ export function ConversationComposer({
 
   /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
+    if (onBeforeSend && !(await onBeforeSend())) return
+    if (!aliveRef.current) return
     const body = values.body.trim()
     const normalizedMentionSubjectIDs = [...mentionSubjectIDs].sort()
     const activeReplyTo =

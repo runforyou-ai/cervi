@@ -6,6 +6,10 @@ import {
   CreateGroupConversation,
   FindDirectConversation,
   GetGroupConversation,
+  GetConversationMessageContext,
+  GetConversationNavigationState,
+  ListPendingConversationMentions,
+  MarkConversationMentionReviewed,
   LeaveGroupConversation,
   ListConversationMessages,
   MarkConversationRead,
@@ -105,6 +109,14 @@ export type GroupTextMessageDataInput = Omit<
 const loadInboxBound = bind(LoadInbox)
 const listConversationMessagesBound = bind(ListConversationMessages)
 const markConversationReadBound = bind(MarkConversationRead)
+const getConversationMessageContextBound = bind(GetConversationMessageContext)
+const getConversationNavigationStateBound = bind(GetConversationNavigationState)
+const listPendingConversationMentionsBound = bind(
+  ListPendingConversationMentions,
+)
+const markConversationMentionReviewedBound = bind(
+  MarkConversationMentionReviewed,
+)
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
 const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
 const findDirectConversationBound = bind(FindDirectConversation)
@@ -374,4 +386,51 @@ export async function sendGroupTextMessage(
     mentionAll: false,
   })
   return normalizeConversationMessage(message)
+}
+
+/** 读取目标消息周围的连续上下文。 */
+export async function getConversationMessageContext(
+  conversationID: string,
+  messageID: string,
+  signal?: AbortSignal,
+): Promise<ConversationMessageListData> {
+  const result = await getConversationMessageContextBound(
+    conversationID,
+    messageID,
+    signal,
+  )
+  return {
+    ...result,
+    messages: asList(result.messages).map(normalizeConversationMessage),
+  }
+}
+
+/** 读取群聊待查看数量及最新可见消息。 */
+export function getConversationNavigationState(
+  conversationID: string,
+  signal?: AbortSignal,
+) {
+  return getConversationNavigationStateBound(conversationID, signal)
+}
+
+/** 获取本轮固定的提及目标列表。 */
+export async function listPendingConversationMentions(
+  conversationID: string,
+  signal?: AbortSignal,
+) {
+  const result = await listPendingConversationMentionsBound(
+    conversationID,
+    signal,
+  )
+  return { ...result, messageIds: asList(result.messageIds) }
+}
+
+/** 连续确认一条提及目标。 */
+export function markConversationMentionReviewed(
+  conversationID: string,
+  messageID: string,
+) {
+  return markConversationMentionReviewedBound(conversationID, {
+    messageId: messageID,
+  })
 }

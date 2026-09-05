@@ -9,6 +9,12 @@ import (
 )
 
 var (
+	// ErrMessageUnavailable 表示目标消息不存在或已经删除。
+	ErrMessageUnavailable = errors.New("conversation message unavailable")
+	// ErrMentionTargetInvalid 表示目标不是当前用户的提及。
+	ErrMentionTargetInvalid = errors.New("conversation mention target invalid")
+	// ErrMentionProgressChanged 表示目标之前仍有未确认的有效提及。
+	ErrMentionProgressChanged = errors.New("conversation mention progress changed")
 	// ErrChannelNotFound 表示网站渠道不存在或不可用。
 	ErrChannelNotFound = errors.New("website channel not found")
 	// ErrConversationNotFound 表示会话不存在或当前身份无权访问。

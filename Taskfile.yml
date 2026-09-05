@@ -172,10 +172,16 @@ tasks:
       - task: common:run:docker
 
   test:
-    summary: 运行服务端和当前平台桌面端测试
+    summary: 运行前端、服务端和当前平台桌面端测试
     cmds:
+      - task: test:frontend
       - task: test:server
       - task: test:desktop
+
+  test:frontend:
+    summary: 验证消息窗口顺序和分页边界
+    cmds:
+      - node --test frontend/tests/*.test.ts
 
   test:server:
     silent: true

@@ -415,19 +415,7 @@ func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta Reque
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	result := ConversationMessageList{Messages: make([]ConversationMessage, 0, len(history.Messages))}
-	for _, message := range history.Messages {
-		result.Messages = append(result.Messages, conversationMessageFromAction(message))
-	}
-	if history.Before != nil {
-		value := encodeConversationMessageCursor(conversationID, *history.Before)
-		result.Before = &value
-	}
-	if history.After != nil {
-		value := encodeConversationMessageCursor(conversationID, *history.After)
-		result.After = &value
-	}
-	return result, nil
+	return conversationMessageListFromAction(conversationID, history), nil
 }
 
 // MarkConversationRead 单调推进当前用户的原生会话已读水位。
@@ -521,7 +509,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	var replyTo *ConversationMessageReference
 	if message.ReplyTo != nil {
 		replyTo = &ConversationMessageReference{
-			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body,
+			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
 			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender),
 		}
 	}
@@ -534,7 +522,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	}
 	return ConversationMessage{
 		ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
-		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt,
+		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, GroupMessageSequence: groupMessageSequenceString(message.GroupMessageSequence),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
 	}
@@ -636,6 +624,9 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 
 // encodeConversationMessageCursor 编码绑定会话的成员消息游标。
 func encodeConversationMessageCursor(conversationID string, point conversationaction.MessageCursorPoint) string {
+	if point.GroupMessageSequence != nil {
+		return conversationID + ".group." + strconv.FormatInt(*point.GroupMessageSequence, 10) + "." + point.ID
+	}
 	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + strconv.FormatInt(point.SourceOrder, 10) + "." + point.ID
 }
 
@@ -644,6 +635,13 @@ func decodeConversationMessageCursor(value, conversationID string) (conversation
 	parts := strings.Split(value, ".")
 	if len(parts) != 4 || parts[0] != conversationID || !common.ValidUUID(parts[3]) {
 		return conversationaction.MessageCursorPoint{}, false
+	}
+	if parts[1] == "group" {
+		sequence, err := strconv.ParseInt(parts[2], 10, 64)
+		if err != nil || sequence <= 0 {
+			return conversationaction.MessageCursorPoint{}, false
+		}
+		return conversationaction.MessageCursorPoint{ID: parts[3], GroupMessageSequence: &sequence}, true
 	}
 	originatedAt, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil || originatedAt <= 0 {
@@ -665,7 +663,16 @@ func conversationMessageError(ctx context.Context, meta RequestMeta, err error, 
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+	}
+	if errors.Is(err, conversationaction.ErrMessageUnavailable) {
+		return NotFoundError(meta, cervii18n.ErrorConversationMessageUnavailable).WithReason("message_unavailable")
+	}
+	if errors.Is(err, conversationaction.ErrMentionTargetInvalid) {
+		return InvalidError(meta, cervii18n.ErrorConversationMentionTargetInvalid, nil)
+	}
+	if errors.Is(err, conversationaction.ErrMentionProgressChanged) {
+		return ConflictError(meta, cervii18n.ErrorConversationMentionProgressChanged, "mention_progress_changed")
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
@@ -724,4 +731,21 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationGroupMemberIDInvalid:     cervii18n.FieldGroupMemberIDInvalid,
 	conversationaction.ValidationGroupOwnerIDInvalid:      cervii18n.FieldGroupOwnerIDInvalid,
 	conversationaction.ValidationGroupSuccessorIDInvalid:  cervii18n.FieldGroupSuccessorIDInvalid,
+}
+
+// conversationMessageListFromAction 共用成员消息窗口及游标转换。
+func conversationMessageListFromAction(conversationID string, history conversationaction.ConversationMessageHistory) ConversationMessageList {
+	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
+	for _, message := range history.Messages {
+		result.Messages = append(result.Messages, conversationMessageFromAction(message))
+	}
+	if history.Before != nil {
+		value := encodeConversationMessageCursor(conversationID, *history.Before)
+		result.Before = &value
+	}
+	if history.After != nil {
+		value := encodeConversationMessageCursor(conversationID, *history.After)
+		result.After = &value
+	}
+	return result
 }

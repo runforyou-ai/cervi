@@ -1,5 +1,5 @@
 /** 统一的页面数据读取 hook，封装 TanStack Query 并约束项目取数行为。 */
-import { useEffect } from "react"
+import { useCallback, useEffect } from "react"
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query"
 import { useNavigate } from "react-router"
 
@@ -22,6 +22,7 @@ export function useResource<T>(
   } = {},
 ) {
   const navigate = useNavigate()
+  const client = useQueryClient()
   const query = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => load(signal),
@@ -38,12 +39,33 @@ export function useResource<T>(
     }
   }, [sessionError, navigate])
 
+  /** 按统一资源 key 执行交互触发的读取，共享缓存及会话错误恢复。 */
+  const read = useCallback(
+    async <R>(
+      resourceKey: QueryKey,
+      loader: (signal: AbortSignal) => Promise<R>,
+    ) => {
+      try {
+        return await client.fetchQuery({
+          queryKey: resourceKey,
+          queryFn: ({ signal }) => loader(signal),
+          staleTime: 0,
+        })
+      } catch (error) {
+        recoverSession(error, navigate)
+        throw error
+      }
+    },
+    [client, navigate],
+  )
+
   return {
     data: query.data,
     loading: query.isPending && query.isFetching,
     refreshing: query.isFetching && !query.isPending,
     error: query.error,
     refresh: query.refetch,
+    read,
   }
 }
 

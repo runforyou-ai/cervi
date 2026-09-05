@@ -281,6 +281,20 @@ export function GetContact(meta: $models.RequestMeta, contactID: string): $Cance
 }
 
 /**
+ * GetConversationMessageContext 返回目标消息及其前后上下文。
+ */
+export function GetConversationMessageContext(meta: $models.RequestMeta, conversationID: string, messageID: string): $CancellablePromise<$models.ConversationMessageList> {
+    return $Call.ByID(2207630407, meta, conversationID, messageID);
+}
+
+/**
+ * GetConversationNavigationState 返回群聊提及进度和最新可见消息。
+ */
+export function GetConversationNavigationState(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ConversationNavigationState> {
+    return $Call.ByID(56482708, meta, conversationID);
+}
+
+/**
  * GetGroupConversation 返回当前成员可见的群聊资料。
  */
 export function GetGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
@@ -484,6 +498,13 @@ export function ListMessageChannels(meta: $models.RequestMeta): $CancellableProm
 }
 
 /**
+ * ListPendingConversationMentions 返回本轮待查看提及目标。
+ */
+export function ListPendingConversationMentions(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.PendingConversationMentions> {
+    return $Call.ByID(1362085509, meta, conversationID);
+}
+
+/**
  * ListRoles 返回当前企业的角色和预定义权限目录。
  */
 export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$models.RoleList> {
@@ -551,6 +572,13 @@ export function Login(meta: $models.RequestMeta, input: $models.LoginInput): $Ca
  */
 export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
     return $Call.ByID(991463980, meta);
+}
+
+/**
+ * MarkConversationMentionReviewed 连续确认群聊提及。
+ */
+export function MarkConversationMentionReviewed(meta: $models.RequestMeta, conversationID: string, input: $models.MarkConversationMentionReviewedInput): $CancellablePromise<$models.ConversationMentionReview> {
+    return $Call.ByID(2481523975, meta, conversationID, input);
 }
 
 /**

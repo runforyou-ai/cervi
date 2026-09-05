@@ -57,3 +57,18 @@ func TestCustomerTextMessageErrorMapsConflicts(t *testing.T) {
 		}
 	}
 }
+
+// TestGroupCursorPreservesSequence 验证群聊游标无损传输大整数序号。
+func TestGroupCursorPreservesSequence(t *testing.T) {
+	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
+	sequence := int64(9007199254740993)
+	point := conversationaction.MessageCursorPoint{GroupMessageSequence: &sequence, ID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65"}
+	cursor := encodeConversationMessageCursor(conversationID, point)
+	decoded, valid := decodeConversationMessageCursor(cursor, conversationID)
+	if !valid || decoded.GroupMessageSequence == nil || *decoded.GroupMessageSequence != sequence || decoded.ID != point.ID {
+		t.Fatalf("decoded=%+v valid=%v", decoded, valid)
+	}
+	if got := groupMessageSequenceString(&sequence); got == nil || *got != "9007199254740993" {
+		t.Fatalf("sequence=%v", got)
+	}
+}

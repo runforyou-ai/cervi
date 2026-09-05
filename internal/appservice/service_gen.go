@@ -54,6 +54,26 @@ func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta
 	return s.backend.ListConversationMessages(ctx, meta, conversationID, input)
 }
 
+// GetConversationMessageContext 返回目标消息及其前后上下文。
+func (s *Service) GetConversationMessageContext(ctx context.Context, meta RequestMeta, conversationID string, messageID string) (ConversationMessageList, error) {
+	return s.backend.GetConversationMessageContext(ctx, meta, conversationID, messageID)
+}
+
+// GetConversationNavigationState 返回群聊提及进度和最新可见消息。
+func (s *Service) GetConversationNavigationState(ctx context.Context, meta RequestMeta, conversationID string) (ConversationNavigationState, error) {
+	return s.backend.GetConversationNavigationState(ctx, meta, conversationID)
+}
+
+// ListPendingConversationMentions 返回本轮待查看提及目标。
+func (s *Service) ListPendingConversationMentions(ctx context.Context, meta RequestMeta, conversationID string) (PendingConversationMentions, error) {
+	return s.backend.ListPendingConversationMentions(ctx, meta, conversationID)
+}
+
+// MarkConversationMentionReviewed 连续确认群聊提及。
+func (s *Service) MarkConversationMentionReviewed(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationMentionReviewedInput) (ConversationMentionReview, error) {
+	return s.backend.MarkConversationMentionReviewed(ctx, meta, conversationID, input)
+}
+
 // MarkConversationRead 单调推进当前用户的原生会话已读水位。
 func (s *Service) MarkConversationRead(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
 	return s.backend.MarkConversationRead(ctx, meta, conversationID, input)

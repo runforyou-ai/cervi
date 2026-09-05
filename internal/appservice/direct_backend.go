@@ -53,6 +53,9 @@ type DirectBackend struct {
 	listCustomerServiceAssignees      *inboxaction.ListCustomerServiceAssigneesQuery
 	listConversationMessages          *conversationaction.ListConversationMessagesQuery
 	markConversationRead              *conversationaction.MarkConversationReadAction
+	conversationNavigation            *conversationaction.GetConversationNavigationStateQuery
+	pendingConversationMentions       *conversationaction.ListPendingConversationMentionsQuery
+	reviewConversationMention         *conversationaction.MarkConversationMentionReviewedAction
 	updateConversationNotifications   *conversationaction.UpdateConversationNotificationSettingsAction
 	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
 	claimServiceSession               *conversationaction.ClaimServiceSessionAction
@@ -181,6 +184,9 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		listCustomerServiceAssignees:      inboxaction.NewListCustomerServiceAssigneesQuery(db),
 		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
 		markConversationRead:              conversationaction.NewMarkConversationReadAction(db),
+		conversationNavigation:            conversationaction.NewGetConversationNavigationStateQuery(db),
+		pendingConversationMentions:       conversationaction.NewListPendingConversationMentionsQuery(db),
+		reviewConversationMention:         conversationaction.NewMarkConversationMentionReviewedAction(db),
 		updateConversationNotifications:   conversationaction.NewUpdateConversationNotificationSettingsAction(db),
 		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
 		claimServiceSession:               conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),

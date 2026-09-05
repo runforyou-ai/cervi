@@ -91,6 +91,9 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Test frontend message windows
+        run: '"$(go env GOPATH)/bin/wails3" task test:frontend'
+
       - name: Build frontend
         working-directory: frontend
         run: npm run build

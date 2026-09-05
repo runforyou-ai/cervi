@@ -47,6 +47,9 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
+		if _, err := lockConversationMember(ctx, tx, identity, conversationID); err != nil {
+			return err
+		}
 		var target servermodels.Message
 		err := tx.NewSelect().Model(&target).
 			Join("JOIN conversations AS cv ON cv.organization_id = msg.organization_id AND cv.id = msg.conversation_id").
@@ -92,6 +95,10 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *servermodels.ConversationUserState, message *servermodels.Message) error {
 	readAt := time.Now().UTC()
 	state.LastReadAt = &readAt
+	orderCondition := bun.SafeQuery("(current_message.originated_at, current_message.source_order, current_message.id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID)
+	if message.GroupMessageSequence != nil {
+		orderCondition = bun.SafeQuery("current_message.group_message_sequence < ?", *message.GroupMessageSequence)
+	}
 	if _, err := db.NewInsert().Model(state).
 		Column("organization_id", "conversation_id", "user_id", "last_read_message_id", "last_read_at").
 		On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
@@ -102,10 +109,8 @@ func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *se
 			SELECT 1 FROM messages AS current_message
 			WHERE current_message.organization_id = cus.organization_id
 				AND current_message.conversation_id = cus.conversation_id
-				AND current_message.id = cus.last_read_message_id
-				AND (current_message.originated_at, current_message.source_order, current_message.id)
-					< (?, ?, ?)
-		)`, message.OriginatedAt, message.SourceOrder, message.ID).
+				AND current_message.id = cus.last_read_message_id AND ?
+		)`, orderCondition).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("advance conversation user read state: %w", err)
 	}

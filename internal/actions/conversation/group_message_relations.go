@@ -15,6 +15,7 @@ import (
 )
 
 type groupMessageRelationSenderRow struct {
+	Deleted       bool    `bun:"deleted"`
 	MessageID     string  `bun:"message_id"`
 	Body          string  `bun:"body"`
 	ChatSubjectID *string `bun:"chat_subject_id"`
@@ -78,7 +79,7 @@ func loadGroupReplyTarget(ctx context.Context, db bun.IDB, organizationID, conve
 		return nil, nil
 	}
 	reference, err := loadMessageReference(ctx, db, organizationID, conversationID, messageID)
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && reference.Deleted) {
 		return nil, &ConflictError{Reason: ConflictReasonGroupReplyTargetInvalid}
 	}
 	if err != nil {
@@ -87,13 +88,14 @@ func loadGroupReplyTarget(ctx context.Context, db bun.IDB, organizationID, conve
 	return reference, nil
 }
 
-// loadMessageReference 读取一条未删除文本消息的一层引用摘要。
+// loadMessageReference 读取文本消息引用，并将软删除表示为不可用摘要。
 func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conversationID, messageID string) (*ConversationMessageReference, error) {
 	row := groupMessageRelationSenderRow{}
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS message_id").
-		ColumnExpr("msg.body AS body").
+		ColumnExpr("CASE WHEN msg.deleted_at IS NULL THEN msg.body ELSE '' END AS body").
+		ColumnExpr("msg.deleted_at IS NOT NULL AS deleted").
 		ColumnExpr("cs.id AS chat_subject_id").
 		ColumnExpr("cs.kind AS kind").
 		ColumnExpr("cs.source_id AS source_id").
@@ -105,10 +107,12 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		Where("msg.conversation_id = ?", conversationID).
 		Where("msg.id = ?", messageID).
 		Where("msg.type = ?", domain.MessageTypeText).
-		Where("msg.deleted_at IS NULL").
 		Scan(ctx, &row)
 	if err != nil {
 		return nil, err
+	}
+	if row.Deleted {
+		return &ConversationMessageReference{ID: row.MessageID, Deleted: true}, nil
 	}
 	if row.ChatSubjectID == nil || row.Kind == nil || row.SourceID == nil {
 		return nil, ErrDataInvariant

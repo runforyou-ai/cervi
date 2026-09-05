@@ -1,5 +1,18 @@
 /** 简体中文·收件箱文案。 */
 const inbox = {
+  messagesLoadingLater: "正在加载后续消息",
+  messagesLoadLaterError: "加载后续消息失败",
+  messageOriginalDeleted: "原消息已删除",
+  messageGoToOriginal: "查看原消息",
+  mentionNavigation: "提及导航",
+  mentionPendingCount: "查看 {{count}} 条提及",
+  mentionPrevious: "上一条",
+  mentionNext: "下一条",
+  mentionResume: "继续查看",
+  mentionNavigationError: "无法查看提及，请重试",
+  messagesBackToLatest: "回到最新消息",
+  messagesLoadLater: "加载后续消息",
+
   searchLabel: "搜索会话",
   scopeRailLabel: "消息范围",
   scopeRailCollapse: "收起范围栏",

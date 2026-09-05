@@ -128,7 +128,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 		if group.Title != normalized.Title {
 			previousTitle := group.Title
 			eventTitle := normalized.Title
-			if err := createGroupSystemEvent(ctx, tx, identity, normalized.ConversationID, ConversationSystemEvent{
+			if _, err := createGroupSystemEvent(ctx, tx, identity, normalized.ConversationID, ConversationSystemEvent{
 				Type:          domain.ConversationSystemEventGroupRenamed,
 				Actor:         groupActorSnapshot(identity),
 				PreviousTitle: &previousTitle,
@@ -205,21 +205,22 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 				}
 				targets = append(targets, ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName})
 			}
-			if err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+			eventMessage, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
 				Type: domain.ConversationSystemEventGroupMembersAdded, Actor: groupActorSnapshot(identity), Targets: targets,
-			}); err != nil {
+			})
+			if err != nil {
 				return err
 			}
 			// 新成员从本轮加入事件开始记录已读，离开期间的历史不形成未读。
 			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id, last_read_at)
-				SELECT u.organization_id, cv.id, u.id, cv.last_message_id, now()
+				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id, last_read_at, last_reviewed_mention_message_id)
+				SELECT u.organization_id, cv.id, u.id, ?::uuid, now(), ?::uuid
 				FROM users AS u
 				JOIN conversations AS cv ON cv.organization_id = u.organization_id AND cv.id = ?
 				WHERE u.organization_id = ? AND u.identity_id IN (?)
 				ON CONFLICT (organization_id, conversation_id, user_id) DO UPDATE
-				SET last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = now(), updated_at = now()
-			`, conversationID, identity.Organization.ID, bun.In(memberIDs)); err != nil {
+				SET last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = now(), last_reviewed_mention_message_id = EXCLUDED.last_reviewed_mention_message_id, updated_at = now()
+			`, eventMessage.ID, eventMessage.ID, conversationID, identity.Organization.ID, bun.In(memberIDs)); err != nil {
 				return fmt.Errorf("initialize added group member read states: %w", err)
 			}
 			result, err = loadGroupConversation(ctx, tx, identity, conversationID)
@@ -267,7 +268,7 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, target.ParticipantID); err != nil {
 			return err
 		}
-		if err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+		if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMemberRemoved, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
 		}); err != nil {
 			return err
@@ -310,7 +311,7 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 		if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.CurrentParticipantID, target.ParticipantID); err != nil {
 			return err
 		}
-		if err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+		if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupOwnerTransferred, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
 		}); err != nil {
 			return err
@@ -360,7 +361,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 				if len(activeIdentityIDs) != 1 {
 					return &ConflictError{Reason: ConflictReasonGroupSuccessorRequired}
 				}
-				if err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+				if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
 					Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),
 				}); err != nil {
 					return err
@@ -377,7 +378,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 			if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.CurrentParticipantID, target.ParticipantID); err != nil {
 				return err
 			}
-			if err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+			if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
 				Type: domain.ConversationSystemEventGroupOwnerTransferred, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
 			}); err != nil {
 				return err
@@ -388,9 +389,10 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, group.CurrentParticipantID); err != nil {
 			return err
 		}
-		return createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+		_, err = createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMemberLeft, Actor: groupActorSnapshot(identity),
 		})
+		return err
 	})
 	if err != nil {
 		return fmt.Errorf("leave group conversation: %w", err)
@@ -472,6 +474,9 @@ func normalizeGroupMemberInput(conversationID, identityID, field string, code Va
 
 // lockGroupConversation 锁定当前成员可见的有效群聊。
 func lockGroupConversation(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (lockedGroupConversationRow, error) {
+	if _, err := lockConversationMember(ctx, db, identity, conversationID); err != nil {
+		return lockedGroupConversationRow{}, err
+	}
 	row := lockedGroupConversationRow{}
 	err := db.NewSelect().
 		TableExpr("conversations AS cv").
@@ -486,7 +491,6 @@ func lockGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		Where("cv.id = ?", conversationID).
 		Where("cv.type = ?", domain.ConversationTypeGroup).
 		Where("cv.status = ?", domain.ConversationStatusActive).
-		For("UPDATE OF cv").
 		Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return lockedGroupConversationRow{}, ErrConversationNotFound
@@ -634,37 +638,42 @@ func archiveGroupConversation(ctx context.Context, db bun.IDB, organizationID, c
 }
 
 // createGroupSystemEvent 写入类型化系统事件并推进会话摘要。
-func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string, event ConversationSystemEvent) error {
+func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string, event ConversationSystemEvent) (*servermodels.Message, error) {
 	if event.Targets == nil {
 		event.Targets = make([]ConversationSystemEventParticipant, 0)
 	}
 	payload, err := json.Marshal(event)
 	if err != nil {
-		return fmt.Errorf("marshal group system event: %w", err)
+		return nil, fmt.Errorf("marshal group system event: %w", err)
+	}
+	sequence, err := nextGroupMessageSequence(ctx, db, identity.Organization.ID, conversationID)
+	if err != nil {
+		return nil, err
 	}
 	eventType := string(event.Type)
 	message := &servermodels.Message{
-		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: conversationID,
+		GroupMessageSequence: &sequence,
+		ID:                   uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: conversationID,
 		Type: string(domain.MessageTypeSystem), Body: "", SystemEventType: &eventType, SystemEventPayload: payload,
 		OriginatedAt: time.Now().UTC(),
 	}
 	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "type", "body", "system_event_type", "system_event_payload", "originated_at").
+		Column("id", "organization_id", "conversation_id", "type", "body", "system_event_type", "system_event_payload", "originated_at", "group_message_sequence").
 		Exec(ctx); err != nil {
-		return fmt.Errorf("create group system event: %w", err)
+		return nil, fmt.Errorf("create group system event: %w", err)
 	}
 	conversation := &servermodels.Conversation{ID: conversationID, OrganizationID: identity.Organization.ID}
 	if err := updateConversationSummary(ctx, db, conversation, message); err != nil {
-		return err
+		return nil, err
 	}
 	state := &servermodels.ConversationUserState{
 		OrganizationID: identity.Organization.ID, ConversationID: conversationID,
 		UserID: identity.User.ID, LastReadMessageID: &message.ID,
 	}
 	if err := advanceConversationUserReadState(ctx, db, state, message); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return message, nil
 }
 
 // groupActorSnapshot 记录操作人的审计快照。
