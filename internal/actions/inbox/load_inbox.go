@@ -319,7 +319,7 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 	return rows, nil
 }
 
-// loadDirectConversations 读取当前成员参与的内部单聊，包括尚无消息的新会话。
+// loadDirectConversations 读取当前成员参与的内部单聊。
 func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizationID, identityID, userID string) ([]directConversationRow, error) {
 	var rows []directConversationRow
 	err := q.db.NewSelect().

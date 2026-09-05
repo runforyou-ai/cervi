@@ -127,30 +127,56 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 	return FailedError(meta, cervii18n.ErrorServiceSessionUpdateFailed)
 }
 
-// StartDirectConversation 发起或打开企业成员内部单聊。
-func (b *DirectBackend) StartDirectConversation(ctx context.Context, meta RequestMeta, input DirectConversationInput) (InboxConversation, error) {
+// SendFirstDirectTextMessage 发送首条单聊消息并按需创建长期会话。
+func (b *DirectBackend) SendFirstDirectTextMessage(ctx context.Context, meta RequestMeta, input FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return InboxConversation{}, err
+		return FirstDirectTextMessageResult{}, err
 	}
-	summary, err := b.startDirectConversation.Execute(ctx, identity, conversationaction.DirectConversationInput{
-		TargetIdentityID: input.TargetIdentityID,
+	result, err := b.sendFirstDirectTextMessage.Execute(ctx, identity, conversationaction.FirstDirectTextMessageInput{
+		TargetIdentityID: input.TargetIdentityID, ClientMessageID: input.ClientMessageID, Body: input.Body,
 	})
 	if err != nil {
-		return InboxConversation{}, directConversationError(ctx, meta, err, identity.Organization.ID, input.TargetIdentityID, "start")
+		return FirstDirectTextMessageResult{}, directConversationError(ctx, meta, err, identity.Organization.ID, input.TargetIdentityID, "send_first")
 	}
-	slog.Info("企业成员内部单聊已打开",
+	slog.Info("企业成员内部单聊首条文本消息已保存",
 		"organization_id", identity.Organization.ID,
-		"conversation_id", summary.ID,
-		"target_identity_id", summary.PeerIdentityID,
+		"conversation_id", result.Conversation.ID,
+		"target_identity_id", result.Conversation.PeerIdentityID,
+		"message_id", result.Message.ID,
 	)
+	return FirstDirectTextMessageResult{
+		Conversation: directInboxConversationFromSummary(result.Conversation),
+		Message:      conversationMessageFromAction(result.Message),
+	}, nil
+}
+
+// FindDirectConversation 按目标身份查找当前成员的活跃单聊。
+func (b *DirectBackend) FindDirectConversation(ctx context.Context, meta RequestMeta, targetIdentityID string) (DirectConversationLookup, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return DirectConversationLookup{}, err
+	}
+	summary, err := b.findDirectConversation.Execute(ctx, identity, targetIdentityID)
+	if err != nil {
+		return DirectConversationLookup{}, directConversationError(ctx, meta, err, identity.Organization.ID, targetIdentityID, "find")
+	}
+	if summary == nil {
+		return DirectConversationLookup{}, nil
+	}
+	conversation := directInboxConversationFromSummary(*summary)
+	return DirectConversationLookup{Conversation: &conversation}, nil
+}
+
+// directInboxConversationFromSummary 把单聊摘要转换为统一收件箱会话。
+func directInboxConversationFromSummary(summary conversationaction.DirectConversationSummary) InboxConversation {
 	return InboxConversation{
 		ID: summary.ID, Type: ConversationTypeDirect,
 		Direct: &DirectInboxConversation{
 			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName,
 			Preview: summary.Preview, LastMessageAt: summary.LastMessageAt,
 		},
-	}, nil
+	}
 }
 
 // SendDirectTextMessage 发送内部单聊文本消息。
@@ -545,9 +571,9 @@ func directConversationError(ctx context.Context, meta RequestMeta, err error, o
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		return ConflictError(meta, cervii18n.ErrorDirectMessageConflict, conflictError.Reason)
 	}
-	slog.Warn("内部单聊命令失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
-	if operation == "start" {
-		return FailedError(meta, cervii18n.ErrorDirectConversationStartFailed)
+	slog.Warn("内部单聊操作失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
+	if operation == "find" {
+		return FailedError(meta, cervii18n.ErrorDirectConversationLookupFailed)
 	}
 	return FailedError(meta, cervii18n.ErrorDirectMessageSendFailed)
 }

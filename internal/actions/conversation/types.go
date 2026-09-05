@@ -225,9 +225,17 @@ type CustomerTextMessageInput struct {
 	Body            string
 }
 
-// DirectConversationInput 定义成员发起内部单聊的目标。
-type DirectConversationInput struct {
+// FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。
+type FirstDirectTextMessageInput struct {
 	TargetIdentityID string
+	ClientMessageID  string
+	Body             string
+}
+
+// FirstDirectTextMessageResult 定义首条单聊消息及其确定的长期会话。
+type FirstDirectTextMessageResult struct {
+	Conversation DirectConversationSummary
+	Message      ConversationMessage
 }
 
 // DirectConversationSummary 定义成员内部单聊摘要。

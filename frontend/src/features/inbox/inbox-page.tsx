@@ -10,13 +10,13 @@ import {
   PlusIcon,
   SearchIcon,
   UsersRoundIcon,
-  XIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
   ConversationStatus,
+  ConversationType,
   CustomerInboxView,
   InboxScope,
   OrganizationIdentityType,
@@ -27,6 +27,7 @@ import {
   getGroupConversation,
   listCustomerServiceAssignees,
   markConversationRead,
+  sendFirstDirectTextMessage,
   type ConversationMessageReference,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
@@ -35,6 +36,7 @@ import {
   type InboxAssignee,
   type InboxConversation,
   type LoadInboxQuery,
+  type MemberOption,
 } from "@/api"
 import { PageSplit } from "@/components/page-split"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -74,7 +76,8 @@ import {
 } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
-import { StartDirectConversationDialog } from "@/features/inbox/start-direct-conversation-dialog"
+import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
+import { DirectConversationPickerDialog } from "@/features/inbox/direct-conversation-picker-dialog"
 import {
   useOutgoingConversationMessages,
   type OutgoingConversationDraft,
@@ -86,6 +89,10 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
+
+type ConversationSelection =
+  | { kind: "direct-draft"; member: MemberOption }
+  | { kind: "conversation"; conversation: InboxConversation }
 
 type InternalInboxConversationData =
   | DirectInboxConversationData
@@ -316,38 +323,19 @@ function useMinuteTick() {
   }, [])
 }
 
-/** 顶部操作行：收纳纵栏、搜索框和发起会话占位菜单。 */
+/** 顶部操作行：收纳范围栏、搜索占位和发起会话菜单。 */
 function InboxPaneTop({
-  query,
-  onQueryChange,
   railCollapsed,
   onRailToggle,
-  searchDisabled,
   onStartDirect,
   onCreateGroup,
 }: {
-  query: string
-  onQueryChange: (query: string) => void
   railCollapsed: boolean
   onRailToggle: () => void
-  searchDisabled: boolean
   onStartDirect: () => void
   onCreateGroup: () => void
 }) {
   const { t } = useTranslation("inbox")
-  const searchInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    /** Ctrl/⌘+K 聚焦搜索框。 */
-    function focusSearch(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault()
-        searchInputRef.current?.focus()
-      }
-    }
-    window.addEventListener("keydown", focusSearch)
-    return () => window.removeEventListener("keydown", focusSearch)
-  }, [])
 
   return (
     <div
@@ -368,32 +356,11 @@ function InboxPaneTop({
       <div className="relative min-w-0 flex-1">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
-          ref={searchInputRef}
           type="text"
-          autoComplete="off"
-          value={query}
-          disabled={searchDisabled}
+          disabled
           aria-label={t("searchLabel")}
-          title={t("searchShortcut")}
-          className="h-9 w-full rounded-md border border-transparent bg-muted pr-8 pl-8 text-sm text-foreground transition-colors outline-none focus:border-ring focus:bg-background disabled:opacity-50"
-          onChange={(event) => onQueryChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && query) {
-              event.stopPropagation()
-              onQueryChange("")
-            }
-          }}
+          className="h-9 w-full rounded-md border border-transparent bg-muted px-8 text-sm text-foreground opacity-50"
         />
-        {query ? (
-          <button
-            type="button"
-            aria-label={t("searchClear")}
-            className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground"
-            onClick={() => onQueryChange("")}
-          >
-            <XIcon className="size-3.5" />
-          </button>
-        ) : null}
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -625,14 +592,12 @@ function InboxCustomerQueueFilter({
 /** 会话列表。 */
 function InboxConversationList({
   conversations,
-  hasAnyConversation,
   loading,
   selectedId,
   onSelect,
   onMarkRead,
 }: {
   conversations: InboxConversation[]
-  hasAnyConversation: boolean
   loading: boolean
   selectedId?: string
   onSelect: (conversationId: string) => void
@@ -651,13 +616,7 @@ function InboxConversationList({
     )
   }
 
-  if (conversations.length === 0) {
-    return hasAnyConversation ? (
-      <p className="px-6 py-12 text-center text-sm text-muted-foreground">
-        {t("searchEmpty")}
-      </p>
-    ) : null
-  }
+  if (conversations.length === 0) return null
 
   return (
     <ScrollArea className="min-h-0 min-w-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:block">
@@ -775,13 +734,14 @@ function InboxConversationList({
 
 /** 组合当前 Conversation 工作区和独立联系人上下文栏。 */
 function ConversationMain({
-  conversation,
+  selection,
   onSessionMoved,
   onConversationChanged,
   onGroupLeft,
+  onDirectStarted,
   narrowViewport = false,
 }: {
-  conversation: InboxConversation
+  selection: ConversationSelection
   onSessionMoved: (
     conversation: CustomerInboxConversationData,
     session: CustomerServiceSession,
@@ -795,8 +755,13 @@ function ConversationMain({
       | GroupInboxConversationData,
   ) => void
   onGroupLeft: (conversationID: string) => void
+  onDirectStarted: (conversation: DirectInboxConversationData) => void
   narrowViewport?: boolean
 }) {
+  const conversation =
+    selection.kind === "conversation" ? selection.conversation : null
+  const directTarget =
+    selection.kind === "direct-draft" ? selection.member : null
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
   const isWideViewport = useIsWideViewport()
@@ -810,37 +775,37 @@ function ConversationMain({
     setContextCollapsed(!isWideViewport)
   }, [isWideViewport])
 
-  const sourceGroupConversation = isGroupInboxConversation(conversation)
-    ? conversation
-    : null
+  const sourceGroupConversation =
+    conversation && isGroupInboxConversation(conversation) ? conversation : null
   const [groupSummaryDraft, setGroupSummaryDraft] = useState<{
     conversationID: string
     summary: GroupInboxConversationData["group"]
   } | null>(null)
   const activeGroupSummary = sourceGroupConversation
-    ? groupSummaryDraft?.conversationID === conversation.id
+    ? groupSummaryDraft?.conversationID === sourceGroupConversation.id
       ? groupSummaryDraft.summary
       : sourceGroupConversation.group
     : null
 
-  const displayedConversation: InboxConversation =
+  const displayedConversation =
     sourceGroupConversation && activeGroupSummary
       ? { ...sourceGroupConversation, group: activeGroupSummary }
       : conversation
-  const contactName = conversationName(displayedConversation)
-  const customerConversation = isCustomerInboxConversation(
-    displayedConversation,
-  )
-    ? displayedConversation
-    : null
-  const directConversation = isDirectInboxConversation(
-    displayedConversation,
-  )
-    ? displayedConversation
-    : null
-  const groupConversation = isGroupInboxConversation(displayedConversation)
-    ? displayedConversation
-    : null
+  const contactName = displayedConversation
+    ? conversationName(displayedConversation)
+    : directTarget?.displayName ?? ""
+  const customerConversation =
+    displayedConversation && isCustomerInboxConversation(displayedConversation)
+      ? displayedConversation
+      : null
+  const directConversation =
+    displayedConversation && isDirectInboxConversation(displayedConversation)
+      ? displayedConversation
+      : null
+  const groupConversation =
+    displayedConversation && isGroupInboxConversation(displayedConversation)
+      ? displayedConversation
+      : null
   const sessionStatus = customerConversation
     ? sessionStatusLabel(
         customerConversation.customer.serviceSessionStatus,
@@ -864,53 +829,65 @@ function ConversationMain({
       : null
   const validConversation =
     customerConversation ?? directConversation ?? groupConversation
-  if (!validConversation) return null
+  if (!validConversation && !directTarget) return null
+  // 单聊按目标身份保持消息组件，首发落库不会清空失败消息和输入状态。
+  const threadKey =
+    directTarget?.id ?? directConversation?.direct.peerIdentityId ?? validConversation?.id
 
   return (
     <div className="flex h-full min-h-0 bg-background">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <ConversationHeader
-          conversation={validConversation}
-          contactName={contactName}
-          sessionStatus={sessionStatus}
-          currentIdentityId={identity.user.identityId}
-          onSessionMoved={(session, view, assigneeIdentityId) => {
-            if (!customerConversation) return
-            onSessionMoved(
-              customerConversation,
-              session,
-              view,
-              assigneeIdentityId,
-            )
-          }}
-          narrowViewport={narrowViewport}
-        />
+        {validConversation ? (
+          <ConversationHeader
+            conversation={validConversation}
+            contactName={contactName}
+            sessionStatus={sessionStatus}
+            currentIdentityId={identity.user.identityId}
+            onSessionMoved={(session, view, assigneeIdentityId) => {
+              if (!customerConversation) return
+              onSessionMoved(
+                customerConversation,
+                session,
+                view,
+                assigneeIdentityId,
+              )
+            }}
+            narrowViewport={narrowViewport}
+          />
+        ) : directTarget ? (
+          <DirectConversationDraftHeader member={directTarget} />
+        ) : null}
         <ConversationThread
-          key={conversation.id}
+          key={threadKey}
           conversation={validConversation}
+          directTarget={directTarget}
           replyDisabledReason={replyDisabledReason}
-          onConversationChanged={() =>
-            onConversationChanged(validConversation)
-          }
+          onConversationChanged={() => {
+            if (validConversation) onConversationChanged(validConversation)
+          }}
+          onDirectStarted={onDirectStarted}
         />
       </div>
       <ConversationContextPane
         conversation={validConversation}
+        directTarget={directTarget}
         displayName={contactName}
         currentIdentityID={identity.user.identityId}
         onGroupSummaryChange={(changes) => {
           if (!sourceGroupConversation) return
           setGroupSummaryDraft((current) => ({
-            conversationID: conversation.id,
+            conversationID: sourceGroupConversation.id,
             summary: {
-              ...(current?.conversationID === conversation.id
+              ...(current?.conversationID === sourceGroupConversation.id
                 ? current.summary
                 : sourceGroupConversation.group),
               ...changes,
             },
           }))
         }}
-        onGroupLeft={() => onGroupLeft(conversation.id)}
+        onGroupLeft={() => {
+          if (validConversation) onGroupLeft(validConversation.id)
+        }}
         visible={!contextCollapsed}
         onToggle={() => setContextCollapsed((collapsed) => !collapsed)}
       />
@@ -921,19 +898,36 @@ function ConversationMain({
 /** 协调当前会话时间线和回复区的即时消息。 */
 function ConversationThread({
   conversation,
+  directTarget,
   replyDisabledReason,
   onConversationChanged,
+  onDirectStarted,
 }: {
   conversation:
     | CustomerInboxConversationData
     | DirectInboxConversationData
     | GroupInboxConversationData
+    | null
+  directTarget: MemberOption | null
   replyDisabledReason: string | null
   onConversationChanged: () => void
+  onDirectStarted: (conversation: DirectInboxConversationData) => void
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
   const outgoing = useOutgoingConversationMessages()
+  const invalidate = useResourceInvalidator()
+  const aliveRef = useRef(true)
+  const conversationID = conversation?.id ?? ""
+  const conversationType =
+    conversation?.type ?? ConversationType.ConversationTypeDirect
+
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+    }
+  }, [])
   const [replyTo, setReplyTo] = useState<ConversationMessageReference | null>(
     null,
   )
@@ -943,12 +937,12 @@ function ConversationThread({
     (message) => message.status === "sending",
   )
   const replySupported =
+    !conversation ||
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation) ||
     conversation.customer.channelType === ChannelType.ChannelTypeWebsite
-  const groupConversation = isGroupInboxConversation(conversation)
-    ? conversation
-    : null
+  const groupConversation =
+    conversation && isGroupInboxConversation(conversation) ? conversation : null
   const groupResource = useResource(
     resourceKeys.groupConversation(groupConversation?.id ?? ""),
     () => getGroupConversation(groupConversation?.id ?? ""),
@@ -958,7 +952,7 @@ function ConversationThread({
   /** 保存当前已看到的最新内部消息并刷新收件箱未读摘要。 */
   const markRead = useCallback(
     (messageID: string) => {
-      if (isCustomerInboxConversation(conversation)) return
+      if (!conversation || isCustomerInboxConversation(conversation)) return
       void markConversationRead(conversation.id, {
         lastReadMessageId: messageID,
       })
@@ -976,8 +970,8 @@ function ConversationThread({
   return (
     <>
       <ConversationTimeline
-        conversationID={conversation.id}
-        conversationType={conversation.type}
+        conversationID={conversationID}
+        conversationType={conversationType}
         currentIdentityID={identity.user.identityId}
         workspaceLayout
         outgoingMessages={outgoing.messages}
@@ -992,23 +986,26 @@ function ConversationThread({
             : undefined
         }
         onReadMessage={
-          isCustomerInboxConversation(conversation) ? undefined : markRead
+          !conversation || isCustomerInboxConversation(conversation)
+            ? undefined
+            : markRead
         }
         readThroughMessageID={
-          isCustomerInboxConversation(conversation)
+          !conversation || isCustomerInboxConversation(conversation)
             ? undefined
             : conversation.lastReadMessageId
         }
+        enabled={Boolean(conversation)}
       />
       {!replySupported || replyDisabledReason ? (
         <ConversationComposerUnavailable
-          conversationID={conversation.id}
+          conversationID={conversationID}
           reason={replyDisabledReason ?? t("channelReplyUnsupported")}
         />
       ) : (
         <ConversationComposer
-          conversationID={conversation.id}
-          conversationType={conversation.type}
+          conversationID={conversationID}
+          conversationType={conversationType}
           submitOnEnter
           refocusAfterSubmit
           retryFailedMessage
@@ -1022,6 +1019,29 @@ function ConversationThread({
           onSent={outgoing.succeed}
           onFailed={outgoing.fail}
           onSucceeded={onConversationChanged}
+          sendDirectMessage={
+            directTarget
+              ? async (input) => {
+                  const result = await sendFirstDirectTextMessage({
+                    targetIdentityId: directTarget.id,
+                    ...input,
+                  })
+                  void invalidate(
+                    resourceKeys.directConversation(directTarget.id),
+                  )
+                  void invalidate(
+                    resourceKeys.conversationMessages(result.conversation.id),
+                  )
+                  // 离开原线程后只刷新列表，不改变当前选择。
+                  if (aliveRef.current) {
+                    onDirectStarted(result.conversation)
+                  } else {
+                    void invalidate(resourceKeys.inbox())
+                  }
+                  return result.message
+                }
+              : undefined
+          }
         />
       )}
     </>
@@ -1066,7 +1086,7 @@ export function InboxPage({
   const isNarrowViewport = useIsNarrowViewport()
   const invalidate = useResourceInvalidator()
   const [railCollapsed, setRailCollapsed] = useState(false)
-  const [query, setQuery] = useState("")
+  const [directDraft, setDirectDraft] = useState<MemberOption | null>(null)
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [directDialogOpen, setDirectDialogOpen] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
@@ -1129,33 +1149,6 @@ export function InboxPage({
     }
   }, [allConversations, scope])
 
-  const normalizedQuery = query.trim().toLocaleLowerCase()
-  const visibleConversations = useMemo(() => {
-    if (!normalizedQuery) {
-      return scopedConversations
-    }
-    return scopedConversations.filter((conversation) => {
-      const values = isCustomerInboxConversation(conversation)
-        ? [
-            conversationName(conversation),
-            conversation.customer.title,
-            conversation.customer.preview ?? "",
-            conversation.customer.channelName,
-          ]
-        : isDirectInboxConversation(conversation)
-          ? [
-              conversation.direct.peerName,
-              conversation.direct.preview ?? "",
-            ]
-          : isGroupInboxConversation(conversation)
-            ? [conversation.group.title, conversation.group.preview ?? ""]
-            : []
-      return values.some((value) =>
-        value.toLocaleLowerCase().includes(normalizedQuery),
-      )
-    })
-  }, [conversationName, normalizedQuery, scopedConversations])
-
   useEffect(() => {
     if (!isNarrowViewport) {
       setIsNarrowDetailOpen(false)
@@ -1188,16 +1181,27 @@ export function InboxPage({
     })
   }, [conversations])
 
+  const activeDirectDraft =
+    scope === InboxScope.InboxScopeInternal && !selectedConversationId
+      ? directDraft
+      : null
+  useEffect(() => {
+    if (selectedConversationId || scope !== InboxScope.InboxScopeInternal) {
+      setDirectDraft(null)
+    }
+  }, [scope, selectedConversationId])
   const selectedPool = listLoading ? allConversations : scopedConversations
-  const selectedFromPool =
-    selectedPool.find(
-      (conversation) => conversation.id === selectedConversationId,
-    ) ?? (selectedConversationId ? undefined : selectedPool[0])
+  const selectedFromPool = activeDirectDraft
+    ? undefined
+    : selectedPool.find(
+        (conversation) => conversation.id === selectedConversationId,
+      ) ?? (selectedConversationId ? undefined : selectedPool[0])
   useEffect(() => {
     if (selectedFromPool) setSelectedConversationSnapshot(selectedFromPool)
   }, [selectedFromPool])
   useEffect(() => {
     if (
+      activeDirectDraft ||
       listLoading ||
       (selectedConversationId &&
         scopedConversations.some(
@@ -1211,18 +1215,20 @@ export function InboxPage({
     setSelectedConversationSnapshot(null)
     onSelectedConversationChange(nextConversationID, true)
   }, [
+    activeDirectDraft,
     listLoading,
     onSelectedConversationChange,
     scopedConversations,
     selectedConversationId,
   ])
-  const selectedConversation =
-    selectedConversationSnapshot?.id === selectedConversationId &&
-    selectedPool.some(
-      (conversation) => conversation.id === selectedConversationId,
-    )
-      ? selectedConversationSnapshot
-      : selectedFromPool
+  const selectedConversation = activeDirectDraft
+    ? undefined
+    : selectedConversationSnapshot?.id === selectedConversationId &&
+      selectedPool.some(
+        (conversation) => conversation.id === selectedConversationId,
+      )
+        ? selectedConversationSnapshot
+        : selectedFromPool
 
   /** 切入另一条内部会话时直接把当前最后消息标为已读。 */
   useEffect(() => {
@@ -1249,6 +1255,7 @@ export function InboxPage({
 
   /** 选中一个会话。 */
   function selectConversation(conversationId: string) {
+    setDirectDraft(null)
     onSelectedConversationChange(conversationId)
 
     if (isNarrowViewport) {
@@ -1316,6 +1323,7 @@ export function InboxPage({
   function showStartedConversation(
     conversation: InternalInboxConversationData,
   ) {
+    setDirectDraft(null)
     setStartedConversations((current) => [
       conversation,
       ...current.filter((item) => item.id !== conversation.id),
@@ -1326,6 +1334,23 @@ export function InboxPage({
       destination,
       conversation.id,
     )
+    setIsNarrowDetailOpen(isNarrowViewport)
+  }
+
+  /** 在主区打开不持久化的单聊草稿。 */
+  function showDirectDraft(
+    member: MemberOption,
+    existing: DirectInboxConversationData | null,
+  ) {
+    if (existing) {
+      showStartedConversation(existing)
+      return
+    }
+    setDirectDraft(member)
+    onQueryChange({
+      scope: InboxScope.InboxScopeInternal,
+      conversationId: "",
+    })
     setIsNarrowDetailOpen(isNarrowViewport)
   }
 
@@ -1444,14 +1469,17 @@ export function InboxPage({
     onSelectedConversationChange(nextConversationID ?? "", true)
   }
 
+  const selection: ConversationSelection | null = activeDirectDraft
+    ? { kind: "direct-draft", member: activeDirectDraft }
+    : selectedConversation
+      ? { kind: "conversation", conversation: selectedConversation }
+      : null
+
   const pane = (
     <div className="flex min-h-0 flex-1 flex-col">
       <InboxPaneTop
-        query={query}
-        onQueryChange={setQuery}
         railCollapsed={railCollapsed}
         onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
-        searchDisabled={listLoading || allConversations.length === 0}
         onStartDirect={() => setDirectDialogOpen(true)}
         onCreateGroup={() => setGroupDialogOpen(true)}
       />
@@ -1468,9 +1496,10 @@ export function InboxPage({
         {railCollapsed ? null : (
           <InboxScopeRail
             scope={scope}
-            onScopeChange={(nextScope) =>
+            onScopeChange={(nextScope) => {
+              setDirectDraft(null)
               onQueryChange({ scope: nextScope })
-            }
+            }}
           />
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -1489,8 +1518,7 @@ export function InboxPage({
             />
           ) : null}
           <InboxConversationList
-            conversations={visibleConversations}
-            hasAnyConversation={scopedConversations.length > 0}
+            conversations={scopedConversations}
             loading={listLoading}
             selectedId={selectedConversationId}
             onSelect={selectConversation}
@@ -1510,13 +1538,14 @@ export function InboxPage({
         paneClassName="transition-[width]"
         pane={pane}
       >
-        {isNarrowViewport ? null : selectedConversation ? (
+        {isNarrowViewport ? null : selection ? (
           <section className="min-h-0 flex-1">
             <ConversationMain
-              conversation={selectedConversation}
+              selection={selection}
               onSessionMoved={showMovedCustomerConversation}
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
+              onDirectStarted={showStartedConversation}
             />
           </section>
         ) : (
@@ -1536,33 +1565,42 @@ export function InboxPage({
         )}
       </PageSplit>
 
-      {selectedConversation ? (
-        <Sheet open={isNarrowDetailOpen} onOpenChange={setIsNarrowDetailOpen}>
+      {selection ? (
+        <Sheet
+          open={isNarrowDetailOpen}
+          onOpenChange={(open) => {
+            setIsNarrowDetailOpen(open)
+            if (!open) setDirectDraft(null)
+          }}
+        >
           <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
             <SheetHeader className="sr-only">
               <SheetTitle>
                 {t("conversationTitle", {
-                  name: conversationName(selectedConversation),
+                  name: activeDirectDraft?.displayName ?? (
+                    selectedConversation ? conversationName(selectedConversation) : ""
+                  ),
                 })}
               </SheetTitle>
               <SheetDescription>{t("detailDescription")}</SheetDescription>
             </SheetHeader>
             <ConversationMain
-              conversation={selectedConversation}
+              selection={selection}
               onSessionMoved={showMovedCustomerConversation}
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
+              onDirectStarted={showStartedConversation}
               narrowViewport
             />
           </SheetContent>
         </Sheet>
       ) : null}
 
-      <StartDirectConversationDialog
+      <DirectConversationPickerDialog
         open={directDialogOpen}
         currentIdentityID={identity.user.identityId}
         onOpenChange={setDirectDialogOpen}
-        onStarted={showStartedConversation}
+        onSelected={showDirectDraft}
       />
       <CreateGroupConversationDialog
         open={groupDialogOpen}

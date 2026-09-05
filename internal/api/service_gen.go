@@ -33,7 +33,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/transfer", s.transferServiceSession)
 	router.POST("/conversations/:conversationID/close", s.closeServiceSession)
 	router.POST("/conversations/:conversationID/reopen", s.reopenServiceSession)
-	router.POST("/direct-conversations", s.startDirectConversation)
+	router.POST("/direct-conversations/messages", s.sendFirstDirectTextMessage)
+	router.GET("/direct-conversations/by-target/:targetIdentityID", s.findDirectConversation)
 	router.POST("/direct-conversations/:conversationID/messages", s.sendDirectTextMessage)
 	router.POST("/group-conversations", s.createGroupConversation)
 	router.GET("/group-conversations/:conversationID", s.getGroupConversation)
@@ -294,13 +295,19 @@ func (s *Service) reopenServiceSession(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// startDirectConversation 发起或打开企业成员内部单聊。
-func (s *Service) startDirectConversation(c *gin.Context) {
-	var input appservice.DirectConversationInput
+// sendFirstDirectTextMessage 向目标身份发送首条单聊消息并按需创建长期会话。
+func (s *Service) sendFirstDirectTextMessage(c *gin.Context) {
+	var input appservice.FirstDirectTextMessageInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	output, err := s.application.StartDirectConversation(c.Request.Context(), requestMeta(c), input)
+	output, err := s.application.SendFirstDirectTextMessage(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// findDirectConversation 按目标身份查找当前成员的活跃单聊。
+func (s *Service) findDirectConversation(c *gin.Context) {
+	output, err := s.application.FindDirectConversation(c.Request.Context(), requestMeta(c), c.Param("targetIdentityID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 

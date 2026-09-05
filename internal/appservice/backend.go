@@ -74,9 +74,12 @@ type Backend interface {
 	// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
 	//cervi:route POST /conversations/:conversationID/reopen
 	ReopenServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
-	// StartDirectConversation 发起或打开企业成员内部单聊。
-	//cervi:route POST /direct-conversations
-	StartDirectConversation(context.Context, RequestMeta, DirectConversationInput) (InboxConversation, error)
+	// SendFirstDirectTextMessage 向目标身份发送首条单聊消息并按需创建长期会话。
+	//cervi:route POST /direct-conversations/messages
+	SendFirstDirectTextMessage(context.Context, RequestMeta, FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error)
+	// FindDirectConversation 按目标身份查找当前成员的活跃单聊。
+	//cervi:route GET /direct-conversations/by-target/:targetIdentityID
+	FindDirectConversation(context.Context, RequestMeta, string) (DirectConversationLookup, error)
 	// SendDirectTextMessage 发送内部单聊文本消息。
 	//cervi:route POST /direct-conversations/:conversationID/messages
 	SendDirectTextMessage(context.Context, RequestMeta, string, DirectTextMessageInput) (ConversationMessage, error)

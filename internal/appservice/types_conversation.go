@@ -154,9 +154,22 @@ type ConversationReadState struct {
 	LastReadAt        time.Time `json:"lastReadAt"`
 }
 
-// DirectConversationInput 定义成员发起内部单聊的目标。
-type DirectConversationInput struct {
+// FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。
+type FirstDirectTextMessageInput struct {
 	TargetIdentityID string `json:"targetIdentityId"`
+	ClientMessageID  string `json:"clientMessageId"`
+	Body             string `json:"body"`
+}
+
+// FirstDirectTextMessageResult 定义首条单聊消息及其确定的长期会话。
+type FirstDirectTextMessageResult struct {
+	Conversation InboxConversation   `json:"conversation"`
+	Message      ConversationMessage `json:"message"`
+}
+
+// DirectConversationLookup 定义按目标身份查找单聊的结果。
+type DirectConversationLookup struct {
+	Conversation *InboxConversation `json:"conversation"`
 }
 
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。
