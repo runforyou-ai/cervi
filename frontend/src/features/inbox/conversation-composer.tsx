@@ -31,7 +31,11 @@ import {
   createConversationComposerSchema,
   type ConversationComposerValues,
 } from "@/features/inbox/conversation-composer-schema"
-import { mentionTokenPattern } from "@/features/inbox/mention-token"
+import {
+  mentionTokenPattern,
+  reconcileMentionAllToken,
+  type MentionAllToken,
+} from "@/features/inbox/mention-token"
 import {
   conversationSendingIndicatorDelay,
   type OutgoingConversationDraft,
@@ -138,7 +142,9 @@ export function ConversationComposer({
   const replyToRef = useRef(replyTo)
   replyToRef.current = replyTo
   const [mentionSubjectIDs, setMentionSubjectIDs] = useState<string[]>([])
-  const [mentionAll, setMentionAll] = useState(false)
+  const [mentionAllToken, setMentionAllToken] =
+    useState<MentionAllToken | null>(null)
+  const mentionAll = mentionAllToken !== null
   const [mentionQuery, setMentionQuery] = useState<{
     start: number
     value: string
@@ -162,7 +168,7 @@ export function ConversationComposer({
     retryRef.current = retryDraft
     form.setValue("body", retryDraft.body, { shouldDirty: true })
     setMentionSubjectIDs(retryDraft.mentionSubjectIDs)
-    setMentionAll(retryDraft.mentionAll)
+    setMentionAllToken(retryDraft.mentionAllToken)
     onReplyToChange?.(retryDraft.replyTo)
     resizeComposerInput(inputRef.current, manualInputHeightRef.current)
     form.setFocus("body")
@@ -248,20 +254,23 @@ export function ConversationComposer({
     })
   }
 
-  /** 插入选中的群成员或启用独立的所有人提醒标记。 */
+  /** 在正文光标处插入选中的群成员或所有人标记。 */
   function selectMention(candidate: MentionCandidate) {
     const query = mentionQuery
     const input = inputRef.current
     if (!query || !input) return
     const body = form.getValues("body")
     const caret = input.selectionStart ?? body.length
-    const token = candidate.kind === "all" ? "" : `@${candidate.displayName} `
+    const token = `@${candidate.displayName} `
     const nextBody = `${body.slice(0, query.start)}${token}${body.slice(caret)}`
     const nextCaret = query.start + token.length
     form.setValue("body", nextBody, { shouldDirty: true })
     if (candidate.kind === "all") {
-      setMentionAll(true)
+      setMentionAllToken({ start: query.start, text: token.trimEnd() })
     } else {
+      setMentionAllToken((current) =>
+        reconcileMentionAllToken(current, body, nextBody, nextCaret),
+      )
       const subjectID = candidate.participant.chatSubjectId
       setMentionSubjectIDs((current) =>
         current.includes(subjectID) ? current : [...current, subjectID],
@@ -292,6 +301,12 @@ export function ConversationComposer({
     if (onBeforeSend && !(await onBeforeSend())) return
     if (!aliveRef.current) return
     const body = values.body.trim()
+    // 草稿正文去掉首部空白后，同步调整结构化标记的位置。
+    const rawBody = form.getValues("body")
+    const leadingWhitespace = rawBody.length - rawBody.trimStart().length
+    const draftMentionAllToken = mentionAllToken
+      ? { ...mentionAllToken, start: mentionAllToken.start - leadingWhitespace }
+      : null
     const normalizedMentionSubjectIDs = [...mentionSubjectIDs].sort()
     const activeReplyTo =
       conversationType === ConversationType.ConversationTypeGroup
@@ -313,6 +328,7 @@ export function ConversationComposer({
       replyTo: activeReplyTo,
       mentionSubjectIDs: normalizedMentionSubjectIDs,
       mentionAll,
+      mentionAllToken: draftMentionAllToken,
     }
     retryRef.current = null
     onSending(draft)
@@ -347,7 +363,7 @@ export function ConversationComposer({
       onSucceeded()
       if (!aliveRef.current) return
       setMentionSubjectIDs([])
-      setMentionAll(false)
+      setMentionAllToken(null)
       setMentionQuery(null)
       if (replyToRef.current?.id === activeReplyTo?.id) {
         onReplyToChange?.(null)
@@ -373,6 +389,7 @@ export function ConversationComposer({
       if (retryFailedMessage) {
         retryRef.current = draft
         form.setValue("body", body, { shouldDirty: true })
+        setMentionAllToken(draft.mentionAllToken)
         resizeComposerInput(inputRef.current, manualInputHeightRef.current)
       }
       refocusPendingRef.current = refocusAfterSubmit
@@ -558,23 +575,6 @@ export function ConversationComposer({
               </button>
             </div>
           ) : null}
-          {mentionAll ? (
-            <div className="flex items-center gap-2 px-3 pt-2 text-xs">
-              <span className="font-semibold">@{t("messageMentionAll")}</span>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                className="text-muted-foreground hover:text-foreground disabled:opacity-50"
-                aria-label={t("messageMentionAllRemove")}
-                onClick={() => {
-                  setMentionAll(false)
-                  form.setFocus("body")
-                }}
-              >
-                {t("messageMentionRemove")}
-              </button>
-            </div>
-          ) : null}
           <Textarea
             {...bodyField}
             ref={(input) => {
@@ -595,6 +595,13 @@ export function ConversationComposer({
               )
             }}
             onChange={(event) => {
+              const previousBody = form.getValues("body")
+              const { value, selectionStart } = event.currentTarget
+              setMentionAllToken((current) =>
+                reconcileMentionAllToken(
+                  current, previousBody, value, selectionStart,
+                ),
+              )
               bodyField.onChange(event)
               reconcileMentionSubjects(event.currentTarget.value)
               updateMentionQuery(

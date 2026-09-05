@@ -156,8 +156,6 @@ const inbox = {
   messageReplyCancel: "Cancel reply",
   messageMentionCandidates: "Group members to mention",
   messageMentionAll: "Everyone",
-  messageMentionRemove: "Remove",
-  messageMentionAllRemove: "Remove mention of everyone",
   messageCopyText: "Copy text",
   messageCopySuccess: "Message text copied",
   messageCopyError: "Could not copy message text",

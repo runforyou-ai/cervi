@@ -152,8 +152,6 @@ const inbox = {
   messageReplyCancel: "取消回复",
   messageMentionCandidates: "可提醒的群成员",
   messageMentionAll: "所有人",
-  messageMentionRemove: "移除",
-  messageMentionAllRemove: "移除所有人提醒",
   messageCopyText: "复制文本",
   messageCopySuccess: "消息文本已复制",
   messageCopyError: "无法复制消息文本",
