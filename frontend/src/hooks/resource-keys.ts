@@ -45,6 +45,9 @@ export const resourceKeys = {
   /** 开始一轮导航时读取的提及队列。 */
   conversationMentions: (conversationId: string) =>
     itemKey("conversation-mentions", conversationId),
+  /** 当前成员与目标身份的已有单聊。 */
+  directConversation: (identityId?: string) =>
+    itemKey("direct-conversation", identityId),
   /** 发起内部会话时使用的成员候选项。 */
   memberOptions: () => ["member-options"],
   /** 单个群聊资料和当前成员。 */

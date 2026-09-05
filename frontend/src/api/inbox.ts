@@ -4,6 +4,7 @@ import {
   ClaimServiceSession,
   CloseServiceSession,
   CreateGroupConversation,
+  FindDirectConversation,
   GetGroupConversation,
   GetConversationMessageContext,
   GetConversationNavigationState,
@@ -17,9 +18,9 @@ import {
   ReopenServiceSession,
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
+  SendFirstDirectTextMessage,
   SendDirectTextMessage,
   SendGroupTextMessage,
-  StartDirectConversation,
   TransferServiceSession,
   TransferGroupConversationOwner,
   UpdateGroupConversation,
@@ -34,7 +35,7 @@ import type {
   ConversationNotificationSettingsInput,
   CustomerTextMessageInput,
   DirectInboxConversation,
-  DirectConversationInput,
+  FirstDirectTextMessageInput,
   DirectTextMessageInput,
   GroupConversation,
   GroupConversationInput,
@@ -117,7 +118,8 @@ const markConversationMentionReviewedBound = bind(
   MarkConversationMentionReviewed,
 )
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
-const startDirectConversationBound = bind(StartDirectConversation)
+const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
+const findDirectConversationBound = bind(FindDirectConversation)
 const sendDirectTextMessageBound = bind(SendDirectTextMessage)
 const createGroupConversationBound = bind(CreateGroupConversation)
 const getGroupConversationBound = bind(GetGroupConversation)
@@ -281,9 +283,22 @@ export async function sendCustomerTextMessage(
   return normalizeConversationMessage(message)
 }
 
-/** 发起或打开企业成员内部单聊。 */
-export function startDirectConversation(input: DirectConversationInput) {
-  return startDirectConversationBound(input)
+/** 发送首条单聊消息并返回最终会话。 */
+export async function sendFirstDirectTextMessage(
+  input: FirstDirectTextMessageInput,
+) {
+  const result = await sendFirstDirectTextMessageBound(input)
+  return {
+    ...result,
+    conversation: result.conversation as DirectInboxConversationData,
+    message: normalizeConversationMessage(result.message),
+  }
+}
+
+/** 按目标身份查找当前成员的活跃单聊。 */
+export async function findDirectConversation(targetIdentityID: string) {
+  const result = await findDirectConversationBound(targetIdentityID)
+  return result.conversation as DirectInboxConversationData | null
 }
 
 /** 发送企业成员内部单聊文本消息。 */

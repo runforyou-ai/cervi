@@ -193,6 +193,7 @@ function ConversationTimelineContent({
   onReadMessage,
   readThroughMessageID,
   prepareSendRef,
+  enabled = true,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -207,6 +208,7 @@ function ConversationTimelineContent({
   onReadMessage?: (messageID: string) => void
   readThroughMessageID?: string | null
   prepareSendRef?: RefObject<(() => Promise<boolean>) | null>
+  enabled?: boolean
 }) {
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -214,7 +216,11 @@ function ConversationTimelineContent({
   const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const [, setSearchParams] = useSearchParams()
-  const timeline = useConversationTimeline(conversationID, pollingActive)
+  const timeline = useConversationTimeline(
+    conversationID,
+    pollingActive,
+    enabled,
+  )
   const currentPage = timeline.page
   const { loading, error, refresh } = timeline
   const visibleMessages = mergeTimelineMessages(

@@ -845,10 +845,10 @@ export interface CustomerTextMessageInput {
 }
 
 /**
- * DirectConversationInput 定义成员发起内部单聊的目标。
+ * DirectConversationLookup 定义按目标身份查找单聊的结果。
  */
-export interface DirectConversationInput {
-    "targetIdentityId": string;
+export interface DirectConversationLookup {
+    "conversation": InboxConversation | null;
 }
 
 /**
@@ -962,6 +962,23 @@ export interface FileUploadRequest {
     "method": string;
     "url": string;
     "headers": { [_ in string]?: string } | null;
+}
+
+/**
+ * FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。
+ */
+export interface FirstDirectTextMessageInput {
+    "targetIdentityId": string;
+    "clientMessageId": string;
+    "body": string;
+}
+
+/**
+ * FirstDirectTextMessageResult 定义首条单聊消息及其确定的长期会话。
+ */
+export interface FirstDirectTextMessageResult {
+    "conversation": InboxConversation;
+    "message": ConversationMessage;
 }
 
 /**

@@ -14,6 +14,7 @@ import { memberChatPollingInterval } from "./use-member-chat-polling"
 export function useConversationTimeline(
   conversationID: string,
   pollingActive: boolean,
+  enabled = true,
 ) {
   const [page, setPage] = useState<ConversationMessageListData | null>(null)
   const [mode, setMode] = useState<"latest" | "anchor">("latest")
@@ -31,7 +32,7 @@ export function useConversationTimeline(
   const initial = useResource(
     resourceKeys.conversationMessages(conversationID),
     (signal) => listConversationMessages(conversationID, undefined, signal),
-    { refetchOnWindowFocus: false, staleTime: 0 },
+    { enabled, refetchOnWindowFocus: false, staleTime: 0 },
   )
   const { read } = initial
   const after = page?.after ?? ""
@@ -41,13 +42,18 @@ export function useConversationTimeline(
       listConversationMessages(conversationID, { before: "", after }, signal),
     {
       enabled:
+        enabled &&
         pollingActive &&
         mode === "latest" &&
         Boolean(page) &&
         !switching &&
         !loadingDirection,
       refetchInterval:
-        pollingActive && mode === "latest" && !switching && !loadingDirection
+        enabled &&
+        pollingActive &&
+        mode === "latest" &&
+        !switching &&
+        !loadingDirection
           ? memberChatPollingInterval
           : false,
       refetchOnWindowFocus: false,
