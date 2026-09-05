@@ -2,6 +2,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent,
 } from "react"
@@ -25,7 +26,7 @@ import {
   type RoleData,
   type Team,
 } from "@/api"
-import { DetailEditActions, DetailEditRow } from "@/components/form/detail-edit-row"
+import { DetailEditRow } from "@/components/form/detail-edit-row"
 import { StatusBadge } from "@/components/status-badge"
 import {
   selectableWorkStatuses,
@@ -115,6 +116,7 @@ export function AgentDetailView({
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [editing, setEditing] = useState<EditingField>(null)
+  const selectionGroupRef = useRef<HTMLDivElement>(null)
   const saveState = useImmediateSave()
   const { saving } = saveState
   const schema = useMemo(
@@ -160,6 +162,19 @@ export function AgentDetailView({
     accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
   }, [accountStatusForm, agent, form, managedExecutionForm, workStatusForm])
+
+  // 点击多选区外部时退出，组内说明文本和移除选项不触发退出。
+  useEffect(() => {
+    if (editing !== "teams" && editing !== "knowledgeBases") return
+    /** 关闭指针明确离开的多选编辑区。 */
+    function handleOutsidePointerDown(event: PointerEvent) {
+      if (event.target instanceof Node && !selectionGroupRef.current?.contains(event.target)) {
+        setEditing(null)
+      }
+    }
+    document.addEventListener("pointerdown", handleOutsidePointerDown)
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown)
+  }, [editing])
 
   /** 放弃尚未提交的修改并退出编辑。 */
   function cancelEdit() {
@@ -231,6 +246,7 @@ export function AgentDetailView({
   /** 保存 AI 员工平台托管执行配置。 */
   async function saveManagedExecution(
     draft: AgentManagedExecutionFormValues = managedExecutionForm.getValues(),
+    closeAfterSave = true,
   ) {
     const request = saveState.begin()
     if (request === null) return
@@ -261,7 +277,7 @@ export function AgentDetailView({
         },
       })
       if (!saveState.isCurrent(request)) return
-      setEditing(null)
+      if (closeAfterSave) setEditing(null)
       onSaved(saved)
       console.info("AI 员工运行配置已保存", {
         agent_id: saved.id,
@@ -664,22 +680,40 @@ export function AgentDetailView({
             editEnabled={editing === null && !saving}
             onEdit={() => startEditing("knowledgeBases")}
           >
-            <div>
+            <div
+              ref={selectionGroupRef}
+              onBlur={(event) => {
+                if (!event.relatedTarget || event.currentTarget.contains(event.relatedTarget)) return
+                if (saveState.isSaving()) {
+                  setEditing(null)
+                  return
+                }
+                cancelEdit()
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") return
+                event.preventDefault()
+                event.stopPropagation()
+                cancelEdit()
+              }}
+            >
               <Controller
                 name="knowledgeBaseIds"
                 control={managedExecutionForm.control}
                 render={({ field }) => (
                   <AgentKnowledgeField
                     value={field.value}
-                    onChange={field.onChange}
+                    onChange={(knowledgeBaseIds) => {
+                      if (saveState.isSaving()) return
+                      field.onChange(knowledgeBaseIds)
+                      void saveManagedExecution(
+                        { ...managedExecutionForm.getValues(), knowledgeBaseIds },
+                        false,
+                      )
+                    }}
                     disabled={saving}
                   />
                 )}
-              />
-              <DetailEditActions
-                saving={saving}
-                onSave={() => void saveManagedExecution()}
-                onCancel={cancelEdit}
               />
             </div>
           </DetailEditRow>
@@ -704,9 +738,10 @@ export function AgentDetailView({
                   <FieldDescription>{t("agents.form.noTeams")}</FieldDescription>
                 ) : (
                   <div
+                    ref={selectionGroupRef}
                     className="grid gap-2 rounded-md border p-3 sm:grid-cols-2"
                     onBlur={(event) => {
-                      if (event.currentTarget.contains(event.relatedTarget)) {
+                      if (!event.relatedTarget || event.currentTarget.contains(event.relatedTarget)) {
                         return
                       }
                       if (saveState.isSaving()) {
@@ -729,10 +764,11 @@ export function AgentDetailView({
                       >
                         <input
                           type="checkbox"
-                          className="size-4 accent-primary disabled:cursor-wait disabled:opacity-60"
-                          disabled={saving}
+                          className="size-4 accent-primary aria-disabled:cursor-wait aria-disabled:opacity-60"
+                          aria-disabled={saving}
                           checked={field.value.includes(team.id)}
                           onChange={(event) => {
+                            if (saveState.isSaving()) return
                             const teamIds = event.target.checked
                               ? [...field.value, team.id]
                               : field.value.filter((id) => id !== team.id)

@@ -41,7 +41,7 @@ export function AgentKnowledgeField({
     )
   }
   const bases = resource.data?.knowledgeBases ?? []
-  // 保留已删除知识库编号供用户移除。
+  // 将失效绑定合并为一项，支持一次移除后立即保存。
   const unavailable = value.filter((id) => !bases.some((base) => base.id === id))
   if (!onChange) {
     return (
@@ -55,23 +55,26 @@ export function AgentKnowledgeField({
     )
   }
   const options = [
-    ...bases.map((base) => ({ id: base.id, name: base.name, unavailable: false })),
-    ...unavailable.map((id) => ({
-      id, name: t("agents.execution.knowledgeUnavailable"), unavailable: true,
-    })),
+    ...bases.map((base) => ({ ids: [base.id], name: base.name, unavailable: false })),
+    ...(unavailable.length > 0 ? [{
+      ids: unavailable,
+      name: t("agents.execution.knowledgeUnavailableCount", { count: unavailable.length }),
+      unavailable: true,
+    }] : []),
   ]
   return (
     <div className="grid gap-2" role="group" aria-label={t("agents.execution.knowledgeBases")}>
       {options.map((option) => (
-        <label key={option.id} className="flex items-center gap-2 text-sm">
+        <label key={option.ids[0]} className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            className="size-4 accent-primary"
-            disabled={disabled}
-            checked={value.includes(option.id)}
-            onChange={(event) => onChange(
-              event.target.checked ? [...value, option.id] : value.filter((id) => id !== option.id),
-            )}
+            className="size-4 accent-primary aria-disabled:cursor-wait aria-disabled:opacity-60"
+            aria-disabled={disabled}
+            checked={option.ids.every((id) => value.includes(id))}
+            onChange={(event) => {
+              if (disabled) return
+              onChange(event.target.checked ? [...value, ...option.ids] : value.filter((id) => !option.ids.includes(id)))
+            }}
           />
           <span className={option.unavailable ? "text-destructive" : undefined}>{option.name}</span>
         </label>

@@ -168,6 +168,7 @@ const contacts = {
       knowledgeLoadError: "知识库加载失败",
       knowledgeRetry: "重试",
       knowledgeUnavailable: "已失效的知识库",
+      knowledgeUnavailableCount: "已失效的知识库（{{count}} 个）",
       knowledgeHint: "未选择时不启用知识检索。",
 
       title: "运行配置",

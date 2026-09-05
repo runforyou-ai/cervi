@@ -170,6 +170,7 @@ const contacts = {
       knowledgeLoadError: "Failed to load knowledge bases",
       knowledgeRetry: "Retry",
       knowledgeUnavailable: "Unavailable knowledge base",
+      knowledgeUnavailableCount: "Unavailable knowledge bases ({{count}})",
       knowledgeHint: "Knowledge search is disabled when none are selected.",
 
       title: "Execution settings",
