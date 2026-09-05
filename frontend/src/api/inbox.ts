@@ -445,7 +445,7 @@ export async function listPendingConversationMentions(
   return { ...result, messageIds: asList(result.messageIds) }
 }
 
-/** 连续确认一条提及目标。 */
+/** 确认一条实际查看的提及目标。 */
 export function markConversationMentionReviewed(
   conversationID: string,
   messageID: string,

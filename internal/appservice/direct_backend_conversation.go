@@ -686,9 +686,6 @@ func conversationMessageError(ctx context.Context, meta RequestMeta, err error, 
 	if errors.Is(err, conversationaction.ErrMentionTargetInvalid) {
 		return InvalidError(meta, cervii18n.ErrorConversationMentionTargetInvalid, nil)
 	}
-	if errors.Is(err, conversationaction.ErrMentionProgressChanged) {
-		return ConflictError(meta, cervii18n.ErrorConversationMentionProgressChanged, "mention_progress_changed")
-	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}

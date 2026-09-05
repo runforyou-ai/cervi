@@ -62,7 +62,7 @@ type Backend interface {
 	// ListPendingConversationMentions 返回本轮待查看提及目标。
 	//cervi:route GET /conversations/:conversationID/mentions/pending
 	ListPendingConversationMentions(context.Context, RequestMeta, string) (PendingConversationMentions, error)
-	// MarkConversationMentionReviewed 连续确认群聊提及。
+	// MarkConversationMentionReviewed 确认已查看的群聊提及。
 	//cervi:route POST /conversations/:conversationID/mentions/review
 	MarkConversationMentionReviewed(context.Context, RequestMeta, string, MarkConversationMentionReviewedInput) (ConversationMentionReview, error)
 	// MarkConversationRead 单调推进当前用户的原生会话已读水位。

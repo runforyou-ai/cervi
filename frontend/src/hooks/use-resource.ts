@@ -61,6 +61,7 @@ export function useResource<T>(
 
   return {
     data: query.data,
+    dataUpdatedAt: query.dataUpdatedAt,
     loading: query.isPending && query.isFetching,
     refreshing: query.isFetching && !query.isPending,
     error: query.error,

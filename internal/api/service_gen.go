@@ -260,7 +260,7 @@ func (s *Service) listPendingConversationMentions(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// markConversationMentionReviewed 连续确认群聊提及。
+// markConversationMentionReviewed 确认已查看的群聊提及。
 func (s *Service) markConversationMentionReviewed(c *gin.Context) {
 	var input appservice.MarkConversationMentionReviewedInput
 	if !bindJSON(c, &input) {

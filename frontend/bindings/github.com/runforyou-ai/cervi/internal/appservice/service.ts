@@ -575,7 +575,7 @@ export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
 }
 
 /**
- * MarkConversationMentionReviewed 连续确认群聊提及。
+ * MarkConversationMentionReviewed 确认已查看的群聊提及。
  */
 export function MarkConversationMentionReviewed(meta: $models.RequestMeta, conversationID: string, input: $models.MarkConversationMentionReviewedInput): $CancellablePromise<$models.ConversationMentionReview> {
     return $Call.ByID(2481523975, meta, conversationID, input);

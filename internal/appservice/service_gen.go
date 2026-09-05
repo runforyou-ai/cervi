@@ -69,7 +69,7 @@ func (s *Service) ListPendingConversationMentions(ctx context.Context, meta Requ
 	return s.backend.ListPendingConversationMentions(ctx, meta, conversationID)
 }
 
-// MarkConversationMentionReviewed 连续确认群聊提及。
+// MarkConversationMentionReviewed 确认已查看的群聊提及。
 func (s *Service) MarkConversationMentionReviewed(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationMentionReviewedInput) (ConversationMentionReview, error) {
 	return s.backend.MarkConversationMentionReviewed(ctx, meta, conversationID, input)
 }
