@@ -3,6 +3,9 @@ import { useEffect } from "react"
 import { Navigate, Route, Routes } from "react-router"
 
 import { MobileDirectConversationPage } from "@/apps/mobile/mobile-direct-conversation-page"
+import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
+import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
+import { MobileEmployeesPage } from "@/apps/mobile/mobile-employees-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
 import { MobileMePage, MobileSettingsPage } from "@/apps/mobile/mobile-me-page"
 import {
@@ -62,6 +65,15 @@ export default function MobileApp() {
               element={<MobileDirectConversationPage />}
             />
             <Route path="/me/settings" element={<MobileSettingsPage />} />
+            <Route path="/contacts/employees" element={<MobileEmployeesPage />} />
+            <Route
+              path="/contacts/employees/:userID"
+              element={<MobileEmployeeProfilePage />}
+            />
+            <Route
+              path="/contacts/employees/:userID/chat"
+              element={<MobileEmployeeChatPage />}
+            />
             <Route
               path="/contacts/:category"
               element={<MobileContactCategoryPage />}
