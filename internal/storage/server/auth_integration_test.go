@@ -2157,7 +2157,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		// 最新窗口和锚点窗口均返回消息所属的完整过程，不将过程附到用户消息。
 		for _, anchor := range []string{"", *run.ResponseMessageID} {
 			history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID, AroundMessageID: anchor})
-			if err != nil || history.LatestAgentRun == nil || history.LatestAgentRun.ID != run.ID {
+			if err != nil || history.LatestAgentRun == nil || history.LatestAgentRun.ID != run.ID || history.LatestAgentRun.AgentName != "售前智能体" {
 				t.Fatalf("agent message history = %#v, error = %v", history, err)
 			}
 			foundProcess := false

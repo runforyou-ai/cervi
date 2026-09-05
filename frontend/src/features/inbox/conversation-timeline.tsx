@@ -923,7 +923,11 @@ function ConversationTimelineContent({
             })}
           </div>
           {timeline.mode === "latest" && !currentPage?.hasLater && currentPage?.latestAgentRun ? (
-            <AgentRunState key={currentPage.latestAgentRun.id} run={currentPage.latestAgentRun} />
+            <AgentRunState
+              key={currentPage.latestAgentRun.id}
+              run={currentPage.latestAgentRun}
+              incoming={conversationType !== ConversationType.ConversationTypeCustomer}
+            />
           ) : null}
           {currentPage?.hasLater && timeline.mode === "anchor" ? (
             <div className="flex justify-center py-2">

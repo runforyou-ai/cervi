@@ -237,6 +237,7 @@ type ConversationAgentProcess struct {
 
 // ConversationAgentRun 定义会话最近一次运行的状态。
 type ConversationAgentRun struct {
+	AgentName string
 	ID        string
 	Status    domain.AgentRunStatus
 	ErrorCode *string

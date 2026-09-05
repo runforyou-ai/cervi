@@ -609,6 +609,7 @@ export interface ConversationAgentProcess {
  * ConversationAgentRun 定义消息窗口中的最近一次运行状态。
  */
 export interface ConversationAgentRun {
+    "agentName": string;
     "id": string;
     "status": AgentRunStatus;
     "errorCode": string | null;

@@ -50,7 +50,7 @@ test("没有新消息的页面仍更新运行终态并保留既有消息", () =>
   const current = page([message("reply", null)], false, false)
   const incoming = page([], false, false)
   incoming.latestAgentRun = {
-    id: "run", status: "failed", errorCode: null, lastError: "model rejected input",
+    id: "run", agentName: "AI 助手", status: "failed", errorCode: null, lastError: "model rejected input",
   } as NonNullable<ConversationMessageListData["latestAgentRun"]>
   const merged = mergeConversationPage(current, incoming, "after")
   assert.equal(merged.latestAgentRun, incoming.latestAgentRun)

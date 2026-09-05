@@ -20,11 +20,13 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  TooltipProvider,
 } from "@/components/ui/tooltip"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
 /** 按实际溢出情况为截断的完整原文提供悬停和键盘提示。 */
-function ToolValue({ label, value }: { label: string; value: string }) {
+function ToolValue({ value }: { value: string }) {
   const element = useRef<HTMLPreElement>(null)
   const [truncated, setTruncated] = useState(false)
   useLayoutEffect(() => {
@@ -40,8 +42,7 @@ function ToolValue({ label, value }: { label: string; value: string }) {
   }, [value])
 
   return (
-    <div className="min-w-0 space-y-1">
-      <div className="text-xs text-muted-foreground">{label}</div>
+    <TooltipProvider delayDuration={2000} skipDelayDuration={0}>
       <Tooltip>
         <TooltipTrigger asChild>
           <pre
@@ -64,7 +65,7 @@ function ToolValue({ label, value }: { label: string; value: string }) {
           </TooltipContent>
         ) : null}
       </Tooltip>
-    </div>
+    </TooltipProvider>
   )
 }
 
@@ -87,14 +88,26 @@ function AgentTool({ call }: { call: AgentToolCall }) {
         </span>
         <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-3 px-3 pb-3">
-        <ToolValue label={t("agentToolArguments")} value={call.arguments} />
-        {call.result !== null ? (
-          <ToolValue label={t("agentToolResult")} value={call.result} />
-        ) : null}
-        {call.error !== null ? (
-          <ToolValue label={t("agentToolError")} value={call.error} />
-        ) : null}
+      <CollapsibleContent className="px-3 pb-3">
+        <Tabs defaultValue="arguments">
+          <TabsList className="gap-4">
+            <TabsTrigger value="arguments" className="pb-2 text-xs">
+              {t("agentToolArguments")}
+            </TabsTrigger>
+            <TabsTrigger value="result" className="pb-2 text-xs">
+              {t("agentToolResult")}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="arguments" className="pt-2">
+            <ToolValue value={call.arguments} />
+          </TabsContent>
+          <TabsContent value="result" className="space-y-1 pt-2">
+            {call.error !== null ? (
+              <p className="text-xs text-destructive">{t("agentToolError")}</p>
+            ) : null}
+            <ToolValue value={call.error ?? call.result ?? statusLabel} />
+          </TabsContent>
+        </Tabs>
       </CollapsibleContent>
     </Collapsible>
   )
@@ -145,12 +158,14 @@ export function AgentProcessUsage({ process }: { process: ConversationAgentProce
 }
 
 /** 显示最近一次运行的等待、思考或失败状态，终止运行不展示中间内容。 */
-export function AgentRunState({ run }: { run: ConversationAgentRun }) {
+export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; incoming: boolean }) {
   const { t } = useTranslation("inbox")
   if (run.status === AgentRunStatus.AgentRunStatusSucceeded) return null
   const thinking = run.status === AgentRunStatus.AgentRunStatusRunning
   const failed = run.status === AgentRunStatus.AgentRunStatusFailed
   const cancelled = run.status === AgentRunStatus.AgentRunStatusCancelled
+  const senderName = run.agentName.trim() || t("unknownSender")
+  const senderInitial = Array.from(senderName)[0]?.toLocaleUpperCase() ?? "?"
   const label = thinking
     ? t("agentThoughtRunning")
     : failed
@@ -164,16 +179,34 @@ export function AgentRunState({ run }: { run: ConversationAgentRun }) {
       ? t("agentRunSessionClosed")
       : run.lastError
   return (
-    <div className="mx-10 mt-3 min-w-0 text-xs text-muted-foreground" role="status">
-      <div className={cn("flex items-center gap-1.5", failed && "text-destructive")}>
-        {thinking ? (
-          <LoaderCircleIcon aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
-        ) : <BrainIcon aria-hidden className="size-4" />}
-        <span>{label}</span>
+    <div
+      className={cn("mt-3 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}
+      role="status"
+      aria-label={`${senderName} ${label}`}
+    >
+      <div className={cn("relative flex min-h-8 max-w-[75%] flex-col justify-center py-2", incoming ? "ml-10" : "mr-10")}>
+        <span
+          className={cn(
+            "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
+            incoming
+              ? "right-full mr-2 border bg-background text-foreground"
+              : "left-full ml-2 bg-primary text-primary-foreground",
+          )}
+          title={senderName}
+          aria-hidden="true"
+        >
+          {senderInitial}
+        </span>
+        <div className={cn("flex items-center gap-1.5", failed && "text-destructive")}>
+          {thinking ? (
+            <LoaderCircleIcon aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
+          ) : <BrainIcon aria-hidden className="size-4" />}
+          <span>{label}</span>
+        </div>
+        {(failed || cancelled) && reason ? (
+          <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>
+        ) : null}
       </div>
-      {(failed || cancelled) && reason ? (
-        <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>
-      ) : null}
     </div>
   )
 }
