@@ -129,6 +129,11 @@ func (b *Backend) MarkConversationRead(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
+// UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
+func (b *Backend) UpdateConversationUnreadMark(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationUnreadMarkInput) error {
+	return b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/unread-mark", nil, input, nil)
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (b *Backend) UpdateConversationNotificationSettings(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationNotificationSettingsInput) (appservice.ConversationNotificationSettings, error) {
 	var output appservice.ConversationNotificationSettings

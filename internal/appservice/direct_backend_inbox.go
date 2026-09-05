@@ -51,7 +51,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 	}
 	conversations := make([]InboxConversation, 0, len(summaries))
 	for _, summary := range summaries {
-		conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, LastMessageID: summary.LastMessageID, LastReadMessageID: summary.LastReadMessageID}
+		conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, LastMessageID: summary.LastMessageID, LastReadMessageID: summary.LastReadMessageID}
 		if summary.Customer != nil {
 			var assignee *InboxAssignee
 			if summary.Customer.Assignee != nil {

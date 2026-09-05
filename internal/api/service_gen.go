@@ -31,6 +31,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/conversations/:conversationID/mentions/pending", s.listPendingConversationMentions)
 	router.POST("/conversations/:conversationID/mentions/review", s.markConversationMentionReviewed)
 	router.POST("/conversations/:conversationID/read", s.markConversationRead)
+	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
@@ -277,6 +278,15 @@ func (s *Service) markConversationRead(c *gin.Context) {
 	}
 	output, err := s.application.MarkConversationRead(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
+func (s *Service) updateConversationUnreadMark(c *gin.Context) {
+	var input appservice.ConversationUnreadMarkInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.UpdateConversationUnreadMark(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input))
 }
 
 // updateConversationNotificationSettings 保存当前用户的原生会话提醒设置。

@@ -79,6 +79,11 @@ func (s *Service) MarkConversationRead(ctx context.Context, meta RequestMeta, co
 	return s.backend.MarkConversationRead(ctx, meta, conversationID, input)
 }
 
+// UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
+func (s *Service) UpdateConversationUnreadMark(ctx context.Context, meta RequestMeta, conversationID string, input ConversationUnreadMarkInput) error {
+	return s.backend.UpdateConversationUnreadMark(ctx, meta, conversationID, input)
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (s *Service) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
 	return s.backend.UpdateConversationNotificationSettings(ctx, meta, conversationID, input)

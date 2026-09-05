@@ -25,6 +25,7 @@ import {
   TransferGroupConversationOwner,
   UpdateGroupConversation,
   UpdateConversationNotificationSettings,
+  UpdateConversationUnreadMark,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   CustomerInboxConversation,
@@ -33,6 +34,7 @@ import type {
   ConversationMessageListInput,
   ConversationNotificationSettings,
   ConversationNotificationSettingsInput,
+  ConversationUnreadMarkInput,
   CustomerTextMessageInput,
   DirectInboxConversation,
   FirstDirectTextMessageInput,
@@ -59,6 +61,7 @@ import {
   InboxScope,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
+import { enqueueConversationUnreadChange } from "@/api/conversation-read-queue"
 import { asList } from "@/api/normalize"
 
 export type InboxData = Omit<Inbox, "conversations"> & {
@@ -143,6 +146,18 @@ const closeServiceSessionBound = bind(CloseServiceSession)
 const reopenServiceSessionBound = bind(ReopenServiceSession)
 
 export type LoadInboxQuery = Partial<LoadInboxInput>
+
+const updateConversationUnreadMarkBound = bind(UpdateConversationUnreadMark)
+
+/** 保存独立于阅读水位的个人未读标记。 */
+export function updateConversationUnreadMark(
+  conversationID: string,
+  input: ConversationUnreadMarkInput,
+) {
+  return enqueueConversationUnreadChange(conversationID, () =>
+    updateConversationUnreadMarkBound(conversationID, input),
+  )
+}
 
 /** 保存当前用户的原生会话提醒设置。 */
 export function updateConversationNotificationSettings(
@@ -271,6 +286,11 @@ export function markConversationRead(
   conversationID: string,
   input: MarkConversationReadInput,
 ) {
+  if (input.clearUnreadMark) {
+    return enqueueConversationUnreadChange(conversationID, () =>
+      markConversationReadBound(conversationID, input),
+    )
+  }
   return markConversationReadBound(conversationID, input)
 }
 

@@ -105,7 +105,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 	if err != nil || !slices.Equal(queue.MessageIDs, []string{first.ID, second.ID}) || queue.LastTargetSequence == nil || *queue.LastTargetSequence != *second.GroupMessageSequence {
 		t.Fatalf("queue=%+v err=%v", queue, err)
 	}
-	if _, err := read.Execute(ctx, f.member, f.groupID, last.ID); err != nil {
+	if _, err := read.Execute(ctx, f.member, f.groupID, last.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	status, err := navigation.Execute(ctx, f.member, f.groupID)
@@ -142,7 +142,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 	if err != nil || result.Outcome != "reviewed" {
 		t.Fatalf("review after deletion=%+v err=%v", result, err)
 	}
-	if _, err := read.Execute(ctx, f.member, f.groupID, first.ID); err != nil {
+	if _, err := read.Execute(ctx, f.member, f.groupID, first.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	if state = f.state(t); *state.LastReadMessageID != last.ID {

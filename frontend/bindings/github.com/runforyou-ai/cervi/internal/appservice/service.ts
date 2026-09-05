@@ -813,6 +813,13 @@ export function UpdateConversationNotificationSettings(meta: $models.RequestMeta
 }
 
 /**
+ * UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
+ */
+export function UpdateConversationUnreadMark(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationUnreadMarkInput): $CancellablePromise<void> {
+    return $Call.ByID(1934573390, meta, conversationID, input);
+}
+
+/**
  * UpdateGroupConversation 修改群聊资料。
  */
 export function UpdateGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationProfileInput): $CancellablePromise<$models.GroupConversation> {

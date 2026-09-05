@@ -112,6 +112,7 @@ type InboxConversation struct {
 	Type                 ConversationType           `json:"type"`
 	UnreadCount          int                        `json:"unreadCount"`
 	MentionedUnreadCount int                        `json:"mentionedUnreadCount"`
+	MarkedUnread         bool                       `json:"markedUnread"`
 	Muted                bool                       `json:"muted"`
 	LastMessageID        *string                    `json:"lastMessageId"`
 	LastReadMessageID    *string                    `json:"lastReadMessageId"`

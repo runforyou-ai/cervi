@@ -737,6 +737,13 @@ export enum ConversationType {
 };
 
 /**
+ * ConversationUnreadMarkInput 定义当前用户的独立未读标记。
+ */
+export interface ConversationUnreadMarkInput {
+    "markedUnread": boolean;
+}
+
+/**
  * CreateAgentInput 定义新增 AI 员工字段。
  */
 export interface CreateAgentInput {
@@ -1136,6 +1143,7 @@ export interface InboxConversation {
     "type": ConversationType;
     "unreadCount": number;
     "mentionedUnreadCount": number;
+    "markedUnread": boolean;
     "muted": boolean;
     "lastMessageId": string | null;
     "lastReadMessageId": string | null;
@@ -1505,6 +1513,7 @@ export interface MarkConversationMentionReviewedInput {
  */
 export interface MarkConversationReadInput {
     "lastReadMessageId": string;
+    "clearUnreadMark": boolean;
 }
 
 /**

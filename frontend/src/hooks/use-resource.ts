@@ -77,6 +77,9 @@ type ResourceInvalidationOptions = {
 /** 返回按 key 失效缓存的函数，供数据变更后刷新相关读取。 */
 export function useResourceInvalidator() {
   const client = useQueryClient()
-  return (key: QueryKey, options: ResourceInvalidationOptions = {}) =>
-    client.invalidateQueries({ queryKey: key, ...options })
+  return useCallback(
+    (key: QueryKey, options: ResourceInvalidationOptions = {}) =>
+      client.invalidateQueries({ queryKey: key, ...options }),
+    [client],
+  )
 }

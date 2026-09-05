@@ -424,11 +424,26 @@ func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMe
 	if err != nil {
 		return ConversationReadState{}, err
 	}
-	state, err := b.markConversationRead.Execute(ctx, identity, conversationID, input.LastReadMessageID)
+	state, err := b.markConversationRead.Execute(ctx, identity, conversationID, input.LastReadMessageID, input.ClearUnreadMark)
 	if err != nil {
 		return ConversationReadState{}, conversationReadError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	return ConversationReadState{LastReadMessageID: state.LastReadMessageID, LastReadAt: state.LastReadAt}, nil
+}
+
+// UpdateConversationUnreadMark 保存个人未读标记，不改变已读和提及查看水位。
+func (b *DirectBackend) UpdateConversationUnreadMark(ctx context.Context, meta RequestMeta, conversationID string, input ConversationUnreadMarkInput) error {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	if err := b.updateConversationUnreadMark.Execute(ctx, identity, conversationID, input.MarkedUnread); err != nil {
+		return conversationReadError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	if input.MarkedUnread {
+		slog.Info("会话已标为未读", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "user_id", identity.User.ID)
+	}
+	return nil
 }
 
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
@@ -463,7 +478,7 @@ func conversationNotificationSettingsError(ctx context.Context, meta RequestMeta
 	return FailedError(meta, cervii18n.ErrorConversationNotifyUpdateFailed)
 }
 
-// conversationReadError 转换会话已读水位更新错误。
+// conversationReadError 转换会话阅读状态更新错误。
 func conversationReadError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -477,7 +492,7 @@ func conversationReadError(ctx context.Context, meta RequestMeta, err error, org
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
-	slog.Warn("更新会话已读水位失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
+	slog.Warn("更新会话阅读状态失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
 	return FailedError(meta, cervii18n.ErrorConversationReadUpdateFailed)
 }
 

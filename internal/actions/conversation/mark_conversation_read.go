@@ -31,7 +31,7 @@ func NewMarkConversationReadAction(db *bun.DB) *MarkConversationReadAction {
 }
 
 // Execute 校验原生会话访问权并保存不回退的消息水位。
-func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID, messageID string) (ConversationReadState, error) {
+func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID, messageID string, clearUnreadMark bool) (ConversationReadState, error) {
 	fields := make(map[string]ValidationCode)
 	if !common.ValidUUID(conversationID) {
 		fields["conversationId"] = ValidationConversationIDInvalid
@@ -73,6 +73,14 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		}
 		if err := advanceConversationUserReadState(ctx, tx, state, &target); err != nil {
 			return err
+		}
+		// 主动标为已读时，在同一事务清除独立标记；可见消息自动已读只推进水位。
+		if clearUnreadMark {
+			if _, err := tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
+				Set("marked_unread = false").Set("updated_at = now()").
+				Where("organization_id = ? AND conversation_id = ? AND user_id = ? AND marked_unread", identity.Organization.ID, conversationID, identity.User.ID).Exec(ctx); err != nil {
+				return fmt.Errorf("clear conversation unread mark: %w", err)
+			}
 		}
 		if err := tx.NewSelect().
 			TableExpr("conversation_user_states AS cus").
