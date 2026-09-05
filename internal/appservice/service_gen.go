@@ -69,7 +69,7 @@ func (s *Service) ListPendingConversationMentions(ctx context.Context, meta Requ
 	return s.backend.ListPendingConversationMentions(ctx, meta, conversationID)
 }
 
-// MarkConversationMentionReviewed 连续确认群聊提及。
+// MarkConversationMentionReviewed 确认已查看的群聊提及。
 func (s *Service) MarkConversationMentionReviewed(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationMentionReviewedInput) (ConversationMentionReview, error) {
 	return s.backend.MarkConversationMentionReviewed(ctx, meta, conversationID, input)
 }
@@ -77,6 +77,11 @@ func (s *Service) MarkConversationMentionReviewed(ctx context.Context, meta Requ
 // MarkConversationRead 单调推进当前用户的原生会话已读水位。
 func (s *Service) MarkConversationRead(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
 	return s.backend.MarkConversationRead(ctx, meta, conversationID, input)
+}
+
+// UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
+func (s *Service) UpdateConversationUnreadMark(ctx context.Context, meta RequestMeta, conversationID string, input ConversationUnreadMarkInput) error {
+	return s.backend.UpdateConversationUnreadMark(ctx, meta, conversationID, input)
 }
 
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。

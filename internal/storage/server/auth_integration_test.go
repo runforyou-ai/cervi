@@ -1271,7 +1271,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				t.Fatalf("member unread group = %#v", item)
 			}
 		}
-		readState, err := conversationaction.NewMarkConversationReadAction(db).Execute(context.Background(), memberLogin.Identity, group.ID, relationMessage.ID)
+		readState, err := conversationaction.NewMarkConversationReadAction(db).Execute(context.Background(), memberLogin.Identity, group.ID, relationMessage.ID, false)
 		if err != nil || readState.LastReadMessageID != relationMessage.ID {
 			t.Fatalf("marked group read state = %#v, error = %v", readState, err)
 		}
@@ -1484,7 +1484,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil || observerState.LastReadMessageID == nil || observerState.LastReadAt == nil {
 			t.Fatalf("added group member read state = %#v, error = %v", observerState, err)
 		}
-		if _, err := conversationaction.NewMarkConversationReadAction(db).Execute(context.Background(), observerLogin.Identity, group.ID, *observerState.LastReadMessageID); err != nil {
+		if _, err := conversationaction.NewMarkConversationReadAction(db).Execute(context.Background(), observerLogin.Identity, group.ID, *observerState.LastReadMessageID, false); err != nil {
 			t.Fatalf("mark added group member read: %v", err)
 		}
 

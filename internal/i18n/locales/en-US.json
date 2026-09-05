@@ -412,6 +412,5 @@
   "field.message_body_too_long": "Messages can contain up to 4,000 characters.",
   "field.message_cursor_invalid": "The message position is invalid. Reopen the conversation.",
   "error.conversation_message_unavailable": "The original message is no longer available",
-  "error.conversation_mention_target_invalid": "This message does not mention you",
-  "error.conversation_mention_progress_changed": "Mention progress changed. Please start again"
+  "error.conversation_mention_target_invalid": "This message does not mention you"
 }

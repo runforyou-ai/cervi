@@ -1,5 +1,5 @@
-/** 固定本轮提及序列，并在可见后按服务端顺序连续确认。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+/** 固定本轮提及序列，并同步正常浏览和主动导航的可见确认。 */
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
@@ -8,9 +8,11 @@ import {
   isApiError,
   listPendingConversationMentions,
   markConversationMentionReviewed,
+  type ConversationMessageListData,
 } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useVisibleConversationMentions } from "./use-visible-conversation-mentions"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
 
 type MentionRound = {
@@ -26,6 +28,9 @@ export function useConversationMentionNavigation({
   conversationID,
   enabled,
   pollingActive,
+  root,
+  page,
+  switching,
   locate,
   cancel,
   onUnavailable,
@@ -33,6 +38,9 @@ export function useConversationMentionNavigation({
   conversationID: string
   enabled: boolean
   pollingActive: boolean
+  root: RefObject<HTMLDivElement | null>
+  page: ConversationMessageListData | null
+  switching: boolean
   locate: (id: string) => Promise<boolean>
   cancel: () => void
   onUnavailable: () => void
@@ -55,6 +63,29 @@ export function useConversationMentionNavigation({
       refetchOnWindowFocus: false,
     },
   )
+  const pending = useResource(
+    resourceKeys.conversationMentions(conversationID),
+    (signal) => listPendingConversationMentions(conversationID, signal),
+    {
+      enabled: enabled && pollingActive,
+      refetchInterval: enabled && pollingActive ? memberChatPollingInterval : false,
+      refetchOnWindowFocus: false,
+    },
+  )
+  const visibleIDs = useVisibleConversationMentions({
+    conversationID, root, page, pendingIDs: pending.data?.messageIds,
+    pendingUpdatedAt: pending.dataUpdatedAt,
+    enabled: enabled && pollingActive && !switching && !busy,
+    // 自然看到本轮其他目标时同步确认状态，保留本轮顺序和回看位置。
+    onReviewed: (id) => {
+      const active = currentRound.current
+      if (!active || !active.ids.includes(id) || active.confirmed.has(id)) return
+      const next = { ...active, confirmed: new Set([...active.confirmed, id]) }
+      currentRound.current = next
+      setRound(next)
+      if (active.ids[active.index] === id) setNeedsResume(false)
+    },
+  })
   const { read } = state
 
   /** 结束本轮但保留时间线位置。 */
@@ -144,9 +175,14 @@ export function useConversationMentionNavigation({
             }
             next = { ...next, confirmed: new Set([...next.confirmed, id]) }
           }
+          // 保留定位等待期间由视口确认的其他目标。
+          if (currentRound.current?.ids === next.ids) {
+            next = { ...next, confirmed: new Set([...next.confirmed, ...currentRound.current.confirmed]) }
+          }
           currentRound.current = next
           setRound(next)
           void invalidate(resourceKeys.conversationNavigation(conversationID))
+          void invalidate(resourceKeys.conversationMentions(conversationID))
           return
         } catch (error) {
           if (revision !== operation.current) return
@@ -176,6 +212,7 @@ export function useConversationMentionNavigation({
         setNeedsResume(!next.confirmed.has(next.ids[remaining]))
       }
       void invalidate(resourceKeys.conversationNavigation(conversationID))
+      void invalidate(resourceKeys.conversationMentions(conversationID))
     } catch (error) {
       if (revision !== operation.current) return
       if (isApiError(error) && error.reason === "conversation_unavailable") {
@@ -183,9 +220,7 @@ export function useConversationMentionNavigation({
         onUnavailable()
         return
       }
-      if (isApiError(error) && error.reason === "mention_progress_changed")
-        close()
-      else setNeedsResume(true)
+      setNeedsResume(true)
       if (!isApiError(error) || !error.state)
         toast.error(
           error instanceof Error ? error.message : t("mentionNavigationError"),
@@ -208,6 +243,7 @@ export function useConversationMentionNavigation({
       if (revision !== operation.current) return
       if (!pending.messageIds.length || !pending.lastTargetSequence) {
         void invalidate(resourceKeys.conversationNavigation(conversationID))
+        void invalidate(resourceKeys.conversationMentions(conversationID))
         return
       }
       const next: MentionRound = {
@@ -235,7 +271,7 @@ export function useConversationMentionNavigation({
     round,
     busy,
     needsResume,
-    pendingCount: state.data?.pendingMentionCount ?? 0,
+    pendingCount: pending.data?.messageIds.filter((id) => !visibleIDs.has(id)).length ?? 0,
     latestSequence: state.data?.latestSequence ?? "0",
     start,
     visit,

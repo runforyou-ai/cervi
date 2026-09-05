@@ -66,7 +66,7 @@ export function InboxRoute() {
   useEffect(() => {
     if (!data) return
     const unreadRevision = beginUnreadSnapshot()
-    applyUnreadSnapshot(data.unreadCount, unreadRevision)
+    applyUnreadSnapshot(data.attentionUnreadCount, unreadRevision)
     console.info("消息已加载", {
       conversation_count: data.conversations.length,
     })
@@ -153,6 +153,7 @@ export function InboxRoute() {
   return (
     <InboxPage
       conversations={visibleData.conversations}
+      attentionUnreadCount={visibleData.attentionUnreadCount}
       listLoading={showLoading}
       listError={Boolean(error)}
       onListRefresh={() => void refresh()}

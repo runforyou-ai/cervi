@@ -150,6 +150,7 @@ type ConversationMessageList struct {
 // MarkConversationReadInput 定义用户确认已读的消息水位。
 type MarkConversationReadInput struct {
 	LastReadMessageID string `json:"lastReadMessageId"`
+	ClearUnreadMark   bool   `json:"clearUnreadMark"`
 }
 
 // ConversationReadState 定义用户会话的已读水位。
@@ -245,6 +246,11 @@ type GroupTextMessageInput struct {
 	ReplyToMessageID  string   `json:"replyToMessageId"`
 	MentionSubjectIDs []string `json:"mentionSubjectIds"`
 	MentionAll        bool     `json:"mentionAll"`
+}
+
+// ConversationUnreadMarkInput 定义当前用户的独立未读标记。
+type ConversationUnreadMarkInput struct {
+	MarkedUnread bool `json:"markedUnread"`
 }
 
 // ConversationNotificationSettingsInput 定义当前用户的会话提醒设置。

@@ -113,7 +113,7 @@ func (b *Backend) ListPendingConversationMentions(ctx context.Context, meta apps
 	return output, err
 }
 
-// MarkConversationMentionReviewed 连续确认群聊提及。
+// MarkConversationMentionReviewed 确认已查看的群聊提及。
 func (b *Backend) MarkConversationMentionReviewed(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.MarkConversationMentionReviewedInput) (appservice.ConversationMentionReview, error) {
 	var output appservice.ConversationMentionReview
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/mentions/review", nil, input, &output)
@@ -127,6 +127,11 @@ func (b *Backend) MarkConversationRead(ctx context.Context, meta appservice.Requ
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/read", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
+}
+
+// UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
+func (b *Backend) UpdateConversationUnreadMark(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationUnreadMarkInput) error {
+	return b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/unread-mark", nil, input, nil)
 }
 
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。

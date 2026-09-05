@@ -13,9 +13,8 @@ import (
 type Key string
 
 const (
-	ErrorConversationMessageUnavailable     Key = "error.conversation_message_unavailable"
-	ErrorConversationMentionTargetInvalid   Key = "error.conversation_mention_target_invalid"
-	ErrorConversationMentionProgressChanged Key = "error.conversation_mention_progress_changed"
+	ErrorConversationMessageUnavailable   Key = "error.conversation_message_unavailable"
+	ErrorConversationMentionTargetInvalid Key = "error.conversation_mention_target_invalid"
 )
 
 const (

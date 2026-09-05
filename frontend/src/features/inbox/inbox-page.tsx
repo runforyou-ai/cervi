@@ -1,7 +1,8 @@
 /** 消息页中栏（范围纵栏 + 会话列表）和会话主区。 */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import {
+  BellOffIcon,
   CheckIcon,
   ChevronDownIcon,
   HeadsetIcon,
@@ -12,6 +13,8 @@ import {
   UsersRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
+import { toast } from "sonner"
 
 import {
   ChannelType,
@@ -21,6 +24,7 @@ import {
   InboxScope,
   OrganizationIdentityType,
   ServiceSessionStatus,
+  isApiError,
   isCustomerInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
@@ -28,6 +32,8 @@ import {
   listCustomerServiceAssignees,
   markConversationRead,
   sendFirstDirectTextMessage,
+  updateConversationNotificationSettings,
+  updateConversationUnreadMark,
   type ConversationMessageReference,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
@@ -53,6 +59,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { usePortalContainer } from "@/components/ui/portal-container"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Sheet,
@@ -87,7 +94,10 @@ import {
   useIsWideViewport,
 } from "@/hooks/use-narrow-viewport"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { apiErrorMessage } from "@/lib/form-errors"
+import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
 type ConversationSelection =
@@ -394,9 +404,11 @@ function InboxPaneTop({
 /** 中栏左缘的范围纵栏。 */
 function InboxScopeRail({
   scope,
+  attentionUnreadCount,
   onScopeChange,
 }: {
   scope: InboxScope
+  attentionUnreadCount: number
   onScopeChange: (scope: InboxScope) => void
 }) {
   const { t } = useTranslation("inbox")
@@ -418,7 +430,19 @@ function InboxScopeRail({
           )}
           onClick={() => onScopeChange(item.id)}
         >
-          <item.icon className="size-5" />
+          <span className="relative">
+            <item.icon className="size-5" />
+            {item.id === InboxScope.InboxScopeInternal &&
+            attentionUnreadCount > 0 ? (
+              <span
+                className="absolute -top-0.5 -right-1 size-2 rounded-full bg-destructive"
+                role="status"
+                aria-label={t("internalAttentionUnread", {
+                  count: attentionUnreadCount,
+                })}
+              />
+            ) : null}
+          </span>
           <span className="w-full truncate px-px text-center text-xs leading-tight">
             {t(item.labelKey)}
           </span>
@@ -601,12 +625,68 @@ function InboxConversationList({
   loading: boolean
   selectedId?: string
   onSelect: (conversationId: string) => void
-  onMarkRead: (conversation: InboxConversation) => void
+  onMarkRead: (conversation: InboxConversation) => Promise<void>
 }) {
   const { t } = useTranslation("inbox")
   const conversationName = useConversationName()
   const formatTime = useConversationTime()
+  const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
+  const settingsSave = useImmediateSave()
   useMinuteTick()
+
+  /** 保存会话静音设置并重新读取统一收件箱。 */
+  async function toggleConversationMuted(conversation: InboxConversation) {
+    const request = settingsSave.begin()
+    if (request === null) return
+    try {
+      await updateConversationNotificationSettings(conversation.id, {
+        muted: !conversation.muted,
+      })
+      await invalidate(resourceKeys.inbox())
+    } catch (error) {
+      if (!settingsSave.isCurrent(request)) return
+      console.warn("更新会话静音设置失败", {
+        conversationId: conversation.id,
+        error,
+      })
+      if (!recoverSession(error, navigate)) {
+        toast.error(
+          isApiError(error)
+            ? apiErrorMessage(error)
+            : t("conversationMuteError"),
+        )
+      }
+    } finally {
+      settingsSave.finish(request)
+    }
+  }
+
+  /** 保存手动未读状态，按需把真实已读推进到列表最后一条消息。 */
+  async function changeConversationReadState(
+    conversation: InboxConversation,
+    markedUnread: boolean,
+    advanceRead = false,
+  ) {
+    const request = settingsSave.begin()
+    if (request === null) return
+    try {
+      if (advanceRead && conversation.lastMessageId) {
+        await onMarkRead(conversation)
+      } else {
+        await updateConversationUnreadMark(conversation.id, { markedUnread })
+      }
+      await invalidate(resourceKeys.inbox())
+    } catch (error) {
+      if (!settingsSave.isCurrent(request)) return
+      console.warn("更新会话阅读状态失败", { conversationId: conversation.id, error })
+      if (!recoverSession(error, navigate)) {
+        toast.error(isApiError(error) ? apiErrorMessage(error) : t("conversationReadStateError"))
+      }
+    } finally {
+      settingsSave.finish(request)
+    }
+  }
 
   if (loading) {
     return (
@@ -650,7 +730,10 @@ function InboxConversationList({
                   ? t("groupSystemUpdated")
                   : t("messagesEmpty"))
           const formattedTime = formatTime(summary.lastMessageAt)
-          const hasUnread = conversation.unreadCount > 0
+          const hasUnread = conversation.unreadCount > 0 || conversation.markedUnread
+          const isInternal =
+            isDirectInboxConversation(conversation) ||
+            isGroupInboxConversation(conversation)
           return (
             <ContextMenu key={conversation.id}>
               <ContextMenuTrigger asChild>
@@ -664,16 +747,39 @@ function InboxConversationList({
                   ? "bg-accent text-accent-foreground"
                   : "hover:bg-muted",
               )}
-              onClick={() => onSelect(conversation.id)}
+              onClick={() => {
+                // 再次点击也按进入会话处理，等待在途的手动标记完成后清除。
+                if (selectedId === conversation.id && isInternal) {
+                  void updateConversationUnreadMark(conversation.id, { markedUnread: false })
+                    .then(() => invalidate(resourceKeys.inbox()))
+                    .catch((error: unknown) => {
+                      console.warn("清除会话未读标记失败", { conversationId: conversation.id, error })
+                      recoverSession(error, navigate)
+                    })
+                }
+                onSelect(conversation.id)
+              }}
                 >
               <span className="relative shrink-0">
                 <ConversationAvatar conversation={conversation} />
                 {hasUnread ? (
-                  <span className="absolute -top-1.5 -right-1.5 flex min-w-5 items-center justify-center gap-0.5 rounded-full bg-destructive px-1 text-[10px] font-semibold leading-5 text-destructive-foreground ring-2 ring-background">
-                    {conversation.mentionedUnreadCount > 0 ? "@" : null}
-                    {conversation.unreadCount > 99
-                      ? "99+"
-                      : conversation.unreadCount}
+                  <span
+                    className={cn(
+                      "absolute rounded-full ring-2 ring-background",
+                      conversation.unreadCount > 0
+                        ? "-top-1.5 -right-1.5 flex min-w-5 items-center justify-center gap-0.5 px-1 text-[10px] font-semibold leading-5"
+                        : "-top-0.5 -right-0.5 size-2.5",
+                      conversation.muted
+                        ? "bg-muted text-muted-foreground"
+                        : "bg-destructive text-destructive-foreground",
+                    )}
+                  >
+                    {conversation.unreadCount > 0 ? (
+                      <>
+                        {conversation.mentionedUnreadCount > 0 ? "@" : null}
+                        {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
+                      </>
+                    ) : <span className="sr-only">{t("conversationMarkedUnread")}</span>}
                   </span>
                 ) : null}
               </span>
@@ -704,23 +810,54 @@ function InboxConversationList({
                     ) : null}
                   </span>
                 </span>
-                <span
-                  title={preview}
-                  className={cn(
-                    "mt-0.5 block w-full min-w-0 truncate text-xs text-muted-foreground",
-                    selectedId === conversation.id &&
-                      "text-accent-foreground/75",
-                  )}
-                >
-                  {preview}
+                <span className="mt-0.5 flex min-w-0 items-center gap-2">
+                  <span
+                    title={preview}
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-xs text-muted-foreground",
+                      selectedId === conversation.id &&
+                        "text-accent-foreground/75",
+                    )}
+                  >
+                    {preview}
+                  </span>
+                  {isInternal && conversation.muted ? (
+                    <BellOffIcon
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-label={t("conversationMuted")}
+                    />
+                  ) : null}
                 </span>
               </span>
                 </button>
               </ContextMenuTrigger>
-              {hasUnread && conversation.lastMessageId ? (
+              {isInternal ? (
                 <ContextMenuContent>
-                  <ContextMenuItem onSelect={() => onMarkRead(conversation)}>
-                    {t("conversationMarkRead")}
+                  {hasUnread ? (
+                    <ContextMenuItem
+                      disabled={settingsSave.saving}
+                      onSelect={() => void changeConversationReadState(conversation, false, true)}
+                    >
+                      {t("conversationMarkRead")}
+                    </ContextMenuItem>
+                  ) : null}
+                  {!conversation.markedUnread ? (
+                    <ContextMenuItem
+                      disabled={settingsSave.saving}
+                      onSelect={() => void changeConversationReadState(conversation, true)}
+                    >
+                      {t("conversationMarkUnread")}
+                    </ContextMenuItem>
+                  ) : null}
+                  <ContextMenuItem
+                    disabled={settingsSave.saving}
+                    onSelect={() => void toggleConversationMuted(conversation)}
+                  >
+                    {t(
+                      conversation.muted
+                        ? "conversationUnmute"
+                        : "conversationMute",
+                    )}
                   </ContextMenuItem>
                 </ContextMenuContent>
               ) : null}
@@ -915,6 +1052,8 @@ function ConversationThread({
 }) {
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const { t } = useTranslation("inbox")
+  const navigate = useNavigate()
+  const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
   const outgoing = useOutgoingConversationMessages()
   const invalidate = useResourceInvalidator()
@@ -922,6 +1061,24 @@ function ConversationThread({
   const conversationID = conversation?.id ?? ""
   const conversationType =
     conversation?.type ?? ConversationType.ConversationTypeDirect
+
+  const handleUnreadMarkClearError = useEffectEvent((id: string, error: unknown) => {
+    console.warn("清除会话未读标记失败", { conversationId: id, error })
+    recoverSession(error, navigate)
+  })
+
+  useEffect(() => {
+    if (!conversationID || !pageActive || conversationType === ConversationType.ConversationTypeCustomer) return
+    let current = true
+    // 每次进入都清除服务端标记，避免旧缓存掩盖另一端新设的标记。
+    void updateConversationUnreadMark(conversationID, { markedUnread: false })
+      .then(() => invalidate(resourceKeys.inbox()))
+      .catch((error: unknown) => {
+        if (!current) return
+        handleUnreadMarkClearError(conversationID, error)
+      })
+    return () => { current = false }
+  }, [conversationID, conversationType, pageActive, invalidate])
 
   useEffect(() => {
     aliveRef.current = true
@@ -956,6 +1113,7 @@ function ConversationThread({
       if (!conversation || isCustomerInboxConversation(conversation)) return
       void markConversationRead(conversation.id, {
         lastReadMessageId: messageID,
+        clearUnreadMark: false,
       })
         .then(() => onConversationChanged())
         .catch((error: unknown) =>
@@ -1054,6 +1212,7 @@ function ConversationThread({
 /** 消息页中栏和当前会话。 */
 export function InboxPage({
   conversations,
+  attentionUnreadCount,
   listLoading,
   listError,
   onListRefresh,
@@ -1065,6 +1224,7 @@ export function InboxPage({
   onQueryChange,
 }: {
   conversations: InboxConversation[]
+  attentionUnreadCount: number
   listLoading: boolean
   listError: boolean
   onListRefresh: () => void
@@ -1244,25 +1404,12 @@ export function InboxPage({
   }
 
   /** 不打开会话并把列表项推进到当前最后消息。 */
-  function markConversationAsRead(conversation: InboxConversation) {
-    if (
-      (!isDirectInboxConversation(conversation) &&
-        !isGroupInboxConversation(conversation)) ||
-      !conversation.lastMessageId ||
-      conversation.unreadCount === 0
-    ) {
-      return
-    }
-    void markConversationRead(conversation.id, {
+  async function markConversationAsRead(conversation: InboxConversation) {
+    if (!conversation.lastMessageId) return
+    await markConversationRead(conversation.id, {
       lastReadMessageId: conversation.lastMessageId,
+      clearUnreadMark: true,
     })
-      .then(() => refreshConversationAfterMessage(conversation))
-      .catch((error: unknown) =>
-        console.warn("标记列表会话已读失败", {
-          conversationId: conversation.id,
-          error,
-        }),
-      )
   }
 
   /** 标旧受影响的精确查询，仅让最终可见视图立即重新读取。 */
@@ -1476,6 +1623,7 @@ export function InboxPage({
         {railCollapsed ? null : (
           <InboxScopeRail
             scope={scope}
+            attentionUnreadCount={attentionUnreadCount}
             onScopeChange={(nextScope) => {
               setDirectDraft(null)
               onQueryChange({ scope: nextScope })

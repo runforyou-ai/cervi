@@ -223,6 +223,12 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 			`, eventMessage.ID, eventMessage.ID, conversationID, identity.Organization.ID, bun.In(memberIDs)); err != nil {
 				return fmt.Errorf("initialize added group member read states: %w", err)
 			}
+			// 本轮入群基线已覆盖此前查看记录。
+			if _, err := tx.NewDelete().Model((*servermodels.ConversationMentionReview)(nil)).
+				Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).
+				Where("user_id IN (SELECT id FROM users WHERE organization_id = ? AND identity_id IN (?))", identity.Organization.ID, bun.In(memberIDs)).Exec(ctx); err != nil {
+				return fmt.Errorf("reset added group member mention reviews: %w", err)
+			}
 			result, err = loadGroupConversation(ctx, tx, identity, conversationID)
 			return err
 		})

@@ -105,15 +105,12 @@ func TestGroupMentionNavigation(t *testing.T) {
 	if err != nil || !slices.Equal(queue.MessageIDs, []string{first.ID, second.ID}) || queue.LastTargetSequence == nil || *queue.LastTargetSequence != *second.GroupMessageSequence {
 		t.Fatalf("queue=%+v err=%v", queue, err)
 	}
-	if _, err := read.Execute(ctx, f.member, f.groupID, last.ID); err != nil {
+	if _, err := read.Execute(ctx, f.member, f.groupID, last.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	status, err := navigation.Execute(ctx, f.member, f.groupID)
 	if err != nil || status.PendingMentionCount != 2 || status.ReviewedThroughSequence != 0 || status.LatestMessageID == nil || *status.LatestMessageID != last.ID {
 		t.Fatalf("navigation=%+v err=%v", status, err)
-	}
-	if _, err := review.Execute(ctx, f.member, f.groupID, second.ID); !errors.Is(err, conversationaction.ErrMentionProgressChanged) {
-		t.Fatalf("skipped first mention: %v", err)
 	}
 	if _, err := review.Execute(ctx, f.member, f.groupID, last.ID); !errors.Is(err, conversationaction.ErrMentionTargetInvalid) {
 		t.Fatalf("accepted ordinary message: %v", err)
@@ -142,7 +139,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 	if err != nil || result.Outcome != "reviewed" {
 		t.Fatalf("review after deletion=%+v err=%v", result, err)
 	}
-	if _, err := read.Execute(ctx, f.member, f.groupID, first.ID); err != nil {
+	if _, err := read.Execute(ctx, f.member, f.groupID, first.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	if state = f.state(t); *state.LastReadMessageID != last.ID {
@@ -426,5 +423,81 @@ func TestRemovedMemberCannotSendAfterWaiting(t *testing.T) {
 	var count int
 	if err := f.db.NewSelect().TableExpr("messages").ColumnExpr("count(*)").Where("conversation_id = ?", f.groupID).Scan(ctx, &count); err != nil || count != 1 {
 		t.Fatalf("message count=%d err=%v", count, err)
+	}
+}
+
+// TestVisibleMentionsCanBeReviewedOutOfOrder 验证可视提及单独确认且不越过屏幕外的旧提及。
+func TestVisibleMentionsCanBeReviewedOutOfOrder(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	review := conversationaction.NewMarkConversationMentionReviewedAction(f.db)
+	pending := conversationaction.NewListPendingConversationMentionsQuery(f.db)
+	navigation := conversationaction.NewGetConversationNavigationStateQuery(f.db)
+	first := f.send(t, f.owner, "屏幕外的第一条", false, f.subjectID)
+	second := f.send(t, f.owner, "屏幕外的第二条", true)
+	third := f.send(t, f.owner, "当前可视的提及", false, f.subjectID)
+	result, err := review.Execute(ctx, f.member, f.groupID, third.ID)
+	if err != nil || result.Outcome != "reviewed" || result.ReviewedThroughSequence != 0 {
+		t.Fatalf("out-of-order review=%+v err=%v", result, err)
+	}
+	result, err = review.Execute(ctx, f.member, f.groupID, third.ID)
+	if err != nil || result.Outcome != "alreadyReviewed" {
+		t.Fatalf("repeated sparse review=%+v err=%v", result, err)
+	}
+	queue, err := pending.Execute(ctx, f.member, f.groupID)
+	if err != nil || !slices.Equal(queue.MessageIDs, []string{first.ID, second.ID}) {
+		t.Fatalf("offscreen mentions lost: %+v err=%v", queue, err)
+	}
+	status, err := navigation.Execute(ctx, f.member, f.groupID)
+	if err != nil || status.PendingMentionCount != 2 {
+		t.Fatalf("sparse count=%+v err=%v", status, err)
+	}
+	result, err = review.Execute(ctx, f.member, f.groupID, first.ID)
+	if err != nil || result.ReviewedThroughSequence != *first.GroupMessageSequence {
+		t.Fatalf("first review=%+v err=%v", result, err)
+	}
+	result, err = review.Execute(ctx, f.member, f.groupID, second.ID)
+	if err != nil || result.ReviewedThroughSequence != *third.GroupMessageSequence {
+		t.Fatalf("merged review=%+v err=%v", result, err)
+	}
+	var receipts int
+	if err := f.db.NewSelect().Model((*servermodels.ConversationMentionReview)(nil)).ColumnExpr("count(*)").Where("conversation_id = ?", f.groupID).Scan(ctx, &receipts); err != nil || receipts != 0 {
+		t.Fatalf("compacted receipts=%d err=%v", receipts, err)
+	}
+	state := f.state(t)
+	if state.LastReadMessageID != nil {
+		t.Fatalf("mention review advanced ordinary read: %+v", state)
+	}
+	fourth := f.send(t, f.owner, "随后删除的旧提及", true)
+	fifth := f.send(t, f.owner, "再次可视的提及", true)
+	if _, err := review.Execute(ctx, f.member, f.groupID, fifth.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", fourth.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	sixth := f.send(t, f.owner, "删除后继续确认", true)
+	result, err = review.Execute(ctx, f.member, f.groupID, sixth.ID)
+	if err != nil || result.ReviewedThroughSequence != *sixth.GroupMessageSequence {
+		t.Fatalf("deleted gap blocks review=%+v err=%v", result, err)
+	}
+	// 重新入群建立新基线，并清除上一轮尚未合并的单条记录。
+	f.send(t, f.owner, "离群前屏幕外", true)
+	last := f.send(t, f.owner, "离群前已看到", true)
+	if _, err := review.Execute(ctx, f.member, f.groupID, last.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
+		t.Fatal(err)
+	}
+	queue, err = pending.Execute(ctx, f.member, f.groupID)
+	if err != nil || len(queue.MessageIDs) != 0 {
+		t.Fatalf("rejoin queue=%+v err=%v", queue, err)
+	}
+	if err := f.db.NewSelect().Model((*servermodels.ConversationMentionReview)(nil)).ColumnExpr("count(*)").Where("conversation_id = ?", f.groupID).Scan(ctx, &receipts); err != nil || receipts != 0 {
+		t.Fatalf("rejoin receipts=%d err=%v", receipts, err)
 	}
 }

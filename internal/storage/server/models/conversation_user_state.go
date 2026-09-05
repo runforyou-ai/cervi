@@ -21,5 +21,6 @@ type ConversationUserState struct {
 	LastReviewedMentionMessageID *string    `bun:"last_reviewed_mention_message_id"`
 	LastReadMessageID            *string    `bun:"last_read_message_id"`
 	LastReadAt                   *time.Time `bun:"last_read_at"`
+	MarkedUnread                 bool       `bun:"marked_unread"`
 	Muted                        bool       `bun:"muted"`
 }

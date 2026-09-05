@@ -48,7 +48,7 @@ func (b *DirectBackend) ListPendingConversationMentions(ctx context.Context, met
 	return PendingConversationMentions{MessageIDs: pending.MessageIDs, LastTargetSequence: groupMessageSequenceString(pending.LastTargetSequence)}, nil
 }
 
-// MarkConversationMentionReviewed 确认最早有效提及并返回权威水位。
+// MarkConversationMentionReviewed 确认已查看的提及并返回连续水位。
 func (b *DirectBackend) MarkConversationMentionReviewed(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationMentionReviewedInput) (ConversationMentionReview, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

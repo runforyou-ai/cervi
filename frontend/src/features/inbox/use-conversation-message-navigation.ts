@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from "react"
 import type { ConversationMessageListData } from "@/api"
+import { isConversationMessageVisible } from "./conversation-message-visibility"
 
 type PendingLocation = {
   id: string
@@ -115,9 +116,7 @@ export function useConversationMessageNavigation({
         return
       const bounds = viewport.getBoundingClientRect()
       const rect = row.getBoundingClientRect()
-      const visible =
-        Math.min(bounds.bottom, rect.bottom) - Math.max(bounds.top, rect.top)
-      if (visible < Math.min(rect.height / 2, 32)) return
+      if (!isConversationMessageVisible(rect, bounds)) return
       pending.current?.resolve(true)
       pending.current = null
     }

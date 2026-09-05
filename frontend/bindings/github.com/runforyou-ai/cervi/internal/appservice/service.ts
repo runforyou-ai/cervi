@@ -575,7 +575,7 @@ export function Logout(meta: $models.RequestMeta): $CancellablePromise<void> {
 }
 
 /**
- * MarkConversationMentionReviewed 连续确认群聊提及。
+ * MarkConversationMentionReviewed 确认已查看的群聊提及。
  */
 export function MarkConversationMentionReviewed(meta: $models.RequestMeta, conversationID: string, input: $models.MarkConversationMentionReviewedInput): $CancellablePromise<$models.ConversationMentionReview> {
     return $Call.ByID(2481523975, meta, conversationID, input);
@@ -810,6 +810,13 @@ export function UpdateContact(meta: $models.RequestMeta, contactID: string, inpu
  */
 export function UpdateConversationNotificationSettings(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationNotificationSettingsInput): $CancellablePromise<$models.ConversationNotificationSettings> {
     return $Call.ByID(379824806, meta, conversationID, input);
+}
+
+/**
+ * UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
+ */
+export function UpdateConversationUnreadMark(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationUnreadMarkInput): $CancellablePromise<void> {
+    return $Call.ByID(1934573390, meta, conversationID, input);
 }
 
 /**
