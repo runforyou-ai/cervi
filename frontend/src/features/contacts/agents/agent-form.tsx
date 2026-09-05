@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import { NativeSelect } from "@/components/ui/native-select"
+import { AgentKnowledgeField } from "@/features/contacts/agents/agent-knowledge-field"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import { parseAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
 import {
@@ -81,6 +82,7 @@ export function AgentForm({
         managed: {
           modelSelection: "",
           systemInstruction: "",
+          knowledgeBaseIds: [],
         },
       },
     },
@@ -100,6 +102,7 @@ export function AgentForm({
           managed: {
             ...model,
             systemInstruction: values.execution.managed.systemInstruction,
+            knowledgeBaseIds: values.execution.managed.knowledgeBaseIds,
           },
         },
       })
@@ -124,6 +127,7 @@ export function AgentForm({
               "providerId",
               "modelIdentifier",
               "systemInstruction",
+              "knowledgeBaseIds",
               "teamIds",
             ])
           : t("agents.form.networkError"),
@@ -245,6 +249,16 @@ function AgentManagedExecutionFields({
               required
               aria-invalid={fieldState.invalid}
             />
+          </Field>
+        )}
+      />
+      <Controller
+        name="execution.managed.knowledgeBaseIds"
+        control={control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel>{t("agents.execution.knowledgeBases")}</FieldLabel>
+            <AgentKnowledgeField value={field.value} onChange={field.onChange} />
           </Field>
         )}
       />

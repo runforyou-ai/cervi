@@ -275,6 +275,7 @@
   "field.display_name_required": "请输入你的姓名。",
   "field.agent_name_required": "请输入 AI 员工名称。",
   "field.agent_execution_invalid": "请选择有效的 AI 员工运行配置。",
+  "field.agent_knowledge_base_invalid": "请选择当前企业中仍然存在的知识库。",
   "field.agent_model_invalid": "请选择可用的对话模型。",
   "field.agent_system_instruction_required": "请输入工作指令。",
   "field.agent_system_instruction_too_long": "工作指令不能超过 20000 个字符。",

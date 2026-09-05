@@ -48,8 +48,11 @@ func NewSearchService(db *bun.DB, getter knowledgeBaseGetter, retriever knowledg
 	return &SearchService{db: db, getter: getter, retriever: retriever, reader: reader}
 }
 
-// ForOrganization 返回固定当前企业全部知识库范围的检索闭包。
-func (s *SearchService) ForOrganization(ctx context.Context, organizationID string) (func(context.Context, knowledgeretrieval.Request) (knowledgeretrieval.Result, error), error) {
+// ForKnowledgeBases 返回固定当前企业指定知识库范围的检索闭包。
+func (s *SearchService) ForKnowledgeBases(ctx context.Context, organizationID string, knowledgeBaseIDs []string) (func(context.Context, knowledgeretrieval.Request) (knowledgeretrieval.Result, error), error) {
+	if len(knowledgeBaseIDs) == 0 {
+		return nil, nil
+	}
 	rows := make([]searchSourceRow, 0)
 	if err := s.db.NewSelect().
 		TableExpr("knowledge_bases AS kb").
@@ -57,14 +60,15 @@ func (s *SearchService) ForOrganization(ctx context.Context, organizationID stri
 		ColumnExpr("ic.configuration AS configuration").
 		Join("JOIN integration_connections AS ic ON ic.id = kb.integration_connection_id AND ic.organization_id = kb.organization_id").
 		Where("kb.organization_id = ?", organizationID).
+		Where("kb.id IN (?)", bun.In(knowledgeBaseIDs)).
 		Where("NULLIF(trim(kb.external_resource_id), '') IS NOT NULL").
 		Where("ic.connector_type = ?", domain.IntegrationConnectionTypeDify).
 		OrderExpr("kb.id ASC").
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("load knowledge search scope: %w", err)
 	}
-	if len(rows) == 0 {
-		return nil, nil
+	if len(rows) != len(knowledgeBaseIDs) {
+		return nil, fmt.Errorf("agent knowledge scope contains unavailable knowledge bases")
 	}
 	sources := make([]knowledgeretrieval.Source, 0, len(rows))
 	for _, row := range rows {

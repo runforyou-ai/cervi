@@ -161,6 +161,15 @@ const contacts = {
       instructionTooLong: "工作指令不能超过 20000 个字符。",
     },
     execution: {
+      knowledgeBases: "知识库",
+      knowledgeDisabled: "未启用知识检索",
+      knowledgeEmpty: "暂无知识库",
+      knowledgeLoading: "正在加载知识库…",
+      knowledgeLoadError: "知识库加载失败",
+      knowledgeRetry: "重试",
+      knowledgeUnavailable: "已失效的知识库",
+      knowledgeHint: "未选择时不启用知识检索。",
+
       title: "运行配置",
       model: "对话模型",
       instruction: "工作指令",

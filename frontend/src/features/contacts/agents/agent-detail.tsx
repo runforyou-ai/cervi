@@ -25,7 +25,7 @@ import {
   type RoleData,
   type Team,
 } from "@/api"
-import { DetailEditRow } from "@/components/form/detail-edit-row"
+import { DetailEditActions, DetailEditRow } from "@/components/form/detail-edit-row"
 import { StatusBadge } from "@/components/status-badge"
 import {
   selectableWorkStatuses,
@@ -44,6 +44,7 @@ import {
   type AgentProfileFormValues,
   type AgentWorkStatusFormValues,
 } from "@/features/contacts/agents/agent-schema"
+import { AgentKnowledgeField } from "@/features/contacts/agents/agent-knowledge-field"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import {
   agentModelSelection,
@@ -69,6 +70,7 @@ type EditingField =
   | "teams"
   | "executionModel"
   | "systemInstruction"
+  | "knowledgeBases"
   | null
 
 /** 把 AI 员工详情转换为编辑表单值。 */
@@ -90,6 +92,7 @@ function managedExecutionValuesFromAgent(
       agent.execution.managed.modelIdentifier,
     ),
     systemInstruction: agent.execution.managed.systemInstruction,
+    knowledgeBaseIds: agent.execution.managed.knowledgeBaseIds,
   }
 }
 
@@ -240,7 +243,8 @@ export function AgentDetailView({
     const current = managedExecutionValuesFromAgent(agent)
     if (
       draft.modelSelection === current.modelSelection &&
-      draft.systemInstruction === current.systemInstruction
+      draft.systemInstruction === current.systemInstruction &&
+      sameIDs(draft.knowledgeBaseIds, current.knowledgeBaseIds)
     ) {
       setEditing(null)
       saveState.finish(request)
@@ -253,6 +257,7 @@ export function AgentDetailView({
         managed: {
           ...model,
           systemInstruction: draft.systemInstruction,
+          knowledgeBaseIds: draft.knowledgeBaseIds,
         },
       })
       if (!saveState.isCurrent(request)) return
@@ -284,6 +289,7 @@ export function AgentDetailView({
               "providerId",
               "modelIdentifier",
               "systemInstruction",
+              "knowledgeBaseIds",
             ])
           : t("agents.execution.saveError"),
       )
@@ -648,6 +654,34 @@ export function AgentDetailView({
                 </Field>
               )}
             />
+          </DetailEditRow>
+          <DetailEditRow
+            label={t("agents.execution.knowledgeBases")}
+            value={
+              <AgentKnowledgeField value={agent.execution.managed.knowledgeBaseIds} />
+            }
+            editing={editing === "knowledgeBases"}
+            editEnabled={editing === null && !saving}
+            onEdit={() => startEditing("knowledgeBases")}
+          >
+            <div>
+              <Controller
+                name="knowledgeBaseIds"
+                control={managedExecutionForm.control}
+                render={({ field }) => (
+                  <AgentKnowledgeField
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={saving}
+                  />
+                )}
+              />
+              <DetailEditActions
+                saving={saving}
+                onSave={() => void saveManagedExecution()}
+                onCancel={cancelEdit}
+              />
+            </div>
           </DetailEditRow>
         </div>
       </section>

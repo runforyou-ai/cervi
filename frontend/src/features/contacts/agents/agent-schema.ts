@@ -37,6 +37,7 @@ export function createAgentManagedExecutionSchema(
       .string()
       .min(1, messages.modelRequired)
       .refine(isAgentModelSelection, messages.modelRequired),
+    knowledgeBaseIds: z.array(z.string().uuid()),
     systemInstruction: z
       .string()
       .trim()

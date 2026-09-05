@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -34,6 +35,7 @@ type ManagedExecutionInput struct {
 	ProviderID        string
 	ModelIdentifier   string
 	SystemInstruction string
+	KnowledgeBaseIDs  []string
 }
 
 // Execution 定义 AI 员工当前生效的执行配置。
@@ -50,6 +52,7 @@ type ManagedExecution struct {
 	ModelIdentifier   string
 	ModelName         string
 	SystemInstruction string
+	KnowledgeBaseIDs  []string
 }
 
 // ExecutionSummary 定义 AI 员工当前执行配置摘要。
@@ -78,6 +81,7 @@ type ModelOption struct {
 type managedRevisionConfigurationV1 struct {
 	Model             managedRevisionModelV1 `json:"model"`
 	SystemInstruction string                 `json:"systemInstruction"`
+	KnowledgeBaseIDs  []string               `json:"knowledgeBaseIds"`
 }
 
 type managedRevisionModelV1 struct {
@@ -107,6 +111,17 @@ func normalizeManagedExecutionInput(input ManagedExecutionInput) (ManagedExecuti
 	input.ModelIdentifier = strings.TrimSpace(input.ModelIdentifier)
 	input.SystemInstruction = strings.TrimSpace(input.SystemInstruction)
 	fields := make(map[string]common.FieldCode)
+	// 规范化知识库编号并按集合保存。
+	knowledgeBaseIDs := make([]string, 0, len(input.KnowledgeBaseIDs))
+	for _, id := range input.KnowledgeBaseIDs {
+		normalized, valid := common.NormalizeUUID(id)
+		if !valid {
+			fields["knowledgeBaseIds"] = ValidationKnowledgeBaseInvalid
+		}
+		knowledgeBaseIDs = append(knowledgeBaseIDs, normalized)
+	}
+	slices.Sort(knowledgeBaseIDs)
+	input.KnowledgeBaseIDs = slices.Compact(knowledgeBaseIDs)
 	if !providerIDValid {
 		fields["providerId"] = ValidationModelInvalid
 	}
@@ -151,12 +166,26 @@ func managedExecutionModelQuery(db bun.IDB, organizationID, providerID, modelIde
 
 // insertExecutionRevision 创建 AI 员工执行配置版本。
 func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermodels.Identity, agentID, revisionID string, input ExecutionInput, model ModelOption) (Execution, error) {
+	// 锁定绑定记录，保证校验与版本写入之间知识库不会被删除。
+	if len(input.Managed.KnowledgeBaseIDs) > 0 {
+		ids := make([]string, 0, len(input.Managed.KnowledgeBaseIDs))
+		if err := db.NewSelect().Model((*servermodels.KnowledgeBase)(nil)).
+			Column("id").Where("kb.organization_id = ?", identity.Organization.ID).
+			Where("kb.id IN (?)", bun.In(input.Managed.KnowledgeBaseIDs)).
+			OrderExpr("kb.id ASC").For("KEY SHARE").Scan(ctx, &ids); err != nil {
+			return Execution{}, err
+		}
+		if len(ids) != len(input.Managed.KnowledgeBaseIDs) {
+			return Execution{}, &common.FieldError{Fields: map[string]common.FieldCode{"knowledgeBaseIds": ValidationKnowledgeBaseInvalid}}
+		}
+	}
 	configuration, err := json.Marshal(managedRevisionConfigurationV1{
 		Model: managedRevisionModelV1{
 			ProviderID: model.ProviderID, ProviderName: model.ProviderName,
 			Identifier: model.ModelIdentifier, Name: model.ModelName,
 		},
 		SystemInstruction: input.Managed.SystemInstruction,
+		KnowledgeBaseIDs:  input.Managed.KnowledgeBaseIDs,
 	})
 	if err != nil {
 		return Execution{}, err
@@ -177,6 +206,7 @@ func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermo
 			ProviderID: model.ProviderID, ProviderName: model.ProviderName,
 			ModelIdentifier: model.ModelIdentifier, ModelName: model.ModelName,
 			SystemInstruction: input.Managed.SystemInstruction,
+			KnowledgeBaseIDs:  input.Managed.KnowledgeBaseIDs,
 		},
 	}, nil
 }
@@ -210,6 +240,7 @@ func decodeRevisionExecution(revision servermodels.AgentRevision) (Execution, er
 			ProviderID: configuration.Model.ProviderID, ProviderName: configuration.Model.ProviderName,
 			ModelIdentifier: configuration.Model.Identifier, ModelName: configuration.Model.Name,
 			SystemInstruction: configuration.SystemInstruction,
+			KnowledgeBaseIDs:  configuration.KnowledgeBaseIDs,
 		},
 	}, nil
 }

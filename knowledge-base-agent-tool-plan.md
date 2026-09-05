@@ -1,5 +1,16 @@
 # 知识库 Agent Tool 方案
 
+## 实现状态
+
+已完成企业知识检索、多查询融合、游标上下文读取和 Agent 知识库范围配置。当前实现以代码为准，下面保留检索编排设计及上线前待办。
+
+- Agent 创建页和详情运行配置可选择当前企业知识库；新建默认不选，空列表不注册 `search_knowledge`。
+- `managed/v1` Revision 的 `knowledgeBaseIds` 保存明确范围，更新生成新版本；Run 读取其绑定的 Revision，配置切换不影响在途 Run。
+- 保存时在事务中校验并锁定同企业知识库；被删除的绑定保留在详情中供移除，新运行明确失败并推进消费水位。
+- Tool 除 `queries` 外还支持 `cursor` 与 `before`、`after`，两种读取共用同一范围。游标中的知识库必须在绑定范围内。
+- 当前 Dify 适配器读取知识库保存的检索配置并用于查询，人工检索测试与 Agent 共用同一检索服务。
+- MVP 未实现下文列出的复杂重试、输出预算和详细失败下标。
+
 ## 1. 目标
 
 将知识库检索作为 Cervi 托管 Agent 的只读 Tool。Agent 根据当前问题自行决定是否检索、选择哪个知识库、组织多少条查询以及每条查询的表达方式；Cervi 负责授权、并发执行、结果融合和上下文裁剪。
@@ -15,18 +26,18 @@
 
 ## 2. 核心决策
 
-1. 每个 Run 生成一个统一知识检索 Tool，知识库范围通过闭包注入；MVP 默认使用当前企业全部知识库，后续由 Agent 配置收窄范围。
-2. Tool 只向 LLM 暴露 `queries` 数组，不暴露检索参数。
+1. 每个 Run 生成一个统一知识检索 Tool，知识库范围通过闭包注入；知识库范围固定为本次 Run 的 Revision 所保存的绑定。
+2. Tool 向 LLM 暴露 `queries` 或游标上下文读取参数，不暴露检索方式和排名配置。
 3. LLM 自行决定数组长度和查询内容，Tool 描述不提供“简单问题一条、复杂问题多条”等生成规则。
 4. 每个查询仍是一次独立的后端检索；MVP 由 Tool 层直接并发执行并负责去重和融合，上线前再补并发与输出预算。
-5. Dify 检索请求只传 `query`，由 Dify 使用知识库中保存的检索配置。
+5. Dify 检索使用知识库中保存的检索配置，Cervi 不提供第二份配置入口。
 6. 多查询编排位于统一检索器之上，不进入 Dify 连接器，因而可以直接复用于本地知识库。
 
 ## 3. Agent Tool 契约
 
 ### 3.1 Tool 生成
 
-Run 开始时，服务端按 `organization_id` 加载本次可用知识库，并通过闭包注入统一 Tool。MVP 使用当前企业全部知识库；后续 Agent Revision 保存允许使用的知识库编号后，只调整范围加载参数，不修改 Tool 契约和检索实现。Tool 是本次 Run 的动态依赖，不加入进程级全局 Tool 列表。
+Run 开始时，服务端按 `organization_id` 和 Run 绑定 Revision 的 `knowledgeBaseIds` 加载本次可用知识库，并通过闭包注入统一 Tool。空列表不注册 Tool；非空范围中有知识库不可用时整个 Run 失败。Tool 是本次 Run 的动态依赖，不加入进程级全局 Tool 列表。
 
 Tool 名固定为：
 
@@ -114,7 +125,7 @@ Tool 返回融合后的分段和必要引用信息：
 
 ```text
 Agent Run
-  -> 按 organization_id 解析可用知识库
+  -> 按 organization_id 和 Run Revision 绑定解析可用知识库
   -> 通过闭包把知识库范围注入统一 Tool
   -> LLM 调用 Tool，传入 queries
   -> MultiQueryRetriever
@@ -143,31 +154,9 @@ Tool 使用 `AgentExecutionContext` 中的 `organization_id`、Agent、Revision 
 
 ## 5. Dify 检索语义
 
-Dify 是其知识库检索配置的唯一事实来源。Cervi 对每条查询发送：
+Dify 是其知识库检索配置的唯一事实来源。当前适配器在每次检索闭包首次查询时读取知识库详情，再把保存的检索配置交给 Dify 检索接口；Cervi 不提供检索方式、Top K、阈值或 Rerank 的独立配置。
 
-```json
-{
-  "query": "年假可以结转吗"
-}
-```
-
-Cervi 不读取后再回传 `retrieval_model_dict`，也不发送或覆盖以下参数：
-
-- `search_method`
-- `top_k`
-- `reranking_enable`
-- `reranking_model`
-- `weights`
-- `score_threshold_enabled`
-- `score_threshold`
-
-知识库在 Dify 中配置为关键词检索时，每个查询都由 Dify 执行关键词检索；配置的 Top K 为 3 时，每个查询各自最多召回 3 个候选。Dify 配置修改后，下一次检索直接使用新配置。
-
-Cervi 不在 Dify 返回后再次应用 Score Threshold 或结果重排。目标 Dify 不接受只传 `query` 的调用或无法执行已保存配置时，将其作为配置或协议错误返回。
-
-Embedding、Rerank、鉴权或知识库配置错误由 Dify 返回，Cervi 将其映射为结构化 Tool 错误，不静默切换检索方式。
-
-现有知识库“检索测试”也应收敛为只输入查询并使用知识库配置，避免人工测试和 Agent 实际执行采用两套检索语义。
+人工检索测试与 Agent 实际执行使用同一检索服务。游标读取通过文档和分段接口读取命中片段周边内容，知识库范围仍由闭包约束。
 
 ## 6. 多查询编排
 
@@ -242,20 +231,21 @@ LocalRetriever
 
 ## 9. 实现 PR 拆分
 
-### PR 1：支持 Agent 检索企业知识
+### PR 1：支持 Agent 检索企业知识（已完成）
 
 - 增加统一的单查询 `KnowledgeRetriever` 和多查询编排器。
-- Dify 检索请求改为只传 `query`，移除 Cervi 对 Dify 检索参数的覆盖。
-- Run 开始时加载当前企业全部知识库，通过闭包注入统一 `search_knowledge` Tool。
+- Dify 检索使用知识库保存的检索配置。
+- 通过闭包注入统一 `search_knowledge` Tool；知识库范围现已由 PR 2 的 Revision 绑定提供。
 - 并发执行知识库与查询的组合，按知识库和分段去重并使用 RRF 融合。
 - 保留 calculator 作为上线前的长期测试 Tool。
 - MVP 只实现贯通流程所需的参数校验和错误返回，不提前增加配额、复杂重试、降级和输出预算。
 - 覆盖多查询、多知识库、重复分段、稳定排序和组织隔离测试。
 
-### PR 2：配置 Agent 知识库范围
+### PR 2：配置 Agent 知识库范围（已完成）
 
 - Agent Revision 增加知识库绑定配置，管理界面支持选择同一 `organization_id` 下的知识库。
-- Run 开始时把默认企业范围替换为 Revision 绑定范围。
+- 单聊和网站客服 Run 使用自身 Revision 的绑定，空列表关闭检索；已有 Run 不随当前版本切换范围。
+- 删除知识库后保留失效绑定供用户移除，新运行明确失败并推进消费水位。
 - Tool 闭包、输入契约、多查询执行和 RRF 融合保持不变。
 - 覆盖多知识库选择、`organization_id` 隔离和失效绑定测试。
 
@@ -266,11 +256,11 @@ LocalRetriever
 
 ## 10. 验收标准
 
-- LLM 只能看到知识库用途和 `queries`，查询数量与表达方式由模型自行决定。
+- LLM 使用 `queries` 查询或使用 `cursor` 与 `before`、`after` 读取上下文，查询数量与表达方式由模型自行决定。
 - Tool 描述不包含固定查询数量、查询改写模板或检索参数建议。
-- Dify 请求体只包含 `query`，实际检索方式和 Top K 与 Dify 知识库配置一致。
+- Dify 实际检索方式和 Top K 使用其知识库保存的配置。
 - 多条查询并发执行，重复分段只返回一次，输出顺序稳定。
 - 单条查询时结果顺序与后端一致，多条查询时按 RRF 融合。
 - 上线前专项补充检索并发与模型上下文输出预算。
 - Dify 与本地知识库可以替换实现而不改变 Agent Tool Schema。
-- MVP Agent 只能检索当前 `organization_id` 的知识库；范围配置完成后只能检索 Revision 已绑定的知识库。
+- Agent 只能检索当前 `organization_id` 且 Run Revision 已绑定的知识库；游标读取不能扩大范围。

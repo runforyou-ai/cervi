@@ -275,6 +275,7 @@
   "field.display_name_required": "Enter your name.",
   "field.agent_name_required": "Enter an AI employee name.",
   "field.agent_execution_invalid": "Select a valid AI employee execution setting.",
+  "field.agent_knowledge_base_invalid": "Select knowledge bases that still exist in this organization.",
   "field.agent_model_invalid": "Select an available chat model.",
   "field.agent_system_instruction_required": "Enter work instructions.",
   "field.agent_system_instruction_too_long": "Work instructions cannot exceed 20,000 characters.",

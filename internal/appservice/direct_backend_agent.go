@@ -29,6 +29,7 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 			agentaction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:               cervii18n.FieldMemberTeamInvalid,
 			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
+			agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
 			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
 			agentaction.ValidationSystemInstructionRequired: cervii18n.FieldAgentSystemInstructionRequired,
 			agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
@@ -42,6 +43,7 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 		"execution_mode", created.Execution.Mode,
 		"provider_id", created.Execution.Managed.ProviderID,
 		"model_identifier", created.Execution.Managed.ModelIdentifier,
+		"knowledge_base_count", len(created.Execution.Managed.KnowledgeBaseIDs),
 	)
 	return agentFromAction(*created), nil
 }
@@ -143,6 +145,7 @@ func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMe
 	if err != nil {
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentExecutionUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
+			agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
 			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
 			agentaction.ValidationSystemInstructionRequired: cervii18n.FieldAgentSystemInstructionRequired,
 			agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
@@ -156,6 +159,7 @@ func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMe
 		"execution_mode", agent.Execution.Mode,
 		"provider_id", agent.Execution.Managed.ProviderID,
 		"model_identifier", agent.Execution.Managed.ModelIdentifier,
+		"knowledge_base_count", len(agent.Execution.Managed.KnowledgeBaseIDs),
 	)
 	return agentFromAction(*agent), nil
 }
@@ -216,6 +220,7 @@ func agentFromAction(agent agentaction.Agent) Agent {
 			ProviderID: agent.Execution.Managed.ProviderID, ProviderName: agent.Execution.Managed.ProviderName,
 			ModelIdentifier: agent.Execution.Managed.ModelIdentifier, ModelName: agent.Execution.Managed.ModelName,
 			SystemInstruction: agent.Execution.Managed.SystemInstruction,
+			KnowledgeBaseIDs:  agent.Execution.Managed.KnowledgeBaseIDs,
 		}
 	}
 	execution := AgentExecution{RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
@@ -229,6 +234,7 @@ func agentExecutionInput(input AgentExecutionInput) agentaction.ExecutionInput {
 		managed = &agentaction.ManagedExecutionInput{
 			ProviderID: input.Managed.ProviderID, ModelIdentifier: input.Managed.ModelIdentifier,
 			SystemInstruction: input.Managed.SystemInstruction,
+			KnowledgeBaseIDs:  input.Managed.KnowledgeBaseIDs,
 		}
 	}
 	return agentaction.ExecutionInput{Mode: domain.AgentExecutionMode(input.Mode), Managed: managed}

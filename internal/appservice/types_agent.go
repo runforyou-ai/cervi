@@ -41,9 +41,10 @@ type AgentExecutionInput struct {
 
 // AgentManagedExecutionInput 定义平台托管执行配置输入。
 type AgentManagedExecutionInput struct {
-	ProviderID        string `json:"providerId"`
-	ModelIdentifier   string `json:"modelIdentifier"`
-	SystemInstruction string `json:"systemInstruction"`
+	ProviderID        string   `json:"providerId"`
+	ModelIdentifier   string   `json:"modelIdentifier"`
+	SystemInstruction string   `json:"systemInstruction"`
+	KnowledgeBaseIDs  []string `json:"knowledgeBaseIds"`
 }
 
 // AgentListInput 定义 AI 员工目录查询条件。
@@ -89,11 +90,12 @@ type AgentExecution struct {
 
 // AgentManagedExecution 定义平台托管执行配置。
 type AgentManagedExecution struct {
-	ProviderID        string `json:"providerId"`
-	ProviderName      string `json:"providerName"`
-	ModelIdentifier   string `json:"modelIdentifier"`
-	ModelName         string `json:"modelName"`
-	SystemInstruction string `json:"systemInstruction"`
+	ProviderID        string   `json:"providerId"`
+	ProviderName      string   `json:"providerName"`
+	ModelIdentifier   string   `json:"modelIdentifier"`
+	ModelName         string   `json:"modelName"`
+	SystemInstruction string   `json:"systemInstruction"`
+	KnowledgeBaseIDs  []string `json:"knowledgeBaseIds"`
 }
 
 // AgentExecutionSummary 定义 AI 员工当前执行配置摘要。

@@ -2206,6 +2206,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("agent run after exhausted task = %#v, error = %v", nextRun, err)
 		}
 
+		t.Run("Agent 知识库范围", func(t *testing.T) {
+			testAgentKnowledgeScopes(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
 		closedWebsite, err := closeServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
 		if err != nil || closedWebsite.Status != domain.ServiceSessionStatusClosed {
 			t.Fatalf("closed participated website session = %#v, error = %v", closedWebsite, err)
