@@ -745,12 +745,6 @@ function InboxConversationList({
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {name}
                     </span>
-                    {isInternal && conversation.muted ? (
-                      <BellOffIcon
-                        className="size-3.5 shrink-0 text-muted-foreground"
-                        aria-label={t("conversationMuted")}
-                      />
-                    ) : null}
                     {agentRunLabel ? (
                       <span className="shrink-0 text-[10px] text-muted-foreground">
                         {agentRunLabel}
@@ -772,15 +766,23 @@ function InboxConversationList({
                     ) : null}
                   </span>
                 </span>
-                <span
-                  title={preview}
-                  className={cn(
-                    "mt-0.5 block w-full min-w-0 truncate text-xs text-muted-foreground",
-                    selectedId === conversation.id &&
-                      "text-accent-foreground/75",
-                  )}
-                >
-                  {preview}
+                <span className="mt-0.5 flex min-w-0 items-center gap-2">
+                  <span
+                    title={preview}
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-xs text-muted-foreground",
+                      selectedId === conversation.id &&
+                        "text-accent-foreground/75",
+                    )}
+                  >
+                    {preview}
+                  </span>
+                  {isInternal && conversation.muted ? (
+                    <BellOffIcon
+                      className="size-3.5 shrink-0 text-muted-foreground"
+                      aria-label={t("conversationMuted")}
+                    />
+                  ) : null}
                 </span>
               </span>
                 </button>
