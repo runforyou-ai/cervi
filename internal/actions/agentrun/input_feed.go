@@ -14,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -205,6 +206,11 @@ func lockAgentRun(ctx context.Context, db bun.IDB, policy agentRunPolicy, initia
 	run := &servermodels.AgentRun{}
 	if err := db.NewSelect().Model(run).Where("agr.id = ?", initial.ID).For("UPDATE").Scan(ctx); err != nil {
 		return lockedAgentRun{}, err
+	}
+	if !agentRunStatusTerminal(run.Status) {
+		if err := servertask.LockExecution(ctx, db); err != nil {
+			return lockedAgentRun{}, err
+		}
 	}
 	return lockedAgentRun{PolicyContext: policyContext, State: state, Run: run}, nil
 }

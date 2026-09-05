@@ -258,6 +258,31 @@ export interface AgentModelOptionList {
 }
 
 /**
+ * AgentRunBlockKind 定义思考区域中的内容类型。
+ */
+export enum AgentRunBlockKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentRunBlockThinking = "thinking",
+    AgentRunBlockContent = "content",
+    AgentRunBlockToolCall = "tool_call",
+};
+
+/**
+ * AgentRunContentBlock 定义一个独立的文本或工具内容块。
+ */
+export interface AgentRunContentBlock {
+    "id": string;
+    "position": number;
+    "kind": AgentRunBlockKind;
+    "text": string;
+    "toolCall": AgentToolCall | null;
+}
+
+/**
  * AgentRunStatus 表示 Agent 单聊当前最近一次运行状态。
  */
 export enum AgentRunStatus {
@@ -270,6 +295,33 @@ export enum AgentRunStatus {
     AgentRunStatusRunning = "running",
     AgentRunStatusSucceeded = "succeeded",
     AgentRunStatusFailed = "failed",
+    AgentRunStatusCancelled = "cancelled",
+};
+
+/**
+ * AgentToolCall 定义完整工具参数、结果和错误。
+ */
+export interface AgentToolCall {
+    "name": string;
+    "arguments": string;
+    "result": string | null;
+    "error": string | null;
+    "status": AgentToolCallStatus;
+}
+
+/**
+ * AgentToolCallStatus 定义工具执行状态。
+ */
+export enum AgentToolCallStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentToolCallQueued = "queued",
+    AgentToolCallRunning = "running",
+    AgentToolCallSucceeded = "succeeded",
+    AgentToolCallFailed = "failed",
 };
 
 /**
@@ -543,6 +595,28 @@ export interface ContactSummary {
 }
 
 /**
+ * ConversationAgentProcess 定义成功消息的有序过程和模型用量。
+ */
+export interface ConversationAgentProcess {
+    "id": string;
+    "durationMilliseconds": number;
+    "inputTokens": number;
+    "outputTokens": number;
+    "blocks": AgentRunContentBlock[] | null;
+}
+
+/**
+ * ConversationAgentRun 定义消息窗口中的最近一次运行状态。
+ */
+export interface ConversationAgentRun {
+    "agentName": string;
+    "id": string;
+    "status": AgentRunStatus;
+    "errorCode": string | null;
+    "lastError": string | null;
+}
+
+/**
  * ConversationMentionReview 定义连续确认后的服务端水位。
  */
 export interface ConversationMentionReview {
@@ -569,6 +643,7 @@ export enum ConversationMentionReviewOutcome {
  * ConversationMessage 定义成员可见的会话消息。
  */
 export interface ConversationMessage {
+    "agentProcess": ConversationAgentProcess | null;
     "groupMessageSequence": string | null;
     "id": string;
     "type": MessageType;
@@ -588,6 +663,7 @@ export interface ConversationMessage {
  * ConversationMessageList 定义成员消息页。
  */
 export interface ConversationMessageList {
+    "latestAgentRun": ConversationAgentRun | null;
     "hasEarlier": boolean;
     "hasLater": boolean;
     "messages": ConversationMessage[] | null;

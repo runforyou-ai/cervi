@@ -123,6 +123,7 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
+	AgentProcess         *ConversationAgentProcess        `json:"agentProcess"`
 	GroupMessageSequence *string                          `json:"groupMessageSequence"`
 	ID                   string                           `json:"id"`
 	Type                 MessageType                      `json:"type"`
@@ -140,11 +141,12 @@ type ConversationMessage struct {
 
 // ConversationMessageList 定义成员消息页。
 type ConversationMessageList struct {
-	HasEarlier bool                  `json:"hasEarlier"`
-	HasLater   bool                  `json:"hasLater"`
-	Messages   []ConversationMessage `json:"messages"`
-	Before     *string               `json:"before"`
-	After      *string               `json:"after"`
+	LatestAgentRun *ConversationAgentRun `json:"latestAgentRun"`
+	HasEarlier     bool                  `json:"hasEarlier"`
+	HasLater       bool                  `json:"hasLater"`
+	Messages       []ConversationMessage `json:"messages"`
+	Before         *string               `json:"before"`
+	After          *string               `json:"after"`
 }
 
 // MarkConversationReadInput 定义用户确认已读的消息水位。

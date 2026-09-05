@@ -74,7 +74,12 @@ export function useConversationTimeline(
       return
     setPage((current) => {
       if (!current || (current.after ?? "") !== after) return current
-      if (!incomingPage.messages.length && !current.hasLater) return current
+      // 失败和中断不产生消息，也需要同步最近运行的终态。
+      if (
+        !incomingPage.messages.length &&
+        !current.hasLater &&
+        JSON.stringify(current.latestAgentRun) === JSON.stringify(incomingPage.latestAgentRun)
+      ) return current
       return mergeConversationPage(current, incomingPage, "after")
     })
   }, [incoming.data, after, switching, loadingDirection])

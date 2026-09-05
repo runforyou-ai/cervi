@@ -7,13 +7,20 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
-type runningAgentRun struct{ cancel context.CancelFunc }
+type runningAgentRun struct {
+	cancel   context.CancelFunc
+	attempt  int
+	progress agentruntime.Progress
+}
 
 // CancelForServiceSession 在客服事务内取消原负责人尚未结束的运行。
 func (a *ExecuteAction) CancelForServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
@@ -73,16 +80,35 @@ func (a *ExecuteAction) CancelRunContexts(runIDs []string) {
 }
 
 // registerRunContext 注册一次可被客服负责人变化中断的模型调用。
-func (a *ExecuteAction) registerRunContext(runID string, cancel context.CancelFunc) func() {
-	running := &runningAgentRun{cancel: cancel}
+func (a *ExecuteAction) registerRunContext(ctx context.Context, runID string, cancel context.CancelFunc) (*runningAgentRun, func(), error) {
+	execution, _ := servertask.CurrentExecution(ctx)
+	running := &runningAgentRun{cancel: cancel, attempt: execution.Attempt, progress: agentruntime.Progress{RunID: runID, StreamID: uuid.NewV7().String(), Attempt: execution.Attempt}}
 	a.runningMu.Lock()
+	if previous := a.runningRuns[runID]; previous != nil {
+		if previous.attempt >= running.attempt {
+			a.runningMu.Unlock()
+			return nil, nil, servertask.ErrExecutionLost
+		}
+		previous.cancel()
+	}
 	a.runningRuns[runID] = running
 	a.runningMu.Unlock()
-	return func() {
+	return running, func() {
 		a.runningMu.Lock()
 		if a.runningRuns[runID] == running {
 			delete(a.runningRuns, runID)
 		}
 		a.runningMu.Unlock()
+	}, nil
+}
+
+// Progress 返回本进程中当前执行尝试的快照，调用方负责会话访问校验。
+func (a *ExecuteAction) Progress(runID string) (agentruntime.Progress, bool) {
+	a.runningMu.Lock()
+	defer a.runningMu.Unlock()
+	running := a.runningRuns[runID]
+	if running == nil {
+		return agentruntime.Progress{}, false
 	}
+	return running.progress.Clone(), true
 }
