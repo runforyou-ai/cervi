@@ -8,6 +8,7 @@ import {
   MessagesSquareIcon,
   PanelLeftIcon,
   PlusIcon,
+  SearchIcon,
   UsersRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -322,7 +323,7 @@ function useMinuteTick() {
   }, [])
 }
 
-/** 顶部操作行：收纳范围栏和发起会话菜单。 */
+/** 顶部操作行：收纳范围栏、搜索占位和发起会话菜单。 */
 function InboxPaneTop({
   railCollapsed,
   onRailToggle,
@@ -352,7 +353,15 @@ function InboxPaneTop({
       >
         <PanelLeftIcon className="size-5" />
       </Button>
-      <div className="flex-1" />
+      <div className="relative min-w-0 flex-1">
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="text"
+          disabled
+          aria-label={t("searchLabel")}
+          className="h-9 w-full rounded-md border border-transparent bg-muted px-8 text-sm text-foreground opacity-50"
+        />
+      </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

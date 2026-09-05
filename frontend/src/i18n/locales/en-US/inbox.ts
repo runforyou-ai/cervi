@@ -1,5 +1,6 @@
 /** 美式英语·收件箱文案。 */
 const inbox = {
+  searchLabel: "Search conversations",
   scopeRailLabel: "Message scopes",
   scopeRailCollapse: "Collapse the scope rail",
   scopeRailExpand: "Expand the scope rail",

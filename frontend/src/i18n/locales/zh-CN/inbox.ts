@@ -1,5 +1,6 @@
 /** 简体中文·收件箱文案。 */
 const inbox = {
+  searchLabel: "搜索会话",
   scopeRailLabel: "消息范围",
   scopeRailCollapse: "收起范围栏",
   scopeRailExpand: "展开范围栏",
