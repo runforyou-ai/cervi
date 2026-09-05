@@ -120,7 +120,6 @@ export function ConversationComposer({
   const schema = useMemo(
     () =>
       createConversationComposerSchema({
-        bodyRequired: t("messageBodyRequired"),
         bodyTooLong: t("messageBodyTooLong"),
       }),
     [t],
@@ -151,6 +150,7 @@ export function ConversationComposer({
   } | null>(null)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
   const { isSubmitting } = form.formState
+  const isBodyEmpty = !form.watch("body").trim()
   const bodyField = form.register("body")
 
   useEffect(() => {
@@ -298,9 +298,10 @@ export function ConversationComposer({
 
   /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
+    const body = values.body.trim()
+    if (!body) return
     if (onBeforeSend && !(await onBeforeSend())) return
     if (!aliveRef.current) return
-    const body = values.body.trim()
     // 草稿正文去掉首部空白后，同步调整结构化标记的位置。
     const rawBody = form.getValues("body")
     const leadingWhitespace = rawBody.length - rawBody.trimStart().length
@@ -435,7 +436,7 @@ export function ConversationComposer({
       return
     }
     event.preventDefault()
-    if (!form.formState.isSubmitting) {
+    if (!form.formState.isSubmitting && !isBodyEmpty) {
       void form.handleSubmit(send)()
     }
   }
@@ -584,7 +585,6 @@ export function ConversationComposer({
             id={inputID}
             disabled={isSubmitting}
             rows={3}
-            required
             aria-label={t("replyLabel")}
             aria-invalid={form.formState.errors.body ? true : undefined}
             className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none focus-visible:ring-0"
@@ -632,7 +632,7 @@ export function ConversationComposer({
             >
               <PaperclipIcon />
             </Button>
-            <Button type="submit" size="sm" disabled={isSubmitting}>
+            <Button type="submit" size="sm" disabled={isSubmitting || isBodyEmpty}>
               {isSubmitting && showSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : null}

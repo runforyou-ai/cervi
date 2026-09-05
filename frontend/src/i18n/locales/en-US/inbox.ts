@@ -186,7 +186,6 @@ const inbox = {
   replyLabel: "Reply",
   composerResize: "Resize message input",
   attachmentAdd: "Add attachment",
-  messageBodyRequired: "Enter a message",
   messageBodyTooLong: "Messages can contain up to 4,000 characters",
   messageSend: "Send",
   messageSenderYou: "You",
