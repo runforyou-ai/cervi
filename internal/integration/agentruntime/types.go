@@ -60,6 +60,9 @@ type RunRequest struct {
 	Model           ModelConfig
 	KnowledgeSearch KnowledgeSearch
 	MaxTurns        int
+	StreamID        string
+	Attempt         int
+	OnProgress      func(Progress)
 }
 
 // Usage 定义一次业务运行累计的模型用量。
@@ -74,6 +77,7 @@ type RunResult struct {
 	Content string
 	EndSeq  int64
 	Usage   Usage
+	Blocks  []Block
 }
 
 // Runtime 执行一次可吸收后续输入的 Agent Run。

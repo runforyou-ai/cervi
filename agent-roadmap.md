@@ -25,6 +25,7 @@
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；Agent 可以复用同一 ChatSubject、Participant 和 Message 路径。
 - Agent 任务使用独立 Worker 队列。本阶段已精确锁定 Eino v0.10 Alpha，通过 eino-ext 接入 OpenAI 兼容模型，并以纯函数计算器验证 Tool 与 TurnLoop 安全点补入。
 - `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊与网站客服自动触发、单在途 Run、成功或失败水位及最终消息幂等。
+- `agent_run_blocks` 保存成功 Run 的有序中间内容；运行中使用按尝试隔离的内存快照，工具普通错误反馈给模型以便修正。
 - `search_knowledge` 已支持多知识库、多查询融合和游标读取；单聊和网站客服均使用 Run 绑定的 Revision 所配置的知识库范围，空范围不注册检索 Tool。
 - Web 端 Bearer Token 保存在 `localStorage`；桌面端和移动端由 Go `clientsession` 持久化当前凭据，API Proxy 调用时注入 Bearer Token。
 - 文件模块已有临时上传、激活、过期清理、本地存储和对象存储路径。
@@ -342,7 +343,19 @@ agent_runs
 - `token_and_cost_usage` 在 P1a 和 P1b 只记录模型返回的输入/输出 Token；耗时由 Run 时间字段或既有 usage 结构记录，不计算金额。完整 P1 在具备价格快照后记录费用。
 - P1 不提前增加 `runtime` 或 `device_id`。只有整段 Agent 循环真正迁移到设备时才给 Run 增加运行位置。
 
-### 7.2 语义步骤
+### 7.2 聊天过程内容与语义步骤
+
+当前聊天过程使用 `agent_run_blocks`，每条记录包含 `id`、`organization_id`、`agent_run_id`、`position`、`model_call_id`、`kind` 和 `payload`。`(agent_run_id, position)` 唯一约束保证 Run 内的展示顺序。内容类型固定为 `thinking`、`content`、`tool_call`：
+
+- 同一次模型响应先记录 thinking，再记录同时带工具的 content，最后按模型返回顺序记录每个工具；工具完成顺序不改变块位置。
+- 安全点补入新消息时，移除上一轮已提出但被跳过、尚未启动的工具；已返回的思考、说明文本和已完成的工具仍保留。
+- 工具块保存调用编号、工具名、原始参数字符串、完整结果或错误、状态和起止时间。参数使用字符串，使非法 JSON 也能保留。单次工具失败反馈给模型，后续修正调用产生独立块；取消、超时和框架中断继续向上结束执行。
+- 不带工具的正文作为候选最终回复，最终稳定内容写入 `messages.body`；输入、输出用量继续保存在 `agent_runs.usage`。
+- 内容块只在 Run 成功时与最终 Message、Run 终态和消费水位原子提交。整次运行失败、取消或当前尝试退出时丢弃内存过程，不持久化半成品。
+- 运行快照包含 `runId`、任务 `attempt`、`streamId`、流内递增 `sequence`、稳定块编号及候选正文。重算建立新流并清空旧过程；未来 WebSocket 切换流时替换整个思考区，并忽略旧尝试事件。当前仅提供进程内快照，尚未接入 token 流和传输订阅。
+- 后续实时交付统一接入产品 WebSocket，接入后移除现有前台和网站轮询；不新增过程轮询接口。连接恢复通过当前尝试快照或已落库终态同步，不逐 token 落库。
+
+聊天内容块用于回看成功回复的过程；未来涉及外部副作用、审批和费用的审计记录另按下面的语义步骤模型建设，不能用聊天过程的丢弃规则代替业务审计。
 
 P1a 和 P1b 不创建 Step。完整 P1 使用 `agent_run_steps` 记录模型、工具、审批或交接等有界语义步骤：
 
@@ -444,12 +457,14 @@ uncertain_at
 | --- | --- |
 | Message、Trigger、Run 和 Task 的事务提交前 | 本次触发相关事实全部回滚 |
 | 数据库事务提交后、NATS 发布前 | `task_outbox` 继续发布，触发事实和 Run 不丢失 |
-| 模型调用前或调用中 | Task 租约恢复后可以用同一 Run、Revision 和输入快照重新执行 |
+| 模型调用前或调用中 | Task 租约过期后用同一 Run、Revision 和持久化会话输入重新计算，建立新的临时过程流 |
 | Provider 已返回、最终事务提交前 | 可能再次调用 Provider，但只能持久化一条最终 Message |
 | 最终 Message、Run 终态和 `processed_*` 提交后、Task ACK 前 | 重试读取到 Run 终态并正常结束，不再次调用 Provider |
-| 两个执行尝试短暂重叠 | 最终事务锁定 Run 并复核终态；唯一 `agent:<agent_run_id>` 只允许一条输出 |
+| 两个执行尝试短暂重叠 | 业务写回事务锁定 Run 和 Task，校验 attempt、Worker 和租约；拒绝旧尝试，唯一 `agent:<agent_run_id>` 只允许一条输出 |
 
-仅在 Task 租约失效并超过模型超时安全窗口后恢复 `running` Run。迟到执行仍由最终事务和业务幂等键收敛。系统只保证每个 Run 最多持久化一条最终消息，不保证 Provider 只调用一次。
+当前 Agent Task 最多执行 3 次。进程重启不扫描并中断所有 Run，依靠已有 Task 租约过期和消息重投重新认领；不保存 Eino Checkpoint，也不从某个工具步骤续跑。新尝试重新读取持久化会话输入，仍可吸收运行期间的新消息，因此重新计算结果可能不同。模型及工具可能重复执行，当前计算器和知识检索可重复调用；未来引入有副作用的工具时须单独落实业务幂等。
+
+认领输入、成功提交和失败收尾均在事务中校验任务尝试。最后一次尝试进程退出后，由任务系统校验最终租约确已过期，再将业务 Run 收尾为失败。正常业务失败和人工接管保持既有终态逻辑，不触发重新计算。系统只保证每个 Run 最多持久化一条最终消息，不保证 Provider 只调用一次。
 
 日志要求：
 

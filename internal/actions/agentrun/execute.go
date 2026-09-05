@@ -76,8 +76,16 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	}
 	runCtx, cancel := context.WithTimeout(ctx, agentRunTimeout)
 	defer cancel()
-	unregister := a.registerRunContext(execution.Run.ID, cancel)
+	running, unregister, err := a.registerRunContext(ctx, execution.Run.ID, cancel)
+	if err != nil {
+		return err
+	}
 	defer unregister()
+	if running.attempt > 1 {
+		taskExecution, _ := servertask.CurrentExecution(ctx)
+		slog.Warn("Agent 任务重新计算", "agent_run_id", execution.Run.ID, "task_run_id", taskExecution.TaskRunID,
+			"attempt", running.attempt, "stream_id", running.progress.StreamID)
+	}
 	maxOutputTokens := agentMaxOutputTokens
 	if execution.MaxOutputTokens > 0 && execution.MaxOutputTokens < int64(maxOutputTokens) {
 		maxOutputTokens = int(execution.MaxOutputTokens)
@@ -106,6 +114,15 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 				Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
 			},
 			KnowledgeSearch: knowledgeSearch,
+			StreamID:        running.progress.StreamID,
+			Attempt:         running.attempt,
+			OnProgress: func(progress agentruntime.Progress) {
+				a.runningMu.Lock()
+				defer a.runningMu.Unlock()
+				if a.runningRuns[execution.Run.ID] == running && runCtx.Err() == nil {
+					running.progress = progress.Clone()
+				}
+			},
 		}, feed)
 	}
 	if errors.Is(err, errAgentRunSuppressed) {
@@ -148,13 +165,21 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 	if status != string(domain.AgentRunStatusQueued) && status != string(domain.AgentRunStatusRunning) {
 		return executionContext{}, false, task.Permanent(fmt.Errorf("unsupported agent run status %q", status))
 	}
-	result, err := a.db.NewUpdate().Model((*servermodels.AgentRun)(nil)).
-		Set("status = ?", domain.AgentRunStatusRunning).
-		Set("started_at = COALESCE(started_at, now())").
-		Set("updated_at = now()").
-		Where("id = ?", runID).
-		Where("status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
-		Exec(ctx)
+	var result sql.Result
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		var err error
+		result, err = tx.NewUpdate().Model((*servermodels.AgentRun)(nil)).
+			Set("status = ?", domain.AgentRunStatusRunning).
+			Set("started_at = COALESCE(started_at, now())").
+			Set("updated_at = now()").
+			Where("id = ?", runID).
+			Where("status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		return servertask.LockExecution(ctx, tx)
+	})
 	if err != nil {
 		return executionContext{}, false, fmt.Errorf("begin agent run: %w", err)
 	}
@@ -333,6 +358,18 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		return fmt.Errorf("encode agent run usage: %w", err)
 	}
 	messageID := uuid.NewV7().String()
+	// 成功内容与最终消息共享事务，失败或取消不写入内容块。
+	blocks := make([]servermodels.AgentRunBlock, 0, len(result.Blocks))
+	for _, block := range result.Blocks {
+		payload, err := json.Marshal(block.Payload)
+		if err != nil {
+			return fmt.Errorf("encode agent run block: %w", err)
+		}
+		blocks = append(blocks, servermodels.AgentRunBlock{
+			ID: block.ID, OrganizationID: execution.Run.OrganizationID, AgentRunID: execution.Run.ID,
+			Position: block.Position, ModelCallID: block.ModelCallID, Kind: string(block.Kind), Payload: payload,
+		})
+	}
 	suppressed := false
 	completed := false
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -358,6 +395,11 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		}
 		if err := policy.persistResponse(ctx, tx, policyContext, run, messageID, content); err != nil {
 			return err
+		}
+		if len(blocks) > 0 {
+			if _, err := tx.NewInsert().Model(&blocks).Exec(ctx); err != nil {
+				return fmt.Errorf("persist agent run blocks: %w", err)
+			}
 		}
 		if _, err := tx.NewUpdate().Model(run).
 			Set("status = ?", domain.AgentRunStatusSucceeded).

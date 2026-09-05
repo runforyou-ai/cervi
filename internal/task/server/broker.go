@@ -268,7 +268,7 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 		r.finishFailedMessage(ctx, run, workerID, message, task.Permanent(fmt.Errorf("task action %q is not registered", run.ActionName)))
 		return
 	}
-	handlerCtx, cancelHandler := context.WithCancel(ctx)
+	handlerCtx, cancelHandler := context.WithCancel(withExecution(ctx, run, false, false))
 	heartbeatCtx, cancelHeartbeat := context.WithCancel(ctx)
 	heartbeatResult := make(chan error, 1)
 	go func() {
@@ -394,7 +394,7 @@ func (r *Runtime) finalizeActionFailure(ctx context.Context, run *servermodels.T
 	if !exists {
 		return nil
 	}
-	return finalize(ctx, run.Payload, runErr)
+	return finalize(withExecution(ctx, run, true, false), run.Payload, runErr)
 }
 
 // taskFinalizationContext 为任务终态写入保留独立的短超时窗口。
@@ -427,7 +427,11 @@ func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, mess
 	if run.Status == statusRunning && run.Attempt >= run.MaxAttempts && run.LeaseExpiresAt != nil && !run.LeaseExpiresAt.After(time.Now()) {
 		exhaustedErr := errors.New("task worker lease expired after final attempt")
 		finalizeCtx, cancelFinalize := taskFinalizationContext(ctx)
-		finalizeErr := r.finalizeActionFailure(finalizeCtx, run, exhaustedErr)
+		finalize, exists := r.registry.lookupTerminalFailure(run.ActionName)
+		var finalizeErr error
+		if exists {
+			finalizeErr = finalize(withExecution(finalizeCtx, run, true, true), run.Payload, exhaustedErr)
+		}
 		cancelFinalize()
 		if finalizeErr != nil {
 			slog.Warn("提交耗尽任务业务失败终态失败", "run_id", run.ID, "action", run.ActionName, "error", finalizeErr)
