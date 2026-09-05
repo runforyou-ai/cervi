@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useParams } from "react-router"
 
 import {
-  ConversationType,
   CustomerInboxView,
   InboxScope,
   isDirectInboxConversation,
@@ -14,20 +13,17 @@ import {
   type DirectInboxConversationData,
   type InboxConversation,
 } from "@/api"
-import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
+import { MobileDirectThread } from "@/apps/mobile/mobile-direct-thread"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
-import { useOutgoingConversationMessages } from "@/features/inbox/use-outgoing-conversation-messages"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 
 const directInboxQuery = {
   scope: InboxScope.InboxScopeInternal,
@@ -37,6 +33,7 @@ const directInboxQuery = {
 
 type MobileDirectLocationState = {
   conversation?: InboxConversation
+  memberUserID?: string
 }
 
 /** 展示当前 Direct 的移动端头部。 */
@@ -49,6 +46,9 @@ function MobileDirectHeader({
 }) {
   const { t: tInbox } = useTranslation("inbox")
   const { inboxURL } = useMobileNavigation()
+  const location = useLocation()
+  const memberUserID = (location.state as MobileDirectLocationState | null)
+    ?.memberUserID
   const initial = Array.from(peerName)[0]?.toLocaleUpperCase()
   const directAgent =
     conversation?.direct.peerType ===
@@ -60,7 +60,7 @@ function MobileDirectHeader({
 
   return (
     <MobilePageHeader
-      backTo={inboxURL}
+      backTo={memberUserID ? `/contacts/employees/${memberUserID}` : inboxURL}
       title={
         <span className="flex items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
@@ -91,9 +91,7 @@ function MobileDirectHeader({
 /** 加载并显示移动端 Direct 历史和文本发送区。 */
 export function MobileDirectConversationPage() {
   const { t } = useTranslation("inbox")
-  const { identity } = useMobileWorkspace()
   const { inboxURL } = useMobileNavigation()
-  const invalidate = useResourceInvalidator()
   const location = useLocation()
   const { conversationID = "" } = useParams()
   const stateConversation = useMemo(() => {
@@ -117,7 +115,6 @@ export function MobileDirectConversationPage() {
       refetchOnWindowFocus: false,
     },
   )
-  const outgoing = useOutgoingConversationMessages()
 
   if (!conversationID) return <Navigate to={inboxURL} replace />
 
@@ -141,23 +138,7 @@ export function MobileDirectConversationPage() {
           {t("messagesLoading")}
         </LoadingIndicator>
       ) : (
-        <>
-          <ConversationTimeline
-            conversationID={conversationID}
-            conversationType={ConversationType.ConversationTypeDirect}
-            currentIdentityID={identity.user.identityId}
-            requireWindowFocus={false}
-            outgoingMessages={outgoing.messages}
-          />
-          <ConversationComposer
-            conversationID={conversationID}
-            conversationType={ConversationType.ConversationTypeDirect}
-            onSucceeded={() => void invalidate(resourceKeys.inbox())}
-            onSending={outgoing.start}
-            onSent={outgoing.succeed}
-            onFailed={outgoing.fail}
-          />
-        </>
+        <MobileDirectThread key={conversationID} conversationID={conversationID} />
       )}
     </section>
   )

@@ -1,4 +1,4 @@
-/** 移动端通讯录分类入口和后续功能占位。 */
+/** 移动端通讯录分类入口和未开放分类占位。 */
 import {
   BotIcon,
   ChevronRightIcon,
@@ -43,9 +43,11 @@ export function MobileContactsPage() {
                 <span className="min-w-0 flex-1 text-[15px] font-medium">
                   {t(`contacts.${label}`)}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {t("unavailable")}
-                </span>
+                {path !== "employees" ? (
+                  <span className="text-xs text-muted-foreground">
+                    {t("unavailable")}
+                  </span>
+                ) : null}
                 <ChevronRightIcon className="size-4 text-muted-foreground" />
               </Link>
             </li>
