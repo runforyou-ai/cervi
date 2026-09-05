@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from "react-router"
 import { MobileDirectConversationPage } from "@/apps/mobile/mobile-direct-conversation-page"
 import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
 import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
+import { MobileGroupConversationPage } from "@/apps/mobile/mobile-group-conversation-page"
 import { MobileEmployeesPage } from "@/apps/mobile/mobile-employees-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
 import { MobileMePage, MobileSettingsPage } from "@/apps/mobile/mobile-me-page"
@@ -60,6 +61,10 @@ export default function MobileApp() {
             <Route path="/me" element={<MobileMePage />} />
           </Route>
           <Route element={<MobileDetailLayout />}>
+            <Route
+              path="/inbox/group/:conversationID"
+              element={<MobileGroupConversationPage />}
+            />
             <Route
               path="/inbox/direct/:conversationID"
               element={<MobileDirectConversationPage />}
