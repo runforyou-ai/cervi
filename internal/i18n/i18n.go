@@ -202,6 +202,7 @@ const (
 	FieldDisplayNameRequired              Key = "field.display_name_required"
 	FieldAgentNameRequired                Key = "field.agent_name_required"
 	FieldAgentExecutionInvalid            Key = "field.agent_execution_invalid"
+	FieldAgentKnowledgeBaseInvalid        Key = "field.agent_knowledge_base_invalid"
 	FieldAgentModelInvalid                Key = "field.agent_model_invalid"
 	FieldAgentSystemInstructionRequired   Key = "field.agent_system_instruction_required"
 	FieldAgentSystemInstructionTooLong    Key = "field.agent_system_instruction_too_long"

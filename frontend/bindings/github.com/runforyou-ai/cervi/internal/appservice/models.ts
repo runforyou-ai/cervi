@@ -217,6 +217,7 @@ export interface AgentManagedExecution {
     "modelIdentifier": string;
     "modelName": string;
     "systemInstruction": string;
+    "knowledgeBaseIds": string[] | null;
 }
 
 /**
@@ -226,6 +227,7 @@ export interface AgentManagedExecutionInput {
     "providerId": string;
     "modelIdentifier": string;
     "systemInstruction": string;
+    "knowledgeBaseIds": string[] | null;
 }
 
 /**

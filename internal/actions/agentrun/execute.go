@@ -17,6 +17,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -30,6 +31,10 @@ const (
 	agentRunErrorMaxRunes = 4000
 )
 
+type knowledgeSearchFactory interface {
+	ForKnowledgeBases(context.Context, string, []string) (func(context.Context, knowledgeretrieval.Request) (knowledgeretrieval.Result, error), error)
+}
+
 // ExecuteAction 执行并收尾一次 Agent 业务运行。
 type ExecuteAction struct {
 	db                     *bun.DB
@@ -41,14 +46,15 @@ type ExecuteAction struct {
 }
 
 type executionContext struct {
-	Run             servermodels.AgentRun `bun:",embed"`
-	AgentName       string                `bun:"agent_name"`
-	Brand           string                `bun:"brand"`
-	APIKey          string                `bun:"api_key"`
-	APIURL          string                `bun:"api_url"`
-	ModelIdentifier string                `bun:"model_identifier"`
-	MaxOutputTokens int64                 `bun:"max_output_tokens"`
-	Instruction     string                `bun:"instruction"`
+	Run              servermodels.AgentRun `bun:",embed"`
+	AgentName        string                `bun:"agent_name"`
+	Brand            string                `bun:"brand"`
+	APIKey           string                `bun:"api_key"`
+	APIURL           string                `bun:"api_url"`
+	ModelIdentifier  string                `bun:"model_identifier"`
+	MaxOutputTokens  int64                 `bun:"max_output_tokens"`
+	Instruction      string                `bun:"instruction"`
+	KnowledgeBaseIDs []string              `bun:"knowledge_base_ids,type:jsonb"`
 }
 
 // NewExecuteAction 创建 Agent Worker Action。
@@ -81,18 +87,27 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		return task.Permanent(err)
 	}
 	feed := &databaseInputFeed{db: a.db, execution: execution, policy: policy}
-	knowledgeSearch, err := a.knowledgeSearchForRun(runCtx, execution.Run.OrganizationID)
-	if err != nil {
-		return task.Permanent(err)
+	// 空绑定不注册知识检索；非空绑定只从本次 Run 的版本加载。
+	var knowledgeSearch agentruntime.KnowledgeSearch
+	if len(execution.KnowledgeBaseIDs) > 0 {
+		knowledgeSearch, err = a.knowledgeSearchFactory.ForKnowledgeBases(runCtx, execution.Run.OrganizationID, execution.KnowledgeBaseIDs)
+		if err != nil {
+			slog.Warn("Agent 知识库范围加载失败", "agent_run_id", execution.Run.ID,
+				"organization_id", execution.Run.OrganizationID, "knowledge_base_count", len(execution.KnowledgeBaseIDs), "error", err)
+		}
 	}
-	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
-		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: execution.Instruction,
-		Model: agentruntime.ModelConfig{
-			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
-			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
-		},
-		KnowledgeSearch: knowledgeSearch,
-	}, feed)
+	// 范围加载失败也走运行失败收尾。
+	var result agentruntime.RunResult
+	if err == nil {
+		result, err = a.runtime.Run(runCtx, agentruntime.RunRequest{
+			RunID: execution.Run.ID, Name: execution.AgentName, Instruction: execution.Instruction,
+			Model: agentruntime.ModelConfig{
+				Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
+				Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
+			},
+			KnowledgeSearch: knowledgeSearch,
+		}, feed)
+	}
 	if errors.Is(err, errAgentRunSuppressed) {
 		return nil
 	}
@@ -166,6 +181,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		ColumnExpr("ar.configuration->'model'->>'identifier' AS model_identifier").
 		ColumnExpr("aipm.max_output_tokens AS max_output_tokens").
 		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction").
+		ColumnExpr("ar.configuration->'knowledgeBaseIds' AS knowledge_base_ids").
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
 		Join("JOIN agent_revisions AS ar ON ar.id = agr.agent_revision_id AND ar.agent_id = a.id AND ar.organization_id = agr.organization_id").

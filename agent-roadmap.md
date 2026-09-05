@@ -19,12 +19,13 @@
 以下内容已经存在：
 
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
-- Agent 已保存模型选择、系统指令和不可变配置版本，`agents.active_revision_id` 指向当前版本。
+- Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；Agent 可以复用同一 ChatSubject、Participant 和 Message 路径。
 - Agent 任务使用独立 Worker 队列。本阶段已精确锁定 Eino v0.10 Alpha，通过 eino-ext 接入 OpenAI 兼容模型，并以纯函数计算器验证 Tool 与 TurnLoop 安全点补入。
-- `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊自动触发、单在途 Run、成功或失败水位及最终消息幂等。
+- `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊与网站客服自动触发、单在途 Run、成功或失败水位及最终消息幂等。
+- `search_knowledge` 已支持多知识库、多查询融合和游标读取；单聊和网站客服均使用 Run 绑定的 Revision 所配置的知识库范围，空范围不注册检索 Tool。
 - Web 端 Bearer Token 保存在 `localStorage`；桌面端和移动端由 Go `clientsession` 持久化当前凭据，API Proxy 调用时注入 Bearer Token。
 - 文件模块已有临时上传、激活、过期清理、本地存储和对象存储路径。
 
@@ -34,7 +35,7 @@
 - `conversation_agent_policies`、完整 Run 快照、Step、Tool Invocation、审批和费用审计。
 - 产品级 WebSocket 尚未实现，但 `chat-roadmap.md` 已确定统一 Realtime Gateway、Protobuf 协议、连接认证、同步恢复和背压方案；设备注册和 Capability Executor 仍未设计落地。
 - 客户端可靠任务 Runtime；当前只有按真实场景落地的书面方案。
-- 网站 AI 客服、群聊 @Agent 和通用响应策略。
+- 群聊 @Agent 和通用响应策略。
 
 现有 Wails MCP 只用于开发期桌面页面检查，不属于 Cervi 产品中的设备能力协议。
 
@@ -169,7 +170,7 @@ agent_revisions
 
 `execution_mode` 表示 AI 员工的执行方式，当前只接受 `managed`。未来接入外部平台时增加 `connected`，Dify、n8n 等具体平台属于该模式下的适配器或调用目标，不成为 Agent 身份类型。代码只在真实模式可用时增加对应枚举值和强类型配置，不接受尚未实现的空配置。
 
-`configuration` 是按 `(execution_mode, schema_version)` 解释的完整、规范化、非敏感 JSON 快照。当前 `managed/v1` 保存模型服务编号与名称快照、模型标识与名称快照以及系统指令。Action 必须使用对应版本的强类型编解码器严格校验，未知模式、未知结构版本和未知字段都必须失败，不能静默降级。项目不创建数据库外键，因此 Action 仍须在事务中校验企业、Agent、Provider、模型和配置版本的关联；平台托管配置选择的模型必须对应现有模型目录中的同企业文本 Chat 模型。
+`configuration` 是按 `(execution_mode, schema_version)` 解释的完整、规范化、非敏感 JSON 快照。当前 `managed/v1` 保存模型服务编号与名称快照、模型标识与名称快照、系统指令以及 `knowledgeBaseIds`。Action 必须使用对应版本的强类型编解码器严格校验，未知模式、未知结构版本和未知字段都必须失败，不能静默降级。项目不创建数据库外键，因此 Action 仍须在事务中校验企业、Agent、Provider、模型和配置版本的关联；平台托管配置选择的模型必须对应现有模型目录中的同企业文本 Chat 模型。
 
 ```json
 {
@@ -179,7 +180,8 @@ agent_revisions
     "identifier": "gpt-5-mini",
     "name": "GPT-5 mini"
   },
-  "systemInstruction": "负责回答企业产品问题。"
+  "systemInstruction": "负责回答企业产品问题。",
+  "knowledgeBaseIds": []
 }
 ```
 
@@ -187,6 +189,9 @@ agent_revisions
 
 - Revision 创建后不可修改；编辑 Agent 配置时创建新 Revision 并切换当前版本。
 - 已被 Run 引用的 Revision 不物理删除。
+- 知识库范围按明确编号保存；空列表表示关闭知识检索，新增企业知识库不会自动进入已有配置。保存时在事务中校验并锁定同企业知识库。
+- Run 使用自身 Revision 的绑定；修改当前版本不改变在途 Run。绑定知识库被删除时，详情保留失效编号供移除，新运行以配置失效结束并推进消费水位。
+- 查询与游标读取共用相同知识库范围，不允许通过游标访问未绑定知识库。
 - Revision 保存管理员当时配置的完整业务快照和非敏感名称快照；当前详情可以继续解析模型目录中的最新显示名称。
 - Provider 密钥和 Endpoint 仍属于 Provider 配置，不复制到 Revision 或 Run；未来外部平台凭据同样通过独立调用目标与凭据配置解析。
 - Tool Policy 保存产品能力标识和策略，不保存 Eino Tool 实例或 Go 类型。

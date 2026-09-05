@@ -31,7 +31,11 @@ export type ManagedAgentExecutionData = Omit<
   "mode" | "managed"
 > & {
   mode: AgentExecutionMode.AgentExecutionModeManaged
-  managed: NonNullable<Agent["execution"]["managed"]>
+  managed: Omit<NonNullable<Agent["execution"]["managed"]>, "knowledgeBaseIds"> & {
+    knowledgeBaseIds: NonNullable<
+      NonNullable<Agent["execution"]["managed"]>["knowledgeBaseIds"]
+    >
+  }
 }
 
 export type ManagedAgentExecutionSummaryData = Omit<
@@ -165,7 +169,10 @@ function normalizeAgent(agent: Agent): AgentData {
     execution: {
       ...execution,
       mode: execution.mode,
-      managed: execution.managed,
+      managed: {
+        ...execution.managed,
+        knowledgeBaseIds: asList(execution.managed.knowledgeBaseIds),
+      },
     },
   }
 }

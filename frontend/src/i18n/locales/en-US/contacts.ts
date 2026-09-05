@@ -163,6 +163,15 @@ const contacts = {
       instructionTooLong: "Work instructions cannot exceed 20,000 characters.",
     },
     execution: {
+      knowledgeBases: "Knowledge bases",
+      knowledgeDisabled: "Knowledge search disabled",
+      knowledgeEmpty: "No knowledge bases",
+      knowledgeLoading: "Loading knowledge bases…",
+      knowledgeLoadError: "Failed to load knowledge bases",
+      knowledgeRetry: "Retry",
+      knowledgeUnavailable: "Unavailable knowledge base",
+      knowledgeUnavailableCount: "Unavailable knowledge bases ({{count}})",
+
       title: "Execution settings",
       model: "Chat model",
       instruction: "Work instructions",
