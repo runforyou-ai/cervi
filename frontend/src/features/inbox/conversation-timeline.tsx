@@ -44,6 +44,7 @@ import { useConversationReading } from "./use-conversation-reading"
 import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
 import { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
 import { ConversationMentionNavigator } from "./conversation-mention-navigator"
+import { AgentProcess, AgentProcessUsage, AgentRunState } from "./agent-process"
 
 type TimelineMessage = Pick<
   ConversationMessageData,
@@ -59,6 +60,7 @@ type TimelineMessage = Pick<
   | "replyTo"
   | "mentions"
   | "mentionAll"
+  | "agentProcess"
 > & {
   clientMessageID: string | null
   mentionSubjectIDs: string[]
@@ -118,6 +120,7 @@ function mergeTimelineMessages(
       sourceOrder: 0,
       groupMessageSequence: null,
       sender: null,
+      agentProcess: null,
       sessionStart: null,
       systemEvent: null,
       replyTo: message.replyTo,
@@ -710,7 +713,8 @@ function ConversationTimelineContent({
                       >
                         <div
                           className={cn(
-                            "flex max-w-[75%] flex-col gap-1",
+                            "flex min-w-0 max-w-[75%] flex-col gap-1",
+                            message.agentProcess && "w-[36rem] max-w-[85%] sm:max-w-[75%]",
                             incoming ? "ml-10 items-start" : "mr-10 items-end",
                           )}
                         >
@@ -734,7 +738,7 @@ function ConversationTimelineContent({
                               {senderName}
                             </span>
                           ) : null}
-                          <div className="relative max-w-full">
+                          <div className="relative min-w-0 max-w-full">
                             {endsGroup ? (
                               <span
                                 className={cn(
@@ -770,7 +774,9 @@ function ConversationTimelineContent({
                                 <div
                                   className={cn(
                                     "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
-                                    incoming
+                                    message.agentProcess
+                                      ? "border bg-background text-foreground shadow-xs"
+                                      : incoming
                                       ? cn(
                                           "border bg-muted text-foreground shadow-xs",
                                           endsGroup && "rounded-bl-sm",
@@ -817,6 +823,9 @@ function ConversationTimelineContent({
                                       )}
                                     </button>
                                   ) : null}
+                                  {message.agentProcess ? (
+                                    <AgentProcess process={message.agentProcess} />
+                                  ) : null}
                                   <div
                                     className={cn(
                                       "min-w-0",
@@ -832,7 +841,7 @@ function ConversationTimelineContent({
                                         title={dateFormatters.full.format(date)}
                                         className={cn(
                                           "shrink-0 translate-y-0.5 text-[10px]",
-                                          incoming
+                                          incoming || message.agentProcess
                                             ? "text-muted-foreground"
                                             : "text-primary-foreground/75",
                                         )}
@@ -841,6 +850,9 @@ function ConversationTimelineContent({
                                       </time>
                                     ) : null}
                                   </div>
+                                  {message.agentProcess ? (
+                                    <AgentProcessUsage process={message.agentProcess} />
+                                  ) : null}
                                 </div>
                               </div>
                             </ContextMenuTrigger>
@@ -910,6 +922,9 @@ function ConversationTimelineContent({
               )
             })}
           </div>
+          {timeline.mode === "latest" && !currentPage?.hasLater && currentPage?.latestAgentRun ? (
+            <AgentRunState key={currentPage.latestAgentRun.id} run={currentPage.latestAgentRun} />
+          ) : null}
           {currentPage?.hasLater && timeline.mode === "anchor" ? (
             <div className="flex justify-center py-2">
               <Button

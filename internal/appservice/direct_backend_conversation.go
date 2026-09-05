@@ -536,7 +536,8 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		})
 	}
 	return ConversationMessage{
-		ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
+		AgentProcess: conversationAgentProcessFromAction(message.AgentProcess),
+		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, GroupMessageSequence: groupMessageSequenceString(message.GroupMessageSequence),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
@@ -748,6 +749,9 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。
 func conversationMessageListFromAction(conversationID string, history conversationaction.ConversationMessageHistory) ConversationMessageList {
 	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
+	if run := history.LatestAgentRun; run != nil {
+		result.LatestAgentRun = &ConversationAgentRun{ID: run.ID, Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError}
+	}
 	for _, message := range history.Messages {
 		result.Messages = append(result.Messages, conversationMessageFromAction(message))
 	}

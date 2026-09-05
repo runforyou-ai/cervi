@@ -7,6 +7,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 )
 
 // ValidationCode 标识会话业务输入的校验结果。
@@ -192,6 +193,7 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
+	AgentProcess         *ConversationAgentProcess
 	GroupMessageSequence *int64
 	ID                   string
 	Type                 domain.MessageType
@@ -217,11 +219,28 @@ type ConversationMessageHistoryInput struct {
 
 // ConversationMessageHistory 定义成员消息历史和下一页边界。
 type ConversationMessageHistory struct {
-	HasEarlier bool
-	HasLater   bool
-	Messages   []ConversationMessage
-	Before     *MessageCursorPoint
-	After      *MessageCursorPoint
+	LatestAgentRun *ConversationAgentRun
+	HasEarlier     bool
+	HasLater       bool
+	Messages       []ConversationMessage
+	Before         *MessageCursorPoint
+	After          *MessageCursorPoint
+}
+
+// ConversationAgentProcess 定义成功回复的完整过程和模型用量。
+type ConversationAgentProcess struct {
+	ID                   string
+	DurationMilliseconds int64
+	Usage                agentruntime.Usage
+	Blocks               []agentruntime.Block
+}
+
+// ConversationAgentRun 定义会话最近一次运行的状态。
+type ConversationAgentRun struct {
+	ID        string
+	Status    domain.AgentRunStatus
+	ErrorCode *string
+	LastError *string
 }
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。

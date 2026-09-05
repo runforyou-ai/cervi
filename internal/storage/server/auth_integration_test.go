@@ -2154,6 +2154,30 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertDirectAgentRunStatus(t, inboxAfterRun, agentConversation.ID, domain.AgentRunStatusSucceeded, "结果是 42")
+		// 最新窗口和锚点窗口均返回消息所属的完整过程，不将过程附到用户消息。
+		for _, anchor := range []string{"", *run.ResponseMessageID} {
+			history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID, AroundMessageID: anchor})
+			if err != nil || history.LatestAgentRun == nil || history.LatestAgentRun.ID != run.ID {
+				t.Fatalf("agent message history = %#v, error = %v", history, err)
+			}
+			foundProcess := false
+			for _, message := range history.Messages {
+				if message.ID != *run.ResponseMessageID {
+					if message.AgentProcess != nil {
+						t.Fatal("user message contains agent process")
+					}
+					continue
+				}
+				process := message.AgentProcess
+				if process == nil || process.ID != run.ID || len(process.Blocks) != 1 || process.Blocks[0].Payload.Text != "计算过程" || process.Usage.TotalTokens != 12 || process.DurationMilliseconds < 0 {
+					t.Fatalf("message agent process = %#v", process)
+				}
+				foundProcess = true
+			}
+			if !foundProcess {
+				t.Fatal("reply process missing from message window")
+			}
+		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f72", Body: "这次模拟模型失败",
@@ -2191,6 +2215,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if state.ProcessedSeq != 3 || failedRun.Status != string(domain.AgentRunStatusFailed) || failedRun.TriggerEndSeq == nil || *failedRun.TriggerEndSeq != 3 {
 			t.Fatalf("failed claimed agent run = %#v, state = %#v", failedRun, state)
+		}
+		failedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID})
+		if err != nil || failedHistory.LatestAgentRun == nil || failedHistory.LatestAgentRun.ID != failedRun.ID || failedHistory.LatestAgentRun.Status != domain.AgentRunStatusFailed || failedHistory.LatestAgentRun.LastError == nil {
+			t.Fatalf("failed run message state = %#v, error = %v", failedHistory, err)
 		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
