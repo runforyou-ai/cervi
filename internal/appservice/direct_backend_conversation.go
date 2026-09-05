@@ -35,7 +35,7 @@ func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta Reques
 		"message_id", message.ID,
 		"sender_identity_id", identity.OrganizationIdentity.ID,
 	)
-	return conversationMessageFromAction(message), nil
+	return b.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
 // ClaimServiceSession 领取或接管客户会话最新处理周期。
@@ -145,9 +145,13 @@ func (b *DirectBackend) SendFirstDirectTextMessage(ctx context.Context, meta Req
 		"target_identity_id", result.Conversation.PeerIdentityID,
 		"message_id", result.Message.ID,
 	)
+	avatarURLs, err := b.conversationAvatarURLs(ctx, identity, []conversationaction.ConversationMessage{result.Message}, result.Conversation.PeerAvatarFileID)
+	if err != nil {
+		slog.Warn("读取已保存单聊首条消息头像失败", "organization_id", identity.Organization.ID, "conversation_id", result.Conversation.ID, "message_id", result.Message.ID, "error", err)
+	}
 	return FirstDirectTextMessageResult{
-		Conversation: directInboxConversationFromSummary(result.Conversation),
-		Message:      conversationMessageFromAction(result.Message),
+		Conversation: directInboxConversationFromSummary(result.Conversation, avatarURLs),
+		Message:      conversationMessageFromAction(result.Message, avatarURLs),
 	}, nil
 }
 
@@ -164,16 +168,20 @@ func (b *DirectBackend) FindDirectConversation(ctx context.Context, meta Request
 	if summary == nil {
 		return DirectConversationLookup{}, nil
 	}
-	conversation := directInboxConversationFromSummary(*summary)
+	avatarURLs, err := b.conversationAvatarURLs(ctx, identity, nil, summary.PeerAvatarFileID)
+	if err != nil {
+		return DirectConversationLookup{}, directConversationError(ctx, meta, err, identity.Organization.ID, targetIdentityID, "find")
+	}
+	conversation := directInboxConversationFromSummary(*summary, avatarURLs)
 	return DirectConversationLookup{Conversation: &conversation}, nil
 }
 
 // directInboxConversationFromSummary 把单聊摘要转换为统一收件箱会话。
-func directInboxConversationFromSummary(summary conversationaction.DirectConversationSummary) InboxConversation {
+func directInboxConversationFromSummary(summary conversationaction.DirectConversationSummary, avatarURLs map[string]string) InboxConversation {
 	return InboxConversation{
 		ID: summary.ID, Type: ConversationTypeDirect,
 		Direct: &DirectInboxConversation{
-			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName,
+			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.PeerAvatarFileID),
 			Preview: summary.Preview, LastMessageAt: summary.LastMessageAt,
 		},
 	}
@@ -197,7 +205,7 @@ func (b *DirectBackend) SendDirectTextMessage(ctx context.Context, meta RequestM
 		"message_id", message.ID,
 		"sender_identity_id", identity.OrganizationIdentity.ID,
 	)
-	return conversationMessageFromAction(message), nil
+	return b.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
 // CreateGroupConversation 创建只包含有效真人成员的企业内部群聊。
@@ -383,7 +391,7 @@ func (b *DirectBackend) SendGroupTextMessage(ctx context.Context, meta RequestMe
 		"message_id", message.ID,
 		"sender_identity_id", identity.OrganizationIdentity.ID,
 	)
-	return conversationMessageFromAction(message), nil
+	return b.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
 // ListConversationMessages 返回成员可见的会话消息。
@@ -415,7 +423,7 @@ func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta Reque
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	return conversationMessageListFromAction(conversationID, history), nil
+	return b.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
 }
 
 // MarkConversationRead 单调推进当前用户的原生会话已读水位。
@@ -497,8 +505,8 @@ func conversationReadError(ctx context.Context, meta RequestMeta, err error, org
 }
 
 // conversationMessageFromAction 转换成员会话消息契约。
-func conversationMessageFromAction(message conversationaction.ConversationMessage) ConversationMessage {
-	sender := conversationMessageSenderFromAction(message.Sender)
+func conversationMessageFromAction(message conversationaction.ConversationMessage, avatarURLs map[string]string) ConversationMessage {
+	sender := conversationMessageSenderFromAction(message.Sender, avatarURLs)
 	var sessionStart *ConversationMessageSessionStart
 	if message.SessionStart != nil {
 		sessionStart = &ConversationMessageSessionStart{
@@ -525,7 +533,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	if message.ReplyTo != nil {
 		replyTo = &ConversationMessageReference{
 			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
-			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender),
+			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender, avatarURLs),
 		}
 	}
 	mentions := make([]ConversationMessageMention, 0, len(message.Mentions))
@@ -544,13 +552,14 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 }
 
 // conversationMessageSenderFromAction 转换消息发送主体。
-func conversationMessageSenderFromAction(sender *conversationaction.ConversationMessageSender) *ConversationMessageSender {
+func conversationMessageSenderFromAction(sender *conversationaction.ConversationMessageSender, avatarURLs map[string]string) *ConversationMessageSender {
 	if sender == nil {
 		return nil
 	}
 	return &ConversationMessageSender{
 		ChatSubjectID: sender.ChatSubjectID, Kind: ChatSubjectKind(sender.Kind),
 		SourceID: sender.SourceID, DisplayName: sender.DisplayName,
+		AvatarURL: optionalFileURL(avatarURLs, sender.AvatarFileID), IdentityType: (*OrganizationIdentityType)(sender.IdentityType),
 	}
 }
 
@@ -749,10 +758,14 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 }
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。
-func conversationMessageListFromAction(conversationID string, history conversationaction.ConversationMessageHistory) ConversationMessageList {
+func (b *DirectBackend) conversationMessageListFromAction(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, history conversationaction.ConversationMessageHistory) (ConversationMessageList, error) {
+	avatarURLs, err := b.conversationAvatarURLs(ctx, identity, history.Messages)
+	if err != nil {
+		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
 	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
 	for _, message := range history.Messages {
-		result.Messages = append(result.Messages, conversationMessageFromAction(message))
+		result.Messages = append(result.Messages, conversationMessageFromAction(message, avatarURLs))
 	}
 	if history.Before != nil {
 		value := encodeConversationMessageCursor(conversationID, *history.Before)
@@ -762,5 +775,33 @@ func conversationMessageListFromAction(conversationID string, history conversati
 		value := encodeConversationMessageCursor(conversationID, *history.After)
 		result.After = &value
 	}
-	return result
+	return result, nil
+}
+
+// conversationAvatarURLs 批量解析消息发送者、引用发送者和单聊目标的头像。
+func (b *DirectBackend) conversationAvatarURLs(ctx context.Context, identity *servermodels.Identity, messages []conversationaction.ConversationMessage, extraFileIDs ...*string) (map[string]string, error) {
+	fileIDs := make([]string, 0, len(messages)+len(extraFileIDs))
+	for _, fileID := range extraFileIDs {
+		if fileID != nil {
+			fileIDs = append(fileIDs, *fileID)
+		}
+	}
+	for _, message := range messages {
+		if message.Sender != nil && message.Sender.AvatarFileID != nil {
+			fileIDs = append(fileIDs, *message.Sender.AvatarFileID)
+		}
+		if message.ReplyTo != nil && message.ReplyTo.Sender != nil && message.ReplyTo.Sender.AvatarFileID != nil {
+			fileIDs = append(fileIDs, *message.ReplyTo.Sender.AvatarFileID)
+		}
+	}
+	return b.activeFileURLs(ctx, identity, fileIDs)
+}
+
+// conversationMessageWithAvatar 转换发送结果并补充头像地址。
+func (b *DirectBackend) conversationMessageWithAvatar(ctx context.Context, identity *servermodels.Identity, message conversationaction.ConversationMessage) ConversationMessage {
+	urls, err := b.conversationAvatarURLs(ctx, identity, []conversationaction.ConversationMessage{message})
+	if err != nil {
+		slog.Warn("读取已保存消息头像失败", "organization_id", identity.Organization.ID, "message_id", message.ID, "error", err)
+	}
+	return conversationMessageFromAction(message, urls)
 }

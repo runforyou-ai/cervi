@@ -9,14 +9,17 @@ import {
   ConversationSystemEventType,
   ConversationType,
   MessageType,
+  OrganizationIdentityType,
   ServiceSessionStatus,
   isApiError,
+  type CurrentUser,
   type ConversationMessageData,
   type ConversationMessageReference,
   type ConversationSystemEvent,
   type ConversationSystemEventParticipant,
   type GroupParticipant,
 } from "@/api"
+import { ProfileAvatar } from "@/components/profile-avatar"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
@@ -194,7 +197,7 @@ function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
 function ConversationTimelineContent({
   conversationID,
   conversationType,
-  currentIdentityID,
+  currentUser,
   requireWindowFocus = true,
   workspaceLayout = false,
   outgoingMessages,
@@ -209,7 +212,7 @@ function ConversationTimelineContent({
 }: {
   conversationID: string
   conversationType: ConversationType
-  currentIdentityID: string
+  currentUser: CurrentUser
   requireWindowFocus?: boolean
   workspaceLayout?: boolean
   outgoingMessages: OutgoingConversationMessage[]
@@ -222,6 +225,7 @@ function ConversationTimelineContent({
   prepareSendRef?: RefObject<(() => Promise<boolean>) | null>
   enabled?: boolean
 }) {
+  const currentIdentityID = currentUser.identityId
   const { t, i18n } = useTranslation("inbox")
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
@@ -634,8 +638,12 @@ function ConversationTimelineContent({
                 (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
                   ? t("anonymousVisitor")
                   : t("unknownSender"))
-              const senderInitial =
-                Array.from(senderName)[0]?.toLocaleUpperCase() ?? "?"
+              // 头像始终使用身份资料，避免“你”等展示文案改变默认头像。
+              const useCurrentUserAvatar =
+                message.local ||
+                (message.sender?.kind ===
+                  ChatSubjectKind.ChatSubjectKindOrganizationIdentity &&
+                  message.sender.sourceId === currentIdentityID)
               const failedDraft =
                 message.deliveryStatus === "failed" && message.clientMessageID
                   ? {
@@ -744,18 +752,23 @@ function ConversationTimelineContent({
                           ) : null}
                           <div className="relative max-w-full">
                             {endsGroup ? (
-                              <span
-                                className={cn(
-                                  "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
-                                  incoming
-                                    ? "right-full mr-2 border bg-background text-foreground"
-                                    : "left-full ml-2 bg-primary text-primary-foreground",
-                                )}
+                              <ProfileAvatar
                                 title={senderName}
-                                aria-hidden="true"
-                              >
-                                {senderInitial}
-                              </span>
+                                name={useCurrentUserAvatar
+                                  ? currentUser.displayName
+                                  : message.sender?.displayName}
+                                imageURL={useCurrentUserAvatar
+                                  ? currentUser.avatarUrl
+                                  : message.sender?.avatarUrl}
+                                fallback={message.sender?.identityType ===
+                                  OrganizationIdentityType.OrganizationIdentityTypeAgent
+                                  ? "agent"
+                                  : "person"}
+                                className={cn(
+                                  "absolute bottom-0 size-8 text-xs",
+                                  incoming ? "right-full mr-2" : "left-full ml-2",
+                                )}
+                              />
                             ) : null}
                             <ContextMenuTrigger asChild>
                               <div className="group/message relative max-w-full">

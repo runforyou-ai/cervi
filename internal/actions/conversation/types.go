@@ -150,6 +150,8 @@ type ConversationMessageSender struct {
 	Kind          domain.ChatSubjectKind
 	SourceID      string
 	DisplayName   *string
+	AvatarFileID  *string
+	IdentityType  *domain.OrganizationIdentityType
 }
 
 // ConversationMessageReference 定义引用消息的一层摘要。
@@ -246,12 +248,13 @@ type FirstDirectTextMessageResult struct {
 
 // DirectConversationSummary 定义成员内部单聊摘要。
 type DirectConversationSummary struct {
-	ID             string
-	PeerIdentityID string
-	PeerType       domain.OrganizationIdentityType
-	PeerName       string
-	Preview        *string
-	LastMessageAt  *time.Time
+	ID               string
+	PeerIdentityID   string
+	PeerType         domain.OrganizationIdentityType
+	PeerName         string
+	PeerAvatarFileID *string
+	Preview          *string
+	LastMessageAt    *time.Time
 }
 
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。

@@ -49,12 +49,13 @@ type CustomerConversationSummary struct {
 
 // DirectConversationSummary 定义收件箱中的内部单聊详情。
 type DirectConversationSummary struct {
-	PeerIdentityID string
-	PeerType       domain.OrganizationIdentityType
-	PeerName       string
-	Preview        *string
-	LastMessageAt  *time.Time
-	AgentRunStatus *domain.AgentRunStatus
+	PeerIdentityID   string
+	PeerType         domain.OrganizationIdentityType
+	PeerName         string
+	PeerAvatarFileID *string
+	Preview          *string
+	LastMessageAt    *time.Time
+	AgentRunStatus   *domain.AgentRunStatus
 }
 
 // GroupConversationSummary 定义收件箱中的企业群聊详情。
@@ -118,6 +119,7 @@ type directConversationRow struct {
 	PeerIdentityID    string     `bun:"peer_identity_id"`
 	PeerType          string     `bun:"peer_type"`
 	PeerName          string     `bun:"peer_name"`
+	PeerAvatarFileID  *string    `bun:"peer_avatar_file_id"`
 	Preview           *string    `bun:"preview"`
 	LastMessageAt     *time.Time `bun:"last_message_at"`
 	AgentRunStatus    *string    `bun:"agent_run_status"`
@@ -214,7 +216,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		result = append(result, ConversationSummary{
 			ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
 			Direct: &DirectConversationSummary{
-				PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName,
+				PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID,
 				Preview: row.Preview, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
 			},
 		})
@@ -342,6 +344,7 @@ func (q *LoadInboxQuery) directConversationsQuery(organizationID, identityID, us
 		ColumnExpr("peer_oi.id AS peer_identity_id").
 		ColumnExpr("peer_oi.type AS peer_type").
 		ColumnExpr("peer_oi.display_name AS peer_name").
+		ColumnExpr("peer_oi.avatar_file_id::text AS peer_avatar_file_id").
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("cv.last_message_id::text AS last_message_id").

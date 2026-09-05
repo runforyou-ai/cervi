@@ -77,10 +77,12 @@ type CustomerServiceSession struct {
 
 // ConversationMessageSender 定义消息发送主体。
 type ConversationMessageSender struct {
-	ChatSubjectID string          `json:"chatSubjectId"`
-	Kind          ChatSubjectKind `json:"kind"`
-	SourceID      string          `json:"sourceId"`
-	DisplayName   *string         `json:"displayName"`
+	ChatSubjectID string                    `json:"chatSubjectId"`
+	Kind          ChatSubjectKind           `json:"kind"`
+	SourceID      string                    `json:"sourceId"`
+	DisplayName   *string                   `json:"displayName"`
+	AvatarURL     string                    `json:"avatarUrl"`
+	IdentityType  *OrganizationIdentityType `json:"identityType"`
 }
 
 // ConversationMessageReference 定义引用消息的一层摘要。

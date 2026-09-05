@@ -1,6 +1,6 @@
 /** 群聊成员的搜索、多选和批量添加对话框。 */
 import { useId, useMemo, useState } from "react"
-import { SearchIcon, UserRoundIcon } from "lucide-react"
+import { SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -11,6 +11,7 @@ import {
   type GroupParticipant,
   type MemberOption,
 } from "@/api"
+import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -209,22 +210,7 @@ export function GroupMemberPickerDialog({
                           toggleMember(member.id, event.target.checked)
                         }
                       />
-                      <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-sm font-medium text-muted-foreground">
-                        {member.avatarUrl ? (
-                          <img
-                            src={member.avatarUrl}
-                            alt=""
-                            className="size-full object-cover"
-                            draggable={false}
-                          />
-                        ) : member.displayName ? (
-                          Array.from(
-                            member.displayName,
-                          )[0]?.toLocaleUpperCase()
-                        ) : (
-                          <UserRoundIcon className="size-4" />
-                        )}
-                      </span>
+                      <ProfileAvatar imageURL={member.avatarUrl} name={member.displayName} className="size-9" />
                       <span className="min-w-0 flex-1 truncate text-sm">
                         {member.displayName}
                       </span>

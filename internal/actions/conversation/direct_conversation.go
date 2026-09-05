@@ -51,6 +51,7 @@ type directTargetRow struct {
 	IdentityID   string                          `bun:"identity_id"`
 	IdentityType domain.OrganizationIdentityType `bun:"identity_type"`
 	DisplayName  string                          `bun:"display_name"`
+	AvatarFileID *string                         `bun:"avatar_file_id"`
 }
 
 type directConversationIDs struct {
@@ -305,7 +306,7 @@ func sendDirectTextMessage(ctx context.Context, db bun.IDB, identity *servermode
 	}, message); err != nil {
 		return ConversationMessage{}, err
 	}
-	result := memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
+	result := memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity)
 	result.ReplyTo = replyTo
 	return result, nil
 }
@@ -318,6 +319,7 @@ func loadDirectTarget(ctx context.Context, db bun.IDB, organizationID, identityI
 		ColumnExpr("oi.id AS identity_id").
 		ColumnExpr("oi.type AS identity_type").
 		ColumnExpr("oi.display_name AS display_name").
+		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
 		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ?", organizationID).
@@ -437,7 +439,7 @@ func loadDirectConversationSummary(ctx context.Context, db bun.IDB, organization
 		return DirectConversationSummary{}, fmt.Errorf("load direct conversation summary: %w", err)
 	}
 	return DirectConversationSummary{
-		ID: row.ID, PeerIdentityID: target.IdentityID, PeerType: target.IdentityType, PeerName: target.DisplayName,
+		ID: row.ID, PeerIdentityID: target.IdentityID, PeerType: target.IdentityType, PeerName: target.DisplayName, PeerAvatarFileID: target.AvatarFileID,
 		Preview: row.Preview, LastMessageAt: row.LastMessageAt,
 	}, nil
 }

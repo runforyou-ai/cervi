@@ -210,7 +210,7 @@ export function WorkspaceNavigation({
             <button
               ref={userMenuTriggerRef}
               type="button"
-              className="relative flex size-10 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              className="relative flex size-10 items-center justify-center rounded-lg outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               aria-label={t("openUserMenu", {
                 name: identity.user.displayName,
               })}

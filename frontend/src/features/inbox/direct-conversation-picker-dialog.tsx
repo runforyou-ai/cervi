@@ -1,10 +1,6 @@
 /** 企业成员内部单聊对象选择器。 */
 import { useEffect, useState } from "react"
-import {
-  BotIcon,
-  LoaderCircleIcon,
-  UserRoundIcon,
-} from "lucide-react"
+import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import {
@@ -15,6 +11,7 @@ import {
   type DirectInboxConversationData,
   type MemberOption,
 } from "@/api"
+import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
@@ -128,16 +125,7 @@ export function DirectConversationPickerDialog({
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
                   onClick={() => setSelectedMember(member)}
                 >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-                    {member.type ===
-                    OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
-                      <BotIcon className="size-4" />
-                    ) : member.displayName ? (
-                      Array.from(member.displayName)[0]?.toLocaleUpperCase()
-                    ) : (
-                      <UserRoundIcon className="size-4" />
-                    )}
-                  </span>
+                  <DirectConversationDraftAvatar member={member} className="size-9" />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {member.displayName}
                   </span>
