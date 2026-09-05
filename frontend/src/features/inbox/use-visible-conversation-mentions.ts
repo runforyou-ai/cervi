@@ -3,7 +3,7 @@ import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "rea
 import { ConversationMentionReviewOutcome, markConversationMentionReviewed, type ConversationMessageListData } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
-import { conversationViewport } from "./use-conversation-message-navigation"
+import { conversationViewport } from "./use-conversation-viewport"
 import { isConversationMessageVisible } from "./conversation-message-visibility"
 
 /** 观察当前待查看目标，只确认激活页面内实际可见的消息。 */

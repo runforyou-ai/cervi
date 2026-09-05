@@ -265,8 +265,12 @@ func sendDirectTextMessage(ctx context.Context, db bun.IDB, identity *servermode
 		return ConversationMessage{}, err
 	}
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
-	if saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, idempotencyKey, false); err != nil || found {
+	if saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, false); err != nil || found {
 		return saved, err
+	}
+	replyTo, err := loadConversationReplyTarget(ctx, db, identity.Organization.ID, input.ConversationID, input.ReplyToMessageID)
+	if err != nil {
+		return ConversationMessage{}, err
 	}
 	message := &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID,
@@ -274,8 +278,11 @@ func sendDirectTextMessage(ctx context.Context, db bun.IDB, identity *servermode
 		Type: string(domain.MessageTypeText), Body: input.Body,
 		IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
 	}
+	if replyTo != nil {
+		message.ReplyToMessageID = &replyTo.ID
+	}
 	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
+		Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "idempotency_key", "originated_at").
 		Returning("*").
 		Exec(ctx); err != nil {
 		return ConversationMessage{}, fmt.Errorf("create direct text message: %w", err)
@@ -298,7 +305,9 @@ func sendDirectTextMessage(ctx context.Context, db bun.IDB, identity *servermode
 	}, message); err != nil {
 		return ConversationMessage{}, err
 	}
-	return memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName), nil
+	result := memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
+	result.ReplyTo = replyTo
+	return result, nil
 }
 
 // loadDirectTarget 读取同企业可发起单聊的活跃成员身份。
@@ -472,6 +481,14 @@ func normalizeDirectTextMessageInput(input DirectTextMessageInput) (DirectTextMe
 	input.ConversationID = conversationID
 	input.ClientMessageID = clientMessageID
 	input.Body = body
+	// 规范化引用消息编号。
+	if input.ReplyToMessageID != "" {
+		var valid bool
+		input.ReplyToMessageID, valid = common.NormalizeUUID(input.ReplyToMessageID)
+		if !valid {
+			fields["replyToMessageId"] = ValidationReplyToMessageIDInvalid
+		}
+	}
 	return input, fields
 }
 

@@ -7,3 +7,12 @@ export function isConversationMessageVisible(row: VerticalBounds, viewport: Vert
     Math.min(viewport.bottom, row.bottom) - Math.max(viewport.top, row.top) >=
       Math.min(row.height / 2, 32)
 }
+
+/** 完整可见的消息保持原位，屏幕外消息居中，超高消息优先展示开头。 */
+export function conversationMessageScrollOffset(row: VerticalBounds, viewport: VerticalBounds) {
+  if (
+    (row.top >= viewport.top && row.bottom <= viewport.bottom) ||
+    (row.top <= viewport.top && row.bottom >= viewport.bottom)
+  ) return 0
+  return row.top - viewport.top - Math.max(0, (viewport.height - row.height) / 2)
+}

@@ -186,7 +186,7 @@ func (b *DirectBackend) SendDirectTextMessage(ctx context.Context, meta RequestM
 		return ConversationMessage{}, err
 	}
 	message, err := b.sendDirectTextMessage.Execute(ctx, identity, conversationaction.DirectTextMessageInput{
-		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body,
+		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
 		return ConversationMessage{}, directConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "send")
@@ -572,6 +572,9 @@ func directConversationError(ctx context.Context, meta RequestMeta, err error, o
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
+		if conflictError.Reason == conversationaction.ConflictReasonReplyTargetInvalid {
+			return ConflictError(meta, cervii18n.ErrorReplyTargetInvalid, conflictError.Reason)
+		}
 		return ConflictError(meta, cervii18n.ErrorDirectMessageConflict, conflictError.Reason)
 	}
 	slog.Warn("内部单聊操作失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
@@ -615,8 +618,8 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 			messageKey = cervii18n.ErrorGroupOwnerCannotBeRemoved
 		case conversationaction.ConflictReasonGroupSuccessorRequired:
 			messageKey = cervii18n.ErrorGroupSuccessorRequired
-		case conversationaction.ConflictReasonGroupReplyTargetInvalid:
-			messageKey = cervii18n.ErrorGroupReplyTargetInvalid
+		case conversationaction.ConflictReasonReplyTargetInvalid:
+			messageKey = cervii18n.ErrorReplyTargetInvalid
 		case conversationaction.ConflictReasonGroupMentionTargetInvalid:
 			messageKey = cervii18n.ErrorGroupMentionTargetInvalid
 		}

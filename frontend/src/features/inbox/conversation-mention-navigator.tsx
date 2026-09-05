@@ -82,11 +82,15 @@ export function ConversationMentionNavigator({
           @ {navigation.pendingCount}
         </Button>
       ) : null}
-      {showLatest || round ? (
+      {showLatest ? (
         <Button size="sm" variant="outline" disabled={busy} onClick={onLatest}>
           {newCount > 0
             ? t("messagesNew", { count: newCount })
             : t("messagesBackToLatest")}
+        </Button>
+      ) : round ? (
+        <Button size="sm" variant="outline" disabled={busy} onClick={navigation.close}>
+          {t("mentionClose")}
         </Button>
       ) : null}
     </div>

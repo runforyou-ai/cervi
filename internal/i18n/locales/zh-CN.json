@@ -268,7 +268,7 @@
   "error.group_successor_required": "群主退出前需要选择一位新群主。",
   "error.group_message_send_failed": "群聊消息发送失败，请重试。",
   "error.group_message_conflict": "这条消息与之前的发送内容不一致。",
-  "error.group_reply_target_invalid": "回复的消息已不可用。",
+  "error.reply_target_invalid": "回复的消息已不可用。",
   "error.group_mention_target_invalid": "提醒的成员已不在当前群聊中。",
   "error.service_session_owned": "这条会话已由其他客服负责。",
   "error.service_session_not_replyable": "当前客服处理周期无法继续处理。",

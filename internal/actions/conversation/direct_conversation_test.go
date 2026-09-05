@@ -21,12 +21,27 @@ func TestNormalizeDirectIdentityPair(t *testing.T) {
 // TestNormalizeDirectTextMessageInput 验证内部单聊文本消息输入归一化。
 func TestNormalizeDirectTextMessageInput(t *testing.T) {
 	input := DirectTextMessageInput{
-		ConversationID:  "0198DDEE-C056-7BC5-A1D9-586F878EE966",
-		ClientMessageID: "0198DDF0-A234-7F01-8D99-E3E0AF0F5F65",
-		Body:            "  你好，同事  ",
+		ConversationID:   "0198DDEE-C056-7BC5-A1D9-586F878EE966",
+		ClientMessageID:  "0198DDF0-A234-7F01-8D99-E3E0AF0F5F65",
+		Body:             "  你好，同事  ",
+		ReplyToMessageID: "0198DDF0-A234-7F01-8D99-E3E0AF0F5F66",
 	}
 	normalized, fields := normalizeDirectTextMessageInput(input)
-	if len(fields) != 0 || normalized.Body != "你好，同事" || normalized.ConversationID != strings.ToLower(input.ConversationID) || normalized.ClientMessageID != strings.ToLower(input.ClientMessageID) {
+	if len(fields) != 0 || normalized.ReplyToMessageID != strings.ToLower(input.ReplyToMessageID) || normalized.Body != "你好，同事" || normalized.ConversationID != strings.ToLower(input.ConversationID) || normalized.ClientMessageID != strings.ToLower(input.ClientMessageID) {
 		t.Fatalf("normalized = %#v, fields = %#v", normalized, fields)
+	}
+}
+
+// TestNormalizeDirectReplyTarget 验证引用编号可省略但不能携带非法值。
+func TestNormalizeDirectReplyTarget(t *testing.T) {
+	for _, reference := range []string{"", "invalid"} {
+		_, fields := normalizeDirectTextMessageInput(DirectTextMessageInput{
+			ConversationID:  "0198ddee-c056-7bc5-a1d9-586f878ee966",
+			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+			Body:            "回复", ReplyToMessageID: reference,
+		})
+		if (fields["replyToMessageId"] == ValidationReplyToMessageIDInvalid) != (reference != "") {
+			t.Fatalf("reference=%q fields=%v", reference, fields)
+		}
 	}
 }

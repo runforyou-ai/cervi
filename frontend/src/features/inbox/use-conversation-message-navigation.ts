@@ -8,20 +8,13 @@ import {
   type RefObject,
 } from "react"
 import type { ConversationMessageListData } from "@/api"
+import { conversationViewport, type useConversationViewport } from "./use-conversation-viewport"
 import { isConversationMessageVisible } from "./conversation-message-visibility"
 
 type PendingLocation = {
   id: string
   revision: number
   resolve: (visible: boolean) => void
-}
-
-/** 返回时间线滚动视口。 */
-export function conversationViewport(root: HTMLDivElement | null) {
-  return (
-    root?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ??
-    null
-  )
 }
 
 /** 定位消息并在当前窗口实际可见时完成确认。 */
@@ -31,13 +24,16 @@ export function useConversationMessageNavigation({
   readingActive,
   openWindow,
   cancelWindowUpdate,
+  viewport,
 }: {
   root: RefObject<HTMLDivElement | null>
   page: ConversationMessageListData | null
   readingActive: boolean
   openWindow: (messageID?: string) => Promise<boolean>
   cancelWindowUpdate: () => void
+  viewport: ReturnType<typeof useConversationViewport>
 }) {
+  const { holdForLocation, releaseLocation, revealMessage } = viewport
   const revision = useRef(0)
   const pending = useRef<PendingLocation | null>(null)
   const positioned = useRef(0)
@@ -51,6 +47,7 @@ export function useConversationMessageNavigation({
   /** 结束未完成的定位并清理旧高亮。 */
   const cancel = useCallback(() => {
     revision.current += 1
+    releaseLocation()
     pending.current?.resolve(false)
     pending.current = null
     if (highlightTimer.current !== null) clearTimeout(highlightTimer.current)
@@ -58,13 +55,14 @@ export function useConversationMessageNavigation({
     setTarget(null)
     setHighlightedID(null)
     setLocating(false)
-  }, [cancelWindowUpdate])
+  }, [cancelWindowUpdate, releaseLocation])
 
   /** 用统一窗口入口定位目标，等待实际视口确认。 */
   const locate = useCallback(
     async (id: string) => {
       cancel()
       const current = revision.current
+      holdForLocation()
       setLocating(true)
       try {
         if (!(await openWindow(id)) || revision.current !== current)
@@ -74,34 +72,23 @@ export function useConversationMessageNavigation({
           setTarget({ id, revision: current })
         })
       } finally {
-        if (revision.current === current) setLocating(false)
+        if (revision.current === current) {
+          releaseLocation()
+          setLocating(false)
+        }
       }
     },
-    [cancel, openWindow],
+    [cancel, openWindow, holdForLocation, releaseLocation],
   )
 
   useLayoutEffect(() => {
     if (!target || !readingActive || positioned.current === target.revision)
       return
-    const viewport = conversationViewport(root.current)
-    const row = viewport?.querySelector<HTMLElement>(
-      `[data-message-id="${target.id}"]`,
-    )
-    if (!viewport || !row) return
-    const rect = row.getBoundingClientRect()
-    viewport.scrollTop +=
-      rect.top -
-      viewport.getBoundingClientRect().top -
-      Math.max(0, (viewport.clientHeight - rect.height) / 2)
-    if (readingActive) row.focus({ preventScroll: true })
-    const frame = requestAnimationFrame(() => {
-      if (revision.current !== target.revision) return
-      positioned.current = target.revision
-      setHighlightedID(target.id)
-      highlightTimer.current = setTimeout(() => setHighlightedID(null), 2000)
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [target, page, readingActive, root])
+    if (!revealMessage(target.id)) return
+    positioned.current = target.revision
+    setHighlightedID(target.id)
+    highlightTimer.current = setTimeout(() => setHighlightedID(null), 2000)
+  }, [target, page, readingActive, revealMessage])
 
   useEffect(() => {
     if (!target || !readingActive) return
