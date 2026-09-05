@@ -134,6 +134,8 @@ const inbox = {
   agentToolArguments: "参数",
   agentToolResult: "结果",
   agentToolError: "错误",
+  agentToolMore: "更多",
+  agentToolFullContent: "完整内容",
   agentUsageInput: "输入{{count}}",
   agentUsageOutput: "输出{{count}}",
   anonymousVisitor: "网站访客",

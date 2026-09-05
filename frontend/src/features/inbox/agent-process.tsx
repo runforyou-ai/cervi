@@ -2,6 +2,7 @@
 import { useLayoutEffect, useRef, useState } from "react"
 import { BrainIcon, ChevronDownIcon, LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { Popover } from "radix-ui"
 
 import {
   AgentRunBlockKind,
@@ -16,17 +17,14 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip"
+import { usePortalContainer } from "@/components/ui/portal-container"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 
-/** 按实际溢出情况为截断的完整原文提供悬停和键盘提示。 */
+/** 在截断末尾提供更多按钮，点击后浮层展示完整原文。 */
 function ToolValue({ value }: { value: string }) {
+  const { t } = useTranslation("inbox")
+  const pagePortal = usePortalContainer()
   const element = useRef<HTMLPreElement>(null)
   const [truncated, setTruncated] = useState(false)
   useLayoutEffect(() => {
@@ -42,30 +40,42 @@ function ToolValue({ value }: { value: string }) {
   }, [value])
 
   return (
-    <TooltipProvider delayDuration={2000} skipDelayDuration={0}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <pre
-            ref={element}
-            tabIndex={truncated ? 0 : undefined}
-            className={cn(
-              "line-clamp-4 whitespace-pre-wrap break-all font-mono text-xs leading-5",
-              truncated && "cursor-help focus-visible:outline focus-visible:outline-ring",
-            )}
-          >
-            {value}
-          </pre>
-        </TooltipTrigger>
-        {truncated ? (
-          <TooltipContent
-            side="top"
-            className="max-h-80 max-w-[min(40rem,calc(100vw-2rem))] overflow-y-auto whitespace-pre-wrap break-all text-left font-mono text-xs leading-5"
-          >
-            {value}
-          </TooltipContent>
-        ) : null}
-      </Tooltip>
-    </TooltipProvider>
+    <div className="relative min-w-0">
+      <pre
+        ref={element}
+        className="max-h-20 overflow-hidden whitespace-pre-wrap break-all font-mono text-xs leading-5"
+      >
+        {value}
+      </pre>
+      {truncated && (pagePortal?.active ?? true) ? (
+        <Popover.Root>
+          <span className="absolute right-0 bottom-0 flex items-center gap-1 bg-muted pl-1 text-xs leading-5">
+            <span aria-hidden="true">…</span>
+            <Popover.Trigger asChild>
+              <button
+                type="button"
+                className="rounded-sm text-primary hover:underline focus-visible:outline focus-visible:outline-ring"
+              >
+                {t("agentToolMore")}
+              </button>
+            </Popover.Trigger>
+          </span>
+          <Popover.Portal container={pagePortal?.container}>
+            <Popover.Content
+              side="top"
+              align="end"
+              sideOffset={6}
+              collisionPadding={16}
+              aria-label={t("agentToolFullContent")}
+              className="z-50 max-h-[min(20rem,var(--radix-popover-content-available-height))] w-max max-w-[min(40rem,calc(100vw-2rem))] overflow-y-auto rounded-md bg-foreground px-3 py-2 text-left font-mono text-xs leading-5 whitespace-pre-wrap break-all text-background shadow-md outline-none"
+            >
+              {value}
+              <Popover.Arrow className="fill-foreground" />
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      ) : null}
+    </div>
   )
 }
 
@@ -80,7 +90,7 @@ function AgentTool({ call }: { call: AgentToolCall }) {
     [AgentToolCallStatus.AgentToolCallFailed]: t("agentToolFailed"),
   }[call.status]
   return (
-    <Collapsible className="min-w-0 rounded-md bg-muted/70">
+    <Collapsible className="min-w-0 rounded-md bg-muted">
       <CollapsibleTrigger className="group flex w-full min-w-0 items-center gap-3 rounded-md px-3 py-2 text-left text-xs focus-visible:outline focus-visible:outline-ring">
         <span className="min-w-0 flex-1 break-all font-medium">{call.name}</span>
         <span className={cn("shrink-0 text-muted-foreground", failed && "text-destructive")}>

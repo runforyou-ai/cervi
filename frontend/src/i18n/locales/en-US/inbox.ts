@@ -137,6 +137,8 @@ const inbox = {
   agentToolArguments: "Arguments",
   agentToolResult: "Result",
   agentToolError: "Error",
+  agentToolMore: "More",
+  agentToolFullContent: "Full content",
   agentUsageInput: "Input {{count}}",
   agentUsageOutput: "Output {{count}}",
   anonymousVisitor: "Website visitor",
