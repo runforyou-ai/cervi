@@ -32,7 +32,7 @@ func (a *CreateKnowledgeGroupAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		knowledgeBase, err := loadKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID)
+		knowledgeBase, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID)
 		if err != nil {
 			return err
 		}

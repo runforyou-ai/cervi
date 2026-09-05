@@ -66,8 +66,9 @@ export function KnowledgeBaseLayout() {
     useState<KnowledgeGroupDialogState | null>(null)
   const [deletingKnowledgeBase, setDeletingKnowledgeBase] =
     useState<KnowledgeBaseData | null>(null)
-  const [deletingGroup, setDeletingGroup] =
-    useState<DeleteGroupTarget | null>(null)
+  const [deletingGroup, setDeletingGroup] = useState<DeleteGroupTarget | null>(
+    null,
+  )
   const [deleting, setDeleting] = useState(false)
   const mounted = useRef(true)
   const indexActive =
@@ -119,7 +120,9 @@ export function KnowledgeBaseLayout() {
         knowledge_base_id: target.id,
         error,
       })
-      toast.error(isApiError(error) ? apiErrorMessage(error) : t("delete.error"))
+      toast.error(
+        isApiError(error) ? apiErrorMessage(error) : t("delete.error"),
+      )
     } finally {
       if (mounted.current) setDeleting(false)
     }
@@ -349,6 +352,7 @@ function KnowledgeBaseTree({
   const categoryLabel = isQA
     ? t("category.qaShort")
     : t("category.standardShort")
+  const defaultGroup = knowledgeBase.groups.find((group) => group.isDefault)
   const regularGroups = knowledgeBase.groups.filter((group) => !group.isDefault)
 
   return (
@@ -364,11 +368,7 @@ function KnowledgeBaseTree({
           className="flex h-9 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
           title={knowledgeBase.name}
         >
-          {isQA ? (
-            <CircleHelpIcon />
-          ) : (
-            <FileTextIcon />
-          )}
+          {isQA ? <CircleHelpIcon /> : <FileTextIcon />}
           <span className="truncate">{knowledgeBase.name}</span>
           <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
             {isExternal
@@ -421,6 +421,18 @@ function KnowledgeBaseTree({
             <FolderIcon className="size-3.5 shrink-0" />
             <span className="truncate">{t("group.default")}</span>
           </Link>
+        ) : isQA && defaultGroup ? (
+          <Link
+            to={`${path}/groups/${defaultGroup.id}/qa`}
+            className={cn(
+              "flex h-8 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent",
+              currentPath.startsWith(`${path}/groups/${defaultGroup.id}/qa`) &&
+                "bg-sidebar-accent/60 font-medium text-sidebar-accent-foreground",
+            )}
+          >
+            <FolderIcon className="size-3.5 shrink-0" />
+            <span className="truncate">{t("group.default")}</span>
+          </Link>
         ) : (
           <div className="flex h-8 items-center gap-2 px-2 text-xs text-muted-foreground">
             <FolderIcon className="size-3.5 shrink-0" />
@@ -431,6 +443,12 @@ function KnowledgeBaseTree({
           <div key={group.id}>
             <KnowledgeGroupTreeRow
               group={group}
+              contentPath={
+                isQA && !isExternal
+                  ? `${path}/groups/${group.id}/qa`
+                  : undefined
+              }
+              currentPath={currentPath}
               onAddChild={() => onCreateGroup(group.id)}
               onEdit={() => onEditGroup(group)}
               onDelete={() => onDeleteGroup(group)}
@@ -439,6 +457,12 @@ function KnowledgeBaseTree({
               <div key={child.id} className="ml-4">
                 <KnowledgeGroupTreeRow
                   group={child}
+                  contentPath={
+                    isQA && !isExternal
+                      ? `${path}/groups/${child.id}/qa`
+                      : undefined
+                  }
+                  currentPath={currentPath}
                   onEdit={() => onEditGroup(child)}
                   onDelete={() => onDeleteGroup(child)}
                 />
@@ -454,11 +478,15 @@ function KnowledgeBaseTree({
 /** 渲染知识库分组行及低频操作。 */
 function KnowledgeGroupTreeRow({
   group,
+  contentPath,
+  currentPath,
   onAddChild,
   onEdit,
   onDelete,
 }: {
   group: KnowledgeGroupData
+  contentPath?: string
+  currentPath: string
   onAddChild?: () => void
   onEdit: () => void
   onDelete: () => void
@@ -467,7 +495,20 @@ function KnowledgeGroupTreeRow({
   return (
     <div className="group/tree flex h-8 items-center rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
       <FolderIcon className="size-3.5 shrink-0" />
-      <span className="ml-2 min-w-0 flex-1 truncate">{group.name}</span>
+      {contentPath ? (
+        <Link
+          to={contentPath}
+          className={cn(
+            "ml-2 min-w-0 flex-1 truncate py-2",
+            currentPath.startsWith(contentPath) &&
+              "font-medium text-sidebar-accent-foreground",
+          )}
+        >
+          {group.name}
+        </Link>
+      ) : (
+        <span className="ml-2 min-w-0 flex-1 truncate">{group.name}</span>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

@@ -1,6 +1,11 @@
 /** 统一的页面数据读取 hook，封装 TanStack Query 并约束项目取数行为。 */
 import { useCallback, useEffect } from "react"
-import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query"
+import {
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+  type QueryKey,
+} from "@tanstack/react-query"
 import { useNavigate } from "react-router"
 
 import { recoverSession } from "@/lib/session-navigation"
@@ -15,6 +20,7 @@ export function useResource<T>(
   key: QueryKey,
   load: (signal: AbortSignal) => Promise<T>,
   options: {
+    keepPreviousData?: boolean
     enabled?: boolean
     staleTime?: number
     refetchInterval?: number | false
@@ -26,6 +32,7 @@ export function useResource<T>(
   const query = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => load(signal),
+    placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
     enabled: options.enabled,
     staleTime: options.staleTime,
     refetchInterval: options.refetchInterval,
@@ -62,6 +69,7 @@ export function useResource<T>(
   return {
     data: query.data,
     dataUpdatedAt: query.dataUpdatedAt,
+    isPlaceholderData: query.isPlaceholderData,
     loading: query.isPending && query.isFetching,
     refreshing: query.isFetching && !query.isPending,
     error: query.error,

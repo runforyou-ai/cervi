@@ -106,6 +106,10 @@ type DirectBackend struct {
 	createTeam                        *teamaction.CreateTeamAction
 	updateTeam                        *teamaction.UpdateTeamAction
 	deleteTeam                        *teamaction.DeleteTeamAction
+	listQAEntries                     *knowledgebaseaction.ListQAEntriesQuery
+	getQAEntry                        *knowledgebaseaction.GetQAEntryQuery
+	saveQAEntry                       *knowledgebaseaction.SaveQAEntryAction
+	deleteQAEntry                     *knowledgebaseaction.DeleteQAEntryAction
 	listKnowledgeBases                *knowledgebaseaction.ListKnowledgeBasesQuery
 	listExternalKnowledgeBaseOptions  *knowledgebaseaction.ListExternalOptionsQuery
 	listKnowledgeDocuments            *knowledgebaseaction.ListKnowledgeDocumentsQuery
@@ -238,6 +242,10 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		createTeam:                        teamaction.NewCreateTeamAction(db),
 		updateTeam:                        teamaction.NewUpdateTeamAction(db),
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
+		listQAEntries:                     knowledgebaseaction.NewListQAEntriesQuery(db),
+		getQAEntry:                        knowledgebaseaction.NewGetQAEntryQuery(db),
+		saveQAEntry:                       knowledgebaseaction.NewSaveQAEntryAction(db),
+		deleteQAEntry:                     knowledgebaseaction.NewDeleteQAEntryAction(db),
 		listKnowledgeBases:                knowledgebaseaction.NewListKnowledgeBasesQuery(db),
 		listExternalKnowledgeBaseOptions:  knowledgebaseaction.NewListExternalOptionsQuery(db, connector.NewDifyKnowledgeBaseLister(connectorClient)),
 		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, difyKnowledgeDocuments),

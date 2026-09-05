@@ -11,6 +11,10 @@ import (
 )
 
 const (
+	ValidationQAQuestionRequired           common.FieldCode = "KNOWLEDGE_QA_QUESTION_REQUIRED"
+	ValidationQAAnswerRequired             common.FieldCode = "KNOWLEDGE_QA_ANSWER_REQUIRED"
+	ValidationQAGroupInvalid               common.FieldCode = "KNOWLEDGE_QA_GROUP_INVALID"
+	ValidationQAContentInvalid             common.FieldCode = "KNOWLEDGE_QA_CONTENT_INVALID"
 	ValidationNameRequired                 common.FieldCode = "KNOWLEDGE_BASE_NAME_REQUIRED"
 	ValidationNameTooLong                  common.FieldCode = "KNOWLEDGE_BASE_NAME_TOO_LONG"
 	ValidationNameDuplicate                common.FieldCode = "KNOWLEDGE_BASE_NAME_DUPLICATE"

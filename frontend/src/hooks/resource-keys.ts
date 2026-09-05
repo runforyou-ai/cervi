@@ -14,7 +14,11 @@ function itemKey(prefix: string, id?: string) {
 }
 
 /** 生成「前缀 + 可选归属 ID + 可选参数」的子列表 key，逐级省略时作为失效用前缀。 */
-function scopedListKey(prefix: string, scopeId?: string, parameters?: KeyParameters) {
+function scopedListKey(
+  prefix: string,
+  scopeId?: string,
+  parameters?: KeyParameters,
+) {
   if (scopeId === undefined) return [prefix]
   return parameters === undefined ? [prefix, scopeId] : [prefix, scopeId, parameters]
 }
@@ -81,14 +85,20 @@ export const resourceKeys = {
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */
   knowledgeBase: (id?: string) => itemKey("knowledge-base", id),
+  /** 指定知识库及分组条件的问答列表。 */
+  knowledgeQAEntries: (knowledgeBaseId?: string, parameters?: KeyParameters) =>
+    scopedListKey("knowledge-qa-entries", knowledgeBaseId, parameters),
+  /** 指定知识库中的完整问答。 */
+  knowledgeQAEntry: (knowledgeBaseId: string, entryId?: string) =>
+    entryId === undefined
+      ? ["knowledge-qa-entry", knowledgeBaseId]
+      : ["knowledge-qa-entry", knowledgeBaseId, entryId],
   /** 指定连接可访问的外部知识库选项。 */
   externalKnowledgeBaseOptions: (connectionId?: string) =>
     itemKey("external-knowledge-base-options", connectionId),
   /** 指定知识库及查询条件的文档列表。 */
-  knowledgeDocuments: (
-    knowledgeBaseId?: string,
-    parameters?: KeyParameters,
-  ) => scopedListKey("knowledge-documents", knowledgeBaseId, parameters),
+  knowledgeDocuments: (knowledgeBaseId?: string, parameters?: KeyParameters) =>
+    scopedListKey("knowledge-documents", knowledgeBaseId, parameters),
   /** 指定知识库中的单个知识文档。 */
   knowledgeDocument: (knowledgeBaseId: string, documentId: string) => [
     "knowledge-document",

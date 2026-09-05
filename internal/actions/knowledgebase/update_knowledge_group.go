@@ -31,6 +31,9 @@ func (a *UpdateKnowledgeGroupAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
+		if _, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID); err != nil {
+			return err
+		}
 		group, err := loadKnowledgeGroup(ctx, tx, identity.Organization.ID, knowledgeBaseID, groupID)
 		if err != nil {
 			return err

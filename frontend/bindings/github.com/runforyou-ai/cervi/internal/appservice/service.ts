@@ -141,6 +141,13 @@ export function CreateKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID:
 }
 
 /**
+ * CreateKnowledgeQAEntry 创建本地问答。
+ */
+export function CreateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeQAInput): $CancellablePromise<$models.KnowledgeQAEntry> {
+    return $Call.ByID(2807633900, meta, knowledgeBaseID, input);
+}
+
+/**
  * CreateMessageChannel 创建消息渠道。
  */
 export function CreateMessageChannel(meta: $models.RequestMeta, input: $models.CreateMessageChannelInput): $CancellablePromise<$models.MessageChannelSummary> {
@@ -225,10 +232,17 @@ export function DeleteKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: 
 }
 
 /**
- * DeleteKnowledgeGroup 删除不含子分组的知识库分组。
+ * DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
  */
 export function DeleteKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, groupID: string): $CancellablePromise<$models.KnowledgeBase> {
     return $Call.ByID(3559839338, meta, knowledgeBaseID, groupID);
+}
+
+/**
+ * DeleteKnowledgeQAEntry 删除本地问答。
+ */
+export function DeleteKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<void> {
+    return $Call.ByID(3628287475, meta, knowledgeBaseID, entryID);
 }
 
 /**
@@ -320,6 +334,13 @@ export function GetKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: str
  */
 export function GetKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocument> {
     return $Call.ByID(593812391, meta, knowledgeBaseID, documentID);
+}
+
+/**
+ * GetKnowledgeQAEntry 返回完整的本地问答。
+ */
+export function GetKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<$models.KnowledgeQAEntry> {
+    return $Call.ByID(3966244004, meta, knowledgeBaseID, entryID);
 }
 
 /**
@@ -481,6 +502,13 @@ export function ListKnowledgeDocumentSegments(meta: $models.RequestMeta, knowled
  */
 export function ListKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeDocumentListInput): $CancellablePromise<$models.KnowledgeDocumentList> {
     return $Call.ByID(4195704972, meta, knowledgeBaseID, input);
+}
+
+/**
+ * ListKnowledgeQAEntries 返回分组中的本地问答列表。
+ */
+export function ListKnowledgeQAEntries(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeQAListInput): $CancellablePromise<$models.KnowledgeQAList> {
+    return $Call.ByID(3867410272, meta, knowledgeBaseID, input);
 }
 
 /**
@@ -845,6 +873,13 @@ export function UpdateKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: 
  */
 export function UpdateKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, groupID: string, input: $models.KnowledgeGroupInput): $CancellablePromise<$models.KnowledgeBase> {
     return $Call.ByID(1535726024, meta, knowledgeBaseID, groupID, input);
+}
+
+/**
+ * UpdateKnowledgeQAEntry 修改本地问答。
+ */
+export function UpdateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string, input: $models.KnowledgeQAInput): $CancellablePromise<$models.KnowledgeQAEntry> {
+    return $Call.ByID(137278157, meta, knowledgeBaseID, entryID, input);
 }
 
 /**

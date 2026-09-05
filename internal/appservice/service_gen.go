@@ -359,6 +359,31 @@ func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamI
 	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
 }
 
+// ListKnowledgeQAEntries 返回分组中的本地问答列表。
+func (s *Service) ListKnowledgeQAEntries(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAListInput) (KnowledgeQAList, error) {
+	return s.backend.ListKnowledgeQAEntries(ctx, meta, knowledgeBaseID, input)
+}
+
+// GetKnowledgeQAEntry 返回完整的本地问答。
+func (s *Service) GetKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string) (KnowledgeQAEntry, error) {
+	return s.backend.GetKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID)
+}
+
+// CreateKnowledgeQAEntry 创建本地问答。
+func (s *Service) CreateKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAInput) (KnowledgeQAEntry, error) {
+	return s.backend.CreateKnowledgeQAEntry(ctx, meta, knowledgeBaseID, input)
+}
+
+// UpdateKnowledgeQAEntry 修改本地问答。
+func (s *Service) UpdateKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string, input KnowledgeQAInput) (KnowledgeQAEntry, error) {
+	return s.backend.UpdateKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID, input)
+}
+
+// DeleteKnowledgeQAEntry 删除本地问答。
+func (s *Service) DeleteKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string) error {
+	return s.backend.DeleteKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID)
+}
+
 // ListKnowledgeBases 返回当前企业的知识库列表。
 func (s *Service) ListKnowledgeBases(ctx context.Context, meta RequestMeta) (KnowledgeBaseList, error) {
 	return s.backend.ListKnowledgeBases(ctx, meta)
@@ -419,7 +444,7 @@ func (s *Service) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, kn
 	return s.backend.UpdateKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID, input)
 }
 
-// DeleteKnowledgeGroup 删除不含子分组的知识库分组。
+// DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
 func (s *Service) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, groupID string) (KnowledgeBase, error) {
 	return s.backend.DeleteKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID)
 }

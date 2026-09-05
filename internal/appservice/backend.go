@@ -236,6 +236,21 @@ type Backend interface {
 	// RemoveTeamMembers 将企业身份批量移出团队。
 	//cervi:route POST /teams/:teamID/members/remove
 	RemoveTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
+	// ListKnowledgeQAEntries 返回分组中的本地问答列表。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/qa-entries
+	ListKnowledgeQAEntries(context.Context, RequestMeta, string, KnowledgeQAListInput) (KnowledgeQAList, error)
+	// GetKnowledgeQAEntry 返回完整的本地问答。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/qa-entries/:entryID
+	GetKnowledgeQAEntry(context.Context, RequestMeta, string, string) (KnowledgeQAEntry, error)
+	// CreateKnowledgeQAEntry 创建本地问答。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/qa-entries status=201
+	CreateKnowledgeQAEntry(context.Context, RequestMeta, string, KnowledgeQAInput) (KnowledgeQAEntry, error)
+	// UpdateKnowledgeQAEntry 修改本地问答。
+	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/qa-entries/:entryID
+	UpdateKnowledgeQAEntry(context.Context, RequestMeta, string, string, KnowledgeQAInput) (KnowledgeQAEntry, error)
+	// DeleteKnowledgeQAEntry 删除本地问答。
+	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID/qa-entries/:entryID
+	DeleteKnowledgeQAEntry(context.Context, RequestMeta, string, string) error
 	// ListKnowledgeBases 返回当前企业的知识库列表。
 	//cervi:route GET /knowledge-bases
 	ListKnowledgeBases(context.Context, RequestMeta) (KnowledgeBaseList, error)
@@ -272,7 +287,7 @@ type Backend interface {
 	// UpdateKnowledgeGroup 修改知识库分组。
 	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/groups/:groupID
 	UpdateKnowledgeGroup(context.Context, RequestMeta, string, string, KnowledgeGroupInput) (KnowledgeBase, error)
-	// DeleteKnowledgeGroup 删除不含子分组的知识库分组。
+	// DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
 	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID/groups/:groupID
 	DeleteKnowledgeGroup(context.Context, RequestMeta, string, string) (KnowledgeBase, error)
 	// ListContacts 返回联系人列表。

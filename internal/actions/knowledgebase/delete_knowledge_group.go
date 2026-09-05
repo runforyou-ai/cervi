@@ -19,11 +19,14 @@ func NewDeleteKnowledgeGroupAction(db *bun.DB) *DeleteKnowledgeGroupAction {
 	return &DeleteKnowledgeGroupAction{db: db}
 }
 
-// Execute 删除不含子分组的非默认分组。
+// Execute 删除不含子分组和问答的非默认分组。
 func (a *DeleteKnowledgeGroupAction) Execute(ctx context.Context, identity *servermodels.Identity, knowledgeBaseID, groupID string) (*Record, error) {
 	var output *Record
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		if _, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID); err != nil {
 			return err
 		}
 		group, err := loadKnowledgeGroup(ctx, tx, identity.Organization.ID, knowledgeBaseID, groupID)
@@ -34,6 +37,13 @@ func (a *DeleteKnowledgeGroupAction) Execute(ctx context.Context, identity *serv
 			return ErrGroupInvalid
 		}
 		occupied, err := tx.NewSelect().TableExpr("knowledge_groups AS child").Where("child.parent_id = ?", group.ID).Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if occupied {
+			return ErrGroupNotEmpty
+		}
+		occupied, err = tx.NewSelect().Model((*servermodels.KnowledgeQAEntry)(nil)).Where("group_id = ?", group.ID).Exists(ctx)
 		if err != nil {
 			return err
 		}
