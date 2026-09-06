@@ -15,6 +15,7 @@ type messageReferenceRow struct {
 	Deleted       bool                             `bun:"deleted"`
 	MessageID     string                           `bun:"message_id"`
 	Body          string                           `bun:"body"`
+	BodyFormat    domain.MessageBodyFormat         `bun:"body_format"`
 	ChatSubjectID *string                          `bun:"chat_subject_id"`
 	Kind          *string                          `bun:"kind"`
 	SourceID      *string                          `bun:"source_id"`
@@ -44,6 +45,7 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS message_id").
+		ColumnExpr("msg.body_format AS body_format").
 		ColumnExpr("CASE WHEN msg.deleted_at IS NULL THEN msg.body ELSE '' END AS body").
 		ColumnExpr("msg.deleted_at IS NOT NULL AS deleted").
 		ColumnExpr("cs.id AS chat_subject_id").
@@ -70,7 +72,7 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		return nil, ErrDataInvariant
 	}
 	return &ConversationMessageReference{
-		ID: row.MessageID, Body: row.Body,
+		ID: row.MessageID, Body: row.Body, BodyFormat: row.BodyFormat,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: *row.ChatSubjectID, Kind: domain.ChatSubjectKind(*row.Kind),
 			SourceID: *row.SourceID, DisplayName: row.DisplayName, AvatarFileID: row.AvatarFileID, IdentityType: row.IdentityType,

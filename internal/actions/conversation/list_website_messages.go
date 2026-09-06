@@ -24,12 +24,13 @@ type ListWebsiteMessagesQuery struct {
 }
 
 type websiteMessageRow struct {
-	ID           string    `bun:"id"`
-	Body         string    `bun:"body"`
-	OriginatedAt time.Time `bun:"originated_at"`
-	SourceOrder  int64     `bun:"source_order"`
-	CreatedAt    time.Time `bun:"created_at"`
-	SubjectKind  string    `bun:"subject_kind"`
+	ID           string                   `bun:"id"`
+	Body         string                   `bun:"body"`
+	BodyFormat   domain.MessageBodyFormat `bun:"body_format"`
+	OriginatedAt time.Time                `bun:"originated_at"`
+	SourceOrder  int64                    `bun:"source_order"`
+	CreatedAt    time.Time                `bun:"created_at"`
+	SubjectKind  string                   `bun:"subject_kind"`
 }
 
 // NewListWebsiteMessagesQuery 创建网站访客消息历史查询。
@@ -77,6 +78,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("msg.body AS body").
+		ColumnExpr("msg.body_format AS body_format").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.source_order AS source_order").
 		ColumnExpr("msg.created_at AS created_at").
@@ -142,7 +144,7 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 			author = domain.MessageAuthorVisitor
 		}
 		messages = append(messages, Message{
-			ID: row.ID, Author: author, Body: row.Body,
+			ID: row.ID, Author: author, Body: row.Body, BodyFormat: row.BodyFormat,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
 		})
 	}

@@ -41,6 +41,7 @@ type CustomerConversationSummary struct {
 	ChannelType          domain.ChannelType
 	ChannelName          string
 	Preview              *string
+	PreviewFormat        domain.MessageBodyFormat
 	LastMessageAt        *time.Time
 	ServiceSessionStatus domain.ServiceSessionStatus
 	ServiceSessionID     string
@@ -54,6 +55,7 @@ type DirectConversationSummary struct {
 	PeerName         string
 	PeerAvatarFileID *string
 	Preview          *string
+	PreviewFormat    domain.MessageBodyFormat
 	LastMessageAt    *time.Time
 	AgentRunStatus   *domain.AgentRunStatus
 }
@@ -64,6 +66,7 @@ type GroupConversationSummary struct {
 	ImageFileID   *string
 	Status        domain.ConversationStatus
 	Preview       *string
+	PreviewFormat domain.MessageBodyFormat
 	LastMessageAt *time.Time
 	MemberCount   int
 }
@@ -96,58 +99,61 @@ type UnreadCounts struct {
 }
 
 type customerConversationRow struct {
-	ID                   string     `bun:"id"`
-	Title                string     `bun:"title"`
-	ContactName          *string    `bun:"contact_name"`
-	ContactAvatarFileID  *string    `bun:"contact_avatar_file_id"`
-	ChannelType          string     `bun:"channel_type"`
-	ChannelName          string     `bun:"channel_name"`
-	Preview              *string    `bun:"preview"`
-	LastMessageAt        *time.Time `bun:"last_message_at"`
-	ServiceSessionStatus string     `bun:"service_session_status"`
-	ServiceSessionID     string     `bun:"service_session_id"`
-	AssigneeIdentityID   *string    `bun:"assignee_identity_id"`
-	AssigneeType         *string    `bun:"assignee_type"`
-	AssigneeDisplayName  *string    `bun:"assignee_display_name"`
-	AssigneeAvatarFileID *string    `bun:"assignee_avatar_file_id"`
-	SortAt               *time.Time `bun:"sort_at"`
-	UnreadCount          int        `bun:"unread_count"`
-	LastReadMessageID    *string    `bun:"last_read_message_id"`
-	LastMessageID        *string    `bun:"last_message_id"`
+	ID                   string                   `bun:"id"`
+	Title                string                   `bun:"title"`
+	ContactName          *string                  `bun:"contact_name"`
+	ContactAvatarFileID  *string                  `bun:"contact_avatar_file_id"`
+	ChannelType          string                   `bun:"channel_type"`
+	ChannelName          string                   `bun:"channel_name"`
+	Preview              *string                  `bun:"preview"`
+	PreviewFormat        domain.MessageBodyFormat `bun:"preview_format"`
+	LastMessageAt        *time.Time               `bun:"last_message_at"`
+	ServiceSessionStatus string                   `bun:"service_session_status"`
+	ServiceSessionID     string                   `bun:"service_session_id"`
+	AssigneeIdentityID   *string                  `bun:"assignee_identity_id"`
+	AssigneeType         *string                  `bun:"assignee_type"`
+	AssigneeDisplayName  *string                  `bun:"assignee_display_name"`
+	AssigneeAvatarFileID *string                  `bun:"assignee_avatar_file_id"`
+	SortAt               *time.Time               `bun:"sort_at"`
+	UnreadCount          int                      `bun:"unread_count"`
+	LastReadMessageID    *string                  `bun:"last_read_message_id"`
+	LastMessageID        *string                  `bun:"last_message_id"`
 }
 
 type directConversationRow struct {
-	ID                string     `bun:"id"`
-	PeerIdentityID    string     `bun:"peer_identity_id"`
-	PeerType          string     `bun:"peer_type"`
-	PeerName          string     `bun:"peer_name"`
-	PeerAvatarFileID  *string    `bun:"peer_avatar_file_id"`
-	Preview           *string    `bun:"preview"`
-	LastMessageAt     *time.Time `bun:"last_message_at"`
-	AgentRunStatus    *string    `bun:"agent_run_status"`
-	SortAt            *time.Time `bun:"sort_at"`
-	UnreadCount       int        `bun:"unread_count"`
-	LastMessageID     *string    `bun:"last_message_id"`
-	LastReadMessageID *string    `bun:"last_read_message_id"`
-	Muted             bool       `bun:"muted"`
-	MarkedUnread      bool       `bun:"marked_unread"`
+	ID                string                   `bun:"id"`
+	PeerIdentityID    string                   `bun:"peer_identity_id"`
+	PeerType          string                   `bun:"peer_type"`
+	PeerName          string                   `bun:"peer_name"`
+	PeerAvatarFileID  *string                  `bun:"peer_avatar_file_id"`
+	Preview           *string                  `bun:"preview"`
+	PreviewFormat     domain.MessageBodyFormat `bun:"preview_format"`
+	LastMessageAt     *time.Time               `bun:"last_message_at"`
+	AgentRunStatus    *string                  `bun:"agent_run_status"`
+	SortAt            *time.Time               `bun:"sort_at"`
+	UnreadCount       int                      `bun:"unread_count"`
+	LastMessageID     *string                  `bun:"last_message_id"`
+	LastReadMessageID *string                  `bun:"last_read_message_id"`
+	Muted             bool                     `bun:"muted"`
+	MarkedUnread      bool                     `bun:"marked_unread"`
 }
 
 type groupConversationRow struct {
-	ID                   string     `bun:"id"`
-	Title                string     `bun:"title"`
-	ImageFileID          *string    `bun:"image_file_id"`
-	Status               string     `bun:"status"`
-	Preview              *string    `bun:"preview"`
-	LastMessageAt        *time.Time `bun:"last_message_at"`
-	MemberCount          int        `bun:"member_count"`
-	SortAt               *time.Time `bun:"sort_at"`
-	UnreadCount          int        `bun:"unread_count"`
-	MentionedUnreadCount int        `bun:"mentioned_unread_count"`
-	LastMessageID        *string    `bun:"last_message_id"`
-	LastReadMessageID    *string    `bun:"last_read_message_id"`
-	Muted                bool       `bun:"muted"`
-	MarkedUnread         bool       `bun:"marked_unread"`
+	ID                   string                   `bun:"id"`
+	Title                string                   `bun:"title"`
+	ImageFileID          *string                  `bun:"image_file_id"`
+	Status               string                   `bun:"status"`
+	Preview              *string                  `bun:"preview"`
+	PreviewFormat        domain.MessageBodyFormat `bun:"preview_format"`
+	LastMessageAt        *time.Time               `bun:"last_message_at"`
+	MemberCount          int                      `bun:"member_count"`
+	SortAt               *time.Time               `bun:"sort_at"`
+	UnreadCount          int                      `bun:"unread_count"`
+	MentionedUnreadCount int                      `bun:"mentioned_unread_count"`
+	LastMessageID        *string                  `bun:"last_message_id"`
+	LastReadMessageID    *string                  `bun:"last_read_message_id"`
+	Muted                bool                     `bun:"muted"`
+	MarkedUnread         bool                     `bun:"marked_unread"`
 }
 
 // NewLoadInboxQuery 创建成员收件箱查询。
@@ -204,7 +210,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			Customer: &CustomerConversationSummary{
 				Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
 				ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
-				Preview: row.Preview, LastMessageAt: row.LastMessageAt,
+				Preview: row.Preview, PreviewFormat: row.PreviewFormat, LastMessageAt: row.LastMessageAt,
 				ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,
 			},
 		})
@@ -219,7 +225,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
 			Direct: &DirectConversationSummary{
 				PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID,
-				Preview: row.Preview, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
+				Preview: row.Preview, PreviewFormat: row.PreviewFormat, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
 			},
 		})
 	}
@@ -227,7 +233,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		result = append(result, ConversationSummary{
 			ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
 			Group: &GroupConversationSummary{
-				Title: row.Title, ImageFileID: row.ImageFileID, Status: domain.ConversationStatus(row.Status), Preview: row.Preview,
+				Title: row.Title, ImageFileID: row.ImageFileID, Status: domain.ConversationStatus(row.Status), Preview: row.Preview, PreviewFormat: row.PreviewFormat,
 				LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount,
 			},
 		})
@@ -267,6 +273,7 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		ColumnExpr("ch.type AS channel_type").
 		ColumnExpr("ch.name AS channel_name").
 		ColumnExpr("msg.body AS preview").
+		ColumnExpr("msg.body_format AS preview_format").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("cv.last_message_id::text AS last_message_id").
 		ColumnExpr("current.status AS service_session_status").
@@ -362,6 +369,7 @@ func (q *LoadInboxQuery) directConversationsQuery(organizationID, identityID, us
 		ColumnExpr("peer_oi.display_name AS peer_name").
 		ColumnExpr("peer_oi.avatar_file_id::text AS peer_avatar_file_id").
 		ColumnExpr("msg.body AS preview").
+		ColumnExpr("msg.body_format AS preview_format").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("cv.last_message_id::text AS last_message_id").
 		ColumnExpr("latest_agent_run.status AS agent_run_status").
@@ -415,6 +423,7 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
 		ColumnExpr("msg.body AS preview").
+		ColumnExpr("msg.body_format AS preview_format").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("cv.last_message_id::text AS last_message_id").
 		ColumnExpr("members.member_count AS member_count").

@@ -50,9 +50,10 @@ type AgentToolCall struct {
 
 // ConversationAgentRun 定义消息窗口中的最近一次运行状态。
 type ConversationAgentRun struct {
-	AgentName string         `json:"agentName"`
-	ID        string         `json:"id"`
-	Status    AgentRunStatus `json:"status"`
-	ErrorCode *string        `json:"errorCode"`
-	LastError *string        `json:"lastError"`
+	AgentName      string         `json:"agentName"`
+	AgentAvatarURL string         `json:"agentAvatarUrl"`
+	ID             string         `json:"id"`
+	Status         AgentRunStatus `json:"status"`
+	ErrorCode      *string        `json:"errorCode"`
+	LastError      *string        `json:"lastError"`
 }

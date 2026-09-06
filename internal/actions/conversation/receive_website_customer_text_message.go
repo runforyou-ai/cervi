@@ -435,7 +435,7 @@ func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessage
 		OpenedNewServiceSession: received.OpenedServiceSession,
 		Message: Message{
 			ID: received.Message.ID, Author: domain.MessageAuthorVisitor,
-			Body: received.Message.Body, OriginatedAt: received.Message.OriginatedAt,
+			Body: received.Message.Body, BodyFormat: domain.MessageBodyFormat(received.Message.BodyFormat), OriginatedAt: received.Message.OriginatedAt,
 			CreatedAt: received.Message.CreatedAt,
 		},
 	}
@@ -450,6 +450,7 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("msg.body AS preview").
+		ColumnExpr("msg.body_format AS preview_format").
 		ColumnExpr("current.id AS service_session_id").
 		ColumnExpr("current.status AS service_session_status").
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").

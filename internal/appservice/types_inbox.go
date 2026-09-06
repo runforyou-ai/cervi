@@ -81,6 +81,7 @@ type CustomerInboxConversation struct {
 	ChannelType          ChannelType          `json:"channelType"`
 	ChannelName          string               `json:"channelName"`
 	Preview              *string              `json:"preview"`
+	PreviewFormat        MessageBodyFormat    `json:"previewFormat"`
 	LastMessageAt        *time.Time           `json:"lastMessageAt"`
 	ServiceSessionStatus ServiceSessionStatus `json:"serviceSessionStatus"`
 	ServiceSessionID     string               `json:"serviceSessionId"`
@@ -94,6 +95,7 @@ type DirectInboxConversation struct {
 	PeerName       string                   `json:"peerName"`
 	PeerAvatarURL  string                   `json:"peerAvatarUrl"`
 	Preview        *string                  `json:"preview"`
+	PreviewFormat  MessageBodyFormat        `json:"previewFormat"`
 	LastMessageAt  *time.Time               `json:"lastMessageAt"`
 	AgentRunStatus *AgentRunStatus          `json:"agentRunStatus"`
 }
@@ -104,6 +106,7 @@ type GroupInboxConversation struct {
 	ImageURL      string             `json:"imageUrl"`
 	Status        ConversationStatus `json:"status"`
 	Preview       *string            `json:"preview"`
+	PreviewFormat MessageBodyFormat  `json:"previewFormat"`
 	LastMessageAt *time.Time         `json:"lastMessageAt"`
 	MemberCount   int                `json:"memberCount"`
 }

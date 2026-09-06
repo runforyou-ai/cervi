@@ -136,6 +136,7 @@ tasks:
     run: once
     deps:
       - task: go:mod:tidy
+      - task: build:messenger
     sources:
       - "**/*.[jt]s"
       - exclude: frontend/**/*
@@ -156,6 +157,16 @@ tasks:
     # 每次构建重新生成，确保未纳入版本管理的 Assets.car 不会因缓存而缺失。
     cmds:
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
+
+  build:messenger:
+    summary: 构建网站 Messenger 共用的消息正文组件
+    run: once
+    deps:
+      - task: install:frontend:deps
+    cmds:
+      - task: frontend:run
+        vars:
+          SCRIPT: build:messenger
 
   dev:frontend:
     summary: Runs the frontend in development mode

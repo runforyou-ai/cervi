@@ -98,6 +98,7 @@ type ConversationSummary struct {
 	ID                   string
 	Title                string
 	Preview              string
+	PreviewFormat        domain.MessageBodyFormat
 	LastMessageAt        time.Time
 	ServiceSessionID     string
 	ServiceSessionStatus domain.ServiceSessionStatus
@@ -108,6 +109,7 @@ type Message struct {
 	ID           string
 	Author       domain.MessageAuthor
 	Body         string
+	BodyFormat   domain.MessageBodyFormat
 	OriginatedAt time.Time
 	SourceOrder  int64
 	CreatedAt    time.Time
@@ -157,10 +159,11 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
-	Deleted bool
-	ID      string
-	Body    string
-	Sender  *ConversationMessageSender
+	Deleted    bool
+	ID         string
+	Body       string
+	BodyFormat domain.MessageBodyFormat
+	Sender     *ConversationMessageSender
 }
 
 // ConversationMessageMention 定义消息提醒的聊天主体。
@@ -200,6 +203,7 @@ type ConversationMessage struct {
 	ID                   string
 	Type                 domain.MessageType
 	Body                 string
+	BodyFormat           domain.MessageBodyFormat
 	OriginatedAt         time.Time
 	SourceOrder          int64
 	CreatedAt            time.Time
@@ -239,11 +243,12 @@ type ConversationAgentProcess struct {
 
 // ConversationAgentRun 定义会话最近一次运行的状态。
 type ConversationAgentRun struct {
-	AgentName string
-	ID        string
-	Status    domain.AgentRunStatus
-	ErrorCode *string
-	LastError *string
+	AgentAvatarFileID *string
+	AgentName         string
+	ID                string
+	Status            domain.AgentRunStatus
+	ErrorCode         *string
+	LastError         *string
 }
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。
@@ -274,6 +279,7 @@ type DirectConversationSummary struct {
 	PeerName         string
 	PeerAvatarFileID *string
 	Preview          *string
+	PreviewFormat    domain.MessageBodyFormat
 	LastMessageAt    *time.Time
 }
 

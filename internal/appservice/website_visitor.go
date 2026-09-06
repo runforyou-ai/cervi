@@ -21,6 +21,7 @@ type WebsiteVisitorConversation struct {
 	ID             string                       `json:"id"`
 	Title          string                       `json:"title"`
 	Preview        string                       `json:"preview"`
+	PreviewFormat  MessageBodyFormat            `json:"previewFormat"`
 	LastMessageAt  time.Time                    `json:"lastMessageAt"`
 	ServiceSession WebsiteVisitorServiceSession `json:"serviceSession"`
 }
@@ -40,11 +41,12 @@ type WebsiteVisitorTextMessageInput struct {
 
 // WebsiteVisitorMessage 定义网站访客可见消息。
 type WebsiteVisitorMessage struct {
-	ID           string    `json:"id"`
-	Author       string    `json:"author"`
-	Body         string    `json:"body"`
-	OriginatedAt time.Time `json:"originatedAt"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID           string            `json:"id"`
+	Author       string            `json:"author"`
+	Body         string            `json:"body"`
+	BodyFormat   MessageBodyFormat `json:"bodyFormat"`
+	OriginatedAt time.Time         `json:"originatedAt"`
+	CreatedAt    time.Time         `json:"createdAt"`
 }
 
 // WebsiteVisitorTextMessageResult 定义网站访客文本写入结果。

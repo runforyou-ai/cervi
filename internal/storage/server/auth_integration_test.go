@@ -2037,7 +2037,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		websiteMessages, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), conversationaction.MessageHistoryInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: websiteInbound.Conversation.ID,
 		})
-		if err != nil || len(websiteMessages.Messages) == 0 || websiteMessages.Messages[len(websiteMessages.Messages)-1].Author != domain.MessageAuthorAgent || websiteMessages.Messages[len(websiteMessages.Messages)-1].Body != "已结合补充信息回复" {
+		if err != nil || len(websiteMessages.Messages) == 0 || websiteMessages.Messages[len(websiteMessages.Messages)-1].Author != domain.MessageAuthorAgent || websiteMessages.Messages[len(websiteMessages.Messages)-1].Body != "已结合补充信息回复" || websiteMessages.Messages[len(websiteMessages.Messages)-1].BodyFormat != domain.MessageBodyFormatMarkdown {
 			t.Fatalf("website messages after customer run = %#v, error = %v", websiteMessages, err)
 		}
 		if _, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID); err != nil {

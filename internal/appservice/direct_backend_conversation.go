@@ -182,7 +182,7 @@ func directInboxConversationFromSummary(summary conversationaction.DirectConvers
 		ID: summary.ID, Type: ConversationTypeDirect,
 		Direct: &DirectInboxConversation{
 			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.PeerAvatarFileID),
-			Preview: summary.Preview, LastMessageAt: summary.LastMessageAt,
+			Preview: summary.Preview, PreviewFormat: MessageBodyFormat(summary.PreviewFormat), LastMessageAt: summary.LastMessageAt,
 		},
 	}
 }
@@ -532,7 +532,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	var replyTo *ConversationMessageReference
 	if message.ReplyTo != nil {
 		replyTo = &ConversationMessageReference{
-			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
+			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body, BodyFormat: MessageBodyFormat(message.ReplyTo.BodyFormat), Deleted: message.ReplyTo.Deleted,
 			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender, avatarURLs),
 		}
 	}
@@ -545,7 +545,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	}
 	return ConversationMessage{
 		AgentProcess: conversationAgentProcessFromAction(message.AgentProcess),
-		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body,
+		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body, BodyFormat: MessageBodyFormat(message.BodyFormat),
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, GroupMessageSequence: groupMessageSequenceString(message.GroupMessageSequence),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
@@ -760,13 +760,17 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。
 func (b *DirectBackend) conversationMessageListFromAction(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, history conversationaction.ConversationMessageHistory) (ConversationMessageList, error) {
-	avatarURLs, err := b.conversationAvatarURLs(ctx, identity, history.Messages)
+	var agentAvatarFileID *string
+	if history.LatestAgentRun != nil {
+		agentAvatarFileID = history.LatestAgentRun.AgentAvatarFileID
+	}
+	avatarURLs, err := b.conversationAvatarURLs(ctx, identity, history.Messages, agentAvatarFileID)
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
 	if run := history.LatestAgentRun; run != nil {
-		result.LatestAgentRun = &ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError}
+		result.LatestAgentRun = &ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, run.AgentAvatarFileID), Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError}
 	}
 	for _, message := range history.Messages {
 		result.Messages = append(result.Messages, conversationMessageFromAction(message, avatarURLs))
@@ -782,7 +786,7 @@ func (b *DirectBackend) conversationMessageListFromAction(ctx context.Context, m
 	return result, nil
 }
 
-// conversationAvatarURLs 批量解析消息发送者、引用发送者和单聊目标的头像。
+// conversationAvatarURLs 批量解析消息发送者、引用发送者、单聊目标和运行中 Agent 的头像。
 func (b *DirectBackend) conversationAvatarURLs(ctx context.Context, identity *servermodels.Identity, messages []conversationaction.ConversationMessage, extraFileIDs ...*string) (map[string]string, error) {
 	fileIDs := make([]string, 0, len(messages)+len(extraFileIDs))
 	for _, fileID := range extraFileIDs {

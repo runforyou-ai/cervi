@@ -63,9 +63,10 @@ type directConversationIDs struct {
 }
 
 type directConversationSummaryRow struct {
-	ID            string     `bun:"id"`
-	Preview       *string    `bun:"preview"`
-	LastMessageAt *time.Time `bun:"last_message_at"`
+	ID            string                   `bun:"id"`
+	Preview       *string                  `bun:"preview"`
+	PreviewFormat domain.MessageBodyFormat `bun:"preview_format"`
+	LastMessageAt *time.Time               `bun:"last_message_at"`
 }
 
 type directSendContextRow struct {
@@ -429,6 +430,7 @@ func loadDirectConversationSummary(ctx context.Context, db bun.IDB, organization
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("msg.body AS preview").
+		ColumnExpr("msg.body_format AS preview_format").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Where("cv.organization_id = ?", organizationID).
@@ -440,7 +442,7 @@ func loadDirectConversationSummary(ctx context.Context, db bun.IDB, organization
 	}
 	return DirectConversationSummary{
 		ID: row.ID, PeerIdentityID: target.IdentityID, PeerType: target.IdentityType, PeerName: target.DisplayName, PeerAvatarFileID: target.AvatarFileID,
-		Preview: row.Preview, LastMessageAt: row.LastMessageAt,
+		Preview: row.Preview, PreviewFormat: row.PreviewFormat, LastMessageAt: row.LastMessageAt,
 	}, nil
 }
 

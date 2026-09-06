@@ -12,6 +12,7 @@ import {
   SearchIcon,
   UsersRoundIcon,
 } from "lucide-react"
+import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -722,7 +723,7 @@ function InboxConversationList({
           const preview =
             groupDissolved
               ? t("groupDissolved")
-              : summary.preview?.trim() ||
+              : messagePreview(summary.preview ?? "", summary.previewFormat).trim() ||
                 (isGroupInboxConversation(conversation) &&
                 summary.lastMessageAt
                   ? t("groupSystemUpdated")

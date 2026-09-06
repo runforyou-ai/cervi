@@ -21,12 +21,13 @@ type ListWebsiteConversationsQuery struct {
 }
 
 type conversationSummaryRow struct {
-	ID                   string    `bun:"id"`
-	Title                string    `bun:"title"`
-	LastMessageAt        time.Time `bun:"last_message_at"`
-	Preview              string    `bun:"preview"`
-	ServiceSessionID     string    `bun:"service_session_id"`
-	ServiceSessionStatus string    `bun:"service_session_status"`
+	ID                   string                   `bun:"id"`
+	Title                string                   `bun:"title"`
+	LastMessageAt        time.Time                `bun:"last_message_at"`
+	Preview              string                   `bun:"preview"`
+	PreviewFormat        domain.MessageBodyFormat `bun:"preview_format"`
+	ServiceSessionID     string                   `bun:"service_session_id"`
+	ServiceSessionStatus string                   `bun:"service_session_status"`
 }
 
 // NewListWebsiteConversationsQuery 创建网站访客会话列表查询。
@@ -69,6 +70,7 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("msg.body AS preview").
+		ColumnExpr("msg.body_format AS preview_format").
 		ColumnExpr("current.id AS service_session_id").
 		ColumnExpr("current.status AS service_session_status").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
@@ -95,7 +97,7 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 // conversationSummaryFromRow 转换网站访客会话摘要。
 func conversationSummaryFromRow(row conversationSummaryRow) ConversationSummary {
 	return ConversationSummary{
-		ID: row.ID, Title: row.Title, Preview: row.Preview, LastMessageAt: row.LastMessageAt,
+		ID: row.ID, Title: row.Title, Preview: row.Preview, PreviewFormat: row.PreviewFormat, LastMessageAt: row.LastMessageAt,
 		ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus),
 	}
 }

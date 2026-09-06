@@ -34,6 +34,7 @@ export {
     KnowledgeDocumentSegmentIndexStatus,
     KnowledgeDocumentStatus,
     Locale,
+    MessageBodyFormat,
     MessageType,
     NotificationPermissionStatus,
     OrganizationIdentityType,

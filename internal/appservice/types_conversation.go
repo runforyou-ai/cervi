@@ -22,6 +22,14 @@ const (
 	MessageTypeSystem MessageType = MessageType(domain.MessageTypeSystem)
 )
 
+// MessageBodyFormat 定义消息正文的解释方式。
+type MessageBodyFormat string
+
+const (
+	MessageBodyFormatPlain    MessageBodyFormat = MessageBodyFormat(domain.MessageBodyFormatPlain)
+	MessageBodyFormatMarkdown MessageBodyFormat = MessageBodyFormat(domain.MessageBodyFormatMarkdown)
+)
+
 // ConversationStatus 表示会话生命周期状态。
 type ConversationStatus string
 
@@ -87,10 +95,11 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
-	Deleted bool                       `json:"deleted"`
-	ID      string                     `json:"id"`
-	Body    string                     `json:"body"`
-	Sender  *ConversationMessageSender `json:"sender"`
+	Deleted    bool                       `json:"deleted"`
+	ID         string                     `json:"id"`
+	Body       string                     `json:"body"`
+	BodyFormat MessageBodyFormat          `json:"bodyFormat"`
+	Sender     *ConversationMessageSender `json:"sender"`
 }
 
 // ConversationMessageMention 定义消息提醒的聊天主体。
@@ -130,6 +139,7 @@ type ConversationMessage struct {
 	ID                   string                           `json:"id"`
 	Type                 MessageType                      `json:"type"`
 	Body                 string                           `json:"body"`
+	BodyFormat           MessageBodyFormat                `json:"bodyFormat"`
 	OriginatedAt         time.Time                        `json:"originatedAt"`
 	SourceOrder          int64                            `json:"sourceOrder"`
 	CreatedAt            time.Time                        `json:"createdAt"`

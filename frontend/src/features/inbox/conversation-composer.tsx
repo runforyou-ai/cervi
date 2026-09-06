@@ -10,6 +10,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
+import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -569,7 +570,7 @@ export function ConversationComposer({
                   })}
                 </p>
                 <p className="truncate text-muted-foreground">
-                  {activeReplyTo.body}
+                  {messagePreview(activeReplyTo.body, activeReplyTo.bodyFormat)}
                 </p>
               </div>
               <button

@@ -9,6 +9,7 @@ import {
   ConversationSystemEventType,
   ConversationType,
   MessageType,
+  MessageBodyFormat,
   OrganizationIdentityType,
   ServiceSessionStatus,
   isApiError,
@@ -19,6 +20,9 @@ import {
   type ConversationSystemEventParticipant,
   type GroupParticipant,
 } from "@/api"
+import { MessageMarkdown } from "@/components/message-markdown"
+import { messagePreview } from "@/lib/message-preview"
+import { openExternalURL } from "@/platform/external-navigation"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
@@ -55,6 +59,7 @@ type TimelineMessage = Pick<
   | "id"
   | "type"
   | "body"
+  | "bodyFormat"
   | "originatedAt"
   | "sourceOrder"
   | "groupMessageSequence"
@@ -120,6 +125,7 @@ function mergeTimelineMessages(
       id: `local:${message.clientMessageID}`,
       type: MessageType.MessageTypeText,
       body: message.body,
+      bodyFormat: MessageBodyFormat.MessageBodyFormatPlain,
       originatedAt: message.originatedAt,
       sourceOrder: 0,
       groupMessageSequence: null,
@@ -784,6 +790,7 @@ function ConversationTimelineContent({
                                       onReplyMessage({
                                         id: message.id,
                                         body: message.body,
+                                        bodyFormat: message.bodyFormat,
                                         sender: message.sender,
                                         deleted: false,
                                       })
@@ -838,7 +845,7 @@ function ConversationTimelineContent({
                                               t("unknownSender")}
                                           </span>
                                           <span className="line-clamp-2 whitespace-pre-wrap">
-                                            {message.replyTo.body}
+                                            {messagePreview(message.replyTo.body, message.replyTo.bodyFormat)}
                                           </span>
                                         </>
                                       )}
@@ -853,9 +860,13 @@ function ConversationTimelineContent({
                                       workspaceLayout && "flex items-end gap-2",
                                     )}
                                   >
-                                    <span className="min-w-0 whitespace-pre-wrap">
-                                      {renderMessageBody(message)}
-                                    </span>
+                                    {message.bodyFormat === MessageBodyFormat.MessageBodyFormatMarkdown ? (
+                                      <div className="min-w-0 flex-1">
+                                        <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
+                                      </div>
+                                    ) : (
+                                      <span className="min-w-0 whitespace-pre-wrap">{renderMessageBody(message)}</span>
+                                    )}
                                     {workspaceLayout ? (
                                       <time
                                         dateTime={message.originatedAt}
@@ -923,6 +934,7 @@ function ConversationTimelineContent({
                               onReplyMessage({
                                 id: message.id,
                                 body: message.body,
+                                bodyFormat: message.bodyFormat,
                                 sender: message.sender,
                                 deleted: false,
                               })

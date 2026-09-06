@@ -30,6 +30,7 @@ type conversationMessageRow struct {
 	ID                             string                           `bun:"id"`
 	Type                           string                           `bun:"type"`
 	Body                           string                           `bun:"body"`
+	BodyFormat                     domain.MessageBodyFormat         `bun:"body_format"`
 	SystemEventType                *string                          `bun:"system_event_type"`
 	SystemEventPayload             json.RawMessage                  `bun:"system_event_payload"`
 	OriginatedAt                   time.Time                        `bun:"originated_at"`
@@ -45,6 +46,7 @@ type conversationMessageRow struct {
 	ReplyToMessageID               *string                          `bun:"reply_to_message_id"`
 	MentionAll                     bool                             `bun:"mention_all"`
 	ReplyToDeleted                 bool                             `bun:"reply_to_deleted"`
+	ReplyToBodyFormat              domain.MessageBodyFormat         `bun:"reply_to_body_format"`
 	ReplyToBody                    *string                          `bun:"reply_to_body"`
 	ReplyToSenderSubjectID         *string                          `bun:"reply_to_sender_subject_id"`
 	ReplyToSenderKind              *string                          `bun:"reply_to_sender_kind"`
@@ -119,6 +121,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
+		ColumnExpr("msg.body_format AS body_format").
 		ColumnExpr("msg.system_event_type AS system_event_type").
 		ColumnExpr("msg.system_event_payload AS system_event_payload").
 		ColumnExpr("msg.originated_at AS originated_at").
@@ -134,6 +137,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.mention_all AS mention_all").
 		ColumnExpr("CASE WHEN reply_msg.deleted_at IS NULL THEN reply_msg.body END AS reply_to_body").
+		ColumnExpr("reply_msg.body_format AS reply_to_body_format").
 		ColumnExpr("reply_msg.deleted_at IS NOT NULL AS reply_to_deleted").
 		ColumnExpr("reply_cs.id AS reply_to_sender_subject_id").
 		ColumnExpr("reply_cs.kind AS reply_to_sender_kind").
@@ -305,7 +309,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	messages := make([]ConversationMessage, 0, len(rows))
 	for _, row := range rows {
 		message := ConversationMessage{
-			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
+			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body, BodyFormat: row.BodyFormat,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, GroupMessageSequence: row.GroupMessageSequence,
 		}
 		if message.Type == domain.MessageTypeSystem {
@@ -333,7 +337,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 				return ConversationMessageHistory{}, fmt.Errorf("load conversation reply reference: %w", ErrDataInvariant)
 			}
 			message.ReplyTo = &ConversationMessageReference{
-				ID: *row.ReplyToMessageID, Body: *row.ReplyToBody,
+				ID: *row.ReplyToMessageID, Body: *row.ReplyToBody, BodyFormat: row.ReplyToBodyFormat,
 				Sender: &ConversationMessageSender{
 					ChatSubjectID: *row.ReplyToSenderSubjectID,
 					Kind:          domain.ChatSubjectKind(*row.ReplyToSenderKind),

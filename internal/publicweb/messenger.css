@@ -545,11 +545,12 @@ summary:focus-visible {
 .cv-message { display: flex; width: 100%; flex-direction: column; gap: 5px; }
 .cv-message-visitor { align-items: flex-end; }
 .cv-message-assistant { align-items: flex-start; }
-.cv-message-row { display: flex; max-width: 82%; align-items: flex-end; gap: 8px; }
+.cv-message-row { display: flex; min-width: 0; max-width: 82%; align-items: flex-end; gap: 8px; }
 .cv-message-row-with-assets { flex-direction: column; }
 .cv-message-visitor .cv-message-row-with-assets { align-items: flex-end; }
 .cv-message-assistant .cv-message-row-with-assets { align-items: flex-start; }
 .cv-message-bubble {
+  min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
   padding: 10px 14px;

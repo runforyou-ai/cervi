@@ -2,6 +2,24 @@
 (function () {
   var messenger = document.getElementById("cv-messenger");
   var messages = document.getElementById("cv-messages");
+  var followingMessages = true;
+  var previousMessagesHeight = messages.scrollHeight;
+  var messageResizeObserver = new ResizeObserver(function () {
+    if (followingMessages) messages.scrollTop = messages.scrollHeight;
+    previousMessagesHeight = messages.scrollHeight;
+  });
+  messages.addEventListener("scroll", function () {
+    if (messages.scrollHeight === previousMessagesHeight) {
+      followingMessages = messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 48;
+    }
+    previousMessagesHeight = messages.scrollHeight;
+  });
+  window.addEventListener("pagehide", function (event) {
+    if (event.persisted) return;
+    messageResizeObserver.disconnect();
+    CerviMarkdown.unmount(messages);
+    conversationItems.forEach(function (conversation) { CerviMarkdown.unmount(conversation.fragment); });
+  });
   var composer = document.getElementById("cv-composer");
   var input = document.getElementById("cv-input");
 
@@ -120,7 +138,7 @@
       fragment: document.createDocumentFragment(),
       started: summary !== null,
       draft: "",
-      summary: summary ? summary.preview : "",
+      summary: summary ? CerviMarkdown.preview(summary.preview, summary.previewFormat) : "",
       time: summary ? formatTime(new Date(summary.lastMessageAt)) : "",
       lastMessageAt: summary ? summary.lastMessageAt : "",
       serviceSession: summary ? summary.serviceSession : null,
@@ -149,7 +167,7 @@
   // 向指定会话追加节点，并只滚动当前会话。
   function appendConversationNode(conversation, node) {
     conversationMessageContainer(conversation).appendChild(node);
-    if (conversation === activeConversation) {
+    if (conversation === activeConversation && followingMessages) {
       scrollToBottom();
     }
   }
@@ -439,6 +457,7 @@
   }
 
   function scrollToBottom() {
+    followingMessages = true;
     messages.scrollTop = messages.scrollHeight;
   }
 
@@ -514,13 +533,14 @@
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
-    bubble.textContent = text;
+    CerviMarkdown.render(bubble, { body: text, bodyFormat: greeting ? "plain" : "markdown" });
+    messageResizeObserver.observe(bubble);
     row.appendChild(bubble);
     message.appendChild(row);
     message.appendChild(messageMeta(now));
     appendConversationNode(conversation, message);
     if (!greeting) {
-      updateConversationSummary(conversation, text, now);
+      updateConversationSummary(conversation, CerviMarkdown.preview(text, "markdown"), now);
     }
   }
 
@@ -728,7 +748,7 @@
         conversation.lastMessageID,
       ) >= 0
     ) {
-      conversation.summary = summary.preview;
+      conversation.summary = CerviMarkdown.preview(summary.preview, summary.previewFormat);
       conversation.lastMessageAt = summary.lastMessageAt;
       conversation.lastMessageID = summaryMessageID || "";
       conversation.time = formatTime(new Date(summary.lastMessageAt));
@@ -835,7 +855,7 @@
           var lastMessage = result.messages[result.messages.length - 1];
           updateConversationSummary(
             conversation,
-            lastMessage.body,
+            CerviMarkdown.preview(lastMessage.body, lastMessage.bodyFormat),
             lastMessage.originatedAt,
             lastMessage.id,
           );
@@ -862,6 +882,10 @@
 
   // 清空指定会话现有的真实消息节点。
   function clearConversationMessages(conversation) {
+    CerviMarkdown.unmount(conversationMessageContainer(conversation));
+    conversationMessageContainer(conversation).querySelectorAll(".cv-message-bubble").forEach(function (bubble) {
+      messageResizeObserver.unobserve(bubble);
+    });
     conversation.messageIDs = Object.create(null);
     if (conversation === activeConversation) {
       Array.from(messages.children).forEach(function (node) {
@@ -896,7 +920,7 @@
     } else {
       container.appendChild(node);
     }
-    if (conversation === activeConversation) {
+    if (conversation === activeConversation && followingMessages) {
       scrollToBottom();
     }
   }
@@ -915,7 +939,8 @@
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
-    bubble.textContent = value.body;
+    CerviMarkdown.render(bubble, value);
+    messageResizeObserver.observe(bubble);
     row.appendChild(bubble);
     message.appendChild(row);
     message.appendChild(messageMeta(new Date(value.originatedAt)));
@@ -1017,7 +1042,7 @@
         var lastMessage = result.messages[result.messages.length - 1];
         updateConversationSummary(
           conversation,
-          lastMessage.body,
+          CerviMarkdown.preview(lastMessage.body, lastMessage.bodyFormat),
           lastMessage.originatedAt,
           lastMessage.id,
         );

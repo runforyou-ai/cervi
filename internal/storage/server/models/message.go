@@ -22,6 +22,7 @@ type Message struct {
 	SenderParticipantID  *string         `bun:"sender_participant_id"`
 	Type                 string          `bun:"type"`
 	Body                 string          `bun:"body"`
+	BodyFormat           string          `bun:"body_format,notnull,default:'plain'"`
 	SystemEventType      *string         `bun:"system_event_type"`
 	SystemEventPayload   json.RawMessage `bun:"system_event_payload,type:jsonb"`
 	ReplyToMessageID     *string         `bun:"reply_to_message_id"`

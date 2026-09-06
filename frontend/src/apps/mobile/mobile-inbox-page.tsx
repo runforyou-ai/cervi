@@ -1,6 +1,7 @@
 /** 移动端统一会话摘要列表和内部单聊入口。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
+import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
@@ -177,7 +178,7 @@ function MobileConversationRow({
     groupConversation?.group.status ===
     ConversationStatus.ConversationStatusArchived
       ? t("groupDissolved")
-      : (summary.preview ??
+      : (messagePreview(summary.preview ?? "", summary.previewFormat) ||
         (groupConversation && conversation.lastMessageId
           ? t("groupSystemUpdated")
           : t("messagesEmpty")))
