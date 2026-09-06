@@ -610,6 +610,7 @@ export interface ConversationAgentProcess {
  */
 export interface ConversationAgentRun {
     "agentName": string;
+    "agentAvatarUrl": string;
     "id": string;
     "status": AgentRunStatus;
     "errorCode": string | null;
@@ -885,6 +886,7 @@ export interface CustomerInboxConversation {
     "channelType": ChannelType;
     "channelName": string;
     "preview": string | null;
+    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "serviceSessionStatus": ServiceSessionStatus;
     "serviceSessionId": string;
@@ -948,6 +950,7 @@ export interface DirectInboxConversation {
     "peerName": string;
     "peerAvatarUrl": string;
     "preview": string | null;
+    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "agentRunStatus": AgentRunStatus | null;
 }
@@ -1143,6 +1146,7 @@ export interface GroupInboxConversation {
     "imageUrl": string;
     "status": ConversationStatus;
     "preview": string | null;
+    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "memberCount": number;
 }

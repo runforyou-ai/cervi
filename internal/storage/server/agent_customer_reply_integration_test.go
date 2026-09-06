@@ -135,6 +135,25 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 			if calls != 1 {
 				t.Fatalf("runtime calls=%d", calls)
 			}
+			// 访客引用 AI 回复时，发送响应与历史页均保留 AI 身份。
+			historyInput := conversationaction.MessageHistoryInput{ChannelID: channel.ID, ExternalID: input.ExternalID, ConversationID: original.Conversation.ID}
+			history, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(ctx, historyInput)
+			if err != nil || len(history.Messages) == 0 {
+				t.Fatalf("AI history=%+v err=%v", history, err)
+			}
+			input.ClientMessageID, input.Body = uuid.NewV7().String(), "引用 AI 回答"
+			input.ReplyToMessageID = history.Messages[len(history.Messages)-1].ID
+			reply, err := receive.Execute(ctx, input)
+			if err != nil || reply.Message.ReplyTo == nil || reply.Message.ReplyTo.SenderIdentityType == nil || *reply.Message.ReplyTo.SenderIdentityType != domain.OrganizationIdentityTypeAgent {
+				t.Fatalf("AI reference response=%+v err=%v", reply, err)
+			}
+			history, err = conversationaction.NewListWebsiteMessagesQuery(db).Execute(ctx, historyInput)
+			if err != nil || len(history.Messages) == 0 {
+				t.Fatalf("AI reference history=%+v err=%v", history, err)
+			}
+			if reference := history.Messages[len(history.Messages)-1].ReplyTo; reference == nil || reference.Body != "AI 后续回答" || reference.SenderIdentityType == nil || *reference.SenderIdentityType != domain.OrganizationIdentityTypeAgent {
+				t.Fatalf("AI history reference=%+v", reference)
+			}
 		})
 	}
 }

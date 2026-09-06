@@ -2,6 +2,24 @@
 (function () {
   var messenger = document.getElementById("cv-messenger");
   var messages = document.getElementById("cv-messages");
+  var followingMessages = true;
+  var previousMessagesHeight = messages.scrollHeight;
+  var messageResizeObserver = new ResizeObserver(function () {
+    if (followingMessages) messages.scrollTop = messages.scrollHeight;
+    previousMessagesHeight = messages.scrollHeight;
+  });
+  messages.addEventListener("scroll", function () {
+    if (messages.scrollHeight === previousMessagesHeight) {
+      followingMessages = messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 48;
+    }
+    previousMessagesHeight = messages.scrollHeight;
+  });
+  window.addEventListener("pagehide", function (event) {
+    if (event.persisted) return;
+    messageResizeObserver.disconnect();
+    CerviMarkdown.unmount(messages);
+    conversationItems.forEach(function (conversation) { CerviMarkdown.unmount(conversation.fragment); });
+  });
   var composer = document.getElementById("cv-composer");
   var input = document.getElementById("cv-input");
 
@@ -132,7 +150,7 @@
       fragment: document.createDocumentFragment(),
       started: summary !== null,
       draft: "",
-      summary: summary ? summary.preview : "",
+      summary: summary ? CerviMarkdown.preview(summary.preview, summary.previewSenderIdentityType) : "",
       time: summary ? formatTime(new Date(summary.lastMessageAt)) : "",
       lastMessageAt: summary ? summary.lastMessageAt : "",
       serviceSession: summary ? summary.serviceSession : null,
@@ -164,7 +182,7 @@
   // 向指定会话追加节点，并只滚动当前会话。
   function appendConversationNode(conversation, node) {
     conversationMessageContainer(conversation).appendChild(node);
-    if (conversation === activeConversation) {
+    if (conversation === activeConversation && followingMessages) {
       scrollToBottom();
     }
   }
@@ -211,6 +229,8 @@
     }
     autosize();
     updateSendState();
+    // 切换会话后重新跟随正文的异步布局和后续消息。
+    followingMessages = true;
     messages.scrollTop = activeConversation.started ? messages.scrollHeight : 0;
     if (
       !previewMode &&
@@ -458,6 +478,7 @@
   }
 
   function scrollToBottom() {
+    followingMessages = true;
     $("cv-latest-message").hidden = true;
     messages.scrollTop = messages.scrollHeight;
   }
@@ -534,13 +555,14 @@
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
-    bubble.textContent = text;
+    CerviMarkdown.render(bubble, text, greeting ? null : "agent");
+    messageResizeObserver.observe(bubble);
     row.appendChild(bubble);
     message.appendChild(row);
     message.appendChild(messageMeta(now));
     appendConversationNode(conversation, message);
     if (!greeting) {
-      updateConversationSummary(conversation, text, now);
+      updateConversationSummary(conversation, CerviMarkdown.preview(text, "agent"), now);
     }
   }
 
@@ -748,7 +770,7 @@
         conversation.lastMessageID,
       ) >= 0
     ) {
-      conversation.summary = summary.preview;
+      conversation.summary = CerviMarkdown.preview(summary.preview, summary.previewSenderIdentityType);
       conversation.lastMessageAt = summary.lastMessageAt;
       conversation.lastMessageID = summaryMessageID || "";
       conversation.time = formatTime(new Date(summary.lastMessageAt));
@@ -856,7 +878,7 @@
           var lastMessage = result.messages[result.messages.length - 1];
           updateConversationSummary(
             conversation,
-            lastMessage.body,
+            CerviMarkdown.preview(lastMessage.body, lastMessage.senderIdentityType),
             lastMessage.originatedAt,
             lastMessage.id,
           );
@@ -883,6 +905,10 @@
 
   // 清空指定会话现有的真实消息节点。
   function clearConversationMessages(conversation) {
+    CerviMarkdown.unmount(conversationMessageContainer(conversation));
+    conversationMessageContainer(conversation).querySelectorAll(".cv-message-bubble").forEach(function (bubble) {
+      messageResizeObserver.unobserve(bubble);
+    });
     conversation.messageIDs = Object.create(null);
     if (conversation === activeConversation) {
       Array.from(messages.children).forEach(function (node) {
@@ -948,13 +974,16 @@
         author.textContent = referenceLabels[value.replyTo.author];
         var excerpt = document.createElement("span");
         excerpt.className = "cv-message-reference-body";
-        excerpt.textContent = value.replyTo.body;
+        excerpt.textContent = CerviMarkdown.preview(value.replyTo.body, value.replyTo.senderIdentityType);
         reference.appendChild(author);
         reference.appendChild(excerpt);
       }
       bubble.appendChild(reference);
     }
-    bubble.appendChild(document.createTextNode(value.body));
+    var body = document.createElement("div");
+    bubble.appendChild(body);
+    CerviMarkdown.render(body, value.body, value.senderIdentityType);
+    messageResizeObserver.observe(bubble);
     row.appendChild(bubble);
     message.appendChild(row);
     message.appendChild(messageMeta(new Date(value.originatedAt)));
@@ -1008,12 +1037,13 @@
     $("cv-composer-reference-author").textContent = value
       ? referenceLabels.replying + " " + referenceLabels[value.author]
       : "";
-    $("cv-composer-reference-body").textContent = value ? value.body : "";
+    $("cv-composer-reference-body").textContent = value ? CerviMarkdown.preview(value.body, value.senderIdentityType) : "";
   }
 
   // 补齐较早的历史后定位原文，保留连续消息和当前阅读位置。
   async function locateReferencedMessage(conversation, messageID) {
     var sequence = ++referenceNavigationSeq;
+    followingMessages = false;
     var errorElement = $("cv-conversation-error");
     errorElement.hidden = true;
     try {
@@ -1028,8 +1058,10 @@
         }
         var previousHeight = messages.scrollHeight;
         var previousTop = messages.scrollTop;
-        result.messages.forEach(function (value) {
-          appendServerMessage(conversation, value);
+        CerviMarkdown.renderBatch(function () {
+          result.messages.forEach(function (value) {
+            appendServerMessage(conversation, value);
+          });
         });
         conversation.before = result.before || "";
         messages.scrollTop = previousTop + messages.scrollHeight - previousHeight;
@@ -1135,8 +1167,7 @@
         ) {
           return;
         }
-        var followLatest = conversation === activeConversation &&
-          messages.scrollHeight - messages.scrollTop - messages.clientHeight < 48;
+        var followLatest = conversation === activeConversation && followingMessages;
         result.messages.forEach(function (message) {
           appendServerMessage(conversation, message);
         });
@@ -1152,7 +1183,7 @@
         var lastMessage = result.messages[result.messages.length - 1];
         updateConversationSummary(
           conversation,
-          lastMessage.body,
+          CerviMarkdown.preview(lastMessage.body, lastMessage.senderIdentityType),
           lastMessage.originatedAt,
           lastMessage.id,
         );

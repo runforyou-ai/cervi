@@ -123,7 +123,7 @@ const inbox = {
   groupSystemListSeparator: ", ",
   groupSystemListPairSeparator: " and ",
   groupSystemListFinalSeparator: ", and ",
-  agentRunQueued: "Waiting",
+  agentRunQueued: "Thinking",
   agentRunRunning: "Working",
   agentRunFailed: "Failed",
   agentRunCancelled: "Interrupted",

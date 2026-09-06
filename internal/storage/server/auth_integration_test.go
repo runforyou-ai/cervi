@@ -1683,6 +1683,16 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		memberHistory, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), conversationaction.MessageHistoryInput{
+			ChannelID: channel.ID, ExternalID: "web-session:fedcba9876543210fedcba9876543210", ConversationID: publicQueueInbound.Conversation.ID,
+		})
+		if err != nil || len(memberHistory.Messages) != 2 || memberHistory.Messages[0].SenderIdentityType != nil || memberHistory.Messages[1].Author != domain.MessageAuthorAgent || memberHistory.Messages[1].SenderIdentityType == nil || *memberHistory.Messages[1].SenderIdentityType != domain.OrganizationIdentityTypeUser {
+			t.Fatalf("website visitor and human sender identities = %#v, error = %v", memberHistory, err)
+		}
+		memberSummaries, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:fedcba9876543210fedcba9876543210")
+		if err != nil || len(memberSummaries) != 1 || memberSummaries[0].PreviewSenderIdentityType == nil || *memberSummaries[0].PreviewSenderIdentityType != domain.OrganizationIdentityTypeUser {
+			t.Fatalf("website human preview identity = %#v, error = %v", memberSummaries, err)
+		}
 		publicQueueSession := &servermodels.ServiceSession{}
 		if err := db.NewSelect().Model(publicQueueSession).
 			Where("ss.id = ?", publicQueueInbound.Conversation.ServiceSessionID).
@@ -2037,8 +2047,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		websiteMessages, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), conversationaction.MessageHistoryInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: websiteInbound.Conversation.ID,
 		})
-		if err != nil || len(websiteMessages.Messages) == 0 || websiteMessages.Messages[len(websiteMessages.Messages)-1].Author != domain.MessageAuthorAgent || websiteMessages.Messages[len(websiteMessages.Messages)-1].Body != "已结合补充信息回复" {
+		if err != nil || len(websiteMessages.Messages) == 0 || websiteMessages.Messages[len(websiteMessages.Messages)-1].Author != domain.MessageAuthorAgent || websiteMessages.Messages[len(websiteMessages.Messages)-1].Body != "已结合补充信息回复" || websiteMessages.Messages[len(websiteMessages.Messages)-1].SenderIdentityType == nil || *websiteMessages.Messages[len(websiteMessages.Messages)-1].SenderIdentityType != domain.OrganizationIdentityTypeAgent {
 			t.Fatalf("website messages after customer run = %#v, error = %v", websiteMessages, err)
+		}
+		websiteSummaries, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:0123456789abcdef0123456789abcdef")
+		if err != nil || len(websiteSummaries) == 0 || websiteSummaries[0].ID != websiteInbound.Conversation.ID || websiteSummaries[0].PreviewSenderIdentityType == nil || *websiteSummaries[0].PreviewSenderIdentityType != domain.OrganizationIdentityTypeAgent {
+			t.Fatalf("website AI preview identity = %#v, error = %v", websiteSummaries, err)
 		}
 		if _, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID); err != nil {
 			t.Fatal(err)

@@ -67,10 +67,10 @@ func TestCustomerReplies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := page.Messages[len(page.Messages)-2].ReplyTo; r == nil || r.Author != "visitor" || r.Body != original.Message.Body {
+	if r := page.Messages[len(page.Messages)-2].ReplyTo; r == nil || r.Author != "visitor" || r.Body != original.Message.Body || r.SenderIdentityType != nil {
 		t.Fatalf("visitor reference=%+v", r)
 	}
-	if r := page.Messages[len(page.Messages)-1].ReplyTo; r == nil || r.Author != "agent" || r.Body != input.Body {
+	if r := page.Messages[len(page.Messages)-1].ReplyTo; r == nil || r.Author != "agent" || r.Body != input.Body || r.SenderIdentityType == nil || *r.SenderIdentityType != appservice.OrganizationIdentityTypeUser {
 		t.Fatalf("agent reference=%+v", r)
 	}
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", original.Message.ID).Exec(ctx); err != nil {
@@ -91,7 +91,7 @@ func TestCustomerReplies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := page.Messages[len(page.Messages)-2].ReplyTo; r == nil || !r.Deleted || r.Body != "" || r.Author != "" {
+	if r := page.Messages[len(page.Messages)-2].ReplyTo; r == nil || !r.Deleted || r.Body != "" || r.Author != "" || r.SenderIdentityType != nil {
 		t.Fatalf("deleted visitor reference=%+v", r)
 	}
 }
@@ -219,7 +219,7 @@ func TestWebsiteVisitorReplies(t *testing.T) {
 	}
 	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "引用客服说明", ReplyToMessageID: agent.ID}
 	reply, err := f.receive.Execute(ctx, input)
-	if err != nil || reply.Message.ReplyTo == nil || reply.Message.ReplyTo.Author != domain.MessageAuthorAgent || reply.Message.ReplyTo.Body != agent.Body {
+	if err != nil || reply.Message.ReplyTo == nil || reply.Message.ReplyTo.Author != domain.MessageAuthorAgent || reply.Message.ReplyTo.Body != agent.Body || reply.Message.ReplyTo.SenderIdentityType == nil || *reply.Message.ReplyTo.SenderIdentityType != domain.OrganizationIdentityTypeUser {
 		t.Fatalf("reply=%+v err=%v", reply, err)
 	}
 	replay, err := f.receive.Execute(ctx, input)

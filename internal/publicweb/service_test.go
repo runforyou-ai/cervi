@@ -15,6 +15,24 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
+// TestChatServiceMarkdownAssets 验证正文资源由企业服务端提供且路径不落入渠道查询。
+func TestChatServiceMarkdownAssets(t *testing.T) {
+	service := NewChatService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
+		t.Fatal("markdown assets must not look up a channel")
+		return nil, nil
+	})
+	for _, name := range []string{"markdown.js", "markdown.css"} {
+		response := httptest.NewRecorder()
+		service.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/assets/"+name, nil))
+		if response.Code != http.StatusOK || response.Body.Len() == 0 {
+			t.Fatalf("asset %s: status=%d bytes=%d", name, response.Code, response.Body.Len())
+		}
+		if response.Header().Get("Cache-Control") != "no-cache" {
+			t.Fatalf("asset %s must revalidate after deployment", name)
+		}
+	}
+}
+
 // TestPreferredMessengerLocale 验证 Messenger 只把中文族浏览器识别为中文。
 func TestPreferredMessengerLocale(t *testing.T) {
 	cases := []struct {

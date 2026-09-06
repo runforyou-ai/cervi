@@ -64,7 +64,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 				Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
 				ContactAvatarURL: optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
 				ChannelType:      ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
-				Preview: summary.Customer.Preview, LastMessageAt: summary.Customer.LastMessageAt,
+				Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType), LastMessageAt: summary.Customer.LastMessageAt,
 				ServiceSessionID: summary.Customer.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus), Assignee: assignee,
 			}
 		}
@@ -76,13 +76,13 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 			}
 			conversation.Direct = &DirectInboxConversation{
 				PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID),
-				Preview: summary.Direct.Preview, LastMessageAt: summary.Direct.LastMessageAt, AgentRunStatus: agentRunStatus,
+				Preview: summary.Direct.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Direct.PreviewSenderIdentityType), LastMessageAt: summary.Direct.LastMessageAt, AgentRunStatus: agentRunStatus,
 			}
 		}
 		if summary.Group != nil {
 			conversation.Group = &GroupInboxConversation{
 				Title: summary.Group.Title, ImageURL: optionalFileURL(avatarURLs, summary.Group.ImageFileID),
-				Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview,
+				Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Group.PreviewSenderIdentityType),
 				LastMessageAt: summary.Group.LastMessageAt, MemberCount: summary.Group.MemberCount,
 			}
 		}
