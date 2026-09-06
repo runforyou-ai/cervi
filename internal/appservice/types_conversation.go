@@ -143,12 +143,12 @@ type ConversationMessage struct {
 
 // ConversationMessageList 定义成员消息页。
 type ConversationMessageList struct {
-	LatestAgentRuns []ConversationAgentRun `json:"latestAgentRuns"`
-	HasEarlier      bool                   `json:"hasEarlier"`
-	HasLater        bool                   `json:"hasLater"`
-	Messages        []ConversationMessage  `json:"messages"`
-	Before          *string                `json:"before"`
-	After           *string                `json:"after"`
+	LatestAgentRun *ConversationAgentRun `json:"latestAgentRun"`
+	HasEarlier     bool                  `json:"hasEarlier"`
+	HasLater       bool                  `json:"hasLater"`
+	Messages       []ConversationMessage `json:"messages"`
+	Before         *string               `json:"before"`
+	After          *string               `json:"after"`
 }
 
 // MarkConversationReadInput 定义用户确认已读的消息水位。

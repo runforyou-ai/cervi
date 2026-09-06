@@ -5,12 +5,8 @@ package agentruntime
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -26,65 +22,6 @@ type testInputFeed struct {
 	desired  int64
 	claimed  int64
 	messages []Message
-}
-
-// TestChatModelAgentStandardMessages 验证标准消息经 ChatModelAgent 和模型适配器保留身份与正文。
-func TestChatModelAgentStandardMessages(t *testing.T) {
-	for _, answer := range []string{"晚上好呀！🌙", `{"body":"这是用户要求的 JSON","senderName":"示例"}`} {
-		t.Run(answer, func(t *testing.T) {
-			type wireMessage struct {
-				Role    string `json:"role"`
-				Name    string `json:"name,omitempty"`
-				Content string `json:"content"`
-			}
-			received := make(chan []wireMessage, 1)
-			endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				var request struct {
-					Messages []wireMessage `json:"messages"`
-				}
-				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-					t.Error(err)
-					http.Error(w, "invalid model request", http.StatusBadRequest)
-					return
-				}
-				received <- request.Messages
-				w.Header().Set("Content-Type", "application/json")
-				if err := json.NewEncoder(w).Encode(map[string]any{
-					"id": "reply", "object": "chat.completion", "model": "test-model",
-					"choices": []any{map[string]any{"index": 0, "finish_reason": "stop", "message": wireMessage{Role: "assistant", Content: answer}}},
-				}); err != nil {
-					t.Error(err)
-				}
-			}))
-			defer endpoint.Close()
-			feed := &testInputFeed{desired: 3, messages: []Message{
-				{Role: MessageRoleUser, Name: "member-1", Content: "你好"},
-				{Role: MessageRoleAssistant, Name: "agent-1", Content: "晚上好呀！🌙"},
-				{Role: MessageRoleUser, Name: "agent-2", Content: "请补充"},
-			}}
-			runtime := &EinoRuntime{newModel: newOpenAICompatibleModel}
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			result, err := runtime.Run(ctx, RunRequest{Name: "agent-1", Instruction: "参与群聊", Model: ModelConfig{
-				Brand: "openai", APIKey: "test-key", BaseURL: endpoint.URL, Identifier: "test-model",
-			}}, feed)
-			if err != nil {
-				t.Fatal(err)
-			}
-			want := []wireMessage{
-				{Role: "system", Content: "参与群聊"},
-				{Role: "user", Name: "member-1", Content: "你好"},
-				{Role: "assistant", Name: "agent-1", Content: "晚上好呀！🌙"},
-				{Role: "user", Name: "agent-2", Content: "请补充"},
-			}
-			if got := <-received; !reflect.DeepEqual(got, want) {
-				t.Fatalf("model messages=%+v, want=%+v", got, want)
-			}
-			if result.Content != answer || result.EndSeq != 3 {
-				t.Fatalf("result=%+v", result)
-			}
-		})
-	}
 }
 
 func (f *testInputFeed) Peek(_ context.Context, afterSeq int64) ([]Trigger, error) {

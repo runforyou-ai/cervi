@@ -63,8 +63,7 @@ export function GroupMemberPickerDialog({
   const availableMembers = useMemo(
     () =>
       (resource.data ?? []).filter(
-        (member) =>
-          !participantIdentityIDs.has(member.id),
+        (member) => !participantIdentityIDs.has(member.id),
       ),
     [participantIdentityIDs, resource.data],
   )

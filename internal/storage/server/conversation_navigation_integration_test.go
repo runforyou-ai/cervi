@@ -72,7 +72,7 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 // send 通过真实发送命令写入测试消息。
 func (f navigationFixture) send(t *testing.T, identity *servermodels.Identity, body string, all bool, subjects ...string) conversationaction.ConversationMessage {
 	t.Helper()
-	message, err := conversationaction.NewSendGroupTextMessageAction(f.db, nil).Execute(context.Background(), identity, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: body, MentionAll: all, MentionSubjectIDs: subjects})
+	message, err := conversationaction.NewSendGroupTextMessageAction(f.db).Execute(context.Background(), identity, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: body, MentionAll: all, MentionSubjectIDs: subjects})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 func TestGroupMessageContextAndOrder(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendGroupTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendGroupTextMessageAction(f.db)
 	messages := make([]conversationaction.ConversationMessage, 70)
 	for index := range messages {
 		messages[index] = f.send(t, f.owner, fmt.Sprintf("消息 %d", index), index == 30)
@@ -320,7 +320,7 @@ func TestGroupSequenceCommitBarrier(t *testing.T) {
 		err     error
 	}
 	firstDone, secondDone := make(chan sent, 1), make(chan sent, 1)
-	send := conversationaction.NewSendGroupTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendGroupTextMessageAction(f.db)
 	go func() {
 		message, err := send.Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: barrier.body, MentionAll: true})
 		firstDone <- sent{message, err}
@@ -409,7 +409,7 @@ func TestRemovedMemberCannotSendAfterWaiting(t *testing.T) {
 		t.Fatal(ctx.Err())
 	}
 	go func() {
-		_, err := conversationaction.NewSendGroupTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "已被移除成员不能发送"})
+		_, err := conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "已被移除成员不能发送"})
 		sent <- err
 	}()
 	waitForNavigationLock(t, ctx, f.db, f.groupID)

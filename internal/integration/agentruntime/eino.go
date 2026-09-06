@@ -272,15 +272,12 @@ func (r *EinoRuntime) pushPending(ctx context.Context, loop *adk.TurnLoop[Trigge
 func schemaMessages(messages []Message) []*schema.Message {
 	result := make([]*schema.Message, 0, len(messages))
 	for _, message := range messages {
-		var input *schema.Message
 		switch message.Role {
 		case MessageRoleAssistant:
-			input = schema.AssistantMessage(message.Content, nil)
+			result = append(result, schema.AssistantMessage(message.Content, nil))
 		default:
-			input = schema.UserMessage(message.Content)
+			result = append(result, schema.UserMessage(message.Content))
 		}
-		input.Name = message.Name
-		result = append(result, input)
 	}
 	return result
 }

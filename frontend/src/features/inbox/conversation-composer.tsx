@@ -198,6 +198,7 @@ export function ConversationComposer({
       ...groupParticipants
         .filter(
           (participant) =>
+            participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeUser &&
             participant.identityId !== currentIdentityID &&
             !mentionSubjectIDs.includes(participant.chatSubjectId) &&
             participant.displayName.toLocaleLowerCase().includes(query),
@@ -544,9 +545,6 @@ export function ConversationComposer({
                 onClick={() => selectMention(candidate)}
               >
                 {candidate.displayName}
-                {candidate.kind === "member" && candidate.participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
-                  <span className="ml-2 text-xs text-muted-foreground">{t("groupAgent")}</span>
-                ) : null}
               </button>
             ))}
           </div>

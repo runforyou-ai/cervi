@@ -4,7 +4,9 @@ package conversation
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -13,28 +15,23 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// loadConversationAgentProcesses 补充成功过程，群聊分别返回每位 Agent 的最近运行。
-func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizationID, conversationID string, group bool, history *ConversationMessageHistory) error {
-	var latest []struct {
+// loadConversationAgentProcesses 在已授权的消息窗口中批量补充成功过程和最近运行状态。
+func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizationID, conversationID string, history *ConversationMessageHistory) error {
+	var latest struct {
 		servermodels.AgentRun `bun:",embed"`
 		AgentName             string `bun:"agent_name"`
 	}
-	query := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
+	err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
 		ColumnExpr("agr.*").ColumnExpr("oi.display_name AS agent_name").
 		Join("JOIN organization_identities AS oi ON oi.id = agr.agent_identity_id AND oi.organization_id = agr.organization_id").
-		Where("agr.organization_id = ? AND agr.conversation_id = ?", organizationID, conversationID)
-	if group {
-		query = query.DistinctOn("agr.agent_identity_id").OrderExpr("agr.agent_identity_id, agr.created_at DESC, agr.id DESC")
-	} else {
-		query = query.OrderExpr("agr.created_at DESC, agr.id DESC").Limit(1)
+		Where("agr.organization_id = ? AND agr.conversation_id = ?", organizationID, conversationID).
+		OrderExpr("agr.created_at DESC, agr.id DESC").Limit(1).Scan(ctx, &latest)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("load latest conversation agent run: %w", err)
 	}
-	if err := query.Scan(ctx, &latest); err != nil {
-		return fmt.Errorf("load latest conversation agent runs: %w", err)
-	}
-	history.LatestAgentRuns = make([]ConversationAgentRun, 0, len(latest))
-	for _, run := range latest {
-		history.LatestAgentRuns = append(history.LatestAgentRuns, ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, Status: domain.AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError})
-	}
+	history.LatestAgentRun = &ConversationAgentRun{ID: latest.ID, AgentName: latest.AgentName, Status: domain.AgentRunStatus(latest.Status), ErrorCode: latest.ErrorCode, LastError: latest.LastError}
 	if len(history.Messages) == 0 {
 		return nil
 	}

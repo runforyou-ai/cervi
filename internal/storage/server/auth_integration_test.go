@@ -1205,7 +1205,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 		}
 
-		send := conversationaction.NewSendGroupTextMessageAction(db, nil)
+		send := conversationaction.NewSendGroupTextMessageAction(db)
 		input := conversationaction.GroupTextMessageInput{
 			ConversationID:  group.ID,
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f67",
@@ -2157,7 +2157,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		// 最新窗口和锚点窗口均返回消息所属的完整过程，不将过程附到用户消息。
 		for _, anchor := range []string{"", *run.ResponseMessageID} {
 			history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID, AroundMessageID: anchor})
-			if err != nil || len(history.LatestAgentRuns) != 1 || history.LatestAgentRuns[0].ID != run.ID || history.LatestAgentRuns[0].AgentName != "售前智能体" {
+			if err != nil || history.LatestAgentRun == nil || history.LatestAgentRun.ID != run.ID || history.LatestAgentRun.AgentName != "售前智能体" {
 				t.Fatalf("agent message history = %#v, error = %v", history, err)
 			}
 			foundProcess := false
@@ -2217,7 +2217,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("failed claimed agent run = %#v, state = %#v", failedRun, state)
 		}
 		failedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID})
-		if err != nil || len(failedHistory.LatestAgentRuns) != 1 || failedHistory.LatestAgentRuns[0].ID != failedRun.ID || failedHistory.LatestAgentRuns[0].Status != domain.AgentRunStatusFailed || failedHistory.LatestAgentRuns[0].LastError == nil {
+		if err != nil || failedHistory.LatestAgentRun == nil || failedHistory.LatestAgentRun.ID != failedRun.ID || failedHistory.LatestAgentRun.Status != domain.AgentRunStatusFailed || failedHistory.LatestAgentRun.LastError == nil {
 			t.Fatalf("failed run message state = %#v, error = %v", failedHistory, err)
 		}
 
@@ -2262,8 +2262,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("agent run after exhausted task = %#v, error = %v", nextRun, err)
 		}
 
-		t.Run("Agent 群聊提及", func(t *testing.T) {
-			testAgentGroupMentions(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		t.Run("Agent 群聊成员", func(t *testing.T) {
+			testGroupAgentMembership(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 单聊引用", func(t *testing.T) {

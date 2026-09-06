@@ -32,7 +32,7 @@ function page(
 ): ConversationMessageListData {
   return {
     messages,
-    latestAgentRuns: [],
+    latestAgentRun: null,
     before: messages[0]?.id ?? null,
     after: messages[messages.length - 1]?.id ?? null,
     hasEarlier,
@@ -49,12 +49,11 @@ test("群聊使用超过 JavaScript 安全整数的服务端序号", () => {
 test("没有新消息的页面仍更新运行终态并保留既有消息", () => {
   const current = page([message("reply", null)], false, false)
   const incoming = page([], false, false)
-  incoming.latestAgentRuns = [
-    { id: "run", agentName: "AI 助手", status: "failed", errorCode: null, lastError: "model rejected input" },
-    { id: "other-run", agentName: "AI 助手 2", status: "running", errorCode: null, lastError: null },
-  ] as ConversationMessageListData["latestAgentRuns"]
+  incoming.latestAgentRun = {
+    id: "run", agentName: "AI 助手", status: "failed", errorCode: null, lastError: "model rejected input",
+  } as NonNullable<ConversationMessageListData["latestAgentRun"]>
   const merged = mergeConversationPage(current, incoming, "after")
-  assert.equal(merged.latestAgentRuns, incoming.latestAgentRuns)
+  assert.equal(merged.latestAgentRun, incoming.latestAgentRun)
   assert.deepEqual(merged.messages, current.messages)
   assert.equal(merged.after, current.after)
 })

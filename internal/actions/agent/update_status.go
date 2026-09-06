@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -51,20 +50,6 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			return err
 		}
 		if status == domain.UserStatusInactive {
-			// 账号锁阻止新提醒入队，取消已有群聊输入后再允许恢复账号。
-			var groupIDs []string
-			if err := tx.NewSelect().TableExpr("conversation_agent_states AS cas").ColumnExpr("cas.conversation_id").
-				Join("JOIN conversations AS cv ON cv.organization_id = cas.organization_id AND cv.id = cas.conversation_id AND cv.type = ?", domain.ConversationTypeGroup).
-				Where("cas.organization_id = ? AND cas.agent_identity_id = ?", identity.Organization.ID, updatedAgent.IdentityID).
-				OrderExpr("cas.conversation_id").Scan(ctx, &groupIDs); err != nil {
-				return err
-			}
-			for _, groupID := range groupIDs {
-				if err := agentrunaction.CancelGroupRuns(ctx, tx, identity.Organization.ID, groupID, updatedAgent.IdentityID, domain.AgentRunErrorCodeAgentInactive); err != nil {
-					return err
-				}
-			}
-
 			if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 				Set("work_status = ?", domain.WorkStatusOffDuty).
 				Set("work_status_updated_at = now()").

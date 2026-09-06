@@ -24,7 +24,7 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 	f.owner.OrganizationIdentity.AvatarFileID = &avatarID
 	first := f.send(t, f.owner, "有头像的消息", false)
 	assertMessageAvatar(t, first.Sender, avatarID)
-	reply, err := conversationaction.NewSendGroupTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{
+	reply, err := conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{
 		ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "引用消息", ReplyToMessageID: first.ID,
 	})
 	if err != nil {

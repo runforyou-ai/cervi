@@ -40,13 +40,7 @@ type GetGroupConversationQuery struct {
 
 // SendGroupTextMessageAction 持久化企业内部群聊文本消息。
 type SendGroupTextMessageAction struct {
-	db             *bun.DB
-	agentScheduler GroupAgentMessageScheduler
-}
-
-// GroupAgentMessageScheduler 把群聊中的结构化提醒加入 Agent 输入流。
-type GroupAgentMessageScheduler interface {
-	ScheduleGroupMentions(context.Context, bun.IDB, string, string, string, []string, bool) error
+	db *bun.DB
 }
 
 type groupMemberRow struct {
@@ -81,8 +75,8 @@ func NewGetGroupConversationQuery(db *bun.DB) *GetGroupConversationQuery {
 }
 
 // NewSendGroupTextMessageAction 创建群聊文本发送操作。
-func NewSendGroupTextMessageAction(db *bun.DB, scheduler GroupAgentMessageScheduler) *SendGroupTextMessageAction {
-	return &SendGroupTextMessageAction{db: db, agentScheduler: scheduler}
+func NewSendGroupTextMessageAction(db *bun.DB) *SendGroupTextMessageAction {
+	return &SendGroupTextMessageAction{db: db}
 }
 
 // Execute 创建包含有效企业成员的企业内部群聊。
@@ -303,11 +297,6 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 		}
 		if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
 			return err
-		}
-		if a.agentScheduler != nil {
-			if err := a.agentScheduler.ScheduleGroupMentions(ctx, tx, identity.Organization.ID, normalized.ConversationID, message.ID, normalized.MentionSubjectIDs, normalized.MentionAll); err != nil {
-				return err
-			}
 		}
 		conversation := &servermodels.Conversation{ID: normalized.ConversationID, OrganizationID: identity.Organization.ID}
 		if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {

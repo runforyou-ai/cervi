@@ -19,13 +19,12 @@
 以下内容已经存在：
 
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
-- 群聊允许活跃 Agent 作为普通成员加入；真人显式 @Agent 或 @所有人会触发当前群内的活跃 Agent，重叠提醒按 Agent 去重。群主仍由真人担任，最后一位真人可以解散含 Agent 的群聊。
 - Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；Agent 可以复用同一 ChatSubject、Participant 和 Message 路径。
 - Agent 任务使用独立 Worker 队列。本阶段已精确锁定 Eino v0.10 Alpha，通过 eino-ext 接入 OpenAI 兼容模型，并以纯函数计算器验证 Tool 与 TurnLoop 安全点补入。
-- `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊、群聊提醒与网站客服自动触发、单在途 Run、成功或失败水位及最终消息幂等。
+- `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊与网站客服自动触发、单在途 Run、成功或失败水位及最终消息幂等。
 - `agent_run_blocks` 保存成功 Run 的有序中间内容；运行中使用按尝试隔离的内存快照，工具普通错误反馈给模型以便修正。
 - 成员消息时间线可展开成功回复的思考和工具详情，显示输入、输出用量及最近运行状态；完整过程随消息查询返回。
 - `search_knowledge` 已支持多知识库、多查询融合和游标读取；单聊和网站客服均使用 Run 绑定的 Revision 所配置的知识库范围，空范围不注册检索 Tool。
@@ -38,7 +37,7 @@
 - `conversation_agent_policies`、完整 Run 快照、Step、Tool Invocation、审批和费用审计。
 - 产品级 WebSocket 尚未实现，但 `chat-roadmap.md` 已确定统一 Realtime Gateway、Protobuf 协议、连接认证、同步恢复和背压方案；设备注册和 Capability Executor 仍未设计落地。
 - 客户端可靠任务 Runtime；当前只有按真实场景落地的书面方案。
-- 通用响应策略。
+- 群聊 @Agent 和通用响应策略。
 
 现有 Wails MCP 只用于开发期桌面页面检查，不属于 Cervi 产品中的设备能力协议。
 
@@ -248,11 +247,11 @@ conversation_agent_states
 
 | 模式 | 长期语义 | 首轮安排 |
 | --- | --- | --- |
-| `mention` | 真人群聊消息显式 @Agent 或 @所有人时触发 | 已以群聊固定规则启用 |
+| `mention` | 内部单聊或群聊只有显式 @Agent 的新消息触发 | 基础群聊与提醒事实完成后启用 |
 | `agent_direct` | 发给 Agent 的内部单聊自动触发，群聊仍需 @ | P1a 固定使用，作为内部 AI 员工验证入口 |
 | `customer_auto` | 符合客户路由和会话策略的新客户消息自动触发 | P1b 先用于网站客户；第三方渠道仍需对应 Delivery |
 
-首轮启用 P1a 的 `agent_direct` 和 P1b 的 `customer_auto`，两者都固定支持运行中连续消息在下一个 Eino 安全点补入同一 Run；`mention` 已作为群聊固定入口交付；通用 `response_policy` 留到完整 P1。
+首轮启用 P1a 的 `agent_direct` 和 P1b 的 `customer_auto`，两者都固定支持运行中连续消息在下一个 Eino 安全点补入同一 Run；`mention` 和通用 `response_policy` 在基础群聊与完整 P1 中实现。
 
 ### 6.2 服务端持久触发事实
 
@@ -836,15 +835,6 @@ P1a 验证成功后立即交付网站客户自动响应：
 - 不流式输出、无设备、无审批，只记录 Token、耗时和错误，不计算金额；calculator 仅用于开发期延时并发测试，正式发布前删除。
 
 验收边界：符合负责人规则的网站客户新消息会自动得到一条可由访客轮询读取的 AI 回复；消息重放和 Task 重复不重复回复；运行中连续消息由同一 Run 在下一个安全点处理；接管、关闭、换负责人与模型完成并发时结果可确定且不会迟到发言；网站闭环在没有 Realtime 和第三方 Delivery 的情况下成立。
-
-### 群聊提醒：AI 员工参与内部协作（已实现）
-
-- 创建群聊、增员和结构化提醒复用企业身份与 Participant；Agent 不能担任群主。
-- 真人消息首次保存时，为显式提醒或 `mention_all` 覆盖的当前活跃 Agent 分别写入 `mention` Trigger；重叠去重，不展开 `message_mentions`。手写名称、单独引用和 Agent 输出不触发。
-- 每个会话与 Agent 保持单在途 Run，连续提醒在安全点纳入当前 Run；普通群消息只作为已认领边界内的上下文。上下文和最终回复使用群消息序号，并携带发言者、提醒对象及一层引用。
-- 移除、解散和停用事务取消未完成群聊 Run 并推进消费水位；重新入群或恢复账号不复活旧运行。回复落库前重新校验群状态与 Agent 资格。
-- 消息查询按群内每位 Agent 返回最近运行状态；成功回复复用过程内容和用量展示。单聊和客服仍只返回会话最近运行，统一使用数组契约。
-- 不新增 Policy、审批、工具调用审计表或实时协议；Agent 配置和知识库范围继续读取 Run 的不可变 Revision。
 
 ### P1：纯服务端、只读或强幂等 Agent（完整能力）
 

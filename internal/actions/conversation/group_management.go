@@ -15,7 +15,6 @@ import (
 
 	"uuid"
 
-	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -272,9 +271,6 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if target.Role == string(domain.ConversationParticipantRoleOwner) {
 			return &ConflictError{Reason: ConflictReasonGroupOwnerCannotBeRemoved}
 		}
-		if err := agentrunaction.CancelGroupRuns(ctx, tx, identity.Organization.ID, conversationID, memberID, domain.AgentRunErrorCodeGroupMemberRemoved); err != nil {
-			return err
-		}
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, target.ParticipantID); err != nil {
 			return err
 		}
@@ -374,9 +370,6 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 				}
 				if otherUsers {
 					return &ConflictError{Reason: ConflictReasonGroupSuccessorRequired}
-				}
-				if err := agentrunaction.CancelGroupRuns(ctx, tx, identity.Organization.ID, conversationID, "", domain.AgentRunErrorCodeGroupArchived); err != nil {
-					return err
 				}
 				if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
 					Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),

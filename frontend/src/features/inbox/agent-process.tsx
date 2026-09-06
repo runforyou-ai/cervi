@@ -187,13 +187,7 @@ export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; in
     ? t("agentRunAssigneeChanged")
     : run.errorCode === "session_closed"
       ? t("agentRunSessionClosed")
-      : run.errorCode === "group_member_removed"
-        ? t("agentRunGroupMemberRemoved")
-        : run.errorCode === "group_archived"
-          ? t("agentRunGroupArchived")
-          : run.errorCode === "agent_inactive"
-            ? t("agentRunAgentInactive")
-            : run.lastError
+      : run.lastError
   return (
     <div
       className={cn("mt-3 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}
