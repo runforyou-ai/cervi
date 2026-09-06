@@ -208,7 +208,7 @@ export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; in
           )}
         />
         <div className={cn("flex items-center gap-1.5", failed && "text-destructive")}>
-          {!thinking ? <BrainIcon aria-hidden className="size-4" /> : null}
+          {failed || cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
           <span>{label}</span>
         </div>
         {(failed || cancelled) && reason ? (
