@@ -22,7 +22,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// testAgentCustomerReplies 验证转交 AI 后仍能理解窗口外的客户引用，删除的原文不进入模型。
+// testAgentCustomerReplies 验证客服上下文按周期隔离，并保留窗口外和跨周期的一层引用。
 func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
@@ -37,8 +37,9 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 		t.Fatal(err)
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	for _, deleted := range []bool{false, true} {
-		t.Run(fmt.Sprintf("deleted=%t", deleted), func(t *testing.T) {
+	for _, scenario := range []struct{ earlierSession, deleted bool }{{false, false}, {false, true}, {true, false}, {true, true}} {
+		t.Run(fmt.Sprintf("earlierSession=%t/deleted=%t", scenario.earlierSession, scenario.deleted), func(t *testing.T) {
+			deleted := scenario.deleted
 			channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
 				Type: domain.ChannelTypeWebsite, Name: "引用上下文", DefaultLocale: domain.LocaleChineseSimplified,
 				NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
@@ -59,6 +60,20 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 					t.Fatal(err)
 				}
 			}
+			coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
+			if scenario.earlierSession {
+				if _, err := conversationaction.NewCloseServiceSessionAction(db, coordinator).Execute(ctx, identity, original.Conversation.ID); err != nil {
+					t.Fatal(err)
+				}
+				input.ClientMessageID, input.Body = uuid.NewV7().String(), "本轮客户问题"
+				reopened, err := receive.Execute(ctx, input)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if reopened.Conversation.ID != original.Conversation.ID || reopened.Conversation.ServiceSessionID == original.Conversation.ServiceSessionID {
+					t.Fatalf("expected new session in same conversation: %+v", reopened.Conversation)
+				}
+			}
 			if _, err := conversationaction.NewSendCustomerTextMessageAction(db).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{ConversationID: original.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题的回答", ReplyToMessageID: original.Message.ID}); err != nil {
 				t.Fatal(err)
 			}
@@ -67,7 +82,6 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 					t.Fatal(err)
 				}
 			}
-			coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
 			if _, err := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: original.Conversation.ID, AssigneeIdentityID: created.IdentityID}); err != nil {
 				t.Fatal(err)
 			}
@@ -76,8 +90,15 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 				t.Fatal(err)
 			}
 			calls := 0
-			runtime := &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+			runtime := &testAgentRuntime{run: func(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 				calls++
+				if request.CustomerHistorySearch == nil {
+					t.Fatal("customer history tool not provided")
+				}
+				history, err := request.CustomerHistorySearch(ctx, "以往的客户问题")
+				if err != nil || history.Available || history.Message == "" {
+					t.Fatalf("history placeholder=%+v, error=%v", history, err)
+				}
 				triggers, err := feed.Peek(ctx, 0)
 				if err != nil {
 					return agentruntime.RunResult{}, err
@@ -86,10 +107,17 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 				if err != nil {
 					return agentruntime.RunResult{}, err
 				}
-				if len(claimed.Messages) != 100 {
+				wantLength := 100
+				if scenario.earlierSession {
+					wantLength = 3
+					if len(claimed.Messages) > 0 && claimed.Messages[0].Content != "本轮客户问题" {
+						t.Fatalf("previous session leaked into current context: %+v", claimed.Messages)
+					}
+				}
+				if len(claimed.Messages) != wantLength {
 					t.Fatalf("history length=%d", len(claimed.Messages))
 				}
-				last, quoted := claimed.Messages[99], claimed.Messages[98]
+				last, quoted := claimed.Messages[wantLength-1], claimed.Messages[wantLength-2]
 				if last.Role != agentruntime.MessageRoleUser || last.Content != input.Body || quoted.Role != agentruntime.MessageRoleAssistant {
 					t.Fatalf("roles/plain body changed: %+v %+v", last, quoted)
 				}
@@ -118,10 +146,26 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 				} else if reference.Body != original.Message.Body || reference.SenderKind != string(domain.ChatSubjectKindContact) || reference.SenderSourceID == "" {
 					t.Fatalf("customer reference=%+v", reference)
 				}
-				for _, message := range claimed.Messages[:98] {
+				for _, message := range claimed.Messages[:wantLength-2] {
 					if message.Content == original.Message.Body {
 						t.Fatal("reference target should be outside history window")
 					}
+				}
+				// 后续 Claim 仍按同一客服周期构造上下文，不重新混入已结束周期。
+				input.ClientMessageID, input.Body = uuid.NewV7().String(), "本轮补充信息"
+				if _, err := receive.Execute(ctx, input); err != nil {
+					return agentruntime.RunResult{}, err
+				}
+				pending, err := feed.Peek(ctx, claimed.EndSeq)
+				if err != nil || len(pending) != 1 {
+					t.Fatalf("pending triggers=%+v, error=%v", pending, err)
+				}
+				claimed, err = feed.Claim(ctx, pending[0].Seq)
+				if err != nil {
+					return agentruntime.RunResult{}, err
+				}
+				if len(claimed.Messages) != min(wantLength+1, 100) || claimed.Messages[len(claimed.Messages)-1].Content != input.Body {
+					t.Fatalf("follow-up context=%+v", claimed.Messages)
 				}
 				return agentruntime.RunResult{Content: "AI 后续回答", EndSeq: claimed.EndSeq}, nil
 			}}
