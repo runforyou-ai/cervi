@@ -61,7 +61,7 @@ func loadConversationMessageMentions(ctx context.Context, db bun.IDB, organizati
 	return nil
 }
 
-// loadGroupMentionTargets 校验提醒目标是当前群聊中的有效参与者。
+// loadGroupMentionTargets 校验提醒目标是当前群聊中的真人参与者。
 func loadGroupMentionTargets(ctx context.Context, db bun.IDB, organizationID, conversationID, senderSubjectID string, subjectIDs []string) ([]ConversationMessageMention, error) {
 	if len(subjectIDs) == 0 {
 		return []ConversationMessageMention{}, nil
@@ -78,6 +78,7 @@ func loadGroupMentionTargets(ctx context.Context, db bun.IDB, organizationID, co
 		Where("cp.organization_id = ?", organizationID).
 		Where("cp.conversation_id = ?", conversationID).
 		Where("cp.left_at IS NULL").
+		Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Where("cp.subject_id IN (?)", bun.In(subjectIDs)).
 		OrderExpr("cp.subject_id ASC").
 		Scan(ctx, &rows); err != nil {

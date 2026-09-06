@@ -120,6 +120,7 @@ const inbox = {
   groupSystemListSeparator: "、",
   groupSystemListPairSeparator: "和",
   groupSystemListFinalSeparator: "和",
+  groupAgent: "AI 员工",
   agentRunQueued: "思考中",
   agentRunRunning: "正在处理",
   agentRunFailed: "处理失败",

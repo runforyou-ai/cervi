@@ -146,7 +146,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 	return result, nil
 }
 
-// Execute 增加有效真人成员，重新加入时复用原参与者行。
+// Execute 增加有效企业成员，重新加入时复用原参与者行。
 func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationMembersInput) (GroupConversation, error) {
 	conversationID, memberIDs, fields := normalizeGroupMembersInput(identity.OrganizationIdentity.ID, input.ConversationID, input.MemberIdentityIDs)
 	if len(fields) > 0 {
@@ -331,7 +331,7 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 	return result, nil
 }
 
-// Execute 退出群聊，群主退出时转让群主或解散只有自己的群聊。
+// Execute 退出群聊，群主退出时转让群主或解散没有其他真人的群聊。
 func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationLeaveInput) error {
 	conversationID, valid := common.NormalizeUUID(input.ConversationID)
 	fields := map[string]ValidationCode{}
@@ -360,11 +360,15 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		}
 		if group.CurrentRole == string(domain.ConversationParticipantRoleOwner) {
 			if successorID == "" {
-				activeIdentityIDs, err := loadActiveGroupParticipantIdentityIDs(ctx, tx, identity.Organization.ID, conversationID)
+				// 只有真人可以接任群主，最后一位真人可直接解散含 Agent 的群聊。
+				otherUsers, err := tx.NewSelect().TableExpr("conversation_participants AS cp").
+					Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+					Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
+					Where("cp.organization_id = ? AND cp.conversation_id = ? AND cp.left_at IS NULL AND oi.id <> ?", identity.Organization.ID, conversationID, identity.OrganizationIdentity.ID).Exists(ctx)
 				if err != nil {
 					return err
 				}
-				if len(activeIdentityIDs) != 1 {
+				if otherUsers {
 					return &ConflictError{Reason: ConflictReasonGroupSuccessorRequired}
 				}
 				if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
@@ -628,7 +632,7 @@ func leaveGroupParticipant(ctx context.Context, db bun.IDB, organizationID, part
 	return nil
 }
 
-// archiveGroupConversation 归档已经由最后一位成员解散的群聊。
+// archiveGroupConversation 归档已经解散的群聊。
 func archiveGroupConversation(ctx context.Context, db bun.IDB, organizationID, conversationID string) error {
 	if _, err := db.NewUpdate().Model((*servermodels.Conversation)(nil)).
 		Set("status = ?", domain.ConversationStatusArchived).

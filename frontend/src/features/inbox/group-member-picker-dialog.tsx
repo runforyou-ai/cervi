@@ -63,10 +63,7 @@ export function GroupMemberPickerDialog({
   const availableMembers = useMemo(
     () =>
       (resource.data ?? []).filter(
-        (member) =>
-          member.type ===
-            OrganizationIdentityType.OrganizationIdentityTypeUser &&
-          !participantIdentityIDs.has(member.id),
+        (member) => !participantIdentityIDs.has(member.id),
       ),
     [participantIdentityIDs, resource.data],
   )
@@ -210,10 +207,18 @@ export function GroupMemberPickerDialog({
                           toggleMember(member.id, event.target.checked)
                         }
                       />
-                      <ProfileAvatar imageURL={member.avatarUrl} name={member.displayName} className="size-9" />
+                      <ProfileAvatar
+                        imageURL={member.avatarUrl}
+                        name={member.displayName}
+                        fallback={member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent ? "agent" : "person"}
+                        className="size-9"
+                      />
                       <span className="min-w-0 flex-1 truncate text-sm">
                         {member.displayName}
                       </span>
+                      {member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                        <span className="shrink-0 text-xs text-muted-foreground">{t("groupAgent")}</span>
+                      ) : null}
                     </label>
                   )
                 })}

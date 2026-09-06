@@ -1556,11 +1556,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if createdAgent.RoleID != customerServiceRole.ID || createdAgent.RoleKind != domain.RoleKindCustomerService || len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
 			t.Fatalf("created agent = %#v", createdAgent)
 		}
-		if _, err := conversationaction.NewCreateGroupConversationAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
-			Title: "AI 群聊", MemberIdentityIDs: []string{createdAgent.IdentityID},
-		}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
-			t.Fatalf("agent group member error = %v", err)
-		}
 		customerServiceAssignees, err := inboxaction.NewListCustomerServiceAssigneesQuery(db).Execute(context.Background(), loggedIn.Identity)
 		if err != nil {
 			t.Fatal(err)
@@ -2275,6 +2270,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil || nextRun.TriggerStartSeq != 5 {
 			t.Fatalf("agent run after exhausted task = %#v, error = %v", nextRun, err)
 		}
+
+		t.Run("Agent 群聊成员", func(t *testing.T) {
+			testGroupAgentMembership(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
 
 		t.Run("Agent 单聊引用", func(t *testing.T) {
 			testAgentDirectReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)

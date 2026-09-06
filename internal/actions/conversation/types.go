@@ -352,6 +352,7 @@ type GroupConversationSummary struct {
 
 // GroupParticipant 定义群聊中的当前有效成员。
 type GroupParticipant struct {
+	IdentityType  domain.OrganizationIdentityType
 	ChatSubjectID string
 	IdentityID    string
 	DisplayName   string

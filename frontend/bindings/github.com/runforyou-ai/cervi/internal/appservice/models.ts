@@ -1155,6 +1155,7 @@ export interface GroupInboxConversation {
  * GroupParticipant 定义群聊当前有效成员。
  */
 export interface GroupParticipant {
+    "identityType": OrganizationIdentityType;
     "chatSubjectId": string;
     "identityId": string;
     "displayName": string;

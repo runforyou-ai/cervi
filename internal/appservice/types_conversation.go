@@ -227,11 +227,12 @@ type GroupConversationLeaveInput struct {
 
 // GroupParticipant 定义群聊当前有效成员。
 type GroupParticipant struct {
-	ChatSubjectID string               `json:"chatSubjectId"`
-	IdentityID    string               `json:"identityId"`
-	DisplayName   string               `json:"displayName"`
-	AvatarURL     string               `json:"avatarUrl"`
-	Role          GroupParticipantRole `json:"role"`
+	IdentityType  OrganizationIdentityType `json:"identityType"`
+	ChatSubjectID string                   `json:"chatSubjectId"`
+	IdentityID    string                   `json:"identityId"`
+	DisplayName   string                   `json:"displayName"`
+	AvatarURL     string                   `json:"avatarUrl"`
+	Role          GroupParticipantRole     `json:"role"`
 }
 
 // GroupConversation 定义群聊资料和当前有效成员。

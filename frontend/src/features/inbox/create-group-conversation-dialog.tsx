@@ -141,8 +141,6 @@ export function CreateGroupConversationDialog({
     return (data ?? []).filter(
       (member) =>
         member.id !== currentIdentityID &&
-        member.type ===
-          OrganizationIdentityType.OrganizationIdentityTypeUser &&
         (!normalizedQuery ||
           member.displayName.toLocaleLowerCase().includes(normalizedQuery)),
     )
@@ -397,10 +395,18 @@ export function CreateGroupConversationDialog({
                               )
                             }}
                           />
-                          <ProfileAvatar imageURL={member.avatarUrl} name={member.displayName} className="size-9" />
+                          <ProfileAvatar
+                            imageURL={member.avatarUrl}
+                            name={member.displayName}
+                            fallback={member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent ? "agent" : "person"}
+                            className="size-9"
+                          />
                           <span className="min-w-0 flex-1 truncate text-sm">
                             {member.displayName}
                           </span>
+                          {member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                            <span className="shrink-0 text-xs text-muted-foreground">{t("groupAgent")}</span>
+                          ) : null}
                         </label>
                       )
                     })}
