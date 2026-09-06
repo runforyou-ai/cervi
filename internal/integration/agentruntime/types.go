@@ -17,8 +17,9 @@ const (
 	MessageRoleAssistant MessageRole = "assistant"
 )
 
-// Message 定义与具体 Agent SDK 无关的上下文消息。
+// Message 定义带持久编号的上下文消息，编号用于跨轮次去重。
 type Message struct {
+	ID      string
 	Role    MessageRole
 	Content string
 }
@@ -59,7 +60,8 @@ type RunRequest struct {
 	Instruction     string
 	Model           ModelConfig
 	KnowledgeSearch KnowledgeSearch
-	MaxTurns        int
+	MaxIterations   int // 单轮模型与工具迭代上限，零值使用默认值。
+	MaxTurns        int // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID        string
 	Attempt         int
 	OnProgress      func(Progress)

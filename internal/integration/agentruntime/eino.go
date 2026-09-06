@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
@@ -16,10 +14,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-const (
-	defaultMaxTurns     = 8
-	triggerPollInterval = 200 * time.Millisecond
-)
+const defaultMaxIterations = 8
 
 type runIDContextKey struct{}
 
@@ -38,16 +33,16 @@ func New() (*EinoRuntime, error) {
 	return &EinoRuntime{newModel: newOpenAICompatibleModel, tools: []tool.BaseTool{calculator}}, nil
 }
 
-// Run 执行有界 TurnLoop，并在安全点吸收持久化后续输入。
+// Run 执行受迭代上限和 context 控制的 TurnLoop，并在安全点吸收后续输入。
 func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFeed) (RunResult, error) {
 	if feed == nil {
 		return RunResult{}, errors.New("agent input feed is required")
 	}
 	ctx = context.WithValue(ctx, runIDContextKey{}, request.RunID)
 	recorder := newProcessRecorder(request)
-	maxTurns := request.MaxTurns
-	if maxTurns <= 0 {
-		maxTurns = defaultMaxTurns
+	maxIterations := request.MaxIterations
+	if maxIterations <= 0 {
+		maxIterations = defaultMaxIterations
 	}
 	chatModel, err := r.newModel(ctx, request.Model)
 	if err != nil {
@@ -67,238 +62,120 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
 		}},
 		Handlers:      []adk.ChatModelAgentMiddleware{recorder},
-		MaxIterations: maxTurns,
+		MaxIterations: maxIterations,
 	})
 	if err != nil {
 		return RunResult{}, fmt.Errorf("create Eino chat model agent: %w", err)
 	}
 
-	var stateMu sync.Mutex
-	var maxPushedSeq int64
-	var claimedSeq int64
-	var turnCount int
-	var finalContent string
-	var usage Usage
-	var watcherErr error
-
-	loop := adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
-		GenInput: func(ctx context.Context, loop *adk.TurnLoop[Trigger, *schema.Message], items []Trigger) (*adk.GenInputResult[Trigger, *schema.Message], error) {
-			turnCount++
-			recorder.resetCandidate()
-			if turnCount > maxTurns {
-				return nil, fmt.Errorf("agent turn limit %d exceeded", maxTurns)
-			}
-			throughSeq := maxTriggerSeq(items)
-			claimed, err := feed.Claim(ctx, throughSeq)
-			if err != nil {
-				return nil, err
-			}
-			if claimed.EndSeq <= 0 || len(claimed.Messages) == 0 {
-				return nil, errors.New("agent input feed returned no claimed messages")
-			}
-			stateMu.Lock()
-			claimedSeq = claimed.EndSeq
-			if maxPushedSeq < claimed.EndSeq {
-				maxPushedSeq = claimed.EndSeq
-			}
-			stateMu.Unlock()
-			return &adk.GenInputResult[Trigger, *schema.Message]{
-				Input: &adk.AgentInput{Messages: schemaMessages(claimed.Messages)},
-				RunOpts: []adk.AgentRunOption{
-					adk.WithAfterToolCallsHook(func(hookCtx context.Context) error {
-						return r.pushPending(hookCtx, loop, feed, &stateMu, &maxPushedSeq, true)
-					}),
-				},
-				Consumed: items,
-			}, nil
-		},
+	execution := &einoExecution{
+		inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns,
+	}
+	execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
+		GenInput: execution.genInput,
 		PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.Message], []Trigger) (adk.Agent, error) {
 			return agent, nil
 		},
-		OnAgentEvents: func(eventCtx context.Context, turn *adk.TurnContext[Trigger, *schema.Message], events *adk.AsyncIterator[*adk.AgentEvent]) error {
-			candidate := ""
-			for {
-				event, ok := events.Next()
-				if !ok {
-					break
-				}
-				if event.Err != nil {
-					if _, ok := errors.AsType[*adk.CancelError](event.Err); ok {
-						continue
-					}
-					return event.Err
-				}
-				if event.Output == nil || event.Output.MessageOutput == nil || event.Output.MessageOutput.Role != schema.Assistant {
-					continue
-				}
-				message, err := event.Output.MessageOutput.GetMessage()
-				if err != nil {
-					return err
-				}
-				if message == nil {
-					continue
-				}
-				if message.ResponseMeta != nil && message.ResponseMeta.Usage != nil {
-					usage.PromptTokens += message.ResponseMeta.Usage.PromptTokens
-					usage.CompletionTokens += message.ResponseMeta.Usage.CompletionTokens
-					usage.TotalTokens += message.ResponseMeta.Usage.TotalTokens
-				}
-				if len(message.ToolCalls) == 0 && strings.TrimSpace(message.Content) != "" {
-					candidate = strings.TrimSpace(message.Content)
-				}
-			}
-			if turnPreempted(turn) {
-				return nil
-			}
-			if err := r.pushPending(eventCtx, turn.Loop, feed, &stateMu, &maxPushedSeq, false); err != nil {
-				return err
-			}
-			stateMu.Lock()
-			hasBufferedInput := maxPushedSeq > claimedSeq
-			stateMu.Unlock()
-			if hasBufferedInput {
-				return nil
-			}
-			if candidate == "" {
-				return errors.New("agent returned an empty final response")
-			}
-			finalContent = candidate
-			turn.Loop.Stop()
-			return nil
-		},
+		OnAgentEvents: execution.onAgentEvents,
 	})
-
-	if err := r.pushPending(ctx, loop, feed, &stateMu, &maxPushedSeq, false); err != nil {
+	if err := execution.inputs.run(ctx); err != nil {
 		return RunResult{}, err
 	}
-	stateMu.Lock()
-	hasInitialInput := maxPushedSeq > 0
-	stateMu.Unlock()
-	if !hasInitialInput {
-		return RunResult{}, errors.New("agent run has no pending trigger")
-	}
-
-	runCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	loop.Run(runCtx)
-	watcherDone := make(chan struct{})
-	go func() {
-		defer close(watcherDone)
-		ticker := time.NewTicker(triggerPollInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-runCtx.Done():
-				return
-			case <-ticker.C:
-				if err := r.pushPending(runCtx, loop, feed, &stateMu, &maxPushedSeq, true); err != nil {
-					if runCtx.Err() != nil {
-						return
-					}
-					stateMu.Lock()
-					watcherErr = err
-					stateMu.Unlock()
-					loop.Stop(adk.WithImmediate())
-					return
-				}
-			}
-		}
-	}()
-	exit := loop.Wait()
-	cancel()
-	<-watcherDone
-	stateMu.Lock()
-	deferredWatcherErr := watcherErr
-	endSeq := claimedSeq
-	stateMu.Unlock()
-	if deferredWatcherErr != nil {
-		return RunResult{}, deferredWatcherErr
-	}
-	if exit.ExitReason != nil {
-		return RunResult{}, exit.ExitReason
-	}
-	if finalContent == "" || endSeq <= 0 {
+	if execution.result.Content == "" || execution.inputs.claimedSeq <= 0 {
 		return RunResult{}, errors.New("agent run stopped without a stable response")
 	}
-	return RunResult{Content: finalContent, EndSeq: endSeq, Usage: usage, Blocks: recorder.blocks()}, nil
+	execution.result.EndSeq = execution.inputs.claimedSeq
+	execution.result.Blocks = recorder.blocks()
+	return execution.result, nil
+}
+
+// einoExecution 保存单次运行的上下文、轮次和结果，回调按轮次顺序访问。
+type einoExecution struct {
+	inputs   *turnInputs
+	history  turnHistory
+	recorder *processRecorder
+	maxTurns int
+	turns    int
+	result   RunResult
+}
+
+// genInput 认领新输入，并在已有执行上下文后追加尚未消费的会话消息。
+func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *schema.Message], items []Trigger) (*adk.GenInputResult[Trigger, *schema.Message], error) {
+	e.turns++
+	e.recorder.resetCandidate()
+	if e.maxTurns > 0 && e.turns > e.maxTurns {
+		return nil, fmt.Errorf("agent turn limit %d exceeded", e.maxTurns)
+	}
+	var throughSeq int64
+	for _, item := range items {
+		throughSeq = max(throughSeq, item.Seq)
+	}
+	claimed, err := e.inputs.claim(ctx, throughSeq)
+	if err != nil {
+		return nil, err
+	}
+	return &adk.GenInputResult[Trigger, *schema.Message]{
+		Input: &adk.AgentInput{Messages: e.history.appendInput(claimed.Messages)},
+		RunOpts: []adk.AgentRunOption{
+			adk.WithAfterToolCallsHook(func(hookCtx context.Context) error {
+				return e.inputs.poll(hookCtx, true)
+			}),
+		},
+		Consumed: items,
+	}, nil
+}
+
+// onAgentEvents 保存完整中间消息，并由输入协调器决定继续下一轮或收尾。
+func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.Message], events *adk.AsyncIterator[*adk.AgentEvent]) error {
+	candidate := ""
+	var intermediates []*schema.Message
+	for {
+		event, ok := events.Next()
+		if !ok {
+			break
+		}
+		if event.Err != nil {
+			if _, ok := errors.AsType[*adk.CancelError](event.Err); ok {
+				continue
+			}
+			return event.Err
+		}
+		if event.Output == nil || event.Output.MessageOutput == nil {
+			continue
+		}
+		message, err := event.Output.MessageOutput.GetMessage()
+		if err != nil {
+			return err
+		}
+		if message == nil || (message.Role != schema.Assistant && message.Role != schema.Tool) {
+			continue
+		}
+		intermediates = append(intermediates, message)
+		if message.Role != schema.Assistant {
+			continue
+		}
+		if message.ResponseMeta != nil && message.ResponseMeta.Usage != nil {
+			e.result.Usage.PromptTokens += message.ResponseMeta.Usage.PromptTokens
+			e.result.Usage.CompletionTokens += message.ResponseMeta.Usage.CompletionTokens
+			e.result.Usage.TotalTokens += message.ResponseMeta.Usage.TotalTokens
+		}
+		if len(message.ToolCalls) == 0 && strings.TrimSpace(message.Content) != "" {
+			candidate = strings.TrimSpace(message.Content)
+		}
+	}
+	e.history.appendOutput(intermediates)
+	finished, err := e.inputs.finish(ctx, turn, candidate)
+	if err != nil {
+		return err
+	}
+	if finished {
+		e.result.Content = candidate
+	}
+	return nil
 }
 
 // runIDFromContext 返回当前 Runtime 传给组件的 Agent Run 编号。
 func runIDFromContext(ctx context.Context) string {
 	runID, _ := ctx.Value(runIDContextKey{}).(string)
 	return runID
-}
-
-// pushPending 把数据库中的新 Trigger 放入 TurnLoop，并按需请求安全点抢占。
-func (r *EinoRuntime) pushPending(ctx context.Context, loop *adk.TurnLoop[Trigger, *schema.Message], feed InputFeed, stateMu *sync.Mutex, maxPushedSeq *int64, preempt bool) error {
-	stateMu.Lock()
-	afterSeq := *maxPushedSeq
-	stateMu.Unlock()
-	triggers, err := feed.Peek(ctx, afterSeq)
-	if err != nil {
-		return err
-	}
-	var preemptAck <-chan struct{}
-	stateMu.Lock()
-	for _, trigger := range triggers {
-		if trigger.Seq <= *maxPushedSeq {
-			continue
-		}
-		var accepted bool
-		if preempt && preemptAck == nil {
-			accepted, preemptAck = loop.Push(trigger, adk.WithPreempt[Trigger, *schema.Message](adk.AnySafePoint))
-		} else {
-			accepted, _ = loop.Push(trigger)
-		}
-		if !accepted {
-			stateMu.Unlock()
-			if preemptAck != nil {
-				<-preemptAck
-			}
-			return nil
-		}
-		if trigger.Seq > *maxPushedSeq {
-			*maxPushedSeq = trigger.Seq
-		}
-	}
-	stateMu.Unlock()
-	if preemptAck != nil {
-		<-preemptAck
-	}
-	return nil
-}
-
-// schemaMessages 转换为 Eino 标准消息。
-func schemaMessages(messages []Message) []*schema.Message {
-	result := make([]*schema.Message, 0, len(messages))
-	for _, message := range messages {
-		switch message.Role {
-		case MessageRoleAssistant:
-			result = append(result, schema.AssistantMessage(message.Content, nil))
-		default:
-			result = append(result, schema.UserMessage(message.Content))
-		}
-	}
-	return result
-}
-
-// maxTriggerSeq 返回本轮输入中的最大 Trigger 序号。
-func maxTriggerSeq(items []Trigger) int64 {
-	var result int64
-	for _, item := range items {
-		if item.Seq > result {
-			result = item.Seq
-		}
-	}
-	return result
-}
-
-// turnPreempted 判断当前 Turn 是否已收到安全点抢占信号。
-func turnPreempted(turn *adk.TurnContext[Trigger, *schema.Message]) bool {
-	select {
-	case <-turn.Preempted:
-		return true
-	default:
-		return false
-	}
 }
