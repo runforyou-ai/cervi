@@ -212,6 +212,8 @@
     }
     autosize();
     updateSendState();
+    // 切换会话后重新跟随正文的异步布局和后续消息。
+    followingMessages = true;
     messages.scrollTop = activeConversation.started ? messages.scrollHeight : 0;
     if (
       !previewMode &&

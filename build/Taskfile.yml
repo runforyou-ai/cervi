@@ -136,6 +136,7 @@ tasks:
     run: once
     deps:
       - task: go:mod:tidy
+      # 服务端绑定按 server 标签分析 Go 包，必须先生成 go:embed 引用的资源。
       - task: build:messenger
     sources:
       - "**/*.[jt]s"

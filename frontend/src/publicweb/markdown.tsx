@@ -1,4 +1,4 @@
-/** 为原生 Messenger 消息正文提供共享 React 渲染和生命周期接口。 */
+/** 为网站 Messenger 消息正文提供共享 React 渲染和生命周期接口。 */
 import { createRoot, type Root } from "react-dom/client"
 import { MessageMarkdown } from "../components/message-markdown"
 import { messagePreview } from "../lib/message-preview"
