@@ -276,7 +276,7 @@ export async function listConversationMessages(
   }
 }
 
-/** 单调推进当前用户的原生会话已读水位。 */
+/** 单调推进当前用户的会话已读水位。 */
 export function markConversationRead(
   conversationID: string,
   input: MarkConversationReadInput,

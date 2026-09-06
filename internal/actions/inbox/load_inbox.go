@@ -111,6 +111,8 @@ type customerConversationRow struct {
 	AssigneeDisplayName  *string    `bun:"assignee_display_name"`
 	AssigneeAvatarFileID *string    `bun:"assignee_avatar_file_id"`
 	SortAt               *time.Time `bun:"sort_at"`
+	UnreadCount          int        `bun:"unread_count"`
+	LastReadMessageID    *string    `bun:"last_read_message_id"`
 	LastMessageID        *string    `bun:"last_message_id"`
 }
 
@@ -175,7 +177,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	groups := make([]groupConversationRow, 0)
 	var err error
 	if input.Scope != domain.InboxScopeInternal {
-		customers, err = q.loadCustomerConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, input)
+		customers, err = q.loadCustomerConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID, input)
 		if err != nil {
 			return nil, UnreadCounts{}, err
 		}
@@ -198,7 +200,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			assignee = &AssigneeSummary{IdentityID: *row.AssigneeIdentityID, Type: domain.OrganizationIdentityType(*row.AssigneeType), DisplayName: *row.AssigneeDisplayName, AvatarFileID: row.AssigneeAvatarFileID}
 		}
 		result = append(result, ConversationSummary{
-			ID: row.ID, Type: domain.ConversationTypeCustomer, LastMessageID: row.LastMessageID, sortAt: row.SortAt,
+			ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
 			Customer: &CustomerConversationSummary{
 				Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
 				ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
@@ -252,11 +254,13 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 }
 
 // loadCustomerConversations 按客户视图读取当前处理周期对应的会话。
-func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organizationID, currentIdentityID string, input LoadInput) ([]customerConversationRow, error) {
+func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organizationID, currentIdentityID, userID string, input LoadInput) ([]customerConversationRow, error) {
 	var rows []customerConversationRow
 	query := q.db.NewSelect().
 		TableExpr("customer_conversations AS cc").
 		ColumnExpr("cv.id AS id").
+		ColumnExpr("unread.unread_count AS unread_count").
+		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("COALESCE(cci.display_name, c.display_name) AS contact_name").
 		ColumnExpr("cci.avatar_file_id AS contact_avatar_file_id").
@@ -279,6 +283,18 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
 		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
 		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = current.assignee_identity_id").
+		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
+		Join(`JOIN LATERAL (
+			SELECT count(*) AS unread_count
+			FROM messages AS unread_msg
+			LEFT JOIN messages AS read_msg ON read_msg.organization_id = state.organization_id AND read_msg.conversation_id = state.conversation_id AND read_msg.id = state.last_read_message_id
+			JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.conversation_id = unread_msg.conversation_id AND sender_cp.id = unread_msg.sender_participant_id
+			JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
+			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id
+				AND unread_msg.type = ? AND unread_msg.deleted_at IS NULL
+				AND NOT (sender_cs.kind = ? AND sender_cs.source_id = ?)
+				AND (read_msg.id IS NULL OR (unread_msg.originated_at, unread_msg.source_order, unread_msg.id) > (read_msg.originated_at, read_msg.source_order, read_msg.id))
+		) AS unread ON TRUE`, domain.MessageTypeText, domain.ChatSubjectKindOrganizationIdentity, currentIdentityID).
 		Where("cc.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer)
 	if input.Scope == domain.InboxScopeAll {

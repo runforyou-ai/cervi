@@ -610,7 +610,7 @@ export function MarkConversationMentionReviewed(meta: $models.RequestMeta, conve
 }
 
 /**
- * MarkConversationRead 单调推进当前用户的原生会话已读水位。
+ * MarkConversationRead 单调推进当前用户的会话已读水位。
  */
 export function MarkConversationRead(meta: $models.RequestMeta, conversationID: string, input: $models.MarkConversationReadInput): $CancellablePromise<$models.ConversationReadState> {
     return $Call.ByID(3314752344, meta, conversationID, input);

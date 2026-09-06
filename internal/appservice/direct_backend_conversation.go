@@ -426,7 +426,7 @@ func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta Reque
 	return b.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
 }
 
-// MarkConversationRead 单调推进当前用户的原生会话已读水位。
+// MarkConversationRead 单调推进当前用户的会话已读水位。
 func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

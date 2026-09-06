@@ -97,6 +97,10 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 			return InboundCustomerTextMessageResult{}, err
 		}
 	}
+	// 网站消息在确定写入周期后生成时间，已有会话此时已持有周期锁；外部渠道保留来源时间。
+	if input.OriginatedAt.IsZero() {
+		input.OriginatedAt = time.Now().UTC()
+	}
 	if conversation.Status == string(domain.ConversationStatusArchived) {
 		if _, err := db.NewUpdate().Model(conversation).
 			Set("status = ?", domain.ConversationStatusActive).

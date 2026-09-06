@@ -79,7 +79,6 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 	if len(fields) > 0 {
 		return ReceiveWebsiteCustomerTextMessageResult{}, &ValidationError{Fields: fields}
 	}
-	originatedAt := time.Now().UTC()
 	idempotencyKey := "chmsg:" + normalized.ChannelID + ":" + normalized.ClientMessageID
 
 	var err error
@@ -87,7 +86,7 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 		var result ReceiveWebsiteCustomerTextMessageResult
 		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 			var executeErr error
-			result, executeErr = a.executeTransaction(ctx, tx, normalized, originatedAt, idempotencyKey)
+			result, executeErr = a.executeTransaction(ctx, tx, normalized, idempotencyKey)
 			return executeErr
 		})
 		if err == nil {
@@ -106,14 +105,14 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 }
 
 // executeTransaction 执行一次完整的网站访客消息事务。
-func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, input WebsiteCustomerTextMessageInput, originatedAt time.Time, idempotencyKey string) (ReceiveWebsiteCustomerTextMessageResult, error) {
+func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, input WebsiteCustomerTextMessageInput, idempotencyKey string) (ReceiveWebsiteCustomerTextMessageResult, error) {
 	channel, err := loadWebsiteChannel(ctx, tx, input.ChannelID)
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
 	}
 	received, err := ReceiveInboundCustomerTextMessage(ctx, tx, channel, InboundCustomerTextMessageInput{
 		ExternalID: input.ExternalID, RequestedConversationID: input.ConversationID,
-		Body: input.Body, IdempotencyKey: idempotencyKey, OriginatedAt: originatedAt,
+		Body: input.Body, IdempotencyKey: idempotencyKey,
 	})
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
