@@ -39,7 +39,6 @@ const mobile = {
   inbox: {
     refreshFailed: "刷新失败",
     customerSummaryOnly: "仅查看摘要",
-    groupUnavailable: "群聊详情暂未开放",
     assigneesRetry: "负责人加载失败，重试",
     allCoworkers: "全部同事",
     selectedAssignee: "已选负责人",
@@ -52,6 +51,13 @@ const mobile = {
     refreshError: "消息刷新失败，点击重试",
     emptyTitle: "暂无会话",
     emptyDescription: "当前分类和筛选条件下没有会话。",
+  },
+  group: {
+    title: "群聊",
+    memberCount: "{{count}} 人",
+    loadError: "无法加载群聊，请重试。",
+    unavailable: "该群聊不存在或你已不在群内。",
+    archived: "群聊已解散，仅可查看历史消息。",
   },
   me: {
     logoutDescription: "退出后需要重新登录，企业服务器连接将保留。",
