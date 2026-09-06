@@ -117,7 +117,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, "", idempotencyKey, true); err != nil || found {
+	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, true); err != nil || found {
 		return saved, err
 	}
 
@@ -133,6 +133,10 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	}
 	if session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonServiceSessionOwned}
+	}
+	replyTo, err := loadConversationReplyTarget(ctx, tx, identity.Organization.ID, conversation.ID, input.ReplyToMessageID)
+	if err != nil {
+		return ConversationMessage{}, err
 	}
 	plan := memberReplySessionPlan{assign: session.AssigneeIdentityID == nil}
 	if err := applyMemberReplySessionPlan(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt, plan); err != nil {
@@ -153,8 +157,11 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		ServiceSessionID: &session.ID, SenderParticipantID: &participant.ID,
 		Type: string(domain.MessageTypeText), Body: input.Body, IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
 	}
+	if replyTo != nil {
+		message.ReplyToMessageID = &replyTo.ID
+	}
 	if _, err := tx.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
+		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "reply_to_message_id", "idempotency_key", "originated_at").
 		Returning("*").
 		Exec(ctx); err != nil {
 		return ConversationMessage{}, fmt.Errorf("create member customer message: %w", err)
@@ -174,7 +181,9 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
 		return ConversationMessage{}, err
 	}
-	return memberConversationMessage(message, subject.ID, identity.OrganizationIdentity), nil
+	result := memberConversationMessage(message, subject.ID, identity.OrganizationIdentity)
+	result.ReplyTo = replyTo
+	return result, nil
 }
 
 // ensureCustomerConversationOutboundSupported 校验客户会话来源渠道已实现外发。
@@ -212,6 +221,12 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 	input.ClientMessageID, valid = common.NormalizeUUID(input.ClientMessageID)
 	if !valid {
 		fields["clientMessageId"] = ValidationClientMessageIDInvalid
+	}
+	if input.ReplyToMessageID != "" {
+		input.ReplyToMessageID, valid = common.NormalizeUUID(input.ReplyToMessageID)
+		if !valid {
+			fields["replyToMessageId"] = ValidationReplyToMessageIDInvalid
+		}
 	}
 	if input.Body == "" {
 		fields["body"] = ValidationBodyRequired

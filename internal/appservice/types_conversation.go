@@ -58,8 +58,9 @@ type ConversationMessageListInput struct {
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。
 type CustomerTextMessageInput struct {
-	ClientMessageID string `json:"clientMessageId"`
-	Body            string `json:"body"`
+	ReplyToMessageID string `json:"replyToMessageId"`
+	ClientMessageID  string `json:"clientMessageId"`
+	Body             string `json:"body"`
 }
 
 // TransferServiceSessionInput 定义客服处理周期转交目标。

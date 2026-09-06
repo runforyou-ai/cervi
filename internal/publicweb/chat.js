@@ -42,6 +42,17 @@
   var defaultGreeting = messenger.getAttribute("data-default-greeting");
   var defaultSubtitle = messenger.getAttribute("data-default-subtitle");
   var loadingLabel = messenger.getAttribute("data-loading");
+  var replyMenu = document.getElementById("cv-message-menu");
+  var replyMenuSource = null;
+  var referenceNavigationSeq = 0;
+  var referenceLabels = {
+    reply: messenger.getAttribute("data-reference-reply"),
+    replying: messenger.getAttribute("data-reference-replying"),
+    unavailable: messenger.getAttribute("data-reference-unavailable"),
+    deleted: messenger.getAttribute("data-reference-deleted"),
+    visitor: messenger.getAttribute("data-reference-visitor"),
+    agent: messenger.getAttribute("data-reference-agent"),
+  };
   var requestFailedLabel = messenger.getAttribute("data-request-failed");
   var sessionLabels = {
     open: messenger.getAttribute("data-session-open"),
@@ -80,6 +91,7 @@
     document.querySelectorAll("[data-screen]").forEach(function (screen) {
       screen.hidden = screen.getAttribute("data-screen") !== route;
     });
+    referenceNavigationSeq += 1;
     activeRoute = route;
     var topLevel = route === "home" || route === "messages" || route === "help";
     $("cv-navigation").hidden = !topLevel;
@@ -126,6 +138,9 @@
       serviceSession: summary ? summary.serviceSession : null,
       unread: false,
       after: "",
+      before: "",
+      replyTo: null,
+      pendingReplyToID: "",
       polling: false,
       pollSeq: 0,
       lastMessageID: "",
@@ -176,6 +191,7 @@
       syncRealMessagePolling();
       return;
     }
+    referenceNavigationSeq += 1;
     stashActiveConversation();
     activeConversation = conversation;
     messages.appendChild(activeConversation.fragment);
@@ -184,6 +200,7 @@
       : activeConversation.id !== null;
     $("cv-conversation-error").hidden = true;
     input.value = activeConversation.draft;
+    renderComposerReference();
     fileInput.value = "";
     if (!recording.hidden) {
       resetRecording(false);
@@ -248,6 +265,7 @@
   }
 
   function closeOverlays() {
+    replyMenu.hidden = true;
     emojiPanel.hidden = true;
     $("cv-emoji-toggle").setAttribute("aria-expanded", "false");
     moreMenu.hidden = true;
@@ -270,6 +288,7 @@
 
   // 只允许鼠标右键、键盘或触摸打开原生上下文菜单。
   function allowOnlyNativeSecondaryButtonMenu(event) {
+    replyMenu.hidden = true;
     var allow =
       nativeContextMenuSource !== "" ||
       (event.pointerType && event.pointerType !== "mouse");
@@ -439,6 +458,7 @@
   }
 
   function scrollToBottom() {
+    $("cv-latest-message").hidden = true;
     messages.scrollTop = messages.scrollHeight;
   }
 
@@ -829,6 +849,7 @@
         result.messages.forEach(function (message) {
           appendServerMessage(conversation, message);
         });
+        conversation.before = result.before || "";
         conversation.after = result.after || "";
         conversation.historyLoaded = true;
         if (result.messages.length > 0) {
@@ -896,9 +917,6 @@
     } else {
       container.appendChild(node);
     }
-    if (conversation === activeConversation) {
-      scrollToBottom();
-    }
   }
 
   // 把一条持久消息有序合入指定会话。
@@ -910,22 +928,134 @@
       value.author === "visitor" ? "visitor" : "assistant",
     );
     message.setAttribute("data-message-id", value.id);
+    message.tabIndex = 0;
     message.setAttribute("data-originated-at", value.originatedAt);
     var row = document.createElement("div");
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
-    bubble.textContent = value.body;
+    if (value.replyTo) {
+      var reference = document.createElement(value.replyTo.deleted ? "blockquote" : "button");
+      reference.className = "cv-message-reference";
+      if (value.replyTo.deleted) {
+        reference.textContent = referenceLabels.deleted;
+      } else {
+        reference.type = "button";
+        reference.addEventListener("click", function () {
+          locateReferencedMessage(conversation, value.replyTo.id);
+        });
+        var author = document.createElement("strong");
+        author.textContent = referenceLabels[value.replyTo.author];
+        var excerpt = document.createElement("span");
+        excerpt.className = "cv-message-reference-body";
+        excerpt.textContent = value.replyTo.body;
+        reference.appendChild(author);
+        reference.appendChild(excerpt);
+      }
+      bubble.appendChild(reference);
+    }
+    bubble.appendChild(document.createTextNode(value.body));
     row.appendChild(bubble);
     message.appendChild(row);
     message.appendChild(messageMeta(new Date(value.originatedAt)));
-    conversation.messageIDs[value.id] = true;
+    // 收到的消息悬停显示回复操作，双方消息均支持右键引用。
+    if (value.author === "agent") {
+      var replyButton = document.createElement("button");
+      replyButton.type = "button";
+      replyButton.className = "cv-message-reply";
+      replyButton.textContent = referenceLabels.reply;
+      replyButton.addEventListener("click", function () {
+        selectReplyMessage(value);
+      });
+      row.appendChild(replyButton);
+    }
+    message.addEventListener("contextmenu", function (event) {
+      if (event.defaultPrevented) {
+        return;
+      }
+      event.preventDefault();
+      closeOverlays();
+      replyMenuSource = message;
+      replyMenu.hidden = false;
+      var bounds = message.getBoundingClientRect();
+      var x = event.clientX || bounds.left;
+      var y = event.clientY || bounds.top;
+      replyMenu.style.left = Math.max(8, Math.min(x, window.innerWidth - replyMenu.offsetWidth - 8)) + "px";
+      replyMenu.style.top = Math.max(8, Math.min(y, window.innerHeight - replyMenu.offsetHeight - 8)) + "px";
+      $("cv-menu-reply").focus();
+    });
+    conversation.messageIDs[value.id] = value;
     insertServerMessageNode(
       conversation,
       message,
       value.originatedAt,
       value.id,
     );
+  }
+
+  // 把选中的原文保存在当前会话草稿中。
+  function selectReplyMessage(value) {
+    activeConversation.replyTo = value;
+    closeOverlays();
+    renderComposerReference();
+    input.focus();
+  }
+
+  // 同步输入框的一层原文摘要。
+  function renderComposerReference() {
+    var value = activeConversation.replyTo;
+    $("cv-composer-reference").hidden = !value;
+    $("cv-composer-reference-author").textContent = value
+      ? referenceLabels.replying + " " + referenceLabels[value.author]
+      : "";
+    $("cv-composer-reference-body").textContent = value ? value.body : "";
+  }
+
+  // 补齐较早的历史后定位原文，保留连续消息和当前阅读位置。
+  async function locateReferencedMessage(conversation, messageID) {
+    var sequence = ++referenceNavigationSeq;
+    var errorElement = $("cv-conversation-error");
+    errorElement.hidden = true;
+    try {
+      while (!conversation.messageIDs[messageID] && conversation.before) {
+        var result = await requestWebsiteJSON(
+          "/api/public/website-channels/" + encodeURIComponent(channelID) +
+          "/conversations/" + encodeURIComponent(conversation.id) +
+          "/messages?before=" + encodeURIComponent(conversation.before),
+        );
+        if (sequence !== referenceNavigationSeq) {
+          return;
+        }
+        var previousHeight = messages.scrollHeight;
+        var previousTop = messages.scrollTop;
+        result.messages.forEach(function (value) {
+          appendServerMessage(conversation, value);
+        });
+        conversation.before = result.before || "";
+        messages.scrollTop = previousTop + messages.scrollHeight - previousHeight;
+      }
+      if (sequence !== referenceNavigationSeq) {
+        return;
+      }
+      var target = messages.querySelector('[data-message-id="' + messageID + '"]');
+      if (!target) {
+        throw new Error(referenceLabels.unavailable);
+      }
+      messages.querySelectorAll(".cv-message-highlight").forEach(function (node) {
+        node.classList.remove("cv-message-highlight");
+      });
+      target.scrollIntoView({ block: "center" });
+      target.focus({ preventScroll: true });
+      target.classList.add("cv-message-highlight");
+      window.setTimeout(function () {
+        target.classList.remove("cv-message-highlight");
+      }, 2000);
+    } catch (error) {
+      if (sequence === referenceNavigationSeq) {
+        errorElement.textContent = error.message || requestFailedLabel;
+        errorElement.hidden = false;
+      }
+    }
   }
 
   // 返回当前允许访客消息轮询的会话。
@@ -1005,9 +1135,14 @@
         ) {
           return;
         }
+        var followLatest = conversation === activeConversation &&
+          messages.scrollHeight - messages.scrollTop - messages.clientHeight < 48;
         result.messages.forEach(function (message) {
           appendServerMessage(conversation, message);
         });
+        if (followLatest) {
+          scrollToBottom();
+        }
         if (result.messages.length === 0) {
           return;
         }
@@ -1049,9 +1184,15 @@
     }
     var conversation = activeConversation;
     var startsConversation = conversation.id === null;
+    var replyToID = conversation.replyTo ? conversation.replyTo.id : "";
     conversation.pollSeq += 1;
     stopRealMessagePolling();
-    if (conversation.pendingBody !== text || !conversation.pendingMessageID) {
+    if (
+      conversation.pendingBody !== text ||
+      conversation.pendingReplyToID !== replyToID ||
+      !conversation.pendingMessageID
+    ) {
+      conversation.pendingReplyToID = replyToID;
       conversation.pendingBody = text;
       conversation.pendingMessageID = createClientMessageID();
     }
@@ -1067,6 +1208,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientMessageId: conversation.pendingMessageID,
+          replyToMessageId: replyToID,
           conversationId: conversation.id,
           body: text,
         }),
@@ -1080,7 +1222,14 @@
         );
         conversation.pendingMessageID = "";
         conversation.pendingBody = "";
-        conversation.draft = "";
+        // 只清除本次成功发送的草稿，保留等待期间修改的正文或引用。
+        var currentDraft = conversation === activeConversation ? input.value : conversation.draft;
+        var currentReplyToID = conversation.replyTo ? conversation.replyTo.id : "";
+        var sentDraft = currentDraft.trim() === text && currentReplyToID === replyToID;
+        conversation.draft = sentDraft ? "" : currentDraft;
+        if (sentDraft) {
+          conversation.replyTo = null;
+        }
         appendServerMessage(conversation, result.message);
         if (startsConversation) {
           conversation.historyLoaded = true;
@@ -1088,13 +1237,14 @@
           loadConversationHistory(conversation);
         }
         if (conversation === activeConversation) {
-          if (input.value.trim() === text) {
+          if (sentDraft) {
             preserveComposerHeight();
             input.value = "";
-          } else {
-            conversation.draft = input.value;
           }
           intro.hidden = true;
+          renderComposerReference();
+          referenceNavigationSeq += 1;
+          scrollToBottom();
           autosize();
         }
         renderRecentConversation();
@@ -1518,6 +1668,42 @@
     nativeContextMenuSource = "";
   });
 
+  // 下一次独立按下时关闭菜单，保留长按结束后浏览器补发的点击。
+  document.addEventListener("pointerdown", function (event) {
+    if (!replyMenu.contains(event.target)) {
+      replyMenu.hidden = true;
+    }
+  });
+  document.addEventListener("click", function (event) {
+    if (!replyMenu.hidden && replyMenuSource.contains(event.target)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+
+  $("cv-menu-reply").addEventListener("click", function () {
+    var value = activeConversation.messageIDs[replyMenuSource.getAttribute("data-message-id")];
+    selectReplyMessage(value);
+  });
+  $("cv-cancel-reply").addEventListener("click", function () {
+    activeConversation.replyTo = null;
+    renderComposerReference();
+    input.focus();
+  });
+  $("cv-latest-message").addEventListener("click", function () {
+    referenceNavigationSeq += 1;
+    scrollToBottom();
+    input.focus();
+  });
+  messages.addEventListener("scroll", function () {
+    replyMenu.hidden = true;
+    $("cv-latest-message").hidden = previewMode ||
+      messages.scrollHeight - messages.scrollTop - messages.clientHeight < 48;
+  });
+  window.addEventListener("resize", function () {
+    replyMenu.hidden = true;
+  });
+
   $("cv-help-input").addEventListener("input", filterHelp);
   input.addEventListener("input", function () {
     if (!previewMode && activeConversation.pendingBody !== input.value.trim()) {
@@ -1609,11 +1795,19 @@
     closeOverlays();
   });
   document.addEventListener("keydown", function (event) {
+    if (event.key === "Tab") {
+      replyMenu.hidden = true;
+    }
     if (event.key !== "Escape") {
       return;
     }
     if (lightbox && !lightbox.hidden) {
       lightbox.hidden = true;
+      return;
+    }
+    if (!replyMenu.hidden) {
+      closeOverlays();
+      replyMenuSource.focus({ preventScroll: true });
       return;
     }
     if (!emojiPanel.hidden || !moreMenu.hidden) {

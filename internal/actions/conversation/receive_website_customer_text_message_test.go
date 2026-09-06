@@ -29,3 +29,21 @@ func TestValidWebsiteExternalIDRejectsNonHex(t *testing.T) {
 		t.Fatal("expected non-hex external ID to be rejected")
 	}
 }
+
+// TestNormalizeWebsiteReplyTarget 验证引用编号格式及新会话不能携带引用。
+func TestNormalizeWebsiteReplyTarget(t *testing.T) {
+	conversationID := "0198ddee-c056-7bc5-a1d9-586f878ee966"
+	for _, input := range []WebsiteCustomerTextMessageInput{
+		{ReplyToMessageID: "invalid", ConversationID: &conversationID},
+		{ReplyToMessageID: conversationID},
+	} {
+		_, fields := normalizeWebsiteMessageInput(input)
+		if fields["replyToMessageId"] != ValidationReplyToMessageIDInvalid {
+			t.Fatalf("fields=%+v", fields)
+		}
+	}
+	input, fields := normalizeWebsiteMessageInput(WebsiteCustomerTextMessageInput{ReplyToMessageID: "0198DDEE-C056-7BC5-A1D9-586F878EE966", ConversationID: &conversationID})
+	if _, invalid := fields["replyToMessageId"]; invalid || input.ReplyToMessageID != conversationID {
+		t.Fatalf("input=%+v fields=%+v", input, fields)
+	}
+}

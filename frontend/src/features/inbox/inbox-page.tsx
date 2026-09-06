@@ -1141,7 +1141,7 @@ function ConversationThread({
         }
         groupParticipants={groupResource.data?.participants}
         onReplyMessage={
-          conversation && !isCustomerInboxConversation(conversation) && !replyDisabledReason
+          conversation && replySupported && !replyDisabledReason
             ? setReplyTo
             : undefined
         }

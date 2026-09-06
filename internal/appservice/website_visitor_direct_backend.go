@@ -50,7 +50,7 @@ func (b *WebsiteVisitorDirectBackend) ListConversations(ctx context.Context, met
 func (b *WebsiteVisitorDirectBackend) SendTextMessage(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string, input WebsiteVisitorTextMessageInput) (WebsiteVisitorTextMessageResult, error) {
 	result, err := b.sendTextMessage.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channelID, ExternalID: externalID, ConversationID: input.ConversationID,
-		ClientMessageID: input.ClientMessageID, Body: input.Body,
+		ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
 		return WebsiteVisitorTextMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessageSendFailed, "send_text_message", "channel_id", channelID)
@@ -147,6 +147,9 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 		return NotFoundError(requestMeta, cervii18n.ErrorWebsiteConversationNotFound)
 	}
 	if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
+		if conflict.Reason == conversationaction.ConflictReasonReplyTargetInvalid {
+			return ConflictError(requestMeta, cervii18n.ErrorReplyTargetInvalid, conflict.Reason)
+		}
 		return ConflictError(requestMeta, cervii18n.ErrorWebsiteMessageConflict, conflict.Reason)
 	}
 	// 请求被取消不属于业务失败，不产生告警日志。
@@ -160,13 +163,14 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 }
 
 var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{
-	conversationaction.ValidationChannelIDInvalid:       cervii18n.FieldChannelIDInvalid,
-	conversationaction.ValidationExternalIDInvalid:      cervii18n.FieldVisitorTokenInvalid,
-	conversationaction.ValidationConversationIDInvalid:  cervii18n.FieldConversationIDInvalid,
-	conversationaction.ValidationClientMessageIDInvalid: cervii18n.FieldClientMessageIDInvalid,
-	conversationaction.ValidationBodyRequired:           cervii18n.FieldMessageBodyRequired,
-	conversationaction.ValidationBodyTooLong:            cervii18n.FieldMessageBodyTooLong,
-	conversationaction.ValidationCursorInvalid:          cervii18n.FieldMessageCursorInvalid,
+	conversationaction.ValidationReplyToMessageIDInvalid: cervii18n.FieldReplyToMessageIDInvalid,
+	conversationaction.ValidationChannelIDInvalid:        cervii18n.FieldChannelIDInvalid,
+	conversationaction.ValidationExternalIDInvalid:       cervii18n.FieldVisitorTokenInvalid,
+	conversationaction.ValidationConversationIDInvalid:   cervii18n.FieldConversationIDInvalid,
+	conversationaction.ValidationClientMessageIDInvalid:  cervii18n.FieldClientMessageIDInvalid,
+	conversationaction.ValidationBodyRequired:            cervii18n.FieldMessageBodyRequired,
+	conversationaction.ValidationBodyTooLong:             cervii18n.FieldMessageBodyTooLong,
+	conversationaction.ValidationCursorInvalid:           cervii18n.FieldMessageCursorInvalid,
 }
 
 // websiteVisitorConversationFromAction 转换访客会话摘要。
@@ -179,8 +183,16 @@ func websiteVisitorConversationFromAction(value conversationaction.ConversationS
 
 // websiteVisitorMessageFromAction 转换访客消息。
 func websiteVisitorMessageFromAction(value conversationaction.Message) WebsiteVisitorMessage {
+	var replyTo *WebsiteVisitorMessageReference
+	if value.ReplyTo != nil {
+		replyTo = &WebsiteVisitorMessageReference{
+			ID: value.ReplyTo.ID, Deleted: value.ReplyTo.Deleted,
+			Author: string(value.ReplyTo.Author), Body: value.ReplyTo.Body,
+		}
+	}
 	return WebsiteVisitorMessage{
-		ID: value.ID, Author: string(value.Author), Body: value.Body,
+		ReplyTo: replyTo,
+		ID:      value.ID, Author: string(value.Author), Body: value.Body,
 		OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
 	}
 }

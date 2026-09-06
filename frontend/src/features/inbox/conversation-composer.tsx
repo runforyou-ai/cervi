@@ -15,6 +15,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ChatSubjectKind,
   ConversationType,
   isApiError,
   sendCustomerTextMessage,
@@ -138,11 +139,7 @@ export function ConversationComposer({
   } | null>(null)
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
-  const activeReplyTo =
-    conversationType === ConversationType.ConversationTypeGroup ||
-    conversationType === ConversationType.ConversationTypeDirect
-      ? replyTo
-      : null
+  const activeReplyTo = replyTo
   const replyToRef = useRef(replyTo)
   replyToRef.current = replyTo
   const [mentionSubjectIDs, setMentionSubjectIDs] = useState<string[]>([])
@@ -362,7 +359,10 @@ export function ConversationComposer({
           })
           break
         case ConversationType.ConversationTypeCustomer:
-          message = await sendCustomerTextMessage(conversationID, messageInput)
+          message = await sendCustomerTextMessage(conversationID, {
+            ...messageInput,
+            replyToMessageId: activeReplyTo?.id ?? "",
+          })
           break
         default:
           throw new Error("不支持的会话类型")
@@ -565,7 +565,7 @@ export function ConversationComposer({
                   {t("messageReplyingTo", {
                     name:
                       activeReplyTo.sender?.displayName?.trim() ||
-                      t("unknownSender"),
+                      t(activeReplyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
                   })}
                 </p>
                 <p className="truncate text-muted-foreground">
