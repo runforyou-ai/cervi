@@ -263,6 +263,7 @@ func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermode
 }
 
 type claimedMessageRow struct {
+	ID               string  `bun:"id"`
 	Body             string  `bun:"body"`
 	SenderSourceID   string  `bun:"sender_source_id"`
 	ReplyToMessageID *string `bun:"reply_to_message_id"`
@@ -288,7 +289,7 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 	}
 	rows := make([]claimedMessageRow, 0, agentHistoryLimit)
 	if err := db.NewSelect().TableExpr("messages AS msg").
-		ColumnExpr("msg.body").
+		ColumnExpr("msg.id, msg.body").
 		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("msg.reply_to_message_id").
 		ColumnExpr("CASE WHEN reply.deleted_at IS NULL THEN COALESCE(reply.body, '') ELSE '' END AS reply_body").
@@ -331,7 +332,7 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 			}{Body: row.Body, ReplyTo: reference})
 			content = string(encoded)
 		}
-		messages = append(messages, agentruntime.Message{Role: role, Content: content})
+		messages = append(messages, agentruntime.Message{ID: row.ID, Role: role, Content: content})
 	}
 	return messages, nil
 }
