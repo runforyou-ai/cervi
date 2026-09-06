@@ -542,7 +542,7 @@
     message.appendChild(messageMeta(now));
     appendConversationNode(conversation, message);
     if (!greeting) {
-      updateConversationSummary(conversation, CerviMarkdown.preview(text, "markdown"), now);
+      updateConversationSummary(conversation, CerviMarkdown.preview(text, "agent"), now);
     }
   }
 
