@@ -56,6 +56,7 @@ export function useConversationTimeline(
         !loadingDirection
           ? memberChatPollingInterval
           : false,
+      staleTime: 0,
       refetchOnWindowFocus: false,
     },
   )

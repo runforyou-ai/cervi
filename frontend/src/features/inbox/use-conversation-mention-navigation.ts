@@ -108,13 +108,14 @@ export function useConversationMentionNavigation({
   }, [state.data, round, close])
   useEffect(() => {
     if (
+      enabled &&
       isApiError(state.error) &&
       state.error.reason === "conversation_unavailable"
     ) {
       close()
       onUnavailable()
     }
-  }, [state.error, close, onUnavailable])
+  }, [enabled, state.error, close, onUnavailable])
   useEffect(
     () => () => {
       operation.current += 1
@@ -271,7 +272,9 @@ export function useConversationMentionNavigation({
     round,
     busy,
     needsResume,
-    pendingCount: pending.data?.messageIds.filter((id) => !visibleIDs.has(id)).length ?? 0,
+    pendingCount: enabled
+      ? (pending.data?.messageIds.filter((id) => !visibleIDs.has(id)).length ?? 0)
+      : 0,
     latestSequence: state.data?.latestSequence ?? "0",
     start,
     visit,
