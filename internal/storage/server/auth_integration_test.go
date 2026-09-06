@@ -13,6 +13,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
@@ -2056,7 +2057,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		assertDirectAgentRunStatus(t, inboxBeforeRun, agentConversation.ID, domain.AgentRunStatusQueued, "只给我最终结果")
 
+		var executionStreams []string
+		var successfulBlocks []agentruntime.Block
 		executedRuntime := testAgentRuntime{run: func(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+			executionStreams = append(executionStreams, request.StreamID)
 			if request.Name != "售前智能体" || request.Model.Identifier != model.Identifier {
 				return agentruntime.RunResult{}, errors.New("unexpected agent runtime request")
 			}
@@ -2081,7 +2085,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			if claimed.EndSeq != 2 || len(claimed.Messages) != 2 {
 				return agentruntime.RunResult{}, errors.New("unexpected claimed agent input")
 			}
-			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}}, nil
+			successfulBlocks = []agentruntime.Block{{
+				ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(),
+				Kind: domain.AgentRunBlockThinking, Payload: agentruntime.BlockPayload{Text: "计算过程"},
+			}}
+			request.OnProgress(agentruntime.Progress{RunID: request.RunID, StreamID: request.StreamID, Sequence: 1, Blocks: successfulBlocks})
+			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}, Blocks: successfulBlocks}, nil
 		}}
 		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime, nil)
 		if _, err := db.ExecContext(context.Background(), `
@@ -2105,6 +2114,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || state.ProcessedSeq != 0 || run.Status != string(domain.AgentRunStatusRunning) || messageCountAfterPersistenceError != 2 {
 			t.Fatalf("agent run after completion persistence error = %#v, state = %#v, messages = %d, error = %v", run, state, messageCountAfterPersistenceError, err)
 		}
+		if count, err := db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", run.ID).Count(context.Background()); err != nil || count != 0 {
+			t.Fatalf("blocks after failed transaction = %d, error = %v", count, err)
+		}
+		if _, exists := executeAgentRun.Progress(run.ID); exists {
+			t.Fatal("failed attempt retained its temporary progress")
+		}
 		if _, err := db.ExecContext(context.Background(), `ALTER TABLE messages DROP CONSTRAINT messages_reject_test_agent_response`); err != nil {
 			t.Fatal(err)
 		}
@@ -2121,11 +2136,48 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || state.ProcessedSeq != 2 || run.Status != string(domain.AgentRunStatusSucceeded) || run.ResponseMessageID == nil || messageCount != 3 {
 			t.Fatalf("completed agent run = %#v, state = %#v, messages = %d, error = %v", run, state, messageCount, err)
 		}
+		var savedBlocks []servermodels.AgentRunBlock
+		if err := db.NewSelect().Model(&savedBlocks).Where("arb.agent_run_id = ?", run.ID).Order("position ASC").Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if len(savedBlocks) != 1 || savedBlocks[0].ID != successfulBlocks[0].ID || savedBlocks[0].OrganizationID != run.OrganizationID || !strings.Contains(string(savedBlocks[0].Payload), "计算过程") {
+			t.Fatalf("saved blocks = %#v", savedBlocks)
+		}
+		if len(executionStreams) != 2 || executionStreams[0] == "" || executionStreams[0] == executionStreams[1] {
+			t.Fatalf("retry streams = %#v", executionStreams)
+		}
+		if err := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID}); err != nil || len(executionStreams) != 2 {
+			t.Fatalf("completed run was recomputed: streams = %#v, error = %v", executionStreams, err)
+		}
 		inboxAfterRun, _, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		assertDirectAgentRunStatus(t, inboxAfterRun, agentConversation.ID, domain.AgentRunStatusSucceeded, "结果是 42")
+		// 最新窗口和锚点窗口均返回消息所属的完整过程，不将过程附到用户消息。
+		for _, anchor := range []string{"", *run.ResponseMessageID} {
+			history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID, AroundMessageID: anchor})
+			if err != nil || history.LatestAgentRun == nil || history.LatestAgentRun.ID != run.ID || history.LatestAgentRun.AgentName != "售前智能体" {
+				t.Fatalf("agent message history = %#v, error = %v", history, err)
+			}
+			foundProcess := false
+			for _, message := range history.Messages {
+				if message.ID != *run.ResponseMessageID {
+					if message.AgentProcess != nil {
+						t.Fatal("user message contains agent process")
+					}
+					continue
+				}
+				process := message.AgentProcess
+				if process == nil || process.ID != run.ID || len(process.Blocks) != 1 || process.Blocks[0].Payload.Text != "计算过程" || process.Usage.TotalTokens != 12 || process.DurationMilliseconds < 0 {
+					t.Fatalf("message agent process = %#v", process)
+				}
+				foundProcess = true
+			}
+			if !foundProcess {
+				t.Fatal("reply process missing from message window")
+			}
+		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f72", Body: "这次模拟模型失败",
@@ -2163,6 +2215,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if state.ProcessedSeq != 3 || failedRun.Status != string(domain.AgentRunStatusFailed) || failedRun.TriggerEndSeq == nil || *failedRun.TriggerEndSeq != 3 {
 			t.Fatalf("failed claimed agent run = %#v, state = %#v", failedRun, state)
+		}
+		failedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID})
+		if err != nil || failedHistory.LatestAgentRun == nil || failedHistory.LatestAgentRun.ID != failedRun.ID || failedHistory.LatestAgentRun.Status != domain.AgentRunStatusFailed || failedHistory.LatestAgentRun.LastError == nil {
+			t.Fatalf("failed run message state = %#v, error = %v", failedHistory, err)
 		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{

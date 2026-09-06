@@ -22,6 +22,7 @@ const (
 	AgentRunStatusRunning   AgentRunStatus = AgentRunStatus(domain.AgentRunStatusRunning)
 	AgentRunStatusSucceeded AgentRunStatus = AgentRunStatus(domain.AgentRunStatusSucceeded)
 	AgentRunStatusFailed    AgentRunStatus = AgentRunStatus(domain.AgentRunStatusFailed)
+	AgentRunStatusCancelled AgentRunStatus = AgentRunStatus(domain.AgentRunStatusCancelled)
 )
 
 // InboxScope 表示统一收件箱读取范围。

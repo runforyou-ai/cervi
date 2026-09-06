@@ -544,7 +544,8 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		})
 	}
 	return ConversationMessage{
-		ID: message.ID, Type: MessageType(message.Type), Body: message.Body,
+		AgentProcess: conversationAgentProcessFromAction(message.AgentProcess),
+		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, GroupMessageSequence: groupMessageSequenceString(message.GroupMessageSequence),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
@@ -764,6 +765,9 @@ func (b *DirectBackend) conversationMessageListFromAction(ctx context.Context, m
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
+	if run := history.LatestAgentRun; run != nil {
+		result.LatestAgentRun = &ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError}
+	}
 	for _, message := range history.Messages {
 		result.Messages = append(result.Messages, conversationMessageFromAction(message, avatarURLs))
 	}
