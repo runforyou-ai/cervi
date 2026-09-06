@@ -95,24 +95,24 @@ type WebsiteCustomerTextMessageInput struct {
 
 // ConversationSummary 定义访客可见会话摘要。
 type ConversationSummary struct {
-	ID                   string
-	Title                string
-	Preview              string
-	PreviewFormat        domain.MessageBodyFormat
-	LastMessageAt        time.Time
-	ServiceSessionID     string
-	ServiceSessionStatus domain.ServiceSessionStatus
+	ID                        string
+	Title                     string
+	Preview                   string
+	PreviewSenderIdentityType *domain.OrganizationIdentityType
+	LastMessageAt             time.Time
+	ServiceSessionID          string
+	ServiceSessionStatus      domain.ServiceSessionStatus
 }
 
 // Message 定义访客可见消息。
 type Message struct {
-	ID           string
-	Author       domain.MessageAuthor
-	Body         string
-	BodyFormat   domain.MessageBodyFormat
-	OriginatedAt time.Time
-	SourceOrder  int64
-	CreatedAt    time.Time
+	ID                 string
+	Author             domain.MessageAuthor
+	SenderIdentityType *domain.OrganizationIdentityType
+	Body               string
+	OriginatedAt       time.Time
+	SourceOrder        int64
+	CreatedAt          time.Time
 }
 
 // ReceiveWebsiteCustomerTextMessageResult 定义网站消息写入结果。
@@ -159,11 +159,10 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
-	Deleted    bool
-	ID         string
-	Body       string
-	BodyFormat domain.MessageBodyFormat
-	Sender     *ConversationMessageSender
+	Deleted bool
+	ID      string
+	Body    string
+	Sender  *ConversationMessageSender
 }
 
 // ConversationMessageMention 定义消息提醒的聊天主体。
@@ -203,7 +202,6 @@ type ConversationMessage struct {
 	ID                   string
 	Type                 domain.MessageType
 	Body                 string
-	BodyFormat           domain.MessageBodyFormat
 	OriginatedAt         time.Time
 	SourceOrder          int64
 	CreatedAt            time.Time
@@ -273,14 +271,14 @@ type FirstDirectTextMessageResult struct {
 
 // DirectConversationSummary 定义成员内部单聊摘要。
 type DirectConversationSummary struct {
-	ID               string
-	PeerIdentityID   string
-	PeerType         domain.OrganizationIdentityType
-	PeerName         string
-	PeerAvatarFileID *string
-	Preview          *string
-	PreviewFormat    domain.MessageBodyFormat
-	LastMessageAt    *time.Time
+	ID                        string
+	PeerIdentityID            string
+	PeerType                  domain.OrganizationIdentityType
+	PeerName                  string
+	PeerAvatarFileID          *string
+	Preview                   *string
+	PreviewSenderIdentityType *domain.OrganizationIdentityType
+	LastMessageAt             *time.Time
 }
 
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。

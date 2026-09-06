@@ -570,7 +570,7 @@ export function ConversationComposer({
                   })}
                 </p>
                 <p className="truncate text-muted-foreground">
-                  {messagePreview(activeReplyTo.body, activeReplyTo.bodyFormat)}
+                  {messagePreview(activeReplyTo.body, activeReplyTo.sender?.identityType)}
                 </p>
               </div>
               <button

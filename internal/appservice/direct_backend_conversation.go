@@ -182,7 +182,7 @@ func directInboxConversationFromSummary(summary conversationaction.DirectConvers
 		ID: summary.ID, Type: ConversationTypeDirect,
 		Direct: &DirectInboxConversation{
 			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.PeerAvatarFileID),
-			Preview: summary.Preview, PreviewFormat: MessageBodyFormat(summary.PreviewFormat), LastMessageAt: summary.LastMessageAt,
+			Preview: summary.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.PreviewSenderIdentityType), LastMessageAt: summary.LastMessageAt,
 		},
 	}
 }
@@ -532,7 +532,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	var replyTo *ConversationMessageReference
 	if message.ReplyTo != nil {
 		replyTo = &ConversationMessageReference{
-			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body, BodyFormat: MessageBodyFormat(message.ReplyTo.BodyFormat), Deleted: message.ReplyTo.Deleted,
+			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
 			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender, avatarURLs),
 		}
 	}
@@ -545,7 +545,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	}
 	return ConversationMessage{
 		AgentProcess: conversationAgentProcessFromAction(message.AgentProcess),
-		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body, BodyFormat: MessageBodyFormat(message.BodyFormat),
+		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, GroupMessageSequence: groupMessageSequenceString(message.GroupMessageSequence),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,

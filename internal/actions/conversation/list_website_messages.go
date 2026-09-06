@@ -24,13 +24,13 @@ type ListWebsiteMessagesQuery struct {
 }
 
 type websiteMessageRow struct {
-	ID           string                   `bun:"id"`
-	Body         string                   `bun:"body"`
-	BodyFormat   domain.MessageBodyFormat `bun:"body_format"`
-	OriginatedAt time.Time                `bun:"originated_at"`
-	SourceOrder  int64                    `bun:"source_order"`
-	CreatedAt    time.Time                `bun:"created_at"`
-	SubjectKind  string                   `bun:"subject_kind"`
+	ID                 string                           `bun:"id"`
+	Body               string                           `bun:"body"`
+	SenderIdentityType *domain.OrganizationIdentityType `bun:"sender_identity_type"`
+	OriginatedAt       time.Time                        `bun:"originated_at"`
+	SourceOrder        int64                            `bun:"source_order"`
+	CreatedAt          time.Time                        `bun:"created_at"`
+	SubjectKind        string                           `bun:"subject_kind"`
 }
 
 // NewListWebsiteMessagesQuery 创建网站访客消息历史查询。
@@ -78,13 +78,14 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("msg.body AS body").
-		ColumnExpr("msg.body_format AS body_format").
+		ColumnExpr("oi.type AS sender_identity_type").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.source_order AS source_order").
 		ColumnExpr("msg.created_at AS created_at").
 		ColumnExpr("cs.kind AS subject_kind").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ?", channel.OrganizationID).
 		Where("msg.conversation_id = ?", input.ConversationID).
 		Where("msg.type = ?", domain.MessageTypeText).
@@ -144,7 +145,7 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 			author = domain.MessageAuthorVisitor
 		}
 		messages = append(messages, Message{
-			ID: row.ID, Author: author, Body: row.Body, BodyFormat: row.BodyFormat,
+			ID: row.ID, Author: author, Body: row.Body, SenderIdentityType: row.SenderIdentityType,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
 		})
 	}

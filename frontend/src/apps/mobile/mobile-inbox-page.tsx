@@ -180,7 +180,7 @@ function MobileConversationRow({
     groupConversation?.group.status ===
     ConversationStatus.ConversationStatusArchived
       ? t("groupDissolved")
-      : (messagePreview(summary.preview ?? "", summary.previewFormat) ||
+      : (messagePreview(summary.preview ?? "", summary.previewSenderIdentityType) ||
         (groupConversation && conversation.lastMessageId
           ? t("groupSystemUpdated")
           : t("messagesEmpty")))

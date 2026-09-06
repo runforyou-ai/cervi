@@ -2,15 +2,15 @@
 import { createRoot, type Root } from "react-dom/client"
 import { MessageMarkdown } from "../components/message-markdown"
 import { messagePreview } from "../lib/message-preview"
-import type { ConversationMessage } from "../api"
+import type { OrganizationIdentityType } from "../api"
 
 const roots = new Map<HTMLElement, Root>()
 
 /** 在稳定的正文节点上更新完整消息或流式原文。 */
-export function render(container: HTMLElement, message: Pick<ConversationMessage, "body" | "bodyFormat">, streaming = false) {
-  if (message.bodyFormat !== "markdown") {
+export function render(container: HTMLElement, body: string, senderIdentityType: OrganizationIdentityType | null, streaming = false) {
+  if (senderIdentityType !== "agent") {
     unmount(container)
-    container.textContent = message.body
+    container.textContent = body
     return
   }
   let root = roots.get(container)
@@ -18,7 +18,7 @@ export function render(container: HTMLElement, message: Pick<ConversationMessage
     root = createRoot(container)
     roots.set(container, root)
   }
-  root.render(<MessageMarkdown locale={document.documentElement.lang} streaming={streaming}>{message.body}</MessageMarkdown>)
+  root.render(<MessageMarkdown locale={document.documentElement.lang} streaming={streaming}>{body}</MessageMarkdown>)
 }
 
 /** 在消息节点被移除前释放它和后代正文的 React 资源。 */

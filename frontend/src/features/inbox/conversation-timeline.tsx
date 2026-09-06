@@ -9,7 +9,6 @@ import {
   ConversationSystemEventType,
   ConversationType,
   MessageType,
-  MessageBodyFormat,
   OrganizationIdentityType,
   ServiceSessionStatus,
   isApiError,
@@ -59,7 +58,6 @@ type TimelineMessage = Pick<
   | "id"
   | "type"
   | "body"
-  | "bodyFormat"
   | "originatedAt"
   | "sourceOrder"
   | "groupMessageSequence"
@@ -125,7 +123,6 @@ function mergeTimelineMessages(
       id: `local:${message.clientMessageID}`,
       type: MessageType.MessageTypeText,
       body: message.body,
-      bodyFormat: MessageBodyFormat.MessageBodyFormatPlain,
       originatedAt: message.originatedAt,
       sourceOrder: 0,
       groupMessageSequence: null,
@@ -802,7 +799,6 @@ function ConversationTimelineContent({
                                       onReplyMessage({
                                         id: message.id,
                                         body: message.body,
-                                        bodyFormat: message.bodyFormat,
                                         sender: message.sender,
                                         deleted: false,
                                       })
@@ -857,7 +853,7 @@ function ConversationTimelineContent({
                                               t("unknownSender")}
                                           </span>
                                           <span className="line-clamp-2 whitespace-pre-wrap">
-                                            {messagePreview(message.replyTo.body, message.replyTo.bodyFormat)}
+                                            {messagePreview(message.replyTo.body, message.replyTo.sender?.identityType)}
                                           </span>
                                         </>
                                       )}
@@ -872,7 +868,7 @@ function ConversationTimelineContent({
                                       workspaceLayout && "flex items-end gap-2",
                                     )}
                                   >
-                                    {message.bodyFormat === MessageBodyFormat.MessageBodyFormatMarkdown ? (
+                                    {message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
                                         <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
                                       </div>
@@ -946,7 +942,6 @@ function ConversationTimelineContent({
                               onReplyMessage({
                                 id: message.id,
                                 body: message.body,
-                                bodyFormat: message.bodyFormat,
                                 sender: message.sender,
                                 deleted: false,
                               })

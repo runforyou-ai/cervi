@@ -320,11 +320,11 @@ func insertAgentResponseMessage(ctx context.Context, db bun.IDB, run *servermode
 	message := &servermodels.Message{
 		ID: messageID, OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
 		ServiceSessionID: serviceSessionID, SenderParticipantID: &participantID,
-		Type: string(domain.MessageTypeText), Body: content, BodyFormat: string(domain.MessageBodyFormatMarkdown), IdempotencyKey: &idempotencyKey,
+		Type: string(domain.MessageTypeText), Body: content, IdempotencyKey: &idempotencyKey,
 		OriginatedAt: time.Now().UTC(),
 	}
 	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "body_format", "idempotency_key", "originated_at").
+		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
 		Returning("*").Exec(ctx); err != nil {
 		return nil, fmt.Errorf("create agent response message: %w", err)
 	}

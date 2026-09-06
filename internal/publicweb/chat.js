@@ -138,7 +138,7 @@
       fragment: document.createDocumentFragment(),
       started: summary !== null,
       draft: "",
-      summary: summary ? CerviMarkdown.preview(summary.preview, summary.previewFormat) : "",
+      summary: summary ? CerviMarkdown.preview(summary.preview, summary.previewSenderIdentityType) : "",
       time: summary ? formatTime(new Date(summary.lastMessageAt)) : "",
       lastMessageAt: summary ? summary.lastMessageAt : "",
       serviceSession: summary ? summary.serviceSession : null,
@@ -535,7 +535,7 @@
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
-    CerviMarkdown.render(bubble, { body: text, bodyFormat: greeting ? "plain" : "markdown" });
+    CerviMarkdown.render(bubble, text, greeting ? null : "agent");
     messageResizeObserver.observe(bubble);
     row.appendChild(bubble);
     message.appendChild(row);
@@ -750,7 +750,7 @@
         conversation.lastMessageID,
       ) >= 0
     ) {
-      conversation.summary = CerviMarkdown.preview(summary.preview, summary.previewFormat);
+      conversation.summary = CerviMarkdown.preview(summary.preview, summary.previewSenderIdentityType);
       conversation.lastMessageAt = summary.lastMessageAt;
       conversation.lastMessageID = summaryMessageID || "";
       conversation.time = formatTime(new Date(summary.lastMessageAt));
@@ -857,7 +857,7 @@
           var lastMessage = result.messages[result.messages.length - 1];
           updateConversationSummary(
             conversation,
-            CerviMarkdown.preview(lastMessage.body, lastMessage.bodyFormat),
+            CerviMarkdown.preview(lastMessage.body, lastMessage.senderIdentityType),
             lastMessage.originatedAt,
             lastMessage.id,
           );
@@ -941,7 +941,7 @@
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
-    CerviMarkdown.render(bubble, value);
+    CerviMarkdown.render(bubble, value.body, value.senderIdentityType);
     messageResizeObserver.observe(bubble);
     row.appendChild(bubble);
     message.appendChild(row);
@@ -1044,7 +1044,7 @@
         var lastMessage = result.messages[result.messages.length - 1];
         updateConversationSummary(
           conversation,
-          CerviMarkdown.preview(lastMessage.body, lastMessage.bodyFormat),
+          CerviMarkdown.preview(lastMessage.body, lastMessage.senderIdentityType),
           lastMessage.originatedAt,
           lastMessage.id,
         );

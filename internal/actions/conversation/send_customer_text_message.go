@@ -42,22 +42,21 @@ type memberReplySessionPlan struct {
 }
 
 type idempotentMemberMessageRow struct {
-	ReplyToMessageID       *string                  `bun:"reply_to_message_id"`
-	GroupMessageSequence   *int64                   `bun:"group_message_sequence"`
-	ID                     string                   `bun:"id"`
-	CreatedAt              time.Time                `bun:"created_at"`
-	ConversationID         string                   `bun:"conversation_id"`
-	ServiceSessionID       *string                  `bun:"service_session_id"`
-	SenderParticipantID    *string                  `bun:"sender_participant_id"`
-	Type                   string                   `bun:"type"`
-	Body                   string                   `bun:"body"`
-	BodyFormat             domain.MessageBodyFormat `bun:"body_format"`
-	OriginatedAt           time.Time                `bun:"originated_at"`
-	DeletedAt              *time.Time               `bun:"deleted_at"`
-	SenderSubjectID        *string                  `bun:"sender_subject_id"`
-	SenderSubjectKind      *string                  `bun:"sender_subject_kind"`
-	SenderSubjectSourceID  *string                  `bun:"sender_subject_source_id"`
-	JoinedServiceSessionID *string                  `bun:"joined_service_session_id"`
+	ReplyToMessageID       *string    `bun:"reply_to_message_id"`
+	GroupMessageSequence   *int64     `bun:"group_message_sequence"`
+	ID                     string     `bun:"id"`
+	CreatedAt              time.Time  `bun:"created_at"`
+	ConversationID         string     `bun:"conversation_id"`
+	ServiceSessionID       *string    `bun:"service_session_id"`
+	SenderParticipantID    *string    `bun:"sender_participant_id"`
+	Type                   string     `bun:"type"`
+	Body                   string     `bun:"body"`
+	OriginatedAt           time.Time  `bun:"originated_at"`
+	DeletedAt              *time.Time `bun:"deleted_at"`
+	SenderSubjectID        *string    `bun:"sender_subject_id"`
+	SenderSubjectKind      *string    `bun:"sender_subject_kind"`
+	SenderSubjectSourceID  *string    `bun:"sender_subject_source_id"`
+	JoinedServiceSessionID *string    `bun:"joined_service_session_id"`
 }
 
 // NewSendCustomerTextMessageAction 创建成员客户会话回复操作。
@@ -285,7 +284,6 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ColumnExpr("msg.sender_participant_id AS sender_participant_id").
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
-		ColumnExpr("msg.body_format AS body_format").
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.deleted_at AS deleted_at").
@@ -325,7 +323,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	message := &servermodels.Message{
 		ID: row.ID, CreatedAt: row.CreatedAt, ConversationID: row.ConversationID,
 		ServiceSessionID: row.ServiceSessionID, SenderParticipantID: row.SenderParticipantID,
-		Type: row.Type, Body: row.Body, BodyFormat: string(row.BodyFormat), OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, GroupMessageSequence: row.GroupMessageSequence,
+		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, GroupMessageSequence: row.GroupMessageSequence,
 	}
 	result := memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity)
 	if storedReply != "" {
@@ -407,7 +405,7 @@ func memberConversationMessage(message *servermodels.Message, subjectID string, 
 	name := identity.DisplayName
 	identityType := domain.OrganizationIdentityType(identity.Type)
 	return ConversationMessage{
-		ID: message.ID, Type: domain.MessageTypeText, Body: message.Body, BodyFormat: domain.MessageBodyFormat(message.BodyFormat),
+		ID: message.ID, Type: domain.MessageTypeText, Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll, GroupMessageSequence: message.GroupMessageSequence,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,

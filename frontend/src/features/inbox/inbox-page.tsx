@@ -723,7 +723,7 @@ function InboxConversationList({
           const preview =
             groupDissolved
               ? t("groupDissolved")
-              : messagePreview(summary.preview ?? "", summary.previewFormat).trim() ||
+              : messagePreview(summary.preview ?? "", summary.previewSenderIdentityType).trim() ||
                 (isGroupInboxConversation(conversation) &&
                 summary.lastMessageAt
                   ? t("groupSystemUpdated")

@@ -172,7 +172,7 @@ var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii1
 // websiteVisitorConversationFromAction 转换访客会话摘要。
 func websiteVisitorConversationFromAction(value conversationaction.ConversationSummary) WebsiteVisitorConversation {
 	return WebsiteVisitorConversation{
-		ID: value.ID, Title: value.Title, Preview: value.Preview, PreviewFormat: MessageBodyFormat(value.PreviewFormat), LastMessageAt: value.LastMessageAt,
+		ID: value.ID, Title: value.Title, Preview: value.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(value.PreviewSenderIdentityType), LastMessageAt: value.LastMessageAt,
 		ServiceSession: WebsiteVisitorServiceSession{ID: value.ServiceSessionID, Status: string(value.ServiceSessionStatus)},
 	}
 }
@@ -180,7 +180,7 @@ func websiteVisitorConversationFromAction(value conversationaction.ConversationS
 // websiteVisitorMessageFromAction 转换访客消息。
 func websiteVisitorMessageFromAction(value conversationaction.Message) WebsiteVisitorMessage {
 	return WebsiteVisitorMessage{
-		ID: value.ID, Author: string(value.Author), Body: value.Body, BodyFormat: MessageBodyFormat(value.BodyFormat),
+		ID: value.ID, Author: string(value.Author), Body: value.Body, SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
 		OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
 	}
 }

@@ -649,7 +649,6 @@ export interface ConversationMessage {
     "id": string;
     "type": MessageType;
     "body": string;
-    "bodyFormat": MessageBodyFormat;
     "originatedAt": string;
     "sourceOrder": number;
     "createdAt": string;
@@ -698,7 +697,6 @@ export interface ConversationMessageReference {
     "deleted": boolean;
     "id": string;
     "body": string;
-    "bodyFormat": MessageBodyFormat;
     "sender": ConversationMessageSender | null;
 }
 
@@ -888,7 +886,7 @@ export interface CustomerInboxConversation {
     "channelType": ChannelType;
     "channelName": string;
     "preview": string | null;
-    "previewFormat": MessageBodyFormat;
+    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "serviceSessionStatus": ServiceSessionStatus;
     "serviceSessionId": string;
@@ -951,7 +949,7 @@ export interface DirectInboxConversation {
     "peerName": string;
     "peerAvatarUrl": string;
     "preview": string | null;
-    "previewFormat": MessageBodyFormat;
+    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "agentRunStatus": AgentRunStatus | null;
 }
@@ -1147,7 +1145,7 @@ export interface GroupInboxConversation {
     "imageUrl": string;
     "status": ConversationStatus;
     "preview": string | null;
-    "previewFormat": MessageBodyFormat;
+    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "memberCount": number;
 }
@@ -1691,19 +1689,6 @@ export interface MemberOptionListInput {
     "page": number;
     "pageSize": number;
 }
-
-/**
- * MessageBodyFormat 定义消息正文的解释方式。
- */
-export enum MessageBodyFormat {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    MessageBodyFormatPlain = "plain",
-    MessageBodyFormatMarkdown = "markdown",
-};
 
 /**
  * MessageChannelInput 定义消息渠道可编辑的通用字段。

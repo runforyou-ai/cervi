@@ -21,13 +21,13 @@ type ListWebsiteConversationsQuery struct {
 }
 
 type conversationSummaryRow struct {
-	ID                   string                   `bun:"id"`
-	Title                string                   `bun:"title"`
-	LastMessageAt        time.Time                `bun:"last_message_at"`
-	Preview              string                   `bun:"preview"`
-	PreviewFormat        domain.MessageBodyFormat `bun:"preview_format"`
-	ServiceSessionID     string                   `bun:"service_session_id"`
-	ServiceSessionStatus string                   `bun:"service_session_status"`
+	ID                        string                           `bun:"id"`
+	Title                     string                           `bun:"title"`
+	LastMessageAt             time.Time                        `bun:"last_message_at"`
+	Preview                   string                           `bun:"preview"`
+	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
+	ServiceSessionID          string                           `bun:"service_session_id"`
+	ServiceSessionStatus      string                           `bun:"service_session_status"`
 }
 
 // NewListWebsiteConversationsQuery 创建网站访客会话列表查询。
@@ -70,11 +70,14 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("msg.body AS preview").
-		ColumnExpr("msg.body_format AS preview_format").
+		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("current.id AS service_session_id").
 		ColumnExpr("current.status AS service_session_status").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
+		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
+		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
+		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
 		Where("cc.organization_id = ?", channel.OrganizationID).
 		Where("cc.contact_channel_identity_id = ?", identity.ID).
@@ -97,7 +100,7 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 // conversationSummaryFromRow 转换网站访客会话摘要。
 func conversationSummaryFromRow(row conversationSummaryRow) ConversationSummary {
 	return ConversationSummary{
-		ID: row.ID, Title: row.Title, Preview: row.Preview, PreviewFormat: row.PreviewFormat, LastMessageAt: row.LastMessageAt,
+		ID: row.ID, Title: row.Title, Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
 		ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus),
 	}
 }
