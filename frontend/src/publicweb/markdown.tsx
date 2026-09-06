@@ -1,10 +1,16 @@
 /** 为网站 Messenger 消息正文提供共享 React 渲染和生命周期接口。 */
 import { createRoot, type Root } from "react-dom/client"
+import { flushSync } from "react-dom"
 import { MessageMarkdown } from "../components/message-markdown"
 import { messagePreview } from "../lib/message-preview"
 import type { OrganizationIdentityType } from "../api"
 
 const roots = new Map<HTMLElement, Root>()
+
+/** 同步提交待定位的历史正文，使滚动测量包含 Markdown 的实际布局。 */
+export function renderBatch(renderMessages: () => void) {
+  flushSync(renderMessages)
+}
 
 /** 在稳定的正文节点上更新完整消息或流式原文。 */
 export function render(container: HTMLElement, body: string, senderIdentityType: OrganizationIdentityType | null, streaming = false) {

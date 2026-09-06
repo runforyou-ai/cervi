@@ -118,3 +118,63 @@ test("未完成链接在生成中不可跳转，脚注在多条消息之间保�
   assert.notEqual(links[0].getAttribute("href"), links[1].getAttribute("href"))
   for (const link of links) assert.ok(container.ownerDocument.getElementById(link.getAttribute("href")!.slice(1)))
 })
+
+test("网站引用与 Markdown 正文共存，定位历史后保持阅读位置", async (t) => {
+  const template = readFileSync(new URL("../../internal/publicweb/page.html", import.meta.url), "utf8")
+    .replace(/<style>[\s\S]*?<\/style>/g, "").replace(/\{\{[\s\S]*?\}\}/g, "")
+  const dom = new JSDOM(template, { runScripts: "outside-only", url: "https://cervi.test/chat" })
+  const { window } = dom
+  const document = window.document
+  document.documentElement.lang = "zh-CN"
+  const messages = document.getElementById("cv-messages")!
+  const resized: (() => void)[] = []
+  let located: Element | null = null
+  window.CERVI_COMPOSER_EMOJIS = []
+  window.ResizeObserver = class {
+    constructor(callback: () => void) { resized.push(callback) }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  Object.defineProperty(messages, "clientHeight", { value: 200 })
+  Object.defineProperty(messages, "scrollHeight", { get: () => 1000 + messages.querySelectorAll("h1").length * 200 })
+  window.HTMLElement.prototype.scrollIntoView = function () {
+    assert.equal(this.querySelector("h1")?.textContent, "最早回复")
+    located = this
+    messages.scrollTop = 120
+  }
+  const old = { id: "old-ai", author: "agent", senderIdentityType: "agent", body: "# 最早回复", originatedAt: "2026-09-07T00:00:00Z" }
+  const replies = [
+    { id: "reply-ai", author: "agent", senderIdentityType: "agent", body: "**回答**", originatedAt: "2026-09-07T00:01:00Z", replyTo: { ...old, deleted: false } },
+    { id: "reply-human", author: "agent", senderIdentityType: "user", body: "**人工正文**", originatedAt: "2026-09-07T00:02:00Z", replyTo: { id: "human", author: "agent", senderIdentityType: "user", body: "**人工原文**", deleted: false } },
+  ]
+  window.fetch = async (path: string) => ({ ok: true, json: async () => {
+    if (path.endsWith("/messenger")) return { visitorToken: "test", conversations: [{ id: "conversation", title: "测试", preview: "**人工正文**", previewSenderIdentityType: "user", lastMessageAt: replies[1].originatedAt }] }
+    if (path.includes("?before=")) return { messages: [old], before: "", after: "" }
+    if (path.includes("?after=")) return { messages: [], before: "", after: "latest" }
+    return { messages: replies, before: "earlier", after: "latest" }
+  } })
+  window.eval(bundle)
+  t.after(() => { window.CerviMarkdown.unmount(messages); dom.window.close() })
+  window.eval(readFileSync(new URL("../../internal/publicweb/chat.js", import.meta.url), "utf8"))
+  await rendered(() => assert.equal(document.getElementById("cv-home-recent")!.hidden, false))
+  document.getElementById("cv-home-recent")!.click()
+  await rendered(() => {
+    assert.equal(document.querySelector('[data-message-id="reply-ai"] .message-markdown strong')?.textContent, "回答")
+    assert.equal(document.querySelector('[data-message-id="reply-ai"] .cv-message-reference-body')?.textContent, "最早回复")
+    assert.equal(document.querySelector('[data-message-id="reply-human"] .cv-message-reference-body')?.textContent, "**人工原文**")
+    assert.equal(document.querySelector('[data-message-id="reply-human"] .message-markdown'), null)
+  })
+  document.querySelector<HTMLButtonElement>('[data-message-id="reply-ai"] .cv-message-reply')!.click()
+  assert.equal(document.getElementById("cv-composer-reference-body")!.textContent, "回答")
+  document.querySelector<HTMLButtonElement>('[data-message-id="reply-ai"] .cv-message-reference')!.click()
+  await rendered(() => {
+    assert.equal(located?.getAttribute("data-message-id"), "old-ai")
+    assert.equal(document.querySelector('[data-message-id="old-ai"] h1')?.textContent, "最早回复")
+    assert.equal(messages.scrollTop, 120)
+  })
+  resized.forEach((callback) => callback())
+  assert.equal(messages.scrollTop, 120)
+  document.getElementById("cv-latest-message")!.click()
+  assert.equal(messages.scrollTop, messages.scrollHeight)
+})

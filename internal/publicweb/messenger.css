@@ -545,7 +545,7 @@ summary:focus-visible {
 .cv-message { display: flex; width: 100%; flex-direction: column; gap: 5px; }
 .cv-message-visitor { align-items: flex-end; }
 .cv-message-assistant { align-items: flex-start; }
-.cv-message-row { display: flex; min-width: 0; max-width: 82%; align-items: flex-end; gap: 8px; }
+.cv-message-row { position: relative; display: flex; min-width: 0; max-width: 82%; align-items: flex-end; gap: 8px; }
 .cv-message-row-with-assets { flex-direction: column; }
 .cv-message-visitor .cv-message-row-with-assets { align-items: flex-end; }
 .cv-message-assistant .cv-message-row-with-assets { align-items: flex-start; }
@@ -560,6 +560,10 @@ summary:focus-visible {
 }
 .cv-message-visitor .cv-message-bubble { border-radius: 18px 18px 4px 18px; background: var(--cv-theme); color: var(--cv-on-theme); }
 .cv-message-assistant .cv-message-bubble { border-radius: 18px 18px 18px 4px; background: var(--cv-surface-strong); color: var(--cv-foreground); }
+.cv-message-reference { display: block; width: 100%; border: 0; background: transparent; color: inherit; text-align: left; margin: 0 0 8px; border-left: 2px solid currentColor; padding-left: 8px; font-size: 12px; line-height: 18px; opacity: .8; }
+button.cv-message-reference { cursor: pointer; }
+.cv-message-reference strong { display: block; }
+.cv-message-reference-body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .cv-message-meta { padding: 0 4px; color: var(--cv-muted-foreground); font-size: 10px; line-height: 15px; }
 .cv-message-assets { display: flex; max-width: 260px; flex-direction: column; gap: 8px; }
 .cv-asset {
@@ -758,3 +762,16 @@ html.cv-preview body { background: transparent; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* 消息引用操作浮于原有布局，输入框保留当前会话的引用草稿。 */
+.cv-message-reply { position: absolute; right: -8px; top: 0; transform: translateY(-50%); opacity: 0; pointer-events: none; border: 1px solid var(--cv-border); border-radius: 6px; padding: 3px 8px; background: var(--cv-background); color: var(--cv-foreground); font-size: 12px; cursor: pointer; }
+.cv-message-row:hover .cv-message-reply, .cv-message:focus-within .cv-message-reply { opacity: 1; pointer-events: auto; }
+.cv-message-menu { position: fixed; z-index: 40; min-width: 120px; padding: 4px; border: 1px solid var(--cv-border); border-radius: 8px; background: var(--cv-background); box-shadow: 0 4px 16px #0002; }
+.cv-message-menu button { width: 100%; border: 0; border-radius: 4px; padding: 8px; background: transparent; color: var(--cv-foreground); text-align: left; cursor: pointer; }
+.cv-message-menu button:hover, .cv-message-menu button:focus-visible { background: var(--cv-surface-strong); }
+.cv-composer-reference { display: flex; align-items: flex-start; gap: 12px; margin: 4px 0 10px; border-left: 2px solid var(--cv-theme); padding-left: 8px; font-size: 12px; line-height: 18px; }
+.cv-composer-reference > div { min-width: 0; flex: 1; overflow-wrap: anywhere; white-space: pre-wrap; }
+.cv-composer-reference button { flex-shrink: 0; border: 0; background: transparent; color: var(--cv-muted-foreground); font-size: 12px; cursor: pointer; }
+.cv-message-highlight .cv-message-bubble { outline: 2px solid var(--cv-theme); outline-offset: 3px; }
+.cv-composer { position: relative; }
+.cv-latest-message { position: absolute; z-index: 1; top: -36px; left: 50%; transform: translateX(-50%); white-space: nowrap; border: 1px solid var(--cv-border); border-radius: 16px; padding: 6px 12px; background: var(--cv-background); color: var(--cv-foreground); font-size: 12px; cursor: pointer; }

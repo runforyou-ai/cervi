@@ -24,7 +24,7 @@ func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta Reques
 		return ConversationMessage{}, err
 	}
 	message, err := b.sendCustomerTextMessage.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
-		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body,
+		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
 		return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
@@ -729,6 +729,8 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 			messageKey = cervii18n.ErrorServiceSessionNotReplyable
 		case conversationaction.ConflictReasonChannelOutboundUnsupported:
 			messageKey = cervii18n.ErrorChannelOutboundUnsupported
+		case conversationaction.ConflictReasonReplyTargetInvalid:
+			messageKey = cervii18n.ErrorReplyTargetInvalid
 		}
 		return ConflictError(meta, messageKey, conflictError.Reason)
 	}

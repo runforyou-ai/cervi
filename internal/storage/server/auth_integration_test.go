@@ -2280,6 +2280,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			testAgentDirectReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
+		t.Run("Agent 客服引用", func(t *testing.T) {
+			testAgentCustomerReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
 		t.Run("Agent 知识库范围", func(t *testing.T) {
 			testAgentKnowledgeScopes(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})

@@ -112,7 +112,7 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 	}
 	received, err := ReceiveInboundCustomerTextMessage(ctx, tx, channel, InboundCustomerTextMessageInput{
 		ExternalID: input.ExternalID, RequestedConversationID: input.ConversationID,
-		Body: input.Body, IdempotencyKey: idempotencyKey,
+		Body: input.Body, IdempotencyKey: idempotencyKey, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
@@ -151,6 +151,13 @@ func normalizeWebsiteMessageInput(input WebsiteCustomerTextMessageInput) (Websit
 	}
 	if !common.ValidUUID(input.ClientMessageID) {
 		fields["clientMessageId"] = ValidationClientMessageIDInvalid
+	}
+	if input.ReplyToMessageID != "" {
+		var valid bool
+		input.ReplyToMessageID, valid = common.NormalizeUUID(input.ReplyToMessageID)
+		if !valid || input.ConversationID == nil {
+			fields["replyToMessageId"] = ValidationReplyToMessageIDInvalid
+		}
 	}
 	if input.Body == "" {
 		fields["body"] = ValidationBodyRequired
@@ -429,12 +436,25 @@ func updateConversationSummary(ctx context.Context, db bun.IDB, conversation *se
 
 // receiveWebsiteCustomerTextMessageResult 转换网站访客消息写入结果。
 func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessageResult) ReceiveWebsiteCustomerTextMessageResult {
+	var replyTo *MessageReference
+	if reference := received.ReplyTo; reference != nil {
+		replyTo = &MessageReference{ID: reference.ID, Deleted: reference.Deleted}
+		if !reference.Deleted {
+			replyTo.Author = domain.MessageAuthorAgent
+			if reference.Sender.Kind == domain.ChatSubjectKindContact {
+				replyTo.Author = domain.MessageAuthorVisitor
+			}
+			replyTo.Body = reference.Body
+			replyTo.SenderIdentityType = reference.Sender.IdentityType
+		}
+	}
 	return ReceiveWebsiteCustomerTextMessageResult{
 		Conversation:            received.Summary,
 		CreatedConversation:     received.CreatedConversation,
 		OpenedNewServiceSession: received.OpenedServiceSession,
 		Message: Message{
-			ID: received.Message.ID, Author: domain.MessageAuthorVisitor,
+			ReplyTo: replyTo,
+			ID:      received.Message.ID, Author: domain.MessageAuthorVisitor,
 			Body: received.Message.Body, OriginatedAt: received.Message.OriginatedAt,
 			CreatedAt: received.Message.CreatedAt,
 		},

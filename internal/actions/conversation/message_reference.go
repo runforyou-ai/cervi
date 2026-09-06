@@ -49,12 +49,15 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		ColumnExpr("cs.id AS chat_subject_id").
 		ColumnExpr("cs.kind AS kind").
 		ColumnExpr("cs.source_id AS source_id").
-		ColumnExpr("oi.display_name AS display_name").
-		ColumnExpr("oi.avatar_file_id AS avatar_file_id").
+		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) ELSE oi.display_name END AS display_name", domain.ChatSubjectKindContact).
+		ColumnExpr("CASE WHEN cs.kind = ? THEN cci.avatar_file_id ELSE oi.avatar_file_id END AS avatar_file_id", domain.ChatSubjectKindContact).
 		ColumnExpr("oi.type AS identity_type").
 		Join("LEFT JOIN conversation_participants AS cp ON cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id AND cp.id = msg.sender_participant_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
+		Join("LEFT JOIN contacts AS c ON c.id = cs.source_id AND c.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", organizationID).
 		Where("msg.conversation_id = ?", conversationID).
 		Where("msg.id = ?", messageID).

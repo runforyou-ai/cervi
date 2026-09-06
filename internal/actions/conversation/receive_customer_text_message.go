@@ -17,6 +17,7 @@ import (
 
 // InboundCustomerTextMessageInput 定义渠道文本入站事务的稳定事实。
 type InboundCustomerTextMessageInput struct {
+	ReplyToMessageID        string
 	ExternalID              string
 	DisplayName             *string
 	RequestedConversationID *string
@@ -29,6 +30,7 @@ type InboundCustomerTextMessageInput struct {
 
 // InboundCustomerTextMessageResult 返回渠道文本入站事务创建或取得的事实。
 type InboundCustomerTextMessageResult struct {
+	ReplyTo              *ConversationMessageReference
 	Summary              ConversationSummary
 	Session              *servermodels.ServiceSession
 	Message              *servermodels.Message
@@ -78,6 +80,10 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 	} else {
 		conversation, insertedConversation, err = selectTargetConversation(ctx, db, channel.OrganizationID, identity.ID, input.RequestedConversationID, input.Body, ids.conversation)
 	}
+	if err != nil {
+		return InboundCustomerTextMessageResult{}, err
+	}
+	replyTo, err := loadConversationReplyTarget(ctx, db, channel.OrganizationID, conversation.ID, input.ReplyToMessageID)
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, err
 	}
@@ -150,8 +156,11 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 		Body: input.Body, IdempotencyKey: &input.IdempotencyKey,
 		OriginatedAt: input.OriginatedAt, SourceOrder: input.SourceOrder,
 	}
+	if replyTo != nil {
+		message.ReplyToMessageID = &replyTo.ID
+	}
 	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at", "source_order").
+		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "reply_to_message_id", "idempotency_key", "originated_at", "source_order").
 		Returning("*").
 		Exec(ctx); err != nil {
 		return InboundCustomerTextMessageResult{}, fmt.Errorf("create inbound customer message: %w", err)
@@ -177,7 +186,9 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, err
 	}
-	return inboundCustomerTextMessageResult(summary, session, message, true), nil
+	result := inboundCustomerTextMessageResult(summary, session, message, true)
+	result.ReplyTo = replyTo
+	return result, nil
 }
 
 // loadInboundCustomerTextMessage 校验并返回已经写入的渠道文本消息。
@@ -196,7 +207,11 @@ func loadInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *se
 	if message.ServiceSessionID == nil || message.SenderParticipantID == nil || message.Type != string(domain.MessageTypeText) || message.DeletedAt != nil {
 		return InboundCustomerTextMessageResult{}, true, ErrDataInvariant
 	}
-	if message.Body != input.Body || (input.RequestedConversationID != nil && *input.RequestedConversationID != message.ConversationID) {
+	storedReply := ""
+	if message.ReplyToMessageID != nil {
+		storedReply = *message.ReplyToMessageID
+	}
+	if storedReply != input.ReplyToMessageID || message.Body != input.Body || (input.RequestedConversationID != nil && *input.RequestedConversationID != message.ConversationID) {
 		return InboundCustomerTextMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	session := &servermodels.ServiceSession{}
@@ -223,7 +238,14 @@ func loadInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *se
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, true, err
 	}
-	return inboundCustomerTextMessageResult(summary, session, message, false), true, nil
+	result := inboundCustomerTextMessageResult(summary, session, message, false)
+	if storedReply != "" {
+		result.ReplyTo, err = loadMessageReference(ctx, db, channel.OrganizationID, message.ConversationID, storedReply)
+		if err != nil {
+			return InboundCustomerTextMessageResult{}, true, err
+		}
+	}
+	return result, true, nil
 }
 
 // inboundCustomerTextMessageResult 构造渠道文本入站结果。
