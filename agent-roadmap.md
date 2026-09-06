@@ -19,6 +19,7 @@
 以下内容已经存在：
 
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
+- Web 与桌面端创建群聊和添加成员支持同企业活跃 Agent，成员列表展示 AI 员工标识。群主仍由真人担任；群聊消息不触发 Agent，群内 @Agent 与响应策略留待后续设计。
 - Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。

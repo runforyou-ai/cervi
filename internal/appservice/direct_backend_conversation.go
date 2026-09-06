@@ -208,7 +208,7 @@ func (b *DirectBackend) SendDirectTextMessage(ctx context.Context, meta RequestM
 	return b.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
-// CreateGroupConversation 创建只包含有效真人成员的企业内部群聊。
+// CreateGroupConversation 创建包含有效企业成员的企业内部群聊。
 func (b *DirectBackend) CreateGroupConversation(ctx context.Context, meta RequestMeta, input GroupConversationInput) (InboxConversation, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

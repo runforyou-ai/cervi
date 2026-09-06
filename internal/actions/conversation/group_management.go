@@ -632,7 +632,7 @@ func leaveGroupParticipant(ctx context.Context, db bun.IDB, organizationID, part
 	return nil
 }
 
-// archiveGroupConversation 归档已经由最后一位成员解散的群聊。
+// archiveGroupConversation 归档已经解散的群聊。
 func archiveGroupConversation(ctx context.Context, db bun.IDB, organizationID, conversationID string) error {
 	if _, err := db.NewUpdate().Model((*servermodels.Conversation)(nil)).
 		Set("status = ?", domain.ConversationStatusArchived).

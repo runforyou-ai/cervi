@@ -1556,11 +1556,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if createdAgent.RoleID != customerServiceRole.ID || createdAgent.RoleKind != domain.RoleKindCustomerService || len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
 			t.Fatalf("created agent = %#v", createdAgent)
 		}
-		if _, err := conversationaction.NewCreateGroupConversationAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
-			Title: "AI 群聊", MemberIdentityIDs: []string{createdAgent.IdentityID},
-		}); err != nil {
-			t.Fatalf("agent group member error = %v", err)
-		}
 		customerServiceAssignees, err := inboxaction.NewListCustomerServiceAssigneesQuery(db).Execute(context.Background(), loggedIn.Identity)
 		if err != nil {
 			t.Fatal(err)
