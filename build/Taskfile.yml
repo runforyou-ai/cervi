@@ -153,12 +153,7 @@ tasks:
     summary: Generates application icons for Windows and macOS
     run: once
     dir: build
-    sources:
-      - "appicon.png"
-      - "appicon.icon"
-    generates:
-      - "darwin/icons.icns"
-      - "windows/icon.ico"
+    # 每次构建重新生成，确保未纳入版本管理的 Assets.car 不会因缓存而缺失。
     cmds:
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
 

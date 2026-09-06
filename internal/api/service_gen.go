@@ -275,7 +275,7 @@ func (s *Service) markConversationMentionReviewed(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// markConversationRead 单调推进当前用户的原生会话已读水位。
+// markConversationRead 单调推进当前用户的会话已读水位。
 func (s *Service) markConversationRead(c *gin.Context) {
 	var input appservice.MarkConversationReadInput
 	if !bindJSON(c, &input) {

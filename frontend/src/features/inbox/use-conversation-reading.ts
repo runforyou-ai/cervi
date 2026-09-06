@@ -7,7 +7,7 @@ import {
   useState,
   type RefObject,
 } from "react"
-import { MessageType, type ConversationMessageListData } from "@/api"
+import { ChatSubjectKind, MessageType, type ConversationMessageListData } from "@/api"
 import { compareConversationMessages } from "./conversation-window"
 import { conversationViewport } from "./use-conversation-viewport"
 
@@ -96,7 +96,8 @@ export function useConversationReading({
         if (
           compareConversationMessages(message, previousLast.current) > 0 &&
           (message.type === MessageType.MessageTypeSystem ||
-            message.sender?.sourceId !== identityID)
+            message.sender?.kind !== ChatSubjectKind.ChatSubjectKindOrganizationIdentity ||
+            message.sender.sourceId !== identityID)
         ) newMessages.current.add(message.id)
       }
       setNewCount(newMessages.current.size)
@@ -140,7 +141,8 @@ export function useConversationReading({
         let nextID = readID.current
         for (const message of messages.slice(index + 1)) {
           if (
-            message.sender?.sourceId !== identityID &&
+            (message.sender?.kind !== ChatSubjectKind.ChatSubjectKindOrganizationIdentity ||
+              message.sender.sourceId !== identityID) &&
             !seen.current.has(message.id)
           )
             break

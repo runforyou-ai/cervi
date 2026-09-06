@@ -26,7 +26,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
-import { ConversationAvatar } from "@/features/inbox/conversation-header"
+import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
@@ -91,7 +91,7 @@ function InternalConversationProfile({
           {conversation ? (
             <ConversationAvatar
               conversation={conversation}
-              className="size-7 rounded-full text-xs"
+              className="size-7 text-xs"
             />
           ) : directTarget ? (
             <DirectConversationDraftAvatar member={directTarget} className="size-7 text-xs" />
@@ -196,7 +196,7 @@ function ConversationContextContent({
                   <dd className="flex min-h-8 min-w-0 items-center gap-2">
                     <ConversationAvatar
                       conversation={conversation}
-                      className="size-7 rounded-full text-xs"
+                      className="size-7 text-xs"
                     />
                     <span className="min-w-0 truncate" title={displayName}>
                       {displayName}

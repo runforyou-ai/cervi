@@ -37,7 +37,7 @@ export function MobileDirectThread({
       <ConversationTimeline
         conversationID={conversationID}
         conversationType={ConversationType.ConversationTypeDirect}
-        currentIdentityID={identity.user.identityId}
+        currentUser={identity.user}
         requireWindowFocus={false}
         enabled={Boolean(conversationID)}
         outgoingMessages={outgoing.messages}

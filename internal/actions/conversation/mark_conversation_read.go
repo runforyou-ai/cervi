@@ -30,7 +30,7 @@ func NewMarkConversationReadAction(db *bun.DB) *MarkConversationReadAction {
 	return &MarkConversationReadAction{db: db}
 }
 
-// Execute 校验原生会话访问权并保存不回退的消息水位。
+// Execute 校验会话访问权并保存不回退的消息水位。
 func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID, messageID string, clearUnreadMark bool) (ConversationReadState, error) {
 	fields := make(map[string]ValidationCode)
 	if !common.ValidUUID(conversationID) {
@@ -47,18 +47,28 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if _, err := lockConversationMember(ctx, tx, identity, conversationID); err != nil {
+		var conversationType domain.ConversationType
+		err := tx.NewSelect().TableExpr("conversations AS cv").Column("cv.type").
+			Where("cv.organization_id = ? AND cv.id = ?", identity.Organization.ID, conversationID).Scan(ctx, &conversationType)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrConversationNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("load conversation read type: %w", err)
+		}
+		// 客服阅读沿用企业内历史访问范围，不创建参与者或改变负责人。
+		if conversationType == domain.ConversationTypeCustomer {
+			if err := authorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
+				return err
+			}
+		} else if _, err := lockConversationMember(ctx, tx, identity, conversationID); err != nil {
 			return err
 		}
 		var target servermodels.Message
-		err := tx.NewSelect().Model(&target).
-			Join("JOIN conversations AS cv ON cv.organization_id = msg.organization_id AND cv.id = msg.conversation_id").
-			Join("JOIN conversation_participants AS cp ON cp.organization_id = cv.organization_id AND cp.conversation_id = cv.id AND cp.left_at IS NULL").
-			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ? AND cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
+		err = tx.NewSelect().Model(&target).
 			Where("msg.organization_id = ?", identity.Organization.ID).
 			Where("msg.conversation_id = ?", conversationID).
 			Where("msg.id = ?", messageID).
-			Where("cv.type IN (?, ?)", domain.ConversationTypeDirect, domain.ConversationTypeGroup).
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrConversationNotFound

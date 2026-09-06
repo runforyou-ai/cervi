@@ -153,15 +153,51 @@ func (b *Backend) normalizeOutput(output any) {
 		}
 	case *appservice.Inbox:
 		for index := range value.Conversations {
-			customer := value.Conversations[index].Customer
-			if customer != nil {
-				customer.ContactAvatarURL = b.absoluteContentURL(customer.ContactAvatarURL)
-			}
+			b.normalizeConversation(&value.Conversations[index])
+		}
+	case *appservice.InboxConversation:
+		b.normalizeConversation(value)
+	case *appservice.DirectConversationLookup:
+		if value.Conversation != nil {
+			b.normalizeConversation(value.Conversation)
+		}
+	case *appservice.FirstDirectTextMessageResult:
+		b.normalizeConversation(&value.Conversation)
+		b.normalizeConversationMessage(&value.Message)
+	case *appservice.ConversationMessage:
+		b.normalizeConversationMessage(value)
+	case *appservice.ConversationMessageList:
+		for index := range value.Messages {
+			b.normalizeConversationMessage(&value.Messages[index])
 		}
 	case *appservice.GroupConversation:
+		value.ImageURL = b.absoluteContentURL(value.ImageURL)
 		for index := range value.Participants {
 			value.Participants[index].AvatarURL = b.absoluteContentURL(value.Participants[index].AvatarURL)
 		}
+	}
+}
+
+// normalizeConversation 补全会话列表和单聊查询中的头像地址。
+func (b *Backend) normalizeConversation(conversation *appservice.InboxConversation) {
+	if conversation.Customer != nil {
+		conversation.Customer.ContactAvatarURL = b.absoluteContentURL(conversation.Customer.ContactAvatarURL)
+	}
+	if conversation.Direct != nil {
+		conversation.Direct.PeerAvatarURL = b.absoluteContentURL(conversation.Direct.PeerAvatarURL)
+	}
+	if conversation.Group != nil {
+		conversation.Group.ImageURL = b.absoluteContentURL(conversation.Group.ImageURL)
+	}
+}
+
+// normalizeConversationMessage 补全消息和引用发送者的头像地址。
+func (b *Backend) normalizeConversationMessage(message *appservice.ConversationMessage) {
+	if message.Sender != nil {
+		message.Sender.AvatarURL = b.absoluteContentURL(message.Sender.AvatarURL)
+	}
+	if message.ReplyTo != nil && message.ReplyTo.Sender != nil {
+		message.ReplyTo.Sender.AvatarURL = b.absoluteContentURL(message.ReplyTo.Sender.AvatarURL)
 	}
 }
 

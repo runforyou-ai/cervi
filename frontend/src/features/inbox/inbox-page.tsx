@@ -44,6 +44,7 @@ import {
   type LoadInboxQuery,
   type MemberOption,
 } from "@/api"
+import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { PageSplit } from "@/components/page-split"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
@@ -77,10 +78,7 @@ import {
   ConversationComposerUnavailable,
 } from "@/features/inbox/conversation-composer"
 import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
-import {
-  ConversationAvatar,
-  ConversationHeader,
-} from "@/features/inbox/conversation-header"
+import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
@@ -831,7 +829,7 @@ function InboxConversationList({
               </span>
                 </button>
               </ContextMenuTrigger>
-              {isInternal ? (
+              {isInternal || hasUnread ? (
                 <ContextMenuContent>
                   {hasUnread ? (
                     <ContextMenuItem
@@ -841,7 +839,7 @@ function InboxConversationList({
                       {t("conversationMarkRead")}
                     </ContextMenuItem>
                   ) : null}
-                  {!conversation.markedUnread ? (
+                  {isInternal && !conversation.markedUnread ? (
                     <ContextMenuItem
                       disabled={settingsSave.saving}
                       onSelect={() => void changeConversationReadState(conversation, true)}
@@ -849,16 +847,18 @@ function InboxConversationList({
                       {t("conversationMarkUnread")}
                     </ContextMenuItem>
                   ) : null}
-                  <ContextMenuItem
-                    disabled={settingsSave.saving}
-                    onSelect={() => void toggleConversationMuted(conversation)}
-                  >
-                    {t(
-                      conversation.muted
-                        ? "conversationUnmute"
-                        : "conversationMute",
-                    )}
-                  </ContextMenuItem>
+                  {isInternal ? (
+                    <ContextMenuItem
+                      disabled={settingsSave.saving}
+                      onSelect={() => void toggleConversationMuted(conversation)}
+                    >
+                      {t(
+                        conversation.muted
+                          ? "conversationUnmute"
+                          : "conversationMute",
+                      )}
+                    </ContextMenuItem>
+                  ) : null}
                 </ContextMenuContent>
               ) : null}
             </ContextMenu>
@@ -1107,15 +1107,15 @@ function ConversationThread({
     { enabled: Boolean(groupConversation) },
   )
 
-  /** 保存当前已看到的最新内部消息并刷新收件箱未读摘要。 */
+  /** 保存当前已看到的最新消息并刷新收件箱未读摘要。 */
   const markRead = useCallback(
     (messageID: string) => {
-      if (!conversation || isCustomerInboxConversation(conversation)) return
+      if (!conversation) return
       void markConversationRead(conversation.id, {
         lastReadMessageId: messageID,
         clearUnreadMark: false,
       })
-        .then(() => onConversationChanged())
+        .then(() => invalidate(resourceKeys.inbox()))
         .catch((error: unknown) =>
           console.warn("标记会话已读失败", {
             conversationId: conversation.id,
@@ -1123,7 +1123,7 @@ function ConversationThread({
           }),
         )
     },
-    [conversation, onConversationChanged],
+    [conversation, invalidate],
   )
 
   return (
@@ -1132,7 +1132,7 @@ function ConversationThread({
         prepareSendRef={prepareSendRef}
         conversationID={conversationID}
         conversationType={conversationType}
-        currentIdentityID={identity.user.identityId}
+        currentUser={identity.user}
         workspaceLayout
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
@@ -1145,16 +1145,8 @@ function ConversationThread({
             ? setReplyTo
             : undefined
         }
-        onReadMessage={
-          !conversation || isCustomerInboxConversation(conversation)
-            ? undefined
-            : markRead
-        }
-        readThroughMessageID={
-          !conversation || isCustomerInboxConversation(conversation)
-            ? undefined
-            : conversation.lastReadMessageId
-        }
+        onReadMessage={conversation ? markRead : undefined}
+        readThroughMessageID={conversation?.lastReadMessageId}
         enabled={Boolean(conversation)}
       />
       {!replySupported || replyDisabledReason ? (

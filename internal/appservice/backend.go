@@ -65,7 +65,7 @@ type Backend interface {
 	// MarkConversationMentionReviewed 确认已查看的群聊提及。
 	//cervi:route POST /conversations/:conversationID/mentions/review
 	MarkConversationMentionReviewed(context.Context, RequestMeta, string, MarkConversationMentionReviewedInput) (ConversationMentionReview, error)
-	// MarkConversationRead 单调推进当前用户的原生会话已读水位。
+	// MarkConversationRead 单调推进当前用户的会话已读水位。
 	//cervi:route POST /conversations/:conversationID/read
 	MarkConversationRead(context.Context, RequestMeta, string, MarkConversationReadInput) (ConversationReadState, error)
 	// UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。

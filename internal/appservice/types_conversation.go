@@ -77,10 +77,12 @@ type CustomerServiceSession struct {
 
 // ConversationMessageSender 定义消息发送主体。
 type ConversationMessageSender struct {
-	ChatSubjectID string          `json:"chatSubjectId"`
-	Kind          ChatSubjectKind `json:"kind"`
-	SourceID      string          `json:"sourceId"`
-	DisplayName   *string         `json:"displayName"`
+	ChatSubjectID string                    `json:"chatSubjectId"`
+	Kind          ChatSubjectKind           `json:"kind"`
+	SourceID      string                    `json:"sourceId"`
+	DisplayName   *string                   `json:"displayName"`
+	AvatarURL     string                    `json:"avatarUrl"`
+	IdentityType  *OrganizationIdentityType `json:"identityType"`
 }
 
 // ConversationMessageReference 定义引用消息的一层摘要。
@@ -123,6 +125,7 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
+	AgentProcess         *ConversationAgentProcess        `json:"agentProcess"`
 	GroupMessageSequence *string                          `json:"groupMessageSequence"`
 	ID                   string                           `json:"id"`
 	Type                 MessageType                      `json:"type"`
@@ -140,11 +143,12 @@ type ConversationMessage struct {
 
 // ConversationMessageList 定义成员消息页。
 type ConversationMessageList struct {
-	HasEarlier bool                  `json:"hasEarlier"`
-	HasLater   bool                  `json:"hasLater"`
-	Messages   []ConversationMessage `json:"messages"`
-	Before     *string               `json:"before"`
-	After      *string               `json:"after"`
+	LatestAgentRun *ConversationAgentRun `json:"latestAgentRun"`
+	HasEarlier     bool                  `json:"hasEarlier"`
+	HasLater       bool                  `json:"hasLater"`
+	Messages       []ConversationMessage `json:"messages"`
+	Before         *string               `json:"before"`
+	After          *string               `json:"after"`
 }
 
 // MarkConversationReadInput 定义用户确认已读的消息水位。

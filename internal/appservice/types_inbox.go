@@ -22,6 +22,7 @@ const (
 	AgentRunStatusRunning   AgentRunStatus = AgentRunStatus(domain.AgentRunStatusRunning)
 	AgentRunStatusSucceeded AgentRunStatus = AgentRunStatus(domain.AgentRunStatusSucceeded)
 	AgentRunStatusFailed    AgentRunStatus = AgentRunStatus(domain.AgentRunStatusFailed)
+	AgentRunStatusCancelled AgentRunStatus = AgentRunStatus(domain.AgentRunStatusCancelled)
 )
 
 // InboxScope 表示统一收件箱读取范围。
@@ -91,6 +92,7 @@ type DirectInboxConversation struct {
 	PeerIdentityID string                   `json:"peerIdentityId"`
 	PeerType       OrganizationIdentityType `json:"peerType"`
 	PeerName       string                   `json:"peerName"`
+	PeerAvatarURL  string                   `json:"peerAvatarUrl"`
 	Preview        *string                  `json:"preview"`
 	LastMessageAt  *time.Time               `json:"lastMessageAt"`
 	AgentRunStatus *AgentRunStatus          `json:"agentRunStatus"`

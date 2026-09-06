@@ -34,6 +34,9 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 		if summary.Group != nil && summary.Group.ImageFileID != nil {
 			avatarFileIDs = append(avatarFileIDs, *summary.Group.ImageFileID)
 		}
+		if summary.Direct != nil && summary.Direct.PeerAvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *summary.Direct.PeerAvatarFileID)
+		}
 		if summary.Customer == nil {
 			continue
 		}
@@ -72,7 +75,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 				agentRunStatus = &status
 			}
 			conversation.Direct = &DirectInboxConversation{
-				PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName,
+				PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID),
 				Preview: summary.Direct.Preview, LastMessageAt: summary.Direct.LastMessageAt, AgentRunStatus: agentRunStatus,
 			}
 		}

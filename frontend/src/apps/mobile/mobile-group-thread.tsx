@@ -40,7 +40,7 @@ export function MobileGroupThread({
       <ConversationTimeline
         conversationID={conversation.id}
         conversationType={ConversationType.ConversationTypeGroup}
-        currentIdentityID={identity.user.identityId}
+        currentUser={identity.user}
         requireWindowFocus={false}
         mentionNavigation={false}
         onUnavailable={onUnavailable}

@@ -1,7 +1,7 @@
 /** 企业内部群聊创建表单。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon, SearchIcon, UserRoundIcon } from "lucide-react"
+import { LoaderCircleIcon, SearchIcon } from "lucide-react"
 import { useController, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -17,6 +17,7 @@ import {
   type GroupInboxConversationData,
   uploadFile,
 } from "@/api"
+import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -396,15 +397,7 @@ export function CreateGroupConversationDialog({
                               )
                             }}
                           />
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-muted-foreground">
-                            {member.displayName ? (
-                              Array.from(
-                                member.displayName,
-                              )[0]?.toLocaleUpperCase()
-                            ) : (
-                              <UserRoundIcon className="size-4" />
-                            )}
-                          </span>
+                          <ProfileAvatar imageURL={member.avatarUrl} name={member.displayName} className="size-9" />
                           <span className="min-w-0 flex-1 truncate text-sm">
                             {member.displayName}
                           </span>

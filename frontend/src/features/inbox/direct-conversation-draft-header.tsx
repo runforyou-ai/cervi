@@ -1,29 +1,26 @@
 /** 展示尚未创建会话的单聊目标。 */
-import { BotIcon, UserRoundIcon } from "lucide-react"
 import { OrganizationIdentityType, type MemberOption } from "@/api"
-import { cn } from "@/lib/utils"
+import { ProfileAvatar } from "@/components/profile-avatar"
 
 /** 展示草稿收件人的头像。 */
 export function DirectConversationDraftAvatar({
   member,
-  className,
+  className = "size-9",
 }: {
   member: MemberOption
   className?: string
 }) {
   return (
-    <span className={cn(
-      "flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary",
-      className,
-    )}>
-      {member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
-        <BotIcon className="size-4.5" />
-      ) : member.displayName ? (
-        Array.from(member.displayName)[0]
-      ) : (
-        <UserRoundIcon className="size-4.5" />
-      )}
-    </span>
+    <ProfileAvatar
+      imageURL={member.avatarUrl}
+      name={member.displayName}
+      fallback={
+        member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+          ? "agent"
+          : "person"
+      }
+      className={className}
+    />
   )
 }
 

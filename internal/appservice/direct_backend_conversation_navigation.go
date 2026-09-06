@@ -19,7 +19,7 @@ func (b *DirectBackend) GetConversationMessageContext(ctx context.Context, meta 
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	return conversationMessageListFromAction(conversationID, history), nil
+	return b.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
 }
 
 // GetConversationNavigationState 返回当前群聊的待查看数量和可见尾端。

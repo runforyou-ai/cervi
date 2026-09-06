@@ -30,6 +30,7 @@ import {
 import type {
   CustomerInboxConversation,
   ConversationMessage,
+  ConversationAgentProcess,
   ConversationMessageList,
   ConversationMessageListInput,
   ConversationNotificationSettings,
@@ -75,8 +76,13 @@ export type ConversationMessageListData = Omit<
   messages: ConversationMessageData[]
 }
 
-export type ConversationMessageData = Omit<ConversationMessage, "mentions"> & {
+export type ConversationAgentProcessData = Omit<ConversationAgentProcess, "blocks"> & {
+  blocks: NonNullable<ConversationAgentProcess["blocks"]>
+}
+
+export type ConversationMessageData = Omit<ConversationMessage, "mentions" | "agentProcess"> & {
   mentions: NonNullable<ConversationMessage["mentions"]>
+  agentProcess: ConversationAgentProcessData | null
 }
 
 export type CustomerInboxConversationData = InboxConversation & {
@@ -169,6 +175,9 @@ function normalizeConversationMessage(
   return {
     ...message,
     mentions: asList(message.mentions),
+    agentProcess: message.agentProcess
+      ? { ...message.agentProcess, blocks: asList(message.agentProcess.blocks) }
+      : null,
     systemEvent: message.systemEvent
       ? {
           ...message.systemEvent,
@@ -276,7 +285,7 @@ export async function listConversationMessages(
   }
 }
 
-/** 单调推进当前用户的原生会话已读水位。 */
+/** 单调推进当前用户的会话已读水位。 */
 export function markConversationRead(
   conversationID: string,
   input: MarkConversationReadInput,

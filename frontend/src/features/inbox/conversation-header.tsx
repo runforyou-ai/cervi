@@ -1,14 +1,9 @@
-/** 成员会话头与会话头像。 */
-import { useEffect, useState } from "react"
+/** 成员会话头与操作菜单。 */
+import { useState } from "react"
 import {
-  BotIcon,
   ChevronDownIcon,
-  GlobeIcon,
   LoaderCircleIcon,
-  MessageCircleIcon,
   MoreHorizontalIcon,
-  SendIcon,
-  UserRoundIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -44,7 +39,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { GroupAvatar } from "@/features/inbox/group-avatar"
+import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,94 +51,6 @@ import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
-
-const sourceBadges: Partial<
-  Record<ChannelType, { icon: typeof GlobeIcon; className: string }>
-> = {
-  [ChannelType.ChannelTypeWebsite]: {
-    icon: GlobeIcon,
-    className: "bg-badge-website",
-  },
-  [ChannelType.ChannelTypeTelegram]: {
-    icon: SendIcon,
-    className: "bg-badge-telegram",
-  },
-  [ChannelType.ChannelTypeWeChatOfficialAccount]: {
-    icon: MessageCircleIcon,
-    className: "bg-badge-wechat",
-  },
-}
-
-/** 展示联系人头像和来源渠道角标。 */
-export function ConversationAvatar({
-  conversation,
-  className,
-}: {
-  conversation: InboxConversation
-  className?: string
-}) {
-  const customer = isCustomerInboxConversation(conversation)
-    ? conversation.customer
-    : null
-  const direct = isDirectInboxConversation(conversation)
-    ? conversation.direct
-    : null
-  const group = isGroupInboxConversation(conversation)
-    ? conversation.group
-    : null
-  const badge = customer ? sourceBadges[customer.channelType] : undefined
-  const contactName =
-    customer?.contactName?.trim() ||
-    direct?.peerName.trim() ||
-    group?.title.trim()
-  const avatarURL = customer?.contactAvatarUrl ?? ""
-  const [avatarFailed, setAvatarFailed] = useState(false)
-  const directAgent =
-    direct?.peerType ===
-    OrganizationIdentityType.OrganizationIdentityTypeAgent
-
-  useEffect(() => setAvatarFailed(false), [avatarURL])
-
-  return (
-    <div className="relative shrink-0">
-      <div
-        className={cn(
-          "flex size-10 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-sm font-medium text-primary",
-          className,
-        )}
-      >
-        {group ? (
-          <GroupAvatar imageURL={group.imageUrl} />
-        ) : avatarURL && !avatarFailed ? (
-          <img
-            src={avatarURL}
-            alt=""
-            className="size-full rounded-[inherit] object-cover"
-            draggable={false}
-            onError={() => setAvatarFailed(true)}
-          />
-        ) : directAgent ? (
-          <BotIcon className="size-4.5" />
-        ) : contactName ? (
-          contactName.slice(0, 1).toLocaleUpperCase()
-        ) : (
-          <UserRoundIcon className="size-4.5" />
-        )}
-      </div>
-      {badge ? (
-        <span
-          aria-hidden="true"
-          className={cn(
-            "absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full border-2 border-background text-white",
-            badge.className,
-          )}
-        >
-          <badge.icon className="size-2" />
-        </span>
-      ) : null}
-    </div>
-  )
-}
 
 /** 按 Helmdesk 会话头布局展示当前联系人、会话状态和操作区。 */
 export function ConversationHeader({
@@ -242,7 +149,7 @@ export function ConversationHeader({
       >
       <ConversationAvatar
         conversation={conversation}
-        className="size-9 rounded-full"
+        className="size-9"
       />
       <div className="min-w-0 flex-1">
         <div className="w-fit max-w-full">

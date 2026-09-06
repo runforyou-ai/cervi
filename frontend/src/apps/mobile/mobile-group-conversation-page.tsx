@@ -72,9 +72,7 @@ function MobileGroupConversation({ conversationID }: { conversationID: string })
         backTo={inboxURL}
         title={
           <span className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 overflow-hidden rounded-xl bg-muted">
-              <GroupAvatar imageURL={data?.imageUrl ?? ""} />
-            </span>
+            <GroupAvatar imageURL={data?.imageUrl ?? ""} className="size-9" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-base font-semibold">
                 {data?.title ?? t("group.title")}

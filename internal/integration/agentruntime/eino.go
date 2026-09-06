@@ -44,6 +44,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, errors.New("agent input feed is required")
 	}
 	ctx = context.WithValue(ctx, runIDContextKey{}, request.RunID)
+	recorder := newProcessRecorder(request)
 	maxTurns := request.MaxTurns
 	if maxTurns <= 0 {
 		maxTurns = defaultMaxTurns
@@ -63,8 +64,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
-			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolLoggingMiddleware()},
+			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
 		}},
+		Handlers:      []adk.ChatModelAgentMiddleware{recorder},
 		MaxIterations: maxTurns,
 	})
 	if err != nil {
@@ -82,6 +84,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	loop := adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
 		GenInput: func(ctx context.Context, loop *adk.TurnLoop[Trigger, *schema.Message], items []Trigger) (*adk.GenInputResult[Trigger, *schema.Message], error) {
 			turnCount++
+			recorder.resetCandidate()
 			if turnCount > maxTurns {
 				return nil, fmt.Errorf("agent turn limit %d exceeded", maxTurns)
 			}
@@ -217,7 +220,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if finalContent == "" || endSeq <= 0 {
 		return RunResult{}, errors.New("agent run stopped without a stable response")
 	}
-	return RunResult{Content: finalContent, EndSeq: endSeq, Usage: usage}, nil
+	return RunResult{Content: finalContent, EndSeq: endSeq, Usage: usage, Blocks: recorder.blocks()}, nil
 }
 
 // runIDFromContext 返回当前 Runtime 传给组件的 Agent Run 编号。
