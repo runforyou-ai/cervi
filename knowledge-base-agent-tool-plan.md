@@ -4,6 +4,8 @@
 
 已完成企业知识检索、多查询融合、游标上下文读取和 Agent 知识库范围配置。当前实现以代码为准，下面保留检索编排设计及上线前待办。
 
+本地知识库的部署、内容生命周期、实施 PR 与评测结论见 [本地知识库接入方案](knowledge-base-plan.md)。本地执行层直接接入 Hindsight，保留本篇已有 Tool 编排，不建设可替换搜索引擎框架。
+
 - Agent 创建页和详情运行配置可选择当前企业知识库；新建默认不选，空列表不注册 `search_knowledge`。
 - `managed/v1` Revision 的 `knowledgeBaseIds` 保存明确范围，更新生成新版本；Run 读取其绑定的 Revision，配置切换不影响在途 Run。
 - 保存时在事务中校验并锁定同企业知识库；被删除的绑定保留在详情中供移除，新运行明确失败并推进消费水位。
@@ -131,7 +133,7 @@ Agent Run
   -> MultiQueryRetriever
        -> 并发调用 KnowledgeRetriever.Retrieve(query)
        -> 合并、去重、排序和裁剪
-  -> DifyRetriever 或 LocalRetriever
+  -> Dify 连接器或 Hindsight 本地知识库接入
 ```
 
 后端执行契约保持单查询：
@@ -176,6 +178,8 @@ knowledge_base_id + segment_id
 
 同一查询内重复出现的分段只保留最靠前的名次。同一分段被不同查询命中时合并 `matchedQueryIndexes`；分段字段采用最佳名次对应的记录，最佳名次相同时采用首次出现下标较小的记录，保证内容和文档信息稳定。
 
+本地问答接入时，先在来源适配中按问答条目折叠，把条目编号作为逻辑 `segment_id`，返回主问题和完整答案，再进入上述融合。Hindsight 实际切出的多个片段不能使同一问答重复输出。
+
 ### 6.3 融合排序
 
 不同查询的 Dify 分数不可直接横向比较，关键词检索也可能没有有效分数。多查询结果使用 Reciprocal Rank Fusion，只使用每个查询结果中的相对名次：
@@ -215,19 +219,19 @@ Agent Tool 在创建编排器时显式提供分段条数上限和序列化后 UT
 
 ## 8. 本地知识库统一方式
 
-本地知识库实现相同的单查询 `KnowledgeRetriever`，从 Cervi 保存的知识库配置中选择关键词、全文、向量或混合检索。Agent Tool、`queries` 契约、并发、RRF、输出预算和失败语义保持不变。
+本地知识库直接对接 Hindsight 的 chunks 模式，接入现有检索服务和多查询编排。首版使用固定混合检索配置，不开放关键词、语义与混合模式切换，不增加可替换引擎抽象。Agent Tool 保留 `queries` 和受限范围的游标读取语义；本地 cursor 必须携带 `sourceVersion` 并验证索引版本，Dify 不提供该字段，继续读取远端当前文档与分段。具体规则按 [本地知识库接入方案](knowledge-base-plan.md) 落地。
 
 ```text
 DifyRetriever
   -> Dify 保存检索配置
   -> POST /datasets/{id}/retrieve，只传 query
 
-LocalRetriever
-  -> Cervi 保存检索配置
-  -> 调用本地索引，只接收 query
+Hindsight 本地知识库接入
+  -> Cervi 根据身份和知识库解析 bank 与有效来源
+  -> Hindsight 召回，再校验来源修订号并返回原文或完整问答
 ```
 
-统一的是执行契约和检索结果，不统一 Dify 与本地知识库的底层配置字段。
+复用的是现有工具入口与结果编排；Dify 保留自身检索配置，Hindsight 使用固定版本的直接接入。两者原始分数不做统一阈值判断。
 
 ## 9. 实现 PR 拆分
 
@@ -251,8 +255,8 @@ LocalRetriever
 
 ### 后续：本地知识库
 
-- 增加本地文档、分段、索引和检索配置。
-- 实现 `LocalRetriever`，不修改 Agent Tool 契约和多查询编排。
+- 按 [本地知识库接入方案](knowledge-base-plan.md) 分 PR 完成 pgvector 基础环境、Hindsight、本地问答检索和文档导入。
+- Cervi 管理业务来源、文件和处理状态，Hindsight 管理分段与索引；继续复用 Agent Tool 和多查询编排。
 
 ## 10. 验收标准
 
@@ -262,5 +266,5 @@ LocalRetriever
 - 多条查询并发执行，重复分段只返回一次，输出顺序稳定。
 - 单条查询时结果顺序与后端一致，多条查询时按 RRF 融合。
 - 上线前专项补充检索并发与模型上下文输出预算。
-- Dify 与本地知识库可以替换实现而不改变 Agent Tool Schema。
+- Dify 与本地知识库共用 Agent Tool 的查询和范围语义；本地游标约束来源索引版本，Dify 校验当前远端分段，不承诺历史快照；不向模型暴露 Hindsight bank 或底层引擎选择。
 - Agent 只能检索当前 `organization_id` 且 Run Revision 已绑定的知识库；游标读取不能扩大范围。
