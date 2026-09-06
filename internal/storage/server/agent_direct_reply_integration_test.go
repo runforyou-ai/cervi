@@ -28,8 +28,11 @@ type testDirectReplyRuntime struct {
 }
 
 // Run 检查引用消息的模型输入并返回可辨认的测试回复。
-func (r *testDirectReplyRuntime) Run(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+func (r *testDirectReplyRuntime) Run(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 	t := r.t
+	if request.CustomerHistorySearch != nil {
+		t.Fatal("direct chat received customer history tool")
+	}
 	r.calls++
 	triggers, err := feed.Peek(ctx, 0)
 	if err != nil {

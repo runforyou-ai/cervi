@@ -56,6 +56,13 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		}
 		tools = append(tools, knowledgeTool)
 	}
+	if request.CustomerHistorySearch != nil {
+		historyTool, toolErr := newCustomerHistoryTool(request.CustomerHistorySearch)
+		if toolErr != nil {
+			return RunResult{}, fmt.Errorf("create customer history tool: %w", toolErr)
+		}
+		tools = append(tools, historyTool)
+	}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{

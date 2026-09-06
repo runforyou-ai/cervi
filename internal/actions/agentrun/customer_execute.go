@@ -54,7 +54,7 @@ func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policy
 	return false, nil
 }
 
-// loadMessages 按客户和企业身份映射读取客服会话上下文。
+// loadMessages 读取本轮客服周期内的模型上下文。
 func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
 	return loadClaimedCustomerMessages(ctx, db, run, endSeq)
 }
@@ -113,13 +113,14 @@ type customerMessageReference struct {
 	Body           string `json:"body,omitempty"`
 }
 
-// loadClaimedCustomerMessages 读取不越过已认领 Trigger 的客户会话上下文。
+// loadClaimedCustomerMessages 读取本轮客服周期内不越过已认领 Trigger 的消息。
 func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err
 	}
 	rows := make([]customerMessageRow, 0, agentHistoryLimit)
+	// 仅筛选主消息的客服周期；当前消息主动引用的旧周期原文仍作为一层引用传入。
 	if err := db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id, msg.body, cs.kind").
@@ -139,6 +140,7 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
+		Where("msg.service_session_id = ?", run.ServiceSessionID).
 		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).

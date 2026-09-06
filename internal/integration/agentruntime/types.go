@@ -53,18 +53,28 @@ type ModelConfig struct {
 // KnowledgeSearch 检索本次 Agent Run 获准使用的知识库。
 type KnowledgeSearch func(context.Context, knowledgeretrieval.Request) (knowledgeretrieval.Result, error)
 
+// CustomerHistorySearch 查询本次运行所属客户会话中已结束的客服周期。
+type CustomerHistorySearch func(context.Context, string) (CustomerHistoryResult, error)
+
+// CustomerHistoryResult 明确区分历史查询不可用与查询后没有匹配记录。
+type CustomerHistoryResult struct {
+	Available bool   `json:"available"`
+	Message   string `json:"message"`
+}
+
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
-	RunID           string
-	Name            string
-	Instruction     string
-	Model           ModelConfig
-	KnowledgeSearch KnowledgeSearch
-	MaxIterations   int // 单轮模型与工具迭代上限，零值使用默认值。
-	MaxTurns        int // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
-	StreamID        string
-	Attempt         int
-	OnProgress      func(Progress)
+	RunID                 string
+	Name                  string
+	Instruction           string
+	Model                 ModelConfig
+	KnowledgeSearch       KnowledgeSearch
+	CustomerHistorySearch CustomerHistorySearch
+	MaxIterations         int // 单轮模型与工具迭代上限，零值使用默认值。
+	MaxTurns              int // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
+	StreamID              string
+	Attempt               int
+	OnProgress            func(Progress)
 }
 
 // Usage 定义一次业务运行累计的模型用量。

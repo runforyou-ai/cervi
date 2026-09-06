@@ -95,6 +95,17 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		return task.Permanent(err)
 	}
 	feed := &databaseInputFeed{db: a.db, execution: execution, policy: policy}
+	var customerHistorySearch agentruntime.CustomerHistorySearch
+	if domain.AgentTriggerType(execution.Run.TriggerType) == domain.AgentTriggerTypeCustomerAuto {
+		// TODO：全文检索方案确定后接入历史查询，范围限定为本企业、本 Conversation 内已关闭的 ServiceSession。
+		// 占位结果明确表示功能不可用，不能让模型据此断言没有历史记录。
+		customerHistorySearch = func(context.Context, string) (agentruntime.CustomerHistoryResult, error) {
+			return agentruntime.CustomerHistoryResult{
+				Available: false,
+				Message:   "历史消息查询暂未开放，无法确认以往的沟通内容。请根据本轮消息回答，必要时请客户补充信息；不要重复调用此工具。",
+			}, nil
+		}
+	}
 	// 空绑定不注册知识检索；非空绑定只从本次 Run 的版本加载。
 	var knowledgeSearch agentruntime.KnowledgeSearch
 	if len(execution.KnowledgeBaseIDs) > 0 {
@@ -113,9 +124,10 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 				Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
 				Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
 			},
-			KnowledgeSearch: knowledgeSearch,
-			StreamID:        running.progress.StreamID,
-			Attempt:         running.attempt,
+			KnowledgeSearch:       knowledgeSearch,
+			CustomerHistorySearch: customerHistorySearch,
+			StreamID:              running.progress.StreamID,
+			Attempt:               running.attempt,
 			OnProgress: func(progress agentruntime.Progress) {
 				a.runningMu.Lock()
 				defer a.runningMu.Unlock()

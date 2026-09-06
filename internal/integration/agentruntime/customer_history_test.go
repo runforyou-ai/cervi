@@ -1,0 +1,91 @@
+//go:build server
+
+package agentruntime
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"testing"
+
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
+)
+
+type customerHistoryChatModel struct {
+	*processChatModel
+	tools []*schema.ToolInfo
+}
+
+// Generate 记录调用参数中的工具并执行当前测试步骤。
+func (m *customerHistoryChatModel) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+	m.tools = model.GetCommonOptions(nil, opts...).Tools
+	return m.processChatModel.Generate(ctx, input, opts...)
+}
+
+// TestCustomerHistoryTool 验证占位结果到达模型，且工具不会泄漏到后续单聊运行。
+func TestCustomerHistoryTool(t *testing.T) {
+	runtime, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, enabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
+			modelCalls, searchCalls := 0, 0
+			chatModel := &customerHistoryChatModel{}
+			chatModel.processChatModel = &processChatModel{generate: func(_ context.Context, messages []*schema.Message) (*schema.Message, error) {
+				modelCalls++
+				if enabled && modelCalls == 1 {
+					return schema.AssistantMessage("", []schema.ToolCall{{
+						ID: "history", Type: "function",
+						Function: schema.FunctionCall{Name: "search_customer_history", Arguments: `{"query":"上次退款的处理结果"}`},
+					}}), nil
+				}
+				if enabled {
+					for _, message := range messages {
+						if message.Role == schema.Tool && message.ToolCallID == "history" {
+							var result CustomerHistoryResult
+							if err := json.Unmarshal([]byte(message.Content), &result); err != nil {
+								return nil, err
+							}
+							if result.Available || result.Message != "历史查询暂不可用" {
+								return nil, fmt.Errorf("unexpected history result: %+v", result)
+							}
+							return schema.AssistantMessage("请补充上次退款的信息", nil), nil
+						}
+					}
+					return nil, errors.New("history result not delivered to model")
+				}
+				return schema.AssistantMessage("单聊回答", nil), nil
+			}}
+			runtime.newModel = func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }
+			request := RunRequest{RunID: "history-test", Name: "客服助手"}
+			if enabled {
+				request.CustomerHistorySearch = func(_ context.Context, query string) (CustomerHistoryResult, error) {
+					searchCalls++
+					if query != "上次退款的处理结果" {
+						return CustomerHistoryResult{}, fmt.Errorf("unexpected query: %q", query)
+					}
+					return CustomerHistoryResult{Available: false, Message: "历史查询暂不可用"}, nil
+				}
+			}
+			feed := &testInputFeed{}
+			feed.appendUser("请继续处理退款")
+			result, err := runtime.Run(context.Background(), request, feed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, info := range chatModel.tools {
+				found = found || info.Name == "search_customer_history"
+			}
+			if found != enabled {
+				t.Fatalf("history tool registered=%t, expected=%t", found, enabled)
+			}
+			if enabled && (searchCalls != 1 || result.Content != "请补充上次退款的信息") {
+				t.Fatalf("search calls=%d, result=%+v", searchCalls, result)
+			}
+		})
+	}
+}
