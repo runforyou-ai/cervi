@@ -27,31 +27,35 @@ type ListConversationMessagesQuery struct {
 }
 
 type conversationMessageRow struct {
-	ID                             string          `bun:"id"`
-	Type                           string          `bun:"type"`
-	Body                           string          `bun:"body"`
-	SystemEventType                *string         `bun:"system_event_type"`
-	SystemEventPayload             json.RawMessage `bun:"system_event_payload"`
-	OriginatedAt                   time.Time       `bun:"originated_at"`
-	GroupMessageSequence           *int64          `bun:"group_message_sequence"`
-	SourceOrder                    int64           `bun:"source_order"`
-	CreatedAt                      time.Time       `bun:"created_at"`
-	SenderSubjectID                *string         `bun:"sender_subject_id"`
-	SenderKind                     *string         `bun:"sender_kind"`
-	SenderSourceID                 *string         `bun:"sender_source_id"`
-	SenderDisplayName              *string         `bun:"sender_display_name"`
-	ReplyToMessageID               *string         `bun:"reply_to_message_id"`
-	MentionAll                     bool            `bun:"mention_all"`
-	ReplyToDeleted                 bool            `bun:"reply_to_deleted"`
-	ReplyToBody                    *string         `bun:"reply_to_body"`
-	ReplyToSenderSubjectID         *string         `bun:"reply_to_sender_subject_id"`
-	ReplyToSenderKind              *string         `bun:"reply_to_sender_kind"`
-	ReplyToSenderSourceID          *string         `bun:"reply_to_sender_source_id"`
-	ReplyToSenderDisplayName       *string         `bun:"reply_to_sender_display_name"`
-	ServiceSessionOpeningMessageID *string         `bun:"service_session_opening_message_id"`
-	ServiceSessionSequence         *int64          `bun:"service_session_sequence"`
-	ServiceSessionStartedAt        *time.Time      `bun:"service_session_started_at"`
-	ServiceSessionStatus           *string         `bun:"service_session_status"`
+	ID                             string                           `bun:"id"`
+	Type                           string                           `bun:"type"`
+	Body                           string                           `bun:"body"`
+	SystemEventType                *string                          `bun:"system_event_type"`
+	SystemEventPayload             json.RawMessage                  `bun:"system_event_payload"`
+	OriginatedAt                   time.Time                        `bun:"originated_at"`
+	GroupMessageSequence           *int64                           `bun:"group_message_sequence"`
+	SourceOrder                    int64                            `bun:"source_order"`
+	CreatedAt                      time.Time                        `bun:"created_at"`
+	SenderSubjectID                *string                          `bun:"sender_subject_id"`
+	SenderKind                     *string                          `bun:"sender_kind"`
+	SenderSourceID                 *string                          `bun:"sender_source_id"`
+	SenderDisplayName              *string                          `bun:"sender_display_name"`
+	SenderAvatarFileID             *string                          `bun:"sender_avatar_file_id"`
+	SenderIdentityType             *domain.OrganizationIdentityType `bun:"sender_identity_type"`
+	ReplyToMessageID               *string                          `bun:"reply_to_message_id"`
+	MentionAll                     bool                             `bun:"mention_all"`
+	ReplyToDeleted                 bool                             `bun:"reply_to_deleted"`
+	ReplyToBody                    *string                          `bun:"reply_to_body"`
+	ReplyToSenderSubjectID         *string                          `bun:"reply_to_sender_subject_id"`
+	ReplyToSenderKind              *string                          `bun:"reply_to_sender_kind"`
+	ReplyToSenderSourceID          *string                          `bun:"reply_to_sender_source_id"`
+	ReplyToSenderDisplayName       *string                          `bun:"reply_to_sender_display_name"`
+	ReplyToSenderAvatarFileID      *string                          `bun:"reply_to_sender_avatar_file_id"`
+	ReplyToSenderIdentityType      *domain.OrganizationIdentityType `bun:"reply_to_sender_identity_type"`
+	ServiceSessionOpeningMessageID *string                          `bun:"service_session_opening_message_id"`
+	ServiceSessionSequence         *int64                           `bun:"service_session_sequence"`
+	ServiceSessionStartedAt        *time.Time                       `bun:"service_session_started_at"`
+	ServiceSessionStatus           *string                          `bun:"service_session_status"`
 }
 
 // NewListConversationMessagesQuery 创建成员消息历史查询。
@@ -122,6 +126,8 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("cs.kind AS sender_kind").
 		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) WHEN cs.kind = ? THEN oi.display_name END AS sender_display_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
+		ColumnExpr("CASE WHEN cs.kind = ? THEN cci.avatar_file_id ELSE oi.avatar_file_id END::text AS sender_avatar_file_id", domain.ChatSubjectKindContact).
+		ColumnExpr("oi.type AS sender_identity_type").
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.mention_all AS mention_all").
 		ColumnExpr("CASE WHEN reply_msg.deleted_at IS NULL THEN reply_msg.body END AS reply_to_body").
@@ -130,6 +136,8 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("reply_cs.kind AS reply_to_sender_kind").
 		ColumnExpr("reply_cs.source_id AS reply_to_sender_source_id").
 		ColumnExpr("reply_oi.display_name AS reply_to_sender_display_name").
+		ColumnExpr("reply_oi.avatar_file_id::text AS reply_to_sender_avatar_file_id").
+		ColumnExpr("reply_oi.type AS reply_to_sender_identity_type").
 		ColumnExpr("ss.opening_message_id AS service_session_opening_message_id").
 		ColumnExpr("ss.sequence AS service_session_sequence").
 		ColumnExpr("ss.created_at AS service_session_started_at").
@@ -312,7 +320,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 				ChatSubjectID: *row.SenderSubjectID,
 				Kind:          domain.ChatSubjectKind(*row.SenderKind),
 				SourceID:      *row.SenderSourceID,
-				DisplayName:   row.SenderDisplayName,
+				DisplayName:   row.SenderDisplayName, AvatarFileID: row.SenderAvatarFileID, IdentityType: row.SenderIdentityType,
 			}
 		}
 		if row.ReplyToMessageID != nil && row.ReplyToDeleted {
@@ -327,7 +335,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 					ChatSubjectID: *row.ReplyToSenderSubjectID,
 					Kind:          domain.ChatSubjectKind(*row.ReplyToSenderKind),
 					SourceID:      *row.ReplyToSenderSourceID,
-					DisplayName:   row.ReplyToSenderDisplayName,
+					DisplayName:   row.ReplyToSenderDisplayName, AvatarFileID: row.ReplyToSenderAvatarFileID, IdentityType: row.ReplyToSenderIdentityType,
 				},
 			}
 		}

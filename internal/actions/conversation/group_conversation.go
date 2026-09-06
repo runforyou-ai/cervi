@@ -307,7 +307,7 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 		}, message); err != nil {
 			return err
 		}
-		result = memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName)
+		result = memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity)
 		result.ReplyTo = reply
 		result.Mentions = mentions
 		result.MentionAll = normalized.MentionAll

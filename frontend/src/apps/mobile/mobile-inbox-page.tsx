@@ -1,25 +1,16 @@
 /** 移动端统一会话摘要列表和内部单聊入口。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
-import {
-  BotIcon,
-  GlobeIcon,
-  MessageCircleIcon,
-  SendIcon,
-  UserRoundIcon,
-} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import {
-  ChannelType,
   isCustomerInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   InboxScope,
   ConversationStatus,
   loadInbox,
-  OrganizationIdentityType,
   ServiceSessionStatus,
   type CustomerInboxConversationData,
   type DirectInboxConversationData,
@@ -36,7 +27,7 @@ import {
   MobilePageState,
   MobileScrollArea,
 } from "@/apps/mobile/mobile-page"
-import { GroupAvatar } from "@/features/inbox/group-avatar"
+import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { Button } from "@/components/ui/button"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useUserTimeZone } from "@/contexts/user-preferences"
@@ -64,23 +55,6 @@ function isMobileInboxConversation(
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation)
   )
-}
-
-const sourceBadges: Partial<
-  Record<ChannelType, { icon: typeof GlobeIcon; className: string }>
-> = {
-  [ChannelType.ChannelTypeWebsite]: {
-    icon: GlobeIcon,
-    className: "bg-badge-website",
-  },
-  [ChannelType.ChannelTypeTelegram]: {
-    icon: SendIcon,
-    className: "bg-badge-telegram",
-  },
-  [ChannelType.ChannelTypeWeChatOfficialAccount]: {
-    icon: MessageCircleIcon,
-    className: "bg-badge-wechat",
-  },
 }
 
 /** 返回客服处理状态的移动端文案。 */
@@ -158,76 +132,6 @@ function useMinuteTick() {
   }, [])
 }
 
-/** 展示移动端会话头像和来源角标。 */
-function MobileConversationAvatar({
-  conversation,
-}: {
-  conversation: MobileInboxConversation
-}) {
-  const customerConversation = isCustomerInboxConversation(conversation)
-    ? conversation
-    : null
-  const directConversation = isDirectInboxConversation(conversation)
-    ? conversation
-    : null
-  const groupConversation = isGroupInboxConversation(conversation)
-    ? conversation
-    : null
-  const badge = customerConversation
-    ? sourceBadges[customerConversation.customer.channelType]
-    : null
-  const displayName = customerConversation
-    ? customerConversation.customer.contactName?.trim()
-    : directConversation?.direct.peerName.trim()
-  const avatarURL = customerConversation?.customer.contactAvatarUrl ?? ""
-  const [avatarFailed, setAvatarFailed] = useState(false)
-  const directAgent =
-    directConversation?.direct.peerType ===
-    OrganizationIdentityType.OrganizationIdentityTypeAgent
-
-  useEffect(() => setAvatarFailed(false), [avatarURL])
-
-  return (
-    <div className="relative shrink-0">
-      <div
-        className={cn(
-          "flex size-11 items-center justify-center overflow-hidden bg-primary/10 text-sm font-medium text-primary",
-          directConversation ? "rounded-full" : "rounded-xl",
-        )}
-      >
-        {groupConversation ? (
-          <GroupAvatar imageURL={groupConversation.group.imageUrl} />
-        ) : avatarURL && !avatarFailed ? (
-          <img
-            src={avatarURL}
-            alt=""
-            className="size-full rounded-[inherit] object-cover"
-            draggable={false}
-            onError={() => setAvatarFailed(true)}
-          />
-        ) : directAgent ? (
-          <BotIcon className="size-4.5" />
-        ) : displayName ? (
-          Array.from(displayName)[0]?.toLocaleUpperCase()
-        ) : (
-          <UserRoundIcon className="size-4.5" />
-        )}
-      </div>
-      {badge ? (
-        <span
-          aria-hidden="true"
-          className={cn(
-            "absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full border-2 border-background text-white",
-            badge.className,
-          )}
-        >
-          <badge.icon className="size-2" />
-        </span>
-      ) : null}
-    </div>
-  )
-}
-
 /** 渲染会话摘要，单聊可进入详情，客户和群聊明确标注只读范围。 */
 function MobileConversationRow({
   conversation,
@@ -281,7 +185,7 @@ function MobileConversationRow({
 
   const content = (
     <>
-      <MobileConversationAvatar conversation={conversation} />
+      <ConversationAvatar conversation={conversation} />
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
           <div className="flex min-w-0 items-center gap-2">

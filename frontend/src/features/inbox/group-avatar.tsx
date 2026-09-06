@@ -1,15 +1,15 @@
 /** 群聊图片展示和跨平台图片选择交互。 */
 import {
-  useEffect,
   useRef,
   useState,
   type ChangeEvent,
 } from "react"
-import { LoaderCircleIcon, UsersRoundIcon } from "lucide-react"
+import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { selectImage } from "@/api"
+import { ProfileAvatar } from "@/components/profile-avatar"
 import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
@@ -30,31 +30,11 @@ export function GroupAvatar({
   imageURL?: string
   className?: string
 }) {
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => setFailed(false), [imageURL])
-
-  if (!imageURL || failed) {
-    return (
-      <span
-        aria-hidden="true"
-        className={cn(
-          "flex size-full items-center justify-center bg-primary/10 text-primary",
-          className,
-        )}
-      >
-        <UsersRoundIcon className="size-[45%]" />
-      </span>
-    )
-  }
-
   return (
-    <img
-      src={imageURL}
-      alt=""
-      className={cn("size-full object-cover", className)}
-      draggable={false}
-      onError={() => setFailed(true)}
+    <ProfileAvatar
+      imageURL={imageURL}
+      fallback="group"
+      className={cn("size-full", className)}
     />
   )
 }

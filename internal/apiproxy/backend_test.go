@@ -363,3 +363,50 @@ func writeTestJSON(writer http.ResponseWriter, status int, value any) {
 	writer.WriteHeader(status)
 	_ = json.NewEncoder(writer).Encode(value)
 }
+
+// TestConversationAvatarURLs 验证各会话响应补全本地头像地址并保留对象存储地址。
+func TestConversationAvatarURLs(t *testing.T) {
+	const serverURL = "https://company.example.com/cervi"
+	const avatarPath = "/storage/avatar.png"
+	const objectURL = "https://objects.example.com/avatar.png"
+	backend, err := newTestBackend(&memoryStore{serverURL: serverURL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceURL := range []string{avatarPath, objectURL, ""} {
+		t.Run(sourceURL, func(t *testing.T) {
+			want := sourceURL
+			if sourceURL == avatarPath {
+				want = serverURL + avatarPath
+			}
+			conversation := appservice.InboxConversation{Direct: &appservice.DirectInboxConversation{PeerAvatarURL: sourceURL}}
+			message := appservice.ConversationMessage{
+				Sender:  &appservice.ConversationMessageSender{AvatarURL: sourceURL},
+				ReplyTo: &appservice.ConversationMessageReference{Sender: &appservice.ConversationMessageSender{AvatarURL: sourceURL}},
+			}
+			inbox := appservice.Inbox{Conversations: []appservice.InboxConversation{conversation}}
+			lookup := appservice.DirectConversationLookup{Conversation: &conversation}
+			first := appservice.FirstDirectTextMessageResult{Conversation: conversation, Message: message}
+			history := appservice.ConversationMessageList{Messages: []appservice.ConversationMessage{message}}
+			for _, output := range []any{&inbox, &lookup, &first, &history, &message} {
+				// 每次恢复相对地址，验证各响应入口都完成转换。
+				conversation.Direct.PeerAvatarURL = sourceURL
+				message.Sender.AvatarURL = sourceURL
+				message.ReplyTo.Sender.AvatarURL = sourceURL
+				backend.normalizeOutput(output)
+				switch output.(type) {
+				case *appservice.Inbox, *appservice.DirectConversationLookup, *appservice.FirstDirectTextMessageResult:
+					if conversation.Direct.PeerAvatarURL != want {
+						t.Fatalf("%T peer avatar=%q, want=%q", output, conversation.Direct.PeerAvatarURL, want)
+					}
+				}
+				switch output.(type) {
+				case *appservice.FirstDirectTextMessageResult, *appservice.ConversationMessageList, *appservice.ConversationMessage:
+					if message.Sender.AvatarURL != want || message.ReplyTo.Sender.AvatarURL != want {
+						t.Fatalf("%T sender=%q reply=%q, want=%q", output, message.Sender.AvatarURL, message.ReplyTo.Sender.AvatarURL, want)
+					}
+				}
+			}
+		})
+	}
+}

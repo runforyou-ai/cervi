@@ -12,13 +12,15 @@ import (
 )
 
 type messageReferenceRow struct {
-	Deleted       bool    `bun:"deleted"`
-	MessageID     string  `bun:"message_id"`
-	Body          string  `bun:"body"`
-	ChatSubjectID *string `bun:"chat_subject_id"`
-	Kind          *string `bun:"kind"`
-	SourceID      *string `bun:"source_id"`
-	DisplayName   *string `bun:"display_name"`
+	Deleted       bool                             `bun:"deleted"`
+	MessageID     string                           `bun:"message_id"`
+	Body          string                           `bun:"body"`
+	ChatSubjectID *string                          `bun:"chat_subject_id"`
+	Kind          *string                          `bun:"kind"`
+	SourceID      *string                          `bun:"source_id"`
+	DisplayName   *string                          `bun:"display_name"`
+	AvatarFileID  *string                          `bun:"avatar_file_id"`
+	IdentityType  *domain.OrganizationIdentityType `bun:"identity_type"`
 }
 
 // loadConversationReplyTarget 校验并读取同一会话中的文本引用目标。
@@ -48,6 +50,8 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		ColumnExpr("cs.kind AS kind").
 		ColumnExpr("cs.source_id AS source_id").
 		ColumnExpr("oi.display_name AS display_name").
+		ColumnExpr("oi.avatar_file_id AS avatar_file_id").
+		ColumnExpr("oi.type AS identity_type").
 		Join("LEFT JOIN conversation_participants AS cp ON cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id AND cp.id = msg.sender_participant_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
@@ -69,7 +73,7 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		ID: row.MessageID, Body: row.Body,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: *row.ChatSubjectID, Kind: domain.ChatSubjectKind(*row.Kind),
-			SourceID: *row.SourceID, DisplayName: row.DisplayName,
+			SourceID: *row.SourceID, DisplayName: row.DisplayName, AvatarFileID: row.AvatarFileID, IdentityType: row.IdentityType,
 		},
 	}, nil
 }

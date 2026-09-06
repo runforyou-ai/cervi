@@ -91,6 +91,7 @@ type DirectInboxConversation struct {
 	PeerIdentityID string                   `json:"peerIdentityId"`
 	PeerType       OrganizationIdentityType `json:"peerType"`
 	PeerName       string                   `json:"peerName"`
+	PeerAvatarURL  string                   `json:"peerAvatarUrl"`
 	Preview        *string                  `json:"preview"`
 	LastMessageAt  *time.Time               `json:"lastMessageAt"`
 	AgentRunStatus *AgentRunStatus          `json:"agentRunStatus"`
