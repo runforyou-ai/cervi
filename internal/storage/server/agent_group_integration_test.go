@@ -4,7 +4,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -125,6 +124,10 @@ func testAgentGroupMentions(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		f := newGroupAgentFixture(t, db, identity, roleID, providerID, modelID)
 		testGroupAgentTriggers(t, f)
 	})
+	t.Run("多轮回复保持标准消息", func(t *testing.T) {
+		f := newGroupAgentFixture(t, db, identity, roleID, providerID, modelID)
+		testGroupAgentMessageHistory(t, f)
+	})
 	t.Run("移除后重新加入", func(t *testing.T) {
 		f := newGroupAgentFixture(t, db, identity, roleID, providerID, modelID)
 		testGroupAgentRemoval(t, f)
@@ -169,17 +172,14 @@ func testGroupAgentTriggers(t *testing.T, f *groupAgentFixture) {
 		if err != nil {
 			return agentruntime.RunResult{}, err
 		}
-		var content struct {
-			Body, SenderIdentityID, SenderName string
-			MentionAll                         bool
-			MentionIdentityIDs                 []string
-			ReplyTo                            *claimedGroupReply
+		message := claimed.Messages[len(claimed.Messages)-1]
+		if message.Role != agentruntime.MessageRoleUser || message.Name != f.identity.OrganizationIdentity.ID || !strings.HasSuffix(message.Content, "\n\n"+input.Body) {
+			t.Fatalf("context=%+v", message)
 		}
-		if err := json.Unmarshal([]byte(claimed.Messages[len(claimed.Messages)-1].Content), &content); err != nil {
-			t.Fatal(err)
-		}
-		if content.Body != input.Body || !content.MentionAll || len(content.MentionIdentityIDs) != 1 || content.SenderIdentityID != f.identity.OrganizationIdentity.ID || content.SenderName == "" || content.ReplyTo == nil || content.ReplyTo.MessageID != ordinary.ID {
-			t.Fatalf("context=%+v", content)
+		for _, expected := range []string{"发言者：", "提醒：所有人", "提醒身份：" + f.agents[0].IdentityID, "引用消息 " + ordinary.ID, ordinary.Body} {
+			if !strings.Contains(message.Content, expected) {
+				t.Fatalf("context missing %q: %+v", expected, message)
+			}
 		}
 		if calls == 1 {
 			if !strings.Contains(request.Instruction, f.agents[0].IdentityID) {
@@ -248,7 +248,61 @@ func testGroupAgentTriggers(t *testing.T, f *groupAgentFixture) {
 	}
 }
 
-type claimedGroupReply struct{ MessageID string }
+// testGroupAgentMessageHistory 验证当前 Agent 的历史回答原样输入，其他 Agent 按群成员区分。
+func testGroupAgentMessageHistory(t *testing.T, f *groupAgentFixture) {
+	ctx := context.Background()
+	replies := []string{"晚上好呀！🌙", `{"body":"用户要求的 JSON","senderName":"示例"}`}
+	for round, reply := range replies {
+		f.message("请继续", true)
+		for agentIndex := range 2 {
+			runtime := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+				claimed, err := claimGroupAgentInput(ctx, feed)
+				if err != nil {
+					return agentruntime.RunResult{}, err
+				}
+				own, other := 0, 0
+				for _, message := range claimed.Messages {
+					switch message.Name {
+					case f.agents[agentIndex].IdentityID:
+						if message.Role != agentruntime.MessageRoleAssistant || message.Content != replies[own] {
+							t.Fatalf("own history=%+v", message)
+						}
+						own++
+					case f.agents[1-agentIndex].IdentityID:
+						if message.Role != agentruntime.MessageRoleUser || !strings.HasSuffix(message.Content, "\n\n"+replies[other]) {
+							t.Fatalf("other history=%+v", message)
+						}
+						other++
+					}
+				}
+				if own != round || other != round {
+					t.Fatalf("round=%d own=%d other=%d", round, own, other)
+				}
+				return agentruntime.RunResult{Content: reply, EndSeq: claimed.EndSeq}, nil
+			}}
+			run := f.queued(agentIndex)
+			if err := agentrunaction.NewExecuteAction(f.db, f.tasks, runtime, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	// 再次提醒时，JSON 也是正文，不作为业务消息外壳解析。
+	f.message("继续检查历史", false, f.subjects[0])
+	execute := agentrunaction.NewExecuteAction(f.db, f.tasks, testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+		claimed, err := claimGroupAgentInput(ctx, feed)
+		if err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		message := claimed.Messages[4]
+		if message.Role != agentruntime.MessageRoleAssistant || message.Name != f.agents[0].IdentityID || message.Content != replies[1] {
+			t.Fatalf("JSON history=%+v", message)
+		}
+		return agentruntime.RunResult{Content: "完成", EndSeq: claimed.EndSeq}, nil
+	}}, nil)
+	if err := execute.Execute(ctx, agentrunaction.RunInput{RunID: f.queued(0).ID}); err != nil {
+		t.Fatal(err)
+	}
+}
 
 // testGroupAgentRemoval 验证移除和重新加入后旧运行不能回复或消费新提醒。
 func testGroupAgentRemoval(t *testing.T, f *groupAgentFixture) {

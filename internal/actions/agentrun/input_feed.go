@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -332,32 +333,52 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		if row.SenderSourceID == run.AgentIdentityID {
 			role = agentruntime.MessageRoleAssistant
 		}
+		// 群聊身份使用标准消息 Name，当前 Agent 的历史回答保持原文。
+		if group {
+			message := agentruntime.Message{Role: role, Name: row.SenderSourceID, Content: row.Body}
+			if role == agentruntime.MessageRoleUser {
+				message.Content = groupMessageContent(row)
+			}
+			messages = append(messages, message)
+			continue
+		}
 		content := row.Body
-		// 群聊标明发言者和提醒对象，引用只附带一层原消息。
-		if group || row.ReplyToMessageID != nil {
-			var reference *claimedMessageReference
-			if row.ReplyToMessageID != nil {
-				reference = &claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
-				if !row.ReplyDeleted {
-					reference.SenderID, reference.SenderName, reference.Body = row.ReplySenderID, row.ReplySenderName, row.ReplyBody
-				}
+		// 单聊引用只附带一层原消息。
+		if row.ReplyToMessageID != nil {
+			reference := &claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
+			if !row.ReplyDeleted {
+				reference.SenderID, reference.SenderName, reference.Body = row.ReplySenderID, row.ReplySenderName, row.ReplyBody
 			}
 			payload := struct {
-				Body               string                   `json:"body"`
-				SenderID           string                   `json:"senderIdentityId,omitempty"`
-				SenderName         string                   `json:"senderName,omitempty"`
-				MentionAll         bool                     `json:"mentionAll,omitempty"`
-				MentionIdentityIDs []string                 `json:"mentionIdentityIds,omitempty"`
-				ReplyTo            *claimedMessageReference `json:"replyTo,omitempty"`
+				Body    string                   `json:"body"`
+				ReplyTo *claimedMessageReference `json:"replyTo,omitempty"`
 			}{Body: row.Body, ReplyTo: reference}
-			if group {
-				payload.SenderID, payload.SenderName = row.SenderSourceID, row.SenderName
-				payload.MentionAll, payload.MentionIdentityIDs = row.MentionAll, row.MentionIdentityIDs
-			}
 			encoded, _ := json.Marshal(payload)
 			content = string(encoded)
 		}
 		messages = append(messages, agentruntime.Message{Role: role, Content: content})
 	}
 	return messages, nil
+}
+
+// groupMessageContent 为其他成员的正文附带群聊提醒和一层引用上下文。
+func groupMessageContent(row claimedMessageRow) string {
+	var content strings.Builder
+	fmt.Fprintf(&content, "发言者：%q\n", row.SenderName)
+	if row.MentionAll {
+		content.WriteString("提醒：所有人\n")
+	}
+	if len(row.MentionIdentityIDs) > 0 {
+		fmt.Fprintf(&content, "提醒身份：%s\n", strings.Join(row.MentionIdentityIDs, "、"))
+	}
+	if row.ReplyToMessageID != nil {
+		if row.ReplyDeleted {
+			fmt.Fprintf(&content, "引用消息 %s：已删除\n", *row.ReplyToMessageID)
+		} else {
+			fmt.Fprintf(&content, "引用消息 %s（发言者 %q，身份 %s）：%q\n", *row.ReplyToMessageID, row.ReplySenderName, row.ReplySenderID, row.ReplyBody)
+		}
+	}
+	content.WriteString("\n")
+	content.WriteString(row.Body)
+	return content.String()
 }

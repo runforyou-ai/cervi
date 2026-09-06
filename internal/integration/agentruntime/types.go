@@ -20,6 +20,7 @@ const (
 // Message 定义与具体 Agent SDK 无关的上下文消息。
 type Message struct {
 	Role    MessageRole
+	Name    string
 	Content string
 }
 
