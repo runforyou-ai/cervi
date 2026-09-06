@@ -48,7 +48,7 @@ type AgentToolCall struct {
 	Status    AgentToolCallStatus `json:"status"`
 }
 
-// ConversationAgentRun 定义消息窗口中的最近一次运行状态。
+// ConversationAgentRun 定义消息窗口中一位 Agent 的最近运行状态。
 type ConversationAgentRun struct {
 	AgentName string         `json:"agentName"`
 	ID        string         `json:"id"`

@@ -221,12 +221,12 @@ type ConversationMessageHistoryInput struct {
 
 // ConversationMessageHistory 定义成员消息历史和下一页边界。
 type ConversationMessageHistory struct {
-	LatestAgentRun *ConversationAgentRun
-	HasEarlier     bool
-	HasLater       bool
-	Messages       []ConversationMessage
-	Before         *MessageCursorPoint
-	After          *MessageCursorPoint
+	LatestAgentRuns []ConversationAgentRun
+	HasEarlier      bool
+	HasLater        bool
+	Messages        []ConversationMessage
+	Before          *MessageCursorPoint
+	After           *MessageCursorPoint
 }
 
 // ConversationAgentProcess 定义成功回复的完整过程和模型用量。
@@ -336,6 +336,7 @@ type GroupConversationSummary struct {
 
 // GroupParticipant 定义群聊中的当前有效成员。
 type GroupParticipant struct {
+	IdentityType  domain.OrganizationIdentityType `json:"identityType"`
 	ChatSubjectID string
 	IdentityID    string
 	DisplayName   string

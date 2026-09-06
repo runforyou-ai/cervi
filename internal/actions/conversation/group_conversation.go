@@ -40,7 +40,13 @@ type GetGroupConversationQuery struct {
 
 // SendGroupTextMessageAction 持久化企业内部群聊文本消息。
 type SendGroupTextMessageAction struct {
-	db *bun.DB
+	db             *bun.DB
+	agentScheduler GroupAgentMessageScheduler
+}
+
+// GroupAgentMessageScheduler 把群聊中的结构化提醒加入 Agent 输入流。
+type GroupAgentMessageScheduler interface {
+	ScheduleGroupMentions(context.Context, bun.IDB, string, string, string, []string, bool) error
 }
 
 type groupMemberRow struct {
@@ -50,11 +56,12 @@ type groupMemberRow struct {
 }
 
 type groupParticipantRow struct {
-	ChatSubjectID string  `bun:"chat_subject_id"`
-	IdentityID    string  `bun:"identity_id"`
-	DisplayName   string  `bun:"display_name"`
-	AvatarFileID  *string `bun:"avatar_file_id"`
-	Role          string  `bun:"role"`
+	IdentityType  domain.OrganizationIdentityType `bun:"identity_type"`
+	ChatSubjectID string                          `bun:"chat_subject_id"`
+	IdentityID    string                          `bun:"identity_id"`
+	DisplayName   string                          `bun:"display_name"`
+	AvatarFileID  *string                         `bun:"avatar_file_id"`
+	Role          string                          `bun:"role"`
 }
 
 type groupSendContextRow struct {
@@ -74,11 +81,11 @@ func NewGetGroupConversationQuery(db *bun.DB) *GetGroupConversationQuery {
 }
 
 // NewSendGroupTextMessageAction 创建群聊文本发送操作。
-func NewSendGroupTextMessageAction(db *bun.DB) *SendGroupTextMessageAction {
-	return &SendGroupTextMessageAction{db: db}
+func NewSendGroupTextMessageAction(db *bun.DB, scheduler GroupAgentMessageScheduler) *SendGroupTextMessageAction {
+	return &SendGroupTextMessageAction{db: db, agentScheduler: scheduler}
 }
 
-// Execute 创建只包含有效真人成员的企业内部群聊。
+// Execute 创建包含有效企业成员的企业内部群聊。
 func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationInput) (GroupConversationSummary, error) {
 	normalized, fields := normalizeGroupConversationInput(identity.OrganizationIdentity.ID, input)
 	if len(fields) > 0 {
@@ -219,7 +226,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ColumnExpr("cs.source_id AS identity_id").
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
-		ColumnExpr("cp.role AS role").
+		ColumnExpr("cp.role AS role, oi.type AS identity_type").
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id").
 		Where("cp.organization_id = ?", identity.Organization.ID).
@@ -232,8 +239,8 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 	participants := make([]GroupParticipant, 0, len(rows))
 	for _, row := range rows {
 		participants = append(participants, GroupParticipant{
-			ChatSubjectID: row.ChatSubjectID,
-			IdentityID:    row.IdentityID, DisplayName: row.DisplayName,
+			ChatSubjectID: row.ChatSubjectID, IdentityType: row.IdentityType,
+			IdentityID: row.IdentityID, DisplayName: row.DisplayName,
 			AvatarFileID: row.AvatarFileID, Role: domain.ConversationParticipantRole(row.Role),
 		})
 	}
@@ -296,6 +303,11 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 		}
 		if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
 			return err
+		}
+		if a.agentScheduler != nil {
+			if err := a.agentScheduler.ScheduleGroupMentions(ctx, tx, identity.Organization.ID, normalized.ConversationID, message.ID, normalized.MentionSubjectIDs, normalized.MentionAll); err != nil {
+				return err
+			}
 		}
 		conversation := &servermodels.Conversation{ID: normalized.ConversationID, OrganizationID: identity.Organization.ID}
 		if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
@@ -398,7 +410,7 @@ func normalizeGroupConversationInput(currentIdentityID string, input GroupConver
 	return input, fields
 }
 
-// loadActiveGroupMembers 读取同企业可加入群聊的有效真人成员。
+// loadActiveGroupMembers 读取同企业可加入群聊的有效真人和 AI 员工。
 func loadActiveGroupMembers(ctx context.Context, db bun.IDB, organizationID string, identityIDs []string) ([]groupMemberRow, error) {
 	rows := make([]groupMemberRow, 0, len(identityIDs))
 	if err := db.NewSelect().
@@ -406,9 +418,10 @@ func loadActiveGroupMembers(ctx context.Context, db bun.IDB, organizationID stri
 		ColumnExpr("oi.id AS identity_id").
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
-		Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id AND u.status = ?", domain.UserStatusActive).
+		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ?", organizationID).
-		Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
+		Where("(oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?)", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
 		Where("oi.id IN (?)", bun.In(identityIDs)).
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Scan(ctx, &rows); err != nil {

@@ -209,7 +209,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		removeGroupConversationMember:     conversationaction.NewRemoveGroupConversationMemberAction(db),
 		transferGroupConversationOwner:    conversationaction.NewTransferGroupConversationOwnerAction(db),
 		leaveGroupConversation:            conversationaction.NewLeaveGroupConversationAction(db),
-		sendGroupTextMessage:              conversationaction.NewSendGroupTextMessageAction(db),
+		sendGroupTextMessage:              conversationaction.NewSendGroupTextMessageAction(db, agentScheduler),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
 		getTelegramChannel:                channelaction.NewGetTelegramChannelQuery(db),

@@ -361,7 +361,7 @@ func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identit
 	participants := make([]GroupParticipant, 0, len(record.Participants))
 	for _, participant := range record.Participants {
 		participants = append(participants, GroupParticipant{
-			ChatSubjectID: participant.ChatSubjectID, IdentityID: participant.IdentityID, DisplayName: participant.DisplayName,
+			ChatSubjectID: participant.ChatSubjectID, IdentityType: OrganizationIdentityType(participant.IdentityType), IdentityID: participant.IdentityID, DisplayName: participant.DisplayName,
 			AvatarURL: optionalFileURL(avatarURLs, participant.AvatarFileID), Role: GroupParticipantRole(participant.Role),
 		})
 	}
@@ -765,8 +765,9 @@ func (b *DirectBackend) conversationMessageListFromAction(ctx context.Context, m
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
-	if run := history.LatestAgentRun; run != nil {
-		result.LatestAgentRun = &ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError}
+	result.LatestAgentRuns = make([]ConversationAgentRun, 0, len(history.LatestAgentRuns))
+	for _, run := range history.LatestAgentRuns {
+		result.LatestAgentRuns = append(result.LatestAgentRuns, ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError})
 	}
 	for _, message := range history.Messages {
 		result.Messages = append(result.Messages, conversationMessageFromAction(message, avatarURLs))

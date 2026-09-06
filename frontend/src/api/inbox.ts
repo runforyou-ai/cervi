@@ -71,9 +71,10 @@ export type InboxData = Omit<Inbox, "conversations"> & {
 
 export type ConversationMessageListData = Omit<
   ConversationMessageList,
-  "messages"
+  "messages" | "latestAgentRuns"
 > & {
   messages: ConversationMessageData[]
+  latestAgentRuns: NonNullable<ConversationMessageList["latestAgentRuns"]>
 }
 
 export type ConversationAgentProcessData = Omit<ConversationAgentProcess, "blocks"> & {
@@ -282,6 +283,7 @@ export async function listConversationMessages(
   return {
     ...result,
     messages: asList(result.messages).map(normalizeConversationMessage),
+    latestAgentRuns: asList(result.latestAgentRuns),
   }
 }
 
@@ -423,6 +425,7 @@ export async function getConversationMessageContext(
   return {
     ...result,
     messages: asList(result.messages).map(normalizeConversationMessage),
+    latestAgentRuns: asList(result.latestAgentRuns),
   }
 }
 

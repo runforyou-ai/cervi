@@ -22,6 +22,8 @@ var errAgentRunSuppressed = errors.New("agent run suppressed")
 
 type agentRunPolicyContext struct {
 	ServiceSession *servermodels.ServiceSession
+	Group          *servermodels.Conversation
+	GroupAgent     *groupAgentEligibility
 }
 
 type agentRunPolicy interface {
@@ -168,7 +170,7 @@ func agentRunScopeFor(run *servermodels.AgentRun) (agentRunScope, error) {
 // validateAgentRunScope 校验运行类型和客服周期字段保持一致。
 func validateAgentRunScope(triggerType domain.AgentTriggerType, serviceSessionID *string) error {
 	switch triggerType {
-	case domain.AgentTriggerTypeDirect:
+	case domain.AgentTriggerTypeDirect, domain.AgentTriggerTypeMention:
 		if serviceSessionID != nil {
 			return errors.New("direct agent run cannot belong to a service session")
 		}
@@ -236,9 +238,10 @@ func assignAgentTriggers(ctx context.Context, db bun.IDB, run *servermodels.Agen
 }
 
 type messageBoundary struct {
-	OriginatedAt time.Time `bun:"originated_at"`
-	SourceOrder  int64     `bun:"source_order"`
-	ID           string    `bun:"id"`
+	OriginatedAt         time.Time `bun:"originated_at"`
+	SourceOrder          int64     `bun:"source_order"`
+	ID                   string    `bun:"id"`
+	GroupMessageSequence *int64    `bun:"group_message_sequence"`
 }
 
 // loadClaimedMessageBoundary 读取一次已认领输入对应的稳定消息边界。
@@ -249,7 +252,7 @@ func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermode
 	}
 	boundary := messageBoundary{}
 	query := db.NewSelect().TableExpr("conversation_agent_triggers AS cat").
-		ColumnExpr("msg.originated_at, msg.source_order, msg.id").
+		ColumnExpr("msg.originated_at, msg.source_order, msg.id, msg.group_message_sequence").
 		Join("JOIN messages AS msg ON msg.id = cat.trigger_message_id AND msg.organization_id = cat.organization_id AND msg.conversation_id = cat.conversation_id").
 		Where("cat.organization_id = ?", run.OrganizationID).
 		Where("cat.conversation_id = ?", run.ConversationID).
@@ -263,13 +266,16 @@ func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermode
 }
 
 type claimedMessageRow struct {
-	Body             string  `bun:"body"`
-	SenderSourceID   string  `bun:"sender_source_id"`
-	ReplyToMessageID *string `bun:"reply_to_message_id"`
-	ReplyBody        string  `bun:"reply_body"`
-	ReplySenderID    string  `bun:"reply_sender_id"`
-	ReplySenderName  string  `bun:"reply_sender_name"`
-	ReplyDeleted     bool    `bun:"reply_deleted"`
+	SenderName         string   `bun:"sender_name"`
+	MentionAll         bool     `bun:"mention_all"`
+	MentionIdentityIDs []string `bun:"mention_identity_ids,type:jsonb"`
+	Body               string   `bun:"body"`
+	SenderSourceID     string   `bun:"sender_source_id"`
+	ReplyToMessageID   *string  `bun:"reply_to_message_id"`
+	ReplyBody          string   `bun:"reply_body"`
+	ReplySenderID      string   `bun:"reply_sender_id"`
+	ReplySenderName    string   `bun:"reply_sender_name"`
+	ReplyDeleted       bool     `bun:"reply_deleted"`
 }
 
 type claimedMessageReference struct {
@@ -287,7 +293,7 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		return nil, err
 	}
 	rows := make([]claimedMessageRow, 0, agentHistoryLimit)
-	if err := db.NewSelect().TableExpr("messages AS msg").
+	query := db.NewSelect().TableExpr("messages AS msg").
 		ColumnExpr("msg.body").
 		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("msg.reply_to_message_id").
@@ -304,11 +310,19 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
 		Where("msg.type = ?", domain.MessageTypeText).
-		Where("msg.deleted_at IS NULL").
-		Where("(msg.originated_at, msg.source_order, msg.id) <= (?, ?, ?)", boundary.OriginatedAt, boundary.SourceOrder, boundary.ID).
-		OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC").
-		Limit(agentHistoryLimit).
-		Scan(ctx, &rows); err != nil {
+		Where("msg.deleted_at IS NULL").Limit(agentHistoryLimit)
+	group := run.TriggerType == string(domain.AgentTriggerTypeMention)
+	if group {
+		query = query.ColumnExpr("sender_oi.display_name AS sender_name, msg.mention_all").
+			ColumnExpr("COALESCE((SELECT jsonb_agg(mentioned.source_id ORDER BY mentioned.source_id) FROM message_mentions AS mm JOIN chat_subjects AS mentioned ON mentioned.id = mm.subject_id AND mentioned.organization_id = mm.organization_id WHERE mm.organization_id = msg.organization_id AND mm.message_id = msg.id), '[]'::jsonb) AS mention_identity_ids").
+			Join("JOIN organization_identities AS sender_oi ON sender_oi.organization_id = cs.organization_id AND sender_oi.id = cs.source_id").
+			Where("msg.group_message_sequence <= ?", boundary.GroupMessageSequence).
+			OrderExpr("msg.group_message_sequence DESC")
+	} else {
+		query = query.Where("(msg.originated_at, msg.source_order, msg.id) <= (?, ?, ?)", boundary.OriginatedAt, boundary.SourceOrder, boundary.ID).
+			OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC")
+	}
+	if err := query.Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("load claimed conversation context: %w", err)
 	}
 	slices.Reverse(rows)
@@ -319,16 +333,28 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 			role = agentruntime.MessageRoleAssistant
 		}
 		content := row.Body
-		// 以结构化正文携带一层引用，原消息不占用新的对话角色。
-		if row.ReplyToMessageID != nil {
-			reference := claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
-			if !row.ReplyDeleted {
-				reference.SenderID, reference.SenderName, reference.Body = row.ReplySenderID, row.ReplySenderName, row.ReplyBody
+		// 群聊标明发言者和提醒对象，引用只附带一层原消息。
+		if group || row.ReplyToMessageID != nil {
+			var reference *claimedMessageReference
+			if row.ReplyToMessageID != nil {
+				reference = &claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
+				if !row.ReplyDeleted {
+					reference.SenderID, reference.SenderName, reference.Body = row.ReplySenderID, row.ReplySenderName, row.ReplyBody
+				}
 			}
-			encoded, _ := json.Marshal(struct {
-				Body    string                  `json:"body"`
-				ReplyTo claimedMessageReference `json:"replyTo"`
-			}{Body: row.Body, ReplyTo: reference})
+			payload := struct {
+				Body               string                   `json:"body"`
+				SenderID           string                   `json:"senderIdentityId,omitempty"`
+				SenderName         string                   `json:"senderName,omitempty"`
+				MentionAll         bool                     `json:"mentionAll,omitempty"`
+				MentionIdentityIDs []string                 `json:"mentionIdentityIds,omitempty"`
+				ReplyTo            *claimedMessageReference `json:"replyTo,omitempty"`
+			}{Body: row.Body, ReplyTo: reference}
+			if group {
+				payload.SenderID, payload.SenderName = row.SenderSourceID, row.SenderName
+				payload.MentionAll, payload.MentionIdentityIDs = row.MentionAll, row.MentionIdentityIDs
+			}
+			encoded, _ := json.Marshal(payload)
 			content = string(encoded)
 		}
 		messages = append(messages, agentruntime.Message{Role: role, Content: content})

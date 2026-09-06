@@ -51,7 +51,7 @@ export function mergeConversationPage(
     ).values(),
   ].sort(compareConversationMessages)
   return {
-    latestAgentRun: page.latestAgentRun,
+    latestAgentRuns: page.latestAgentRuns,
     messages,
     before:
       direction === "before" ? (page.before ?? current.before) : current.before,

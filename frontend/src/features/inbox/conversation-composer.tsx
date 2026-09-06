@@ -23,6 +23,7 @@ import {
   type ConversationMessageData,
   type ConversationMessageReference,
   type DirectTextMessageInput,
+  OrganizationIdentityType,
   type GroupParticipant,
 } from "@/api"
 import { Button } from "@/components/ui/button"
@@ -543,6 +544,9 @@ export function ConversationComposer({
                 onClick={() => selectMention(candidate)}
               >
                 {candidate.displayName}
+                {candidate.kind === "member" && candidate.participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                  <span className="ml-2 text-xs text-muted-foreground">{t("groupAgent")}</span>
+                ) : null}
               </button>
             ))}
           </div>

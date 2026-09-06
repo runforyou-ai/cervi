@@ -606,7 +606,7 @@ export interface ConversationAgentProcess {
 }
 
 /**
- * ConversationAgentRun 定义消息窗口中的最近一次运行状态。
+ * ConversationAgentRun 定义消息窗口中一位 Agent 的最近运行状态。
  */
 export interface ConversationAgentRun {
     "agentName": string;
@@ -663,7 +663,7 @@ export interface ConversationMessage {
  * ConversationMessageList 定义成员消息页。
  */
 export interface ConversationMessageList {
-    "latestAgentRun": ConversationAgentRun | null;
+    "latestAgentRuns": ConversationAgentRun[] | null;
     "hasEarlier": boolean;
     "hasLater": boolean;
     "messages": ConversationMessage[] | null;
@@ -1150,6 +1150,7 @@ export interface GroupInboxConversation {
  * GroupParticipant 定义群聊当前有效成员。
  */
 export interface GroupParticipant {
+    "identityType": OrganizationIdentityType;
     "chatSubjectId": string;
     "identityId": string;
     "displayName": string;

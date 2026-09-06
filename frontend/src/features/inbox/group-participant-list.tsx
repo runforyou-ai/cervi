@@ -11,6 +11,7 @@ import { toast } from "sonner"
 
 import {
   GroupParticipantRole,
+  OrganizationIdentityType,
   isApiError,
   type GroupParticipant,
   type MemberOption,
@@ -56,6 +57,11 @@ function GroupParticipantAvatar({
     <ProfileAvatar
       imageURL={participant.avatarUrl}
       name={participant.displayName}
+      fallback={
+        participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
+          ? "agent"
+          : "person"
+      }
       className="size-9"
     />
   )
@@ -106,7 +112,9 @@ export function GroupParticipantList({
     [normalizedQuery, participants],
   )
   const successorCandidates = participants.filter(
-    (participant) => participant.identityId !== currentIdentityID,
+    (participant) =>
+      participant.identityId !== currentIdentityID &&
+      participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeUser,
   )
   const leavingAsOwner =
     leaving?.role === GroupParticipantRole.GroupParticipantRoleOwner
@@ -239,6 +247,9 @@ export function GroupParticipantList({
                       </span>
                     ) : null}
                   </span>
+                  {participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">{t("groupAgent")}</span>
+                  ) : null}
                   {isOwner ? (
                     <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                       <CrownIcon className="size-3.5" />
@@ -270,18 +281,20 @@ export function GroupParticipantList({
                               onSelect={() => setLeaving(participant)}
                             >
                               {t(
-                                isOwner && participants.length === 1
+                                isOwner && successorCandidates.length === 0
                                   ? "groupDissolve"
                                   : "groupLeave",
                               )}
                             </DropdownMenuItem>
                           ) : (
                             <>
-                              <DropdownMenuItem
-                                onSelect={() => setTransferring(participant)}
-                              >
-                                {t("groupTransferOwner")}
-                              </DropdownMenuItem>
+                              {participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeUser ? (
+                                <DropdownMenuItem
+                                  onSelect={() => setTransferring(participant)}
+                                >
+                                  {t("groupTransferOwner")}
+                                </DropdownMenuItem>
+                              ) : null}
                               <DropdownMenuItem
                                 destructive
                                 onSelect={() => setRemoving(participant)}

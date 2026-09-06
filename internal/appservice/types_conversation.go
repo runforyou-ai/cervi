@@ -143,12 +143,12 @@ type ConversationMessage struct {
 
 // ConversationMessageList 定义成员消息页。
 type ConversationMessageList struct {
-	LatestAgentRun *ConversationAgentRun `json:"latestAgentRun"`
-	HasEarlier     bool                  `json:"hasEarlier"`
-	HasLater       bool                  `json:"hasLater"`
-	Messages       []ConversationMessage `json:"messages"`
-	Before         *string               `json:"before"`
-	After          *string               `json:"after"`
+	LatestAgentRuns []ConversationAgentRun `json:"latestAgentRuns"`
+	HasEarlier      bool                   `json:"hasEarlier"`
+	HasLater        bool                   `json:"hasLater"`
+	Messages        []ConversationMessage  `json:"messages"`
+	Before          *string                `json:"before"`
+	After           *string                `json:"after"`
 }
 
 // MarkConversationReadInput 定义用户确认已读的消息水位。
@@ -226,11 +226,12 @@ type GroupConversationLeaveInput struct {
 
 // GroupParticipant 定义群聊当前有效成员。
 type GroupParticipant struct {
-	ChatSubjectID string               `json:"chatSubjectId"`
-	IdentityID    string               `json:"identityId"`
-	DisplayName   string               `json:"displayName"`
-	AvatarURL     string               `json:"avatarUrl"`
-	Role          GroupParticipantRole `json:"role"`
+	IdentityType  OrganizationIdentityType `json:"identityType"`
+	ChatSubjectID string                   `json:"chatSubjectId"`
+	IdentityID    string                   `json:"identityId"`
+	DisplayName   string                   `json:"displayName"`
+	AvatarURL     string                   `json:"avatarUrl"`
+	Role          GroupParticipantRole     `json:"role"`
 }
 
 // GroupConversation 定义群聊资料和当前有效成员。

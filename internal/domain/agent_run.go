@@ -15,6 +15,7 @@ const (
 type AgentTriggerType string
 
 const (
+	AgentTriggerTypeMention      AgentTriggerType = "mention"
 	AgentTriggerTypeDirect       AgentTriggerType = "agent_direct"
 	AgentTriggerTypeCustomerAuto AgentTriggerType = "customer_auto"
 )
@@ -23,6 +24,9 @@ const (
 type AgentRunErrorCode string
 
 const (
-	AgentRunErrorCodeAssigneeChanged AgentRunErrorCode = "assignee_changed"
-	AgentRunErrorCodeSessionClosed   AgentRunErrorCode = "session_closed"
+	AgentRunErrorCodeGroupMemberRemoved AgentRunErrorCode = "group_member_removed"
+	AgentRunErrorCodeGroupArchived      AgentRunErrorCode = "group_archived"
+	AgentRunErrorCodeAgentInactive      AgentRunErrorCode = "agent_inactive"
+	AgentRunErrorCodeAssigneeChanged    AgentRunErrorCode = "assignee_changed"
+	AgentRunErrorCodeSessionClosed      AgentRunErrorCode = "session_closed"
 )

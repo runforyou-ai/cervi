@@ -95,6 +95,10 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		return task.Permanent(err)
 	}
 	feed := &databaseInputFeed{db: a.db, execution: execution, policy: policy}
+	if execution.Run.TriggerType == string(domain.AgentTriggerTypeMention) {
+		// 群聊输入使用身份编号区分同名成员，明确当前 Agent 对应的提醒对象。
+		execution.Instruction += fmt.Sprintf("\n你正在企业群聊中回复提醒你的消息。你的身份编号是 %s。上下文中的 senderIdentityId、senderName、mentionIdentityIds 和 mentionAll 表示发言者与提醒对象，body 是消息正文。", execution.Run.AgentIdentityID)
+	}
 	// 空绑定不注册知识检索；非空绑定只从本次 Run 的版本加载。
 	var knowledgeSearch agentruntime.KnowledgeSearch
 	if len(execution.KnowledgeBaseIDs) > 0 {
@@ -253,6 +257,8 @@ func (a *ExecuteAction) policyForRun(run *servermodels.AgentRun) (agentRunPolicy
 	switch domain.AgentTriggerType(run.TriggerType) {
 	case domain.AgentTriggerTypeDirect:
 		return directRunPolicy{enqueuer: a.enqueuer}, scope, nil
+	case domain.AgentTriggerTypeMention:
+		return groupRunPolicy{enqueuer: a.enqueuer}, scope, nil
 	case domain.AgentTriggerTypeCustomerAuto:
 		return customerRunPolicy{enqueuer: a.enqueuer}, scope, nil
 	default:

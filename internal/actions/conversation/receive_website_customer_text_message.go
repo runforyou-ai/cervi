@@ -46,8 +46,9 @@ type CustomerAgentMessageScheduler interface {
 	ScheduleCustomerAuto(context.Context, bun.IDB, string, string, string, string) (bool, error)
 }
 
-// AgentMessageScheduler 同时调度内部单聊和网站客户 Agent 输入。
+// AgentMessageScheduler 统一调度内部单聊、群聊提醒和网站客户 Agent 输入。
 type AgentMessageScheduler interface {
+	GroupAgentMessageScheduler
 	DirectAgentMessageScheduler
 	CustomerAgentMessageScheduler
 }

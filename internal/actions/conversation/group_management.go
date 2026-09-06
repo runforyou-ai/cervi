@@ -15,6 +15,7 @@ import (
 
 	"uuid"
 
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -146,7 +147,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 	return result, nil
 }
 
-// Execute 增加有效真人成员，重新加入时复用原参与者行。
+// Execute 增加有效企业成员，重新加入时复用原参与者行。
 func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationMembersInput) (GroupConversation, error) {
 	conversationID, memberIDs, fields := normalizeGroupMembersInput(identity.OrganizationIdentity.ID, input.ConversationID, input.MemberIdentityIDs)
 	if len(fields) > 0 {
@@ -271,6 +272,9 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if target.Role == string(domain.ConversationParticipantRoleOwner) {
 			return &ConflictError{Reason: ConflictReasonGroupOwnerCannotBeRemoved}
 		}
+		if err := agentrunaction.CancelGroupRuns(ctx, tx, identity.Organization.ID, conversationID, memberID, domain.AgentRunErrorCodeGroupMemberRemoved); err != nil {
+			return err
+		}
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, target.ParticipantID); err != nil {
 			return err
 		}
@@ -331,7 +335,7 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 	return result, nil
 }
 
-// Execute 退出群聊，群主退出时转让群主或解散只有自己的群聊。
+// Execute 退出群聊，群主退出时转让群主或解散没有其他真人的群聊。
 func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationLeaveInput) error {
 	conversationID, valid := common.NormalizeUUID(input.ConversationID)
 	fields := map[string]ValidationCode{}
@@ -360,12 +364,19 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		}
 		if group.CurrentRole == string(domain.ConversationParticipantRoleOwner) {
 			if successorID == "" {
-				activeIdentityIDs, err := loadActiveGroupParticipantIdentityIDs(ctx, tx, identity.Organization.ID, conversationID)
+				// 只有真人可以接任群主，最后一位真人可直接解散含 Agent 的群聊。
+				otherUsers, err := tx.NewSelect().TableExpr("conversation_participants AS cp").
+					Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+					Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
+					Where("cp.organization_id = ? AND cp.conversation_id = ? AND cp.left_at IS NULL AND oi.id <> ?", identity.Organization.ID, conversationID, identity.OrganizationIdentity.ID).Exists(ctx)
 				if err != nil {
 					return err
 				}
-				if len(activeIdentityIDs) != 1 {
+				if otherUsers {
 					return &ConflictError{Reason: ConflictReasonGroupSuccessorRequired}
+				}
+				if err := agentrunaction.CancelGroupRuns(ctx, tx, identity.Organization.ID, conversationID, "", domain.AgentRunErrorCodeGroupArchived); err != nil {
+					return err
 				}
 				if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
 					Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),
