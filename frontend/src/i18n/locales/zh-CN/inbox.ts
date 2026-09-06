@@ -124,7 +124,7 @@ const inbox = {
   agentRunGroupMemberRemoved: "AI 员工已移出群聊",
   agentRunGroupArchived: "群聊已解散",
   agentRunAgentInactive: "AI 员工已停用",
-  agentRunQueued: "等待处理",
+  agentRunQueued: "思考中",
   agentRunRunning: "正在处理",
   agentRunFailed: "处理失败",
   agentRunCancelled: "已中断",

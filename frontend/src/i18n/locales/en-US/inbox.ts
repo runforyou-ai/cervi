@@ -127,7 +127,7 @@ const inbox = {
   agentRunGroupMemberRemoved: "AI employee removed from group",
   agentRunGroupArchived: "Group dissolved",
   agentRunAgentInactive: "AI employee deactivated",
-  agentRunQueued: "Waiting",
+  agentRunQueued: "Thinking",
   agentRunRunning: "Working",
   agentRunFailed: "Failed",
   agentRunCancelled: "Interrupted",
