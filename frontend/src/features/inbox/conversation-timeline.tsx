@@ -217,6 +217,8 @@ function ConversationTimelineContent({
   onReadMessage,
   readThroughMessageID,
   prepareSendRef,
+  mentionNavigation = true,
+  onUnavailable,
   enabled = true,
 }: {
   conversationID: string
@@ -232,6 +234,8 @@ function ConversationTimelineContent({
   onReadMessage?: (messageID: string) => void
   readThroughMessageID?: string | null
   prepareSendRef?: RefObject<(() => Promise<boolean>) | null>
+  mentionNavigation?: boolean
+  onUnavailable?: () => void
   enabled?: boolean
 }) {
   const currentIdentityID = currentUser.identityId
@@ -284,6 +288,10 @@ function ConversationTimelineContent({
 
   /** 当前成员失去会话访问权时恢复到会话列表。 */
   const handleUnavailable = useCallback(() => {
+    if (onUnavailable) {
+      onUnavailable()
+      return
+    }
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current)
@@ -292,10 +300,14 @@ function ConversationTimelineContent({
       },
       { replace: true },
     )
-  }, [setSearchParams])
+  }, [onUnavailable, setSearchParams])
+
   const mentions = useConversationMentionNavigation({
     conversationID,
-    enabled: conversationType === ConversationType.ConversationTypeGroup,
+    enabled:
+      enabled &&
+      mentionNavigation &&
+      conversationType === ConversationType.ConversationTypeGroup,
     pollingActive,
     root: scrollRootRef,
     page: currentPage,
@@ -985,8 +997,7 @@ function ConversationTimelineContent({
           ) : null}
         </div>
       </ScrollArea>
-      {workspaceLayout &&
-      timeline.pollingError &&
+      {timeline.pollingError &&
       timeline.mode === "latest" ? (
         <button
           type="button"

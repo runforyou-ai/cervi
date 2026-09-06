@@ -39,7 +39,6 @@ const mobile = {
   inbox: {
     refreshFailed: "Refresh failed",
     customerSummaryOnly: "Summary only",
-    groupUnavailable: "Group details are not available yet",
     assigneesRetry: "Could not load assignees. Retry",
     allCoworkers: "All coworkers",
     selectedAssignee: "Selected assignee",
@@ -52,6 +51,13 @@ const mobile = {
     refreshError: "Could not refresh messages. Tap to try again.",
     emptyTitle: "No conversations",
     emptyDescription: "No conversations match this category and its filters.",
+  },
+  group: {
+    title: "Group chat",
+    memberCount: "Members: {{count}}",
+    loadError: "Could not load the group. Please try again.",
+    unavailable: "This group does not exist or you are no longer a member.",
+    archived: "This group has been dissolved. You can only view its history.",
   },
   me: {
     logoutDescription:

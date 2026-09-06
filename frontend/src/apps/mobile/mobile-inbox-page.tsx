@@ -1,4 +1,4 @@
-/** 移动端统一会话摘要列表和内部单聊入口。 */
+/** 移动端统一会话摘要列表和内部聊天入口。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import { messagePreview } from "@/lib/message-preview"
@@ -133,13 +133,15 @@ function useMinuteTick() {
   }, [])
 }
 
-/** 渲染会话摘要，单聊可进入详情，客户和群聊明确标注只读范围。 */
+/** 渲染会话摘要，内部聊天进入详情，客户会话保留只读摘要。 */
 function MobileConversationRow({
   conversation,
-  onOpenDirect,
+  onOpen,
 }: {
   conversation: MobileInboxConversation
-  onOpenDirect: (conversation: DirectInboxConversationData) => void
+  onOpen: (
+    conversation: DirectInboxConversationData | GroupInboxConversationData,
+  ) => void
 }) {
   const { t } = useTranslation("inbox")
   const { t: tMobile } = useTranslation("mobile")
@@ -183,6 +185,7 @@ function MobileConversationRow({
           ? t("groupSystemUpdated")
           : t("messagesEmpty")))
   const formattedTime = formatTime(summary.lastMessageAt)
+  const internalConversation = directConversation ?? groupConversation
 
   const content = (
     <>
@@ -214,13 +217,9 @@ function MobileConversationRow({
         >
           {preview}
         </p>
-        {!directConversation ? (
+        {customerConversation ? (
           <p className="mt-1 text-xs text-muted-foreground">
-            {tMobile(
-              groupConversation
-                ? "inbox.groupUnavailable"
-                : "inbox.customerSummaryOnly",
-            )}
+            {tMobile("inbox.customerSummaryOnly")}
           </p>
         ) : null}
         {customerConversation ? (
@@ -247,12 +246,12 @@ function MobileConversationRow({
 
   return (
     <li className="border-b last:border-b-0">
-      {directConversation ? (
+      {internalConversation ? (
         <button
           type="button"
           className="flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           aria-label={name}
-          onClick={() => onOpenDirect(directConversation)}
+          onClick={() => onOpen(internalConversation)}
         >
           {content}
         </button>
@@ -346,9 +345,12 @@ export function MobileInboxPage() {
               <MobileConversationRow
                 key={conversation.id}
                 conversation={conversation}
-                onOpenDirect={(direct) => {
-                  navigate(`/inbox/direct/${direct.id}`, {
-                    state: { conversation: direct, mobileBack: true },
+                onOpen={(conversation) => {
+                  const type = isDirectInboxConversation(conversation)
+                    ? "direct"
+                    : "group"
+                  navigate(`/inbox/${type}/${conversation.id}`, {
+                    state: { conversation, mobileBack: true },
                   })
                 }}
               />
