@@ -42,6 +42,11 @@
   var defaultGreeting = messenger.getAttribute("data-default-greeting");
   var defaultSubtitle = messenger.getAttribute("data-default-subtitle");
   var loadingLabel = messenger.getAttribute("data-loading");
+  var referenceLabels = {
+    deleted: messenger.getAttribute("data-reference-deleted"),
+    visitor: messenger.getAttribute("data-reference-visitor"),
+    agent: messenger.getAttribute("data-reference-agent"),
+  };
   var requestFailedLabel = messenger.getAttribute("data-request-failed");
   var sessionLabels = {
     open: messenger.getAttribute("data-session-open"),
@@ -915,7 +920,23 @@
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
-    bubble.textContent = value.body;
+    if (value.replyTo) {
+      var reference = document.createElement("blockquote");
+      reference.className = "cv-message-reference";
+      if (value.replyTo.deleted) {
+        reference.textContent = referenceLabels.deleted;
+      } else {
+        var author = document.createElement("strong");
+        author.textContent = referenceLabels[value.replyTo.author];
+        var excerpt = document.createElement("span");
+        excerpt.className = "cv-message-reference-body";
+        excerpt.textContent = value.replyTo.body;
+        reference.appendChild(author);
+        reference.appendChild(excerpt);
+      }
+      bubble.appendChild(reference);
+    }
+    bubble.appendChild(document.createTextNode(value.body));
     row.appendChild(bubble);
     message.appendChild(row);
     message.appendChild(messageMeta(new Date(value.originatedAt)));

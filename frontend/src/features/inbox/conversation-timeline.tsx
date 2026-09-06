@@ -847,7 +847,7 @@ function ConversationTimelineContent({
                                         <>
                                           <span className="block font-medium">
                                             {message.replyTo.sender?.displayName?.trim() ||
-                                              t("unknownSender")}
+                                              t(message.replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender")}
                                           </span>
                                           <span className="line-clamp-2 whitespace-pre-wrap">
                                             {message.replyTo.body}

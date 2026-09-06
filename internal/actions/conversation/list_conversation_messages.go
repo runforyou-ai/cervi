@@ -138,8 +138,8 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("reply_cs.id AS reply_to_sender_subject_id").
 		ColumnExpr("reply_cs.kind AS reply_to_sender_kind").
 		ColumnExpr("reply_cs.source_id AS reply_to_sender_source_id").
-		ColumnExpr("reply_oi.display_name AS reply_to_sender_display_name").
-		ColumnExpr("reply_oi.avatar_file_id::text AS reply_to_sender_avatar_file_id").
+		ColumnExpr("CASE WHEN reply_cs.kind = ? THEN COALESCE(reply_cci.display_name, reply_c.display_name) ELSE reply_oi.display_name END AS reply_to_sender_display_name", domain.ChatSubjectKindContact).
+		ColumnExpr("CASE WHEN reply_cs.kind = ? THEN reply_cci.avatar_file_id ELSE reply_oi.avatar_file_id END::text AS reply_to_sender_avatar_file_id", domain.ChatSubjectKindContact).
 		ColumnExpr("reply_oi.type AS reply_to_sender_identity_type").
 		ColumnExpr("ss.opening_message_id AS service_session_opening_message_id").
 		ColumnExpr("ss.sequence AS service_session_sequence").
@@ -156,6 +156,8 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.organization_id = reply_msg.organization_id AND reply_cp.conversation_id = reply_msg.conversation_id AND reply_cp.id = reply_msg.sender_participant_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.organization_id = reply_cp.organization_id AND reply_cs.id = reply_cp.subject_id").
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.organization_id = reply_cs.organization_id AND reply_oi.id = reply_cs.source_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN contact_channel_identities AS reply_cci ON reply_cci.id = cc.contact_channel_identity_id AND reply_cci.organization_id = cc.organization_id AND reply_cci.contact_id = reply_cs.source_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
+		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.conversation_id = ?", conversationID).
 		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem})).

@@ -103,8 +103,17 @@ type ConversationSummary struct {
 	ServiceSessionStatus domain.ServiceSessionStatus
 }
 
+// MessageReference 定义访客可见的一层引用摘要。
+type MessageReference struct {
+	ID      string
+	Deleted bool
+	Author  domain.MessageAuthor
+	Body    string
+}
+
 // Message 定义访客可见消息。
 type Message struct {
+	ReplyTo      *MessageReference
 	ID           string
 	Author       domain.MessageAuthor
 	Body         string
@@ -248,9 +257,10 @@ type ConversationAgentRun struct {
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。
 type CustomerTextMessageInput struct {
-	ConversationID  string
-	ClientMessageID string
-	Body            string
+	ReplyToMessageID string
+	ConversationID   string
+	ClientMessageID  string
+	Body             string
 }
 
 // FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。

@@ -179,8 +179,16 @@ func websiteVisitorConversationFromAction(value conversationaction.ConversationS
 
 // websiteVisitorMessageFromAction 转换访客消息。
 func websiteVisitorMessageFromAction(value conversationaction.Message) WebsiteVisitorMessage {
+	var replyTo *WebsiteVisitorMessageReference
+	if value.ReplyTo != nil {
+		replyTo = &WebsiteVisitorMessageReference{
+			ID: value.ReplyTo.ID, Deleted: value.ReplyTo.Deleted,
+			Author: string(value.ReplyTo.Author), Body: value.ReplyTo.Body,
+		}
+	}
 	return WebsiteVisitorMessage{
-		ID: value.ID, Author: string(value.Author), Body: value.Body,
+		ReplyTo: replyTo,
+		ID:      value.ID, Author: string(value.Author), Body: value.Body,
 		OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
 	}
 }

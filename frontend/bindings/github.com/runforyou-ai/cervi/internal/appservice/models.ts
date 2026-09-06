@@ -927,6 +927,7 @@ export interface CustomerServiceSession {
  * CustomerTextMessageInput 定义成员发送的客户会话文本消息。
  */
 export interface CustomerTextMessageInput {
+    "replyToMessageId": string;
     "clientMessageId": string;
     "body": string;
 }
