@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -45,7 +47,7 @@ func (f *testInputFeed) appendUser(content string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.desired++
-	f.messages = append(f.messages, Message{Role: MessageRoleUser, Content: content})
+	f.messages = append(f.messages, Message{ID: fmt.Sprint(f.desired), Role: MessageRoleUser, Content: content})
 }
 
 type steeringChatModel struct {
@@ -53,15 +55,17 @@ type steeringChatModel struct {
 	calls            int
 	calledWithoutNew bool
 	firstCall        chan struct{}
+	lastInput        []*schema.Message
 }
 
 func (m *steeringChatModel) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
+	m.lastInput = input
 	if m.calls == 1 {
 		close(m.firstCall)
-		return schema.AssistantMessage("", []schema.ToolCall{{
+		return schema.AssistantMessage("先计算一加二", []schema.ToolCall{{
 			ID: "calculator-call-1", Type: "function",
 			Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":500}`},
 		}}), nil
@@ -110,7 +114,7 @@ func (f *cancelRaceInputFeed) Peek(ctx context.Context, afterSeq int64) ([]Trigg
 }
 
 func (f *cancelRaceInputFeed) Claim(context.Context, int64) (ClaimedInput, error) {
-	return ClaimedInput{Messages: []Message{{Role: MessageRoleUser, Content: "hello"}}, EndSeq: 1}, nil
+	return ClaimedInput{Messages: []Message{{ID: "1", Role: MessageRoleUser, Content: "hello"}}, EndSeq: 1}, nil
 }
 
 type finalAfterWatcherModel struct {
@@ -176,6 +180,20 @@ func TestEinoRuntimeSteersBeforeNextModelCall(t *testing.T) {
 	}
 	if chatModel.calls != 2 {
 		t.Fatalf("model calls = %d, want 2", chatModel.calls)
+	}
+	var roles []schema.RoleType
+	for _, message := range chatModel.lastInput {
+		if message.Role != schema.System {
+			roles = append(roles, message.Role)
+		}
+	}
+	if !reflect.DeepEqual(roles, []schema.RoleType{schema.User, schema.Assistant, schema.Tool, schema.User}) {
+		t.Fatalf("steered message roles = %v", roles)
+	}
+	messages := chatModel.lastInput[len(chatModel.lastInput)-4:]
+	if messages[1].Content != "先计算一加二" || messages[1].ToolCalls[0].ID != "calculator-call-1" ||
+		messages[2].ToolCallID != "calculator-call-1" || messages[2].Content != `{"result":3}` {
+		t.Fatalf("steered tool exchange = %#v / %#v", messages[1], messages[2])
 	}
 	logs := logOutput.String()
 	for _, expected := range []string{`"msg":"Agent Tool 调用开始"`, `"msg":"Calculator Tool 执行配置"`, `"msg":"Agent Tool 调用成功"`, `"agent_run_id":"test-run-id"`, `"tool_name":"calculator"`, `"tool_call_id":"calculator-call-1"`, `"operation":"add"`, `"delay_ms":500`, `"duration_ms":`} {

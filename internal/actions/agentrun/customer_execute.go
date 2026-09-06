@@ -93,6 +93,7 @@ func (p customerRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, policyCo
 }
 
 type customerMessageRow struct {
+	ID               string  `bun:"id"`
 	ReplyToMessageID *string `bun:"reply_to_message_id"`
 	ReplyDeleted     bool    `bun:"reply_deleted"`
 	ReplyBody        string  `bun:"reply_body"`
@@ -121,7 +122,7 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 	rows := make([]customerMessageRow, 0, agentHistoryLimit)
 	if err := db.NewSelect().
 		TableExpr("messages AS msg").
-		ColumnExpr("msg.body, cs.kind").
+		ColumnExpr("msg.id, msg.body, cs.kind").
 		ColumnExpr("msg.reply_to_message_id").
 		ColumnExpr("reply.deleted_at IS NOT NULL AS reply_deleted").
 		ColumnExpr("CASE WHEN reply.deleted_at IS NULL THEN reply.body ELSE '' END AS reply_body").
@@ -168,7 +169,7 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 			}{Body: row.Body, ReplyTo: reference})
 			content = string(encoded)
 		}
-		messages = append(messages, agentruntime.Message{Role: role, Content: content})
+		messages = append(messages, agentruntime.Message{ID: row.ID, Role: role, Content: content})
 	}
 	return messages, nil
 }
