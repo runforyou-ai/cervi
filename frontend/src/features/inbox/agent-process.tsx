@@ -1,6 +1,6 @@
 /** 在聊天消息中展示折叠的 Agent 思考过程、工具详情和模型用量。 */
 import { useLayoutEffect, useRef, useState } from "react"
-import { BrainIcon, ChevronDownIcon, LoaderCircleIcon } from "lucide-react"
+import { BrainIcon, ChevronDownIcon, LightbulbIcon, LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Popover } from "radix-ui"
 
@@ -130,7 +130,7 @@ export function AgentProcess({ process }: { process: ConversationAgentProcessDat
   return (
     <Collapsible className="mb-3 min-w-0 text-foreground">
       <CollapsibleTrigger className="group flex w-full items-center gap-1.5 rounded-sm py-1 text-left text-xs text-muted-foreground focus-visible:outline focus-visible:outline-ring">
-        <BrainIcon aria-hidden className="size-4 shrink-0" />
+        <LightbulbIcon aria-hidden className="size-4 shrink-0" />
         <span>{t("agentThoughtCompleted", { seconds })}</span>
         <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
