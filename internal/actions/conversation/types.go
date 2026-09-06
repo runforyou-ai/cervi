@@ -86,31 +86,44 @@ type TransferServiceSessionInput struct {
 
 // WebsiteCustomerTextMessageInput 定义网站客户文本消息。
 type WebsiteCustomerTextMessageInput struct {
-	ChannelID       string
-	ExternalID      string
-	ConversationID  *string
-	ClientMessageID string
-	Body            string
+	ReplyToMessageID string
+	ChannelID        string
+	ExternalID       string
+	ConversationID   *string
+	ClientMessageID  string
+	Body             string
 }
 
 // ConversationSummary 定义访客可见会话摘要。
 type ConversationSummary struct {
-	ID                   string
-	Title                string
-	Preview              string
-	LastMessageAt        time.Time
-	ServiceSessionID     string
-	ServiceSessionStatus domain.ServiceSessionStatus
+	ID                        string
+	Title                     string
+	Preview                   string
+	PreviewSenderIdentityType *domain.OrganizationIdentityType
+	LastMessageAt             time.Time
+	ServiceSessionID          string
+	ServiceSessionStatus      domain.ServiceSessionStatus
+}
+
+// MessageReference 定义访客可见的一层引用摘要。
+type MessageReference struct {
+	SenderIdentityType *domain.OrganizationIdentityType
+	ID                 string
+	Deleted            bool
+	Author             domain.MessageAuthor
+	Body               string
 }
 
 // Message 定义访客可见消息。
 type Message struct {
-	ID           string
-	Author       domain.MessageAuthor
-	Body         string
-	OriginatedAt time.Time
-	SourceOrder  int64
-	CreatedAt    time.Time
+	ReplyTo            *MessageReference
+	ID                 string
+	Author             domain.MessageAuthor
+	SenderIdentityType *domain.OrganizationIdentityType
+	Body               string
+	OriginatedAt       time.Time
+	SourceOrder        int64
+	CreatedAt          time.Time
 }
 
 // ReceiveWebsiteCustomerTextMessageResult 定义网站消息写入结果。
@@ -239,18 +252,20 @@ type ConversationAgentProcess struct {
 
 // ConversationAgentRun 定义会话最近一次运行的状态。
 type ConversationAgentRun struct {
-	AgentName string
-	ID        string
-	Status    domain.AgentRunStatus
-	ErrorCode *string
-	LastError *string
+	AgentAvatarFileID *string
+	AgentName         string
+	ID                string
+	Status            domain.AgentRunStatus
+	ErrorCode         *string
+	LastError         *string
 }
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。
 type CustomerTextMessageInput struct {
-	ConversationID  string
-	ClientMessageID string
-	Body            string
+	ReplyToMessageID string
+	ConversationID   string
+	ClientMessageID  string
+	Body             string
 }
 
 // FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。
@@ -268,13 +283,14 @@ type FirstDirectTextMessageResult struct {
 
 // DirectConversationSummary 定义成员内部单聊摘要。
 type DirectConversationSummary struct {
-	ID               string
-	PeerIdentityID   string
-	PeerType         domain.OrganizationIdentityType
-	PeerName         string
-	PeerAvatarFileID *string
-	Preview          *string
-	LastMessageAt    *time.Time
+	ID                        string
+	PeerIdentityID            string
+	PeerType                  domain.OrganizationIdentityType
+	PeerName                  string
+	PeerAvatarFileID          *string
+	Preview                   *string
+	PreviewSenderIdentityType *domain.OrganizationIdentityType
+	LastMessageAt             *time.Time
 }
 
 // DirectTextMessageInput 定义成员发送的内部单聊文本消息。

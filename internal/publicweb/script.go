@@ -2,7 +2,12 @@
 
 package publicweb
 
-import _ "embed"
+import "embed"
+
+// markdownAssets 是由前端 Task 构建的共享消息正文资源。
+//
+//go:embed dist/markdown.js dist/markdown.css
+var markdownAssets embed.FS
 
 // composerEmojisJSON 是访客 Messenger 的固定表情候选。
 //

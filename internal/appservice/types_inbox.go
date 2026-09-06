@@ -75,37 +75,40 @@ const (
 
 // CustomerInboxConversation 定义客户会话摘要。
 type CustomerInboxConversation struct {
-	Title                string               `json:"title"`
-	ContactName          *string              `json:"contactName"`
-	ContactAvatarURL     string               `json:"contactAvatarUrl"`
-	ChannelType          ChannelType          `json:"channelType"`
-	ChannelName          string               `json:"channelName"`
-	Preview              *string              `json:"preview"`
-	LastMessageAt        *time.Time           `json:"lastMessageAt"`
-	ServiceSessionStatus ServiceSessionStatus `json:"serviceSessionStatus"`
-	ServiceSessionID     string               `json:"serviceSessionId"`
-	Assignee             *InboxAssignee       `json:"assignee"`
+	Title                     string                    `json:"title"`
+	ContactName               *string                   `json:"contactName"`
+	ContactAvatarURL          string                    `json:"contactAvatarUrl"`
+	ChannelType               ChannelType               `json:"channelType"`
+	ChannelName               string                    `json:"channelName"`
+	Preview                   *string                   `json:"preview"`
+	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
+	LastMessageAt             *time.Time                `json:"lastMessageAt"`
+	ServiceSessionStatus      ServiceSessionStatus      `json:"serviceSessionStatus"`
+	ServiceSessionID          string                    `json:"serviceSessionId"`
+	Assignee                  *InboxAssignee            `json:"assignee"`
 }
 
 // DirectInboxConversation 定义内部单聊摘要。
 type DirectInboxConversation struct {
-	PeerIdentityID string                   `json:"peerIdentityId"`
-	PeerType       OrganizationIdentityType `json:"peerType"`
-	PeerName       string                   `json:"peerName"`
-	PeerAvatarURL  string                   `json:"peerAvatarUrl"`
-	Preview        *string                  `json:"preview"`
-	LastMessageAt  *time.Time               `json:"lastMessageAt"`
-	AgentRunStatus *AgentRunStatus          `json:"agentRunStatus"`
+	PeerIdentityID            string                    `json:"peerIdentityId"`
+	PeerType                  OrganizationIdentityType  `json:"peerType"`
+	PeerName                  string                    `json:"peerName"`
+	PeerAvatarURL             string                    `json:"peerAvatarUrl"`
+	Preview                   *string                   `json:"preview"`
+	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
+	LastMessageAt             *time.Time                `json:"lastMessageAt"`
+	AgentRunStatus            *AgentRunStatus           `json:"agentRunStatus"`
 }
 
 // GroupInboxConversation 定义企业群聊摘要。
 type GroupInboxConversation struct {
-	Title         string             `json:"title"`
-	ImageURL      string             `json:"imageUrl"`
-	Status        ConversationStatus `json:"status"`
-	Preview       *string            `json:"preview"`
-	LastMessageAt *time.Time         `json:"lastMessageAt"`
-	MemberCount   int                `json:"memberCount"`
+	Title                     string                    `json:"title"`
+	ImageURL                  string                    `json:"imageUrl"`
+	Status                    ConversationStatus        `json:"status"`
+	Preview                   *string                   `json:"preview"`
+	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
+	LastMessageAt             *time.Time                `json:"lastMessageAt"`
+	MemberCount               int                       `json:"memberCount"`
 }
 
 // InboxConversation 定义成员统一收件箱列表项。

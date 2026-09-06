@@ -18,11 +18,12 @@ type WebsiteVisitorServiceSession struct {
 
 // WebsiteVisitorConversation 定义网站访客会话摘要。
 type WebsiteVisitorConversation struct {
-	ID             string                       `json:"id"`
-	Title          string                       `json:"title"`
-	Preview        string                       `json:"preview"`
-	LastMessageAt  time.Time                    `json:"lastMessageAt"`
-	ServiceSession WebsiteVisitorServiceSession `json:"serviceSession"`
+	ID                        string                       `json:"id"`
+	Title                     string                       `json:"title"`
+	Preview                   string                       `json:"preview"`
+	PreviewSenderIdentityType *OrganizationIdentityType    `json:"previewSenderIdentityType"`
+	LastMessageAt             time.Time                    `json:"lastMessageAt"`
+	ServiceSession            WebsiteVisitorServiceSession `json:"serviceSession"`
 }
 
 // WebsiteVisitorMessenger 定义网站 Messenger 初始化结果。
@@ -33,18 +34,30 @@ type WebsiteVisitorMessenger struct {
 
 // WebsiteVisitorTextMessageInput 定义网站访客文本发送参数。
 type WebsiteVisitorTextMessageInput struct {
-	ClientMessageID string  `json:"clientMessageId"`
-	ConversationID  *string `json:"conversationId"`
-	Body            string  `json:"body"`
+	ReplyToMessageID string  `json:"replyToMessageId"`
+	ClientMessageID  string  `json:"clientMessageId"`
+	ConversationID   *string `json:"conversationId"`
+	Body             string  `json:"body"`
+}
+
+// WebsiteVisitorMessageReference 定义网站访客可见的一层引用摘要。
+type WebsiteVisitorMessageReference struct {
+	SenderIdentityType *OrganizationIdentityType `json:"senderIdentityType"`
+	ID                 string                    `json:"id"`
+	Deleted            bool                      `json:"deleted"`
+	Author             string                    `json:"author,omitempty"`
+	Body               string                    `json:"body,omitempty"`
 }
 
 // WebsiteVisitorMessage 定义网站访客可见消息。
 type WebsiteVisitorMessage struct {
-	ID           string    `json:"id"`
-	Author       string    `json:"author"`
-	Body         string    `json:"body"`
-	OriginatedAt time.Time `json:"originatedAt"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ReplyTo            *WebsiteVisitorMessageReference `json:"replyTo"`
+	ID                 string                          `json:"id"`
+	Author             string                          `json:"author"`
+	Body               string                          `json:"body"`
+	SenderIdentityType *OrganizationIdentityType       `json:"senderIdentityType"`
+	OriginatedAt       time.Time                       `json:"originatedAt"`
+	CreatedAt          time.Time                       `json:"createdAt"`
 }
 
 // WebsiteVisitorTextMessageResult 定义网站访客文本写入结果。

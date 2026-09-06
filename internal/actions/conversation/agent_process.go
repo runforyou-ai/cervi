@@ -19,10 +19,12 @@ import (
 func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizationID, conversationID string, history *ConversationMessageHistory) error {
 	var latest struct {
 		servermodels.AgentRun `bun:",embed"`
-		AgentName             string `bun:"agent_name"`
+		AgentName             string  `bun:"agent_name"`
+		AgentAvatarFileID     *string `bun:"agent_avatar_file_id"`
 	}
 	err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
 		ColumnExpr("agr.*").ColumnExpr("oi.display_name AS agent_name").
+		ColumnExpr("oi.avatar_file_id AS agent_avatar_file_id").
 		Join("JOIN organization_identities AS oi ON oi.id = agr.agent_identity_id AND oi.organization_id = agr.organization_id").
 		Where("agr.organization_id = ? AND agr.conversation_id = ?", organizationID, conversationID).
 		OrderExpr("agr.created_at DESC, agr.id DESC").Limit(1).Scan(ctx, &latest)
@@ -31,7 +33,7 @@ func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizatio
 	} else if err != nil {
 		return fmt.Errorf("load latest conversation agent run: %w", err)
 	}
-	history.LatestAgentRun = &ConversationAgentRun{ID: latest.ID, AgentName: latest.AgentName, Status: domain.AgentRunStatus(latest.Status), ErrorCode: latest.ErrorCode, LastError: latest.LastError}
+	history.LatestAgentRun = &ConversationAgentRun{ID: latest.ID, AgentName: latest.AgentName, AgentAvatarFileID: latest.AgentAvatarFileID, Status: domain.AgentRunStatus(latest.Status), ErrorCode: latest.ErrorCode, LastError: latest.LastError}
 	if len(history.Messages) == 0 {
 		return nil
 	}

@@ -24,12 +24,18 @@ type ListWebsiteMessagesQuery struct {
 }
 
 type websiteMessageRow struct {
-	ID           string    `bun:"id"`
-	Body         string    `bun:"body"`
-	OriginatedAt time.Time `bun:"originated_at"`
-	SourceOrder  int64     `bun:"source_order"`
-	CreatedAt    time.Time `bun:"created_at"`
-	SubjectKind  string    `bun:"subject_kind"`
+	ID                      string                           `bun:"id"`
+	Body                    string                           `bun:"body"`
+	SenderIdentityType      *domain.OrganizationIdentityType `bun:"sender_identity_type"`
+	OriginatedAt            time.Time                        `bun:"originated_at"`
+	SourceOrder             int64                            `bun:"source_order"`
+	CreatedAt               time.Time                        `bun:"created_at"`
+	SubjectKind             string                           `bun:"subject_kind"`
+	ReplyToMessageID        *string                          `bun:"reply_to_message_id"`
+	ReplyDeleted            bool                             `bun:"reply_deleted"`
+	ReplyBody               string                           `bun:"reply_body"`
+	ReplySubjectKind        string                           `bun:"reply_subject_kind"`
+	ReplySenderIdentityType *domain.OrganizationIdentityType `bun:"reply_sender_identity_type"`
 }
 
 // NewListWebsiteMessagesQuery 创建网站访客消息历史查询。
@@ -77,12 +83,23 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("msg.body AS body").
+		ColumnExpr("oi.type AS sender_identity_type").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.source_order AS source_order").
 		ColumnExpr("msg.created_at AS created_at").
 		ColumnExpr("cs.kind AS subject_kind").
+		ColumnExpr("msg.reply_to_message_id").
+		ColumnExpr("reply.deleted_at IS NOT NULL AS reply_deleted").
+		ColumnExpr("CASE WHEN reply.deleted_at IS NULL THEN reply.body ELSE '' END AS reply_body").
+		ColumnExpr("reply_cs.kind AS reply_subject_kind").
+		ColumnExpr("reply_oi.type AS reply_sender_identity_type").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type = ?", domain.MessageTypeText).
+		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
+		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id").
+		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ?", channel.OrganizationID).
 		Where("msg.conversation_id = ?", input.ConversationID).
 		Where("msg.type = ?", domain.MessageTypeText).
@@ -141,10 +158,22 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 		if row.SubjectKind == string(domain.ChatSubjectKindContact) {
 			author = domain.MessageAuthorVisitor
 		}
-		messages = append(messages, Message{
-			ID: row.ID, Author: author, Body: row.Body,
+		message := Message{
+			ID: row.ID, Author: author, Body: row.Body, SenderIdentityType: row.SenderIdentityType,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
-		})
+		}
+		if row.ReplyToMessageID != nil {
+			message.ReplyTo = &MessageReference{ID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
+			if !row.ReplyDeleted {
+				message.ReplyTo.Author = domain.MessageAuthorAgent
+				if row.ReplySubjectKind == string(domain.ChatSubjectKindContact) {
+					message.ReplyTo.Author = domain.MessageAuthorVisitor
+				}
+				message.ReplyTo.Body = row.ReplyBody
+				message.ReplyTo.SenderIdentityType = row.ReplySenderIdentityType
+			}
+		}
+		messages = append(messages, message)
 	}
 	result := MessageHistory{Messages: messages}
 	if len(rows) == 0 {

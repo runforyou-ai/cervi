@@ -117,6 +117,12 @@ func (s *ChatService) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	channelID := strings.TrimPrefix(request.URL.Path, "/")
+	if channelID == "assets/markdown.js" || channelID == "assets/markdown.css" {
+		writer.Header().Set("Cache-Control", "no-cache")
+		writer.Header().Set("X-Content-Type-Options", "nosniff")
+		http.ServeFileFS(writer, request, markdownAssets, "dist/"+strings.TrimPrefix(channelID, "assets/"))
+		return
+	}
 	if channelID == "preview" {
 		if err := writePreviewHost(writer, request); err != nil {
 			slog.Warn("写入网站渠道挂件预览失败", "error", err)
@@ -376,6 +382,14 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"messengerNavigation":       cervii18n.MessengerNavigation,
 	"loading":                   cervii18n.MessengerLoading,
 	"retry":                     cervii18n.MessengerRetry,
+	"referenceDeleted":          cervii18n.MessengerReferenceDeleted,
+	"referenceVisitor":          cervii18n.MessengerReferenceVisitor,
+	"referenceAgent":            cervii18n.MessengerReferenceAgent,
+	"referenceReply":            cervii18n.MessengerReferenceReply,
+	"referenceReplying":         cervii18n.MessengerReferenceReplying,
+	"referenceCancel":           cervii18n.MessengerReferenceCancel,
+	"referenceUnavailable":      cervii18n.MessengerReferenceUnavailable,
+	"referenceLatest":           cervii18n.MessengerReferenceLatest,
 	"requestFailed":             cervii18n.MessengerRequestFailed,
 	"sessionOpen":               cervii18n.MessengerSessionOpen,
 	"sessionClosed":             cervii18n.MessengerSessionClosed,

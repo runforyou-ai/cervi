@@ -179,7 +179,9 @@ tasks:
       - task: test:desktop
 
   test:frontend:
-    summary: 验证消息窗口顺序和分页边界
+    summary: 验证消息窗口、Markdown 和流式正文行为
+    deps:
+      - common:build:messenger
     cmds:
       - node --test frontend/tests/*.test.ts
 
@@ -188,6 +190,7 @@ tasks:
     summary: 使用当前工作区测试数据库运行服务端测试
     deps:
       - db:test:reset
+      - common:build:messenger
     preconditions:
       - sh: '{{if .NATS_URL}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置 NATS_URL"

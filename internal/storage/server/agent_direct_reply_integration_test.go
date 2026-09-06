@@ -108,6 +108,18 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if err != nil {
 		t.Fatal(err)
 	}
+	if first.Conversation.PreviewSenderIdentityType == nil || *first.Conversation.PreviewSenderIdentityType != domain.OrganizationIdentityTypeUser {
+		t.Fatalf("first message preview identity = %#v", first.Conversation)
+	}
+	// 运行状态与成功回复从同一 AI 身份读取头像。
+	avatarID := uuid.NewV7().String()
+	if _, err := db.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).Set("avatar_file_id = ?", avatarID).Where("id = ?", created.IdentityID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	queuedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID})
+	if err != nil || queuedHistory.LatestAgentRun == nil || queuedHistory.LatestAgentRun.AgentAvatarFileID == nil || *queuedHistory.LatestAgentRun.AgentAvatarFileID != avatarID {
+		t.Fatalf("queued agent avatar = %#v, error = %v", queuedHistory.LatestAgentRun, err)
+	}
 	runtime := &testDirectReplyRuntime{t: t}
 	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, nil)
 	// 同步执行真实排队记录，用可控 Runtime 检查模型接收的上下文。
@@ -129,6 +141,13 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		return run
 	}
 	initialRun := runNext()
+	history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID})
+	if err != nil || len(history.Messages) != 2 || history.Messages[0].Sender == nil || history.Messages[0].Sender.IdentityType == nil || *history.Messages[0].Sender.IdentityType != domain.OrganizationIdentityTypeUser || history.Messages[1].Sender == nil || history.Messages[1].Sender.IdentityType == nil || *history.Messages[1].Sender.IdentityType != domain.OrganizationIdentityTypeAgent {
+		t.Fatalf("message sender identities = %#v, error = %v", history.Messages, err)
+	}
+	if history.LatestAgentRun == nil || history.LatestAgentRun.AgentAvatarFileID == nil || *history.LatestAgentRun.AgentAvatarFileID != avatarID || history.Messages[1].Sender == nil || history.Messages[1].Sender.AvatarFileID == nil || *history.Messages[1].Sender.AvatarFileID != avatarID {
+		t.Fatalf("completed agent avatars = %#v, sender = %#v", history.LatestAgentRun, history.Messages[1].Sender)
+	}
 	send := conversationaction.NewSendDirectTextMessageAction(db, scheduler)
 	for i := range 101 {
 		if _, err := send.Execute(ctx, identity, conversationaction.DirectTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: fmt.Sprintf("普通消息 %d", i)}); err != nil {
@@ -139,6 +158,9 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	reply, err := send.Execute(ctx, identity, input)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if reply.ReplyTo == nil || reply.ReplyTo.Sender == nil || reply.ReplyTo.Sender.IdentityType == nil || *reply.ReplyTo.Sender.IdentityType != domain.OrganizationIdentityTypeAgent || reply.Sender == nil || reply.Sender.IdentityType == nil || *reply.Sender.IdentityType != domain.OrganizationIdentityTypeUser {
+		t.Fatalf("reply sender identities = %#v", reply)
 	}
 	runtime.expected = reply.ReplyTo
 	if replay, err := send.Execute(ctx, identity, input); err != nil || replay.ID != reply.ID {

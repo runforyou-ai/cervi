@@ -1,0 +1,84 @@
+/** 在成员聊天和网站 Messenger 中统一渲染完整或生成中的 Markdown。 */
+import { createContext, createElement, memo, useContext, useId, useMemo, useRef, useState, type ComponentProps } from "react"
+import { Streamdown, defaultRehypePlugins, type Components, type ExtraProps } from "streamdown"
+import chineseCopy from "../i18n/locales/zh-CN/markdown"
+import englishCopy from "../i18n/locales/en-US/markdown"
+import "./message-markdown.css"
+
+type MessageMarkdownProps = {
+  children: string
+  streaming?: boolean
+  locale?: string
+  onOpenLink?: (url: string) => void | Promise<void>
+}
+
+const MarkdownContext = createContext<{ copy: typeof englishCopy; onOpenLink?: MessageMarkdownProps["onOpenLink"] }>({ copy: chineseCopy })
+// 禁用原始 HTML 解析，保留标签和 URL 的清理规则。
+const rehypePlugins = [defaultRehypePlugins.sanitize]
+
+/** 按宿主平台打开正文链接并保留浏览器的链接语义。 */
+function MarkdownLink({ node, href, children, ...props }: ComponentProps<"a"> & ExtraProps) {
+  const { onOpenLink, copy } = useContext(MarkdownContext)
+  const [failed, setFailed] = useState(false)
+  return <>
+    <a {...props} href={href || undefined} target={href?.startsWith("#") ? undefined : "_blank"} rel="noopener noreferrer" onClick={onOpenLink && href && !href.startsWith("#") ? (event) => {
+      event.preventDefault()
+      setFailed(false)
+      Promise.resolve().then(() => onOpenLink(href)).catch((error) => {
+        console.warn("打开消息链接失败", error)
+        setFailed(true)
+      })
+    } : undefined}>{children}</a>
+    {failed ? <span role="status">{copy.linkFailed}</span> : null}
+  </>
+}
+
+/** 展示代码原文并复制当前已经生成的内容。 */
+function MarkdownCodeBlock({ children }: ComponentProps<"pre"> & ExtraProps) {
+  const { copy } = useContext(MarkdownContext)
+  const pre = useRef<HTMLPreElement>(null)
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle")
+  return <div className="message-markdown-code">
+    <div className="message-markdown-code-actions">
+      <span role="status">{copyState === "copied" ? copy.copied : copyState === "failed" ? copy.copyFailed : ""}</span>
+      <button type="button" onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(pre.current?.textContent ?? "")
+          setCopyState("copied")
+        } catch (error) {
+          console.warn("复制消息代码失败", error)
+          setCopyState("failed")
+        }
+      }}>{copy.copyCode}</button>
+    </div>
+    <pre ref={pre} tabIndex={0}>{children}</pre>
+  </div>
+}
+
+// 元素样式由共享 CSS 管理，访客页面不需要加载管理端的 Tailwind 样式。
+const components: Components = {
+  ...Object.fromEntries(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "hr", "strong", "em", "del", "thead", "tbody", "tr", "th", "td", "input"].map((tag) => [tag, ({ node, ...props }: { node?: unknown }) => createElement(tag, props)])),
+  a: MarkdownLink,
+  pre: MarkdownCodeBlock,
+  code: ({ node, ...props }) => <code {...props} />,
+  table: ({ node, ...props }) => <div className="message-markdown-table" tabIndex={0}><table {...props} /></div>,
+  img: ({ node, ...props }) => <img {...props} loading="lazy" />,
+}
+
+/** 保持正文分块结构，仅在生成中修复未闭合语法，结束时保留已有 DOM。 */
+export const MessageMarkdown = memo(function MessageMarkdown({ children, streaming = false, locale = "zh-CN", onOpenLink }: MessageMarkdownProps) {
+  const id = useId()
+  const context = useMemo(() => ({ copy: locale.startsWith("zh") ? chineseCopy : englishCopy, onOpenLink }), [locale, onOpenLink])
+  const remarkRehypeOptions = useMemo(() => ({ clobberPrefix: `message-${id}-` }), [id])
+  // 链接只允许网页、邮件和消息内锚点，避免触发 WebView 应用指令。
+  return <MarkdownContext.Provider value={context}>
+    <Streamdown className="message-markdown" mode="streaming"
+      isAnimating={streaming} parseIncompleteMarkdown={streaming} skipHtml
+      rehypePlugins={rehypePlugins} components={components}
+      urlTransform={(url) => /^(https?:\/\/|mailto:|#)/i.test(url) ? url : ""}
+      remarkRehypeOptions={remarkRehypeOptions}
+      controls={false}>
+      {children}
+    </Streamdown>
+  </MarkdownContext.Provider>
+})

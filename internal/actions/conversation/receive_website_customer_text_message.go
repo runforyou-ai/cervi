@@ -112,7 +112,7 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 	}
 	received, err := ReceiveInboundCustomerTextMessage(ctx, tx, channel, InboundCustomerTextMessageInput{
 		ExternalID: input.ExternalID, RequestedConversationID: input.ConversationID,
-		Body: input.Body, IdempotencyKey: idempotencyKey,
+		Body: input.Body, IdempotencyKey: idempotencyKey, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
@@ -151,6 +151,13 @@ func normalizeWebsiteMessageInput(input WebsiteCustomerTextMessageInput) (Websit
 	}
 	if !common.ValidUUID(input.ClientMessageID) {
 		fields["clientMessageId"] = ValidationClientMessageIDInvalid
+	}
+	if input.ReplyToMessageID != "" {
+		var valid bool
+		input.ReplyToMessageID, valid = common.NormalizeUUID(input.ReplyToMessageID)
+		if !valid || input.ConversationID == nil {
+			fields["replyToMessageId"] = ValidationReplyToMessageIDInvalid
+		}
 	}
 	if input.Body == "" {
 		fields["body"] = ValidationBodyRequired
@@ -429,12 +436,25 @@ func updateConversationSummary(ctx context.Context, db bun.IDB, conversation *se
 
 // receiveWebsiteCustomerTextMessageResult 转换网站访客消息写入结果。
 func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessageResult) ReceiveWebsiteCustomerTextMessageResult {
+	var replyTo *MessageReference
+	if reference := received.ReplyTo; reference != nil {
+		replyTo = &MessageReference{ID: reference.ID, Deleted: reference.Deleted}
+		if !reference.Deleted {
+			replyTo.Author = domain.MessageAuthorAgent
+			if reference.Sender.Kind == domain.ChatSubjectKindContact {
+				replyTo.Author = domain.MessageAuthorVisitor
+			}
+			replyTo.Body = reference.Body
+			replyTo.SenderIdentityType = reference.Sender.IdentityType
+		}
+	}
 	return ReceiveWebsiteCustomerTextMessageResult{
 		Conversation:            received.Summary,
 		CreatedConversation:     received.CreatedConversation,
 		OpenedNewServiceSession: received.OpenedServiceSession,
 		Message: Message{
-			ID: received.Message.ID, Author: domain.MessageAuthorVisitor,
+			ReplyTo: replyTo,
+			ID:      received.Message.ID, Author: domain.MessageAuthorVisitor,
 			Body: received.Message.Body, OriginatedAt: received.Message.OriginatedAt,
 			CreatedAt: received.Message.CreatedAt,
 		},
@@ -450,9 +470,13 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("msg.body AS preview").
+		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("current.id AS service_session_id").
 		ColumnExpr("current.status AS service_session_status").
 		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
+		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
+		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
+		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
 		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
 		Where("cv.organization_id = ?", organizationID).

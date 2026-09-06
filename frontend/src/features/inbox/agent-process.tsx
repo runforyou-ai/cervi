@@ -1,6 +1,9 @@
 /** 在聊天消息中展示折叠的 Agent 思考过程、工具详情和模型用量。 */
 import { useLayoutEffect, useRef, useState } from "react"
-import { BrainIcon, ChevronDownIcon, LightbulbIcon, LoaderCircleIcon } from "lucide-react"
+import { BrainIcon, ChevronDownIcon, LightbulbIcon } from "lucide-react"
+import { MessageMarkdown } from "@/components/message-markdown"
+import { ProfileAvatar } from "@/components/profile-avatar"
+import { openExternalURL } from "@/platform/external-navigation"
 import { useTranslation } from "react-i18next"
 import { Popover } from "radix-ui"
 
@@ -125,7 +128,7 @@ function AgentTool({ call }: { call: AgentToolCall }) {
 
 /** 按服务端块顺序展示一个默认折叠的已完成思考区域。 */
 export function AgentProcess({ process }: { process: ConversationAgentProcessData }) {
-  const { t } = useTranslation("inbox")
+  const { t, i18n } = useTranslation("inbox")
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
   return (
     <Collapsible className="mb-3 min-w-0 text-foreground">
@@ -142,12 +145,12 @@ export function AgentProcess({ process }: { process: ConversationAgentProcessDat
             <div
               key={block.id}
               className={cn(
-                "whitespace-pre-wrap break-words",
+                "min-w-0 break-words",
                 block.kind === AgentRunBlockKind.AgentRunBlockThinking &&
                   "italic text-muted-foreground",
               )}
             >
-              {block.text}
+              <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{block.text}</MessageMarkdown>
             </div>
           ),
         )}
@@ -175,7 +178,6 @@ export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; in
   const failed = run.status === AgentRunStatus.AgentRunStatusFailed
   const cancelled = run.status === AgentRunStatus.AgentRunStatusCancelled
   const senderName = run.agentName.trim() || t("unknownSender")
-  const senderInitial = Array.from(senderName)[0]?.toLocaleUpperCase() ?? "?"
   const label = thinking
     ? t("agentThoughtRunning")
     : failed
@@ -195,22 +197,18 @@ export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; in
       aria-label={`${senderName} ${label}`}
     >
       <div className={cn("relative flex min-h-8 max-w-[75%] flex-col justify-center py-2", incoming ? "ml-10" : "mr-10")}>
-        <span
-          className={cn(
-            "absolute bottom-0 flex size-8 items-center justify-center rounded-full text-xs font-medium",
-            incoming
-              ? "right-full mr-2 border bg-background text-foreground"
-              : "left-full ml-2 bg-primary text-primary-foreground",
-          )}
+        <ProfileAvatar
+          imageURL={run.agentAvatarUrl}
+          name={run.agentName}
+          fallback="agent"
           title={senderName}
-          aria-hidden="true"
-        >
-          {senderInitial}
-        </span>
+          className={cn(
+            "absolute bottom-0 size-8 text-xs",
+            incoming ? "right-full mr-2" : "left-full ml-2",
+          )}
+        />
         <div className={cn("flex items-center gap-1.5", failed && "text-destructive")}>
-          {thinking ? (
-            <LoaderCircleIcon aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
-          ) : <BrainIcon aria-hidden className="size-4" />}
+          {failed || cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
           <span>{label}</span>
         </div>
         {(failed || cancelled) && reason ? (
