@@ -86,11 +86,12 @@ type TransferServiceSessionInput struct {
 
 // WebsiteCustomerTextMessageInput 定义网站客户文本消息。
 type WebsiteCustomerTextMessageInput struct {
-	ChannelID       string
-	ExternalID      string
-	ConversationID  *string
-	ClientMessageID string
-	Body            string
+	ReplyToMessageID string
+	ChannelID        string
+	ExternalID       string
+	ConversationID   *string
+	ClientMessageID  string
+	Body             string
 }
 
 // ConversationSummary 定义访客可见会话摘要。

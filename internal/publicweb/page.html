@@ -27,6 +27,9 @@
       data-reference-deleted="{{.Copy.referenceDeleted}}"
       data-reference-visitor="{{.Copy.referenceVisitor}}"
       data-reference-agent="{{.Copy.referenceAgent}}"
+      data-reference-reply="{{.Copy.referenceReply}}"
+      data-reference-replying="{{.Copy.referenceReplying}}"
+      data-reference-unavailable="{{.Copy.referenceUnavailable}}"
       data-session-open="{{.Copy.sessionOpen}}"
       data-session-closed="{{.Copy.sessionClosed}}"
     >
@@ -247,11 +250,19 @@
             </div>
           </div>
 
+          <div class="cv-message-menu" id="cv-message-menu" role="menu" hidden>
+            <button id="cv-menu-reply" type="button" role="menuitem">{{.Copy.referenceReply}}</button>
+          </div>
           <p class="cv-conversation-error" id="cv-conversation-error" role="status" hidden>{{.Copy.requestFailed}}</p>
 
           <form class="cv-composer" id="cv-composer" action="#" method="dialog">
+            <button class="cv-latest-message" id="cv-latest-message" type="button" hidden>{{.Copy.referenceLatest}}</button>
             <div class="cv-composer-main" id="cv-composer-main">
               <button class="cv-composer-resize" type="button" id="cv-composer-resize" aria-label="{{.Copy.resizeMessageInput}}"></button>
+              <div class="cv-composer-reference" id="cv-composer-reference" hidden>
+                <div><strong id="cv-composer-reference-author"></strong><span class="cv-message-reference-body" id="cv-composer-reference-body"></span></div>
+                <button id="cv-cancel-reply" type="button">{{.Copy.referenceCancel}}</button>
+              </div>
               <textarea id="cv-input" rows="1" maxlength="4000" aria-label="{{.Copy.message}}"></textarea>
               <div class="cv-composer-bar">
                 <div class="cv-composer-tools">

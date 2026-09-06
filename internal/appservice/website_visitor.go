@@ -33,9 +33,10 @@ type WebsiteVisitorMessenger struct {
 
 // WebsiteVisitorTextMessageInput 定义网站访客文本发送参数。
 type WebsiteVisitorTextMessageInput struct {
-	ClientMessageID string  `json:"clientMessageId"`
-	ConversationID  *string `json:"conversationId"`
-	Body            string  `json:"body"`
+	ReplyToMessageID string  `json:"replyToMessageId"`
+	ClientMessageID  string  `json:"clientMessageId"`
+	ConversationID   *string `json:"conversationId"`
+	Body             string  `json:"body"`
 }
 
 // WebsiteVisitorMessageReference 定义不包含企业内部身份的一层引用摘要。

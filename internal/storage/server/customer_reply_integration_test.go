@@ -208,3 +208,125 @@ func TestCustomerReplyEarlierSession(t *testing.T) {
 		t.Fatalf("location changed read: count=%d err=%v", count, err)
 	}
 }
+
+// TestWebsiteVisitorReplies 验证访客引用双方消息、重试、删除和客服历史展示。
+func TestWebsiteVisitorReplies(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	agent, err := conversationaction.NewSendCustomerTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服说明"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "引用客服说明", ReplyToMessageID: agent.ID}
+	reply, err := f.receive.Execute(ctx, input)
+	if err != nil || reply.Message.ReplyTo == nil || reply.Message.ReplyTo.Author != domain.MessageAuthorAgent || reply.Message.ReplyTo.Body != agent.Body {
+		t.Fatalf("reply=%+v err=%v", reply, err)
+	}
+	replay, err := f.receive.Execute(ctx, input)
+	if err != nil || replay.Message.ID != reply.Message.ID || replay.Message.ReplyTo == nil {
+		t.Fatalf("replay=%+v err=%v", replay, err)
+	}
+	for _, target := range []string{"", reply.Message.ID} {
+		changed := input
+		changed.ReplyToMessageID = target
+		_, err := f.receive.Execute(ctx, changed)
+		var conflict *conversationaction.ConflictError
+		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
+			t.Fatalf("changed reference=%v", err)
+		}
+	}
+	ownInput := input
+	ownInput.ClientMessageID = uuid.NewV7().String()
+	ownInput.ReplyToMessageID = reply.Message.ID
+	own, err := f.receive.Execute(ctx, ownInput)
+	if err != nil || own.Message.ReplyTo == nil || own.Message.ReplyTo.Author != domain.MessageAuthorVisitor || own.Message.ReplyTo.Body != input.Body {
+		t.Fatalf("own=%+v err=%v", own, err)
+	}
+	history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.owner, conversationaction.ConversationMessageHistoryInput{ConversationID: f.conversationID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := history.Messages[len(history.Messages)-2].ReplyTo; r == nil || r.ID != agent.ID || r.Body != agent.Body {
+		t.Fatalf("staff reference=%+v", r)
+	}
+	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", agent.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	replay, err = f.receive.Execute(ctx, input)
+	if err != nil || replay.Message.ID != reply.Message.ID || replay.Message.ReplyTo == nil || !replay.Message.ReplyTo.Deleted || replay.Message.ReplyTo.Body != "" || replay.Message.ReplyTo.Author != "" {
+		t.Fatalf("deleted replay=%+v err=%v", replay, err)
+	}
+}
+
+// TestWebsiteVisitorReplyBoundaries 验证引用的会话和访客边界，失败时不重新打开客服周期。
+func TestWebsiteVisitorReplyBoundaries(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	foreign := newCustomerReadFixture(t)
+	ctx := context.Background()
+	original, err := f.visitorMessage(ctx, "将删除的原文")
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreignMessage, err := foreign.visitorMessage(ctx, "其他企业消息")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "同一访客另一会话"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	internal := f.send(t, f.owner, "内部消息", false)
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, nil)).Execute(ctx, f.owner, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, nil)).Execute(ctx, f.owner, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", original.Message.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	system := &servermodels.Message{OrganizationID: f.owner.Organization.ID, ConversationID: f.conversationID, Type: "system", Body: "系统事件", OriginatedAt: time.Now().UTC()}
+	if _, err := f.db.NewInsert().Model(system).Column("organization_id", "conversation_id", "type", "body", "originated_at").Returning("id").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	before, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", f.conversationID).Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "无效引用"}
+	for _, target := range []string{original.Message.ID, foreignMessage.Message.ID, other.Message.ID, internal.ID, system.ID, uuid.NewV7().String()} {
+		input.ReplyToMessageID = target
+		_, err := f.receive.Execute(ctx, input)
+		var conflict *conversationaction.ConflictError
+		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
+			t.Fatalf("target=%s err=%v", target, err)
+		}
+	}
+	after, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", f.conversationID).Count(ctx)
+	if err != nil || after != before {
+		t.Fatalf("invalid writes: %d -> %d err=%v", before, after, err)
+	}
+	open, err := f.db.NewSelect().Model((*servermodels.ServiceSession)(nil)).Where("ss.conversation_id = ? AND ss.status = ?", f.conversationID, domain.ServiceSessionStatusOpen).Count(ctx)
+	if err != nil || open != 0 {
+		t.Fatalf("invalid reference reopened session: %d err=%v", open, err)
+	}
+	input.ExternalID = "web-session:ffffffffffffffffffffffffffffffff"
+	_, err = f.receive.Execute(ctx, input)
+	if !errors.Is(err, conversationaction.ErrConversationNotFound) {
+		t.Fatalf("foreign visitor=%v", err)
+	}
+	// 已关闭周期中的有效原文仍属于当前会话，访客引用可打开新周期。
+	input.ExternalID = "web-session:0123456789abcdef0123456789abcdef"
+	input.ConversationID = &other.Conversation.ID
+	input.ReplyToMessageID = other.Message.ID
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, nil)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, nil)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+		t.Fatal(err)
+	}
+	valid, err := f.receive.Execute(ctx, input)
+	if err != nil || !valid.OpenedNewServiceSession || valid.Message.ReplyTo == nil || valid.Message.ReplyTo.ID != other.Message.ID {
+		t.Fatalf("earlier cycle reply=%+v err=%v", valid, err)
+	}
+}
