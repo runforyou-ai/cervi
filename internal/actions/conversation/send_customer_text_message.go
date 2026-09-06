@@ -77,14 +77,13 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	}
 	ids := memberMessageIDs{subject: values[0], participant: values[1], message: values[2]}
 	var err error
-	originatedAt := time.Now().UTC()
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + normalized.ClientMessageID
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result ConversationMessage
 		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 			var executeErr error
-			result, executeErr = a.executeTransaction(ctx, tx, identity, normalized, ids, originatedAt, idempotencyKey)
+			result, executeErr = a.executeTransaction(ctx, tx, identity, normalized, ids, idempotencyKey)
 			return executeErr
 		})
 		if err == nil {
@@ -103,7 +102,7 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 }
 
 // executeTransaction 执行一次完整的成员客户会话回复事务。
-func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input CustomerTextMessageInput, ids memberMessageIDs, originatedAt time.Time, idempotencyKey string) (ConversationMessage, error) {
+func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input CustomerTextMessageInput, ids memberMessageIDs, idempotencyKey string) (ConversationMessage, error) {
 	if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 		return ConversationMessage{}, err
 	}
@@ -122,6 +121,8 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		return saved, err
 	}
 
+	// 取得客服周期锁后生成消息时间，避免等待期间的消息落到已读水位之前。
+	originatedAt := time.Now().UTC()
 	// 计算成员回复对应的客服周期状态迁移。
 	status := domain.ServiceSessionStatus(session.Status)
 	if status == domain.ServiceSessionStatusClosed {

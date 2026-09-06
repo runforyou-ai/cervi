@@ -74,7 +74,7 @@ func (s *Service) MarkConversationMentionReviewed(ctx context.Context, meta Requ
 	return s.backend.MarkConversationMentionReviewed(ctx, meta, conversationID, input)
 }
 
-// MarkConversationRead 单调推进当前用户的原生会话已读水位。
+// MarkConversationRead 单调推进当前用户的会话已读水位。
 func (s *Service) MarkConversationRead(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
 	return s.backend.MarkConversationRead(ctx, meta, conversationID, input)
 }

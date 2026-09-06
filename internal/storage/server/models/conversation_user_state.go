@@ -8,7 +8,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// ConversationUserState 表示用户在原生会话中的个人已读状态。
+// ConversationUserState 表示用户在会话中的个人阅读与提醒状态。
 type ConversationUserState struct {
 	bun.BaseModel `bun:"table:conversation_user_states,alias:cus"`
 
