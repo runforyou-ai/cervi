@@ -49,6 +49,12 @@ const documentStatuses = [
   KnowledgeDocumentStatus.KnowledgeDocumentStatusArchived,
 ] satisfies KnowledgeDocumentStatusId[]
 
+/** 将字数按千显示，省略整数的小数部分。 */
+function formatWordCount(count: number) {
+  if (count < 1000) return count.toLocaleString("en-US")
+  return `${(count / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 })}K`
+}
+
 /** 选择知识文档状态的展示样式。 */
 function statusVariant(status: KnowledgeDocumentStatusId) {
   if (status === KnowledgeDocumentStatus.KnowledgeDocumentStatusReady) {
@@ -218,7 +224,7 @@ export function KnowledgeDocumentListPage() {
               {t("documents.metadata.wordCount")}
             </dt>
             <dd className="mt-1 font-medium">
-              {externalConfiguration.wordCount}
+              {formatWordCount(externalConfiguration.wordCount)}
             </dd>
           </div>
           <div>
@@ -364,7 +370,7 @@ export function KnowledgeDocumentListPage() {
                         </StatusBadge>
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {document.wordCount?.toLocaleString() ?? "—"}
+                        {document.wordCount === null ? "—" : formatWordCount(document.wordCount)}
                       </TableCell>
                       <TableCell className="tabular-nums">
                         {document.hitCount.toLocaleString()}
