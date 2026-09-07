@@ -154,11 +154,6 @@ tasks:
     cmds:
       - task: common:build:server
 
-  build:postgres:
-    summary: 构建包含 vector 与 pg_trgm 的 PostgreSQL 镜像
-    cmds:
-      - docker compose build postgres
-
   run:server:
     summary: Runs the application in server mode
     deps:

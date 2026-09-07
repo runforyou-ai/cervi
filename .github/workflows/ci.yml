@@ -122,7 +122,7 @@ jobs:
       - name: Start integration test dependencies
         run: |
           cp .env.example .env
-          docker compose up -d --build --wait postgres nats
+          docker compose up -d --wait postgres nats
 
       - name: Test Go server build
         run: '"$(go env GOPATH)/bin/wails3" task test:server'
