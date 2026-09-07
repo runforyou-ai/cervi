@@ -171,7 +171,7 @@ function MobileConversationRow({
     : (
         directConversation?.direct.peerName ??
         (agent
-          ? `${agent.title} · ${agent.agentName}`
+          ? `${agent.agentName} · ${agent.title}`
           : groupConversation?.group.title)
       )?.trim() || t("unknownSender")
   const summary =

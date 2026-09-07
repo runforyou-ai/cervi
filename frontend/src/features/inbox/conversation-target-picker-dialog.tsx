@@ -1,5 +1,5 @@
 /** 真人单聊与 AI 聊天对象选择器。 */
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -45,6 +45,7 @@ export function ConversationTargetPickerDialog({
   ) => void
 }) {
   const { t } = useTranslation("inbox")
+  const dialogRef = useRef<HTMLDivElement>(null)
   const [selectedMember, setSelectedMember] = useState<MemberOption | null>(
     null,
   )
@@ -108,7 +109,15 @@ export function ConversationTargetPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="grid max-h-[min(42rem,calc(100svh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+      <DialogContent
+        ref={dialogRef}
+        className="grid max-h-[min(42rem,calc(100svh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden outline-none"
+        onOpenAutoFocus={(event) => {
+          // 选择器打开时聚焦弹窗容器，保留键盘导航且不选中任何操作。
+          event.preventDefault()
+          dialogRef.current?.focus()
+        }}
+      >
         <DialogHeader>
           <DialogTitle>
             {t(agentChat ? "agentPickerTitle" : "directPickerTitle")}

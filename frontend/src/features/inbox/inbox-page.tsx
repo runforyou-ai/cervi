@@ -738,7 +738,7 @@ function InboxConversationList({
       <div className="grid min-w-0 pb-1.5">
         {conversations.map((conversation) => {
           const name = isAgentInboxConversation(conversation)
-            ? `${conversation.agent.title} · ${conversation.agent.agentName}`
+            ? `${conversation.agent.agentName} · ${conversation.agent.title}`
             : conversationName(conversation)
           const summary = isCustomerInboxConversation(conversation)
             ? conversation.customer
