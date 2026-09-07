@@ -47,6 +47,49 @@ storage:
 
 服务端依赖 PostgreSQL 和启用 JetStream 的 NATS。
 
+## PostgreSQL 初始化
+
+PostgreSQL 基线为 18，数据库镜像必须提供 `vector` 和 `pg_trgm` 扩展安装文件。仓库的 `build/docker/Dockerfile.postgres` 固定 pgvector 0.8.6、Bookworm 和多架构镜像摘要，包含两个扩展。发布工作流提供 `ghcr.io/runforyou-ai/cervi-postgres:<发行版本>`，支持 linux/amd64 和 linux/arm64。
+
+主工作区构建并启动共享依赖：
+
+```bash
+wails3 task build:postgres
+docker compose up -d --wait postgres nats
+wails3 task migrate
+```
+
+每个工作区使用独立的 `POSTGRES_DB`，业务库和测试库分别初始化。Cervi 与后续 Hayhooks 共用同一实例、目标数据库和应用账号；业务表沿用原 schema，检索表由应用账号在 `haystack` schema 管理。
+
+服务端在开放 HTTP 和后台任务前，持有当前数据库的事务级初始化锁，安装缺失扩展、创建 `haystack`，验证权限和实际向量/trigram 能力，再取得 Goose 迁移锁执行业务迁移。启动日志记录已安装扩展版本；重复启动不升级扩展、不移动 schema，也不修改账号 search_path。`pg_isready` 只表示 PostgreSQL 接受连接，应用就绪以 `/readyz` 为准。
+
+仅准备数据库和执行业务迁移可以使用发行二进制，不需要源码或 Task：
+
+```bash
+./cervi-server -config cervi.yaml -migrate
+```
+
+`wails3 task migrate` 和服务端测试复用相同 Go 初始化入口。迁移回滚不会删除扩展和 `haystack`，检索表的生命周期独立管理。
+
+应用账号不能安装扩展时，管理员在**每个目标数据库**执行随发行包提供的 SQL；两个 SQL 文件保持同目录：
+
+```bash
+psql -h <数据库主机> -U <管理员> -d <目标数据库> \
+  -v cervi_role=<应用账号> -f database/prepare-admin.sql
+```
+
+该脚本安装两个扩展并授权 `public` 的 USAGE、`haystack` 的 USAGE/CREATE。应用账号还需原有业务 schema 的建表和业务表访问权限；建议由该账号拥有业务数据库及其业务表。正常运行时 Cervi 与 Hayhooks 均使用应用账号。管理员 SQL 同时包含在服务端容器的 `/database`，可通过 `docker cp <容器>:/database ./database` 取出。
+
+缺少扩展安装文件时需更换镜像或在 PostgreSQL 主机安装扩展包；缺少权限时按启动错误执行管理员 SQL。已有扩展不在 `public` 时由管理员明确处理。初始化按实际能力校验，不以扩展版本字符串强制拒绝其他兼容版本。真实云数据库的扩展支持与权限取决于提供商，本次未进行真实云实例验收。
+
+### 已有数据库更换镜像
+
+从 Alpine 切换到 Bookworm 时，使用逻辑备份恢复到新卷，验证编码、排序规则、数据、序列和索引。不要直接将未经验证的旧数据目录挂载到不同发行版镜像。
+
+先在独立容器和端口完成空库部署、备份恢复和业务测试。正式切换前阻止源库继续写入、终止原连接，完成最终备份后恢复至新卷；核验通过后再向客户端开放原端口。保留旧镜像、旧卷及备份用于回退。新实例重新接受写入后，回退需要另行迁移新增数据。
+
+共享实例数据卷由主工作区 `.env` 的 `POSTGRES_VOLUME` 指定，端口由 `POSTGRES_PORT` 指定。其他工作区继续使用共享实例地址，不自行启动 PostgreSQL。数据库备份不包含本地或对象存储中的原始文件，文件存储路径应保持可用。
+
 ## Linux systemd
 
 文件路径：

@@ -154,6 +154,11 @@ tasks:
     cmds:
       - task: common:build:server
 
+  build:postgres:
+    summary: 构建包含 vector 与 pg_trgm 的 PostgreSQL 镜像
+    cmds:
+      - docker compose build postgres
+
   run:server:
     summary: Runs the application in server mode
     deps:
@@ -221,10 +226,15 @@ tasks:
     deps:
       - db:ensure
     cmds:
-      - task: migrate:run
-        vars:
-          GOOSE_CMD: up
-          GOOSE_FLAGS: -allow-missing
+      - go run -tags server ./internal/tools/databasemigrate
+    env:
+      CGO_ENABLED: "0"
+      POSTGRES_HOST: "{{.POSTGRES_HOST}}"
+      POSTGRES_PORT: "{{.POSTGRES_PORT}}"
+      POSTGRES_USER: "{{.POSTGRES_USER}}"
+      POSTGRES_PASSWORD: "{{.POSTGRES_PASSWORD}}"
+      POSTGRES_DB: "{{.POSTGRES_DB}}"
+      POSTGRES_SSLMODE: "{{.POSTGRES_SSLMODE}}"
 
   migrate:status:
     summary: 查看服务端迁移状态

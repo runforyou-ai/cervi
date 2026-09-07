@@ -3,13 +3,16 @@ name: cervi
 services:
   postgres:
     container_name: cervi-postgres
-    image: postgres:18-alpine
+    image: cervi-postgres:18-vector0.8.6
+    build:
+      context: .
+      dockerfile: build/docker/Dockerfile.postgres
     environment:
       POSTGRES_DB: main
       POSTGRES_USER: cervi
       POSTGRES_PASSWORD: cervi
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - cervi-postgres-data:/var/lib/postgresql
     healthcheck:
@@ -39,4 +42,5 @@ services:
 
 volumes:
   cervi-postgres-data:
+    name: ${POSTGRES_VOLUME:-cervi_cervi-postgres-data}
   cervi-nats-data:

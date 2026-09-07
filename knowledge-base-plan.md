@@ -37,18 +37,18 @@ schema 划分表名与代码归属，同一账号可访问双方数据，双方�
 
 “基础库换到 pgvector”指将默认 PostgreSQL 镜像换成包含 pgvector 的 PostgreSQL 镜像，并在目标数据库启用 SQL 扩展 `vector` 和 `pg_trgm`；关系数据库、Bun、现有业务表和事务模型仍使用 PostgreSQL。
 
-当前 Compose 使用 `postgres:18-alpine`。实施时新增独立的 `build/docker/Dockerfile.postgres`，基于官方 `pgvector/pgvector` 的 PostgreSQL 18 镜像，锁定扩展版本、发行版标签及镜像摘要，并验证 `vector` 与 `pg_trgm` 的 control、SQL 和共享库文件可用；受测的 `0.8.6-pg18-bookworm` 已提供两者，直接复用镜像中的扩展包。Dockerfile 负责构建镜像，数据库初始化 SQL 在服务运行阶段执行。产品保持 PostgreSQL 18 主版本。[pgvector 官方部署说明](https://github.com/pgvector/pgvector#docker)
+Compose 已通过独立的 `build/docker/Dockerfile.postgres` 构建 `cervi-postgres:18-vector0.8.6`，基于官方 `pgvector/pgvector` 的 PostgreSQL 18 镜像，锁定扩展版本、发行版标签及镜像摘要，并验证 `vector` 与 `pg_trgm` 的 control、SQL 和共享库文件可用；受测的 `0.8.6-pg18-bookworm` 已提供两者，直接复用镜像中的扩展包。Dockerfile 负责构建镜像，数据库初始化 SQL 在服务运行阶段执行。产品保持 PostgreSQL 18 主版本。[pgvector 官方部署说明](https://github.com/pgvector/pgvector#docker)
 
 - 镜像提供扩展安装文件，扩展启用由数据库初始化完成。每个 worktree 的业务库及测试库分别初始化一次。
 - **`vector` 和 `pg_trgm` 都是 Cervi 的数据库基线，在目标数据库的 `public` schema 启用。** 分段向量统一保存在 `haystack` schema。
 - `pg_trgm` 随产品基线安装；Haystack 向量组件的数据库依赖是 `vector`。关键词检索接入与中文效果另行验收。
 - 两个服务直接复用当前数据库账号和密码。云数据库如要求管理员安装扩展，由管理员在部署时准备；Cervi 与 Hayhooks 常态运行时共用一个普通应用账号。
 
-AWS RDS、阿里云 RDS 和腾讯云 PostgreSQL 均有 pgvector 支持文档，但扩展版本、数据库版本、实例规格及安装权限需要按目标实例验证。真实云实例验收列入实施 PR。[AWS 扩展清单](https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-extensions.html)、[阿里云 pgvector 指南](https://www.alibabacloud.com/help/zh/rds/apsaradb-rds-for-postgresql/pgvector-use-guide)、[腾讯云扩展安装说明](https://www.tencentcloud.com/document/product/409/72650)
+AWS RDS、阿里云 RDS 和腾讯云 PostgreSQL 均有 pgvector 支持文档，但扩展版本、数据库版本、实例规格及安装权限需要按目标实例验证。本次 PR 1 不进行真实云实例验收；通过本地普通账号覆盖管理员预装及权限不足场景。[AWS 扩展清单](https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-extensions.html)、[阿里云 pgvector 指南](https://www.alibabacloud.com/help/zh/rds/apsaradb-rds-for-postgresql/pgvector-use-guide)、[腾讯云扩展安装说明](https://www.tencentcloud.com/document/product/409/72650)
 
 ### 2.3 由正式部署入口初始化
 
-**统一由 Cervi Go server 的数据库启动流程安装和校验扩展与 `haystack` schema。** 当前 `internal/storage/server/store.go` 的 `Open` 已负责连接与执行内嵌迁移；PR 1 在业务迁移之前加入数据库准备。独立二进制和服务端容器运行同一份内嵌初始化代码，运行环境使用服务端发行产物即可。
+**统一由 Cervi Go server 的数据库启动流程安装和校验扩展与 `haystack` schema。** `internal/storage/server/store.go` 的 `Open` 负责连接，在业务迁移之前准备数据库，再执行内嵌迁移。独立二进制和服务端容器运行同一份内嵌初始化代码，运行环境使用服务端发行产物即可。
 
 准备 SQL 作为独立资源内嵌进服务端，同时随发行包提供给云数据库管理员。它的目标语义为：
 
@@ -237,7 +237,7 @@ BM25、`ts_rank_cd`、pg_trgm similarity、向量 cosine、RRF 融合分数和�
 
 ## 7. PR 拆分与验收
 
-本次 PR 交付三份文档中的选型、模型配置规则与验收方案修订，共享数据库与业务代码保持现状。知识库按以下 PR 依次实施，长期记忆按独立产品计划交付。
+知识库按以下 PR 依次实施，长期记忆按独立产品计划交付。PR 1 已实现数据库镜像、初始化入口和部署说明，后续 PR 沿用该基线。
 
 ### PR 1：统一数据库镜像与 server 启动初始化
 
@@ -408,7 +408,7 @@ Go 客户端的五项检查全部通过：40 次最多四并发的交错查询�
 - 另一个只启用 vector 的数据库也能调用成功，验证了组件的 vector 依赖；产品基线仍统一安装 pg_trgm。
 - 默认自动安装路径创建的扩展为 vector；所有检查期间 API 实例标识不变。
 
-本轮验证上游组件与专用管线的启动边界；Cervi Go 启动安装、正式 PostgreSQL Dockerfile、Compose 编排与云权限列入实施验收。此前第 8.6/8.7 节只启用 vector 的实验结果保留为历史事实，双扩展部署按新的基线独立验收。
+本轮验证上游组件与专用管线的启动边界；Cervi Go 启动安装、正式 PostgreSQL Dockerfile、Compose 编排列入实施验收；本次以本地普通账号验证权限边界，不验收真实云实例。此前第 8.6/8.7 节只启用 vector 的实验结果保留为历史事实，双扩展部署按新的基线独立验收。
 
 ## 9. 长期记忆：统一使用 Haystack，交互确定后开发
 

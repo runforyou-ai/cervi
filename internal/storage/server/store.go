@@ -32,7 +32,7 @@ type Store struct {
 	db *bun.DB
 }
 
-// Open 连接 PostgreSQL 并执行数据库迁移。
+// Open 连接 PostgreSQL，准备扩展与 schema 后执行业务迁移。
 func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, error) {
 	sqlDB := sql.OpenDB(pgdriver.NewConnector(
 		pgdriver.WithDSN(postgresDSN(config)),
@@ -58,8 +58,12 @@ func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, erro
 	)
 
 	migrationCtx, cancelMigration := context.WithTimeout(ctx, postgresMigrationTimeout)
+	defer cancelMigration()
+	if err := prepareDatabase(migrationCtx, sqlDB); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("prepare PostgreSQL database %s: %w", config.Name, err)
+	}
 	migrationErr := migrate(migrationCtx, sqlDB)
-	cancelMigration()
 	if migrationErr != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate PostgreSQL: %w", migrationErr)
