@@ -1,6 +1,7 @@
 /** 简体中文·联系人文案。 */
 const contacts = {
   title: "通讯录",
+  sendMessage: "发消息",
   scopeNavigation: "通讯录分类",
   all: "全部",
   create: "添加联系人",

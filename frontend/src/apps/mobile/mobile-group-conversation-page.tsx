@@ -1,5 +1,6 @@
 /** 移动端已有群聊的资料读取、访问恢复和详情入口。 */
 import { useCallback, useEffect, useRef } from "react"
+import { BellOffIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
@@ -10,7 +11,6 @@ import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
-import { GroupAvatar } from "@/features/inbox/group-avatar"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
@@ -28,7 +28,7 @@ export function MobileGroupConversationPage() {
 
 /** 独立读取群资料，前台同步名称、成员人数及解散状态。 */
 function MobileGroupConversation({ conversationID }: { conversationID: string }) {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "inbox"])
   const navigate = useNavigate()
   const { inboxURL } = useMobileNavigation()
   const invalidate = useResourceInvalidator()
@@ -71,31 +71,46 @@ function MobileGroupConversation({ conversationID }: { conversationID: string })
       <MobilePageHeader
         backTo={inboxURL}
         title={
-          <span className="flex items-center gap-3">
-            <GroupAvatar imageURL={data?.imageUrl ?? ""} className="size-9" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-base font-semibold">
-                {data?.title ?? t("group.title")}
+          <span className="flex min-w-0 items-center">
+            <span className="truncate">{data?.title ?? t("group.title")}</span>
+            {data ? (
+              <span className="shrink-0">
+                {t("group.memberCount", { count: data.participants.length })}
               </span>
-              {data ? (
-                <span className="block text-xs font-normal text-muted-foreground">
-                  {t("group.memberCount", { count: data.participants.length })}
-                </span>
-              ) : null}
-            </span>
+            ) : null}
+            {data?.muted ? (
+              <BellOffIcon
+                className="ml-1 size-3.5 shrink-0 text-muted-foreground"
+                aria-label={t("inbox:conversationMuted")}
+              />
+            ) : null}
           </span>
         }
         actions={
-          data && error && !isNotFoundApiError(error) ? (
+          <>
+            {data && error && !isNotFoundApiError(error) ? (
+              <Button
+                variant="ghost"
+                className="min-h-11 text-warning"
+                disabled={refreshing}
+                onClick={() => void refresh()}
+              >
+                {t("inbox.refreshFailed")}
+              </Button>
+            ) : null}
             <Button
               variant="ghost"
-              className="min-h-11 text-warning"
-              disabled={refreshing}
-              onClick={() => void refresh()}
+              size="icon-lg"
+              className="-mr-2"
+              aria-label={t("group.details")}
+              disabled={!data}
+              onClick={() => navigate(`/inbox/group/${conversationID}/details`, {
+                state: { mobileBack: true },
+              })}
             >
-              {t("inbox.refreshFailed")}
+              <MoreHorizontalIcon />
             </Button>
-          ) : null
+          </>
         }
       />
       {data ? (

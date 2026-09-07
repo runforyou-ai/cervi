@@ -5,10 +5,13 @@ package conversation
 import (
 	"errors"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
 )
 
 var (
+	// ErrAgentTargetNotFound 表示 AI 聊天目标不存在或不可用。
+	ErrAgentTargetNotFound = errors.New("AI conversation target not found")
 	// ErrMessageUnavailable 表示目标消息不存在或已经删除。
 	ErrMessageUnavailable = errors.New("conversation message unavailable")
 	// ErrMentionTargetInvalid 表示目标不是当前用户的提及。
@@ -16,7 +19,7 @@ var (
 	// ErrChannelNotFound 表示网站渠道不存在或不可用。
 	ErrChannelNotFound = errors.New("website channel not found")
 	// ErrConversationNotFound 表示会话不存在或当前身份无权访问。
-	ErrConversationNotFound = errors.New("conversation not found")
+	ErrConversationNotFound = chatstate.ErrConversationNotFound
 	// ErrDirectTargetNotFound 表示内部单聊目标不存在或不可用。
 	ErrDirectTargetNotFound = errors.New("direct conversation target not found")
 	// ErrGroupMemberNotFound 表示待加入群聊的成员不存在或不可用。
@@ -24,7 +27,7 @@ var (
 	// ErrGroupImageFileNotFound 表示群聊图片文件不可关联。
 	ErrGroupImageFileNotFound = errors.New("group conversation image file not found")
 	// ErrGroupOwnerRequired 表示当前成员不是群主。
-	ErrGroupOwnerRequired = errors.New("group conversation owner required")
+	ErrGroupOwnerRequired = chatstate.ErrGroupOwnerRequired
 	// ErrDataInvariant 表示聊天持久关系不完整或互相矛盾。
 	ErrDataInvariant = errors.New("conversation data invariant violated")
 )

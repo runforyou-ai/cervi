@@ -32,7 +32,7 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 	}
 	assertMessageAvatar(t, reply.ReplyTo.Sender, avatarID)
 
-	start := conversationaction.NewSendFirstDirectTextMessageAction(f.db, nil)
+	start := conversationaction.NewSendFirstDirectTextMessageAction(f.db)
 	direct, err := start.Execute(ctx, f.member, conversationaction.FirstDirectTextMessageInput{
 		TargetIdentityID: f.owner.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息",
 	})
@@ -40,8 +40,8 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 		t.Fatalf("direct=%+v err=%v", direct, err)
 	}
 
-	sendDirect := conversationaction.NewSendDirectTextMessageAction(f.db, nil)
-	directMessage, err := sendDirect.Execute(ctx, f.owner, conversationaction.DirectTextMessageInput{
+	sendDirect := conversationaction.NewSendDirectTextMessageAction(f.db)
+	directMessage, err := sendDirect.Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{
 		ConversationID: direct.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊回复目标",
 	})
 	if err != nil {
@@ -55,7 +55,7 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 首次发送与幂等重试都应补齐单聊引用发送者的最新头像。
-	directReplyInput := conversationaction.DirectTextMessageInput{
+	directReplyInput := conversationaction.InternalTextMessageInput{
 		ConversationID: direct.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊引用", ReplyToMessageID: directMessage.ID,
 	}
 	for range 2 {

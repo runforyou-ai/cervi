@@ -162,6 +162,9 @@ func (b *Backend) normalizeOutput(output any) {
 		if value.Conversation != nil {
 			b.normalizeConversation(value.Conversation)
 		}
+	case *appservice.FirstAgentTextMessageResult:
+		b.normalizeConversation(&value.Conversation)
+		b.normalizeConversationMessage(&value.Message)
 	case *appservice.FirstDirectTextMessageResult:
 		b.normalizeConversation(&value.Conversation)
 		b.normalizeConversationMessage(&value.Message)
@@ -187,6 +190,9 @@ func (b *Backend) normalizeOutput(output any) {
 func (b *Backend) normalizeConversation(conversation *appservice.InboxConversation) {
 	if conversation.Customer != nil {
 		conversation.Customer.ContactAvatarURL = b.absoluteContentURL(conversation.Customer.ContactAvatarURL)
+	}
+	if conversation.Agent != nil {
+		conversation.Agent.AgentAvatarURL = b.absoluteContentURL(conversation.Agent.AgentAvatarURL)
 	}
 	if conversation.Direct != nil {
 		conversation.Direct.PeerAvatarURL = b.absoluteContentURL(conversation.Direct.PeerAvatarURL)

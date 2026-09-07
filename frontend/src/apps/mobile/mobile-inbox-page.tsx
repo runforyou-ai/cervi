@@ -1,19 +1,23 @@
 /** 移动端统一会话摘要列表和内部聊天入口。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
+import { PlusIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import {
   isCustomerInboxConversation,
+  isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   InboxScope,
   ConversationStatus,
+  MessageType,
   loadInbox,
   ServiceSessionStatus,
   type CustomerInboxConversationData,
+  type AgentInboxConversationData,
   type DirectInboxConversationData,
   type InboxConversation,
   type GroupInboxConversationData,
@@ -30,6 +34,12 @@ import {
 } from "@/apps/mobile/mobile-page"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
@@ -44,15 +54,17 @@ import { cn } from "@/lib/utils"
 
 type MobileInboxConversation =
   | CustomerInboxConversationData
+  | AgentInboxConversationData
   | DirectInboxConversationData
   | GroupInboxConversationData
 
-/** 识别移动端展示的三种会话摘要。 */
+/** 识别移动端支持的会话摘要。 */
 function isMobileInboxConversation(
   conversation: InboxConversation,
 ): conversation is MobileInboxConversation {
   return (
     isCustomerInboxConversation(conversation) ||
+    isAgentInboxConversation(conversation) ||
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation)
   )
@@ -140,7 +152,10 @@ function MobileConversationRow({
 }: {
   conversation: MobileInboxConversation
   onOpen: (
-    conversation: DirectInboxConversationData | GroupInboxConversationData,
+    conversation:
+      | DirectInboxConversationData
+      | AgentInboxConversationData
+      | GroupInboxConversationData,
   ) => void
 }) {
   const { t } = useTranslation("inbox")
@@ -152,22 +167,26 @@ function MobileConversationRow({
   const directConversation = isDirectInboxConversation(conversation)
     ? conversation
     : null
+  const agent = isAgentInboxConversation(conversation)
+    ? conversation.agent
+    : null
   const groupConversation = isGroupInboxConversation(conversation)
     ? conversation
     : null
   const name = customerConversation
     ? (customerConversation.customer.contactName ?? t("anonymousVisitor"))
     : (
-        directConversation?.direct.peerName ?? groupConversation?.group.title
+        directConversation?.direct.peerName ??
+        (agent
+          ? `${agent.agentName} · ${agent.title}`
+          : groupConversation?.group.title)
       )?.trim() || t("unknownSender")
   const summary =
     customerConversation?.customer ??
     directConversation?.direct ??
+    agent ??
     groupConversation?.group
-  const agentRunLabel = agentRunStatusLabel(
-    directConversation?.direct.agentRunStatus ?? null,
-    t,
-  )
+  const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
   // 返回客服处理状态的移动端颜色。
   const customerSessionStatusClass =
     customerConversation?.customer.serviceSessionStatus ===
@@ -180,12 +199,20 @@ function MobileConversationRow({
     groupConversation?.group.status ===
     ConversationStatus.ConversationStatusArchived
       ? t("groupDissolved")
-      : (messagePreview(summary.preview ?? "", summary.previewSenderIdentityType) ||
+      : conversation.lastMessageType === MessageType.MessageTypeAgentError
+        ? t("agentRunFailed")
+        : messagePreview(
+          summary.preview ?? "",
+          summary.previewSenderIdentityType,
+        ) ||
         (groupConversation && conversation.lastMessageId
           ? t("groupSystemUpdated")
-          : t("messagesEmpty")))
+          : t("messagesEmpty"))
   const formattedTime = formatTime(summary.lastMessageAt)
-  const internalConversation = directConversation ?? groupConversation
+  const internalConversation =
+    directConversation ??
+    groupConversation ??
+    (isAgentInboxConversation(conversation) ? conversation : null)
 
   const content = (
     <>
@@ -271,7 +298,7 @@ export function MobileInboxPage() {
     requireWindowFocus: false,
   })
   const previousPollingActiveRef = useRef(pollingActive)
-  const { data, loading, refreshing, error, refresh } = useResource(
+  const { data, loading, refresh } = useResource(
     resourceKeys.inbox(query),
     () => loadInbox(query),
     {
@@ -296,19 +323,28 @@ export function MobileInboxPage() {
       <MobilePageHeader
         title={t("inbox.title")}
         actions={
-          <Button
-            variant="ghost"
-            className={cn("min-h-11", error && "text-warning")}
-            aria-label={error ? t("inbox.refreshError") : t("inbox.refresh")}
-            disabled={loading || refreshing}
-            onClick={() => void refresh()}
-          >
-            {refreshing
-              ? t("inbox.refreshing")
-              : error
-                ? t("inbox.refreshFailed")
-                : t("inbox.refresh")}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                aria-label={t("inbox.add")}
+              >
+                <PlusIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() => navigate("/inbox/group/new", {
+                  state: { mobileBack: true },
+                })}
+              >
+                {t("group.create")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
       <MobileInboxScopes scope={query.scope} onChange={changeQuery} />
@@ -346,9 +382,11 @@ export function MobileInboxPage() {
                 key={conversation.id}
                 conversation={conversation}
                 onOpen={(conversation) => {
-                  const type = isDirectInboxConversation(conversation)
-                    ? "direct"
-                    : "group"
+                  const type = isAgentInboxConversation(conversation)
+                    ? "agent"
+                    : isDirectInboxConversation(conversation)
+                      ? "direct"
+                      : "group"
                   navigate(`/inbox/${type}/${conversation.id}`, {
                     state: { conversation, mobileBack: true },
                   })

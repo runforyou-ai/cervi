@@ -14,7 +14,7 @@ const (
 	ServiceSessionStatusClosed ServiceSessionStatus = ServiceSessionStatus(domain.ServiceSessionStatusClosed)
 )
 
-// AgentRunStatus 表示 Agent 单聊当前最近一次运行状态。
+// AgentRunStatus 表示会话中 Agent 最近一次运行状态。
 type AgentRunStatus string
 
 const (
@@ -70,6 +70,7 @@ type ConversationType string
 const (
 	ConversationTypeCustomer ConversationType = ConversationType(domain.ConversationTypeCustomer)
 	ConversationTypeDirect   ConversationType = ConversationType(domain.ConversationTypeDirect)
+	ConversationTypeAgent    ConversationType = ConversationType(domain.ConversationTypeAgent)
 	ConversationTypeGroup    ConversationType = ConversationType(domain.ConversationTypeGroup)
 )
 
@@ -97,6 +98,17 @@ type DirectInboxConversation struct {
 	Preview                   *string                   `json:"preview"`
 	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
 	LastMessageAt             *time.Time                `json:"lastMessageAt"`
+}
+
+// AgentInboxConversation 定义 AI 聊天摘要。
+type AgentInboxConversation struct {
+	Title                     string                    `json:"title"`
+	AgentIdentityID           string                    `json:"agentIdentityId"`
+	AgentName                 string                    `json:"agentName"`
+	AgentAvatarURL            string                    `json:"agentAvatarUrl"`
+	Preview                   *string                   `json:"preview"`
+	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
+	LastMessageAt             *time.Time                `json:"lastMessageAt"`
 	AgentRunStatus            *AgentRunStatus           `json:"agentRunStatus"`
 }
 
@@ -113,6 +125,7 @@ type GroupInboxConversation struct {
 
 // InboxConversation 定义成员统一收件箱列表项。
 type InboxConversation struct {
+	LastMessageType      *MessageType               `json:"lastMessageType"`
 	ID                   string                     `json:"id"`
 	Type                 ConversationType           `json:"type"`
 	UnreadCount          int                        `json:"unreadCount"`
@@ -121,6 +134,7 @@ type InboxConversation struct {
 	Muted                bool                       `json:"muted"`
 	LastMessageID        *string                    `json:"lastMessageId"`
 	LastReadMessageID    *string                    `json:"lastReadMessageId"`
+	Agent                *AgentInboxConversation    `json:"agent"`
 	Customer             *CustomerInboxConversation `json:"customer"`
 	Direct               *DirectInboxConversation   `json:"direct"`
 	Group                *GroupInboxConversation    `json:"group"`

@@ -13,6 +13,31 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
+// TestGroupConversationMuted 验证群资料返回当前用户的静音状态。
+func TestGroupConversationMuted(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	get := conversationaction.NewGetGroupConversationQuery(f.db)
+	mute := conversationaction.NewUpdateConversationNotificationSettingsAction(f.db)
+	initial, err := get.Execute(ctx, f.member, f.groupID)
+	if err != nil || initial.Muted {
+		t.Fatalf("initial group = %#v, error = %v", initial, err)
+	}
+	for _, muted := range []bool{true, false} {
+		if _, err := mute.Execute(ctx, f.member, f.groupID, muted); err != nil {
+			t.Fatal(err)
+		}
+		group, err := get.Execute(ctx, f.member, f.groupID)
+		if err != nil || group.Muted != muted {
+			t.Fatalf("group muted = %v, want %v, error = %v", group.Muted, muted, err)
+		}
+		ownerGroup, err := get.Execute(ctx, f.owner, f.groupID)
+		if err != nil || ownerGroup.Muted {
+			t.Fatalf("member mute affected owner: %#v, error = %v", ownerGroup, err)
+		}
+	}
+}
+
 // TestConversationUnreadMark 验证个人标记、静音和两个阅读水位相互独立。
 func TestConversationUnreadMark(t *testing.T) {
 	f := newNavigationFixture(t)
@@ -116,7 +141,7 @@ func TestConversationUnreadMark(t *testing.T) {
 func TestInboxUnreadUsesCanonicalDirect(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	sent, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息"})
+	sent, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息"})
 	if err != nil {
 		t.Fatal(err)
 	}

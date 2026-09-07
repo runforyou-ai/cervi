@@ -4,6 +4,7 @@ package domain
 type ConversationType string
 
 const (
+	ConversationTypeAgent    ConversationType = "agent"
 	ConversationTypeDirect   ConversationType = "direct"
 	ConversationTypeGroup    ConversationType = "group"
 	ConversationTypeCustomer ConversationType = "customer"

@@ -59,14 +59,14 @@ func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *se
 	return loadClaimedCustomerMessages(ctx, db, run, endSeq)
 }
 
-// persistResponse 写入客户 Agent 回复并更新客服周期摘要。
-func (p customerRunPolicy) persistResponse(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID, content string) error {
+// persistMessage 写入客服 Agent 结果消息并更新会话摘要。
+func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
 	participantID, err := ensureCustomerAgentParticipant(ctx, db, run.OrganizationID, run.ConversationID, run.AgentIdentityID)
 	if err != nil {
 		return err
 	}
-	message, err := insertAgentResponseMessage(
-		ctx, db, run, messageID, participantID, content, &policyContext.ServiceSession.ID,
+	message, err := insertAgentMessage(
+		ctx, db, run, messageID, participantID, messageType, content, &policyContext.ServiceSession.ID,
 	)
 	if err != nil {
 		return err
@@ -257,8 +257,7 @@ func ensureCustomerAgentParticipant(ctx context.Context, db bun.IDB, organizatio
 
 // updateCustomerAgentSummaries 更新客服首响和会话消息摘要。
 func updateCustomerAgentSummaries(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, message *servermodels.Message) error {
-	if _, err := db.NewUpdate().Model(session).
-		Set("first_response_at = COALESCE(first_response_at, ?)", message.OriginatedAt).
+	query := db.NewUpdate().Model(session).
 		Set("last_message_id = ?", message.ID).
 		Set("last_message_at = ?", message.OriginatedAt).
 		Set("last_message_source_order = ?", message.SourceOrder).
@@ -266,8 +265,12 @@ func updateCustomerAgentSummaries(ctx context.Context, db bun.IDB, session *serv
 		WherePK().
 		Where("organization_id = ?", message.OrganizationID).
 		Where("status = ?", domain.ServiceSessionStatusOpen).
-		Where("(last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID).
-		Exec(ctx); err != nil {
+		Where("(last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID)
+	// 客服首响仅由访客可见的正常回复确认。
+	if message.Type == string(domain.MessageTypeText) {
+		query = query.Set("first_response_at = COALESCE(first_response_at, ?)", message.OriginatedAt)
+	}
+	if _, err := query.Exec(ctx); err != nil {
 		return fmt.Errorf("update service session after customer agent response: %w", err)
 	}
 	return updateConversationAfterAgentResponse(ctx, db, message)

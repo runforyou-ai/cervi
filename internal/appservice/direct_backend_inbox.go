@@ -37,6 +37,9 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 		if summary.Direct != nil && summary.Direct.PeerAvatarFileID != nil {
 			avatarFileIDs = append(avatarFileIDs, *summary.Direct.PeerAvatarFileID)
 		}
+		if summary.Agent != nil && summary.Agent.AgentAvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *summary.Agent.AgentAvatarFileID)
+		}
 		if summary.Customer == nil {
 			continue
 		}
@@ -54,38 +57,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 	}
 	conversations := make([]InboxConversation, 0, len(summaries))
 	for _, summary := range summaries {
-		conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, LastMessageID: summary.LastMessageID, LastReadMessageID: summary.LastReadMessageID}
-		if summary.Customer != nil {
-			var assignee *InboxAssignee
-			if summary.Customer.Assignee != nil {
-				assignee = &InboxAssignee{IdentityID: summary.Customer.Assignee.IdentityID, Type: OrganizationIdentityType(summary.Customer.Assignee.Type), DisplayName: summary.Customer.Assignee.DisplayName, AvatarURL: optionalFileURL(avatarURLs, summary.Customer.Assignee.AvatarFileID)}
-			}
-			conversation.Customer = &CustomerInboxConversation{
-				Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
-				ContactAvatarURL: optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
-				ChannelType:      ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
-				Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType), LastMessageAt: summary.Customer.LastMessageAt,
-				ServiceSessionID: summary.Customer.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus), Assignee: assignee,
-			}
-		}
-		if summary.Direct != nil {
-			var agentRunStatus *AgentRunStatus
-			if summary.Direct.AgentRunStatus != nil {
-				status := AgentRunStatus(*summary.Direct.AgentRunStatus)
-				agentRunStatus = &status
-			}
-			conversation.Direct = &DirectInboxConversation{
-				PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID),
-				Preview: summary.Direct.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Direct.PreviewSenderIdentityType), LastMessageAt: summary.Direct.LastMessageAt, AgentRunStatus: agentRunStatus,
-			}
-		}
-		if summary.Group != nil {
-			conversation.Group = &GroupInboxConversation{
-				Title: summary.Group.Title, ImageURL: optionalFileURL(avatarURLs, summary.Group.ImageFileID),
-				Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Group.PreviewSenderIdentityType),
-				LastMessageAt: summary.Group.LastMessageAt, MemberCount: summary.Group.MemberCount,
-			}
-		}
+		conversation := inboxConversationFromAction(summary, avatarURLs)
 		conversations = append(conversations, conversation)
 	}
 	return Inbox{Conversations: conversations, UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention}, nil
@@ -121,4 +93,47 @@ func (b *DirectBackend) ListCustomerServiceAssignees(ctx context.Context, meta R
 		assignees = append(assignees, InboxAssignee{IdentityID: item.IdentityID, Type: OrganizationIdentityType(item.Type), DisplayName: item.DisplayName, AvatarURL: optionalFileURL(avatarURLs, item.AvatarFileID)})
 	}
 	return CustomerServiceAssigneeList{Assignees: assignees}, nil
+}
+
+// inboxConversationFromAction 转换完整会话摘要并填充头像地址。
+func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatarURLs map[string]string) InboxConversation {
+	conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, LastMessageID: summary.LastMessageID, LastMessageType: (*MessageType)(summary.LastMessageType), LastReadMessageID: summary.LastReadMessageID}
+	if summary.Customer != nil {
+		var assignee *InboxAssignee
+		if summary.Customer.Assignee != nil {
+			assignee = &InboxAssignee{IdentityID: summary.Customer.Assignee.IdentityID, Type: OrganizationIdentityType(summary.Customer.Assignee.Type), DisplayName: summary.Customer.Assignee.DisplayName, AvatarURL: optionalFileURL(avatarURLs, summary.Customer.Assignee.AvatarFileID)}
+		}
+		conversation.Customer = &CustomerInboxConversation{
+			Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
+			ContactAvatarURL: optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
+			ChannelType:      ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
+			Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType), LastMessageAt: summary.Customer.LastMessageAt,
+			ServiceSessionID: summary.Customer.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus), Assignee: assignee,
+		}
+	}
+	if summary.Direct != nil {
+		conversation.Direct = &DirectInboxConversation{
+			PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID),
+			Preview: summary.Direct.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Direct.PreviewSenderIdentityType), LastMessageAt: summary.Direct.LastMessageAt,
+		}
+	}
+	if summary.Agent != nil {
+		var agentRunStatus *AgentRunStatus
+		if summary.Agent.AgentRunStatus != nil {
+			status := AgentRunStatus(*summary.Agent.AgentRunStatus)
+			agentRunStatus = &status
+		}
+		conversation.Agent = &AgentInboxConversation{
+			Title: summary.Agent.Title, AgentIdentityID: summary.Agent.AgentIdentityID, AgentName: summary.Agent.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, summary.Agent.AgentAvatarFileID),
+			Preview: summary.Agent.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Agent.PreviewSenderIdentityType), LastMessageAt: summary.Agent.LastMessageAt, AgentRunStatus: agentRunStatus,
+		}
+	}
+	if summary.Group != nil {
+		conversation.Group = &GroupInboxConversation{
+			Title: summary.Group.Title, ImageURL: optionalFileURL(avatarURLs, summary.Group.ImageFileID),
+			Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Group.PreviewSenderIdentityType),
+			LastMessageAt: summary.Group.LastMessageAt, MemberCount: summary.Group.MemberCount,
+		}
+	}
+	return conversation
 }

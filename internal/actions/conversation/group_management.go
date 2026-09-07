@@ -8,23 +8,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-var groupManagementRetryableConstraintNames = map[string]struct{}{
-	"chat_subjects_organization_kind_source_unique": {},
-}
 
 // UpdateGroupConversationAction 修改群聊资料。
 type UpdateGroupConversationAction struct{ db *bun.DB }
@@ -40,14 +36,6 @@ type TransferGroupConversationOwnerAction struct{ db *bun.DB }
 
 // LeaveGroupConversationAction 退出群聊，最后一位群主退出时解散群聊。
 type LeaveGroupConversationAction struct{ db *bun.DB }
-
-type lockedGroupConversationRow struct {
-	Title                string  `bun:"title"`
-	Description          string  `bun:"description"`
-	ImageFileID          *string `bun:"image_file_id"`
-	CurrentParticipantID string  `bun:"current_participant_id"`
-	CurrentRole          string  `bun:"current_role"`
-}
 
 type activeGroupParticipantRow struct {
 	ParticipantID string `bun:"participant_id"`
@@ -92,23 +80,22 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		group, err := lockGroupConversation(ctx, tx, identity, normalized.ConversationID)
+		group, err := chatstate.LockGroup(ctx, tx, identity, normalized.ConversationID, chatstate.GroupManageable)
 		if err != nil {
 			return err
 		}
-		if err := requireGroupOwner(group); err != nil {
-			return err
-		}
-		nextImageFileID := group.ImageFileID
+		title := common.StringValue(group.Conversation.Title)
+		description := common.StringValue(group.Conversation.Description)
+		nextImageFileID := group.Conversation.ImageFileID
 		imageChanged := false
 		if normalized.ImageFileID != nil {
-			nextImageFileID, err = activateGroupImage(ctx, tx, identity.Organization.ID, *normalized.ImageFileID, group.ImageFileID)
+			nextImageFileID, err = activateGroupImage(ctx, tx, identity.Organization.ID, *normalized.ImageFileID, group.Conversation.ImageFileID)
 			if err != nil {
 				return err
 			}
-			imageChanged = group.ImageFileID == nil || *group.ImageFileID != *normalized.ImageFileID
+			imageChanged = group.Conversation.ImageFileID == nil || *group.Conversation.ImageFileID != *normalized.ImageFileID
 		}
-		if group.Title != normalized.Title || group.Description != normalized.Description || imageChanged {
+		if title != normalized.Title || description != normalized.Description || imageChanged {
 			if _, err := tx.NewUpdate().Model((*servermodels.Conversation)(nil)).
 				Set("title = ?", normalized.Title).
 				Set("description = ?", common.OptionalString(normalized.Description)).
@@ -120,13 +107,13 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 				return fmt.Errorf("update group conversation profile: %w", err)
 			}
 			if imageChanged {
-				if err := retireGroupImage(ctx, tx, identity.Organization.ID, group.ImageFileID, nextImageFileID); err != nil {
+				if err := retireGroupImage(ctx, tx, identity.Organization.ID, group.Conversation.ImageFileID, nextImageFileID); err != nil {
 					return err
 				}
 			}
 		}
-		if group.Title != normalized.Title {
-			previousTitle := group.Title
+		if title != normalized.Title {
+			previousTitle := title
 			eventTitle := normalized.Title
 			if _, err := createGroupSystemEvent(ctx, tx, identity, normalized.ConversationID, ConversationSystemEvent{
 				Type:          domain.ConversationSystemEventGroupRenamed,
@@ -153,66 +140,60 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 		return GroupConversation{}, &ValidationError{Fields: fields}
 	}
 	participantIDs := make(map[string]string, len(memberIDs))
-	subjectIDs := make(map[string]string, len(memberIDs))
 	for _, identityID := range memberIDs {
 		participantIDs[identityID] = uuid.NewV7().String()
-		subjectIDs[identityID] = uuid.NewV7().String()
 	}
 
 	var result GroupConversation
-	var err error
-	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
-		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-				return err
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		_, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
+		if err != nil {
+			return err
+		}
+		members, err := loadActiveGroupMembers(ctx, tx, identity.Organization.ID, memberIDs)
+		if err != nil {
+			return err
+		}
+		activeIDs, err := loadActiveGroupParticipantIdentityIDs(ctx, tx, identity.Organization.ID, conversationID)
+		if err != nil {
+			return err
+		}
+		activeSet := make(map[string]struct{}, len(activeIDs))
+		for _, identityID := range activeIDs {
+			activeSet[identityID] = struct{}{}
+		}
+		for _, identityID := range memberIDs {
+			if _, exists := activeSet[identityID]; exists {
+				return &ConflictError{Reason: ConflictReasonGroupMemberAlreadyActive}
 			}
-			group, err := lockGroupConversation(ctx, tx, identity, conversationID)
-			if err != nil {
-				return err
-			}
-			if err := requireGroupOwner(group); err != nil {
-				return err
-			}
-			members, err := loadActiveGroupMembers(ctx, tx, identity.Organization.ID, memberIDs)
-			if err != nil {
-				return err
-			}
-			activeIDs, err := loadActiveGroupParticipantIdentityIDs(ctx, tx, identity.Organization.ID, conversationID)
-			if err != nil {
-				return err
-			}
-			activeSet := make(map[string]struct{}, len(activeIDs))
-			for _, identityID := range activeIDs {
-				activeSet[identityID] = struct{}{}
-			}
-			for _, identityID := range memberIDs {
-				if _, exists := activeSet[identityID]; exists {
-					return &ConflictError{Reason: ConflictReasonGroupMemberAlreadyActive}
-				}
-			}
-			if len(activeIDs)+len(memberIDs) > maxGroupParticipantCount {
-				return &ValidationError{Fields: map[string]ValidationCode{"memberIdentityIds": ValidationGroupMembersTooMany}}
-			}
+		}
+		if len(activeIDs)+len(memberIDs) > maxGroupParticipantCount {
+			return &ValidationError{Fields: map[string]ValidationCode{"memberIdentityIds": ValidationGroupMembersTooMany}}
+		}
 
-			targets := make([]ConversationSystemEventParticipant, 0, len(members))
-			for _, member := range members {
-				subject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, member.IdentityID, subjectIDs[member.IdentityID])
-				if err != nil {
-					return err
-				}
-				if err := restoreOrCreateGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, subject.ID, participantIDs[member.IdentityID]); err != nil {
-					return err
-				}
-				targets = append(targets, ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName})
-			}
-			eventMessage, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
-				Type: domain.ConversationSystemEventGroupMembersAdded, Actor: groupActorSnapshot(identity), Targets: targets,
-			})
-			if err != nil {
+		subjects, err := ensureOrganizationIdentityChatSubjects(ctx, tx, identity.Organization.ID, memberIDs)
+		if err != nil {
+			return err
+		}
+		targets := make([]ConversationSystemEventParticipant, 0, len(members))
+		for _, member := range members {
+			subject := subjects[member.IdentityID]
+			if err := restoreOrCreateGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, subject.ID, participantIDs[member.IdentityID]); err != nil {
 				return err
 			}
-			// 新成员从本轮加入事件开始记录已读，离开期间的历史不形成未读。
-			if _, err := tx.ExecContext(ctx, `
+			targets = append(targets, ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName})
+		}
+		eventMessage, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+			Type: domain.ConversationSystemEventGroupMembersAdded, Actor: groupActorSnapshot(identity), Targets: targets,
+		})
+		if err != nil {
+			return err
+		}
+		// 新成员从本轮加入事件开始记录已读，离开期间的历史不形成未读。
+		if _, err := tx.ExecContext(ctx, `
 				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id, last_read_at, last_reviewed_mention_message_id)
 				SELECT u.organization_id, cv.id, u.id, ?::uuid, now(), ?::uuid
 				FROM users AS u
@@ -221,29 +202,21 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 				ON CONFLICT (organization_id, conversation_id, user_id) DO UPDATE
 				SET last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = now(), last_reviewed_mention_message_id = EXCLUDED.last_reviewed_mention_message_id, updated_at = now()
 			`, eventMessage.ID, eventMessage.ID, conversationID, identity.Organization.ID, bun.In(memberIDs)); err != nil {
-				return fmt.Errorf("initialize added group member read states: %w", err)
-			}
-			// 本轮入群基线已覆盖此前查看记录。
-			if _, err := tx.NewDelete().Model((*servermodels.ConversationMentionReview)(nil)).
-				Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).
-				Where("user_id IN (SELECT id FROM users WHERE organization_id = ? AND identity_id IN (?))", identity.Organization.ID, bun.In(memberIDs)).Exec(ctx); err != nil {
-				return fmt.Errorf("reset added group member mention reviews: %w", err)
-			}
-			result, err = loadGroupConversation(ctx, tx, identity, conversationID)
-			return err
-		})
-		if err == nil {
-			return result, nil
+			return fmt.Errorf("initialize added group member read states: %w", err)
 		}
-		constraint, retryable := retryableUniqueViolation(err, groupManagementRetryableConstraintNames)
-		if !retryable {
-			return GroupConversation{}, fmt.Errorf("add group conversation members: %w", err)
+		// 本轮入群基线已覆盖此前查看记录。
+		if _, err := tx.NewDelete().Model((*servermodels.ConversationMentionReview)(nil)).
+			Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).
+			Where("user_id IN (SELECT id FROM users WHERE organization_id = ? AND identity_id IN (?))", identity.Organization.ID, bun.In(memberIDs)).Exec(ctx); err != nil {
+			return fmt.Errorf("reset added group member mention reviews: %w", err)
 		}
-		if attempt < maxWriteAttempts-1 {
-			slog.Info("企业群聊增员重试", "conversation_id", conversationID, "attempt", attempt+2, "constraint", constraint)
-		}
+		result, err = loadGroupConversation(ctx, tx, identity, conversationID)
+		return err
+	})
+	if err != nil {
+		return GroupConversation{}, fmt.Errorf("add group conversation members: %w", err)
 	}
-	return GroupConversation{}, fmt.Errorf("add group conversation members retries exhausted: %w", err)
+	return result, nil
 }
 
 // Execute 将当前有效的普通成员移出群聊。
@@ -257,11 +230,8 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		group, err := lockGroupConversation(ctx, tx, identity, conversationID)
+		_, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
 		if err != nil {
-			return err
-		}
-		if err := requireGroupOwner(group); err != nil {
 			return err
 		}
 		target, err := loadActiveGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, memberID, false)
@@ -299,11 +269,8 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		group, err := lockGroupConversation(ctx, tx, identity, conversationID)
+		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
 		if err != nil {
-			return err
-		}
-		if err := requireGroupOwner(group); err != nil {
 			return err
 		}
 		if ownerID == identity.OrganizationIdentity.ID {
@@ -314,7 +281,7 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 		if err != nil {
 			return err
 		}
-		if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.CurrentParticipantID, target.ParticipantID); err != nil {
+		if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.ParticipantID, target.ParticipantID); err != nil {
 			return err
 		}
 		if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
@@ -354,11 +321,11 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		group, err := lockGroupConversation(ctx, tx, identity, conversationID)
+		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupSendable)
 		if err != nil {
 			return err
 		}
-		if group.CurrentRole == string(domain.ConversationParticipantRoleOwner) {
+		if group.Role == string(domain.ConversationParticipantRoleOwner) {
 			if successorID == "" {
 				// 只有真人可以接任群主，最后一位真人可直接解散含 Agent 的群聊。
 				otherUsers, err := tx.NewSelect().TableExpr("conversation_participants AS cp").
@@ -385,7 +352,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 			if err != nil {
 				return err
 			}
-			if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.CurrentParticipantID, target.ParticipantID); err != nil {
+			if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.ParticipantID, target.ParticipantID); err != nil {
 				return err
 			}
 			if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
@@ -396,7 +363,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		} else if successorID != "" {
 			return &ValidationError{Fields: map[string]ValidationCode{"successorIdentityId": ValidationGroupSuccessorIDInvalid}}
 		}
-		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, group.CurrentParticipantID); err != nil {
+		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, group.ParticipantID); err != nil {
 			return err
 		}
 		_, err = createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
@@ -480,43 +447,6 @@ func normalizeGroupMemberInput(conversationID, identityID, field string, code Va
 		fields[field] = code
 	}
 	return normalizedConversationID, normalizedIdentityID, fields
-}
-
-// lockGroupConversation 锁定当前成员可见的有效群聊。
-func lockGroupConversation(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (lockedGroupConversationRow, error) {
-	if _, err := lockConversationMember(ctx, db, identity, conversationID); err != nil {
-		return lockedGroupConversationRow{}, err
-	}
-	row := lockedGroupConversationRow{}
-	err := db.NewSelect().
-		TableExpr("conversations AS cv").
-		ColumnExpr("cv.title AS title").
-		ColumnExpr("COALESCE(cv.description, '') AS description").
-		ColumnExpr("cv.image_file_id::text AS image_file_id").
-		ColumnExpr("mine.id AS current_participant_id").
-		ColumnExpr("mine.role AS current_role").
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
-		Where("cv.organization_id = ?", identity.Organization.ID).
-		Where("cv.id = ?", conversationID).
-		Where("cv.type = ?", domain.ConversationTypeGroup).
-		Where("cv.status = ?", domain.ConversationStatusActive).
-		Scan(ctx, &row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return lockedGroupConversationRow{}, ErrConversationNotFound
-	}
-	if err != nil {
-		return lockedGroupConversationRow{}, fmt.Errorf("lock group conversation: %w", err)
-	}
-	return row, nil
-}
-
-// requireGroupOwner 校验当前成员持有群主角色。
-func requireGroupOwner(group lockedGroupConversationRow) error {
-	if group.CurrentRole != string(domain.ConversationParticipantRoleOwner) {
-		return ErrGroupOwnerRequired
-	}
-	return nil
 }
 
 // loadActiveGroupParticipantIdentityIDs 读取群聊当前有效成员编号。

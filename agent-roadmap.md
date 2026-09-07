@@ -9,7 +9,7 @@
 - `chat-roadmap.md` 负责聊天身份、会话、参与者、消息、同步和外部投递等通用事实。
 - `chat-roadmap.md` 也是 Realtime Gateway、`realtime_outbox`、Core NATS、Protobuf 实时协议、连接票据、恢复和背压的权威设计；本文只定义 Agent 和设备能力需要增加的实时事件。
 - 本文负责 Agent 配置、运行、工具、审批、设备能力和 Eino 接入。
-- Agent 继续沿统一聊天路径发送消息，不创建第二套 Agent 会话或消息系统。
+- Agent 继续沿统一聊天路径发送消息。独立 AI 聊天使用统一 `conversations` 的 `agent` 类型及 `agent_conversations` 业务归属扩展，不创建第二套消息或执行系统。
 - 本文不提前创建尚未进入开发阶段的表和字段；文中的后续对象只在对应阶段出现首个真实场景时落地。
 - 本地知识库直接接入 Haystack + Hayhooks，模型配置统一由 Cervi 后台管理，实施顺序与评测结论见 [本地知识库接入方案](knowledge-base-plan.md)。长期记忆也统一使用 Haystack + Hayhooks；该方案第 9 节记录职责与验收，交互确定后独立实施。
 
@@ -220,7 +220,9 @@ Revision 负责长期配置历史，Run 快照负责证明本次执行实际使�
 
 ## 6. 会话触发、游标与并发
 
-真人消息、网站入站、Agent 调度／认领／写回和客服取消共用聊天路线图第 10.14 节的锁序；不能在 Agent 内再定义一套顺序。当前 `directRunPolicy.lockContext` 不锁会话，客服策略先锁 CustomerConversation／ServiceSession，`lockAgentRun` 再锁 State、Run 和 Task，最后写摘要才触及 Conversation；PR03–04 把 Conversation 前置并补齐锁后资格检查；客服参与关系在周期、State、Run、Task 门禁之后确保，只随有效最终回复提交，所有参与者写入均先持有 Conversation 锁。无当前用户的任务继续使用任务守卫，不能套用 LockActiveUser。
+真人消息、网站入站、Agent 调度／认领／写回和客服取消共用聊天路线图第 10.14 节的锁序。PR03 基于独立 AI 聊天改为 `agentChatRunPolicy`：先锁 Conversation 与固定 Agent 的 Participant，再由 `lockAgentRun` 锁 State、Run 和 Task；`begin`、输入认领、成功、失败及最终失败均进入同一入口。客服策略仍先锁 CustomerConversation／ServiceSession，再锁 State、Run、Task，Conversation 前置由 PR04 完成。无当前用户的任务使用任务守卫，不套用 LockActiveUser。本轮并发与任务租约用例已于 2026-09-08 通过服务端全量测试，构建及界面回归记录见 PR 实施清单。
+
+停用 Agent 或归档 AI 会话不取消已提交输入：排队、运行中和尚待消费的输入继续处理，结果写回原 Conversation。之后资格校验的新发送拒绝；已经通过事务内资格校验的发送允许完成。此边界不改变客服的负责人、周期和取消门禁。
 
 PR23 为 queued、running、成功、失败和取消写持久会话版本；成功 Message、blocks、Run 终态和消费水位同事务提交。客服同时推进共享 Inbox，访客只读公开状态。临时 token 不推进持久水位；Trigger 调度、同步变更和实时过程各自保留独立职责。
 
@@ -261,7 +263,7 @@ conversation_agent_states
 | 模式 | 长期语义 | 首轮安排 |
 | --- | --- | --- |
 | `mention` | 内部单聊或群聊只有显式 @Agent 的新消息触发 | 基础群聊与提醒事实完成后启用 |
-| `agent_direct` | 发给 Agent 的内部单聊自动触发，群聊仍需 @ | P1a 固定使用，作为内部 AI 员工验证入口 |
+| `agent_direct` | 独立 AI 聊天的成员消息自动触发，群聊仍需 @ | P1a 固定使用，作为内部 AI 员工验证入口 |
 | `customer_auto` | 符合客户路由和会话策略的新客户消息自动触发 | P1b 先用于网站客户；第三方渠道仍需对应 Delivery |
 
 首轮启用 P1a 的 `agent_direct` 和 P1b 的 `customer_auto`，两者都固定支持运行中连续消息在下一个 Eino 安全点补入同一 Run；`mention` 和通用 `response_policy` 在基础群聊与完整 P1 中实现。
@@ -826,11 +828,11 @@ Cervi Gateway
 
 固定使用发给 Agent 的内部单聊消息作为验证入口：
 
-- 依赖已完成的企业成员文本单聊；选择活跃 Agent 身份即可发起长期 Direct，首次持久化的用户消息自动创建 `agent_direct` Trigger。
+- 选择活跃 Agent 身份创建独立 agent 会话，首次持久化的用户消息自动创建 `agent_direct` Trigger；真人 direct 不再接受 Agent。
 - 使用不可变 `managed/v1` Revision 和同企业文本 Chat 模型，通过 Eino v0.10 Alpha 的 ChatModelAgent 与 TurnLoop 执行。
 - 增加最小 `conversation_agent_states`、`conversation_agent_triggers` 和 `agent_runs`，Message、Trigger、Run 与 Task 在同一事务收敛。
 - 注册纯函数计算器；运行期间的新消息通过持久 Trigger 推入当前 Run，并在下一次 Tool 或模型规划前从数据库重建最新上下文。
-- 一个 Run 可吸收连续 Trigger，但最多只生成一条最终文本 Message，使用 `agent:<agent_run_id>` 业务幂等键；成功和业务失败都推进明确水位。
+- 一个 Run 可吸收连续 Trigger，最多生成一条结果 Message：成功为 `text`，失败为 `agent_error`，统一使用 `agent:<agent_run_id>` 业务幂等键并由 `response_message_id` 关联；结果消息、终态和消费水位在同一事务提交。
 - 不创建 Step、Tool Invocation、Approval、Device Invocation、Checkpoint 或本地 Runtime，不流式输出，不依赖 Realtime。
 - 只记录输入/输出 Token、耗时和错误，不计算金额；客户端通过普通业务查询刷新最终消息和 Run 结果。
 
@@ -845,7 +847,7 @@ P1a 验证成功后立即交付网站客户自动响应：
 - Agent 最终回复仍是统一 Cervi Message。网站访客通过既有授权轮询直接读取该 Message，因此“写入 Message 并可被网站读取”就是网站路径的交付闭环，不创建外部 Delivery。
 - ServiceSession 的 `open/closed + assignee_identity_id` 是唯一客服状态。成员使用现有 Claim 接管，现有 Transfer 转交；最后一条来自 contact 时转交给 Agent 会补 Trigger，来自企业身份时等待客户下一条消息。不增加 AI 专属暂停、恢复、接管或状态。
 - `customer_auto` 复用 Eino TurnLoop：queued 时只冻结起点，Tool 或模型执行期间到达的新消息在下一个安全点由同一 Run 的下一 Turn Claim，最终只写一条文本 Message；完成边界后到达的消息进入下一 Run。
-- 当前完成前经 CustomerConversation／ServiceSession、State、Run 和 Task 锁后重新校验负责人、渠道、Agent 资格、Run Revision 和实际消费边界，接管、关闭或换负责人后的迟到结果不得写入；PR03–04 按第 6 节再将 Conversation 锁前置。
+- 当前完成前经 CustomerConversation／ServiceSession、State、Run 和 Task 锁后重新校验负责人、渠道、Agent 资格、Run Revision 和实际消费边界，接管、关闭或换负责人后的迟到结果不得写入；PR04 按第 6 节将客服 Conversation 锁前置。
 - 不流式输出、无设备、无审批，只记录 Token、耗时和错误，不计算金额；calculator 仅用于开发期延时并发测试，正式发布前删除。
 
 验收边界：符合负责人规则的网站客户新消息会自动得到一条可由访客轮询读取的 AI 回复；消息重放和 Task 重复不重复回复；运行中连续消息由同一 Run 在下一个安全点处理；接管、关闭、换负责人与模型完成并发时结果可确定且不会迟到发言；网站闭环在没有 Realtime 和第三方 Delivery 的情况下成立。
@@ -946,3 +948,12 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 - 是否绕过统一 Realtime Gateway、连接票据和 Protobuf Schema 建设第二套设备实时协议。
 - 是否提前创建没有真实场景的表、字段、运行时或协议。
 - 是否能在不改变聊天身份和业务事实的前提下替换或升级 Eino。
+
+## 独立 AI 聊天的上下文边界
+
+真人单聊与独立 AI 聊天分别使用 `direct` 和 `agent` 会话类型。消息页创建 AI 聊天先进入本地草稿，首条消息与 Conversation、双方参与者、业务归属、Trigger、Run 和可靠任务在同一事务提交。同一成员与同一 Agent 可创建多个独立 Conversation；首发通过稳定会话编号和客户端消息编号实现幂等，不按身份对复用会话。
+
+现有“Conversation + Agent”输入状态和活动 Run 唯一约束继续作为执行边界。不同 Conversation 的运行互不合并，新建会话不取消旧 Run，回复只写回原 Conversation。上下文仅包含本会话历史及同会话引用，继续使用当前 Agent 执行配置和知识库范围。独立 AI 聊天不增加 ServiceSession 或重置游标。
+
+
+失败消息沿用消息时间线的发送者、头像、排序、分页与成员阅读状态。正文留空，客户端按 `agent_error` 类型显示本地化红色「出错了」；技术错误保存在 Run 中。模型上下文与引用仅接受文本消息，网站访客历史和摘要仅展示正常聊天内容。会话列表通过 `lastMessageType` 生成特殊消息摘要。

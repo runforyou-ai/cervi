@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -58,12 +58,6 @@ type groupParticipantRow struct {
 	Role          string                          `bun:"role"`
 }
 
-type groupSendContextRow struct {
-	ConversationID string `bun:"conversation_id"`
-	ParticipantID  string `bun:"participant_id"`
-	SubjectID      string `bun:"subject_id"`
-}
-
 // NewCreateGroupConversationAction 创建群聊创建操作。
 func NewCreateGroupConversationAction(db *bun.DB) *CreateGroupConversationAction {
 	return &CreateGroupConversationAction{db: db}
@@ -87,89 +81,73 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 	}
 
 	conversationID := uuid.NewV7().String()
-	subjectIDs := make(map[string]string, len(normalized.MemberIdentityIDs)+1)
 	participantIDs := make(map[string]string, len(normalized.MemberIdentityIDs)+1)
 	for _, identityID := range append([]string{identity.OrganizationIdentity.ID}, normalized.MemberIdentityIDs...) {
-		subjectIDs[identityID] = uuid.NewV7().String()
 		participantIDs[identityID] = uuid.NewV7().String()
 	}
 
-	var err error
-	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
-		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-				return err
-			}
-			members, err := loadActiveGroupMembers(ctx, tx, identity.Organization.ID, normalized.MemberIdentityIDs)
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		members, err := loadActiveGroupMembers(ctx, tx, identity.Organization.ID, normalized.MemberIdentityIDs)
+		if err != nil {
+			return err
+		}
+		var imageFileID *string
+		if normalized.ImageFileID != "" {
+			imageFileID, err = activateGroupImage(ctx, tx, identity.Organization.ID, normalized.ImageFileID, nil)
 			if err != nil {
 				return err
 			}
-			var imageFileID *string
-			if normalized.ImageFileID != "" {
-				imageFileID, err = activateGroupImage(ctx, tx, identity.Organization.ID, normalized.ImageFileID, nil)
-				if err != nil {
-					return err
-				}
-			}
-			creatorSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, subjectIDs[identity.OrganizationIdentity.ID])
-			if err != nil {
-				return err
-			}
-			createdBySubjectID := creatorSubject.ID
-			conversation := &servermodels.Conversation{
-				ID: conversationID, OrganizationID: identity.Organization.ID,
-				Type: string(domain.ConversationTypeGroup), Status: string(domain.ConversationStatusActive),
-				Title: &normalized.Title, Description: common.OptionalString(normalized.Description),
-				ImageFileID: imageFileID, CreatedBySubjectID: &createdBySubjectID,
-			}
-			if _, err := tx.NewInsert().Model(conversation).
-				Column("id", "organization_id", "type", "status", "title", "description", "image_file_id", "created_by_subject_id").
-				Exec(ctx); err != nil {
-				return fmt.Errorf("create group conversation: %w", err)
-			}
+		}
+		subjects, err := ensureOrganizationIdentityChatSubjects(ctx, tx, identity.Organization.ID, append([]string{identity.OrganizationIdentity.ID}, normalized.MemberIdentityIDs...))
+		if err != nil {
+			return err
+		}
+		creatorSubject := subjects[identity.OrganizationIdentity.ID]
+		createdBySubjectID := creatorSubject.ID
+		conversation := &servermodels.Conversation{
+			ID: conversationID, OrganizationID: identity.Organization.ID,
+			Type: string(domain.ConversationTypeGroup), Status: string(domain.ConversationStatusActive),
+			Title: &normalized.Title, Description: common.OptionalString(normalized.Description),
+			ImageFileID: imageFileID, CreatedBySubjectID: &createdBySubjectID,
+		}
+		if _, err := tx.NewInsert().Model(conversation).
+			Column("id", "organization_id", "type", "status", "title", "description", "image_file_id", "created_by_subject_id").
+			Exec(ctx); err != nil {
+			return fmt.Errorf("create group conversation: %w", err)
+		}
 
-			participants := make([]*servermodels.ConversationParticipant, 0, len(members)+1)
+		participants := make([]*servermodels.ConversationParticipant, 0, len(members)+1)
+		participants = append(participants, &servermodels.ConversationParticipant{
+			ID: participantIDs[identity.OrganizationIdentity.ID], OrganizationID: identity.Organization.ID,
+			ConversationID: conversation.ID, SubjectID: creatorSubject.ID,
+			Role: string(domain.ConversationParticipantRoleOwner),
+		})
+		for _, member := range members {
+			subject := subjects[member.IdentityID]
 			participants = append(participants, &servermodels.ConversationParticipant{
-				ID: participantIDs[identity.OrganizationIdentity.ID], OrganizationID: identity.Organization.ID,
-				ConversationID: conversation.ID, SubjectID: creatorSubject.ID,
-				Role: string(domain.ConversationParticipantRoleOwner),
+				ID: participantIDs[member.IdentityID], OrganizationID: identity.Organization.ID,
+				ConversationID: conversation.ID, SubjectID: subject.ID,
+				Role: string(domain.ConversationParticipantRoleMember),
 			})
-			for _, member := range members {
-				subject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, member.IdentityID, subjectIDs[member.IdentityID])
-				if err != nil {
-					return err
-				}
-				participants = append(participants, &servermodels.ConversationParticipant{
-					ID: participantIDs[member.IdentityID], OrganizationID: identity.Organization.ID,
-					ConversationID: conversation.ID, SubjectID: subject.ID,
-					Role: string(domain.ConversationParticipantRoleMember),
-				})
-			}
-			if _, err := tx.NewInsert().Model(&participants).
-				Column("id", "organization_id", "conversation_id", "subject_id", "role").
-				Exec(ctx); err != nil {
-				return fmt.Errorf("create group conversation participants: %w", err)
-			}
-			return nil
-		})
-		if err == nil {
-			return GroupConversationSummary{
-				ID: conversationID, Title: normalized.Title,
-				Status: domain.ConversationStatusActive, MemberCount: len(normalized.MemberIdentityIDs) + 1,
-				ImageFileID: common.OptionalString(normalized.ImageFileID),
-			}, nil
 		}
-		constraint, retryable := retryableUniqueViolation(err, map[string]struct{}{
-			"chat_subjects_organization_kind_source_unique": {},
-		})
-		if !retryable {
-			return GroupConversationSummary{}, err
+		if _, err := tx.NewInsert().Model(&participants).
+			Column("id", "organization_id", "conversation_id", "subject_id", "role").
+			Exec(ctx); err != nil {
+			return fmt.Errorf("create group conversation participants: %w", err)
 		}
-		if attempt < maxWriteAttempts-1 {
-			slog.Info("企业群聊创建重试", "conversation_id", conversationID, "attempt", attempt+2, "constraint", constraint)
-		}
+		return nil
+	})
+	if err != nil {
+		return GroupConversationSummary{}, fmt.Errorf("create group conversation: %w", err)
 	}
-	return GroupConversationSummary{}, fmt.Errorf("create group conversation retries exhausted: %w", err)
+	return GroupConversationSummary{
+		ID: conversationID, Title: normalized.Title,
+		Status: domain.ConversationStatusActive, MemberCount: len(normalized.MemberIdentityIDs) + 1,
+		ImageFileID: common.OptionalString(normalized.ImageFileID),
+	}, nil
 }
 
 // Execute 委托共用查询返回当前成员可见的群聊。
@@ -191,20 +169,16 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ImageFileID *string   `bun:"image_file_id"`
 		Status      string    `bun:"status"`
 		CreatedAt   time.Time `bun:"created_at"`
+		Muted       bool      `bun:"muted"`
 	}
-	err := db.NewSelect().
-		TableExpr("conversations AS cv").
+	err := chatstate.GroupQuery(db, identity, conversationID).
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("COALESCE(cv.description, '') AS description").
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
 		ColumnExpr("cv.created_at AS created_at").
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
-		Where("cv.organization_id = ?", identity.Organization.ID).
-		Where("cv.id = ?", conversationID).
-		Where("cv.type = ?", domain.ConversationTypeGroup).
-		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
+		ColumnExpr("COALESCE(state.muted, false) AS muted").
+		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
 		Scan(ctx, &summary)
 	if errors.Is(err, sql.ErrNoRows) {
 		return GroupConversation{}, ErrConversationNotFound
@@ -242,6 +216,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ID: conversationID, Title: summary.Title, Description: summary.Description, ImageFileID: summary.ImageFileID,
 		Status:    domain.ConversationStatus(summary.Status),
 		CreatedAt: summary.CreatedAt, Participants: participants,
+		Muted: summary.Muted,
 	}, nil
 }
 
@@ -258,7 +233,7 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		sendContext, err := loadGroupSendContext(ctx, tx, identity, normalized.ConversationID)
+		sendContext, err := chatstate.LockGroup(ctx, tx, identity, normalized.ConversationID, chatstate.GroupSendable)
 		if err != nil {
 			return err
 		}
@@ -420,31 +395,4 @@ func loadActiveGroupMembers(ctx context.Context, db bun.IDB, organizationID stri
 		return nil, ErrGroupMemberNotFound
 	}
 	return rows, nil
-}
-
-// loadGroupSendContext 校验群聊及当前成员关系并返回发送上下文。
-func loadGroupSendContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (groupSendContextRow, error) {
-	if _, err := lockConversationMember(ctx, db, identity, conversationID); err != nil {
-		return groupSendContextRow{}, err
-	}
-	row := groupSendContextRow{}
-	err := db.NewSelect().
-		TableExpr("conversations AS cv").
-		ColumnExpr("cv.id AS conversation_id").
-		ColumnExpr("mine.id AS participant_id").
-		ColumnExpr("mine.subject_id AS subject_id").
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
-		Where("cv.organization_id = ?", identity.Organization.ID).
-		Where("cv.id = ?", conversationID).
-		Where("cv.type = ?", domain.ConversationTypeGroup).
-		Where("cv.status = ?", domain.ConversationStatusActive).
-		Scan(ctx, &row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return groupSendContextRow{}, ErrConversationNotFound
-	}
-	if err != nil {
-		return groupSendContextRow{}, fmt.Errorf("load group send context: %w", err)
-	}
-	return row, nil
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -160,7 +161,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.conversation_id = ?", conversationID).
-		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem})).
+		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem, domain.MessageTypeAgentError})).
 		Where("msg.deleted_at IS NULL")
 }
 
@@ -263,7 +264,16 @@ func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *ser
 			return ErrConversationNotFound
 		}
 		return nil
-	case domain.ConversationTypeDirect, domain.ConversationTypeGroup:
+	case domain.ConversationTypeGroup:
+		available, err := chatstate.GroupQuery(db, identity, conversationID).Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check group conversation access: %w", err)
+		}
+		if !available {
+			return ErrConversationNotFound
+		}
+		return nil
+	case domain.ConversationTypeDirect, domain.ConversationTypeAgent:
 		available, err := db.NewSelect().
 			TableExpr("conversation_participants AS cp").
 			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").

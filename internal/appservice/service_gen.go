@@ -129,6 +129,16 @@ func (s *Service) SendFirstDirectTextMessage(ctx context.Context, meta RequestMe
 	return s.backend.SendFirstDirectTextMessage(ctx, meta, input)
 }
 
+// SendFirstAgentTextMessage 在首次发送时创建独立 AI 聊天。
+func (s *Service) SendFirstAgentTextMessage(ctx context.Context, meta RequestMeta, input FirstAgentTextMessageInput) (FirstAgentTextMessageResult, error) {
+	return s.backend.SendFirstAgentTextMessage(ctx, meta, input)
+}
+
+// SendAgentTextMessage 向已有 AI 会话发送文本消息。
+func (s *Service) SendAgentTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input AgentTextMessageInput) (ConversationMessage, error) {
+	return s.backend.SendAgentTextMessage(ctx, meta, conversationID, input)
+}
+
 // FindDirectConversation 按目标身份查找当前成员的活跃单聊。
 func (s *Service) FindDirectConversation(ctx context.Context, meta RequestMeta, targetIdentityID string) (DirectConversationLookup, error) {
 	return s.backend.FindDirectConversation(ctx, meta, targetIdentityID)

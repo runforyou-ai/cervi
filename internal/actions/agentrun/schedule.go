@@ -39,7 +39,7 @@ func NewScheduler(enqueuer servertask.TxEnqueuer) *Scheduler {
 	return &Scheduler{enqueuer: enqueuer}
 }
 
-// Schedule 把一条新用户消息追加到 Agent 持久化输入流。
+// Schedule 在调用方已锁定会话并保存个人状态的事务内追加 AI 聊天输入。
 func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID, revisionID, messageID string) error {
 	return s.scheduleInput(ctx, db, agentRunSpec{
 		OrganizationID: organizationID, ConversationID: conversationID,

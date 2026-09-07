@@ -21,14 +21,15 @@ import (
 var errAgentRunSuppressed = errors.New("agent run suppressed")
 
 type agentRunPolicyContext struct {
-	ServiceSession *servermodels.ServiceSession
+	ServiceSession     *servermodels.ServiceSession
+	AgentParticipantID string
 }
 
 type agentRunPolicy interface {
 	lockContext(context.Context, bun.IDB, *servermodels.AgentRun) (agentRunPolicyContext, error)
 	prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error)
 	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64) ([]agentruntime.Message, error)
-	persistResponse(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, string) error
+	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
 	enqueueNext(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, int64) error
 }
 
@@ -188,7 +189,7 @@ func (s agentRunScope) applySelect(query *bun.SelectQuery) {
 		Where("cat.service_session_id IS NOT DISTINCT FROM ?", s.ServiceSessionID)
 }
 
-// lockAgentRun 按策略上下文、输入状态、运行记录的顺序取得事务锁。
+// lockAgentRun 按策略会话上下文、输入状态、运行记录和任务租约的顺序取得事务锁。
 func lockAgentRun(ctx context.Context, db bun.IDB, policy agentRunPolicy, initial *servermodels.AgentRun) (lockedAgentRun, error) {
 	policyContext, err := policy.lockContext(ctx, db, initial)
 	if err != nil {

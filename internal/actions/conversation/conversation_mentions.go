@@ -8,9 +8,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -63,13 +63,9 @@ func NewMarkConversationMentionReviewedAction(db *bun.DB) *MarkConversationMenti
 
 // groupNavigationQuery 限定当前用户可阅读的群聊并关联提及水位。
 func groupNavigationQuery(db bun.IDB, identity *servermodels.Identity, conversationID string) *bun.SelectQuery {
-	return db.NewSelect().TableExpr("conversations AS cv").
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS subject ON subject.organization_id = mine.organization_id AND subject.id = mine.subject_id AND subject.kind = ? AND subject.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
+	return chatstate.GroupQuery(db, identity, conversationID).
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
-		Join("LEFT JOIN messages AS reviewed ON reviewed.organization_id = cv.organization_id AND reviewed.conversation_id = cv.id AND reviewed.id = state.last_reviewed_mention_message_id").
-		Where("cv.organization_id = ? AND cv.id = ? AND cv.type = ?", identity.Organization.ID, conversationID, domain.ConversationTypeGroup).
-		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived)
+		Join("LEFT JOIN messages AS reviewed ON reviewed.organization_id = cv.organization_id AND reviewed.conversation_id = cv.id AND reviewed.id = state.last_reviewed_mention_message_id")
 }
 
 // pendingMentionsQuery 共用提及资格，排除本人消息、连续已查看范围和单条查看记录。
@@ -144,12 +140,9 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		conversation, err := lockConversationMember(ctx, tx, identity, conversationID)
+		_, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupReadable)
 		if err != nil {
 			return err
-		}
-		if conversation.Type != string(domain.ConversationTypeGroup) {
-			return ErrConversationNotFound
 		}
 		var target struct {
 			Sequence int64
