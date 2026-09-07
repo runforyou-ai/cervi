@@ -660,6 +660,14 @@ func (b *Backend) RetrieveKnowledgeBase(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// ReadKnowledgeContext 读取指定分段及前后最多各两段内容。
+func (b *Backend) ReadKnowledgeContext(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeContextInput) (appservice.KnowledgeContext, error) {
+	var output appservice.KnowledgeContext
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/context", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase

@@ -118,6 +118,7 @@ type DirectBackend struct {
 	listKnowledgeDocuments            *knowledgebaseaction.ListKnowledgeDocumentsQuery
 	getKnowledgeDocument              *knowledgebaseaction.GetKnowledgeDocumentQuery
 	listKnowledgeDocumentSegments     *knowledgebaseaction.ListKnowledgeDocumentSegmentsQuery
+	readKnowledgeContext              *knowledgebaseaction.ReadKnowledgeContextQuery
 	retrieveKnowledgeBase             *knowledgebaseaction.RetrieveKnowledgeBaseQuery
 	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
 	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
@@ -255,6 +256,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, difyKnowledgeDocuments),
 		getKnowledgeDocument:              knowledgebaseaction.NewGetKnowledgeDocumentQuery(db, difyKnowledgeDocuments),
 		listKnowledgeDocumentSegments:     knowledgebaseaction.NewListKnowledgeDocumentSegmentsQuery(db, difyKnowledgeDocuments),
+		readKnowledgeContext:              knowledgebaseaction.NewReadKnowledgeContextQuery(knowledgeSearch),
 		retrieveKnowledgeBase:             knowledgebaseaction.NewRetrieveKnowledgeBaseQuery(knowledgeSearch),
 		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db, difyKnowledgeBaseGetter),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),

@@ -131,6 +131,14 @@ const knowledgeBase = {
     },
   },
   retrieval: {
+    viewContext: "View context",
+    contextTitle: "Segment context",
+    contextDescription: "The matched segment and up to 2 segments before and after it.",
+    backToResults: "Back to results",
+    contextLoading: "Loading context…",
+    contextError: "Could not load the context. Try again.",
+    matched: "Matched segment",
+
     action: "Test retrieval",
     title: "Test retrieval",
     description: "Enter a question to see the most relevant segments.",

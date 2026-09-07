@@ -652,6 +652,13 @@ export function ReactivateUser(meta: $models.RequestMeta, userID: string): $Canc
 }
 
 /**
+ * ReadKnowledgeContext 读取指定分段及前后最多各两段内容。
+ */
+export function ReadKnowledgeContext(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeContextInput): $CancellablePromise<$models.KnowledgeContext> {
+    return $Call.ByID(747998841, meta, knowledgeBaseID, input);
+}
+
+/**
  * RemoveGroupConversationMember 移除单个群聊成员。
  */
 export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {

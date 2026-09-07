@@ -100,6 +100,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/segments", s.listKnowledgeDocumentSegments)
 	router.POST("/knowledge-bases/:knowledgeBaseID/retrieve", s.retrieveKnowledgeBase)
+	router.POST("/knowledge-bases/:knowledgeBaseID/context", s.readKnowledgeContext)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
@@ -867,6 +868,16 @@ func (s *Service) retrieveKnowledgeBase(c *gin.Context) {
 		return
 	}
 	output, err := s.application.RetrieveKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// readKnowledgeContext 读取指定分段及前后最多各两段内容。
+func (s *Service) readKnowledgeContext(c *gin.Context) {
+	var input appservice.KnowledgeContextInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.ReadKnowledgeContext(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

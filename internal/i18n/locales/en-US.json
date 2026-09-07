@@ -1,4 +1,7 @@
 {
+  "error.knowledge_context_read_failed": "Could not read the context.",
+  "error.knowledge_context_not_found": "The document or matched segment has changed. Run retrieval again.",
+  "field.knowledge_context_invalid": "The matched segment location is invalid. Run retrieval again.",
   "error.customer_delivery_conflict": "The delivery state changed or the channel cannot send. Refresh and try again.",
   "error.customer_delivery_failed": "Could not process message delivery. Try again.",
   "error.channel_outbound_unavailable": "The channel is disabled or its bot is not configured.",

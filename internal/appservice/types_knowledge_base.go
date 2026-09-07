@@ -188,3 +188,25 @@ type KnowledgeRetrievalRecord struct {
 type KnowledgeRetrievalResult struct {
 	Records []KnowledgeRetrievalRecord `json:"records"`
 }
+
+// KnowledgeContextInput 定位指定知识库中的命中分段。
+type KnowledgeContextInput struct {
+	DocumentID string `json:"documentId"`
+	SegmentID  string `json:"segmentId"`
+	Position   int    `json:"position"`
+}
+
+// KnowledgeContextSegment 定义上下文分段及命中标记。
+type KnowledgeContextSegment struct {
+	SegmentID string  `json:"segmentId"`
+	Position  int     `json:"position"`
+	Content   string  `json:"content"`
+	Answer    *string `json:"answer"`
+	Matched   bool    `json:"matched"`
+}
+
+// KnowledgeContext 定义命中文档的周边内容。
+type KnowledgeContext struct {
+	DocumentName string                    `json:"documentName"`
+	Segments     []KnowledgeContextSegment `json:"segments"`
+}

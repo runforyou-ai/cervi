@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	ValidationContextInvalid               common.FieldCode = "KNOWLEDGE_CONTEXT_INVALID"
 	ValidationQAQuestionRequired           common.FieldCode = "KNOWLEDGE_QA_QUESTION_REQUIRED"
 	ValidationQAAnswerRequired             common.FieldCode = "KNOWLEDGE_QA_ANSWER_REQUIRED"
 	ValidationQAGroupInvalid               common.FieldCode = "KNOWLEDGE_QA_GROUP_INVALID"

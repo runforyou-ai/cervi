@@ -117,6 +117,10 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 // normalizeOutput 按响应类型将远程响应中的相对文件地址转换为企业服务器绝对地址。
 func (b *Backend) normalizeOutput(output any) {
 	switch value := output.(type) {
+	case *appservice.KnowledgeContext:
+		if value.Segments == nil {
+			value.Segments = []appservice.KnowledgeContextSegment{}
+		}
 	case *appservice.KnowledgeQAEntry:
 		if value.SimilarQuestions == nil {
 			value.SimilarQuestions = []appservice.KnowledgeQASimilarQuestion{}

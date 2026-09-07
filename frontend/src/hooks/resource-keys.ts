@@ -122,6 +122,13 @@ export const resourceKeys = {
           documentId,
           parameters,
         ],
+  /** 指定知识库命中分段的上下文。 */
+  knowledgeContext: (
+    knowledgeBaseId: string,
+    documentId: string,
+    segmentId: string,
+    position: number,
+  ) => ["knowledge-context", knowledgeBaseId, documentId, segmentId, position],
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */

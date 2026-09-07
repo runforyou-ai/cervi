@@ -1473,6 +1473,34 @@ export interface KnowledgeBaseList {
 }
 
 /**
+ * KnowledgeContext 定义命中文档的周边内容。
+ */
+export interface KnowledgeContext {
+    "documentName": string;
+    "segments": KnowledgeContextSegment[] | null;
+}
+
+/**
+ * KnowledgeContextInput 定位指定知识库中的命中分段。
+ */
+export interface KnowledgeContextInput {
+    "documentId": string;
+    "segmentId": string;
+    "position": number;
+}
+
+/**
+ * KnowledgeContextSegment 定义上下文分段及命中标记。
+ */
+export interface KnowledgeContextSegment {
+    "segmentId": string;
+    "position": number;
+    "content": string;
+    "answer": string | null;
+    "matched": boolean;
+}
+
+/**
  * KnowledgeDocument 定义知识文档详情。
  */
 export interface KnowledgeDocument {

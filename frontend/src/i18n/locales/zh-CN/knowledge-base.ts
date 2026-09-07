@@ -129,6 +129,14 @@ const knowledgeBase = {
     },
   },
   retrieval: {
+    viewContext: "查看上下文",
+    contextTitle: "分段上下文",
+    contextDescription: "命中分段及前后最多各 2 段内容。",
+    backToResults: "返回结果",
+    contextLoading: "正在读取上下文…",
+    contextError: "读取上下文失败，请重试。",
+    matched: "命中分段",
+
     action: "检索测试",
     title: "检索测试",
     description: "输入问题，查看最相关的知识分段。",

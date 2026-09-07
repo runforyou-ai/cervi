@@ -424,6 +424,11 @@ func (s *Service) RetrieveKnowledgeBase(ctx context.Context, meta RequestMeta, k
 	return s.backend.RetrieveKnowledgeBase(ctx, meta, knowledgeBaseID, input)
 }
 
+// ReadKnowledgeContext 读取指定分段及前后最多各两段内容。
+func (s *Service) ReadKnowledgeContext(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeContextInput) (KnowledgeContext, error) {
+	return s.backend.ReadKnowledgeContext(ctx, meta, knowledgeBaseID, input)
+}
+
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (s *Service) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBase, error) {
 	return s.backend.GetKnowledgeBase(ctx, meta, knowledgeBaseID)

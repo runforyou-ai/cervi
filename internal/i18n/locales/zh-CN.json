@@ -1,4 +1,7 @@
 {
+  "error.knowledge_context_read_failed": "读取上下文失败。",
+  "error.knowledge_context_not_found": "文档或命中分段已变更，请重新检索。",
+  "field.knowledge_context_invalid": "命中分段位置无效，请重新检索。",
   "error.customer_delivery_conflict": "投递状态已变化或渠道当前无法发送，请刷新后重试。",
   "error.customer_delivery_failed": "处理消息投递失败，请重试。",
   "error.channel_outbound_unavailable": "渠道已停用或尚未配置机器人，无法发送。",

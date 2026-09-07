@@ -15,6 +15,7 @@ import {
   ListKnowledgeBases,
   ListKnowledgeDocumentSegments,
   ListKnowledgeDocuments,
+  ReadKnowledgeContext,
   RetrieveKnowledgeBase,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
@@ -43,6 +44,8 @@ import {
   type KnowledgeDocumentSummary,
   type KnowledgeGroup,
   type KnowledgeGroupInput,
+  type KnowledgeContext,
+  type KnowledgeContextInput,
   type KnowledgeRetrievalInput,
   type KnowledgeRetrievalRecord,
   type KnowledgeRetrievalResult,
@@ -143,6 +146,10 @@ export type KnowledgeRetrievalResultData = Omit<
   records: KnowledgeRetrievalRecord[]
 }
 
+export type KnowledgeContextData = Omit<KnowledgeContext, "segments"> & {
+  segments: NonNullable<KnowledgeContext["segments"]>
+}
+
 const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
 const getKnowledgeBaseBound = bind(GetKnowledgeBase)
 const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
@@ -157,6 +164,7 @@ const listKnowledgeDocumentsBound = bind(ListKnowledgeDocuments)
 const getKnowledgeDocumentBound = bind(GetKnowledgeDocument)
 const listKnowledgeDocumentSegmentsBound = bind(ListKnowledgeDocumentSegments)
 const retrieveKnowledgeBaseBound = bind(RetrieveKnowledgeBase)
+const readKnowledgeContextBound = bind(ReadKnowledgeContext)
 
 /** 创建企业知识库。 */
 export function createKnowledgeBase(
@@ -314,6 +322,20 @@ export function retrieveKnowledgeBase(
     ...output,
     records: asList(output.records),
   }))
+}
+
+/** 读取指定命中分段及前后最多各两段内容。 */
+export function readKnowledgeContext(
+  knowledgeBaseId: string,
+  input: KnowledgeContextInput,
+  signal?: AbortSignal,
+): Promise<KnowledgeContextData> {
+  return readKnowledgeContextBound(knowledgeBaseId, input, signal).then(
+    (output) => ({
+      ...output,
+      segments: asList(output.segments),
+    }),
+  )
 }
 
 /** 归一化知识库分组树。 */

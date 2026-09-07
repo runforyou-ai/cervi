@@ -275,6 +275,9 @@ type Backend interface {
 	// RetrieveKnowledgeBase 检索指定外部知识库。
 	//cervi:route POST /knowledge-bases/:knowledgeBaseID/retrieve
 	RetrieveKnowledgeBase(context.Context, RequestMeta, string, KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error)
+	// ReadKnowledgeContext 读取指定分段及前后最多各两段内容。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/context
+	ReadKnowledgeContext(context.Context, RequestMeta, string, KnowledgeContextInput) (KnowledgeContext, error)
 	// GetKnowledgeBase 返回当前企业中的知识库详情。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID
 	GetKnowledgeBase(context.Context, RequestMeta, string) (KnowledgeBase, error)
