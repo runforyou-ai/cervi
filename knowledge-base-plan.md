@@ -6,7 +6,7 @@
 
 本地知识库提供基础的资料管理与检索，高级文档处理和专业 RAG 能力继续通过 Dify 等外部连接器提供。本地执行层直接采用 Haystack + Hayhooks，不建设支持多种搜索引擎互换的通用框架。
 
-实施顺序为：**PostgreSQL + pgvector 基础环境 → Haystack + Hayhooks 接入 → 后台模型配置与索引版本 → 已有本地问答检索 → 本地文档导入 → 常用文件解析**。长期记忆、聊天记录搜索不在本轮开发范围。
+实施顺序为：**PostgreSQL + pgvector + pg_trgm 基础环境 → Haystack + Hayhooks 接入 → 后台模型配置与索引版本 → 已有本地问答检索 → 本地文档导入 → 常用文件解析**。长期记忆、聊天记录搜索不在本轮开发范围。
 
 知识库和长期记忆统一使用 Haystack + Hayhooks，不再部署或保留另一套记忆框架作为候选。所有 embedding、重排及未来解析/记忆使用的模型都由 Cervi 管理后台配置。Haystack 路线已完成第 8.6 节的小型动态配置验证，但仍需专用适配代码；长期记忆的技术方向已确定，产品交互与实现验收仍待后续完成。
 
@@ -33,27 +33,65 @@
 
 schema 避免表名与代码归属混淆，不提供账号权限隔离；双方共享资源和故障域。一个知识库的一个索引代次使用一张固定维度的分段表，不为每个企业创建数据库或 schema。表名由服务端内部编号生成，业务来源编号保存为 Document 元数据；客户端和模型不能指定物理表或任意知识库范围。这个布局优先保证不同维度与版本语义清晰，尚未验收大量知识库/索引表的容量。
 
-### 2.2 PostgreSQL + pgvector 的含义
+### 2.2 PostgreSQL 扩展安装基线
 
-“基础库换到 pgvector”指将默认 PostgreSQL 镜像换成包含 pgvector 的 PostgreSQL 镜像，并在目标数据库启用 SQL 扩展 `vector`；关系数据库、Bun、现有业务表和事务模型仍使用 PostgreSQL。
+“基础库换到 pgvector”指将默认 PostgreSQL 镜像换成包含 pgvector 的 PostgreSQL 镜像，并在目标数据库启用 SQL 扩展 `vector` 和 `pg_trgm`；关系数据库、Bun、现有业务表和事务模型仍使用 PostgreSQL。
 
-当前 Compose 使用 `postgres:18-alpine`。实施时保持 PostgreSQL 18 主版本，采用官方 `pgvector/pgvector` 的 PostgreSQL 18 镜像，锁定扩展版本、发行版标签及镜像摘要；例如已发布的 `0.8.6-pg18-bookworm` 可作为验证起点。评测使用的 PostgreSQL 17 不意味着产品要降级。[pgvector 官方部署说明](https://github.com/pgvector/pgvector#docker)
+当前 Compose 使用 `postgres:18-alpine`。实施时新增独立的 `build/docker/Dockerfile.postgres`，基于官方 `pgvector/pgvector` 的 PostgreSQL 18 镜像，锁定扩展版本、发行版标签及镜像摘要，并验证 `vector` 与 `pg_trgm` 的 control、SQL 和共享库文件可用；受测的 `0.8.6-pg18-bookworm` 已提供两者，不重复安装已有包。Dockerfile 构建数据库镜像，不在构建时运行数据库初始化 SQL。历史评测的 PostgreSQL 17 不意味着产品要降级。[pgvector 官方部署说明](https://github.com/pgvector/pgvector#docker)
 
 - 镜像包含扩展安装文件，不代表数据库自动启用了扩展。每个 worktree 的业务库及测试库分别初始化一次。
-- 当前库启用 `vector` 作为统一部署基线；分段向量只保存在 `haystack` schema，不复制到 Cervi 业务表。
-- 首版只要求 `vector`，安装在 `public` schema；不要求 `pg_trgm`。原生全文功能不需要额外扩展，但其中文效果仍须另行验证。
+- **`vector` 和 `pg_trgm` 都是 Cervi 的数据库基线，在目标数据库的 `public` schema 启用。** 分段向量保存在 `haystack` schema，不复制到业务表。
+- `pg_trgm` 是产品部署要求，不是 Haystack 向量组件的强制依赖；安装它也不代表已经接通关键词检索或验证中文效果。
 - 不要求 zhparser、PGroonga、AGE、pg_textsearch 或厂商专属向量索引扩展。
 - 两个服务直接复用当前数据库账号和密码，不要求额外长期维护迁移账号。云数据库如要求管理员安装扩展，由部署初始化执行一次，不能要求常态服务具备超级用户权限。
 
 AWS RDS、阿里云 RDS 和腾讯云 PostgreSQL 均有 pgvector 支持文档，但扩展版本、数据库版本、实例规格及安装权限需要按目标实例验证，不能把“云厂商支持”写成所有实例已通过。当前未完成真实云实例验收。[AWS 扩展清单](https://docs.aws.amazon.com/AmazonRDS/latest/PostgreSQLReleaseNotes/postgresql-extensions.html)、[阿里云 pgvector 指南](https://www.alibabacloud.com/help/zh/rds/apsaradb-rds-for-postgresql/pgvector-use-guide)、[腾讯云扩展安装说明](https://www.tencentcloud.com/document/product/409/72650)
 
-### 2.3 安装、运行与开发命名
+### 2.3 由正式部署入口初始化，不依赖 Taskfile
 
-安装 Task 准备当前数据库的 `vector` 扩展与 `haystack` schema；业务表通过 Cervi 迁移管理，索引代次的分段表由适配代码调用固定版本 PgvectorDocumentStore 创建。运行设置 `create_extension=False`，不要求常态服务拥有超级权限；同一应用账号需要在 `haystack` 中创建、读写和删除索引表。云实例若限制扩展安装，由部署管理员一次性准备，不增加第二套长期应用凭据。框架升级涉及表结构时单独验证与重建，不能假定 DocumentStore 会自动迁移旧结构。
+**统一由 Cervi Go server 的数据库启动流程安装和校验扩展与 `haystack` schema。** 当前 `internal/storage/server/store.go` 的 `Open` 已负责连接与执行内嵌迁移；PR 1 在业务迁移之前加入数据库准备。独立二进制和服务端容器运行同一份代码，不需要宿主机安装 Wails、Task、Go 工具链或 psql。
 
-Compose 和部署 Task 只向共享 Hayhooks 提供 PostgreSQL 主机、端口、用户名与密码，不把任一 worktree 的 `POSTGRES_DB` 写入其启动环境。Cervi 配置共享检索服务地址与服务凭据；调用时按第 2.4 节传入目标数据库，在请求内构造连接与指定 `haystack` schema 的 DocumentStore，扩展类型和算符保持可见，不修改账号全局 search_path。模型名称、模型 Endpoint 与供应商密钥不放入 Hayhooks 启动环境或固定 YAML。
+准备 SQL 作为独立资源内嵌进服务端，同时随发行包提供给云数据库管理员。它的目标语义为：
 
-Cervi 经专用 HTTP 契约调用 Hayhooks，Bun 不直接读写分段表。虽然数据同库，跨服务调用仍不属于 Cervi 业务事务：业务变更和任务投递事务内提交，远端写入完成并核对版本后才发布可检索状态。Hayhooks 不再增加业务配置中心或独立任务队列。
+```sql
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+CREATE SCHEMA IF NOT EXISTS haystack;
+```
+
+随包管理员 SQL 必须在创建对象后包含授权段；执行前将 `<cervi_role>` 替换为 Cervi 与 Hayhooks 共用的实际数据库角色名。正常 Go 启动不重复执行管理员授权，已准备的对象只检查当前账号权限。
+
+```sql
+GRANT USAGE ON SCHEMA public TO "<cervi_role>";
+GRANT USAGE, CREATE ON SCHEMA haystack TO "<cervi_role>";
+```
+
+Go 启动时先检查当前数据库的扩展、schema 与所需权限，只对缺失项执行对应 SQL，避免普通运行账号对已准备对象重复申请 CREATE 权限。初始化使用数据库级锁防止多个 server 同时安装，随后沿用现有 Goose 迁移锁执行业务迁移；成功后记录两个扩展的已安装版本，校验所用类型/算符可见性与 schema 访问能力，才能开放本工作区的业务请求与索引任务。版本号用于诊断，不要求云实例与镜像中的精确版本一致；首版按实际使用的向量类型、距离算符与 trigram 函数校验必要能力，缺失则报告具体能力并拒绝启动，不在启动时自动升级扩展。连接的目标数据库须已由 PostgreSQL 部署或云实例创建，server 不负责创建数据库或安装操作系统扩展包。
+
+扩展文件缺失时提示更换数据库镜像/安装服务端扩展；权限不足时提示由管理员对**当前目标数据库**执行随包 SQL 的安装与授权部分，不静默跳过，也不要求应用长期使用超级账号。管理员预建 schema 时需让同一应用账号具备 USAGE、CREATE 和后续分段表管理能力；Cervi 与 Hayhooks 继续共用这一账号。扩展或 schema 已准备时只验证，不在普通启动中强制升级、迁移 schema 或删除扩展。
+
+| 部署方式 | 扩展文件 | 在目标数据库启用扩展 |
+|---|---|---|
+| Docker Compose 新实例 | 独立 PostgreSQL Dockerfile 构建并发布镜像 | Cervi 启动时执行内嵌准备逻辑 |
+| 已有 Docker 数据卷 | 更换前按第 2.5 节完成备份恢复与镜像验证 | Cervi 针对现有数据库检查并安装缺失项，不依赖新卷初始化 |
+| 独立 server 二进制 + 自建 PostgreSQL | 数据库管理员安装两个扩展的服务端文件 | 同一启动代码执行；权限不足时管理员先执行随包 SQL |
+| 云 PostgreSQL | 云实例须支持两个扩展及所需版本 | 当前账号有权限则启动安装，否则管理员预先准备 |
+
+不把 `/docker-entrypoint-initdb.d` 当作唯一安装入口：官方镜像仅在空数据目录初始化时执行它，不覆盖已有数据卷、后来新建的工作区库或云数据库。Taskfile 只保留开发命令编排；测试建库后也通过同一 Go 数据库准备入口初始化，不另写一套扩展 SQL。[PostgreSQL 镜像入口](https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh)
+
+分段表仍由专用适配代码调用固定版本 PgvectorDocumentStore 创建，设置 `create_extension=False`；Hayhooks 不承担第二套扩展安装或业务迁移。框架升级涉及表结构时单独验证与重建，不假定 DocumentStore 自动迁移旧结构。
+
+Compose 只向共享 Hayhooks 提供 PostgreSQL 主机、端口、用户名与密码，不把任一 worktree 的 `POSTGRES_DB` 写入其启动环境。Cervi 配置共享检索服务地址与服务凭据；每次调用按第 2.4 节传入目标数据库并构造 DocumentStore，显式指定 `haystack` schema，不修改账号全局 search_path。模型配置不放入启动环境或固定 YAML。
+
+#### 启动顺序与可用状态
+
+受测的 pgvector-haystack 6.6.0 构造器只保存配置，首次实际数据库操作才通过 `_ensure_db_setup` / 异步对应方法连接数据库：默认 `create_extension=True` 会尝试创建 `vector`；设为 `False` 仍需注册 vector 类型，缺失时失败。该路径没有 `pg_trgm` 依赖。Hayhooks 是否因此启动失败，取决于管线 `setup` / 预热是否主动访问数据库。[固定版本 DocumentStore 源码](https://github.com/deepset-ai/haystack-core-integrations/blob/8cfdcc56f02f494e5f32e0ea1245fbf65532bc4a/integrations/pgvector/src/haystack_integrations/document_stores/pgvector/document_store.py)
+
+本方案的共享 Hayhooks 在 `setup` 中只加载管线代码，不连接某个工作区数据库或调用 DocumentStore 读写；数据库访问推迟到携带工作区上下文的请求。Compose 中 Cervi 等待 PostgreSQL 健康后执行数据库准备与迁移；Hayhooks 可以独立启动，双方不设置相互等待的依赖。PostgreSQL 的 `pg_isready` 只表示服务接受连接，不代表某个工作区的扩展已启用；也不能用单个库的扩展状态决定共享 Hayhooks 的全局健康。[Compose 启动依赖](https://docs.docker.com/compose/how-tos/startup-order/)
+
+Cervi 的 HTTP 与 Worker 入口在本库准备和迁移成功后开放；本地检索另需通过共享 API 的协议与目标库能力探测。Hayhooks 暂未可用时，不把数据库已准备误报为检索可用，也不阻塞已具备条件的普通业务；索引任务保留在既有可靠任务机制中。启动探测和调用错误要区分“API 未就绪”与“目标库扩展/schema 缺失”。Hayhooks 先启动或较晚启动都不需要重启另一个服务来安装扩展，不能用固定 sleep 维持顺序。
+
+Cervi 经专用 HTTP 契约操作 Hayhooks，Bun 不直接读写分段表。同库不使 HTTP 写入成为业务事务的一部分，仍按业务事务投递、远端完成核对、版本发布的顺序执行。
 
 ### 2.4 单实例服务、多工作区数据库
 
@@ -65,7 +103,7 @@ Cervi 服务端从本工作区 `.env` 构造内部调用上下文，携带目标
 
 共享服务由主工作区启动，其他 worktree 复用地址与服务凭据；每个数据库里的配置表、来源和 `haystack` schema 独立。生产部署同样可用这个入口，但通常只连接一个 Cervi 数据库，无需额外创建开发工作区配置。
 
-PR 2 增加显式的 Hayhooks 集成测试选项：停止本工作区的测试任务与请求 → 只重建本工作区 `<POSTGRES_DB>_test` → 初始化该库扩展/schema → 经共享 API 执行测试。不得为重置一个测试库停止共享 API 或断开其他库连接。既有未启用该选项的测试不发起 Hayhooks 调用；仍遵循同一 worktree 同时只运行一轮数据库集成测试的约定。
+PR 2 增加显式的 Hayhooks 集成测试选项：停止本工作区的测试任务与请求 → 只重建本工作区 `<POSTGRES_DB>_test` → 经同一 Go 数据库准备入口初始化该库扩展/schema 与迁移 → 经共享 API 执行测试。不得为重置一个测试库停止共享 API 或断开其他库连接。既有未启用该选项的测试不发起 Hayhooks 调用；仍遵循同一 worktree 同时只运行一轮数据库集成测试的约定。
 
 共享服务使用固定构建的管线版本，不挂载各工作区代码自动热更新。修改管线或服务协议时用临时独立实例验收，完成后再协调升级共享版本；版本不匹配明确报错，不能由某个 worktree 自动重启或覆盖共享服务。测试结束只清理本次启动的独立实例和本工作区进程，保留既有共享服务。
 
@@ -210,17 +248,17 @@ BM25、`ts_rank_cd`、pg_trgm similarity、向量 cosine、RRF 融合分数 和�
 
 本次文档 PR 只修订选型、模型配置规则与验收方案，不更换共享数据库、不接入业务代码。各 PR 依次推进，避免把完整知识库与记忆一起交付。
 
-### PR 1：统一 PostgreSQL + pgvector 基础环境
+### PR 1：统一数据库镜像与 server 启动初始化
 
-范围：默认镜像、扩展初始化 Task、测试库与 CI，同实例、同库、同账号的部署说明；不启动检索服务或增加知识业务表。
+范围：独立 PostgreSQL Dockerfile、发布与 Compose 配置；Cervi server 内嵌的 `vector` / `pg_trgm` / `haystack` 准备与校验、随包管理员 SQL、测试库与 CI 复用入口，同实例、同库、同账号的部署说明。Taskfile 不承载独有的数据库初始化，不启动检索服务或增加知识业务表。
 
-验收：独立新卷初始化与备份恢复、缺少扩展/权限的错误、现有服务端测试与构建。共享实例需协调停机后切换，不直接复用 Alpine 旧卷。
+验收：在没有 Taskfile/psql 的运行环境中，独立二进制与 server 容器都能准备数据库；两个扩展在新库、已有库和测试库启用，重复/并发启动幂等，管理员预装后普通账号可启动，缺少扩展文件或权限时错误清晰。验证独立新卷备份恢复、现有服务端测试与构建；共享实例协调停机后切换，不直接复用 Alpine 旧卷。
 
 ### PR 2：接入 Haystack + Hayhooks 与动态执行契约
 
 范围：固定版本共享服务镜像、工作区数据库路由、Go HTTP 客户端和专用管线，支持指定配置快照的写入、检索、读取和删除；复用数据库凭据，`haystack` schema 保存分段。未配置服务时既有问答 CRUD 与 Dify 仍可用。
 
-验收：只启用 vector，Hayhooks 使用与 Cervi 相同的普通账号访问 `haystack`；给定两套真实 embedding/重排配置快照，写入、检索、读取与删除契约通过。验证不重启执行不同快照、不同维度表隔离、实际模型调用审计与错误契约。适配服务不直接读取或修改 Cervi 模型业务表，不复制实验管理 API；生产服务认证与日志不泄漏密钥。验证单实例并发访问不同工作区库、相同编号不串库、单库重置不影响其他库，以及固定协议版本探测。
+验收：按产品基线启用 `vector` 与 `pg_trgm`，Hayhooks 使用与 Cervi 相同的普通账号访问 `haystack`；给定两套真实 embedding/重排配置快照，写入、检索、读取与删除契约通过。验证不重启执行不同快照、不同维度表隔离、实际模型调用审计与错误契约。适配服务不直接读取或修改 Cervi 模型业务表，不复制实验管理 API；生产服务认证与日志不泄漏密钥。验证单实例并发访问不同工作区库、相同编号不串库、单库重置不影响其他库，以及固定协议版本探测。分别验证 Hayhooks 先启动、Cervi 先完成本库准备、数据库缺扩展与目标库未准备的路径；API 全局健康与工作区检索就绪不能混淆。
 
 ### PR 3：知识库后台模型配置与索引代次
 
@@ -367,6 +405,19 @@ Haystack 的 PgvectorDocumentStore 在只有 core 的库里初始化失败；预
 Go 客户端的五项检查全部通过：40 次最多四并发的交错查询；重建一库时另一库的在途与新请求成功；重建后原工作区无需 API 重启即可重新索引检索；未知工作区被拒绝；全程无 API 重启或重新部署。含重置后的请求共 43 次成功检索，逐条核对实际返回正文归属与模型请求，两个数据库中的表归属和实际向量维度独立核对。
 
 重置只对本轮独立实例中的工作区一执行 `DROP DATABASE ... WITH (FORCE)` 并重建，未操作 Cervi 共享数据库。这验证了请求局部连接的方案；实验路由采用两个固定工作区映射，不代表产品的内部服务认证、动态数据库目标和大量连接池已实现。下一步接入遵循第 2.4 节，不把实验管理 API 当作产品入口。
+
+### 8.8 本次扩展与启动边界验证（2026-09-07）
+
+使用 pgvector/pgvector `0.8.6-pg18-bookworm` 与前述固定 Haystack/Hayhooks 版本，另建独立 PostgreSQL、Hayhooks 实例，不调用模型。八项检查通过：
+
+- 镜像中的 `vector` 与 `pg_trgm` 均可安装，空数据库初始只启用 plpgsql。
+- Hayhooks 在两个扩展均未启用时能启动；`setup` 构造了指向不存在数据库的 DocumentStore，也未立即连接。
+- `create_extension=False` 首次执行 `count_documents()` 因缺少 vector 类型失败；仅安装 pg_trgm 后仍失败。
+- 对目标库安装两个扩展后，同一 API 实例的 `count_documents()` 成功，无需重启。
+- 另一个只启用 vector 的数据库也能调用成功，证明 pg_trgm 是产品基线要求，而非这个组件的必要条件。
+- 默认自动安装路径只创建 vector，不创建 pg_trgm；所有检查期间 API 实例标识不变。
+
+这轮验证的是上游组件与专用管线的启动边界，尚未实现 Cervi Go 启动安装、正式 PostgreSQL Dockerfile、Compose 编排或云权限验收。此前第 8.6/8.7 节只启用 vector 的实验结果保留为历史事实，不能替代新的双扩展部署验收。
 
 ## 9. 长期记忆：统一使用 Haystack，交互确定后开发
 
