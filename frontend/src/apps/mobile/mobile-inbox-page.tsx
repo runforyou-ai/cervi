@@ -296,19 +296,32 @@ export function MobileInboxPage() {
       <MobilePageHeader
         title={t("inbox.title")}
         actions={
-          <Button
-            variant="ghost"
-            className={cn("min-h-11", error && "text-warning")}
-            aria-label={error ? t("inbox.refreshError") : t("inbox.refresh")}
-            disabled={loading || refreshing}
-            onClick={() => void refresh()}
-          >
-            {refreshing
-              ? t("inbox.refreshing")
-              : error
-                ? t("inbox.refreshFailed")
-                : t("inbox.refresh")}
-          </Button>
+          <>
+            {query.scope !== InboxScope.InboxScopeCustomer ? (
+              <Button
+                variant="ghost"
+                className="min-h-11 px-2"
+                onClick={() => navigate("/inbox/group/new", {
+                  state: { mobileBack: true },
+                })}
+              >
+                {t("group.create")}
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              className={cn("min-h-11", error && "text-warning")}
+              aria-label={error ? t("inbox.refreshError") : t("inbox.refresh")}
+              disabled={loading || refreshing}
+              onClick={() => void refresh()}
+            >
+              {refreshing
+                ? t("inbox.refreshing")
+                : error
+                  ? t("inbox.refreshFailed")
+                  : t("inbox.refresh")}
+            </Button>
+          </>
         }
       />
       <MobileInboxScopes scope={query.scope} onChange={changeQuery} />

@@ -2,6 +2,7 @@
 import { useEffect } from "react"
 import { Navigate, Route, Routes } from "react-router"
 
+import { MobileCreateGroupPage } from "@/apps/mobile/mobile-create-group-page"
 import { MobileDirectConversationPage } from "@/apps/mobile/mobile-direct-conversation-page"
 import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
 import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
@@ -61,6 +62,7 @@ export default function MobileApp() {
             <Route path="/me" element={<MobileMePage />} />
           </Route>
           <Route element={<MobileDetailLayout />}>
+            <Route path="/inbox/group/new" element={<MobileCreateGroupPage />} />
             <Route
               path="/inbox/group/:conversationID"
               element={<MobileGroupConversationPage />}
