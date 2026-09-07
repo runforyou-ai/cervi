@@ -1,4 +1,8 @@
 {
+  "error.customer_delivery_conflict": "投递状态已变化或渠道当前无法发送，请刷新后重试。",
+  "error.customer_delivery_failed": "处理消息投递失败，请重试。",
+  "error.channel_outbound_unavailable": "渠道已停用或尚未配置机器人，无法发送。",
+
   "error.knowledge_qa_not_found": "问答不存在或已删除。",
   "error.knowledge_qa_unsupported": "只有本地问答知识库支持此操作。",
   "error.knowledge_base_has_content": "知识库已有问答，无法切换类型或来源。",

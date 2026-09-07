@@ -150,6 +150,19 @@ func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.R
 	return output, err
 }
 
+// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
+func (b *Backend) ListCustomerMessageDeliveries(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerDeliveryListInput) (appservice.CustomerDeliveryList, error) {
+	var output appservice.CustomerDeliveryList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/deliveries", encodeCustomerDeliveryListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
+func (b *Backend) ResolveCustomerMessageDelivery(ctx context.Context, meta appservice.RequestMeta, conversationID string, deliveryID string, input appservice.CustomerDeliveryResolveInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/deliveries/"+url.PathEscape(deliveryID)+"/resolve", nil, input, nil)
+}
+
 // ClaimServiceSession 领取或接管客户会话最新处理周期。
 func (b *Backend) ClaimServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
 	var output appservice.CustomerServiceSession
@@ -965,6 +978,13 @@ func encodeConversationMessageListInputQuery(input appservice.ConversationMessag
 	query := url.Values{}
 	setQuery(query, "before", input.Before)
 	setQuery(query, "after", input.After)
+	return query
+}
+
+// encodeCustomerDeliveryListInputQuery 将 appservice.CustomerDeliveryListInput 编码为查询参数。
+func encodeCustomerDeliveryListInputQuery(input appservice.CustomerDeliveryListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "messageIds", input.MessageIDs)
 	return query
 }
 

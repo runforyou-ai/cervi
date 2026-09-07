@@ -1195,7 +1195,13 @@ function ConversationThread({
     isAgentInboxConversation(conversation) ||
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation) ||
-    conversation.customer.channelType === ChannelType.ChannelTypeWebsite
+    (conversation.customer.channelType === ChannelType.ChannelTypeWebsite ||
+      conversation.customer.channelType === ChannelType.ChannelTypeTelegram)
+  const telegramConversation = Boolean(
+    conversation &&
+    isCustomerInboxConversation(conversation) &&
+    conversation.customer.channelType === ChannelType.ChannelTypeTelegram,
+  )
   const groupConversation =
     conversation && isGroupInboxConversation(conversation) ? conversation : null
   const groupResource = useResource(
@@ -1227,6 +1233,7 @@ function ConversationThread({
     <>
       <ConversationTimeline
         prepareSendRef={prepareSendRef}
+        customerDeliveries={telegramConversation}
         conversationID={conversationID}
         conversationType={conversationType}
         currentUser={identity.user}
@@ -1238,7 +1245,7 @@ function ConversationThread({
         }
         groupParticipants={groupResource.data?.participants}
         onReplyMessage={
-          conversation && replySupported && !replyDisabledReason
+          conversation && replySupported && !replyDisabledReason && !telegramConversation
             ? setReplyTo
             : undefined
         }

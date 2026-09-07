@@ -901,6 +901,60 @@ export interface CurrentUser {
 }
 
 /**
+ * CustomerDeliveryList 定义当前窗口的投递集合。
+ */
+export interface CustomerDeliveryList {
+    "deliveries": CustomerMessageDelivery[] | null;
+}
+
+/**
+ * CustomerDeliveryListInput 定义当前消息窗口的投递查询。
+ */
+export interface CustomerDeliveryListInput {
+    "messageIds": string;
+}
+
+/**
+ * CustomerDeliveryResolution 表示人工投递处理操作。
+ */
+export enum CustomerDeliveryResolution {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CustomerDeliveryRetry = "retry",
+    CustomerDeliveryConfirmSent = "confirm_sent",
+    CustomerDeliveryConfirmFailed = "confirm_failed",
+};
+
+/**
+ * CustomerDeliveryResolveInput 定义人工确认或重试意图。
+ */
+export interface CustomerDeliveryResolveInput {
+    "resolution": CustomerDeliveryResolution;
+    "confirmDuplicateRisk": boolean;
+}
+
+/**
+ * CustomerDeliveryStatus 表示客户消息的外部投递状态。
+ */
+export enum CustomerDeliveryStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CustomerDeliveryPending = "pending",
+    CustomerDeliverySending = "sending",
+    CustomerDeliverySent = "sent",
+    CustomerDeliveryRetryWait = "retry_wait",
+    CustomerDeliveryFailed = "failed",
+    CustomerDeliveryUncertain = "uncertain",
+    CustomerDeliveryNeedsReview = "needs_review",
+};
+
+/**
  * CustomerInboxConversation 定义客户会话摘要。
  */
 export interface CustomerInboxConversation {
@@ -931,6 +985,18 @@ export enum CustomerInboxView {
     CustomerInboxViewCoworkers = "coworkers",
     CustomerInboxViewClosed = "closed",
 };
+
+/**
+ * CustomerMessageDelivery 定义成员可见的外部投递结果。
+ */
+export interface CustomerMessageDelivery {
+    "canRetry": boolean;
+    "paused": boolean;
+    "id": string;
+    "messageId": string;
+    "status": CustomerDeliveryStatus;
+    "lastError": string;
+}
 
 /**
  * CustomerServiceAssigneeList 定义客服筛选候选列表。

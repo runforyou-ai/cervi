@@ -94,6 +94,16 @@ func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta,
 	return s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input)
 }
 
+// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
+func (s *Service) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
+	return s.backend.ListCustomerMessageDeliveries(ctx, meta, conversationID, input)
+}
+
+// ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
+func (s *Service) ResolveCustomerMessageDelivery(ctx context.Context, meta RequestMeta, conversationID string, deliveryID string, input CustomerDeliveryResolveInput) error {
+	return s.backend.ResolveCustomerMessageDelivery(ctx, meta, conversationID, deliveryID, input)
+}
+
 // ClaimServiceSession 领取或接管客户会话最新处理周期。
 func (s *Service) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
 	return s.backend.ClaimServiceSession(ctx, meta, conversationID)

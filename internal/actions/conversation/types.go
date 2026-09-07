@@ -44,6 +44,8 @@ const (
 	ConflictReasonServiceSessionOwned = "service_session_owned"
 	// ConflictReasonServiceSessionNotReplyable 表示客服处理周期当前不可回复。
 	ConflictReasonServiceSessionNotReplyable = "service_session_not_replyable"
+	// ConflictReasonChannelOutboundUnavailable 表示来源渠道已停用或尚未配置。
+	ConflictReasonChannelOutboundUnavailable = "channel_outbound_unavailable"
 	// ConflictReasonChannelOutboundUnsupported 表示来源渠道尚不支持外发。
 	ConflictReasonChannelOutboundUnsupported = "channel_outbound_unsupported"
 	// ConflictReasonServiceSessionAlreadyOpen 表示客服处理周期已经打开。

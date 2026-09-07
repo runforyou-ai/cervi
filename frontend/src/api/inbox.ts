@@ -1,5 +1,7 @@
 /** 成员收件箱与会话消息调用归一化。 */
 import {
+  ListCustomerMessageDeliveries,
+  ResolveCustomerMessageDelivery,
   AddGroupConversationMembers,
   ClaimServiceSession,
   CloseServiceSession,
@@ -506,3 +508,13 @@ export async function sendAgentTextMessage(
   const result = await sendAgentTextMessageBound(conversationID, input)
   return normalizeConversationMessage(result)
 }
+
+/** 读取当前窗口的客户消息投递状态。 */
+const listCustomerMessageDeliveriesBound = bind(ListCustomerMessageDeliveries)
+/** 归一化当前消息窗口的投递集合。 */
+export async function listCustomerMessageDeliveries(conversationID: string, messageIds: string) {
+  const result = await listCustomerMessageDeliveriesBound(conversationID, { messageIds })
+  return { ...result, deliveries: asList(result.deliveries) }
+}
+/** 人工确认或重试一条客户消息投递。 */
+export const resolveCustomerMessageDelivery = bind(ResolveCustomerMessageDelivery)

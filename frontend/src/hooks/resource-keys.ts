@@ -24,6 +24,9 @@ function scopedListKey(
 }
 
 export const resourceKeys = {
+  /** 当前会话窗口的外部投递状态。 */
+  customerDeliveries: (conversationId: string, messageIds?: string) =>
+    scopedListKey("customer-deliveries", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 收件箱数据。 */
   inbox: (parameters?: KeyParameters) => listKey("inbox", parameters),
   /** 客服筛选候选。 */

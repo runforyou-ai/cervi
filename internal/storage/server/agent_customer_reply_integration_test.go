@@ -74,7 +74,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 					t.Fatalf("expected new session in same conversation: %+v", reopened.Conversation)
 				}
 			}
-			if _, err := conversationaction.NewSendCustomerTextMessageAction(db).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{ConversationID: original.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题的回答", ReplyToMessageID: original.Message.ID}); err != nil {
+			if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{ConversationID: original.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题的回答", ReplyToMessageID: original.Message.ID}); err != nil {
 				t.Fatal(err)
 			}
 			if deleted {

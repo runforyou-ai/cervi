@@ -77,6 +77,12 @@ type Backend interface {
 	// SendCustomerTextMessage 发送客户会话文本消息。
 	//cervi:route POST /conversations/:conversationID/messages
 	SendCustomerTextMessage(context.Context, RequestMeta, string, CustomerTextMessageInput) (ConversationMessage, error)
+	// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
+	//cervi:route GET /conversations/:conversationID/deliveries
+	ListCustomerMessageDeliveries(context.Context, RequestMeta, string, CustomerDeliveryListInput) (CustomerDeliveryList, error)
+	// ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
+	//cervi:route POST /conversations/:conversationID/deliveries/:deliveryID/resolve
+	ResolveCustomerMessageDelivery(context.Context, RequestMeta, string, string, CustomerDeliveryResolveInput) error
 	// ClaimServiceSession 领取或接管客户会话最新处理周期。
 	//cervi:route POST /conversations/:conversationID/claim
 	ClaimServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)

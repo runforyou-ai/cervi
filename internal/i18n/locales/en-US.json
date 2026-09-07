@@ -1,4 +1,8 @@
 {
+  "error.customer_delivery_conflict": "The delivery state changed or the channel cannot send. Refresh and try again.",
+  "error.customer_delivery_failed": "Could not process message delivery. Try again.",
+  "error.channel_outbound_unavailable": "The channel is disabled or its bot is not configured.",
+
   "error.knowledge_qa_not_found": "The Q&A entry does not exist or has been deleted.",
   "error.knowledge_qa_unsupported": "This operation is only available for local Q&A knowledge bases.",
   "error.knowledge_base_has_content": "This knowledge base contains Q&A entries. Its type or source cannot be changed.",

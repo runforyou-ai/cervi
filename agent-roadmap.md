@@ -15,6 +15,8 @@
 
 首轮按 P1a 内部 AI 员工验证、P1b 网站 AI 客服的顺序交付；P1a 验证通过后立即进入 P1b。
 
+聊天实时重构按 [PR 实施清单](chat-realtime-pr-plan.md) 推进；PR01 以 `707fdff` 核对现状并对齐目标。统一消息顺序、同步恢复和写入口锁序见聊天路线图第 5.3、10.8–10.14 节，尚未接入的实时能力不视为已交付。
+
 ## 2. 当前代码事实
 
 以下内容已经存在：
@@ -24,7 +26,8 @@
 - Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
-- Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；Agent 可以复用同一 ChatSubject、Participant 和 Message 路径。
+- Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；`direct_conversations` 已用企业内规范身份对唯一约束收敛首发，Agent 复用同一 ChatSubject、Participant 和 Message 路径。
+- Telegram Bot 私聊文本入站已共用客户文本事务；Telegram 外发和 Agent 响应尚未实现，网站 AI 客服不依赖它们。
 - Agent 任务使用独立 Worker 队列。本阶段已精确锁定 Eino v0.10 Alpha，通过 eino-ext 接入 OpenAI 兼容模型，并以纯函数计算器验证 Tool 与 TurnLoop 安全点补入。
 - `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊与网站客服自动触发、单在途 Run、成功或失败水位及最终消息幂等。
 - `agent_run_blocks` 保存成功 Run 的有序中间内容；运行中使用按尝试隔离的内存快照，工具普通错误反馈给模型以便修正。
@@ -125,7 +128,11 @@ Eino Session、Checkpoint 和 BackgroundTask 若以后启用，只是某个 Run 
 Realtime 不参与 P1a/P1b 的正确性闭环；两阶段分别通过 appservice 业务查询和网站轮询读取最终 Message。完整 P1 和设备阶段使用以下统一实时设计。
 
 - 全产品只使用 `chat-roadmap.md` 定义的一个版本化 Realtime WebSocket 和 `cervi.realtime.v1` Protobuf 协议，不为设备能力另建连接、JSON WebSocket 或 MCP Transport。
-- 聊天变化通过 Mailbox/Inbox 和会话同步水位通知，客户端经 HTTP 补拉；WebSocket 不复制完整业务 DTO。
+- 聊天变化通过用户 Mailbox、客服 Inbox、访客目录及会话水位通知，客户端经 HTTP／Wails 业务 Query 补拉；WebSocket 不复制完整业务 DTO。受众采用 `(namespace, organizationId, audienceKind, audienceId)`，Subject 为 `<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>`。
+- 最小协议只包含认证、Hello、心跳、水位、撤销、错误和下线；AI 流及授权焦点由 PR45 扩展，设备帧到设备阶段再增加。
+- 首版投影与游标只驻留内存，缓存丢失必须重建基线：记录 H0、按不可变 ID 扫描完整授权索引，再追赶 H0 后变化。target／applied 与实体读取版本分开，Query 失败保留 dirty；独立保存游标不能替代离线库。
+- 网站已有渠道身份才换票连接；首条有效消息建立身份后再连接，无身份页面仅通过恢复前台和低频无副作用检查发现其他页面建立的身份。访客先同步目录，再补所需窗口。
+- 实时接入保留列表选择和滚动锚点，深处暂存活动序移动；个人置顶由本人手动排序并跨端同步，新消息不改变顺序。收到帧或补拉完成不能推进已读；冷启动／重连不逐条补弹通知。
 - AI token 流可以使用 `AIStreamStarted/Delta/Completed/Failed` 临时帧，增量不写入 Message、Changelog 或 Outbox；最终消息和 Run 状态仍从 PostgreSQL 与 HTTP 恢复。
 - 设备调用先写入 PostgreSQL，并在同一事务写 `realtime_outbox`；Realtime Gateway 只推送设备工作水位，参数领取、进度、结果和持久取消状态走 HTTP。
 - WSS、Gateway 或 Core NATS 丢失通知后，客户端按设备工作水位和待领取列表恢复。
@@ -150,7 +157,7 @@ Realtime 不参与 P1a/P1b 的正确性闭环；两阶段分别通过 appservice
 12. 移动端默认是前台确认与选择器，不承担无人值守企业 Worker 职责。
 13. 不为未来本地运行提前创建第二套身份、表或空字段；真实落地时直接调整目标模型。
 14. Device Capability Gateway 复用 Realtime Gateway 的连接、票据、Protobuf、Outbox、NATS 和背压，不建设第二套实时基础设施。
-15. Agent 触发资格来自消息首次持久化时写入的服务端触发事实和单调序号；`originated_at` 只用于聊天展示排序，不能作为 Agent 触发水位。
+15. Agent 触发资格来自消息首次持久化时写入的服务端触发事实和单调序号；`originated_at` 只用于来源时间展示，不能作为 Agent 触发水位；聊天顺序统一使用会话内 `message_seq`，与 Trigger 序号及 `sync_seq` 分开。
 16. 同一个 Run 最多持久化一条最终输出消息；Message 使用 `agent:<agent_run_id>` 业务幂等键，Task 幂等键不能替代它。
 17. 后台 Runtime 使用 `AgentExecutionContext` 显式授权，不伪造登录用户；工具、审批和设备能力只在对应阶段逐层放开。
 
@@ -212,6 +219,10 @@ agent_revisions
 Revision 负责长期配置历史，Run 快照负责证明本次执行实际使用了什么。快照不得包含 Provider 明文密钥。
 
 ## 6. 会话触发、游标与并发
+
+真人消息、网站入站、Agent 调度／认领／写回和客服取消共用聊天路线图第 10.14 节的锁序；不能在 Agent 内再定义一套顺序。当前 `directRunPolicy.lockContext` 不锁会话，客服策略先锁 CustomerConversation／ServiceSession，`lockAgentRun` 再锁 State、Run 和 Task，最后写摘要才触及 Conversation；PR03–04 把 Conversation 前置并补齐锁后资格检查；客服参与关系在周期、State、Run、Task 门禁之后确保，只随有效最终回复提交，所有参与者写入均先持有 Conversation 锁。无当前用户的任务继续使用任务守卫，不能套用 LockActiveUser。
+
+PR23 为 queued、running、成功、失败和取消写持久会话版本；成功 Message、blocks、Run 终态和消费水位同事务提交。客服同时推进共享 Inbox，访客只读公开状态。临时 token 不推进持久水位；Trigger 调度、同步变更和实时过程各自保留独立职责。
 
 ### 6.1 策略和状态
 
@@ -278,7 +289,7 @@ conversation_agent_triggers
 - `trigger_type` 记录 `mention`、`agent_direct` 或 `customer_auto` 等实际入口，不从消息时间推断。
 - Agent、系统消息和历史补拉默认不创建自动触发事实；人工回放必须使用显式持久命令。
 - P1b 只在当前开放 ServiceSession 的负责人是合格 Agent 时创建 `customer_auto`；真人接管后自然不再触发，不增加 AI 专属暂停或恢复状态。完整 P1 的通用策略另行定义。
-- `originated_at` 可以早于已经展示的消息，仍不影响本次新触发事实的资格和 `trigger_seq`；它继续只用于消息时间线排序。
+- `originated_at` 可以早于已经展示的消息，仍不影响本次新触发事实的资格和 `trigger_seq`；它只用于来源时间展示和诊断，本地时间线、分页与阅读改用 `message_seq`。
 - 触发事实是恢复和审计依据，NATS Delivery、进程内事件和当前 WebSocket 连接都不能代替它。
 
 ### 6.3 不丢唤醒的单 Run 模型
@@ -356,7 +367,8 @@ agent_runs
 - 不带工具的正文作为候选最终回复，最终稳定内容写入 `messages.body`；输入、输出用量继续保存在 `agent_runs.usage`。
 - 内容块只在 Run 成功时与最终 Message、Run 终态和消费水位原子提交。整次运行失败、取消或当前尝试退出时丢弃内存过程，不持久化半成品。
 - 运行快照包含 `runId`、任务 `attempt`、`streamId`、流内递增 `sequence`、稳定块编号及候选正文。重算建立新流并清空旧过程；未来 WebSocket 切换流时替换整个思考区，并忽略旧尝试事件。当前仅提供进程内快照，尚未接入 token 流和传输订阅。
-- 后续实时交付统一接入产品 WebSocket，接入后移除现有前台和网站轮询；不新增过程轮询接口。连接恢复通过当前尝试快照或已落库终态同步，不逐 token 落库。
+- 后续实时交付统一接入产品 WebSocket；各端只有通过补拉、失权和阅读回归后才移除对应轮询，不新增过程轮询接口。PR42 拆分轻量 Run 摘要集合与按 runId 读取的持久过程；PR43 增量消费模型输出；PR44 经授权后按执行节点取得当前 attempt／streamId 的快照，节点缺失返回 snapshot_unavailable 和持久状态，不冒充当前快照。
+- PR45 用快照及其 sequence 修复流缺口，忽略旧 attempt／streamId；只有事务提交后才能提示 completed，持久 Query 终态覆盖临时候选，丢失 completed 仍由水位收敛。PR46 在服务端构造访客专属公开正文／基础状态，内部思考、工具参数与结果不进入访客帧；接管或关闭立即终止旧候选资格。
 - 当前 Web、桌面端和移动端成员消息时间线共用一个默认折叠的思考区，展开箭头紧邻状态文字；thinking 用斜体，content 正常显示，工具逐个折叠展示状态和完整参数、结果或错误。工具原文按实际布局截断，只有溢出时提供完整内容提示；最终正文下显示输入、输出用量。现有消息读取带上最近 Run 的状态，运行中显示“思考中”，实时过程和打字机效果待 WebSocket 接入。
 
 聊天内容块用于回看成功回复的过程；未来涉及外部副作用、审批和费用的审计记录另按下面的语义步骤模型建设，不能用聊天过程的丢弃规则代替业务审计。
@@ -464,7 +476,7 @@ uncertain_at
 | 模型调用前或调用中 | Task 租约过期后用同一 Run、Revision 和持久化会话输入重新计算，建立新的临时过程流 |
 | Provider 已返回、最终事务提交前 | 可能再次调用 Provider，但只能持久化一条最终 Message |
 | 最终 Message、Run 终态和 `processed_*` 提交后、Task ACK 前 | 重试读取到 Run 终态并正常结束，不再次调用 Provider |
-| 两个执行尝试短暂重叠 | 业务写回事务锁定 Run 和 Task，校验 attempt、Worker 和租约；拒绝旧尝试，唯一 `agent:<agent_run_id>` 只允许一条输出 |
+| 两个执行尝试短暂重叠 | 业务写回目标顺序为 Conversation → 客服扩展／周期（如有）→ AgentState → Run → Task，锁后校验 attempt、Worker 和租约；拒绝旧尝试，唯一 `agent:<agent_run_id>` 只允许一条输出 |
 
 当前 Agent Task 最多执行 3 次。进程重启不扫描并中断所有 Run，依靠已有 Task 租约过期和消息重投重新认领；不保存 Eino Checkpoint，也不从某个工具步骤续跑。新尝试重新读取持久化会话输入，仍可吸收运行期间的新消息，因此重新计算结果可能不同。模型及工具可能重复执行，当前计算器和知识检索可重复调用；未来引入有副作用的工具时须单独落实业务幂等。
 
@@ -804,7 +816,7 @@ Cervi Gateway
 ### P0：聊天和任务前置能力
 
 - 完成 `chat_subjects`、Conversation、Participant 和 Message 事实。
-- 落地消息事务、幂等、引用、@ 和双时间顺序。
+- 落地消息事务、幂等、引用和 @；来源双时间保留，统一 `message_seq` 由聊天重构 PR06 交付，不属于 P1a／P1b 已完成证据。
 - 增加 `TxEnqueuer.EnqueueIn`。
 - 为模型调用提供有界超时、独立队列或 Worker 配额，不能耗尽非 Agent 任务容量。
 
@@ -833,7 +845,7 @@ P1a 验证成功后立即交付网站客户自动响应：
 - Agent 最终回复仍是统一 Cervi Message。网站访客通过既有授权轮询直接读取该 Message，因此“写入 Message 并可被网站读取”就是网站路径的交付闭环，不创建外部 Delivery。
 - ServiceSession 的 `open/closed + assignee_identity_id` 是唯一客服状态。成员使用现有 Claim 接管，现有 Transfer 转交；最后一条来自 contact 时转交给 Agent 会补 Trigger，来自企业身份时等待客户下一条消息。不增加 AI 专属暂停、恢复、接管或状态。
 - `customer_auto` 复用 Eino TurnLoop：queued 时只冻结起点，Tool 或模型执行期间到达的新消息在下一个安全点由同一 Run 的下一 Turn Claim，最终只写一条文本 Message；完成边界后到达的消息进入下一 Run。
-- 完成前按 `ServiceSession -> State -> Run` 重新校验负责人、渠道、Agent 资格、Run Revision 和实际消费边界，接管、关闭或换负责人后的迟到结果不得写入。
+- 当前完成前经 CustomerConversation／ServiceSession、State、Run 和 Task 锁后重新校验负责人、渠道、Agent 资格、Run Revision 和实际消费边界，接管、关闭或换负责人后的迟到结果不得写入；PR03–04 按第 6 节再将 Conversation 锁前置。
 - 不流式输出、无设备、无审批，只记录 Token、耗时和错误，不计算金额；calculator 仅用于开发期延时并发测试，正式发布前删除。
 
 验收边界：符合负责人规则的网站客户新消息会自动得到一条可由访客轮询读取的 AI 回复；消息重放和 Task 重复不重复回复；运行中连续消息由同一 Run 在下一个安全点处理；接管、关闭、换负责人与模型完成并发时结果可确定且不会迟到发言；网站闭环在没有 Realtime 和第三方 Delivery 的情况下成立。

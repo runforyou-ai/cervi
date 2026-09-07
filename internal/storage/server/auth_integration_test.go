@@ -567,14 +567,15 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if messageCountBeforeReply != 2 {
 			t.Fatalf("Telegram message count = %d, want 2", messageCountBeforeReply)
 		}
-		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db)
+		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db, nil)
 		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
-			ConversationID:  telegramConversation.ID,
-			ClientMessageID: "019d4e1c-40a5-77dd-82e6-6951f9957ba5",
-			Body:            "不应写入的 Telegram 回复",
+			ConversationID:   telegramConversation.ID,
+			ClientMessageID:  "019d4e1c-40a5-77dd-82e6-6951f9957ba5",
+			Body:             "Telegram 暂不支持引用",
+			ReplyToMessageID: telegramMessages[0].ID,
 		})
 		var replyConflict *conversationaction.ConflictError
-		if !errors.As(err, &replyConflict) || replyConflict.Reason != conversationaction.ConflictReasonChannelOutboundUnsupported {
+		if !errors.As(err, &replyConflict) || replyConflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 			t.Fatalf("Telegram reply error = %#v", err)
 		}
 		messageCountAfterReply, err := db.NewSelect().Model((*servermodels.Message)(nil)).
@@ -1671,7 +1672,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db)
+		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db, nil)
 		memberReply, err := sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
 			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f93", Body: "我来处理",
 		})
@@ -1818,7 +1819,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || reclaimedWebsite.Assignee == nil || reclaimedWebsite.Assignee.IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
 			t.Fatalf("reclaim website session before reply = %#v, error = %v", reclaimedWebsite, err)
 		}
-		if _, err := conversationaction.NewSendCustomerTextMessageAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+		if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
 			ConversationID: websiteInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f91", Body: "我已参与处理",
 		}); err != nil {
 			t.Fatal(err)

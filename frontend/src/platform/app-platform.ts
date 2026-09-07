@@ -25,8 +25,12 @@ type WailsWindow = Window & {
   }
 }
 
-/** 根据 Wails 运行环境识别 Web、桌面端和移动端。 */
+/** 根据运行环境和开发预览标记识别应用平台。 */
 export function resolveAppPlatform(): AppPlatform {
+  // 开发窗口通过地址标记加载移动端页面和交互。
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("preview") === "mobile") {
+    return "mobile"
+  }
   const wailsWindow = window as WailsWindow
   const os = wailsWindow._wails?.environment?.OS
   if (os === "ios" || os === "android") {
@@ -58,6 +62,9 @@ export function resolveAppPlatform(): AppPlatform {
 
 /** 判断桌面端是否运行在 macOS。 */
 export function isDesktopMacOS(): boolean {
+  if (resolveAppPlatform() !== "desktop") {
+    return false
+  }
   const wailsWindow = window as WailsWindow
   if (wailsWindow._wails?.environment?.OS === "darwin") {
     return true
