@@ -12,6 +12,7 @@ import {
   isGroupInboxConversation,
   InboxScope,
   ConversationStatus,
+  MessageType,
   loadInbox,
   ServiceSessionStatus,
   type CustomerInboxConversationData,
@@ -191,7 +192,9 @@ function MobileConversationRow({
     groupConversation?.group.status ===
     ConversationStatus.ConversationStatusArchived
       ? t("groupDissolved")
-      : messagePreview(
+      : conversation.lastMessageType === MessageType.MessageTypeAgentError
+        ? t("agentRunFailed")
+        : messagePreview(
           summary.preview ?? "",
           summary.previewSenderIdentityType,
         ) ||

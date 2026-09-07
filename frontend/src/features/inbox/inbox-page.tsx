@@ -28,6 +28,7 @@ import {
   ChannelType,
   ConversationStatus,
   ConversationType,
+  MessageType,
   CustomerInboxView,
   InboxScope,
   OrganizationIdentityType,
@@ -761,7 +762,9 @@ function InboxConversationList({
               ConversationStatus.ConversationStatusArchived
           const preview = groupDissolved
             ? t("groupDissolved")
-            : messagePreview(
+            : conversation.lastMessageType === MessageType.MessageTypeAgentError
+              ? t("agentRunFailed")
+              : messagePreview(
                 summary.preview ?? "",
                 summary.previewSenderIdentityType,
               ).trim() ||

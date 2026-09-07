@@ -12,7 +12,6 @@ import {
   AgentRunStatus,
   AgentToolCallStatus,
   type AgentToolCall,
-  type ConversationAgentFailure,
   type ConversationAgentProcessData,
   type ConversationAgentRun,
 } from "@/api"
@@ -222,20 +221,6 @@ export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; in
           <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>
         ) : null}
       </div>
-    </div>
-  )
-}
-
-/** 在失败轮次的位置显示错误文案。 */
-export function AgentRunFailure({ failure, incoming }: { failure: ConversationAgentFailure; incoming: boolean }) {
-  const { t } = useTranslation("inbox")
-  return (
-    <div
-      className={cn("mt-3 flex min-w-0 text-xs text-destructive", incoming ? "justify-start" : "justify-end")}
-      role="status"
-      aria-label={`${failure.agentName.trim() || t("unknownSender")} ${t("agentRunFailed")}`}
-    >
-      <span className={cn("py-2", incoming ? "ml-10" : "mr-10")}>{t("agentRunFailed")}</span>
     </div>
   )
 }

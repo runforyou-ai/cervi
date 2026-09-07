@@ -773,10 +773,7 @@ func (b *DirectBackend) conversationMessageListFromAction(ctx context.Context, m
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	result := ConversationMessageList{AgentFailures: make([]ConversationAgentFailure, 0, len(history.AgentFailures)), HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
-	for _, failure := range history.AgentFailures {
-		result.AgentFailures = append(result.AgentFailures, ConversationAgentFailure{ID: failure.ID, AfterMessageID: failure.AfterMessageID, AgentName: failure.AgentName})
-	}
+	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
 	if run := history.LatestAgentRun; run != nil {
 		result.LatestAgentRun = &ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, run.AgentAvatarFileID), Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError}
 	}

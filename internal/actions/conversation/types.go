@@ -234,7 +234,6 @@ type ConversationMessageHistoryInput struct {
 
 // ConversationMessageHistory 定义成员消息历史和下一页边界。
 type ConversationMessageHistory struct {
-	AgentFailures  []ConversationAgentFailure
 	LatestAgentRun *ConversationAgentRun
 	HasEarlier     bool
 	HasLater       bool
@@ -249,13 +248,6 @@ type ConversationAgentProcess struct {
 	DurationMilliseconds int64
 	Usage                agentruntime.Usage
 	Blocks               []agentruntime.Block
-}
-
-// ConversationAgentFailure 定义失败运行在消息时间线中的位置和发送者。
-type ConversationAgentFailure struct {
-	ID             string `bun:"id"`
-	AfterMessageID string `bun:"after_message_id"`
-	AgentName      string `bun:"agent_name"`
 }
 
 // ConversationAgentRun 定义会话最近一次运行的状态。

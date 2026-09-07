@@ -125,6 +125,7 @@ type GroupInboxConversation struct {
 
 // InboxConversation 定义成员统一收件箱列表项。
 type InboxConversation struct {
+	LastMessageType      *MessageType               `json:"lastMessageType"`
 	ID                   string                     `json:"id"`
 	Type                 ConversationType           `json:"type"`
 	UnreadCount          int                        `json:"unreadCount"`

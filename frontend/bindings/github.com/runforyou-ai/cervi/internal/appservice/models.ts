@@ -618,15 +618,6 @@ export interface ContactSummary {
 }
 
 /**
- * ConversationAgentFailure 定义失败运行的时间线位置和 Agent 名称。
- */
-export interface ConversationAgentFailure {
-    "id": string;
-    "afterMessageId": string;
-    "agentName": string;
-}
-
-/**
  * ConversationAgentProcess 定义成功消息的有序过程和模型用量。
  */
 export interface ConversationAgentProcess {
@@ -696,7 +687,6 @@ export interface ConversationMessage {
  * ConversationMessageList 定义成员消息页。
  */
 export interface ConversationMessageList {
-    "agentFailures": ConversationAgentFailure[] | null;
     "latestAgentRun": ConversationAgentRun | null;
     "hasEarlier": boolean;
     "hasLater": boolean;
@@ -1278,6 +1268,7 @@ export interface InboxAssignee {
  * InboxConversation 定义成员统一收件箱列表项。
  */
 export interface InboxConversation {
+    "lastMessageType": MessageType | null;
     "id": string;
     "type": ConversationType;
     "unreadCount": number;
@@ -1801,6 +1792,7 @@ export enum MessageType {
 
     MessageTypeText = "text",
     MessageTypeSystem = "system",
+    MessageTypeAgentError = "agent_error",
 };
 
 /**

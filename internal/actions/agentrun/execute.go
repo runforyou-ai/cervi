@@ -287,8 +287,8 @@ func (p directRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *serv
 	return loadClaimedConversationMessages(ctx, db, run, endSeq)
 }
 
-// persistResponse 写入普通 Agent 回复并更新会话摘要。
-func (p directRunPolicy) persistResponse(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, run *servermodels.AgentRun, messageID, content string) error {
+// persistMessage 写入 Agent 结果消息并更新会话摘要。
+func (p directRunPolicy) persistMessage(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
 	var participantID string
 	if err := db.NewSelect().TableExpr("conversation_participants AS cp").
 		ColumnExpr("cp.id").
@@ -301,7 +301,7 @@ func (p directRunPolicy) persistResponse(ctx context.Context, db bun.IDB, _ agen
 		Scan(ctx, &participantID); err != nil {
 		return fmt.Errorf("load agent conversation participant: %w", err)
 	}
-	message, err := insertAgentResponseMessage(ctx, db, run, messageID, participantID, content, nil)
+	message, err := insertAgentMessage(ctx, db, run, messageID, participantID, messageType, content, nil)
 	if err != nil {
 		return err
 	}
@@ -326,19 +326,19 @@ func (p directRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, _ agentRun
 	return err
 }
 
-// insertAgentResponseMessage 写入一条带运行幂等键的 Agent 回复。
-func insertAgentResponseMessage(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, messageID, participantID, content string, serviceSessionID *string) (*servermodels.Message, error) {
+// insertAgentMessage 写入一条带运行幂等键的 Agent 结果消息。
+func insertAgentMessage(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, messageID, participantID string, messageType domain.MessageType, content string, serviceSessionID *string) (*servermodels.Message, error) {
 	idempotencyKey := "agent:" + run.ID
 	message := &servermodels.Message{
 		ID: messageID, OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
 		ServiceSessionID: serviceSessionID, SenderParticipantID: &participantID,
-		Type: string(domain.MessageTypeText), Body: content, IdempotencyKey: &idempotencyKey,
+		Type: string(messageType), Body: content, IdempotencyKey: &idempotencyKey,
 		OriginatedAt: time.Now().UTC(),
 	}
 	if _, err := db.NewInsert().Model(message).
 		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
 		Returning("*").Exec(ctx); err != nil {
-		return nil, fmt.Errorf("create agent response message: %w", err)
+		return nil, fmt.Errorf("create agent result message: %w", err)
 	}
 	return message, nil
 }
@@ -405,7 +405,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 			*run.TriggerEndSeq != result.EndSeq || run.TriggerStartSeq != state.ProcessedSeq+1 {
 			return errors.New("agent run completion boundary is inconsistent")
 		}
-		if err := policy.persistResponse(ctx, tx, policyContext, run, messageID, content); err != nil {
+		if err := policy.persistMessage(ctx, tx, policyContext, run, messageID, domain.MessageTypeText, content); err != nil {
 			return err
 		}
 		if len(blocks) > 0 {
@@ -527,8 +527,13 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 		if int64(len(failedSeqs)) != failureEnd-state.ProcessedSeq {
 			return errors.New("failed agent trigger sequence is not contiguous")
 		}
+		messageID := uuid.NewV7().String()
+		if err := policy.persistMessage(ctx, tx, policyContext, run, messageID, domain.MessageTypeAgentError, ""); err != nil {
+			return err
+		}
 		if _, err := tx.NewUpdate().Model(run).
 			Set("status = ?", domain.AgentRunStatusFailed).
+			Set("response_message_id = ?", messageID).
 			Set("trigger_end_seq = ?", failureEnd).
 			Set("last_error = ?", message).
 			Set("error_code = NULL").

@@ -52,9 +52,6 @@ export function mergeConversationPage(
   ].sort(compareConversationMessages)
   return {
     latestAgentRun: page.latestAgentRun,
-    agentFailures: [...new Map(
-      [...current.agentFailures, ...page.agentFailures].map((failure) => [failure.id, failure]),
-    ).values()],
     messages,
     before:
       direction === "before" ? (page.before ?? current.before) : current.before,

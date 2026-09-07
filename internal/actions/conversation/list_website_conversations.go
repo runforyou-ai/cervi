@@ -68,13 +68,17 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 		TableExpr("customer_conversations AS cc").
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("cv.title AS title").
-		ColumnExpr("cv.last_message_at AS last_message_at").
+		ColumnExpr("msg.originated_at AS last_message_at").
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("current.id AS service_session_id").
 		ColumnExpr("current.status AS service_session_status").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
-		Join("JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
+		Join(`JOIN LATERAL (
+ SELECT visible.* FROM messages AS visible
+ WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type = ? AND visible.deleted_at IS NULL
+ ORDER BY visible.originated_at DESC, visible.source_order DESC, visible.id DESC LIMIT 1
+ ) AS msg ON TRUE`, domain.MessageTypeText).
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
@@ -84,7 +88,7 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 		Where("current.contact_channel_identity_id = ?", identity.ID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer).
 		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
-		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
+		OrderExpr("msg.originated_at DESC, cv.id DESC").
 		Limit(20).
 		Scan(ctx, &rows)
 	if err != nil {
