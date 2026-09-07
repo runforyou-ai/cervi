@@ -28,7 +28,7 @@ type agentRunPolicy interface {
 	lockContext(context.Context, bun.IDB, *servermodels.AgentRun) (agentRunPolicyContext, error)
 	prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error)
 	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64) ([]agentruntime.Message, error)
-	persistResponse(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, string) error
+	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
 	enqueueNext(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, int64) error
 }
 

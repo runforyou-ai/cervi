@@ -1,4 +1,4 @@
-/** 客服、单聊与群聊共用的成员消息时间线。 */
+/** 展示各类会话的成员消息时间线、Agent 结果与发送状态。 */
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router"
@@ -547,6 +547,8 @@ function ConversationTimelineContent({
       !next ||
       next.sessionStart ||
       previous.type === MessageType.MessageTypeSystem ||
+      previous.type === MessageType.MessageTypeAgentError ||
+      next.type === MessageType.MessageTypeAgentError ||
       next.type === MessageType.MessageTypeSystem
     ) {
       return false
@@ -600,6 +602,7 @@ function ConversationTimelineContent({
     <div className="relative min-h-0 flex-1 bg-background">
       <ScrollArea
         ref={scrollRootRef}
+        // 覆盖 Radix Viewport 的内联 table 布局，避免固定宽气泡撑出视口。
         className="h-full min-h-0 bg-background [&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!min-h-full [&>[data-slot=scroll-area-viewport]>div]:!flex-col"
       >
         <div className="flex w-full flex-1 flex-col px-4 pb-3 md:px-6">
@@ -636,6 +639,7 @@ function ConversationTimelineContent({
             {visibleMessages.map((message, index) => {
               const previous = visibleMessages[index - 1]
               const next = visibleMessages[index + 1]
+              const agentError = message.type === MessageType.MessageTypeAgentError
               const date = new Date(message.originatedAt)
               const day = dateFormatters.dayKey.format(date)
               const startsDay =
@@ -788,7 +792,7 @@ function ConversationTimelineContent({
                             ) : null}
                             <ContextMenuTrigger asChild>
                               <div className="group/message relative max-w-full">
-                                {incoming && onReplyMessage ? (
+                                {incoming && !agentError && onReplyMessage ? (
                                   <button
                                     type="button"
                                     className="pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
@@ -807,15 +811,10 @@ function ConversationTimelineContent({
                                 <div
                                   className={cn(
                                     "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
-                                    incoming
-                                      ? cn(
-                                          "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted",
-                                          endsGroup && "rounded-bl-sm",
-                                        )
-                                      : cn(
-                                          "bg-primary text-primary-foreground",
-                                          endsGroup && "rounded-br-sm",
-                                        ),
+                                    incoming || agentError
+                                      ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
+                                      : "bg-primary text-primary-foreground",
+                                    endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
                                   )}
                                 >
                                   {message.replyTo ? (
@@ -858,7 +857,9 @@ function ConversationTimelineContent({
                                     <AgentProcess process={message.agentProcess} incoming={incoming} />
                                   ) : null}
                                   <div className="flex min-w-0 items-end gap-2">
-                                    {message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                                    {agentError ? (
+                                      <span className="text-destructive">{t("agentRunFailed")}</span>
+                                    ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
                                         <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
                                       </div>
@@ -868,7 +869,7 @@ function ConversationTimelineContent({
                                     <div
                                       className={cn(
                                         "inline-flex shrink-0 translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
-                                        incoming
+                                        incoming || agentError
                                           ? "text-muted-foreground"
                                           : "text-primary-foreground/75",
                                       )}
@@ -879,7 +880,7 @@ function ConversationTimelineContent({
                                       >
                                         {dateFormatters.clock.format(date)}
                                       </time>
-                                      {customerDeliveries && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
+                                      {customerDeliveries && !agentError && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
                                         <CustomerDeliveryState
                                           conversationID={conversationID}
                                           delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
@@ -919,7 +920,7 @@ function ConversationTimelineContent({
                         </div>
                       </article>
                       <ContextMenuContent>
-                        {!message.local && onReplyMessage ? (
+                        {!message.local && !agentError && onReplyMessage ? (
                           <ContextMenuItem
                             onSelect={() =>
                               onReplyMessage({
@@ -934,7 +935,7 @@ function ConversationTimelineContent({
                           </ContextMenuItem>
                         ) : null}
                         <ContextMenuItem
-                          onSelect={() => void copyMessageText(message.body)}
+                          onSelect={() => void copyMessageText(agentError ? t("agentRunFailed") : message.body)}
                         >
                           {t("messageCopyText")}
                         </ContextMenuItem>

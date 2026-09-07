@@ -179,21 +179,18 @@ export function AgentProcessUsage({ process, incoming }: { process: Conversation
   )
 }
 
-/** 显示最近一次运行的等待、思考或失败状态，终止运行不展示中间内容。 */
+/** 显示最近一次运行的等待、思考或取消状态。 */
 export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; incoming: boolean }) {
   const { t } = useTranslation("inbox")
-  if (run.status === AgentRunStatus.AgentRunStatusSucceeded) return null
+  if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed) return null
   const thinking = run.status === AgentRunStatus.AgentRunStatusRunning
-  const failed = run.status === AgentRunStatus.AgentRunStatusFailed
   const cancelled = run.status === AgentRunStatus.AgentRunStatusCancelled
   const senderName = run.agentName.trim() || t("unknownSender")
   const label = thinking
     ? t("agentThoughtRunning")
-    : failed
-      ? t("agentRunFailed")
-      : cancelled
-        ? t("agentRunCancelled")
-        : t("agentRunQueued")
+    : cancelled
+      ? t("agentRunCancelled")
+      : t("agentRunQueued")
   const reason = run.errorCode === "assignee_changed"
     ? t("agentRunAssigneeChanged")
     : run.errorCode === "session_closed"
@@ -216,11 +213,11 @@ export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; in
             incoming ? "right-full mr-2" : "left-full ml-2",
           )}
         />
-        <div className={cn("flex items-center gap-1.5", failed && "text-destructive")}>
-          {failed || cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
+        <div className="flex items-center gap-1.5">
+          {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
           <span>{label}</span>
         </div>
-        {(failed || cancelled) && reason ? (
+        {cancelled && reason ? (
           <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>
         ) : null}
       </div>

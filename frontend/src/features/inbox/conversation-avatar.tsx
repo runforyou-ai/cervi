@@ -3,8 +3,8 @@ import { GlobeIcon, MessageCircleIcon, SendIcon } from "lucide-react"
 
 import {
   ChannelType,
-  OrganizationIdentityType,
   isCustomerInboxConversation,
+  isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   type InboxConversation,
@@ -46,16 +46,17 @@ export function ConversationAvatar({
   const group = isGroupInboxConversation(conversation)
     ? conversation.group
     : null
+  const agent = isAgentInboxConversation(conversation) ? conversation.agent : null
   const badge = customer ? sourceBadges[customer.channelType] : undefined
   const contactName =
     customer?.contactName?.trim() ||
-    direct?.peerName.trim() ||
+    direct?.peerName.trim() || agent?.agentName.trim() ||
     group?.title.trim()
   const avatarURL =
-    customer?.contactAvatarUrl ?? direct?.peerAvatarUrl ?? group?.imageUrl
+    customer?.contactAvatarUrl ?? direct?.peerAvatarUrl ?? agent?.agentAvatarUrl ?? group?.imageUrl
   const fallback = group
     ? "group"
-    : direct?.peerType === OrganizationIdentityType.OrganizationIdentityTypeAgent
+    : agent
       ? "agent"
       : "person"
 

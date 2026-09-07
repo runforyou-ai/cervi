@@ -18,14 +18,14 @@ import (
 func TestDirectMessageReplies(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
+	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
 		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "原文",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendDirectTextMessageAction(f.db, nil)
-	input := conversationaction.DirectTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "回复", ReplyToMessageID: first.Message.ID}
+	send := conversationaction.NewSendDirectTextMessageAction(f.db)
+	input := conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "回复", ReplyToMessageID: first.Message.ID}
 	reply, err := send.Execute(ctx, f.member, input)
 	if err != nil || reply.ReplyTo == nil || reply.ReplyTo.Body != "原文" || reply.ReplyTo.Sender.SourceID != f.owner.OrganizationIdentity.ID {
 		t.Fatalf("reply=%+v err=%v", reply, err)
@@ -71,7 +71,7 @@ func TestDirectReplyBoundaries(t *testing.T) {
 	f := newNavigationFixture(t)
 	foreign := newNavigationFixture(t)
 	ctx := context.Background()
-	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
+	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
 		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "原文",
 	})
 	if err != nil {
@@ -86,19 +86,19 @@ func TestDirectReplyBoundaries(t *testing.T) {
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", first.Message.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendDirectTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendDirectTextMessageAction(f.db)
 	before, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", first.Conversation.ID).Count(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, target := range []string{first.Message.ID, otherConversation.ID, otherOrganization.ID, system.ID, uuid.NewV7().String()} {
-		_, err := send.Execute(ctx, f.member, conversationaction.DirectTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "不允许", ReplyToMessageID: target})
+		_, err := send.Execute(ctx, f.member, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "不允许", ReplyToMessageID: target})
 		var conflict *conversationaction.ConflictError
 		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 			t.Fatalf("target=%s err=%v", target, err)
 		}
 	}
-	_, err = send.Execute(ctx, foreign.owner, conversationaction.DirectTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "越权", ReplyToMessageID: first.Message.ID})
+	_, err = send.Execute(ctx, foreign.owner, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "越权", ReplyToMessageID: first.Message.ID})
 	if !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("foreign sender error=%v", err)
 	}
@@ -112,15 +112,15 @@ func TestDirectReplyBoundaries(t *testing.T) {
 func TestDirectReplyHistoryWindow(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
+	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
 		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "较早的原文",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendDirectTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendDirectTextMessageAction(f.db)
 	for i := range 60 {
-		if _, err := send.Execute(ctx, f.owner, conversationaction.DirectTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: fmt.Sprintf("后续消息 %d", i)}); err != nil {
+		if _, err := send.Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: fmt.Sprintf("后续消息 %d", i)}); err != nil {
 			t.Fatal(err)
 		}
 	}

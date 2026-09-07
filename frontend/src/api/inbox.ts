@@ -20,6 +20,8 @@ import {
   ReopenServiceSession,
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
+  SendFirstAgentTextMessage,
+  SendAgentTextMessage,
   SendFirstDirectTextMessage,
   SendDirectTextMessage,
   SendGroupTextMessage,
@@ -40,6 +42,9 @@ import type {
   ConversationUnreadMarkInput,
   CustomerTextMessageInput,
   DirectInboxConversation,
+  FirstAgentTextMessageInput,
+  AgentTextMessageInput,
+  AgentInboxConversation,
   FirstDirectTextMessageInput,
   DirectTextMessageInput,
   GroupConversation,
@@ -78,11 +83,17 @@ export type ConversationMessageListData = Omit<
   messages: ConversationMessageData[]
 }
 
-export type ConversationAgentProcessData = Omit<ConversationAgentProcess, "blocks"> & {
+export type ConversationAgentProcessData = Omit<
+  ConversationAgentProcess,
+  "blocks"
+> & {
   blocks: NonNullable<ConversationAgentProcess["blocks"]>
 }
 
-export type ConversationMessageData = Omit<ConversationMessage, "mentions" | "agentProcess"> & {
+export type ConversationMessageData = Omit<
+  ConversationMessage,
+  "mentions" | "agentProcess"
+> & {
   mentions: NonNullable<ConversationMessage["mentions"]>
   agentProcess: ConversationAgentProcessData | null
 }
@@ -92,6 +103,7 @@ export type CustomerInboxConversationData = InboxConversation & {
   customer: CustomerInboxConversation
   direct: null
   group: null
+  agent: null
 }
 
 export type DirectInboxConversationData = InboxConversation & {
@@ -99,6 +111,7 @@ export type DirectInboxConversationData = InboxConversation & {
   customer: null
   direct: DirectInboxConversation
   group: null
+  agent: null
 }
 
 export type GroupInboxConversationData = InboxConversation & {
@@ -106,6 +119,15 @@ export type GroupInboxConversationData = InboxConversation & {
   customer: null
   direct: null
   group: GroupInboxConversation
+  agent: null
+}
+
+export type AgentInboxConversationData = InboxConversation & {
+  type: ConversationType.ConversationTypeAgent
+  customer: null
+  direct: null
+  group: null
+  agent: AgentInboxConversation
 }
 
 export type GroupConversationData = Omit<GroupConversation, "participants"> & {
@@ -124,6 +146,8 @@ const markConversationMentionReviewedBound = bind(
   MarkConversationMentionReviewed,
 )
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
+const sendFirstAgentTextMessageBound = bind(SendFirstAgentTextMessage)
+const sendAgentTextMessageBound = bind(SendAgentTextMessage)
 const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
 const findDirectConversationBound = bind(FindDirectConversation)
 const sendDirectTextMessageBound = bind(SendDirectTextMessage)
@@ -134,12 +158,8 @@ const updateConversationNotificationSettingsBound = bind(
   UpdateConversationNotificationSettings,
 )
 const addGroupConversationMembersBound = bind(AddGroupConversationMembers)
-const removeGroupConversationMemberBound = bind(
-  RemoveGroupConversationMember,
-)
-const transferGroupConversationOwnerBound = bind(
-  TransferGroupConversationOwner,
-)
+const removeGroupConversationMemberBound = bind(RemoveGroupConversationMember)
+const transferGroupConversationOwnerBound = bind(TransferGroupConversationOwner)
 const leaveGroupConversationBound = bind(LeaveGroupConversation)
 const sendGroupTextMessageBound = bind(SendGroupTextMessage)
 const listCustomerServiceAssigneesBound = bind(ListCustomerServiceAssignees)
@@ -194,6 +214,7 @@ export function isCustomerInboxConversation(
   conversation: InboxConversation,
 ): conversation is CustomerInboxConversationData {
   return (
+    conversation.agent === null &&
     conversation.type === ConversationType.ConversationTypeCustomer &&
     conversation.customer !== null &&
     conversation.direct === null &&
@@ -206,6 +227,7 @@ export function isDirectInboxConversation(
   conversation: InboxConversation,
 ): conversation is DirectInboxConversationData {
   return (
+    conversation.agent === null &&
     conversation.type === ConversationType.ConversationTypeDirect &&
     conversation.customer === null &&
     conversation.direct !== null &&
@@ -218,6 +240,7 @@ export function isGroupInboxConversation(
   conversation: InboxConversation,
 ): conversation is GroupInboxConversationData {
   return (
+    conversation.agent === null &&
     conversation.type === ConversationType.ConversationTypeGroup &&
     conversation.customer === null &&
     conversation.direct === null &&
@@ -363,10 +386,7 @@ export async function addGroupConversationMembers(
   conversationID: string,
   input: GroupConversationMembersInput,
 ): Promise<GroupConversationData> {
-  const result = await addGroupConversationMembersBound(
-    conversationID,
-    input,
-  )
+  const result = await addGroupConversationMembersBound(conversationID, input)
   return { ...result, participants: asList(result.participants) }
 }
 
@@ -375,10 +395,7 @@ export async function removeGroupConversationMember(
   conversationID: string,
   input: GroupConversationMemberInput,
 ): Promise<GroupConversationData> {
-  const result = await removeGroupConversationMemberBound(
-    conversationID,
-    input,
-  )
+  const result = await removeGroupConversationMemberBound(conversationID, input)
   return { ...result, participants: asList(result.participants) }
 }
 
@@ -456,6 +473,40 @@ export function markConversationMentionReviewed(
   return markConversationMentionReviewedBound(conversationID, {
     messageId: messageID,
   })
+}
+
+/** 判断收件箱项是否为独立 AI 聊天。 */
+export function isAgentInboxConversation(
+  conversation: InboxConversation,
+): conversation is AgentInboxConversationData {
+  return (
+    conversation.type === ConversationType.ConversationTypeAgent &&
+    conversation.agent !== null &&
+    conversation.direct === null &&
+    conversation.customer === null &&
+    conversation.group === null
+  )
+}
+
+/** 确认 AI 草稿对应的会话并保存首条消息。 */
+export async function sendFirstAgentTextMessage(
+  input: FirstAgentTextMessageInput,
+) {
+  const result = await sendFirstAgentTextMessageBound(input)
+  return {
+    ...result,
+    conversation: result.conversation as AgentInboxConversationData,
+    message: normalizeConversationMessage(result.message),
+  }
+}
+
+/** 向指定 AI 会话发送成员消息。 */
+export async function sendAgentTextMessage(
+  conversationID: string,
+  input: AgentTextMessageInput,
+) {
+  const result = await sendAgentTextMessageBound(conversationID, input)
+  return normalizeConversationMessage(result)
 }
 
 /** 读取当前窗口的客户消息投递状态。 */

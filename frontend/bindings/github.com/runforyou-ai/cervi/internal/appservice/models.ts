@@ -176,6 +176,20 @@ export interface AgentExecutionSummary {
 }
 
 /**
+ * AgentInboxConversation 定义 AI 聊天摘要。
+ */
+export interface AgentInboxConversation {
+    "title": string;
+    "agentIdentityId": string;
+    "agentName": string;
+    "agentAvatarUrl": string;
+    "preview": string | null;
+    "previewSenderIdentityType": OrganizationIdentityType | null;
+    "lastMessageAt": string | null;
+    "agentRunStatus": AgentRunStatus | null;
+}
+
+/**
  * AgentList 定义 AI 员工分页结果。
  */
 export interface AgentList {
@@ -283,7 +297,7 @@ export interface AgentRunContentBlock {
 }
 
 /**
- * AgentRunStatus 表示 Agent 单聊当前最近一次运行状态。
+ * AgentRunStatus 表示会话中 Agent 最近一次运行状态。
  */
 export enum AgentRunStatus {
     /**
@@ -297,6 +311,15 @@ export enum AgentRunStatus {
     AgentRunStatusFailed = "failed",
     AgentRunStatusCancelled = "cancelled",
 };
+
+/**
+ * AgentTextMessageInput 定义发给 AI 会话的成员消息。
+ */
+export interface AgentTextMessageInput {
+    "clientMessageId": string;
+    "body": string;
+    "replyToMessageId": string;
+}
 
 /**
  * AgentToolCall 定义完整工具参数、结果和错误。
@@ -814,6 +837,7 @@ export enum ConversationType {
 
     ConversationTypeCustomer = "customer",
     ConversationTypeDirect = "direct",
+    ConversationTypeAgent = "agent",
     ConversationTypeGroup = "group",
 };
 
@@ -1018,7 +1042,6 @@ export interface DirectInboxConversation {
     "preview": string | null;
     "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
-    "agentRunStatus": AgentRunStatus | null;
 }
 
 /**
@@ -1121,6 +1144,24 @@ export interface FileUploadRequest {
     "method": string;
     "url": string;
     "headers": { [_ in string]?: string } | null;
+}
+
+/**
+ * FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息。
+ */
+export interface FirstAgentTextMessageInput {
+    "conversationId": string;
+    "agentIdentityId": string;
+    "clientMessageId": string;
+    "body": string;
+}
+
+/**
+ * FirstAgentTextMessageResult 定义首次发送确认的 AI 会话和消息。
+ */
+export interface FirstAgentTextMessageResult {
+    "conversation": InboxConversation;
+    "message": ConversationMessage;
 }
 
 /**
@@ -1294,6 +1335,7 @@ export interface InboxAssignee {
  * InboxConversation 定义成员统一收件箱列表项。
  */
 export interface InboxConversation {
+    "lastMessageType": MessageType | null;
     "id": string;
     "type": ConversationType;
     "unreadCount": number;
@@ -1302,6 +1344,7 @@ export interface InboxConversation {
     "muted": boolean;
     "lastMessageId": string | null;
     "lastReadMessageId": string | null;
+    "agent": AgentInboxConversation | null;
     "customer": CustomerInboxConversation | null;
     "direct": DirectInboxConversation | null;
     "group": GroupInboxConversation | null;
@@ -1816,6 +1859,7 @@ export enum MessageType {
 
     MessageTypeText = "text",
     MessageTypeSystem = "system",
+    MessageTypeAgentError = "agent_error",
 };
 
 /**

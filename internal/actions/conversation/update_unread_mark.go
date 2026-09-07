@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -29,7 +30,7 @@ func (a *UpdateConversationUnreadMarkAction) Execute(ctx context.Context, identi
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if _, err := lockConversationMember(ctx, tx, identity, conversationID); err != nil {
+		if _, err := chatstate.LockMember(ctx, tx, identity, conversationID); err != nil {
 			return err
 		}
 		// 进入会话只清除已有标记，不为没有标记的会话创建个人状态。

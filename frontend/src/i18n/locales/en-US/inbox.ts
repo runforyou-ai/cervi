@@ -1,5 +1,9 @@
 /** 美式英语·收件箱文案。 */
 const inbox = {
+  newAgentConversation: "Create AI chat",
+  agentPickerTitle: "Choose an AI colleague",
+  agentPickerDescription: "Choose an AI colleague to start a new chat.",
+  agentPickerEmpty: "No AI colleagues available",
   messageSendState: "Send status",
   messageSendState_sending: "Sending",
   messageSendState_sent: "Sent",
@@ -152,7 +156,7 @@ const inbox = {
   groupAgent: "AI employee",
   agentRunQueued: "Thinking",
   agentRunRunning: "Working",
-  agentRunFailed: "Failed",
+  agentRunFailed: "Something went wrong",
   agentRunCancelled: "Interrupted",
   agentRunAssigneeChanged: "Conversation reassigned",
   agentRunSessionClosed: "Conversation closed",

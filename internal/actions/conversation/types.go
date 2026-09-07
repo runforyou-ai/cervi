@@ -295,8 +295,8 @@ type DirectConversationSummary struct {
 	LastMessageAt             *time.Time
 }
 
-// DirectTextMessageInput 定义成员发送的内部单聊文本消息。
-type DirectTextMessageInput struct {
+// InternalTextMessageInput 定义成员发送的内部单聊文本消息。
+type InternalTextMessageInput struct {
 	ConversationID   string
 	ClientMessageID  string
 	Body             string

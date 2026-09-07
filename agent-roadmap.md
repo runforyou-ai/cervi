@@ -9,7 +9,7 @@
 - `chat-roadmap.md` 负责聊天身份、会话、参与者、消息、同步和外部投递等通用事实。
 - `chat-roadmap.md` 也是 Realtime Gateway、`realtime_outbox`、Core NATS、Protobuf 实时协议、连接票据、恢复和背压的权威设计；本文只定义 Agent 和设备能力需要增加的实时事件。
 - 本文负责 Agent 配置、运行、工具、审批、设备能力和 Eino 接入。
-- Agent 继续沿统一聊天路径发送消息，不创建第二套 Agent 会话或消息系统。
+- Agent 继续沿统一聊天路径发送消息。独立 AI 聊天使用统一 `conversations` 的 `agent` 类型及 `agent_conversations` 业务归属扩展，不创建第二套消息或执行系统。
 - 本文不提前创建尚未进入开发阶段的表和字段；文中的后续对象只在对应阶段出现首个真实场景时落地。
 - 本地知识库直接接入 Haystack + Hayhooks，模型配置统一由 Cervi 后台管理，实施顺序与评测结论见 [本地知识库接入方案](knowledge-base-plan.md)。长期记忆也统一使用 Haystack + Hayhooks；该方案第 9 节记录职责与验收，交互确定后独立实施。
 
@@ -830,7 +830,7 @@ Cervi Gateway
 - 使用不可变 `managed/v1` Revision 和同企业文本 Chat 模型，通过 Eino v0.10 Alpha 的 ChatModelAgent 与 TurnLoop 执行。
 - 增加最小 `conversation_agent_states`、`conversation_agent_triggers` 和 `agent_runs`，Message、Trigger、Run 与 Task 在同一事务收敛。
 - 注册纯函数计算器；运行期间的新消息通过持久 Trigger 推入当前 Run，并在下一次 Tool 或模型规划前从数据库重建最新上下文。
-- 一个 Run 可吸收连续 Trigger，但最多只生成一条最终文本 Message，使用 `agent:<agent_run_id>` 业务幂等键；成功和业务失败都推进明确水位。
+- 一个 Run 可吸收连续 Trigger，最多生成一条结果 Message：成功为 `text`，失败为 `agent_error`，统一使用 `agent:<agent_run_id>` 业务幂等键并由 `response_message_id` 关联；结果消息、终态和消费水位在同一事务提交。
 - 不创建 Step、Tool Invocation、Approval、Device Invocation、Checkpoint 或本地 Runtime，不流式输出，不依赖 Realtime。
 - 只记录输入/输出 Token、耗时和错误，不计算金额；客户端通过普通业务查询刷新最终消息和 Run 结果。
 
@@ -946,3 +946,12 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 - 是否绕过统一 Realtime Gateway、连接票据和 Protobuf Schema 建设第二套设备实时协议。
 - 是否提前创建没有真实场景的表、字段、运行时或协议。
 - 是否能在不改变聊天身份和业务事实的前提下替换或升级 Eino。
+
+## 独立 AI 聊天的上下文边界
+
+真人单聊与独立 AI 聊天分别使用 `direct` 和 `agent` 会话类型。消息页创建 AI 聊天先进入本地草稿，首条消息与 Conversation、双方参与者、业务归属、Trigger、Run 和可靠任务在同一事务提交。同一成员与同一 Agent 可创建多个独立 Conversation；首发通过稳定会话编号和客户端消息编号实现幂等，不按身份对复用会话。
+
+现有“Conversation + Agent”输入状态和活动 Run 唯一约束继续作为执行边界。不同 Conversation 的运行互不合并，新建会话不取消旧 Run，回复只写回原 Conversation。上下文仅包含本会话历史及同会话引用，继续使用当前 Agent 执行配置和知识库范围。独立 AI 聊天不增加 ServiceSession 或重置游标。
+
+
+失败消息沿用消息时间线的发送者、头像、排序、分页与成员阅读状态。正文留空，客户端按 `agent_error` 类型显示本地化红色「出错了」；技术错误保存在 Run 中。模型上下文与引用仅接受文本消息，网站访客历史和摘要仅展示正常聊天内容。会话列表通过 `lastMessageType` 生成特殊消息摘要。

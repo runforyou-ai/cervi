@@ -15,6 +15,7 @@ import (
 
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -56,12 +57,6 @@ type groupParticipantRow struct {
 	DisplayName   string                          `bun:"display_name"`
 	AvatarFileID  *string                         `bun:"avatar_file_id"`
 	Role          string                          `bun:"role"`
-}
-
-type groupSendContextRow struct {
-	ConversationID string `bun:"conversation_id"`
-	ParticipantID  string `bun:"participant_id"`
-	SubjectID      string `bun:"subject_id"`
 }
 
 // NewCreateGroupConversationAction 创建群聊创建操作。
@@ -193,8 +188,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		CreatedAt   time.Time `bun:"created_at"`
 		Muted       bool      `bun:"muted"`
 	}
-	err := db.NewSelect().
-		TableExpr("conversations AS cv").
+	err := chatstate.GroupQuery(db, identity, conversationID).
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("COALESCE(cv.description, '') AS description").
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
@@ -202,12 +196,6 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ColumnExpr("cv.created_at AS created_at").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
-		Where("cv.organization_id = ?", identity.Organization.ID).
-		Where("cv.id = ?", conversationID).
-		Where("cv.type = ?", domain.ConversationTypeGroup).
-		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
 		Scan(ctx, &summary)
 	if errors.Is(err, sql.ErrNoRows) {
 		return GroupConversation{}, ErrConversationNotFound
@@ -262,7 +250,7 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		sendContext, err := loadGroupSendContext(ctx, tx, identity, normalized.ConversationID)
+		sendContext, err := chatstate.LockGroup(ctx, tx, identity, normalized.ConversationID, chatstate.GroupSendable)
 		if err != nil {
 			return err
 		}
@@ -424,31 +412,4 @@ func loadActiveGroupMembers(ctx context.Context, db bun.IDB, organizationID stri
 		return nil, ErrGroupMemberNotFound
 	}
 	return rows, nil
-}
-
-// loadGroupSendContext 校验群聊及当前成员关系并返回发送上下文。
-func loadGroupSendContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (groupSendContextRow, error) {
-	if _, err := lockConversationMember(ctx, db, identity, conversationID); err != nil {
-		return groupSendContextRow{}, err
-	}
-	row := groupSendContextRow{}
-	err := db.NewSelect().
-		TableExpr("conversations AS cv").
-		ColumnExpr("cv.id AS conversation_id").
-		ColumnExpr("mine.id AS participant_id").
-		ColumnExpr("mine.subject_id AS subject_id").
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
-		Where("cv.organization_id = ?", identity.Organization.ID).
-		Where("cv.id = ?", conversationID).
-		Where("cv.type = ?", domain.ConversationTypeGroup).
-		Where("cv.status = ?", domain.ConversationStatusActive).
-		Scan(ctx, &row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return groupSendContextRow{}, ErrConversationNotFound
-	}
-	if err != nil {
-		return groupSendContextRow{}, fmt.Errorf("load group send context: %w", err)
-	}
-	return row, nil
 }

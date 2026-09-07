@@ -4,10 +4,9 @@ package conversation
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -35,27 +34,11 @@ func (a *UpdateConversationNotificationSettingsAction) Execute(ctx context.Conte
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		var conversation struct {
-			Type   string `bun:"type"`
-			Status string `bun:"status"`
-		}
-		err := tx.NewSelect().
-			TableExpr("conversations AS cv").
-			ColumnExpr("cv.type, cv.status").
-			Join("JOIN conversation_participants AS cp ON cp.organization_id = cv.organization_id AND cp.conversation_id = cv.id AND cp.left_at IS NULL").
-			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ? AND cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
-			Where("cv.organization_id = ?", identity.Organization.ID).
-			Where("cv.id = ?", conversationID).
-			Where("cv.type IN (?, ?)", domain.ConversationTypeDirect, domain.ConversationTypeGroup).
-			Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
-			Scan(ctx, &conversation)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrConversationNotFound
-		}
+		member, err := chatstate.LockMember(ctx, tx, identity, conversationID)
 		if err != nil {
-			return fmt.Errorf("load conversation notification target: %w", err)
+			return err
 		}
-		if domain.ConversationType(conversation.Type) == domain.ConversationTypeDirect && domain.ConversationStatus(conversation.Status) != domain.ConversationStatusActive {
+		if member.Conversation.Type != string(domain.ConversationTypeGroup) && member.Conversation.Status != string(domain.ConversationStatusActive) {
 			return ErrConversationNotFound
 		}
 		state := &servermodels.ConversationUserState{

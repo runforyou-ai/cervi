@@ -722,6 +722,13 @@ export function SelectImage(meta: $models.RequestMeta): $CancellablePromise<$mod
 }
 
 /**
+ * SendAgentTextMessage 向已有 AI 会话发送文本消息。
+ */
+export function SendAgentTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.AgentTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(1168206825, meta, conversationID, input);
+}
+
+/**
  * SendCustomerTextMessage 发送客户会话文本消息。
  */
 export function SendCustomerTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
@@ -733,6 +740,13 @@ export function SendCustomerTextMessage(meta: $models.RequestMeta, conversationI
  */
 export function SendDirectTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.DirectTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
     return $Call.ByID(1058328585, meta, conversationID, input);
+}
+
+/**
+ * SendFirstAgentTextMessage 在首次发送时创建独立 AI 聊天。
+ */
+export function SendFirstAgentTextMessage(meta: $models.RequestMeta, input: $models.FirstAgentTextMessageInput): $CancellablePromise<$models.FirstAgentTextMessageResult> {
+    return $Call.ByID(1367071003, meta, input);
 }
 
 /**

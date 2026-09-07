@@ -75,7 +75,7 @@ export function useConversationTimeline(
       return
     setPage((current) => {
       if (!current || (current.after ?? "") !== after) return current
-      // 失败和中断不产生消息，也需要同步最近运行的终态。
+      // 取消状态随增量读取同步。
       if (
         !incomingPage.messages.length &&
         !current.hasLater &&

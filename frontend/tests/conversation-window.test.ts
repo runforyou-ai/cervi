@@ -50,7 +50,7 @@ test("没有新消息的页面仍更新运行终态并保留既有消息", () =>
   const current = page([message("reply", null)], false, false)
   const incoming = page([], false, false)
   incoming.latestAgentRun = {
-    id: "run", agentName: "AI 助手", status: "failed", errorCode: null, lastError: "model rejected input",
+    id: "run", agentName: "AI 助手", status: "cancelled", errorCode: "session_closed", lastError: "session closed",
   } as NonNullable<ConversationMessageListData["latestAgentRun"]>
   const merged = mergeConversationPage(current, incoming, "after")
   assert.equal(merged.latestAgentRun, incoming.latestAgentRun)
@@ -116,4 +116,15 @@ test("空轮询不会清掉端点，重复页不会重复消息", () => {
     duplicate.messages.map((row) => row.id),
     ["b", "c", "d"],
   )
+})
+
+
+test("失败消息沿用消息分页并在新一轮消息后保留", () => {
+  const question = message("question", null, "2026-09-05T00:00:00Z")
+  const failure = { ...message("failure", null, "2026-09-05T00:00:01Z"), type: "agent_error", body: "", sender: { sourceId: "agent", identityType: "agent", avatarUrl: "/avatar" } } as ConversationMessageData
+  const first = mergeConversationPage(page([question], false, false), page([failure], false, false), "after")
+  const next = mergeConversationPage(first, page([message("next", null, "2026-09-05T00:00:02Z")], false, false), "after")
+  assert.deepEqual(next.messages.map((row) => row.id), ["question", "failure", "next"])
+  assert.equal(next.messages[1].sender?.avatarUrl, "/avatar")
+  assert.deepEqual(mergeConversationPage(next, page([failure]), "before").messages, next.messages)
 })

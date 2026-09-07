@@ -141,7 +141,7 @@ func TestConversationUnreadMark(t *testing.T) {
 func TestInboxUnreadUsesCanonicalDirect(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	sent, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息"})
+	sent, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息"})
 	if err != nil {
 		t.Fatal(err)
 	}

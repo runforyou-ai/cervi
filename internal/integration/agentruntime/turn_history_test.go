@@ -28,6 +28,25 @@ func TestTurnHistoryRetainsOutputsAcrossSlidingInput(t *testing.T) {
 	}
 }
 
+// TestTurnHistoryDropsEmptyAssistantOutputs 验证空输出和仅思考输出不会成为下一轮消息，空工具结果仍保留。
+func TestTurnHistoryDropsEmptyAssistantOutputs(t *testing.T) {
+	history := &turnHistory{}
+	reasoning := schema.AssistantMessage("", nil)
+	reasoning.ReasoningContent = "还在思考"
+	skipped := schema.AssistantMessage("", []schema.ToolCall{{ID: "skipped"}})
+	skipped.ReasoningContent = "准备调用工具"
+	completed := schema.AssistantMessage("", []schema.ToolCall{{ID: "done"}})
+	completed.ReasoningContent = "工具已返回"
+	result := schema.ToolMessage("", "done")
+	history.appendOutput([]*schema.Message{schema.AssistantMessage("", nil), reasoning, skipped, completed, result})
+	if !reflect.DeepEqual(history.messages, []*schema.Message{completed, result}) {
+		t.Fatalf("retained output = %#v", history.messages)
+	}
+	if len(skipped.ToolCalls) != 1 || skipped.ReasoningContent != "准备调用工具" {
+		t.Fatal("history modified original events")
+	}
+}
+
 // TestTurnHistoryDropsUnansweredCalls 验证抢占后只保留有结果的调用，保留说明且不修改原事件。
 func TestTurnHistoryDropsUnansweredCalls(t *testing.T) {
 	history := &turnHistory{}

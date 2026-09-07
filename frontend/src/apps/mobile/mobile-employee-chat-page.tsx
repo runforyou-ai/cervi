@@ -10,7 +10,7 @@ import {
   UserStatus,
   type UserData,
 } from "@/api"
-import { MobileDirectThread } from "@/apps/mobile/mobile-direct-thread"
+import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -154,9 +154,9 @@ function MobileEmployeeDraft({ user }: { user: UserData }) {
   }, [])
 
   return (
-    <MobileDirectThread
+    <MobileIndividualThread
       conversationID=""
-      sendDirectMessage={async (input) => {
+      sendIndividualMessage={async (input) => {
         const result = await sendFirstDirectTextMessage({
           targetIdentityId: user.identityId,
           ...input,
