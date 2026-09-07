@@ -106,7 +106,7 @@ export function MobileCreateGroupPage() {
             type="submit"
             form="mobile-create-group"
             variant="ghost"
-            className="min-h-11"
+            className="min-h-11 text-primary hover:text-primary"
             disabled={saving || !title.trim() || field.value.length === 0}
           >
             {t("group.complete")}
