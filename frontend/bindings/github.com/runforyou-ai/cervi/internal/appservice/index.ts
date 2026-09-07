@@ -93,6 +93,7 @@ export type {
     ContactRecord,
     ContactSourceChannel,
     ContactSummary,
+    ConversationAgentFailure,
     ConversationAgentProcess,
     ConversationAgentRun,
     ConversationMentionReview,

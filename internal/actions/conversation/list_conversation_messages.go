@@ -104,7 +104,10 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		if err := loadConversationMessageMentions(ctx, tx, identity.Organization.ID, history.Messages); err != nil {
 			return err
 		}
-		return loadConversationAgentProcesses(ctx, tx, identity.Organization.ID, input.ConversationID, &history)
+		if err := loadConversationAgentProcesses(ctx, tx, identity.Organization.ID, input.ConversationID, &history); err != nil {
+			return err
+		}
+		return loadConversationAgentFailures(ctx, tx, identity.Organization.ID, input, &history)
 	})
 	if err != nil {
 		return ConversationMessageHistory{}, fmt.Errorf("read conversation message window: %w", err)

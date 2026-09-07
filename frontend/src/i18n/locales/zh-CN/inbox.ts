@@ -127,7 +127,7 @@ const inbox = {
   groupAgent: "AI 员工",
   agentRunQueued: "思考中",
   agentRunRunning: "正在处理",
-  agentRunFailed: "处理失败",
+  agentRunFailed: "出错了",
   agentRunCancelled: "已中断",
   agentRunAssigneeChanged: "会话已转交",
   agentRunSessionClosed: "会话已关闭",

@@ -130,7 +130,7 @@ const inbox = {
   groupAgent: "AI employee",
   agentRunQueued: "Thinking",
   agentRunRunning: "Working",
-  agentRunFailed: "Failed",
+  agentRunFailed: "Something went wrong",
   agentRunCancelled: "Interrupted",
   agentRunAssigneeChanged: "Conversation reassigned",
   agentRunSessionClosed: "Conversation closed",

@@ -33,6 +33,7 @@ function page(
   return {
     messages,
     latestAgentRun: null,
+    agentFailures: [],
     before: messages[0]?.id ?? null,
     after: messages[messages.length - 1]?.id ?? null,
     hasEarlier,
@@ -116,4 +117,19 @@ test("空轮询不会清掉端点，重复页不会重复消息", () => {
     duplicate.messages.map((row) => row.id),
     ["b", "c", "d"],
   )
+})
+
+test("失败记录在空轮询和后续新运行中保留，重复分页不重复展示", () => {
+  const current = page([message("question", null)], false, false)
+  const failed = page([], false, false)
+  const failure = { id: "failed-run", afterMessageId: "question", agentName: "AI 助手" }
+  failed.agentFailures = [failure]
+  const first = mergeConversationPage(current, failed, "after")
+  assert.deepEqual(first.agentFailures, [failure])
+  const next = page([message("next-question", null)], false, false)
+  next.latestAgentRun = { id: "new-run", status: "running" } as NonNullable<ConversationMessageListData["latestAgentRun"]>
+  const continued = mergeConversationPage(first, next, "after")
+  assert.deepEqual(continued.agentFailures, [failure])
+  assert.equal(continued.latestAgentRun?.id, "new-run")
+  assert.deepEqual(mergeConversationPage(continued, failed, "before").agentFailures, [failure])
 })

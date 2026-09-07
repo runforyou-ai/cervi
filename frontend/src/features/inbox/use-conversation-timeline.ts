@@ -79,7 +79,8 @@ export function useConversationTimeline(
       if (
         !incomingPage.messages.length &&
         !current.hasLater &&
-        JSON.stringify(current.latestAgentRun) === JSON.stringify(incomingPage.latestAgentRun)
+        JSON.stringify(current.latestAgentRun) === JSON.stringify(incomingPage.latestAgentRun) &&
+        incomingPage.agentFailures.every((failure) => current.agentFailures.some((saved) => saved.id === failure.id))
       ) return current
       return mergeConversationPage(current, incomingPage, "after")
     })

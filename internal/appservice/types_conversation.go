@@ -50,6 +50,13 @@ const (
 	GroupParticipantRoleMember GroupParticipantRole = GroupParticipantRole(domain.ConversationParticipantRoleMember)
 )
 
+// ConversationAgentFailure 定义失败运行的时间线位置和 Agent 名称。
+type ConversationAgentFailure struct {
+	ID             string `json:"id"`
+	AfterMessageID string `json:"afterMessageId"`
+	AgentName      string `json:"agentName"`
+}
+
 // ConversationMessageListInput 定义成员消息查询方向。
 type ConversationMessageListInput struct {
 	Before string `json:"before" query:"before"`
@@ -144,12 +151,13 @@ type ConversationMessage struct {
 
 // ConversationMessageList 定义成员消息页。
 type ConversationMessageList struct {
-	LatestAgentRun *ConversationAgentRun `json:"latestAgentRun"`
-	HasEarlier     bool                  `json:"hasEarlier"`
-	HasLater       bool                  `json:"hasLater"`
-	Messages       []ConversationMessage `json:"messages"`
-	Before         *string               `json:"before"`
-	After          *string               `json:"after"`
+	AgentFailures  []ConversationAgentFailure `json:"agentFailures"`
+	LatestAgentRun *ConversationAgentRun      `json:"latestAgentRun"`
+	HasEarlier     bool                       `json:"hasEarlier"`
+	HasLater       bool                       `json:"hasLater"`
+	Messages       []ConversationMessage      `json:"messages"`
+	Before         *string                    `json:"before"`
+	After          *string                    `json:"after"`
 }
 
 // MarkConversationReadInput 定义用户确认已读的消息水位。

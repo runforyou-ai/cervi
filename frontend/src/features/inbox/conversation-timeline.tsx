@@ -14,6 +14,7 @@ import {
   isApiError,
   type CurrentUser,
   type ConversationMessageData,
+  type ConversationAgentFailure,
   type ConversationMessageReference,
   type ConversationSystemEvent,
   type ConversationSystemEventParticipant,
@@ -51,7 +52,7 @@ import { useConversationReading } from "./use-conversation-reading"
 import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
 import { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
 import { ConversationMentionNavigator } from "./conversation-mention-navigator"
-import { AgentProcess, AgentProcessUsage, AgentRunState } from "./agent-process"
+import { AgentProcess, AgentProcessUsage, AgentRunState, AgentRunFailure } from "./agent-process"
 
 type TimelineMessage = Pick<
   ConversationMessageData,
@@ -254,6 +255,13 @@ function ConversationTimelineContent({
     timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
+  // 失败运行固定跟随最后消费的消息，新运行不会替换已展示的错误。
+  const failuresByMessage = new Map<string, ConversationAgentFailure[]>()
+  for (const failure of currentPage?.agentFailures ?? []) {
+    const failures = failuresByMessage.get(failure.afterMessageId) ?? []
+    failures.push(failure)
+    failuresByMessage.set(failure.afterMessageId, failures)
+  }
   const viewport = useConversationViewport({
     root: scrollRootRef,
     page: currentPage,
@@ -631,10 +639,10 @@ function ConversationTimelineContent({
                     new Date(previous.originatedAt),
                   ) !== day)
               const startsGroup = workspaceLayout
-                ? !messagesShareGroup(previous, message)
+                ? Boolean(previous && failuresByMessage.has(previous.id)) || !messagesShareGroup(previous, message)
                 : true
               const endsGroup = workspaceLayout
-                ? !messagesShareGroup(message, next)
+                ? failuresByMessage.has(message.id) || !messagesShareGroup(message, next)
                 : true
               const incoming = message.local
                 ? false
@@ -956,6 +964,13 @@ function ConversationTimelineContent({
                       </ContextMenuContent>
                     </ContextMenu>
                   )}
+                  {failuresByMessage.get(message.id)?.map((failure) => (
+                    <AgentRunFailure
+                      key={failure.id}
+                      failure={failure}
+                      incoming={conversationType !== ConversationType.ConversationTypeCustomer}
+                    />
+                  ))}
                 </div>
               )
             })}

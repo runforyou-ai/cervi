@@ -2271,6 +2271,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("agent run after exhausted task = %#v, error = %v", nextRun, err)
 		}
 
+		testAgentFailureHistory(t, db, loggedIn.Identity, agentConversation.ID, failedRun.ID, exhaustedRun.ID, nextRun.ID)
+
 		t.Run("Agent 群聊成员", func(t *testing.T) {
 			testGroupAgentMembership(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})

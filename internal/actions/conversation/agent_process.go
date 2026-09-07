@@ -82,3 +82,35 @@ func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizatio
 	}
 	return nil
 }
+
+// loadConversationAgentFailures 按最后消费的消息定位历史错误，并补充增量轮询期间结束的失败运行。
+func loadConversationAgentFailures(ctx context.Context, db bun.IDB, organizationID string, input ConversationMessageHistoryInput, history *ConversationMessageHistory) error {
+	history.AgentFailures = make([]ConversationAgentFailure, 0)
+	messageIDs := make([]string, 0, len(history.Messages))
+	for _, message := range history.Messages {
+		messageIDs = append(messageIDs, message.ID)
+	}
+	query := db.NewSelect().TableExpr("agent_runs AS agr").
+		ColumnExpr("agr.id, cat.trigger_message_id AS after_message_id, oi.display_name AS agent_name").
+		Join("JOIN conversation_agent_triggers AS cat ON cat.organization_id = agr.organization_id AND cat.conversation_id = agr.conversation_id AND cat.agent_identity_id = agr.agent_identity_id AND cat.agent_run_id = agr.id AND cat.trigger_seq = agr.trigger_end_seq").
+		Join("JOIN organization_identities AS oi ON oi.organization_id = agr.organization_id AND oi.id = agr.agent_identity_id").
+		Where("agr.organization_id = ? AND agr.conversation_id = ? AND agr.status = ?", organizationID, input.ConversationID, domain.AgentRunStatusFailed).
+		WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
+			query = query.Where("cat.trigger_message_id IN (?)", bun.In(messageIDs))
+			// 失败不新增聊天消息，空增量页仍需返回上次游标之后结束的运行。
+			if input.After != nil {
+				query = query.WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
+					query = query.Where("agr.completed_at >= ?", input.After.OriginatedAt)
+					if history.HasLater && history.After != nil {
+						query = query.Where("agr.completed_at <= ?", history.After.OriginatedAt)
+					}
+					return query
+				})
+			}
+			return query
+		}).OrderExpr("agr.completed_at, agr.id")
+	if err := query.Scan(ctx, &history.AgentFailures); err != nil {
+		return fmt.Errorf("load conversation agent failures: %w", err)
+	}
+	return nil
+}

@@ -76,8 +76,9 @@ export type InboxData = Omit<Inbox, "conversations"> & {
 
 export type ConversationMessageListData = Omit<
   ConversationMessageList,
-  "messages"
+  "messages" | "agentFailures"
 > & {
+  agentFailures: NonNullable<ConversationMessageList["agentFailures"]>
   messages: ConversationMessageData[]
 }
 
@@ -304,6 +305,7 @@ export async function listConversationMessages(
   )
   return {
     ...result,
+    agentFailures: asList(result.agentFailures),
     messages: asList(result.messages).map(normalizeConversationMessage),
   }
 }
@@ -439,6 +441,7 @@ export async function getConversationMessageContext(
   )
   return {
     ...result,
+    agentFailures: asList(result.agentFailures),
     messages: asList(result.messages).map(normalizeConversationMessage),
   }
 }
