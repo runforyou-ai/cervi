@@ -103,7 +103,7 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
             }}>{t("documentDetail.segments.retryPrevious")}</Button> : null}
           </div>
           {pages.flatMap((page) => page.segments).map((segment) => <article key={segment.id} data-segment-id={segment.id}
-            className={cn("flex items-baseline gap-4 border-b py-3", segment.id === segmentId && "border-l-2 border-l-primary bg-primary/5 px-4")}>
+            className={cn("flex items-baseline gap-4 border-b py-1.5", segment.id === segmentId && "border-l-2 border-l-primary bg-primary/5 px-4")}>
             <div className="w-20 shrink-0 text-xs leading-7 text-muted-foreground">
               <span className="whitespace-nowrap">{t("retrieval.position", { position: segment.position })}</span>
               {segment.id === segmentId && <span className="block text-primary">{t("retrieval.matched")}</span>}
