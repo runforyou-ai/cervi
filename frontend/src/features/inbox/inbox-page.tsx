@@ -1237,7 +1237,6 @@ function ConversationThread({
         conversationID={conversationID}
         conversationType={conversationType}
         currentUser={identity.user}
-        workspaceLayout
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
         retryFailedMessageDisabled={

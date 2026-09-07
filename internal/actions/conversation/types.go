@@ -371,6 +371,7 @@ type GroupConversation struct {
 	Status       domain.ConversationStatus
 	CreatedAt    time.Time
 	Participants []GroupParticipant
+	Muted        bool
 }
 
 // GroupTextMessageInput 定义成员发送的群聊文本消息。

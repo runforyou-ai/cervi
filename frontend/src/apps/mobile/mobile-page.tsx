@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-/** 渲染一级页或详情页标题，固定操作区的位置。 */
+/** 居中显示移动端标题，两侧保留等宽的返回和操作空间。 */
 export function MobilePageHeader({
   title,
   backTo,
@@ -22,6 +22,28 @@ export function MobilePageHeader({
 }) {
   const { t } = useTranslation("common")
   const back = useMobileBack(backTo ?? "/inbox")
+  const headerRef = useRef<HTMLElement>(null)
+  const startRef = useRef<HTMLDivElement>(null)
+  const endRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const header = headerRef.current
+    const start = startRef.current
+    const end = endRef.current
+    if (!header || !start || !end) return
+
+    /** 按较宽一侧预留空间，让标题居中且不遮挡操作。 */
+    const updateSideWidth = () => {
+      header.style.setProperty(
+        "--mobile-header-side-width",
+        `${Math.max(start.offsetWidth, end.offsetWidth)}px`,
+      )
+    }
+    updateSideWidth()
+    const observer = new ResizeObserver(updateSideWidth)
+    observer.observe(start)
+    observer.observe(end)
+    return () => observer.disconnect()
+  }, [])
   useEffect(() => {
     if (!backTo) return
     // 浮层处理后，详情页让系统返回与标题返回走同一条路径。
@@ -34,22 +56,29 @@ export function MobilePageHeader({
     return () => window.removeEventListener("cervi:back", handleBack)
   }, [back, backTo])
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-      {backTo ? (
-        <Button
-          className="-ml-2"
-          variant="ghost"
-          size="icon-lg"
-          aria-label={t("actions.back")}
-          onClick={back}
-        >
-          <ArrowLeftIcon />
-        </Button>
-      ) : null}
-      <h1 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
+    <header
+      ref={headerRef}
+      className="grid h-14 shrink-0 grid-cols-[var(--mobile-header-side-width,0px)_minmax(0,1fr)_var(--mobile-header-side-width,0px)] items-center gap-2 border-b px-4"
+    >
+      <div ref={startRef} className="flex w-max items-center">
+        {backTo ? (
+          <Button
+            className="-ml-2"
+            variant="ghost"
+            size="icon-lg"
+            aria-label={t("actions.back")}
+            onClick={back}
+          >
+            <ArrowLeftIcon />
+          </Button>
+        ) : null}
+      </div>
+      <h1 className="min-w-0 max-w-full justify-self-center truncate text-center text-lg font-semibold tracking-tight">
         {title}
       </h1>
-      {actions}
+      <div ref={endRef} className="flex w-max items-center justify-self-end gap-2">
+        {actions}
+      </div>
     </header>
   )
 }

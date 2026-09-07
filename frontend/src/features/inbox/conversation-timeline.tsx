@@ -213,7 +213,6 @@ function ConversationTimelineContent({
   conversationType,
   currentUser,
   requireWindowFocus = true,
-  workspaceLayout = false,
   customerDeliveries = false,
   outgoingMessages,
   onRetryFailedMessage,
@@ -231,7 +230,6 @@ function ConversationTimelineContent({
   conversationType: ConversationType
   currentUser: CurrentUser
   requireWindowFocus?: boolean
-  workspaceLayout?: boolean
   customerDeliveries?: boolean
   outgoingMessages: OutgoingConversationMessage[]
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
@@ -605,18 +603,9 @@ function ConversationTimelineContent({
       <ScrollArea
         ref={scrollRootRef}
         // 覆盖 Radix Viewport 的内联 table 布局，避免固定宽气泡撑出视口。
-        className={cn(
-          "h-full min-h-0 bg-background [&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!flex-col",
-          workspaceLayout &&
-            "[&>[data-slot=scroll-area-viewport]>div]:!min-h-full",
-        )}
+        className="h-full min-h-0 bg-background [&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!min-h-full [&>[data-slot=scroll-area-viewport]>div]:!flex-col"
       >
-        <div
-          className={cn(
-            "flex w-full flex-col px-4 pb-3 md:px-6",
-            workspaceLayout && "flex-1",
-          )}
-        >
+        <div className="flex w-full flex-1 flex-col px-4 pb-3 md:px-6">
           {currentPage?.hasEarlier || timeline.pageError === "before" ? (
             <div className="flex items-center justify-center py-2">
               {currentPage?.hasEarlier ? (
@@ -654,17 +643,12 @@ function ConversationTimelineContent({
               const date = new Date(message.originatedAt)
               const day = dateFormatters.dayKey.format(date)
               const startsDay =
-                workspaceLayout &&
-                (!previous ||
-                  dateFormatters.dayKey.format(
-                    new Date(previous.originatedAt),
-                  ) !== day)
-              const startsGroup = workspaceLayout
-                ? !messagesShareGroup(previous, message)
-                : true
-              const endsGroup = workspaceLayout
-                ? !messagesShareGroup(message, next)
-                : true
+                !previous ||
+                dateFormatters.dayKey.format(
+                  new Date(previous.originatedAt),
+                ) !== day
+              const startsGroup = !messagesShareGroup(previous, message)
+              const endsGroup = !messagesShareGroup(message, next)
               const incoming = message.local
                 ? false
                 : conversationType !== ConversationType.ConversationTypeCustomer
@@ -780,7 +764,7 @@ function ConversationTimelineContent({
                         >
                           {conversationType ===
                             ConversationType.ConversationTypeGroup &&
-                          (!workspaceLayout || incoming) &&
+                          incoming &&
                           startsGroup ? (
                             <span className="max-w-full truncate text-xs font-medium text-foreground">
                               {senderName}
@@ -894,9 +878,7 @@ function ConversationTimelineContent({
                                         dateTime={message.originatedAt}
                                         title={dateFormatters.full.format(date)}
                                       >
-                                        {workspaceLayout
-                                          ? dateFormatters.clock.format(date)
-                                          : formatMessageTime(dateFormatters.sessionTime, date)}
+                                        {dateFormatters.clock.format(date)}
                                       </time>
                                       {customerDeliveries && !agentError && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
                                         <CustomerDeliveryState

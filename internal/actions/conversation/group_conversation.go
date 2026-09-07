@@ -186,6 +186,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ImageFileID *string   `bun:"image_file_id"`
 		Status      string    `bun:"status"`
 		CreatedAt   time.Time `bun:"created_at"`
+		Muted       bool      `bun:"muted"`
 	}
 	err := chatstate.GroupQuery(db, identity, conversationID).
 		ColumnExpr("cv.title AS title").
@@ -193,6 +194,8 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
 		ColumnExpr("cv.created_at AS created_at").
+		ColumnExpr("COALESCE(state.muted, false) AS muted").
+		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
 		Scan(ctx, &summary)
 	if errors.Is(err, sql.ErrNoRows) {
 		return GroupConversation{}, ErrConversationNotFound
@@ -230,6 +233,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ID: conversationID, Title: summary.Title, Description: summary.Description, ImageFileID: summary.ImageFileID,
 		Status:    domain.ConversationStatus(summary.Status),
 		CreatedAt: summary.CreatedAt, Participants: participants,
+		Muted: summary.Muted,
 	}, nil
 }
 
