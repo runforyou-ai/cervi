@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -83,11 +84,12 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, err
 	}
-	replyTo, err := loadConversationReplyTarget(ctx, db, channel.OrganizationID, conversation.ID, input.ReplyToMessageID)
+	// 渠道身份稳定后锁定会话，已有线程随后锁当前周期并核对渠道身份。
+	conversation, err = chatstate.LockCustomerConversation(ctx, db, channel.OrganizationID, conversation.ID)
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, err
 	}
-	participant, err := ensureContactParticipant(ctx, db, channel.OrganizationID, conversation.ID, subject.ID, ids.participant)
+	replyTo, err := loadConversationReplyTarget(ctx, db, channel.OrganizationID, conversation.ID, input.ReplyToMessageID)
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, err
 	}
@@ -147,6 +149,11 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 			Exec(ctx); err != nil {
 			return InboundCustomerTextMessageResult{}, fmt.Errorf("update current service session: %w", err)
 		}
+	}
+
+	participant, err := ensureContactParticipant(ctx, db, channel.OrganizationID, conversation.ID, subject.ID, ids.participant)
+	if err != nil {
+		return InboundCustomerTextMessageResult{}, err
 	}
 
 	message := &servermodels.Message{

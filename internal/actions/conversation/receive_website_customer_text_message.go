@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -321,7 +322,7 @@ func ensureContactParticipant(ctx context.Context, db bun.IDB, organizationID, c
 
 // selectServiceSession 选择线程当前批次或计算下一个批次序号。
 func selectServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID, channelIdentityID string) (*servermodels.ServiceSession, bool, error) {
-	session, err := lockCurrentServiceSession(ctx, db, organizationID, conversationID)
+	session, err := chatstate.LockCurrentServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, false, err
 	}

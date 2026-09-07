@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -120,6 +121,14 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
+		// 转交目标身份先于会话锁定，避免与身份资料和路由变更反向等待。
+		target, err := identityaction.LockActiveCustomerServiceIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
+		}
+		if err != nil {
+			return err
+		}
 		session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, input.ConversationID)
 		if err != nil {
 			return err
@@ -135,13 +144,6 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 			Where("cci.id = ?", session.ContactChannelIdentityID).
 			Where("cci.organization_id = ?", session.OrganizationID).
 			Scan(ctx, &channelType); err != nil {
-			return err
-		}
-		target, err := identityaction.LockActiveCustomerServiceIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
-		}
-		if err != nil {
 			return err
 		}
 		if domain.OrganizationIdentityType(target.Type) == domain.OrganizationIdentityTypeAgent && !domain.ChannelSupportsAgentAssignee(channelType) {
@@ -318,7 +320,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		session, err := lockCurrentCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		session, err := chatstate.LockCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
@@ -360,24 +362,12 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 
 // lockOpenServiceSession 锁定客户会话最新且未关闭的客服处理周期。
 func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	session, err := lockCurrentCustomerServiceSession(ctx, db, organizationID, conversationID)
+	session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, err
 	}
 	if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen {
 		return nil, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
-	}
-	return session, nil
-}
-
-// lockCurrentCustomerServiceSession 校验客户会话并锁定当前处理周期。
-func lockCurrentCustomerServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	if _, err := loadCustomerConversationForReply(ctx, db, organizationID, conversationID); err != nil {
-		return nil, err
-	}
-	session, err := lockCurrentServiceSession(ctx, db, organizationID, conversationID)
-	if err != nil {
-		return nil, err
 	}
 	return session, nil
 }

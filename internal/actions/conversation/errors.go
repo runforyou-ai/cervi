@@ -29,7 +29,7 @@ var (
 	// ErrGroupOwnerRequired 表示当前成员不是群主。
 	ErrGroupOwnerRequired = chatstate.ErrGroupOwnerRequired
 	// ErrDataInvariant 表示聊天持久关系不完整或互相矛盾。
-	ErrDataInvariant = errors.New("conversation data invariant violated")
+	ErrDataInvariant = chatstate.ErrDataInvariant
 )
 
 // ConflictError 表示语言无关的消息写入冲突。

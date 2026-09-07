@@ -166,3 +166,79 @@ func assertAgentExecutionUnchanged(t *testing.T, ctx context.Context, db *bun.DB
 		t.Fatalf("rejected result messages=%d err=%v", count, err)
 	}
 }
+
+// TestCustomerCallbacksFenceTaskAttempts 验证客服回调在当前周期锁后拒绝旧尝试、旧 Worker 和过期租约。
+func TestCustomerCallbacksFenceTaskAttempts(t *testing.T) {
+	ctx, db, tasks := servertask.NewExecutionRuntimeForTest(t)
+	run := seedAgentExecution(t, ctx, db)
+	sessionID, identityID := uuid.NewV7().String(), uuid.NewV7().String()
+	t.Cleanup(func() {
+		for _, table := range []string{"service_sessions", "customer_conversations"} {
+			if _, err := db.NewDelete().TableExpr(table).Where("organization_id = ?", run.OrganizationID).Exec(context.Background()); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	// 已关闭周期使有效最终回调只收敛取消，不需要外部模型或执行配置。
+	if _, err := db.ExecContext(ctx, "UPDATE conversations SET type = 'customer' WHERE id = ?", run.ConversationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO customer_conversations (organization_id, conversation_id, contact_channel_identity_id, current_service_session_id) VALUES (?, ?, ?, ?)", run.OrganizationID, run.ConversationID, identityID, sessionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO service_sessions (id, organization_id, conversation_id, contact_channel_identity_id, sequence, status, opening_message_id, last_message_id, last_message_at, status_changed_at)
+ SELECT ?, organization_id, conversation_id, ?, 1, 'closed', id, id, originated_at, now() FROM messages WHERE conversation_id = ?`, sessionID, identityID, run.ConversationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "UPDATE agent_runs SET trigger_type = ?, service_session_id = ? WHERE id = ?", domain.AgentTriggerTypeCustomerAuto, sessionID, run.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	taskID, err := tasks.Enqueue(ctx, agentrunaction.RunActionName, agentrunaction.RunInput{RunID: run.ID}, servertask.EnqueueOptions{MaxAttempts: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.NewDelete().Model((*servermodels.TaskOutbox)(nil)).Where("task_run_id = ?", taskID).Exec(context.Background())
+		_, _ = db.NewDelete().Model((*servermodels.TaskRun)(nil)).Where("id = ?", taskID).Exec(context.Background())
+	})
+	var current servermodels.TaskRun
+	if err := db.NewUpdate().Model(&current).Set("status = 'running'").Set("attempt = 2").Set("worker_id = 'customer-worker'").Set("lease_expires_at = now() + interval '1 hour'").Where("id = ?", taskID).Returning("*").Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	executor := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
+	for _, kind := range []string{"旧尝试", "旧Worker", "过期租约"} {
+		stale := current
+		switch kind {
+		case "旧尝试":
+			stale.Attempt = 1
+		case "旧Worker":
+			worker := "old-worker"
+			stale.WorkerID = &worker
+		case "过期租约":
+			if _, err := db.NewUpdate().Model((*servermodels.TaskRun)(nil)).Set("lease_expires_at = now() - interval '1 second'").Where("id = ?", taskID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, start := range []bool{true, false} {
+			staleCtx := servertask.WithExecutionForTest(ctx, &stale, false, false)
+			if start {
+				err = executor.Execute(staleCtx, agentrunaction.RunInput{RunID: run.ID})
+			} else {
+				err = executor.FinalizeFailure(staleCtx, agentrunaction.RunInput{RunID: run.ID}, errors.New("旧失败"))
+			}
+			if !errors.Is(err, servertask.ErrExecutionLost) {
+				t.Fatalf("%s start=%v err=%v", kind, start, err)
+			}
+			assertAgentExecutionUnchanged(t, ctx, db, run)
+		}
+	}
+	if err := executor.FinalizeFailure(servertask.WithExecutionForTest(ctx, &current, true, false), agentrunaction.RunInput{RunID: run.ID}, errors.New("最终失败")); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.NewSelect().Model(&run).WherePK().Scan(ctx); err != nil || run.Status != string(domain.AgentRunStatusCancelled) || run.ResponseMessageID != nil {
+		t.Fatalf("run=%+v err=%v", run, err)
+	}
+}
