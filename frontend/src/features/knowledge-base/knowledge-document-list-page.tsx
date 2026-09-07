@@ -338,7 +338,7 @@ export function KnowledgeDocumentListPage() {
                   <TableHead>{t("documents.columns.wordCount")}</TableHead>
                   <TableHead>{t("documents.columns.hitCount")}</TableHead>
                   <TableHead>{t("documents.columns.createdAt")}</TableHead>
-                  <TableHead>
+                  <TableHead className="w-px">
                     {t("documents.columns.actions")}
                   </TableHead>
                 </TableRow>
