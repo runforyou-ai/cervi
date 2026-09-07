@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -22,10 +21,6 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-var groupManagementRetryableConstraintNames = map[string]struct{}{
-	"chat_subjects_organization_kind_source_unique": {},
-}
 
 // UpdateGroupConversationAction 修改群聊资料。
 type UpdateGroupConversationAction struct{ db *bun.DB }
@@ -145,63 +140,60 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 		return GroupConversation{}, &ValidationError{Fields: fields}
 	}
 	participantIDs := make(map[string]string, len(memberIDs))
-	subjectIDs := make(map[string]string, len(memberIDs))
 	for _, identityID := range memberIDs {
 		participantIDs[identityID] = uuid.NewV7().String()
-		subjectIDs[identityID] = uuid.NewV7().String()
 	}
 
 	var result GroupConversation
-	var err error
-	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
-		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-				return err
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		_, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
+		if err != nil {
+			return err
+		}
+		members, err := loadActiveGroupMembers(ctx, tx, identity.Organization.ID, memberIDs)
+		if err != nil {
+			return err
+		}
+		activeIDs, err := loadActiveGroupParticipantIdentityIDs(ctx, tx, identity.Organization.ID, conversationID)
+		if err != nil {
+			return err
+		}
+		activeSet := make(map[string]struct{}, len(activeIDs))
+		for _, identityID := range activeIDs {
+			activeSet[identityID] = struct{}{}
+		}
+		for _, identityID := range memberIDs {
+			if _, exists := activeSet[identityID]; exists {
+				return &ConflictError{Reason: ConflictReasonGroupMemberAlreadyActive}
 			}
-			_, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
-			if err != nil {
-				return err
-			}
-			members, err := loadActiveGroupMembers(ctx, tx, identity.Organization.ID, memberIDs)
-			if err != nil {
-				return err
-			}
-			activeIDs, err := loadActiveGroupParticipantIdentityIDs(ctx, tx, identity.Organization.ID, conversationID)
-			if err != nil {
-				return err
-			}
-			activeSet := make(map[string]struct{}, len(activeIDs))
-			for _, identityID := range activeIDs {
-				activeSet[identityID] = struct{}{}
-			}
-			for _, identityID := range memberIDs {
-				if _, exists := activeSet[identityID]; exists {
-					return &ConflictError{Reason: ConflictReasonGroupMemberAlreadyActive}
-				}
-			}
-			if len(activeIDs)+len(memberIDs) > maxGroupParticipantCount {
-				return &ValidationError{Fields: map[string]ValidationCode{"memberIdentityIds": ValidationGroupMembersTooMany}}
-			}
+		}
+		if len(activeIDs)+len(memberIDs) > maxGroupParticipantCount {
+			return &ValidationError{Fields: map[string]ValidationCode{"memberIdentityIds": ValidationGroupMembersTooMany}}
+		}
 
-			targets := make([]ConversationSystemEventParticipant, 0, len(members))
-			for _, member := range members {
-				subject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, member.IdentityID, subjectIDs[member.IdentityID])
-				if err != nil {
-					return err
-				}
-				if err := restoreOrCreateGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, subject.ID, participantIDs[member.IdentityID]); err != nil {
-					return err
-				}
-				targets = append(targets, ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName})
-			}
-			eventMessage, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
-				Type: domain.ConversationSystemEventGroupMembersAdded, Actor: groupActorSnapshot(identity), Targets: targets,
-			})
-			if err != nil {
+		subjects, err := ensureOrganizationIdentityChatSubjects(ctx, tx, identity.Organization.ID, memberIDs)
+		if err != nil {
+			return err
+		}
+		targets := make([]ConversationSystemEventParticipant, 0, len(members))
+		for _, member := range members {
+			subject := subjects[member.IdentityID]
+			if err := restoreOrCreateGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, subject.ID, participantIDs[member.IdentityID]); err != nil {
 				return err
 			}
-			// 新成员从本轮加入事件开始记录已读，离开期间的历史不形成未读。
-			if _, err := tx.ExecContext(ctx, `
+			targets = append(targets, ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName})
+		}
+		eventMessage, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+			Type: domain.ConversationSystemEventGroupMembersAdded, Actor: groupActorSnapshot(identity), Targets: targets,
+		})
+		if err != nil {
+			return err
+		}
+		// 新成员从本轮加入事件开始记录已读，离开期间的历史不形成未读。
+		if _, err := tx.ExecContext(ctx, `
 				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id, last_read_at, last_reviewed_mention_message_id)
 				SELECT u.organization_id, cv.id, u.id, ?::uuid, now(), ?::uuid
 				FROM users AS u
@@ -210,29 +202,21 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 				ON CONFLICT (organization_id, conversation_id, user_id) DO UPDATE
 				SET last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = now(), last_reviewed_mention_message_id = EXCLUDED.last_reviewed_mention_message_id, updated_at = now()
 			`, eventMessage.ID, eventMessage.ID, conversationID, identity.Organization.ID, bun.In(memberIDs)); err != nil {
-				return fmt.Errorf("initialize added group member read states: %w", err)
-			}
-			// 本轮入群基线已覆盖此前查看记录。
-			if _, err := tx.NewDelete().Model((*servermodels.ConversationMentionReview)(nil)).
-				Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).
-				Where("user_id IN (SELECT id FROM users WHERE organization_id = ? AND identity_id IN (?))", identity.Organization.ID, bun.In(memberIDs)).Exec(ctx); err != nil {
-				return fmt.Errorf("reset added group member mention reviews: %w", err)
-			}
-			result, err = loadGroupConversation(ctx, tx, identity, conversationID)
-			return err
-		})
-		if err == nil {
-			return result, nil
+			return fmt.Errorf("initialize added group member read states: %w", err)
 		}
-		constraint, retryable := retryableUniqueViolation(err, groupManagementRetryableConstraintNames)
-		if !retryable {
-			return GroupConversation{}, fmt.Errorf("add group conversation members: %w", err)
+		// 本轮入群基线已覆盖此前查看记录。
+		if _, err := tx.NewDelete().Model((*servermodels.ConversationMentionReview)(nil)).
+			Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).
+			Where("user_id IN (SELECT id FROM users WHERE organization_id = ? AND identity_id IN (?))", identity.Organization.ID, bun.In(memberIDs)).Exec(ctx); err != nil {
+			return fmt.Errorf("reset added group member mention reviews: %w", err)
 		}
-		if attempt < maxWriteAttempts-1 {
-			slog.Info("企业群聊增员重试", "conversation_id", conversationID, "attempt", attempt+2, "constraint", constraint)
-		}
+		result, err = loadGroupConversation(ctx, tx, identity, conversationID)
+		return err
+	})
+	if err != nil {
+		return GroupConversation{}, fmt.Errorf("add group conversation members: %w", err)
 	}
-	return GroupConversation{}, fmt.Errorf("add group conversation members retries exhausted: %w", err)
+	return result, nil
 }
 
 // Execute 将当前有效的普通成员移出群聊。

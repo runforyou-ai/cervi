@@ -16,7 +16,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// saveInternalTextMessage 幂等保存双方聊天消息及其读取状态和 Agent 输入。
+// saveInternalTextMessage 在会话与成员已锁定的事务内幂等保存消息、个人状态和 Agent 输入。
 func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input InternalTextMessageInput, sendContext internalMessageContext, agentScheduler AgentChatMessageScheduler) (ConversationMessage, error) {
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
 	if saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, false); err != nil || found {
@@ -41,14 +41,6 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 		Exec(ctx); err != nil {
 		return ConversationMessage{}, fmt.Errorf("create individual text message: %w", err)
 	}
-	if sendContext.AgentIdentityID != "" {
-		if agentScheduler == nil || sendContext.AgentRevisionID == nil {
-			return ConversationMessage{}, ErrDataInvariant
-		}
-		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.AgentIdentityID, *sendContext.AgentRevisionID, message.ID); err != nil {
-			return ConversationMessage{}, fmt.Errorf("schedule AI chat message: %w", err)
-		}
-	}
 	conversation := &servermodels.Conversation{ID: input.ConversationID, OrganizationID: identity.Organization.ID}
 	if err := updateConversationSummary(ctx, db, conversation, message); err != nil {
 		return ConversationMessage{}, err
@@ -58,6 +50,14 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 		UserID: identity.User.ID, LastReadMessageID: &message.ID,
 	}, message); err != nil {
 		return ConversationMessage{}, err
+	}
+	if sendContext.AgentIdentityID != "" {
+		if agentScheduler == nil || sendContext.AgentRevisionID == nil {
+			return ConversationMessage{}, ErrDataInvariant
+		}
+		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.AgentIdentityID, *sendContext.AgentRevisionID, message.ID); err != nil {
+			return ConversationMessage{}, fmt.Errorf("schedule AI chat message: %w", err)
+		}
 	}
 	result := memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity)
 	result.ReplyTo = replyTo

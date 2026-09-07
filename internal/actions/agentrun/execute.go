@@ -164,50 +164,44 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 
 // begin 将待执行或崩溃恢复中的业务运行标记为运行中并读取配置。
 func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionContext, bool, error) {
-	var status string
-	if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
-		Column("status").Where("agr.id = ?", runID).Scan(ctx, &status); errors.Is(err, sql.ErrNoRows) {
+	initial := &servermodels.AgentRun{}
+	if err := a.db.NewSelect().Model(initial).Where("agr.id = ?", runID).Scan(ctx); errors.Is(err, sql.ErrNoRows) {
 		return executionContext{}, false, task.Permanent(errors.New("agent run not found"))
 	} else if err != nil {
-		return executionContext{}, false, fmt.Errorf("load agent run status: %w", err)
+		return executionContext{}, false, fmt.Errorf("load agent run: %w", err)
 	}
-	if agentRunStatusTerminal(status) {
+	if agentRunStatusTerminal(initial.Status) {
 		return executionContext{}, true, nil
 	}
-	if status != string(domain.AgentRunStatusQueued) && status != string(domain.AgentRunStatusRunning) {
-		return executionContext{}, false, task.Permanent(fmt.Errorf("unsupported agent run status %q", status))
+	policy, _, err := a.policyForRun(initial)
+	if err != nil {
+		return executionContext{}, false, task.Permanent(err)
 	}
-	var result sql.Result
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		var err error
-		result, err = tx.NewUpdate().Model((*servermodels.AgentRun)(nil)).
-			Set("status = ?", domain.AgentRunStatusRunning).
-			Set("started_at = COALESCE(started_at, now())").
-			Set("updated_at = now()").
-			Where("id = ?", runID).
-			Where("status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
-			Exec(ctx)
+	terminal := false
+	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		locked, err := lockAgentRun(ctx, tx, policy, initial)
 		if err != nil {
 			return err
 		}
-		return servertask.LockExecution(ctx, tx)
+		run := locked.Run
+		if agentRunStatusTerminal(run.Status) {
+			terminal = true
+			return nil
+		}
+		if run.Status != string(domain.AgentRunStatusQueued) && run.Status != string(domain.AgentRunStatusRunning) {
+			return task.Permanent(fmt.Errorf("unsupported agent run status %q", run.Status))
+		}
+		_, err = tx.NewUpdate().Model(run).
+			Set("status = ?", domain.AgentRunStatusRunning).
+			Set("started_at = COALESCE(started_at, now())").
+			Set("updated_at = now()").WherePK().Exec(ctx)
+		return err
 	})
 	if err != nil {
 		return executionContext{}, false, fmt.Errorf("begin agent run: %w", err)
 	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return executionContext{}, false, fmt.Errorf("read begun agent run rows: %w", err)
-	}
-	if rows == 0 {
-		if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
-			Column("status").Where("agr.id = ?", runID).Scan(ctx, &status); err != nil {
-			return executionContext{}, false, fmt.Errorf("reload agent run status: %w", err)
-		}
-		if agentRunStatusTerminal(status) {
-			return executionContext{}, true, nil
-		}
-		return executionContext{}, false, fmt.Errorf("agent run status changed to %q before begin", status)
+	if terminal {
+		return executionContext{}, true, nil
 	}
 	execution := executionContext{}
 	err = a.db.NewSelect().
@@ -231,6 +225,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		Where("aipm.model_type = ?", domain.AIModelTypeChat).
 		Scan(ctx, &execution)
 	if errors.Is(err, sql.ErrNoRows) {
+		var status string
 		if reloadErr := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
 			Column("status").Where("agr.id = ?", runID).Scan(ctx, &status); reloadErr != nil {
 			return executionContext{}, false, fmt.Errorf("reload unavailable agent run status: %w", reloadErr)
@@ -252,10 +247,6 @@ func agentRunStatusTerminal(status string) bool {
 		status == string(domain.AgentRunStatusCancelled)
 }
 
-type directRunPolicy struct {
-	enqueuer servertask.TxEnqueuer
-}
-
 // policyForRun 根据持久化触发类型选择运行策略和输入范围。
 func (a *ExecuteAction) policyForRun(run *servermodels.AgentRun) (agentRunPolicy, agentRunScope, error) {
 	scope, err := agentRunScopeFor(run)
@@ -264,66 +255,12 @@ func (a *ExecuteAction) policyForRun(run *servermodels.AgentRun) (agentRunPolicy
 	}
 	switch domain.AgentTriggerType(run.TriggerType) {
 	case domain.AgentTriggerTypeDirect:
-		return directRunPolicy{enqueuer: a.enqueuer}, scope, nil
+		return agentChatRunPolicy{enqueuer: a.enqueuer}, scope, nil
 	case domain.AgentTriggerTypeCustomerAuto:
 		return customerRunPolicy{enqueuer: a.enqueuer}, scope, nil
 	default:
 		return nil, agentRunScope{}, fmt.Errorf("unsupported agent trigger type %q", run.TriggerType)
 	}
-}
-
-// lockContext 返回普通 Agent 不需要额外锁定的策略上下文。
-func (p directRunPolicy) lockContext(context.Context, bun.IDB, *servermodels.AgentRun) (agentRunPolicyContext, error) {
-	return agentRunPolicyContext{}, nil
-}
-
-// prepareLocked 确认普通 Agent 可以继续执行。
-func (p directRunPolicy) prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error) {
-	return true, nil
-}
-
-// loadMessages 按会话稳定顺序读取普通 Agent 上下文。
-func (p directRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
-	return loadClaimedConversationMessages(ctx, db, run, endSeq)
-}
-
-// persistMessage 写入 Agent 结果消息并更新会话摘要。
-func (p directRunPolicy) persistMessage(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
-	var participantID string
-	if err := db.NewSelect().TableExpr("conversation_participants AS cp").
-		ColumnExpr("cp.id").
-		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
-		Where("cp.organization_id = ?", run.OrganizationID).
-		Where("cp.conversation_id = ?", run.ConversationID).
-		Where("cp.left_at IS NULL").
-		Where("cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Where("cs.source_id = ?", run.AgentIdentityID).
-		Scan(ctx, &participantID); err != nil {
-		return fmt.Errorf("load agent conversation participant: %w", err)
-	}
-	message, err := insertAgentMessage(ctx, db, run, messageID, participantID, messageType, content, nil)
-	if err != nil {
-		return err
-	}
-	return updateConversationAfterAgentResponse(ctx, db, message)
-}
-
-// enqueueNext 为普通 Agent 的剩余输入创建下一次运行。
-func (p directRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, run *servermodels.AgentRun, startSeq int64) error {
-	var revisionID string
-	if err := db.NewSelect().Model((*servermodels.Agent)(nil)).
-		Column("active_revision_id").
-		Where("a.identity_id = ?", run.AgentIdentityID).
-		Where("a.organization_id = ?", run.OrganizationID).
-		Scan(ctx, &revisionID); err != nil {
-		return fmt.Errorf("load next agent run revision: %w", err)
-	}
-	_, err := insertAndEnqueueRun(ctx, db, p.enqueuer, agentRunSpec{
-		OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
-		AgentIdentityID: run.AgentIdentityID, RevisionID: revisionID,
-		TriggerType: domain.AgentTriggerTypeDirect,
-	}, startSeq)
-	return err
 }
 
 // insertAgentMessage 写入一条带运行幂等键的 Agent 结果消息。
