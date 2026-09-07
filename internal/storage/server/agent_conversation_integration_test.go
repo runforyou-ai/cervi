@@ -187,6 +187,10 @@ func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodel
 	if _, err := conversationaction.NewUpdateConversationNotificationSettingsAction(db).Execute(ctx, identity, second.Conversation.ID, true); err != nil {
 		t.Fatal(err)
 	}
+	unreadMark := conversationaction.NewUpdateConversationUnreadMarkAction(db)
+	if err := unreadMark.Execute(ctx, identity, first.Conversation.ID, true); err != nil {
+		t.Fatal(err)
+	}
 	rows, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
 	if err != nil {
 		t.Fatal(err)
@@ -200,15 +204,18 @@ func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodel
 		if row.Agent == nil || row.Direct != nil || row.Agent.AgentIdentityID != first.Conversation.Agent.AgentIdentityID {
 			t.Fatalf("AI inbox payload: %+v", row)
 		}
-		if row.ID == first.Conversation.ID && (row.UnreadCount != 0 || row.Muted) {
+		if row.ID == first.Conversation.ID && (row.UnreadCount != 0 || row.Muted || !row.MarkedUnread) {
 			t.Fatalf("first read state: %+v", row)
 		}
-		if row.ID == second.Conversation.ID && (row.UnreadCount != 1 || !row.Muted) {
+		if row.ID == second.Conversation.ID && (row.UnreadCount != 1 || !row.Muted || row.MarkedUnread) {
 			t.Fatalf("second read state: %+v", row)
 		}
 	}
 	if found != 2 {
 		t.Fatalf("AI inbox rows=%d", found)
+	}
+	if err := unreadMark.Execute(ctx, identity, first.Conversation.ID, false); err != nil {
+		t.Fatal(err)
 	}
 	outsider := newNavigationFixture(t)
 	for _, actor := range []*servermodels.Identity{outsider.owner, outsider.member} {
