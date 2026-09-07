@@ -4,7 +4,7 @@
 
 已完成企业知识检索、多查询融合、游标上下文读取和 Agent 知识库范围配置。当前实现以代码为准，下面保留检索编排设计及上线前待办。
 
-本地知识库的部署、内容生命周期、实施 PR 与评测结论见 [本地知识库接入方案](knowledge-base-plan.md)。本地执行层直接接入 Hindsight，保留本篇已有 Tool 编排，不建设可替换搜索引擎框架。
+本地知识库的部署、内容生命周期、实施 PR 与评测结论见 [本地知识库接入方案](knowledge-base-plan.md)。本地执行层直接接入 Haystack + Hayhooks，保留本篇已有 Tool 编排，不建设可替换搜索引擎框架。
 
 - Agent 创建页和详情运行配置可选择当前企业知识库；新建默认不选，空列表不注册 `search_knowledge`。
 - `managed/v1` Revision 的 `knowledgeBaseIds` 保存明确范围，更新生成新版本；Run 读取其绑定的 Revision，配置切换不影响在途 Run。
@@ -133,7 +133,7 @@ Agent Run
   -> MultiQueryRetriever
        -> 并发调用 KnowledgeRetriever.Retrieve(query)
        -> 合并、去重、排序和裁剪
-  -> Dify 连接器或 Hindsight 本地知识库接入
+  -> Dify 连接器或 Haystack + Hayhooks 本地知识库接入
 ```
 
 后端执行契约保持单查询：
@@ -178,7 +178,7 @@ knowledge_base_id + segment_id
 
 同一查询内重复出现的分段只保留最靠前的名次。同一分段被不同查询命中时合并 `matchedQueryIndexes`；分段字段采用最佳名次对应的记录，最佳名次相同时采用首次出现下标较小的记录，保证内容和文档信息稳定。
 
-本地问答接入时，先在来源适配中按问答条目折叠，把条目编号作为逻辑 `segment_id`，返回主问题和完整答案，再进入上述融合。Hindsight 实际切出的多个片段不能使同一问答重复输出。
+本地问答接入时，先在来源适配中按问答条目折叠，把条目编号作为逻辑 `segment_id`，返回主问题和完整答案，再进入上述融合。Haystack + Hayhooks 实际切出的多个片段不能使同一问答重复输出。
 
 ### 6.3 融合排序
 
@@ -219,19 +219,20 @@ Agent Tool 在创建编排器时显式提供分段条数上限和序列化后 UT
 
 ## 8. 本地知识库统一方式
 
-本地知识库直接对接 Hindsight 的 chunks 模式，接入现有检索服务和多查询编排。首版使用固定混合检索配置，不开放关键词、语义与混合模式切换，不增加可替换引擎抽象。Agent Tool 保留 `queries` 和受限范围的游标读取语义；本地 cursor 必须携带 `sourceVersion` 并验证索引版本，Dify 不提供该字段，继续读取远端当前文档与分段。具体规则按 [本地知识库接入方案](knowledge-base-plan.md) 落地。
+本地知识库直接对接 Haystack + Hayhooks 的专用管线，接入现有检索服务和多查询编排。首版使用向量召回与按知识库配置启用的重排，不开放关键词、语义与混合模式切换，不增加可替换引擎抽象。Agent Tool 保留 `queries` 和受限范围的游标读取语义；本地 cursor 必须携带 `sourceVersion` 并验证索引版本，Dify 不提供该字段，继续读取远端当前文档与分段。具体规则按 [本地知识库接入方案](knowledge-base-plan.md) 落地。
 
 ```text
 DifyRetriever
   -> Dify 保存检索配置
   -> POST /datasets/{id}/retrieve，只传 query
 
-Hindsight 本地知识库接入
-  -> Cervi 根据身份和知识库解析 bank 与有效来源
-  -> Hindsight 召回，再校验来源修订号并返回原文或完整问答
+Haystack + Hayhooks 本地知识库接入
+  -> Cervi 服务端从本进程配置注入工作区数据库
+  -> 根据身份和 Run Revision 解析知识库、当前索引代次与有效来源
+  -> Haystack + Hayhooks 召回，再校验来源修订号并返回原文或完整问答
 ```
 
-复用的是现有工具入口与结果编排；Dify 保留自身检索配置，Hindsight 使用固定版本的直接接入。两者原始分数不做统一阈值判断。
+复用的是现有工具入口与结果编排；Dify 保留自身检索配置，本地锁定 Haystack + Hayhooks 框架版本，embedding 与重排选择由 Cervi 后台管理。两者原始分数不做统一阈值判断。
 
 ## 9. 实现 PR 拆分
 
@@ -255,8 +256,8 @@ Hindsight 本地知识库接入
 
 ### 后续：本地知识库
 
-- 按 [本地知识库接入方案](knowledge-base-plan.md) 分 PR 完成 pgvector 基础环境、Hindsight、本地问答检索和文档导入。
-- Cervi 管理业务来源、文件和处理状态，Hindsight 管理分段与索引；继续复用 Agent Tool 和多查询编排。
+- 按 [本地知识库接入方案](knowledge-base-plan.md) 分 PR 完成 pgvector 基础环境、Haystack + Hayhooks、后台模型配置与索引版本、本地问答检索和文档导入。
+- Cervi 管理业务来源、文件和处理状态，Haystack + Hayhooks 执行分段与索引，Cervi 管理模型配置与索引代次；继续复用 Agent Tool 和多查询编排。
 
 ## 10. 验收标准
 
@@ -266,5 +267,5 @@ Hindsight 本地知识库接入
 - 多条查询并发执行，重复分段只返回一次，输出顺序稳定。
 - 单条查询时结果顺序与后端一致，多条查询时按 RRF 融合。
 - 上线前专项补充检索并发与模型上下文输出预算。
-- Dify 与本地知识库共用 Agent Tool 的查询和范围语义；本地游标约束来源索引版本，Dify 校验当前远端分段，不承诺历史快照；不向模型暴露 Hindsight bank 或底层引擎选择。
+- Dify 与本地知识库共用 Agent Tool 的查询和范围语义；本地游标约束来源索引版本，Dify 校验当前远端分段，不承诺历史快照；不向模型暴露底层索引表或底层引擎选择。
 - Agent 只能检索当前 `organization_id` 且 Run Revision 已绑定的知识库；游标读取不能扩大范围。
