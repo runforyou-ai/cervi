@@ -167,8 +167,6 @@ const knowledgeBase = {
     segments: {
       loading: "Loading segments…",
       error: "Failed to load segments.",
-      start: "Start of document",
-      end: "End of document",
       empty: "This document has no segments",
       retryPrevious: "Retry loading earlier segments",
       retryNext: "Retry loading later segments",

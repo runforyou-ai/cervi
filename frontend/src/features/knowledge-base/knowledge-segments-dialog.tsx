@@ -95,15 +95,15 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
       <div ref={viewport} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto px-6 outline-none [overflow-anchor:none]" aria-label={t("documentDetail.viewSegments")}>
         {resource.isPending ? <LoadingIndicator className="min-h-48 justify-center">{t("documentDetail.segments.loading")}</LoadingIndicator> : !pages ?
           <div className="py-12 text-center text-sm text-muted-foreground"><p>{isApiError(resource.error) ? apiErrorMessage(resource.error) : t("documentDetail.segments.error")}</p><Button className="mt-4" variant="outline" onClick={() => void resource.refetch()}>{t("retry")}</Button></div> : <>
-          <div ref={top} className="flex h-12 items-center justify-center text-sm text-muted-foreground">
-            {resource.isFetchingPreviousPage ? t("documentDetail.segments.loading") : resource.isFetchPreviousPageError ? <Button variant="link" onClick={() => {
+          <div ref={top} className="flex min-h-px items-center justify-center text-sm text-muted-foreground">
+            {resource.isFetchingPreviousPage ? <span className="py-3">{t("documentDetail.segments.loading")}</span> : resource.isFetchPreviousPageError ? <Button variant="link" onClick={() => {
               const pane = viewport.current
               if (pane) anchor.current = { height: pane.scrollHeight }
               void resource.fetchPreviousPage().then((result) => { if (result.isError) anchor.current = null })
-            }}>{t("documentDetail.segments.retryPrevious")}</Button> : !resource.hasPreviousPage ? t("documentDetail.segments.start") : null}
+            }}>{t("documentDetail.segments.retryPrevious")}</Button> : null}
           </div>
           {pages.flatMap((page) => page.segments).map((segment) => <article key={segment.id} data-segment-id={segment.id}
-            className={cn("flex items-baseline gap-4 border-b py-6", segment.id === segmentId && "border-l-2 border-l-primary bg-primary/5 px-4")}>
+            className={cn("flex items-baseline gap-4 border-b py-3", segment.id === segmentId && "border-l-2 border-l-primary bg-primary/5 px-4")}>
             <div className="w-20 shrink-0 text-xs leading-7 text-muted-foreground">
               <span className="whitespace-nowrap">{t("retrieval.position", { position: segment.position })}</span>
               {segment.id === segmentId && <span className="block text-primary">{t("retrieval.matched")}</span>}
@@ -113,8 +113,8 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
               {segment.answer && <div className="mt-4 text-sm"><p className="mb-2 text-xs text-muted-foreground">{t("retrieval.answer")}</p><p className="whitespace-pre-wrap break-words leading-7 select-text">{segment.answer}</p></div>}
             </div>
           </article>)}
-          <div ref={bottom} className="flex h-12 items-center justify-center text-sm text-muted-foreground">
-            {resource.isFetchingNextPage ? t("documentDetail.segments.loading") : resource.isFetchNextPageError ? <Button variant="link" onClick={() => void resource.fetchNextPage()}>{t("documentDetail.segments.retryNext")}</Button> : !resource.hasNextPage ? t(pages[0].page.total === 0 ? "documentDetail.segments.empty" : "documentDetail.segments.end") : null}
+          <div ref={bottom} className="flex min-h-px items-center justify-center text-sm text-muted-foreground">
+            {resource.isFetchingNextPage ? <span className="py-3">{t("documentDetail.segments.loading")}</span> : resource.isFetchNextPageError ? <Button variant="link" onClick={() => void resource.fetchNextPage()}>{t("documentDetail.segments.retryNext")}</Button> : pages[0].page.total === 0 ? <p className="py-12">{t("documentDetail.segments.empty")}</p> : null}
           </div>
         </>}
       </div>

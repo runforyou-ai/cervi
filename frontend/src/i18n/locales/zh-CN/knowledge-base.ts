@@ -165,8 +165,6 @@ const knowledgeBase = {
     segments: {
       loading: "正在读取分段…",
       error: "读取分段失败。",
-      start: "文档开头",
-      end: "文档末尾",
       empty: "这个文档还没有分段",
       retryPrevious: "重试加载前面的分段",
       retryNext: "重试加载后面的分段",
