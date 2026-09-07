@@ -103,13 +103,15 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
             }}>{t("documentDetail.segments.retryPrevious")}</Button> : !resource.hasPreviousPage ? t("documentDetail.segments.start") : null}
           </div>
           {pages.flatMap((page) => page.segments).map((segment) => <article key={segment.id} data-segment-id={segment.id}
-            className={cn("border-b py-6", segment.id === segmentId && "border-l-2 border-l-primary bg-primary/5 px-4")}>
-            <div className="mb-3 flex gap-3 text-xs text-muted-foreground">
-              <span>{t("retrieval.position", { position: segment.position })}</span>
-              {segment.id === segmentId && <span className="text-primary">{t("retrieval.matched")}</span>}
+            className={cn("flex items-baseline gap-4 border-b py-6", segment.id === segmentId && "border-l-2 border-l-primary bg-primary/5 px-4")}>
+            <div className="w-20 shrink-0 text-xs leading-7 text-muted-foreground">
+              <span className="whitespace-nowrap">{t("retrieval.position", { position: segment.position })}</span>
+              {segment.id === segmentId && <span className="block text-primary">{t("retrieval.matched")}</span>}
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm leading-7 select-text">{segment.content}</p>
-            {segment.answer && <div className="mt-4 text-sm"><p className="mb-2 text-xs text-muted-foreground">{t("retrieval.answer")}</p><p className="whitespace-pre-wrap break-words leading-7 select-text">{segment.answer}</p></div>}
+            <div className="min-w-0 flex-1">
+              <p className="whitespace-pre-wrap break-words text-sm leading-7 select-text">{segment.content}</p>
+              {segment.answer && <div className="mt-4 text-sm"><p className="mb-2 text-xs text-muted-foreground">{t("retrieval.answer")}</p><p className="whitespace-pre-wrap break-words leading-7 select-text">{segment.answer}</p></div>}
+            </div>
           </article>)}
           <div ref={bottom} className="flex h-12 items-center justify-center text-sm text-muted-foreground">
             {resource.isFetchingNextPage ? t("documentDetail.segments.loading") : resource.isFetchNextPageError ? <Button variant="link" onClick={() => void resource.fetchNextPage()}>{t("documentDetail.segments.retryNext")}</Button> : !resource.hasNextPage ? t(pages[0].page.total === 0 ? "documentDetail.segments.empty" : "documentDetail.segments.end") : null}
