@@ -59,7 +59,7 @@ const mobile = {
     noSelection: "尚未选择成员",
     searchMembers: "搜索成员姓名",
     title: "群聊",
-    memberCount: "（{{count}}）",
+    memberCount: "({{count}})",
     details: "群详情",
     loadError: "无法加载群聊，请重试。",
     unavailable: "该群聊不存在或你已不在群内。",

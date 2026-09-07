@@ -244,6 +244,7 @@ type GroupConversation struct {
 	Status       ConversationStatus `json:"status"`
 	CreatedAt    time.Time          `json:"createdAt"`
 	Participants []GroupParticipant `json:"participants"`
+	Muted        bool               `json:"muted"`
 }
 
 // GroupTextMessageInput 定义成员发送的群聊文本消息。

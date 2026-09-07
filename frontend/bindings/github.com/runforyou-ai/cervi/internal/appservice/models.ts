@@ -1151,6 +1151,7 @@ export interface GroupConversation {
     "status": ConversationStatus;
     "createdAt": string;
     "participants": GroupParticipant[] | null;
+    "muted": boolean;
 }
 
 /**

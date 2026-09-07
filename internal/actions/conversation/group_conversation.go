@@ -191,6 +191,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ImageFileID *string   `bun:"image_file_id"`
 		Status      string    `bun:"status"`
 		CreatedAt   time.Time `bun:"created_at"`
+		Muted       bool      `bun:"muted"`
 	}
 	err := db.NewSelect().
 		TableExpr("conversations AS cv").
@@ -199,6 +200,8 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
 		ColumnExpr("cv.created_at AS created_at").
+		ColumnExpr("COALESCE(state.muted, false) AS muted").
+		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		Where("cv.organization_id = ?", identity.Organization.ID).
@@ -242,6 +245,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ID: conversationID, Title: summary.Title, Description: summary.Description, ImageFileID: summary.ImageFileID,
 		Status:    domain.ConversationStatus(summary.Status),
 		CreatedAt: summary.CreatedAt, Participants: participants,
+		Muted: summary.Muted,
 	}, nil
 }
 

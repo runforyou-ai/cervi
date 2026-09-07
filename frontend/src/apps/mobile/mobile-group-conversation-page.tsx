@@ -1,6 +1,6 @@
 /** 移动端已有群聊的资料读取、访问恢复和详情入口。 */
 import { useCallback, useEffect, useRef } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
+import { BellOffIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
@@ -28,7 +28,7 @@ export function MobileGroupConversationPage() {
 
 /** 独立读取群资料，前台同步名称、成员人数及解散状态。 */
 function MobileGroupConversation({ conversationID }: { conversationID: string }) {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "inbox"])
   const navigate = useNavigate()
   const { inboxURL } = useMobileNavigation()
   const invalidate = useResourceInvalidator()
@@ -77,6 +77,12 @@ function MobileGroupConversation({ conversationID }: { conversationID: string })
               <span className="shrink-0">
                 {t("group.memberCount", { count: data.participants.length })}
               </span>
+            ) : null}
+            {data?.muted ? (
+              <BellOffIcon
+                className="ml-1 size-3.5 shrink-0 text-muted-foreground"
+                aria-label={t("inbox:conversationMuted")}
+              />
             ) : null}
           </span>
         }

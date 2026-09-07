@@ -369,6 +369,7 @@ func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identit
 		ID: record.ID, Title: record.Title, Description: record.Description,
 		ImageURL: optionalFileURL(avatarURLs, record.ImageFileID), Status: ConversationStatus(record.Status),
 		CreatedAt: record.CreatedAt, Participants: participants,
+		Muted: record.Muted,
 	}, nil
 }
 

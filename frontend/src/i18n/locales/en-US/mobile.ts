@@ -59,7 +59,7 @@ const mobile = {
     noSelection: "No members selected",
     searchMembers: "Search member names",
     title: "Group chat",
-    memberCount: " ({{count}})",
+    memberCount: "({{count}})",
     details: "Group details",
     loadError: "Could not load the group. Please try again.",
     unavailable: "This group does not exist or you are no longer a member.",
