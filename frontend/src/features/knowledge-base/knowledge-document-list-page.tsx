@@ -324,15 +324,15 @@ export function KnowledgeDocumentListPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border bg-card">
-            <Table>
+            <Table className="[&_th]:text-center [&_td]:text-center">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{t("documents.columns.name")}</TableHead>
                   <TableHead>{t("documents.columns.status")}</TableHead>
-                  <TableHead className="text-right">{t("documents.columns.wordCount")}</TableHead>
-                  <TableHead className="text-right">{t("documents.columns.hitCount")}</TableHead>
+                  <TableHead>{t("documents.columns.wordCount")}</TableHead>
+                  <TableHead>{t("documents.columns.hitCount")}</TableHead>
                   <TableHead>{t("documents.columns.createdAt")}</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead>
                     {t("documents.columns.actions")}
                   </TableHead>
                 </TableRow>
@@ -363,10 +363,10 @@ export function KnowledgeDocumentListPage() {
                           {t(`documents.status.${document.status}`)}
                         </StatusBadge>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="tabular-nums">
                         {document.wordCount?.toLocaleString() ?? "—"}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
+                      <TableCell className="tabular-nums">
                         {document.hitCount.toLocaleString()}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -374,7 +374,7 @@ export function KnowledgeDocumentListPage() {
                           ? formatDateTime(document.createdAt)
                           : "—"}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap">
                         <Button variant="outline" size="sm" asChild>
                           <Link
                             to={`/knowledge-bases/${knowledgeBaseId}/documents/${encodeURIComponent(document.id)}`}
