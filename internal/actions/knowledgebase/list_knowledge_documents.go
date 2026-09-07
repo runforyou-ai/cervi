@@ -68,6 +68,7 @@ func (q *ListKnowledgeDocumentsQuery) Execute(
 		}
 		documents = append(documents, DocumentRecord{
 			ID: document.ID, Name: document.Name, Status: status, CreatedAt: document.CreatedAt,
+			WordCount: document.WordCount, HitCount: document.HitCount,
 		})
 	}
 	return DocumentListOutput{

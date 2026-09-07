@@ -122,6 +122,8 @@ func (l *DifyKnowledgeDocumentLister) List(
 			ID            string `json:"id"`
 			Name          string `json:"name"`
 			DisplayStatus string `json:"display_status"`
+			WordCount     *int   `json:"word_count"`
+			HitCount      int    `json:"hit_count"`
 			CreatedAt     *int64 `json:"created_at"`
 		} `json:"data"`
 		Page  *int `json:"page"`
@@ -160,6 +162,7 @@ func (l *DifyKnowledgeDocumentLister) List(
 		}
 		documents = append(documents, DifyKnowledgeDocument{
 			ID: id, Name: name, Status: status, CreatedAt: difyUnixTime(item.CreatedAt),
+			WordCount: item.WordCount, HitCount: item.HitCount,
 		})
 	}
 

@@ -101,7 +101,7 @@ func (b *DirectBackend) ListKnowledgeDocuments(
 	for _, document := range output.Documents {
 		documents = append(documents, KnowledgeDocumentSummary{
 			ID: document.ID, Name: document.Name, Status: KnowledgeDocumentStatus(document.Status),
-			CreatedAt: document.CreatedAt,
+			WordCount: document.WordCount, HitCount: document.HitCount, CreatedAt: document.CreatedAt,
 		})
 	}
 	slog.Info("Dify 知识文档列表读取成功",

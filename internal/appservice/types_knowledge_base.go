@@ -123,6 +123,8 @@ type KnowledgeDocumentSummary struct {
 	ID        string                  `json:"id"`
 	Name      string                  `json:"name"`
 	Status    KnowledgeDocumentStatus `json:"status"`
+	WordCount *int                    `json:"wordCount"`
+	HitCount  int                     `json:"hitCount"`
 	CreatedAt *time.Time              `json:"createdAt"`
 }
 

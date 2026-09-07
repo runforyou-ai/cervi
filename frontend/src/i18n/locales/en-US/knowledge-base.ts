@@ -110,6 +110,8 @@ const knowledgeBase = {
     columns: {
       name: "Document name",
       status: "Status",
+      wordCount: "Total words",
+      hitCount: "Retrieval count",
       createdAt: "Created",
       actions: "Actions",
     },

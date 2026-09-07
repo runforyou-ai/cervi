@@ -73,6 +73,8 @@ type DocumentRecord struct {
 	ID        string
 	Name      string
 	Status    domain.KnowledgeDocumentStatus
+	WordCount *int
+	HitCount  int
 	CreatedAt *time.Time
 }
 

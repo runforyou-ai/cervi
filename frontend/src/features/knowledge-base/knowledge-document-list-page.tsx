@@ -329,6 +329,8 @@ export function KnowledgeDocumentListPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{t("documents.columns.name")}</TableHead>
                   <TableHead>{t("documents.columns.status")}</TableHead>
+                  <TableHead className="text-right">{t("documents.columns.wordCount")}</TableHead>
+                  <TableHead className="text-right">{t("documents.columns.hitCount")}</TableHead>
                   <TableHead>{t("documents.columns.createdAt")}</TableHead>
                   <TableHead className="text-right">
                     {t("documents.columns.actions")}
@@ -339,7 +341,7 @@ export function KnowledgeDocumentListPage() {
                 {documents.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={4}
+                      colSpan={6}
                       className="h-32 text-center text-muted-foreground"
                     >
                       {keyword || status
@@ -360,6 +362,12 @@ export function KnowledgeDocumentListPage() {
                         >
                           {t(`documents.status.${document.status}`)}
                         </StatusBadge>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {document.wordCount?.toLocaleString() ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {document.hitCount.toLocaleString()}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
                         {document.createdAt

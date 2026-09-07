@@ -108,6 +108,8 @@ const knowledgeBase = {
     columns: {
       name: "文档名称",
       status: "状态",
+      wordCount: "总字数",
+      hitCount: "匹配次数",
       createdAt: "创建时间",
       actions: "操作",
     },

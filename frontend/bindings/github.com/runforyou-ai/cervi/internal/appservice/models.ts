@@ -1587,6 +1587,8 @@ export interface KnowledgeDocumentSummary {
     "id": string;
     "name": string;
     "status": KnowledgeDocumentStatus;
+    "wordCount": number | null;
+    "hitCount": number;
     "createdAt": string | null;
 }
 
