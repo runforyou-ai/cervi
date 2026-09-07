@@ -324,7 +324,7 @@ export function KnowledgeDocumentListPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border bg-card">
-            <Table className="[&_th]:text-center [&_td]:text-center">
+            <Table className="[&_th]:text-left [&_td]:text-left">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{t("documents.columns.name")}</TableHead>
