@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/runforyou-ai/cervi/internal/actions/channelstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -34,7 +35,7 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 		return nil, ErrNotFound
 	}
 	var output *MessageChannelRecord
-	err := withTelegramChannelLock(ctx, a.db, channelID, func(conn bun.Conn) error {
+	err := channelstate.WithTelegramLock(ctx, a.db, channelID, func(conn bun.Conn) error {
 		current, err := loadTelegramChannelDetail(ctx, conn, identity.Organization.ID, channelID, false)
 		if err != nil {
 			return err

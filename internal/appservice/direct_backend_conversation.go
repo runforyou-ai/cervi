@@ -727,6 +727,8 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 			messageKey = cervii18n.ErrorServiceSessionOwned
 		case conversationaction.ConflictReasonServiceSessionNotReplyable:
 			messageKey = cervii18n.ErrorServiceSessionNotReplyable
+		case conversationaction.ConflictReasonChannelOutboundUnavailable:
+			messageKey = cervii18n.ErrorChannelOutboundUnavailable
 		case conversationaction.ConflictReasonChannelOutboundUnsupported:
 			messageKey = cervii18n.ErrorChannelOutboundUnsupported
 		case conversationaction.ConflictReasonReplyTargetInvalid:

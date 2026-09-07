@@ -463,6 +463,13 @@ export function ListConversationMessages(meta: $models.RequestMeta, conversation
 }
 
 /**
+ * ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
+ */
+export function ListCustomerMessageDeliveries(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerDeliveryListInput): $CancellablePromise<$models.CustomerDeliveryList> {
+    return $Call.ByID(344678729, meta, conversationID, input);
+}
+
+/**
  * ListCustomerServiceAssignees 返回有效真人和 AI 客服。
  */
 export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerServiceAssigneeList> {
@@ -670,6 +677,13 @@ export function ReopenServiceSession(meta: $models.RequestMeta, conversationID: 
  */
 export function RequestNotificationPermission(meta: $models.RequestMeta): $CancellablePromise<$models.NotificationPermissionStatus> {
     return $Call.ByID(3018557431, meta);
+}
+
+/**
+ * ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
+ */
+export function ResolveCustomerMessageDelivery(meta: $models.RequestMeta, conversationID: string, deliveryID: string, input: $models.CustomerDeliveryResolveInput): $CancellablePromise<void> {
+    return $Call.ByID(2639604801, meta, conversationID, deliveryID, input);
 }
 
 /**

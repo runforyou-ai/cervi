@@ -15,6 +15,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
@@ -33,6 +34,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
@@ -44,6 +46,7 @@ var (
 
 // DirectBackend 在服务端进程内直接调用 Action 和 Query。
 type DirectBackend struct {
+	customerDeliveries                *deliveryaction.Manager
 	installWorkspace                  *installationaction.InstallWorkspaceAction
 	login                             *authaction.LoginAction
 	logout                            *authaction.LogoutAction
@@ -170,7 +173,7 @@ type DirectBackend struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator, knowledgeSearch *knowledgebaseaction.SearchService) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator, knowledgeSearch *knowledgebaseaction.SearchService, deliveryEnqueuer servertask.TxEnqueuer) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
@@ -180,6 +183,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 	difyKnowledgeBaseGetter := connector.NewDifyKnowledgeBaseGetter(connectorClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	return &DirectBackend{
+		customerDeliveries:                deliveryaction.NewManager(db, deliveryEnqueuer),
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
 		logout:                            authaction.NewLogoutAction(db),
@@ -194,7 +198,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		pendingConversationMentions:       conversationaction.NewListPendingConversationMentionsQuery(db),
 		reviewConversationMention:         conversationaction.NewMarkConversationMentionReviewedAction(db),
 		updateConversationNotifications:   conversationaction.NewUpdateConversationNotificationSettingsAction(db),
-		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db),
+		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db, deliveryEnqueuer),
 		claimServiceSession:               conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),
 		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
 		closeServiceSession:               conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),

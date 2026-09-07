@@ -166,6 +166,10 @@ func (b *Backend) normalizeOutput(output any) {
 		b.normalizeConversationMessage(&value.Message)
 	case *appservice.ConversationMessage:
 		b.normalizeConversationMessage(value)
+	case *appservice.CustomerDeliveryList:
+		if value.Deliveries == nil {
+			value.Deliveries = []appservice.CustomerMessageDelivery{}
+		}
 	case *appservice.ConversationMessageList:
 		for index := range value.Messages {
 			b.normalizeConversationMessage(&value.Messages[index])

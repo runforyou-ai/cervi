@@ -103,7 +103,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 			received, err := conversationaction.ReceiveInboundCustomerTextMessage(ctx, tx, channel, conversationaction.InboundCustomerTextMessageInput{
 				ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
 				SingleConversation: true, Body: input.Message.Body,
-				IdempotencyKey: "chmsg:" + channelID + ":tg:" + strconv.FormatInt(input.Message.ChatID, 10) + ":" + strconv.FormatInt(input.Message.MessageID, 10),
+				IdempotencyKey: "chmsg:" + channelID + ":tg:" + strconv.FormatInt(*setting.BotID, 10) + ":" + strconv.FormatInt(input.Message.ChatID, 10) + ":" + strconv.FormatInt(input.Message.MessageID, 10),
 				OriginatedAt:   input.Message.OriginatedAt, SourceOrder: input.Message.MessageID,
 			})
 			if err != nil {
@@ -328,7 +328,8 @@ func loadActiveTelegramWebhookSetting(ctx context.Context, db bun.IDB, channelID
 		Where("tcs.channel_id = ?", channelID).
 		Where("c.type = ?", domain.ChannelTypeTelegram).
 		Where("c.enabled = TRUE").
-		Where("tcs.webhook_secret IS NOT NULL")
+		Where("tcs.webhook_secret IS NOT NULL").
+		Where("tcs.bot_id IS NOT NULL")
 	if lock {
 		query = query.For("UPDATE OF tcs")
 	}

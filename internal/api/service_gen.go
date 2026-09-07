@@ -34,6 +34,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
+	router.GET("/conversations/:conversationID/deliveries", s.listCustomerMessageDeliveries)
+	router.POST("/conversations/:conversationID/deliveries/:deliveryID/resolve", s.resolveCustomerMessageDelivery)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
 	router.POST("/conversations/:conversationID/transfer", s.transferServiceSession)
 	router.POST("/conversations/:conversationID/close", s.closeServiceSession)
@@ -312,6 +314,25 @@ func (s *Service) sendCustomerTextMessage(c *gin.Context) {
 	}
 	output, err := s.application.SendCustomerTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// listCustomerMessageDeliveries 读取当前窗口的外部投递状态。
+func (s *Service) listCustomerMessageDeliveries(c *gin.Context) {
+	input, ok := bindCustomerDeliveryListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListCustomerMessageDeliveries(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// resolveCustomerMessageDelivery 人工处理失败或待确认的投递。
+func (s *Service) resolveCustomerMessageDelivery(c *gin.Context) {
+	var input appservice.CustomerDeliveryResolveInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.ResolveCustomerMessageDelivery(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("deliveryID"), input))
 }
 
 // claimServiceSession 领取或接管客户会话最新处理周期。
@@ -1173,6 +1194,13 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 	return appservice.ConversationMessageListInput{
 		Before: c.Query("before"),
 		After:  c.Query("after"),
+	}, true
+}
+
+// bindCustomerDeliveryListInputQuery 从查询参数解析 appservice.CustomerDeliveryListInput。
+func bindCustomerDeliveryListInputQuery(c *gin.Context) (appservice.CustomerDeliveryListInput, bool) {
+	return appservice.CustomerDeliveryListInput{
+		MessageIDs: c.Query("messageIds"),
 	}, true
 }
 

@@ -109,7 +109,7 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 	if err != nil || count != 1 {
 		t.Fatalf("reading created participant: %d %v", count, err)
 	}
-	reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"})
+	reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +242,7 @@ func TestCustomerConversationDelayedMessage(t *testing.T) {
 					_, err := f.visitorMessage(ctx, "等待后入站")
 					done <- err
 				} else {
-					_, err := conversationaction.NewSendCustomerTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "等待后回复"})
+					_, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "等待后回复"})
 					done <- err
 				}
 			}()
@@ -265,7 +265,7 @@ func TestCustomerConversationDelayedMessage(t *testing.T) {
 			}
 			var earlierID string
 			if visitor {
-				reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "先提交回复"})
+				reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "先提交回复"})
 				if err != nil {
 					t.Fatal(err)
 				}
