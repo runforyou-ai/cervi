@@ -3,7 +3,10 @@ name: cervi
 services:
   postgres:
     container_name: cervi-postgres
-    image: postgres:18-alpine
+    image: cervi-postgres:18-vector0.8.6
+    build:
+      context: .
+      dockerfile: build/docker/Dockerfile.postgres
     environment:
       POSTGRES_DB: main
       POSTGRES_USER: cervi

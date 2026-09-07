@@ -92,7 +92,7 @@ tasks:
 
   db:ensure:
     silent: true
-    summary: 确保当前工作区数据库已创建
+    summary: 确保当前工作区数据库和 haystack schema 已创建
     deps:
       - env:check:database
     preconditions:
@@ -106,11 +106,14 @@ tasks:
           "SELECT 1 FROM pg_database WHERE datname = '{{.POSTGRES_DB}}'")
         if [ "$exists" = "1" ]; then
           echo "数据库 {{.POSTGRES_DB}} 已存在"
-          exit 0
+        else
+          docker compose exec -T postgres \
+            createdb -U "{{.POSTGRES_USER}}" "{{.POSTGRES_DB}}"
+          echo "已创建数据库 {{.POSTGRES_DB}}"
         fi
         docker compose exec -T postgres \
-          createdb -U "{{.POSTGRES_USER}}" "{{.POSTGRES_DB}}"
-        echo "已创建数据库 {{.POSTGRES_DB}}"
+          psql -v ON_ERROR_STOP=1 -U "{{.POSTGRES_USER}}" -d "{{.POSTGRES_DB}}" \
+          -c 'CREATE SCHEMA IF NOT EXISTS haystack'
 
   db:test:reset:
     internal: true
@@ -160,6 +163,24 @@ tasks:
       - env:check:server
     cmds:
       - task: common:run:server
+
+  run:haystack:
+    summary: 运行当前工作区的 Haystack 向量验证脚本
+    deps:
+      - db:ensure
+    preconditions:
+      - sh: '{{if .HAYSTACK_PORT}}true{{else}}false{{end}}'
+        msg: "请在 .env 中配置 HAYSTACK_PORT"
+    cmds:
+      - uv run haystack/run.py
+    env:
+      POSTGRES_HOST: "{{.POSTGRES_HOST}}"
+      POSTGRES_PORT: "{{.POSTGRES_PORT}}"
+      POSTGRES_USER: "{{.POSTGRES_USER}}"
+      POSTGRES_PASSWORD: "{{.POSTGRES_PASSWORD}}"
+      POSTGRES_DB: "{{.POSTGRES_DB}}"
+      POSTGRES_SSLMODE: "{{.POSTGRES_SSLMODE}}"
+      HAYSTACK_PORT: "{{.HAYSTACK_PORT}}"
 
   build:docker:
     summary: Builds a Docker image for server mode deployment
