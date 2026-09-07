@@ -5,27 +5,20 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react"
-import {
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react"
+import { useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
   OrganizationIdentityType,
   isCustomerInboxConversation,
+  isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   type GroupConversationData,
   type InboxConversation,
   type MemberOption,
 } from "@/api"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
@@ -74,12 +67,17 @@ function InternalConversationProfile({
     conversation && isDirectInboxConversation(conversation)
       ? conversation.direct
       : null
+  const agent =
+    conversation && isAgentInboxConversation(conversation)
+      ? conversation.agent
+      : null
   const identityType =
+    agent ||
     (direct?.peerType ?? directTarget?.type) ===
-    OrganizationIdentityType.OrganizationIdentityTypeAgent
+      OrganizationIdentityType.OrganizationIdentityTypeAgent
       ? t("contextIdentityAgent")
       : t("contextIdentityMember")
-  const agentStatus = agentRunStatusLabel(direct?.agentRunStatus ?? null, t)
+  const agentStatus = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
 
   return (
     <dl className="space-y-1 text-sm">
@@ -94,14 +92,20 @@ function InternalConversationProfile({
               className="size-7 text-xs"
             />
           ) : directTarget ? (
-            <DirectConversationDraftAvatar member={directTarget} className="size-7 text-xs" />
+            <DirectConversationDraftAvatar
+              member={directTarget}
+              className="size-7 text-xs"
+            />
           ) : null}
-          <span className="min-w-0 truncate" title={displayName}>
-            {displayName}
+          <span
+            className="min-w-0 truncate"
+            title={agent?.agentName ?? displayName}
+          >
+            {agent?.agentName ?? displayName}
           </span>
         </dd>
       </div>
-      {direct || directTarget ? (
+      {direct || agent || directTarget ? (
         <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
           <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
             {t("contextIdentityType")}
@@ -109,7 +113,7 @@ function InternalConversationProfile({
           <dd className="flex min-h-8 items-center">{identityType}</dd>
         </div>
       ) : null}
-      {direct && agentStatus ? (
+      {agent && agentStatus ? (
         <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
           <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
             {t("contextAgentStatus")}
@@ -148,9 +152,13 @@ function ConversationContextContent({
 }) {
   const { t } = useTranslation("inbox")
   const customer =
-    conversation && isCustomerInboxConversation(conversation) ? conversation.customer : null
+    conversation && isCustomerInboxConversation(conversation)
+      ? conversation.customer
+      : null
   const group =
-    conversation && isGroupInboxConversation(conversation) ? conversation.group : null
+    conversation && isGroupInboxConversation(conversation)
+      ? conversation.group
+      : null
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
       {conversation && customer ? (
@@ -300,7 +308,8 @@ export function ConversationContextPane({
   onToggle: () => void
 }) {
   const { t } = useTranslation("inbox")
-  const [contextPanelWidth, setContextPanelWidth] = useState(contextPanelMinWidth)
+  const [contextPanelWidth, setContextPanelWidth] =
+    useState(contextPanelMinWidth)
   const [groupDraft, setGroupDraft] = useState<{
     conversationID: string
     group: GroupConversationData
@@ -311,9 +320,7 @@ export function ConversationContextPane({
       : null
 
   /** 结束拖动联系人上下文栏。 */
-  function stopContextPanelResize(
-    event: ReactPointerEvent<HTMLButtonElement>,
-  ) {
+  function stopContextPanelResize(event: ReactPointerEvent<HTMLButtonElement>) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
@@ -356,9 +363,7 @@ export function ConversationContextPane({
           type="button"
           className={cn(
             "absolute top-1/2 left-0 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center border border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground",
-            visible
-              ? "rounded-r-md border-l-0"
-              : "rounded-l-md border-r-0",
+            visible ? "rounded-r-md border-l-0" : "rounded-l-md border-r-0",
           )}
           aria-label={visible ? t("contextClose") : t("contextOpen")}
           title={visible ? t("contextClose") : t("contextOpen")}

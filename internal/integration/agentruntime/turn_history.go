@@ -29,7 +29,7 @@ func (h *turnHistory) appendInput(messages []Message) []*schema.Message {
 	return append([]*schema.Message(nil), h.messages...)
 }
 
-// appendOutput 保留已返回的标准消息，移除安全点抢占跳过的工具调用。
+// appendOutput 保留有效回复和完整工具交互，移除抢占跳过的调用及其空消息。
 func (h *turnHistory) appendOutput(messages []*schema.Message) {
 	completed := make(map[string]struct{})
 	for _, message := range messages {
@@ -38,7 +38,7 @@ func (h *turnHistory) appendOutput(messages []*schema.Message) {
 		}
 	}
 	for _, message := range messages {
-		if len(message.ToolCalls) == 0 {
+		if message.Role != schema.Assistant {
 			h.messages = append(h.messages, message)
 			continue
 		}
@@ -50,7 +50,8 @@ func (h *turnHistory) appendOutput(messages []*schema.Message) {
 				retained.ToolCalls = append(retained.ToolCalls, call)
 			}
 		}
-		if len(retained.ToolCalls) > 0 || retained.Content != "" || retained.ReasoningContent != "" {
+		// 思考内容不能独立构成 assistant 消息，仍由过程记录器保留用于展示。
+		if len(retained.ToolCalls) > 0 || retained.Content != "" {
 			h.messages = append(h.messages, &retained)
 		}
 	}

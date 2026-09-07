@@ -18,7 +18,7 @@ import {
   closeServiceSession,
   isApiError,
   isCustomerInboxConversation,
-  isDirectInboxConversation,
+  isAgentInboxConversation,
   isGroupInboxConversation,
   OrganizationIdentityType,
   listCustomerServiceAssignees,
@@ -79,14 +79,14 @@ export function ConversationHeader({
   const customer = isCustomerInboxConversation(conversation)
     ? conversation.customer
     : null
-  const direct = isDirectInboxConversation(conversation)
-    ? conversation.direct
+  const agent = isAgentInboxConversation(conversation)
+    ? conversation.agent
     : null
   const group = isGroupInboxConversation(conversation)
     ? conversation.group
     : null
   const agentRunLabel = agentRunStatusLabel(
-    direct?.agentRunStatus ?? null,
+    agent?.agentRunStatus ?? null,
     t,
   )
   const sessionOpen =
@@ -185,12 +185,13 @@ export function ConversationHeader({
                 ? t("groupDissolved")
                 : t("groupMemberCount", { count: group.memberCount })}
             </p>
-          ) : agentRunLabel ? (
+          ) : agent ? (
             <div
               data-slot="conversation-header-detail"
               className="w-fit max-w-full text-xs text-muted-foreground"
             >
-              {agentRunLabel}
+              {agent.agentName}
+              {agentRunLabel ? ` · ${agentRunLabel}` : ""}
             </div>
           ) : null}
         </div>

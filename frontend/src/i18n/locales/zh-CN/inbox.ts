@@ -1,5 +1,9 @@
 /** 简体中文·收件箱文案。 */
 const inbox = {
+  newAgentConversation: "创建 AI 聊天",
+  agentPickerTitle: "选择 AI 员工",
+  agentPickerDescription: "选择一位 AI 员工开始新的聊天。",
+  agentPickerEmpty: "暂无可用的 AI 员工",
   messageSendState: "发送状态",
   messageSendState_sending: "发送中",
   messageSendState_sent: "已发送",
@@ -149,7 +153,7 @@ const inbox = {
   groupAgent: "AI 员工",
   agentRunQueued: "思考中",
   agentRunRunning: "正在处理",
-  agentRunFailed: "处理失败",
+  agentRunFailed: "出错了",
   agentRunCancelled: "已中断",
   agentRunAssigneeChanged: "会话已转交",
   agentRunSessionClosed: "会话已关闭",

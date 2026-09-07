@@ -1,4 +1,4 @@
-/** 移动端单聊共用的时间线、发送和失败重试。 */
+/** 移动端真人与 AI 聊天共用的时间线、发送和失败重试。 */
 import { useState } from "react"
 
 import {
@@ -17,12 +17,14 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
 /** 草稿只展示本地发送状态，正式会话读取历史并在前台轮询。 */
-export function MobileDirectThread({
+export function MobileIndividualThread({
   conversationID,
-  sendDirectMessage,
+  conversationType = ConversationType.ConversationTypeDirect,
+  sendIndividualMessage,
 }: {
   conversationID: string
-  sendDirectMessage?: (
+  conversationType?: ConversationType
+  sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
 }) {
@@ -36,7 +38,7 @@ export function MobileDirectThread({
     <>
       <ConversationTimeline
         conversationID={conversationID}
-        conversationType={ConversationType.ConversationTypeDirect}
+        conversationType={conversationType}
         currentUser={identity.user}
         requireWindowFocus={false}
         enabled={Boolean(conversationID)}
@@ -48,11 +50,11 @@ export function MobileDirectThread({
       />
       <ConversationComposer
         conversationID={conversationID}
-        conversationType={ConversationType.ConversationTypeDirect}
+        conversationType={conversationType}
         retryFailedMessage
         retryDraft={retryDraft}
         onRetryDraftHandled={() => setRetryDraft(null)}
-        sendDirectMessage={sendDirectMessage}
+        sendIndividualMessage={sendIndividualMessage}
         onSucceeded={() => void invalidate(resourceKeys.inbox())}
         onSending={outgoing.start}
         onSent={outgoing.succeed}

@@ -1,17 +1,20 @@
-/** 移动端企业成员内部单聊详情。 */
+/** 移动端真人单聊与 AI 聊天详情。 */
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useParams } from "react-router"
 
 import {
+  ConversationType,
   CustomerInboxView,
   InboxScope,
+  isAgentInboxConversation,
   isDirectInboxConversation,
   loadInbox,
+  type AgentInboxConversationData,
   type DirectInboxConversationData,
   type InboxConversation,
 } from "@/api"
-import { MobileDirectThread } from "@/apps/mobile/mobile-direct-thread"
+import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -25,32 +28,32 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-const directInboxQuery = {
+const individualInboxQuery = {
   scope: InboxScope.InboxScopeInternal,
   customerView: CustomerInboxView.CustomerInboxViewQueue,
   assigneeIdentityId: "",
 }
 
-type MobileDirectLocationState = {
+type MobileIndividualLocationState = {
   conversation?: InboxConversation
   memberUserID?: string
 }
 
-/** 展示当前 Direct 的移动端头部。 */
-function MobileDirectHeader({
+/** 展示当前双方会话的移动端头部。 */
+function MobileIndividualHeader({
   conversation,
   peerName,
 }: {
-  conversation: DirectInboxConversationData | null
+  conversation: DirectInboxConversationData | AgentInboxConversationData | null
   peerName: string
 }) {
   const { t: tInbox } = useTranslation("inbox")
   const { inboxURL } = useMobileNavigation()
   const location = useLocation()
-  const memberUserID = (location.state as MobileDirectLocationState | null)
+  const memberUserID = (location.state as MobileIndividualLocationState | null)
     ?.memberUserID
   const agentRunLabel = agentRunStatusLabel(
-    conversation?.direct.agentRunStatus ?? null,
+    conversation?.agent?.agentRunStatus ?? null,
     tInbox,
   )
 
@@ -60,7 +63,10 @@ function MobileDirectHeader({
       title={
         <span className="flex items-center gap-3">
           {conversation ? (
-            <ConversationAvatar conversation={conversation} className="size-9" />
+            <ConversationAvatar
+              conversation={conversation}
+              className="size-9"
+            />
           ) : (
             <ProfileAvatar name={peerName} className="size-9" />
           )}
@@ -68,9 +74,10 @@ function MobileDirectHeader({
             <span className="block truncate text-base font-semibold">
               {peerName}
             </span>
-            {agentRunLabel ? (
+            {conversation?.agent ? (
               <span className="block text-xs font-normal text-muted-foreground">
-                {agentRunLabel}
+                {conversation.agent.agentName}
+                {agentRunLabel ? ` · ${agentRunLabel}` : ""}
               </span>
             ) : null}
           </span>
@@ -80,18 +87,23 @@ function MobileDirectHeader({
   )
 }
 
-/** 加载并显示移动端 Direct 历史和文本发送区。 */
-export function MobileDirectConversationPage() {
+/** 加载并显示移动端双方会话历史和文本发送区。 */
+export function MobileIndividualConversationPage({
+  conversationType,
+}: {
+  conversationType: ConversationType
+}) {
   const { t } = useTranslation("inbox")
   const { inboxURL } = useMobileNavigation()
   const location = useLocation()
   const { conversationID = "" } = useParams()
   const stateConversation = useMemo(() => {
-    // 从路由状态读取本次打开的 Direct 摘要。
-    const candidate = (location.state as MobileDirectLocationState | null)
+    // 从路由状态读取本次打开的会话摘要。
+    const candidate = (location.state as MobileIndividualLocationState | null)
       ?.conversation
     return candidate?.id === conversationID &&
-      isDirectInboxConversation(candidate)
+      (isDirectInboxConversation(candidate) ||
+        isAgentInboxConversation(candidate))
       ? candidate
       : null
   }, [conversationID, location.state])
@@ -99,8 +111,8 @@ export function MobileDirectConversationPage() {
     requireWindowFocus: false,
   })
   const { data, loading } = useResource(
-    resourceKeys.inbox(directInboxQuery),
-    () => loadInbox(directInboxQuery),
+    resourceKeys.inbox(individualInboxQuery),
+    () => loadInbox(individualInboxQuery),
     {
       staleTime: 0,
       refetchInterval: pollingActive ? memberChatPollingInterval : false,
@@ -113,24 +125,36 @@ export function MobileDirectConversationPage() {
   const matchedConversation = data?.conversations.find(
     (conversation) => conversation.id === conversationID,
   )
-  if (matchedConversation && !isDirectInboxConversation(matchedConversation)) {
+  if (
+    matchedConversation &&
+    !isDirectInboxConversation(matchedConversation) &&
+    !isAgentInboxConversation(matchedConversation)
+  ) {
     return <Navigate to={inboxURL} replace />
   }
   const conversation =
-    (matchedConversation && isDirectInboxConversation(matchedConversation)
+    (matchedConversation &&
+    (isDirectInboxConversation(matchedConversation) ||
+      isAgentInboxConversation(matchedConversation))
       ? matchedConversation
       : null) ?? stateConversation
-  const peerName = conversation?.direct.peerName.trim() || t("unknownSender")
+  const peerName =
+    (conversation?.agent?.title ?? conversation?.direct?.peerName)?.trim() ||
+    t("unknownSender")
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
-      <MobileDirectHeader conversation={conversation} peerName={peerName} />
+      <MobileIndividualHeader conversation={conversation} peerName={peerName} />
       {loading && !conversation ? (
         <LoadingIndicator className="min-h-0 flex-1 justify-center">
           {t("messagesLoading")}
         </LoadingIndicator>
       ) : (
-        <MobileDirectThread key={conversationID} conversationID={conversationID} />
+        <MobileIndividualThread
+          key={conversationID}
+          conversationID={conversationID}
+          conversationType={conversationType}
+        />
       )}
     </section>
   )

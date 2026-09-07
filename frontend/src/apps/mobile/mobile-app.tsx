@@ -1,8 +1,9 @@
 /** 移动端独立入口和路由。 */
+import { ConversationType } from "@/api"
 import { useEffect } from "react"
 import { Navigate, Route, Routes } from "react-router"
 
-import { MobileDirectConversationPage } from "@/apps/mobile/mobile-direct-conversation-page"
+import { MobileIndividualConversationPage } from "@/apps/mobile/mobile-individual-conversation-page"
 import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
 import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
 import { MobileGroupConversationPage } from "@/apps/mobile/mobile-group-conversation-page"
@@ -66,11 +67,26 @@ export default function MobileApp() {
               element={<MobileGroupConversationPage />}
             />
             <Route
+              path="/inbox/agent/:conversationID"
+              element={
+                <MobileIndividualConversationPage
+                  conversationType={ConversationType.ConversationTypeAgent}
+                />
+              }
+            />
+            <Route
               path="/inbox/direct/:conversationID"
-              element={<MobileDirectConversationPage />}
+              element={
+                <MobileIndividualConversationPage
+                  conversationType={ConversationType.ConversationTypeDirect}
+                />
+              }
             />
             <Route path="/me/settings" element={<MobileSettingsPage />} />
-            <Route path="/contacts/employees" element={<MobileEmployeesPage />} />
+            <Route
+              path="/contacts/employees"
+              element={<MobileEmployeesPage />}
+            />
             <Route
               path="/contacts/employees/:userID"
               element={<MobileEmployeeProfilePage />}

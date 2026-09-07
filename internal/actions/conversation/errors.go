@@ -10,6 +10,8 @@ import (
 )
 
 var (
+	// ErrAgentTargetNotFound 表示 AI 聊天目标不存在或不可用。
+	ErrAgentTargetNotFound = errors.New("AI conversation target not found")
 	// ErrMessageUnavailable 表示目标消息不存在或已经删除。
 	ErrMessageUnavailable = errors.New("conversation message unavailable")
 	// ErrMentionTargetInvalid 表示目标不是当前用户的提及。

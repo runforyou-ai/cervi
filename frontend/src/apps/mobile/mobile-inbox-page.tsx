@@ -7,13 +7,16 @@ import { useNavigate } from "react-router"
 
 import {
   isCustomerInboxConversation,
+  isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   InboxScope,
   ConversationStatus,
+  MessageType,
   loadInbox,
   ServiceSessionStatus,
   type CustomerInboxConversationData,
+  type AgentInboxConversationData,
   type DirectInboxConversationData,
   type InboxConversation,
   type GroupInboxConversationData,
@@ -44,15 +47,17 @@ import { cn } from "@/lib/utils"
 
 type MobileInboxConversation =
   | CustomerInboxConversationData
+  | AgentInboxConversationData
   | DirectInboxConversationData
   | GroupInboxConversationData
 
-/** 识别移动端展示的三种会话摘要。 */
+/** 识别移动端支持的会话摘要。 */
 function isMobileInboxConversation(
   conversation: InboxConversation,
 ): conversation is MobileInboxConversation {
   return (
     isCustomerInboxConversation(conversation) ||
+    isAgentInboxConversation(conversation) ||
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation)
   )
@@ -140,7 +145,10 @@ function MobileConversationRow({
 }: {
   conversation: MobileInboxConversation
   onOpen: (
-    conversation: DirectInboxConversationData | GroupInboxConversationData,
+    conversation:
+      | DirectInboxConversationData
+      | AgentInboxConversationData
+      | GroupInboxConversationData,
   ) => void
 }) {
   const { t } = useTranslation("inbox")
@@ -152,22 +160,26 @@ function MobileConversationRow({
   const directConversation = isDirectInboxConversation(conversation)
     ? conversation
     : null
+  const agent = isAgentInboxConversation(conversation)
+    ? conversation.agent
+    : null
   const groupConversation = isGroupInboxConversation(conversation)
     ? conversation
     : null
   const name = customerConversation
     ? (customerConversation.customer.contactName ?? t("anonymousVisitor"))
     : (
-        directConversation?.direct.peerName ?? groupConversation?.group.title
+        directConversation?.direct.peerName ??
+        (agent
+          ? `${agent.agentName} · ${agent.title}`
+          : groupConversation?.group.title)
       )?.trim() || t("unknownSender")
   const summary =
     customerConversation?.customer ??
     directConversation?.direct ??
+    agent ??
     groupConversation?.group
-  const agentRunLabel = agentRunStatusLabel(
-    directConversation?.direct.agentRunStatus ?? null,
-    t,
-  )
+  const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
   // 返回客服处理状态的移动端颜色。
   const customerSessionStatusClass =
     customerConversation?.customer.serviceSessionStatus ===
@@ -180,12 +192,20 @@ function MobileConversationRow({
     groupConversation?.group.status ===
     ConversationStatus.ConversationStatusArchived
       ? t("groupDissolved")
-      : (messagePreview(summary.preview ?? "", summary.previewSenderIdentityType) ||
+      : conversation.lastMessageType === MessageType.MessageTypeAgentError
+        ? t("agentRunFailed")
+        : messagePreview(
+          summary.preview ?? "",
+          summary.previewSenderIdentityType,
+        ) ||
         (groupConversation && conversation.lastMessageId
           ? t("groupSystemUpdated")
-          : t("messagesEmpty")))
+          : t("messagesEmpty"))
   const formattedTime = formatTime(summary.lastMessageAt)
-  const internalConversation = directConversation ?? groupConversation
+  const internalConversation =
+    directConversation ??
+    groupConversation ??
+    (isAgentInboxConversation(conversation) ? conversation : null)
 
   const content = (
     <>
@@ -346,9 +366,11 @@ export function MobileInboxPage() {
                 key={conversation.id}
                 conversation={conversation}
                 onOpen={(conversation) => {
-                  const type = isDirectInboxConversation(conversation)
-                    ? "direct"
-                    : "group"
+                  const type = isAgentInboxConversation(conversation)
+                    ? "agent"
+                    : isDirectInboxConversation(conversation)
+                      ? "direct"
+                      : "group"
                   navigate(`/inbox/${type}/${conversation.id}`, {
                     state: { conversation, mobileBack: true },
                   })

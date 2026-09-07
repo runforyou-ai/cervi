@@ -105,13 +105,13 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		t.Fatal(err)
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	first, err := conversationaction.NewSendFirstDirectTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstDirectTextMessageInput{
-		TargetIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "第一问",
+	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(),
+		AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "第一问",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.Conversation.PreviewSenderIdentityType == nil || *first.Conversation.PreviewSenderIdentityType != domain.OrganizationIdentityTypeUser {
+	if first.Conversation.Agent.PreviewSenderIdentityType == nil || *first.Conversation.Agent.PreviewSenderIdentityType != domain.OrganizationIdentityTypeUser {
 		t.Fatalf("first message preview identity = %#v", first.Conversation)
 	}
 	// 运行状态与成功回复从同一 AI 身份读取头像。
@@ -151,13 +151,13 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if history.LatestAgentRun == nil || history.LatestAgentRun.AgentAvatarFileID == nil || *history.LatestAgentRun.AgentAvatarFileID != avatarID || history.Messages[1].Sender == nil || history.Messages[1].Sender.AvatarFileID == nil || *history.Messages[1].Sender.AvatarFileID != avatarID {
 		t.Fatalf("completed agent avatars = %#v, sender = %#v", history.LatestAgentRun, history.Messages[1].Sender)
 	}
-	send := conversationaction.NewSendDirectTextMessageAction(db, scheduler)
+	send := conversationaction.NewSendAgentTextMessageAction(db, scheduler)
 	for i := range 101 {
-		if _, err := send.Execute(ctx, identity, conversationaction.DirectTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: fmt.Sprintf("普通消息 %d", i)}); err != nil {
+		if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: fmt.Sprintf("普通消息 %d", i)}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	input := conversationaction.DirectTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对引用提问", ReplyToMessageID: *initialRun.ResponseMessageID}
+	input := conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对引用提问", ReplyToMessageID: *initialRun.ResponseMessageID}
 	reply, err := send.Execute(ctx, identity, input)
 	if err != nil {
 		t.Fatal(err)

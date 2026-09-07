@@ -38,7 +38,7 @@ func (a *UpdateConversationNotificationSettingsAction) Execute(ctx context.Conte
 		if err != nil {
 			return err
 		}
-		if member.Conversation.Type == string(domain.ConversationTypeDirect) && member.Conversation.Status != string(domain.ConversationStatusActive) {
+		if member.Conversation.Type != string(domain.ConversationTypeGroup) && member.Conversation.Status != string(domain.ConversationStatusActive) {
 			return ErrConversationNotFound
 		}
 		state := &servermodels.ConversationUserState{
