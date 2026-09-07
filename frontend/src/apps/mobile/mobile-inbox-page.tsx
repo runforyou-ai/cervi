@@ -307,7 +307,8 @@ export function MobileInboxPage() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon-lg"
+                size="icon-sm"
+                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
                 aria-label={t("inbox.add")}
               >
                 <PlusIcon />

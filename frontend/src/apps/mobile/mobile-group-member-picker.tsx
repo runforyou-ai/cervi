@@ -56,7 +56,6 @@ export function MobileGroupMemberPicker({
           {tInbox("groupMembersSelected", { count: selected.length })}
         </span>
       </div>
-      <p className="text-xs text-muted-foreground">{t("group.creatorIncluded")}</p>
       <div className="h-20 overflow-y-auto" aria-label={t("group.selectedMembers")}>
         {selected.length ? (
           <ul className="flex flex-wrap gap-2">

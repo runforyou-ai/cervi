@@ -53,7 +53,6 @@ const mobile = {
   group: {
     create: "Start group chat",
     complete: "Done",
-    creatorIncluded: "You will join automatically. Select 1–99 other members.",
     selectedMembers: "Selected members",
     removeMember: "Remove {{name}}",
     remove: "Remove",

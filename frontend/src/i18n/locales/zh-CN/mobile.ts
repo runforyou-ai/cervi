@@ -53,7 +53,6 @@ const mobile = {
   group: {
     create: "发起群聊",
     complete: "完成",
-    creatorIncluded: "你将自动加入群聊，再选择 1–99 位企业成员。",
     selectedMembers: "已选成员",
     removeMember: "移除 {{name}}",
     remove: "移除",
