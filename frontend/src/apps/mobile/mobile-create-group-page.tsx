@@ -105,7 +105,6 @@ export function MobileCreateGroupPage() {
           <Button
             type="submit"
             form="mobile-create-group"
-            className="min-h-11"
             disabled={saving || !title.trim() || field.value.length === 0}
           >
             {t("group.complete")}
