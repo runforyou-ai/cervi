@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import {
+  listCustomerMessageDeliveries,
   ChatSubjectKind,
   ConversationSystemEventType,
   ConversationType,
@@ -19,6 +20,10 @@ import {
   type ConversationSystemEventParticipant,
   type GroupParticipant,
 } from "@/api"
+import { CustomerDeliveryState } from "./customer-delivery-state"
+import { MessageSendState } from "./message-send-state"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { messagePreview } from "@/lib/message-preview"
 import { openExternalURL } from "@/platform/external-navigation"
@@ -69,6 +74,7 @@ type TimelineMessage = Pick<
   | "mentionAll"
   | "agentProcess"
 > & {
+  persistedMessageID: string | null
   clientMessageID: string | null
   mentionSubjectIDs: string[]
   mentionAllToken: OutgoingConversationDraft["mentionAllToken"]
@@ -107,6 +113,7 @@ function mergeTimelineMessages(
   )
   const messages: TimelineMessage[] = current.map((message) => ({
     ...message,
+    persistedMessageID: message.id,
     clientMessageID: null,
     mentionSubjectIDs: [],
     mentionAllToken: null,
@@ -121,6 +128,7 @@ function mergeTimelineMessages(
       continue
     messages.push({
       id: `local:${message.clientMessageID}`,
+      persistedMessageID: message.saved?.id ?? null,
       type: MessageType.MessageTypeText,
       body: message.body,
       originatedAt: message.originatedAt,
@@ -206,6 +214,7 @@ function ConversationTimelineContent({
   currentUser,
   requireWindowFocus = true,
   workspaceLayout = false,
+  customerDeliveries = false,
   outgoingMessages,
   onRetryFailedMessage,
   retryFailedMessageDisabled = false,
@@ -223,6 +232,7 @@ function ConversationTimelineContent({
   currentUser: CurrentUser
   requireWindowFocus?: boolean
   workspaceLayout?: boolean
+  customerDeliveries?: boolean
   outgoingMessages: OutgoingConversationMessage[]
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
   retryFailedMessageDisabled?: boolean
@@ -254,6 +264,21 @@ function ConversationTimelineContent({
     timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
+  // 使用窗口内持久消息编号查询投递，历史窗口也能刷新原有消息的状态。
+  const deliveryMessageIDs = visibleMessages
+    .flatMap((message) => message.persistedMessageID ? [message.persistedMessageID] : [])
+    .sort()
+    .join(",")
+  const deliveries = useResource(
+    resourceKeys.customerDeliveries(conversationID, deliveryMessageIDs),
+    () => listCustomerMessageDeliveries(conversationID, deliveryMessageIDs),
+    {
+      enabled: enabled && customerDeliveries && Boolean(deliveryMessageIDs),
+      keepPreviousData: true,
+      refetchInterval: pollingActive ? 2000 : false,
+    },
+  )
+  const deliveriesByMessage = new Map(deliveries.data?.deliveries.map((delivery) => [delivery.messageId, delivery]))
   const viewport = useConversationViewport({
     root: scrollRootRef,
     page: currentPage,
@@ -749,18 +774,6 @@ function ConversationTimelineContent({
                             incoming ? "ml-10 items-start" : "mr-10 items-end",
                           )}
                         >
-                          {!workspaceLayout ? (
-                            <time
-                              dateTime={message.originatedAt}
-                              title={dateFormatters.full.format(date)}
-                              className="text-[11px] text-muted-foreground/80"
-                            >
-                              {formatMessageTime(
-                                dateFormatters.sessionTime,
-                                date,
-                              )}
-                            </time>
-                          ) : null}
                           {conversationType ===
                             ConversationType.ConversationTypeGroup &&
                           (!workspaceLayout || incoming) &&
@@ -860,12 +873,7 @@ function ConversationTimelineContent({
                                   {message.agentProcess ? (
                                     <AgentProcess process={message.agentProcess} incoming={incoming} />
                                   ) : null}
-                                  <div
-                                    className={cn(
-                                      "min-w-0",
-                                      workspaceLayout && "flex items-end gap-2",
-                                    )}
-                                  >
+                                  <div className="flex min-w-0 items-end gap-2">
                                     {message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
                                         <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
@@ -873,20 +881,51 @@ function ConversationTimelineContent({
                                     ) : (
                                       <span className="min-w-0 whitespace-pre-wrap">{renderMessageBody(message)}</span>
                                     )}
-                                    {workspaceLayout ? (
+                                    <div
+                                      className={cn(
+                                        "inline-flex shrink-0 translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
+                                        incoming
+                                          ? "text-muted-foreground"
+                                          : "text-primary-foreground/75",
+                                      )}
+                                    >
                                       <time
                                         dateTime={message.originatedAt}
                                         title={dateFormatters.full.format(date)}
-                                        className={cn(
-                                          "shrink-0 translate-y-0.5 text-[10px]",
-                                          incoming
-                                            ? "text-muted-foreground"
-                                            : "text-primary-foreground/75",
-                                        )}
                                       >
-                                        {dateFormatters.clock.format(date)}
+                                        {workspaceLayout
+                                          ? dateFormatters.clock.format(date)
+                                          : formatMessageTime(dateFormatters.sessionTime, date)}
                                       </time>
-                                    ) : null}
+                                      {customerDeliveries && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
+                                        <CustomerDeliveryState
+                                          conversationID={conversationID}
+                                          delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
+                                          loadingError={Boolean(message.persistedMessageID && deliveries.error)}
+                                          onRefresh={() => void deliveries.refresh()}
+                                          localFailed={message.deliveryStatus === "failed"}
+                                          onRetryLocal={failedDraft && onRetryFailedMessage ? () => onRetryFailedMessage(failedDraft) : undefined}
+                                          retryLocalDisabled={retryFailedMessageDisabled}
+                                        />
+                                      ) : message.deliveryStatus ? (
+                                        <div className="inline-flex items-center gap-1.5 text-[11px]">
+                                          <MessageSendState
+                                            state={message.deliveryStatus === "failed" ? "attention" : "sending"}
+                                            detail={message.deliveryStatus === "failed" ? t("messageSendError") : undefined}
+                                          />
+                                          {failedDraft && onRetryFailedMessage ? (
+                                            <button
+                                              type="button"
+                                              className="underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                                              disabled={retryFailedMessageDisabled}
+                                              onClick={() => onRetryFailedMessage(failedDraft)}
+                                            >
+                                              {t("messageRetry")}
+                                            </button>
+                                          ) : null}
+                                        </div>
+                                      ) : null}
+                                    </div>
                                   </div>
                                   {message.agentProcess ? (
                                     <AgentProcessUsage process={message.agentProcess} incoming={incoming} />
@@ -895,42 +934,6 @@ function ConversationTimelineContent({
                               </div>
                             </ContextMenuTrigger>
                           </div>
-                          {failedDraft && onRetryFailedMessage ? (
-                            <div
-                              className="flex items-center gap-1.5 text-[11px] text-destructive"
-                              role="status"
-                            >
-                              <span>{t("messageSendError")}</span>
-                              <button
-                                type="button"
-                                className="underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
-                                disabled={retryFailedMessageDisabled}
-                                onClick={() =>
-                                  onRetryFailedMessage(failedDraft)
-                                }
-                              >
-                                {t("messageRetry")}
-                              </button>
-                            </div>
-                          ) : message.deliveryStatus ? (
-                            <span
-                              className={cn(
-                                "text-[11px]",
-                                message.deliveryStatus === "failed"
-                                  ? "text-destructive"
-                                  : "text-muted-foreground",
-                              )}
-                              role={
-                                message.deliveryStatus === "failed"
-                                  ? "status"
-                                  : undefined
-                              }
-                            >
-                              {message.deliveryStatus === "failed"
-                                ? t("messageSendError")
-                                : t("messageSending")}
-                            </span>
-                          ) : null}
                         </div>
                       </article>
                       <ContextMenuContent>

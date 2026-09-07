@@ -857,6 +857,7 @@ customer_message_deliveries
 ├── message_id
 ├── channel_id
 ├── contact_channel_identity_id
+├── bot_id                         # Telegram 投递使用的机器人编号
 ├── position
 ├── status
 ├── attempt
@@ -876,7 +877,7 @@ customer_message_deliveries
 ```text
 UNIQUE (organization_id, message_id)
 UNIQUE (channel_id, contact_channel_identity_id, position)
-UNIQUE (channel_id, contact_channel_identity_id, provider_message_id)
+UNIQUE (channel_id, bot_id, contact_channel_identity_id, provider_message_id)
     WHERE provider_message_id IS NOT NULL
 UNIQUE (channel_id, contact_channel_identity_id)
     WHERE status IN ('sending', 'uncertain')
@@ -904,6 +905,8 @@ customer_channel_send_gates
 `customer_conversations` 继续只表达客户会话与渠道身份的业务关系，不加入 dirty、Worker lease 或 FloodWait 等投递运行字段。TDLib 和联邦也不复用 `customer_message_deliveries`。
 
 ### 10.6 外部投递状态机
+
+成员端消息气泡只展示三种产品状态：发送中（时钟）、已发送（对勾）和需要关注（提醒）。本地提交、排队、平台调用和自动重试共用发送中图标；失败、渠道停用和发送结果未确认归入需要关注，具体原因及处理方式在提示和操作入口中表达。数据库投递状态不直接作为用户可见状态，发送结果未确认也不等同于发送失败。
 
 外部平台调用结果分为确定成功、确定未受理和结果未知。状态机至少包括：
 
@@ -1263,6 +1266,8 @@ P3 typing、presence 等临时事件
 - 本子阶段只实现文本，不包含文件、外部平台投递和统一实时基础设施。
 
 #### 阶段 1B：Telegram Bot 客服私聊
+
+当前工作区已实现人工客服私聊文本外发、投递状态和人工处理；AI、引用和媒体仍不在本次范围。`TxEnqueuer.EnqueueIn` 已由现有任务运行时提供。
 
 - Telegram Bot 是第一种真正调用外部平台收发消息的客服适配器，首版只接私聊。
 - 在本子阶段提取网站与 Telegram 共用的客户文本事务能力；各 Adapter 保留验签、来源时间、幂等和平台规则。

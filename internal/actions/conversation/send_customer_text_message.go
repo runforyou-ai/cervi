@@ -13,10 +13,12 @@ import (
 	"unicode/utf8"
 	"uuid"
 
+	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -28,7 +30,8 @@ var memberMessageRetryableConstraintNames = map[string]struct{}{
 
 // SendCustomerTextMessageAction 持久化企业成员的客户会话文本回复。
 type SendCustomerTextMessageAction struct {
-	db *bun.DB
+	enqueuer servertask.TxEnqueuer
+	db       *bun.DB
 }
 
 type memberMessageIDs struct {
@@ -60,8 +63,8 @@ type idempotentMemberMessageRow struct {
 }
 
 // NewSendCustomerTextMessageAction 创建成员客户会话回复操作。
-func NewSendCustomerTextMessageAction(db *bun.DB) *SendCustomerTextMessageAction {
-	return &SendCustomerTextMessageAction{db: db}
+func NewSendCustomerTextMessageAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *SendCustomerTextMessageAction {
+	return &SendCustomerTextMessageAction{db: db, enqueuer: enqueuer}
 }
 
 // Execute 在一个可重试事务中写入成员客户会话回复。
@@ -106,12 +109,19 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 		return ConversationMessage{}, err
 	}
+	route, err := deliveryaction.Prepare(ctx, tx, identity.Organization.ID, input.ConversationID)
+	if errors.Is(err, deliveryaction.ErrUnavailable) {
+		return ConversationMessage{}, ErrConversationNotFound
+	}
+	if err != nil {
+		return ConversationMessage{}, err
+	}
 	conversation, err := loadCustomerConversationForReply(ctx, tx, identity.Organization.ID, input.ConversationID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	if err := ensureCustomerConversationOutboundSupported(ctx, tx, identity.Organization.ID, conversation.ID); err != nil {
-		return ConversationMessage{}, err
+	if route.ChannelType != domain.ChannelTypeWebsite && route.ChannelType != domain.ChannelTypeTelegram {
+		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelOutboundUnsupported}
 	}
 	session, err := lockCurrentServiceSession(ctx, tx, identity.Organization.ID, conversation.ID)
 	if err != nil {
@@ -121,6 +131,14 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		return saved, err
 	}
 
+	if route.ChannelType == domain.ChannelTypeTelegram {
+		if !route.Enabled || route.BotID == nil {
+			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelOutboundUnavailable}
+		}
+		if input.ReplyToMessageID != "" {
+			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
+		}
+	}
 	// 取得客服周期锁后生成消息时间，避免等待期间的消息落到已读水位之前。
 	originatedAt := time.Now().UTC()
 	// 计算成员回复对应的客服周期状态迁移。
@@ -166,6 +184,11 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		Exec(ctx); err != nil {
 		return ConversationMessage{}, fmt.Errorf("create member customer message: %w", err)
 	}
+	if route.ChannelType == domain.ChannelTypeTelegram {
+		if err := deliveryaction.Enqueue(ctx, tx, a.enqueuer, route, message); err != nil {
+			return ConversationMessage{}, err
+		}
+	}
 	// 只记录客服处理周期的首次成员响应时间。
 	if _, err := tx.NewUpdate().Model(session).
 		Set("first_response_at = COALESCE(first_response_at, ?)", originatedAt).
@@ -184,29 +207,6 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	result := memberConversationMessage(message, subject.ID, identity.OrganizationIdentity)
 	result.ReplyTo = replyTo
 	return result, nil
-}
-
-// ensureCustomerConversationOutboundSupported 校验客户会话来源渠道已实现外发。
-func ensureCustomerConversationOutboundSupported(ctx context.Context, db bun.IDB, organizationID, conversationID string) error {
-	var channelType string
-	err := db.NewSelect().
-		TableExpr("customer_conversations AS cc").
-		ColumnExpr("ch.type").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
-		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
-		Where("cc.organization_id = ?", organizationID).
-		Where("cc.conversation_id = ?", conversationID).
-		Scan(ctx, &channelType)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrDataInvariant
-	}
-	if err != nil {
-		return fmt.Errorf("load customer conversation outbound channel: %w", err)
-	}
-	if domain.ChannelType(channelType) != domain.ChannelTypeWebsite {
-		return &ConflictError{Reason: ConflictReasonChannelOutboundUnsupported}
-	}
-	return nil
 }
 
 // normalizeCustomerTextMessageInput 规范化并校验成员客户消息输入。

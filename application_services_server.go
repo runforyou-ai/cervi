@@ -7,6 +7,7 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
@@ -64,11 +65,22 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: fileaction.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,
 	})
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, knowledgeSearch)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, knowledgeSearch, tasks)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
+	deliveryWorker := deliveryaction.NewWorker(appStorage.DB(), telegramAPI, tasks)
+	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, deliveryWorker.Execute); err != nil {
+		return nil, err
+	}
+	if err := tasks.Registry().RegisterJSON(deliveryaction.ScanActionName, deliveryWorker.Scan); err != nil {
+		return nil, err
+	}
+	tasks.RegisterSchedule(servertask.ScheduleDefinition{
+		Key: "customer-delivery-scan", ActionName: deliveryaction.ScanActionName, Queue: "maintenance",
+		Payload: struct{}{}, CronExpression: "@every 5s", Timezone: "UTC", Enabled: true, MaxAttempts: 1, StartImmediately: true,
+	})
 	getS3Setting := settingaction.NewGetS3SettingQuery(appStorage.DB())
 	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
 		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
