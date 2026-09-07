@@ -60,12 +60,12 @@ export function ConversationTargetPickerDialog({
         <ScrollArea className="min-h-64 rounded-md border">
           {loading ? (
             <LoadingIndicator className="min-h-64 justify-center">
-              {t("directPickerLoading")}
+              {t("agentPickerLoading")}
             </LoadingIndicator>
           ) : error ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                {t("directPickerLoadError")}
+                {t("agentPickerLoadError")}
               </p>
               <Button
                 type="button"
@@ -89,7 +89,6 @@ export function ConversationTargetPickerDialog({
                   type="button"
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted"
                   onClick={() => {
-                    // 每次选择都进入新的 AI 聊天草稿。
                     onSelected(member)
                     onOpenChange(false)
                   }}

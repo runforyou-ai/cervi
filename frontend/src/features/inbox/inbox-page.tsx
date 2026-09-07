@@ -1442,7 +1442,9 @@ export function InboxPage({
   }, [conversations])
 
   const activeChatDraft =
-    scope === InboxScope.InboxScopeInternal && !selectedConversationId
+    !targetIdentityId &&
+    scope === InboxScope.InboxScopeInternal &&
+    !selectedConversationId
       ? chatDraft
       : null
   useEffect(() => {
@@ -1451,7 +1453,7 @@ export function InboxPage({
     }
   }, [scope, selectedConversationId])
   const selectedPool = listLoading ? allConversations : scopedConversations
-  const selectedFromPool = activeChatDraft
+  const selectedFromPool = targetIdentityId || activeChatDraft
     ? undefined
     : (selectedPool.find(
         (conversation) => conversation.id === selectedConversationId,
@@ -1483,7 +1485,7 @@ export function InboxPage({
     scopedConversations,
     selectedConversationId,
   ])
-  const selectedConversation = activeChatDraft
+  const selectedConversation = targetIdentityId || activeChatDraft
     ? undefined
     : selectedConversationSnapshot?.id === selectedConversationId &&
         selectedPool.some(
@@ -1532,7 +1534,7 @@ export function InboxPage({
     void invalidate(resourceKeys.inbox(destination), { exact: true })
     if (destinationIdentity === inboxQueryIdentity(currentInboxQuery)) {
       if (nextConversationId) {
-        onSelectedConversationChange(nextConversationId)
+        onSelectedConversationChange(nextConversationId, Boolean(targetIdentityId))
       }
       return
     }
@@ -1541,7 +1543,7 @@ export function InboxPage({
       customerView: destination.customerView,
       assigneeIdentityId: destination.assigneeIdentityId,
       conversationId: nextConversationId,
-      replace: nextConversationId ? false : undefined,
+      replace: nextConversationId ? Boolean(targetIdentityId) : undefined,
     })
   }
 
@@ -1771,7 +1773,11 @@ export function InboxPage({
         paneClassName="transition-[width]"
         pane={pane}
       >
-        {isNarrowViewport ? null : selection ? (
+        {isNarrowViewport ? null : targetIdentityId ? (
+          <LoadingIndicator className="flex-1 justify-center">
+            {t("chatTargetLoading")}
+          </LoadingIndicator>
+        ) : selection ? (
           <section className="min-h-0 flex-1">
             <ConversationMain
               selection={selection}
@@ -1840,7 +1846,11 @@ export function InboxPage({
           identityId={targetIdentityId}
           currentIdentityId={identity.user.identityId}
           onSelected={showChatDraft}
-          onFailed={() => onQueryChange({ conversationId: selectedConversationId })}
+          onFailed={() => {
+            // 打开失败时结束旧草稿并回到内部会话列表。
+            setChatDraft(null)
+            onQueryChange({ conversationId: "" })
+          }}
         />
       ) : null}
       <ConversationTargetPickerDialog

@@ -1,5 +1,5 @@
 /** 解析通讯录传入的聊天对象并打开对应会话或草稿。 */
-import { useEffect, useEffectEvent } from "react"
+import { useEffect, useEffectEvent, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -32,6 +32,7 @@ export function InboxConversationTarget({
   onFailed: () => void
 }) {
   const { t } = useTranslation("inbox")
+  const completedRef = useRef(false)
   const members = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
     staleTime: 0,
   })
@@ -49,6 +50,13 @@ export function InboxConversationTarget({
     members.refreshing ||
     (direct && (lookup.loading || lookup.refreshing))
   const complete = useEffectEvent(() => {
+    if (completedRef.current) return
+    if (
+      !error && member && identityId !== currentIdentityId && direct &&
+      lookup.data === undefined
+    ) return
+    // 同一入口只落地一次，查询刷新和重复 effect 不再重建草稿。
+    completedRef.current = true
     if (error) {
       if (isApiError(error) && sessionPath(error.state)) return
       console.warn("打开通讯录聊天失败", { identityId, error })
@@ -61,7 +69,7 @@ export function InboxConversationTarget({
     } else if (!member || identityId === currentIdentityId) {
       toast.error(t("chatTargetUnavailable"))
       onFailed()
-    } else if (!direct || lookup.data !== undefined) {
+    } else {
       onSelected(member, direct ? (lookup.data ?? null) : null)
     }
   })
