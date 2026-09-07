@@ -330,7 +330,7 @@ export function KnowledgeDocumentListPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border bg-card">
-            <Table className="[&_th]:text-left [&_td]:text-left">
+            <Table className="text-left">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{t("documents.columns.name")}</TableHead>
@@ -338,7 +338,7 @@ export function KnowledgeDocumentListPage() {
                   <TableHead>{t("documents.columns.wordCount")}</TableHead>
                   <TableHead>{t("documents.columns.hitCount")}</TableHead>
                   <TableHead>{t("documents.columns.createdAt")}</TableHead>
-                  <TableHead>
+                  <TableHead className="text-right">
                     {t("documents.columns.actions")}
                   </TableHead>
                 </TableRow>
@@ -380,7 +380,7 @@ export function KnowledgeDocumentListPage() {
                           ? formatDateTime(document.createdAt)
                           : "—"}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">
+                      <TableCell className="text-right whitespace-nowrap">
                         <Button variant="outline" size="sm" asChild>
                           <Link
                             to={`/knowledge-bases/${knowledgeBaseId}/documents/${encodeURIComponent(document.id)}`}
