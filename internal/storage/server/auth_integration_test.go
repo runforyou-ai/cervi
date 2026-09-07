@@ -56,7 +56,7 @@ func assertDirectAgentRunStatus(t *testing.T, conversations []inboxaction.Conver
 		if conversation.ID != conversationID {
 			continue
 		}
-		if conversation.Direct == nil || conversation.Direct.PeerType != domain.OrganizationIdentityTypeAgent || conversation.Direct.AgentRunStatus == nil || *conversation.Direct.AgentRunStatus != status || conversation.Direct.Preview == nil || *conversation.Direct.Preview != preview {
+		if conversation.Agent == nil || conversation.Type != domain.ConversationTypeAgent || conversation.Agent.AgentRunStatus == nil || *conversation.Agent.AgentRunStatus != status || conversation.Agent.Preview == nil || *conversation.Agent.Preview != preview {
 			t.Fatalf("agent inbox conversation = %#v", conversation)
 		}
 		return
@@ -950,7 +950,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		start := conversationaction.NewSendFirstDirectTextMessageAction(db, nil)
+		start := conversationaction.NewSendFirstDirectTextMessageAction(db)
 		startGate := make(chan struct{})
 		startResults := make(chan conversationaction.FirstDirectTextMessageResult, 2)
 		startErrors := make(chan error, 2)
@@ -1050,8 +1050,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				unreadBeforeDirectMessage = item.UnreadCount
 			}
 		}
-		send := conversationaction.NewSendDirectTextMessageAction(db, nil)
-		message, err := send.Execute(context.Background(), memberLogin.Identity, conversationaction.DirectTextMessageInput{
+		send := conversationaction.NewSendDirectTextMessageAction(db)
+		message, err := send.Execute(context.Background(), memberLogin.Identity, conversationaction.InternalTextMessageInput{
 			ConversationID:  conversationID,
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
 			Body:            "你好，管理员",
@@ -1098,7 +1098,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
 			ConversationID:  conversationID,
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f66",
 			Body:            "归档后发送",
@@ -1874,23 +1874,23 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("working agent = %#v, error = %v", updatedAgent, err)
 		}
 
-		agentStart, err := conversationaction.NewSendFirstDirectTextMessageAction(db, scheduler).Execute(context.Background(), loggedIn.Identity, conversationaction.FirstDirectTextMessageInput{
-			TargetIdentityID: createdAgent.IdentityID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7",
+		agentStart, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(context.Background(), loggedIn.Identity, conversationaction.FirstAgentTextMessageInput{ConversationID: "0198ddf0-a234-7f01-8d99-e3e0af0f5fff",
+			AgentIdentityID: createdAgent.IdentityID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7",
 		})
-		if err != nil || agentStart.Conversation.PeerType != domain.OrganizationIdentityTypeAgent {
+		if err != nil || agentStart.Conversation.Agent.AgentIdentityID != createdAgent.IdentityID {
 			t.Fatalf("agent direct conversation = %#v, error = %v", agentStart.Conversation, err)
 		}
 		agentConversation := agentStart.Conversation
-		sendAgentMessage := conversationaction.NewSendDirectTextMessageAction(db, scheduler)
-		firstAgentMessage := conversationaction.FirstDirectTextMessageInput{TargetIdentityID: createdAgent.IdentityID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7"}
-		firstRetriedResult, err := conversationaction.NewSendFirstDirectTextMessageAction(db, scheduler).Execute(context.Background(), loggedIn.Identity, firstAgentMessage)
+		sendAgentMessage := conversationaction.NewSendAgentTextMessageAction(db, scheduler)
+		firstAgentMessage := conversationaction.FirstAgentTextMessageInput{ConversationID: "0198ddf0-a234-7f01-8d99-e3e0af0f5fff", AgentIdentityID: createdAgent.IdentityID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7"}
+		firstRetriedResult, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(context.Background(), loggedIn.Identity, firstAgentMessage)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if firstRetriedResult.Message.ID != agentStart.Message.ID {
 			t.Fatalf("idempotent agent message = %#v", firstRetriedResult.Message)
 		}
-		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f71", Body: "只给我最终结果",
 		}); err != nil {
 			t.Fatal(err)
@@ -2188,7 +2188,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 		}
 
-		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f72", Body: "这次模拟模型失败",
 		}); err != nil {
 			t.Fatal(err)
@@ -2230,7 +2230,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("failed run message state = %#v, error = %v", failedHistory, err)
 		}
 
-		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f73", Body: "失败后继续",
 		}); err != nil {
 			t.Fatal(err)
@@ -2258,7 +2258,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if state.ProcessedSeq != 4 || exhaustedRun.Status != string(domain.AgentRunStatusFailed) || exhaustedRun.TriggerEndSeq == nil || *exhaustedRun.TriggerEndSeq != 4 {
 			t.Fatalf("exhausted agent run = %#v, state = %#v", exhaustedRun, state)
 		}
-		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.DirectTextMessageInput{
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f74", Body: "耗尽后继续",
 		}); err != nil {
 			t.Fatal(err)
@@ -2277,6 +2277,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		t.Run("Agent 单聊引用", func(t *testing.T) {
 			testAgentDirectReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
+		t.Run("独立 AI 聊天", func(t *testing.T) {
+			testAgentConversations(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 客服引用", func(t *testing.T) {

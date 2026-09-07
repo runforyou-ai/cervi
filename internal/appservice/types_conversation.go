@@ -305,3 +305,24 @@ type ConversationMentionReview struct {
 	ReviewedThroughSequence  string                           `json:"reviewedThroughSequence"`
 	Outcome                  ConversationMentionReviewOutcome `json:"outcome"`
 }
+
+// FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息。
+type FirstAgentTextMessageInput struct {
+	ConversationID  string `json:"conversationId"`
+	AgentIdentityID string `json:"agentIdentityId"`
+	ClientMessageID string `json:"clientMessageId"`
+	Body            string `json:"body"`
+}
+
+// FirstAgentTextMessageResult 定义首次发送确认的 AI 会话和消息。
+type FirstAgentTextMessageResult struct {
+	Conversation InboxConversation   `json:"conversation"`
+	Message      ConversationMessage `json:"message"`
+}
+
+// AgentTextMessageInput 定义发给 AI 会话的成员消息。
+type AgentTextMessageInput struct {
+	ClientMessageID  string `json:"clientMessageId"`
+	Body             string `json:"body"`
+	ReplyToMessageID string `json:"replyToMessageId"`
+}

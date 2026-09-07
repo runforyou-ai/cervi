@@ -57,6 +57,17 @@ type DirectConversationSummary struct {
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	LastMessageAt             *time.Time
+}
+
+// AgentConversationSummary 定义收件箱中的 AI 聊天详情。
+type AgentConversationSummary struct {
+	Title                     string
+	AgentIdentityID           string
+	AgentName                 string
+	AgentAvatarFileID         *string
+	Preview                   *string
+	PreviewSenderIdentityType *domain.OrganizationIdentityType
+	LastMessageAt             *time.Time
 	AgentRunStatus            *domain.AgentRunStatus
 }
 
@@ -82,6 +93,7 @@ type ConversationSummary struct {
 	LastMessageID        *string
 	LastReadMessageID    *string
 	Customer             *CustomerConversationSummary
+	Agent                *AgentConversationSummary
 	Direct               *DirectConversationSummary
 	Group                *GroupConversationSummary
 	sortAt               *time.Time
@@ -89,7 +101,7 @@ type ConversationSummary struct {
 
 // LoadInboxQuery 读取当前企业的统一收件箱。
 type LoadInboxQuery struct {
-	db *bun.DB
+	db bun.IDB
 }
 
 // UnreadCounts 定义内部会话的客观未读和提醒未读总数。
@@ -129,6 +141,23 @@ type directConversationRow struct {
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
+	SortAt                    *time.Time                       `bun:"sort_at"`
+	UnreadCount               int                              `bun:"unread_count"`
+	LastMessageID             *string                          `bun:"last_message_id"`
+	LastReadMessageID         *string                          `bun:"last_read_message_id"`
+	Muted                     bool                             `bun:"muted"`
+	MarkedUnread              bool                             `bun:"marked_unread"`
+}
+
+type agentConversationRow struct {
+	Title                     string                           `bun:"title"`
+	ID                        string                           `bun:"id"`
+	AgentIdentityID           string                           `bun:"agent_identity_id"`
+	AgentName                 string                           `bun:"agent_name"`
+	AgentAvatarFileID         *string                          `bun:"agent_avatar_file_id"`
+	Preview                   *string                          `bun:"preview"`
+	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
+	LastMessageAt             *time.Time                       `bun:"last_message_at"`
 	AgentRunStatus            *string                          `bun:"agent_run_status"`
 	SortAt                    *time.Time                       `bun:"sort_at"`
 	UnreadCount               int                              `bun:"unread_count"`
@@ -157,7 +186,7 @@ type groupConversationRow struct {
 }
 
 // NewLoadInboxQuery 创建成员收件箱查询。
-func NewLoadInboxQuery(db *bun.DB) *LoadInboxQuery {
+func NewLoadInboxQuery(db bun.IDB) *LoadInboxQuery {
 	return &LoadInboxQuery{db: db}
 }
 
@@ -181,6 +210,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	customers := make([]customerConversationRow, 0)
 	directs := make([]directConversationRow, 0)
 	groups := make([]groupConversationRow, 0)
+	agents := make([]agentConversationRow, 0)
 	var err error
 	if input.Scope != domain.InboxScopeInternal {
 		customers, err = q.loadCustomerConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID, input)
@@ -193,13 +223,17 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		if err != nil {
 			return nil, UnreadCounts{}, err
 		}
+		agents, err = q.loadAgentConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
+		if err != nil {
+			return nil, UnreadCounts{}, err
+		}
 		groups, err = q.loadGroupConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
 		if err != nil {
 			return nil, UnreadCounts{}, err
 		}
 	}
 
-	result := make([]ConversationSummary, 0, len(customers)+len(directs)+len(groups))
+	result := make([]ConversationSummary, 0, len(customers)+len(directs)+len(groups)+len(agents))
 	for _, row := range customers {
 		var assignee *AssigneeSummary
 		if row.AssigneeIdentityID != nil && row.AssigneeType != nil && row.AssigneeDisplayName != nil {
@@ -216,18 +250,16 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		})
 	}
 	for _, row := range directs {
-		var agentRunStatus *domain.AgentRunStatus
-		if row.AgentRunStatus != nil {
-			status := domain.AgentRunStatus(*row.AgentRunStatus)
-			agentRunStatus = &status
-		}
 		result = append(result, ConversationSummary{
 			ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
 			Direct: &DirectConversationSummary{
 				PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID,
-				Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
+				Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
 			},
 		})
+	}
+	for _, row := range agents {
+		result = append(result, row.summary())
 	}
 	for _, row := range groups {
 		result = append(result, ConversationSummary{
@@ -362,34 +394,24 @@ func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizati
 	return rows, nil
 }
 
-// directConversationsQuery 共用单聊身份对范围、个人状态和未读统计。
-func (q *LoadInboxQuery) directConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
+// individualConversationsQuery 共用双方聊天的消息摘要、成员范围和个人未读状态。
+func (q *LoadInboxQuery) individualConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
 	return q.db.NewSelect().
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
-		ColumnExpr("peer_oi.id AS peer_identity_id").
-		ColumnExpr("peer_oi.type AS peer_type").
-		ColumnExpr("peer_oi.display_name AS peer_name").
-		ColumnExpr("peer_oi.avatar_file_id::text AS peer_avatar_file_id").
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("cv.last_message_id::text AS last_message_id").
-		ColumnExpr("latest_agent_run.status AS agent_run_status").
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
 		ColumnExpr("cv.last_message_at AS sort_at").
-		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
-		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identityID).
-		Join("LEFT JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id").
-		Join("LEFT JOIN agents AS peer_a ON peer_a.organization_id = peer_oi.organization_id AND peer_a.identity_id = peer_oi.id").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("LEFT JOIN LATERAL (SELECT agr.status FROM agent_runs AS agr WHERE agr.organization_id = cv.organization_id AND agr.conversation_id = cv.id AND agr.agent_identity_id = peer_oi.id ORDER BY agr.created_at DESC, agr.id DESC LIMIT 1) AS latest_agent_run ON peer_oi.type = ?", domain.OrganizationIdentityTypeAgent).
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
 		Join(`JOIN LATERAL (
 			SELECT count(*) AS unread_count
@@ -401,11 +423,40 @@ func (q *LoadInboxQuery) directConversationsQuery(organizationID, identityID, us
 				AND (unread_msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?)
 				AND (read_msg.id IS NULL OR (unread_msg.originated_at, unread_msg.source_order, unread_msg.id) > (read_msg.originated_at, read_msg.source_order, read_msg.id))
 		) AS unread ON TRUE`, identityID).
+		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
+		Join("JOIN chat_subjects AS mine_cs ON mine_cs.id = mine.subject_id AND mine_cs.organization_id = mine.organization_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
 		Where("cv.organization_id = ?", organizationID).
+		Where("cv.status = ?", domain.ConversationStatusActive)
+}
+
+// directConversationsQuery 按真人身份对读取长期单聊。
+func (q *LoadInboxQuery) directConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
+	return q.individualConversationsQuery(organizationID, identityID, userID).
+		ColumnExpr("peer_oi.id AS peer_identity_id, peer_oi.type AS peer_type, peer_oi.display_name AS peer_name, peer_oi.avatar_file_id AS peer_avatar_file_id").
+		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
+		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identityID).
+		Join("JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id").
 		Where("cv.type = ?", domain.ConversationTypeDirect).
-		Where("cv.status = ?", domain.ConversationStatusActive).
 		Where("? IN (dc.first_identity_id, dc.second_identity_id)", identityID).
-		Where("((peer_oi.type = ? AND peer_u.status = ?) OR (peer_oi.type = ? AND peer_a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive)
+		Where("peer_oi.type = ? AND peer_u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive)
+}
+
+// agentConversationsQuery 按业务归属读取独立 AI 聊天。
+func (q *LoadInboxQuery) agentConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
+	return q.individualConversationsQuery(organizationID, identityID, userID).
+		ColumnExpr("cv.title, oi.id AS agent_identity_id, oi.display_name AS agent_name, oi.avatar_file_id AS agent_avatar_file_id, latest_agent_run.status AS agent_run_status").
+		Join("JOIN agent_conversations AS ac ON ac.organization_id = cv.organization_id AND ac.conversation_id = cv.id").
+		Join("JOIN organization_identities AS oi ON oi.organization_id = ac.organization_id AND oi.id = ac.agent_identity_id").
+		Join("JOIN agents AS agent ON agent.organization_id = oi.organization_id AND agent.identity_id = oi.id").
+		Join("LEFT JOIN LATERAL (SELECT agr.status FROM agent_runs AS agr WHERE agr.organization_id = cv.organization_id AND agr.conversation_id = cv.id AND agr.agent_identity_id = ac.agent_identity_id ORDER BY agr.created_at DESC, agr.id DESC LIMIT 1) AS latest_agent_run ON TRUE").
+		Where("cv.type = ? AND ac.user_identity_id = ? AND oi.type = ? AND agent.status = ?", domain.ConversationTypeAgent, identityID, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive)
+}
+
+// loadAgentConversations 读取当前成员的独立 AI 会话列表。
+func (q *LoadInboxQuery) loadAgentConversations(ctx context.Context, organizationID, identityID, userID string) ([]agentConversationRow, error) {
+	rows := make([]agentConversationRow, 0)
+	err := q.agentConversationsQuery(organizationID, identityID, userID).OrderExpr("cv.last_message_at DESC, cv.id DESC").Limit(inboxConversationTypeLimit).Scan(ctx, &rows)
+	return rows, err
 }
 
 // loadGroupConversations 读取当前成员参与的企业群聊，包括尚无消息的新群聊。
@@ -470,8 +521,9 @@ func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, i
 		ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread")
 	group := q.db.NewSelect().TableExpr("(?) AS groups", q.groupConversationsQuery(organizationID, identityID, userID)).
 		ColumnExpr("unread_count, mentioned_unread_count, muted, marked_unread")
+	agent := q.db.NewSelect().TableExpr("(?) AS agents", q.agentConversationsQuery(organizationID, identityID, userID)).ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread")
 	counts := UnreadCounts{}
-	err := q.db.NewSelect().TableExpr("(?) AS internal", direct.UnionAll(group)).
+	err := q.db.NewSelect().TableExpr("(?) AS internal", direct.UnionAll(group).UnionAll(agent)).
 		ColumnExpr("COALESCE(sum(unread_count), 0) AS unread_count").
 		ColumnExpr(`COALESCE(sum(CASE WHEN muted THEN mentioned_unread_count
             ELSE GREATEST(unread_count, CASE WHEN marked_unread THEN 1 ELSE 0 END)
@@ -480,4 +532,30 @@ func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, i
 		return UnreadCounts{}, fmt.Errorf("count internal unread messages: %w", err)
 	}
 	return counts, nil
+}
+
+// summary 将 AI 会话查询结果转换为统一摘要。
+func (row agentConversationRow) summary() ConversationSummary {
+	var agentRunStatus *domain.AgentRunStatus
+	if row.AgentRunStatus != nil {
+		status := domain.AgentRunStatus(*row.AgentRunStatus)
+		agentRunStatus = &status
+	}
+	return ConversationSummary{
+		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
+		Agent: &AgentConversationSummary{
+			Title: row.Title, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName, AgentAvatarFileID: row.AgentAvatarFileID,
+			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
+		},
+	}
+}
+
+// LoadAgentConversation 读取当前成员指定 AI 会话的完整收件箱摘要。
+func (q *LoadInboxQuery) LoadAgentConversation(ctx context.Context, identity *servermodels.Identity, conversationID string) (ConversationSummary, error) {
+	var row agentConversationRow
+	err := q.agentConversationsQuery(identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID).Where("cv.id = ?", conversationID).Scan(ctx, &row)
+	if err != nil {
+		return ConversationSummary{}, err
+	}
+	return row.summary(), nil
 }

@@ -1,5 +1,12 @@
 /** 消息页中栏（范围纵栏 + 会话列表）和会话主区。 */
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import type { TFunction } from "i18next"
 import {
   BellOffIcon,
@@ -27,17 +34,20 @@ import {
   ServiceSessionStatus,
   isApiError,
   isCustomerInboxConversation,
+  isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   getGroupConversation,
   listCustomerServiceAssignees,
   markConversationRead,
+  sendFirstAgentTextMessage,
   sendFirstDirectTextMessage,
   updateConversationNotificationSettings,
   updateConversationUnreadMark,
   type ConversationMessageReference,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
+  type AgentInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
   type InboxAssignee,
@@ -83,7 +93,7 @@ import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
-import { DirectConversationPickerDialog } from "@/features/inbox/direct-conversation-picker-dialog"
+import { ConversationTargetPickerDialog } from "@/features/inbox/conversation-target-picker-dialog"
 import {
   useOutgoingConversationMessages,
   type OutgoingConversationDraft,
@@ -99,11 +109,15 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
-type ConversationSelection =
+type ChatDraft =
   | { kind: "direct-draft"; member: MemberOption }
-  | { kind: "conversation"; conversation: InboxConversation }
+  | { kind: "agent-draft"; member: MemberOption; conversationId: string }
+
+type ConversationSelection =
+  ChatDraft | { kind: "conversation"; conversation: InboxConversation }
 
 type InternalInboxConversationData =
+  | AgentInboxConversationData
   | DirectInboxConversationData
   | GroupInboxConversationData
 
@@ -120,18 +134,22 @@ function compareInboxConversations(
 ) {
   const firstSummary = isCustomerInboxConversation(first)
     ? first.customer
-    : isDirectInboxConversation(first)
-      ? first.direct
-      : isGroupInboxConversation(first)
-        ? first.group
-        : null
+    : isAgentInboxConversation(first)
+      ? first.agent
+      : isDirectInboxConversation(first)
+        ? first.direct
+        : isGroupInboxConversation(first)
+          ? first.group
+          : null
   const secondSummary = isCustomerInboxConversation(second)
     ? second.customer
-    : isDirectInboxConversation(second)
-      ? second.direct
-      : isGroupInboxConversation(second)
-        ? second.group
-        : null
+    : isAgentInboxConversation(second)
+      ? second.agent
+      : isDirectInboxConversation(second)
+        ? second.direct
+        : isGroupInboxConversation(second)
+          ? second.group
+          : null
   const firstTime = firstSummary?.lastMessageAt
   const secondTime = secondSummary?.lastMessageAt
   if (!firstTime || !secondTime) {
@@ -251,11 +269,15 @@ function useConversationName() {
   const { t } = useTranslation("inbox")
   return useCallback(
     (conversation: InboxConversation) => {
+      if (isAgentInboxConversation(conversation))
+        return conversation.agent.title
       if (isDirectInboxConversation(conversation)) {
         return conversation.direct.peerName.trim() || t("unknownSender")
       }
       if (isCustomerInboxConversation(conversation)) {
-        return conversation.customer.contactName?.trim() || t("anonymousVisitor")
+        return (
+          conversation.customer.contactName?.trim() || t("anonymousVisitor")
+        )
       }
       if (isGroupInboxConversation(conversation)) {
         return conversation.group.title.trim() || t("unknownSender")
@@ -274,7 +296,10 @@ function useConversationTime() {
   return useMemo(() => {
     const locale = i18n.resolvedLanguage
     const relative = new Intl.RelativeTimeFormat(locale, { numeric: "always" })
-    const weekday = new Intl.DateTimeFormat(locale, { timeZone, weekday: "short" })
+    const weekday = new Intl.DateTimeFormat(locale, {
+      timeZone,
+      weekday: "short",
+    })
     const monthDay = new Intl.DateTimeFormat(locale, {
       timeZone,
       month: "numeric",
@@ -338,11 +363,13 @@ function InboxPaneTop({
   onRailToggle,
   onStartDirect,
   onCreateGroup,
+  onCreateAgent,
 }: {
   railCollapsed: boolean
   onRailToggle: () => void
   onStartDirect: () => void
   onCreateGroup: () => void
+  onCreateAgent: () => void
 }) {
   const { t } = useTranslation("inbox")
 
@@ -356,7 +383,9 @@ function InboxPaneTop({
         size="icon"
         className="shrink-0 text-muted-foreground"
         aria-pressed={railCollapsed}
-        aria-label={railCollapsed ? t("scopeRailExpand") : t("scopeRailCollapse")}
+        aria-label={
+          railCollapsed ? t("scopeRailExpand") : t("scopeRailCollapse")
+        }
         title={railCollapsed ? t("scopeRailExpand") : t("scopeRailCollapse")}
         onClick={onRailToggle}
       >
@@ -388,6 +417,9 @@ function InboxPaneTop({
             <span className="min-w-0 flex-1 truncate">
               {t("newDirectConversation")}
             </span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onCreateAgent}>
+            {t("newAgentConversation")}
           </DropdownMenuItem>
           <DropdownMenuItem className="gap-2" onSelect={onCreateGroup}>
             <span className="min-w-0 flex-1 truncate">
@@ -598,15 +630,11 @@ function InboxCustomerQueueFilter({
         type="button"
         role="tab"
         aria-selected={view === CustomerInboxView.CustomerInboxViewClosed}
-        className={tabClass(
-          view === CustomerInboxView.CustomerInboxViewClosed,
-        )}
+        className={tabClass(view === CustomerInboxView.CustomerInboxViewClosed)}
         onClick={() => onChange(CustomerInboxView.CustomerInboxViewClosed)}
       >
         <span className="block truncate">{t("queueFilterClosed")}</span>
-        {activeIndicator(
-          view === CustomerInboxView.CustomerInboxViewClosed,
-        )}
+        {activeIndicator(view === CustomerInboxView.CustomerInboxViewClosed)}
       </button>
     </div>
   )
@@ -678,9 +706,16 @@ function InboxConversationList({
       await invalidate(resourceKeys.inbox())
     } catch (error) {
       if (!settingsSave.isCurrent(request)) return
-      console.warn("更新会话阅读状态失败", { conversationId: conversation.id, error })
+      console.warn("更新会话阅读状态失败", {
+        conversationId: conversation.id,
+        error,
+      })
       if (!recoverSession(error, navigate)) {
-        toast.error(isApiError(error) ? apiErrorMessage(error) : t("conversationReadStateError"))
+        toast.error(
+          isApiError(error)
+            ? apiErrorMessage(error)
+            : t("conversationReadStateError"),
+        )
       }
     } finally {
       settingsSave.finish(request)
@@ -701,18 +736,22 @@ function InboxConversationList({
     <ScrollArea className="min-h-0 min-w-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:block">
       <div className="grid min-w-0 pb-1.5">
         {conversations.map((conversation) => {
-          const name = conversationName(conversation)
+          const name = isAgentInboxConversation(conversation)
+            ? `${conversation.agent.title} · ${conversation.agent.agentName}`
+            : conversationName(conversation)
           const summary = isCustomerInboxConversation(conversation)
             ? conversation.customer
-            : isDirectInboxConversation(conversation)
-              ? conversation.direct
-              : isGroupInboxConversation(conversation)
-                ? conversation.group
-                : null
+            : isAgentInboxConversation(conversation)
+              ? conversation.agent
+              : isDirectInboxConversation(conversation)
+                ? conversation.direct
+                : isGroupInboxConversation(conversation)
+                  ? conversation.group
+                  : null
           if (!summary) return null
           const agentRunLabel = agentRunStatusLabel(
-            isDirectInboxConversation(conversation)
-              ? conversation.direct.agentRunStatus
+            isAgentInboxConversation(conversation)
+              ? conversation.agent.agentRunStatus
               : null,
             t,
           )
@@ -720,114 +759,128 @@ function InboxConversationList({
             isGroupInboxConversation(conversation) &&
             conversation.group.status ===
               ConversationStatus.ConversationStatusArchived
-          const preview =
-            groupDissolved
-              ? t("groupDissolved")
-              : messagePreview(summary.preview ?? "", summary.previewSenderIdentityType).trim() ||
-                (isGroupInboxConversation(conversation) &&
-                summary.lastMessageAt
-                  ? t("groupSystemUpdated")
-                  : t("messagesEmpty"))
+          const preview = groupDissolved
+            ? t("groupDissolved")
+            : messagePreview(
+                summary.preview ?? "",
+                summary.previewSenderIdentityType,
+              ).trim() ||
+              (isGroupInboxConversation(conversation) && summary.lastMessageAt
+                ? t("groupSystemUpdated")
+                : t("messagesEmpty"))
           const formattedTime = formatTime(summary.lastMessageAt)
-          const hasUnread = conversation.unreadCount > 0 || conversation.markedUnread
+          const hasUnread =
+            conversation.unreadCount > 0 || conversation.markedUnread
           const isInternal =
+            isAgentInboxConversation(conversation) ||
             isDirectInboxConversation(conversation) ||
             isGroupInboxConversation(conversation)
           return (
             <ContextMenu key={conversation.id}>
               <ContextMenuTrigger asChild>
                 <button
-              type="button"
-              aria-pressed={selectedId === conversation.id}
-              aria-label={name}
-              className={cn(
-                "flex w-full min-w-0 items-start gap-3 px-3 py-2.5 text-left transition-colors",
-                selectedId === conversation.id
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-muted",
-              )}
-              onClick={() => {
-                // 再次点击也按进入会话处理，等待在途的手动标记完成后清除。
-                if (selectedId === conversation.id && isInternal) {
-                  void updateConversationUnreadMark(conversation.id, { markedUnread: false })
-                    .then(() => invalidate(resourceKeys.inbox()))
-                    .catch((error: unknown) => {
-                      console.warn("清除会话未读标记失败", { conversationId: conversation.id, error })
-                      recoverSession(error, navigate)
-                    })
-                }
-                onSelect(conversation.id)
-              }}
+                  type="button"
+                  aria-pressed={selectedId === conversation.id}
+                  aria-label={name}
+                  className={cn(
+                    "flex w-full min-w-0 items-start gap-3 px-3 py-2.5 text-left transition-colors",
+                    selectedId === conversation.id
+                      ? "bg-accent text-accent-foreground"
+                      : "hover:bg-muted",
+                  )}
+                  onClick={() => {
+                    // 再次点击也按进入会话处理，等待在途的手动标记完成后清除。
+                    if (selectedId === conversation.id && isInternal) {
+                      void updateConversationUnreadMark(conversation.id, {
+                        markedUnread: false,
+                      })
+                        .then(() => invalidate(resourceKeys.inbox()))
+                        .catch((error: unknown) => {
+                          console.warn("清除会话未读标记失败", {
+                            conversationId: conversation.id,
+                            error,
+                          })
+                          recoverSession(error, navigate)
+                        })
+                    }
+                    onSelect(conversation.id)
+                  }}
                 >
-              <span className="relative shrink-0">
-                <ConversationAvatar conversation={conversation} />
-                {hasUnread ? (
-                  <span
-                    className={cn(
-                      "absolute rounded-full ring-2 ring-background",
-                      conversation.unreadCount > 0
-                        ? "-top-1.5 -right-1.5 flex min-w-5 items-center justify-center gap-0.5 px-1 text-[10px] font-semibold leading-5"
-                        : "-top-0.5 -right-0.5 size-2.5",
-                      conversation.muted
-                        ? "bg-muted text-muted-foreground"
-                        : "bg-destructive text-destructive-foreground",
-                    )}
-                  >
-                    {conversation.unreadCount > 0 ? (
-                      <>
-                        {conversation.mentionedUnreadCount > 0 ? "@" : null}
-                        {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
-                      </>
-                    ) : <span className="sr-only">{t("conversationMarkedUnread")}</span>}
-                  </span>
-                ) : null}
-              </span>
-              <span className="min-w-0 flex-1 overflow-hidden">
-                <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {name}
-                    </span>
-                    {agentRunLabel ? (
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
-                        {agentRunLabel}
+                  <span className="relative shrink-0">
+                    <ConversationAvatar conversation={conversation} />
+                    {hasUnread ? (
+                      <span
+                        className={cn(
+                          "absolute rounded-full ring-2 ring-background",
+                          conversation.unreadCount > 0
+                            ? "-top-1.5 -right-1.5 flex min-w-5 items-center justify-center gap-0.5 px-1 text-[10px] font-semibold leading-5"
+                            : "-top-0.5 -right-0.5 size-2.5",
+                          conversation.muted
+                            ? "bg-muted text-muted-foreground"
+                            : "bg-destructive text-destructive-foreground",
+                        )}
+                      >
+                        {conversation.unreadCount > 0 ? (
+                          <>
+                            {conversation.mentionedUnreadCount > 0 ? "@" : null}
+                            {conversation.unreadCount > 99
+                              ? "99+"
+                              : conversation.unreadCount}
+                          </>
+                        ) : (
+                          <span className="sr-only">
+                            {t("conversationMarkedUnread")}
+                          </span>
+                        )}
                       </span>
                     ) : null}
                   </span>
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    {formattedTime ? (
-                      <time
-                        dateTime={summary.lastMessageAt ?? undefined}
+                  <span className="min-w-0 flex-1 overflow-hidden">
+                    <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                          {name}
+                        </span>
+                        {agentRunLabel ? (
+                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                            {agentRunLabel}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {formattedTime ? (
+                          <time
+                            dateTime={summary.lastMessageAt ?? undefined}
+                            className={cn(
+                              "shrink-0 text-xs text-muted-foreground",
+                              selectedId === conversation.id &&
+                                "text-accent-foreground/75",
+                            )}
+                          >
+                            {formattedTime}
+                          </time>
+                        ) : null}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 flex min-w-0 items-center gap-2">
+                      <span
+                        title={preview}
                         className={cn(
-                          "shrink-0 text-xs text-muted-foreground",
+                          "min-w-0 flex-1 truncate text-xs text-muted-foreground",
                           selectedId === conversation.id &&
                             "text-accent-foreground/75",
                         )}
                       >
-                        {formattedTime}
-                      </time>
-                    ) : null}
+                        {preview}
+                      </span>
+                      {isInternal && conversation.muted ? (
+                        <BellOffIcon
+                          className="size-3.5 shrink-0 text-muted-foreground"
+                          aria-label={t("conversationMuted")}
+                        />
+                      ) : null}
+                    </span>
                   </span>
-                </span>
-                <span className="mt-0.5 flex min-w-0 items-center gap-2">
-                  <span
-                    title={preview}
-                    className={cn(
-                      "min-w-0 flex-1 truncate text-xs text-muted-foreground",
-                      selectedId === conversation.id &&
-                        "text-accent-foreground/75",
-                    )}
-                  >
-                    {preview}
-                  </span>
-                  {isInternal && conversation.muted ? (
-                    <BellOffIcon
-                      className="size-3.5 shrink-0 text-muted-foreground"
-                      aria-label={t("conversationMuted")}
-                    />
-                  ) : null}
-                </span>
-              </span>
                 </button>
               </ContextMenuTrigger>
               {isInternal || hasUnread ? (
@@ -835,7 +888,13 @@ function InboxConversationList({
                   {hasUnread ? (
                     <ContextMenuItem
                       disabled={settingsSave.saving}
-                      onSelect={() => void changeConversationReadState(conversation, false, true)}
+                      onSelect={() =>
+                        void changeConversationReadState(
+                          conversation,
+                          false,
+                          true,
+                        )
+                      }
                     >
                       {t("conversationMarkRead")}
                     </ContextMenuItem>
@@ -843,7 +902,9 @@ function InboxConversationList({
                   {isInternal && !conversation.markedUnread ? (
                     <ContextMenuItem
                       disabled={settingsSave.saving}
-                      onSelect={() => void changeConversationReadState(conversation, true)}
+                      onSelect={() =>
+                        void changeConversationReadState(conversation, true)
+                      }
                     >
                       {t("conversationMarkUnread")}
                     </ContextMenuItem>
@@ -851,7 +912,9 @@ function InboxConversationList({
                   {isInternal ? (
                     <ContextMenuItem
                       disabled={settingsSave.saving}
-                      onSelect={() => void toggleConversationMuted(conversation)}
+                      onSelect={() =>
+                        void toggleConversationMuted(conversation)
+                      }
                     >
                       {t(
                         conversation.muted
@@ -876,7 +939,7 @@ function ConversationMain({
   onSessionMoved,
   onConversationChanged,
   onGroupLeft,
-  onDirectStarted,
+  onChatStarted,
   narrowViewport = false,
 }: {
   selection: ConversationSelection
@@ -889,17 +952,20 @@ function ConversationMain({
   onConversationChanged: (
     conversation:
       | CustomerInboxConversationData
+      | AgentInboxConversationData
       | DirectInboxConversationData
       | GroupInboxConversationData,
   ) => void
   onGroupLeft: (conversationID: string) => void
-  onDirectStarted: (conversation: DirectInboxConversationData) => void
+  onChatStarted: (
+    conversation: DirectInboxConversationData | AgentInboxConversationData,
+  ) => void
   narrowViewport?: boolean
 }) {
   const conversation =
     selection.kind === "conversation" ? selection.conversation : null
   const directTarget =
-    selection.kind === "direct-draft" ? selection.member : null
+    selection.kind !== "conversation" ? selection.member : null
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
   const isWideViewport = useIsWideViewport()
@@ -931,7 +997,7 @@ function ConversationMain({
       : conversation
   const contactName = displayedConversation
     ? conversationName(displayedConversation)
-    : directTarget?.displayName ?? ""
+    : (directTarget?.displayName ?? "")
   const customerConversation =
     displayedConversation && isCustomerInboxConversation(displayedConversation)
       ? displayedConversation
@@ -945,10 +1011,7 @@ function ConversationMain({
       ? displayedConversation
       : null
   const sessionStatus = customerConversation
-    ? sessionStatusLabel(
-        customerConversation.customer.serviceSessionStatus,
-        t,
-      )
+    ? sessionStatusLabel(customerConversation.customer.serviceSessionStatus, t)
     : ""
   const replyDisabledReason = customerConversation
     ? customerConversation.customer.serviceSessionStatus ===
@@ -966,11 +1029,20 @@ function ConversationMain({
       ? t("groupDissolvedUnavailable")
       : null
   const validConversation =
-    customerConversation ?? directConversation ?? groupConversation
+    customerConversation ??
+    directConversation ??
+    groupConversation ??
+    (displayedConversation && isAgentInboxConversation(displayedConversation)
+      ? displayedConversation
+      : null)
   if (!validConversation && !directTarget) return null
-  // 单聊按目标身份保持消息组件，首发落库不会清空失败消息和输入状态。
+  // AI 草稿与正式会话共用稳定编号，真人单聊按固定身份保持组件。
   const threadKey =
-    directTarget?.id ?? directConversation?.direct.peerIdentityId ?? validConversation?.id
+    selection.kind === "agent-draft"
+      ? selection.conversationId
+      : (directTarget?.id ??
+        directConversation?.direct.peerIdentityId ??
+        validConversation?.id)
 
   return (
     <div className="flex h-full min-h-0 bg-background">
@@ -999,11 +1071,14 @@ function ConversationMain({
           key={threadKey}
           conversation={validConversation}
           directTarget={directTarget}
+          agentDraftID={
+            selection.kind === "agent-draft" ? selection.conversationId : ""
+          }
           replyDisabledReason={replyDisabledReason}
           onConversationChanged={() => {
             if (validConversation) onConversationChanged(validConversation)
           }}
-          onDirectStarted={onDirectStarted}
+          onChatStarted={onChatStarted}
         />
       </div>
       <ConversationContextPane
@@ -1035,21 +1110,26 @@ function ConversationMain({
 
 /** 协调当前会话时间线和回复区的即时消息。 */
 function ConversationThread({
+  agentDraftID,
   conversation,
   directTarget,
   replyDisabledReason,
   onConversationChanged,
-  onDirectStarted,
+  onChatStarted,
 }: {
   conversation:
     | CustomerInboxConversationData
+    | AgentInboxConversationData
     | DirectInboxConversationData
     | GroupInboxConversationData
     | null
   directTarget: MemberOption | null
+  agentDraftID: string
   replyDisabledReason: string | null
   onConversationChanged: () => void
-  onDirectStarted: (conversation: DirectInboxConversationData) => void
+  onChatStarted: (
+    conversation: DirectInboxConversationData | AgentInboxConversationData,
+  ) => void
 }) {
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const { t } = useTranslation("inbox")
@@ -1061,15 +1141,25 @@ function ConversationThread({
   const aliveRef = useRef(true)
   const conversationID = conversation?.id ?? ""
   const conversationType =
-    conversation?.type ?? ConversationType.ConversationTypeDirect
+    conversation?.type ??
+    (agentDraftID
+      ? ConversationType.ConversationTypeAgent
+      : ConversationType.ConversationTypeDirect)
 
-  const handleUnreadMarkClearError = useEffectEvent((id: string, error: unknown) => {
-    console.warn("清除会话未读标记失败", { conversationId: id, error })
-    recoverSession(error, navigate)
-  })
+  const handleUnreadMarkClearError = useEffectEvent(
+    (id: string, error: unknown) => {
+      console.warn("清除会话未读标记失败", { conversationId: id, error })
+      recoverSession(error, navigate)
+    },
+  )
 
   useEffect(() => {
-    if (!conversationID || !pageActive || conversationType === ConversationType.ConversationTypeCustomer) return
+    if (
+      !conversationID ||
+      !pageActive ||
+      conversationType === ConversationType.ConversationTypeCustomer
+    )
+      return
     let current = true
     // 每次进入都清除服务端标记，避免旧缓存掩盖另一端新设的标记。
     void updateConversationUnreadMark(conversationID, { markedUnread: false })
@@ -1078,7 +1168,9 @@ function ConversationThread({
         if (!current) return
         handleUnreadMarkClearError(conversationID, error)
       })
-    return () => { current = false }
+    return () => {
+      current = false
+    }
   }, [conversationID, conversationType, pageActive, invalidate])
 
   useEffect(() => {
@@ -1097,6 +1189,7 @@ function ConversationThread({
   )
   const replySupported =
     !conversation ||
+    isAgentInboxConversation(conversation) ||
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation) ||
     conversation.customer.channelType === ChannelType.ChannelTypeWebsite
@@ -1157,7 +1250,9 @@ function ConversationThread({
         />
       ) : (
         <ConversationComposer
-          onBeforeSend={() => prepareSendRef.current?.() ?? Promise.resolve(true)}
+          onBeforeSend={() =>
+            prepareSendRef.current?.() ?? Promise.resolve(true)
+          }
           conversationID={conversationID}
           conversationType={conversationType}
           submitOnEnter
@@ -1173,22 +1268,30 @@ function ConversationThread({
           onSent={outgoing.succeed}
           onFailed={outgoing.fail}
           onSucceeded={onConversationChanged}
-          sendDirectMessage={
+          sendIndividualMessage={
             directTarget
               ? async (input) => {
-                  const result = await sendFirstDirectTextMessage({
-                    targetIdentityId: directTarget.id,
-                    ...input,
-                  })
-                  void invalidate(
-                    resourceKeys.directConversation(directTarget.id),
-                  )
+                  const result = agentDraftID
+                    ? await sendFirstAgentTextMessage({
+                        conversationId: agentDraftID,
+                        agentIdentityId: directTarget.id,
+                        clientMessageId: input.clientMessageId,
+                        body: input.body,
+                      })
+                    : await sendFirstDirectTextMessage({
+                        targetIdentityId: directTarget.id,
+                        ...input,
+                      })
+                  if (!agentDraftID)
+                    void invalidate(
+                      resourceKeys.directConversation(directTarget.id),
+                    )
                   void invalidate(
                     resourceKeys.conversationMessages(result.conversation.id),
                   )
                   // 离开原线程后只刷新列表，不改变当前选择。
                   if (aliveRef.current) {
-                    onDirectStarted(result.conversation)
+                    onChatStarted(result.conversation)
                   } else {
                     void invalidate(resourceKeys.inbox())
                   }
@@ -1242,9 +1345,10 @@ export function InboxPage({
   const isNarrowViewport = useIsNarrowViewport()
   const invalidate = useResourceInvalidator()
   const [railCollapsed, setRailCollapsed] = useState(false)
-  const [directDraft, setDirectDraft] = useState<MemberOption | null>(null)
+  const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null)
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [directDialogOpen, setDirectDialogOpen] = useState(false)
+  const [agentDialogOpen, setAgentDialogOpen] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [startedConversations, setStartedConversations] = useState<
     InternalInboxConversationData[]
@@ -1255,11 +1359,7 @@ export function InboxPage({
   const [selectedConversationSnapshot, setSelectedConversationSnapshot] =
     useState<InboxConversation | null>(null)
   const conversationName = useConversationName()
-  const currentInboxQuery = inboxQuery(
-    scope,
-    customerView,
-    assigneeIdentityId,
-  )
+  const currentInboxQuery = inboxQuery(scope, customerView, assigneeIdentityId)
   const { data: customerServiceAssignees = [] } = useResource(
     resourceKeys.customerServiceAssignees(),
     () => listCustomerServiceAssignees(),
@@ -1272,6 +1372,7 @@ export function InboxPage({
         (conversation) =>
           !leftGroupConversationIDs.has(conversation.id) &&
           (isCustomerInboxConversation(conversation) ||
+            isAgentInboxConversation(conversation) ||
             isDirectInboxConversation(conversation) ||
             isGroupInboxConversation(conversation)),
       ),
@@ -1297,6 +1398,7 @@ export function InboxPage({
       case InboxScope.InboxScopeInternal:
         return allConversations.filter(
           (conversation) =>
+            isAgentInboxConversation(conversation) ||
             isDirectInboxConversation(conversation) ||
             isGroupInboxConversation(conversation),
         )
@@ -1329,35 +1431,33 @@ export function InboxPage({
     )
     setLeftGroupConversationIDs((current) => {
       const pending = new Set(
-        [...current].filter((conversationID) =>
-          listedIDs.has(conversationID),
-        ),
+        [...current].filter((conversationID) => listedIDs.has(conversationID)),
       )
       return pending.size === current.size ? current : pending
     })
   }, [conversations])
 
-  const activeDirectDraft =
+  const activeChatDraft =
     scope === InboxScope.InboxScopeInternal && !selectedConversationId
-      ? directDraft
+      ? chatDraft
       : null
   useEffect(() => {
     if (selectedConversationId || scope !== InboxScope.InboxScopeInternal) {
-      setDirectDraft(null)
+      setChatDraft(null)
     }
   }, [scope, selectedConversationId])
   const selectedPool = listLoading ? allConversations : scopedConversations
-  const selectedFromPool = activeDirectDraft
+  const selectedFromPool = activeChatDraft
     ? undefined
-    : selectedPool.find(
+    : (selectedPool.find(
         (conversation) => conversation.id === selectedConversationId,
-      ) ?? (selectedConversationId ? undefined : selectedPool[0])
+      ) ?? (selectedConversationId ? undefined : selectedPool[0]))
   useEffect(() => {
     if (selectedFromPool) setSelectedConversationSnapshot(selectedFromPool)
   }, [selectedFromPool])
   useEffect(() => {
     if (
-      activeDirectDraft ||
+      activeChatDraft ||
       listLoading ||
       (selectedConversationId &&
         scopedConversations.some(
@@ -1371,24 +1471,24 @@ export function InboxPage({
     setSelectedConversationSnapshot(null)
     onSelectedConversationChange(nextConversationID, true)
   }, [
-    activeDirectDraft,
+    activeChatDraft,
     listLoading,
     onSelectedConversationChange,
     scopedConversations,
     selectedConversationId,
   ])
-  const selectedConversation = activeDirectDraft
+  const selectedConversation = activeChatDraft
     ? undefined
     : selectedConversationSnapshot?.id === selectedConversationId &&
-      selectedPool.some(
-        (conversation) => conversation.id === selectedConversationId,
-      )
-        ? selectedConversationSnapshot
-        : selectedFromPool
+        selectedPool.some(
+          (conversation) => conversation.id === selectedConversationId,
+        )
+      ? selectedConversationSnapshot
+      : selectedFromPool
 
   /** 选中一个会话。 */
   function selectConversation(conversationId: string) {
-    setDirectDraft(null)
+    setChatDraft(null)
     onSelectedConversationChange(conversationId)
 
     if (isNarrowViewport) {
@@ -1443,7 +1543,7 @@ export function InboxPage({
   function showStartedConversation(
     conversation: InternalInboxConversationData,
   ) {
-    setDirectDraft(null)
+    setChatDraft(null)
     setStartedConversations((current) => [
       conversation,
       ...current.filter((item) => item.id !== conversation.id),
@@ -1458,7 +1558,7 @@ export function InboxPage({
   }
 
   /** 在主区打开不持久化的单聊草稿。 */
-  function showDirectDraft(
+  function showChatDraft(
     member: MemberOption,
     existing: DirectInboxConversationData | null,
   ) {
@@ -1466,7 +1566,7 @@ export function InboxPage({
       showStartedConversation(existing)
       return
     }
-    setDirectDraft(member)
+    setChatDraft({ kind: "direct-draft", member })
     onQueryChange({
       scope: InboxScope.InboxScopeInternal,
       conversationId: "",
@@ -1515,10 +1615,12 @@ export function InboxPage({
   function refreshConversationAfterMessage(
     conversation:
       | CustomerInboxConversationData
+      | AgentInboxConversationData
       | DirectInboxConversationData
       | GroupInboxConversationData,
   ) {
     if (
+      isAgentInboxConversation(conversation) ||
       isDirectInboxConversation(conversation) ||
       isGroupInboxConversation(conversation)
     ) {
@@ -1589,8 +1691,8 @@ export function InboxPage({
     onSelectedConversationChange(nextConversationID ?? "", true)
   }
 
-  const selection: ConversationSelection | null = activeDirectDraft
-    ? { kind: "direct-draft", member: activeDirectDraft }
+  const selection: ConversationSelection | null = activeChatDraft
+    ? activeChatDraft
     : selectedConversation
       ? { kind: "conversation", conversation: selectedConversation }
       : null
@@ -1602,6 +1704,7 @@ export function InboxPage({
         onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
         onStartDirect={() => setDirectDialogOpen(true)}
         onCreateGroup={() => setGroupDialogOpen(true)}
+        onCreateAgent={() => setAgentDialogOpen(true)}
       />
       {listError ? (
         <button
@@ -1618,7 +1721,7 @@ export function InboxPage({
             scope={scope}
             attentionUnreadCount={attentionUnreadCount}
             onScopeChange={(nextScope) => {
-              setDirectDraft(null)
+              setChatDraft(null)
               onQueryChange({ scope: nextScope })
             }}
           />
@@ -1666,12 +1769,15 @@ export function InboxPage({
               onSessionMoved={showMovedCustomerConversation}
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
-              onDirectStarted={showStartedConversation}
+              onChatStarted={showStartedConversation}
             />
           </section>
         ) : (
           <div className="cervi-inbox-empty-main flex min-h-0 flex-1 items-center justify-center p-6">
-            <div data-slot="empty-state-content" className="max-w-sm text-center">
+            <div
+              data-slot="empty-state-content"
+              className="max-w-sm text-center"
+            >
               <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
                 <MessagesSquareIcon className="size-5 text-muted-foreground" />
               </div>
@@ -1691,16 +1797,18 @@ export function InboxPage({
           open={isNarrowDetailOpen}
           onOpenChange={(open) => {
             setIsNarrowDetailOpen(open)
-            if (!open) setDirectDraft(null)
+            if (!open) setChatDraft(null)
           }}
         >
           <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
             <SheetHeader className="sr-only">
               <SheetTitle>
                 {t("conversationTitle", {
-                  name: activeDirectDraft?.displayName ?? (
-                    selectedConversation ? conversationName(selectedConversation) : ""
-                  ),
+                  name:
+                    activeChatDraft?.member.displayName ??
+                    (selectedConversation
+                      ? conversationName(selectedConversation)
+                      : ""),
                 })}
               </SheetTitle>
               <SheetDescription>{t("detailDescription")}</SheetDescription>
@@ -1710,18 +1818,36 @@ export function InboxPage({
               onSessionMoved={showMovedCustomerConversation}
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
-              onDirectStarted={showStartedConversation}
+              onChatStarted={showStartedConversation}
               narrowViewport
             />
           </SheetContent>
         </Sheet>
       ) : null}
 
-      <DirectConversationPickerDialog
+      <ConversationTargetPickerDialog
         open={directDialogOpen}
         currentIdentityID={identity.user.identityId}
         onOpenChange={setDirectDialogOpen}
-        onSelected={showDirectDraft}
+        onSelected={showChatDraft}
+      />
+      <ConversationTargetPickerDialog
+        agentChat
+        open={agentDialogOpen}
+        currentIdentityID={identity.user.identityId}
+        onOpenChange={setAgentDialogOpen}
+        onSelected={(member) => {
+          setChatDraft({
+            kind: "agent-draft",
+            member,
+            conversationId: crypto.randomUUID(),
+          })
+          onQueryChange({
+            scope: InboxScope.InboxScopeInternal,
+            conversationId: "",
+          })
+          setIsNarrowDetailOpen(isNarrowViewport)
+        }}
       />
       <CreateGroupConversationDialog
         open={groupDialogOpen}

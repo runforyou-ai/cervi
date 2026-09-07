@@ -27,8 +27,7 @@ var directMessageRetryableConstraintNames = map[string]struct{}{
 
 // SendFirstDirectTextMessageAction 发送首条单聊消息并按需创建长期会话。
 type SendFirstDirectTextMessageAction struct {
-	db             *bun.DB
-	agentScheduler DirectAgentMessageScheduler
+	db *bun.DB
 }
 
 // FindDirectConversationQuery 按目标身份查找当前成员的活跃长期单聊。
@@ -38,13 +37,7 @@ type FindDirectConversationQuery struct {
 
 // SendDirectTextMessageAction 持久化企业成员内部单聊文本消息。
 type SendDirectTextMessageAction struct {
-	db             *bun.DB
-	agentScheduler DirectAgentMessageScheduler
-}
-
-// DirectAgentMessageScheduler 把发给 Agent 的单聊消息加入持久化输入流。
-type DirectAgentMessageScheduler interface {
-	Schedule(context.Context, bun.IDB, string, string, string, string, string) error
+	db *bun.DB
 }
 
 type directTargetRow struct {
@@ -69,18 +62,9 @@ type directConversationSummaryRow struct {
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
 }
 
-type directSendContextRow struct {
-	ConversationID string                          `bun:"conversation_id"`
-	ParticipantID  string                          `bun:"participant_id"`
-	SubjectID      string                          `bun:"subject_id"`
-	PeerType       domain.OrganizationIdentityType `bun:"peer_type"`
-	PeerIdentityID string                          `bun:"peer_identity_id"`
-	PeerRevisionID *string                         `bun:"peer_revision_id"`
-}
-
 // NewSendFirstDirectTextMessageAction 创建首条单聊消息发送操作。
-func NewSendFirstDirectTextMessageAction(db *bun.DB, agentScheduler DirectAgentMessageScheduler) *SendFirstDirectTextMessageAction {
-	return &SendFirstDirectTextMessageAction{db: db, agentScheduler: agentScheduler}
+func NewSendFirstDirectTextMessageAction(db *bun.DB) *SendFirstDirectTextMessageAction {
+	return &SendFirstDirectTextMessageAction{db: db}
 }
 
 // NewFindDirectConversationQuery 创建内部单聊查找查询。
@@ -110,8 +94,8 @@ func (q *FindDirectConversationQuery) Execute(ctx context.Context, identity *ser
 }
 
 // NewSendDirectTextMessageAction 创建内部单聊发送操作。
-func NewSendDirectTextMessageAction(db *bun.DB, agentScheduler DirectAgentMessageScheduler) *SendDirectTextMessageAction {
-	return &SendDirectTextMessageAction{db: db, agentScheduler: agentScheduler}
+func NewSendDirectTextMessageAction(db *bun.DB) *SendDirectTextMessageAction {
+	return &SendDirectTextMessageAction{db: db}
 }
 
 // Execute 发送首条单聊消息并按需创建当前成员与目标成员的长期单聊。
@@ -197,9 +181,9 @@ func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity
 			} else if conversation.Status != string(domain.ConversationStatusActive) {
 				return ErrDataInvariant
 			}
-			message, err := sendDirectTextMessage(ctx, tx, identity, DirectTextMessageInput{
+			message, err := sendDirectTextMessage(ctx, tx, identity, InternalTextMessageInput{
 				ConversationID: conversation.ID, ClientMessageID: clientMessageID, Body: body,
-			}, a.agentScheduler)
+			})
 			if err != nil {
 				return err
 			}
@@ -229,8 +213,8 @@ func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity
 }
 
 // Execute 在可重试事务中写入内部单聊文本消息。
-func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input DirectTextMessageInput) (ConversationMessage, error) {
-	normalized, fields := normalizeDirectTextMessageInput(input)
+func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input InternalTextMessageInput) (ConversationMessage, error) {
+	normalized, fields := normalizeInternalMessageInput(input)
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
@@ -243,7 +227,7 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 				return err
 			}
 			var sendErr error
-			result, sendErr = sendDirectTextMessage(ctx, tx, identity, normalized, a.agentScheduler)
+			result, sendErr = sendDirectTextMessage(ctx, tx, identity, normalized)
 			return sendErr
 		})
 		if err == nil {
@@ -260,56 +244,13 @@ func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *ser
 	return ConversationMessage{}, fmt.Errorf("send direct message retries exhausted: %w", err)
 }
 
-// sendDirectTextMessage 在当前事务中幂等写入单聊文本消息。
-func sendDirectTextMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input DirectTextMessageInput, agentScheduler DirectAgentMessageScheduler) (ConversationMessage, error) {
+// sendDirectTextMessage 校验真人单聊范围并保存消息。
+func sendDirectTextMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input InternalTextMessageInput) (ConversationMessage, error) {
 	sendContext, err := loadDirectSendContext(ctx, db, identity, input.ConversationID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
-	if saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, false); err != nil || found {
-		return saved, err
-	}
-	replyTo, err := loadConversationReplyTarget(ctx, db, identity.Organization.ID, input.ConversationID, input.ReplyToMessageID)
-	if err != nil {
-		return ConversationMessage{}, err
-	}
-	message := &servermodels.Message{
-		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID,
-		ConversationID: input.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
-		Type: string(domain.MessageTypeText), Body: input.Body,
-		IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
-	}
-	if replyTo != nil {
-		message.ReplyToMessageID = &replyTo.ID
-	}
-	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "idempotency_key", "originated_at").
-		Returning("*").
-		Exec(ctx); err != nil {
-		return ConversationMessage{}, fmt.Errorf("create direct text message: %w", err)
-	}
-	if sendContext.PeerType == domain.OrganizationIdentityTypeAgent {
-		if agentScheduler == nil || sendContext.PeerIdentityID == "" || sendContext.PeerRevisionID == nil {
-			return ConversationMessage{}, ErrDataInvariant
-		}
-		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.PeerIdentityID, *sendContext.PeerRevisionID, message.ID); err != nil {
-			return ConversationMessage{}, fmt.Errorf("schedule agent direct message: %w", err)
-		}
-	}
-	conversation := &servermodels.Conversation{ID: input.ConversationID, OrganizationID: identity.Organization.ID}
-	if err := updateConversationSummary(ctx, db, conversation, message); err != nil {
-		return ConversationMessage{}, err
-	}
-	if err := advanceConversationUserReadState(ctx, db, &servermodels.ConversationUserState{
-		OrganizationID: identity.Organization.ID, ConversationID: input.ConversationID,
-		UserID: identity.User.ID, LastReadMessageID: &message.ID,
-	}, message); err != nil {
-		return ConversationMessage{}, err
-	}
-	result := memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity)
-	result.ReplyTo = replyTo
-	return result, nil
+	return saveInternalTextMessage(ctx, db, identity, input, sendContext, nil)
 }
 
 // loadDirectTarget 读取同企业可发起单聊的活跃成员身份。
@@ -322,10 +263,9 @@ func loadDirectTarget(ctx context.Context, db bun.IDB, organizationID, identityI
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
 		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
-		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ?", organizationID).
 		Where("oi.id = ?", identityID).
-		Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
+		Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
 		Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return directTargetRow{}, ErrDirectTargetNotFound
@@ -363,6 +303,7 @@ func ensureOrganizationIdentityChatSubject(ctx context.Context, db bun.IDB, orga
 	}
 	if _, err := db.NewInsert().Model(subject).
 		Column("id", "organization_id", "kind", "source_id").
+		On("CONFLICT (organization_id, kind, source_id) DO UPDATE").Set("source_id = EXCLUDED.source_id").Returning("*").
 		Exec(ctx); err != nil {
 		return nil, fmt.Errorf("create organization identity chat subject: %w", err)
 	}
@@ -450,72 +391,30 @@ func loadDirectConversationSummary(ctx context.Context, db bun.IDB, organization
 }
 
 // loadDirectSendContext 校验当前成员是单聊现有有效参与者。
-func loadDirectSendContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (directSendContextRow, error) {
-	row := directSendContextRow{}
+func loadDirectSendContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (internalMessageContext, error) {
+	row := internalMessageContext{}
 	err := db.NewSelect().
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS conversation_id").
 		ColumnExpr("mine.id AS participant_id").
 		ColumnExpr("mine_cs.id AS subject_id").
-		ColumnExpr("peer_oi.type AS peer_type").
-		ColumnExpr("peer_oi.id AS peer_identity_id").
-		ColumnExpr("peer_a.active_revision_id AS peer_revision_id").
 		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identity.OrganizationIdentity.ID).
 		Join("LEFT JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id").
-		Join("LEFT JOIN agents AS peer_a ON peer_a.organization_id = peer_oi.organization_id AND peer_a.identity_id = peer_oi.id").
 		Where("cv.organization_id = ?", identity.Organization.ID).
 		Where("cv.id = ?", conversationID).
 		Where("cv.type = ?", domain.ConversationTypeDirect).
 		Where("cv.status = ?", domain.ConversationStatusActive).
 		Where("? IN (dc.first_identity_id, dc.second_identity_id)", identity.OrganizationIdentity.ID).
-		Where("((peer_oi.type = ? AND peer_u.status = ?) OR (peer_oi.type = ? AND peer_a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
+		Where("peer_oi.type = ? AND peer_u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
 		Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return directSendContextRow{}, ErrConversationNotFound
+		return internalMessageContext{}, ErrConversationNotFound
 	}
 	if err != nil {
-		return directSendContextRow{}, fmt.Errorf("load direct send context: %w", err)
+		return internalMessageContext{}, fmt.Errorf("load direct send context: %w", err)
 	}
 	return row, nil
-}
-
-// normalizeDirectTextMessageInput 规范化并校验内部单聊文本消息输入。
-func normalizeDirectTextMessageInput(input DirectTextMessageInput) (DirectTextMessageInput, map[string]ValidationCode) {
-	conversationID, clientMessageID, body, fields := normalizeInternalTextMessageInput(input.ConversationID, input.ClientMessageID, input.Body)
-	input.ConversationID = conversationID
-	input.ClientMessageID = clientMessageID
-	input.Body = body
-	// 规范化引用消息编号。
-	if input.ReplyToMessageID != "" {
-		var valid bool
-		input.ReplyToMessageID, valid = common.NormalizeUUID(input.ReplyToMessageID)
-		if !valid {
-			fields["replyToMessageId"] = ValidationReplyToMessageIDInvalid
-		}
-	}
-	return input, fields
-}
-
-// normalizeInternalTextMessageInput 规范化内部会话文本消息输入。
-func normalizeInternalTextMessageInput(conversationID, clientMessageID, body string) (string, string, string, map[string]ValidationCode) {
-	fields := map[string]ValidationCode{}
-	body = strings.TrimSpace(body)
-	var valid bool
-	conversationID, valid = common.NormalizeUUID(conversationID)
-	if !valid {
-		fields["conversationId"] = ValidationConversationIDInvalid
-	}
-	clientMessageID, valid = common.NormalizeUUID(clientMessageID)
-	if !valid {
-		fields["clientMessageId"] = ValidationClientMessageIDInvalid
-	}
-	if body == "" {
-		fields["body"] = ValidationBodyRequired
-	} else if utf8.RuneCountInString(body) > 4000 {
-		fields["body"] = ValidationBodyTooLong
-	}
-	return conversationID, clientMessageID, body, fields
 }

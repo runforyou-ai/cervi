@@ -1,5 +1,9 @@
 /** 美式英语·收件箱文案。 */
 const inbox = {
+  newAgentConversation: "Create AI chat",
+  agentPickerTitle: "Choose an AI colleague",
+  agentPickerDescription: "Choose an AI colleague to start a new chat.",
+  agentPickerEmpty: "No AI colleagues available",
   messagesLoadingLater: "Loading newer messages",
   messagesLoadLaterError: "Unable to load newer messages",
   messageOriginalDeleted: "Original message deleted",

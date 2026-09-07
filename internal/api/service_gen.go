@@ -39,6 +39,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/close", s.closeServiceSession)
 	router.POST("/conversations/:conversationID/reopen", s.reopenServiceSession)
 	router.POST("/direct-conversations/messages", s.sendFirstDirectTextMessage)
+	router.POST("/agent-conversations/messages", s.sendFirstAgentTextMessage)
+	router.POST("/agent-conversations/:conversationID/messages", s.sendAgentTextMessage)
 	router.GET("/direct-conversations/by-target/:targetIdentityID", s.findDirectConversation)
 	router.POST("/direct-conversations/:conversationID/messages", s.sendDirectTextMessage)
 	router.POST("/group-conversations", s.createGroupConversation)
@@ -349,6 +351,26 @@ func (s *Service) sendFirstDirectTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendFirstDirectTextMessage(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// sendFirstAgentTextMessage 在首次发送时创建独立 AI 聊天。
+func (s *Service) sendFirstAgentTextMessage(c *gin.Context) {
+	var input appservice.FirstAgentTextMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendFirstAgentTextMessage(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// sendAgentTextMessage 向已有 AI 会话发送文本消息。
+func (s *Service) sendAgentTextMessage(c *gin.Context) {
+	var input appservice.AgentTextMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendAgentTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

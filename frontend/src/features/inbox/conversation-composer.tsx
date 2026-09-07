@@ -20,6 +20,7 @@ import {
   ConversationType,
   isApiError,
   sendCustomerTextMessage,
+  sendAgentTextMessage,
   sendDirectTextMessage,
   sendGroupTextMessage,
   type ConversationMessageData,
@@ -95,7 +96,7 @@ export function ConversationComposer({
   onSent,
   onFailed,
   onSucceeded,
-  sendDirectMessage,
+  sendIndividualMessage,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -113,7 +114,7 @@ export function ConversationComposer({
   onSent: (clientMessageID: string, message: ConversationMessageData) => void
   onFailed: (clientMessageID: string) => void
   onSucceeded: () => void
-  sendDirectMessage?: (
+  sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
 }) {
@@ -343,14 +344,17 @@ export function ConversationComposer({
       const messageInput = { clientMessageId: clientMessageID, body }
       let message: ConversationMessageData
       switch (conversationType) {
+        case ConversationType.ConversationTypeAgent:
         case ConversationType.ConversationTypeDirect: {
           const directInput = {
             ...messageInput,
             replyToMessageId: activeReplyTo?.id ?? "",
           }
-          message = sendDirectMessage
-            ? await sendDirectMessage(directInput)
-            : await sendDirectTextMessage(conversationID, directInput)
+          message = sendIndividualMessage
+            ? await sendIndividualMessage(directInput)
+            : conversationType === ConversationType.ConversationTypeAgent
+              ? await sendAgentTextMessage(conversationID, directInput)
+              : await sendDirectTextMessage(conversationID, directInput)
           break
         }
         case ConversationType.ConversationTypeGroup:

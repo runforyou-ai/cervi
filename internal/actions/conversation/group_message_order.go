@@ -20,7 +20,7 @@ func lockConversationMember(ctx context.Context, db bun.IDB, identity *servermod
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS subject ON subject.organization_id = mine.organization_id AND subject.id = mine.subject_id AND subject.kind = ? AND subject.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		Where("cv.organization_id = ? AND cv.id = ?", identity.Organization.ID, conversationID).
-		Where("cv.type IN (?, ?)", domain.ConversationTypeDirect, domain.ConversationTypeGroup).
+		Where("cv.type IN (?, ?, ?)", domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup).
 		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
 		For("UPDATE OF cv").Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {

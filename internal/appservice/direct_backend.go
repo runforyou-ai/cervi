@@ -63,6 +63,8 @@ type DirectBackend struct {
 	transferServiceSession            *conversationaction.TransferServiceSessionAction
 	closeServiceSession               *conversationaction.CloseServiceSessionAction
 	reopenServiceSession              *conversationaction.ReopenServiceSessionAction
+	sendFirstAgentTextMessage         *conversationaction.SendFirstAgentTextMessageAction
+	sendAgentTextMessage              *conversationaction.SendAgentTextMessageAction
 	sendFirstDirectTextMessage        *conversationaction.SendFirstDirectTextMessageAction
 	findDirectConversation            *conversationaction.FindDirectConversationQuery
 	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
@@ -199,9 +201,11 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
 		closeServiceSession:               conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),
 		reopenServiceSession:              conversationaction.NewReopenServiceSessionAction(db),
-		sendFirstDirectTextMessage:        conversationaction.NewSendFirstDirectTextMessageAction(db, agentScheduler),
+		sendFirstAgentTextMessage:         conversationaction.NewSendFirstAgentTextMessageAction(db, agentScheduler),
+		sendAgentTextMessage:              conversationaction.NewSendAgentTextMessageAction(db, agentScheduler),
+		sendFirstDirectTextMessage:        conversationaction.NewSendFirstDirectTextMessageAction(db),
 		findDirectConversation:            conversationaction.NewFindDirectConversationQuery(db),
-		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db, agentScheduler),
+		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db),
 		createGroupConversation:           conversationaction.NewCreateGroupConversationAction(db),
 		getGroupConversation:              conversationaction.NewGetGroupConversationQuery(db),
 		updateGroupConversation:           conversationaction.NewUpdateGroupConversationAction(db),

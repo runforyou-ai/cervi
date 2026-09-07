@@ -1,5 +1,9 @@
 /** 简体中文·收件箱文案。 */
 const inbox = {
+  newAgentConversation: "创建 AI 聊天",
+  agentPickerTitle: "选择 AI 员工",
+  agentPickerDescription: "选择一位 AI 员工开始新的聊天。",
+  agentPickerEmpty: "暂无可用的 AI 员工",
   messagesLoadingLater: "正在加载后续消息",
   messagesLoadLaterError: "加载后续消息失败",
   messageOriginalDeleted: "原消息已删除",

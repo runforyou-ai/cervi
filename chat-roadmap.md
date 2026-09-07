@@ -69,7 +69,8 @@ Cervi 中的“渠道”仅表示网站、微信公众号、Telegram Bot 私聊�
 会话类型只表达沟通形态：
 
 ```text
-direct    单聊
+direct    真人单聊
+agent     独立 AI 聊天
 group     群聊
 customer  客户会话
 ```
@@ -85,7 +86,7 @@ customer  客户会话
 
 一个 `Conversation` 最多关联一种来源扩展：`customer_conversations`、未来的 `connected_chats` 和联邦扩展互斥。`conversations.type` 创建后不可修改，避免扩展关系与参与者规则失真。
 
-Cervi 原生 `direct` 会话采用“一对允许单聊的 ChatSubject 对应一个长期会话”的产品语义。同一企业内先按主体编号形成规范化主体对，并以数据库唯一约束或等价的并发安全机制保证并发创建收敛；具体约束随企业内部单聊子阶段落地，不在客户会话数据底座中提前建表。
+Cervi 原生 `direct` 会话仅用于真人之间，采用“一对允许单聊的 ChatSubject 对应一个长期会话”的产品语义。同一企业内先按主体编号形成规范化主体对，并以数据库唯一约束或等价的并发安全机制保证并发创建收敛；具体约束随企业内部单聊子阶段落地，不在客户会话数据底座中提前建表。
 
 ### 3.4 第三方账号会话按账号视图隔离
 
@@ -311,7 +312,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 `ServiceSession` 表示一条客户 Conversation 上的一次客服处理过程，与客户可见线程分离。持久状态只保留 `open` 和 `closed`；开放周期是否排队以及由谁负责，分别由 `assignee_identity_id` 是否为空及其指向表达。团队、转接记录、响应指标和满意度按实际需求另行建模，不把它们扩成同一状态枚举。
 
-一个客户 Conversation 可以先后产生多个服务批次，同一 Conversation 同时最多一个未结束批次。批次不切断 Conversation 消息历史，也不作为客户侧聊天列表和历史接口的主键。内部单聊、群聊和第三方账号会话不创建服务批次。
+一个客户 Conversation 可以先后产生多个服务批次，同一 Conversation 同时最多一个未结束批次。批次不切断 Conversation 消息历史，也不作为客户侧聊天列表和历史接口的主键。真人单聊、AI 聊天、群聊和第三方账号会话不创建服务批次。
 
 网站 Messenger 允许同一 `contact_channel_identity` 同时拥有多条未结束客户线程，每条 Conversation 仍同时最多一个未结束服务批次。访客选择哪个 Conversation，就继续哪个客户线程。
 
@@ -1644,3 +1645,13 @@ Web 与桌面端创建群聊和添加成员支持同企业的活跃 Agent，候�
 群主仍由真人担任，不能转让给 Agent；最后一位真人可以解散仍包含 Agent 的群聊。群内结构化 @ 候选及服务端提醒目标仅接受真人，既有真人 @成员和 @所有人功能保持原有语义。
 
 本次只交付成员邀请和管理，不创建群聊 Agent Trigger 或 Run，不提供群内 Agent 回复、抢占、上下文组装或运行状态展示；群内 @Agent 和 @所有人触发 Agent 的规则留待后续设计。不增加迁移，不扩展移动端建群和成员管理。
+
+### 独立 AI 聊天
+
+AI 聊天使用 `conversations.type = agent`，通过 `agent_conversations` 固定所属成员身份与目标 Agent 身份。同一企业内同一成员与同一 Agent 可以拥有多个 Conversation，身份组合没有唯一索引。双方同时写入统一参与者表，消息读取和发送按企业及有效参与者授权。真人 `direct` 保留 `direct_conversations` 的规范化身份对唯一约束，查找和发送入口不再接受 Agent。
+
+Web 与桌面端消息页的加号提供「发起单聊 / 创建 AI 聊天 / 创建群聊」。AI 选择器仅列出活跃 Agent，选中后每次进入新的本地草稿；不查找历史会话，不创建数据库记录。草稿预生成稳定 `conversationId`，首次发送携带该编号、目标 Agent、`clientMessageId` 和正文，在一个事务中创建 Conversation、扩展记录、参与者、消息、个人阅读状态、Trigger、Run 与可靠任务。事务失败全部回滚；响应丢失后沿用会话和消息编号重试，确认已有结果。编号已存在时核对企业、所属用户、目标 Agent 和会话类型，消息重试核对正文和引用。
+
+每个 AI 会话分别进入「全部 / 内部」列表，标题取首条消息归并空白后的前 40 个字符，列表和会话头同时展示 Agent 名称。组件身份、消息缓存、未读和运行状态按 Conversation 隔离；草稿转正式会话时保持组件身份，离开草稿后的迟到结果仅刷新列表。移动端支持已有 AI 会话的列表、历史和文本收发。草稿保留范围沿用当前页面，不建立服务端草稿状态。
+
+新建 AI 会话不关闭旧会话或中止旧 Run。任何已有 AI 会话都可以继续聊天，模型仅读取当前 Conversation 的历史和引用；Agent 配置与知识库能力由正常执行配置提供。不创建 ServiceSession、上下文重置标记或历史兼容分支。

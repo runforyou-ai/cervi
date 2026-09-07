@@ -1,4 +1,4 @@
-/** 企业成员内部单聊对象选择器。 */
+/** 真人单聊与 AI 聊天对象选择器。 */
 import { useEffect, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -28,13 +28,15 @@ import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 选择一位活跃企业成员。 */
-export function DirectConversationPickerDialog({
+export function ConversationTargetPickerDialog({
   open,
+  agentChat = false,
   currentIdentityID,
   onOpenChange,
   onSelected,
 }: {
   open: boolean
+  agentChat?: boolean
   currentIdentityID: string
   onOpenChange: (open: boolean) => void
   onSelected: (
@@ -43,7 +45,9 @@ export function DirectConversationPickerDialog({
   ) => void
 }) {
   const { t } = useTranslation("inbox")
-  const [selectedMember, setSelectedMember] = useState<MemberOption | null>(null)
+  const [selectedMember, setSelectedMember] = useState<MemberOption | null>(
+    null,
+  )
   const { data, loading, error, refresh } = useResource(
     resourceKeys.memberOptions(),
     listAllMemberOptions,
@@ -52,10 +56,13 @@ export function DirectConversationPickerDialog({
   const lookup = useResource(
     resourceKeys.directConversation(selectedMember?.id ?? ""),
     () => findDirectConversation(selectedMember?.id ?? ""),
-    { enabled: open && Boolean(selectedMember), staleTime: 0 },
+    { enabled: open && !agentChat && Boolean(selectedMember), staleTime: 0 },
   )
-  const candidates = (data ?? []).filter(
-    (member) => member.id !== currentIdentityID,
+  const candidates = (data ?? []).filter((member) =>
+    agentChat
+      ? member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+      : member.type === OrganizationIdentityType.OrganizationIdentityTypeUser &&
+        member.id !== currentIdentityID,
   )
 
   useEffect(() => {
@@ -63,7 +70,14 @@ export function DirectConversationPickerDialog({
   }, [open])
 
   useEffect(() => {
-    if (!open || !selectedMember || lookup.loading || lookup.refreshing) return
+    if (
+      agentChat ||
+      !open ||
+      !selectedMember ||
+      lookup.loading ||
+      lookup.refreshing
+    )
+      return
     if (lookup.error) {
       setSelectedMember(null)
       if (isApiError(lookup.error) && sessionPath(lookup.error.state)) return
@@ -80,16 +94,30 @@ export function DirectConversationPickerDialog({
     setSelectedMember(null)
     onOpenChange(false)
   }, [
-    lookup.data, lookup.error, lookup.loading, lookup.refreshing,
-    onOpenChange, onSelected, open, selectedMember, t,
+    lookup.data,
+    lookup.error,
+    lookup.loading,
+    lookup.refreshing,
+    onOpenChange,
+    onSelected,
+    open,
+    selectedMember,
+    t,
+    agentChat,
   ])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="grid max-h-[min(42rem,calc(100svh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
         <DialogHeader>
-          <DialogTitle>{t("directPickerTitle")}</DialogTitle>
-          <DialogDescription>{t("directPickerDescription")}</DialogDescription>
+          <DialogTitle>
+            {t(agentChat ? "agentPickerTitle" : "directPickerTitle")}
+          </DialogTitle>
+          <DialogDescription>
+            {t(
+              agentChat ? "agentPickerDescription" : "directPickerDescription",
+            )}
+          </DialogDescription>
         </DialogHeader>
         <ScrollArea className="min-h-64 rounded-md border">
           {loading ? (
@@ -113,7 +141,7 @@ export function DirectConversationPickerDialog({
             </div>
           ) : candidates.length === 0 ? (
             <p className="px-6 py-12 text-center text-sm text-muted-foreground">
-              {t("directPickerEmpty")}
+              {t(agentChat ? "agentPickerEmpty" : "directPickerEmpty")}
             </p>
           ) : (
             <div className="grid p-1.5">
@@ -123,18 +151,21 @@ export function DirectConversationPickerDialog({
                   type="button"
                   disabled={Boolean(selectedMember)}
                   className="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
-                  onClick={() => setSelectedMember(member)}
+                  onClick={() => {
+                    // AI 每次进入新草稿，真人单聊先查找已有会话。
+                    if (agentChat) {
+                      onSelected(member, null)
+                      onOpenChange(false)
+                    } else setSelectedMember(member)
+                  }}
                 >
-                  <DirectConversationDraftAvatar member={member} className="size-9" />
+                  <DirectConversationDraftAvatar
+                    member={member}
+                    className="size-9"
+                  />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {member.displayName}
                   </span>
-                  {member.type ===
-                  OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {t("directPickerAgent")}
-                    </span>
-                  ) : null}
                   {selectedMember?.id === member.id ? (
                     <LoaderCircleIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
                   ) : null}

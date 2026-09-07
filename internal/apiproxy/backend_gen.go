@@ -190,6 +190,22 @@ func (b *Backend) SendFirstDirectTextMessage(ctx context.Context, meta appservic
 	return output, err
 }
 
+// SendFirstAgentTextMessage 在首次发送时创建独立 AI 聊天。
+func (b *Backend) SendFirstAgentTextMessage(ctx context.Context, meta appservice.RequestMeta, input appservice.FirstAgentTextMessageInput) (appservice.FirstAgentTextMessageResult, error) {
+	var output appservice.FirstAgentTextMessageResult
+	err := b.do(ctx, meta, http.MethodPost, "/agent-conversations/messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// SendAgentTextMessage 向已有 AI 会话发送文本消息。
+func (b *Backend) SendAgentTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.AgentTextMessageInput) (appservice.ConversationMessage, error) {
+	var output appservice.ConversationMessage
+	err := b.do(ctx, meta, http.MethodPost, "/agent-conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // FindDirectConversation 按目标身份查找当前成员的活跃单聊。
 func (b *Backend) FindDirectConversation(ctx context.Context, meta appservice.RequestMeta, targetIdentityID string) (appservice.DirectConversationLookup, error) {
 	var output appservice.DirectConversationLookup

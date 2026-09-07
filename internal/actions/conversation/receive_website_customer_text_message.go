@@ -48,7 +48,7 @@ type CustomerAgentMessageScheduler interface {
 
 // AgentMessageScheduler 同时调度内部单聊和网站客户 Agent 输入。
 type AgentMessageScheduler interface {
-	DirectAgentMessageScheduler
+	AgentChatMessageScheduler
 	CustomerAgentMessageScheduler
 }
 

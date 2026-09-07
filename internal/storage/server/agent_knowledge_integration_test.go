@@ -147,15 +147,15 @@ func testAgentKnowledgeRuns(t *testing.T, db *bun.DB, identity *servermodels.Ide
 			}
 			conversationID = output.Conversation.ID
 		} else if conversationID == "" {
-			output, err := conversationaction.NewSendFirstDirectTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstDirectTextMessageInput{
-				TargetIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "查询知识",
+			output, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(),
+				AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "查询知识",
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
 			conversationID = output.Conversation.ID
 		} else {
-			if _, err := conversationaction.NewSendDirectTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.DirectTextMessageInput{
+			if _, err := conversationaction.NewSendAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.InternalTextMessageInput{
 				ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "查询知识",
 			}); err != nil {
 				t.Fatal(err)

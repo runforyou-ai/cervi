@@ -46,7 +46,7 @@ func (a *UpdateConversationNotificationSettingsAction) Execute(ctx context.Conte
 			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ? AND cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 			Where("cv.organization_id = ?", identity.Organization.ID).
 			Where("cv.id = ?", conversationID).
-			Where("cv.type IN (?, ?)", domain.ConversationTypeDirect, domain.ConversationTypeGroup).
+			Where("cv.type IN (?, ?, ?)", domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup).
 			Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
 			Scan(ctx, &conversation)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -55,7 +55,7 @@ func (a *UpdateConversationNotificationSettingsAction) Execute(ctx context.Conte
 		if err != nil {
 			return fmt.Errorf("load conversation notification target: %w", err)
 		}
-		if domain.ConversationType(conversation.Type) == domain.ConversationTypeDirect && domain.ConversationStatus(conversation.Status) != domain.ConversationStatusActive {
+		if domain.ConversationType(conversation.Type) != domain.ConversationTypeGroup && domain.ConversationStatus(conversation.Status) != domain.ConversationStatusActive {
 			return ErrConversationNotFound
 		}
 		state := &servermodels.ConversationUserState{

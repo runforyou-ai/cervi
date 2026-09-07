@@ -263,7 +263,7 @@ func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *ser
 			return ErrConversationNotFound
 		}
 		return nil
-	case domain.ConversationTypeDirect, domain.ConversationTypeGroup:
+	case domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup:
 		available, err := db.NewSelect().
 			TableExpr("conversation_participants AS cp").
 			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
