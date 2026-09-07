@@ -586,7 +586,7 @@ function ConversationTimelineContent({
         <div
           className={cn(
             "flex w-full flex-col px-4 pb-3 md:px-6",
-            workspaceLayout && "flex-1 justify-end",
+            workspaceLayout && "flex-1",
           )}
         >
           {currentPage?.hasEarlier || timeline.pageError === "before" ? (
@@ -810,11 +810,9 @@ function ConversationTimelineContent({
                                 <div
                                   className={cn(
                                     "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
-                                    message.agentProcess
-                                      ? "border bg-background text-foreground shadow-xs"
-                                      : incoming
+                                    incoming
                                       ? cn(
-                                          "border bg-muted text-foreground shadow-xs",
+                                          "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted",
                                           endsGroup && "rounded-bl-sm",
                                         )
                                       : cn(
@@ -860,7 +858,7 @@ function ConversationTimelineContent({
                                     </button>
                                   ) : null}
                                   {message.agentProcess ? (
-                                    <AgentProcess process={message.agentProcess} />
+                                    <AgentProcess process={message.agentProcess} incoming={incoming} />
                                   ) : null}
                                   <div
                                     className={cn(
@@ -881,7 +879,7 @@ function ConversationTimelineContent({
                                         title={dateFormatters.full.format(date)}
                                         className={cn(
                                           "shrink-0 translate-y-0.5 text-[10px]",
-                                          incoming || message.agentProcess
+                                          incoming
                                             ? "text-muted-foreground"
                                             : "text-primary-foreground/75",
                                         )}
@@ -891,7 +889,7 @@ function ConversationTimelineContent({
                                     ) : null}
                                   </div>
                                   {message.agentProcess ? (
-                                    <AgentProcessUsage process={message.agentProcess} />
+                                    <AgentProcessUsage process={message.agentProcess} incoming={incoming} />
                                   ) : null}
                                 </div>
                               </div>
