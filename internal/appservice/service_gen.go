@@ -414,6 +414,11 @@ func (s *Service) GetKnowledgeDocument(ctx context.Context, meta RequestMeta, kn
 	return s.backend.GetKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
 }
 
+// GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
+func (s *Service) GetKnowledgeDocumentFile(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocumentFile, error) {
+	return s.backend.GetKnowledgeDocumentFile(ctx, meta, knowledgeBaseID, documentID)
+}
+
 // ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
 func (s *Service) ListKnowledgeDocumentSegments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentSegmentListInput) (KnowledgeDocumentSegmentList, error) {
 	return s.backend.ListKnowledgeDocumentSegments(ctx, meta, knowledgeBaseID, documentID, input)
@@ -422,11 +427,6 @@ func (s *Service) ListKnowledgeDocumentSegments(ctx context.Context, meta Reques
 // RetrieveKnowledgeBase 检索指定外部知识库。
 func (s *Service) RetrieveKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error) {
 	return s.backend.RetrieveKnowledgeBase(ctx, meta, knowledgeBaseID, input)
-}
-
-// ReadKnowledgeContext 读取指定分段及前后最多各两段内容。
-func (s *Service) ReadKnowledgeContext(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeContextInput) (KnowledgeContext, error) {
-	return s.backend.ReadKnowledgeContext(ctx, meta, knowledgeBaseID, input)
 }
 
 // GetKnowledgeBase 返回当前企业中的知识库详情。

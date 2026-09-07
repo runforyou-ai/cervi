@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
@@ -117,10 +118,6 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 // normalizeOutput 按响应类型将远程响应中的相对文件地址转换为企业服务器绝对地址。
 func (b *Backend) normalizeOutput(output any) {
 	switch value := output.(type) {
-	case *appservice.KnowledgeContext:
-		if value.Segments == nil {
-			value.Segments = []appservice.KnowledgeContextSegment{}
-		}
 	case *appservice.KnowledgeQAEntry:
 		if value.SimilarQuestions == nil {
 			value.SimilarQuestions = []appservice.KnowledgeQASimilarQuestion{}
@@ -346,7 +343,13 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	if authenticated {
 		request.Header.Set("Authorization", "Bearer "+credential.Token)
 	}
-	response, err := state.client.Do(request)
+	// 原文件预览包含完整二进制内容，使用下载超时且不套用普通 JSON 大小上限。
+	_, documentFile := output.(*appservice.KnowledgeDocumentFile)
+	client := *state.client
+	if documentFile {
+		client.Timeout = 3 * time.Minute
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -355,7 +358,10 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
 	defer response.Body.Close()
-	limited := io.LimitReader(response.Body, maxResponseBytes)
+	var limited io.Reader = response.Body
+	if !documentFile || response.StatusCode >= http.StatusMultipleChoices {
+		limited = io.LimitReader(response.Body, maxResponseBytes)
+	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		var payload errorBody
 		if err := json.NewDecoder(limited).Decode(&payload); err != nil {

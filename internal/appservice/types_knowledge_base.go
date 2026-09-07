@@ -144,10 +144,12 @@ type KnowledgeDocument struct {
 
 // KnowledgeDocumentSegmentListInput 定义知识文档分段列表查询条件。
 type KnowledgeDocumentSegmentListInput struct {
-	Keyword  string                               `json:"keyword" query:"keyword"`
-	Status   *KnowledgeDocumentSegmentIndexStatus `json:"status,omitempty" query:"status"`
-	Page     int                                  `json:"page" query:"page,default=1"`
-	PageSize int                                  `json:"pageSize" query:"pageSize,default=20"`
+	SegmentID string                               `json:"segmentId" query:"segmentId"`
+	Position  int                                  `json:"position" query:"position,default=0"`
+	Keyword   string                               `json:"keyword" query:"keyword"`
+	Status    *KnowledgeDocumentSegmentIndexStatus `json:"status,omitempty" query:"status"`
+	Page      int                                  `json:"page" query:"page,default=1"`
+	PageSize  int                                  `json:"pageSize" query:"pageSize,default=20"`
 }
 
 // KnowledgeDocumentSegment 定义知识文档分段列表项。
@@ -189,24 +191,9 @@ type KnowledgeRetrievalResult struct {
 	Records []KnowledgeRetrievalRecord `json:"records"`
 }
 
-// KnowledgeContextInput 定位指定知识库中的命中分段。
-type KnowledgeContextInput struct {
-	DocumentID string `json:"documentId"`
-	SegmentID  string `json:"segmentId"`
-	Position   int    `json:"position"`
-}
-
-// KnowledgeContextSegment 定义上下文分段及命中标记。
-type KnowledgeContextSegment struct {
-	SegmentID string  `json:"segmentId"`
-	Position  int     `json:"position"`
-	Content   string  `json:"content"`
-	Answer    *string `json:"answer"`
-	Matched   bool    `json:"matched"`
-}
-
-// KnowledgeContext 定义命中文档的周边内容。
-type KnowledgeContext struct {
-	DocumentName string                    `json:"documentName"`
-	Segments     []KnowledgeContextSegment `json:"segments"`
+// KnowledgeDocumentFile 定义原文件预览响应，Content 为 Base64 编码的原始内容。
+type KnowledgeDocumentFile struct {
+	Available bool   `json:"available"`
+	Name      string `json:"name"`
+	Content   string `json:"content"`
 }

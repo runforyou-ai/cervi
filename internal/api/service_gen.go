@@ -98,9 +98,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/integration-connections/:connectionID/knowledge-bases", s.listExternalKnowledgeBaseOptions)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/file", s.getKnowledgeDocumentFile)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/segments", s.listKnowledgeDocumentSegments)
 	router.POST("/knowledge-bases/:knowledgeBaseID/retrieve", s.retrieveKnowledgeBase)
-	router.POST("/knowledge-bases/:knowledgeBaseID/context", s.readKnowledgeContext)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
@@ -851,6 +851,12 @@ func (s *Service) getKnowledgeDocument(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// getKnowledgeDocumentFile 返回指定文档的原始文件供预览。
+func (s *Service) getKnowledgeDocumentFile(c *gin.Context) {
+	output, err := s.application.GetKnowledgeDocumentFile(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
 func (s *Service) listKnowledgeDocumentSegments(c *gin.Context) {
 	input, ok := bindKnowledgeDocumentSegmentListInputQuery(c)
@@ -868,16 +874,6 @@ func (s *Service) retrieveKnowledgeBase(c *gin.Context) {
 		return
 	}
 	output, err := s.application.RetrieveKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// readKnowledgeContext 读取指定分段及前后最多各两段内容。
-func (s *Service) readKnowledgeContext(c *gin.Context) {
-	var input appservice.KnowledgeContextInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.ReadKnowledgeContext(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1235,6 +1231,10 @@ func bindKnowledgeDocumentListInputQuery(c *gin.Context) (appservice.KnowledgeDo
 
 // bindKnowledgeDocumentSegmentListInputQuery 从查询参数解析 appservice.KnowledgeDocumentSegmentListInput。
 func bindKnowledgeDocumentSegmentListInputQuery(c *gin.Context) (appservice.KnowledgeDocumentSegmentListInput, bool) {
+	position, ok := positiveQueryInteger(c, "position", 0)
+	if !ok {
+		return appservice.KnowledgeDocumentSegmentListInput{}, false
+	}
 	page, ok := positiveQueryInteger(c, "page", 1)
 	if !ok {
 		return appservice.KnowledgeDocumentSegmentListInput{}, false
@@ -1244,10 +1244,12 @@ func bindKnowledgeDocumentSegmentListInputQuery(c *gin.Context) (appservice.Know
 		return appservice.KnowledgeDocumentSegmentListInput{}, false
 	}
 	return appservice.KnowledgeDocumentSegmentListInput{
-		Keyword:  c.Query("keyword"),
-		Status:   optionalEnum[appservice.KnowledgeDocumentSegmentIndexStatus](c.Query("status")),
-		Page:     page,
-		PageSize: pageSize,
+		SegmentID: c.Query("segmentId"),
+		Position:  position,
+		Keyword:   c.Query("keyword"),
+		Status:    optionalEnum[appservice.KnowledgeDocumentSegmentIndexStatus](c.Query("status")),
+		Page:      page,
+		PageSize:  pageSize,
 	}, true
 }
 

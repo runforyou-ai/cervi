@@ -18,12 +18,14 @@ const difyKnowledgeDocumentTimeout = 10 * time.Second
 
 // DifyKnowledgeDocument 定义 Dify 知识文档读取结果。
 type DifyKnowledgeDocument struct {
-	ID        string
-	Name      string
-	Status    string
-	WordCount *int
-	HitCount  int
-	CreatedAt *time.Time
+	ID         string
+	Name       string
+	Status     string
+	WordCount  *int
+	HitCount   int
+	CreatedAt  *time.Time
+	SourceType string
+	FileName   string
 }
 
 // DifyKnowledgeDocumentPage 定义 Dify 知识库文档分页结果。
@@ -195,6 +197,12 @@ func (l *DifyKnowledgeDocumentLister) Get(
 		WordCount     *int   `json:"word_count"`
 		HitCount      int    `json:"hit_count"`
 		CreatedAt     *int64 `json:"created_at"`
+		SourceType    string `json:"data_source_type"`
+		SourceDetail  struct {
+			UploadFile struct {
+				Name string `json:"name"`
+			} `json:"upload_file"`
+		} `json:"data_source_info"`
 	}
 	err = connectiontest.ReadHTTPResponse(ctx, l.client, request, func(body io.Reader) error {
 		if err := json.NewDecoder(body).Decode(&payload); err != nil {
@@ -219,6 +227,7 @@ func (l *DifyKnowledgeDocumentLister) Get(
 	return DifyKnowledgeDocument{
 		ID: id, Name: name, Status: status, WordCount: payload.WordCount,
 		HitCount: payload.HitCount, CreatedAt: difyUnixTime(payload.CreatedAt),
+		SourceType: payload.SourceType, FileName: payload.SourceDetail.UploadFile.Name,
 	}, nil
 }
 

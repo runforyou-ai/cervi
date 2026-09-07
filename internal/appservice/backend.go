@@ -269,15 +269,15 @@ type Backend interface {
 	// GetKnowledgeDocument 返回指定外部知识文档详情。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID
 	GetKnowledgeDocument(context.Context, RequestMeta, string, string) (KnowledgeDocument, error)
+	// GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/file
+	GetKnowledgeDocumentFile(context.Context, RequestMeta, string, string) (KnowledgeDocumentFile, error)
 	// ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/segments
 	ListKnowledgeDocumentSegments(context.Context, RequestMeta, string, string, KnowledgeDocumentSegmentListInput) (KnowledgeDocumentSegmentList, error)
 	// RetrieveKnowledgeBase 检索指定外部知识库。
 	//cervi:route POST /knowledge-bases/:knowledgeBaseID/retrieve
 	RetrieveKnowledgeBase(context.Context, RequestMeta, string, KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error)
-	// ReadKnowledgeContext 读取指定分段及前后最多各两段内容。
-	//cervi:route POST /knowledge-bases/:knowledgeBaseID/context
-	ReadKnowledgeContext(context.Context, RequestMeta, string, KnowledgeContextInput) (KnowledgeContext, error)
 	// GetKnowledgeBase 返回当前企业中的知识库详情。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID
 	GetKnowledgeBase(context.Context, RequestMeta, string) (KnowledgeBase, error)

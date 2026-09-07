@@ -1473,34 +1473,6 @@ export interface KnowledgeBaseList {
 }
 
 /**
- * KnowledgeContext 定义命中文档的周边内容。
- */
-export interface KnowledgeContext {
-    "documentName": string;
-    "segments": KnowledgeContextSegment[] | null;
-}
-
-/**
- * KnowledgeContextInput 定位指定知识库中的命中分段。
- */
-export interface KnowledgeContextInput {
-    "documentId": string;
-    "segmentId": string;
-    "position": number;
-}
-
-/**
- * KnowledgeContextSegment 定义上下文分段及命中标记。
- */
-export interface KnowledgeContextSegment {
-    "segmentId": string;
-    "position": number;
-    "content": string;
-    "answer": string | null;
-    "matched": boolean;
-}
-
-/**
  * KnowledgeDocument 定义知识文档详情。
  */
 export interface KnowledgeDocument {
@@ -1510,6 +1482,15 @@ export interface KnowledgeDocument {
     "wordCount": number | null;
     "hitCount": number;
     "createdAt": string | null;
+}
+
+/**
+ * KnowledgeDocumentFile 定义原文件预览响应，Content 为 Base64 编码的原始内容。
+ */
+export interface KnowledgeDocumentFile {
+    "available": boolean;
+    "name": string;
+    "content": string;
 }
 
 /**
@@ -1573,6 +1554,8 @@ export interface KnowledgeDocumentSegmentList {
  * KnowledgeDocumentSegmentListInput 定义知识文档分段列表查询条件。
  */
 export interface KnowledgeDocumentSegmentListInput {
+    "segmentId": string;
+    "position": number;
     "keyword": string;
     "status"?: KnowledgeDocumentSegmentIndexStatus | null;
     "page": number;

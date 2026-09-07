@@ -337,6 +337,13 @@ export function GetKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID:
 }
 
 /**
+ * GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
+ */
+export function GetKnowledgeDocumentFile(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocumentFile> {
+    return $Call.ByID(1892761017, meta, knowledgeBaseID, documentID);
+}
+
+/**
  * GetKnowledgeQAEntry 返回完整的本地问答。
  */
 export function GetKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<$models.KnowledgeQAEntry> {
@@ -649,13 +656,6 @@ export function ReactivateAgent(meta: $models.RequestMeta, agentID: string): $Ca
  */
 export function ReactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
     return $Call.ByID(2986051725, meta, userID);
-}
-
-/**
- * ReadKnowledgeContext 读取指定分段及前后最多各两段内容。
- */
-export function ReadKnowledgeContext(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeContextInput): $CancellablePromise<$models.KnowledgeContext> {
-    return $Call.ByID(747998841, meta, knowledgeBaseID, input);
 }
 
 /**

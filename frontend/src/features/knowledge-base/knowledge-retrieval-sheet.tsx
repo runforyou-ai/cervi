@@ -1,7 +1,6 @@
 /** 外部知识库检索测试侧栏。 */
 import {
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,7 +17,7 @@ import {
   retrieveKnowledgeBase,
   type KnowledgeRetrievalResultData,
 } from "@/api"
-import { KnowledgeRetrievalContext } from "./knowledge-retrieval-context"
+import { KnowledgeSegmentsDialog } from "./knowledge-segments-dialog"
 import { KnowledgeRetrievalResults } from "./knowledge-retrieval-results"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -84,18 +83,6 @@ export function KnowledgeRetrievalSheet({
   >(null)
   const resultPane = useRef<HTMLDivElement>(null)
   const contextTrigger = useRef<HTMLButtonElement | null>(null)
-  const resultScrollTop = useRef(0)
-
-  // 返回结果时恢复原滚动位置和触发按钮焦点。
-  useLayoutEffect(() => {
-    if (!contextRecord && contextTrigger.current && open) {
-      if (resultPane.current)
-        resultPane.current.scrollTop = resultScrollTop.current
-      contextTrigger.current.focus({ preventScroll: true })
-      contextTrigger.current = null
-    }
-  }, [contextRecord, open])
-
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -134,7 +121,7 @@ export function KnowledgeRetrievalSheet({
         className="w-full gap-0 p-0 sm:max-w-xl"
         onOpenAutoFocus={(event) => {
           event.preventDefault()
-          if (!contextRecord) form.setFocus("query")
+          form.setFocus("query")
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault()
@@ -142,19 +129,11 @@ export function KnowledgeRetrievalSheet({
         }}
       >
         <SheetHeader className="px-6 pt-6 pr-12 pb-0">
-          <SheetTitle>
-            {t(contextRecord ? "retrieval.contextTitle" : "retrieval.title")}
-          </SheetTitle>
-          <SheetDescription>
-            {t(
-              contextRecord
-                ? "retrieval.contextDescription"
-                : "retrieval.description",
-            )}
-          </SheetDescription>
+          <SheetTitle>{t("retrieval.title")}</SheetTitle>
+          <SheetDescription>{t("retrieval.description")}</SheetDescription>
         </SheetHeader>
         <div
-          className={contextRecord ? "hidden" : "flex min-h-0 flex-1 flex-col"}
+          className="flex min-h-0 flex-1 flex-col"
         >
           <form
             className="shrink-0 space-y-9 px-6 pt-4 pb-6"
@@ -213,7 +192,6 @@ export function KnowledgeRetrievalSheet({
               <KnowledgeRetrievalResults
                 records={records}
                 onViewContext={(record, trigger) => {
-                  resultScrollTop.current = resultPane.current?.scrollTop ?? 0
                   contextTrigger.current = trigger
                   setContextRecord(record)
                 }}
@@ -221,14 +199,17 @@ export function KnowledgeRetrievalSheet({
             )}
           </div>
         </div>
-        {contextRecord && (
-          <KnowledgeRetrievalContext
-            key={`${contextRecord.documentId}-${contextRecord.segmentId}-${contextRecord.position}`}
-            knowledgeBaseId={knowledgeBaseId}
-            record={contextRecord}
-            onBack={() => setContextRecord(null)}
-          />
-        )}
+        {contextRecord && <KnowledgeSegmentsDialog
+          key={`${contextRecord.documentId}-${contextRecord.segmentId}`}
+          knowledgeBaseId={knowledgeBaseId}
+          documentId={contextRecord.documentId}
+          documentName={contextRecord.documentName}
+          segmentId={contextRecord.segmentId}
+          position={contextRecord.position}
+          triggerRef={contextTrigger}
+          onClose={() => setContextRecord(null)}
+        />}
+
       </SheetContent>
     </Sheet>
   )

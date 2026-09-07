@@ -4,6 +4,7 @@ package appservice
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"strings"
@@ -164,6 +165,7 @@ func (b *DirectBackend) ListKnowledgeDocumentSegments(
 		knowledgeBaseID,
 		documentID,
 		knowledgebaseaction.DocumentSegmentListInput{
+			SegmentID: input.SegmentID, Position: input.Position,
 			Keyword: input.Keyword,
 			Status: optionalDomain[
 				KnowledgeDocumentSegmentIndexStatus,
@@ -173,6 +175,10 @@ func (b *DirectBackend) ListKnowledgeDocumentSegments(
 		},
 	)
 	if err != nil {
+		if _, kind, _ := connectiontest.Details(err); input.SegmentID != "" && kind == connectiontest.FailureNotFound {
+			slog.Warn("知识文档命中分段已失效", "organization_id", identity.Organization.ID, "knowledge_base_id", knowledgeBaseID, "document_id", documentID, "segment_id", input.SegmentID, "position", input.Position)
+			return KnowledgeDocumentSegmentList{}, NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentSegmentNotFound)
+		}
 		return KnowledgeDocumentSegmentList{}, b.knowledgeDocumentReadError(
 			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSegmentListFailed,
 			identity.Organization.ID, knowledgeBaseID, documentID,
@@ -470,30 +476,20 @@ func (b *DirectBackend) knowledgeRemoteReadError(
 	return b.knowledgeBaseError(ctx, meta, err, failureKey, organizationID, knowledgeBaseID)
 }
 
-// ReadKnowledgeContext 读取当前企业指定分段的周边内容。
-func (b *DirectBackend) ReadKnowledgeContext(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeContextInput) (KnowledgeContext, error) {
+// GetKnowledgeDocumentFile 读取原始文件并通过统一契约传送预览内容。
+func (b *DirectBackend) GetKnowledgeDocumentFile(ctx context.Context, meta RequestMeta, knowledgeBaseID, documentID string) (KnowledgeDocumentFile, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
-		return KnowledgeContext{}, err
+		return KnowledgeDocumentFile{}, err
 	}
-	records, err := b.readKnowledgeContext.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.ContextInput{
-		DocumentID: input.DocumentID, SegmentID: input.SegmentID, Position: input.Position,
-	})
+	file, err := b.getKnowledgeDocumentFile.Execute(ctx, identity, knowledgeBaseID, documentID)
 	if err != nil {
-		if _, kind, classified := connectiontest.Details(err); classified && kind == connectiontest.FailureNotFound {
-			slog.Warn("知识库上下文已失效", "organization_id", identity.Organization.ID, "knowledge_base_id", knowledgeBaseID, "document_id", input.DocumentID, "segment_id", input.SegmentID, "error", err)
-			return KnowledgeContext{}, NotFoundError(meta, cervii18n.ErrorKnowledgeContextNotFound)
-		}
-		return KnowledgeContext{}, b.knowledgeDocumentReadError(ctx, meta, err, cervii18n.ErrorKnowledgeContextReadFailed, identity.Organization.ID, knowledgeBaseID, input.DocumentID)
+		return KnowledgeDocumentFile{}, b.knowledgeDocumentReadError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, knowledgeBaseID, documentID)
 	}
-	output := KnowledgeContext{Segments: make([]KnowledgeContextSegment, 0, len(records))}
-	for _, record := range records {
-		output.DocumentName = record.DocumentName
-		output.Segments = append(output.Segments, KnowledgeContextSegment{
-			SegmentID: record.SegmentID, Position: record.Position, Content: record.Content, Answer: record.Answer, Matched: record.Matched,
-		})
+	if file == nil {
+		return KnowledgeDocumentFile{}, nil
 	}
-	return output, nil
+	return KnowledgeDocumentFile{Available: true, Name: file.Name, Content: base64.StdEncoding.EncodeToString(file.Content)}, nil
 }
 
 // knowledgeBaseFromAction 转换知识库契约。
@@ -543,7 +539,6 @@ func knowledgeGroupsFromAction(records []knowledgebaseaction.GroupRecord) []Know
 // knowledgeBaseFieldKeys 把知识库校验错误码映射为本地化文案键。
 func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		knowledgebaseaction.ValidationContextInvalid:               cervii18n.FieldKnowledgeContextInvalid,
 		knowledgebaseaction.ValidationQAQuestionRequired:           cervii18n.FieldKnowledgeQAQuestionRequired,
 		knowledgebaseaction.ValidationQAAnswerRequired:             cervii18n.FieldKnowledgeQAAnswerRequired,
 		knowledgebaseaction.ValidationQAGroupInvalid:               cervii18n.FieldKnowledgeQAGroupInvalid,

@@ -644,6 +644,14 @@ func (b *Backend) GetKnowledgeDocument(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
+// GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
+func (b *Backend) GetKnowledgeDocumentFile(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocumentFile, error) {
+	var output appservice.KnowledgeDocumentFile
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/file", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
 func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentSegmentListInput) (appservice.KnowledgeDocumentSegmentList, error) {
 	var output appservice.KnowledgeDocumentSegmentList
@@ -656,14 +664,6 @@ func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appser
 func (b *Backend) RetrieveKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeRetrievalInput) (appservice.KnowledgeRetrievalResult, error) {
 	var output appservice.KnowledgeRetrievalResult
 	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/retrieve", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// ReadKnowledgeContext 读取指定分段及前后最多各两段内容。
-func (b *Backend) ReadKnowledgeContext(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeContextInput) (appservice.KnowledgeContext, error) {
-	var output appservice.KnowledgeContext
-	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/context", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -993,6 +993,8 @@ func encodeKnowledgeDocumentListInputQuery(input appservice.KnowledgeDocumentLis
 // encodeKnowledgeDocumentSegmentListInputQuery 将 appservice.KnowledgeDocumentSegmentListInput 编码为查询参数。
 func encodeKnowledgeDocumentSegmentListInputQuery(input appservice.KnowledgeDocumentSegmentListInput) url.Values {
 	query := url.Values{}
+	setQuery(query, "segmentId", input.SegmentID)
+	setPositiveQuery(query, "position", input.Position)
 	setQuery(query, "keyword", input.Keyword)
 	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
