@@ -1,10 +1,2 @@
 # 固定 PostgreSQL 18、pgvector 0.8.6 和 Debian Bookworm 的多架构镜像。
 FROM pgvector/pgvector:0.8.6-pg18-bookworm@sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a
-
-# 构建时验证扩展安装文件，目标数据库由 Cervi 启动流程准备。
-RUN set -eu; \
-    for extension in vector pg_trgm; do \
-        test -s "$(pg_config --sharedir)/extension/${extension}.control"; \
-        ls "$(pg_config --sharedir)/extension/${extension}"--*.sql >/dev/null; \
-        test -s "$(pg_config --pkglibdir)/${extension}.so"; \
-    done

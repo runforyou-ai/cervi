@@ -131,12 +131,11 @@ jobs:
               -o "release-stage/$executable" \
               .
 
-            cp -R internal/storage/server/database release-stage/database
             asset="cervi-server_${VERSION}_${target_os}_${target_arch}"
             if [[ "$target_os" == "windows" ]]; then
-              (cd release-stage && zip -qr "../release-assets/${asset}.zip" "$executable" database)
+              (cd release-stage && zip -q "../release-assets/${asset}.zip" "$executable")
             else
-              tar -C release-stage -czf "release-assets/${asset}.tar.gz" "$executable" database
+              tar -C release-stage -czf "release-assets/${asset}.tar.gz" "$executable"
             fi
           done
 

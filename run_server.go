@@ -22,7 +22,6 @@ func run(arguments []string) error {
 	flags.SetOutput(os.Stderr)
 	configPath := flags.String("config", "", "显式指定 YAML 配置文件")
 	checkConfig := flags.Bool("check-config", false, "校验配置后退出")
-	migrateOnly := flags.Bool("migrate", false, "准备数据库并执行业务迁移后退出")
 	if err := flags.Parse(arguments); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
@@ -51,10 +50,6 @@ func run(arguments []string) error {
 			slog.Warn("关闭存储失败", "error", err)
 		}
 	}()
-
-	if *migrateOnly {
-		return nil
-	}
 
 	services, err := applicationServices(appStorage, config)
 	if err != nil {
