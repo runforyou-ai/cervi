@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -61,7 +62,7 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 			if err := authorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
 				return err
 			}
-		} else if _, err := lockConversationMember(ctx, tx, identity, conversationID); err != nil {
+		} else if _, err := chatstate.LockMember(ctx, tx, identity, conversationID); err != nil {
 			return err
 		}
 		var target servermodels.Message

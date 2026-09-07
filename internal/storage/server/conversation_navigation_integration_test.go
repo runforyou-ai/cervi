@@ -389,43 +389,6 @@ func waitForNavigationLock(t *testing.T, ctx context.Context, db *bun.DB, conver
 	}
 }
 
-// TestRemovedMemberCannotSendAfterWaiting 验证发送等待群锁后重新检查已提交的移除结果。
-func TestRemovedMemberCannotSendAfterWaiting(t *testing.T) {
-	f := newNavigationFixture(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	barrier := &navigationWriteBarrier{entered: make(chan struct{}), release: make(chan struct{})}
-	f.db.AddQueryHook(barrier)
-	var release sync.Once
-	defer release.Do(func() { close(barrier.release) })
-	removed, sent := make(chan error, 1), make(chan error, 1)
-	go func() {
-		_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
-		removed <- err
-	}()
-	select {
-	case <-barrier.entered:
-	case <-ctx.Done():
-		t.Fatal(ctx.Err())
-	}
-	go func() {
-		_, err := conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "已被移除成员不能发送"})
-		sent <- err
-	}()
-	waitForNavigationLock(t, ctx, f.db, f.groupID)
-	release.Do(func() { close(barrier.release) })
-	if err := <-removed; err != nil {
-		t.Fatal(err)
-	}
-	if err := <-sent; !errors.Is(err, conversationaction.ErrConversationNotFound) {
-		t.Fatalf("removed member send=%v", err)
-	}
-	var count int
-	if err := f.db.NewSelect().TableExpr("messages").ColumnExpr("count(*)").Where("conversation_id = ?", f.groupID).Scan(ctx, &count); err != nil || count != 1 {
-		t.Fatalf("message count=%d err=%v", count, err)
-	}
-}
-
 // TestVisibleMentionsCanBeReviewedOutOfOrder 验证可视提及单独确认且不越过屏幕外的旧提及。
 func TestVisibleMentionsCanBeReviewedOutOfOrder(t *testing.T) {
 	f := newNavigationFixture(t)

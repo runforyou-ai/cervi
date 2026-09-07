@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -263,7 +264,16 @@ func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *ser
 			return ErrConversationNotFound
 		}
 		return nil
-	case domain.ConversationTypeDirect, domain.ConversationTypeGroup:
+	case domain.ConversationTypeGroup:
+		available, err := chatstate.GroupQuery(db, identity, conversationID).Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check group conversation access: %w", err)
+		}
+		if !available {
+			return ErrConversationNotFound
+		}
+		return nil
+	case domain.ConversationTypeDirect:
 		available, err := db.NewSelect().
 			TableExpr("conversation_participants AS cp").
 			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
