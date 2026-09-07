@@ -9,10 +9,7 @@ import { z } from "zod"
 
 import { createGroupConversation, isApiError, type MemberOption } from "@/api"
 import { MobileGroupMemberPicker } from "@/apps/mobile/mobile-group-member-picker"
-import {
-  useMobileBack,
-  useMobileNavigation,
-} from "@/apps/mobile/mobile-navigation"
+import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
@@ -29,7 +26,6 @@ export function MobileCreateGroupPage() {
   const { t: tInbox } = useTranslation("inbox")
   const { identity } = useMobileWorkspace()
   const { inboxURL } = useMobileNavigation()
-  const back = useMobileBack(inboxURL)
   const location = useLocation()
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
@@ -61,6 +57,7 @@ export function MobileCreateGroupPage() {
     control: form.control,
     name: "members",
   })
+  const title = form.watch("title")
 
   /** 提交初始成员，失败时保留表单，离开页面后忽略返回结果。 */
   async function create(values: z.infer<typeof schema>) {
@@ -101,9 +98,24 @@ export function MobileCreateGroupPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <MobilePageHeader title={t("group.create")} />
+      <MobilePageHeader
+        title={t("group.create")}
+        backTo={inboxURL}
+        actions={
+          <Button
+            type="submit"
+            form="mobile-create-group"
+            variant="ghost"
+            className="min-h-11"
+            disabled={saving || !title.trim() || field.value.length === 0}
+          >
+            {t("group.complete")}
+          </Button>
+        }
+      />
       <form
-        className="min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
+        id="mobile-create-group"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"
         noValidate
         onSubmit={form.handleSubmit(create)}
       >
@@ -130,20 +142,6 @@ export function MobileCreateGroupPage() {
             inputRef={field.ref}
             disabled={saving}
           />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11"
-            disabled={saving}
-            onClick={back}
-          >
-            {t("cancel")}
-          </Button>
-          <Button type="submit" className="min-h-11" disabled={saving}>
-            {t(saving ? "group.creating" : "group.create")}
-          </Button>
         </div>
       </form>
     </section>

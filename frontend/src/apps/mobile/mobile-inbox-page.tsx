@@ -1,6 +1,7 @@
 /** 移动端统一会话摘要列表和内部聊天入口。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
+import { PlusIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -30,6 +31,12 @@ import {
 } from "@/apps/mobile/mobile-page"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
@@ -271,7 +278,7 @@ export function MobileInboxPage() {
     requireWindowFocus: false,
   })
   const previousPollingActiveRef = useRef(pollingActive)
-  const { data, loading, refreshing, error, refresh } = useResource(
+  const { data, loading, refresh } = useResource(
     resourceKeys.inbox(query),
     () => loadInbox(query),
     {
@@ -296,32 +303,27 @@ export function MobileInboxPage() {
       <MobilePageHeader
         title={t("inbox.title")}
         actions={
-          <>
-            {query.scope !== InboxScope.InboxScopeCustomer ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="min-h-11 px-2"
-                onClick={() => navigate("/inbox/group/new", {
+                size="icon-lg"
+                aria-label={t("inbox.add")}
+              >
+                <PlusIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() => navigate("/inbox/group/new", {
                   state: { mobileBack: true },
                 })}
               >
                 {t("group.create")}
-              </Button>
-            ) : null}
-            <Button
-              variant="ghost"
-              className={cn("min-h-11", error && "text-warning")}
-              aria-label={error ? t("inbox.refreshError") : t("inbox.refresh")}
-              disabled={loading || refreshing}
-              onClick={() => void refresh()}
-            >
-              {refreshing
-                ? t("inbox.refreshing")
-                : error
-                  ? t("inbox.refreshFailed")
-                  : t("inbox.refresh")}
-            </Button>
-          </>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
       <MobileInboxScopes scope={query.scope} onChange={changeQuery} />
