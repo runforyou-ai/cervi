@@ -12,12 +12,6 @@ import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
@@ -98,28 +92,18 @@ function MobileGroupConversation({ conversationID }: { conversationID: string })
                 {t("inbox.refreshFailed")}
               </Button>
             ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  className="-mr-2"
-                  aria-label={t("group.menu")}
-                  disabled={!data}
-                >
-                  <MoreHorizontalIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onSelect={() => navigate(`/inbox/group/${conversationID}/details`, {
-                    state: { mobileBack: true },
-                  })}
-                >
-                  {t("group.details")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Button
+              variant="ghost"
+              size="icon-lg"
+              className="-mr-2"
+              aria-label={t("group.details")}
+              disabled={!data}
+              onClick={() => navigate(`/inbox/group/${conversationID}/details`, {
+                state: { mobileBack: true },
+              })}
+            >
+              <MoreHorizontalIcon />
+            </Button>
           </>
         }
       />

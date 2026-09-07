@@ -60,7 +60,6 @@ const mobile = {
     searchMembers: "搜索成员姓名",
     title: "群聊",
     memberCount: "（{{count}}）",
-    menu: "群聊菜单",
     details: "群详情",
     loadError: "无法加载群聊，请重试。",
     unavailable: "该群聊不存在或你已不在群内。",
