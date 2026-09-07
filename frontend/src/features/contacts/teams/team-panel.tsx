@@ -371,7 +371,7 @@ export function TeamPanel({
                 <TableHead>{t("columns.type")}</TableHead>
                 <TableHead>{t("columns.workStatus")}</TableHead>
                 <TableHead>{t("columns.joinedAt")}</TableHead>
-                <TableHead className="text-right">
+                <TableHead className="w-px">
                   {t("columns.actions")}
                 </TableHead>
               </TableRow>
@@ -414,7 +414,7 @@ export function TeamPanel({
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {formatDateTime(member.joinedAt)}
                   </TableCell>
-                  <TableCell className="text-right whitespace-nowrap">
+                  <TableCell className="whitespace-nowrap">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button

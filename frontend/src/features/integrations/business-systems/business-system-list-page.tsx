@@ -138,7 +138,7 @@ export function BusinessSystemListPage() {
                   <TableHead>{t("businessSystem.list.columns.name")}</TableHead>
                   <TableHead>{t("businessSystem.list.columns.url")}</TableHead>
                   <TableHead>{t("businessSystem.list.columns.status")}</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead className="w-px">
                     {t("businessSystem.list.columns.actions")}
                   </TableHead>
                 </TableRow>
@@ -172,8 +172,8 @@ export function BusinessSystemListPage() {
                             : t("businessSystem.status.disabled")}
                         </StatusBadge>
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex justify-end gap-2">
+                      <TableCell className="whitespace-nowrap">
+                        <div className="inline-flex gap-2">
                           <Button variant="outline" size="sm" asChild>
                             <Link
                               to={`/integrations/business-systems/${businessSystem.id}`}

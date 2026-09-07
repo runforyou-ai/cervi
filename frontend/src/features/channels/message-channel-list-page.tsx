@@ -87,8 +87,8 @@ function MessageChannelRow({
           `locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`
         )}
       </TableCell>
-      <TableCell className="text-right whitespace-nowrap">
-        <div className="flex justify-end gap-2">
+      <TableCell className="whitespace-nowrap">
+        <div className="inline-flex gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to={`/integrations/channels/${channel.type}/${channel.id}`}>
               {t("list.edit")}
@@ -272,7 +272,7 @@ export function MessageChannelListPage() {
                   <TableHead>{t("list.columns.name")}</TableHead>
                   <TableHead>{t("list.columns.category")}</TableHead>
                   <TableHead>{t("list.columns.language")}</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead className="w-px">
                     {t("list.columns.actions")}
                   </TableHead>
                 </TableRow>

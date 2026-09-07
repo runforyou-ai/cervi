@@ -63,7 +63,7 @@ export function KnowledgeQATable({
             <TableHead>{t("qa.similarQuestions")}</TableHead>
             <TableHead>{t("qa.answer")}</TableHead>
             <TableHead>{t("qa.createdAt")}</TableHead>
-            <TableHead className="text-right">
+            <TableHead>
               {t("documents.columns.actions")}
             </TableHead>
           </TableRow>
@@ -167,8 +167,8 @@ function KnowledgeQARow({
       <TableCell className="whitespace-nowrap text-muted-foreground">
         {formatDateTime(entry.createdAt)}
       </TableCell>
-      <TableCell className="text-right">
-        <div className="flex items-center justify-end gap-2">
+      <TableCell className="whitespace-nowrap">
+        <div className="inline-flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to={editPath}>{t("qa.edit")}</Link>
           </Button>
