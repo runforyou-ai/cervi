@@ -108,6 +108,20 @@ func run(_ []string) error {
 		app.RegisterService(service)
 	}
 
+	// 桌面开发时同时打开移动端预览窗口，共用当前原生服务。
+	if app.Env.Info().Debug && runtime.GOOS != "ios" && runtime.GOOS != "android" {
+		app.Window.NewWithOptions(application.WebviewWindowOptions{
+			Name:             "mobile-preview",
+			Title:            "Cervi · 移动端预览",
+			Width:            390,
+			Height:           844,
+			DisableResize:    true,
+			BackgroundColour: application.NewRGB(250, 250, 250),
+			URL:              "/?preview=mobile",
+		})
+		slog.Info("已创建移动端预览窗口")
+	}
+
 	slog.Info("启动 Cervi")
 	return app.Run()
 }
