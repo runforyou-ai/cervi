@@ -338,7 +338,7 @@ export function KnowledgeDocumentListPage() {
                   <TableHead>{t("documents.columns.wordCount")}</TableHead>
                   <TableHead>{t("documents.columns.hitCount")}</TableHead>
                   <TableHead>{t("documents.columns.createdAt")}</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead>
                     {t("documents.columns.actions")}
                   </TableHead>
                 </TableRow>
@@ -380,7 +380,7 @@ export function KnowledgeDocumentListPage() {
                           ? formatDateTime(document.createdAt)
                           : "—"}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap">
                         <Button variant="outline" size="sm" asChild>
                           <Link
                             to={`/knowledge-bases/${knowledgeBaseId}/documents/${encodeURIComponent(document.id)}`}
