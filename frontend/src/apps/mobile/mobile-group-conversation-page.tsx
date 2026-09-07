@@ -1,5 +1,6 @@
 /** 移动端已有群聊的资料读取、访问恢复和详情入口。 */
 import { useCallback, useEffect, useRef } from "react"
+import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
@@ -10,7 +11,12 @@ import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
-import { GroupAvatar } from "@/features/inbox/group-avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
@@ -71,31 +77,50 @@ function MobileGroupConversation({ conversationID }: { conversationID: string })
       <MobilePageHeader
         backTo={inboxURL}
         title={
-          <span className="flex items-center gap-3">
-            <GroupAvatar imageURL={data?.imageUrl ?? ""} className="size-9" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-base font-semibold">
-                {data?.title ?? t("group.title")}
+          <span className="flex min-w-0 items-center">
+            <span className="truncate">{data?.title ?? t("group.title")}</span>
+            {data ? (
+              <span className="shrink-0">
+                {t("group.memberCount", { count: data.participants.length })}
               </span>
-              {data ? (
-                <span className="block text-xs font-normal text-muted-foreground">
-                  {t("group.memberCount", { count: data.participants.length })}
-                </span>
-              ) : null}
-            </span>
+            ) : null}
           </span>
         }
         actions={
-          data && error && !isNotFoundApiError(error) ? (
-            <Button
-              variant="ghost"
-              className="min-h-11 text-warning"
-              disabled={refreshing}
-              onClick={() => void refresh()}
-            >
-              {t("inbox.refreshFailed")}
-            </Button>
-          ) : null
+          <>
+            {data && error && !isNotFoundApiError(error) ? (
+              <Button
+                variant="ghost"
+                className="min-h-11 text-warning"
+                disabled={refreshing}
+                onClick={() => void refresh()}
+              >
+                {t("inbox.refreshFailed")}
+              </Button>
+            ) : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-lg"
+                  className="-mr-2"
+                  aria-label={t("group.menu")}
+                  disabled={!data}
+                >
+                  <MoreHorizontalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={() => navigate(`/inbox/group/${conversationID}/details`, {
+                    state: { mobileBack: true },
+                  })}
+                >
+                  {t("group.details")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         }
       />
       {data ? (
