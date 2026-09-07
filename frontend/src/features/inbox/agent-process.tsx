@@ -93,7 +93,7 @@ function AgentTool({ call }: { call: AgentToolCall }) {
     [AgentToolCallStatus.AgentToolCallFailed]: t("agentToolFailed"),
   }[call.status]
   return (
-    <Collapsible className="min-w-0 rounded-md bg-muted">
+    <Collapsible className="min-w-0 rounded-md bg-muted text-foreground">
       <CollapsibleTrigger className="group flex w-full min-w-0 items-center gap-3 rounded-md px-3 py-2 text-left text-xs focus-visible:outline focus-visible:outline-ring">
         <span className="min-w-0 flex-1 break-all font-medium">{call.name}</span>
         <span className={cn("shrink-0 text-muted-foreground", failed && "text-destructive")}>
@@ -127,17 +127,23 @@ function AgentTool({ call }: { call: AgentToolCall }) {
 }
 
 /** 按服务端块顺序展示一个默认折叠的已完成思考区域。 */
-export function AgentProcess({ process }: { process: ConversationAgentProcessData }) {
+export function AgentProcess({ process, incoming }: { process: ConversationAgentProcessData; incoming: boolean }) {
   const { t, i18n } = useTranslation("inbox")
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
   return (
-    <Collapsible className="mb-3 min-w-0 text-foreground">
-      <CollapsibleTrigger className="group flex w-full items-center gap-1.5 rounded-sm py-1 text-left text-xs text-muted-foreground focus-visible:outline focus-visible:outline-ring">
+    <Collapsible className="mb-3 min-w-0">
+      <CollapsibleTrigger className={cn(
+        "group flex w-full items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
+        incoming ? "text-muted-foreground" : "text-primary-foreground/75",
+      )}>
         <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
         <span>{t("agentThoughtCompleted", { seconds })}</span>
         <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2 space-y-3 border-l border-border pl-3 text-sm">
+      <CollapsibleContent className={cn(
+        "mt-2 space-y-3 border-l pl-3 text-sm",
+        incoming ? "border-border" : "border-primary-foreground/30",
+      )}>
         {process.blocks.map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
             <AgentTool key={block.id} call={block.toolCall} />
@@ -147,7 +153,7 @@ export function AgentProcess({ process }: { process: ConversationAgentProcessDat
               className={cn(
                 "min-w-0 break-words",
                 block.kind === AgentRunBlockKind.AgentRunBlockThinking &&
-                  "italic text-muted-foreground",
+                  cn("italic", incoming ? "text-muted-foreground" : "text-primary-foreground/75"),
               )}
             >
               <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{block.text}</MessageMarkdown>
@@ -160,10 +166,13 @@ export function AgentProcess({ process }: { process: ConversationAgentProcessDat
 }
 
 /** 在最终正文下方显示本次模型输入和输出用量。 */
-export function AgentProcessUsage({ process }: { process: ConversationAgentProcessData }) {
+export function AgentProcessUsage({ process, incoming }: { process: ConversationAgentProcessData; incoming: boolean }) {
   const { t } = useTranslation("inbox")
   return (
-    <div className="mt-2 flex gap-4 text-[11px] text-muted-foreground">
+    <div className={cn(
+      "mt-2 flex gap-4 text-[11px]",
+      incoming ? "text-muted-foreground" : "text-primary-foreground/75",
+    )}>
       <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
       <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
     </div>

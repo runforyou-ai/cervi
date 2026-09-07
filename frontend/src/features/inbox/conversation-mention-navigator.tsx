@@ -1,4 +1,5 @@
 /** 展示待查看提及导航及返回最新消息入口。 */
+import { ChevronDownIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import type { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
@@ -20,6 +21,9 @@ export function ConversationMentionNavigator({
   const { t } = useTranslation("inbox")
   const { round } = navigation
   const disabled = busy || navigation.busy
+  const latestLabel = newCount > 0
+    ? `${t("messagesBackToLatest")} · ${t("messagesNew", { count: newCount })}`
+    : t("messagesBackToLatest")
   const hasPrevious = round?.ids.some(
     (id, index) => index < round.index && !round.unavailable.has(id),
   )
@@ -29,7 +33,7 @@ export function ConversationMentionNavigator({
   if (!round && !navigation.pendingCount && !showLatest) return null
   return (
     <div
-      className="absolute right-4 bottom-3 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center justify-end gap-2 rounded-lg bg-background/95 p-1 shadow-sm"
+      className="absolute right-4 bottom-3 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center justify-end gap-2 p-1"
       aria-label={t("mentionNavigation")}
     >
       {round ? (
@@ -83,10 +87,24 @@ export function ConversationMentionNavigator({
         </Button>
       ) : null}
       {showLatest ? (
-        <Button size="sm" variant="outline" disabled={busy} onClick={onLatest}>
-          {newCount > 0
-            ? t("messagesNew", { count: newCount })
-            : t("messagesBackToLatest")}
+        <Button
+          size="icon-lg"
+          variant="ghost"
+          className="relative size-12 rounded-full bg-gray-100 text-gray-500 shadow-sm hover:bg-gray-200 hover:text-gray-500 dark:hover:bg-gray-200"
+          disabled={busy}
+          onClick={onLatest}
+          aria-label={latestLabel}
+          title={latestLabel}
+        >
+          <ChevronDownIcon className="size-7 translate-y-[2px]" strokeWidth={1.75} aria-hidden />
+          {newCount > 0 ? (
+            <span
+              className="absolute -top-1 -right-1 min-w-4 rounded-full bg-primary px-1 text-[10px] leading-4 text-primary-foreground tabular-nums"
+              aria-hidden
+            >
+              {newCount}
+            </span>
+          ) : null}
         </Button>
       ) : round ? (
         <Button size="sm" variant="outline" disabled={busy} onClick={navigation.close}>
