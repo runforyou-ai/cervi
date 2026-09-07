@@ -11,6 +11,7 @@
 - 本文负责 Agent 配置、运行、工具、审批、设备能力和 Eino 接入。
 - Agent 继续沿统一聊天路径发送消息，不创建第二套 Agent 会话或消息系统。
 - 本文不提前创建尚未进入开发阶段的表和字段；文中的后续对象只在对应阶段出现首个真实场景时落地。
+- 本地知识库优先接入 Hindsight，实施顺序与评测结论见 [本地知识库接入方案](knowledge-base-plan.md)。长期记忆交互尚未确定，该方案第 9 节仅保留建议和注意事项，不构成本轮开发范围。
 
 首轮按 P1a 内部 AI 员工验证、P1b 网站 AI 客服的顺序交付；P1a 验证通过后立即进入 P1b。
 
@@ -555,7 +556,7 @@ P1 默认不使用：
 | Checkpoint | 出现无法由 Run、Step、Tool Invocation 和审批事实重建的中间状态 | 只作可丢附件，不能替代业务状态或解决外部副作用 `uncertain` |
 | TurnLoop | 同一个 Run 需要运行中 Push、新输入抢占或长期 idle 生命周期 | P1a 已因运行中消息补入而启用；Conversation 的长期监听仍由消息游标和新 Run 表达 |
 | SessionStore | 单个 Run 内确需框架工作集或 Middleware 回放 | 不作为 Conversation 或聊天历史 |
-| Automemory | 出现明确的跨 Run 长期记忆产品 | 长期事实进入 Cervi 摘要或记忆表，不能只留在 Eino Store |
+| Automemory | 出现明确的跨 Run 长期记忆产品 | 先确定来源、使用范围与遗忘交互；可复用 Hindsight，Cervi 管理来源和生命周期，不能只留在 Eino Store |
 | BackgroundTask Store | 出现同一 Run 内子代理或长工具的框架级租约 | 服务端唤醒仍由 `task_runs` 承担，设备长任务由客户端工作项承担 |
 | Reduction Middleware | 真实上下文或工具输出达到上限 | 业务层仍先限制输入和大结果，不依赖 Middleware 兜底 |
 

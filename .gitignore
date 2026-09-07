@@ -5,6 +5,7 @@ frontend/dist
 frontend/node_modules
 internal/publicweb/dist
 /data/
+/experiments/
 build/linux/appimage/build
 build/darwin/Assets.car
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
