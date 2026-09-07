@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -274,7 +274,7 @@ export function MembersPanel({
                 <TableHead>{t("columns.accountStatus")}</TableHead>
                 <TableHead>{t("columns.workStatus")}</TableHead>
                 <TableHead>{t("columns.createdAt")}</TableHead>
-                <TableHead className="text-right">
+                <TableHead className="w-px">
                   {t("columns.actions")}
                 </TableHead>
               </TableRow>
@@ -304,16 +304,18 @@ export function MembersPanel({
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {formatDateTime(user.createdAt)}
                   </TableCell>
-                  <TableCell className="text-right whitespace-nowrap">
-                    <div className="flex justify-end gap-2">
-                      {user.status === UserStatus.UserStatusActive &&
-                      user.identityId !== identity.user.identityId ? (
-                        <Button asChild size="sm">
-                          <Link to={`/inbox?scope=internal&target=${user.identityId}`}>
-                            {t("sendMessage")}
-                          </Link>
-                        </Button>
-                      ) : null}
+                  <TableCell className="whitespace-nowrap">
+                    <div className="inline-flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={
+                          user.status !== UserStatus.UserStatusActive ||
+                          user.identityId === identity.user.identityId
+                        }
+                        onClick={() => navigate(`/inbox?scope=internal&target=${user.identityId}`)}
+                      >
+                        {t("sendMessage")}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

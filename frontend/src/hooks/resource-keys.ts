@@ -108,20 +108,10 @@ export const resourceKeys = {
     knowledgeBaseId,
     documentId,
   ],
-  /** 指定知识文档及查询条件的分段列表。 */
-  knowledgeDocumentSegments: (
-    knowledgeBaseId: string,
-    documentId: string,
-    parameters?: KeyParameters,
-  ) =>
-    parameters === undefined
-      ? ["knowledge-document-segments", knowledgeBaseId, documentId]
-      : [
-          "knowledge-document-segments",
-          knowledgeBaseId,
-          documentId,
-          parameters,
-        ],
+  /** 原始文档的预览内容。 */
+  knowledgeDocumentFile: (knowledgeBaseId: string, documentId: string) => ["knowledge-document-file", knowledgeBaseId, documentId],
+  /** 连续浏览的文档分段，命中位置作为初始页定位条件。 */
+  knowledgeDocumentSegmentWindow: (knowledgeBaseId: string, documentId: string, segmentId?: string, position?: number) => ["knowledge-document-segment-window", knowledgeBaseId, documentId, segmentId, position],
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */

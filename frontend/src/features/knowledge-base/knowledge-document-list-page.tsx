@@ -49,6 +49,12 @@ const documentStatuses = [
   KnowledgeDocumentStatus.KnowledgeDocumentStatusArchived,
 ] satisfies KnowledgeDocumentStatusId[]
 
+/** 将字数按千显示，省略整数的小数部分。 */
+function formatWordCount(count: number) {
+  if (count < 1000) return count.toLocaleString("en-US")
+  return `${(count / 1000).toLocaleString("en-US", { maximumFractionDigits: 1 })}K`
+}
+
 /** 选择知识文档状态的展示样式。 */
 function statusVariant(status: KnowledgeDocumentStatusId) {
   if (status === KnowledgeDocumentStatus.KnowledgeDocumentStatusReady) {
@@ -218,7 +224,7 @@ export function KnowledgeDocumentListPage() {
               {t("documents.metadata.wordCount")}
             </dt>
             <dd className="mt-1 font-medium">
-              {externalConfiguration.wordCount}
+              {formatWordCount(externalConfiguration.wordCount)}
             </dd>
           </div>
           <div>
@@ -324,13 +330,15 @@ export function KnowledgeDocumentListPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border bg-card">
-            <Table>
+            <Table className="text-left">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{t("documents.columns.name")}</TableHead>
                   <TableHead>{t("documents.columns.status")}</TableHead>
+                  <TableHead>{t("documents.columns.wordCount")}</TableHead>
+                  <TableHead>{t("documents.columns.hitCount")}</TableHead>
                   <TableHead>{t("documents.columns.createdAt")}</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead className="w-px">
                     {t("documents.columns.actions")}
                   </TableHead>
                 </TableRow>
@@ -339,7 +347,7 @@ export function KnowledgeDocumentListPage() {
                 {documents.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={4}
+                      colSpan={6}
                       className="h-32 text-center text-muted-foreground"
                     >
                       {keyword || status
@@ -361,12 +369,18 @@ export function KnowledgeDocumentListPage() {
                           {t(`documents.status.${document.status}`)}
                         </StatusBadge>
                       </TableCell>
+                      <TableCell className="tabular-nums">
+                        {document.wordCount === null ? "—" : formatWordCount(document.wordCount)}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {document.hitCount.toLocaleString()}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
                         {document.createdAt
                           ? formatDateTime(document.createdAt)
                           : "—"}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
+                      <TableCell className="whitespace-nowrap">
                         <Button variant="outline" size="sm" asChild>
                           <Link
                             to={`/knowledge-bases/${knowledgeBaseId}/documents/${encodeURIComponent(document.id)}`}

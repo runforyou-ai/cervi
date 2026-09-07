@@ -1529,6 +1529,15 @@ export interface KnowledgeDocument {
 }
 
 /**
+ * KnowledgeDocumentFile 定义原文件预览响应，Content 为 Base64 编码的原始内容。
+ */
+export interface KnowledgeDocumentFile {
+    "available": boolean;
+    "name": string;
+    "content": string;
+}
+
+/**
  * KnowledgeDocumentList 定义知识文档分页结果。
  */
 export interface KnowledgeDocumentList {
@@ -1589,6 +1598,8 @@ export interface KnowledgeDocumentSegmentList {
  * KnowledgeDocumentSegmentListInput 定义知识文档分段列表查询条件。
  */
 export interface KnowledgeDocumentSegmentListInput {
+    "segmentId": string;
+    "position": number;
     "keyword": string;
     "status"?: KnowledgeDocumentSegmentIndexStatus | null;
     "page": number;
@@ -1620,6 +1631,8 @@ export interface KnowledgeDocumentSummary {
     "id": string;
     "name": string;
     "status": KnowledgeDocumentStatus;
+    "wordCount": number | null;
+    "hitCount": number;
     "createdAt": string | null;
 }
 

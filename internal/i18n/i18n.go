@@ -366,6 +366,7 @@ const (
 	ErrorKnowledgeGroupUpdateFailed                Key = "error.knowledge_group_update_failed"
 	ErrorKnowledgeGroupDeleteFailed                Key = "error.knowledge_group_delete_failed"
 	ErrorKnowledgeDocumentListFailed               Key = "error.knowledge_document_list_failed"
+	ErrorKnowledgeDocumentSegmentNotFound          Key = "error.knowledge_document_segment_not_found"
 	ErrorKnowledgeDocumentReadFailed               Key = "error.knowledge_document_read_failed"
 	ErrorKnowledgeDocumentSegmentListFailed        Key = "error.knowledge_document_segment_list_failed"
 	ErrorKnowledgeDocumentNotFound                 Key = "error.knowledge_document_not_found"

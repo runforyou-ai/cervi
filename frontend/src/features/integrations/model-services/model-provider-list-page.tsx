@@ -215,7 +215,7 @@ export function ModelProviderListPage({
                     <TableHead>{t("modelServices.list.columns.name")}</TableHead>
                     <TableHead>{t("modelServices.list.columns.models")}</TableHead>
                     <TableHead>{t("modelServices.list.columns.apiUrl")}</TableHead>
-                    <TableHead className="text-right">
+                    <TableHead className="w-px">
                       {t("modelServices.list.columns.actions")}
                     </TableHead>
                   </TableRow>
@@ -251,8 +251,8 @@ export function ModelProviderListPage({
                         <TableCell className="text-muted-foreground">
                           <SelectableText>{provider.apiUrl}</SelectableText>
                         </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <div className="flex justify-end gap-2">
+                        <TableCell className="whitespace-nowrap">
+                          <div className="inline-flex gap-2">
                             <Button variant="outline" size="sm" asChild>
                               <Link
                                 to={`/integrations/model-services/${section}/${provider.id}`}

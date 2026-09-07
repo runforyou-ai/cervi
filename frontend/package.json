@@ -37,7 +37,12 @@
     "unified": "^11.0.5",
     "remark-parse": "^11.0.0",
     "remark-gfm": "^4.0.1",
-    "mdast-util-to-string": "^4.0.0"
+    "mdast-util-to-string": "^4.0.0",
+    "mammoth": "1.11.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "jszip": "3.10.1",
+    "dompurify": "3.3.1",
+    "pdfjs-dist": "5.4.624"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -50,7 +55,8 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
-    "jsdom": "^27.0.0"
+    "jsdom": "^27.0.0",
+    "vite-plugin-static-copy": "4.1.1"
   },
   "engines": {
     "node": ">=24.0.0"

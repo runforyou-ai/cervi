@@ -15,6 +15,7 @@ import {
   ListKnowledgeBases,
   ListKnowledgeDocumentSegments,
   ListKnowledgeDocuments,
+  GetKnowledgeDocumentFile,
   RetrieveKnowledgeBase,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
@@ -43,6 +44,7 @@ import {
   type KnowledgeDocumentSummary,
   type KnowledgeGroup,
   type KnowledgeGroupInput,
+
   type KnowledgeRetrievalInput,
   type KnowledgeRetrievalRecord,
   type KnowledgeRetrievalResult,
@@ -157,6 +159,8 @@ const listKnowledgeDocumentsBound = bind(ListKnowledgeDocuments)
 const getKnowledgeDocumentBound = bind(GetKnowledgeDocument)
 const listKnowledgeDocumentSegmentsBound = bind(ListKnowledgeDocumentSegments)
 const retrieveKnowledgeBaseBound = bind(RetrieveKnowledgeBase)
+/** 读取文档的原始文件。 */
+export const getKnowledgeDocumentFile = bind(GetKnowledgeDocumentFile)
 
 /** 创建企业知识库。 */
 export function createKnowledgeBase(
@@ -291,6 +295,8 @@ export function listKnowledgeDocumentSegments(
     {
       keyword: query.keyword ?? "",
       status: query.status ?? null,
+      segmentId: query.segmentId ?? "",
+      position: query.position ?? 0,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 20,
     },

@@ -166,6 +166,7 @@ export type {
     KnowledgeBaseInput,
     KnowledgeBaseList,
     KnowledgeDocument,
+    KnowledgeDocumentFile,
     KnowledgeDocumentList,
     KnowledgeDocumentListInput,
     KnowledgeDocumentSegment,

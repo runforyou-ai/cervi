@@ -1,4 +1,5 @@
 {
+  "error.knowledge_document_segment_not_found": "The document or matched segment has changed. Run retrieval again.",
   "error.customer_delivery_conflict": "The delivery state changed or the channel cannot send. Refresh and try again.",
   "error.customer_delivery_failed": "Could not process message delivery. Try again.",
   "error.channel_outbound_unavailable": "The channel is disabled or its bot is not configured.",

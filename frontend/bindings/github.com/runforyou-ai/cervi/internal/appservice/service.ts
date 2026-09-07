@@ -337,6 +337,13 @@ export function GetKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID:
 }
 
 /**
+ * GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
+ */
+export function GetKnowledgeDocumentFile(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocumentFile> {
+    return $Call.ByID(1892761017, meta, knowledgeBaseID, documentID);
+}
+
+/**
  * GetKnowledgeQAEntry 返回完整的本地问答。
  */
 export function GetKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<$models.KnowledgeQAEntry> {

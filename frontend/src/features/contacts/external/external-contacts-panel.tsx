@@ -361,7 +361,7 @@ export function ExternalContactsPanel({
                 <TableHead>
                   {deleted ? t("columns.deletedAt") : t("columns.addedAt")}
                 </TableHead>
-                <TableHead className="text-right">
+                <TableHead className="w-px">
                   {t("columns.actions")}
                 </TableHead>
               </TableRow>
@@ -390,7 +390,7 @@ export function ExternalContactsPanel({
                     )}
                   </TableCell>
                   {deleted ? (
-                    <TableCell className="text-right whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap">
                       <Button
                         variant="outline"
                         size="sm"
@@ -400,8 +400,8 @@ export function ExternalContactsPanel({
                       </Button>
                     </TableCell>
                   ) : (
-                    <TableCell className="text-right whitespace-nowrap">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="whitespace-nowrap">
+                      <div className="inline-flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
