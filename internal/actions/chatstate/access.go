@@ -53,19 +53,26 @@ func GroupQuery(db bun.IDB, identity *servermodels.Identity, conversationID stri
 	return MemberQuery(db, identity, conversationID).Where("cv.type = ?", domain.ConversationTypeGroup)
 }
 
-// LockMember 在调用方事务中先锁会话，再读取并锁定当前成员关系。
-func LockMember(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string) (Member, error) {
+// LockConversation 在调用方事务中锁定指定企业的会话。
+func LockConversation(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Conversation, error) {
 	conversation := &servermodels.Conversation{}
-	err := tx.NewSelect().Model(conversation).
-		Where("cv.organization_id = ? AND cv.id = ?", identity.Organization.ID, conversationID).
-		Where("cv.type IN (?, ?, ?)", domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup).
-		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
+	err := db.NewSelect().Model(conversation).
+		Where("cv.organization_id = ? AND cv.id = ?", organizationID, conversationID).
 		For("UPDATE").Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Member{}, ErrConversationNotFound
+		return nil, ErrConversationNotFound
 	}
 	if err != nil {
-		return Member{}, fmt.Errorf("lock member conversation: %w", err)
+		return nil, fmt.Errorf("lock conversation: %w", err)
+	}
+	return conversation, nil
+}
+
+// LockMember 在调用方事务中先锁会话，再读取并锁定当前成员关系。
+func LockMember(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string) (Member, error) {
+	conversation, err := LockConversation(ctx, tx, identity.Organization.ID, conversationID)
+	if err != nil {
+		return Member{}, err
 	}
 	// 单独查询取得等待会话锁之后的成员资格，避免使用锁等待前的关系快照。
 	member := Member{Conversation: conversation}

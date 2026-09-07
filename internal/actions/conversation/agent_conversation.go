@@ -10,6 +10,7 @@ import (
 	"strings"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -61,7 +62,7 @@ func (a *SendFirstAgentTextMessageAction) Execute(ctx context.Context, identity 
 		if err := ensureAgentConversation(ctx, tx, identity, messageInput.ConversationID, agentID, messageInput.Body); err != nil {
 			return err
 		}
-		sendContext, err := loadAgentSendContext(ctx, tx, identity, messageInput.ConversationID)
+		sendContext, err := lockAgentSendContext(ctx, tx, identity, messageInput.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -80,6 +81,10 @@ func (a *SendFirstAgentTextMessageAction) Execute(ctx context.Context, identity 
 
 // ensureAgentConversation 创建 AI 聊天，重试时核对固定的业务归属。
 func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID, agentID, body string) error {
+	// 已有草稿先锁定并核对归属，不重新创建共享主体。
+	if found, err := lockAgentConversationDraft(ctx, tx, identity, conversationID, agentID); err != nil || found {
+		return err
+	}
 	var target servermodels.OrganizationIdentity
 	err := tx.NewSelect().Model(&target).
 		Join("JOIN agents AS agent ON agent.organization_id = oi.organization_id AND agent.identity_id = oi.id").
@@ -91,15 +96,11 @@ func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermod
 	if err != nil {
 		return fmt.Errorf("load AI chat target: %w", err)
 	}
-	// 聊天主体跨多个会话共享，冲突时直接读取已存在的主体。
-	userSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, uuid.NewV7().String())
+	subjects, err := ensureOrganizationIdentityChatSubjects(ctx, tx, identity.Organization.ID, []string{identity.OrganizationIdentity.ID, agentID})
 	if err != nil {
 		return err
 	}
-	agentSubject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, agentID, uuid.NewV7().String())
-	if err != nil {
-		return err
-	}
+	userSubject, agentSubject := subjects[identity.OrganizationIdentity.ID], subjects[agentID]
 	title := []rune(strings.Join(strings.Fields(body), " "))
 	if len(title) > 40 {
 		title = title[:40]
@@ -115,14 +116,11 @@ func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermod
 		return err
 	}
 	if count == 0 {
-		matches, err := tx.NewSelect().Model((*servermodels.AgentConversation)(nil)).
-			Join("JOIN conversations AS cv ON cv.id = ac.conversation_id AND cv.organization_id = ac.organization_id").
-			Where("ac.conversation_id = ? AND ac.organization_id = ? AND ac.user_identity_id = ? AND ac.agent_identity_id = ?", conversationID, identity.Organization.ID, identity.OrganizationIdentity.ID, agentID).
-			Where("cv.type = ? AND cv.status = ?", domain.ConversationTypeAgent, domain.ConversationStatusActive).Exists(ctx)
+		found, err := lockAgentConversationDraft(ctx, tx, identity, conversationID, agentID)
 		if err != nil {
 			return err
 		}
-		if !matches {
+		if !found {
 			return &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 		}
 		return nil
@@ -139,6 +137,26 @@ func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermod
 		return fmt.Errorf("create AI conversation participants: %w", err)
 	}
 	return nil
+}
+
+// lockAgentConversationDraft 锁定已有草稿编号并核对首次发送的业务归属。
+func lockAgentConversationDraft(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID, agentID string) (bool, error) {
+	cv, err := chatstate.LockConversation(ctx, tx, identity.Organization.ID, conversationID)
+	if errors.Is(err, chatstate.ErrConversationNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	matches, err := tx.NewSelect().Model((*servermodels.AgentConversation)(nil)).
+		Where("ac.conversation_id = ? AND ac.organization_id = ? AND ac.user_identity_id = ? AND ac.agent_identity_id = ?", conversationID, identity.Organization.ID, identity.OrganizationIdentity.ID, agentID).Exists(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !matches || cv.Type != string(domain.ConversationTypeAgent) || cv.Status != string(domain.ConversationStatusActive) {
+		return false, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+	}
+	return true, nil
 }
 
 // SendAgentTextMessageAction 向已有 AI 聊天发送成员消息。
@@ -163,7 +181,7 @@ func (a *SendAgentTextMessageAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		sendContext, err := loadAgentSendContext(ctx, tx, identity, normalized.ConversationID)
+		sendContext, err := lockAgentSendContext(ctx, tx, identity, normalized.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -173,10 +191,13 @@ func (a *SendAgentTextMessageAction) Execute(ctx context.Context, identity *serv
 	return result, err
 }
 
-// loadAgentSendContext 校验 AI 会话归属和双方有效参与关系。
-func loadAgentSendContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) (internalMessageContext, error) {
+// lockAgentSendContext 锁定会话与成员后复核 AI 会话归属和发送资格。
+func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string) (internalMessageContext, error) {
 	row := internalMessageContext{}
-	err := db.NewSelect().TableExpr("agent_conversations AS ac").
+	if _, err := chatstate.LockMember(ctx, tx, identity, conversationID); err != nil {
+		return row, err
+	}
+	err := tx.NewSelect().TableExpr("agent_conversations AS ac").
 		ColumnExpr("ac.conversation_id, mine.id AS participant_id, mine.subject_id, ac.agent_identity_id, agent.active_revision_id AS agent_revision_id").
 		Join("JOIN conversations AS cv ON cv.id = ac.conversation_id AND cv.organization_id = ac.organization_id").
 		Join("JOIN chat_subjects AS user_cs ON user_cs.organization_id = ac.organization_id AND user_cs.kind = ? AND user_cs.source_id = ac.user_identity_id", domain.ChatSubjectKindOrganizationIdentity).

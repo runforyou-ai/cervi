@@ -162,6 +162,9 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if exists, err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Where("id = ?", rollbackInput.ConversationID).Exists(ctx); err != nil || exists {
 		t.Fatalf("empty conversation survived rollback: %v %v", exists, err)
 	}
+	t.Run("AI 会话事务锁序", func(t *testing.T) {
+		testAgentChatLocking(t, db, identity, agent.ID, agent.IdentityID, tasks)
+	})
 }
 
 // testAgentConversationAccess 验证多会话列表、阅读状态、引用和参与者访问范围。
