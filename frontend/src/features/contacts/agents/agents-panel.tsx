@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -282,13 +282,13 @@ export function AgentsPanel({
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     <div className="inline-flex gap-2">
-                      {agent.status === UserStatus.UserStatusActive ? (
-                        <Button asChild size="sm">
-                          <Link to={`/inbox?scope=internal&target=${agent.identityId}`}>
-                            {t("sendMessage")}
-                          </Link>
-                        </Button>
-                      ) : null}
+                      <Button
+                        size="sm"
+                        disabled={agent.status !== UserStatus.UserStatusActive}
+                        onClick={() => navigate(`/inbox?scope=internal&target=${agent.identityId}`)}
+                      >
+                        {t("sendMessage")}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
