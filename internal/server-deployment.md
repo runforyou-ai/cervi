@@ -45,7 +45,7 @@ storage:
   localDirectory: /var/lib/cervi/files
 ```
 
-服务端依赖 PostgreSQL 和启用 JetStream 的 NATS。PostgreSQL 使用 `build/docker/Dockerfile.postgres` 构建的 pgvector 镜像；镜像首次初始化时通过 `00-init-schemas.sql` 在默认库和 `template1` 中启用 `vector`、`pg_trgm` 并创建 `haystack` schema，后续新建数据库自动继承；已有数据卷需手动执行该脚本。
+服务端依赖 PostgreSQL 和启用 JetStream 的 NATS。PostgreSQL 使用 `build/docker/Dockerfile.postgres` 构建的 pgvector 镜像；镜像首次初始化时通过 `00-init-schemas.sql` 在默认库和 `template1` 中启用 `vector`、`pg_trgm`，后续新建数据库自动继承；已有数据卷需手动执行该脚本。`wails3 task db:ensure` 创建工作区数据库和 `haystack` schema。
 
 ## Linux systemd
 

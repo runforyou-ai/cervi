@@ -1,9 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
-CREATE SCHEMA IF NOT EXISTS haystack;
 
--- 后续新建的工作区库和测试库从 template1 继承扩展与 schema。
+-- 后续新建的工作区库和测试库从 template1 继承扩展。
 \connect template1
 CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
-CREATE SCHEMA IF NOT EXISTS haystack;

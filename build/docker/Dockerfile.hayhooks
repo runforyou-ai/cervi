@@ -1,5 +1,0 @@
-FROM deepset/hayhooks:v1.24.0@sha256:2d657aa5499f440ccae17c860d35d1d709095b385da3ec9338ebc0decdb37ce9
-
-RUN pip install --no-cache-dir haystack-ai==3.1.1 pgvector-haystack==6.6.0
-
-CMD ["hayhooks", "run", "--host", "0.0.0.0"]

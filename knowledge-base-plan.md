@@ -39,7 +39,7 @@ schema 划分表名与代码归属，同一账号可访问双方数据，双方�
 
 Compose 已通过独立的 `build/docker/Dockerfile.postgres` 构建 `cervi-postgres:18-vector0.8.6`，基于官方 `pgvector/pgvector` 的 PostgreSQL 18 镜像，锁定扩展版本、发行版标签及镜像摘要；受测的 `0.8.6-pg18-bookworm` 已提供两者，直接复用镜像中的扩展包。Dockerfile 将 `00-init-schemas.sql` 放入 `/docker-entrypoint-initdb.d/`，由 PostgreSQL 镜像在首次初始化时执行。产品保持 PostgreSQL 18 主版本。[pgvector 官方部署说明](https://github.com/pgvector/pgvector#docker)
 
-- 镜像初始化默认库和 `template1`；后续新建的工作区业务库与测试库从 `template1` 继承扩展和 schema。
+- 镜像初始化默认库和 `template1`；后续新建的工作区业务库与测试库从 `template1` 继承扩展，`db:ensure` 创建工作区的 `haystack` schema。
 - **`vector` 和 `pg_trgm` 都是 Cervi 的数据库基线，在目标数据库的 `public` schema 启用。** 分段向量统一保存在 `haystack` schema。
 - `pg_trgm` 随产品基线安装；Haystack 向量组件的数据库依赖是 `vector`。关键词检索接入与中文效果另行验收。
 - 两个服务直接复用当前数据库账号和密码。
@@ -51,10 +51,9 @@ Compose 已通过独立的 `build/docker/Dockerfile.postgres` 构建 `cervi-post
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
-CREATE SCHEMA IF NOT EXISTS haystack;
 ```
 
-初始化脚本只在空数据目录首次启动时执行；已有库需要手动执行同一脚本。Cervi 沿用原有业务迁移。
+初始化脚本只在空数据目录首次启动时执行；已有库需要手动执行同一脚本。`wails3 task db:ensure` 创建数据库并执行 `CREATE SCHEMA IF NOT EXISTS haystack`，已有数据库也会补齐 schema。Cervi 沿用原有业务迁移。
 
 分段表仍由专用适配代码调用固定版本 PgvectorDocumentStore 创建，设置 `create_extension=False`；扩展由 PostgreSQL 镜像准备，业务迁移由 Cervi 执行。框架升级涉及表结构时单独验证并重建。
 
@@ -74,7 +73,7 @@ Cervi 服务端从本工作区 `.env` 构造内部调用上下文，携带目标
 
 共享服务由主工作区启动，其他 worktree 复用地址与服务凭据；每个数据库里的配置表、来源和 `haystack` schema 独立。生产部署同样可用这个入口，但通常只连接一个 Cervi 数据库，直接使用该库的配置。
 
-PR 2 增加显式的 Hayhooks 集成测试选项：停止本工作区的测试任务与请求 → 只重建本工作区 `<POSTGRES_DB>_test` → 从 `template1` 继承扩展与 schema 后执行业务迁移 → 经共享 API 执行测试。重置期间保持共享 API 与其他数据库连接运行。Hayhooks 调用由该测试选项启用；仍遵循同一 worktree 同时只运行一轮数据库集成测试的约定。
+PR 2 增加显式的 Hayhooks 集成测试选项：停止本工作区的测试任务与请求 → 只重建本工作区 `<POSTGRES_DB>_test` → 从 `template1` 继承扩展并创建 `haystack` schema 后执行业务迁移 → 经共享 API 执行测试。重置期间保持共享 API 与其他数据库连接运行。Hayhooks 调用由该测试选项启用；仍遵循同一 worktree 同时只运行一轮数据库集成测试的约定。
 
 共享服务运行固定构建的管线版本。修改管线或服务协议时用临时独立实例验收，完成后再协调升级共享版本；版本不匹配明确报错，共享服务升级由主工作区统一执行。测试结束只清理本次启动的独立实例和本工作区进程，保留既有共享服务。
 
@@ -213,9 +212,9 @@ BM25、`ts_rank_cd`、pg_trgm similarity、向量 cosine、RRF 融合分数和�
 
 ### PR 1：更换数据库镜像并初始化扩展与 schema
 
-范围：将 PostgreSQL 换为固定版本的 pgvector 镜像，通过镜像初始化脚本启用 `vector`、`pg_trgm`，创建 `haystack` schema；更新开发 Compose 的镜像引用。
+范围：将 PostgreSQL 换为固定版本的 pgvector 镜像，通过镜像初始化脚本启用 `vector`、`pg_trgm`，由 `db:ensure` 创建 `haystack` schema；更新开发 Compose 的镜像引用。`haystack/` 提供本地向量验证脚本，通过 `wails3 task run:haystack` 读取当前工作区的数据库配置和 `HAYSTACK_PORT`，main 使用 1416，task1～task4 使用 1417～1420。
 
-验收：空卷启动后默认库已具备两个扩展和 schema，新建工作区库与测试库自动继承；已有卷重启保留数据，服务端测试通过。
+验收：空卷启动后默认库已具备两个扩展，新建工作区库与测试库自动继承；`db:ensure` 创建或补齐 `haystack` schema。两个工作区的本地 HTTP 脚本分别访问各自数据库，向量写入与检索通过；已有卷重启保留数据，服务端测试通过。
 
 ### PR 2：接入 Haystack + Hayhooks 与动态执行契约
 

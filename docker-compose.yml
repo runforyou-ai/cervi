@@ -21,23 +21,6 @@ services:
       timeout: 5s
       retries: 15
 
-  hayhooks:
-    container_name: cervi-hayhooks
-    image: cervi-hayhooks:1.24.0
-    build:
-      context: .
-      dockerfile: build/docker/Dockerfile.hayhooks
-    environment:
-      HAYHOOKS_PIPELINES_DIR: /pipelines
-      PG_CONN_STR: postgresql://cervi:cervi@postgres:5432/main
-    ports:
-      - "1416:1416"
-    volumes:
-      - ./pipelines:/pipelines:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   nats:
     container_name: cervi-nats
     image: nats:2.14.5-alpine
