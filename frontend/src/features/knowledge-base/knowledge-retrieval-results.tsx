@@ -42,10 +42,22 @@ export function KnowledgeRetrievalResults({
                   <SelectableText className="break-all text-sm font-medium">
                     {record.documentName || record.documentId}
                   </SelectableText>
-                  <span className="text-xs text-muted-foreground">
-                    {t("retrieval.position", {
-                      position: record.position,
-                    })}
+                  <span className="inline-flex items-baseline gap-2 text-xs text-muted-foreground">
+                    <span>
+                      {t("retrieval.position", {
+                        position: record.position,
+                      })}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 text-xs font-normal"
+                      onClick={(event) =>
+                        onViewContext(record, event.currentTarget)
+                      }
+                    >
+                      {t("retrieval.viewContext")}
+                    </Button>
                   </span>
                 </div>
                 <SelectableText className="mt-3 block whitespace-pre-wrap break-words text-sm leading-6">
@@ -61,16 +73,6 @@ export function KnowledgeRetrievalResults({
                     </SelectableText>
                   </div>
                 ) : null}
-                <Button
-                  className="mt-3"
-                  variant="outline"
-                  size="sm"
-                  onClick={(event) =>
-                    onViewContext(record, event.currentTarget)
-                  }
-                >
-                  {t("retrieval.viewContext")}
-                </Button>
               </div>
               <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                 {record.score == null
