@@ -604,10 +604,11 @@ function ConversationTimelineContent({
     <div className="relative min-h-0 flex-1 bg-background">
       <ScrollArea
         ref={scrollRootRef}
+        // 覆盖 Radix Viewport 的内联 table 布局，避免固定宽气泡撑出视口。
         className={cn(
-          "h-full min-h-0 bg-background",
+          "h-full min-h-0 bg-background [&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!flex-col",
           workspaceLayout &&
-            "[&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!min-h-full [&>[data-slot=scroll-area-viewport]>div]:!flex-col",
+            "[&>[data-slot=scroll-area-viewport]>div]:!min-h-full",
         )}
       >
         <div
