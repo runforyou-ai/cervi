@@ -45,6 +45,23 @@ func (b *DirectBackend) CreateFileUpload(ctx context.Context, meta RequestMeta, 
 	if err != nil {
 		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
+	if record.PartSize > 0 {
+		if backend == domain.FileStorageBackendS3 {
+			uploadID, err := serverfilecontent.CreateMultipart(ctx, s3FileConfig(setting), record.StorageKey, record.ContentType)
+			if err != nil {
+				return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+			}
+			if err := b.createFileUpload.SetMultipartUpload(ctx, identity, record.ID, uploadID); err != nil {
+				// 保存会话失败时清除已创建的远端分片会话。
+				cleanupCtx := context.WithoutCancel(ctx)
+				if cleanupErr := serverfilecontent.AbortMultipart(cleanupCtx, s3FileConfig(setting), record.StorageKey, uploadID); cleanupErr != nil {
+					slog.Warn("清除未保存的分片会话失败", "file_id", record.ID, "upload_id", uploadID, "error", cleanupErr)
+				}
+				return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+			}
+		}
+		return FileUpload{File: fileFromModel(record, contentURL), PartSize: record.PartSize}, nil
+	}
 	request, err := b.fileUploadRequest(ctx, meta, record, setting, contentURL)
 	if err != nil {
 		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
@@ -62,6 +79,11 @@ func (b *DirectBackend) CompleteFileUpload(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
+	return b.completedFile(ctx, meta, record)
+}
+
+// completedFile 为已完成的上传生成文件地址并记录结果。
+func (b *DirectBackend) completedFile(ctx context.Context, meta RequestMeta, record *servermodels.File) (File, error) {
 	// 按文件记录和所属企业设置生成公开地址。
 	publicBaseURL := ""
 	if record.StorageBackend == string(domain.FileStorageBackendS3) {
@@ -75,7 +97,7 @@ func (b *DirectBackend) CompleteFileUpload(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
-	slog.Info("文件上传已完成", "organization_id", identity.Organization.ID, "file_id", record.ID, "storage_backend", record.StorageBackend)
+	slog.Info("文件上传已完成", "organization_id", record.OrganizationID, "file_id", record.ID, "storage_backend", record.StorageBackend)
 	return fileFromModel(record, contentURL), nil
 }
 

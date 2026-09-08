@@ -20,6 +20,11 @@ import {
   ReopenServiceSession,
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
+  SendAttachmentMessage,
+  SendAttachmentBatch,
+  UpdateAttachmentUploads,
+  ListAttachmentStates,
+  GetAttachmentDownload,
   SendFirstAgentTextMessage,
   SendAgentTextMessage,
   SendFirstDirectTextMessage,
@@ -32,6 +37,8 @@ import {
   UpdateConversationUnreadMark,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
+  AttachmentMessageInput,
+  AttachmentBatchInput,
   CustomerInboxConversation,
   ConversationMessage,
   ConversationAgentProcess,
@@ -518,3 +525,26 @@ export async function listCustomerMessageDeliveries(conversationID: string, mess
 }
 /** 人工确认或重试一条客户消息投递。 */
 export const resolveCustomerMessageDelivery = bind(ResolveCustomerMessageDelivery)
+
+/** 发送附件消息并归一化发送结果。 */
+export async function sendAttachmentMessage(input: AttachmentMessageInput) {
+  const result = await bind(SendAttachmentMessage)(input)
+  return { ...result, message: normalizeConversationMessage(result.message) }
+}
+
+/** 获取当前可见附件的下载请求。 */
+export const getAttachmentDownload = bind(GetAttachmentDownload)
+
+/** 保存一批按顺序发送的单聊附件和说明。 */
+export async function sendAttachmentBatch(input: AttachmentBatchInput) {
+ const result = await bind(SendAttachmentBatch)(input)
+ return { ...result, messages: asList(result.messages).map(normalizeConversationMessage) }
+}
+/** 更新上传状态、续期当前上传或取消未完成的附件。 */
+export const updateAttachmentUploads = bind(UpdateAttachmentUploads)
+
+/** 读取窗口内已经存在的附件消息状态。 */
+export async function listAttachmentStates(conversationID: string, messageIDs: string) {
+ const result = await bind(ListAttachmentStates)(conversationID, { messageIds: messageIDs })
+ return { states: asList(result.states) }
+}

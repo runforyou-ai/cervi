@@ -31,6 +31,10 @@ export const resourceKeys = {
   inbox: (parameters?: KeyParameters) => listKey("inbox", parameters),
   /** 客服筛选候选。 */
   customerServiceAssignees: () => ["customer-service-assignees"],
+  /** 窗口内附件的上传状态。 */
+  attachmentStates: (conversationId: string, messageIds?: string) => scopedListKey("attachment-states", conversationId, messageIds === undefined ? undefined : { messageIds }),
+  /** 附件下载与图片读取地址。 */
+  attachmentDownload: (conversationId: string, messageId: string) => ["attachment-download", conversationId, messageId] as const,
   /** 单个会话的初始消息页。 */
   conversationMessages: (conversationId?: string) =>
     itemKey("conversation-messages", conversationId),

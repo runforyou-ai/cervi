@@ -105,6 +105,9 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		if err := loadConversationMessageMentions(ctx, tx, identity.Organization.ID, history.Messages); err != nil {
 			return err
 		}
+		if err := loadMessageAttachments(ctx, tx, identity.Organization.ID, history.Messages); err != nil {
+			return err
+		}
 		return loadConversationAgentProcesses(ctx, tx, identity.Organization.ID, input.ConversationID, &history)
 	})
 	if err != nil {
@@ -161,7 +164,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.conversation_id = ?", conversationID).
-		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem, domain.MessageTypeAgentError})).
+		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem, domain.MessageTypeAgentError, domain.MessageTypeAttachment})).
 		Where("msg.deleted_at IS NULL")
 }
 

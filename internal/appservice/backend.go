@@ -35,6 +35,30 @@ type Backend interface {
 	// CompleteFileUpload 核验并完成文件上传。
 	//cervi:route POST /files/:fileID/complete
 	CompleteFileUpload(context.Context, RequestMeta, string) (File, error)
+	// CreateFilePartUpload 创建一个分片的直传请求。
+	//cervi:route POST /files/:fileID/parts
+	CreateFilePartUpload(context.Context, RequestMeta, string, FilePartUploadInput) (FileUploadRequest, error)
+	// CompleteFileMultipartUpload 合并分片并确认临时文件上传完成。
+	//cervi:route POST /files/:fileID/multipart/complete
+	CompleteFileMultipartUpload(context.Context, RequestMeta, string) (File, error)
+	// CancelFileUpload 将未发送的临时文件交给清理任务。
+	//cervi:route DELETE /files/:fileID/upload
+	CancelFileUpload(context.Context, RequestMeta, string) error
+	// SendAttachmentMessage 发送内部单聊或群聊附件消息。
+	//cervi:route POST /conversation-attachments status=201
+	SendAttachmentMessage(context.Context, RequestMeta, AttachmentMessageInput) (AttachmentMessageResult, error)
+	// SendAttachmentBatch 按选择顺序保存单聊附件和说明消息。
+	//cervi:route POST /direct-attachment-batches status=201
+	SendAttachmentBatch(context.Context, RequestMeta, AttachmentBatchInput) (AttachmentBatchResult, error)
+	// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
+	//cervi:route PATCH /attachment-uploads
+	UpdateAttachmentUploads(context.Context, RequestMeta, AttachmentUploadUpdate) error
+	// ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
+	//cervi:route GET /conversations/:conversationID/attachments
+	ListAttachmentStates(context.Context, RequestMeta, string, AttachmentStateListInput) (AttachmentStateList, error)
+	// GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
+	//cervi:route GET /conversations/:conversationID/messages/:messageID/attachment
+	GetAttachmentDownload(context.Context, RequestMeta, string, string) (FileDownload, error)
 	// ChangePassword 核验当前密码并保存新密码。
 	//cervi:route PATCH /password
 	ChangePassword(context.Context, RequestMeta, ChangePasswordInput) error

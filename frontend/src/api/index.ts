@@ -12,6 +12,10 @@ export {
 export { loadIdentity, loadStartup, sessionPath } from "@/api/session"
 export {
   completeFileUpload,
+  createFilePartUpload,
+  completeFileMultipartUpload,
+  cancelFileUpload,
+  uploadFileSlice,
   createFileUpload,
   uploadFile,
   uploadFileContent,

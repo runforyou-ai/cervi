@@ -44,6 +44,64 @@ func (b *Backend) CompleteFileUpload(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
+// CreateFilePartUpload 创建一个分片的直传请求。
+func (b *Backend) CreateFilePartUpload(ctx context.Context, meta appservice.RequestMeta, fileID string, input appservice.FilePartUploadInput) (appservice.FileUploadRequest, error) {
+	var output appservice.FileUploadRequest
+	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/parts", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CompleteFileMultipartUpload 合并分片并确认临时文件上传完成。
+func (b *Backend) CompleteFileMultipartUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) (appservice.File, error) {
+	var output appservice.File
+	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/multipart/complete", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CancelFileUpload 将未发送的临时文件交给清理任务。
+func (b *Backend) CancelFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/files/"+url.PathEscape(fileID)+"/upload", nil, nil, nil)
+}
+
+// SendAttachmentMessage 发送内部单聊或群聊附件消息。
+func (b *Backend) SendAttachmentMessage(ctx context.Context, meta appservice.RequestMeta, input appservice.AttachmentMessageInput) (appservice.AttachmentMessageResult, error) {
+	var output appservice.AttachmentMessageResult
+	err := b.do(ctx, meta, http.MethodPost, "/conversation-attachments", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// SendAttachmentBatch 按选择顺序保存单聊附件和说明消息。
+func (b *Backend) SendAttachmentBatch(ctx context.Context, meta appservice.RequestMeta, input appservice.AttachmentBatchInput) (appservice.AttachmentBatchResult, error) {
+	var output appservice.AttachmentBatchResult
+	err := b.do(ctx, meta, http.MethodPost, "/direct-attachment-batches", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
+func (b *Backend) UpdateAttachmentUploads(ctx context.Context, meta appservice.RequestMeta, input appservice.AttachmentUploadUpdate) error {
+	return b.do(ctx, meta, http.MethodPatch, "/attachment-uploads", nil, input, nil)
+}
+
+// ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
+func (b *Backend) ListAttachmentStates(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.AttachmentStateListInput) (appservice.AttachmentStateList, error) {
+	var output appservice.AttachmentStateList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/attachments", encodeAttachmentStateListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
+func (b *Backend) GetAttachmentDownload(ctx context.Context, meta appservice.RequestMeta, conversationID string, messageID string) (appservice.FileDownload, error) {
+	var output appservice.FileDownload
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/messages/"+url.PathEscape(messageID)+"/attachment", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ChangePassword 核验当前密码并保存新密码。
 func (b *Backend) ChangePassword(ctx context.Context, meta appservice.RequestMeta, input appservice.ChangePasswordInput) error {
 	return b.do(ctx, meta, http.MethodPatch, "/password", nil, input, nil)
@@ -978,6 +1036,13 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeAttachmentStateListInputQuery 将 appservice.AttachmentStateListInput 编码为查询参数。
+func encodeAttachmentStateListInputQuery(input appservice.AttachmentStateListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "messageIds", input.MessageIDs)
 	return query
 }
 

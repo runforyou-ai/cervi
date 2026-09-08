@@ -5,8 +5,10 @@ package api
 import (
 	"errors"
 	"log/slog"
+	"mime"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
@@ -52,8 +54,25 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	}
 	switch request.Method {
 	case http.MethodGet, http.MethodHead:
+		// 内嵌图片按文件元数据返回内容类型，不依赖存储键的扩展名。
+		if request.URL.Query().Get("inline") == "1" {
+			scope, err := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
+			if err != nil {
+				http.NotFound(writer, request)
+				return
+			}
+			contentType, err := s.getFile.ContentTypeByStorageKey(request.Context(), scope.OrganizationID, storageKey)
+			if err != nil {
+				http.NotFound(writer, request)
+				return
+			}
+			writer.Header().Set("Content-Type", contentType)
+		}
 		// 通过最终对象目录的静态文件服务输出不可变文件。
 		writer.Header().Set("X-Content-Type-Options", "nosniff")
+		if name := request.URL.Query().Get("download"); name != "" {
+			writer.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": name}))
+		}
 		s.objects.ServeHTTP(&localObjectResponseWriter{ResponseWriter: writer}, request)
 	case http.MethodPut:
 		s.uploadLocalObject(writer, request, storageKey)
@@ -100,11 +119,32 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 		http.Error(writer, http.StatusText(http.StatusConflict), http.StatusConflict)
 		return
 	}
-	if request.ContentLength >= 0 && request.ContentLength != record.ByteSize {
+	if record.CreatedByUserID != identity.User.ID {
+		http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		return
+	}
+	expectedSize := record.ByteSize
+	partNumber := int64(0)
+	if record.PartSize > 0 {
+		partNumber, err = strconv.ParseInt(request.URL.Query().Get("partNumber"), 10, 32)
+		if err == nil {
+			expectedSize, err = fileaction.UploadPartSize(record, int32(partNumber))
+		}
+		if err != nil {
+			http.Error(writer, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+	}
+	if request.ContentLength >= 0 && request.ContentLength != expectedSize {
 		http.Error(writer, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
-	if err := s.local.Save(request.Context(), storageKey, request.Body, record.ByteSize); err != nil {
+	if record.PartSize > 0 {
+		err = s.local.SavePart(request.Context(), storageKey, int32(partNumber), request.Body, expectedSize)
+	} else {
+		err = s.local.Save(request.Context(), storageKey, request.Body, expectedSize)
+	}
+	if err != nil {
 		slog.Warn("本地文件写入失败", "file_id", record.ID, "error", err)
 		http.Error(writer, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react"
 
 import type {
   ConversationMessageData,
+  MessageAttachment,
   ConversationMessageReference,
 } from "@/api"
 import type { MentionAllToken } from "@/features/inbox/mention-token"
@@ -11,6 +12,7 @@ export const conversationSendingIndicatorDelay = 300
 
 export type OutgoingConversationDraft = {
   clientMessageID: string
+  attachment?: MessageAttachment
   body: string
   originatedAt: string
   replyTo: ConversationMessageReference | null

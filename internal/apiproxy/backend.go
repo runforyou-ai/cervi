@@ -141,6 +141,23 @@ func (b *Backend) normalizeOutput(output any) {
 		b.normalizeUser(value)
 	case *appservice.File:
 		b.normalizeFile(value)
+	case *appservice.FileDownload:
+		value.PreviewURL = b.absoluteContentURL(value.PreviewURL)
+		value.URL = b.absoluteContentURL(value.URL)
+	case *appservice.FileUploadRequest:
+		value.URL = b.absoluteContentURL(value.URL)
+	case *appservice.AttachmentBatchResult:
+		for index := range value.Messages {
+			b.normalizeOutput(&value.Messages[index])
+		}
+		if value.Conversation != nil {
+			b.normalizeOutput(value.Conversation)
+		}
+	case *appservice.AttachmentMessageResult:
+		b.normalizeOutput(&value.Message)
+		if value.Conversation != nil {
+			b.normalizeOutput(value.Conversation)
+		}
 	case *appservice.FileUpload:
 		b.normalizeFile(&value.File)
 		value.Request.URL = b.absoluteContentURL(value.Request.URL)
@@ -228,7 +245,10 @@ func (b *Backend) absoluteContentURL(value string) string {
 		return ""
 	}
 	parsed, err := url.Parse(value)
-	if err == nil && parsed.IsAbs() {
+	if err != nil {
+		return value
+	}
+	if parsed.IsAbs() {
 		return parsed.String()
 	}
 	state := b.connection.currentState()
@@ -236,9 +256,10 @@ func (b *Backend) absoluteContentURL(value string) string {
 		return value
 	}
 	endpoint := state.baseURL.Clone()
-	endpoint.Path = strings.TrimRight(state.baseURL.Path, "/") + "/" + strings.TrimLeft(value, "/")
-	endpoint.RawQuery = ""
-	endpoint.Fragment = ""
+	endpoint.Path = strings.TrimRight(state.baseURL.Path, "/") + "/" + strings.TrimLeft(parsed.Path, "/")
+	endpoint.RawPath = ""
+	endpoint.RawQuery = parsed.RawQuery
+	endpoint.Fragment = parsed.Fragment
 	return endpoint.String()
 }
 

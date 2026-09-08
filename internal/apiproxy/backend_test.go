@@ -410,3 +410,18 @@ func TestConversationAvatarURLs(t *testing.T) {
 		})
 	}
 }
+
+// TestFileRequestURLs 验证分片序号和下载文件名在补全企业地址后保持查询参数。
+func TestFileRequestURLs(t *testing.T) {
+	backend, err := newTestBackend(&memoryStore{serverURL: "https://company.example.com/cervi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/storage/file.bin?partNumber=2", "/storage/file.bin?download=%E6%96%87%E4%BB%B6.dat"} {
+		request := appservice.FileUploadRequest{URL: path}
+		backend.normalizeOutput(&request)
+		if request.URL != "https://company.example.com/cervi"+path {
+			t.Fatalf("URL=%q", request.URL)
+		}
+	}
+}

@@ -4,6 +4,7 @@ package domain
 type MessageType string
 
 const (
+	MessageTypeAttachment MessageType = "attachment"
 	MessageTypeText       MessageType = "text"
 	MessageTypeSystem     MessageType = "system"
 	MessageTypeAgentError MessageType = "agent_error"

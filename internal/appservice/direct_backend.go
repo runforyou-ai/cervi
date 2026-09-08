@@ -46,6 +46,7 @@ var (
 
 // DirectBackend 在服务端进程内直接调用 Action 和 Query。
 type DirectBackend struct {
+	sendAttachmentMessage             *conversationaction.SendAttachmentMessageAction
 	customerDeliveries                *deliveryaction.Manager
 	installWorkspace                  *installationaction.InstallWorkspaceAction
 	login                             *authaction.LoginAction
@@ -310,6 +311,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),
 		testS3Setting:                     settingaction.NewTestS3SettingAction(connectionRunner),
 		createFileUpload:                  fileaction.NewCreateUploadAction(db),
+		sendAttachmentMessage:             conversationaction.NewSendAttachmentMessageAction(db),
 		completeFileUpload:                fileaction.NewCompleteUploadAction(db),
 		getFile:                           fileaction.NewGetQuery(db),
 		localFiles:                        localFiles,

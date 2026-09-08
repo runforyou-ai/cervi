@@ -36,6 +36,13 @@ export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input:
 }
 
 /**
+ * CancelFileUpload 将未发送的临时文件交给清理任务。
+ */
+export function CancelFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<void> {
+    return $Call.ByID(2213374235, meta, fileID);
+}
+
+/**
  * ChangePassword 核验当前密码并保存新密码。
  */
 export function ChangePassword(meta: $models.RequestMeta, input: $models.ChangePasswordInput): $CancellablePromise<void> {
@@ -61,6 +68,13 @@ export function ClaimServiceSession(meta: $models.RequestMeta, conversationID: s
  */
 export function CloseServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
     return $Call.ByID(3932400583, meta, conversationID);
+}
+
+/**
+ * CompleteFileMultipartUpload 合并分片并确认临时文件上传完成。
+ */
+export function CompleteFileMultipartUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<$models.File> {
+    return $Call.ByID(3966989268, meta, fileID);
 }
 
 /**
@@ -103,6 +117,13 @@ export function CreateBusinessSystem(meta: $models.RequestMeta, input: $models.B
  */
 export function CreateContact(meta: $models.RequestMeta, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(2172055030, meta, input);
+}
+
+/**
+ * CreateFilePartUpload 创建一个分片的直传请求。
+ */
+export function CreateFilePartUpload(meta: $models.RequestMeta, fileID: string, input: $models.FilePartUploadInput): $CancellablePromise<$models.FileUploadRequest> {
+    return $Call.ByID(4242419644, meta, fileID, input);
 }
 
 /**
@@ -281,6 +302,13 @@ export function GetAgent(meta: $models.RequestMeta, agentID: string): $Cancellab
 }
 
 /**
+ * GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
+ */
+export function GetAttachmentDownload(meta: $models.RequestMeta, conversationID: string, messageID: string): $CancellablePromise<$models.FileDownload> {
+    return $Call.ByID(2610529071, meta, conversationID, messageID);
+}
+
+/**
  * GetBusinessSystem 返回当前企业中的业务系统详情。
  */
 export function GetBusinessSystem(meta: $models.RequestMeta, businessSystemID: string): $CancellablePromise<$models.BusinessSystem> {
@@ -432,6 +460,13 @@ export function ListAgentModelOptions(meta: $models.RequestMeta): $CancellablePr
  */
 export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListInput): $CancellablePromise<$models.AgentList> {
     return $Call.ByID(2544201800, meta, input);
+}
+
+/**
+ * ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
+ */
+export function ListAttachmentStates(meta: $models.RequestMeta, conversationID: string, input: $models.AttachmentStateListInput): $CancellablePromise<$models.AttachmentStateList> {
+    return $Call.ByID(2257532333, meta, conversationID, input);
 }
 
 /**
@@ -736,6 +771,20 @@ export function SendAgentTextMessage(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
+ * SendAttachmentBatch 按选择顺序保存单聊附件和说明消息。
+ */
+export function SendAttachmentBatch(meta: $models.RequestMeta, input: $models.AttachmentBatchInput): $CancellablePromise<$models.AttachmentBatchResult> {
+    return $Call.ByID(294445027, meta, input);
+}
+
+/**
+ * SendAttachmentMessage 发送内部单聊或群聊附件消息。
+ */
+export function SendAttachmentMessage(meta: $models.RequestMeta, input: $models.AttachmentMessageInput): $CancellablePromise<$models.AttachmentMessageResult> {
+    return $Call.ByID(115977132, meta, input);
+}
+
+/**
  * SendCustomerTextMessage 发送客户会话文本消息。
  */
 export function SendCustomerTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
@@ -852,6 +901,13 @@ export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string,
  */
 export function UpdateAgentWorkStatus(meta: $models.RequestMeta, agentID: string, input: $models.AgentWorkStatusInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(160063679, meta, agentID, input);
+}
+
+/**
+ * UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
+ */
+export function UpdateAttachmentUploads(meta: $models.RequestMeta, input: $models.AttachmentUploadUpdate): $CancellablePromise<void> {
+    return $Call.ByID(3367707592, meta, input);
 }
 
 /**

@@ -370,7 +370,7 @@ func memberConversationMessage(message *servermodels.Message, subjectID string, 
 	name := identity.DisplayName
 	identityType := domain.OrganizationIdentityType(identity.Type)
 	return ConversationMessage{
-		ID: message.ID, Type: domain.MessageTypeText, Body: message.Body,
+		ID: message.ID, Type: domain.MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll, GroupMessageSequence: message.GroupMessageSequence,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,

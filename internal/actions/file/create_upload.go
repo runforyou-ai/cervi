@@ -38,7 +38,13 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
+		partSize := int64(0)
+		if input.ByteSize > domain.FilePartSize {
+			// 按 S3 最多 10000 片计算片大小，大文件按需增大片。
+			partSize = max(domain.FilePartSize, (input.ByteSize-1)/10000+1)
+		}
 		record = &servermodels.File{
+			PartSize:        partSize,
 			ID:              id.String(),
 			OrganizationID:  identity.Organization.ID,
 			CreatedByUserID: identity.User.ID,
@@ -65,5 +71,9 @@ func (a *CreateUploadAction) Execute(ctx context.Context, identity *servermodels
 
 // storageKey 返回以文件编号命名的存储键。
 func storageKey(organizationID, fileID, contentType string) string {
-	return "organizations/" + organizationID + "/files/" + fileID + imageFileExtensions[contentType]
+	extension := imageFileExtensions[contentType]
+	if extension == "" {
+		extension = ".bin"
+	}
+	return "organizations/" + organizationID + "/files/" + fileID + extension
 }

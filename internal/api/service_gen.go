@@ -20,6 +20,14 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/profile", s.updateProfile)
 	router.POST("/files/uploads", s.createFileUpload)
 	router.POST("/files/:fileID/complete", s.completeFileUpload)
+	router.POST("/files/:fileID/parts", s.createFilePartUpload)
+	router.POST("/files/:fileID/multipart/complete", s.completeFileMultipartUpload)
+	router.DELETE("/files/:fileID/upload", s.cancelFileUpload)
+	router.POST("/conversation-attachments", s.sendAttachmentMessage)
+	router.POST("/direct-attachment-batches", s.sendAttachmentBatch)
+	router.PATCH("/attachment-uploads", s.updateAttachmentUploads)
+	router.GET("/conversations/:conversationID/attachments", s.listAttachmentStates)
+	router.GET("/conversations/:conversationID/messages/:messageID/attachment", s.getAttachmentDownload)
 	router.PATCH("/password", s.changePassword)
 	router.PATCH("/preferences", s.updateUserPreferences)
 	router.PATCH("/work-status", s.updateUserWorkStatus)
@@ -194,6 +202,72 @@ func (s *Service) createFileUpload(c *gin.Context) {
 // completeFileUpload 核验并完成文件上传。
 func (s *Service) completeFileUpload(c *gin.Context) {
 	output, err := s.application.CompleteFileUpload(c.Request.Context(), requestMeta(c), c.Param("fileID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createFilePartUpload 创建一个分片的直传请求。
+func (s *Service) createFilePartUpload(c *gin.Context) {
+	var input appservice.FilePartUploadInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateFilePartUpload(c.Request.Context(), requestMeta(c), c.Param("fileID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// completeFileMultipartUpload 合并分片并确认临时文件上传完成。
+func (s *Service) completeFileMultipartUpload(c *gin.Context) {
+	output, err := s.application.CompleteFileMultipartUpload(c.Request.Context(), requestMeta(c), c.Param("fileID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// cancelFileUpload 将未发送的临时文件交给清理任务。
+func (s *Service) cancelFileUpload(c *gin.Context) {
+	writeEmpty(c, s.application.CancelFileUpload(c.Request.Context(), requestMeta(c), c.Param("fileID")))
+}
+
+// sendAttachmentMessage 发送内部单聊或群聊附件消息。
+func (s *Service) sendAttachmentMessage(c *gin.Context) {
+	var input appservice.AttachmentMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendAttachmentMessage(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// sendAttachmentBatch 按选择顺序保存单聊附件和说明消息。
+func (s *Service) sendAttachmentBatch(c *gin.Context) {
+	var input appservice.AttachmentBatchInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendAttachmentBatch(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
+func (s *Service) updateAttachmentUploads(c *gin.Context) {
+	var input appservice.AttachmentUploadUpdate
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.UpdateAttachmentUploads(c.Request.Context(), requestMeta(c), input))
+}
+
+// listAttachmentStates 读取窗口内已存在附件消息的最新状态。
+func (s *Service) listAttachmentStates(c *gin.Context) {
+	input, ok := bindAttachmentStateListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListAttachmentStates(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getAttachmentDownload 签发当前成员可见消息附件的下载地址。
+func (s *Service) getAttachmentDownload(c *gin.Context) {
+	output, err := s.application.GetAttachmentDownload(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("messageID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1215,6 +1289,13 @@ func bindAgentListInputQuery(c *gin.Context) (appservice.AgentListInput, bool) {
 		Status:   optionalEnum[appservice.UserStatus](c.Query("status")),
 		Page:     page,
 		PageSize: pageSize,
+	}, true
+}
+
+// bindAttachmentStateListInputQuery 从查询参数解析 appservice.AttachmentStateListInput。
+func bindAttachmentStateListInputQuery(c *gin.Context) (appservice.AttachmentStateListInput, bool) {
+	return appservice.AttachmentStateListInput{
+		MessageIDs: c.Query("messageIds"),
 	}, true
 }
 

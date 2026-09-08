@@ -50,6 +50,8 @@ type UploadInput struct {
 // normalizeUploadInput 规范化并校验待上传文件元数据。
 func normalizeUploadInput(input UploadInput) (UploadInput, map[string]ValidationCode) {
 	switch input.Purpose {
+	case domain.FilePurposeMessageAttachment:
+		return normalizeFileInput(input, domain.FilePurposeMessageAttachment)
 	case domain.FilePurposeUserAvatar:
 		return normalizeFileInput(input, domain.FilePurposeUserAvatar)
 	case domain.FilePurposeGroupImage:
@@ -68,7 +70,7 @@ func normalizeFileInput(input UploadInput, purpose domain.FilePurpose) (UploadIn
 	if err == nil {
 		input.ContentType = strings.ToLower(mediaType)
 	} else {
-		input.ContentType = ""
+		input.ContentType = "application/octet-stream"
 	}
 	fields := make(map[string]ValidationCode)
 	if input.FileName == "" || input.FileName == "." || utf8.RuneCountInString(input.FileName) > maxFileNameLength {
@@ -77,10 +79,10 @@ func normalizeFileInput(input UploadInput, purpose domain.FilePurpose) (UploadIn
 	if input.Purpose != purpose {
 		fields["purpose"] = ValidationPurposeInvalid
 	}
-	if _, exists := imageFileExtensions[input.ContentType]; !exists {
+	if _, exists := imageFileExtensions[input.ContentType]; !exists && purpose != domain.FilePurposeMessageAttachment {
 		fields["contentType"] = ValidationContentTypeInvalid
 	}
-	if input.ByteSize <= 0 || input.ByteSize > maxImageByteSize {
+	if input.ByteSize < 0 || (purpose != domain.FilePurposeMessageAttachment && (input.ByteSize == 0 || input.ByteSize > maxImageByteSize)) {
 		fields["byteSize"] = ValidationByteSizeInvalid
 	}
 	return input, fields

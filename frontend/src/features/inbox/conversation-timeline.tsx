@@ -19,8 +19,10 @@ import {
   type ConversationSystemEvent,
   type ConversationSystemEventParticipant,
   type GroupParticipant,
+  listAttachmentStates,
 } from "@/api"
 import { CustomerDeliveryState } from "./customer-delivery-state"
+import { ConversationAttachment } from "./conversation-attachment"
 import { MessageSendState } from "./message-send-state"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -63,6 +65,7 @@ type TimelineMessage = Pick<
   | "id"
   | "type"
   | "body"
+  | "attachment"
   | "originatedAt"
   | "sourceOrder"
   | "groupMessageSequence"
@@ -129,7 +132,8 @@ function mergeTimelineMessages(
     messages.push({
       id: `local:${message.clientMessageID}`,
       persistedMessageID: message.saved?.id ?? null,
-      type: MessageType.MessageTypeText,
+      type: message.saved?.type ?? (message.attachment ? MessageType.MessageTypeAttachment : MessageType.MessageTypeText),
+      attachment: message.saved?.attachment ?? message.attachment ?? null,
       body: message.body,
       originatedAt: message.originatedAt,
       sourceOrder: 0,
@@ -257,11 +261,21 @@ function ConversationTimelineContent({
   )
   const currentPage = timeline.page
   const { loading, error, refresh } = timeline
-  const visibleMessages = mergeTimelineMessages(
+  const combinedMessages = mergeTimelineMessages(
     currentPage?.messages ?? [],
     timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
+  // 单独读取已有附件状态，上传完成和取消不会生成新的消息游标。
+  const attachmentIDs = combinedMessages.flatMap(message => message.attachment && message.persistedMessageID ? [message.persistedMessageID] : []).sort().join(",")
+  const attachmentStates = useResource(resourceKeys.attachmentStates(conversationID, attachmentIDs), () => listAttachmentStates(conversationID, attachmentIDs), {
+    enabled: enabled && Boolean(attachmentIDs), keepPreviousData: true, refetchInterval: pollingActive ? 2000 : false,
+  })
+  const attachmentsByMessage = new Map(attachmentStates.data?.states.map(state => [state.messageId, state]))
+  const visibleMessages = combinedMessages.flatMap(message => {
+    const state = attachmentsByMessage.get(message.persistedMessageID ?? "")
+    return state?.deleted ? [] : [{ ...message, attachment: state?.attachment ?? message.attachment }]
+  })
   // 使用窗口内持久消息编号查询投递，历史窗口也能刷新原有消息的状态。
   const deliveryMessageIDs = visibleMessages
     .flatMap((message) => message.persistedMessageID ? [message.persistedMessageID] : [])
@@ -749,7 +763,7 @@ function ConversationTimelineContent({
                         className={cn(
                           location.highlightedID === message.id &&
                             "message-location-highlight",
-                          "flex items-start gap-2",
+                          "group/message-row flex items-start gap-2",
                           index > 0 && (startsGroup ? "mt-3" : "mt-1"),
                           incoming ? "justify-start" : "justify-end",
                         )}
@@ -792,7 +806,7 @@ function ConversationTimelineContent({
                             ) : null}
                             <ContextMenuTrigger asChild>
                               <div className="group/message relative max-w-full">
-                                {incoming && !agentError && onReplyMessage ? (
+                                {incoming && !agentError && !message.attachment && onReplyMessage ? (
                                   <button
                                     type="button"
                                     className="pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
@@ -811,10 +825,10 @@ function ConversationTimelineContent({
                                 <div
                                   className={cn(
                                     "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
-                                    incoming || agentError
+                                    message.attachment ? "p-0 text-foreground" : incoming || agentError
                                       ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
                                       : "bg-primary text-primary-foreground",
-                                    endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
+                                    !message.attachment && endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
                                   )}
                                 >
                                   {message.replyTo ? (
@@ -859,6 +873,9 @@ function ConversationTimelineContent({
                                   <div className="flex min-w-0 items-end gap-2">
                                     {agentError ? (
                                       <span className="text-destructive">{t("agentRunFailed")}</span>
+                                    ) : message.attachment ? (
+                                      <ConversationAttachment attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
+                                        originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
                                         <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
@@ -866,7 +883,7 @@ function ConversationTimelineContent({
                                     ) : (
                                       <span className="min-w-0 whitespace-pre-wrap">{renderMessageBody(message)}</span>
                                     )}
-                                    <div
+                                    {!message.attachment ? <div
                                       className={cn(
                                         "inline-flex shrink-0 translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
                                         incoming || agentError
@@ -908,7 +925,7 @@ function ConversationTimelineContent({
                                           ) : null}
                                         </div>
                                       ) : null}
-                                    </div>
+                                    </div> : null}
                                   </div>
                                   {message.agentProcess ? (
                                     <AgentProcessUsage process={message.agentProcess} incoming={incoming} />
@@ -920,7 +937,7 @@ function ConversationTimelineContent({
                         </div>
                       </article>
                       <ContextMenuContent>
-                        {!message.local && !agentError && onReplyMessage ? (
+                        {!message.local && !agentError && !message.attachment && onReplyMessage ? (
                           <ContextMenuItem
                             onSelect={() =>
                               onReplyMessage({
@@ -935,7 +952,7 @@ function ConversationTimelineContent({
                           </ContextMenuItem>
                         ) : null}
                         <ContextMenuItem
-                          onSelect={() => void copyMessageText(agentError ? t("agentRunFailed") : message.body)}
+                          onSelect={() => void copyMessageText(agentError ? t("agentRunFailed") : message.attachment?.name ?? message.body)}
                         >
                           {t("messageCopyText")}
                         </ContextMenuItem>
