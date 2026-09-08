@@ -14,7 +14,6 @@ CREATE TABLE service_sessions (
     opening_message_id           uuid NOT NULL,
     last_message_id              uuid NOT NULL,
     last_message_at              timestamptz NOT NULL,
-    last_message_source_order    bigint NOT NULL DEFAULT 0,
     assigned_at                  timestamptz,
     first_response_at            timestamptz,
     status_changed_at            timestamptz NOT NULL DEFAULT now(),
@@ -50,7 +49,6 @@ COMMENT ON COLUMN service_sessions.assignee_identity_id IS '负责人企业身�
 COMMENT ON COLUMN service_sessions.opening_message_id IS '处理周期首条消息编号';
 COMMENT ON COLUMN service_sessions.last_message_id IS '处理周期最后消息编号';
 COMMENT ON COLUMN service_sessions.last_message_at IS '处理周期最后消息发生时间';
-COMMENT ON COLUMN service_sessions.last_message_source_order IS '最后消息的来源内顺序';
 COMMENT ON COLUMN service_sessions.assigned_at IS '首次分配时间';
 COMMENT ON COLUMN service_sessions.first_response_at IS '首次客服响应时间';
 COMMENT ON COLUMN service_sessions.status_changed_at IS '处理状态最后变更时间';

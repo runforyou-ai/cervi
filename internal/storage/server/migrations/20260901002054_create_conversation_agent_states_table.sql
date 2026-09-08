@@ -1,13 +1,14 @@
 -- +goose Up
 -- 创建会话 Agent 输入状态表。
 CREATE TABLE conversation_agent_states (
-    conversation_id    uuid PRIMARY KEY,
+    conversation_id    uuid NOT NULL,
     created_at         timestamptz NOT NULL DEFAULT now(),
     updated_at         timestamptz NOT NULL DEFAULT now(),
     organization_id    uuid NOT NULL,
     agent_identity_id  uuid NOT NULL,
     desired_seq        bigint NOT NULL DEFAULT 0,
-    processed_seq      bigint NOT NULL DEFAULT 0
+    processed_seq      bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (conversation_id, agent_identity_id)
 );
 
 COMMENT ON TABLE conversation_agent_states IS '会话 Agent 输入序号状态';

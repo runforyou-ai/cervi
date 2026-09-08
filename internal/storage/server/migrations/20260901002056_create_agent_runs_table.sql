@@ -15,7 +15,10 @@ CREATE TABLE agent_runs (
     usage                jsonb NOT NULL DEFAULT '{}'::jsonb,
     last_error           text,
     started_at           timestamptz,
-    completed_at         timestamptz
+    completed_at         timestamptz,
+    trigger_type         text NOT NULL,
+    service_session_id   uuid,
+    error_code           text
 );
 
 CREATE UNIQUE INDEX agent_runs_conversation_active_unique
@@ -30,14 +33,17 @@ COMMENT ON COLUMN agent_runs.organization_id IS '所属企业编号';
 COMMENT ON COLUMN agent_runs.conversation_id IS '单聊会话编号';
 COMMENT ON COLUMN agent_runs.agent_identity_id IS '执行 Agent 企业身份编号';
 COMMENT ON COLUMN agent_runs.agent_revision_id IS '运行锁定的 Agent 配置版本';
-COMMENT ON COLUMN agent_runs.status IS '运行状态：queued、running、succeeded、failed';
+COMMENT ON COLUMN agent_runs.status IS '运行状态：queued、running、succeeded、failed、cancelled';
 COMMENT ON COLUMN agent_runs.trigger_start_seq IS '本次运行起始输入序号';
 COMMENT ON COLUMN agent_runs.trigger_end_seq IS '本次运行实际消费的最后输入序号';
-COMMENT ON COLUMN agent_runs.response_message_id IS '最终回复消息编号';
+COMMENT ON COLUMN agent_runs.response_message_id IS '运行结果消息编号，关联成功回复、失败或主动停止消息';
 COMMENT ON COLUMN agent_runs.usage IS '模型用量汇总';
 COMMENT ON COLUMN agent_runs.last_error IS '最终失败信息';
 COMMENT ON COLUMN agent_runs.started_at IS '首次开始执行时间';
 COMMENT ON COLUMN agent_runs.completed_at IS '最终完成时间';
+COMMENT ON COLUMN agent_runs.trigger_type IS '触发类型：agent_direct、customer_auto';
+COMMENT ON COLUMN agent_runs.service_session_id IS '客户自动接待所属客服处理周期编号';
+COMMENT ON COLUMN agent_runs.error_code IS '取消或失败的稳定错误码';
 
 -- +goose Down
 DROP TABLE agent_runs;

@@ -11,7 +11,10 @@ CREATE TABLE conversations (
     created_by_subject_id  uuid,
     last_message_id        uuid,
     last_message_at        timestamptz,
-    last_message_source_order bigint NOT NULL DEFAULT 0
+    description            text,
+    image_file_id          uuid,
+    last_message_seq       bigint NOT NULL DEFAULT 0,
+    last_activity_at       timestamptz
 );
 
 COMMENT ON TABLE conversations IS '聊天会话';
@@ -25,7 +28,10 @@ COMMENT ON COLUMN conversations.title IS '会话标题';
 COMMENT ON COLUMN conversations.created_by_subject_id IS '创建聊天主体编号';
 COMMENT ON COLUMN conversations.last_message_id IS '会话最后消息编号';
 COMMENT ON COLUMN conversations.last_message_at IS '会话最后消息发生时间';
-COMMENT ON COLUMN conversations.last_message_source_order IS '最后消息的来源内顺序';
+COMMENT ON COLUMN conversations.description IS '群聊描述';
+COMMENT ON COLUMN conversations.image_file_id IS '群聊图片文件编号';
+COMMENT ON COLUMN conversations.last_message_seq IS '会话已提交分配的最大消息序号，不随摘要重算回退';
+COMMENT ON COLUMN conversations.last_activity_at IS '会话最后消息追加活动时间';
 
 -- +goose Down
 DROP TABLE conversations;

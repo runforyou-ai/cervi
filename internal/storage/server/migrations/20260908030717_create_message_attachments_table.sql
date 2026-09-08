@@ -23,8 +23,6 @@ COMMENT ON COLUMN message_attachments.image_height IS '图片高度，非图片�
 COMMENT ON COLUMN message_attachments.upload_status IS '上传状态：uploading、ready、failed、cancelled';
 COMMENT ON COLUMN message_attachments.upload_expires_at IS '上传活跃期限';
 COMMENT ON INDEX message_attachments_file_id_key IS '一个上传文件仅关联一条消息';
-COMMENT ON COLUMN messages.type IS '消息类型：text 文本、system 系统事件、agent_error AI 运行失败、attachment 附件';
 
 -- +goose Down
 DROP TABLE message_attachments;
-COMMENT ON COLUMN messages.type IS '消息类型：text 文本、system 系统事件、agent_error AI 运行失败';

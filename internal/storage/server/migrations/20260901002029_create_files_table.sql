@@ -16,7 +16,9 @@ CREATE TABLE files (
     status              text NOT NULL DEFAULT 'pending',
     etag                text,
     uploaded_at         timestamptz,
-    expires_at          timestamptz
+    expires_at          timestamptz,
+    multipart_upload_id text,
+    part_size           bigint NOT NULL DEFAULT 0
 );
 
 CREATE UNIQUE INDEX files_storage_key_unique
@@ -28,7 +30,7 @@ COMMENT ON COLUMN files.created_at IS '创建时间';
 COMMENT ON COLUMN files.updated_at IS '更新时间';
 COMMENT ON COLUMN files.organization_id IS '所属企业编号';
 COMMENT ON COLUMN files.created_by_user_id IS '上传用户编号';
-COMMENT ON COLUMN files.purpose IS '文件业务用途';
+COMMENT ON COLUMN files.purpose IS '文件用途：user_avatar 用户头像、contact_avatar 联系人头像、group_image 群图片、message_attachment 消息附件';
 COMMENT ON COLUMN files.external_id IS '外部来源的文件唯一标识';
 COMMENT ON COLUMN files.storage_backend IS '本地或对象存储类型';
 COMMENT ON COLUMN files.storage_key IS '文件在存储中的对象键';
@@ -39,6 +41,8 @@ COMMENT ON COLUMN files.status IS '文件生命周期状态';
 COMMENT ON COLUMN files.etag IS '对象存储 ETag';
 COMMENT ON COLUMN files.uploaded_at IS '上传完成时间';
 COMMENT ON COLUMN files.expires_at IS '临时文件过期或删除任务执行时间';
+COMMENT ON COLUMN files.multipart_upload_id IS '对象存储分片上传会话编号';
+COMMENT ON COLUMN files.part_size IS '分片字节数，0 表示整体上传';
 
 -- +goose Down
 DROP TABLE files;

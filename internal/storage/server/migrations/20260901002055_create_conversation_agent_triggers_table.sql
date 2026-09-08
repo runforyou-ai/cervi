@@ -8,14 +8,13 @@ CREATE TABLE conversation_agent_triggers (
     agent_identity_id   uuid NOT NULL,
     trigger_seq         bigint NOT NULL,
     trigger_message_id  uuid NOT NULL,
-    agent_run_id        uuid
+    agent_run_id        uuid,
+    trigger_type        text NOT NULL,
+    service_session_id  uuid
 );
 
 CREATE UNIQUE INDEX conversation_agent_triggers_conversation_agent_seq_unique
     ON conversation_agent_triggers (conversation_id, agent_identity_id, trigger_seq);
-
-CREATE UNIQUE INDEX conversation_agent_triggers_conversation_agent_message_unique
-    ON conversation_agent_triggers (conversation_id, agent_identity_id, trigger_message_id);
 
 COMMENT ON TABLE conversation_agent_triggers IS '会话 Agent 用户输入触发记录';
 COMMENT ON COLUMN conversation_agent_triggers.id IS '触发记录编号';
@@ -26,6 +25,8 @@ COMMENT ON COLUMN conversation_agent_triggers.agent_identity_id IS '目标 Agent
 COMMENT ON COLUMN conversation_agent_triggers.trigger_seq IS '会话 Agent 的连续输入序号';
 COMMENT ON COLUMN conversation_agent_triggers.trigger_message_id IS '触发本次输入的用户消息编号';
 COMMENT ON COLUMN conversation_agent_triggers.agent_run_id IS '实际消费本次输入的 Agent 运行编号';
+COMMENT ON COLUMN conversation_agent_triggers.trigger_type IS '触发类型：agent_direct、customer_auto';
+COMMENT ON COLUMN conversation_agent_triggers.service_session_id IS '客户自动接待所属客服处理周期编号';
 
 -- +goose Down
 DROP TABLE conversation_agent_triggers;

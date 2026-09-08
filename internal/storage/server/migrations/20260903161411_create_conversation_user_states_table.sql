@@ -1,14 +1,18 @@
 -- +goose Up
 -- 创建用户会话状态表。
 CREATE TABLE conversation_user_states (
-    id                    uuid PRIMARY KEY DEFAULT uuidv7(),
-    created_at            timestamptz NOT NULL DEFAULT now(),
-    updated_at            timestamptz NOT NULL DEFAULT now(),
-    organization_id       uuid NOT NULL,
-    conversation_id       uuid NOT NULL,
-    user_id               uuid NOT NULL,
-    last_read_message_id  uuid NOT NULL,
-    last_read_at          timestamptz NOT NULL DEFAULT now()
+    id                                uuid PRIMARY KEY DEFAULT uuidv7(),
+    created_at                        timestamptz NOT NULL DEFAULT now(),
+    updated_at                        timestamptz NOT NULL DEFAULT now(),
+    organization_id                   uuid NOT NULL,
+    conversation_id                   uuid NOT NULL,
+    user_id                           uuid NOT NULL,
+    last_read_message_id              uuid,
+    last_read_at                      timestamptz,
+    muted                             boolean NOT NULL DEFAULT false,
+    last_reviewed_mention_message_id  uuid,
+    marked_unread                     boolean NOT NULL DEFAULT false,
+    read_seq                          bigint NOT NULL DEFAULT 0
 );
 
 CREATE UNIQUE INDEX conversation_user_states_org_conversation_user_unique
@@ -24,8 +28,12 @@ COMMENT ON COLUMN conversation_user_states.updated_at IS '更新时间';
 COMMENT ON COLUMN conversation_user_states.organization_id IS '所属企业编号';
 COMMENT ON COLUMN conversation_user_states.conversation_id IS '会话编号';
 COMMENT ON COLUMN conversation_user_states.user_id IS '用户账号编号';
-COMMENT ON COLUMN conversation_user_states.last_read_message_id IS '最后已读消息编号';
-COMMENT ON COLUMN conversation_user_states.last_read_at IS '最后标记已读时间';
+COMMENT ON COLUMN conversation_user_states.last_read_message_id IS '最后已读消息编号，尚未产生已读水位时为空';
+COMMENT ON COLUMN conversation_user_states.last_read_at IS '最后标记已读时间，尚未产生已读水位时为空';
+COMMENT ON COLUMN conversation_user_states.muted IS '是否降低当前用户在会话中的消息提醒';
+COMMENT ON COLUMN conversation_user_states.last_reviewed_mention_message_id IS '已连续查看的提及或本轮入群基线消息编号';
+COMMENT ON COLUMN conversation_user_states.marked_unread IS '用户主动设置的独立未读标记';
+COMMENT ON COLUMN conversation_user_states.read_seq IS '用户已阅读的会话消息序号';
 COMMENT ON INDEX conversation_user_states_org_conversation_user_unique
     IS '企业会话用户状态唯一索引';
 COMMENT ON INDEX conversation_user_states_organization_user_index

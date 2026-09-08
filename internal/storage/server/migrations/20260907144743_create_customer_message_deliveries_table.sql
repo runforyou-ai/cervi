@@ -18,7 +18,8 @@ CREATE TABLE customer_message_deliveries (
     last_error text NOT NULL DEFAULT '',
     sent_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now()
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    reply_provider_message_id text
 );
 COMMENT ON TABLE customer_message_deliveries IS '客户消息外部投递';
 COMMENT ON COLUMN customer_message_deliveries.id IS '投递编号';
@@ -40,6 +41,7 @@ COMMENT ON COLUMN customer_message_deliveries.last_error IS '投递错误码';
 COMMENT ON COLUMN customer_message_deliveries.sent_at IS '发送确认时间';
 COMMENT ON COLUMN customer_message_deliveries.created_at IS '创建时间';
 COMMENT ON COLUMN customer_message_deliveries.updated_at IS '更新时间';
+COMMENT ON COLUMN customer_message_deliveries.reply_provider_message_id IS '入队时确定的引用平台消息编号';
 
 CREATE UNIQUE INDEX customer_deliveries_message_unique ON customer_message_deliveries (organization_id, message_id);
 CREATE UNIQUE INDEX customer_deliveries_position_unique ON customer_message_deliveries (channel_id, contact_channel_identity_id, position);
