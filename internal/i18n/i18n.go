@@ -329,8 +329,6 @@ const (
 	FieldMessageCursorInvalid             Key = "field.message_cursor_invalid"
 )
 
-const ()
-
 const (
 	ErrorKnowledgeBaseNotFound           Key = "error.knowledge_base_not_found"
 	ErrorKnowledgeBaseListFailed         Key = "error.knowledge_base_list_failed"

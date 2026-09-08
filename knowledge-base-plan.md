@@ -13,8 +13,8 @@
 当前代码已经具备：
 
 - `knowledge_bases`、分组、本地问答条目，以及稳定编号的主问题、相似问题和答案，本次继续沿用。
-- 通用 `search_knowledge` Tool 与多查询结果编排；应用层尚未注入本地检索，Agent 知识库选择待本地检索接通后恢复。
-- Agent Revision 中的知识库绑定、`search_knowledge`、多查询 RRF 和游标上下文读取。
+- 通用 `search_knowledge` Tool、多查询 RRF 融合和游标上下文读取；应用层尚未注入本地检索。
+- Agent 创建与详情中的本地知识库选择，以及 Agent Revision 中保存的绑定范围。
 - 临时文件上传、事务激活、本地或对象存储读取，以及 PostgreSQL/NATS 可靠任务。
 
 本文负责本地内容、索引生命周期和部署；[知识库 Agent Tool 方案](knowledge-base-agent-tool-plan.md) 继续负责既有工具契约、多查询融合和 Revision 范围；[Agent 路线图](agent-roadmap.md) 负责 Agent 执行。
@@ -164,7 +164,7 @@ Hayhooks 的 `setup()` 在部署时执行，动态行为要在每次 `run_api` /
 
 本地知识库按第 3 节从管理后台选择模型。首次接入采用 Haystack 向量检索管线，人工检索和 Agent 共用实现与配置。
 
-PR 4 实现本地 `SearchService`，按企业身份和 Agent 配置的知识库范围构造 `knowledgeretrieval.Source{Retrieve, Read}`。同时恢复 Agent 本地知识库范围配置，并在问答页提供人工检索入口。
+PR 4 实现本地 `SearchService`，按企业身份和 Agent 配置的知识库范围构造 `knowledgeretrieval.Source{Retrieve, Read}`。将本地检索注入 `KnowledgeSearch`，并在问答页提供人工检索入口。
 
 ### 5.2 结果映射与上下文
 
