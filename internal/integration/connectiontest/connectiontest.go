@@ -21,6 +21,7 @@ const (
 	CategoryObjectStorage Category = "object_storage"
 	CategoryModelProvider Category = "model_provider"
 	CategoryTelegram      Category = "telegram"
+	CategoryMCPServer     Category = "mcp_server"
 )
 
 // Location 标识探测实际执行的位置。

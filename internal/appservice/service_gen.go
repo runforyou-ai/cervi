@@ -669,6 +669,21 @@ func (s *Service) GetMCPServer(ctx context.Context, meta RequestMeta, mcpServerI
 	return s.backend.GetMCPServer(ctx, meta, mcpServerID)
 }
 
+// TestMCPServerConnection 测试 MCP 草稿连接配置。
+func (s *Service) TestMCPServerConnection(ctx context.Context, meta RequestMeta, input MCPServerConnectionInput) error {
+	return s.backend.TestMCPServerConnection(ctx, meta, input)
+}
+
+// TestSavedMCPServerConnection 测试已保存的 MCP 服务。
+func (s *Service) TestSavedMCPServerConnection(ctx context.Context, meta RequestMeta, mcpServerID string) error {
+	return s.backend.TestSavedMCPServerConnection(ctx, meta, mcpServerID)
+}
+
+// RefreshMCPServerTools 提交当前企业的 MCP 工具更新任务。
+func (s *Service) RefreshMCPServerTools(ctx context.Context, meta RequestMeta) error {
+	return s.backend.RefreshMCPServerTools(ctx, meta)
+}
+
 // CreateMCPServer 创建 MCP 服务。
 func (s *Service) CreateMCPServer(ctx context.Context, meta RequestMeta, input MCPServerInput) (MCPServer, error) {
 	return s.backend.CreateMCPServer(ctx, meta, input)

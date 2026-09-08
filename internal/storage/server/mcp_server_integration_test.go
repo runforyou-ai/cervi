@@ -4,7 +4,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
 	"testing"
 	"uuid"
 
@@ -35,10 +41,20 @@ func TestMCPServerLifecycle(t *testing.T) {
 		identities = append(identities, installed.Identity)
 	}
 	owner, other := identities[0], identities[1]
-	create := mcpserveraction.NewCreateMCPServerAction(db)
+	client := mcpDiscoverFunc(func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error) {
+		return []domain.MCPTool{{Name: "search", Description: "检索文档"}}, nil
+	})
+	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	worker := mcpserveraction.NewUpdateToolsAction(db, client)
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, worker.Execute, worker.FinalizeFailure); err != nil {
+		t.Fatal(err)
+	}
+	scheduler := mcpserveraction.NewToolsScheduler(tasks)
+	test := mcpserveraction.NewTestConnectionAction(client)
+	create := mcpserveraction.NewCreateMCPServerAction(db, test, scheduler)
 	get := mcpserveraction.NewGetMCPServerQuery(db)
 	list := mcpserveraction.NewListMCPServersQuery(db)
-	update := mcpserveraction.NewUpdateMCPServerAction(db)
+	update := mcpserveraction.NewUpdateMCPServerAction(db, test, scheduler)
 	remove := mcpserveraction.NewDeleteMCPServerAction(db)
 	input := mcpserveraction.Input{Name: " Docs ", URL: " https://example.com/mcp ", ServerType: domain.MCPServerTypeStreamableHTTP, AuthorizationToken: "test-token"}
 	created, err := create.Execute(ctx, owner, input)
@@ -101,4 +117,158 @@ func TestMCPServerLifecycle(t *testing.T) {
 	if err != nil || records == nil || len(records) != 0 {
 		t.Fatalf("empty list = %+v, error = %v", records, err)
 	}
+}
+
+// mcpDiscoverFunc 为工具更新测试提供可控的远端响应。
+type mcpDiscoverFunc func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error)
+
+// Discover 返回测试指定的工具目录或错误。
+func (f mcpDiscoverFunc) Discover(ctx context.Context, config mcpintegration.Config) ([]domain.MCPTool, error) {
+	return f(ctx, config)
+}
+
+// TestMCPToolsUpdates 验证保存自动投递、去重、整批替换、失败保留及旧批次拒绝。
+func TestMCPToolsUpdates(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, testDatabaseConfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.DB()
+	installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(ctx, installationaction.InstallWorkspaceInput{
+		AccessHost: uuid.NewV7().String() + ".mcp-tools.test", OrganizationName: "工具测试", DisplayName: "维护人员", Email: "owner@mcp.test", Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := installed.Identity
+	tools := []domain.MCPTool{{Name: "search", Description: "查找文档"}, {Name: "read", Description: "读取文档"}}
+	var discoverError error
+	client := mcpDiscoverFunc(func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error) { return tools, discoverError })
+	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	worker := mcpserveraction.NewUpdateToolsAction(db, client)
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, worker.Execute, worker.FinalizeFailure); err != nil {
+		t.Fatal(err)
+	}
+	scheduler := mcpserveraction.NewToolsScheduler(tasks)
+	probe := mcpserveraction.NewTestConnectionAction(client)
+	create := mcpserveraction.NewCreateMCPServerAction(db, probe, scheduler)
+	update := mcpserveraction.NewUpdateMCPServerAction(db, probe, scheduler)
+	refresh := mcpserveraction.NewRefreshToolsAction(db, scheduler)
+	get := mcpserveraction.NewGetMCPServerQuery(db)
+	input := mcpserveraction.Input{Name: "Docs", URL: "https://example.com/mcp", ServerType: domain.MCPServerTypeStreamableHTTP}
+	record, err := create.Execute(ctx, identity, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !record.ToolsUpdating || record.ToolsUpdatedAt != nil {
+		t.Fatalf("create must enqueue without writing test tools: %+v", record)
+	}
+	first := mcpRefreshInput(t, ctx, db, record.ID)
+	if err := refresh.Execute(ctx, identity); err != nil {
+		t.Fatal(err)
+	}
+	if current := mcpRefreshInput(t, ctx, db, record.ID); current != first {
+		t.Fatal("refresh duplicated pending task")
+	}
+	if err := worker.Execute(ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	record, err = get.Execute(ctx, identity, record.ID)
+	if err != nil || record.ToolsUpdating || len(record.Tools) != 2 || record.ToolsUpdatedAt == nil {
+		t.Fatalf("first refresh: %+v, %v", record, err)
+	}
+	// 每次保存均提交新任务，旧任务的成功和失败都不得覆盖新批次。
+	input.Name = "Renamed"
+	record, err = update.Execute(ctx, identity, record.ID, input)
+	if err != nil || !record.ToolsUpdating {
+		t.Fatalf("save did not enqueue: %+v, %v", record, err)
+	}
+	second := mcpRefreshInput(t, ctx, db, record.ID)
+	if second == first {
+		t.Fatal("save reused old batch")
+	}
+	if err := worker.FinalizeFailure(ctx, first, errors.New("old worker")); err != nil {
+		t.Fatal(err)
+	}
+	if current := mcpRefreshInput(t, ctx, db, record.ID); current != second {
+		t.Fatal("old failure changed current batch")
+	}
+	tools = []domain.MCPTool{}
+	if err := worker.Execute(ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	record, _ = get.Execute(ctx, identity, record.ID)
+	if record.ToolsUpdating || record.ToolsUpdatedAt == nil || len(record.Tools) != 0 {
+		t.Fatalf("empty list must replace tools: %+v", record)
+	}
+	// 保存探测失败时，配置和任务均保持原样。
+	discoverError = connectiontest.NewError(connectiontest.StageAuthenticate, connectiontest.FailureUnauthorized, nil)
+	input.Name = "Must not save"
+	if _, err := update.Execute(ctx, identity, record.ID, input); err == nil {
+		t.Fatal("failed probe saved configuration")
+	}
+	if _, err := create.Execute(ctx, identity, input); err == nil {
+		t.Fatal("failed probe created configuration")
+	}
+	record, _ = get.Execute(ctx, identity, record.ID)
+	if record.Name != "Renamed" || record.ToolsUpdating {
+		t.Fatalf("failed save changed record: %+v", record)
+	}
+	if err := refresh.Execute(ctx, identity); err != nil {
+		t.Fatal(err)
+	}
+	failed := mcpRefreshInput(t, ctx, db, record.ID)
+	if err := worker.Execute(ctx, failed); err == nil {
+		t.Fatal("expected failed discovery")
+	}
+	if err := worker.FinalizeFailure(ctx, failed, discoverError); err != nil {
+		t.Fatal(err)
+	}
+	record, _ = get.Execute(ctx, identity, record.ID)
+	if record.ToolsUpdating || record.ToolsFailure != string(connectiontest.FailureUnauthorized) || record.ToolsUpdatedAt == nil {
+		t.Fatalf("failure did not preserve snapshot: %+v", record)
+	}
+	// 入队失败必须回滚保存事务。
+	discoverError = nil
+	brokenScheduler := mcpserveraction.NewToolsScheduler(servertask.New(db, serverconfig.NATSConfig{}))
+	if _, err := mcpserveraction.NewUpdateMCPServerAction(db, probe, brokenScheduler).Execute(ctx, identity, record.ID, input); err == nil {
+		t.Fatal("expected unregistered action error")
+	}
+	record, _ = get.Execute(ctx, identity, record.ID)
+	if record.Name != "Renamed" {
+		t.Fatal("enqueue failure did not roll back configuration")
+	}
+	// 修改连接后清除旧目录，并拒绝删除后的任务写回。
+	input.URL = "https://new.example.com/mcp"
+	record, err = update.Execute(ctx, identity, record.ID, input)
+	if err != nil || record.ToolsUpdatedAt != nil {
+		t.Fatalf("new connection retained old snapshot: %+v, %v", record, err)
+	}
+	pending := mcpRefreshInput(t, ctx, db, record.ID)
+	if err := mcpserveraction.NewDeleteMCPServerAction(db).Execute(ctx, identity, record.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.Execute(ctx, pending); err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.FinalizeFailure(ctx, pending, errors.New("deleted")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// mcpRefreshInput 读取服务当前批次对应的真实持久化任务。
+func mcpRefreshInput(t *testing.T, ctx context.Context, db *bun.DB, serverID string) mcpserveraction.RefreshToolsInput {
+	t.Helper()
+	var payload string
+	err := db.NewRaw(`SELECT tr.payload FROM task_runs tr JOIN mcp_servers ms ON tr.payload->>'refreshId' = ms.tools_refresh_id::text WHERE ms.id = ?`, serverID).Scan(ctx, &payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var input mcpserveraction.RefreshToolsInput
+	if err := json.Unmarshal([]byte(payload), &input); err != nil {
+		t.Fatal(err)
+	}
+	return input
 }

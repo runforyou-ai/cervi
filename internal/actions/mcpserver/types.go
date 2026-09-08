@@ -16,6 +16,13 @@ type Input struct {
 	AuthorizationToken string
 }
 
+// ConnectionInput 定义待测试的连接配置。
+type ConnectionInput struct {
+	URL                string
+	ServerType         domain.MCPServerType
+	AuthorizationToken string
+}
+
 // Record 定义 MCP 服务记录。
 type Record struct {
 	ID                 string
@@ -23,6 +30,10 @@ type Record struct {
 	URL                string
 	ServerType         domain.MCPServerType
 	AuthorizationToken string
+	Tools              []domain.MCPTool
+	ToolsUpdatedAt     *time.Time
+	ToolsUpdating      bool
+	ToolsFailure       string
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }

@@ -1013,6 +1013,21 @@ func (b *Backend) GetMCPServer(ctx context.Context, meta appservice.RequestMeta,
 	return output, err
 }
 
+// TestMCPServerConnection 测试 MCP 草稿连接配置。
+func (b *Backend) TestMCPServerConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.MCPServerConnectionInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/integrations/mcp-servers/test-connection", nil, input, nil)
+}
+
+// TestSavedMCPServerConnection 测试已保存的 MCP 服务。
+func (b *Backend) TestSavedMCPServerConnection(ctx context.Context, meta appservice.RequestMeta, mcpServerID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/integrations/mcp-servers/"+url.PathEscape(mcpServerID)+"/test-connection", nil, nil, nil)
+}
+
+// RefreshMCPServerTools 提交当前企业的 MCP 工具更新任务。
+func (b *Backend) RefreshMCPServerTools(ctx context.Context, meta appservice.RequestMeta) error {
+	return b.do(ctx, meta, http.MethodPost, "/integrations/mcp-servers/refresh-tools", nil, nil, nil)
+}
+
 // CreateMCPServer 创建 MCP 服务。
 func (b *Backend) CreateMCPServer(ctx context.Context, meta appservice.RequestMeta, input appservice.MCPServerInput) (appservice.MCPServer, error) {
 	var output appservice.MCPServer

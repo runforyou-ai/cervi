@@ -55,10 +55,27 @@ const integrations = {
       loadError: "MCP 服务列表加载失败。",
       empty: "还没有配置 MCP 服务",
       columns: {
+        tools: "工具",
         name: "名称",
         url: "URL",
         serverType: "服务器类型",
       },
+    },
+    connection: {
+      test: "测试连接",
+      testing: "测试中…",
+      success: "MCP 服务连接成功。",
+      error: "MCP 服务连接失败，请检查配置。",
+    },
+    tools: {
+      refresh: "更新工具",
+      updating: "正在更新工具…",
+      pending: "尚未获取工具",
+      count: "{{count}} 个工具",
+      empty: "没有可用工具",
+      noDescription: "暂无描述",
+      failed: "更新失败：{{message}}",
+      submitError: "提交工具更新失败，请重试。",
     },
     form: {
       createTitle: "添加 MCP 服务",

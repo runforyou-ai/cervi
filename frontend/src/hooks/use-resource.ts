@@ -24,12 +24,13 @@ export function useResource<T>(
     enabled?: boolean
     gcTime?: number
     staleTime?: number
-    refetchInterval?: number | false
+    refetchInterval?: number | false | ((data: T | undefined) => number | false)
     refetchOnWindowFocus?: boolean
   } = {},
 ) {
   const navigate = useNavigate()
   const client = useQueryClient()
+  const refetchInterval = options.refetchInterval
   const query = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => load(signal),
@@ -37,7 +38,9 @@ export function useResource<T>(
     enabled: options.enabled,
     staleTime: options.staleTime,
     gcTime: options.gcTime,
-    refetchInterval: options.refetchInterval,
+    refetchInterval: typeof refetchInterval === "function"
+      ? (query) => refetchInterval(query.state.data)
+      : refetchInterval,
     refetchOnWindowFocus: options.refetchOnWindowFocus,
   })
 

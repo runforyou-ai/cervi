@@ -37,6 +37,7 @@ func loadMCPServer(ctx context.Context, db bun.IDB, organizationID, mcpServerID 
 func recordFromModel(input servermodels.MCPServer) Record {
 	return Record{
 		ID: input.ID, Name: input.Name, URL: input.URL, ServerType: input.ServerType, AuthorizationToken: input.AuthorizationToken,
+		Tools: input.Tools, ToolsUpdatedAt: input.ToolsUpdatedAt, ToolsUpdating: input.ToolsRefreshID != nil, ToolsFailure: input.ToolsFailure,
 		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
 }

@@ -37,12 +37,20 @@ const (
 func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.URL = strings.TrimSpace(input.URL)
-	fields := make(map[string]ValidationCode)
+	connection, fields := normalizeConnectionInput(ConnectionInput{URL: input.URL, ServerType: input.ServerType, AuthorizationToken: input.AuthorizationToken})
+	input.URL = connection.URL
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
 	} else if utf8.RuneCountInString(input.Name) > maxNameLength {
 		fields["name"] = ValidationNameTooLong
 	}
+	return input, fields
+}
+
+// normalizeConnectionInput 校验地址与传输类型。
+func normalizeConnectionInput(input ConnectionInput) (ConnectionInput, map[string]ValidationCode) {
+	input.URL = strings.TrimSpace(input.URL)
+	fields := make(map[string]ValidationCode)
 	if input.URL == "" {
 		fields["url"] = ValidationURLRequired
 	} else if len(input.URL) > maxURLBytes {
