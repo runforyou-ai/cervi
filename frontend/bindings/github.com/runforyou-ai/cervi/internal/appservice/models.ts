@@ -1582,6 +1582,7 @@ export enum IntegrationConnectionType {
 
     IntegrationConnectionTypeDify = "dify",
     IntegrationConnectionTypeN8N = "n8n",
+    IntegrationConnectionTypeRAGFlow = "ragflow",
 };
 
 /**
@@ -1999,10 +2000,11 @@ export enum MessageType {
      */
     $zero = "",
 
-    MessageTypeAttachment = "attachment",
     MessageTypeText = "text",
     MessageTypeSystem = "system",
     MessageTypeAgentError = "agent_error",
+    MessageTypeAgentCancelled = "agent_cancelled",
+    MessageTypeAttachment = "attachment",
 };
 
 /**

@@ -35,8 +35,9 @@ type Registry struct {
 // NewRegistry 创建内置连接器注册表。
 func NewRegistry(client HTTPDoer) *Registry {
 	return &Registry{factories: map[domain.IntegrationConnectionType]Factory{
-		domain.IntegrationConnectionTypeDify: newDifyFactory(client),
-		domain.IntegrationConnectionTypeN8N:  newN8NFactory(client),
+		domain.IntegrationConnectionTypeDify:    newDifyFactory(client),
+		domain.IntegrationConnectionTypeN8N:     newN8NFactory(client),
+		domain.IntegrationConnectionTypeRAGFlow: newRAGFlowFactory(client),
 	}}
 }
 

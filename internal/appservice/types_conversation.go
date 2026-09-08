@@ -18,10 +18,11 @@ const (
 type MessageType string
 
 const (
-	MessageTypeAttachment MessageType = MessageType(domain.MessageTypeAttachment)
-	MessageTypeText       MessageType = MessageType(domain.MessageTypeText)
-	MessageTypeSystem     MessageType = MessageType(domain.MessageTypeSystem)
-	MessageTypeAgentError MessageType = MessageType(domain.MessageTypeAgentError)
+	MessageTypeText           MessageType = MessageType(domain.MessageTypeText)
+	MessageTypeSystem         MessageType = MessageType(domain.MessageTypeSystem)
+	MessageTypeAgentError     MessageType = MessageType(domain.MessageTypeAgentError)
+	MessageTypeAgentCancelled MessageType = MessageType(domain.MessageTypeAgentCancelled)
+	MessageTypeAttachment     MessageType = MessageType(domain.MessageTypeAttachment)
 )
 
 // ConversationStatus 表示会话生命周期状态。

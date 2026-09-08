@@ -263,10 +263,11 @@ export function ConnectorFormPage({ mode }: { mode: "create" | "edit" }) {
                           currentAPIURL ===
                             connectorTypeConfigs[previousType].defaultAPIURL
                         ) {
+                          // 切换类型时同步默认地址，保存或测试时再校验。
                           form.setValue(
                             "apiURL",
                             connectorTypeConfigs[nextType].defaultAPIURL,
-                            { shouldDirty: true, shouldValidate: true },
+                            { shouldDirty: true },
                           )
                         }
                       }}

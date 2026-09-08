@@ -28,6 +28,7 @@ import {
   GetAttachmentDownload,
   SendFirstAgentTextMessage,
   SendAgentTextMessage,
+  StopAgentReply,
   SendFirstDirectTextMessage,
   SendDirectTextMessage,
   SendGroupTextMessage,
@@ -552,3 +553,6 @@ export async function listAttachmentStates(conversationID: string, messageIDs: s
 
 /** 完成上传并激活原附件消息。 */
 export const completeAttachmentUpload = bind(CompleteAttachmentUpload)
+
+/** 停止指定 AI 回复并读取实际运行状态。 */
+export const stopAgentReply = bind(StopAgentReply)

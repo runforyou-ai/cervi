@@ -67,7 +67,8 @@ func normalizeConnectionInput(input ConnectionInput) (ConnectionInput, map[strin
 	input.Configuration.APIURL = strings.TrimSpace(input.Configuration.APIURL)
 	input.Configuration.APIKey = strings.TrimSpace(input.Configuration.APIKey)
 	if input.Type != domain.IntegrationConnectionTypeDify &&
-		input.Type != domain.IntegrationConnectionTypeN8N {
+		input.Type != domain.IntegrationConnectionTypeN8N &&
+		input.Type != domain.IntegrationConnectionTypeRAGFlow {
 		fields["type"] = ValidationTypeInvalid
 	}
 	if input.Configuration.APIURL == "" {

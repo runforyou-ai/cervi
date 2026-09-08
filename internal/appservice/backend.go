@@ -131,6 +131,9 @@ type Backend interface {
 	// SendAgentTextMessage 向已有 AI 会话发送文本消息。
 	//cervi:route POST /agent-conversations/:conversationID/messages
 	SendAgentTextMessage(context.Context, RequestMeta, string, AgentTextMessageInput) (ConversationMessage, error)
+	// StopAgentReply 停止独立 AI 会话中指定的回复并返回实际运行状态。
+	//cervi:route POST /agent-conversations/:conversationID/runs/:runID/stop
+	StopAgentReply(context.Context, RequestMeta, string, string) (AgentRunStatus, error)
 	// FindDirectConversation 按目标身份查找当前成员的活跃单聊。
 	//cervi:route GET /direct-conversations/by-target/:targetIdentityID
 	FindDirectConversation(context.Context, RequestMeta, string) (DirectConversationLookup, error)

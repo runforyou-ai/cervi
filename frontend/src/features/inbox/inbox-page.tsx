@@ -757,15 +757,17 @@ function InboxConversationList({
               ConversationStatus.ConversationStatusArchived
           const preview = groupDissolved
             ? t("groupDissolved")
-            : conversation.lastMessageType === MessageType.MessageTypeAgentError
-              ? t("agentRunFailed")
-              : messagePreview(
-                summary.preview ?? "",
-                summary.previewSenderIdentityType,
-              ).trim() ||
-              (isGroupInboxConversation(conversation) && summary.lastMessageAt
-                ? t("groupSystemUpdated")
-                : t("messagesEmpty"))
+            : conversation.lastMessageType === MessageType.MessageTypeAgentCancelled
+              ? t("agentReplyStopped")
+              : conversation.lastMessageType === MessageType.MessageTypeAgentError
+                ? t("agentRunFailed")
+                : messagePreview(
+                    summary.preview ?? "",
+                    summary.previewSenderIdentityType,
+                  ).trim() ||
+                  (isGroupInboxConversation(conversation) && summary.lastMessageAt
+                    ? t("groupSystemUpdated")
+                    : t("messagesEmpty"))
           const formattedTime = formatTime(summary.lastMessageAt)
           const hasUnread =
             conversation.unreadCount > 0 || conversation.markedUnread

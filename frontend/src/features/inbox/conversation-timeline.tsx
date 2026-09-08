@@ -562,7 +562,9 @@ function ConversationTimelineContent({
       next.sessionStart ||
       previous.type === MessageType.MessageTypeSystem ||
       previous.type === MessageType.MessageTypeAgentError ||
+      previous.type === MessageType.MessageTypeAgentCancelled ||
       next.type === MessageType.MessageTypeAgentError ||
+      next.type === MessageType.MessageTypeAgentCancelled ||
       next.type === MessageType.MessageTypeSystem
     ) {
       return false
@@ -654,6 +656,8 @@ function ConversationTimelineContent({
               const previous = visibleMessages[index - 1]
               const next = visibleMessages[index + 1]
               const agentError = message.type === MessageType.MessageTypeAgentError
+              const agentCancelled = message.type === MessageType.MessageTypeAgentCancelled
+              const agentNotice = agentError || agentCancelled
               const date = new Date(message.originatedAt)
               const day = dateFormatters.dayKey.format(date)
               const startsDay =
@@ -806,7 +810,7 @@ function ConversationTimelineContent({
                             ) : null}
                             <ContextMenuTrigger asChild>
                               <div className="group/message relative max-w-full">
-                                {incoming && !agentError && !message.attachment && onReplyMessage ? (
+                                {incoming && !agentNotice && !message.attachment && onReplyMessage ? (
                                   <button
                                     type="button"
                                     className="pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
@@ -825,7 +829,7 @@ function ConversationTimelineContent({
                                 <div
                                   className={cn(
                                     "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
-                                    message.attachment ? "p-0 text-foreground" : incoming || agentError
+                                    message.attachment ? "p-0 text-foreground" : incoming || agentNotice
                                       ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
                                       : "bg-primary text-primary-foreground",
                                     !message.attachment && endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
@@ -871,8 +875,8 @@ function ConversationTimelineContent({
                                     <AgentProcess process={message.agentProcess} incoming={incoming} />
                                   ) : null}
                                   <div className="flex min-w-0 items-end gap-2">
-                                    {agentError ? (
-                                      <span className="text-destructive">{t("agentRunFailed")}</span>
+                                    {agentNotice ? (
+                                      <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
                                       <ConversationAttachment attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
                                         originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} />
@@ -886,7 +890,7 @@ function ConversationTimelineContent({
                                     {!message.attachment ? <div
                                       className={cn(
                                         "inline-flex shrink-0 translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
-                                        incoming || agentError
+                                        incoming || agentNotice
                                           ? "text-muted-foreground"
                                           : "text-primary-foreground/75",
                                       )}
@@ -897,7 +901,7 @@ function ConversationTimelineContent({
                                       >
                                         {dateFormatters.clock.format(date)}
                                       </time>
-                                      {customerDeliveries && !agentError && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
+                                      {customerDeliveries && !agentNotice && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
                                         <CustomerDeliveryState
                                           conversationID={conversationID}
                                           delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
@@ -937,7 +941,7 @@ function ConversationTimelineContent({
                         </div>
                       </article>
                       <ContextMenuContent>
-                        {!message.local && !agentError && !message.attachment && onReplyMessage ? (
+                        {!message.local && !agentNotice && !message.attachment && onReplyMessage ? (
                           <ContextMenuItem
                             onSelect={() =>
                               onReplyMessage({
@@ -952,7 +956,7 @@ function ConversationTimelineContent({
                           </ContextMenuItem>
                         ) : null}
                         <ContextMenuItem
-                          onSelect={() => void copyMessageText(agentError ? t("agentRunFailed") : message.attachment?.name ?? message.body)}
+                          onSelect={() => void copyMessageText(agentNotice ? t(agentError ? "agentRunFailed" : "agentReplyStopped") : message.attachment?.name ?? message.body)}
                         >
                           {t("messageCopyText")}
                         </ContextMenuItem>
@@ -967,6 +971,8 @@ function ConversationTimelineContent({
             <AgentRunState
               key={currentPage.latestAgentRun.id}
               run={currentPage.latestAgentRun}
+              onStopped={timeline.poll}
+              conversationID={conversationType === ConversationType.ConversationTypeAgent ? conversationID : undefined}
               incoming={conversationType !== ConversationType.ConversationTypeCustomer}
             />
           ) : null}

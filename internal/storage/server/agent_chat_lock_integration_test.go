@@ -36,7 +36,6 @@ func createAgentLockChat(t *testing.T, ctx context.Context, db *bun.DB, identity
 
 // testAgentChatLocking 验证 AI 会话各执行阶段与真人发送共用会话锁。
 func testAgentChatLocking(t *testing.T, db *bun.DB, identity *servermodels.Identity, agentID, agentIdentityID string, tasks *servertask.Runtime) {
-	db.AddQueryHook(chatQueryHook{})
 	for _, phase := range []struct {
 		name       string
 		occurrence int

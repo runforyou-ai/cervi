@@ -184,6 +184,11 @@ func (s *Service) SendAgentTextMessage(ctx context.Context, meta RequestMeta, co
 	return s.backend.SendAgentTextMessage(ctx, meta, conversationID, input)
 }
 
+// StopAgentReply 停止独立 AI 会话中指定的回复并返回实际运行状态。
+func (s *Service) StopAgentReply(ctx context.Context, meta RequestMeta, conversationID string, runID string) (AgentRunStatus, error) {
+	return s.backend.StopAgentReply(ctx, meta, conversationID, runID)
+}
+
 // FindDirectConversation 按目标身份查找当前成员的活跃单聊。
 func (s *Service) FindDirectConversation(ctx context.Context, meta RequestMeta, targetIdentityID string) (DirectConversationLookup, error) {
 	return s.backend.FindDirectConversation(ctx, meta, targetIdentityID)
