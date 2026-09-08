@@ -146,7 +146,6 @@ export type {
     FirstDirectTextMessageResult,
     GroupConversation,
     GroupConversationInput,
-    GroupConversationLeaveInput,
     GroupConversationMemberInput,
     GroupConversationMembersInput,
     GroupConversationOwnerInput,

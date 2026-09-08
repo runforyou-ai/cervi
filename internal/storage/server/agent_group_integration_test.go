@@ -73,7 +73,7 @@ func testGroupAgentMembership(t *testing.T, db *bun.DB, identity *servermodels.I
 		t.Fatalf("agent owner error=%v", err)
 	}
 	// 最后一位真人可直接解散含有 Agent 的群聊。
-	if err := conversationaction.NewLeaveGroupConversationAction(db).Execute(ctx, identity, conversationaction.GroupConversationLeaveInput{ConversationID: group.ID}); err != nil {
+	if _, err := conversationaction.NewDissolveGroupConversationAction(db).Execute(ctx, identity, group.ID); err != nil {
 		t.Fatal(err)
 	}
 	var stored servermodels.Conversation

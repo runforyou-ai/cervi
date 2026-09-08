@@ -19,6 +19,7 @@ import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
 import { MobileGroupInfo } from "@/apps/mobile/mobile-group-info"
 import { MobileGroupMembersPreview } from "@/apps/mobile/mobile-group-members"
 import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
+import { GroupDissolveDialog } from "@/features/inbox/group-dissolve-dialog"
 import { MobileGroupLeaveDialog } from "@/apps/mobile/mobile-group-leave-dialog"
 import { Button } from "@/components/ui/button"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
@@ -48,6 +49,7 @@ export function MobileGroupDetailsPage() {
   const muteSave = useImmediateSave()
   const [pendingMuted, setPendingMuted] = useState<boolean | null>(null)
   const [leaveOpen, setLeaveOpen] = useState(false)
+  const [dissolveOpen, setDissolveOpen] = useState(false)
   const trigger = useRef<HTMLElement | null>(null)
   const archived =
     group.status === ConversationStatus.ConversationStatusArchived
@@ -58,8 +60,9 @@ export function MobileGroupDetailsPage() {
   )
   const canManage = isOwner && !archived
   useEffect(() => {
-    // 群聊解散或当前成员成为群主后关闭退出确认。
+    // 群聊解散或群主身份变化后关闭不再适用的退出、解散确认。
     if ((archived || isOwner) && !save.saving) setLeaveOpen(false)
+    if (archived || !isOwner) setDissolveOpen(false)
   }, [archived, isOwner, save.saving])
 
   /** 保存资料或退出群聊，卸载后忽略提示与导航结果。 */
@@ -195,11 +198,18 @@ export function MobileGroupDetailsPage() {
             }}
             onLeave={(source) => {
               trigger.current = source
-              setLeaveOpen(true)
+              if (isOwner) setDissolveOpen(true)
+              else setLeaveOpen(true)
             }}
             onMute={(muted) => void changeMuted(muted)}
           />
         </MobileScrollArea>
+        <GroupDissolveDialog
+          group={group}
+          open={dissolveOpen}
+          onOpenChange={setDissolveOpen}
+          trigger={trigger.current}
+        />
         {leaveOpen && !archived && !isOwner ? (
           <MobileGroupLeaveDialog
             group={group}

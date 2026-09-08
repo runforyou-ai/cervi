@@ -80,6 +80,7 @@ type DirectBackend struct {
 	removeGroupConversationMember     *conversationaction.RemoveGroupConversationMemberAction
 	transferGroupConversationOwner    *conversationaction.TransferGroupConversationOwnerAction
 	leaveGroupConversation            *conversationaction.LeaveGroupConversationAction
+	dissolveGroupConversation         *conversationaction.DissolveGroupConversationAction
 	sendGroupTextMessage              *conversationaction.SendGroupTextMessageAction
 	listMessageChannels               *channelaction.ListMessageChannelsQuery
 	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
@@ -206,6 +207,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		removeGroupConversationMember:     conversationaction.NewRemoveGroupConversationMemberAction(db),
 		transferGroupConversationOwner:    conversationaction.NewTransferGroupConversationOwnerAction(db),
 		leaveGroupConversation:            conversationaction.NewLeaveGroupConversationAction(db),
+		dissolveGroupConversation:         conversationaction.NewDissolveGroupConversationAction(db),
 		sendGroupTextMessage:              conversationaction.NewSendGroupTextMessageAction(db),
 		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
 		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),

@@ -29,20 +29,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { GroupMemberPickerDialog } from "@/features/inbox/group-member-picker-dialog"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -85,19 +77,17 @@ export function GroupParticipantList({
   onAdd: (members: MemberOption[]) => Promise<void>
   onTransferOwner: (identityID: string) => Promise<void>
   onRemove: (identityID: string) => Promise<void>
-  onLeave: (successorIdentityID?: string) => Promise<void>
+  onLeave: () => Promise<void>
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const memberSearchID = useId()
-  const successorRadioName = useId()
   const [query, setQuery] = useState("")
   const [addOpen, setAddOpen] = useState(false)
   const [transferring, setTransferring] =
     useState<GroupParticipant | null>(null)
   const [removing, setRemoving] = useState<GroupParticipant | null>(null)
   const [leaving, setLeaving] = useState<GroupParticipant | null>(null)
-  const [successorIdentityID, setSuccessorIdentityID] = useState("")
   const [acting, setActing] = useState(false)
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const visibleParticipants = useMemo(
@@ -111,15 +101,6 @@ export function GroupParticipantList({
       ),
     [normalizedQuery, participants],
   )
-  const successorCandidates = participants.filter(
-    (participant) =>
-      participant.identityId !== currentIdentityID &&
-      participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeUser,
-  )
-  const leavingAsOwner =
-    leaving?.role === GroupParticipantRole.GroupParticipantRoleOwner
-  const dissolvingGroup = leavingAsOwner && successorCandidates.length === 0
-
   /** 转让群主并关闭确认框。 */
   async function transferOwner() {
     if (!transferring) return
@@ -160,33 +141,24 @@ export function GroupParticipantList({
     }
   }
 
-  /** 退出或解散群聊并关闭对应对话框。 */
+  /** 普通成员退出群聊并关闭确认框。 */
   async function leaveGroup() {
     if (!leaving) return
     setActing(true)
     try {
-      await onLeave(
-        leavingAsOwner ? successorIdentityID || undefined : undefined,
-      )
+      await onLeave()
       setLeaving(null)
-      setSuccessorIdentityID("")
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      console.warn(dissolvingGroup ? "解散群聊失败" : "退出群聊失败", error)
+      console.warn("退出群聊失败", error)
       toast.error(
         isApiError(error)
-          ? apiErrorMessage(error, ["successorIdentityId"])
-          : t(dissolvingGroup ? "groupDissolveError" : "groupLeaveError"),
+          ? apiErrorMessage(error)
+          : t("groupLeaveError"),
       )
     } finally {
       setActing(false)
     }
-  }
-
-  /** 关闭退出交互并清空继任者选择。 */
-  function closeLeaveDialog() {
-    setLeaving(null)
-    setSuccessorIdentityID("")
   }
 
   return (
@@ -232,7 +204,7 @@ export function GroupParticipantList({
                 participant.role ===
                 GroupParticipantRole.GroupParticipantRoleOwner
               const showActions =
-                !readOnly && (isCurrent || (canManage && !isOwner))
+                !readOnly && !isOwner && (isCurrent || canManage)
               return (
                 <div
                   key={participant.identityId}
@@ -280,11 +252,7 @@ export function GroupParticipantList({
                               destructive
                               onSelect={() => setLeaving(participant)}
                             >
-                              {t(
-                                isOwner && successorCandidates.length === 0
-                                  ? "groupDissolve"
-                                  : "groupLeave",
-                              )}
+                              {t("groupLeave")}
                             </DropdownMenuItem>
                           ) : (
                             <>
@@ -381,8 +349,8 @@ export function GroupParticipantList({
       </AlertDialog>
 
       <AlertDialog
-        open={leaving !== null && !leavingAsOwner}
-        onOpenChange={(open) => !open && closeLeaveDialog()}
+        open={leaving !== null && !readOnly && !canManage}
+        onOpenChange={(open) => !open && !acting && setLeaving(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -397,100 +365,16 @@ export function GroupParticipantList({
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={acting}
-              onClick={() => void leaveGroup()}
+              onClick={(event) => {
+                event.preventDefault()
+                void leaveGroup()
+              }}
             >
               {t("groupLeaveConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog
-        open={leaving !== null && leavingAsOwner}
-        onOpenChange={(open) => !open && closeLeaveDialog()}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {t(
-                dissolvingGroup
-                  ? "groupDissolveTitle"
-                  : "groupOwnerLeaveTitle",
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {t(
-                dissolvingGroup
-                  ? "groupDissolveDescription"
-                  : "groupOwnerLeaveDescription",
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid min-h-0 gap-4">
-            {!dissolvingGroup ? (
-              <div className="grid gap-2">
-                <span className="text-sm font-medium">
-                  {t("groupOwnerSuccessor")}
-                </span>
-                <ScrollArea className="max-h-64 rounded-md border">
-                  <div
-                    className="divide-y"
-                    role="radiogroup"
-                    aria-label={t("groupOwnerSuccessor")}
-                  >
-                    {successorCandidates.map((participant) => (
-                      <label
-                        key={participant.identityId}
-                        className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50"
-                      >
-                        <input
-                          type="radio"
-                          name={successorRadioName}
-                          value={participant.identityId}
-                          checked={
-                            successorIdentityID === participant.identityId
-                          }
-                          disabled={acting}
-                          className="size-4 accent-primary"
-                          onChange={() =>
-                            setSuccessorIdentityID(participant.identityId)
-                          }
-                        />
-                        <GroupParticipantAvatar participant={participant} />
-                        <span className="min-w-0 flex-1 truncate text-sm">
-                          {participant.displayName}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={acting}
-                onClick={closeLeaveDialog}
-              >
-                {t("groupCreateCancel")}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={(!dissolvingGroup && !successorIdentityID) || acting}
-                onClick={() => void leaveGroup()}
-              >
-                {t(
-                  dissolvingGroup
-                    ? "groupDissolveConfirm"
-                    : "groupOwnerLeaveConfirm",
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

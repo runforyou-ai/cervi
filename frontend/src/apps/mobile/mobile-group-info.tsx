@@ -119,7 +119,7 @@ export function MobileGroupInfo({
         type="button"
         variant="destructive"
         className="mt-4 min-h-11 w-full"
-        disabled={isOwner || archived || busy}
+        disabled={archived || busy}
         onClick={(event) => onLeave(event.currentTarget)}
       >
         {t(isOwner ? "groupDissolve" : "groupLeave")}

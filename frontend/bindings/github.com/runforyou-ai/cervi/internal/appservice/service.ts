@@ -267,6 +267,13 @@ export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $Cancella
 }
 
 /**
+ * DissolveGroupConversation 解散群聊并保留当前成员的只读历史。
+ */
+export function DissolveGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
+    return $Call.ByID(3528011703, meta, conversationID);
+}
+
+/**
  * FindDirectConversation 按目标身份查找当前成员的活跃单聊。
  */
 export function FindDirectConversation(meta: $models.RequestMeta, targetIdentityID: string): $CancellablePromise<$models.DirectConversationLookup> {
@@ -400,10 +407,10 @@ export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromi
 }
 
 /**
- * LeaveGroupConversation 退出群聊并按需转让群主。
+ * LeaveGroupConversation 退出普通成员参与的群聊。
  */
-export function LeaveGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationLeaveInput): $CancellablePromise<void> {
-    return $Call.ByID(43150167, meta, conversationID, input);
+export function LeaveGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<void> {
+    return $Call.ByID(43150167, meta, conversationID);
 }
 
 /**

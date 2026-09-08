@@ -1288,13 +1288,6 @@ export interface GroupConversationInput {
 }
 
 /**
- * GroupConversationLeaveInput 定义当前成员退出群聊参数。
- */
-export interface GroupConversationLeaveInput {
-    "successorIdentityId": string;
-}
-
-/**
  * GroupConversationMemberInput 定义群聊单个成员操作参数。
  */
 export interface GroupConversationMemberInput {

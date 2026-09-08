@@ -62,6 +62,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/group-conversations/:conversationID/members/remove", s.removeGroupConversationMember)
 	router.POST("/group-conversations/:conversationID/owner/transfer", s.transferGroupConversationOwner)
 	router.POST("/group-conversations/:conversationID/leave", s.leaveGroupConversation)
+	router.POST("/group-conversations/:conversationID/dissolve", s.dissolveGroupConversation)
 	router.POST("/group-conversations/:conversationID/messages", s.sendGroupTextMessage)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
@@ -543,13 +544,15 @@ func (s *Service) transferGroupConversationOwner(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// leaveGroupConversation 退出群聊并按需转让群主。
+// leaveGroupConversation 退出普通成员参与的群聊。
 func (s *Service) leaveGroupConversation(c *gin.Context) {
-	var input appservice.GroupConversationLeaveInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	writeEmpty(c, s.application.LeaveGroupConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input))
+	writeEmpty(c, s.application.LeaveGroupConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID")))
+}
+
+// dissolveGroupConversation 解散群聊并保留当前成员的只读历史。
+func (s *Service) dissolveGroupConversation(c *gin.Context) {
+	output, err := s.application.DissolveGroupConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
 }
 
 // sendGroupTextMessage 发送企业内部群聊文本消息。

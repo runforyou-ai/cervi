@@ -1273,7 +1273,7 @@ PR03 的停用生效边界已确认：目标停用只拒绝之后资格校验的
 | AI 聊天首发／后续：[SendFirstAgentTextMessageAction / SendAgentTextMessageAction](internal/actions/conversation/agent_conversation.go) | LockActiveUser；固定用户与 Agent 归属、活跃 Agent 及有效参与关系 | 草稿按 conversationId 收敛；新建按身份 ID 确保主体并建会话／扩展／Participant；Conversation → Participant → 资格／幂等 → Message／摘要 → 个人已读 → State／Trigger／Run／Task | 同草稿和消息编号重试确认已有结果，不同草稿保持独立；新建会话不取消旧 Run；PR05–06 集中追加与序号 | 所属真人 U |
 | 群创建／发送：[CreateGroupConversationAction、SendGroupTextMessageAction.Execute](internal/actions/conversation/group_conversation.go) | LockActiveUser；活跃成员／可发资格 | 创建时头像激活 → 按身份 ID 确保创建者与全部成员主体 → 新 Conversation／Participant；发送经 chatstate.LockGroup 锁 Conversation／Participant 并重查资格 | 保留成员展示顺序；系统与文本追加仍归 PR05–06；创建空群不伪造消息基线，增员时按系统消息设基线，不触发群 Agent | 当前真人 U |
 | 群资料／增员：[UpdateGroupConversationAction、AddGroupConversationMembersAction.Execute](internal/actions/conversation/group_management.go) | LockActiveUser；chatstate.LockGroup；群主 | Conversation → 参与者／头像文件或新主体 → 群系统消息／个人阅读基线 | 保留头像激活与关联事务；重入复用 Participant、重设阅读及提及基线，保留静音 | 变更前后真人 U |
-| 群移除／转让／退出／解散：[RemoveGroupConversationMemberAction、TransferGroupConversationOwnerAction、LeaveGroupConversationAction.Execute](internal/actions/conversation/group_management.go) | LockActiveUser；群主或本人资格 | chatstate.LockGroup（内调 chatstate.LockMember，依次锁 Conversation／本人 Participant）→ loadActiveGroupParticipant（UPDATE OF cp）→ 参与者修改 → createGroupSystemEvent | PR18 为旧受众写移除；PR47 失权清 pin 并推进本人顺序版本；解散可读则保留，不因列表移除伪造失权 | 变更前后真人 U，移出者仅移除标记 |
+| 群移除／转让／退出／解散：[RemoveGroupConversationMemberAction、TransferGroupConversationOwnerAction、LeaveGroupConversationAction、DissolveGroupConversationAction.Execute](internal/actions/conversation/group_management.go) | LockActiveUser；群主或本人资格 | chatstate.LockGroup（内调 chatstate.LockMember，依次锁 Conversation／本人 Participant）→ loadActiveGroupParticipant（UPDATE OF cp）→ 参与者修改 → createGroupSystemEvent | PR18 为旧受众写移除；PR47 失权清 pin 并推进本人顺序版本；解散可读则保留，不因列表移除伪造失权 | 变更前后真人 U，移出者仅移除标记 |
 | 真人客服回复：[SendCustomerTextMessageAction.executeTransaction](internal/actions/conversation/send_customer_text_message.go) | LockActiveUser；企业及 website／Telegram 外发能力；当前周期负责人规则 | Telegram 先 Prepare 锁 Channel／渠道身份；随后 Conversation → CustomerConversation → ServiceSession → Participant／Message／Delivery → 摘要 | PR04 共用 chatstate 会话／周期锁；保留隐式领取、引用、首次响应、首次回复 Participant、消息与投递同事务 | C、V |
 | 客服领取／转交／关闭／重开：[ClaimServiceSessionAction 等 Execute](internal/actions/conversation/manage_service_session.go) | LockActiveUser；周期状态；转交目标 LockActiveCustomerServiceIdentity | 目标身份（转交）→ Conversation → CustomerConversation → ServiceSession → AgentState → Run；提交后取消内存 context | PR04 已将转交目标身份移到 Conversation 前，再锁会话、扩展与周期并复核资格；PR19–20/23 原子提交周期和取消／补触发事实，不能以进程取消代替数据库门禁 | C、V（公开状态） |
 | 网站入站：[ReceiveWebsiteCustomerTextMessageAction.executeTransaction](internal/actions/conversation/receive_website_customer_text_message.go) → [ReceiveInboundCustomerTextMessage](internal/actions/conversation/receive_customer_text_message.go) | 公开层解析 Cookie/Header；渠道启用、渠道身份及线程归属；无当前用户 | EnsureChannelIdentity 锁渠道身份 → 联系人恢复／主体 → 创建或锁 Conversation → CustomerConversation → ServiceSession → Participant → Message／摘要 → ScheduleCustomerAuto | PR04 已稳定定位渠道身份后锁 Conversation；联系人 Participant 在周期后，AI 回复 Participant 在 State／Run／Task 门禁后，均受同一会话锁串行保护；幂等消息不重复 Trigger，首发前初始化不建业务记录 | C、该身份 V |
@@ -1612,9 +1612,9 @@ Web 和桌面端支持创建、列表、只读查看成员、历史、文本发�
 
 ### 13.12 阶段 2B-G2：群资料与成员管理（已交付）
 
-G2 支持群主修改名称、描述和头像，批量增员、移除成员和转让群主，普通成员可以退出；群主退出前必须转让，最后一位群主可以解散群聊并保留只读历史。成员重新加入时复用原 Participant 行，群名称和成员变化以类型化系统消息记录操作人与目标快照。
+G2 支持群主修改名称、描述和头像，批量增员、移除成员和转让群主，普通成员可以退出；群主需先独立转让，再作为普通成员手动退出；群主可随时解散群聊，解散时仍在群内的成员保留只读历史。成员重新加入时复用原 Participant 行，群名称和成员变化以类型化系统消息记录操作人与目标快照。
 
-Web 和桌面端资料栏提供群资料和成员两个页签，按群主与普通成员权限展示管理操作。退出成员失去群聊访问权；解散后的最后一位成员仍可查看资料、成员与历史，但不能继续发送或修改。
+Web 和桌面端资料栏提供群资料和成员两个页签，按群主与普通成员权限展示管理操作。退出成员失去群聊访问权；解散时仍在群内的成员可查看资料、成员与历史，但不能继续发送或修改；已退出或被移除的成员不会恢复访问权。
 
 ### 13.13 阶段 2B-G3：群聊引用与 @ 提醒（本次交付）
 
@@ -1723,7 +1723,7 @@ Web 与桌面端客服可以引用当前网站客户会话中未删除的文本�
 
 Web 与桌面端创建群聊和添加成员支持同企业的活跃 Agent，候选和成员列表展示 AI 员工标识及头像。成员资料返回身份类型，Agent 作为普通成员加入，可移除并重新添加；停用及跨企业 Agent 不可加入。
 
-群主仍由真人担任，不能转让给 Agent；最后一位真人可以解散仍包含 Agent 的群聊。群内结构化 @ 候选及服务端提醒目标仅接受真人，既有真人 @成员和 @所有人功能保持原有语义。
+群主仍由真人担任，不能转让给 Agent；群主可以解散包含真人与 Agent 的群聊。群内结构化 @ 候选及服务端提醒目标仅接受真人，既有真人 @成员和 @所有人功能保持原有语义。
 
 本次只交付成员邀请和管理，不创建群聊 Agent Trigger 或 Run，不提供群内 Agent 回复、抢占、上下文组装或运行状态展示；群内 @Agent 和 @所有人触发 Agent 的规则留待后续设计。不增加迁移，不扩展移动端建群和成员管理。
 
@@ -1747,7 +1747,7 @@ Web 与桌面端消息页的加号提供「发起单聊 / 创建 AI 聊天 / 创
 
 移动端群详情顶部以每行 5 个头像展示群成员，头像下方显示姓名，最多两行。群主最多展示 8 位成员，末尾保留「添加」「移除」图标；非群主最多展示 9 位成员，末尾保留「添加」图标。群主的「添加」已接入真人成员选择；普通成员、已解散群和满员群保持禁用，「移除」仍为禁用占位。下方「查看群成员(N)」和右箭头进入独立成员页，支持姓名搜索、完整名单与群主标识，不提供成员管理操作。群资料与个人免打扰放在成员区下方，不额外显示「群资料」标题。头像、名称、描述各自显示为独立资料行并保留右侧箭头；群主点击后进入带标题和标准返回按钮的独立编辑页，编辑页仅保留全宽「完成」按钮，左上角返回放弃未提交的编辑并恢复详情位置，提交期间锁定返回。普通成员点击资料项时提示仅群主可修改；已解散群提示不可修改。图片选择后立即上传为临时文件，保存时关联。群主、创建时间为只读字段，免打扰只修改当前用户设置，使用独立保存状态，点击立即切换、失败恢复原值，不禁用其他资料项。
 
-免打扰下方，普通成员显示红色「退出群聊」按钮并在确认后退出；群主显示禁用的红色「解散群聊」按钮，暂不接入解散操作。已解散群保留资料、成员和历史。
+免打扰下方，普通成员显示红色「退出群聊」按钮并在确认后退出；群主显示红色「解散群聊」按钮，二次确认后调用独立解散接口，成功后保持当前详情位置。Web 与桌面端在群资料更多菜单中提供同一操作。解散不可恢复，当前成员保留资料、成员和只读历史；重复请求不重复写入系统消息。
 
 群聊、详情、成员列表与分项编辑采用嵌套路由，隐藏的页面保持挂载和布局尺寸，同时禁用交互与消息轮询，返回后恢复草稿和阅读位置。群资料在应用前台同步；主动退群期间暂停群资料轮询与自动访问失效提示，退出后按群子页记录的历史距离回到来源消息列表并刷新；直接打开的群子页通过替换路由返回所属页面。接口、业务权限和数据库沿用现有契约，不扩展移动端已读、提及、通知投递或实时协议。
 

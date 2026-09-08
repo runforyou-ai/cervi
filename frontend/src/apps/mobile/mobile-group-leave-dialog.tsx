@@ -58,7 +58,7 @@ export function MobileGroupLeaveDialog({
             onClick={async () => {
               const success = await onSave(
                 () =>
-                  leaveGroupConversation(group.id, { successorIdentityId: "" }),
+                  leaveGroupConversation(group.id),
                 "leave",
               )
               if (success) onClose()

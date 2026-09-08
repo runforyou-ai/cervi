@@ -13,6 +13,7 @@ import {
   ListPendingConversationMentions,
   MarkConversationMentionReviewed,
   LeaveGroupConversation,
+  DissolveGroupConversation,
   ListConversationMessages,
   MarkConversationRead,
   ListCustomerServiceAssignees,
@@ -58,7 +59,6 @@ import type {
   DirectTextMessageInput,
   GroupConversation,
   GroupConversationInput,
-  GroupConversationLeaveInput,
   GroupConversationMemberInput,
   GroupConversationMembersInput,
   GroupConversationOwnerInput,
@@ -170,6 +170,7 @@ const addGroupConversationMembersBound = bind(AddGroupConversationMembers)
 const removeGroupConversationMemberBound = bind(RemoveGroupConversationMember)
 const transferGroupConversationOwnerBound = bind(TransferGroupConversationOwner)
 const leaveGroupConversationBound = bind(LeaveGroupConversation)
+const dissolveGroupConversationBound = bind(DissolveGroupConversation)
 const sendGroupTextMessageBound = bind(SendGroupTextMessage)
 const listCustomerServiceAssigneesBound = bind(ListCustomerServiceAssignees)
 const claimServiceSessionBound = bind(ClaimServiceSession)
@@ -423,9 +424,14 @@ export async function transferGroupConversationOwner(
 /** 退出企业内部群聊。 */
 export function leaveGroupConversation(
   conversationID: string,
-  input: GroupConversationLeaveInput,
 ) {
-  return leaveGroupConversationBound(conversationID, input)
+  return leaveGroupConversationBound(conversationID)
+}
+
+/** 解散群聊并归一化保留的成员列表。 */
+export async function dissolveGroupConversation(conversationID: string) {
+  const result = await dissolveGroupConversationBound(conversationID)
+  return { ...result, participants: asList(result.participants) }
 }
 
 /** 发送企业内部群聊文本消息。 */
