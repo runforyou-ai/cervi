@@ -4,11 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import {
-  isApiError,
-  type GroupParticipant,
-  type MemberOption,
-} from "@/api"
+import { isApiError, type GroupParticipant, type MemberOption } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -24,7 +20,7 @@ import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-const groupMemberMaxCount = 100
+import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 
 /** 选择尚未加入群聊的企业成员。 */
 export function GroupMemberPickerDialog({
@@ -43,11 +39,10 @@ export function GroupMemberPickerDialog({
   const [query, setQuery] = useState("")
   const [selectedIdentityIDs, setSelectedIdentityIDs] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
-  const resource = useResource(
-    resourceKeys.memberOptions(),
-    listAllMemberOptions,
-    { enabled: open, staleTime: 0 },
-  )
+  const resource = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
+    enabled: open,
+    staleTime: 0,
+  })
   const participantIdentityIDs = useMemo(
     () =>
       new Set(participants.map((participant) => participant.identityId)),
@@ -55,15 +50,10 @@ export function GroupMemberPickerDialog({
   )
   const availableMembers = useMemo(
     () =>
-      (resource.data ?? []).filter(
-        (member) => !participantIdentityIDs.has(member.id),
-      ),
+      (resource.data ?? []).filter((member) => !participantIdentityIDs.has(member.id)),
     [participantIdentityIDs, resource.data],
   )
-  const remainingCount = Math.max(
-    0,
-    groupMemberMaxCount - participants.length,
-  )
+  const remainingCount = Math.max(0, groupMemberMaxCount - participants.length)
 
   /** 关闭时清空尚未提交的成员选择。 */
   function changeOpen(nextOpen: boolean) {
@@ -102,9 +92,7 @@ export function GroupMemberPickerDialog({
       <DialogContent className="max-h-[min(42rem,calc(100svh-2rem))] max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t("groupAddMembers")}</DialogTitle>
-          <DialogDescription>
-            {t("groupAddMembersDescription")}
-          </DialogDescription>
+          <DialogDescription>{t("groupAddMembersDescription")}</DialogDescription>
         </DialogHeader>
 
         <div className="grid min-h-0 gap-4">

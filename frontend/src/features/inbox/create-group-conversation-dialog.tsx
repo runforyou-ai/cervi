@@ -26,6 +26,12 @@ import {
 import { FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  createGroupConversationSchema,
+  groupTitleMaxLength,
+  groupDescriptionMaxLength,
+  groupAdditionalMemberMaxCount,
+} from "@/features/inbox/group-conversation-schema"
 import { GroupMemberPicker } from "@/features/inbox/group-member-picker"
 import { GroupImagePicker } from "@/features/inbox/group-avatar"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
@@ -34,39 +40,6 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-
-const groupTitleMaxLength = 100
-const groupDescriptionMaxLength = 500
-const groupAdditionalMemberMaxCount = 99
-
-/** 创建群聊表单校验规则。 */
-function createGroupConversationSchema(messages: {
-  titleRequired: string
-  titleTooLong: string
-  descriptionTooLong: string
-  membersRequired: string
-  membersTooMany: string
-}) {
-  return z.object({
-    title: z
-      .string()
-      .trim()
-      .min(1, messages.titleRequired)
-      .max(groupTitleMaxLength, messages.titleTooLong),
-    description: z
-      .string()
-      .trim()
-      .max(groupDescriptionMaxLength, messages.descriptionTooLong),
-    memberIdentityIds: z
-      .array(z.string())
-      .min(1, messages.membersRequired)
-      .max(groupAdditionalMemberMaxCount, messages.membersTooMany),
-  })
-}
-
-type GroupConversationValues = z.infer<
-  ReturnType<typeof createGroupConversationSchema>
->
 
 /** 选择初始成员并创建企业内部群聊。 */
 export function CreateGroupConversationDialog({
@@ -93,21 +66,12 @@ export function CreateGroupConversationDialog({
     },
   })
   const pendingImage = image.pending
-  const schema = useMemo(
-    () =>
-      createGroupConversationSchema({
-        titleRequired: t("groupTitleRequired"),
-        titleTooLong: t("groupTitleTooLong"),
-        descriptionTooLong: t("groupDescriptionTooLong"),
-        membersRequired: t("groupMembersRequired"),
-        membersTooMany: t("groupMembersTooMany"),
-      }),
-    [t],
-  )
+  const schema = useMemo(() => createGroupConversationSchema(t, z.string()), [t])
+  type GroupConversationValues = z.infer<typeof schema>
   const form = useForm<GroupConversationValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: { title: "", description: "", memberIdentityIds: [] },
+    defaultValues: { title: "", description: "", members: [] },
   })
 
   useEffect(() => () => {
@@ -116,7 +80,7 @@ export function CreateGroupConversationDialog({
 
   const { field: memberIdentityIDsField } = useController({
     control: form.control,
-    name: "memberIdentityIds",
+    name: "members",
   })
   const selectedIdentityIDs = memberIdentityIDsField.value
   const { data, loading, error, refresh } = useResource(
@@ -139,7 +103,7 @@ export function CreateGroupConversationDialog({
         title: values.title.trim(),
         description: values.description.trim(),
         imageFileId,
-        memberIdentityIds: values.memberIdentityIds,
+        memberIdentityIds: values.members,
       })
       // 关闭表单或离开页面后忽略迟到结果，不重新打开已放弃的会话。
       if (requestID !== createRequestID.current) {
@@ -197,9 +161,7 @@ export function CreateGroupConversationDialog({
         >
           <div className="grid min-h-0 gap-5 overflow-y-auto pr-1">
             <div className="space-y-1.5">
-              <span className="block text-sm font-medium">
-                {t("groupImageLabel")}
-              </span>
+              <span className="block text-sm font-medium">{t("groupImageLabel")}</span>
               <div className="flex items-center gap-3">
                 <GroupImagePicker
                   imageURL={pendingImage?.previewURL}
@@ -274,9 +236,7 @@ export function CreateGroupConversationDialog({
               {t("common:actions.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : null}
+              {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               {t("common:actions.create")}
             </Button>
           </div>

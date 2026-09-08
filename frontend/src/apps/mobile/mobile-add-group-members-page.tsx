@@ -1,4 +1,5 @@
 /** 移动端群主添加真人成员，保留选择并返回原群详情。 */
+import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 import { useEffect, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useController, useForm } from "react-hook-form"
@@ -6,15 +7,8 @@ import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 import { z } from "zod"
 
-import {
-  addGroupConversationMembers,
-  ConversationStatus,
-  type MemberOption,
-} from "@/api"
-import {
-  mobileGroupMemberLimit,
-  type MobileGroupDetailsContext,
-} from "@/apps/mobile/mobile-group-context"
+import { addGroupConversationMembers, ConversationStatus, type MemberOption } from "@/api"
+import { type MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
 import { MobileGroupMemberPicker } from "@/apps/mobile/mobile-group-member-picker"
 import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
@@ -37,9 +31,10 @@ export function MobileAddGroupMembersPage() {
     }
   }, [])
   const existingIDs = group.participants.map((member) => member.identityId)
-  const remaining = Math.max(0, mobileGroupMemberLimit - existingIDs.length)
+  const remaining = Math.max(0, groupMemberMaxCount - existingIDs.length)
   const schema = z.object({
-    members: z.array(z.custom<MemberOption>())
+    members: z
+      .array(z.custom<MemberOption>())
       .min(1, tInbox("groupMembersRequired"))
       .max(remaining, tInbox("groupMemberLimitReached")),
   })
@@ -51,8 +46,9 @@ export function MobileAddGroupMembersPage() {
   const { field } = useController({ control: form.control, name: "members" })
   useEffect(() => {
     // 已从其他端入群的成员退出候选和勾选，其余选择继续保留。
-    const selected = field.value.filter((member) =>
-      !group.participants.some((participant) => participant.identityId === member.id),
+    const selected = field.value.filter(
+      (member) =>
+        !group.participants.some((participant) => participant.identityId === member.id),
     )
     if (selected.length !== field.value.length) field.onChange(selected)
   }, [field.value, field.onChange, group.participants])

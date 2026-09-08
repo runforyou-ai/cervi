@@ -1,10 +1,9 @@
 /** 业务系统新增与编辑页。 */
 import { useEffect, useMemo, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate, useParams } from "react-router"
+import { useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -13,11 +12,11 @@ import {
   isApiError,
   updateBusinessSystem,
 } from "@/api"
+import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -69,8 +68,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
     { enabled: mode === "edit" },
   )
   const loading =
-    mode === "edit" &&
-    (detailLoading || (Boolean(detailError) && detailRefreshing))
+    mode === "edit" && (detailLoading || (Boolean(detailError) && detailRefreshing))
   const loadError = mode === "edit" && Boolean(detailError) && !loading
 
   /** 详情就绪后回填业务系统表单。 */
@@ -104,13 +102,10 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
       void invalidateResource(resourceKeys.businessSystems())
       if (!mounted.current) return
       form.reset(values)
-      console.info(
-        mode === "create" ? "业务系统已创建" : "业务系统已保存",
-        {
-          business_system_id: saved.id,
-          enabled: saved.enabled,
-        },
-      )
+      console.info(mode === "create" ? "业务系统已创建" : "业务系统已保存", {
+        business_system_id: saved.id,
+        enabled: saved.enabled,
+      })
       toast.success(
         mode === "create"
           ? t("businessSystem.form.createSuccess")
@@ -142,24 +137,12 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={title} />
       <PageContent>
-        {loading ? (
-          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("common:status.loading")}
-          </LoadingIndicator>
-        ) : loadError ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-            <p className="text-sm text-muted-foreground">
-              {t("businessSystem.form.loadError")}
-            </p>
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => void refresh()}
-            >
-              {t("common:actions.retry")}
-            </Button>
-          </div>
-        ) : (
+        <ResourceContent
+          loading={loading}
+          error={Boolean(loadError)}
+          errorMessage={t("businessSystem.form.loadError")}
+          onRetry={() => void refresh()}
+        >
           <form
             className="w-full max-w-2xl space-y-9"
             onSubmit={form.handleSubmit(save)}
@@ -177,10 +160,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel
-                      htmlFor="business-system-description"
-                      required={false}
-                    >
+                    <FieldLabel htmlFor="business-system-description" required={false}>
                       {t("businessSystem.form.description")}
                     </FieldLabel>
                     <Textarea
@@ -219,21 +199,9 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
                 )}
               />
             </FieldGroup>
-            <div className="flex items-center gap-2">
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : null}
-                {form.formState.isSubmitting
-                  ? t("common:actions.saving")
-                  : t("common:actions.save")}
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to={listPath}>{t("common:actions.cancel")}</Link>
-              </Button>
-            </div>
+            <FormActions saving={form.formState.isSubmitting} cancelTo={listPath} />
           </form>
-        )}
+        </ResourceContent>
       </PageContent>
     </div>
   )

@@ -1,4 +1,5 @@
 /** 移动端建群和添加群成员共用的真人搜索与多选。 */
+import { groupAdditionalMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 import { useState, type Ref } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -21,7 +22,7 @@ export function MobileGroupMemberPicker({
   inputRef,
   disabled,
   excludedIdentityIDs = [],
-  selectionLimit = 99,
+  selectionLimit = groupAdditionalMemberMaxCount,
   showSelectionSummary = true,
 }: {
   currentIdentityID: string
@@ -76,16 +77,22 @@ export function MobileGroupMemberPicker({
                       className="min-h-11 max-w-full"
                       disabled={disabled}
                       aria-label={t("group.removeMember", { name: member.displayName })}
-                      onClick={() => onChange(selected.filter((item) => item.id !== member.id))}
+                      onClick={() =>
+                        onChange(selected.filter((item) => item.id !== member.id))
+                      }
                     >
                       <span className="truncate">{member.displayName}</span>
-                      <span className="text-muted-foreground">{t("common:actions.remove")}</span>
+                      <span className="text-muted-foreground">
+                        {t("common:actions.remove")}
+                      </span>
                     </Button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="py-3 text-sm text-muted-foreground">{t("group.noSelection")}</p>
+              <p className="py-3 text-sm text-muted-foreground">
+                {t("group.noSelection")}
+              </p>
             )}
           </div>
         </>
@@ -108,7 +115,9 @@ export function MobileGroupMemberPicker({
       </div>
       <div className="h-64 overflow-y-auto overscroll-contain rounded-md border">
         {loading && !data ? (
-          <LoadingIndicator className="h-full justify-center">{t("common:status.loading")}</LoadingIndicator>
+          <LoadingIndicator className="h-full justify-center">
+            {t("common:status.loading")}
+          </LoadingIndicator>
         ) : null}
         {error ? (
           <div className="space-y-3 p-4 text-sm">
@@ -125,7 +134,9 @@ export function MobileGroupMemberPicker({
           </div>
         ) : null}
         {data && !error && !candidates.length ? (
-          <p className="p-4 text-sm text-muted-foreground">{tInbox("groupMembersEmpty")}</p>
+          <p className="p-4 text-sm text-muted-foreground">
+            {tInbox("groupMembersEmpty")}
+          </p>
         ) : null}
         <ul className="divide-y">
           {candidates.map((member) => {
@@ -140,11 +151,13 @@ export function MobileGroupMemberPicker({
                     className="size-5 shrink-0 accent-primary"
                     disabled={disabled || (!checked && selected.length >= selectionLimit)}
                     onBlur={onBlur}
-                    onChange={(event) => onChange(
-                      event.target.checked
-                        ? [...selected, member]
-                        : selected.filter((item) => item.id !== member.id),
-                    )}
+                    onChange={(event) =>
+                      onChange(
+                        event.target.checked
+                          ? [...selected, member]
+                          : selected.filter((item) => item.id !== member.id),
+                      )
+                    }
                   />
                   <ProfileAvatar
                     name={member.displayName}

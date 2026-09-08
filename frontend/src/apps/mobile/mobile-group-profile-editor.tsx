@@ -1,22 +1,12 @@
 /** 移动端群头像、名称和描述的独立编辑页。 */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import {
-  Navigate,
-  useNavigate,
-  useOutletContext,
-  useParams,
-} from "react-router"
+import { Navigate, useNavigate, useOutletContext, useParams } from "react-router"
 import { toast } from "sonner"
 import { z } from "zod"
-import {
-  ConversationStatus,
-  FilePurpose,
-  uploadFile,
-  updateGroupConversation,
-} from "@/api"
+import { ConversationStatus, FilePurpose, updateGroupConversation } from "@/api"
 import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
 import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
@@ -25,7 +15,12 @@ import { FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { GroupImagePicker } from "@/features/inbox/group-avatar"
-import { useImmediateSave } from "@/hooks/use-immediate-save"
+import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
+import {
+  createGroupProfileSchema,
+  groupTitleMaxLength,
+  groupDescriptionMaxLength,
+} from "@/features/inbox/group-conversation-schema"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 按字段隔离表单，拒绝无效字段和失去群主资格的编辑入口。 */
@@ -44,8 +39,7 @@ export function MobileGroupProfileEditor() {
         />
         <p className="p-4 text-sm text-muted-foreground" role="status">
           {t(
-            context.group.status ===
-              ConversationStatus.ConversationStatusArchived
+            context.group.status === ConversationStatus.ConversationStatusArchived
               ? "group.editArchived"
               : "group.editOwnerOnly",
           )}
@@ -66,16 +60,19 @@ function MobileGroupFieldEditor({
   const { t: tm } = useTranslation("mobile")
   const navigate = useNavigate()
   const close = useMobileBack(`/inbox/group/${group.id}/details`)
-  const upload = useImmediateSave()
-  const [imageFileID, setImageFileID] = useState<string | null>(null)
-  const [preview, setPreview] = useState("")
-  const previewRef = useRef("")
+  const image = usePendingImageUpload({
+    purpose: FilePurpose.FilePurposeGroupImage,
+    onError: (error) => {
+      if (recoverSession(error, navigate)) return
+      console.warn("移动端上传群图片失败", error)
+      toast.error(t("groupImageUploadError"))
+    },
+  })
   const alive = useRef(false)
   useEffect(() => {
     alive.current = true
     return () => {
       alive.current = false
-      URL.revokeObjectURL(previewRef.current)
     }
   }, [])
   const label = t(
@@ -85,15 +82,10 @@ function MobileGroupFieldEditor({
         ? "groupTitleLabel"
         : "groupDescriptionLabel",
   )
+  const profileSchema = createGroupProfileSchema(t)
   const schema = z.object({
     value:
-      field === "title"
-        ? z
-            .string()
-            .trim()
-            .min(1, t("groupTitleRequired"))
-            .max(100, t("groupTitleTooLong"))
-        : z.string().trim().max(500),
+      field === "title" ? profileSchema.shape.title : profileSchema.shape.description,
   })
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -101,29 +93,12 @@ function MobileGroupFieldEditor({
     defaultValues: { value: field === "image" ? "" : group[field] },
   })
 
-  /** 选图立即上传，保存时再关联临时文件。 */
-  async function selectImage(file: File) {
-    const request = upload.begin()
-    if (request === null) return
-    try {
-      const result = await uploadFile(file, FilePurpose.FilePurposeGroupImage)
-      if (!upload.isCurrent(request)) return
-      URL.revokeObjectURL(previewRef.current)
-      previewRef.current = URL.createObjectURL(file)
-      setPreview(previewRef.current)
-      setImageFileID(result.id)
-    } catch (error) {
-      if (!upload.isCurrent(request) || recoverSession(error, navigate)) return
-      console.warn("移动端上传群图片失败", error)
-      toast.error(t("groupImageUploadError"))
-    } finally {
-      upload.finish(request)
-    }
-  }
-
   /** 保存当前字段，离开编辑页后忽略迟到的导航结果。 */
   async function save(values: z.infer<typeof schema>) {
-    if (upload.isSaving()) return
+    // 上传失败由图片 Hook 提示，保留候选供再次保存时重试。
+    const imageFileID =
+      field === "image" ? await image.ensureUploaded().catch(() => null) : null
+    if (!alive.current || (field === "image" && !imageFileID)) return
     const success = await onSave(() =>
       updateGroupConversation(group.id, {
         title: field === "title" ? values.value : group.title,
@@ -134,7 +109,8 @@ function MobileGroupFieldEditor({
     if (success && alive.current) close()
   }
 
-  const disabled = busy || upload.saving
+  const uploading = image.pending?.status === "uploading"
+  const disabled = busy || form.formState.isSubmitting || uploading
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
       <MobilePageHeader
@@ -151,22 +127,17 @@ function MobileGroupFieldEditor({
           {field === "image" ? (
             <div className="flex flex-col items-center gap-2 text-center">
               <GroupImagePicker
-                imageURL={preview || group.imageUrl}
+                imageURL={image.pending?.previewURL || group.imageUrl}
                 className="size-24"
                 disabled={disabled}
-                loading={upload.saving}
-                onSelect={(file) => void selectImage(file)}
+                loading={uploading}
+                onSelect={image.select}
               />
-              <p className="text-xs text-muted-foreground">
-                {tm("group.changeImage")}
-              </p>
+              <p className="text-xs text-muted-foreground">{tm("group.changeImage")}</p>
             </div>
           ) : (
             <>
-              <FieldLabel
-                htmlFor="mobile-edit-group-value"
-                required={field === "title"}
-              >
+              <FieldLabel htmlFor="mobile-edit-group-value" required={field === "title"}>
                 {label}
               </FieldLabel>
               {field === "title" ? (
@@ -174,7 +145,7 @@ function MobileGroupFieldEditor({
                   {...form.register("value")}
                   id="mobile-edit-group-value"
                   required
-                  maxLength={100}
+                  maxLength={groupTitleMaxLength}
                   disabled={disabled}
                   className="min-h-11"
                 />
@@ -182,7 +153,7 @@ function MobileGroupFieldEditor({
                 <Textarea
                   {...form.register("value")}
                   id="mobile-edit-group-value"
-                  maxLength={500}
+                  maxLength={groupDescriptionMaxLength}
                   rows={6}
                   disabled={disabled}
                 />
@@ -194,7 +165,7 @@ function MobileGroupFieldEditor({
           <Button
             type="submit"
             className="min-h-11 w-full"
-            disabled={disabled || (field === "image" && !imageFileID)}
+            disabled={disabled || (field === "image" && !image.pending)}
           >
             {tm("group.complete")}
           </Button>

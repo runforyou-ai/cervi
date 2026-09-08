@@ -15,11 +15,9 @@ import type {
   MemberOptionList,
   MemberOptionListInput,
   TeamListInput,
-  TeamMember,
   TeamMemberCandidate,
   TeamMemberCandidateInput,
   TeamMemberCandidateList,
-  TeamMemberList,
   TeamMemberListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -37,14 +35,7 @@ export type MemberOptionListData = Omit<MemberOptionList, "members"> & {
   members: MemberOption[]
 }
 
-export type TeamMemberListData = Omit<TeamMemberList, "members"> & {
-  members: TeamMember[]
-}
-
-export type TeamMemberCandidateListData = Omit<
-  TeamMemberCandidateList,
-  "members"
-> & {
+export type TeamMemberCandidateListData = Omit<TeamMemberCandidateList, "members"> & {
   members: TeamMemberCandidate[]
 }
 

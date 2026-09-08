@@ -1,11 +1,5 @@
 /** 群聊资料栏中的资料编辑和成员管理交互。 */
-import {
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react"
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -25,12 +19,8 @@ import {
   type GroupConversationData,
   type GroupConversationProfileInput,
   type MemberOption,
-  uploadFile,
 } from "@/api"
-import {
-  DetailEditActions,
-  DetailEditRow,
-} from "@/components/form/detail-edit-row"
+import { DetailEditActions, DetailEditRow } from "@/components/form/detail-edit-row"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,40 +32,31 @@ import {
 import { GroupDissolveDialog } from "@/features/inbox/group-dissolve-dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GroupParticipantList } from "@/features/inbox/group-participant-list"
-import {
-  GroupAvatar,
-  GroupImagePicker,
-} from "@/features/inbox/group-avatar"
+import { GroupAvatar, GroupImagePicker } from "@/features/inbox/group-avatar"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-const groupTitleMaxLength = 100
-const groupDescriptionMaxLength = 500
+import {
+  createGroupProfileSchema,
+  groupTitleMaxLength,
+  groupDescriptionMaxLength,
+} from "@/features/inbox/group-conversation-schema"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import type { z } from "zod"
 
 /** 展示群资料中的只读字段。 */
-function ReadonlyGroupRow({
-  label,
-  children,
-}: {
-  label: string
-  children: ReactNode
-}) {
+function ReadonlyGroupRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-h-11 items-start gap-3 px-2 py-1.5 text-sm">
-      <div className="w-28 shrink-0 pt-1 text-muted-foreground">
-        {label}
-      </div>
+      <div className="w-28 shrink-0 pt-1 text-muted-foreground">{label}</div>
       <div className="min-w-0 flex-1 pt-1">{children}</div>
       <div className="w-14 shrink-0" />
     </div>
@@ -100,27 +81,32 @@ function GroupConversationProfile({
   const [dissolveOpen, setDissolveOpen] = useState(false)
   const moreTrigger = useRef<HTMLButtonElement>(null)
   const [editing, setEditing] = useState<"title" | "description" | null>(null)
-  const [title, setTitle] = useState(group.title)
-  const [description, setDescription] = useState(group.description)
-  const [imagePreviewURL, setImagePreviewURL] = useState("")
-  const [imageSaving, setImageSaving] = useState(false)
+  const schema = createGroupProfileSchema(t)
+  const form = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
+    defaultValues: { title: group.title, description: group.description },
+  })
+  const image = usePendingImageUpload({
+    purpose: FilePurpose.FilePurposeGroupImage,
+    onError: (error) => {
+      if (recoverSession(error, navigate)) return
+      console.warn("上传群聊图片失败", error)
+      toast.error(
+        isApiError(error)
+          ? apiErrorMessage(error, ["imageFileId"])
+          : t("groupImageUploadError"),
+      )
+    },
+  })
   const saveState = useImmediateSave()
   const owner = group.participants.find(
-    (participant) =>
-      participant.role ===
-      GroupParticipantRole.GroupParticipantRoleOwner,
+    (participant) => participant.role === GroupParticipantRole.GroupParticipantRoleOwner,
   )
 
   useEffect(() => {
-    setTitle(group.title)
-    setDescription(group.description)
-  }, [group.description, group.title])
-
-  useEffect(() => {
-    return () => {
-      if (imagePreviewURL) URL.revokeObjectURL(imagePreviewURL)
-    }
-  }, [imagePreviewURL])
+    form.reset({ title: group.title, description: group.description })
+  }, [form, group.description, group.title])
 
   useEffect(() => {
     // 权限变化或群聊解散后停止资料编辑和解散确认。
@@ -132,21 +118,16 @@ function GroupConversationProfile({
 
   /** 放弃尚未提交的群资料字段。 */
   function cancelEdit() {
-    setTitle(group.title)
-    setDescription(group.description)
+    form.reset({ title: group.title, description: group.description })
     setEditing(null)
   }
 
-  /** 保存群名称并退出编辑。 */
-  async function saveTitle(input: HTMLInputElement) {
-    const nextTitle = title.trim()
-    if (!nextTitle) {
-      input.setCustomValidity(t("groupTitleRequired"))
-      input.reportValidity()
-      input.focus()
-      return
-    }
-    if (nextTitle === group.title) {
+  /** 校验并保存指定群资料字段，其他资料使用当前服务端值。 */
+  async function saveProfileField(field: "title" | "description") {
+    // 原生校验需要可用的输入控件，校验通过后再进入保存状态。
+    if (!(await form.trigger(field))) return
+    const value = form.getValues(field).trim()
+    if (value === group[field]) {
       cancelEdit()
       return
     }
@@ -154,22 +135,20 @@ function GroupConversationProfile({
     if (request === null) return
     try {
       await onUpdate({
-        title: nextTitle,
+        title: group.title,
         description: group.description,
+        [field]: value,
         imageFileId: null,
       })
       if (!saveState.isCurrent(request)) return
-      setTitle(nextTitle)
+      form.setValue(field, value)
       setEditing(null)
     } catch (error) {
-      if (!saveState.isCurrent(request)) return
-      if (recoverSession(error, navigate)) return
-      console.warn("修改群聊资料失败", error)
+      if (!saveState.isCurrent(request) || recoverSession(error, navigate)) return
+      console.warn("修改群聊资料失败", { group_id: group.id, field, error })
       cancelEdit()
       toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, ["title"])
-          : t("groupProfileSaveError"),
+        isApiError(error) ? apiErrorMessage(error, [field]) : t("groupProfileSaveError"),
       )
     } finally {
       saveState.finish(request)
@@ -190,43 +169,8 @@ function GroupConversationProfile({
     }
   }
 
-  /** 保存群描述并退出编辑。 */
-  async function saveDescription() {
-    const nextDescription = description.trim()
-    if (nextDescription === group.description) {
-      cancelEdit()
-      return
-    }
-    const request = saveState.begin()
-    if (request === null) return
-    try {
-      await onUpdate({
-        title: group.title,
-        description: nextDescription,
-        imageFileId: null,
-      })
-      if (!saveState.isCurrent(request)) return
-      setDescription(nextDescription)
-      setEditing(null)
-    } catch (error) {
-      if (!saveState.isCurrent(request)) return
-      if (recoverSession(error, navigate)) return
-      console.warn("修改群聊描述失败", error)
-      cancelEdit()
-      toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, ["description"])
-          : t("groupProfileSaveError"),
-      )
-    } finally {
-      saveState.finish(request)
-    }
-  }
-
   /** 处理群描述编辑快捷键。 */
-  function handleDescriptionKeyDown(
-    event: KeyboardEvent<HTMLTextAreaElement>,
-  ) {
+  function handleDescriptionKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Escape") return
     event.preventDefault()
     event.stopPropagation()
@@ -237,45 +181,35 @@ function GroupConversationProfile({
   async function changeImage(file: File) {
     const request = saveState.begin()
     if (request === null) return
-    const previewURL = URL.createObjectURL(file)
-    setImagePreviewURL(previewURL)
-    setImageSaving(true)
+    image.select(file)
     let uploading = true
     try {
-      const uploaded = await uploadFile(
-        file,
-        FilePurpose.FilePurposeGroupImage,
-      )
+      const imageFileId = await image.ensureUploaded()
       if (!saveState.isCurrent(request)) return
       uploading = false
       await onUpdate({
         title: group.title,
         description: group.description,
-        imageFileId: uploaded.id,
+        imageFileId,
       })
       if (!saveState.isCurrent(request)) return
-      setImagePreviewURL("")
+      image.clear()
     } catch (error) {
       if (!saveState.isCurrent(request)) return
-      if (recoverSession(error, navigate)) return
-      console.warn(uploading ? "上传群聊图片失败" : "修改群聊图片失败", error)
-      setImagePreviewURL("")
+      image.clear()
+      if (uploading || recoverSession(error, navigate)) return
+      console.warn("修改群聊图片失败", error)
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error, ["imageFileId"])
-          : t(
-              uploading
-                ? "groupImageUploadError"
-                : "groupProfileSaveError",
-            ),
+          : t("groupProfileSaveError"),
       )
     } finally {
-      if (saveState.isCurrent(request)) setImageSaving(false)
       saveState.finish(request)
     }
   }
 
-  const profileSaving = saveState.saving || imageSaving
+  const profileSaving = saveState.saving
   const profileBusy = profileSaving || editing !== null
 
   return (
@@ -287,17 +221,14 @@ function GroupConversationProfile({
         <div className="min-w-0 flex-1">
           {canManage ? (
             <GroupImagePicker
-              imageURL={imagePreviewURL || group.imageUrl}
+              imageURL={image.pending?.previewURL || group.imageUrl}
               className="size-16 rounded-xl"
               disabled={profileBusy}
-              loading={imageSaving}
+              loading={profileSaving && Boolean(image.pending)}
               onSelect={(file) => void changeImage(file)}
             />
           ) : (
-            <GroupAvatar
-              imageURL={group.imageUrl}
-              className="size-16 rounded-xl"
-            />
+            <GroupAvatar imageURL={group.imageUrl} className="size-16 rounded-xl" />
           )}
         </div>
         <div className="flex w-14 shrink-0 justify-end">
@@ -315,10 +246,7 @@ function GroupConversationProfile({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  destructive
-                  onSelect={() => setDissolveOpen(true)}
-                >
+                <DropdownMenuItem destructive onSelect={() => setDissolveOpen(true)}>
                   {t("groupDissolve")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -340,22 +268,21 @@ function GroupConversationProfile({
         required
         compact
         onEdit={() => {
-          setTitle(group.title)
+          form.setValue("title", group.title)
           setEditing("title")
         }}
       >
         <Input
           autoFocus
-          value={title}
+          {...form.register("title")}
           required
           maxLength={groupTitleMaxLength}
           disabled={saveState.saving}
           aria-label={t("groupTitleLabel")}
-          onChange={(event) => {
-            event.currentTarget.setCustomValidity("")
-            setTitle(event.target.value)
+          onBlur={(event) => {
+            void form.register("title").onBlur(event)
+            void saveProfileField("title")
           }}
-          onBlur={(event) => void saveTitle(event.currentTarget)}
           onKeyDown={handleTitleKeyDown}
         />
       </DetailEditRow>
@@ -366,24 +293,23 @@ function GroupConversationProfile({
         editEnabled={canManage && !profileBusy}
         compact
         onEdit={() => {
-          setDescription(group.description)
+          form.setValue("description", group.description)
           setEditing("description")
         }}
       >
         <Textarea
           autoFocus
-          value={description}
+          {...form.register("description")}
           rows={4}
           maxLength={groupDescriptionMaxLength}
           disabled={saveState.saving}
           aria-label={t("groupDescriptionLabel")}
           className="min-h-24 resize-y"
-          onChange={(event) => setDescription(event.target.value)}
           onKeyDown={handleDescriptionKeyDown}
         />
         <DetailEditActions
           saving={saveState.saving}
-          onSave={() => void saveDescription()}
+          onSave={() => void saveProfileField("description")}
           onCancel={cancelEdit}
         />
       </DetailEditRow>
@@ -418,9 +344,7 @@ function GroupResourceState({
   if (!failed) return null
   return (
     <div className="flex min-h-48 flex-col items-center justify-center p-6 text-center">
-      <p className="text-sm text-muted-foreground">
-        {t("groupDetailsLoadError")}
-      </p>
+      <p className="text-sm text-muted-foreground">{t("groupDetailsLoadError")}</p>
       <Button
         type="button"
         variant="outline"
@@ -445,21 +369,18 @@ export function GroupConversationContext({
   onLeft: () => void
 }) {
   const { t } = useTranslation("inbox")
-  const resource = useResource(
-    resourceKeys.groupConversation(conversationID),
-    () => getGroupConversation(conversationID),
+  const resource = useResource(resourceKeys.groupConversation(conversationID), () =>
+    getGroupConversation(conversationID),
   )
   const invalidate = useResourceInvalidator()
   const group = resource.data
   const currentParticipant = group?.participants.find(
     (participant) => participant.identityId === currentIdentityID,
   )
-  const dissolved =
-    group?.status === ConversationStatus.ConversationStatusArchived
+  const dissolved = group?.status === ConversationStatus.ConversationStatusArchived
   const canManage =
     !dissolved &&
-    currentParticipant?.role ===
-    GroupParticipantRole.GroupParticipantRoleOwner
+    currentParticipant?.role === GroupParticipantRole.GroupParticipantRoleOwner
 
   /** 刷新群资料、消息与收件箱，统一采用查询结果。 */
   async function refreshGroup() {
@@ -520,11 +441,7 @@ export function GroupConversationContext({
   const failed = Boolean(resource.error) || (!resource.loading && !group)
 
   return (
-    <Tabs
-      key={conversationID}
-      defaultValue="profile"
-      className="min-h-0 flex-1"
-    >
+    <Tabs key={conversationID} defaultValue="profile" className="min-h-0 flex-1">
       <TabsList
         aria-label={t("contextTabsLabel")}
         className="h-auto shrink-0 justify-start gap-1 px-3 py-2"
@@ -563,10 +480,7 @@ export function GroupConversationContext({
         )}
       </TabsContent>
 
-      <TabsContent
-        value="members"
-        className="mt-0 min-h-0 flex-1 overflow-hidden"
-      >
+      <TabsContent value="members" className="mt-0 min-h-0 flex-1 overflow-hidden">
         {group ? (
           <GroupParticipantList
             participants={group.participants}

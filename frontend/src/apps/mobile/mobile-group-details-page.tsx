@@ -1,4 +1,5 @@
 /** 移动端群成员预览、群资料和个人设置的连续详情页。 */
+import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Outlet, useMatch, useNavigate } from "react-router"
@@ -10,10 +11,7 @@ import {
   isNotFoundApiError,
   updateConversationNotificationSettings,
 } from "@/api"
-import {
-  mobileGroupMemberLimit,
-  useMobileGroup,
-} from "@/apps/mobile/mobile-group-context"
+import { useMobileGroup } from "@/apps/mobile/mobile-group-context"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
 import { MobileGroupInfo } from "@/apps/mobile/mobile-group-info"
@@ -100,9 +98,7 @@ export function MobileGroupDetailsPage() {
           conversationID: group.id,
           error,
         })
-        toast.error(
-          isApiError(error) ? apiErrorMessage(error) : t("group.saveError"),
-        )
+        toast.error(isApiError(error) ? apiErrorMessage(error) : t("group.saveError"))
         void refresh()
       }
       return false
@@ -132,9 +128,7 @@ export function MobileGroupDetailsPage() {
           conversationID: group.id,
           error,
         })
-        toast.error(
-          isApiError(error) ? apiErrorMessage(error) : t("group.saveError"),
-        )
+        toast.error(isApiError(error) ? apiErrorMessage(error) : t("group.saveError"))
       }
     } finally {
       if (muteSave.isCurrent(request)) setPendingMuted(null)
@@ -170,8 +164,7 @@ export function MobileGroupDetailsPage() {
             isOwner={isOwner}
             returnDepth={returnDepth}
             canAdd={
-              canManage && !save.saving &&
-              group.participants.length < mobileGroupMemberLimit
+              canManage && !save.saving && group.participants.length < groupMemberMaxCount
             }
           />
           <MobileGroupInfo
@@ -183,9 +176,7 @@ export function MobileGroupDetailsPage() {
             muteBusy={muteSave.saving}
             onEdit={(field) => {
               if (!canManage) {
-                toast.message(
-                  t(archived ? "group.editArchived" : "group.editOwnerOnly"),
-                )
+                toast.message(t(archived ? "group.editArchived" : "group.editOwnerOnly"))
                 return
               }
               void navigate(`edit/${field}`, {

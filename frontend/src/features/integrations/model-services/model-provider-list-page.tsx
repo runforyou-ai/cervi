@@ -1,31 +1,19 @@
 /** 模型服务供应商列表页。 */
-import { useEffect, useRef, useState } from "react"
 import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
   deleteAIProvider,
-  isApiError,
   listAIProviders,
   type AIProviderModelSummaryData,
   type AIProviderSummaryData,
 } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -42,11 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
 import {
   modelServiceSectionConfigs,
@@ -54,18 +38,13 @@ import {
   type ModelServiceSection,
 } from "@/features/integrations/model-services/model-service-options"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useResource } from "@/hooks/use-resource"
+import { useIntegrationDeletion } from "@/features/integrations/use-integration-deletion"
 
 const visibleModelLimit = 3
 
 /** 显示供应商当前类型的模型摘要和完整悬浮目录。 */
-function ProviderModelsCell({
-  models,
-}: {
-  models: AIProviderModelSummaryData[]
-}) {
+function ProviderModelsCell({ models }: { models: AIProviderModelSummaryData[] }) {
   const { t } = useTranslation("integrations")
   if (models.length === 0) return "—"
 
@@ -104,64 +83,28 @@ function ProviderModelsCell({
 }
 
 /** 显示指定类型的模型服务供应商。 */
-export function ModelProviderListPage({
-  section,
-}: {
-  section: ModelServiceSection
-}) {
+export function ModelProviderListPage({ section }: { section: ModelServiceSection }) {
   const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
-  const [deletingProvider, setDeletingProvider] =
-    useState<AIProviderSummaryData | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const mounted = useRef(true)
   const sectionConfig = modelServiceSectionConfigs[section]
   const { data, loading, refreshing, error, refresh } = useResource(
     resourceKeys.aiProviders(),
     () => listAIProviders(),
   )
-  const invalidate = useResourceInvalidator()
   const showLoading = loading || (Boolean(error) && refreshing)
   const providers = data?.providers ?? []
-  const visibleProviders = providers.filter(
-    (provider) =>
-      provider.models.some((model) => model.type === sectionConfig.modelType),
+  const visibleProviders = providers.filter((provider) =>
+    provider.models.some((model) => model.type === sectionConfig.modelType),
   )
 
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-
-  /** 删除选中的模型服务供应商。 */
-  async function confirmDelete() {
-    if (!deletingProvider || deleting) return
-    setDeleting(true)
-    try {
-      await deleteAIProvider(deletingProvider.id)
-      if (!mounted.current) return
-      void refresh()
-      void invalidate(resourceKeys.aiProvider(deletingProvider.id))
-      setDeletingProvider(null)
-      toast.success(t("modelServices.delete.success"))
-    } catch (requestError) {
-      if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("模型服务供应商删除失败", {
-        provider_id: deletingProvider.id,
-        error: requestError,
-      })
-      toast.error(
-        isApiError(requestError)
-          ? apiErrorMessage(requestError)
-          : t("modelServices.delete.error"),
-      )
-    } finally {
-      if (mounted.current) setDeleting(false)
-    }
-  }
+  const deletion = useIntegrationDeletion<AIProviderSummaryData>({
+    deleteItem: deleteAIProvider,
+    listKey: resourceKeys.aiProviders(),
+    detailKey: resourceKeys.aiProvider,
+    entityName: "模型服务供应商",
+    successMessage: t("modelServices.delete.success"),
+    errorMessage: t("modelServices.delete.error"),
+  })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -175,9 +118,7 @@ export function ModelProviderListPage({
       <PageContent>
         <Tabs
           value={section}
-          onValueChange={(value) =>
-            navigate(`/integrations/model-services/${value}`)
-          }
+          onValueChange={(value) => navigate(`/integrations/model-services/${value}`)}
         >
           <TabsList>
             {modelServiceSectionOrder.map((item) => (
@@ -189,24 +130,12 @@ export function ModelProviderListPage({
         </Tabs>
 
         <div className="mt-6">
-          {showLoading ? (
-            <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-              {t("common:status.loading")}
-            </LoadingIndicator>
-          ) : error ? (
-            <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-              <p className="text-sm text-muted-foreground">
-                {t("modelServices.list.loadError")}
-              </p>
-              <Button
-                className="mt-4"
-                variant="outline"
-                onClick={() => void refresh()}
-              >
-                {t("common:actions.retry")}
-              </Button>
-            </div>
-          ) : (
+          <ResourceContent
+            loading={showLoading}
+            error={Boolean(error)}
+            errorMessage={t("modelServices.list.loadError")}
+            onRetry={() => void refresh()}
+          >
             <div className="overflow-hidden rounded-lg border bg-card">
               <Table>
                 <TableHeader>
@@ -215,9 +144,7 @@ export function ModelProviderListPage({
                     <TableHead>{t("modelServices.list.columns.name")}</TableHead>
                     <TableHead>{t("modelServices.list.columns.models")}</TableHead>
                     <TableHead>{t("modelServices.list.columns.apiUrl")}</TableHead>
-                    <TableHead className="w-px">
-                      {t("common:table.actions")}
-                    </TableHead>
+                    <TableHead className="w-px">{t("common:table.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -274,7 +201,7 @@ export function ModelProviderListPage({
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"
-                                  onSelect={() => setDeletingProvider(provider)}
+                                  onSelect={() => deletion.select(provider)}
                                 >
                                   {t("common:actions.delete")}
                                 </DropdownMenuItem>
@@ -288,42 +215,24 @@ export function ModelProviderListPage({
                 </TableBody>
               </Table>
             </div>
-          )}
+          </ResourceContent>
         </div>
       </PageContent>
 
-      <AlertDialog
-        open={deletingProvider !== null}
-        onOpenChange={(open) => !open && !deleting && setDeletingProvider(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deletingProvider
-                ? t("modelServices.delete.title", {
-                    name: deletingProvider.name,
-                  })
-                : null}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("modelServices.delete.description")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting}
-              onClick={() => void confirmDelete()}
-            >
-              {deleting
-                ? t("common:actions.deleting")
-                : t("common:actions.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmationDialog
+        open={deletion.item !== null}
+        pending={deletion.pending}
+        title={
+          deletion.item
+            ? t("modelServices.delete.title", { name: deletion.item.name })
+            : ""
+        }
+        description={t("modelServices.delete.description")}
+        onOpenChange={(open) => {
+          if (!open) deletion.select(null)
+        }}
+        onConfirm={() => void deletion.confirm()}
+      />
     </div>
   )
 }
