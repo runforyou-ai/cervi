@@ -39,7 +39,9 @@ const knowledgeBase = {
     },
     upload: {
       action: "Upload documents",
-      description: "Upload up to 10 files at a time.",
+      description: "Upload up to 10 files at a time, with no per-file size limit.",
+      drop: "Drop files here, or select multiple files",
+      choose: "Choose files",
       tooMany: "Upload up to 10 files at a time",
       unsupported: "Supported: TXT, Markdown, HTML, PDF, DOCX, PPTX, XLSX, CSV, JSON",
       success: "Uploaded {{count}} documents",

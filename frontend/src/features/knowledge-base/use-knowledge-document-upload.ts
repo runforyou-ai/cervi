@@ -89,14 +89,13 @@ export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string
     if (!mounted.current) return
     setBusy(false)
     if (items.current.every((item) => item.stage === "saved")) {
-      setOpen(false)
       toast.success(t("documents.upload.success", { count: items.current.length }))
     }
   }
 
   /** 校验整个选择批次并立即开始上传。 */
   function select(files: File[]) {
-    if (open || !files.length) return
+    if (!open || items.current.length || !files.length) return
     if (files.length > 10) {
       toast.error(t("documents.upload.tooMany"))
       return
@@ -126,7 +125,6 @@ export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string
         }),
       ),
     }))
-    setOpen(true)
     void run()
   }
 
@@ -140,5 +138,17 @@ export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string
     setOpen(false)
   }
 
-  return { open, busy, items: items.current, run, select, close }
+  return {
+    open,
+    busy,
+    items: items.current,
+    run,
+    select,
+    close,
+    // 每次打开模态框建立新的上传批次。
+    show: () => {
+      items.current = []
+      setOpen(true)
+    },
+  }
 }

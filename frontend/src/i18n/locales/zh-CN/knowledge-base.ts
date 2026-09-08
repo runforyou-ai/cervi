@@ -39,7 +39,9 @@ const knowledgeBase = {
     },
     upload: {
       action: "上传文档",
-      description: "每次最多上传 10 个文件。",
+      description: "每次最多上传 10 个文件，单个文件大小不限。",
+      drop: "将文件拖到此处，或选择多个文件",
+      choose: "选择文件",
       tooMany: "每次最多上传 10 个文件",
       unsupported: "支持 TXT、Markdown、HTML、PDF、DOCX、PPTX、XLSX、CSV、JSON",
       success: "已上传 {{count}} 个文档",
