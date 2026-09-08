@@ -10,7 +10,10 @@ import {
   isNotFoundApiError,
   updateConversationNotificationSettings,
 } from "@/api"
-import { useMobileGroup } from "@/apps/mobile/mobile-group-context"
+import {
+  mobileGroupMemberLimit,
+  useMobileGroup,
+} from "@/apps/mobile/mobile-group-context"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
 import { MobileGroupInfo } from "@/apps/mobile/mobile-group-info"
@@ -163,6 +166,10 @@ export function MobileGroupDetailsPage() {
             group={group}
             isOwner={isOwner}
             returnDepth={returnDepth}
+            canAdd={
+              canManage && !save.saving &&
+              group.participants.length < mobileGroupMemberLimit
+            }
           />
           <MobileGroupInfo
             group={group}

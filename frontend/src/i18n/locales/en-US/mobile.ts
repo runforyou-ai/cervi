@@ -52,6 +52,9 @@ const mobile = {
   },
   group: {
     add: "Add",
+    addMembers: "Add group members",
+    addOwnerOnly: "Only the group owner can add members.",
+    addArchived: "This group has been dissolved. Members cannot be added.",
     viewMembers: "View members ({{count}})",
     editOwnerOnly: "Only the group owner can edit group details.",
     editArchived: "This group has been dissolved and cannot be edited.",

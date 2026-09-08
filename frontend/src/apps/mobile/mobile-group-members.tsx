@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { ChevronRightIcon, MinusIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useOutletContext } from "react-router"
+import { Link, useNavigate, useOutletContext } from "react-router"
 import {
   GroupParticipantRole,
   OrganizationIdentityType,
@@ -13,17 +13,20 @@ import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Input } from "@/components/ui/input"
 
-/** 展示最多两行头像，并在末尾预留添加和群主移除入口。 */
+/** 展示最多两行头像、群主添加成员入口和移除占位。 */
 export function MobileGroupMembersPreview({
   group,
   isOwner,
   returnDepth,
+  canAdd,
 }: {
   group: GroupConversationData
   isOwner: boolean
   returnDepth: number
+  canAdd: boolean
 }) {
   const { t } = useTranslation("mobile")
+  const navigate = useNavigate()
   const visible = group.participants.slice(0, isOwner ? 8 : 9)
   return (
     <div className="border-b px-4 pt-5">
@@ -57,8 +60,19 @@ export function MobileGroupMembersPreview({
             <li key={action} className="min-w-0">
               <button
                 type="button"
-                disabled
-                className="flex w-full flex-col items-center gap-1.5 text-muted-foreground"
+                disabled={action !== "add" || !canAdd}
+                onClick={
+                  action === "add"
+                    ? () => navigate("add-members", {
+                        replace: returnDepth === 0,
+                        state: {
+                          mobileBack: returnDepth > 0,
+                          groupReturnDepth: returnDepth > 0 ? returnDepth + 1 : 0,
+                        },
+                      })
+                    : undefined
+                }
+                className="flex w-full flex-col items-center gap-1.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground disabled:opacity-50"
               >
                 <span className="flex size-12 items-center justify-center rounded-xl border border-dashed">
                   {action === "add" ? (

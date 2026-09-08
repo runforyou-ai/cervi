@@ -1,4 +1,4 @@
-/** 移动端建群的真人成员搜索、多选和已选成员移除。 */
+/** 移动端建群和添加群成员共用的真人搜索与多选。 */
 import { useState, type Ref } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -12,7 +12,7 @@ import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-/** 保留跨搜索的成员选择，候选与已选区域各自滚动。 */
+/** 保留跨搜索的列表勾选，建群时展示已选成员摘要。 */
 export function MobileGroupMemberPicker({
   currentIdentityID,
   selected,
@@ -20,6 +20,9 @@ export function MobileGroupMemberPicker({
   onBlur,
   inputRef,
   disabled,
+  excludedIdentityIDs = [],
+  selectionLimit = 99,
+  showSelectionSummary = true,
 }: {
   currentIdentityID: string
   selected: MemberOption[]
@@ -27,6 +30,9 @@ export function MobileGroupMemberPicker({
   onBlur: () => void
   inputRef: Ref<HTMLInputElement>
   disabled: boolean
+  excludedIdentityIDs?: string[]
+  selectionLimit?: number
+  showSelectionSummary?: boolean
 }) {
   const { t } = useTranslation("mobile")
   const { t: tInbox } = useTranslation("inbox")
@@ -39,7 +45,8 @@ export function MobileGroupMemberPicker({
   const members = (data ?? []).filter(
     (member) =>
       member.type === OrganizationIdentityType.OrganizationIdentityTypeUser &&
-      member.id !== currentIdentityID,
+      member.id !== currentIdentityID &&
+      !excludedIdentityIDs.includes(member.id),
   )
   const query = search.trim().toLocaleLowerCase()
   const candidates = members.filter((member) =>
@@ -48,37 +55,41 @@ export function MobileGroupMemberPicker({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <FieldLabel htmlFor="mobile-group-members" required>
-          {tInbox("groupMembersLabel")}
-        </FieldLabel>
-        <span className="text-xs text-muted-foreground" role="status">
-          {tInbox("groupMembersSelected", { count: selected.length })}
-        </span>
-      </div>
-      <div className="h-20 overflow-y-auto" aria-label={t("group.selectedMembers")}>
-        {selected.length ? (
-          <ul className="flex flex-wrap gap-2">
-            {selected.map((member) => (
-              <li key={member.id} className="max-w-full">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-11 max-w-full"
-                  disabled={disabled}
-                  aria-label={t("group.removeMember", { name: member.displayName })}
-                  onClick={() => onChange(selected.filter((item) => item.id !== member.id))}
-                >
-                  <span className="truncate">{member.displayName}</span>
-                  <span className="text-muted-foreground">{t("group.remove")}</span>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="py-3 text-sm text-muted-foreground">{t("group.noSelection")}</p>
-        )}
-      </div>
+      {showSelectionSummary ? (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <FieldLabel htmlFor="mobile-group-members" required>
+              {tInbox("groupMembersLabel")}
+            </FieldLabel>
+            <span className="text-xs text-muted-foreground" role="status">
+              {tInbox("groupMembersSelected", { count: selected.length })}
+            </span>
+          </div>
+          <div className="h-20 overflow-y-auto" aria-label={t("group.selectedMembers")}>
+            {selected.length ? (
+              <ul className="flex flex-wrap gap-2">
+                {selected.map((member) => (
+                  <li key={member.id} className="max-w-full">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-11 max-w-full"
+                      disabled={disabled}
+                      aria-label={t("group.removeMember", { name: member.displayName })}
+                      onClick={() => onChange(selected.filter((item) => item.id !== member.id))}
+                    >
+                      <span className="truncate">{member.displayName}</span>
+                      <span className="text-muted-foreground">{t("group.remove")}</span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="py-3 text-sm text-muted-foreground">{t("group.noSelection")}</p>
+            )}
+          </div>
+        </>
+      ) : null}
       <div className="space-y-2">
         <label htmlFor="mobile-group-members" className="text-sm">
           {t("group.searchMembers")}
@@ -127,7 +138,7 @@ export function MobileGroupMemberPicker({
                     checked={checked}
                     name="members"
                     className="size-5 shrink-0 accent-primary"
-                    disabled={disabled || (!checked && selected.length >= 99)}
+                    disabled={disabled || (!checked && selected.length >= selectionLimit)}
                     onBlur={onBlur}
                     onChange={(event) => onChange(
                       event.target.checked

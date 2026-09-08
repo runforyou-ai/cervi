@@ -2,6 +2,9 @@
 import { useOutletContext } from "react-router"
 import type { GroupConversationData } from "@/api"
 
+/** 移动端群聊的参与人数上限。 */
+export const mobileGroupMemberLimit = 100
+
 export type MobileGroupContext = {
   group: GroupConversationData
   returnDepth: number
