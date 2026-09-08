@@ -7,6 +7,7 @@ type FilePurpose string
 
 const (
 	FilePurposeMessageAttachment FilePurpose = FilePurpose(domain.FilePurposeMessageAttachment)
+	FilePurposeKnowledgeDocument FilePurpose = FilePurpose(domain.FilePurposeKnowledgeDocument)
 	FilePurposeUserAvatar        FilePurpose = FilePurpose(domain.FilePurposeUserAvatar)
 	FilePurposeGroupImage        FilePurpose = FilePurpose(domain.FilePurposeGroupImage)
 )

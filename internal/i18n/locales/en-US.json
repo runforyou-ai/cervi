@@ -1,4 +1,11 @@
 {
+  "error.knowledge_document_not_found": "Document not found or deleted.",
+  "error.knowledge_document_unsupported": "Only standard knowledge bases accept supported document formats.",
+  "error.knowledge_document_batch_invalid": "Upload 1 to 10 files at a time.",
+  "error.knowledge_document_read_failed": "Failed to read the document. Please retry.",
+  "error.knowledge_document_save_failed": "Failed to save documents. Please retry.",
+  "error.knowledge_document_delete_failed": "Failed to delete the document. Please retry.",
+
   "error.agent_reply_stop_failed": "Failed to stop the AI reply. Please try again.",
   "error.customer_delivery_conflict": "The delivery state changed or the channel cannot send. Refresh and try again.",
   "error.customer_delivery_failed": "Could not process message delivery. Try again.",
@@ -6,7 +13,7 @@
 
   "error.knowledge_qa_not_found": "The Q&A entry does not exist or has been deleted.",
   "error.knowledge_qa_unsupported": "This operation is only available for local Q&A knowledge bases.",
-  "error.knowledge_base_has_content": "This knowledge base contains Q&A entries. Its type cannot be changed.",
+  "error.knowledge_base_has_content": "This knowledge base contains content. Its type cannot be changed.",
   "error.knowledge_qa_read_failed": "Failed to load Q&A entries. Please try again.",
   "error.knowledge_qa_save_failed": "Failed to save the Q&A entry. Please try again.",
   "error.knowledge_qa_delete_failed": "Failed to delete the Q&A entry. Please try again.",
@@ -184,7 +191,7 @@
   "error.knowledge_base_delete_failed": "Could not delete the knowledge base.",
   "error.knowledge_group_not_found": "This group could not be found.",
   "error.knowledge_group_invalid": "This group operation is not valid.",
-  "error.knowledge_group_not_empty": "This group contains subgroups or Q&A entries. Move or delete them first.",
+  "error.knowledge_group_not_empty": "This group contains subgroups or content. Move or delete them first.",
   "error.knowledge_group_create_failed": "Could not create the group.",
   "error.knowledge_group_update_failed": "Could not save the group.",
   "error.knowledge_group_delete_failed": "Could not delete the group.",

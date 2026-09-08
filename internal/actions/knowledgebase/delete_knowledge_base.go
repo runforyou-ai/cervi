@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -28,6 +29,13 @@ func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 			return err
 		}
 		if _, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID); err != nil {
+			return err
+		}
+		// 文档原件在事务中释放，后台文件任务负责实际清理。
+		if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).Set("status = ?", domain.FileStatusDeleting).Set("expires_at = now()").Set("updated_at = now()").Where("id IN (SELECT file_id FROM knowledge_documents WHERE knowledge_base_id = ?)", knowledgeBaseID).Exec(ctx); err != nil {
+			return err
+		}
+		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeDocument)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exec(ctx); err != nil {
 			return err
 		}
 		// 先删除内容，再删除条目和分组，全部操作持有知识库锁。

@@ -281,6 +281,25 @@ type Backend interface {
 	// RemoveTeamMembers 将企业身份批量移出团队。
 	//cervi:route POST /teams/:teamID/members/remove
 	RemoveTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
+	// ListKnowledgeDocuments 返回当前分组的文档列表。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents
+	ListKnowledgeDocuments(context.Context, RequestMeta, string, KnowledgeDocumentListInput) (KnowledgeDocumentList, error)
+	// GetKnowledgeDocument 返回文档详情。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID
+	GetKnowledgeDocument(context.Context, RequestMeta, string, string) (KnowledgeDocument, error)
+	// CreateKnowledgeDocuments 保存最多十个已上传的文档原件。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/documents status=201
+	CreateKnowledgeDocuments(context.Context, RequestMeta, string, KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error)
+	// MoveKnowledgeDocument 移动文档到同库分组。
+	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/documents/:documentID/group
+	MoveKnowledgeDocument(context.Context, RequestMeta, string, string, KnowledgeDocumentMoveInput) error
+	// DeleteKnowledgeDocument 删除文档并释放原件。
+	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID/documents/:documentID
+	DeleteKnowledgeDocument(context.Context, RequestMeta, string, string) error
+	// GetKnowledgeDocumentPreview 签发当前文档的原件预览请求。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/preview
+	GetKnowledgeDocumentPreview(context.Context, RequestMeta, string, string) (KnowledgeDocumentPreviewRequest, error)
+
 	// ListKnowledgeQAEntries 返回分组中的本地问答列表。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/qa-entries
 	ListKnowledgeQAEntries(context.Context, RequestMeta, string, KnowledgeQAListInput) (KnowledgeQAList, error)

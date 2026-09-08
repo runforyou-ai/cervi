@@ -1,0 +1,22 @@
+//go:build server
+
+package models
+
+import (
+	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/uptrace/bun"
+	"time"
+)
+
+// KnowledgeDocument 保存知识文档的业务归属和原件关联。
+type KnowledgeDocument struct {
+	bun.BaseModel   `bun:"table:knowledge_documents,alias:kd"`
+	ID              string                         `bun:"id,pk"`
+	KnowledgeBaseID string                         `bun:"knowledge_base_id"`
+	GroupID         string                         `bun:"group_id"`
+	FileID          string                         `bun:"file_id"`
+	Status          domain.KnowledgeDocumentStatus `bun:"status"`
+	CreatedByUserID string                         `bun:"created_by_user_id"`
+	CreatedAt       time.Time                      `bun:"created_at"`
+	UpdatedAt       time.Time                      `bun:"updated_at"`
+}

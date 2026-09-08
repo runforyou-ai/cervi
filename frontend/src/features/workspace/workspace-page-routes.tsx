@@ -11,6 +11,8 @@ import { BusinessSystemFormPage } from "@/features/integrations/business-systems
 import { BusinessSystemListPage } from "@/features/integrations/business-systems/business-system-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
+import { KnowledgeDocumentListPage } from "@/features/knowledge-base/knowledge-document-list-page"
+import { KnowledgeDocumentPage } from "@/features/knowledge-base/knowledge-document-page"
 import { KnowledgeQAListPage } from "@/features/knowledge-base/knowledge-qa-list-page"
 import { KnowledgeQAFormPage } from "@/features/knowledge-base/knowledge-qa-form-page"
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
@@ -73,6 +75,8 @@ const workspaceRouteDefinitions = [
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
   },
+  { path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId", tabPath: "/knowledge-bases", titleKey: "tabs.routes.knowledgeBases" },
+  { path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents", tabPath: "/knowledge-bases", titleKey: "tabs.routes.knowledgeBases" },
   { path: "/knowledge-bases", titleKey: "tabs.routes.knowledgeBases" },
   { path: "/apps", titleKey: "tabs.routes.apps" },
   {
@@ -274,6 +278,8 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
       <Route path="/apps" element={<AppsPage />} />
       <Route path="/knowledge-bases" element={<KnowledgeBaseLayout />}>
         <Route index element={<KnowledgeBaseIndexPage />} />
+        <Route path=":knowledgeBaseId/groups/:groupId/documents" element={<KnowledgeDocumentListPage />} />
+        <Route path=":knowledgeBaseId/groups/:groupId/documents/:documentId" element={<KnowledgeDocumentPage />} />
         <Route
           path=":knowledgeBaseId/groups/:groupId/qa"
           element={<KnowledgeQAListPage />}

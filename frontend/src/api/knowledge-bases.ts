@@ -1,5 +1,11 @@
 /** 企业知识库调用与归一化。 */
 import {
+  ListKnowledgeDocuments,
+  GetKnowledgeDocument,
+  CreateKnowledgeDocuments,
+  MoveKnowledgeDocument,
+  DeleteKnowledgeDocument,
+  GetKnowledgeDocumentPreview,
   CreateKnowledgeQAEntry,
   UpdateKnowledgeQAEntry,
   GetKnowledgeQAEntry,
@@ -15,6 +21,12 @@ import {
   UpdateKnowledgeGroup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
+  KnowledgeDocumentStatus,
+  type KnowledgeDocumentList,
+  type KnowledgeDocumentListInput,
+  type KnowledgeDocument,
+  type KnowledgeDocumentBatch,
+  type KnowledgeDocumentBatchInput,
   type KnowledgeQAEntry,
   type KnowledgeQAInput,
   type KnowledgeQAList,
@@ -224,3 +236,63 @@ export function updateKnowledgeQAEntry(
 
 /** 删除完整问答。 */
 export const deleteKnowledgeQAEntry = bind(DeleteKnowledgeQAEntry)
+
+/** 将文档列表的可空切片在 API 边界归一化。 */
+export type KnowledgeDocumentData = Omit<KnowledgeDocument, "status"> & {
+  status: Exclude<KnowledgeDocumentStatus, KnowledgeDocumentStatus.$zero>
+}
+export type KnowledgeDocumentListData = Omit<KnowledgeDocumentList, "documents"> & {
+  documents: KnowledgeDocumentData[]
+}
+const listKnowledgeDocumentsBound = bind(ListKnowledgeDocuments)
+const createKnowledgeDocumentsBound = bind(CreateKnowledgeDocuments)
+/** 读取分组文档列表。 */
+export async function listKnowledgeDocuments(
+  baseId: string,
+  input: KnowledgeDocumentListInput,
+  signal?: AbortSignal,
+): Promise<KnowledgeDocumentListData> {
+  const result = await listKnowledgeDocumentsBound(baseId, input, signal)
+  return { ...result, documents: asList(result.documents).map(normalizeKnowledgeDocument) }
+}
+const getKnowledgeDocumentBound = bind(GetKnowledgeDocument)
+/** 读取文档详情并归一化状态类型。 */
+export async function getKnowledgeDocument(
+  baseId: string,
+  documentId: string,
+  signal?: AbortSignal,
+): Promise<KnowledgeDocumentData> {
+  return normalizeKnowledgeDocument(await getKnowledgeDocumentBound(baseId, documentId, signal))
+}
+/** 将上传原件保存为文档。 */
+export async function createKnowledgeDocuments(
+  baseId: string,
+  input: KnowledgeDocumentBatchInput,
+): Promise<Omit<KnowledgeDocumentBatch, "documents"> & { documents: KnowledgeDocumentData[] }> {
+  const result = await createKnowledgeDocumentsBound(baseId, input)
+  return { ...result, documents: asList(result.documents).map(normalizeKnowledgeDocument) }
+}
+/** 移动文档到同库分组。 */
+export const moveKnowledgeDocument = bind(MoveKnowledgeDocument)
+/** 删除文档并释放原件。 */
+export const deleteKnowledgeDocument = bind(DeleteKnowledgeDocument)
+/** 取得用于预览的原件读取请求。 */
+export const getKnowledgeDocumentPreview = bind(GetKnowledgeDocumentPreview)
+
+/** 将后端文档状态收敛为有效的业务枚举。 */
+function normalizeKnowledgeDocument(document: KnowledgeDocument): KnowledgeDocumentData {
+  return { ...document, status: document.status as KnowledgeDocumentData["status"] }
+}
+/** 使用服务端签发的请求读取原件，文件内容不经过 Wails 绑定。 */
+export async function readKnowledgeDocumentPreview(
+  baseId: string,
+  documentId: string,
+  signal?: AbortSignal,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const request = await getKnowledgeDocumentPreview(baseId, documentId, signal)
+  const headers = new Headers()
+  for (const [name, value] of Object.entries(request.headers ?? {})) if (value !== undefined) headers.set(name, value)
+  const response = await fetch(request.url, { headers, signal, cache: "no-store" })
+  if (!response.ok) throw new Error(`Document preview failed: ${response.status}`)
+  return new Uint8Array(await response.arrayBuffer())
+}

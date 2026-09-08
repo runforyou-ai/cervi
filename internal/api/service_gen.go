@@ -102,6 +102,12 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/teams/:teamID/member-candidates", s.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", s.addTeamMembers)
 	router.POST("/teams/:teamID/members/remove", s.removeTeamMembers)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
+	router.POST("/knowledge-bases/:knowledgeBaseID/documents", s.createKnowledgeDocuments)
+	router.PUT("/knowledge-bases/:knowledgeBaseID/documents/:documentID/group", s.moveKnowledgeDocument)
+	router.DELETE("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.deleteKnowledgeDocument)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/preview", s.getKnowledgeDocumentPreview)
 	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries", s.listKnowledgeQAEntries)
 	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.getKnowledgeQAEntry)
 	router.POST("/knowledge-bases/:knowledgeBaseID/qa-entries", s.createKnowledgeQAEntry)
@@ -882,6 +888,52 @@ func (s *Service) removeTeamMembers(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listKnowledgeDocuments 返回当前分组的文档列表。
+func (s *Service) listKnowledgeDocuments(c *gin.Context) {
+	input, ok := bindKnowledgeDocumentListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListKnowledgeDocuments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getKnowledgeDocument 返回文档详情。
+func (s *Service) getKnowledgeDocument(c *gin.Context) {
+	output, err := s.application.GetKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createKnowledgeDocuments 保存最多十个已上传的文档原件。
+func (s *Service) createKnowledgeDocuments(c *gin.Context) {
+	var input appservice.KnowledgeDocumentBatchInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateKnowledgeDocuments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// moveKnowledgeDocument 移动文档到同库分组。
+func (s *Service) moveKnowledgeDocument(c *gin.Context) {
+	var input appservice.KnowledgeDocumentMoveInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.MoveKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input))
+}
+
+// deleteKnowledgeDocument 删除文档并释放原件。
+func (s *Service) deleteKnowledgeDocument(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID")))
+}
+
+// getKnowledgeDocumentPreview 签发当前文档的原件预览请求。
+func (s *Service) getKnowledgeDocumentPreview(c *gin.Context) {
+	output, err := s.application.GetKnowledgeDocumentPreview(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listKnowledgeQAEntries 返回分组中的本地问答列表。
 func (s *Service) listKnowledgeQAEntries(c *gin.Context) {
 	input, ok := bindKnowledgeQAListInputQuery(c)
@@ -1221,6 +1273,24 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 func bindCustomerDeliveryListInputQuery(c *gin.Context) (appservice.CustomerDeliveryListInput, bool) {
 	return appservice.CustomerDeliveryListInput{
 		MessageIDs: c.Query("messageIds"),
+	}, true
+}
+
+// bindKnowledgeDocumentListInputQuery 从查询参数解析 appservice.KnowledgeDocumentListInput。
+func bindKnowledgeDocumentListInputQuery(c *gin.Context) (appservice.KnowledgeDocumentListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.KnowledgeDocumentListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 20)
+	if !ok {
+		return appservice.KnowledgeDocumentListInput{}, false
+	}
+	return appservice.KnowledgeDocumentListInput{
+		GroupID:  c.Query("groupId"),
+		Keyword:  c.Query("keyword"),
+		Page:     page,
+		PageSize: pageSize,
 	}, true
 }
 

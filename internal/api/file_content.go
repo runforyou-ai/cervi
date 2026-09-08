@@ -54,6 +54,10 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	}
 	switch request.Method {
 	case http.MethodGet, http.MethodHead:
+		if strings.Split(storageKey, "/")[2] == "knowledge-documents" {
+			s.previewKnowledgeObject(writer, request, storageKey)
+			return
+		}
 		// 内嵌图片按文件元数据返回内容类型，不依赖存储键的扩展名。
 		if request.URL.Query().Get("inline") == "1" {
 			scope, err := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
@@ -184,7 +188,7 @@ func (w *localObjectResponseWriter) Write(content []byte) (int, error) {
 func localObjectStorageKey(requestPath string) (string, bool) {
 	storageKey := strings.TrimPrefix(requestPath, "/")
 	parts := strings.Split(storageKey, "/")
-	if len(parts) != 4 || parts[0] != "organizations" || parts[2] != "files" || !common.ValidUUID(parts[1]) {
+	if len(parts) != 4 || parts[0] != "organizations" || (parts[2] != "files" && parts[2] != "knowledge-documents") || !common.ValidUUID(parts[1]) {
 		return "", false
 	}
 	extension := path.Ext(parts[3])
@@ -192,4 +196,33 @@ func localObjectStorageKey(requestPath string) (string, bool) {
 		return "", false
 	}
 	return storageKey, true
+}
+
+// previewKnowledgeObject 认证后读取仍在使用的知识文档原件，禁止共享缓存。
+func (s *LocalObjectService) previewKnowledgeObject(writer http.ResponseWriter, request *http.Request, storageKey string) {
+	scope, err := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
+	if err != nil {
+		http.NotFound(writer, request)
+		return
+	}
+	identity, err := s.resolveIdentity.Execute(request.Context(), scope.OrganizationID, bearerToken(request.Header.Get("Authorization")))
+	if err != nil {
+		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	record, err := s.getFile.ExecuteByStorageKey(request.Context(), identity, storageKey)
+	if err != nil || record.Status != string(domain.FileStatusActive) || record.Purpose != string(domain.FilePurposeKnowledgeDocument) {
+		http.NotFound(writer, request)
+		return
+	}
+	file, info, err := s.local.Open(request.Context(), storageKey)
+	if err != nil {
+		http.NotFound(writer, request)
+		return
+	}
+	defer file.Close()
+	writer.Header().Set("Cache-Control", "private, no-store")
+	writer.Header().Set("X-Content-Type-Options", "nosniff")
+	writer.Header().Set("Content-Type", "application/octet-stream")
+	http.ServeContent(writer, request, record.OriginalName, info.ModTime(), file)
 }
