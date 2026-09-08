@@ -1,10 +1,6 @@
 /** 成员会话头与操作菜单。 */
 import { useState } from "react"
-import {
-  ChevronDownIcon,
-  LoaderCircleIcon,
-  MoreHorizontalIcon,
-} from "lucide-react"
+import { ChevronDownIcon, LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -74,24 +70,14 @@ export function ConversationHeader({
   const customer = isCustomerInboxConversation(conversation)
     ? conversation.customer
     : null
-  const agent = isAgentInboxConversation(conversation)
-    ? conversation.agent
-    : null
-  const group = isGroupInboxConversation(conversation)
-    ? conversation.group
-    : null
-  const agentRunLabel = agentRunStatusLabel(
-    agent?.agentRunStatus ?? null,
-    t,
-  )
+  const agent = isAgentInboxConversation(conversation) ? conversation.agent : null
+  const group = isGroupInboxConversation(conversation) ? conversation.group : null
+  const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
   const sessionOpen =
-    customer?.serviceSessionStatus ===
-    ServiceSessionStatus.ServiceSessionStatusOpen
+    customer?.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusOpen
   const sessionClosed =
-    customer?.serviceSessionStatus ===
-    ServiceSessionStatus.ServiceSessionStatusClosed
-  const assignedToCurrentUser =
-    customer?.assignee?.identityId === currentIdentityId
+    customer?.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusClosed
+  const assignedToCurrentUser = customer?.assignee?.identityId === currentIdentityId
   const { data: assignees = [] } = useResource(
     resourceKeys.customerServiceAssignees(),
     () => listCustomerServiceAssignees(),
@@ -102,8 +88,7 @@ export function ConversationHeader({
       assignee.identityId !== currentIdentityId &&
       (customer?.channelType === ChannelType.ChannelTypeWebsite ||
         customer?.channelType === ChannelType.ChannelTypeTelegram ||
-        assignee.type !==
-          OrganizationIdentityType.OrganizationIdentityTypeAgent),
+        assignee.type !== OrganizationIdentityType.OrganizationIdentityTypeAgent),
   )
   /** 执行客服处理周期命令并通知上层刷新受影响视图。 */
   async function runSessionOperation(
@@ -124,13 +109,45 @@ export function ConversationHeader({
         error,
       })
       toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error)
-          : t("conversationActionError"),
+        isApiError(error) ? apiErrorMessage(error) : t("conversationActionError"),
       )
     } finally {
       setOperation("")
     }
+  }
+
+  /** 重新打开会话并刷新受影响视图。 */
+  function reopen() {
+    return runSessionOperation(
+      "reopen",
+      () => reopenServiceSession(conversation.id),
+      t("conversationReopenSuccess"),
+    )
+  }
+
+  /** 领取或接管会话并刷新受影响视图。 */
+  function claim() {
+    return runSessionOperation(
+      "claim",
+      () => claimServiceSession(conversation.id),
+      customer?.assignee
+        ? t("conversationTakeoverSuccess")
+        : t("conversationClaimSuccess"),
+    )
+  }
+
+  /** 将会话转交给指定接待成员。 */
+  function transfer(assignee: (typeof transferCandidates)[number]) {
+    return runSessionOperation(
+      `transfer:${assignee.identityId}`,
+      () =>
+        transferServiceSession(conversation.id, {
+          assigneeIdentityId: assignee.identityId,
+        }),
+      t("conversationTransferSuccess", {
+        name: assignee.displayName,
+      }),
+    )
   }
 
   return (
@@ -142,183 +159,151 @@ export function ConversationHeader({
           narrowViewport && "pr-14",
         )}
       >
-      <ConversationAvatar
-        conversation={conversation}
-        className="size-9"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="w-fit max-w-full">
-          <h2
-            data-slot="conversation-header-title"
-            className="w-fit max-w-full truncate text-sm font-semibold"
-            title={contactName}
-          >
-            {contactName}
-          </h2>
-          {customer ? (
-            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              <span
-                data-slot="conversation-header-detail"
-                className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]"
-              >
-                {sessionStatus}
-              </span>
-              <span
-                data-slot="conversation-header-detail"
-                className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
-                title={customer.title}
-              >
-                {customer.title}
-              </span>
-            </div>
-          ) : group ? (
-            <p
-              data-slot="conversation-header-detail"
-              className="w-fit max-w-full text-xs text-muted-foreground"
+        <ConversationAvatar conversation={conversation} className="size-9" />
+        <div className="min-w-0 flex-1">
+          <div className="w-fit max-w-full">
+            <h2
+              data-slot="conversation-header-title"
+              className="w-fit max-w-full truncate text-sm font-semibold"
+              title={contactName}
             >
-              {group.status === ConversationStatus.ConversationStatusArchived
-                ? t("groupDissolved")
-                : t("groupMemberCount", { count: group.memberCount })}
-            </p>
-          ) : agent ? (
-            <div
-              data-slot="conversation-header-detail"
-              className="w-fit max-w-full text-xs text-muted-foreground"
-            >
-              {agent.agentName}
-              {agentRunLabel ? ` · ${agentRunLabel}` : ""}
-            </div>
-          ) : null}
+              {contactName}
+            </h2>
+            {customer ? (
+              <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                <span
+                  data-slot="conversation-header-detail"
+                  className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]"
+                >
+                  {sessionStatus}
+                </span>
+                <span
+                  data-slot="conversation-header-detail"
+                  className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
+                  title={customer.title}
+                >
+                  {customer.title}
+                </span>
+              </div>
+            ) : group ? (
+              <p
+                data-slot="conversation-header-detail"
+                className="w-fit max-w-full text-xs text-muted-foreground"
+              >
+                {group.status === ConversationStatus.ConversationStatusArchived
+                  ? t("groupDissolved")
+                  : t("groupMemberCount", { count: group.memberCount })}
+              </p>
+            ) : agent ? (
+              <div
+                data-slot="conversation-header-detail"
+                className="w-fit max-w-full text-xs text-muted-foreground"
+              >
+                {agent.agentName}
+                {agentRunLabel ? ` · ${agentRunLabel}` : ""}
+              </div>
+            ) : null}
+          </div>
         </div>
-      </div>
-      {customer ? (
-        <div
-          data-slot="conversation-actions"
-          className="flex shrink-0 items-center gap-2"
-        >
-          {sessionClosed ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="hidden lg:inline-flex"
-              disabled={operation !== ""}
-              onClick={() =>
-                void runSessionOperation(
-                  "reopen",
-                  () => reopenServiceSession(conversation.id),
-                  t("conversationReopenSuccess"),
-                )
-              }
-            >
-              {operation === "reopen" ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : null}
-              {t("conversationReopen")}
-            </Button>
-          ) : null}
-          {sessionOpen && !assignedToCurrentUser ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="hidden lg:inline-flex"
-              disabled={operation !== ""}
-              onClick={() =>
-                void runSessionOperation(
-                  "claim",
-                  () => claimServiceSession(conversation.id),
-                  customer.assignee
-                    ? t("conversationTakeoverSuccess")
-                    : t("conversationClaimSuccess"),
-                )
-              }
-            >
-              {operation === "claim" ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : null}
-              {customer.assignee
-                ? t("conversationTakeover")
-                : t("conversationClaim")}
-            </Button>
-          ) : null}
-          {sessionOpen && assignedToCurrentUser ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="hidden lg:inline-flex"
-                  disabled={operation !== ""}
-                >
-                  {operation.startsWith("transfer:") ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : null}
-                  {t("conversationTransfer")}
-                  <ChevronDownIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-48">
-                {transferCandidates.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    {t("conversationTransferEmpty")}
-                  </DropdownMenuItem>
-                ) : (
-                  transferCandidates.map((assignee) => (
-                    <DropdownMenuItem
-                      key={assignee.identityId}
-                      onSelect={() =>
-                        void runSessionOperation(
-                          `transfer:${assignee.identityId}`,
-                          () =>
-                            transferServiceSession(conversation.id, {
-                              assigneeIdentityId: assignee.identityId,
-                            }),
-                          t("conversationTransferSuccess", {
-                            name: assignee.displayName,
-                          }),
-                        )
-                      }
-                    >
-                      {assignee.displayName}
+        {customer ? (
+          <div
+            data-slot="conversation-actions"
+            className="flex shrink-0 items-center gap-2"
+          >
+            {sessionClosed ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="hidden lg:inline-flex"
+                disabled={operation !== ""}
+                onClick={() => void reopen()}
+              >
+                {operation === "reopen" ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : null}
+                {t("conversationReopen")}
+              </Button>
+            ) : null}
+            {sessionOpen && !assignedToCurrentUser ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="hidden lg:inline-flex"
+                disabled={operation !== ""}
+                onClick={() => void claim()}
+              >
+                {operation === "claim" ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : null}
+                {customer.assignee ? t("conversationTakeover") : t("conversationClaim")}
+              </Button>
+            ) : null}
+            {sessionOpen && assignedToCurrentUser ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="hidden lg:inline-flex"
+                    disabled={operation !== ""}
+                  >
+                    {operation.startsWith("transfer:") ? (
+                      <LoaderCircleIcon className="animate-spin" />
+                    ) : null}
+                    {t("conversationTransfer")}
+                    <ChevronDownIcon />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-48">
+                  {transferCandidates.length === 0 ? (
+                    <DropdownMenuItem disabled>
+                      {t("conversationTransferEmpty")}
                     </DropdownMenuItem>
-                  ))
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-          {sessionOpen &&
-          (!customer.assignee || assignedToCurrentUser) ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="hidden lg:inline-flex"
-                  disabled={operation !== ""}
-                  aria-label={t("conversationMore")}
-                  title={t("conversationMore")}
-                >
-                  {operation === "close" ? (
-                    <LoaderCircleIcon className="animate-spin" />
                   ) : (
-                    <MoreHorizontalIcon />
+                    transferCandidates.map((assignee) => (
+                      <DropdownMenuItem
+                        key={assignee.identityId}
+                        onSelect={() => void transfer(assignee)}
+                      >
+                        {assignee.displayName}
+                      </DropdownMenuItem>
+                    ))
                   )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onSelect={() => setCloseConfirmationOpen(true)}
-                >
-                  {t("conversationClose")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-          {customer ? (
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            {sessionOpen && (!customer.assignee || assignedToCurrentUser) ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="hidden lg:inline-flex"
+                    disabled={operation !== ""}
+                    aria-label={t("conversationMore")}
+                    title={t("conversationMore")}
+                  >
+                    {operation === "close" ? (
+                      <LoaderCircleIcon className="animate-spin" />
+                    ) : (
+                      <MoreHorizontalIcon />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => setCloseConfirmationOpen(true)}
+                  >
+                    {t("conversationClose")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -339,29 +324,11 @@ export function ConversationHeader({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-48">
                 {sessionClosed ? (
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      void runSessionOperation(
-                        "reopen",
-                        () => reopenServiceSession(conversation.id),
-                        t("conversationReopenSuccess"),
-                      )
-                    }
-                  >
+                  <DropdownMenuItem onSelect={() => void reopen()}>
                     {t("conversationReopen")}
                   </DropdownMenuItem>
                 ) : !assignedToCurrentUser ? (
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      void runSessionOperation(
-                        "claim",
-                        () => claimServiceSession(conversation.id),
-                        customer.assignee
-                          ? t("conversationTakeoverSuccess")
-                          : t("conversationClaimSuccess"),
-                      )
-                    }
-                  >
+                  <DropdownMenuItem onSelect={() => void claim()}>
                     {customer.assignee
                       ? t("conversationTakeover")
                       : t("conversationClaim")}
@@ -370,18 +337,7 @@ export function ConversationHeader({
                   transferCandidates.map((assignee) => (
                     <DropdownMenuItem
                       key={assignee.identityId}
-                      onSelect={() =>
-                        void runSessionOperation(
-                          `transfer:${assignee.identityId}`,
-                          () =>
-                            transferServiceSession(conversation.id, {
-                              assigneeIdentityId: assignee.identityId,
-                            }),
-                          t("conversationTransferSuccess", {
-                            name: assignee.displayName,
-                          }),
-                        )
-                      }
+                      onSelect={() => void transfer(assignee)}
                     >
                       {t("conversationTransferTo", {
                         name: assignee.displayName,
@@ -389,8 +345,7 @@ export function ConversationHeader({
                     </DropdownMenuItem>
                   ))
                 )}
-                {sessionOpen &&
-                (!customer.assignee || assignedToCurrentUser) ? (
+                {sessionOpen && (!customer.assignee || assignedToCurrentUser) ? (
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onSelect={() => setCloseConfirmationOpen(true)}
@@ -400,27 +355,19 @@ export function ConversationHeader({
                 ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : null}
-        </div>
-      ) : null}
+          </div>
+        ) : null}
       </header>
-      <AlertDialog
-        open={closeConfirmationOpen}
-        onOpenChange={setCloseConfirmationOpen}
-      >
+      <AlertDialog open={closeConfirmationOpen} onOpenChange={setCloseConfirmationOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("conversationCloseConfirmTitle")}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{t("conversationCloseConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {t("conversationCloseConfirmDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
                 void runSessionOperation(

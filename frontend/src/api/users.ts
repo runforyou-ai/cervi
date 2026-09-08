@@ -12,7 +12,6 @@ import type {
   CreateUserInput,
   UpdateUserInput,
   User,
-  UserList,
   UserListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -22,10 +21,6 @@ export type UserListQuery = Partial<UserListInput>
 
 export type UserData = Omit<User, "teams"> & {
   teams: NonNullable<User["teams"]>
-}
-
-export type UserListResponse = Omit<UserList, "users"> & {
-  users: UserData[]
 }
 
 const listUsersBound = bind(ListUsers)

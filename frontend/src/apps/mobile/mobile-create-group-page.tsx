@@ -6,6 +6,10 @@ import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 import { z } from "zod"
+import {
+  createGroupConversationSchema,
+  groupTitleMaxLength,
+} from "@/features/inbox/group-conversation-schema"
 
 import { createGroupConversation, isApiError, type MemberOption } from "@/api"
 import { MobileGroupMemberPicker } from "@/apps/mobile/mobile-group-member-picker"
@@ -40,13 +44,8 @@ export function MobileCreateGroupPage() {
   }, [])
 
   // 已选成员作为表单值保存，候选刷新后仍可移除。
-  const schema = z.object({
-    title: z.string().trim()
-      .min(1, tInbox("groupTitleRequired"))
-      .max(100, tInbox("groupTitleTooLong")),
-    members: z.array(z.custom<MemberOption>())
-      .min(1, tInbox("groupMembersRequired"))
-      .max(99, tInbox("groupMembersTooMany")),
+  const schema = createGroupConversationSchema(tInbox, z.custom<MemberOption>()).omit({
+    description: true,
   })
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -127,7 +126,7 @@ export function MobileCreateGroupPage() {
               id="mobile-group-title"
               className="min-h-11 md:text-base"
               autoComplete="off"
-              maxLength={100}
+              maxLength={groupTitleMaxLength}
               required
               disabled={saving}
             />

@@ -12,20 +12,11 @@ import {
   refreshMCPServerTools,
   type MCPServer,
 } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -44,17 +35,15 @@ import {
 import { MCPServerToolsCell } from "@/features/integrations/mcp-servers/mcp-server-tools-cell"
 import { MCPServerTestButton } from "@/features/integrations/mcp-servers/mcp-server-test-button"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { useIntegrationDeletion } from "@/features/integrations/use-integration-deletion"
 
 /** 显示当前企业配置的 MCP 服务。 */
 export function MCPServerListPage() {
   const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
-  const [deletingMCPServer, setDeletingMCPServer] =
-    useState<MCPServer | null>(null)
-  const [deleting, setDeleting] = useState(false)
   const [submittingRefresh, setSubmittingRefresh] = useState(false)
   const mounted = useRef(true)
   const {
@@ -68,7 +57,6 @@ export function MCPServerListPage() {
     refetchInterval: (data) => data?.mcpServers.some((server) => server.toolsUpdating) ? 1000 : false,
     refetchOnWindowFocus: true,
   })
-  const invalidate = useResourceInvalidator()
   const showLoading = loading || (Boolean(loadError) && !data && refreshing)
   const mcpServers = data?.mcpServers ?? []
 
@@ -94,36 +82,14 @@ export function MCPServerListPage() {
     }
   }
 
-  /** 删除选中的 MCP 服务。 */
-  async function confirmDelete() {
-    if (!deletingMCPServer || deleting) return
-    setDeleting(true)
-    try {
-      await deleteMCPServer(deletingMCPServer.id)
-      if (!mounted.current) return
-      void refresh()
-      void invalidate(resourceKeys.mcpServer(deletingMCPServer.id))
-      console.info("MCP 服务已删除", {
-        mcp_server_id: deletingMCPServer.id,
-      })
-      setDeletingMCPServer(null)
-      toast.success(t("mcpServer.delete.success"))
-    } catch (requestError) {
-      if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("MCP 服务删除失败", {
-        mcp_server_id: deletingMCPServer.id,
-        error: requestError,
-      })
-      toast.error(
-        isApiError(requestError)
-          ? apiErrorMessage(requestError)
-          : t("mcpServer.delete.error"),
-      )
-    } finally {
-      if (mounted.current) setDeleting(false)
-    }
-  }
+  const deletion = useIntegrationDeletion<MCPServer>({
+    deleteItem: deleteMCPServer,
+    listKey: resourceKeys.mcpServers(),
+    detailKey: resourceKeys.mcpServer,
+    entityName: "MCP 服务",
+    successMessage: t("mcpServer.delete.success"),
+    errorMessage: t("mcpServer.delete.error"),
+  })
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -137,30 +103,16 @@ export function MCPServerListPage() {
           {t("mcpServer.tools.refresh")}
         </Button>
         <Button size="sm" asChild>
-          <Link to="/integrations/mcp-servers/new">
-            {t("mcpServer.list.create")}
-          </Link>
+          <Link to="/integrations/mcp-servers/new">{t("mcpServer.list.create")}</Link>
         </Button>
       </PageHeader>
       <PageContent>
-        {showLoading ? (
-          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("common:status.loading")}
-          </LoadingIndicator>
-        ) : loadError && !data ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-            <p className="text-sm text-muted-foreground">
-              {t("mcpServer.list.loadError")}
-            </p>
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => void refresh()}
-            >
-              {t("common:actions.retry")}
-            </Button>
-          </div>
-        ) : (
+        <ResourceContent
+          loading={showLoading}
+          error={Boolean(loadError) && !data}
+          errorMessage={t("mcpServer.list.loadError")}
+          onRetry={() => void refresh()}
+        >
           <div className="overflow-hidden rounded-lg border bg-card">
             <Table>
               <TableHeader>
@@ -201,9 +153,7 @@ export function MCPServerListPage() {
                         <div className="inline-flex gap-2">
                           <MCPServerTestButton serverId={mcpServer.id} />
                           <Button variant="outline" size="sm" asChild>
-                            <Link
-                              to={`/integrations/mcp-servers/${mcpServer.id}`}
-                            >
+                            <Link to={`/integrations/mcp-servers/${mcpServer.id}`}>
                               {t("common:actions.edit")}
                             </Link>
                           </Button>
@@ -221,9 +171,7 @@ export function MCPServerListPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem
                                 destructive
-                                onSelect={() =>
-                                  setDeletingMCPServer(mcpServer)
-                                }
+                                onSelect={() => deletion.select(mcpServer)}
                               >
                                 {t("common:actions.delete")}
                               </DropdownMenuItem>
@@ -237,43 +185,21 @@ export function MCPServerListPage() {
               </TableBody>
             </Table>
           </div>
-        )}
+        </ResourceContent>
       </PageContent>
 
-      <AlertDialog
-        open={deletingMCPServer !== null}
-        onOpenChange={(open) =>
-          !open && !deleting && setDeletingMCPServer(null)
+      <DeleteConfirmationDialog
+        open={deletion.item !== null}
+        pending={deletion.pending}
+        title={
+          deletion.item ? t("mcpServer.delete.title", { name: deletion.item.name }) : ""
         }
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deletingMCPServer
-                ? t("mcpServer.delete.title", {
-                    name: deletingMCPServer.name,
-                  })
-                : null}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("mcpServer.delete.description")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting}
-              onClick={() => void confirmDelete()}
-            >
-              {deleting
-                ? t("common:actions.deleting")
-                : t("common:actions.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        description={t("mcpServer.delete.description")}
+        onOpenChange={(open) => {
+          if (!open) deletion.select(null)
+        }}
+        onConfirm={() => void deletion.confirm()}
+      />
     </div>
   )
 }

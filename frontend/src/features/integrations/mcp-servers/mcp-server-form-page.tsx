@@ -1,10 +1,9 @@
 /** MCP 服务新增与编辑页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate, useParams } from "react-router"
+import { useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -15,8 +14,9 @@ import {
   updateMCPServer,
   testMCPServerConnection,
 } from "@/api"
+import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -69,14 +69,11 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
     refreshing: detailRefreshing,
     error: detailError,
     refresh,
-  } = useResource(
-    resourceKeys.mcpServer(mcpServerId),
-    () => getMCPServer(mcpServerId),
-    { enabled: mode === "edit" },
-  )
+  } = useResource(resourceKeys.mcpServer(mcpServerId), () => getMCPServer(mcpServerId), {
+    enabled: mode === "edit",
+  })
   const loading =
-    mode === "edit" &&
-    (detailLoading || (Boolean(detailError) && detailRefreshing))
+    mode === "edit" && (detailLoading || (Boolean(detailError) && detailRefreshing))
   const loadError = mode === "edit" && Boolean(detailError) && !loading
 
   /** 详情就绪后回填 MCP 服务表单。 */
@@ -128,13 +125,10 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       void invalidateResource(resourceKeys.mcpServers())
       if (!mounted.current) return
       form.reset(values)
-      console.info(
-        mode === "create" ? "MCP 服务已创建" : "MCP 服务已保存",
-        {
-          mcp_server_id: saved.id,
-          server_type: saved.serverType,
-        },
-      )
+      console.info(mode === "create" ? "MCP 服务已创建" : "MCP 服务已保存", {
+        mcp_server_id: saved.id,
+        server_type: saved.serverType,
+      })
       toast.success(
         mode === "create"
           ? t("mcpServer.form.createSuccess")
@@ -152,7 +146,10 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       toast.error(
         isApiError(requestError)
           ? apiErrorMessage(requestError, [
-              "name", "url", "serverType", "authorizationToken",
+              "name",
+              "url",
+              "serverType",
+              "authorizationToken",
             ])
           : t("mcpServer.form.saveError"),
       )
@@ -160,32 +157,18 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
   }
 
   const title =
-    mode === "create"
-      ? t("mcpServer.form.createTitle")
-      : t("mcpServer.form.editTitle")
+    mode === "create" ? t("mcpServer.form.createTitle") : t("mcpServer.form.editTitle")
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={title} />
       <PageContent>
-        {loading ? (
-          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("common:status.loading")}
-          </LoadingIndicator>
-        ) : loadError ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-            <p className="text-sm text-muted-foreground">
-              {t("mcpServer.form.loadError")}
-            </p>
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => void refresh()}
-            >
-              {t("common:actions.retry")}
-            </Button>
-          </div>
-        ) : (
+        <ResourceContent
+          loading={loading}
+          error={Boolean(loadError)}
+          errorMessage={t("mcpServer.form.loadError")}
+          onRetry={() => void refresh()}
+        >
           <form
             className="w-full max-w-2xl space-y-9"
             onSubmit={form.handleSubmit(save)}
@@ -246,15 +229,11 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
                 }}
               />
             </FieldGroup>
-            <div className="flex items-center gap-2">
-              <Button type="submit" disabled={testing || form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : null}
-                {form.formState.isSubmitting
-                  ? t("common:actions.saving")
-                  : t("common:actions.save")}
-              </Button>
+            <FormActions
+              saving={form.formState.isSubmitting}
+              disabled={testing}
+              cancelTo={listPath}
+            >
               <Button
                 type="button"
                 variant="outline"
@@ -263,12 +242,9 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
               >
                 {testing ? t("mcpServer.connection.testing") : t("mcpServer.connection.test")}
               </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to={listPath}>{t("common:actions.cancel")}</Link>
-              </Button>
-            </div>
+            </FormActions>
           </form>
-        )}
+        </ResourceContent>
       </PageContent>
     </div>
   )

@@ -1,11 +1,5 @@
 /** 展示并编辑 AI 员工详情。 */
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react"
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -27,7 +21,6 @@ import {
   type Team,
 } from "@/api"
 import { DetailEditRow } from "@/components/form/detail-edit-row"
-import { StatusBadge } from "@/components/status-badge"
 import {
   selectableWorkStatuses,
   WorkStatusBadge,
@@ -51,12 +44,8 @@ import {
   agentModelSelection,
   parseAgentModelSelection,
 } from "@/features/contacts/agents/agent-model-selection"
-import {
-  accountStatuses,
-  accountStatusSchema,
-  type AccountStatusFormValues,
-} from "@/features/contacts/account-status-schema"
-import { userStatusLabel } from "@/features/contacts/external/contact-labels"
+import { AccountStatusEditRow } from "@/features/contacts/account-status-edit-row"
+import { TeamCheckboxOptions } from "@/features/contacts/team-checkbox-options"
 import { roleDisplayName } from "@/features/roles/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
 import { sameIDs, useImmediateSave } from "@/hooks/use-immediate-save"
@@ -146,11 +135,6 @@ export function AgentDetailView({
     shouldUseNativeValidation: true,
     defaultValues: managedExecutionValuesFromAgent(agent),
   })
-  const accountStatusForm = useForm<AccountStatusFormValues>({
-    resolver: zodResolver(accountStatusSchema),
-    shouldUseNativeValidation: true,
-    defaultValues: { status: agent.status },
-  })
   const workStatusForm = useForm<AgentWorkStatusFormValues>({
     resolver: zodResolver(agentWorkStatusSchema),
     shouldUseNativeValidation: true,
@@ -159,16 +143,18 @@ export function AgentDetailView({
   useEffect(() => {
     form.reset(valuesFromAgent(agent))
     managedExecutionForm.reset(managedExecutionValuesFromAgent(agent))
-    accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
-  }, [accountStatusForm, agent, form, managedExecutionForm, workStatusForm])
+  }, [agent, form, managedExecutionForm, workStatusForm])
 
   // 点击多选区外部时退出，组内说明文本和移除选项不触发退出。
   useEffect(() => {
     if (editing !== "teams" && editing !== "knowledgeBases") return
     /** 关闭指针明确离开的多选编辑区。 */
     function handleOutsidePointerDown(event: PointerEvent) {
-      if (event.target instanceof Node && !selectionGroupRef.current?.contains(event.target)) {
+      if (
+        event.target instanceof Node &&
+        !selectionGroupRef.current?.contains(event.target)
+      ) {
         setEditing(null)
       }
     }
@@ -180,7 +166,6 @@ export function AgentDetailView({
   function cancelEdit() {
     form.reset(valuesFromAgent(agent))
     managedExecutionForm.reset(managedExecutionValuesFromAgent(agent))
-    accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
     setEditing(null)
   }
@@ -189,7 +174,6 @@ export function AgentDetailView({
   function startEditing(field: Exclude<EditingField, null>) {
     form.reset(valuesFromAgent(agent))
     managedExecutionForm.reset(managedExecutionValuesFromAgent(agent))
-    accountStatusForm.reset({ status: agent.status })
     workStatusForm.reset({ workStatus: agent.workStatus })
     setEditing(field)
   }
@@ -314,55 +298,6 @@ export function AgentDetailView({
     }
   }
 
-  /** 修改 AI 员工账号状态。 */
-  async function saveAccountStatus(
-    status: AccountStatusFormValues["status"],
-  ) {
-    if (status === agent.status) {
-      setEditing(null)
-      return
-    }
-    const agentID = agent.id
-    const request = saveState.begin()
-    if (request === null) return
-    const valid = await accountStatusForm.trigger()
-    if (!saveState.isCurrent(request)) return
-    if (!valid) {
-      saveState.finish(request)
-      return
-    }
-
-    try {
-      const saved =
-        status === UserStatus.UserStatusInactive
-          ? await deactivateAgent(agentID)
-          : await reactivateAgent(agentID)
-      if (!saveState.isCurrent(request)) return
-      setEditing(null)
-      onSaved(saved)
-    } catch (error) {
-      if (!saveState.isCurrent(request)) return
-      cancelEdit()
-      if (recoverSession(error, navigate)) return
-      if (isNotFoundApiError(error)) {
-        onNotFound()
-        return
-      }
-      console.warn("修改 AI 员工账号状态失败", {
-        agent_id: agentID,
-        status,
-        error,
-      })
-      toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error)
-          : t("agents.status.error"),
-      )
-    } finally {
-      saveState.finish(request)
-    }
-  }
-
   /** 保存 AI 员工工作状态。 */
   async function saveWorkStatus(
     draft: AgentWorkStatusFormValues = workStatusForm.getValues(),
@@ -435,19 +370,13 @@ export function AgentDetailView({
     cancelEdit()
   }
 
-  const empty = (
-    <span className="text-muted-foreground">{t("detail.empty")}</span>
-  )
-  const assignableRoles = roles.filter(
-    (role) => role.kind !== RoleKind.RoleKindAdmin,
-  )
+  const empty = <span className="text-muted-foreground">{t("detail.empty")}</span>
+  const assignableRoles = roles.filter((role) => role.kind !== RoleKind.RoleKindAdmin)
 
   return (
     <div className="flex flex-col gap-7">
       <section>
-        <h3 className="mb-2 text-sm font-medium">
-          {t("detail.basicInformation")}
-        </h3>
+        <h3 className="mb-2 text-sm font-medium">{t("detail.basicInformation")}</h3>
         <div className="divide-y">
           <DetailEditRow
             label={t("columns.name")}
@@ -512,63 +441,31 @@ export function AgentDetailView({
             />
           </DetailEditRow>
 
-          <DetailEditRow
-            label={t("columns.accountStatus")}
-            value={
-              <StatusBadge
-                showDot={false}
-                variant={
-                  agent.status === UserStatus.UserStatusActive
-                    ? "success"
-                    : "muted"
-                }
-              >
-                {userStatusLabel(agent.status, t)}
-              </StatusBadge>
-            }
+          <AccountStatusEditRow
+            status={agent.status}
             editing={editing === "accountStatus"}
             editEnabled={editing === null && !saving}
-            required
+            saveState={saveState}
             onEdit={() => startEditing("accountStatus")}
-          >
-            <Controller
-              name="status"
-              control={accountStatusForm.control}
-              render={({ field }) => (
-                <NativeSelect
-                  {...field}
-                  autoFocus
-                  disabled={saving}
-                  onChange={(event) => {
-                    const status = event.target
-                      .value as AccountStatusFormValues["status"]
-                    field.onChange(status)
-                    void saveAccountStatus(status)
-                  }}
-                  onBlur={() => {
-                    field.onBlur()
-                    if (!saveState.isSaving()) cancelEdit()
-                  }}
-                  onKeyDown={handleSelectKeyDown}
-                >
-                  {accountStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {userStatusLabel(status, t)}
-                    </option>
-                  ))}
-                </NativeSelect>
-              )}
-            />
-          </DetailEditRow>
+            onCancel={cancelEdit}
+            onSave={(status) =>
+              status === UserStatus.UserStatusInactive
+                ? deactivateAgent(agent.id)
+                : reactivateAgent(agent.id)
+            }
+            onSaved={onSaved}
+            onNotFound={onNotFound}
+            entityName="AI 员工"
+            entityId={agent.id}
+            errorMessage={t("agents.status.error")}
+          />
 
           <DetailEditRow
             label={t("columns.workStatus")}
             value={<WorkStatusBadge status={agent.workStatus} />}
             editing={editing === "workStatus"}
             editEnabled={
-              editing === null &&
-              !saving &&
-              agent.status === UserStatus.UserStatusActive
+              editing === null && !saving && agent.status === UserStatus.UserStatusActive
             }
             required
             onEdit={() => startEditing("workStatus")}
@@ -606,9 +503,7 @@ export function AgentDetailView({
       </section>
 
       <section>
-        <h3 className="mb-2 text-sm font-medium">
-          {t("agents.execution.title")}
-        </h3>
+        <h3 className="mb-2 text-sm font-medium">{t("agents.execution.title")}</h3>
         <div className="divide-y">
           <DetailEditRow
             label={t("agents.execution.model")}
@@ -683,7 +578,11 @@ export function AgentDetailView({
             <div
               ref={selectionGroupRef}
               onBlur={(event) => {
-                if (!event.relatedTarget || event.currentTarget.contains(event.relatedTarget)) return
+                if (
+                  !event.relatedTarget ||
+                  event.currentTarget.contains(event.relatedTarget)
+                )
+                  return
                 if (saveState.isSaving()) {
                   setEditing(null)
                   return
@@ -737,11 +636,21 @@ export function AgentDetailView({
                 {teams.length === 0 ? (
                   <FieldDescription>{t("agents.form.noTeams")}</FieldDescription>
                 ) : (
-                  <div
+                  <TeamCheckboxOptions
+                    teams={teams}
+                    value={field.value}
+                    disabled={saving}
+                    preserveFocus
+                    onChange={(teamIds) => {
+                      field.onChange(teamIds)
+                      void saveAgent({ ...form.getValues(), teamIds }, false)
+                    }}
                     ref={selectionGroupRef}
-                    className="grid gap-2 rounded-md border p-3 sm:grid-cols-2"
                     onBlur={(event) => {
-                      if (!event.relatedTarget || event.currentTarget.contains(event.relatedTarget)) {
+                      if (
+                        !event.relatedTarget ||
+                        event.currentTarget.contains(event.relatedTarget)
+                      ) {
                         return
                       }
                       if (saveState.isSaving()) {
@@ -756,36 +665,7 @@ export function AgentDetailView({
                       event.stopPropagation()
                       cancelEdit()
                     }}
-                  >
-                    {teams.map((team) => (
-                      <label
-                        key={team.id}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          className="size-4 accent-primary aria-disabled:cursor-wait aria-disabled:opacity-60"
-                          aria-disabled={saving}
-                          checked={field.value.includes(team.id)}
-                          onChange={(event) => {
-                            if (saveState.isSaving()) return
-                            const teamIds = event.target.checked
-                              ? [...field.value, team.id]
-                              : field.value.filter((id) => id !== team.id)
-                            field.onChange(teamIds)
-                            void saveAgent(
-                              {
-                                ...form.getValues(),
-                                teamIds,
-                              },
-                              false,
-                            )
-                          }}
-                        />
-                        <span>{team.name}</span>
-                      </label>
-                    ))}
-                  </div>
+                  />
                 )}
               </Field>
             )}
@@ -794,9 +674,7 @@ export function AgentDetailView({
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium">
-          {t("detail.otherInformation")}
-        </h3>
+        <h3 className="mb-3 text-sm font-medium">{t("detail.otherInformation")}</h3>
         <dl className="grid gap-4 px-2 text-sm">
           <div className="flex gap-3">
             <dt className="w-28 shrink-0 text-muted-foreground">

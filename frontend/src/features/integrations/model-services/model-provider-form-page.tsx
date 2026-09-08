@@ -2,14 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
-import {
-  Controller,
-  type FieldErrors,
-  useFieldArray,
-  useForm,
-} from "react-hook-form"
+import { Controller, type FieldErrors, useFieldArray, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate, useParams } from "react-router"
+import { useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -24,24 +19,15 @@ import {
   type AIProviderBrandId,
   type AIProviderModelData,
 } from "@/api"
+import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { FormValidationMessage } from "@/components/form/form-validation-message"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-  FieldRequiredMark,
-} from "@/components/ui/field"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Field, FieldGroup, FieldLabel, FieldRequiredMark } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import {
@@ -94,9 +80,7 @@ function modelFormValue(model: AIProviderModelData) {
 }
 
 /** 返回模型目录中的第一条字段校验提示。 */
-function modelValidationMessage(
-  errors: FieldErrors<AIProviderFormValues>["models"],
-) {
+function modelValidationMessage(errors: FieldErrors<AIProviderFormValues>["models"]) {
   if (!errors) return ""
   if (typeof errors.message === "string") return errors.message
   if (typeof errors.root?.message === "string") return errors.root.message
@@ -104,10 +88,7 @@ function modelValidationMessage(
   for (const model of errors) {
     if (!model) continue
     const error =
-      model.identifier ??
-      model.name ??
-      model.contextWindow ??
-      model.maxOutputTokens
+      model.identifier ?? model.name ?? model.contextWindow ?? model.maxOutputTokens
     if (typeof error?.message === "string") return error.message
   }
   return ""
@@ -126,9 +107,7 @@ export function ModelProviderFormPage({
   const { providerId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
   const [modelDialogOpen, setModelDialogOpen] = useState(false)
-  const [availableModels, setAvailableModels] = useState<AIProviderModelData[]>(
-    [],
-  )
+  const [availableModels, setAvailableModels] = useState<AIProviderModelData[]>([])
   const [draftModelIDs, setDraftModelIDs] = useState<Set<string>>(new Set())
   const [loadingModels, setLoadingModels] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
@@ -145,30 +124,16 @@ export function ModelProviderFormPage({
         apiKeyTooLong: t("modelServices.validation.apiKeyTooLong"),
         apiUrlRequired: t("modelServices.validation.apiUrlRequired"),
         apiUrlInvalid: t("modelServices.validation.apiUrlInvalid"),
-        modelIdentifierRequired: t(
-          "modelServices.validation.modelIdentifierRequired",
-        ),
-        modelIdentifierTooLong: t(
-          "modelServices.validation.modelIdentifierTooLong",
-        ),
+        modelIdentifierRequired: t("modelServices.validation.modelIdentifierRequired"),
+        modelIdentifierTooLong: t("modelServices.validation.modelIdentifierTooLong"),
         modelNameRequired: t("modelServices.validation.modelNameRequired"),
         modelNameTooLong: t("modelServices.validation.modelNameTooLong"),
         modelTypeInvalid: t("modelServices.validation.modelTypeInvalid"),
-        inputModalityInvalid: t(
-          "modelServices.validation.inputModalityInvalid",
-        ),
-        inputModalitiesRequired: t(
-          "modelServices.validation.inputModalitiesRequired",
-        ),
-        contextWindowInvalid: t(
-          "modelServices.validation.contextWindowInvalid",
-        ),
-        maxOutputTokensInvalid: t(
-          "modelServices.validation.maxOutputTokensInvalid",
-        ),
-        modelIdentifierDuplicate: t(
-          "modelServices.validation.modelIdentifierDuplicate",
-        ),
+        inputModalityInvalid: t("modelServices.validation.inputModalityInvalid"),
+        inputModalitiesRequired: t("modelServices.validation.inputModalitiesRequired"),
+        contextWindowInvalid: t("modelServices.validation.contextWindowInvalid"),
+        maxOutputTokensInvalid: t("modelServices.validation.maxOutputTokensInvalid"),
+        modelIdentifierDuplicate: t("modelServices.validation.modelIdentifierDuplicate"),
         modelsRequired: t("modelServices.validation.modelsRequired"),
       }),
     [t],
@@ -195,14 +160,11 @@ export function ModelProviderFormPage({
     refreshing: providerRefreshing,
     error: providerError,
     refresh,
-  } = useResource(
-    resourceKeys.aiProvider(providerId),
-    () => getAIProvider(providerId),
-    { enabled: mode === "edit" },
-  )
+  } = useResource(resourceKeys.aiProvider(providerId), () => getAIProvider(providerId), {
+    enabled: mode === "edit",
+  })
   const loading =
-    mode === "edit" &&
-    (providerLoading || (Boolean(providerError) && providerRefreshing))
+    mode === "edit" && (providerLoading || (Boolean(providerError) && providerRefreshing))
   const loadError = mode === "edit" && Boolean(providerError) && !loading
 
   /** 详情就绪后回填供应商表单。 */
@@ -267,14 +229,11 @@ export function ModelProviderFormPage({
   /** 确认模型选择并追加目录中尚不存在的模型。 */
   function confirmModels() {
     const current = form.getValues("models")
-    const existingIDs = new Set(
-      current.map((model) => model.identifier.trim()),
-    )
+    const existingIDs = new Set(current.map((model) => model.identifier.trim()))
     const modelsToAppend = availableModels
       .filter(
         (model) =>
-          draftModelIDs.has(model.identifier) &&
-          !existingIDs.has(model.identifier),
+          draftModelIDs.has(model.identifier) && !existingIDs.has(model.identifier),
       )
       .map(modelFormValue)
     if (modelsToAppend.length > 0) modelFields.append(modelsToAppend)
@@ -364,13 +323,7 @@ export function ModelProviderFormPage({
       })
       toast.error(
         isApiError(requestError)
-          ? apiErrorMessage(requestError, [
-              "brand",
-              "name",
-              "apiKey",
-              "apiUrl",
-              "models",
-            ])
+          ? apiErrorMessage(requestError, ["brand", "name", "apiKey", "apiUrl", "models"])
           : t("modelServices.form.saveError"),
       )
     }
@@ -390,24 +343,12 @@ export function ModelProviderFormPage({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={title} />
       <PageContent>
-        {loading ? (
-          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("common:status.loading")}
-          </LoadingIndicator>
-        ) : loadError ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-            <p className="text-sm text-muted-foreground">
-              {t("modelServices.form.loadError")}
-            </p>
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => void refresh()}
-            >
-              {t("common:actions.retry")}
-            </Button>
-          </div>
-        ) : (
+        <ResourceContent
+          loading={loading}
+          error={Boolean(loadError)}
+          errorMessage={t("modelServices.form.loadError")}
+          onRetry={() => void refresh()}
+        >
           <form
             className="w-full space-y-9"
             onSubmit={form.handleSubmit(save)}
@@ -551,9 +492,7 @@ export function ModelProviderFormPage({
                           {hasChatModel ? <FieldRequiredMark /> : null}
                         </span>
                       </TableHead>
-                      <TableHead className="w-px">
-                        {t("common:table.actions")}
-                      </TableHead>
+                      <TableHead className="w-px">{t("common:table.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -663,17 +602,14 @@ export function ModelProviderFormPage({
                                   row: index + 1,
                                 })}
                                 aria-invalid={Boolean(
-                                  form.formState.errors.models?.[index]
-                                    ?.contextWindow,
+                                  form.formState.errors.models?.[index]?.contextWindow,
                                 )}
                               />
                             </TableCell>
                             <TableCell>
                               {modelType === AIModelType.AIModelTypeChat ? (
                                 <Input
-                                  {...form.register(
-                                    `models.${index}.maxOutputTokens`,
-                                  )}
+                                  {...form.register(`models.${index}.maxOutputTokens`)}
                                   required
                                   inputMode="decimal"
                                   autoComplete="off"
@@ -717,37 +653,25 @@ export function ModelProviderFormPage({
               />
             </section>
 
-            <div className="flex items-center gap-2">
-              <Button
-                type="submit"
-                disabled={form.formState.isSubmitting || testingConnection}
-              >
-                {form.formState.isSubmitting ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : null}
-                {form.formState.isSubmitting
-                  ? t("common:actions.saving")
-                  : t("common:actions.save")}
-              </Button>
+            <FormActions
+              saving={form.formState.isSubmitting}
+              disabled={testingConnection}
+              cancelTo={listPath}
+            >
               <Button
                 type="button"
                 variant="outline"
                 disabled={testingConnection || form.formState.isSubmitting}
                 onClick={() => void testConnection()}
               >
-                {testingConnection ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : null}
+                {testingConnection ? <LoaderCircleIcon className="animate-spin" /> : null}
                 {testingConnection
                   ? t("modelServices.form.testing")
                   : t("modelServices.form.test")}
               </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to={listPath}>{t("common:actions.cancel")}</Link>
-              </Button>
-            </div>
+            </FormActions>
           </form>
-        )}
+        </ResourceContent>
       </PageContent>
 
       <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
@@ -760,13 +684,13 @@ export function ModelProviderFormPage({
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-12">
-                    <span className="sr-only">
-                      {t("modelServices.models.select")}
-                    </span>
+                    <span className="sr-only">{t("modelServices.models.select")}</span>
                   </TableHead>
                   <TableHead>{t("modelServices.models.columns.identifier")}</TableHead>
                   <TableHead>{t("modelServices.models.columns.type")}</TableHead>
-                  <TableHead>{t("modelServices.models.columns.inputModalities")}</TableHead>
+                  <TableHead>
+                    {t("modelServices.models.columns.inputModalities")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -791,9 +715,7 @@ export function ModelProviderFormPage({
                     <TableCell>{t(modelTypeNameKeys[model.type])}</TableCell>
                     <TableCell>
                       {model.inputModalities
-                        .map((modality) =>
-                          t(modelInputModalityNameKeys[modality]),
-                        )
+                        .map((modality) => t(modelInputModalityNameKeys[modality]))
                         .join("、")}
                     </TableCell>
                   </TableRow>
