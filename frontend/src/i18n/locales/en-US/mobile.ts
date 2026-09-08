@@ -81,12 +81,9 @@ const mobile = {
     logoutDescription:
       "You will need to sign in again. Your server connection will be kept.",
     logoutTitle: "Log out of this account?",
-    settingsUnavailable: "Mobile personal settings are not available yet.",
-    settings: "Personal settings",
-    organization: "Connected organization",
+    security: "Login and security",
     title: "Me",
     profile: "Profile",
-    displayName: "Name",
     email: "Email",
   },
 }

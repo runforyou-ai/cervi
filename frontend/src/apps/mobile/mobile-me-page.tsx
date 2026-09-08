@@ -1,4 +1,4 @@
-/** 移动端当前用户基础资料页面。 */
+/** 移动端个人中心、个人资料和登录与安全入口。 */
 import { useState } from "react"
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -26,7 +26,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-/** 展示当前用户基础资料和退出操作。 */
+/** 展示个人资料、登录与安全入口和退出操作。 */
 export function MobileMePage() {
   const { t } = useTranslation("mobile")
   const navigate = useNavigate()
@@ -51,65 +51,48 @@ export function MobileMePage() {
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t("me.title")} />
-      <MobileScrollArea storageKey="me" className="px-4 py-6">
+      <MobileScrollArea storageKey="me" className="px-4 pt-2 pb-6">
         <div className="mx-auto max-w-lg">
-          <section aria-labelledby="mobile-profile-title">
-            <h2
-              id="mobile-profile-title"
-              className="text-sm font-medium text-muted-foreground"
-            >
-              {t("me.profile")}
-            </h2>
-            <div className="mt-3 overflow-hidden rounded-xl border bg-card">
-              <div className="flex justify-center px-4 py-6">
-                <UserAvatar
-                  user={identity.user}
-                  className="size-16 rounded-2xl text-xl"
-                />
-              </div>
-              <dl className="divide-y border-t px-4">
-                <div className="py-4">
-                  <dt className="text-xs text-muted-foreground">
-                    {t("me.displayName")}
-                  </dt>
-                  <dd className="mt-1 break-words text-sm font-medium">
-                    {identity.user.displayName}
-                  </dd>
-                </div>
-                <div className="py-4">
-                  <dt className="text-xs text-muted-foreground">
-                    {t("me.email")}
-                  </dt>
-                  <dd className="mt-1 break-all text-sm font-medium">
-                    {identity.user.email}
-                  </dd>
-                </div>
-                <div className="py-4">
-                  <dt className="text-xs text-muted-foreground">
-                    {t("me.organization")}
-                  </dt>
-                  <dd className="mt-1 break-words text-sm font-medium">
-                    {identity.organization.name}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </section>
-
           <Link
-            to="/me/settings"
+            to="/me/profile"
             state={{ mobileBack: true }}
-            className="mt-6 flex min-h-14 items-center justify-between gap-3 border-y text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={t("me.profile")}
+            className="flex items-center gap-3 py-4 text-left outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {t("me.settings")}
-            <ChevronRightIcon className="size-4 text-muted-foreground" />
+            <UserAvatar
+              user={identity.user}
+              className="size-16 shrink-0 rounded-2xl text-xl"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-base font-semibold">
+                {identity.user.displayName}
+              </span>
+              <span className="mt-1 block truncate text-sm text-muted-foreground">
+                {identity.user.email}
+              </span>
+            </span>
+            <ChevronRightIcon
+              className="size-5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+          </Link>
+          <Link
+            to="/me/security"
+            state={{ mobileBack: true }}
+            className="flex min-h-14 items-center justify-between gap-3 border-y text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {t("me.security")}
+            <ChevronRightIcon
+              className="size-5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
           </Link>
           <div className="mt-9">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   className="min-h-11 w-full"
-                  variant="outline"
+                  variant="destructive"
                   disabled={loggingOut}
                 >
                   {loggingOut ? t("loggingOut") : t("logout")}
@@ -142,16 +125,24 @@ export function MobileMePage() {
   )
 }
 
-/** 保留个人设置的独立页面入口。 */
-export function MobileSettingsPage() {
+/** 展示个人资料占位页并返回个人中心。 */
+export function MobileProfilePage() {
   const { t } = useTranslation("mobile")
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <MobilePageHeader title={t("me.settings")} backTo="/me" />
-      <MobilePageState
-        title={t("unavailable")}
-        description={t("me.settingsUnavailable")}
-      />
+      <MobilePageHeader title={t("me.profile")} backTo="/me" />
+      <MobilePageState title={t("unavailable")} />
+    </section>
+  )
+}
+
+/** 展示登录与安全占位页并返回个人中心。 */
+export function MobileSecurityPage() {
+  const { t } = useTranslation("mobile")
+  return (
+    <section className="flex h-full min-h-0 flex-col">
+      <MobilePageHeader title={t("me.security")} backTo="/me" />
+      <MobilePageState title={t("unavailable")} />
     </section>
   )
 }
