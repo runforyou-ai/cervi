@@ -16,7 +16,7 @@ export function AgentKnowledgeField({
   onChange?: (ids: string[]) => void
   disabled?: boolean
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   const resource = useResource(
     resourceKeys.knowledgeBases(),
     () => listKnowledgeBases(),
@@ -35,7 +35,7 @@ export function AgentKnowledgeField({
           variant="outline"
           onClick={() => void resource.refresh()}
         >
-          {t("agents.execution.knowledgeRetry")}
+          {t("common:actions.retry")}
         </Button>
       </div>
     )

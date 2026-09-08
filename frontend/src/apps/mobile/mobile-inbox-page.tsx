@@ -293,7 +293,7 @@ function MobileConversationRow({
 
 /** 加载当前范围的真实会话摘要并恢复列表浏览位置。 */
 export function MobileInboxPage() {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const navigate = useNavigate()
   const { query, changeQuery } = useMobileInboxQuery()
   const pollingActive = useMemberChatPollingActive({
@@ -362,7 +362,7 @@ export function MobileInboxPage() {
       >
         {loading && !data ? (
           <LoadingIndicator className="min-h-64 flex-1 justify-center">
-            {t("loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : null}
         {!loading && !data ? (

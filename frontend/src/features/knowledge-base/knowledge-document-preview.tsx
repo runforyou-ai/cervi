@@ -24,7 +24,7 @@ export function KnowledgeDocumentPreview({
   documentId: string
   name: string
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const preview = useResource(
     resourceKeys.knowledgeDocumentFile(knowledgeBaseId, documentId),
     async (signal) => {
@@ -49,7 +49,7 @@ export function KnowledgeDocumentPreview({
         <div className="flex h-full flex-col items-center justify-center gap-4 text-sm text-muted-foreground">
           <p>{isApiError(preview.error) ? apiErrorMessage(preview.error) : t("documentDetail.previewError")}</p>
           <Button variant="outline" onClick={() => void preview.refresh()}>
-            {t("retry")}
+            {t("common:actions.retry")}
           </Button>
         </div>
       ) : preview.data ? (

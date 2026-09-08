@@ -28,7 +28,7 @@ export function ContactDetailSheet({
   loading: boolean
   children: ReactNode
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("common")
   const detailTitleRef = useRef<HTMLHeadingElement>(null)
 
   return (
@@ -54,7 +54,7 @@ export function ContactDetailSheet({
           <div className="p-6">
             {loading ? (
               <LoadingIndicator className="min-h-40 justify-center">
-                {t("loading")}
+                {t("status.loading")}
               </LoadingIndicator>
             ) : (
               children

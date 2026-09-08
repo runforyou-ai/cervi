@@ -210,11 +210,11 @@ export function AgentForm({
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting
-            ? t("agents.form.saving")
-            : t("agents.form.save")}
+            ? tCommon("actions.saving")
+            : tCommon("actions.save")}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          {t("agents.form.cancel")}
+          {tCommon("actions.cancel")}
         </Button>
       </div>
     </form>

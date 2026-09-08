@@ -42,7 +42,7 @@ export function GroupMemberPickerDialog({
   onOpenChange: (open: boolean) => void
   onAdd: (members: MemberOption[]) => Promise<void>
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const searchID = useId()
   const [query, setQuery] = useState("")
@@ -170,7 +170,7 @@ export function GroupMemberPickerDialog({
                   className="mt-3"
                   onClick={() => void resource.refresh()}
                 >
-                  {t("messagesRetry")}
+                  {t("common:actions.retry")}
                 </Button>
               </div>
             ) : remainingCount === 0 || visibleMembers.length === 0 ? (
@@ -239,7 +239,7 @@ export function GroupMemberPickerDialog({
                 disabled={saving}
                 onClick={() => changeOpen(false)}
               >
-                {t("groupCreateCancel")}
+                {t("common:actions.cancel")}
               </Button>
               <Button
                 type="button"

@@ -91,7 +91,7 @@ function isConfigured(setting: StorageSettingsFormValues) {
 
 /** 读取、保存和测试对象存储设置。 */
 export function StorageSettingsForm() {
-  const { t } = useTranslation("settings")
+  const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
   const [savedSetting, setSavedSetting] =
     useState<StorageSettingsFormValues>(emptySetting)
@@ -302,7 +302,7 @@ export function StorageSettingsForm() {
   if (loading) {
     return (
       <LoadingIndicator>
-        {t("storage.loading")}
+        {t("common:status.loading")}
       </LoadingIndicator>
     )
   }
@@ -316,7 +316,7 @@ export function StorageSettingsForm() {
           variant="outline"
           onClick={() => void refresh()}
         >
-          {t("storage.retry")}
+          {t("common:actions.retry")}
         </Button>
       </div>
     )
@@ -514,8 +514,8 @@ export function StorageSettingsForm() {
           <div className="flex flex-wrap items-center gap-2">
             <Button type="submit" disabled={submitting}>
               {pendingAction === "save"
-                ? t("storage.form.saving")
-                : t("storage.form.save")}
+                ? t("common:actions.saving")
+                : t("common:actions.save")}
             </Button>
             <Button
               type="button"
@@ -533,7 +533,7 @@ export function StorageSettingsForm() {
               disabled={submitting}
               onClick={cancelEditing}
             >
-              {t("storage.form.cancel")}
+              {t("common:actions.cancel")}
             </Button>
           </div>
         </form>
@@ -656,7 +656,7 @@ export function StorageSettingsForm() {
               disabled={submitting}
               onClick={beginEditing}
             >
-              {t("storage.actions.edit")}
+              {t("common:actions.modify")}
             </Button>
             <Button
               type="button"
@@ -710,7 +710,7 @@ export function StorageSettingsForm() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {t("storage.disableDialog.cancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction onClick={() => void disableSavedSetting()}>
               {t("storage.disableDialog.confirm")}

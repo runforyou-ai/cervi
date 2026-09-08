@@ -27,7 +27,7 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
-			agentaction.ValidationTeamInvalid:               cervii18n.FieldMemberTeamInvalid,
+			agentaction.ValidationTeamInvalid:               cervii18n.FieldTeamInvalid,
 			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
 			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
@@ -128,7 +128,7 @@ func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agent
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired: cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationRoleInvalid:         cervii18n.FieldMemberRoleInvalid,
-			agentaction.ValidationTeamInvalid:         cervii18n.FieldMemberTeamInvalid,
+			agentaction.ValidationTeamInvalid:         cervii18n.FieldTeamInvalid,
 		})
 	}
 	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID)

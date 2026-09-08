@@ -46,7 +46,7 @@ export function TelegramChannelConnectionForm({
   onUpdated: (channel: TelegramChannel) => void
   onSavingChange: (saving: boolean) => void
 }) {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -173,8 +173,8 @@ export function TelegramChannelConnectionForm({
           <Button type="submit" disabled={saving || testing}>
             {saving ? <LoaderCircleIcon className="animate-spin" /> : null}
             {saving
-              ? t("telegramConnection.form.saving")
-              : t("telegramConnection.form.save")}
+              ? t("common:actions.saving")
+              : t("common:actions.save")}
           </Button>
           <Button
             type="button"
@@ -189,7 +189,7 @@ export function TelegramChannelConnectionForm({
           </Button>
           <Button type="button" variant="outline" asChild>
             <Link to="/integrations/channels">
-              {t("telegramConnection.form.cancel")}
+              {t("common:actions.cancel")}
             </Link>
           </Button>
         </div>
@@ -211,7 +211,7 @@ export function TelegramChannelConnectionForm({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {t("telegramConnection.reuseConfirmation.cancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-primary text-primary-foreground hover:bg-primary/90"

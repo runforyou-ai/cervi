@@ -51,7 +51,7 @@ export function UserPreferencesForm({
   user: CurrentUser
   onUpdated: (user: CurrentUser) => void
 }) {
-  const { t } = useTranslation("settings")
+  const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const notificationScope = useMemo<NotificationDeviceScope>(
@@ -299,7 +299,7 @@ export function UserPreferencesForm({
       <div>
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-          {isSubmitting ? t("preferences.saving") : t("preferences.save")}
+          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>
       </div>
     </form>

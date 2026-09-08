@@ -304,7 +304,7 @@ export function RoleMemberDialog({
                         action={() => {
                           if (defaultRole) stageUserRole(user, defaultRole)
                         }}
-                        actionLabel={t("roles.members.remove")}
+                        actionLabel={tCommon("actions.remove")}
                       />
                     ))}
                   </ul>
@@ -319,7 +319,7 @@ export function RoleMemberDialog({
             variant="outline"
             onClick={() => onOpenChange(false)}
           >
-            {t("roles.members.cancel")}
+            {tCommon("actions.cancel")}
           </Button>
           <Button
             type="button"

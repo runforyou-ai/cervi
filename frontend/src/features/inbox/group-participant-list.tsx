@@ -79,7 +79,7 @@ export function GroupParticipantList({
   onRemove: (identityID: string) => Promise<void>
   onLeave: () => Promise<void>
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const memberSearchID = useId()
   const [query, setQuery] = useState("")
@@ -306,7 +306,7 @@ export function GroupParticipantList({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={acting}>
-              {t("groupCreateCancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               className={buttonVariants({ variant: "default" })}
@@ -336,7 +336,7 @@ export function GroupParticipantList({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={acting}>
-              {t("groupCreateCancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={acting}
@@ -361,7 +361,7 @@ export function GroupParticipantList({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={acting}>
-              {t("groupCreateCancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={acting}

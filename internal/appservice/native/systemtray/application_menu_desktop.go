@@ -29,7 +29,7 @@ var applicationMenuMessageKeys = map[application.Role]cervii18n.Key{
 	application.Hide:               cervii18n.AppMenuHide,
 	application.HideOthers:         cervii18n.AppMenuHideOthers,
 	application.UnHide:             cervii18n.AppMenuShowAll,
-	application.Quit:               cervii18n.AppMenuQuit,
+	application.Quit:               cervii18n.AppQuit,
 	application.CloseWindow:        cervii18n.AppMenuClose,
 	application.Undo:               cervii18n.AppMenuUndo,
 	application.Redo:               cervii18n.AppMenuRedo,

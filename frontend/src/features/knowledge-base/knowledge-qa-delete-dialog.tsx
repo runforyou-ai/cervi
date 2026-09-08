@@ -33,7 +33,7 @@ export function KnowledgeQADeleteDialog({
   entry: KnowledgeQASummaryData | null
   onClose: () => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const mounted = useRef(true)
@@ -85,7 +85,7 @@ export function KnowledgeQADeleteDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>
-            {t("qa.cancel")}
+            {t("common:actions.cancel")}
           </AlertDialogCancel>
           <AlertDialogAction
             disabled={busy}
@@ -94,7 +94,7 @@ export function KnowledgeQADeleteDialog({
               void confirmDelete()
             }}
           >
-            {busy ? t("qa.deleting") : t("qa.delete")}
+            {busy ? t("common:actions.deleting") : t("common:actions.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

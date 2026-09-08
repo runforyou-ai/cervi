@@ -35,7 +35,7 @@ const listPath = "/integrations/business-systems"
 
 /** 编辑业务系统名称、地址和启用状态。 */
 export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
-  const { t } = useTranslation("integrations")
+  const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const { businessSystemId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
@@ -144,7 +144,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("businessSystem.loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -156,7 +156,7 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
               variant="outline"
               onClick={() => void refresh()}
             >
-              {t("businessSystem.retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : (
@@ -225,11 +225,11 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
                   <LoaderCircleIcon className="animate-spin" />
                 ) : null}
                 {form.formState.isSubmitting
-                  ? t("businessSystem.form.saving")
-                  : t("businessSystem.form.save")}
+                  ? t("common:actions.saving")
+                  : t("common:actions.save")}
               </Button>
               <Button type="button" variant="outline" asChild>
-                <Link to={listPath}>{t("businessSystem.form.cancel")}</Link>
+                <Link to={listPath}>{t("common:actions.cancel")}</Link>
               </Button>
             </div>
           </form>

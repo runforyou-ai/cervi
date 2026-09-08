@@ -124,7 +124,7 @@ function MobileCustomerAssignee({
   value: string
   onChange: (value: string) => void
 }) {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const { identity } = useMobileWorkspace()
   const { data, loading, error, refresh } = useResource(
     resourceKeys.customerServiceAssignees(),
@@ -159,7 +159,7 @@ function MobileCustomerAssignee({
         ))}
       </select>
       {loading ? (
-        <p className="text-xs text-muted-foreground">{t("loading")}</p>
+        <p className="text-xs text-muted-foreground">{t("common:status.loading")}</p>
       ) : null}
       {error ? (
         <Button
@@ -183,7 +183,7 @@ export function MobileCustomerFilter({
   onChange: (query: LoadInboxQuery) => void
 }) {
   const { t } = useTranslation("inbox")
-  const { t: tMobile } = useTranslation("mobile")
+  const { t: tMobile } = useTranslation(["mobile", "common"])
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(query.customerView)
   const [assignee, setAssignee] = useState(query.assigneeIdentityId)
@@ -234,7 +234,7 @@ export function MobileCustomerFilter({
           <SheetTitle className="flex-1">{t("queueFilterLabel")}</SheetTitle>
           <SheetClose asChild>
             <Button variant="ghost" className="min-h-11">
-              {tMobile("cancel")}
+              {tMobile("common:actions.cancel")}
             </Button>
           </SheetClose>
         </SheetHeader>

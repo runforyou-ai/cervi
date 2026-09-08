@@ -311,7 +311,7 @@ export function MessageChannelFormPage({
 }: {
   mode: "create" | "edit"
 }) {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const { channelId = "", channelType = "" } = useParams()
   const [channel, setChannel] = useState<EditableChannel | null>(null)
@@ -422,7 +422,7 @@ export function MessageChannelFormPage({
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center">
-            {t("loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : mode === "edit" && !channel ? (
           <div className="flex min-h-48 items-center justify-center text-center">
@@ -435,7 +435,7 @@ export function MessageChannelFormPage({
                 variant="outline"
                 onClick={() => void refresh()}
               >
-                {t("retry")}
+                {t("common:actions.retry")}
               </Button>
             </div>
           </div>

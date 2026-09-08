@@ -121,7 +121,7 @@ export function ModelProviderFormPage({
   mode: "create" | "edit"
   returnSection: ModelServiceSection
 }) {
-  const { t } = useTranslation("integrations")
+  const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const { providerId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
@@ -392,7 +392,7 @@ export function ModelProviderFormPage({
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("modelServices.loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -404,7 +404,7 @@ export function ModelProviderFormPage({
               variant="outline"
               onClick={() => void refresh()}
             >
-              {t("modelServices.retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : (
@@ -552,7 +552,7 @@ export function ModelProviderFormPage({
                         </span>
                       </TableHead>
                       <TableHead className="w-px">
-                        {t("modelServices.models.columns.actions")}
+                        {t("common:table.actions")}
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -700,7 +700,7 @@ export function ModelProviderFormPage({
                                 size="xs"
                                 onClick={() => modelFields.remove(index)}
                               >
-                                {t("modelServices.models.delete")}
+                                {t("common:actions.delete")}
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -726,8 +726,8 @@ export function ModelProviderFormPage({
                   <LoaderCircleIcon className="animate-spin" />
                 ) : null}
                 {form.formState.isSubmitting
-                  ? t("modelServices.form.saving")
-                  : t("modelServices.form.save")}
+                  ? t("common:actions.saving")
+                  : t("common:actions.save")}
               </Button>
               <Button
                 type="button"
@@ -743,7 +743,7 @@ export function ModelProviderFormPage({
                   : t("modelServices.form.test")}
               </Button>
               <Button type="button" variant="outline" asChild>
-                <Link to={listPath}>{t("modelServices.form.cancel")}</Link>
+                <Link to={listPath}>{t("common:actions.cancel")}</Link>
               </Button>
             </div>
           </form>
@@ -811,10 +811,10 @@ export function ModelProviderFormPage({
                 variant="outline"
                 onClick={() => setModelDialogOpen(false)}
               >
-                {t("modelServices.models.cancel")}
+                {t("common:actions.cancel")}
               </Button>
               <Button type="button" onClick={confirmModels}>
-                {t("modelServices.models.confirm")}
+                {t("common:actions.confirm")}
               </Button>
             </div>
           </div>

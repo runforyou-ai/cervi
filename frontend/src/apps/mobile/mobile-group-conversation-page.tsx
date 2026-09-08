@@ -42,7 +42,7 @@ function MobileGroupConversation({
 }: {
   conversationID: string
 }) {
-  const { t } = useTranslation(["mobile", "inbox"])
+  const { t } = useTranslation(["mobile", "inbox", "common"])
   const navigate = useNavigate()
   const location = useLocation()
   const navigationState = location.state as {
@@ -183,7 +183,7 @@ function MobileGroupConversation({
           />
         ) : loading || isNotFoundApiError(error) ? (
           <LoadingIndicator className="min-h-0 flex-1 justify-center">
-            {t("loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : (
           <MobilePageState

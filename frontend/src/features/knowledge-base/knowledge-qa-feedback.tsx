@@ -13,11 +13,11 @@ export function KnowledgeQAFeedback({
   error: unknown
   retry: () => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   if (!error)
     return (
       <LoadingIndicator className="min-h-48 justify-center">
-        {t("loading")}
+        {t("common:status.loading")}
       </LoadingIndicator>
     )
   return (
@@ -26,7 +26,7 @@ export function KnowledgeQAFeedback({
         {isApiError(error) ? apiErrorMessage(error) : t("qa.loadError")}
       </p>
       <Button variant="outline" onClick={retry}>
-        {t("retry")}
+        {t("common:actions.retry")}
       </Button>
     </div>
   )

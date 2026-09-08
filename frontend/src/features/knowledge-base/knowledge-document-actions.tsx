@@ -34,7 +34,7 @@ export function KnowledgeDocumentActions({
   action: DocumentAction
   onClose: () => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const mounted = useRef(true)
@@ -87,7 +87,7 @@ export function KnowledgeDocumentActions({
         }}
       >
         <DialogHeader>
-          <DialogTitle>{t(action.kind === "move" ? "documents.move" : "documents.delete")}</DialogTitle>
+          <DialogTitle>{t(action.kind === "move" ? "documents.move" : "common:actions.delete")}</DialogTitle>
           <DialogDescription>
             {action.kind === "delete"
               ? t("documents.deleteDescription", { name: action.document.name })
@@ -115,14 +115,14 @@ export function KnowledgeDocumentActions({
           )}
           <div className="flex justify-end gap-3">
             <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
-              {t("documents.cancel")}
+              {t("common:actions.cancel")}
             </Button>
             <Button
               type="submit"
               variant={action.kind === "delete" ? "destructive" : "default"}
               disabled={busy || (action.kind === "move" && form.watch("groupId") === action.document.groupId)}
             >
-              {t(busy ? "documents.saving" : action.kind === "delete" ? "documents.delete" : "documents.move")}
+              {t(busy ? "common:actions.saving" : action.kind === "delete" ? "common:actions.delete" : "documents.move")}
             </Button>
           </div>
         </form>

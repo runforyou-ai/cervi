@@ -48,7 +48,7 @@ import { recoverSession } from "@/lib/session-navigation"
 
 /** 显示当前企业配置的业务系统。 */
 export function BusinessSystemListPage() {
-  const { t } = useTranslation("integrations")
+  const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const [deletingBusinessSystem, setDeletingBusinessSystem] =
     useState<BusinessSystem | null>(null)
@@ -115,7 +115,7 @@ export function BusinessSystemListPage() {
       <PageContent>
         {showLoading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("businessSystem.loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -127,7 +127,7 @@ export function BusinessSystemListPage() {
               variant="outline"
               onClick={() => void refresh()}
             >
-              {t("businessSystem.retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : (
@@ -139,7 +139,7 @@ export function BusinessSystemListPage() {
                   <TableHead>{t("businessSystem.list.columns.url")}</TableHead>
                   <TableHead>{t("businessSystem.list.columns.status")}</TableHead>
                   <TableHead className="w-px">
-                    {t("businessSystem.list.columns.actions")}
+                    {t("common:table.actions")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -178,7 +178,7 @@ export function BusinessSystemListPage() {
                             <Link
                               to={`/integrations/business-systems/${businessSystem.id}`}
                             >
-                              {t("businessSystem.list.edit")}
+                              {t("common:actions.edit")}
                             </Link>
                           </Button>
                           <DropdownMenu>
@@ -186,8 +186,8 @@ export function BusinessSystemListPage() {
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                aria-label={t("businessSystem.list.more")}
-                                title={t("businessSystem.list.more")}
+                                aria-label={t("common:actions.more")}
+                                title={t("common:actions.more")}
                               >
                                 <MoreHorizontalIcon />
                               </Button>
@@ -199,7 +199,7 @@ export function BusinessSystemListPage() {
                                   setDeletingBusinessSystem(businessSystem)
                                 }
                               >
-                                {t("businessSystem.list.delete")}
+                                {t("common:actions.delete")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -235,15 +235,15 @@ export function BusinessSystemListPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>
-              {t("businessSystem.delete.cancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void confirmDelete()}
             >
               {deleting
-                ? t("businessSystem.delete.deleting")
-                : t("businessSystem.delete.confirm")}
+                ? t("common:actions.deleting")
+                : t("common:actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

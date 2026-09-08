@@ -34,7 +34,7 @@ func textsForLocale(locale appservice.Locale) localizedTexts {
 	messages := cervii18n.LocalizeMap(string(locale), map[string]cervii18n.Key{
 		"productName": cervii18n.AppProductName,
 		"open":        cervii18n.AppTrayOpen,
-		"quit":        cervii18n.AppTrayQuit,
+		"quit":        cervii18n.AppQuit,
 	})
 	return localizedTexts{
 		ProductName: messages["productName"],
