@@ -28,7 +28,7 @@ export function MCPServerToolsCell({ server }: { server: MCPServer }) {
           ) : server.toolsUpdatedAt ? tools.length.toLocaleString(i18n.language) : "—"}
         </button>
       </TooltipTrigger>
-      <TooltipContent side="left" className="max-w-sm text-left text-wrap">
+      <TooltipContent side="bottom" align="start" sideOffset={4} className="max-w-sm text-left text-wrap">
         <div className="max-h-72 space-y-3 overflow-y-auto overscroll-contain">
           {server.toolsUpdating ? <p>{t("mcpServer.tools.updating")}</p> : null}
           {server.toolsError ? <p>{t("mcpServer.tools.failed", { message: server.toolsError })}</p> : null}

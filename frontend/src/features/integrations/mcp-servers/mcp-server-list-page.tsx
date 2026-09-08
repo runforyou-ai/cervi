@@ -166,8 +166,8 @@ export function MCPServerListPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{t("mcpServer.list.columns.name")}</TableHead>
-                  <TableHead>{t("mcpServer.list.columns.url")}</TableHead>
                   <TableHead>{t("mcpServer.list.columns.serverType")}</TableHead>
+                  <TableHead>{t("mcpServer.list.columns.url")}</TableHead>
                   <TableHead className="w-20">{t("mcpServer.list.columns.tools")}</TableHead>
                   <TableHead className="w-px">
                     {t("common:table.actions")}
@@ -190,11 +190,11 @@ export function MCPServerListPage() {
                       <TableCell className="font-medium">
                         <SelectableText>{mcpServer.name}</SelectableText>
                       </TableCell>
-                      <TableCell className="max-w-xl text-muted-foreground">
-                        <SelectableText>{mcpServer.url}</SelectableText>
-                      </TableCell>
                       <TableCell>
                         <SelectableText>{mcpServer.serverType}</SelectableText>
+                      </TableCell>
+                      <TableCell className="max-w-xl text-muted-foreground">
+                        <SelectableText>{mcpServer.url}</SelectableText>
                       </TableCell>
                       <TableCell><MCPServerToolsCell server={mcpServer} /></TableCell>
                       <TableCell className="whitespace-nowrap">
