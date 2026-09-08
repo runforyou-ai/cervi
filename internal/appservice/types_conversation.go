@@ -130,21 +130,23 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	Attachment   *MessageAttachment               `json:"attachment"`
-	AgentProcess *ConversationAgentProcess        `json:"agentProcess"`
-	MessageSeq   string                           `json:"messageSeq"`
-	ID           string                           `json:"id"`
-	Type         MessageType                      `json:"type"`
-	Body         string                           `json:"body"`
-	OriginatedAt time.Time                        `json:"originatedAt"`
-	SourceOrder  int64                            `json:"sourceOrder"`
-	CreatedAt    time.Time                        `json:"createdAt"`
-	Sender       *ConversationMessageSender       `json:"sender"`
-	SessionStart *ConversationMessageSessionStart `json:"sessionStart"`
-	SystemEvent  *ConversationSystemEvent         `json:"systemEvent"`
-	ReplyTo      *ConversationMessageReference    `json:"replyTo"`
-	Mentions     []ConversationMessageMention     `json:"mentions"`
-	MentionAll   bool                             `json:"mentionAll"`
+	// ClientMessageID 仅向原发送身份返回。
+	ClientMessageID *string                          `json:"clientMessageId"`
+	Attachment      *MessageAttachment               `json:"attachment"`
+	AgentProcess    *ConversationAgentProcess        `json:"agentProcess"`
+	MessageSeq      string                           `json:"messageSeq"`
+	ID              string                           `json:"id"`
+	Type            MessageType                      `json:"type"`
+	Body            string                           `json:"body"`
+	OriginatedAt    time.Time                        `json:"originatedAt"`
+	SourceOrder     int64                            `json:"sourceOrder"`
+	CreatedAt       time.Time                        `json:"createdAt"`
+	Sender          *ConversationMessageSender       `json:"sender"`
+	SessionStart    *ConversationMessageSessionStart `json:"sessionStart"`
+	SystemEvent     *ConversationSystemEvent         `json:"systemEvent"`
+	ReplyTo         *ConversationMessageReference    `json:"replyTo"`
+	Mentions        []ConversationMessageMention     `json:"mentions"`
+	MentionAll      bool                             `json:"mentionAll"`
 }
 
 // ConversationMessageList 定义成员消息页。

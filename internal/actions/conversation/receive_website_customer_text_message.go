@@ -80,14 +80,13 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 	if len(fields) > 0 {
 		return ReceiveWebsiteCustomerTextMessageResult{}, &ValidationError{Fields: fields}
 	}
-	idempotencyKey := "chmsg:" + normalized.ChannelID + ":" + normalized.ClientMessageID
 
 	var err error
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result ReceiveWebsiteCustomerTextMessageResult
 		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 			var executeErr error
-			result, executeErr = a.executeTransaction(ctx, tx, normalized, idempotencyKey)
+			result, executeErr = a.executeTransaction(ctx, tx, normalized)
 			return executeErr
 		})
 		if err == nil {
@@ -106,14 +105,14 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 }
 
 // executeTransaction 执行一次完整的网站访客消息事务。
-func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, input WebsiteCustomerTextMessageInput, idempotencyKey string) (ReceiveWebsiteCustomerTextMessageResult, error) {
+func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, input WebsiteCustomerTextMessageInput) (ReceiveWebsiteCustomerTextMessageResult, error) {
 	channel, err := loadWebsiteChannel(ctx, tx, input.ChannelID)
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
 	}
 	received, err := ReceiveInboundCustomerTextMessage(ctx, tx, channel, InboundCustomerTextMessageInput{
 		ExternalID: input.ExternalID, RequestedConversationID: input.ConversationID,
-		Body: input.Body, IdempotencyKey: idempotencyKey, ReplyToMessageID: input.ReplyToMessageID,
+		Body: input.Body, ClientMessageID: &input.ClientMessageID, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
 		return ReceiveWebsiteCustomerTextMessageResult{}, err
@@ -150,7 +149,9 @@ func normalizeWebsiteMessageInput(input WebsiteCustomerTextMessageInput) (Websit
 	if input.ConversationID != nil && !common.ValidUUID(*input.ConversationID) {
 		fields["conversationId"] = ValidationConversationIDInvalid
 	}
-	if !common.ValidUUID(input.ClientMessageID) {
+	clientMessageID, valid := common.NormalizeUUID(input.ClientMessageID)
+	input.ClientMessageID = clientMessageID
+	if !valid {
 		fields["clientMessageId"] = ValidationClientMessageIDInvalid
 	}
 	if input.ReplyToMessageID != "" {
@@ -415,8 +416,9 @@ func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessage
 		CreatedConversation:     received.CreatedConversation,
 		OpenedNewServiceSession: received.OpenedServiceSession,
 		Message: Message{
-			ReplyTo: replyTo,
-			ID:      received.Message.ID, Author: domain.MessageAuthorVisitor,
+			ClientMessageID: received.Message.ClientMessageID,
+			ReplyTo:         replyTo,
+			ID:              received.Message.ID, Author: domain.MessageAuthorVisitor,
 			MessageSeq: received.Message.MessageSeq, Body: received.Message.Body, OriginatedAt: received.Message.OriginatedAt,
 			CreatedAt: received.Message.CreatedAt,
 		},

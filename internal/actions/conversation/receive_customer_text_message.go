@@ -18,6 +18,7 @@ import (
 
 // InboundCustomerTextMessageInput 定义渠道文本入站事务的稳定事实。
 type InboundCustomerTextMessageInput struct {
+	ClientMessageID         *string
 	ReplyToMessageID        string
 	ExternalID              string
 	DisplayName             *string
@@ -55,6 +56,10 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 		return InboundCustomerTextMessageResult{}, err
 	}
 	identity := ensured.Identity
+	// 网站发送编号按渠道访客身份隔离，外部平台保留来源幂等键。
+	if input.ClientMessageID != nil {
+		input.IdempotencyKey = "chmsg:" + identity.ID + ":" + *input.ClientMessageID
+	}
 	if input.DisplayName != nil && (identity.DisplayName == nil || *identity.DisplayName != *input.DisplayName) {
 		if _, err := db.NewUpdate().Model(identity).
 			Set("display_name = ?", *input.DisplayName).
@@ -160,7 +165,7 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 		ID: ids.message, OrganizationID: channel.OrganizationID,
 		ConversationID: conversation.ID, ServiceSessionID: &session.ID,
 		SenderParticipantID: &participant.ID, Type: string(domain.MessageTypeText),
-		Body: input.Body, IdempotencyKey: &input.IdempotencyKey,
+		ClientMessageID: input.ClientMessageID, Body: input.Body, IdempotencyKey: &input.IdempotencyKey,
 		OriginatedAt: input.OriginatedAt, SourceOrder: input.SourceOrder,
 	}
 	if replyTo != nil {

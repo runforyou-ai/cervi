@@ -168,8 +168,9 @@ func websiteVisitorMessageFromAction(value conversationaction.Message) WebsiteVi
 		}
 	}
 	return WebsiteVisitorMessage{
-		ReplyTo: replyTo,
-		ID:      value.ID, Author: string(value.Author), Body: value.Body, SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
+		ClientMessageID: value.ClientMessageID,
+		ReplyTo:         replyTo,
+		ID:              value.ID, Author: string(value.Author), Body: value.Body, SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
 		MessageSeq: strconv.FormatInt(value.MessageSeq, 10), OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
 	}
 }

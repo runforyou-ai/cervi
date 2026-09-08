@@ -28,6 +28,7 @@ type ListConversationMessagesQuery struct {
 }
 
 type conversationMessageRow struct {
+	ClientMessageID                *string                          `bun:"client_message_id"`
 	ReplyToType                    domain.MessageType               `bun:"reply_to_type"`
 	ID                             string                           `bun:"id"`
 	Type                           string                           `bun:"type"`
@@ -113,6 +114,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 	return db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
+		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
 		ColumnExpr("msg.system_event_type AS system_event_type").
@@ -291,7 +293,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	messages := make([]ConversationMessage, 0, len(rows))
 	for _, row := range rows {
 		message := ConversationMessage{
-			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
+			ClientMessageID: row.ClientMessageID, ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, MessageSeq: row.MessageSeq,
 		}
 		if message.Type == domain.MessageTypeSystem {

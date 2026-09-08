@@ -29,7 +29,9 @@ func NewSendAttachmentMessageAction(db *bun.DB) *SendAttachmentMessageAction {
 
 // Execute 在成员和会话锁内幂等发送附件，首发时按需创建单聊。
 func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input AttachmentMessageInput) (AttachmentMessageResult, error) {
-	if !common.ValidUUID(input.ClientMessageID) || !common.ValidUUID(input.FileID) ||
+	clientMessageID, valid := common.NormalizeUUID(input.ClientMessageID)
+	input.ClientMessageID = clientMessageID
+	if !valid || !common.ValidUUID(input.FileID) ||
 		(input.ConversationID == "") == (input.TargetIdentityID == "") ||
 		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) ||
 		(input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) {
@@ -160,7 +162,7 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	message := &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID,
 		SenderParticipantID: &member.ParticipantID, Type: string(domain.MessageTypeAttachment), Body: input.Body,
-		IdempotencyKey: &key, OriginatedAt: time.Now().UTC(),
+		ClientMessageID: &input.ClientMessageID, IdempotencyKey: &key, OriginatedAt: time.Now().UTC(),
 	}
 	// 会话锁内已完成完整幂等校验，已有附件在文件状态检查前返回。
 	message, _, err = chatstate.AppendMessage(ctx, tx, member.Conversation, message)

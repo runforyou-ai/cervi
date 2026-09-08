@@ -257,7 +257,7 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 			ID: messageID.String(), OrganizationID: identity.Organization.ID,
 			ConversationID: normalized.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
 			Type: string(domain.MessageTypeText), Body: normalized.Body, ReplyToMessageID: replyToMessageID, MentionAll: normalized.MentionAll,
-			IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
+			ClientMessageID: &normalized.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
 		}
 		message, inserted, err := chatstate.AppendMessage(ctx, tx, sendContext.Conversation, message)
 		if err != nil {

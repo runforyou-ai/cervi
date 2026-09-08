@@ -52,6 +52,8 @@ type WebsiteVisitorMessageReference struct {
 
 // WebsiteVisitorMessage 定义网站访客可见消息。
 type WebsiteVisitorMessage struct {
+	// ClientMessageID 仅向原发送身份返回。
+	ClientMessageID    *string                         `json:"clientMessageId"`
 	MessageSeq         string                          `json:"messageSeq"`
 	ReplyTo            *WebsiteVisitorMessageReference `json:"replyTo"`
 	ID                 string                          `json:"id"`

@@ -548,9 +548,10 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		attachment = &MessageAttachment{File: File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize}, UploadStatus: AttachmentUploadStatus(message.Attachment.UploadStatus), ImageWidth: message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight}
 	}
 	return ConversationMessage{
-		Attachment:   attachment,
-		AgentProcess: conversationAgentProcessFromAction(message.AgentProcess),
-		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body,
+		ClientMessageID: message.ClientMessageID,
+		Attachment:      attachment,
+		AgentProcess:    conversationAgentProcessFromAction(message.AgentProcess),
+		ID:              message.ID, Type: MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MessageSeq: strconv.FormatInt(message.MessageSeq, 10),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
