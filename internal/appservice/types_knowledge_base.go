@@ -14,38 +14,11 @@ const (
 	KnowledgeBaseCategoryQA       KnowledgeBaseCategory = KnowledgeBaseCategory(domain.KnowledgeBaseCategoryQA)
 )
 
-// KnowledgeDocumentStatus 表示知识文档的统一状态。
-type KnowledgeDocumentStatus string
-
-const (
-	KnowledgeDocumentStatusQueued     KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusQueued)
-	KnowledgeDocumentStatusProcessing KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusProcessing)
-	KnowledgeDocumentStatusReady      KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusReady)
-	KnowledgeDocumentStatusPaused     KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusPaused)
-	KnowledgeDocumentStatusError      KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusError)
-	KnowledgeDocumentStatusDisabled   KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusDisabled)
-	KnowledgeDocumentStatusArchived   KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentStatusArchived)
-)
-
-// KnowledgeDocumentSegmentIndexStatus 表示知识文档分段的索引状态。
-type KnowledgeDocumentSegmentIndexStatus string
-
-const (
-	KnowledgeDocumentSegmentIndexStatusWaiting   KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusWaiting)
-	KnowledgeDocumentSegmentIndexStatusIndexing  KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusIndexing)
-	KnowledgeDocumentSegmentIndexStatusCompleted KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusCompleted)
-	KnowledgeDocumentSegmentIndexStatusError     KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusError)
-	KnowledgeDocumentSegmentIndexStatusPaused    KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusPaused)
-	KnowledgeDocumentSegmentIndexStatusResegment KnowledgeDocumentSegmentIndexStatus = KnowledgeDocumentSegmentIndexStatus(domain.KnowledgeDocumentSegmentIndexStatusResegment)
-)
-
 // KnowledgeBaseInput 定义知识库可编辑字段。
 type KnowledgeBaseInput struct {
-	Name                    string                `json:"name"`
-	Category                KnowledgeBaseCategory `json:"category"`
-	Description             string                `json:"description"`
-	IntegrationConnectionID string                `json:"integrationConnectionId"`
-	ExternalResourceID      string                `json:"externalResourceId"`
+	Name        string                `json:"name"`
+	Category    KnowledgeBaseCategory `json:"category"`
+	Description string                `json:"description"`
 }
 
 // KnowledgeGroupInput 定义知识库分组可编辑字段。
@@ -65,137 +38,16 @@ type KnowledgeGroup struct {
 
 // KnowledgeBase 定义知识库详情。
 type KnowledgeBase struct {
-	ID                      string                              `json:"id"`
-	Name                    string                              `json:"name"`
-	Category                KnowledgeBaseCategory               `json:"category"`
-	Description             string                              `json:"description"`
-	IntegrationConnectionID string                              `json:"integrationConnectionId"`
-	ExternalResourceID      string                              `json:"externalResourceId"`
-	ExternalConfiguration   *ExternalKnowledgeBaseConfiguration `json:"externalConfiguration"`
-	Groups                  []KnowledgeGroup                    `json:"groups"`
-	CreatedAt               time.Time                           `json:"createdAt"`
-	UpdatedAt               time.Time                           `json:"updatedAt"`
-}
-
-// ExternalKnowledgeBaseConfiguration 定义外部知识库的主要运行配置。
-type ExternalKnowledgeBaseConfiguration struct {
-	IndexingTechnique      string   `json:"indexingTechnique"`
-	DocumentCount          int      `json:"documentCount"`
-	WordCount              int      `json:"wordCount"`
-	EmbeddingModel         string   `json:"embeddingModel"`
-	EmbeddingModelProvider string   `json:"embeddingModelProvider"`
-	RetrievalMethod        string   `json:"retrievalMethod"`
-	TopK                   int      `json:"topK"`
-	ScoreThresholdEnabled  bool     `json:"scoreThresholdEnabled"`
-	ScoreThreshold         *float64 `json:"scoreThreshold"`
-	RerankingEnabled       bool     `json:"rerankingEnabled"`
-	RerankingModel         string   `json:"rerankingModel"`
-	RerankingProvider      string   `json:"rerankingProvider"`
+	ID          string                `json:"id"`
+	Name        string                `json:"name"`
+	Category    KnowledgeBaseCategory `json:"category"`
+	Description string                `json:"description"`
+	Groups      []KnowledgeGroup      `json:"groups"`
+	CreatedAt   time.Time             `json:"createdAt"`
+	UpdatedAt   time.Time             `json:"updatedAt"`
 }
 
 // KnowledgeBaseList 定义知识库列表。
 type KnowledgeBaseList struct {
 	KnowledgeBases []KnowledgeBase `json:"knowledgeBases"`
-}
-
-// ExternalKnowledgeBaseOption 定义外部知识库选择项。
-type ExternalKnowledgeBaseOption struct {
-	ID       string                `json:"id"`
-	Name     string                `json:"name"`
-	Category KnowledgeBaseCategory `json:"category"`
-}
-
-// ExternalKnowledgeBaseOptionList 定义外部知识库选择项列表。
-type ExternalKnowledgeBaseOptionList struct {
-	KnowledgeBases []ExternalKnowledgeBaseOption `json:"knowledgeBases"`
-}
-
-// KnowledgeDocumentListInput 定义知识文档列表查询条件。
-type KnowledgeDocumentListInput struct {
-	Keyword  string                   `json:"keyword" query:"keyword"`
-	Status   *KnowledgeDocumentStatus `json:"status,omitempty" query:"status"`
-	Page     int                      `json:"page" query:"page,default=1"`
-	PageSize int                      `json:"pageSize" query:"pageSize,default=20"`
-}
-
-// KnowledgeDocumentSummary 定义知识文档列表项。
-type KnowledgeDocumentSummary struct {
-	ID        string                  `json:"id"`
-	Name      string                  `json:"name"`
-	Status    KnowledgeDocumentStatus `json:"status"`
-	WordCount *int                    `json:"wordCount"`
-	HitCount  int                     `json:"hitCount"`
-	CreatedAt *time.Time              `json:"createdAt"`
-}
-
-// KnowledgeDocumentList 定义知识文档分页结果。
-type KnowledgeDocumentList struct {
-	Documents []KnowledgeDocumentSummary `json:"documents"`
-	Page      PageInfo                   `json:"page"`
-}
-
-// KnowledgeDocument 定义知识文档详情。
-type KnowledgeDocument struct {
-	ID        string                  `json:"id"`
-	Name      string                  `json:"name"`
-	Status    KnowledgeDocumentStatus `json:"status"`
-	WordCount *int                    `json:"wordCount"`
-	HitCount  int                     `json:"hitCount"`
-	CreatedAt *time.Time              `json:"createdAt"`
-}
-
-// KnowledgeDocumentSegmentListInput 定义知识文档分段列表查询条件。
-type KnowledgeDocumentSegmentListInput struct {
-	SegmentID string                               `json:"segmentId" query:"segmentId"`
-	Position  int                                  `json:"position" query:"position,default=0"`
-	Keyword   string                               `json:"keyword" query:"keyword"`
-	Status    *KnowledgeDocumentSegmentIndexStatus `json:"status,omitempty" query:"status"`
-	Page      int                                  `json:"page" query:"page,default=1"`
-	PageSize  int                                  `json:"pageSize" query:"pageSize,default=20"`
-}
-
-// KnowledgeDocumentSegment 定义知识文档分段列表项。
-type KnowledgeDocumentSegment struct {
-	ID          string                              `json:"id"`
-	Position    int                                 `json:"position"`
-	Content     string                              `json:"content"`
-	Answer      *string                             `json:"answer"`
-	WordCount   int                                 `json:"wordCount"`
-	HitCount    int                                 `json:"hitCount"`
-	IndexStatus KnowledgeDocumentSegmentIndexStatus `json:"indexStatus"`
-	CreatedAt   *time.Time                          `json:"createdAt"`
-}
-
-// KnowledgeDocumentSegmentList 定义知识文档分段分页结果。
-type KnowledgeDocumentSegmentList struct {
-	Segments []KnowledgeDocumentSegment `json:"segments"`
-	Page     PageInfo                   `json:"page"`
-}
-
-// KnowledgeRetrievalInput 定义知识库检索条件。
-type KnowledgeRetrievalInput struct {
-	Query string `json:"query"`
-}
-
-// KnowledgeRetrievalRecord 定义知识库检索命中项。
-type KnowledgeRetrievalRecord struct {
-	DocumentID   string   `json:"documentId"`
-	DocumentName string   `json:"documentName"`
-	SegmentID    string   `json:"segmentId"`
-	Position     int      `json:"position"`
-	Content      string   `json:"content"`
-	Answer       *string  `json:"answer"`
-	Score        *float64 `json:"score"`
-}
-
-// KnowledgeRetrievalResult 定义知识库检索结果。
-type KnowledgeRetrievalResult struct {
-	Records []KnowledgeRetrievalRecord `json:"records"`
-}
-
-// KnowledgeDocumentFile 定义原文件预览响应，Content 为 Base64 编码的原始内容。
-type KnowledgeDocumentFile struct {
-	Available bool   `json:"available"`
-	Name      string `json:"name"`
-	Content   string `json:"content"`
 }

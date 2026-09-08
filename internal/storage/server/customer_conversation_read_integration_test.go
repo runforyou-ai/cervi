@@ -125,7 +125,7 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 			t.Fatalf("monotonic read: %+v %v", state, err)
 		}
 	}
-	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, nil)
+	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil)
 	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}

@@ -10,13 +10,7 @@ import {
   DeleteKnowledgeBase,
   DeleteKnowledgeGroup,
   GetKnowledgeBase,
-  GetKnowledgeDocument,
-  ListExternalKnowledgeBaseOptions,
   ListKnowledgeBases,
-  ListKnowledgeDocumentSegments,
-  ListKnowledgeDocuments,
-  GetKnowledgeDocumentFile,
-  RetrieveKnowledgeBase,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -28,26 +22,12 @@ import {
   type KnowledgeQASimilarQuestion,
   type KnowledgeQASummary,
   KnowledgeBaseCategory,
-  KnowledgeDocumentSegmentIndexStatus,
-  KnowledgeDocumentStatus,
-  type ExternalKnowledgeBaseOption,
-  type ExternalKnowledgeBaseOptionList,
   type KnowledgeBase,
   type KnowledgeBaseInput,
   type KnowledgeBaseList,
-  type KnowledgeDocument,
-  type KnowledgeDocumentList,
-  type KnowledgeDocumentListInput,
-  type KnowledgeDocumentSegment,
-  type KnowledgeDocumentSegmentList,
-  type KnowledgeDocumentSegmentListInput,
-  type KnowledgeDocumentSummary,
   type KnowledgeGroup,
   type KnowledgeGroupInput,
 
-  type KnowledgeRetrievalInput,
-  type KnowledgeRetrievalRecord,
-  type KnowledgeRetrievalResult,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import { asList } from "@/api/normalize"
@@ -73,78 +53,6 @@ export type KnowledgeBaseListData = Omit<
   knowledgeBases: KnowledgeBaseData[]
 }
 
-export type ExternalKnowledgeBaseOptionData = Omit<
-  ExternalKnowledgeBaseOption,
-  "category"
-> & {
-  category: KnowledgeBaseCategoryId
-}
-
-export type ExternalKnowledgeBaseOptionListData = Omit<
-  ExternalKnowledgeBaseOptionList,
-  "knowledgeBases"
-> & {
-  knowledgeBases: ExternalKnowledgeBaseOptionData[]
-}
-
-export type KnowledgeDocumentStatusId = Exclude<
-  KnowledgeDocumentStatus,
-  KnowledgeDocumentStatus.$zero
->
-
-export type KnowledgeDocumentData = Omit<
-  KnowledgeDocumentSummary,
-  "status"
-> & {
-  status: KnowledgeDocumentStatusId
-}
-
-export type KnowledgeDocumentListData = Omit<
-  KnowledgeDocumentList,
-  "documents"
-> & {
-  documents: KnowledgeDocumentData[]
-}
-
-export type KnowledgeDocumentListQuery = Partial<KnowledgeDocumentListInput>
-
-export type KnowledgeDocumentDetailData = Omit<
-  KnowledgeDocument,
-  "status"
-> & {
-  status: KnowledgeDocumentStatusId
-}
-
-export type KnowledgeDocumentSegmentIndexStatusId = Exclude<
-  KnowledgeDocumentSegmentIndexStatus,
-  KnowledgeDocumentSegmentIndexStatus.$zero
->
-
-export type KnowledgeDocumentSegmentData = Omit<
-  KnowledgeDocumentSegment,
-  "indexStatus"
-> & {
-  indexStatus: KnowledgeDocumentSegmentIndexStatusId
-}
-
-export type KnowledgeDocumentSegmentListData = Omit<
-  KnowledgeDocumentSegmentList,
-  "segments"
-> & {
-  segments: KnowledgeDocumentSegmentData[]
-}
-
-export type KnowledgeDocumentSegmentListQuery = Partial<
-  KnowledgeDocumentSegmentListInput
->
-
-export type KnowledgeRetrievalResultData = Omit<
-  KnowledgeRetrievalResult,
-  "records"
-> & {
-  records: KnowledgeRetrievalRecord[]
-}
-
 const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
 const getKnowledgeBaseBound = bind(GetKnowledgeBase)
 const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
@@ -152,16 +60,6 @@ const createKnowledgeGroupBound = bind(CreateKnowledgeGroup)
 const updateKnowledgeGroupBound = bind(UpdateKnowledgeGroup)
 const deleteKnowledgeGroupBound = bind(DeleteKnowledgeGroup)
 const listKnowledgeBasesBound = bind(ListKnowledgeBases)
-const listExternalKnowledgeBaseOptionsBound = bind(
-  ListExternalKnowledgeBaseOptions,
-)
-const listKnowledgeDocumentsBound = bind(ListKnowledgeDocuments)
-const getKnowledgeDocumentBound = bind(GetKnowledgeDocument)
-const listKnowledgeDocumentSegmentsBound = bind(ListKnowledgeDocumentSegments)
-const retrieveKnowledgeBaseBound = bind(RetrieveKnowledgeBase)
-/** 读取文档的原始文件。 */
-export const getKnowledgeDocumentFile = bind(GetKnowledgeDocumentFile)
-
 /** 创建企业知识库。 */
 export function createKnowledgeBase(
   input: KnowledgeBaseInput,
@@ -228,97 +126,6 @@ export function listKnowledgeBases(): Promise<KnowledgeBaseListData> {
   return listKnowledgeBasesBound().then((output) => ({
     ...output,
     knowledgeBases: asList(output.knowledgeBases).map(normalizeKnowledgeBase),
-  }))
-}
-
-/** 读取指定 Dify 连接可访问的知识库选项。 */
-export function listExternalKnowledgeBaseOptions(
-  connectionId: string,
-): Promise<ExternalKnowledgeBaseOptionListData> {
-  return listExternalKnowledgeBaseOptionsBound(connectionId).then((output) => ({
-    ...output,
-    knowledgeBases: asList(output.knowledgeBases).map((knowledgeBase) => ({
-      ...knowledgeBase,
-      category: knowledgeBase.category as KnowledgeBaseCategoryId,
-    })),
-  }))
-}
-
-/** 读取指定外部知识库的一页文档。 */
-export function listKnowledgeDocuments(
-  knowledgeBaseId: string,
-  query: KnowledgeDocumentListQuery = {},
-  signal?: AbortSignal,
-): Promise<KnowledgeDocumentListData> {
-  return listKnowledgeDocumentsBound(
-    knowledgeBaseId,
-    {
-      keyword: query.keyword ?? "",
-      status: query.status ?? null,
-      page: query.page ?? 1,
-      pageSize: query.pageSize ?? 20,
-    },
-    signal,
-  ).then((output) => ({
-    ...output,
-    documents: asList(output.documents).map((document) => ({
-      ...document,
-      status: document.status as KnowledgeDocumentStatusId,
-    })),
-  }))
-}
-
-/** 读取指定外部知识文档详情。 */
-export function getKnowledgeDocument(
-  knowledgeBaseId: string,
-  documentId: string,
-  signal?: AbortSignal,
-): Promise<KnowledgeDocumentDetailData> {
-  return getKnowledgeDocumentBound(knowledgeBaseId, documentId, signal).then(
-    (document) => ({
-      ...document,
-      status: document.status as KnowledgeDocumentStatusId,
-    }),
-  )
-}
-
-/** 读取指定外部知识文档的一页分段。 */
-export function listKnowledgeDocumentSegments(
-  knowledgeBaseId: string,
-  documentId: string,
-  query: KnowledgeDocumentSegmentListQuery = {},
-  signal?: AbortSignal,
-): Promise<KnowledgeDocumentSegmentListData> {
-  return listKnowledgeDocumentSegmentsBound(
-    knowledgeBaseId,
-    documentId,
-    {
-      keyword: query.keyword ?? "",
-      status: query.status ?? null,
-      segmentId: query.segmentId ?? "",
-      position: query.position ?? 0,
-      page: query.page ?? 1,
-      pageSize: query.pageSize ?? 20,
-    },
-    signal,
-  ).then((output) => ({
-    ...output,
-    segments: asList(output.segments).map((segment) => ({
-      ...segment,
-      indexStatus:
-        segment.indexStatus as KnowledgeDocumentSegmentIndexStatusId,
-    })),
-  }))
-}
-
-/** 检索指定外部知识库并归一化命中列表。 */
-export function retrieveKnowledgeBase(
-  knowledgeBaseId: string,
-  input: KnowledgeRetrievalInput,
-): Promise<KnowledgeRetrievalResultData> {
-  return retrieveKnowledgeBaseBound(knowledgeBaseId, input).then((output) => ({
-    ...output,
-    records: asList(output.records),
   }))
 }
 

@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   CircleHelpIcon,
-  CloudIcon,
   FileTextIcon,
   FolderIcon,
   MoreHorizontalIcon,
@@ -196,12 +195,6 @@ export function KnowledgeBaseLayout() {
                       {t("sidebar.createQA")}
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/knowledge-bases/new?source=dify">
-                      <CloudIcon />
-                      {t("sidebar.createDify")}
-                    </Link>
-                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             }
@@ -346,8 +339,6 @@ function KnowledgeBaseTree({
   const path = `/knowledge-bases/${knowledgeBase.id}`
   const isQA =
     knowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
-  const isExternal = knowledgeBase.integrationConnectionId !== ""
-  const contentPath = `${path}/documents`
   const active = currentPath === path
   const categoryLabel = isQA
     ? t("category.qaShort")
@@ -371,12 +362,7 @@ function KnowledgeBaseTree({
           {isQA ? <CircleHelpIcon /> : <FileTextIcon />}
           <span className="truncate">{knowledgeBase.name}</span>
           <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
-            {isExternal
-              ? t("sidebar.externalCategory", {
-                  source: t("source.dify"),
-                  category: categoryLabel,
-                })
-              : categoryLabel}
+            {categoryLabel}
           </span>
         </Link>
         <DropdownMenu>
@@ -392,14 +378,10 @@ function KnowledgeBaseTree({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {!isExternal ? (
-              <>
-                <DropdownMenuItem onSelect={() => onCreateGroup()}>
-                  {t("sidebar.addGroup")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            ) : null}
+            <DropdownMenuItem onSelect={() => onCreateGroup()}>
+              {t("sidebar.addGroup")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem destructive onSelect={onDeleteKnowledgeBase}>
               {t("sidebar.delete")}
             </DropdownMenuItem>
@@ -408,20 +390,7 @@ function KnowledgeBaseTree({
       </div>
 
       <div className="mt-1 ml-3 border-l pl-2">
-        {isExternal ? (
-          <Link
-            to={contentPath}
-            className={cn(
-              "flex h-8 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              (currentPath === contentPath ||
-                currentPath.startsWith(`${contentPath}/`)) &&
-                "bg-sidebar-accent/60 font-medium text-sidebar-accent-foreground",
-            )}
-          >
-            <FolderIcon className="size-3.5 shrink-0" />
-            <span className="truncate">{t("group.default")}</span>
-          </Link>
-        ) : isQA && defaultGroup ? (
+        {isQA && defaultGroup ? (
           <Link
             to={`${path}/groups/${defaultGroup.id}/qa`}
             className={cn(
@@ -444,7 +413,7 @@ function KnowledgeBaseTree({
             <KnowledgeGroupTreeRow
               group={group}
               contentPath={
-                isQA && !isExternal
+                isQA
                   ? `${path}/groups/${group.id}/qa`
                   : undefined
               }
@@ -458,7 +427,7 @@ function KnowledgeBaseTree({
                 <KnowledgeGroupTreeRow
                   group={child}
                   contentPath={
-                    isQA && !isExternal
+                    isQA
                       ? `${path}/groups/${child.id}/qa`
                       : undefined
                   }

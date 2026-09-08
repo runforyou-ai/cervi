@@ -38,7 +38,7 @@ func TestAgentCallbacksFenceTaskAttempts(t *testing.T) {
 		Set("lease_expires_at = now() + interval '1 hour'").Where("id = ?", taskID).Returning("*").Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	executor := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
+	executor := agentrunaction.NewExecuteAction(db, tasks, nil)
 	old := current
 	old.Attempt = 1
 	oldWorker := "old-worker"
@@ -209,7 +209,7 @@ func TestCustomerCallbacksFenceTaskAttempts(t *testing.T) {
 	if err := db.NewUpdate().Model(&current).Set("status = 'running'").Set("attempt = 2").Set("worker_id = 'customer-worker'").Set("lease_expires_at = now() + interval '1 hour'").Where("id = ?", taskID).Returning("*").Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	executor := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
+	executor := agentrunaction.NewExecuteAction(db, tasks, nil)
 	for _, kind := range []string{"旧尝试", "旧Worker", "过期租约"} {
 		stale := current
 		switch kind {

@@ -4,17 +4,13 @@ package appservice
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"log/slog"
-	"strings"
-	"time"
 
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
 // ListKnowledgeBases 返回当前企业的知识库列表。
@@ -32,223 +28,6 @@ func (b *DirectBackend) ListKnowledgeBases(ctx context.Context, meta RequestMeta
 		knowledgeBases = append(knowledgeBases, knowledgeBaseFromAction(record))
 	}
 	return KnowledgeBaseList{KnowledgeBases: knowledgeBases}, nil
-}
-
-// ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
-func (b *DirectBackend) ListExternalKnowledgeBaseOptions(
-	ctx context.Context,
-	meta RequestMeta,
-	connectionID string,
-) (ExternalKnowledgeBaseOptionList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ExternalKnowledgeBaseOptionList{}, err
-	}
-	records, err := b.listExternalKnowledgeBaseOptions.Execute(ctx, identity, connectionID)
-	if err != nil {
-		if ctx.Err() != nil {
-			return ExternalKnowledgeBaseOptionList{}, ctx.Err()
-		}
-		if stage, kind, classified := connectiontest.Details(err); classified {
-			slog.Warn("Dify 知识库列表读取失败",
-				"organization_id", identity.Organization.ID,
-				"connection_id", connectionID,
-				"stage", stage,
-				"kind", kind,
-			)
-			return ExternalKnowledgeBaseOptionList{}, integrationConnectionRemoteError(meta, err)
-		}
-		return ExternalKnowledgeBaseOptionList{}, b.knowledgeBaseError(
-			ctx, meta, err, cervii18n.ErrorKnowledgeBaseListFailed, identity.Organization.ID, "",
-		)
-	}
-	knowledgeBases := make([]ExternalKnowledgeBaseOption, 0, len(records))
-	for _, record := range records {
-		knowledgeBases = append(knowledgeBases, ExternalKnowledgeBaseOption{
-			ID: record.ID, Name: record.Name, Category: KnowledgeBaseCategory(record.Category),
-		})
-	}
-	slog.Info("Dify 知识库列表读取成功",
-		"organization_id", identity.Organization.ID,
-		"connection_id", connectionID,
-		"knowledge_base_count", len(knowledgeBases),
-	)
-	return ExternalKnowledgeBaseOptionList{KnowledgeBases: knowledgeBases}, nil
-}
-
-// ListKnowledgeDocuments 返回指定外部知识库的文档列表。
-func (b *DirectBackend) ListKnowledgeDocuments(
-	ctx context.Context,
-	meta RequestMeta,
-	knowledgeBaseID string,
-	input KnowledgeDocumentListInput,
-) (KnowledgeDocumentList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return KnowledgeDocumentList{}, err
-	}
-	output, err := b.listKnowledgeDocuments.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.DocumentListInput{
-		Keyword: input.Keyword, Status: optionalDomain[KnowledgeDocumentStatus, domain.KnowledgeDocumentStatus](input.Status),
-		Page: input.Page, PageSize: input.PageSize,
-	})
-	if err != nil {
-		return KnowledgeDocumentList{}, b.knowledgeDocumentReadError(
-			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentListFailed,
-			identity.Organization.ID, knowledgeBaseID, "",
-		)
-	}
-	documents := make([]KnowledgeDocumentSummary, 0, len(output.Documents))
-	for _, document := range output.Documents {
-		documents = append(documents, KnowledgeDocumentSummary{
-			ID: document.ID, Name: document.Name, Status: KnowledgeDocumentStatus(document.Status),
-			WordCount: document.WordCount, HitCount: document.HitCount, CreatedAt: document.CreatedAt,
-		})
-	}
-	slog.Info("Dify 知识文档列表读取成功",
-		"organization_id", identity.Organization.ID,
-		"knowledge_base_id", knowledgeBaseID,
-		"page", output.Page,
-		"page_size", output.PageSize,
-		"page_document_count", len(documents),
-		"total_document_count", output.Total,
-		"keyword_filtered", strings.TrimSpace(input.Keyword) != "",
-		"status", optionalDomain[KnowledgeDocumentStatus, string](input.Status),
-	)
-	return KnowledgeDocumentList{
-		Documents: documents,
-		Page:      PageInfo{Number: output.Page, Size: output.PageSize, Total: output.Total},
-	}, nil
-}
-
-// GetKnowledgeDocument 返回指定外部知识文档详情。
-func (b *DirectBackend) GetKnowledgeDocument(
-	ctx context.Context,
-	meta RequestMeta,
-	knowledgeBaseID, documentID string,
-) (KnowledgeDocument, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return KnowledgeDocument{}, err
-	}
-	record, err := b.getKnowledgeDocument.Execute(ctx, identity, knowledgeBaseID, documentID)
-	if err != nil {
-		return KnowledgeDocument{}, b.knowledgeDocumentReadError(
-			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed,
-			identity.Organization.ID, knowledgeBaseID, documentID,
-		)
-	}
-	slog.Info("Dify 知识文档读取成功",
-		"organization_id", identity.Organization.ID,
-		"knowledge_base_id", knowledgeBaseID,
-		"document_id", documentID,
-	)
-	return KnowledgeDocument{
-		ID: record.ID, Name: record.Name, Status: KnowledgeDocumentStatus(record.Status),
-		WordCount: record.WordCount, HitCount: record.HitCount, CreatedAt: record.CreatedAt,
-	}, nil
-}
-
-// ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
-func (b *DirectBackend) ListKnowledgeDocumentSegments(
-	ctx context.Context,
-	meta RequestMeta,
-	knowledgeBaseID, documentID string,
-	input KnowledgeDocumentSegmentListInput,
-) (KnowledgeDocumentSegmentList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return KnowledgeDocumentSegmentList{}, err
-	}
-	output, err := b.listKnowledgeDocumentSegments.Execute(
-		ctx,
-		identity,
-		knowledgeBaseID,
-		documentID,
-		knowledgebaseaction.DocumentSegmentListInput{
-			SegmentID: input.SegmentID, Position: input.Position,
-			Keyword: input.Keyword,
-			Status: optionalDomain[
-				KnowledgeDocumentSegmentIndexStatus,
-				domain.KnowledgeDocumentSegmentIndexStatus,
-			](input.Status),
-			Page: input.Page, PageSize: input.PageSize,
-		},
-	)
-	if err != nil {
-		if _, kind, _ := connectiontest.Details(err); input.SegmentID != "" && kind == connectiontest.FailureNotFound {
-			slog.Warn("知识文档命中分段已失效", "organization_id", identity.Organization.ID, "knowledge_base_id", knowledgeBaseID, "document_id", documentID, "segment_id", input.SegmentID, "position", input.Position)
-			return KnowledgeDocumentSegmentList{}, NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentSegmentNotFound)
-		}
-		return KnowledgeDocumentSegmentList{}, b.knowledgeDocumentReadError(
-			ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSegmentListFailed,
-			identity.Organization.ID, knowledgeBaseID, documentID,
-		)
-	}
-	segments := make([]KnowledgeDocumentSegment, 0, len(output.Segments))
-	for _, segment := range output.Segments {
-		segments = append(segments, KnowledgeDocumentSegment{
-			ID: segment.ID, Position: segment.Position, Content: segment.Content, Answer: segment.Answer,
-			WordCount: segment.WordCount, HitCount: segment.HitCount,
-			IndexStatus: KnowledgeDocumentSegmentIndexStatus(segment.IndexStatus),
-			CreatedAt:   segment.CreatedAt,
-		})
-	}
-	slog.Info("Dify 知识文档分段列表读取成功",
-		"organization_id", identity.Organization.ID,
-		"knowledge_base_id", knowledgeBaseID,
-		"document_id", documentID,
-		"page", output.Page,
-		"page_size", output.PageSize,
-		"page_segment_count", len(segments),
-		"total_segment_count", output.Total,
-		"keyword_filtered", strings.TrimSpace(input.Keyword) != "",
-		"index_status", optionalDomain[KnowledgeDocumentSegmentIndexStatus, string](input.Status),
-	)
-	return KnowledgeDocumentSegmentList{
-		Segments: segments,
-		Page:     PageInfo{Number: output.Page, Size: output.PageSize, Total: output.Total},
-	}, nil
-}
-
-// RetrieveKnowledgeBase 检索指定外部知识库。
-func (b *DirectBackend) RetrieveKnowledgeBase(
-	ctx context.Context,
-	meta RequestMeta,
-	knowledgeBaseID string,
-	input KnowledgeRetrievalInput,
-) (KnowledgeRetrievalResult, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return KnowledgeRetrievalResult{}, err
-	}
-	startedAt := time.Now()
-	records, err := b.retrieveKnowledgeBase.Execute(
-		ctx,
-		identity,
-		knowledgeBaseID,
-		knowledgebaseaction.RetrievalInput{Query: input.Query},
-	)
-	if err != nil {
-		return KnowledgeRetrievalResult{}, b.knowledgeRetrievalError(
-			ctx, meta, err, identity.Organization.ID, knowledgeBaseID,
-			time.Since(startedAt), input,
-		)
-	}
-	output := make([]KnowledgeRetrievalRecord, 0, len(records))
-	for _, record := range records {
-		output = append(output, KnowledgeRetrievalRecord{
-			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
-			SegmentID: record.SegmentID, Position: record.Position,
-			Content: record.Content, Answer: record.Answer, Score: record.Score,
-		})
-	}
-	slog.Info("Dify 知识库检索成功",
-		"organization_id", identity.Organization.ID,
-		"knowledge_base_id", knowledgeBaseID,
-		"result_count", len(output),
-		"duration_ms", time.Since(startedAt).Milliseconds(),
-	)
-	return KnowledgeRetrievalResult{Records: output}, nil
 }
 
 // GetKnowledgeBase 返回当前企业中的知识库详情。
@@ -272,12 +51,11 @@ func (b *DirectBackend) CreateKnowledgeBase(ctx context.Context, meta RequestMet
 	}
 	record, err := b.createKnowledgeBase.Execute(ctx, identity, knowledgebaseaction.Input{
 		Name: input.Name, Category: domain.KnowledgeBaseCategory(input.Category), Description: input.Description,
-		IntegrationConnectionID: input.IntegrationConnectionID, ExternalResourceID: input.ExternalResourceID,
 	})
 	if err != nil {
 		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseCreateFailed, identity.Organization.ID, "")
 	}
-	slog.Info("知识库创建成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "category", record.Category, "external", record.IntegrationConnectionID != "")
+	slog.Info("知识库创建成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "category", record.Category)
 	return knowledgeBaseFromAction(*record), nil
 }
 
@@ -289,12 +67,11 @@ func (b *DirectBackend) UpdateKnowledgeBase(ctx context.Context, meta RequestMet
 	}
 	record, err := b.updateKnowledgeBase.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.Input{
 		Name: input.Name, Category: domain.KnowledgeBaseCategory(input.Category), Description: input.Description,
-		IntegrationConnectionID: input.IntegrationConnectionID, ExternalResourceID: input.ExternalResourceID,
 	})
 	if err != nil {
 		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseUpdateFailed, identity.Organization.ID, knowledgeBaseID)
 	}
-	slog.Info("知识库保存成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "category", record.Category, "external", record.IntegrationConnectionID != "")
+	slog.Info("知识库保存成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "category", record.Category)
 	return knowledgeBaseFromAction(*record), nil
 }
 
@@ -385,15 +162,6 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 	if errors.Is(err, knowledgebaseaction.ErrGroupNotEmpty) {
 		return InvalidError(meta, cervii18n.ErrorKnowledgeGroupNotEmpty, nil)
 	}
-	if errors.Is(err, knowledgebaseaction.ErrExternalGroupUnsupported) {
-		return InvalidError(meta, cervii18n.ErrorKnowledgeGroupExternalUnsupported, nil)
-	}
-	if errors.Is(err, knowledgebaseaction.ErrDocumentNotFound) {
-		return NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentNotFound)
-	}
-	if errors.Is(err, knowledgebaseaction.ErrDocumentReadUnsupported) {
-		return InvalidError(meta, cervii18n.ErrorKnowledgeDocumentReadUnsupported, nil)
-	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if knowledgeBaseID != "" {
 		attributes = append(attributes, "knowledge_base_id", knowledgeBaseID)
@@ -402,121 +170,12 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 	return FailedError(meta, failureKey)
 }
 
-// knowledgeDocumentReadError 转换知识文档远程读取错误并保留本地知识库错误语义。
-func (b *DirectBackend) knowledgeDocumentReadError(
-	ctx context.Context,
-	meta RequestMeta,
-	err error,
-	failureKey cervii18n.Key,
-	organizationID, knowledgeBaseID, documentID string,
-) error {
-	return b.knowledgeRemoteReadError(
-		ctx, meta, err, failureKey, organizationID, knowledgeBaseID, documentID,
-		"Dify 知识文档读取失败",
-	)
-}
-
-// knowledgeRetrievalError 转换知识库远程检索错误并保留本地知识库错误语义。
-func (b *DirectBackend) knowledgeRetrievalError(
-	ctx context.Context,
-	meta RequestMeta,
-	err error,
-	organizationID, knowledgeBaseID string,
-	duration time.Duration,
-	input KnowledgeRetrievalInput,
-) error {
-	return b.knowledgeRemoteReadError(
-		ctx, meta, err, cervii18n.ErrorKnowledgeRetrievalFailed,
-		organizationID, knowledgeBaseID, "", "Dify 知识库检索失败",
-		"duration_ms", duration.Milliseconds(),
-	)
-}
-
-// knowledgeRemoteReadError 转换 Dify 只读能力错误并保留本地知识库错误语义。
-func (b *DirectBackend) knowledgeRemoteReadError(
-	ctx context.Context,
-	meta RequestMeta,
-	err error,
-	failureKey cervii18n.Key,
-	organizationID, knowledgeBaseID, documentID, logMessage string,
-	additionalAttributes ...any,
-) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if stage, kind, classified := connectiontest.Details(err); classified {
-		attributes := []any{
-			"organization_id", organizationID,
-			"knowledge_base_id", knowledgeBaseID,
-			"stage", stage,
-			"kind", kind,
-		}
-		if documentID != "" {
-			attributes = append(attributes, "document_id", documentID)
-		}
-		attributes = append(attributes, additionalAttributes...)
-		attributes = append(attributes, "error", err)
-		slog.Warn(logMessage, attributes...)
-		if kind == connectiontest.FailureNotFound && documentID != "" {
-			return NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentNotFound)
-		}
-		switch kind {
-		case connectiontest.FailureUnauthorized,
-			connectiontest.FailureForbidden,
-			connectiontest.FailureRateLimited,
-			connectiontest.FailureTimeout,
-			connectiontest.FailureNetwork,
-			connectiontest.FailureTLS,
-			connectiontest.FailureUnavailable:
-			return integrationConnectionRemoteError(meta, err)
-		default:
-			return FailedError(meta, failureKey).WithReason(err.Error())
-		}
-	}
-	return b.knowledgeBaseError(ctx, meta, err, failureKey, organizationID, knowledgeBaseID)
-}
-
-// GetKnowledgeDocumentFile 读取原始文件并通过统一契约传送预览内容。
-func (b *DirectBackend) GetKnowledgeDocumentFile(ctx context.Context, meta RequestMeta, knowledgeBaseID, documentID string) (KnowledgeDocumentFile, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return KnowledgeDocumentFile{}, err
-	}
-	file, err := b.getKnowledgeDocumentFile.Execute(ctx, identity, knowledgeBaseID, documentID)
-	if err != nil {
-		return KnowledgeDocumentFile{}, b.knowledgeDocumentReadError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, knowledgeBaseID, documentID)
-	}
-	if file == nil {
-		return KnowledgeDocumentFile{}, nil
-	}
-	return KnowledgeDocumentFile{Available: true, Name: file.Name, Content: base64.StdEncoding.EncodeToString(file.Content)}, nil
-}
-
 // knowledgeBaseFromAction 转换知识库契约。
 func knowledgeBaseFromAction(record knowledgebaseaction.Record) KnowledgeBase {
-	var externalConfiguration *ExternalKnowledgeBaseConfiguration
-	if record.ExternalConfiguration != nil {
-		externalConfiguration = &ExternalKnowledgeBaseConfiguration{
-			IndexingTechnique:      record.ExternalConfiguration.IndexingTechnique,
-			DocumentCount:          record.ExternalConfiguration.DocumentCount,
-			WordCount:              record.ExternalConfiguration.WordCount,
-			EmbeddingModel:         record.ExternalConfiguration.EmbeddingModel,
-			EmbeddingModelProvider: record.ExternalConfiguration.EmbeddingModelProvider,
-			RetrievalMethod:        record.ExternalConfiguration.RetrievalMethod,
-			TopK:                   record.ExternalConfiguration.TopK,
-			ScoreThresholdEnabled:  record.ExternalConfiguration.ScoreThresholdEnabled,
-			ScoreThreshold:         record.ExternalConfiguration.ScoreThreshold,
-			RerankingEnabled:       record.ExternalConfiguration.RerankingEnabled,
-			RerankingModel:         record.ExternalConfiguration.RerankingModel,
-			RerankingProvider:      record.ExternalConfiguration.RerankingProvider,
-		}
-	}
 	return KnowledgeBase{
 		ID: record.ID, Name: record.Name, Category: KnowledgeBaseCategory(record.Category), Description: record.Description,
-		IntegrationConnectionID: record.IntegrationConnectionID, ExternalResourceID: record.ExternalResourceID,
-		ExternalConfiguration: externalConfiguration,
-		Groups:                knowledgeGroupsFromAction(record.Groups),
-		CreatedAt:             record.CreatedAt, UpdatedAt: record.UpdatedAt,
+		Groups:    knowledgeGroupsFromAction(record.Groups),
+		CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 	}
 }
 
@@ -539,26 +198,19 @@ func knowledgeGroupsFromAction(records []knowledgebaseaction.GroupRecord) []Know
 // knowledgeBaseFieldKeys 把知识库校验错误码映射为本地化文案键。
 func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		knowledgebaseaction.ValidationQAQuestionRequired:           cervii18n.FieldKnowledgeQAQuestionRequired,
-		knowledgebaseaction.ValidationQAAnswerRequired:             cervii18n.FieldKnowledgeQAAnswerRequired,
-		knowledgebaseaction.ValidationQAGroupInvalid:               cervii18n.FieldKnowledgeQAGroupInvalid,
-		knowledgebaseaction.ValidationQAContentInvalid:             cervii18n.FieldKnowledgeQAContentInvalid,
-		knowledgebaseaction.ValidationNameRequired:                 cervii18n.FieldKnowledgeBaseNameRequired,
-		knowledgebaseaction.ValidationNameTooLong:                  cervii18n.FieldKnowledgeBaseNameTooLong,
-		knowledgebaseaction.ValidationNameDuplicate:                cervii18n.FieldKnowledgeBaseNameDuplicate,
-		knowledgebaseaction.ValidationCategoryInvalid:              cervii18n.FieldKnowledgeBaseCategoryInvalid,
-		knowledgebaseaction.ValidationDescriptionTooLong:           cervii18n.FieldKnowledgeBaseDescriptionTooLong,
-		knowledgebaseaction.ValidationIntegrationConnectionInvalid: cervii18n.FieldKnowledgeBaseIntegrationConnectionInvalid,
-		knowledgebaseaction.ValidationExternalResourceRequired:     cervii18n.FieldKnowledgeBaseExternalResourceRequired,
-		knowledgebaseaction.ValidationExternalResourceTooLong:      cervii18n.FieldKnowledgeBaseExternalResourceTooLong,
-		knowledgebaseaction.ValidationExternalResourceDuplicate:    cervii18n.FieldKnowledgeBaseExternalResourceDuplicate,
-		knowledgebaseaction.ValidationGroupNameRequired:            cervii18n.FieldKnowledgeGroupNameRequired,
-		knowledgebaseaction.ValidationGroupNameTooLong:             cervii18n.FieldKnowledgeGroupNameTooLong,
-		knowledgebaseaction.ValidationGroupNameDuplicate:           cervii18n.FieldKnowledgeGroupNameDuplicate,
-		knowledgebaseaction.ValidationGroupParentInvalid:           cervii18n.FieldKnowledgeGroupParentInvalid,
-		knowledgebaseaction.ValidationDocumentQueryInvalid:         cervii18n.FieldKnowledgeDocumentQueryInvalid,
-		knowledgebaseaction.ValidationRetrievalQueryRequired:       cervii18n.FieldKnowledgeRetrievalQueryRequired,
-		knowledgebaseaction.ValidationRetrievalQueryTooLong:        cervii18n.FieldKnowledgeRetrievalQueryTooLong,
+		knowledgebaseaction.ValidationQAQuestionRequired: cervii18n.FieldKnowledgeQAQuestionRequired,
+		knowledgebaseaction.ValidationQAAnswerRequired:   cervii18n.FieldKnowledgeQAAnswerRequired,
+		knowledgebaseaction.ValidationQAGroupInvalid:     cervii18n.FieldKnowledgeQAGroupInvalid,
+		knowledgebaseaction.ValidationQAContentInvalid:   cervii18n.FieldKnowledgeQAContentInvalid,
+		knowledgebaseaction.ValidationNameRequired:       cervii18n.FieldKnowledgeBaseNameRequired,
+		knowledgebaseaction.ValidationNameTooLong:        cervii18n.FieldKnowledgeBaseNameTooLong,
+		knowledgebaseaction.ValidationNameDuplicate:      cervii18n.FieldKnowledgeBaseNameDuplicate,
+		knowledgebaseaction.ValidationCategoryInvalid:    cervii18n.FieldKnowledgeBaseCategoryInvalid,
+		knowledgebaseaction.ValidationDescriptionTooLong: cervii18n.FieldKnowledgeBaseDescriptionTooLong,
+		knowledgebaseaction.ValidationGroupNameRequired:  cervii18n.FieldKnowledgeGroupNameRequired,
+		knowledgebaseaction.ValidationGroupNameTooLong:   cervii18n.FieldKnowledgeGroupNameTooLong,
+		knowledgebaseaction.ValidationGroupNameDuplicate: cervii18n.FieldKnowledgeGroupNameDuplicate,
+		knowledgebaseaction.ValidationGroupParentInvalid: cervii18n.FieldKnowledgeGroupParentInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

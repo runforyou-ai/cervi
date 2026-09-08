@@ -163,7 +163,7 @@ const contacts = {
     },
     execution: {
       knowledgeBases: "知识库",
-      knowledgeDisabled: "未启用知识检索",
+      knowledgeDisabled: "未绑定知识库",
       knowledgeEmpty: "暂无知识库",
       knowledgeLoading: "正在加载知识库…",
       knowledgeLoadError: "知识库加载失败",

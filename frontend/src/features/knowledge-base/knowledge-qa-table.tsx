@@ -64,7 +64,7 @@ export function KnowledgeQATable({
             <TableHead>{t("qa.answer")}</TableHead>
             <TableHead>{t("qa.createdAt")}</TableHead>
             <TableHead>
-              {t("documents.columns.actions")}
+              {t("qa.actions")}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -99,10 +99,10 @@ export function KnowledgeQATable({
             disabled={loading || pageNumber <= 1}
             onClick={() => onPageChange(pageNumber - 1)}
           >
-            {t("documents.pagination.previous")}
+            {t("qa.previous")}
           </Button>
           <span>
-            {t("documents.pagination.page", {
+            {t("qa.page", {
               current: pageNumber,
               total: totalPages,
             })}
@@ -113,7 +113,7 @@ export function KnowledgeQATable({
             disabled={loading || pageNumber >= totalPages}
             onClick={() => onPageChange(pageNumber + 1)}
           >
-            {t("documents.pagination.next")}
+            {t("qa.next")}
           </Button>
         </div>
       </div>

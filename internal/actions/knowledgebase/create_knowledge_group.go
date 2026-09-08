@@ -32,12 +32,8 @@ func (a *CreateKnowledgeGroupAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		knowledgeBase, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID)
-		if err != nil {
+		if _, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID); err != nil {
 			return err
-		}
-		if knowledgeBase.IntegrationConnectionID != nil {
-			return ErrExternalGroupUnsupported
 		}
 		parentID, err := validGroupParent(ctx, tx, identity.Organization.ID, knowledgeBaseID, input.ParentID, "")
 		if err != nil {
