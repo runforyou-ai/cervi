@@ -141,11 +141,12 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
   return (
     <Collapsible className="mb-3 min-w-0">
       <CollapsibleTrigger className={cn(
-        "flex w-full cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
+        "group flex w-full cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
         incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
       )}>
         <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
         <span>{t("agentThoughtCompleted", { seconds })}</span>
+        <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
       <CollapsibleContent className={cn(
         "mt-2 space-y-3 text-left text-sm",
