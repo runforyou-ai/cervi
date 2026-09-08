@@ -9,6 +9,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -45,17 +46,17 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, err
 	}
-	scanExpired := fileaction.NewScanExpiredAction(appStorage.DB(), tasks)
-	deleteExpired := fileaction.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, resolveFileS3))
-	if err := tasks.Registry().RegisterJSON(fileaction.ScanExpiredActionName, scanExpired.Execute); err != nil {
+	scanExpired := filemaintenance.NewScanExpiredAction(appStorage.DB(), tasks)
+	deleteExpired := filemaintenance.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, resolveFileS3))
+	if err := tasks.Registry().RegisterJSON(filemaintenance.ScanExpiredActionName, scanExpired.Execute); err != nil {
 		return nil, err
 	}
-	if err := tasks.Registry().RegisterJSON(fileaction.DeleteExpiredActionName, deleteExpired.Execute); err != nil {
+	if err := tasks.Registry().RegisterJSON(filemaintenance.DeleteExpiredActionName, deleteExpired.Execute); err != nil {
 		return nil, err
 	}
 	tasks.RegisterSchedule(servertask.ScheduleDefinition{
-		Key: fileaction.CleanupScheduleKey, ActionName: fileaction.ScanExpiredActionName, Queue: "maintenance",
-		Payload: fileaction.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
+		Key: filemaintenance.CleanupScheduleKey, ActionName: filemaintenance.ScanExpiredActionName, Queue: "maintenance",
+		Payload: filemaintenance.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,
 	})
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks)

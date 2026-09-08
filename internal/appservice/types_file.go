@@ -6,8 +6,9 @@ import "github.com/runforyou-ai/cervi/internal/domain"
 type FilePurpose string
 
 const (
-	FilePurposeUserAvatar FilePurpose = FilePurpose(domain.FilePurposeUserAvatar)
-	FilePurposeGroupImage FilePurpose = FilePurpose(domain.FilePurposeGroupImage)
+	FilePurposeMessageAttachment FilePurpose = FilePurpose(domain.FilePurposeMessageAttachment)
+	FilePurposeUserAvatar        FilePurpose = FilePurpose(domain.FilePurposeUserAvatar)
+	FilePurposeGroupImage        FilePurpose = FilePurpose(domain.FilePurposeGroupImage)
 )
 
 // FileUploadInput 定义创建上传所需的文件元数据。
@@ -36,8 +37,9 @@ type FileUploadRequest struct {
 
 // FileUpload 包含待上传文件和内容上传请求。
 type FileUpload struct {
-	File    File              `json:"file"`
-	Request FileUploadRequest `json:"request"`
+	PartSize int64             `json:"partSize"`
+	File     File              `json:"file"`
+	Request  FileUploadRequest `json:"request"`
 }
 
 // ImageFile 定义原生端选择的图片文件。
@@ -45,4 +47,15 @@ type ImageFile struct {
 	Name        string `json:"name"`
 	ContentType string `json:"contentType"`
 	DataBase64  string `json:"dataBase64"`
+}
+
+// FilePartUploadInput 定义待上传分片的序号。
+type FilePartUploadInput struct {
+	PartNumber int32 `json:"partNumber"`
+}
+
+// FileDownload 定义附件的即时下载地址。
+type FileDownload struct {
+	PreviewURL string `json:"previewUrl"`
+	URL        string `json:"url"`
 }

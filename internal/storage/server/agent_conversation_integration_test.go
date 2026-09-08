@@ -162,6 +162,10 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if exists, err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Where("id = ?", rollbackInput.ConversationID).Exists(ctx); err != nil || exists {
 		t.Fatalf("empty conversation survived rollback: %v %v", exists, err)
 	}
+	db.AddQueryHook(chatQueryHook{})
+	t.Run("主动停止回复", func(t *testing.T) {
+		testAgentReplyStopping(t, db, identity, agent.ID, agent.IdentityID, tasks)
+	})
 	t.Run("AI 会话事务锁序", func(t *testing.T) {
 		testAgentChatLocking(t, db, identity, agent.ID, agent.IdentityID, tasks)
 	})

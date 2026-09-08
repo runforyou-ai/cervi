@@ -5,6 +5,7 @@ package conversation
 import (
 	"time"
 
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -58,7 +59,7 @@ const (
 	ConflictReasonGroupOwnerCannotBeRemoved = "group_owner_cannot_be_removed"
 	// ConflictReasonGroupSuccessorRequired 表示群主退出前必须指定继任者。
 	ConflictReasonGroupSuccessorRequired = "group_successor_required"
-	// ConflictReasonReplyTargetInvalid 表示引用目标不是当前会话中的有效文本消息。
+	// ConflictReasonReplyTargetInvalid 表示引用目标不是当前会话中的有效文本或附件消息。
 	ConflictReasonReplyTargetInvalid = "reply_target_invalid"
 	// ConflictReasonGroupMentionTargetInvalid 表示提醒目标不是当前群聊中的有效参与者。
 	ConflictReasonGroupMentionTargetInvalid = "group_mention_target_invalid"
@@ -172,6 +173,7 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
+	Type    domain.MessageType
 	Deleted bool
 	ID      string
 	Body    string
@@ -210,6 +212,7 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
+	Attachment           *MessageAttachment
 	AgentProcess         *ConversationAgentProcess
 	GroupMessageSequence *int64
 	ID                   string
@@ -387,4 +390,60 @@ type GroupTextMessageInput struct {
 // ConversationNotificationSettings 定义当前用户的会话提醒设置。
 type ConversationNotificationSettings struct {
 	Muted bool
+}
+
+// MessageAttachment 定义消息文件的元数据。
+type MessageAttachment struct {
+	UploadStatus domain.AttachmentUploadStatus `bun:"upload_status"`
+	ImageWidth   int                           `bun:"image_width"`
+	ImageHeight  int                           `bun:"image_height"`
+	ID           string                        `bun:"id"`
+	Name         string                        `bun:"name"`
+	ContentType  string                        `bun:"content_type"`
+	ByteSize     int64                         `bun:"byte_size"`
+}
+
+// AttachmentMessageInput 定义已有会话或单聊目标的附件发送意图。
+type AttachmentMessageInput struct {
+	ConversationID   string
+	TargetIdentityID string
+	ClientMessageID  string
+	FileID           string
+}
+
+// AttachmentMessageResult 返回附件消息和首发单聊摘要。
+type AttachmentMessageResult struct {
+	ConversationID string
+	Conversation   *DirectConversationSummary
+	Message        ConversationMessage
+}
+
+// AttachmentBatchItem 定义一条待创建的附件消息。
+type AttachmentBatchItem struct {
+	Body            string
+	File            fileaction.UploadInput
+	ClientMessageID string
+	ImageWidth      int
+	ImageHeight     int
+}
+
+// AttachmentBatchInput 定义按选择顺序发送的附件消息。
+type AttachmentBatchInput struct {
+	ConversationID   string
+	TargetIdentityID string
+	Attachments      []AttachmentBatchItem
+}
+
+// AttachmentBatchResult 返回一次发送的全部消息。
+type AttachmentBatchResult struct {
+	ConversationID string
+	Conversation   *DirectConversationSummary
+	Messages       []ConversationMessage
+}
+
+// AttachmentMessageState 保存附件消息的当前内容状态和撤去标记。
+type AttachmentMessageState struct {
+	MessageID  string
+	Attachment MessageAttachment
+	Deleted    bool
 }

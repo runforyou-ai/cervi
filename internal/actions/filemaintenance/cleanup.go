@@ -1,6 +1,7 @@
 //go:build server
 
-package file
+// Package filemaintenance 协调临时文件回收与业务引用释放。
+package filemaintenance
 
 import (
 	"context"
@@ -46,6 +47,10 @@ func NewScanExpiredAction(db *bun.DB, enqueuer servertask.Enqueuer) *ScanExpired
 
 // Execute 扫描所有过期候选并幂等投递删除任务。
 func (a *ScanExpiredAction) Execute(ctx context.Context, _ ScanExpiredInput) error {
+	// 客户端异常退出后，将超过活跃期限的附件收敛为失败，保留消息位置。
+	if _, err := a.db.NewRaw("UPDATE message_attachments SET upload_status = ?, upload_expires_at = NULL WHERE upload_status = ? AND upload_expires_at <= now()", domain.AttachmentFailed, domain.AttachmentUploading).Exec(ctx); err != nil {
+		return err
+	}
 	type candidate struct {
 		ID        string    `bun:"id"`
 		ExpiresAt time.Time `bun:"expires_at"`
@@ -123,11 +128,19 @@ func (a *DeleteExpiredAction) Execute(ctx context.Context, input DeleteExpiredIn
 	if err := a.deleter.Delete(ctx, &record); err != nil {
 		return err
 	}
-	if _, err := a.db.NewDelete().Model((*servermodels.File)(nil)).
-		Where("id = ?", record.ID).
-		Where("status = ?", domain.FileStatusDeleting).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("delete expired file record: %w", err)
+	if err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.NewRaw("UPDATE message_attachments SET file_id = NULL, upload_status = CASE WHEN upload_status = ? THEN upload_status ELSE ? END, upload_expires_at = NULL WHERE file_id = ?", domain.AttachmentCancelled, domain.AttachmentFailed, record.ID).Exec(ctx); err != nil {
+			return err
+		}
+		if _, err := tx.NewDelete().Model((*servermodels.File)(nil)).
+			Where("id = ?", record.ID).
+			Where("status = ?", domain.FileStatusDeleting).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("delete expired file record: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	slog.Info("过期文件已清理", "organization_id", record.OrganizationID, "file_id", record.ID, "storage_backend", record.StorageBackend)
 	return nil

@@ -35,6 +35,33 @@ type Backend interface {
 	// CompleteFileUpload 核验并完成文件上传。
 	//cervi:route POST /files/:fileID/complete
 	CompleteFileUpload(context.Context, RequestMeta, string) (File, error)
+	// CreateFilePartUpload 创建一个分片的直传请求。
+	//cervi:route POST /files/:fileID/parts
+	CreateFilePartUpload(context.Context, RequestMeta, string, FilePartUploadInput) (FileUploadRequest, error)
+	// PrepareFileUpload 为已有文件记录准备直传请求。
+	//cervi:route POST /files/:fileID/upload
+	PrepareFileUpload(context.Context, RequestMeta, string) (FileUpload, error)
+	// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
+	//cervi:route POST /attachment-uploads/:fileID/complete
+	CompleteAttachmentUpload(context.Context, RequestMeta, string) error
+	// CancelFileUpload 将未发送的临时文件交给清理任务。
+	//cervi:route DELETE /files/:fileID/upload
+	CancelFileUpload(context.Context, RequestMeta, string) error
+	// SendAttachmentMessage 发送内部单聊或群聊附件消息。
+	//cervi:route POST /conversation-attachments status=201
+	SendAttachmentMessage(context.Context, RequestMeta, AttachmentMessageInput) (AttachmentMessageResult, error)
+	// SendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
+	//cervi:route POST /direct-attachment-batches status=201
+	SendAttachmentBatch(context.Context, RequestMeta, AttachmentBatchInput) (AttachmentBatchResult, error)
+	// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
+	//cervi:route PATCH /attachment-uploads
+	UpdateAttachmentUploads(context.Context, RequestMeta, AttachmentUploadUpdate) error
+	// ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
+	//cervi:route GET /conversations/:conversationID/attachments
+	ListAttachmentStates(context.Context, RequestMeta, string, AttachmentStateListInput) (AttachmentStateList, error)
+	// GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
+	//cervi:route GET /conversations/:conversationID/messages/:messageID/attachment
+	GetAttachmentDownload(context.Context, RequestMeta, string, string) (FileDownload, error)
 	// ChangePassword 核验当前密码并保存新密码。
 	//cervi:route PATCH /password
 	ChangePassword(context.Context, RequestMeta, ChangePasswordInput) error
@@ -104,6 +131,9 @@ type Backend interface {
 	// SendAgentTextMessage 向已有 AI 会话发送文本消息。
 	//cervi:route POST /agent-conversations/:conversationID/messages
 	SendAgentTextMessage(context.Context, RequestMeta, string, AgentTextMessageInput) (ConversationMessage, error)
+	// StopAgentReply 停止独立 AI 会话中指定的回复并返回实际运行状态。
+	//cervi:route POST /agent-conversations/:conversationID/runs/:runID/stop
+	StopAgentReply(context.Context, RequestMeta, string, string) (AgentRunStatus, error)
 	// FindDirectConversation 按目标身份查找当前成员的活跃单聊。
 	//cervi:route GET /direct-conversations/by-target/:targetIdentityID
 	FindDirectConversation(context.Context, RequestMeta, string) (DirectConversationLookup, error)

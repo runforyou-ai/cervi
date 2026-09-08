@@ -10,6 +10,8 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
+import { useResource } from "@/hooks/use-resource"
+import { resourceKeys } from "@/hooks/resource-keys"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -17,6 +19,8 @@ import { toast } from "sonner"
 
 import {
   ChatSubjectKind,
+  MessageType,
+  listAttachmentStates,
   ConversationType,
   isApiError,
   sendCustomerTextMessage,
@@ -28,6 +32,7 @@ import {
   type DirectTextMessageInput,
   OrganizationIdentityType,
   type GroupParticipant,
+  type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -44,6 +49,10 @@ import {
   conversationSendingIndicatorDelay,
   type OutgoingConversationDraft,
 } from "@/features/inbox/use-outgoing-conversation-messages"
+import { useMemberChatPollingActive } from "./use-member-chat-polling"
+import { GroupAttachmentUpload } from "./group-attachment-upload"
+import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -97,7 +106,11 @@ export function ConversationComposer({
   onFailed,
   onSucceeded,
   sendIndividualMessage,
+  attachmentTargetIdentityID,
+  onAttachmentConversationCreated,
 }: {
+  attachmentTargetIdentityID?: string
+  onAttachmentConversationCreated?: (conversation: InboxConversation) => void
   conversationID: string
   conversationType: ConversationType
   submitOnEnter?: boolean
@@ -120,6 +133,7 @@ export function ConversationComposer({
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
+  const pollingActive = useMemberChatPollingActive()
   const aliveRef = useRef(true)
   const schema = useMemo(
     () =>
@@ -142,7 +156,22 @@ export function ConversationComposer({
   } | null>(null)
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
-  const activeReplyTo = replyTo
+  // 选中的附件引用独立刷新，原消息取消后保留草稿并阻止发送失效引用。
+  const replyAttachmentID =
+    replyTo?.type === MessageType.MessageTypeAttachment && !replyTo.deleted
+      ? replyTo.id
+      : ""
+  const replyAttachment = useResource(
+    resourceKeys.attachmentStates(conversationID, replyAttachmentID),
+    () => listAttachmentStates(conversationID, replyAttachmentID),
+    { enabled: Boolean(conversationID && replyAttachmentID), refetchInterval: pollingActive ? 2000 : false },
+  )
+  const activeReplyTo =
+    replyTo && replyAttachment.data?.states.some(
+      (state) => state.messageId === replyTo.id && state.deleted,
+    )
+      ? { ...replyTo, body: "", sender: null, deleted: true }
+      : replyTo
   const replyToRef = useRef(replyTo)
   replyToRef.current = replyTo
   const [mentionSubjectIDs, setMentionSubjectIDs] = useState<string[]>([])
@@ -305,7 +334,7 @@ export function ConversationComposer({
   /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
     const body = values.body.trim()
-    if (!body) return
+    if (!body || activeReplyTo?.deleted) return
     if (onBeforeSend && !(await onBeforeSend())) return
     if (!aliveRef.current) return
     // 草稿正文去掉首部空白后，同步调整结构化标记的位置。
@@ -569,11 +598,13 @@ export function ConversationComposer({
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
               <div className="min-w-0">
                 <p className="font-medium text-foreground">
-                  {t("messageReplyingTo", {
-                    name:
-                      activeReplyTo.sender?.displayName?.trim() ||
-                      t(activeReplyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
-                  })}
+                  {activeReplyTo.deleted
+                    ? t("messageOriginalDeleted")
+                    : t("messageReplyingTo", {
+                        name:
+                          activeReplyTo.sender?.displayName?.trim() ||
+                          t(activeReplyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
+                      })}
                 </p>
                 <p className="truncate text-muted-foreground">
                   {messagePreview(activeReplyTo.body, activeReplyTo.sender?.identityType)}
@@ -634,17 +665,44 @@ export function ConversationComposer({
             onKeyDown={submitFromKeyboard}
           />
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              disabled
-              aria-label={t("attachmentAdd")}
-              title={t("attachmentAdd")}
-            >
-              <PaperclipIcon />
-            </Button>
-            <Button type="submit" size="sm" disabled={isSubmitting || isBodyEmpty}>
+            {resolveAppPlatform() !== "mobile" &&
+            (conversationType === ConversationType.ConversationTypeDirect ||
+              conversationType === ConversationType.ConversationTypeGroup) ? (
+              conversationType === ConversationType.ConversationTypeDirect ? (
+                <ConversationAttachmentUpload
+                  conversationID={conversationID}
+                  targetIdentityID={attachmentTargetIdentityID}
+                  disabled={isSubmitting}
+                  onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
+                />
+              ) : (
+                <GroupAttachmentUpload
+                  conversationID={conversationID}
+                  targetIdentityID={attachmentTargetIdentityID}
+                  disabled={isSubmitting}
+                  onSent={(clientMessageID, message, conversation) => {
+                    onSucceeded()
+                    if (conversation) onAttachmentConversationCreated?.(conversation)
+                    if (!aliveRef.current) return
+                    onSending({
+                      clientMessageID,
+                      body: "",
+                      originatedAt: message.originatedAt,
+                      replyTo: null,
+                      mentionSubjectIDs: [],
+                      mentionAll: false,
+                      mentionAllToken: null,
+                    })
+                    onSent(clientMessageID, message)
+                  }}
+                />
+              )
+            ) : (
+              <Button type="button" variant="ghost" size="icon-sm" disabled aria-label={t("attachmentAdd")}>
+                <PaperclipIcon />
+              </Button>
+            )}
+            <Button type="submit" size="sm" disabled={isSubmitting || isBodyEmpty || activeReplyTo?.deleted}>
               {isSubmitting && showSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : null}

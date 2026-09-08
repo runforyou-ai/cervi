@@ -12,6 +12,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -309,7 +310,7 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		ColumnExpr("cci.avatar_file_id AS contact_avatar_file_id").
 		ColumnExpr("ch.type AS channel_type").
 		ColumnExpr("ch.name AS channel_name").
-		ColumnExpr("msg.body AS preview").
+		ColumnExpr("? AS preview", messagequery.Summary("msg")).
 		ColumnExpr("msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").
@@ -405,7 +406,7 @@ func (q *LoadInboxQuery) individualConversationsQuery(organizationID, identityID
 	return q.db.NewSelect().
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
-		ColumnExpr("msg.body AS preview").
+		ColumnExpr("? AS preview", messagequery.Summary("msg")).
 		ColumnExpr("msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").
@@ -486,7 +487,7 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
-		ColumnExpr("msg.body AS preview").
+		ColumnExpr("? AS preview", messagequery.Summary("msg")).
 		ColumnExpr("msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").

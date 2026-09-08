@@ -4,10 +4,36 @@ package appservice
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	"github.com/runforyou-ai/cervi/internal/common"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
+
+// StopAgentReply 校验登录身份并停止指定独立 AI 会话的回复。
+func (b *DirectBackend) StopAgentReply(ctx context.Context, meta RequestMeta, conversationID, runID string) (AgentRunStatus, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return "", err
+	}
+	status, err := b.agentCoordinator.StopAgentReply(ctx, identity, conversationID, runID)
+	if err == nil {
+		return AgentRunStatus(status), nil
+	}
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return "", SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return "", NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	slog.Warn("停止 AI 回复失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "agent_run_id", runID, "error", err)
+	return "", FailedError(meta, cervii18n.ErrorAgentReplyStopFailed)
+}
 
 // SendFirstAgentTextMessage 保存 AI 聊天首条消息并确认草稿对应的会话。
 func (b *DirectBackend) SendFirstAgentTextMessage(ctx context.Context, meta RequestMeta, input FirstAgentTextMessageInput) (FirstAgentTextMessageResult, error) {

@@ -1,11 +1,12 @@
 {
+  "error.agent_reply_stop_failed": "Failed to stop the AI reply. Please try again.",
   "error.customer_delivery_conflict": "The delivery state changed or the channel cannot send. Refresh and try again.",
   "error.customer_delivery_failed": "Could not process message delivery. Try again.",
   "error.channel_outbound_unavailable": "The channel is disabled or its bot is not configured.",
 
   "error.knowledge_qa_not_found": "The Q&A entry does not exist or has been deleted.",
   "error.knowledge_qa_unsupported": "This operation is only available for local Q&A knowledge bases.",
-  "error.knowledge_base_has_content": "This knowledge base contains Q&A entries. Its type or source cannot be changed.",
+  "error.knowledge_base_has_content": "This knowledge base contains Q&A entries. Its type cannot be changed.",
   "error.knowledge_qa_read_failed": "Failed to load Q&A entries. Please try again.",
   "error.knowledge_qa_save_failed": "Failed to save the Q&A entry. Please try again.",
   "error.knowledge_qa_delete_failed": "Failed to delete the Q&A entry. Please try again.",

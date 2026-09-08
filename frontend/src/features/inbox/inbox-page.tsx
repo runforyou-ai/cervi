@@ -20,6 +20,7 @@ import {
   UsersRoundIcon,
 } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
+import { useAttachmentQueue } from "./attachment-queue-context"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -756,15 +757,17 @@ function InboxConversationList({
               ConversationStatus.ConversationStatusArchived
           const preview = groupDissolved
             ? t("groupDissolved")
-            : conversation.lastMessageType === MessageType.MessageTypeAgentError
-              ? t("agentRunFailed")
-              : messagePreview(
-                summary.preview ?? "",
-                summary.previewSenderIdentityType,
-              ).trim() ||
-              (isGroupInboxConversation(conversation) && summary.lastMessageAt
-                ? t("groupSystemUpdated")
-                : t("messagesEmpty"))
+            : conversation.lastMessageType === MessageType.MessageTypeAgentCancelled
+              ? t("agentReplyStopped")
+              : conversation.lastMessageType === MessageType.MessageTypeAgentError
+                ? t("agentRunFailed")
+                : messagePreview(
+                    summary.preview ?? "",
+                    summary.previewSenderIdentityType,
+                  ).trim() ||
+                  (isGroupInboxConversation(conversation) && summary.lastMessageAt
+                    ? t("groupSystemUpdated")
+                    : t("messagesEmpty"))
           const formattedTime = formatTime(summary.lastMessageAt)
           const hasUnread =
             conversation.unreadCount > 0 || conversation.markedUnread
@@ -1134,6 +1137,7 @@ function ConversationThread({
   const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
   const outgoing = useOutgoingConversationMessages()
+  const { queue: attachmentQueue, jobs: attachmentJobs } = useAttachmentQueue()
   const invalidate = useResourceInvalidator()
   const aliveRef = useRef(true)
   const conversationID = conversation?.id ?? ""
@@ -1231,8 +1235,11 @@ function ConversationThread({
         conversationID={conversationID}
         conversationType={conversationType}
         currentUser={identity.user}
-        outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={setRetryDraft}
+        outgoingMessages={[...outgoing.messages, ...attachmentJobs.filter(job => job.stage !== "cancelled" && (conversationID ? job.conversationID === conversationID : directTarget && job.targetIdentityID === directTarget.id)).map(job => job.message)]}
+        onRetryFailedMessage={(draft) => {
+          if (attachmentJobs.some(job => job.id === draft.clientMessageID)) attachmentQueue?.retry(draft.clientMessageID)
+          else setRetryDraft(draft)
+        }}
         retryFailedMessageDisabled={
           messageSending || !replySupported || Boolean(replyDisabledReason)
         }
@@ -1271,6 +1278,12 @@ function ConversationThread({
           onSent={outgoing.succeed}
           onFailed={outgoing.fail}
           onSucceeded={onConversationChanged}
+          attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
+          onAttachmentConversationCreated={(created) => {
+            if (directTarget) void invalidate(resourceKeys.directConversation(directTarget.id))
+            void invalidate(resourceKeys.conversationMessages(created.id))
+            if (aliveRef.current && isDirectInboxConversation(created)) onChatStarted(created)
+          }}
           sendIndividualMessage={
             directTarget
               ? async (input) => {

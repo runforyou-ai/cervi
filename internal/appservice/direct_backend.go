@@ -9,6 +9,7 @@ import (
 	"time"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	businesssystemaction "github.com/runforyou-ai/cervi/internal/actions/businesssystem"
@@ -17,6 +18,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
@@ -44,6 +46,8 @@ var (
 
 // DirectBackend 在服务端进程内直接调用 Action 和 Query。
 type DirectBackend struct {
+	sendAttachmentMessage             *conversationaction.SendAttachmentMessageAction
+	agentCoordinator                  *agentrunaction.ExecuteAction
 	customerDeliveries                *deliveryaction.Manager
 	installWorkspace                  *installationaction.InstallWorkspaceAction
 	login                             *authaction.LoginAction
@@ -156,18 +160,20 @@ type DirectBackend struct {
 	saveS3Setting                     *settingaction.SaveS3SettingAction
 	testS3Setting                     *settingaction.TestS3SettingAction
 	createFileUpload                  *fileaction.CreateUploadAction
+	cancelFileUpload                  *filemaintenance.CancelUploadAction
 	completeFileUpload                *fileaction.CompleteUploadAction
 	getFile                           *fileaction.GetQuery
 	localFiles                        *serverfilecontent.LocalStore
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator, deliveryEnqueuer servertask.TxEnqueuer) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, deliveryEnqueuer servertask.TxEnqueuer) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	return &DirectBackend{
+		agentCoordinator:                  agentCoordinator,
 		customerDeliveries:                deliveryaction.NewManager(db, deliveryEnqueuer),
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
@@ -280,6 +286,8 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),
 		testS3Setting:                     settingaction.NewTestS3SettingAction(connectionRunner),
 		createFileUpload:                  fileaction.NewCreateUploadAction(db),
+		cancelFileUpload:                  filemaintenance.NewCancelUploadAction(db),
+		sendAttachmentMessage:             conversationaction.NewSendAttachmentMessageAction(db),
 		completeFileUpload:                fileaction.NewCompleteUploadAction(db),
 		getFile:                           fileaction.NewGetQuery(db),
 		localFiles:                        localFiles,

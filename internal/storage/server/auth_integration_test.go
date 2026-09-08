@@ -22,6 +22,7 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
@@ -2404,8 +2405,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cleanup := fileaction.NewDeleteExpiredAction(db, serverfilecontent.NewDeleter(localFiles, nil))
-		if err := cleanup.Execute(context.Background(), fileaction.DeleteExpiredInput{FileID: avatar.ID}); err != nil {
+		cleanup := filemaintenance.NewDeleteExpiredAction(db, serverfilecontent.NewDeleter(localFiles, nil))
+		if err := cleanup.Execute(context.Background(), filemaintenance.DeleteExpiredInput{FileID: avatar.ID}); err != nil {
 			t.Fatal(err)
 		}
 		resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, loggedIn.Token)

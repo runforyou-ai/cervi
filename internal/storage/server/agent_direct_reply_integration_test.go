@@ -192,7 +192,40 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	}
 	runtime.expected = chained.ReplyTo
 	runNext()
-	if runtime.calls != 4 {
+	// 用窗口外附件验证模型引用摘要；附件内容本身不进入文本上下文。
+	if _, err := db.NewUpdate().Model((*servermodels.Message)(nil)).Set("type = ?", domain.MessageTypeAttachment).Set("body = ''").Where("id = ?", first.Message.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.NewRaw(`INSERT INTO message_attachments (message_id, organization_id, name, content_type, byte_size, upload_status)
+ VALUES (?, ?, 'reference.txt', 'text/plain', 0, ?)`, first.Message.ID, identity.Organization.ID, domain.AttachmentReady).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []string{"", "附件说明", "取消前说明"} {
+		if _, err := db.NewUpdate().Model((*servermodels.Message)(nil)).Set("body = ?", body).Where("id = ?", first.Message.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		input.ClientMessageID, input.ReplyToMessageID = uuid.NewV7().String(), first.Message.ID
+		attachmentReply, err := send.Execute(ctx, identity, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedBody := body
+		if body == "" {
+			expectedBody = "reference.txt"
+		}
+		if attachmentReply.ReplyTo == nil || attachmentReply.ReplyTo.Body != expectedBody {
+			t.Fatalf("attachment reference=%+v", attachmentReply.ReplyTo)
+		}
+		runtime.expected = attachmentReply.ReplyTo
+		if body == "取消前说明" {
+			if _, err := db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", first.Message.ID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			runtime.expected = &conversationaction.ConversationMessageReference{ID: first.Message.ID, Type: domain.MessageTypeAttachment, Deleted: true}
+		}
+		runNext()
+	}
+	if runtime.calls != 7 {
 		t.Fatalf("runtime calls=%d", runtime.calls)
 	}
 }

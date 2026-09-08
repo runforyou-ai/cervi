@@ -29,6 +29,51 @@ func (s *Service) CompleteFileUpload(ctx context.Context, meta RequestMeta, file
 	return s.backend.CompleteFileUpload(ctx, meta, fileID)
 }
 
+// CreateFilePartUpload 创建一个分片的直传请求。
+func (s *Service) CreateFilePartUpload(ctx context.Context, meta RequestMeta, fileID string, input FilePartUploadInput) (FileUploadRequest, error) {
+	return s.backend.CreateFilePartUpload(ctx, meta, fileID, input)
+}
+
+// PrepareFileUpload 为已有文件记录准备直传请求。
+func (s *Service) PrepareFileUpload(ctx context.Context, meta RequestMeta, fileID string) (FileUpload, error) {
+	return s.backend.PrepareFileUpload(ctx, meta, fileID)
+}
+
+// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
+func (s *Service) CompleteAttachmentUpload(ctx context.Context, meta RequestMeta, fileID string) error {
+	return s.backend.CompleteAttachmentUpload(ctx, meta, fileID)
+}
+
+// CancelFileUpload 将未发送的临时文件交给清理任务。
+func (s *Service) CancelFileUpload(ctx context.Context, meta RequestMeta, fileID string) error {
+	return s.backend.CancelFileUpload(ctx, meta, fileID)
+}
+
+// SendAttachmentMessage 发送内部单聊或群聊附件消息。
+func (s *Service) SendAttachmentMessage(ctx context.Context, meta RequestMeta, input AttachmentMessageInput) (AttachmentMessageResult, error) {
+	return s.backend.SendAttachmentMessage(ctx, meta, input)
+}
+
+// SendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
+func (s *Service) SendAttachmentBatch(ctx context.Context, meta RequestMeta, input AttachmentBatchInput) (AttachmentBatchResult, error) {
+	return s.backend.SendAttachmentBatch(ctx, meta, input)
+}
+
+// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
+func (s *Service) UpdateAttachmentUploads(ctx context.Context, meta RequestMeta, input AttachmentUploadUpdate) error {
+	return s.backend.UpdateAttachmentUploads(ctx, meta, input)
+}
+
+// ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
+func (s *Service) ListAttachmentStates(ctx context.Context, meta RequestMeta, conversationID string, input AttachmentStateListInput) (AttachmentStateList, error) {
+	return s.backend.ListAttachmentStates(ctx, meta, conversationID, input)
+}
+
+// GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
+func (s *Service) GetAttachmentDownload(ctx context.Context, meta RequestMeta, conversationID string, messageID string) (FileDownload, error) {
+	return s.backend.GetAttachmentDownload(ctx, meta, conversationID, messageID)
+}
+
 // ChangePassword 核验当前密码并保存新密码。
 func (s *Service) ChangePassword(ctx context.Context, meta RequestMeta, input ChangePasswordInput) error {
 	return s.backend.ChangePassword(ctx, meta, input)
@@ -137,6 +182,11 @@ func (s *Service) SendFirstAgentTextMessage(ctx context.Context, meta RequestMet
 // SendAgentTextMessage 向已有 AI 会话发送文本消息。
 func (s *Service) SendAgentTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input AgentTextMessageInput) (ConversationMessage, error) {
 	return s.backend.SendAgentTextMessage(ctx, meta, conversationID, input)
+}
+
+// StopAgentReply 停止独立 AI 会话中指定的回复并返回实际运行状态。
+func (s *Service) StopAgentReply(ctx context.Context, meta RequestMeta, conversationID string, runID string) (AgentRunStatus, error) {
+	return s.backend.StopAgentReply(ctx, meta, conversationID, runID)
 }
 
 // FindDirectConversation 按目标身份查找当前成员的活跃单聊。

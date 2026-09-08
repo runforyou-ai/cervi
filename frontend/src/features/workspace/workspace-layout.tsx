@@ -11,6 +11,7 @@ import {
   type Organization,
   type CurrentUser,
 } from "@/api"
+import { AttachmentQueueProvider } from "@/features/inbox/attachment-queue-context"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import {
@@ -319,6 +320,7 @@ export function WorkspaceLayout() {
 
   return (
     <UserPreferencesProvider user={identity.user}>
+      <AttachmentQueueProvider key={identity.user.id}>
       <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
         <WorkspaceNavigation
           identity={identity}
@@ -341,6 +343,7 @@ export function WorkspaceLayout() {
           )}
         </div>
       </div>
+    </AttachmentQueueProvider>
     </UserPreferencesProvider>
   )
 }
