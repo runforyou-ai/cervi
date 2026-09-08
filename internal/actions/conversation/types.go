@@ -28,7 +28,6 @@ const (
 	ValidationGroupMemberIDsInvalid    ValidationCode = "group_member_ids_invalid"
 	ValidationGroupMemberIDInvalid     ValidationCode = "group_member_id_invalid"
 	ValidationGroupOwnerIDInvalid      ValidationCode = "group_owner_id_invalid"
-	ValidationGroupSuccessorIDInvalid  ValidationCode = "group_successor_id_invalid"
 	ValidationClientMessageIDInvalid   ValidationCode = "client_message_id_invalid"
 	ValidationLastReadMessageIDInvalid ValidationCode = "last_read_message_id_invalid"
 	ValidationReplyToMessageIDInvalid  ValidationCode = "reply_to_message_id_invalid"
@@ -57,8 +56,8 @@ const (
 	ConflictReasonGroupMemberNotActive = "group_member_not_active"
 	// ConflictReasonGroupOwnerCannotBeRemoved 表示群主不能通过移除成员操作退出。
 	ConflictReasonGroupOwnerCannotBeRemoved = "group_owner_cannot_be_removed"
-	// ConflictReasonGroupSuccessorRequired 表示群主退出前必须指定继任者。
-	ConflictReasonGroupSuccessorRequired = "group_successor_required"
+	// ConflictReasonGroupOwnerCannotLeave 表示群主必须先转让后退出。
+	ConflictReasonGroupOwnerCannotLeave = "group_owner_cannot_leave"
 	// ConflictReasonReplyTargetInvalid 表示引用目标不是当前会话中的有效文本或附件消息。
 	ConflictReasonReplyTargetInvalid = "reply_target_invalid"
 	// ConflictReasonGroupMentionTargetInvalid 表示提醒目标不是当前群聊中的有效参与者。
@@ -338,12 +337,6 @@ type GroupConversationMemberInput struct {
 type GroupConversationOwnerInput struct {
 	ConversationID  string
 	OwnerIdentityID string
-}
-
-// GroupConversationLeaveInput 定义当前成员退出群聊参数。
-type GroupConversationLeaveInput struct {
-	ConversationID      string
-	SuccessorIdentityID string
 }
 
 // GroupConversationSummary 定义企业内部群聊摘要。

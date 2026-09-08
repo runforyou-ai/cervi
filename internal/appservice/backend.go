@@ -158,9 +158,12 @@ type Backend interface {
 	// TransferGroupConversationOwner 转让群主。
 	//cervi:route POST /group-conversations/:conversationID/owner/transfer
 	TransferGroupConversationOwner(context.Context, RequestMeta, string, GroupConversationOwnerInput) (GroupConversation, error)
-	// LeaveGroupConversation 退出群聊并按需转让群主。
+	// LeaveGroupConversation 退出普通成员参与的群聊。
 	//cervi:route POST /group-conversations/:conversationID/leave
-	LeaveGroupConversation(context.Context, RequestMeta, string, GroupConversationLeaveInput) error
+	LeaveGroupConversation(context.Context, RequestMeta, string) error
+	// DissolveGroupConversation 解散群聊并保留当前成员的只读历史。
+	//cervi:route POST /group-conversations/:conversationID/dissolve
+	DissolveGroupConversation(context.Context, RequestMeta, string) (GroupConversation, error)
 	// SendGroupTextMessage 发送企业内部群聊文本消息。
 	//cervi:route POST /group-conversations/:conversationID/messages
 	SendGroupTextMessage(context.Context, RequestMeta, string, GroupTextMessageInput) (ConversationMessage, error)

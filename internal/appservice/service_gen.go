@@ -229,9 +229,14 @@ func (s *Service) TransferGroupConversationOwner(ctx context.Context, meta Reque
 	return s.backend.TransferGroupConversationOwner(ctx, meta, conversationID, input)
 }
 
-// LeaveGroupConversation 退出群聊并按需转让群主。
-func (s *Service) LeaveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationLeaveInput) error {
-	return s.backend.LeaveGroupConversation(ctx, meta, conversationID, input)
+// LeaveGroupConversation 退出普通成员参与的群聊。
+func (s *Service) LeaveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) error {
+	return s.backend.LeaveGroupConversation(ctx, meta, conversationID)
+}
+
+// DissolveGroupConversation 解散群聊并保留当前成员的只读历史。
+func (s *Service) DissolveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) (GroupConversation, error) {
+	return s.backend.DissolveGroupConversation(ctx, meta, conversationID)
 }
 
 // SendGroupTextMessage 发送企业内部群聊文本消息。

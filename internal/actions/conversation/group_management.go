@@ -34,8 +34,11 @@ type RemoveGroupConversationMemberAction struct{ db *bun.DB }
 // TransferGroupConversationOwnerAction 转让群主。
 type TransferGroupConversationOwnerAction struct{ db *bun.DB }
 
-// LeaveGroupConversationAction 退出群聊，最后一位群主退出时解散群聊。
+// LeaveGroupConversationAction 退出普通成员参与的群聊。
 type LeaveGroupConversationAction struct{ db *bun.DB }
+
+// DissolveGroupConversationAction 解散群聊并保留当前成员的只读历史。
+type DissolveGroupConversationAction struct{ db *bun.DB }
 
 type activeGroupParticipantRow struct {
 	ParticipantID string `bun:"participant_id"`
@@ -67,6 +70,11 @@ func NewTransferGroupConversationOwnerAction(db *bun.DB) *TransferGroupConversat
 // NewLeaveGroupConversationAction 创建群聊退出操作。
 func NewLeaveGroupConversationAction(db *bun.DB) *LeaveGroupConversationAction {
 	return &LeaveGroupConversationAction{db: db}
+}
+
+// NewDissolveGroupConversationAction 创建群聊解散操作。
+func NewDissolveGroupConversationAction(db *bun.DB) *DissolveGroupConversationAction {
+	return &DissolveGroupConversationAction{db: db}
 }
 
 // Execute 修改群聊资料，并在名称变化时记录系统事件。
@@ -298,25 +306,12 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 	return result, nil
 }
 
-// Execute 退出群聊，群主退出时转让群主或解散没有其他真人的群聊。
-func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationLeaveInput) error {
-	conversationID, valid := common.NormalizeUUID(input.ConversationID)
-	fields := map[string]ValidationCode{}
+// Execute 退出群聊，群主必须先通过转让操作成为普通成员。
+func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID string) error {
+	conversationID, valid := common.NormalizeUUID(conversationID)
 	if !valid {
-		fields["conversationId"] = ValidationConversationIDInvalid
+		return &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
-	successorID := strings.TrimSpace(input.SuccessorIdentityID)
-	if successorID != "" {
-		var successorValid bool
-		successorID, successorValid = common.NormalizeUUID(successorID)
-		if !successorValid || successorID == identity.OrganizationIdentity.ID {
-			fields["successorIdentityId"] = ValidationGroupSuccessorIDInvalid
-		}
-	}
-	if len(fields) > 0 {
-		return &ValidationError{Fields: fields}
-	}
-
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -326,42 +321,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 			return err
 		}
 		if group.Role == string(domain.ConversationParticipantRoleOwner) {
-			if successorID == "" {
-				// 只有真人可以接任群主，最后一位真人可直接解散含 Agent 的群聊。
-				otherUsers, err := tx.NewSelect().TableExpr("conversation_participants AS cp").
-					Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-					Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
-					Where("cp.organization_id = ? AND cp.conversation_id = ? AND cp.left_at IS NULL AND oi.id <> ?", identity.Organization.ID, conversationID, identity.OrganizationIdentity.ID).Exists(ctx)
-				if err != nil {
-					return err
-				}
-				if otherUsers {
-					return &ConflictError{Reason: ConflictReasonGroupSuccessorRequired}
-				}
-				if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
-					Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),
-				}); err != nil {
-					return err
-				}
-				if err := archiveGroupConversation(ctx, tx, identity.Organization.ID, conversationID); err != nil {
-					return err
-				}
-				return nil
-			}
-			target, err := loadActiveGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, successorID, true)
-			if err != nil {
-				return err
-			}
-			if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.ParticipantID, target.ParticipantID); err != nil {
-				return err
-			}
-			if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
-				Type: domain.ConversationSystemEventGroupOwnerTransferred, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
-			}); err != nil {
-				return err
-			}
-		} else if successorID != "" {
-			return &ValidationError{Fields: map[string]ValidationCode{"successorIdentityId": ValidationGroupSuccessorIDInvalid}}
+			return &ConflictError{Reason: ConflictReasonGroupOwnerCannotLeave}
 		}
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, group.ParticipantID); err != nil {
 			return err
@@ -375,6 +335,46 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		return fmt.Errorf("leave group conversation: %w", err)
 	}
 	return nil
+}
+
+// Execute 在群聊锁内幂等解散群聊并保留成员关系。
+func (a *DissolveGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID string) (GroupConversation, error) {
+	conversationID, valid := common.NormalizeUUID(conversationID)
+	if !valid {
+		return GroupConversation{}, &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
+	}
+	var result GroupConversation
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		// 已解散群仍需校验群主身份，重复请求不再写入系统消息。
+		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupReadable)
+		if err != nil {
+			return err
+		}
+		if group.Role != string(domain.ConversationParticipantRoleOwner) {
+			return chatstate.ErrGroupOwnerRequired
+		}
+		if group.Conversation.Status == string(domain.ConversationStatusActive) {
+			if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
+				Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),
+			}); err != nil {
+				return err
+			}
+			if _, err := tx.NewUpdate().Model(group.Conversation).
+				Set("status = ?", domain.ConversationStatusArchived).
+				Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+				return err
+			}
+		}
+		result, err = loadGroupConversation(ctx, tx, identity, conversationID)
+		return err
+	})
+	if err != nil {
+		return GroupConversation{}, fmt.Errorf("dissolve group conversation: %w", err)
+	}
+	return result, nil
 }
 
 // normalizeGroupProfileInput 规范化群聊资料修改参数。
@@ -558,21 +558,6 @@ func leaveGroupParticipant(ctx context.Context, db bun.IDB, organizationID, part
 		Where("left_at IS NULL").
 		Exec(ctx); err != nil {
 		return fmt.Errorf("leave group conversation participant: %w", err)
-	}
-	return nil
-}
-
-// archiveGroupConversation 归档已经解散的群聊。
-func archiveGroupConversation(ctx context.Context, db bun.IDB, organizationID, conversationID string) error {
-	if _, err := db.NewUpdate().Model((*servermodels.Conversation)(nil)).
-		Set("status = ?", domain.ConversationStatusArchived).
-		Set("updated_at = now()").
-		Where("organization_id = ?", organizationID).
-		Where("id = ?", conversationID).
-		Where("type = ?", domain.ConversationTypeGroup).
-		Where("status = ?", domain.ConversationStatusActive).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("archive dissolved group conversation: %w", err)
 	}
 	return nil
 }

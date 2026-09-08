@@ -318,18 +318,32 @@ func (b *DirectBackend) TransferGroupConversationOwner(ctx context.Context, meta
 	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
 }
 
-// LeaveGroupConversation 退出群聊并按需转让群主。
-func (b *DirectBackend) LeaveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationLeaveInput) error {
+// LeaveGroupConversation 退出普通成员参与的群聊。
+func (b *DirectBackend) LeaveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) error {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return err
 	}
-	err = b.leaveGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationLeaveInput{ConversationID: conversationID, SuccessorIdentityID: input.SuccessorIdentityID})
+	err = b.leaveGroupConversation.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "leave")
 	}
-	slog.Info("企业群聊退出或解散操作已完成", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
+	slog.Info("企业群聊退出操作已完成", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
 	return nil
+}
+
+// DissolveGroupConversation 解散群聊并返回只读资料。
+func (b *DirectBackend) DissolveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) (GroupConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return GroupConversation{}, err
+	}
+	record, err := b.dissolveGroupConversation.Execute(ctx, identity, conversationID)
+	if err != nil {
+		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "dissolve")
+	}
+	slog.Info("企业群聊解散操作已完成", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
+	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
 }
 
 // groupConversationMutationResult 转换群聊管理命令结果。
@@ -634,8 +648,8 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 			messageKey = cervii18n.ErrorGroupMemberNotActive
 		case conversationaction.ConflictReasonGroupOwnerCannotBeRemoved:
 			messageKey = cervii18n.ErrorGroupOwnerCannotBeRemoved
-		case conversationaction.ConflictReasonGroupSuccessorRequired:
-			messageKey = cervii18n.ErrorGroupSuccessorRequired
+		case conversationaction.ConflictReasonGroupOwnerCannotLeave:
+			messageKey = cervii18n.ErrorGroupOwnerCannotLeave
 		case conversationaction.ConflictReasonReplyTargetInvalid:
 			messageKey = cervii18n.ErrorReplyTargetInvalid
 		case conversationaction.ConflictReasonGroupMentionTargetInvalid:
@@ -753,7 +767,6 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationGroupMemberIDsInvalid:    cervii18n.FieldGroupMemberIDsInvalid,
 	conversationaction.ValidationGroupMemberIDInvalid:     cervii18n.FieldGroupMemberIDInvalid,
 	conversationaction.ValidationGroupOwnerIDInvalid:      cervii18n.FieldGroupOwnerIDInvalid,
-	conversationaction.ValidationGroupSuccessorIDInvalid:  cervii18n.FieldGroupSuccessorIDInvalid,
 }
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。

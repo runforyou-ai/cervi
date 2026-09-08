@@ -1405,21 +1405,17 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = leave.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationLeaveInput{ConversationID: managedGroup.ID})
+		err = leave.Execute(context.Background(), loggedIn.Identity, managedGroup.ID)
 		var conflictError *conversationaction.ConflictError
-		if !errors.As(err, &conflictError) || conflictError.Reason != conversationaction.ConflictReasonGroupSuccessorRequired {
+		if !errors.As(err, &conflictError) || conflictError.Reason != conversationaction.ConflictReasonGroupOwnerCannotLeave {
 			t.Fatalf("owner leave without successor error = %#v", err)
 		}
-		err = leave.Execute(context.Background(), memberLogin.Identity, conversationaction.GroupConversationLeaveInput{
-			ConversationID: managedGroup.ID, SuccessorIdentityID: observerLogin.Identity.OrganizationIdentity.ID,
-		})
-		var validationError *conversationaction.ValidationError
-		if !errors.As(err, &validationError) || validationError.Fields["successorIdentityId"] != conversationaction.ValidationGroupSuccessorIDInvalid {
-			t.Fatalf("member leave with successor error = %#v", err)
-		}
-		if err := leave.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationLeaveInput{
-			ConversationID: managedGroup.ID, SuccessorIdentityID: memberLogin.Identity.OrganizationIdentity.ID,
+		if _, err := conversationaction.NewTransferGroupConversationOwnerAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationOwnerInput{
+			ConversationID: managedGroup.ID, OwnerIdentityID: memberLogin.Identity.OrganizationIdentity.ID,
 		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := leave.Execute(context.Background(), loggedIn.Identity, managedGroup.ID); err != nil {
 			t.Fatal(err)
 		}
 		transferredGroup, err := get.Execute(context.Background(), memberLogin.Identity, managedGroup.ID)
@@ -1442,7 +1438,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || len(remainingGroup.Participants) != 1 {
 			t.Fatalf("remaining group = %#v, error = %v", remainingGroup, err)
 		}
-		if err := leave.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationLeaveInput{ConversationID: dissolvedGroup.ID}); err != nil {
+		if _, err := conversationaction.NewDissolveGroupConversationAction(db).Execute(context.Background(), loggedIn.Identity, dissolvedGroup.ID); err != nil {
 			t.Fatal(err)
 		}
 		dissolvedDetail, err := get.Execute(context.Background(), loggedIn.Identity, dissolvedGroup.ID)

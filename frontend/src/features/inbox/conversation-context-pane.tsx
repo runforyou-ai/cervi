@@ -14,7 +14,6 @@ import {
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  type GroupConversationData,
   type InboxConversation,
   type MemberOption,
 } from "@/api"
@@ -131,23 +130,12 @@ function ConversationContextContent({
   directTarget,
   displayName,
   currentIdentityID,
-  groupDraft,
-  onGroupDraftChange,
-  onGroupSummaryChange,
   onGroupLeft,
 }: {
   conversation: InboxConversation | null
   directTarget: MemberOption | null
   displayName: string
   currentIdentityID: string
-  groupDraft: GroupConversationData | null
-  onGroupDraftChange: (group: GroupConversationData) => void
-  onGroupSummaryChange: (changes: {
-    title?: string
-    imageUrl?: string
-    memberCount?: number
-    status?: GroupConversationData["status"]
-  }) => void
   onGroupLeft: () => void
 }) {
   const { t } = useTranslation("inbox")
@@ -244,9 +232,6 @@ function ConversationContextContent({
         <GroupConversationContext
           conversationID={conversation.id}
           currentIdentityID={currentIdentityID}
-          draft={groupDraft}
-          onDraftChange={onGroupDraftChange}
-          onSummaryChange={onGroupSummaryChange}
           onLeft={onGroupLeft}
         />
       ) : (
@@ -288,7 +273,6 @@ export function ConversationContextPane({
   directTarget,
   displayName,
   currentIdentityID,
-  onGroupSummaryChange,
   onGroupLeft,
   visible,
   onToggle,
@@ -297,12 +281,6 @@ export function ConversationContextPane({
   directTarget: MemberOption | null
   displayName: string
   currentIdentityID: string
-  onGroupSummaryChange: (changes: {
-    title?: string
-    imageUrl?: string
-    memberCount?: number
-    status?: GroupConversationData["status"]
-  }) => void
   onGroupLeft: () => void
   visible: boolean
   onToggle: () => void
@@ -310,15 +288,6 @@ export function ConversationContextPane({
   const { t } = useTranslation("inbox")
   const [contextPanelWidth, setContextPanelWidth] =
     useState(contextPanelMinWidth)
-  const [groupDraft, setGroupDraft] = useState<{
-    conversationID: string
-    group: GroupConversationData
-  } | null>(null)
-  const activeGroupDraft =
-    groupDraft && groupDraft.conversationID === conversation?.id
-      ? groupDraft.group
-      : null
-
   /** 结束拖动联系人上下文栏。 */
   function stopContextPanelResize(event: ReactPointerEvent<HTMLButtonElement>) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -389,11 +358,6 @@ export function ConversationContextPane({
           directTarget={directTarget}
           displayName={displayName}
           currentIdentityID={currentIdentityID}
-          groupDraft={activeGroupDraft}
-          onGroupDraftChange={(group) =>
-            setGroupDraft({ conversationID: group.id, group })
-          }
-          onGroupSummaryChange={onGroupSummaryChange}
           onGroupLeft={onGroupLeft}
         />
       </aside>

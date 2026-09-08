@@ -354,9 +354,17 @@ func (b *Backend) TransferGroupConversationOwner(ctx context.Context, meta appse
 	return output, err
 }
 
-// LeaveGroupConversation 退出群聊并按需转让群主。
-func (b *Backend) LeaveGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationLeaveInput) error {
-	return b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/leave", nil, input, nil)
+// LeaveGroupConversation 退出普通成员参与的群聊。
+func (b *Backend) LeaveGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/leave", nil, nil, nil)
+}
+
+// DissolveGroupConversation 解散群聊并保留当前成员的只读历史。
+func (b *Backend) DissolveGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.GroupConversation, error) {
+	var output appservice.GroupConversation
+	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/dissolve", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
 }
 
 // SendGroupTextMessage 发送企业内部群聊文本消息。

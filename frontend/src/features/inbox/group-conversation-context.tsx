@@ -1,10 +1,12 @@
 /** 群聊资料栏中的资料编辑和成员管理交互。 */
 import {
   useEffect,
+  useRef,
   useState,
   type KeyboardEvent,
   type ReactNode,
 } from "react"
+import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -31,6 +33,13 @@ import {
 } from "@/components/form/detail-edit-row"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { GroupDissolveDialog } from "@/features/inbox/group-dissolve-dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -88,6 +97,8 @@ function GroupConversationProfile({
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
+  const [dissolveOpen, setDissolveOpen] = useState(false)
+  const moreTrigger = useRef<HTMLButtonElement>(null)
   const [editing, setEditing] = useState<"title" | "description" | null>(null)
   const [title, setTitle] = useState(group.title)
   const [description, setDescription] = useState(group.description)
@@ -110,6 +121,14 @@ function GroupConversationProfile({
       if (imagePreviewURL) URL.revokeObjectURL(imagePreviewURL)
     }
   }, [imagePreviewURL])
+
+  useEffect(() => {
+    // 权限变化或群聊解散后停止资料编辑和解散确认。
+    if (!canManage) {
+      setEditing(null)
+      setDissolveOpen(false)
+    }
+  }, [canManage])
 
   /** 放弃尚未提交的群资料字段。 */
   function cancelEdit() {
@@ -281,8 +300,38 @@ function GroupConversationProfile({
             />
           )}
         </div>
-        <div className="w-14 shrink-0" />
+        <div className="flex w-14 shrink-0 justify-end">
+          {canManage ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  ref={moreTrigger}
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t("groupMore")}
+                  disabled={profileBusy}
+                >
+                  <MoreHorizontalIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  destructive
+                  onSelect={() => setDissolveOpen(true)}
+                >
+                  {t("groupDissolve")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
       </div>
+      <GroupDissolveDialog
+        group={group}
+        open={dissolveOpen}
+        onOpenChange={setDissolveOpen}
+        trigger={moreTrigger.current}
+      />
       <DetailEditRow
         label={t("groupTitleLabel")}
         value={group.title}
@@ -389,21 +438,10 @@ function GroupResourceState({
 export function GroupConversationContext({
   conversationID,
   currentIdentityID,
-  draft,
-  onDraftChange,
-  onSummaryChange,
   onLeft,
 }: {
   conversationID: string
   currentIdentityID: string
-  draft: GroupConversationData | null
-  onDraftChange: (group: GroupConversationData) => void
-  onSummaryChange: (changes: {
-    title?: string
-    imageUrl?: string
-    memberCount?: number
-    status?: GroupConversationData["status"]
-  }) => void
   onLeft: () => void
 }) {
   const { t } = useTranslation("inbox")
@@ -412,7 +450,7 @@ export function GroupConversationContext({
     () => getGroupConversation(conversationID),
   )
   const invalidate = useResourceInvalidator()
-  const group = draft ?? resource.data
+  const group = resource.data
   const currentParticipant = group?.participants.find(
     (participant) => participant.identityId === currentIdentityID,
   )
@@ -423,84 +461,60 @@ export function GroupConversationContext({
     currentParticipant?.role ===
     GroupParticipantRole.GroupParticipantRoleOwner
 
-  /** 应用服务端返回的群资料并刷新相关读取。 */
-  function applyGroupResult(result: GroupConversationData) {
-    onDraftChange(result)
-    onSummaryChange({
-      title: result.title,
-      imageUrl: result.imageUrl,
-      memberCount: result.participants.length,
-    })
-    void invalidate(resourceKeys.groupConversation(conversationID), {
-      exact: true,
-    })
-    void invalidate(resourceKeys.conversationMessages(conversationID), {
-      exact: true,
-    })
-    void invalidate(resourceKeys.inbox())
+  /** 刷新群资料、消息与收件箱，统一采用查询结果。 */
+  async function refreshGroup() {
+    await Promise.all([
+      invalidate(resourceKeys.groupConversation(conversationID), { exact: true }),
+      invalidate(resourceKeys.conversationMessages(conversationID), { exact: true }),
+      invalidate(resourceKeys.inbox()),
+    ])
   }
 
-  /** 修改群资料并采用服务端事实。 */
+  /** 修改群资料后刷新服务端事实。 */
   async function updateGroup(input: GroupConversationProfileInput) {
-    const result = await updateGroupConversation(conversationID, input)
-    applyGroupResult(result)
+    await updateGroupConversation(conversationID, input)
+    await refreshGroup()
   }
 
   /** 将选中的有效成员加入群聊。 */
   async function addMembers(members: MemberOption[]) {
-    const result = await addGroupConversationMembers(conversationID, {
+    await addGroupConversationMembers(conversationID, {
       memberIdentityIds: members.map((member) => member.id),
     })
-    applyGroupResult(result)
+    await refreshGroup()
   }
 
   /** 将群主转让给指定成员。 */
   async function transferOwner(identityID: string) {
-    const result = await transferGroupConversationOwner(conversationID, {
+    await transferGroupConversationOwner(conversationID, {
       ownerIdentityId: identityID,
     })
-    applyGroupResult(result)
+    await refreshGroup()
   }
 
   /** 将指定成员移出群聊。 */
   async function removeMember(identityID: string) {
-    const result = await removeGroupConversationMember(conversationID, {
+    await removeGroupConversationMember(conversationID, {
       memberIdentityId: identityID,
     })
-    applyGroupResult(result)
+    await refreshGroup()
   }
 
-  /** 退出群聊后切换会话，解散群聊后保留当前历史视图。 */
-  async function leaveGroup(successorIdentityID?: string) {
-    const dissolving = Boolean(
-      group &&
-        canManage &&
-        group.participants.length === 1 &&
-        !successorIdentityID,
-    )
-    await leaveGroupConversation(conversationID, {
-      successorIdentityId: successorIdentityID ?? "",
-    })
-    await invalidate(resourceKeys.groupConversation(conversationID), {
-      exact: true,
-      refetchType: "none",
-    })
-    if (dissolving && group) {
-      const status = ConversationStatus.ConversationStatusArchived
-      onDraftChange({ ...group, status })
-      onSummaryChange({ status })
-      await invalidate(resourceKeys.conversationMessages(conversationID), {
-        exact: true,
-      })
-      void invalidate(resourceKeys.inbox())
-      return
-    }
-    await invalidate(resourceKeys.conversationMessages(conversationID), {
-      exact: true,
-      refetchType: "none",
-    })
-    void invalidate(resourceKeys.inbox())
+  /** 普通成员退出后返回消息列表。 */
+  async function leaveGroup() {
+    await leaveGroupConversation(conversationID)
     onLeft()
+    await Promise.all([
+      invalidate(resourceKeys.groupConversation(conversationID), {
+        exact: true,
+        refetchType: "none",
+      }),
+      invalidate(resourceKeys.conversationMessages(conversationID), {
+        exact: true,
+        refetchType: "none",
+      }),
+      invalidate(resourceKeys.inbox()),
+    ])
   }
 
   const failed = Boolean(resource.error) || (!resource.loading && !group)

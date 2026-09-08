@@ -57,6 +57,10 @@ import {
   type LoadInboxQuery,
   type MemberOption,
 } from "@/api"
+import {
+  memberChatPollingInterval,
+  useMemberChatPollingActive,
+} from "@/features/inbox/use-member-chat-polling"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { PageSplit } from "@/components/page-split"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -981,19 +985,29 @@ function ConversationMain({
 
   const sourceGroupConversation =
     conversation && isGroupInboxConversation(conversation) ? conversation : null
-  const [groupSummaryDraft, setGroupSummaryDraft] = useState<{
-    conversationID: string
-    summary: GroupInboxConversationData["group"]
-  } | null>(null)
-  const activeGroupSummary = sourceGroupConversation
-    ? groupSummaryDraft?.conversationID === sourceGroupConversation.id
-      ? groupSummaryDraft.summary
-      : sourceGroupConversation.group
-    : null
-
+  const groupPollingActive = useMemberChatPollingActive()
+  const groupResource = useResource(
+    resourceKeys.groupConversation(sourceGroupConversation?.id ?? ""),
+    () => getGroupConversation(sourceGroupConversation?.id ?? ""),
+    {
+      enabled: Boolean(sourceGroupConversation),
+      staleTime: 0,
+      refetchInterval: groupPollingActive ? memberChatPollingInterval : false,
+    },
+  )
+  const group = groupResource.data
   const displayedConversation =
-    sourceGroupConversation && activeGroupSummary
-      ? { ...sourceGroupConversation, group: activeGroupSummary }
+    sourceGroupConversation && group
+      ? {
+          ...sourceGroupConversation,
+          group: {
+            ...sourceGroupConversation.group,
+            title: group.title,
+            imageUrl: group.imageUrl,
+            memberCount: group.participants.length,
+            status: group.status,
+          },
+        }
       : conversation
   const contactName = displayedConversation
     ? conversationName(displayedConversation)
@@ -1086,18 +1100,6 @@ function ConversationMain({
         directTarget={directTarget}
         displayName={contactName}
         currentIdentityID={identity.user.identityId}
-        onGroupSummaryChange={(changes) => {
-          if (!sourceGroupConversation) return
-          setGroupSummaryDraft((current) => ({
-            conversationID: sourceGroupConversation.id,
-            summary: {
-              ...(current?.conversationID === sourceGroupConversation.id
-                ? current.summary
-                : sourceGroupConversation.group),
-              ...changes,
-            },
-          }))
-        }}
         onGroupLeft={() => {
           if (validConversation) onGroupLeft(validConversation.id)
         }}
@@ -1276,7 +1278,12 @@ function ConversationThread({
           onReplyToChange={setReplyTo}
           onSending={outgoing.start}
           onSent={outgoing.succeed}
-          onFailed={outgoing.fail}
+          onFailed={(clientMessageID) => {
+            outgoing.fail(clientMessageID)
+            // 发送被拒绝后同步群资料，及时关闭解散群的发送区。
+            if (groupConversation)
+              void invalidate(resourceKeys.groupConversation(groupConversation.id))
+          }}
           onSucceeded={onConversationChanged}
           attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
           onAttachmentConversationCreated={(created) => {

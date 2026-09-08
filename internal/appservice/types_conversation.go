@@ -226,11 +226,6 @@ type GroupConversationOwnerInput struct {
 	OwnerIdentityID string `json:"ownerIdentityId"`
 }
 
-// GroupConversationLeaveInput 定义当前成员退出群聊参数。
-type GroupConversationLeaveInput struct {
-	SuccessorIdentityID string `json:"successorIdentityId"`
-}
-
 // GroupParticipant 定义群聊当前有效成员。
 type GroupParticipant struct {
 	IdentityType  OrganizationIdentityType `json:"identityType"`
