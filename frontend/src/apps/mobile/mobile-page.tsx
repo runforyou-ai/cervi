@@ -14,10 +14,12 @@ import { cn } from "@/lib/utils"
 export function MobilePageHeader({
   title,
   backTo,
+  backDisabled = false,
   actions,
 }: {
   title: ReactNode
   backTo?: string
+  backDisabled?: boolean
   actions?: ReactNode
 }) {
   const { t } = useTranslation("common")
@@ -50,11 +52,11 @@ export function MobilePageHeader({
     const handleBack = (event: Event) => {
       if (event.defaultPrevented) return
       event.preventDefault()
-      back()
+      if (!backDisabled) back()
     }
     window.addEventListener("cervi:back", handleBack)
     return () => window.removeEventListener("cervi:back", handleBack)
-  }, [back, backTo])
+  }, [back, backTo, backDisabled])
   return (
     <header
       ref={headerRef}
@@ -67,6 +69,7 @@ export function MobilePageHeader({
             variant="ghost"
             size="icon-lg"
             aria-label={t("actions.back")}
+            disabled={backDisabled}
             onClick={back}
           >
             <ArrowLeftIcon />
@@ -76,7 +79,10 @@ export function MobilePageHeader({
       <h1 className="min-w-0 max-w-full justify-self-center truncate text-center text-lg font-semibold tracking-tight">
         {title}
       </h1>
-      <div ref={endRef} className="flex w-max items-center justify-self-end gap-2">
+      <div
+        ref={endRef}
+        className="flex w-max items-center justify-self-end gap-2"
+      >
         {actions}
       </div>
     </header>
