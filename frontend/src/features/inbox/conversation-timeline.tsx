@@ -797,7 +797,7 @@ function ConversationTimelineContent({
                               {senderName}
                             </span>
                           ) : null}
-                          <div className="relative min-w-0 max-w-full">
+                          <div className={cn("relative min-w-0 max-w-full", message.agentProcess && "w-full")}>
                             {endsGroup ? (
                               <ProfileAvatar
                                 title={senderName}
