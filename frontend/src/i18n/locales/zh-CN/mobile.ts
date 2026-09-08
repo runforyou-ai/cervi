@@ -52,6 +52,9 @@ const mobile = {
   },
   group: {
     add: "添加",
+    addMembers: "添加群成员",
+    addOwnerOnly: "仅群主可添加成员。",
+    addArchived: "群聊已解散，无法添加成员。",
     viewMembers: "查看群成员({{count}})",
     editOwnerOnly: "仅群主可修改群资料。",
     editArchived: "群聊已解散，无法修改资料。",
