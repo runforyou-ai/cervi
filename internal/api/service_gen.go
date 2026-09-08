@@ -33,6 +33,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/preferences", s.updateUserPreferences)
 	router.PATCH("/work-status", s.updateUserWorkStatus)
 	router.GET("/inbox", s.loadInbox)
+	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
+	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.GET("/conversations/:conversationID/message-references", s.listConversationMessageReferences)
@@ -315,6 +317,22 @@ func (s *Service) loadInbox(c *gin.Context) {
 		return
 	}
 	output, err := s.application.LoadInbox(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getInboxConversation 返回当前用户有权阅读的独立会话摘要。
+func (s *Service) getInboxConversation(c *gin.Context) {
+	output, err := s.application.GetInboxConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// readInboxConversations 按 ID 批量返回会话摘要及当前筛选资格。
+func (s *Service) readInboxConversations(c *gin.Context) {
+	var input appservice.ReadInboxConversationsInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.ReadInboxConversations(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

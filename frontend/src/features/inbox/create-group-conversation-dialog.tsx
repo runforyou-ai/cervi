@@ -1,5 +1,5 @@
 /** 企业内部群聊创建表单。 */
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useController, useForm } from "react-hook-form"
@@ -31,7 +31,7 @@ import { GroupImagePicker } from "@/features/inbox/group-avatar"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -82,7 +82,9 @@ export function CreateGroupConversationDialog({
 }) {
   const { t } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const [query, setQuery] = useState("")
+  const createRequestID = useRef(0)
   const image = usePendingImageUpload({
     purpose: FilePurpose.FilePurposeGroupImage,
     onError: (error) => {
@@ -108,6 +110,10 @@ export function CreateGroupConversationDialog({
     defaultValues: { title: "", description: "", memberIdentityIds: [] },
   })
 
+  useEffect(() => () => {
+    createRequestID.current += 1
+  }, [])
+
   const { field: memberIdentityIDsField } = useController({
     control: form.control,
     name: "memberIdentityIds",
@@ -122,23 +128,31 @@ export function CreateGroupConversationDialog({
 
   /** 创建群聊并关闭表单。 */
   async function create(values: GroupConversationValues) {
+    const requestID = ++createRequestID.current
     let uploadingImage = false
     try {
       uploadingImage = Boolean(pendingImage && !pendingImage.fileID)
       const imageFileId = await image.ensureUploaded()
       uploadingImage = false
+      if (requestID !== createRequestID.current) return
       const conversation = await createGroupConversation({
         title: values.title.trim(),
         description: values.description.trim(),
         imageFileId,
         memberIdentityIds: values.memberIdentityIds,
       })
+      // 关闭表单或离开页面后忽略迟到结果，不重新打开已放弃的会话。
+      if (requestID !== createRequestID.current) {
+        void invalidate(resourceKeys.inbox())
+        return
+      }
       if (!isGroupInboxConversation(conversation)) {
         throw new Error("企业群聊响应结构无效")
       }
       onCreated(conversation)
       changeOpen(false)
     } catch (createError) {
+      if (requestID !== createRequestID.current) return
       // 上传失败已由共享上传回调提示，创建只处理群聊提交错误。
       if (uploadingImage) return
       if (recoverSession(createError, navigate)) return
@@ -159,6 +173,7 @@ export function CreateGroupConversationDialog({
   /** 关闭时清空尚未提交的群聊表单。 */
   function changeOpen(nextOpen: boolean) {
     if (!nextOpen) {
+      createRequestID.current += 1
       form.reset()
       setQuery("")
       image.clear()

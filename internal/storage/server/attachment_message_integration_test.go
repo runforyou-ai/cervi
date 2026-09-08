@@ -229,6 +229,14 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentReady); err == nil {
 		t.Fatal("pending file marked ready")
 	}
+	// 客户端失权或退出后停止心跳，接收方仍能读到超时失败，消息位置不变。
+	if _, err := f.db.NewRaw("UPDATE message_attachments SET upload_expires_at = now() - interval '1 second' WHERE file_id = ?", first).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	expiredHistory, err := query.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: result.ConversationID})
+	if err != nil || len(expiredHistory.Messages) != 2 || expiredHistory.Messages[0].ID != result.Messages[0].ID || expiredHistory.Messages[0].Attachment == nil || expiredHistory.Messages[0].Attachment.UploadStatus != domain.AttachmentFailed || expiredHistory.Messages[1].Attachment == nil || expiredHistory.Messages[1].Attachment.UploadStatus != domain.AttachmentUploading {
+		t.Fatalf("expired upload history=%+v %v", expiredHistory, err)
+	}
 	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentFailed); err != nil {
 		t.Fatal(err)
 	}

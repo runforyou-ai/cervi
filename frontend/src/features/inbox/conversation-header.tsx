@@ -12,7 +12,6 @@ import { toast } from "sonner"
 import {
   ChannelType,
   ConversationStatus,
-  CustomerInboxView,
   ServiceSessionStatus,
   claimServiceSession,
   closeServiceSession,
@@ -58,18 +57,14 @@ export function ConversationHeader({
   contactName,
   sessionStatus,
   currentIdentityId,
-  onSessionMoved,
+  onSessionChanged,
   narrowViewport = false,
 }: {
   conversation: InboxConversation
   contactName: string
   sessionStatus: string
   currentIdentityId: string
-  onSessionMoved: (
-    session: CustomerServiceSession,
-    view: CustomerInboxView,
-    assigneeIdentityId?: string,
-  ) => void
+  onSessionChanged: () => void
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])
@@ -115,12 +110,11 @@ export function ConversationHeader({
     nextOperation: string,
     execute: () => Promise<CustomerServiceSession>,
     successMessage: string,
-    afterSuccess?: (session: CustomerServiceSession) => void,
   ) {
     setOperation(nextOperation)
     try {
-      const session = await execute()
-      afterSuccess?.(session)
+      await execute()
+      onSessionChanged()
       toast.success(successMessage)
     } catch (error) {
       if (recoverSession(error, navigate)) return
@@ -214,11 +208,6 @@ export function ConversationHeader({
                   "reopen",
                   () => reopenServiceSession(conversation.id),
                   t("conversationReopenSuccess"),
-                  (session) =>
-                    onSessionMoved(
-                      session,
-                      CustomerInboxView.CustomerInboxViewMine,
-                    ),
                 )
               }
             >
@@ -242,11 +231,6 @@ export function ConversationHeader({
                   customer.assignee
                     ? t("conversationTakeoverSuccess")
                     : t("conversationClaimSuccess"),
-                  (session) =>
-                    onSessionMoved(
-                      session,
-                      CustomerInboxView.CustomerInboxViewMine,
-                    ),
                 )
               }
             >
@@ -294,12 +278,6 @@ export function ConversationHeader({
                           t("conversationTransferSuccess", {
                             name: assignee.displayName,
                           }),
-                          (session) =>
-                            onSessionMoved(
-                              session,
-                              CustomerInboxView.CustomerInboxViewCoworkers,
-                              assignee.identityId,
-                            ),
                         )
                       }
                     >
@@ -367,11 +345,6 @@ export function ConversationHeader({
                         "reopen",
                         () => reopenServiceSession(conversation.id),
                         t("conversationReopenSuccess"),
-                        (session) =>
-                          onSessionMoved(
-                            session,
-                            CustomerInboxView.CustomerInboxViewMine,
-                          ),
                       )
                     }
                   >
@@ -386,11 +359,6 @@ export function ConversationHeader({
                         customer.assignee
                           ? t("conversationTakeoverSuccess")
                           : t("conversationClaimSuccess"),
-                        (session) =>
-                          onSessionMoved(
-                            session,
-                            CustomerInboxView.CustomerInboxViewMine,
-                          ),
                       )
                     }
                   >
@@ -412,12 +380,6 @@ export function ConversationHeader({
                           t("conversationTransferSuccess", {
                             name: assignee.displayName,
                           }),
-                          (session) =>
-                            onSessionMoved(
-                              session,
-                              CustomerInboxView.CustomerInboxViewCoworkers,
-                              assignee.identityId,
-                            ),
                         )
                       }
                     >
@@ -465,11 +427,6 @@ export function ConversationHeader({
                   "close",
                   () => closeServiceSession(conversation.id),
                   t("conversationCloseSuccess"),
-                  (session) =>
-                    onSessionMoved(
-                      session,
-                      CustomerInboxView.CustomerInboxViewClosed,
-                    ),
                 )
               }
             >

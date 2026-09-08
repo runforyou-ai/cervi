@@ -24,8 +24,12 @@ function scopedListKey(
 }
 
 export const resourceKeys = {
+  /** 不依赖列表筛选的会话摘要。 */
+  conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
+  /** 指定会话的列表资格。 */
+  inboxConversations: (parameters?: KeyParameters) => listKey("inbox-conversations", parameters),
   /** 当前窗口内消息的引用状态。 */
-  conversationMessageReferences: (conversationId: string, messageIds: string) => scopedListKey("conversation-message-references", conversationId, { messageIds }),
+  conversationMessageReferences: (conversationId: string, messageIds?: string) => scopedListKey("conversation-message-references", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 当前会话窗口的外部投递状态。 */
   customerDeliveries: (conversationId: string, messageIds?: string) =>
     scopedListKey("customer-deliveries", conversationId, messageIds === undefined ? undefined : { messageIds }),
@@ -36,7 +40,9 @@ export const resourceKeys = {
   /** 窗口内附件的上传状态。 */
   attachmentStates: (conversationId: string, messageIds?: string) => scopedListKey("attachment-states", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 附件下载与图片读取地址。 */
-  attachmentDownload: (conversationId: string, messageId: string) => ["attachment-download", conversationId, messageId] as const,
+  attachmentDownload: (conversationId: string, messageId?: string) => messageId === undefined
+    ? ["attachment-download", conversationId] as const
+    : ["attachment-download", conversationId, messageId] as const,
   /** 单个会话的初始消息页。 */
   conversationMessages: (conversationId?: string) =>
     itemKey("conversation-messages", conversationId),

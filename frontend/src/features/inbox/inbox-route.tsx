@@ -1,17 +1,13 @@
 /** 消息列表路由。 */
 import { useEffect, useRef } from "react"
-import { RefreshCwIcon } from "lucide-react"
-import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
 import {
   CustomerInboxView,
   InboxScope,
   loadInbox,
-  type InboxData,
+  type InboxConversation,
 } from "@/api"
-import { Button } from "@/components/ui/button"
-import { LoadingIndicator } from "@/components/loading-indicator"
 import { InboxPage } from "@/features/inbox/inbox-page"
 import {
   memberChatPollingInterval,
@@ -22,13 +18,14 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
+const emptyConversations: InboxConversation[] = []
+
 /** 加载并显示消息页。 */
 export function InboxRoute() {
-  const { t } = useTranslation(["workspace", "common"])
   const { applyUnreadSnapshot, beginUnreadSnapshot } = useWorkspace()
   const pollingActive = useMemberChatPollingActive()
   const previousPollingActiveRef = useRef(pollingActive)
-  const previousDataRef = useRef<InboxData | null>(null)
+  const selections = useRef(new Map<string, string>())
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedConversationId = searchParams.get("conversation") ?? ""
   const scope =
@@ -43,7 +40,7 @@ export function InboxRoute() {
       ? (searchParams.get("assignee") ?? "")
       : ""
   const query = { scope, customerView, assigneeIdentityId }
-  const { data, loading, refreshing, error, refresh } = useResource(
+  const { data, loading, error, refresh } = useResource(
     resourceKeys.inbox(query),
     () => loadInbox(query),
     {
@@ -51,9 +48,7 @@ export function InboxRoute() {
       refetchOnWindowFocus: false,
     },
   )
-  const showLoading = loading || (Boolean(error) && refreshing)
-  if (data) previousDataRef.current = data
-  const visibleData = data ?? previousDataRef.current
+  const showLoading = loading && !data
 
   useEffect(() => {
     if (pollingActive && !previousPollingActiveRef.current && data) {
@@ -72,34 +67,6 @@ export function InboxRoute() {
     })
   }, [applyUnreadSnapshot, beginUnreadSnapshot, data])
 
-  if (showLoading && !visibleData) {
-    return (
-      <LoadingIndicator className="flex-1 justify-center">
-        {t("common:status.loading")}
-      </LoadingIndicator>
-    )
-  }
-
-  if ((!data && Boolean(error)) || !visibleData) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-6 text-center">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {t("inboxLoadError")}
-          </p>
-          <Button
-            className="mt-4"
-            variant="outline"
-            onClick={() => void refresh()}
-          >
-            <RefreshCwIcon />
-            {t("common:actions.retry")}
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
   /** 更新收件箱范围和客户视图查询参数。 */
   function updateQuery(changes: {
     scope?: InboxScope
@@ -111,6 +78,11 @@ export function InboxRoute() {
     const nextScope = changes.scope ?? scope
     const nextView = changes.customerView ?? customerView
     const nextAssignee = changes.assigneeIdentityId ?? assigneeIdentityId
+    const queryIdentity = `${scope}/${customerView}/${assigneeIdentityId}`
+    const nextQueryIdentity = `${nextScope}/${nextScope === InboxScope.InboxScopeCustomer ? nextView : CustomerInboxView.CustomerInboxViewQueue}/${nextScope === InboxScope.InboxScopeCustomer && nextView === CustomerInboxView.CustomerInboxViewCoworkers ? nextAssignee : ""}`
+    // 切换筛选时保存当前选择，恢复目标筛选的上次选择，无记录则保持未选中。
+    selections.current.set(queryIdentity, selectedConversationId)
+    const nextSelection = changes.conversationId ?? (nextQueryIdentity === queryIdentity ? selectedConversationId : selections.current.get(nextQueryIdentity) ?? "")
     setSearchParams((current) => {
       const next = new URLSearchParams(current)
       next.delete("target")
@@ -130,13 +102,8 @@ export function InboxRoute() {
         next.delete("view")
         next.delete("assignee")
       }
-      if (changes.conversationId !== undefined) {
-        if (changes.conversationId) {
-          next.set("conversation", changes.conversationId)
-        } else {
-          next.delete("conversation")
-        }
-      }
+      if (nextSelection) next.set("conversation", nextSelection)
+      else next.delete("conversation")
       return next
     }, { replace: changes.replace ?? true })
   }
@@ -154,8 +121,8 @@ export function InboxRoute() {
 
   return (
     <InboxPage
-      conversations={visibleData.conversations}
-      attentionUnreadCount={visibleData.attentionUnreadCount}
+      conversations={data?.conversations ?? emptyConversations}
+      attentionUnreadCount={data?.attentionUnreadCount ?? 0}
       listLoading={showLoading}
       listError={Boolean(error)}
       onListRefresh={() => void refresh()}

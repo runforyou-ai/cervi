@@ -147,3 +147,30 @@ type Inbox struct {
 	UnreadCount          int                 `json:"unreadCount"`
 	AttentionUnreadCount int                 `json:"attentionUnreadCount"`
 }
+
+// InboxConversationAvailability 表示指定会话的阅读和列表资格。
+type InboxConversationAvailability string
+
+const (
+	InboxConversationMatching     InboxConversationAvailability = "matching"
+	InboxConversationOutsideQuery InboxConversationAvailability = "outside_query"
+	InboxConversationUnavailable  InboxConversationAvailability = "unavailable"
+)
+
+// ReadInboxConversationsInput 指定待核对的会话及完整列表筛选。
+type ReadInboxConversationsInput struct {
+	ConversationIDs []string       `json:"conversationIds"`
+	Query           LoadInboxInput `json:"query"`
+}
+
+// InboxConversationResult 不可用时仅保留请求 ID 和资格，不返回实体信息。
+type InboxConversationResult struct {
+	ID           string                        `json:"id"`
+	Availability InboxConversationAvailability `json:"availability"`
+	Conversation *InboxConversation            `json:"conversation"`
+}
+
+// InboxConversationResults 按请求顺序返回每项结果。
+type InboxConversationResults struct {
+	Results []InboxConversationResult `json:"results"`
+}
