@@ -1,6 +1,12 @@
-/** 在聊天消息中展示折叠的 Agent 思考过程、工具详情和模型用量。 */
-import { useLayoutEffect, useRef, useState } from "react"
-import { BrainIcon, ChevronDownIcon, LightbulbIcon } from "lucide-react"
+/** 展示 Agent 思考过程、工具详情、模型用量和停止回复入口。 */
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useNavigate } from "react-router"
+import { toast } from "sonner"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
+import { apiErrorMessage } from "@/lib/form-errors"
+import { recoverSession } from "@/lib/session-navigation"
+import { BrainIcon, ChevronDownIcon, LightbulbIcon, SquareIcon } from "lucide-react"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { openExternalURL } from "@/platform/external-navigation"
@@ -8,6 +14,8 @@ import { useTranslation } from "react-i18next"
 import { Popover } from "radix-ui"
 
 import {
+  isApiError,
+  stopAgentReply,
   AgentRunBlockKind,
   AgentRunStatus,
   AgentToolCallStatus,
@@ -180,9 +188,10 @@ export function AgentProcessUsage({ process, incoming }: { process: Conversation
 }
 
 /** 显示最近一次运行的等待、思考或取消状态。 */
-export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; incoming: boolean }) {
+export function AgentRunState({ run, incoming, conversationID, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; onStopped: () => Promise<unknown> }) {
   const { t } = useTranslation("inbox")
-  if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed) return null
+  if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed ||
+    (run.status === AgentRunStatus.AgentRunStatusCancelled && run.errorCode === "user_cancelled")) return null
   const thinking = run.status === AgentRunStatus.AgentRunStatusRunning
   const cancelled = run.status === AgentRunStatus.AgentRunStatusCancelled
   const senderName = run.agentName.trim() || t("unknownSender")
@@ -216,11 +225,57 @@ export function AgentRunState({ run, incoming }: { run: ConversationAgentRun; in
         <div className="flex items-center gap-1.5">
           {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
           <span>{label}</span>
+          {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} onStopped={onStopped} /> : null}
         </div>
         {cancelled && reason ? (
           <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>
         ) : null}
       </div>
     </div>
+  )
+}
+
+/** 停止指定运行后刷新原会话资源，卸载后忽略交互结果。 */
+function AgentReplyStopButton({ conversationID, runID, onStopped }: { conversationID: string; runID: string; onStopped: () => Promise<unknown> }) {
+  const { t } = useTranslation("inbox")
+  const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
+  const [stopping, setStopping] = useState(false)
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
+
+  /** 提交停止命令并通过查询读取最终状态和消息。 */
+  async function stop() {
+    setStopping(true)
+    try {
+      await stopAgentReply(conversationID, runID)
+      await Promise.all([
+        invalidate(resourceKeys.conversationMessages(conversationID)),
+        invalidate(resourceKeys.conversationMessagePage(conversationID)),
+        invalidate(resourceKeys.inbox()),
+      ])
+      if (alive.current) await onStopped()
+    } catch (error) {
+      if (!alive.current || recoverSession(error, navigate)) return
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t("agentStopFailed"))
+    } finally {
+      if (alive.current) setStopping(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"
+      aria-label={t("agentStopReply")}
+      title={t("agentStopReply")}
+      disabled={stopping}
+      onClick={() => void stop()}
+    >
+      <SquareIcon aria-hidden className="size-3 fill-current" />
+    </button>
   )
 }

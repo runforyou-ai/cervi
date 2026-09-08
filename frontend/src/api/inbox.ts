@@ -22,6 +22,7 @@ import {
   SendCustomerTextMessage,
   SendFirstAgentTextMessage,
   SendAgentTextMessage,
+  StopAgentReply,
   SendFirstDirectTextMessage,
   SendDirectTextMessage,
   SendGroupTextMessage,
@@ -518,3 +519,6 @@ export async function listCustomerMessageDeliveries(conversationID: string, mess
 }
 /** 人工确认或重试一条客户消息投递。 */
 export const resolveCustomerMessageDelivery = bind(ResolveCustomerMessageDelivery)
+
+/** 停止指定 AI 回复并读取实际运行状态。 */
+export const stopAgentReply = bind(StopAgentReply)

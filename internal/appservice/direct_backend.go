@@ -9,6 +9,7 @@ import (
 	"time"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	businesssystemaction "github.com/runforyou-ai/cervi/internal/actions/businesssystem"
@@ -46,6 +47,7 @@ var (
 
 // DirectBackend 在服务端进程内直接调用 Action 和 Query。
 type DirectBackend struct {
+	agentCoordinator                  *agentrunaction.ExecuteAction
 	customerDeliveries                *deliveryaction.Manager
 	installWorkspace                  *installationaction.InstallWorkspaceAction
 	login                             *authaction.LoginAction
@@ -175,7 +177,7 @@ type DirectBackend struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator, knowledgeSearch *knowledgebaseaction.SearchService, deliveryEnqueuer servertask.TxEnqueuer) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, knowledgeSearch *knowledgebaseaction.SearchService, deliveryEnqueuer servertask.TxEnqueuer) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
@@ -185,6 +187,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 	difyKnowledgeBaseGetter := connector.NewDifyKnowledgeBaseGetter(connectorClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	return &DirectBackend{
+		agentCoordinator:                  agentCoordinator,
 		customerDeliveries:                deliveryaction.NewManager(db, deliveryEnqueuer),
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),

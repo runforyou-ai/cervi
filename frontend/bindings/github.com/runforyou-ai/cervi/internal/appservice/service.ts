@@ -778,6 +778,13 @@ export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string
 }
 
 /**
+ * StopAgentReply 停止独立 AI 会话中指定的回复并返回实际运行状态。
+ */
+export function StopAgentReply(meta: $models.RequestMeta, conversationID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
+    return $Call.ByID(4044594473, meta, conversationID, runID);
+}
+
+/**
  * TestAIProviderConnection 测试模型服务供应商草稿配置。
  */
 export function TestAIProviderConnection(meta: $models.RequestMeta, input: $models.AIProviderConnectionInput): $CancellablePromise<void> {
