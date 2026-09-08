@@ -20,9 +20,11 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 /** 复用消息窗口和幂等重试，群聊解散后保留历史并关闭发送区。 */
 export function MobileGroupThread({
   conversation,
+  active = true,
   onUnavailable,
 }: {
   conversation: GroupConversationData
+  active?: boolean
   onUnavailable: () => void
 }) {
   const { t } = useTranslation("mobile")
@@ -39,6 +41,7 @@ export function MobileGroupThread({
     <>
       <ConversationTimeline
         conversationID={conversation.id}
+        enabled={active}
         conversationType={ConversationType.ConversationTypeGroup}
         currentUser={identity.user}
         requireWindowFocus={false}
