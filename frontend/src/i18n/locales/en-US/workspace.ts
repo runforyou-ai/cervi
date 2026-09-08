@@ -45,7 +45,6 @@ const workspace = {
       channels: "Message channels",
       businessSystems: "Business systems",
       modelServices: "Model services",
-      connectors: "Connectors",
     },
   },
 }

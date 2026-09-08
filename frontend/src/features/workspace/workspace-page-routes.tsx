@@ -9,8 +9,6 @@ import { AppsPage } from "@/features/apps/apps-page"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
 import { BusinessSystemFormPage } from "@/features/integrations/business-systems/business-system-form-page"
 import { BusinessSystemListPage } from "@/features/integrations/business-systems/business-system-list-page"
-import { ConnectorFormPage } from "@/features/integrations/connectors/connector-form-page"
-import { ConnectorListPage } from "@/features/integrations/connectors/connector-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
 import { KnowledgeQAListPage } from "@/features/knowledge-base/knowledge-qa-list-page"
@@ -18,8 +16,6 @@ import { KnowledgeQAFormPage } from "@/features/knowledge-base/knowledge-qa-form
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
 import { KnowledgeBaseIndexPage } from "@/features/knowledge-base/knowledge-base-index-page"
 import { KnowledgeBaseLayout } from "@/features/knowledge-base/knowledge-base-layout"
-import { KnowledgeDocumentListPage } from "@/features/knowledge-base/knowledge-document-list-page"
-import { KnowledgeDocumentPage } from "@/features/knowledge-base/knowledge-document-page"
 import { RoleFormPage } from "@/features/roles/role-form-page"
 import {
   PersonalSettingsPage,
@@ -54,16 +50,6 @@ const workspaceRouteDefinitions = [
   { path: "/contacts/external", titleKey: "tabs.routes.externalContacts" },
   {
     path: "/knowledge-bases/new",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
-  },
-  {
-    path: "/knowledge-bases/:knowledgeBaseId/documents/:documentId",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
-  },
-  {
-    path: "/knowledge-bases/:knowledgeBaseId/documents",
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
   },
@@ -158,20 +144,6 @@ const workspaceRouteDefinitions = [
     path: "/integrations/model-services/rerank",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
-  },
-  {
-    path: "/integrations/connectors/new",
-    tabPath: "/integrations/connectors",
-    titleKey: "tabs.routes.connectors",
-  },
-  {
-    path: "/integrations/connectors/:connectionId",
-    tabPath: "/integrations/connectors",
-    titleKey: "tabs.routes.connectors",
-  },
-  {
-    path: "/integrations/connectors",
-    titleKey: "tabs.routes.connectors",
   },
 ] as const
 
@@ -316,14 +288,6 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
         />
         <Route path="new" element={<KnowledgeBaseFormPage mode="create" />} />
         <Route
-          path=":knowledgeBaseId/documents/:documentId"
-          element={<KnowledgeDocumentPage />}
-        />
-        <Route
-          path=":knowledgeBaseId/documents"
-          element={<KnowledgeDocumentListPage />}
-        />
-        <Route
           path=":knowledgeBaseId"
           element={<KnowledgeBaseFormPage mode="edit" />}
         />
@@ -397,15 +361,6 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
           element={
             <ModelProviderFormPage mode="edit" returnSection="rerank" />
           }
-        />
-        <Route path="connectors" element={<ConnectorListPage />} />
-        <Route
-          path="connectors/new"
-          element={<ConnectorFormPage mode="create" />}
-        />
-        <Route
-          path="connectors/:connectionId"
-          element={<ConnectorFormPage mode="edit" />}
         />
       </Route>
     </Routes>

@@ -40,7 +40,7 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if err != nil {
 			return err
 		}
-		if stored.Category != string(input.Category) || (stored.IntegrationConnectionID == nil) != (input.IntegrationConnectionID == "") {
+		if stored.Category != string(input.Category) {
 			occupied, err := tx.NewSelect().Model((*servermodels.KnowledgeQAEntry)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exists(ctx)
 			if err != nil {
 				return err
@@ -49,24 +49,16 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 				return ErrBaseHasContent
 			}
 		}
-		if err := validateDifyConnection(ctx, tx, identity.Organization.ID, input.IntegrationConnectionID); err != nil {
-			return err
-		}
 		result, err := tx.NewUpdate().Model((*servermodels.KnowledgeBase)(nil)).
 			Set("name = ?", input.Name).
 			Set("category = ?", input.Category).
 			Set("description = ?", input.Description).
-			Set("integration_connection_id = ?", common.OptionalString(input.IntegrationConnectionID)).
-			Set("external_resource_id = ?", common.OptionalString(input.ExternalResourceID)).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", knowledgeBaseID).
 			Exec(ctx)
 		if isConstraintConflict(err, "knowledge_bases_organization_name_unique") {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"name": ValidationNameDuplicate}}
-		}
-		if isConstraintConflict(err, "knowledge_bases_external_resource_unique") {
-			return &common.FieldError{Fields: map[string]common.FieldCode{"externalResourceId": ValidationExternalResourceDuplicate}}
 		}
 		if err != nil {
 			return err

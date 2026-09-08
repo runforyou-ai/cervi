@@ -107,12 +107,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.updateKnowledgeQAEntry)
 	router.DELETE("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.deleteKnowledgeQAEntry)
 	router.GET("/knowledge-bases", s.listKnowledgeBases)
-	router.GET("/integration-connections/:connectionID/knowledge-bases", s.listExternalKnowledgeBaseOptions)
-	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
-	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
-	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/file", s.getKnowledgeDocumentFile)
-	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/segments", s.listKnowledgeDocumentSegments)
-	router.POST("/knowledge-bases/:knowledgeBaseID/retrieve", s.retrieveKnowledgeBase)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
@@ -142,12 +136,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/integrations/business-systems", s.createBusinessSystem)
 	router.PUT("/integrations/business-systems/:businessSystemID", s.updateBusinessSystem)
 	router.DELETE("/integrations/business-systems/:businessSystemID", s.deleteBusinessSystem)
-	router.GET("/integrations/connectors", s.listIntegrationConnections)
-	router.GET("/integrations/connectors/:connectionID", s.getIntegrationConnection)
-	router.POST("/integrations/connectors/test", s.testIntegrationConnection)
-	router.POST("/integrations/connectors", s.createIntegrationConnection)
-	router.PUT("/integrations/connectors/:connectionID", s.updateIntegrationConnection)
-	router.DELETE("/integrations/connectors/:connectionID", s.deleteIntegrationConnection)
 	router.PUT("/settings/organization", s.updateOrganization)
 	router.GET("/settings/storage/s3", s.getS3Setting)
 	router.PUT("/settings/storage/s3", s.saveS3Setting)
@@ -938,54 +926,6 @@ func (s *Service) listKnowledgeBases(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
-func (s *Service) listExternalKnowledgeBaseOptions(c *gin.Context) {
-	output, err := s.application.ListExternalKnowledgeBaseOptions(c.Request.Context(), requestMeta(c), c.Param("connectionID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// listKnowledgeDocuments 返回指定外部知识库的文档列表。
-func (s *Service) listKnowledgeDocuments(c *gin.Context) {
-	input, ok := bindKnowledgeDocumentListInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListKnowledgeDocuments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// getKnowledgeDocument 返回指定外部知识文档详情。
-func (s *Service) getKnowledgeDocument(c *gin.Context) {
-	output, err := s.application.GetKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// getKnowledgeDocumentFile 返回指定文档的原始文件供预览。
-func (s *Service) getKnowledgeDocumentFile(c *gin.Context) {
-	output, err := s.application.GetKnowledgeDocumentFile(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// listKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
-func (s *Service) listKnowledgeDocumentSegments(c *gin.Context) {
-	input, ok := bindKnowledgeDocumentSegmentListInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListKnowledgeDocumentSegments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// retrieveKnowledgeBase 检索指定外部知识库。
-func (s *Service) retrieveKnowledgeBase(c *gin.Context) {
-	var input appservice.KnowledgeRetrievalInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.RetrieveKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
 // getKnowledgeBase 返回当前企业中的知识库详情。
 func (s *Service) getKnowledgeBase(c *gin.Context) {
 	output, err := s.application.GetKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"))
@@ -1206,52 +1146,6 @@ func (s *Service) deleteBusinessSystem(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID")))
 }
 
-// listIntegrationConnections 返回当前企业的连接器列表。
-func (s *Service) listIntegrationConnections(c *gin.Context) {
-	output, err := s.application.ListIntegrationConnections(c.Request.Context(), requestMeta(c))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// getIntegrationConnection 返回当前企业中的连接器详情。
-func (s *Service) getIntegrationConnection(c *gin.Context) {
-	output, err := s.application.GetIntegrationConnection(c.Request.Context(), requestMeta(c), c.Param("connectionID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// testIntegrationConnection 测试连接器草稿配置。
-func (s *Service) testIntegrationConnection(c *gin.Context) {
-	var input appservice.IntegrationConnectionTestInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	writeEmpty(c, s.application.TestIntegrationConnection(c.Request.Context(), requestMeta(c), input))
-}
-
-// createIntegrationConnection 创建外部系统连接器。
-func (s *Service) createIntegrationConnection(c *gin.Context) {
-	var input appservice.IntegrationConnectionInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.CreateIntegrationConnection(c.Request.Context(), requestMeta(c), input)
-	writeResult(c, http.StatusCreated, output, err)
-}
-
-// updateIntegrationConnection 修改外部系统连接器。
-func (s *Service) updateIntegrationConnection(c *gin.Context) {
-	var input appservice.IntegrationConnectionInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.UpdateIntegrationConnection(c.Request.Context(), requestMeta(c), c.Param("connectionID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// deleteIntegrationConnection 删除外部系统连接器。
-func (s *Service) deleteIntegrationConnection(c *gin.Context) {
-	writeEmpty(c, s.application.DeleteIntegrationConnection(c.Request.Context(), requestMeta(c), c.Param("connectionID")))
-}
-
 // updateOrganization 修改当前企业通用设置。
 func (s *Service) updateOrganization(c *gin.Context) {
 	var input appservice.OrganizationInput
@@ -1324,48 +1218,6 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 func bindCustomerDeliveryListInputQuery(c *gin.Context) (appservice.CustomerDeliveryListInput, bool) {
 	return appservice.CustomerDeliveryListInput{
 		MessageIDs: c.Query("messageIds"),
-	}, true
-}
-
-// bindKnowledgeDocumentListInputQuery 从查询参数解析 appservice.KnowledgeDocumentListInput。
-func bindKnowledgeDocumentListInputQuery(c *gin.Context) (appservice.KnowledgeDocumentListInput, bool) {
-	page, ok := positiveQueryInteger(c, "page", 1)
-	if !ok {
-		return appservice.KnowledgeDocumentListInput{}, false
-	}
-	pageSize, ok := positiveQueryInteger(c, "pageSize", 20)
-	if !ok {
-		return appservice.KnowledgeDocumentListInput{}, false
-	}
-	return appservice.KnowledgeDocumentListInput{
-		Keyword:  c.Query("keyword"),
-		Status:   optionalEnum[appservice.KnowledgeDocumentStatus](c.Query("status")),
-		Page:     page,
-		PageSize: pageSize,
-	}, true
-}
-
-// bindKnowledgeDocumentSegmentListInputQuery 从查询参数解析 appservice.KnowledgeDocumentSegmentListInput。
-func bindKnowledgeDocumentSegmentListInputQuery(c *gin.Context) (appservice.KnowledgeDocumentSegmentListInput, bool) {
-	position, ok := positiveQueryInteger(c, "position", 0)
-	if !ok {
-		return appservice.KnowledgeDocumentSegmentListInput{}, false
-	}
-	page, ok := positiveQueryInteger(c, "page", 1)
-	if !ok {
-		return appservice.KnowledgeDocumentSegmentListInput{}, false
-	}
-	pageSize, ok := positiveQueryInteger(c, "pageSize", 20)
-	if !ok {
-		return appservice.KnowledgeDocumentSegmentListInput{}, false
-	}
-	return appservice.KnowledgeDocumentSegmentListInput{
-		SegmentID: c.Query("segmentId"),
-		Position:  position,
-		Keyword:   c.Query("keyword"),
-		Status:    optionalEnum[appservice.KnowledgeDocumentSegmentIndexStatus](c.Query("status")),
-		Page:      page,
-		PageSize:  pageSize,
 	}, true
 }
 

@@ -257,7 +257,6 @@ internal/
 ├── ingress/                        # 企业服务端 HTTPS 与公网流量入口
 ├── integration/
 │   ├── connectiontest/             # 外部连接探测的通用执行语义
-│   ├── connector/                  # 外部系统连接器只读探测
 │   └── modelprovider/              # 模型服务供应商连接探测适配器
 ├── publicweb/                      # 网站渠道公开嵌入脚本和访客聊天页
 ├── storage/
