@@ -259,6 +259,21 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 			return nil
 		}
 
+		// 新旧文件按编号锁定，避免不同渠道身份交换共享头像时反向等待。
+		fileIDs := make([]string, 0, 2)
+		if next != nil {
+			fileIDs = append(fileIDs, next.ID)
+		}
+		if current.AvatarFileID != nil {
+			fileIDs = append(fileIDs, *current.AvatarFileID)
+		}
+		var files []servermodels.File
+		if err := tx.NewSelect().Model(&files).Column("id").
+			Where("f.organization_id = ? AND f.id IN (?)", organizationID, bun.In(fileIDs)).
+			OrderExpr("f.id").For("UPDATE").Scan(ctx); err != nil {
+			return fmt.Errorf("lock Telegram contact avatar files: %w", err)
+		}
+
 		var nextFileID any
 		if next != nil {
 			result, err := tx.NewUpdate().Model((*servermodels.File)(nil)).

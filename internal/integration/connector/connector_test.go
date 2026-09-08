@@ -135,8 +135,9 @@ func TestDifyKnowledgeDocumentLister(t *testing.T) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{
 			"data":[
-				{"id":"document-1","name":"产品手册.pdf","display_status":"available","created_at":1787950000},
-				{"id":"document-2","name":"常见问题.txt","display_status":"indexing","created_at":1787952000}
+				{"id":"document-1","name":"产品手册.pdf","display_status":"available","word_count":123456,"hit_count":42,"created_at":1787950000},
+				{"id":"document-2","name":"常见问题.txt","display_status":"disabled","indexing_status":"completed","enabled":false,"word_count":0,"hit_count":0,"created_at":1787952000},
+				{"id":"document-3","name":"待解析.txt","display_status":"queuing","word_count":null,"hit_count":0}
 			],
 			"page":2,"limit":20,"total":22,"has_more":false
 		}`))
@@ -151,15 +152,21 @@ func TestDifyKnowledgeDocumentLister(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list knowledge documents: %v", err)
 	}
-	if output.Total != 22 || len(output.Documents) != 2 {
+	if output.Total != 22 || len(output.Documents) != 3 {
 		t.Fatalf("unexpected output: %#v", output)
 	}
 	if output.Documents[0].Status != "available" || output.Documents[0].CreatedAt == nil ||
-		output.Documents[0].CreatedAt.Unix() != 1787950000 {
+		output.Documents[0].CreatedAt.Unix() != 1787950000 || output.Documents[0].WordCount == nil ||
+		*output.Documents[0].WordCount != 123456 || output.Documents[0].HitCount != 42 {
 		t.Fatalf("unexpected first document: %#v", output.Documents[0])
 	}
-	if output.Documents[1].CreatedAt == nil || output.Documents[1].CreatedAt.Unix() != 1787952000 {
-		t.Fatalf("unexpected second document time: %#v", output.Documents[1].CreatedAt)
+	if output.Documents[1].Status != "disabled" || output.Documents[1].CreatedAt == nil ||
+		output.Documents[1].CreatedAt.Unix() != 1787952000 || output.Documents[1].WordCount == nil ||
+		*output.Documents[1].WordCount != 0 || output.Documents[1].HitCount != 0 {
+		t.Fatalf("unexpected disabled document: %#v", output.Documents[1])
+	}
+	if output.Documents[2].WordCount != nil {
+		t.Fatalf("unknown word count must remain nil: %#v", output.Documents[2])
 	}
 }
 

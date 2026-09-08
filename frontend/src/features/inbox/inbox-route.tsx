@@ -113,6 +113,7 @@ export function InboxRoute() {
     const nextAssignee = changes.assigneeIdentityId ?? assigneeIdentityId
     setSearchParams((current) => {
       const next = new URLSearchParams(current)
+      next.delete("target")
       if (nextScope === InboxScope.InboxScopeAll) next.delete("scope")
       else next.set("scope", nextScope)
       if (nextScope === InboxScope.InboxScopeCustomer) {
@@ -144,6 +145,7 @@ export function InboxRoute() {
   function selectConversation(conversationId: string, replace = false) {
     setSearchParams((current) => {
       const next = new URLSearchParams(current)
+      next.delete("target")
       if (conversationId) next.set("conversation", conversationId)
       else next.delete("conversation")
       return next
@@ -161,6 +163,7 @@ export function InboxRoute() {
       customerView={customerView}
       assigneeIdentityId={assigneeIdentityId}
       selectedConversationId={selectedConversationId}
+      targetIdentityId={searchParams.get("target") ?? ""}
       onSelectedConversationChange={selectConversation}
       onQueryChange={updateQuery}
     />

@@ -51,6 +51,15 @@ const mobile = {
     emptyDescription: "No conversations match this category and its filters.",
   },
   group: {
+    add: "Add",
+    viewMembers: "View members ({{count}})",
+    editOwnerOnly: "Only the group owner can edit group details.",
+    editArchived: "This group has been dissolved and cannot be edited.",
+    profile: "Group profile",
+    saveError: "Could not save changes. Please try again.",
+    changeImage: "Tap the image to change it",
+    mute: "Mute notifications",
+
     create: "Start group chat",
     complete: "Done",
     selectedMembers: "Selected members",

@@ -152,7 +152,7 @@ export function ConnectorListPage() {
                   <TableHead>{t("connectors.list.columns.description")}</TableHead>
                   <TableHead>{t("connectors.list.columns.status")}</TableHead>
                   <TableHead>{t("connectors.list.columns.lastTestedAt")}</TableHead>
-                  <TableHead className="text-right">
+                  <TableHead className="w-px">
                     {t("connectors.list.columns.actions")}
                   </TableHead>
                 </TableRow>
@@ -194,8 +194,8 @@ export function ConnectorListPage() {
                           ? formatDateTime(connection.lastTestedAt)
                           : "—"}
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        <div className="flex justify-end gap-2">
+                      <TableCell className="whitespace-nowrap">
+                        <div className="inline-flex gap-2">
                           <Button variant="outline" size="sm" asChild>
                             <Link
                               to={`/integrations/connectors/${connection.id}`}

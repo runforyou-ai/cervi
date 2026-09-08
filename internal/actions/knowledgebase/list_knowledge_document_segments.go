@@ -4,11 +4,13 @@ package knowledgebase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/connector"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -51,16 +53,7 @@ func (q *ListKnowledgeDocumentSegmentsQuery) Execute(
 	if documentID == "" {
 		return DocumentSegmentListOutput{}, ErrDocumentNotFound
 	}
-	page, err := q.lister.ListSegments(
-		ctx,
-		access.Config,
-		access.DatasetID,
-		documentID,
-		connector.DifyKnowledgeDocumentSegmentListInput{
-			Keyword: input.Keyword, Status: string(input.Status),
-			Page: input.Page, PageSize: input.PageSize,
-		},
-	)
+	page, pageNumber, err := q.readPage(ctx, access, documentID, input)
 	if err != nil {
 		return DocumentSegmentListOutput{}, fmt.Errorf("list external knowledge document segments: %w", err)
 	}
@@ -77,7 +70,7 @@ func (q *ListKnowledgeDocumentSegmentsQuery) Execute(
 		})
 	}
 	return DocumentSegmentListOutput{
-		Segments: segments, Page: input.Page, PageSize: input.PageSize, Total: page.Total,
+		Segments: segments, Page: pageNumber, PageSize: input.PageSize, Total: page.Total,
 	}, nil
 }
 
@@ -107,6 +100,7 @@ func knowledgeDocumentSegmentIndexStatusFromDify(
 func normalizeDocumentSegmentListInput(
 	input DocumentSegmentListInput,
 ) (DocumentSegmentListInput, map[string]common.FieldCode) {
+	input.SegmentID = strings.TrimSpace(input.SegmentID)
 	input.Keyword = strings.TrimSpace(input.Keyword)
 	input.Status = domain.KnowledgeDocumentSegmentIndexStatus(strings.TrimSpace(string(input.Status)))
 	if input.Page <= 0 {
@@ -116,6 +110,9 @@ func normalizeDocumentSegmentListInput(
 		input.PageSize = defaultKnowledgeDocumentPageSize
 	}
 	fields := make(map[string]common.FieldCode)
+	if input.SegmentID != "" && (input.Position <= 0 || input.Keyword != "" || input.Status != "") {
+		fields["segmentId"] = ValidationDocumentQueryInvalid
+	}
 	if input.PageSize > 100 {
 		fields["pageSize"] = ValidationDocumentQueryInvalid
 	}
@@ -125,4 +122,37 @@ func normalizeDocumentSegmentListInput(
 		}
 	}
 	return input, fields
+}
+
+// readPage 在按位置排序的分段中定位命中页，允许分段删除后序号不连续。
+func (q *ListKnowledgeDocumentSegmentsQuery) readPage(ctx context.Context, access difyKnowledgeAccess, documentID string, input DocumentSegmentListInput) (connector.DifyKnowledgeDocumentSegmentPage, int, error) {
+	pageNumber := input.Page
+	if input.SegmentID != "" {
+		pageNumber = (input.Position-1)/input.PageSize + 1
+	}
+	low, high := 1, pageNumber
+	for low <= high {
+		page, err := q.lister.ListSegments(ctx, access.Config, access.DatasetID, documentID, connector.DifyKnowledgeDocumentSegmentListInput{Keyword: input.Keyword, Status: string(input.Status), Page: pageNumber, PageSize: input.PageSize})
+		if err != nil {
+			return page, pageNumber, err
+		}
+		if input.SegmentID == "" {
+			return page, pageNumber, nil
+		}
+		for _, segment := range page.Segments {
+			if segment.ID == input.SegmentID && segment.Position == input.Position {
+				return page, pageNumber, nil
+			}
+		}
+		high = min(high, (page.Total+input.PageSize-1)/input.PageSize)
+		if len(page.Segments) == 0 || page.Segments[0].Position > input.Position {
+			high = min(high, pageNumber-1)
+		} else if page.Segments[len(page.Segments)-1].Position < input.Position {
+			low = pageNumber + 1
+		} else {
+			break
+		}
+		pageNumber = (low + high) / 2
+	}
+	return connector.DifyKnowledgeDocumentSegmentPage{}, 0, connectiontest.NewError(connectiontest.StageCapability, connectiontest.FailureNotFound, errors.New("knowledge segment no longer exists at the requested position"))
 }

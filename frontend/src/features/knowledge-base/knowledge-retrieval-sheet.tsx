@@ -1,5 +1,11 @@
 /** 外部知识库检索测试侧栏。 */
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -11,7 +17,8 @@ import {
   retrieveKnowledgeBase,
   type KnowledgeRetrievalResultData,
 } from "@/api"
-import { SelectableText } from "@/components/selectable-text"
+import { KnowledgeSegmentsDialog } from "./knowledge-segments-dialog"
+import { KnowledgeRetrievalResults } from "./knowledge-retrieval-results"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -39,7 +46,7 @@ export function KnowledgeRetrievalSheet({
   knowledgeBaseId: string
   triggerRef: RefObject<HTMLButtonElement | null>
 }) {
-  const { t, i18n } = useTranslation("knowledgeBase")
+  const { t } = useTranslation("knowledgeBase")
   const navigate = useNavigate()
   const mounted = useRef(true)
   const requestSequence = useRef(0)
@@ -71,14 +78,11 @@ export function KnowledgeRetrievalSheet({
       query: "",
     },
   })
-  const scoreFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat(i18n.resolvedLanguage, {
-        maximumFractionDigits: 3,
-      }),
-    [i18n.resolvedLanguage],
-  )
-
+  const [contextRecord, setContextRecord] = useState<
+    KnowledgeRetrievalResultData["records"][number] | null
+  >(null)
+  const resultPane = useRef<HTMLDivElement>(null)
+  const contextTrigger = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -128,109 +132,84 @@ export function KnowledgeRetrievalSheet({
           <SheetTitle>{t("retrieval.title")}</SheetTitle>
           <SheetDescription>{t("retrieval.description")}</SheetDescription>
         </SheetHeader>
-        <form
-          className="shrink-0 space-y-9 px-6 pt-4 pb-6"
-          onSubmit={form.handleSubmit(retrieve)}
-          noValidate
-        >
-          <FieldGroup className="gap-5">
-            <Controller
-              name="query"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name} required>
-                    {t("retrieval.query")}
-                  </FieldLabel>
-                  <Input
-                    {...field}
-                    id={field.name}
-                    autoComplete="off"
-                    maxLength={retrievalQueryMaxLength}
-                    required
-                    aria-invalid={fieldState.invalid}
-                  />
-                </Field>
-              )}
-            />
-          </FieldGroup>
-          <Button type="submit">{t("retrieval.submit")}</Button>
-        </form>
         <div
-          className="min-h-0 flex-1 overflow-y-auto border-t px-6 py-5"
-          aria-live="polite"
-          aria-busy={loading}
+          className="flex min-h-0 flex-1 flex-col"
         >
-          {loading ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              {t("retrieval.loading")}
-            </p>
-          ) : requestError ? (
-            <p className="py-12 text-center text-sm text-destructive">
-              {isApiError(requestError)
-                ? requestError.reason ||
-                  apiErrorMessage(requestError, ["query"])
-                : t("retrieval.error")}
-            </p>
-          ) : !result ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              {t("retrieval.initial")}
-            </p>
-          ) : records.length === 0 ? (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              {t("retrieval.empty")}
-            </p>
-          ) : (
-            <div>
-              <p className="mb-1 text-sm text-muted-foreground">
-                {t("retrieval.resultCount", { count: records.length })}
+          <form
+            className="shrink-0 space-y-9 px-6 pt-4 pb-6"
+            onSubmit={form.handleSubmit(retrieve)}
+            noValidate
+          >
+            <FieldGroup className="gap-5">
+              <Controller
+                name="query"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor={field.name} required>
+                      {t("retrieval.query")}
+                    </FieldLabel>
+                    <Input
+                      {...field}
+                      id={field.name}
+                      autoComplete="off"
+                      maxLength={retrievalQueryMaxLength}
+                      required
+                      aria-invalid={fieldState.invalid}
+                    />
+                  </Field>
+                )}
+              />
+            </FieldGroup>
+            <Button type="submit">{t("retrieval.submit")}</Button>
+          </form>
+          <div
+            ref={resultPane}
+            className="min-h-0 flex-1 overflow-y-auto border-t px-6 py-5"
+            aria-live="polite"
+            aria-busy={loading}
+          >
+            {loading ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                {t("retrieval.loading")}
               </p>
-              <ol className="divide-y">
-                {records.map((record, index) => (
-                  <li key={`${record.segmentId}-${index}`} className="py-5">
-                    <div className="flex items-start gap-3">
-                      <span className="w-5 shrink-0 text-right text-sm font-medium tabular-nums">
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <SelectableText className="break-all text-sm font-medium">
-                            {record.documentName || record.documentId}
-                          </SelectableText>
-                          <span className="text-xs text-muted-foreground">
-                            {t("retrieval.position", {
-                              position: record.position,
-                            })}
-                          </span>
-                        </div>
-                        <SelectableText className="mt-3 block whitespace-pre-wrap break-words text-sm leading-6">
-                          {record.content || "—"}
-                        </SelectableText>
-                        {record.answer?.trim() ? (
-                          <div className="mt-4 border-l-2 pl-3">
-                            <p className="mb-1 text-xs font-medium text-muted-foreground">
-                              {t("retrieval.answer")}
-                            </p>
-                            <SelectableText className="block whitespace-pre-wrap break-words text-sm leading-6">
-                              {record.answer}
-                            </SelectableText>
-                          </div>
-                        ) : null}
-                      </div>
-                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                        {record.score == null
-                          ? t("retrieval.scoreUnavailable")
-                          : t("retrieval.score", {
-                              score: scoreFormatter.format(record.score),
-                            })}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
+            ) : requestError ? (
+              <p className="py-12 text-center text-sm text-destructive">
+                {isApiError(requestError)
+                  ? requestError.reason ||
+                    apiErrorMessage(requestError, ["query"])
+                  : t("retrieval.error")}
+              </p>
+            ) : !result ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                {t("retrieval.initial")}
+              </p>
+            ) : records.length === 0 ? (
+              <p className="py-12 text-center text-sm text-muted-foreground">
+                {t("retrieval.empty")}
+              </p>
+            ) : (
+              <KnowledgeRetrievalResults
+                records={records}
+                onViewContext={(record, trigger) => {
+                  contextTrigger.current = trigger
+                  setContextRecord(record)
+                }}
+              />
+            )}
+          </div>
         </div>
+        {contextRecord && <KnowledgeSegmentsDialog
+          key={`${contextRecord.documentId}-${contextRecord.segmentId}`}
+          knowledgeBaseId={knowledgeBaseId}
+          documentId={contextRecord.documentId}
+          documentName={contextRecord.documentName}
+          segmentId={contextRecord.segmentId}
+          position={contextRecord.position}
+          triggerRef={contextTrigger}
+          onClose={() => setContextRecord(null)}
+        />}
+
       </SheetContent>
     </Sheet>
   )

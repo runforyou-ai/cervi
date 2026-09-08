@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -116,14 +117,14 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	conversation, err := loadCustomerConversationForReply(ctx, tx, identity.Organization.ID, input.ConversationID)
+	conversation, err := chatstate.LockCustomerConversation(ctx, tx, identity.Organization.ID, input.ConversationID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
 	if route.ChannelType != domain.ChannelTypeWebsite && route.ChannelType != domain.ChannelTypeTelegram {
 		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelOutboundUnsupported}
 	}
-	session, err := lockCurrentServiceSession(ctx, tx, identity.Organization.ID, conversation.ID)
+	session, err := chatstate.LockCurrentServiceSession(ctx, tx, identity.Organization.ID, conversation.ID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
@@ -161,7 +162,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		return ConversationMessage{}, err
 	}
 	// 取得或创建当前企业成员的聊天主体。
-	subject, err := ensureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.subject)
+	subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.subject)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
@@ -234,57 +235,6 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 		fields["body"] = ValidationBodyTooLong
 	}
 	return input, fields
-}
-
-// loadCustomerConversationForReply 读取当前企业的客户会话。
-func loadCustomerConversationForReply(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Conversation, error) {
-	conversation := &servermodels.Conversation{}
-	err := db.NewSelect().Model(conversation).
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
-		Where("cv.organization_id = ?", organizationID).
-		Where("cv.id = ?", conversationID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrConversationNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("load customer conversation for reply: %w", err)
-	}
-	return conversation, nil
-}
-
-// lockCurrentServiceSession 锁定客户会话当前客服处理周期。
-func lockCurrentServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	customer := &servermodels.CustomerConversation{}
-	err := db.NewSelect().Model(customer).
-		Where("cc.organization_id = ?", organizationID).
-		Where("cc.conversation_id = ?", conversationID).
-		For("UPDATE").
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrDataInvariant
-	}
-	if err != nil {
-		return nil, fmt.Errorf("lock customer conversation: %w", err)
-	}
-	if customer.CurrentServiceSessionID == nil {
-		return nil, ErrDataInvariant
-	}
-	session := &servermodels.ServiceSession{}
-	err = db.NewSelect().Model(session).
-		Where("ss.organization_id = ?", organizationID).
-		Where("ss.conversation_id = ?", conversationID).
-		Where("ss.id = ?", *customer.CurrentServiceSessionID).
-		For("UPDATE").
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrDataInvariant
-	}
-	if err != nil {
-		return nil, fmt.Errorf("lock current service session: %w", err)
-	}
-	return session, nil
 }
 
 // loadIdempotentMemberMessage 校验并返回已经保存的成员消息。

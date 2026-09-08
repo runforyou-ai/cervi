@@ -8,6 +8,8 @@ import { MobileIndividualConversationPage } from "@/apps/mobile/mobile-individua
 import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
 import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
 import { MobileGroupConversationPage } from "@/apps/mobile/mobile-group-conversation-page"
+import { MobileGroupProfileEditor } from "@/apps/mobile/mobile-group-profile-editor"
+import { MobileGroupMembersPage } from "@/apps/mobile/mobile-group-members"
 import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
 import { MobileEmployeesPage } from "@/apps/mobile/mobile-employees-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
@@ -64,15 +66,22 @@ export default function MobileApp() {
             <Route path="/me" element={<MobileMePage />} />
           </Route>
           <Route element={<MobileDetailLayout />}>
-            <Route path="/inbox/group/new" element={<MobileCreateGroupPage />} />
+            <Route
+              path="/inbox/group/new"
+              element={<MobileCreateGroupPage />}
+            />
             <Route
               path="/inbox/group/:conversationID"
               element={<MobileGroupConversationPage />}
-            />
-            <Route
-              path="/inbox/group/:conversationID/details"
-              element={<MobileGroupDetailsPage />}
-            />
+            >
+              <Route path="details" element={<MobileGroupDetailsPage />}>
+                <Route path="members" element={<MobileGroupMembersPage />} />
+                <Route
+                  path="edit/:field"
+                  element={<MobileGroupProfileEditor />}
+                />
+              </Route>
+            </Route>
             <Route
               path="/inbox/agent/:conversationID"
               element={

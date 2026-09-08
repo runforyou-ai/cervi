@@ -94,6 +94,7 @@ import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
+import { InboxConversationTarget } from "@/features/inbox/inbox-conversation-target"
 import { ConversationTargetPickerDialog } from "@/features/inbox/conversation-target-picker-dialog"
 import {
   useOutgoingConversationMessages,
@@ -362,13 +363,11 @@ function useMinuteTick() {
 function InboxPaneTop({
   railCollapsed,
   onRailToggle,
-  onStartDirect,
   onCreateGroup,
   onCreateAgent,
 }: {
   railCollapsed: boolean
   onRailToggle: () => void
-  onStartDirect: () => void
   onCreateGroup: () => void
   onCreateAgent: () => void
 }) {
@@ -414,11 +413,6 @@ function InboxPaneTop({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-52">
-          <DropdownMenuItem className="gap-2" onSelect={onStartDirect}>
-            <span className="min-w-0 flex-1 truncate">
-              {t("newDirectConversation")}
-            </span>
-          </DropdownMenuItem>
           <DropdownMenuItem onSelect={onCreateAgent}>
             {t("newAgentConversation")}
           </DropdownMenuItem>
@@ -1327,6 +1321,7 @@ export function InboxPage({
   customerView,
   assigneeIdentityId,
   selectedConversationId,
+  targetIdentityId,
   onSelectedConversationChange,
   onQueryChange,
 }: {
@@ -1339,6 +1334,7 @@ export function InboxPage({
   customerView: CustomerInboxView
   assigneeIdentityId: string
   selectedConversationId: string
+  targetIdentityId: string
   onSelectedConversationChange: (
     conversationId: string,
     replace?: boolean,
@@ -1358,7 +1354,6 @@ export function InboxPage({
   const [railCollapsed, setRailCollapsed] = useState(false)
   const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null)
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
-  const [directDialogOpen, setDirectDialogOpen] = useState(false)
   const [agentDialogOpen, setAgentDialogOpen] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [startedConversations, setStartedConversations] = useState<
@@ -1449,7 +1444,9 @@ export function InboxPage({
   }, [conversations])
 
   const activeChatDraft =
-    scope === InboxScope.InboxScopeInternal && !selectedConversationId
+    !targetIdentityId &&
+    scope === InboxScope.InboxScopeInternal &&
+    !selectedConversationId
       ? chatDraft
       : null
   useEffect(() => {
@@ -1458,7 +1455,7 @@ export function InboxPage({
     }
   }, [scope, selectedConversationId])
   const selectedPool = listLoading ? allConversations : scopedConversations
-  const selectedFromPool = activeChatDraft
+  const selectedFromPool = targetIdentityId || activeChatDraft
     ? undefined
     : (selectedPool.find(
         (conversation) => conversation.id === selectedConversationId,
@@ -1468,6 +1465,7 @@ export function InboxPage({
   }, [selectedFromPool])
   useEffect(() => {
     if (
+      targetIdentityId ||
       activeChatDraft ||
       listLoading ||
       (selectedConversationId &&
@@ -1482,13 +1480,14 @@ export function InboxPage({
     setSelectedConversationSnapshot(null)
     onSelectedConversationChange(nextConversationID, true)
   }, [
+    targetIdentityId,
     activeChatDraft,
     listLoading,
     onSelectedConversationChange,
     scopedConversations,
     selectedConversationId,
   ])
-  const selectedConversation = activeChatDraft
+  const selectedConversation = targetIdentityId || activeChatDraft
     ? undefined
     : selectedConversationSnapshot?.id === selectedConversationId &&
         selectedPool.some(
@@ -1537,7 +1536,7 @@ export function InboxPage({
     void invalidate(resourceKeys.inbox(destination), { exact: true })
     if (destinationIdentity === inboxQueryIdentity(currentInboxQuery)) {
       if (nextConversationId) {
-        onSelectedConversationChange(nextConversationId)
+        onSelectedConversationChange(nextConversationId, Boolean(targetIdentityId))
       }
       return
     }
@@ -1546,7 +1545,7 @@ export function InboxPage({
       customerView: destination.customerView,
       assigneeIdentityId: destination.assigneeIdentityId,
       conversationId: nextConversationId,
-      replace: nextConversationId ? false : undefined,
+      replace: nextConversationId ? Boolean(targetIdentityId) : undefined,
     })
   }
 
@@ -1568,16 +1567,20 @@ export function InboxPage({
     setIsNarrowDetailOpen(isNarrowViewport)
   }
 
-  /** 在主区打开不持久化的单聊草稿。 */
+  /** 打开已有真人单聊，或在主区开始真人和 AI 聊天草稿。 */
   function showChatDraft(
     member: MemberOption,
-    existing: DirectInboxConversationData | null,
+    existing: DirectInboxConversationData | null = null,
   ) {
     if (existing) {
       showStartedConversation(existing)
       return
     }
-    setChatDraft({ kind: "direct-draft", member })
+    setChatDraft(
+      member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+        ? { kind: "agent-draft", member, conversationId: crypto.randomUUID() }
+        : { kind: "direct-draft", member },
+    )
     onQueryChange({
       scope: InboxScope.InboxScopeInternal,
       conversationId: "",
@@ -1713,7 +1716,6 @@ export function InboxPage({
       <InboxPaneTop
         railCollapsed={railCollapsed}
         onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
-        onStartDirect={() => setDirectDialogOpen(true)}
         onCreateGroup={() => setGroupDialogOpen(true)}
         onCreateAgent={() => setAgentDialogOpen(true)}
       />
@@ -1773,7 +1775,11 @@ export function InboxPage({
         paneClassName="transition-[width]"
         pane={pane}
       >
-        {isNarrowViewport ? null : selection ? (
+        {isNarrowViewport ? null : targetIdentityId ? (
+          <LoadingIndicator className="flex-1 justify-center">
+            {t("chatTargetLoading")}
+          </LoadingIndicator>
+        ) : selection ? (
           <section className="min-h-0 flex-1">
             <ConversationMain
               selection={selection}
@@ -1836,29 +1842,23 @@ export function InboxPage({
         </Sheet>
       ) : null}
 
+      {targetIdentityId ? (
+        <InboxConversationTarget
+          key={targetIdentityId}
+          identityId={targetIdentityId}
+          currentIdentityId={identity.user.identityId}
+          onSelected={showChatDraft}
+          onFailed={() => {
+            // 打开失败时结束旧草稿并回到内部会话列表。
+            setChatDraft(null)
+            onQueryChange({ conversationId: "" })
+          }}
+        />
+      ) : null}
       <ConversationTargetPickerDialog
-        open={directDialogOpen}
-        currentIdentityID={identity.user.identityId}
-        onOpenChange={setDirectDialogOpen}
-        onSelected={showChatDraft}
-      />
-      <ConversationTargetPickerDialog
-        agentChat
         open={agentDialogOpen}
-        currentIdentityID={identity.user.identityId}
         onOpenChange={setAgentDialogOpen}
-        onSelected={(member) => {
-          setChatDraft({
-            kind: "agent-draft",
-            member,
-            conversationId: crypto.randomUUID(),
-          })
-          onQueryChange({
-            scope: InboxScope.InboxScopeInternal,
-            conversationId: "",
-          })
-          setIsNarrowDetailOpen(isNarrowViewport)
-        }}
+        onSelected={showChatDraft}
       />
       <CreateGroupConversationDialog
         open={groupDialogOpen}

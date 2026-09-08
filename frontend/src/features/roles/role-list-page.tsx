@@ -170,7 +170,7 @@ export function RoleListPage() {
                   <TableHead className="hidden @3xl:table-cell">
                     {t("roles.list.columns.permissions")}
                   </TableHead>
-                  <TableHead className="text-right">
+                  <TableHead className="w-px">
                     {t("roles.list.columns.actions")}
                   </TableHead>
                 </TableRow>
@@ -204,8 +204,8 @@ export function RoleListPage() {
                         <TableCell className="hidden text-muted-foreground @3xl:table-cell">
                           {permissionSummary(role, permissions, t)}
                         </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <div className="flex justify-end gap-2">
+                        <TableCell className="whitespace-nowrap">
+                          <div className="inline-flex gap-2">
                             <Button variant="outline" size="sm" asChild>
                               <Link to={`/settings/roles/${role.id}`}>
                                 {t("roles.list.view")}

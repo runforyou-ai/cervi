@@ -1,6 +1,7 @@
 /** 美式英语·联系人文案。 */
 const contacts = {
   title: "Contacts",
+  sendMessage: "Send message",
   scopeNavigation: "Directory categories",
   all: "All",
   create: "Add contact",

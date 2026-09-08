@@ -1,16 +1,8 @@
-/** 真人单聊与 AI 聊天对象选择器。 */
-import { useEffect, useRef, useState } from "react"
-import { LoaderCircleIcon } from "lucide-react"
+/** AI 聊天对象选择器。 */
+import { useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { toast } from "sonner"
-import {
-  findDirectConversation,
-  isApiError,
-  sessionPath,
-  OrganizationIdentityType,
-  type DirectInboxConversationData,
-  type MemberOption,
-} from "@/api"
+
+import { OrganizationIdentityType, type MemberOption } from "@/api"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
@@ -25,87 +17,28 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
 
-/** 选择一位活跃企业成员。 */
+/** 选择一位活跃 AI 员工开始新聊天。 */
 export function ConversationTargetPickerDialog({
   open,
-  agentChat = false,
-  currentIdentityID,
   onOpenChange,
   onSelected,
 }: {
   open: boolean
-  agentChat?: boolean
-  currentIdentityID: string
   onOpenChange: (open: boolean) => void
-  onSelected: (
-    member: MemberOption,
-    conversation: DirectInboxConversationData | null,
-  ) => void
+  onSelected: (member: MemberOption) => void
 }) {
   const { t } = useTranslation("inbox")
   const dialogRef = useRef<HTMLDivElement>(null)
-  const [selectedMember, setSelectedMember] = useState<MemberOption | null>(
-    null,
-  )
   const { data, loading, error, refresh } = useResource(
     resourceKeys.memberOptions(),
     listAllMemberOptions,
     { enabled: open, staleTime: 0 },
   )
-  const lookup = useResource(
-    resourceKeys.directConversation(selectedMember?.id ?? ""),
-    () => findDirectConversation(selectedMember?.id ?? ""),
-    { enabled: open && !agentChat && Boolean(selectedMember), staleTime: 0 },
+  const candidates = (data ?? []).filter(
+    (member) =>
+      member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent,
   )
-  const candidates = (data ?? []).filter((member) =>
-    agentChat
-      ? member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
-      : member.type === OrganizationIdentityType.OrganizationIdentityTypeUser &&
-        member.id !== currentIdentityID,
-  )
-
-  useEffect(() => {
-    if (!open) setSelectedMember(null)
-  }, [open])
-
-  useEffect(() => {
-    if (
-      agentChat ||
-      !open ||
-      !selectedMember ||
-      lookup.loading ||
-      lookup.refreshing
-    )
-      return
-    if (lookup.error) {
-      setSelectedMember(null)
-      if (isApiError(lookup.error) && sessionPath(lookup.error.state)) return
-      console.warn("查找企业成员内部单聊失败", lookup.error)
-      toast.error(
-        isApiError(lookup.error)
-          ? apiErrorMessage(lookup.error, ["targetIdentityId"])
-          : t("directLookupError"),
-      )
-      return
-    }
-    if (lookup.data === undefined) return
-    onSelected(selectedMember, lookup.data)
-    setSelectedMember(null)
-    onOpenChange(false)
-  }, [
-    lookup.data,
-    lookup.error,
-    lookup.loading,
-    lookup.refreshing,
-    onOpenChange,
-    onSelected,
-    open,
-    selectedMember,
-    t,
-    agentChat,
-  ])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,24 +52,20 @@ export function ConversationTargetPickerDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>
-            {t(agentChat ? "agentPickerTitle" : "directPickerTitle")}
-          </DialogTitle>
+          <DialogTitle>{t("agentPickerTitle")}</DialogTitle>
           <DialogDescription>
-            {t(
-              agentChat ? "agentPickerDescription" : "directPickerDescription",
-            )}
+            {t("agentPickerDescription")}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="min-h-64 rounded-md border">
           {loading ? (
             <LoadingIndicator className="min-h-64 justify-center">
-              {t("directPickerLoading")}
+              {t("agentPickerLoading")}
             </LoadingIndicator>
           ) : error ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                {t("directPickerLoadError")}
+                {t("agentPickerLoadError")}
               </p>
               <Button
                 type="button"
@@ -150,7 +79,7 @@ export function ConversationTargetPickerDialog({
             </div>
           ) : candidates.length === 0 ? (
             <p className="px-6 py-12 text-center text-sm text-muted-foreground">
-              {t(agentChat ? "agentPickerEmpty" : "directPickerEmpty")}
+              {t("agentPickerEmpty")}
             </p>
           ) : (
             <div className="grid p-1.5">
@@ -158,14 +87,10 @@ export function ConversationTargetPickerDialog({
                 <button
                   key={member.id}
                   type="button"
-                  disabled={Boolean(selectedMember)}
-                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted disabled:opacity-60"
+                  className="flex items-center gap-3 rounded-md px-3 py-2.5 text-left transition-colors hover:bg-muted"
                   onClick={() => {
-                    // AI 每次进入新草稿，真人单聊先查找已有会话。
-                    if (agentChat) {
-                      onSelected(member, null)
-                      onOpenChange(false)
-                    } else setSelectedMember(member)
+                    onSelected(member)
+                    onOpenChange(false)
                   }}
                 >
                   <DirectConversationDraftAvatar
@@ -175,9 +100,6 @@ export function ConversationTargetPickerDialog({
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {member.displayName}
                   </span>
-                  {selectedMember?.id === member.id ? (
-                    <LoaderCircleIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
-                  ) : null}
                 </button>
               ))}
             </div>

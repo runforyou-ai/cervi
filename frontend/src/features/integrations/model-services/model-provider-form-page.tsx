@@ -551,7 +551,7 @@ export function ModelProviderFormPage({
                           {hasChatModel ? <FieldRequiredMark /> : null}
                         </span>
                       </TableHead>
-                      <TableHead className="text-right">
+                      <TableHead className="w-px">
                         {t("modelServices.models.columns.actions")}
                       </TableHead>
                     </TableRow>
@@ -693,7 +693,7 @@ export function ModelProviderFormPage({
                                 <span className="text-muted-foreground">—</span>
                               )}
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="whitespace-nowrap">
                               <Button
                                 type="button"
                                 variant="outline"

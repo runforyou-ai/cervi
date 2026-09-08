@@ -247,7 +247,7 @@ export function AgentsPanel({
                 <TableHead>{t("columns.accountStatus")}</TableHead>
                 <TableHead>{t("columns.workStatus")}</TableHead>
                 <TableHead>{t("columns.createdAt")}</TableHead>
-                <TableHead className="text-right">
+                <TableHead className="w-px">
                   {t("columns.actions")}
                 </TableHead>
               </TableRow>
@@ -280,8 +280,15 @@ export function AgentsPanel({
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {formatDateTime(agent.createdAt)}
                   </TableCell>
-                  <TableCell className="text-right whitespace-nowrap">
-                    <div className="flex justify-end gap-2">
+                  <TableCell className="whitespace-nowrap">
+                    <div className="inline-flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={agent.status !== UserStatus.UserStatusActive}
+                        onClick={() => navigate(`/inbox?scope=internal&target=${agent.identityId}`)}
+                      >
+                        {t("sendMessage")}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
