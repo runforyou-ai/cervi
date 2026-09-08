@@ -55,6 +55,10 @@ func CreatePending(ctx context.Context, tx bun.Tx, identity *servermodels.Identi
 	record := &servermodels.File{ID: id, OrganizationID: identity.Organization.ID, CreatedByUserID: identity.User.ID,
 		Purpose: string(input.Purpose), StorageBackend: string(backend), StorageKey: storageKey(identity.Organization.ID, id, input.ContentType),
 		OriginalName: input.FileName, ContentType: input.ContentType, ByteSize: input.ByteSize, PartSize: partSize, Status: string(domain.FileStatusPending)}
+	// 知识文档原件使用独立目录，读取时必须校验登录身份与文件状态。
+	if input.Purpose == domain.FilePurposeKnowledgeDocument {
+		record.StorageKey = "organizations/" + identity.Organization.ID + "/knowledge-documents/" + record.ID + ".bin"
+	}
 	_, err := tx.NewInsert().Model(record).Value("expires_at", "now() + make_interval(secs => ?)", temporaryFileLifetime.Seconds()).Returning("expires_at").Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create file upload: %w", err)

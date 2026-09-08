@@ -46,7 +46,7 @@ import {
   type KnowledgeGroupDialogState,
 } from "@/features/knowledge-base/knowledge-group-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
@@ -61,6 +61,7 @@ export function KnowledgeBaseLayout() {
   const { t } = useTranslation("knowledgeBase")
   const location = useLocation()
   const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const [groupDialog, setGroupDialog] =
     useState<KnowledgeGroupDialogState | null>(null)
   const [deletingKnowledgeBase, setDeletingKnowledgeBase] =
@@ -92,10 +93,11 @@ export function KnowledgeBaseLayout() {
 
   /** 把创建、保存或分组结果同步到窄侧栏。 */
   const upsertKnowledgeBase = useCallback(
-    (_knowledgeBase: KnowledgeBaseData) => {
+    (knowledgeBase: KnowledgeBaseData) => {
       void refresh()
+      void invalidate(resourceKeys.knowledgeBase(knowledgeBase.id))
     },
-    [refresh],
+    [refresh, invalidate],
   )
 
   /** 删除当前选中的知识库。 */
@@ -390,12 +392,12 @@ function KnowledgeBaseTree({
       </div>
 
       <div className="mt-1 ml-3 border-l pl-2">
-        {isQA && defaultGroup ? (
+        {defaultGroup ? (
           <Link
-            to={`${path}/groups/${defaultGroup.id}/qa`}
+            to={`${path}/groups/${defaultGroup.id}/${isQA ? "qa" : "documents"}`}
             className={cn(
               "flex h-8 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent",
-              currentPath.startsWith(`${path}/groups/${defaultGroup.id}/qa`) &&
+              currentPath.startsWith(`${path}/groups/${defaultGroup.id}/${isQA ? "qa" : "documents"}`) &&
                 "bg-sidebar-accent/60 font-medium text-sidebar-accent-foreground",
             )}
           >
@@ -415,7 +417,7 @@ function KnowledgeBaseTree({
               contentPath={
                 isQA
                   ? `${path}/groups/${group.id}/qa`
-                  : undefined
+                  : `${path}/groups/${group.id}/documents`
               }
               currentPath={currentPath}
               onAddChild={() => onCreateGroup(group.id)}
@@ -429,7 +431,7 @@ function KnowledgeBaseTree({
                   contentPath={
                     isQA
                       ? `${path}/groups/${child.id}/qa`
-                      : undefined
+                      : `${path}/groups/${child.id}/documents`
                   }
                   currentPath={currentPath}
                   onEdit={() => onEditGroup(child)}

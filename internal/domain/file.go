@@ -13,6 +13,7 @@ type FilePurpose string
 
 const (
 	FilePurposeMessageAttachment FilePurpose = "message_attachment"
+	FilePurposeKnowledgeDocument FilePurpose = "knowledge_document"
 	FilePurposeUserAvatar        FilePurpose = "user_avatar"
 	FilePurposeContactAvatar     FilePurpose = "contact_avatar"
 	FilePurposeGroupImage        FilePurpose = "group_image"

@@ -48,8 +48,9 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  closeDisabled = false,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { closeDisabled?: boolean }) {
   const { t } = useTranslation("common")
 
   return (
@@ -64,7 +65,7 @@ function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden">
+        <DialogPrimitive.Close disabled={closeDisabled} className="absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden">
           <XIcon className="size-4" />
           <span className="sr-only">{t("actions.close")}</span>
         </DialogPrimitive.Close>

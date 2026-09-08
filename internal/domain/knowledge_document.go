@@ -1,0 +1,54 @@
+package domain
+
+import (
+	"path/filepath"
+	"strings"
+)
+
+// KnowledgeDocumentStatus 表示知识文档的处理状态。
+type KnowledgeDocumentStatus string
+
+const KnowledgeDocumentInitial KnowledgeDocumentStatus = "initial"
+
+// KnowledgeDocumentFormat 表示 Haystack 内置转换器支持的文件扩展名。
+type KnowledgeDocumentFormat string
+
+const (
+	KnowledgeDocumentTXT      KnowledgeDocumentFormat = ".txt"
+	KnowledgeDocumentMD       KnowledgeDocumentFormat = ".md"
+	KnowledgeDocumentMarkdown KnowledgeDocumentFormat = ".markdown"
+	KnowledgeDocumentHTML     KnowledgeDocumentFormat = ".html"
+	KnowledgeDocumentHTM      KnowledgeDocumentFormat = ".htm"
+	KnowledgeDocumentPDF      KnowledgeDocumentFormat = ".pdf"
+	KnowledgeDocumentDOCX     KnowledgeDocumentFormat = ".docx"
+	KnowledgeDocumentPPTX     KnowledgeDocumentFormat = ".pptx"
+	KnowledgeDocumentXLSX     KnowledgeDocumentFormat = ".xlsx"
+	KnowledgeDocumentCSV      KnowledgeDocumentFormat = ".csv"
+	KnowledgeDocumentJSON     KnowledgeDocumentFormat = ".json"
+)
+
+// KnowledgeDocumentContentType 按扩展名返回知识文档的规范内容类型。
+func KnowledgeDocumentContentType(name string) string {
+	switch KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(name))) {
+	case KnowledgeDocumentTXT:
+		return "text/plain"
+	case KnowledgeDocumentMD, KnowledgeDocumentMarkdown:
+		return "text/markdown"
+	case KnowledgeDocumentHTML, KnowledgeDocumentHTM:
+		return "text/html"
+	case KnowledgeDocumentPDF:
+		return "application/pdf"
+	case KnowledgeDocumentDOCX:
+		return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+	case KnowledgeDocumentPPTX:
+		return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+	case KnowledgeDocumentXLSX:
+		return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	case KnowledgeDocumentCSV:
+		return "text/csv"
+	case KnowledgeDocumentJSON:
+		return "application/json"
+	default:
+		return ""
+	}
+}

@@ -13,6 +13,13 @@ import (
 type Key string
 
 const (
+	ErrorKnowledgeDocumentNotFound     Key = "error.knowledge_document_not_found"
+	ErrorKnowledgeDocumentUnsupported  Key = "error.knowledge_document_unsupported"
+	ErrorKnowledgeDocumentBatchInvalid Key = "error.knowledge_document_batch_invalid"
+	ErrorKnowledgeDocumentReadFailed   Key = "error.knowledge_document_read_failed"
+	ErrorKnowledgeDocumentSaveFailed   Key = "error.knowledge_document_save_failed"
+	ErrorKnowledgeDocumentDeleteFailed Key = "error.knowledge_document_delete_failed"
+
 	ErrorAgentReplyStopFailed        Key = "error.agent_reply_stop_failed"
 	ErrorKnowledgeQANotFound         Key = "error.knowledge_qa_not_found"
 	ErrorKnowledgeQAUnsupported      Key = "error.knowledge_qa_unsupported"

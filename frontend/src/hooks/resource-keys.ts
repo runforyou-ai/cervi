@@ -96,6 +96,12 @@ export const resourceKeys = {
     entryId === undefined
       ? ["knowledge-qa-entry", knowledgeBaseId]
       : ["knowledge-qa-entry", knowledgeBaseId, entryId],
+  /** 指定知识库及分组条件的文档列表。 */
+  knowledgeDocuments: (baseId?: string, parameters?: KeyParameters) => scopedListKey("knowledge-documents", baseId, parameters),
+  /** 单个文档详情。 */
+  knowledgeDocument: (baseId: string, documentId: string) => ["knowledge-document", baseId, documentId],
+  /** 文档原件的客户端预览。 */
+  knowledgeDocumentFile: (baseId: string, documentId: string) => ["knowledge-document-file", baseId, documentId],
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */

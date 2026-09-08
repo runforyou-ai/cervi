@@ -434,6 +434,36 @@ func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamI
 	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
 }
 
+// ListKnowledgeDocuments 返回当前分组的文档列表。
+func (s *Service) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
+	return s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
+}
+
+// GetKnowledgeDocument 返回文档详情。
+func (s *Service) GetKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocument, error) {
+	return s.backend.GetKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
+}
+
+// CreateKnowledgeDocuments 保存最多十个已上传的文档原件。
+func (s *Service) CreateKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error) {
+	return s.backend.CreateKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
+}
+
+// MoveKnowledgeDocument 移动文档到同库分组。
+func (s *Service) MoveKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentMoveInput) error {
+	return s.backend.MoveKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID, input)
+}
+
+// DeleteKnowledgeDocument 删除文档并释放原件。
+func (s *Service) DeleteKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) error {
+	return s.backend.DeleteKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
+}
+
+// GetKnowledgeDocumentPreview 签发当前文档的原件预览请求。
+func (s *Service) GetKnowledgeDocumentPreview(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocumentPreviewRequest, error) {
+	return s.backend.GetKnowledgeDocumentPreview(ctx, meta, knowledgeBaseID, documentID)
+}
+
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (s *Service) ListKnowledgeQAEntries(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAListInput) (KnowledgeQAList, error) {
 	return s.backend.ListKnowledgeQAEntries(ctx, meta, knowledgeBaseID, input)

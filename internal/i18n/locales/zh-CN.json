@@ -1,4 +1,11 @@
 {
+  "error.knowledge_document_not_found": "文档不存在或已删除。",
+  "error.knowledge_document_unsupported": "仅标准知识库支持上传允许格式的文档。",
+  "error.knowledge_document_batch_invalid": "每次请上传 1 至 10 个文件。",
+  "error.knowledge_document_read_failed": "读取文档失败，请重试。",
+  "error.knowledge_document_save_failed": "保存文档失败，请重试。",
+  "error.knowledge_document_delete_failed": "删除文档失败，请重试。",
+
   "error.agent_reply_stop_failed": "停止 AI 回复失败，请重试。",
   "error.customer_delivery_conflict": "投递状态已变化或渠道当前无法发送，请刷新后重试。",
   "error.customer_delivery_failed": "处理消息投递失败，请重试。",
@@ -6,7 +13,7 @@
 
   "error.knowledge_qa_not_found": "问答不存在或已删除。",
   "error.knowledge_qa_unsupported": "只有本地问答知识库支持此操作。",
-  "error.knowledge_base_has_content": "知识库已有问答，无法切换类型。",
+  "error.knowledge_base_has_content": "知识库已有内容，无法切换类型。",
   "error.knowledge_qa_read_failed": "读取问答失败，请重试。",
   "error.knowledge_qa_save_failed": "保存问答失败，请重试。",
   "error.knowledge_qa_delete_failed": "删除问答失败，请重试。",
@@ -184,7 +191,7 @@
   "error.knowledge_base_delete_failed": "删除知识库失败。",
   "error.knowledge_group_not_found": "没有找到这个分组。",
   "error.knowledge_group_invalid": "该分组操作无效。",
-  "error.knowledge_group_not_empty": "分组仍包含子分组或问答，请先移走或删除内容。",
+  "error.knowledge_group_not_empty": "分组仍包含子分组或内容，请先移走或删除内容。",
   "error.knowledge_group_create_failed": "创建分组失败。",
   "error.knowledge_group_update_failed": "保存分组失败。",
   "error.knowledge_group_delete_failed": "删除分组失败。",

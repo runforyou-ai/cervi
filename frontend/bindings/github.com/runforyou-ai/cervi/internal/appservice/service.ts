@@ -148,6 +148,13 @@ export function CreateKnowledgeBase(meta: $models.RequestMeta, input: $models.Kn
 }
 
 /**
+ * CreateKnowledgeDocuments 保存最多十个已上传的文档原件。
+ */
+export function CreateKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeDocumentBatchInput): $CancellablePromise<$models.KnowledgeDocumentBatch> {
+    return $Call.ByID(3320220084, meta, knowledgeBaseID, input);
+}
+
+/**
  * CreateKnowledgeGroup 创建知识库分组。
  */
 export function CreateKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeGroupInput): $CancellablePromise<$models.KnowledgeBase> {
@@ -236,6 +243,13 @@ export function DeleteContact(meta: $models.RequestMeta, contactID: string): $Ca
  */
 export function DeleteKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<void> {
     return $Call.ByID(541376414, meta, knowledgeBaseID);
+}
+
+/**
+ * DeleteKnowledgeDocument 删除文档并释放原件。
+ */
+export function DeleteKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<void> {
+    return $Call.ByID(1875707654, meta, knowledgeBaseID, documentID);
 }
 
 /**
@@ -341,6 +355,20 @@ export function GetGroupConversation(meta: $models.RequestMeta, conversationID: 
  */
 export function GetKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<$models.KnowledgeBase> {
     return $Call.ByID(3589389559, meta, knowledgeBaseID);
+}
+
+/**
+ * GetKnowledgeDocument 返回文档详情。
+ */
+export function GetKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(593812391, meta, knowledgeBaseID, documentID);
+}
+
+/**
+ * GetKnowledgeDocumentPreview 签发当前文档的原件预览请求。
+ */
+export function GetKnowledgeDocumentPreview(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocumentPreviewRequest> {
+    return $Call.ByID(2139314833, meta, knowledgeBaseID, documentID);
 }
 
 /**
@@ -498,6 +526,13 @@ export function ListKnowledgeBases(meta: $models.RequestMeta): $CancellablePromi
 }
 
 /**
+ * ListKnowledgeDocuments 返回当前分组的文档列表。
+ */
+export function ListKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeDocumentListInput): $CancellablePromise<$models.KnowledgeDocumentList> {
+    return $Call.ByID(4195704972, meta, knowledgeBaseID, input);
+}
+
+/**
  * ListKnowledgeQAEntries 返回分组中的本地问答列表。
  */
 export function ListKnowledgeQAEntries(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeQAListInput): $CancellablePromise<$models.KnowledgeQAList> {
@@ -607,6 +642,13 @@ export function MarkConversationMentionReviewed(meta: $models.RequestMeta, conve
  */
 export function MarkConversationRead(meta: $models.RequestMeta, conversationID: string, input: $models.MarkConversationReadInput): $CancellablePromise<$models.ConversationReadState> {
     return $Call.ByID(3314752344, meta, conversationID, input);
+}
+
+/**
+ * MoveKnowledgeDocument 移动文档到同库分组。
+ */
+export function MoveKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentMoveInput): $CancellablePromise<void> {
+    return $Call.ByID(567509100, meta, knowledgeBaseID, documentID, input);
 }
 
 /**

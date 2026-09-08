@@ -3,7 +3,7 @@ import { FileIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { formatFileSize } from "@/lib/file-size"
 import { cn } from "@/lib/utils"
-import { AttachmentName } from "./attachment-name"
+import { AttachmentName } from "@/components/attachment-name"
 
 /** 展示图片预览或文件图标、名称与大小。 */
 export function AttachmentContent({

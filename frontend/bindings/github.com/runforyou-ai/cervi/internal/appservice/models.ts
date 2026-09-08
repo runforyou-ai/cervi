@@ -1200,6 +1200,7 @@ export enum FilePurpose {
     $zero = "",
 
     FilePurposeMessageAttachment = "message_attachment",
+    FilePurposeKnowledgeDocument = "knowledge_document",
     FilePurposeUserAvatar = "user_avatar",
     FilePurposeGroupImage = "group_image",
 };
@@ -1505,6 +1506,102 @@ export interface KnowledgeBaseInput {
 export interface KnowledgeBaseList {
     "knowledgeBases": KnowledgeBase[] | null;
 }
+
+/**
+ * KnowledgeDocument 定义文档列表与预览页使用的元数据。
+ */
+export interface KnowledgeDocument {
+    "format": KnowledgeDocumentFormat;
+    "id": string;
+    "groupId": string;
+    "name": string;
+    "contentType": string;
+    "byteSize": number;
+    "status": KnowledgeDocumentStatus;
+    "createdAt": string;
+}
+
+/**
+ * KnowledgeDocumentBatch 返回已保存文档，供重试核对。
+ */
+export interface KnowledgeDocumentBatch {
+    "documents": KnowledgeDocument[] | null;
+}
+
+/**
+ * KnowledgeDocumentBatchInput 将最多十个已上传原件保存到分组。
+ */
+export interface KnowledgeDocumentBatchInput {
+    "groupId": string;
+    "fileIds": string[] | null;
+}
+
+/**
+ * KnowledgeDocumentFormat 定义允许上传的文档扩展名。
+ */
+export enum KnowledgeDocumentFormat {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeDocumentTXT = ".txt",
+    KnowledgeDocumentMD = ".md",
+    KnowledgeDocumentMarkdown = ".markdown",
+    KnowledgeDocumentHTML = ".html",
+    KnowledgeDocumentHTM = ".htm",
+    KnowledgeDocumentPDF = ".pdf",
+    KnowledgeDocumentDOCX = ".docx",
+    KnowledgeDocumentPPTX = ".pptx",
+    KnowledgeDocumentXLSX = ".xlsx",
+    KnowledgeDocumentCSV = ".csv",
+    KnowledgeDocumentJSON = ".json",
+};
+
+/**
+ * KnowledgeDocumentList 返回文档及分页信息。
+ */
+export interface KnowledgeDocumentList {
+    "documents": KnowledgeDocument[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * KnowledgeDocumentListInput 定义分组文档的查询参数。
+ */
+export interface KnowledgeDocumentListInput {
+    "groupId": string;
+    "keyword": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * KnowledgeDocumentMoveInput 定义目标分组。
+ */
+export interface KnowledgeDocumentMoveInput {
+    "groupId": string;
+}
+
+/**
+ * KnowledgeDocumentPreviewRequest 定义读取原件用于本地预览的请求。
+ */
+export interface KnowledgeDocumentPreviewRequest {
+    "url": string;
+    "headers": { [_ in string]?: string } | null;
+}
+
+/**
+ * KnowledgeDocumentStatus 定义文档处理状态。
+ */
+export enum KnowledgeDocumentStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeDocumentInitial = "initial",
+};
 
 /**
  * KnowledgeGroup 定义知识库分组树节点。

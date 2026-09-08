@@ -670,6 +670,48 @@ func (b *Backend) RemoveTeamMembers(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
+// ListKnowledgeDocuments 返回当前分组的文档列表。
+func (b *Backend) ListKnowledgeDocuments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeDocumentListInput) (appservice.KnowledgeDocumentList, error) {
+	var output appservice.KnowledgeDocumentList
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents", encodeKnowledgeDocumentListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetKnowledgeDocument 返回文档详情。
+func (b *Backend) GetKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocument, error) {
+	var output appservice.KnowledgeDocument
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateKnowledgeDocuments 保存最多十个已上传的文档原件。
+func (b *Backend) CreateKnowledgeDocuments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeDocumentBatchInput) (appservice.KnowledgeDocumentBatch, error) {
+	var output appservice.KnowledgeDocumentBatch
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// MoveKnowledgeDocument 移动文档到同库分组。
+func (b *Backend) MoveKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentMoveInput) error {
+	return b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/group", nil, input, nil)
+}
+
+// DeleteKnowledgeDocument 删除文档并释放原件。
+func (b *Backend) DeleteKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID), nil, nil, nil)
+}
+
+// GetKnowledgeDocumentPreview 签发当前文档的原件预览请求。
+func (b *Backend) GetKnowledgeDocumentPreview(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocumentPreviewRequest, error) {
+	var output appservice.KnowledgeDocumentPreviewRequest
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/preview", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (b *Backend) ListKnowledgeQAEntries(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeQAListInput) (appservice.KnowledgeQAList, error) {
 	var output appservice.KnowledgeQAList
@@ -989,6 +1031,16 @@ func encodeConversationMessageListInputQuery(input appservice.ConversationMessag
 func encodeCustomerDeliveryListInputQuery(input appservice.CustomerDeliveryListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "messageIds", input.MessageIDs)
+	return query
+}
+
+// encodeKnowledgeDocumentListInputQuery 将 appservice.KnowledgeDocumentListInput 编码为查询参数。
+func encodeKnowledgeDocumentListInputQuery(input appservice.KnowledgeDocumentListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "groupId", input.GroupID)
+	setQuery(query, "keyword", input.Keyword)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query
 }
 
