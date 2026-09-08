@@ -5,7 +5,6 @@ package appservice
 import (
 	"context"
 	"errors"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
