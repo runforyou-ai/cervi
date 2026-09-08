@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/actions/telegrammessage"
 )
 
 const telegramWebhookBodyLimit = 64 << 10
@@ -25,9 +26,11 @@ const telegramTextLimit = 4096
 const telegramMaxCursorUnixSecond = int64(9223372036)
 
 type telegramWebhookMessage struct {
-	MessageID int64   `json:"message_id"`
-	Date      int64   `json:"date"`
-	Text      *string `json:"text"`
+	ReplyTo   *telegramWebhookMessage `json:"reply_to_message"`
+	Caption   string                  `json:"caption"`
+	MessageID int64                   `json:"message_id"`
+	Date      int64                   `json:"date"`
+	Text      *string                 `json:"text"`
 	Chat      struct {
 		ID   int64  `json:"id"`
 		Type string `json:"type"`
@@ -127,9 +130,21 @@ func normalizeTelegramWebhookMessage(message telegramWebhookMessage) (*channelac
 	if displayName == "" {
 		return nil, "missing_sender_name"
 	}
+	var reply *telegrammessage.Reply
+	// 原消息可由机器人发送，只读取同一聊天中的一层引用。
+	if original := message.ReplyTo; original != nil && original.Chat.ID == message.Chat.ID && original.MessageID > 0 && original.MessageID != message.MessageID {
+		reply = &telegrammessage.Reply{MessageID: original.MessageID, Body: original.Caption}
+		if original.Text != nil {
+			reply.Body = *original.Text
+		}
+		if original.From != nil {
+			reply.SenderName = strings.TrimSpace(strings.Join([]string{original.From.FirstName, original.From.LastName}, " "))
+			reply.SenderIsBot = original.From.IsBot
+		}
+	}
 	originatedAt := time.Unix(message.Date, 0).UTC()
 	return &channelaction.TelegramWebhookMessage{
-		ChatID: message.Chat.ID, MessageID: message.MessageID,
+		ChatID: message.Chat.ID, MessageID: message.MessageID, Reply: reply,
 		SenderID: message.From.ID, DisplayName: displayName,
 		Body: body, OriginatedAt: originatedAt,
 	}, ""

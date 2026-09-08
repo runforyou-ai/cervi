@@ -15,6 +15,7 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	"github.com/runforyou-ai/cervi/internal/actions/telegrammessage"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -34,6 +35,7 @@ type TelegramWebhookInput struct {
 
 // TelegramWebhookMessage 定义已归一化的 Telegram 私聊文本消息。
 type TelegramWebhookMessage struct {
+	Reply        *telegrammessage.Reply
 	ChatID       int64
 	MessageID    int64
 	SenderID     int64
@@ -103,6 +105,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 			displayName := input.Message.DisplayName
 			received, err := conversationaction.ReceiveInboundCustomerTextMessage(ctx, tx, channel, conversationaction.InboundCustomerTextMessageInput{
 				ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
+				Telegram:           &telegrammessage.Inbound{BotID: *setting.BotID, ChatID: input.Message.ChatID, MessageID: input.Message.MessageID, Reply: input.Message.Reply},
 				SingleConversation: true, Body: input.Message.Body,
 				IdempotencyKey: "chmsg:" + channelID + ":tg:" + strconv.FormatInt(*setting.BotID, 10) + ":" + strconv.FormatInt(input.Message.ChatID, 10) + ":" + strconv.FormatInt(input.Message.MessageID, 10),
 				OriginatedAt:   input.Message.OriginatedAt, SourceOrder: input.Message.MessageID,

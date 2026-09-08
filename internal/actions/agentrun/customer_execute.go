@@ -120,19 +120,25 @@ func (p customerRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, policyCo
 }
 
 type customerMessageRow struct {
-	ID               string  `bun:"id"`
-	ReplyToMessageID *string `bun:"reply_to_message_id"`
-	ReplyDeleted     bool    `bun:"reply_deleted"`
-	ReplyBody        string  `bun:"reply_body"`
-	ReplySenderKind  string  `bun:"reply_sender_kind"`
-	ReplySenderID    string  `bun:"reply_sender_id"`
-	ReplySenderName  string  `bun:"reply_sender_name"`
-	Body             string  `bun:"body"`
-	Kind             string  `bun:"kind"`
+	ExternalReplyID          *int64  `bun:"external_reply_id"`
+	ExternalReplyBody        string  `bun:"external_reply_body"`
+	ExternalReplySenderName  string  `bun:"external_reply_sender_name"`
+	ExternalReplySenderIsBot bool    `bun:"external_reply_sender_is_bot"`
+	ID                       string  `bun:"id"`
+	ReplyToMessageID         *string `bun:"reply_to_message_id"`
+	ReplyDeleted             bool    `bun:"reply_deleted"`
+	ReplyBody                string  `bun:"reply_body"`
+	ReplySenderKind          string  `bun:"reply_sender_kind"`
+	ReplySenderID            string  `bun:"reply_sender_id"`
+	ReplySenderName          string  `bun:"reply_sender_name"`
+	Body                     string  `bun:"body"`
+	Kind                     string  `bun:"kind"`
 }
 
 type customerMessageReference struct {
-	MessageID      string `json:"messageId"`
+	MessageID      string `json:"messageId,omitempty"`
+	External       bool   `json:"external,omitempty"`
+	SenderIsBot    bool   `json:"senderIsBot,omitempty"`
 	Deleted        bool   `json:"deleted,omitempty"`
 	SenderKind     string `json:"senderKind,omitempty"`
 	SenderSourceID string `json:"senderSourceId,omitempty"`
@@ -152,6 +158,8 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id, msg.body, cs.kind").
 		ColumnExpr("msg.reply_to_message_id").
+		ColumnExpr("tm.reply_provider_message_id AS external_reply_id, tm.reply_body AS external_reply_body, tm.reply_sender_name AS external_reply_sender_name, tm.reply_sender_is_bot AS external_reply_sender_is_bot").
+		Join("LEFT JOIN telegram_messages AS tm ON tm.message_id = msg.id AND tm.organization_id = msg.organization_id AND tm.conversation_id = msg.conversation_id").
 		ColumnExpr("reply.deleted_at IS NOT NULL AS reply_deleted").
 		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
 		ColumnExpr("reply_cs.kind AS reply_sender_kind, reply_cs.source_id AS reply_sender_id").
@@ -186,11 +194,18 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		}
 		content := row.Body
 		// 引用保留一层原文和真实主体类型，不增加模型对话角色。
-		if row.ReplyToMessageID != nil {
-			reference := customerMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
+		if row.ReplyToMessageID != nil || row.ExternalReplyID != nil {
+			reference := customerMessageReference{Deleted: row.ReplyDeleted}
+			if row.ReplyToMessageID != nil {
+				reference.MessageID = *row.ReplyToMessageID
+			}
 			if !row.ReplyDeleted {
 				reference.Body, reference.SenderKind = row.ReplyBody, row.ReplySenderKind
 				reference.SenderSourceID, reference.SenderName = row.ReplySenderID, row.ReplySenderName
+			}
+			if row.ReplyToMessageID == nil {
+				reference.External = true
+				reference.Body, reference.SenderName, reference.SenderIsBot = row.ExternalReplyBody, row.ExternalReplySenderName, row.ExternalReplySenderIsBot
 			}
 			encoded, _ := json.Marshal(struct {
 				Body    string                   `json:"body"`

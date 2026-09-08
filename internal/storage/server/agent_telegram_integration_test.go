@@ -4,7 +4,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"github.com/runforyou-ai/cervi/internal/actions/telegrammessage"
 	"testing"
 	"time"
 
@@ -98,6 +100,64 @@ func (f *agentTelegramFixture) receiveNext(t *testing.T) {
 
 // testAgentTelegramReplies 验证自动接待、连续输入、事务投递及客服接管边界。
 func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identity, roleID, providerID, modelID string) {
+	t.Run("引用上下文与历史窗口", func(t *testing.T) {
+		for _, external := range []bool{false, true} {
+			f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
+			for range 100 {
+				f.receiveNext(t)
+			}
+			target := int64(1)
+			if external {
+				target = 9999
+			}
+			f.input.Message.Reply = &telegrammessage.Reply{MessageID: target, Body: "平台原文快照", SenderName: "外部机器人", SenderIsBot: true}
+			f.receiveNext(t)
+			model := &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+				pending, err := feed.Peek(ctx, 0)
+				if err != nil {
+					return agentruntime.RunResult{}, err
+				}
+				claimed, err := feed.Claim(ctx, pending[len(pending)-1].Seq)
+				if err != nil {
+					return agentruntime.RunResult{}, err
+				}
+				if len(claimed.Messages) != 100 {
+					t.Fatalf("history=%d", len(claimed.Messages))
+				}
+				var payload struct {
+					ReplyTo struct {
+						MessageID   string `json:"messageId"`
+						Body        string `json:"body"`
+						External    bool   `json:"external"`
+						SenderIsBot bool   `json:"senderIsBot"`
+					} `json:"replyTo"`
+				}
+				last := claimed.Messages[len(claimed.Messages)-1]
+				if err := json.Unmarshal([]byte(last.Content), &payload); err != nil {
+					t.Fatal(err)
+				}
+				if last.Role != agentruntime.MessageRoleUser || payload.ReplyTo.External != external {
+					t.Fatalf("reference=%+v", payload)
+				}
+				if external {
+					if payload.ReplyTo.MessageID != "" || payload.ReplyTo.Body != "平台原文快照" || !payload.ReplyTo.SenderIsBot {
+						t.Fatalf("snapshot=%+v", payload)
+					}
+				} else if payload.ReplyTo.MessageID == "" || payload.ReplyTo.Body != "请介绍产品" {
+					t.Fatalf("reference=%+v", payload)
+				}
+				return agentruntime.RunResult{Content: "引用上下文验证完成", EndSeq: claimed.EndSeq}, nil
+			}}
+			if err := agentrunaction.NewExecuteAction(db, f.tasks, model).Execute(context.Background(), agentrunaction.RunInput{RunID: f.run.ID}); err != nil {
+				t.Fatal(err)
+			}
+			f.reload(t)
+			if f.run.Status != string(domain.AgentRunStatusSucceeded) {
+				t.Fatalf("run=%+v", f.run)
+			}
+		}
+	})
+
 	t.Run("连续输入与幂等外发", func(t *testing.T) {
 		f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
 		ctx := context.Background()

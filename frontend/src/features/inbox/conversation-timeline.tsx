@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import {
   listCustomerMessageDeliveries,
+  listConversationMessageReferences,
   ChatSubjectKind,
   ConversationSystemEventType,
   ConversationType,
@@ -71,6 +72,7 @@ type TimelineMessage = Pick<
   | "sessionStart"
   | "systemEvent"
   | "replyTo"
+  | "canReply"
   | "mentions"
   | "mentionAll"
   | "agentProcess"
@@ -139,6 +141,7 @@ function mergeTimelineMessages(
       sessionStart: null,
       systemEvent: null,
       replyTo: message.replyTo,
+      canReply: false,
       mentions: message.mentionSubjectIDs.flatMap((subjectID) => {
         const participant = participantsBySubjectID.get(subjectID)
         return participant
@@ -290,6 +293,15 @@ function ConversationTimelineContent({
       refetchInterval: pollingActive ? 2000 : false,
     },
   )
+  const references = useResource(
+    resourceKeys.conversationMessageReferences(conversationID, deliveryMessageIDs),
+    () => listConversationMessageReferences(conversationID, deliveryMessageIDs),
+    {
+      enabled: enabled && customerDeliveries && Boolean(deliveryMessageIDs),
+      refetchInterval: pollingActive ? 2000 : false,
+    },
+  )
+  const referencesByMessage = new Map(references.data?.states.map((state) => [state.messageId, state]))
   const deliveriesByMessage = new Map(deliveries.data?.deliveries.map((delivery) => [delivery.messageId, delivery]))
   const viewport = useConversationViewport({
     root: scrollRootRef,
@@ -652,7 +664,10 @@ function ConversationTimelineContent({
             </div>
           ) : null}
           <div className="flex flex-col">
-            {visibleMessages.map((message, index) => {
+            {visibleMessages.map((storedMessage, index) => {
+              // 引用状态独立刷新，保留当前窗口、正文位置和滚动上下文。
+              const referenceState = referencesByMessage.get(storedMessage.id)
+              const message = referenceState ? { ...storedMessage, canReply: referenceState.canReply, replyTo: referenceState.replyTo } : storedMessage
               const previous = visibleMessages[index - 1]
               const next = visibleMessages[index + 1]
               const agentError = message.type === MessageType.MessageTypeAgentError
@@ -815,7 +830,8 @@ function ConversationTimelineContent({
                                 {incoming && !agentNotice && onReplyMessage ? (
                                   <button
                                     type="button"
-                                    className="pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                                    disabled={!message.canReply}
+                                    className="disabled:cursor-not-allowed disabled:opacity-50 pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                                     onClick={() =>
                                       onReplyMessage({
                                         id: message.id,
@@ -841,7 +857,7 @@ function ConversationTimelineContent({
                                   {message.replyTo ? (
                                     <button
                                       type="button"
-                                      disabled={message.replyTo.deleted}
+                                      disabled={message.replyTo.deleted || !message.replyTo.id}
                                       onClick={() =>
                                         void followReference(
                                           message.replyTo!.id,
@@ -864,11 +880,11 @@ function ConversationTimelineContent({
                                       ) : (
                                         <>
                                           <span className="block font-medium">
-                                            {message.replyTo.sender?.displayName?.trim() ||
+                                            {message.replyTo.sender?.displayName?.trim() || message.replyTo.externalSenderName ||
                                               t(message.replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender")}
                                           </span>
                                           <span className="line-clamp-2 whitespace-pre-wrap">
-                                            {messagePreview(message.replyTo.body, message.replyTo.sender?.identityType)}
+                                            {message.replyTo.body ? messagePreview(message.replyTo.body, message.replyTo.sender?.identityType) : t("messageOriginalUnavailable")}
                                           </span>
                                         </>
                                       )}
@@ -946,6 +962,7 @@ function ConversationTimelineContent({
                       <ContextMenuContent>
                         {!message.local && !agentNotice && onReplyMessage ? (
                           <ContextMenuItem
+                            disabled={!message.canReply}
                             onSelect={() =>
                               onReplyMessage({
                                 id: message.id,

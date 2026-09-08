@@ -28,6 +28,10 @@ type ListConversationMessagesQuery struct {
 }
 
 type conversationMessageRow struct {
+	ReplyUnavailable               bool                             `bun:"reply_unavailable"`
+	ExternalReplyID                *int64                           `bun:"external_reply_id"`
+	ExternalReplyBody              string                           `bun:"external_reply_body"`
+	ExternalReplySenderName        string                           `bun:"external_reply_sender_name"`
 	ClientMessageID                *string                          `bun:"client_message_id"`
 	ReplyToType                    domain.MessageType               `bun:"reply_to_type"`
 	ID                             string                           `bun:"id"`
@@ -114,6 +118,8 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 	return db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
+		ColumnExpr("tm.reply_provider_message_id AS external_reply_id, tm.reply_body AS external_reply_body, tm.reply_sender_name AS external_reply_sender_name").
+		ColumnExpr("COALESCE(ch.type = ? AND (tm.message_id IS NULL OR tm.bot_id <> tcs.bot_id OR tcs.bot_id IS NULL OR tm.channel_id <> ch.id OR tm.chat_id::text <> route_cci.external_id OR msg.type <> ?), FALSE) AS reply_unavailable", domain.ChannelTypeTelegram, domain.MessageTypeText).
 		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
@@ -148,6 +154,10 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Join("LEFT JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
+		Join("LEFT JOIN contact_channel_identities AS route_cci ON route_cci.id = cc.contact_channel_identity_id AND route_cci.organization_id = cc.organization_id").
+		Join("LEFT JOIN channels AS ch ON ch.id = route_cci.channel_id AND ch.organization_id = route_cci.organization_id").
+		Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = ch.id AND tcs.organization_id = ch.organization_id").
+		Join("LEFT JOIN telegram_messages AS tm ON tm.message_id = msg.id AND tm.organization_id = msg.organization_id AND tm.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN contacts AS c ON c.id = cs.source_id AND c.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN messages AS reply_msg ON reply_msg.organization_id = msg.organization_id AND reply_msg.conversation_id = msg.conversation_id AND reply_msg.id = msg.reply_to_message_id AND reply_msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
@@ -293,7 +303,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	messages := make([]ConversationMessage, 0, len(rows))
 	for _, row := range rows {
 		message := ConversationMessage{
-			ClientMessageID: row.ClientMessageID, ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
+			ReplyUnavailable: row.ReplyUnavailable, ClientMessageID: row.ClientMessageID, ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, MessageSeq: row.MessageSeq,
 		}
 		if message.Type == domain.MessageTypeSystem {
@@ -313,6 +323,9 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 				SourceID:      *row.SenderSourceID,
 				DisplayName:   row.SenderDisplayName, AvatarFileID: row.SenderAvatarFileID, IdentityType: row.SenderIdentityType,
 			}
+		}
+		if row.ReplyToMessageID == nil && row.ExternalReplyID != nil {
+			message.ReplyTo = &ConversationMessageReference{Type: domain.MessageTypeText, Body: row.ExternalReplyBody, ExternalSenderName: row.ExternalReplySenderName}
 		}
 		if row.ReplyToMessageID != nil && row.ReplyToDeleted {
 			message.ReplyTo = &ConversationMessageReference{ID: *row.ReplyToMessageID, Type: row.ReplyToType, Deleted: true}
@@ -349,4 +362,25 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	result.Before = &MessageCursorPoint{ID: first.ID, MessageSeq: first.MessageSeq}
 	result.After = &MessageCursorPoint{ID: last.ID, MessageSeq: last.MessageSeq}
 	return result, nil
+}
+
+// ListReferences 在同一读取快照中刷新指定消息的引用关系，不改变消息窗口。
+func (q *ListConversationMessagesQuery) ListReferences(ctx context.Context, identity *servermodels.Identity, conversationID string, ids []string) ([]ConversationMessage, error) {
+	var messages []ConversationMessage
+	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
+		if err := authorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		var rows []conversationMessageRow
+		if err := conversationMessagesQuery(tx, identity, conversationID).Where("msg.id IN (?)", bun.In(ids)).Scan(ctx, &rows); err != nil {
+			return err
+		}
+		history, err := buildConversationMessageHistory(rows)
+		messages = history.Messages
+		return err
+	})
+	return messages, err
 }

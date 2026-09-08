@@ -173,11 +173,12 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
-	Type    domain.MessageType
-	Deleted bool
-	ID      string
-	Body    string
-	Sender  *ConversationMessageSender
+	ExternalSenderName string
+	Type               domain.MessageType
+	Deleted            bool
+	ID                 string
+	Body               string
+	Sender             *ConversationMessageSender
 }
 
 // ConversationMessageMention 定义消息提醒的聊天主体。
@@ -212,22 +213,23 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	ClientMessageID *string
-	Attachment      *MessageAttachment
-	AgentProcess    *ConversationAgentProcess
-	MessageSeq      int64
-	ID              string
-	Type            domain.MessageType
-	Body            string
-	OriginatedAt    time.Time
-	SourceOrder     int64
-	CreatedAt       time.Time
-	Sender          *ConversationMessageSender
-	SessionStart    *ConversationMessageSessionStart
-	SystemEvent     *ConversationSystemEvent
-	ReplyTo         *ConversationMessageReference
-	Mentions        []ConversationMessageMention
-	MentionAll      bool
+	ReplyUnavailable bool
+	ClientMessageID  *string
+	Attachment       *MessageAttachment
+	AgentProcess     *ConversationAgentProcess
+	MessageSeq       int64
+	ID               string
+	Type             domain.MessageType
+	Body             string
+	OriginatedAt     time.Time
+	SourceOrder      int64
+	CreatedAt        time.Time
+	Sender           *ConversationMessageSender
+	SessionStart     *ConversationMessageSessionStart
+	SystemEvent      *ConversationSystemEvent
+	ReplyTo          *ConversationMessageReference
+	Mentions         []ConversationMessageMention
+	MentionAll       bool
 }
 
 // ConversationMessageHistoryInput 定义成员消息历史查询方向。

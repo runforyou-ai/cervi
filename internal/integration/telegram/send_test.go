@@ -46,7 +46,7 @@ func TestSendTextOutcomes(t *testing.T) {
 				_, _ = fmt.Fprint(w, test.response)
 			}))
 			defer server.Close()
-			id, err := NewClient(server.Client(), WithBaseURL(server.URL)).SendText(context.Background(), testBotToken, "123", "你好 *plain*")
+			id, err := NewClient(server.Client(), WithBaseURL(server.URL)).SendText(context.Background(), testBotToken, TextMessage{ChatID: "123", Body: "你好 *plain*"})
 			if test.code == "" {
 				if err != nil || id != 42 {
 					t.Fatalf("id=%d err=%v", id, err)
@@ -69,9 +69,30 @@ func TestSendTextNetworkFailure(t *testing.T) {
 	client := NewClient(httpDoerFunc(func(*http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("network error with %s", testBotToken)
 	}))
-	_, err := client.SendText(context.Background(), testBotToken, "123", "hello")
+	_, err := client.SendText(context.Background(), testBotToken, TextMessage{ChatID: "123", Body: "hello"})
 	var failure *SendError
 	if !errors.As(err, &failure) || failure.Code != "unknown_result" || strings.Contains(err.Error(), testBotToken) {
 		t.Fatalf("error=%v", err)
+	}
+}
+
+// TestSendTextReplyParameters 验证整条消息引用显式禁止丢弃引用发送。
+func TestSendTextReplyParameters(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			Reply map[string]any `json:"reply_parameters"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		if len(payload.Reply) != 2 || payload.Reply["message_id"] != float64(7) || payload.Reply["allow_sending_without_reply"] != false {
+			t.Errorf("reply=%v", payload.Reply)
+		}
+		_, _ = fmt.Fprint(w, `{"ok":true,"result":{"message_id":42,"chat":{"id":123}}}`)
+	}))
+	defer server.Close()
+	target := int64(7)
+	if _, err := NewClient(server.Client(), WithBaseURL(server.URL)).SendText(context.Background(), testBotToken, TextMessage{ChatID: "123", Body: "回答", ReplyMessageID: &target}); err != nil {
+		t.Fatal(err)
 	}
 }

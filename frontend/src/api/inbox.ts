@@ -1,6 +1,7 @@
 /** 成员收件箱与会话消息调用归一化。 */
 import {
   ListCustomerMessageDeliveries,
+  ListConversationMessageReferences,
   ResolveCustomerMessageDelivery,
   AddGroupConversationMembers,
   ClaimServiceSession,
@@ -562,3 +563,10 @@ export const completeAttachmentUpload = bind(CompleteAttachmentUpload)
 
 /** 停止指定 AI 回复并读取实际运行状态。 */
 export const stopAgentReply = bind(StopAgentReply)
+
+const listConversationMessageReferencesBound = bind(ListConversationMessageReferences)
+/** 读取当前窗口消息的最新引用和回复可用状态。 */
+export async function listConversationMessageReferences(conversationID: string, messageIds: string) {
+  const result = await listConversationMessageReferencesBound(conversationID, { messageIds })
+  return { ...result, states: result.states ?? [] }
+}

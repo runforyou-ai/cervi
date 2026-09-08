@@ -40,6 +40,7 @@ const inbox = {
 
   messagesLoadingLater: "Loading newer messages",
   messagesLoadLaterError: "Unable to load newer messages",
+  messageOriginalUnavailable: "Original message unavailable",
   messageOriginalDeleted: "Original message deleted",
   messageGoToOriginal: "Go to original message",
   mentionNavigation: "Mention navigation",

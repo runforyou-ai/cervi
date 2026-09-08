@@ -5,6 +5,7 @@ package appservice
 import (
 	"context"
 	"errors"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -546,7 +547,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	var replyTo *ConversationMessageReference
 	if message.ReplyTo != nil {
 		replyTo = &ConversationMessageReference{
-			ID: message.ReplyTo.ID, Type: MessageType(message.ReplyTo.Type), Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
+			ExternalSenderName: message.ReplyTo.ExternalSenderName, ID: message.ReplyTo.ID, Type: MessageType(message.ReplyTo.Type), Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
 			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender, avatarURLs),
 		}
 	}
@@ -562,6 +563,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		attachment = &MessageAttachment{File: File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize}, UploadStatus: AttachmentUploadStatus(message.Attachment.UploadStatus), ImageWidth: message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight}
 	}
 	return ConversationMessage{
+		CanReply:        !message.ReplyUnavailable && (message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment),
 		ClientMessageID: message.ClientMessageID,
 		Attachment:      attachment,
 		AgentProcess:    conversationAgentProcessFromAction(message.AgentProcess),

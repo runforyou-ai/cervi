@@ -40,6 +40,7 @@ const inbox = {
 
   messagesLoadingLater: "正在加载后续消息",
   messagesLoadLaterError: "加载后续消息失败",
+  messageOriginalUnavailable: "原消息不可用",
   messageOriginalDeleted: "原消息已删除",
   messageGoToOriginal: "查看原消息",
   mentionNavigation: "提及导航",

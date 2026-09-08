@@ -1247,7 +1247,7 @@ function ConversationThread({
         }
         groupParticipants={groupResource.data?.participants}
         onReplyMessage={
-          conversation && replySupported && !replyDisabledReason && !telegramConversation
+          conversation && replySupported && !replyDisabledReason
             ? setReplyTo
             : undefined
         }

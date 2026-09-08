@@ -470,6 +470,13 @@ export function ListContacts(meta: $models.RequestMeta, input: $models.ContactLi
 }
 
 /**
+ * ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
+ */
+export function ListConversationMessageReferences(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageReferenceListInput): $CancellablePromise<$models.ConversationMessageReferenceList> {
+    return $Call.ByID(3159624270, meta, conversationID, input);
+}
+
+/**
  * ListConversationMessages 返回成员可见的会话消息。
  */
 export function ListConversationMessages(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageListInput): $CancellablePromise<$models.ConversationMessageList> {
