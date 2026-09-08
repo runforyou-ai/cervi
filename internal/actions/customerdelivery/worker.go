@@ -80,7 +80,7 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 		// 请求结束或服务关闭后仍尝试落下平台结果，避免成功结果仅留在内存。
 		saveCtx, saveCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer saveCancel()
-		return w.finish(saveCtx, conn, delivery, messageID, sendErr)
+		return w.finish(saveCtx, conn, delivery, recipient, messageID, sendErr)
 	})
 }
 
@@ -183,7 +183,7 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 }
 
 // finish 保存带认领标识的平台结果，未知结果绝不自动重发。
-func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.CustomerMessageDelivery, messageID int64, sendErr error) error {
+func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.CustomerMessageDelivery, recipient string, messageID int64, sendErr error) error {
 	return conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// 与入站共用渠道身份锁，使映射写入和迟到引用关联串行提交。
 		if _, err := tx.ExecContext(ctx, "SELECT id FROM contact_channel_identities WHERE id = ? AND organization_id = ? FOR UPDATE", delivery.ContactChannelIdentityID, delivery.OrganizationID); err != nil {
@@ -202,10 +202,7 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
 		current.Status = domain.CustomerDeliverySent
 		if sendErr == nil && messageID > 0 {
 			current.ProviderMessageID, current.SentAt = &messageID, &now
-			var recipient string
-			if err := tx.NewSelect().TableExpr("contact_channel_identities").Column("external_id").Where("id = ? AND organization_id = ?", current.ContactChannelIdentityID, current.OrganizationID).Scan(ctx, &recipient); err != nil {
-				return err
-			}
+			// 使用本次实际发送的聊天目标建立平台映射。
 			chatID, err := strconv.ParseInt(recipient, 10, 64)
 			if err != nil {
 				return err

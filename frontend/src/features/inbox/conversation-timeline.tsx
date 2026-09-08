@@ -298,6 +298,7 @@ function ConversationTimelineContent({
     () => listConversationMessageReferences(conversationID, deliveryMessageIDs),
     {
       enabled: enabled && customerDeliveries && Boolean(deliveryMessageIDs),
+      keepPreviousData: true,
       refetchInterval: pollingActive ? 2000 : false,
     },
   )

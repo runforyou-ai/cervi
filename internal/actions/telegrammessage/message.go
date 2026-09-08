@@ -5,6 +5,7 @@ package telegrammessage
 
 import (
 	"context"
+	"fmt"
 
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -63,7 +64,7 @@ func RecordInbound(ctx context.Context, db bun.IDB, channelID string, message *m
 func MatchesInbound(ctx context.Context, db bun.IDB, message *models.Message, channelID string, input *Inbound) (bool, error) {
 	var record models.TelegramMessage
 	if err := db.NewSelect().Model(&record).Where("tm.message_id = ? AND tm.organization_id = ?", message.ID, message.OrganizationID).Scan(ctx); err != nil {
-		return false, err
+		return false, fmt.Errorf("load telegram message mapping: %w", err)
 	}
 	var storedReply, incomingReply int64
 	if record.ReplyProviderMessageID != nil {
