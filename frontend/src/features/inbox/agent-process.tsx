@@ -269,7 +269,7 @@ function AgentReplyStopButton({ conversationID, runID, onStopped }: { conversati
   return (
     <button
       type="button"
-      className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-destructive hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"
+      className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"
       aria-label={t("agentStopReply")}
       title={t("agentStopReply")}
       disabled={stopping}
