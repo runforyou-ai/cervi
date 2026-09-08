@@ -47,7 +47,7 @@ import { recoverSession } from "@/lib/session-navigation"
 
 /** 显示当前企业配置的 MCP 服务。 */
 export function MCPServerListPage() {
-  const { t } = useTranslation("integrations")
+  const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const [deletingMCPServer, setDeletingMCPServer] =
     useState<MCPServer | null>(null)
@@ -114,7 +114,7 @@ export function MCPServerListPage() {
       <PageContent>
         {showLoading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("mcpServer.loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -126,7 +126,7 @@ export function MCPServerListPage() {
               variant="outline"
               onClick={() => void refresh()}
             >
-              {t("mcpServer.retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : (
@@ -138,7 +138,7 @@ export function MCPServerListPage() {
                   <TableHead>{t("mcpServer.list.columns.url")}</TableHead>
                   <TableHead>{t("mcpServer.list.columns.serverType")}</TableHead>
                   <TableHead className="w-px">
-                    {t("mcpServer.list.columns.actions")}
+                    {t("common:table.actions")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -170,7 +170,7 @@ export function MCPServerListPage() {
                             <Link
                               to={`/integrations/mcp-servers/${mcpServer.id}`}
                             >
-                              {t("mcpServer.list.edit")}
+                              {t("common:actions.edit")}
                             </Link>
                           </Button>
                           <DropdownMenu>
@@ -178,8 +178,8 @@ export function MCPServerListPage() {
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                aria-label={t("mcpServer.list.more")}
-                                title={t("mcpServer.list.more")}
+                                aria-label={t("common:actions.more")}
+                                title={t("common:actions.more")}
                               >
                                 <MoreHorizontalIcon />
                               </Button>
@@ -191,7 +191,7 @@ export function MCPServerListPage() {
                                   setDeletingMCPServer(mcpServer)
                                 }
                               >
-                                {t("mcpServer.list.delete")}
+                                {t("common:actions.delete")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -227,15 +227,15 @@ export function MCPServerListPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>
-              {t("mcpServer.delete.cancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void confirmDelete()}
             >
               {deleting
-                ? t("mcpServer.delete.deleting")
-                : t("mcpServer.delete.confirm")}
+                ? t("common:actions.deleting")
+                : t("common:actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

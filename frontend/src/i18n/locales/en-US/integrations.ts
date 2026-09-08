@@ -52,20 +52,14 @@ const integrations = {
   mcpServers: "MCP servers",
   mcpServer: {
     title: "MCP servers",
-    loading: "Loading…",
-    retry: "Retry",
     list: {
       create: "Add MCP server",
-      edit: "Edit",
-      delete: "Delete",
-      more: "More",
       loadError: "Could not load MCP servers.",
       empty: "No MCP servers configured",
       columns: {
         name: "Name",
         url: "URL",
         serverType: "Server type",
-        actions: "Actions",
       },
     },
     form: {
@@ -77,9 +71,6 @@ const integrations = {
       authorizationToken: "Authorization Token",
       showToken: "Show token",
       hideToken: "Hide token",
-      save: "Save",
-      saving: "Saving…",
-      cancel: "Cancel",
       createSuccess: "MCP server added.",
       updateSuccess: "MCP server saved.",
       saveError: "Could not save the MCP server. Try again.",
@@ -88,15 +79,12 @@ const integrations = {
     delete: {
       title: "Delete “{{name}}”?",
       description: "This MCP server configuration cannot be recovered.",
-      cancel: "Cancel",
-      confirm: "Delete",
-      deleting: "Deleting…",
       success: "MCP server deleted.",
       error: "Could not delete the MCP server. Try again.",
     },
     validation: {
       serverTypeInvalid: "Select a supported server type.",
-      nameRequired: "Enter a MCP server name.",
+      nameRequired: "Enter an MCP server name.",
       nameTooLong: "The MCP server name cannot exceed 100 characters.",
       urlRequired: "Enter the MCP server URL.",
       urlTooLong: "The MCP server URL cannot exceed 2048 characters.",

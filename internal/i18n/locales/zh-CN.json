@@ -345,7 +345,6 @@
   "field.business_system_description_too_long": "业务系统描述不能超过 200 个字符。",
   "field.business_system_url_required": "请输入业务系统地址。",
   "field.mcp_server_url_required": "请输入 MCP 服务地址。",
-  "field.mcp_server_url_invalid": "请输入完整的 HTTP 或 HTTPS 地址，且不要包含账号密码。",
   "field.business_system_url_too_long": "业务系统地址不能超过 2048 个字符。",
   "field.mcp_server_url_too_long": "MCP 服务地址不能超过 2048 个字符。",
   "field.channel_type_invalid": "请选择支持的渠道类别。",

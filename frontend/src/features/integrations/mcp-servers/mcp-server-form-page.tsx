@@ -34,7 +34,7 @@ const listPath = "/integrations/mcp-servers"
 
 /** 编辑 MCP 服务名称、地址、服务器类型和认证令牌。 */
 export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
-  const { t } = useTranslation("integrations")
+  const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const { mcpServerId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
@@ -150,7 +150,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("mcpServer.loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -162,7 +162,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
               variant="outline"
               onClick={() => void refresh()}
             >
-              {t("mcpServer.retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : (
@@ -228,11 +228,11 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
                   <LoaderCircleIcon className="animate-spin" />
                 ) : null}
                 {form.formState.isSubmitting
-                  ? t("mcpServer.form.saving")
-                  : t("mcpServer.form.save")}
+                  ? t("common:actions.saving")
+                  : t("common:actions.save")}
               </Button>
               <Button type="button" variant="outline" asChild>
-                <Link to={listPath}>{t("mcpServer.form.cancel")}</Link>
+                <Link to={listPath}>{t("common:actions.cancel")}</Link>
               </Button>
             </div>
           </form>

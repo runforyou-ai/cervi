@@ -50,20 +50,14 @@ const integrations = {
   mcpServers: "MCP 服务",
   mcpServer: {
     title: "MCP 服务",
-    loading: "正在加载…",
-    retry: "重试",
     list: {
       create: "添加 MCP 服务",
-      edit: "编辑",
-      delete: "删除",
-      more: "更多",
       loadError: "MCP 服务列表加载失败。",
       empty: "还没有配置 MCP 服务",
       columns: {
         name: "名称",
         url: "URL",
         serverType: "服务器类型",
-        actions: "操作",
       },
     },
     form: {
@@ -75,9 +69,6 @@ const integrations = {
       authorizationToken: "Authorization Token",
       showToken: "显示令牌",
       hideToken: "隐藏令牌",
-      save: "保存",
-      saving: "保存中…",
-      cancel: "取消",
       createSuccess: "MCP 服务已添加。",
       updateSuccess: "MCP 服务已保存。",
       saveError: "保存 MCP 服务失败，请重试。",
@@ -86,9 +77,6 @@ const integrations = {
     delete: {
       title: "删除“{{name}}”？",
       description: "删除后，该 MCP 服务配置将无法恢复。",
-      cancel: "取消",
-      confirm: "删除",
-      deleting: "删除中…",
       success: "MCP 服务已删除。",
       error: "删除 MCP 服务失败，请重试。",
     },

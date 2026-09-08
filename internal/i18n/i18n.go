@@ -273,7 +273,6 @@ const (
 	FieldMCPServerNameTooLong             Key = "field.mcp_server_name_too_long"
 	FieldMCPServerNameDuplicate           Key = "field.mcp_server_name_duplicate"
 	FieldMCPServerURLRequired             Key = "field.mcp_server_url_required"
-	FieldMCPServerURLInvalid              Key = "field.mcp_server_url_invalid"
 	FieldMCPServerURLTooLong              Key = "field.mcp_server_url_too_long"
 	FieldChannelTypeInvalid               Key = "field.channel_type_invalid"
 	FieldChannelNameRequired              Key = "field.channel_name_required"

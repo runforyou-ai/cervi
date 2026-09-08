@@ -115,7 +115,7 @@ func (b *DirectBackend) mcpServerMutationError(ctx context.Context, meta Request
 			mcpserveraction.ValidationNameTooLong:       cervii18n.FieldMCPServerNameTooLong,
 			mcpserveraction.ValidationNameDuplicate:     cervii18n.FieldMCPServerNameDuplicate,
 			mcpserveraction.ValidationURLRequired:       cervii18n.FieldMCPServerURLRequired,
-			mcpserveraction.ValidationURLInvalid:        cervii18n.FieldMCPServerURLInvalid,
+			mcpserveraction.ValidationURLInvalid:        cervii18n.FieldHTTPURLInvalid,
 			mcpserveraction.ValidationURLTooLong:        cervii18n.FieldMCPServerURLTooLong,
 		}
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
