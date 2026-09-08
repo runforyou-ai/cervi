@@ -289,6 +289,7 @@ type FirstDirectTextMessageResult struct {
 
 // DirectConversationSummary 定义成员内部单聊摘要。
 type DirectConversationSummary struct {
+	LastActivityAt            *time.Time
 	ID                        string
 	PeerIdentityID            string
 	PeerType                  domain.OrganizationIdentityType

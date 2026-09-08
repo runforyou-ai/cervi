@@ -249,7 +249,7 @@ func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodel
 			continue
 		}
 		found++
-		if row.Agent == nil || row.Direct != nil || row.Agent.AgentIdentityID != first.Conversation.Agent.AgentIdentityID {
+		if row.LastActivityAt == nil || row.Agent == nil || row.Direct != nil || row.Agent.AgentIdentityID != first.Conversation.Agent.AgentIdentityID {
 			t.Fatalf("AI inbox payload: %+v", row)
 		}
 		if row.ID == first.Conversation.ID && (row.UnreadCount != 0 || row.Muted || !row.MarkedUnread) {

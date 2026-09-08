@@ -25,4 +25,5 @@ type Conversation struct {
 	LastMessageSeq     int64      `bun:"last_message_seq"`
 	LastMessageID      *string    `bun:"last_message_id"`
 	LastMessageAt      *time.Time `bun:"last_message_at"`
+	LastActivityAt     *time.Time `bun:"last_activity_at"`
 }

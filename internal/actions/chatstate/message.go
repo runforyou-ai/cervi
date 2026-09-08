@@ -52,12 +52,14 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 			return nil, false, fmt.Errorf("update service session summary: %w", err)
 		}
 	}
+	// 活动时间取锁内数据库时钟，保留同会话已提交的较大值。
 	query := db.NewUpdate().Model(conversation).
+		Set("last_activity_at = GREATEST(last_activity_at, clock_timestamp())").
 		Set("last_message_id = ?", message.ID).
 		Set("last_message_at = ?", message.OriginatedAt).
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", conversation.OrganizationID)
-	if _, err := query.Exec(ctx); err != nil {
+	if err := query.Returning("last_activity_at").Scan(ctx); err != nil {
 		return nil, false, fmt.Errorf("update conversation summary: %w", err)
 	}
 	return message, true, nil

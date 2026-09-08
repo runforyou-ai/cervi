@@ -1414,6 +1414,7 @@ export interface InboxAssignee {
  * InboxConversation 定义成员统一收件箱列表项。
  */
 export interface InboxConversation {
+    "lastActivityAt": string | null;
     "lastMessageType": MessageType | null;
     "id": string;
     "type": ConversationType;

@@ -128,47 +128,6 @@ type InternalInboxConversationData =
   | DirectInboxConversationData
   | GroupInboxConversationData
 
-/** 使用与服务端一致的普通字符串 id 倒序。 */
-function compareIDsDescending(first: string, second: string) {
-  if (first === second) return 0
-  return first > second ? -1 : 1
-}
-
-/** 统一按最后消息倒序排列，尚无消息的会话沉底。 */
-function compareInboxConversations(
-  first: InboxConversation,
-  second: InboxConversation,
-) {
-  const firstSummary = isCustomerInboxConversation(first)
-    ? first.customer
-    : isAgentInboxConversation(first)
-      ? first.agent
-      : isDirectInboxConversation(first)
-        ? first.direct
-        : isGroupInboxConversation(first)
-          ? first.group
-          : null
-  const secondSummary = isCustomerInboxConversation(second)
-    ? second.customer
-    : isAgentInboxConversation(second)
-      ? second.agent
-      : isDirectInboxConversation(second)
-        ? second.direct
-        : isGroupInboxConversation(second)
-          ? second.group
-          : null
-  const firstTime = firstSummary?.lastMessageAt
-  const secondTime = secondSummary?.lastMessageAt
-  if (!firstTime || !secondTime) {
-    if (!firstTime && !secondTime)
-      return compareIDsDescending(first.id, second.id)
-    return firstTime ? -1 : 1
-  }
-  const timeDifference = Date.parse(secondTime) - Date.parse(firstTime)
-  if (timeDifference) return timeDifference
-  return compareIDsDescending(first.id, second.id)
-}
-
 /** 生成字段完整且可精确失效的收件箱查询。 */
 function inboxQuery(
   scope: InboxScope,
@@ -1402,6 +1361,7 @@ export function InboxPage({
       ),
     [conversations, leftGroupConversationIDs],
   )
+  // 临时会话保持可达，列表响应接管后沿用服务端顺序。
   const allConversations = useMemo(
     () =>
       [
@@ -1412,7 +1372,7 @@ export function InboxPage({
             ),
         ),
         ...validConversations,
-      ].sort(compareInboxConversations),
+      ],
     [startedConversations, validConversations],
   )
   const scopedConversations = useMemo(() => {

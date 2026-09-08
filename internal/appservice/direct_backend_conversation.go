@@ -178,7 +178,7 @@ func (b *DirectBackend) FindDirectConversation(ctx context.Context, meta Request
 // directInboxConversationFromSummary 把单聊摘要转换为统一收件箱会话。
 func directInboxConversationFromSummary(summary conversationaction.DirectConversationSummary, avatarURLs map[string]string) InboxConversation {
 	return InboxConversation{
-		ID: summary.ID, Type: ConversationTypeDirect,
+		ID: summary.ID, Type: ConversationTypeDirect, LastActivityAt: summary.LastActivityAt,
 		Direct: &DirectInboxConversation{
 			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.PeerAvatarFileID),
 			Preview: summary.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.PreviewSenderIdentityType), LastMessageAt: summary.LastMessageAt,

@@ -50,6 +50,7 @@ type directTargetRow struct {
 }
 
 type directConversationSummaryRow struct {
+	LastActivityAt            *time.Time                       `bun:"last_activity_at"`
 	ID                        string                           `bun:"id"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
@@ -322,6 +323,7 @@ func loadDirectConversationSummary(ctx context.Context, db bun.IDB, organization
 		ColumnExpr("? AS preview", messagequery.Summary("msg")).
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").
+		ColumnExpr("cv.last_activity_at AS last_activity_at").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
@@ -334,7 +336,7 @@ func loadDirectConversationSummary(ctx context.Context, db bun.IDB, organization
 		return DirectConversationSummary{}, fmt.Errorf("load direct conversation summary: %w", err)
 	}
 	return DirectConversationSummary{
-		ID: row.ID, PeerIdentityID: target.IdentityID, PeerType: target.IdentityType, PeerName: target.DisplayName, PeerAvatarFileID: target.AvatarFileID,
+		ID: row.ID, LastActivityAt: row.LastActivityAt, PeerIdentityID: target.IdentityID, PeerType: target.IdentityType, PeerName: target.DisplayName, PeerAvatarFileID: target.AvatarFileID,
 		Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
 	}, nil
 }
