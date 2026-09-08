@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 )
@@ -15,13 +14,12 @@ import (
 func TestConversationMessageCursorRoundTrip(t *testing.T) {
 	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
 	point := conversationaction.MessageCursorPoint{
-		OriginatedAt: time.Date(2026, time.August, 29, 8, 30, 0, 123456789, time.UTC),
-		SourceOrder:  42,
-		ID:           "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+		MessageSeq: 9007199254740993,
+		ID:         "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
 	}
 	cursor := encodeConversationMessageCursor(conversationID, point)
 	decoded, valid := decodeConversationMessageCursor(cursor, conversationID)
-	if !valid || decoded.ID != point.ID || decoded.SourceOrder != point.SourceOrder || !decoded.OriginatedAt.Equal(point.OriginatedAt) {
+	if !valid || decoded.ID != point.ID || decoded.MessageSeq != point.MessageSeq {
 		t.Fatalf("decoded cursor = %#v, valid = %v", decoded, valid)
 	}
 }
@@ -29,8 +27,8 @@ func TestConversationMessageCursorRoundTrip(t *testing.T) {
 // TestConversationMessageCursorRejectsAnotherConversation 验证游标不能跨会话复用。
 func TestConversationMessageCursorRejectsAnotherConversation(t *testing.T) {
 	point := conversationaction.MessageCursorPoint{
-		OriginatedAt: time.Now().UTC(),
-		ID:           "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+		MessageSeq: 9007199254740993,
+		ID:         "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
 	}
 	cursor := encodeConversationMessageCursor("0198ddee-c056-7bc5-a1d9-586f878ee966", point)
 	if _, valid := decodeConversationMessageCursor(cursor, "0198ddee-c056-7bc5-a1d9-586f878ee977"); valid {
@@ -58,17 +56,17 @@ func TestCustomerTextMessageErrorMapsConflicts(t *testing.T) {
 	}
 }
 
-// TestGroupCursorPreservesSequence 验证群聊游标无损传输大整数序号。
-func TestGroupCursorPreservesSequence(t *testing.T) {
+// TestMessageCursorPreservesSequence 验证消息游标无损传输大整数序号。
+func TestMessageCursorPreservesSequence(t *testing.T) {
 	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
 	sequence := int64(9007199254740993)
-	point := conversationaction.MessageCursorPoint{GroupMessageSequence: &sequence, ID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65"}
+	point := conversationaction.MessageCursorPoint{MessageSeq: sequence, ID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65"}
 	cursor := encodeConversationMessageCursor(conversationID, point)
 	decoded, valid := decodeConversationMessageCursor(cursor, conversationID)
-	if !valid || decoded.GroupMessageSequence == nil || *decoded.GroupMessageSequence != sequence || decoded.ID != point.ID {
+	if !valid || decoded.MessageSeq != sequence || decoded.ID != point.ID {
 		t.Fatalf("decoded=%+v valid=%v", decoded, valid)
 	}
-	if got := groupMessageSequenceString(&sequence); got == nil || *got != "9007199254740993" {
+	if got := messageSeqString(&sequence); got == nil || *got != "9007199254740993" {
 		t.Fatalf("sequence=%v", got)
 	}
 }

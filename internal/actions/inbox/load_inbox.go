@@ -336,13 +336,12 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		Join(`JOIN LATERAL (
 			SELECT count(*) AS unread_count
 			FROM messages AS unread_msg
-			LEFT JOIN messages AS read_msg ON read_msg.organization_id = state.organization_id AND read_msg.conversation_id = state.conversation_id AND read_msg.id = state.last_read_message_id
 			JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.conversation_id = unread_msg.conversation_id AND sender_cp.id = unread_msg.sender_participant_id
 			JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
 			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id
 				AND unread_msg.type IN (?) AND unread_msg.deleted_at IS NULL
 				AND NOT (sender_cs.kind = ? AND sender_cs.source_id = ?)
-				AND (read_msg.id IS NULL OR (unread_msg.originated_at, unread_msg.source_order, unread_msg.id) > (read_msg.originated_at, read_msg.source_order, read_msg.id))
+				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
 		) AS unread ON TRUE`, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID).
 		Where("cc.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeCustomer)
@@ -424,12 +423,11 @@ func (q *LoadInboxQuery) individualConversationsQuery(organizationID, identityID
 		Join(`JOIN LATERAL (
 			SELECT count(*) AS unread_count
 			FROM messages AS unread_msg
-			LEFT JOIN messages AS read_msg ON read_msg.organization_id = state.organization_id AND read_msg.conversation_id = state.conversation_id AND read_msg.id = state.last_read_message_id
 			LEFT JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.id = unread_msg.sender_participant_id
 			LEFT JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
 			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id AND unread_msg.deleted_at IS NULL
 				AND (unread_msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?)
-				AND (read_msg.id IS NULL OR (unread_msg.originated_at, unread_msg.source_order, unread_msg.id) > (read_msg.originated_at, read_msg.source_order, read_msg.id))
+				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
 		) AS unread ON TRUE`, identityID).
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.id = mine.subject_id AND mine_cs.organization_id = mine.organization_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
@@ -511,13 +509,12 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 			SELECT count(*) AS unread_count,
 				count(*) FILTER (WHERE mention.message_id IS NOT NULL OR unread_msg.mention_all) AS mentioned_unread_count
 			FROM messages AS unread_msg
-			LEFT JOIN messages AS read_msg ON read_msg.organization_id = state.organization_id AND read_msg.conversation_id = state.conversation_id AND read_msg.id = state.last_read_message_id
 			LEFT JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.id = unread_msg.sender_participant_id
 			LEFT JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
 			LEFT JOIN message_mentions AS mention ON mention.organization_id = unread_msg.organization_id AND mention.message_id = unread_msg.id AND mention.subject_id = mine.subject_id
 			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id AND unread_msg.deleted_at IS NULL
 				AND (unread_msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?)
-				AND (read_msg.id IS NULL OR unread_msg.group_message_sequence > read_msg.group_message_sequence)
+				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
 		) AS unread ON TRUE`, identityID).
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeGroup).

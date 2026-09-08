@@ -132,7 +132,7 @@ func assertAgentLockResult(t *testing.T, ctx context.Context, db *bun.DB, run se
 		t.Fatal(err)
 	}
 	var latest servermodels.Message
-	if err := db.NewSelect().Model(&latest).Where("msg.conversation_id = ?", cv.ID).OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC").Limit(1).Scan(ctx); err != nil || cv.LastMessageID == nil || *cv.LastMessageID != latest.ID {
+	if err := db.NewSelect().Model(&latest).Where("msg.conversation_id = ?", cv.ID).OrderExpr("msg.message_seq DESC").Limit(1).Scan(ctx); err != nil || cv.LastMessageID == nil || *cv.LastMessageID != latest.ID {
 		t.Fatalf("summary=%+v latest=%+v err=%v", cv, latest, err)
 	}
 	count, err = db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", cv.ID).Count(ctx)

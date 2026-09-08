@@ -161,7 +161,7 @@
       pendingReplyToID: "",
       polling: false,
       pollSeq: 0,
-      lastMessageID: "",
+      lastMessageSeq: summary ? summary.lastMessageSeq : "0",
       replyState: "none",
       typingNode: null,
       historyLoaded: false,
@@ -446,20 +446,11 @@
     return match[1] + "." + (match[2] || "").padEnd(9, "0").slice(0, 9) + "Z";
   }
 
-  // 按消息来源时间和编号比较稳定时间线位置。
-  function compareMessagePosition(leftAt, leftID, rightAt, rightID) {
-    if (!leftAt || !rightAt) {
-      if (leftAt === rightAt) {
-        return (leftID || "").localeCompare(rightID || "");
-      }
-      return leftAt ? 1 : -1;
-    }
-    var leftTime = normalizedTimestamp(leftAt);
-    var rightTime = normalizedTimestamp(rightAt);
-    if (leftTime !== rightTime) {
-      return leftTime < rightTime ? -1 : 1;
-    }
-    return (leftID || "").localeCompare(rightID || "");
+  // 无损比较同一会话中的消息序号。
+  function compareMessagePosition(leftSeq, rightSeq) {
+    var left = BigInt(leftSeq);
+    var right = BigInt(rightSeq);
+    return left < right ? -1 : left > right ? 1 : 0;
   }
 
   function formatDuration(seconds) {
@@ -671,23 +662,15 @@
   }
 
   // 更新指定会话的摘要、时间和未读状态。
-  function updateConversationSummary(conversation, preview, date, messageID) {
+  function updateConversationSummary(conversation, preview, date, messageSeq) {
     var originatedAt =
       typeof date === "string" ? date : date.toISOString();
-    if (
-      compareMessagePosition(
-        originatedAt,
-        messageID,
-        conversation.lastMessageAt,
-        conversation.lastMessageID,
-      ) < 0
-    ) {
-      return;
-    }
+    if (previewMode) messageSeq = String(BigInt(conversation.lastMessageSeq) + 1n);
+    if (compareMessagePosition(messageSeq, conversation.lastMessageSeq) < 0) return;
     conversation.summary = preview;
     conversation.time = formatTime(new Date(originatedAt));
     conversation.lastMessageAt = originatedAt;
-    conversation.lastMessageID = messageID || "";
+    conversation.lastMessageSeq = messageSeq;
     conversation.unread =
       conversation !== activeConversation ||
       activeRoute !== "conversation" ||
@@ -751,7 +734,6 @@
   function upsertRealConversation(
     summary,
     preferredConversation,
-    summaryMessageID,
   ) {
     var conversation = conversationByID[summary.id];
     if (!conversation) {
@@ -762,17 +744,10 @@
       conversationItems.push(conversation);
     }
     conversation.title = summary.title;
-    if (
-      compareMessagePosition(
-        summary.lastMessageAt,
-        summaryMessageID,
-        conversation.lastMessageAt,
-        conversation.lastMessageID,
-      ) >= 0
-    ) {
+    if (compareMessagePosition(summary.lastMessageSeq, conversation.lastMessageSeq) >= 0) {
       conversation.summary = CerviMarkdown.preview(summary.preview, summary.previewSenderIdentityType);
       conversation.lastMessageAt = summary.lastMessageAt;
-      conversation.lastMessageID = summaryMessageID || "";
+      conversation.lastMessageSeq = summary.lastMessageSeq;
       conversation.time = formatTime(new Date(summary.lastMessageAt));
     }
     conversation.serviceSession = summary.serviceSession;
@@ -880,7 +855,7 @@
             conversation,
             CerviMarkdown.preview(lastMessage.body, lastMessage.senderIdentityType),
             lastMessage.originatedAt,
-            lastMessage.id,
+            lastMessage.messageSeq,
           );
         }
         if (conversation === activeConversation) {
@@ -921,18 +896,16 @@
     conversation.fragment = document.createDocumentFragment();
   }
 
-  // 按稳定时间线位置插入持久消息节点。
-  function insertServerMessageNode(conversation, node, originatedAt, id) {
+  // 按消息序号插入持久消息节点。
+  function insertServerMessageNode(conversation, node, messageSeq) {
     var container = conversationMessageContainer(conversation);
     var nextNode = null;
     container.querySelectorAll("[data-message-id]").forEach(function (current) {
       if (
         !nextNode &&
         compareMessagePosition(
-          originatedAt,
-          id,
-          current.getAttribute("data-originated-at"),
-          current.getAttribute("data-message-id"),
+          messageSeq,
+          current.getAttribute("data-message-seq"),
         ) < 0
       ) {
         nextNode = current;
@@ -955,7 +928,7 @@
     );
     message.setAttribute("data-message-id", value.id);
     message.tabIndex = 0;
-    message.setAttribute("data-originated-at", value.originatedAt);
+    message.setAttribute("data-message-seq", value.messageSeq);
     var row = document.createElement("div");
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
@@ -1017,8 +990,7 @@
     insertServerMessageNode(
       conversation,
       message,
-      value.originatedAt,
-      value.id,
+      value.messageSeq,
     );
   }
 
@@ -1185,7 +1157,7 @@
           conversation,
           CerviMarkdown.preview(lastMessage.body, lastMessage.senderIdentityType),
           lastMessage.originatedAt,
-          lastMessage.id,
+          lastMessage.messageSeq,
         );
       })
       .catch(function (error) {
@@ -1249,7 +1221,6 @@
         conversation = upsertRealConversation(
           result.conversation,
           conversation,
-          result.message.id,
         );
         conversation.pendingMessageID = "";
         conversation.pendingBody = "";

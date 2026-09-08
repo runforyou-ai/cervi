@@ -159,8 +159,8 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
-		Where("(msg.originated_at, msg.source_order, msg.id) <= (?, ?, ?)", boundary.OriginatedAt, boundary.SourceOrder, boundary.ID).
-		OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC").
+		Where("msg.message_seq <= ?", boundary.MessageSeq).
+		OrderExpr("msg.message_seq DESC").
 		Limit(agentHistoryLimit).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("load claimed customer conversation context: %w", err)

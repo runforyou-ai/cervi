@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -131,7 +132,7 @@ func seedAgentExecution(t *testing.T, ctx context.Context, db *bun.DB) servermod
 			}
 		}
 		message := &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: organizationID, ConversationID: conversationID, SenderParticipantID: &userParticipantID, Type: string(domain.MessageTypeText), Body: "待处理输入", OriginatedAt: time.Now().UTC()}
-		if _, err := tx.NewInsert().Model(message).Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "originated_at").Exec(ctx); err != nil {
+		if _, _, err := chatstate.AppendMessage(ctx, tx, cv, message); err != nil {
 			return err
 		}
 		state := &servermodels.ConversationAgentState{ConversationID: conversationID, OrganizationID: organizationID, AgentIdentityID: agentID, DesiredSeq: 1}

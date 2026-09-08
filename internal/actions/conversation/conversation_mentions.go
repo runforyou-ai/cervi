@@ -74,7 +74,7 @@ func pendingMentionsQuery(db bun.IDB, userID string) *bun.SelectQuery {
 		Join("JOIN conversation_participants AS sender ON sender.organization_id = pending.organization_id AND sender.conversation_id = pending.conversation_id AND sender.id = pending.sender_participant_id").
 		Where("pending.organization_id = cv.organization_id AND pending.conversation_id = cv.id").
 		Where("pending.deleted_at IS NULL AND sender.subject_id <> mine.subject_id").
-		Where("pending.group_message_sequence > COALESCE(reviewed.group_message_sequence, 0)").
+		Where("pending.message_seq > COALESCE(reviewed.message_seq, 0)").
 		Where("NOT EXISTS (SELECT 1 FROM conversation_mention_reviews AS receipt WHERE receipt.organization_id = pending.organization_id AND receipt.conversation_id = pending.conversation_id AND receipt.user_id = ? AND receipt.message_id = pending.id)", userID).
 		Where(`pending.mention_all OR EXISTS (SELECT 1 FROM message_mentions AS mention WHERE mention.organization_id = pending.organization_id AND mention.message_id = pending.id AND mention.subject_id = mine.subject_id)`)
 }
@@ -88,9 +88,9 @@ func (q *GetConversationNavigationStateQuery) Execute(ctx context.Context, ident
 	err := groupNavigationQuery(q.db, identity, conversationID).
 		ColumnExpr("(?) AS pending_mention_count", pendingMentionsQuery(q.db, identity.User.ID).ColumnExpr("count(*)")).
 		ColumnExpr("state.last_reviewed_mention_message_id AS reviewed_through_message_id").
-		ColumnExpr("COALESCE(reviewed.group_message_sequence, 0) AS reviewed_through_sequence").
-		ColumnExpr("latest.id AS latest_message_id, COALESCE(latest.group_message_sequence, 0) AS latest_sequence").
-		Join("LEFT JOIN LATERAL (SELECT id, group_message_sequence FROM messages WHERE organization_id = cv.organization_id AND conversation_id = cv.id AND deleted_at IS NULL ORDER BY group_message_sequence DESC LIMIT 1) AS latest ON TRUE").
+		ColumnExpr("COALESCE(reviewed.message_seq, 0) AS reviewed_through_sequence").
+		ColumnExpr("latest.id AS latest_message_id, COALESCE(latest.message_seq, 0) AS latest_sequence").
+		Join("LEFT JOIN LATERAL (SELECT id, message_seq FROM messages WHERE organization_id = cv.organization_id AND conversation_id = cv.id AND deleted_at IS NULL ORDER BY message_seq DESC LIMIT 1) AS latest ON TRUE").
 		Scan(ctx, &result)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ConversationNavigationState{}, ErrConversationNotFound
@@ -111,9 +111,9 @@ func (q *ListPendingConversationMentionsQuery) Execute(ctx context.Context, iden
 		Sequence *int64
 	}
 	err := groupNavigationQuery(q.db, identity, conversationID).
-		ColumnExpr("targets.id, targets.group_message_sequence AS sequence").
-		Join("LEFT JOIN LATERAL (?) AS targets ON TRUE", pendingMentionsQuery(q.db, identity.User.ID).ColumnExpr("pending.id, pending.group_message_sequence")).
-		OrderExpr("targets.group_message_sequence ASC").Scan(ctx, &rows)
+		ColumnExpr("targets.id, targets.message_seq AS sequence").
+		Join("LEFT JOIN LATERAL (?) AS targets ON TRUE", pendingMentionsQuery(q.db, identity.User.ID).ColumnExpr("pending.id, pending.message_seq")).
+		OrderExpr("targets.message_seq ASC").Scan(ctx, &rows)
 	if err != nil {
 		return PendingConversationMentions{}, fmt.Errorf("list pending conversation mentions: %w", err)
 	}
@@ -153,7 +153,7 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 		err = groupNavigationQuery(tx, identity, conversationID).
 			Join("JOIN messages AS target ON target.organization_id = cv.organization_id AND target.conversation_id = cv.id AND target.id = ?", messageID).
 			Join("JOIN conversation_participants AS sender ON sender.organization_id = target.organization_id AND sender.conversation_id = target.conversation_id AND sender.id = target.sender_participant_id").
-			ColumnExpr("target.group_message_sequence AS sequence, target.deleted_at IS NOT NULL AS deleted").
+			ColumnExpr("target.message_seq AS sequence, target.deleted_at IS NOT NULL AS deleted").
 			ColumnExpr("EXISTS (SELECT 1 FROM conversation_mention_reviews AS receipt WHERE receipt.organization_id = cv.organization_id AND receipt.conversation_id = cv.id AND receipt.user_id = ? AND receipt.message_id = target.id) AS reviewed", identity.User.ID).
 			ColumnExpr("sender.subject_id <> mine.subject_id AND (target.mention_all OR EXISTS (SELECT 1 FROM message_mentions AS mention WHERE mention.organization_id = target.organization_id AND mention.message_id = target.id AND mention.subject_id = mine.subject_id)) AS eligible").Scan(ctx, &target)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -166,7 +166,7 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 			return ErrMentionTargetInvalid
 		}
 		if err := groupNavigationQuery(tx, identity, conversationID).
-			ColumnExpr("state.last_reviewed_mention_message_id AS reviewed_through_message_id, COALESCE(reviewed.group_message_sequence, 0) AS reviewed_through_sequence").Scan(ctx, &result); err != nil {
+			ColumnExpr("state.last_reviewed_mention_message_id AS reviewed_through_message_id, COALESCE(reviewed.message_seq, 0) AS reviewed_through_sequence").Scan(ctx, &result); err != nil {
 			return err
 		}
 		if target.Sequence <= result.ReviewedThroughSequence || target.Reviewed {
@@ -197,7 +197,7 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 func advanceMentionReviewState(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string, result *ConversationMentionReview) error {
 	var firstPending *int64
 	if err := groupNavigationQuery(tx, identity, conversationID).
-		ColumnExpr("(?)", pendingMentionsQuery(tx, identity.User.ID).ColumnExpr("min(pending.group_message_sequence)")).Scan(ctx, &firstPending); err != nil {
+		ColumnExpr("(?)", pendingMentionsQuery(tx, identity.User.ID).ColumnExpr("min(pending.message_seq)")).Scan(ctx, &firstPending); err != nil {
 		return err
 	}
 	var latest struct {
@@ -206,11 +206,11 @@ func advanceMentionReviewState(ctx context.Context, tx bun.Tx, identity *serverm
 	}
 	query := tx.NewSelect().TableExpr("conversation_mention_reviews AS receipt").
 		Join("JOIN messages AS msg ON msg.organization_id = receipt.organization_id AND msg.conversation_id = receipt.conversation_id AND msg.id = receipt.message_id").
-		ColumnExpr("msg.id, msg.group_message_sequence AS sequence").
+		ColumnExpr("msg.id, msg.message_seq AS sequence").
 		Where("receipt.organization_id = ? AND receipt.conversation_id = ? AND receipt.user_id = ?", identity.Organization.ID, conversationID, identity.User.ID).
-		OrderExpr("msg.group_message_sequence DESC").Limit(1)
+		OrderExpr("msg.message_seq DESC").Limit(1)
 	if firstPending != nil {
-		query.Where("msg.group_message_sequence < ?", *firstPending)
+		query.Where("msg.message_seq < ?", *firstPending)
 	}
 	if err := query.Scan(ctx, &latest); errors.Is(err, sql.ErrNoRows) {
 		return nil
@@ -224,7 +224,7 @@ func advanceMentionReviewState(ctx context.Context, tx bun.Tx, identity *serverm
 	}
 	if _, err := tx.NewDelete().Model((*servermodels.ConversationMentionReview)(nil)).
 		Where("organization_id = ? AND conversation_id = ? AND user_id = ?", identity.Organization.ID, conversationID, identity.User.ID).
-		Where("message_id IN (SELECT id FROM messages WHERE organization_id = ? AND conversation_id = ? AND group_message_sequence <= ?)", identity.Organization.ID, conversationID, latest.Sequence).Exec(ctx); err != nil {
+		Where("message_id IN (SELECT id FROM messages WHERE organization_id = ? AND conversation_id = ? AND message_seq <= ?)", identity.Organization.ID, conversationID, latest.Sequence).Exec(ctx); err != nil {
 		return err
 	}
 	result.ReviewedThroughMessageID = &latest.ID

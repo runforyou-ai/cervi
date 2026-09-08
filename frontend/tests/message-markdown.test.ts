@@ -143,13 +143,13 @@ test("网站引用与 Markdown 正文共存，定位历史后保持阅读位置"
     located = this
     messages.scrollTop = 120
   }
-  const old = { id: "old-ai", author: "agent", senderIdentityType: "agent", body: "# 最早回复", originatedAt: "2026-09-07T00:00:00Z" }
+  const old = { id: "old-ai", messageSeq: "9007199254740992", author: "agent", senderIdentityType: "agent", body: "# 最早回复", originatedAt: "2026-09-07T00:00:00Z" }
   const replies = [
-    { id: "reply-ai", author: "agent", senderIdentityType: "agent", body: "**回答**", originatedAt: "2026-09-07T00:01:00Z", replyTo: { ...old, deleted: false } },
-    { id: "reply-human", author: "agent", senderIdentityType: "user", body: "**人工正文**", originatedAt: "2026-09-07T00:02:00Z", replyTo: { id: "human", author: "agent", senderIdentityType: "user", body: "**人工原文**", deleted: false } },
+    { id: "reply-ai", messageSeq: "9007199254740993", author: "agent", senderIdentityType: "agent", body: "**回答**", originatedAt: "2026-09-07T00:01:00Z", replyTo: { ...old, deleted: false } },
+    { id: "reply-human", messageSeq: "9007199254740994", author: "agent", senderIdentityType: "user", body: "**人工正文**", originatedAt: "2026-09-07T00:02:00Z", replyTo: { id: "human", author: "agent", senderIdentityType: "user", body: "**人工原文**", deleted: false } },
   ]
   window.fetch = async (path: string) => ({ ok: true, json: async () => {
-    if (path.endsWith("/messenger")) return { visitorToken: "test", conversations: [{ id: "conversation", title: "测试", preview: "**人工正文**", previewSenderIdentityType: "user", lastMessageAt: replies[1].originatedAt }] }
+    if (path.endsWith("/messenger")) return { visitorToken: "test", conversations: [{ id: "conversation", title: "测试", preview: "**人工正文**", previewSenderIdentityType: "user", lastMessageSeq: replies[1].messageSeq, lastMessageAt: replies[1].originatedAt }] }
     if (path.includes("?before=")) return { messages: [old], before: "", after: "" }
     if (path.includes("?after=")) return { messages: [], before: "", after: "latest" }
     return { messages: replies, before: "earlier", after: "latest" }

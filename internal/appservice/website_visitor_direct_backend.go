@@ -7,8 +7,6 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
-	"strings"
-	"time"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -80,14 +78,14 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	if input.Before != "" {
-		point, valid := decodeWebsiteMessageCursor(input.Before, conversationID)
+		point, valid := decodeConversationMessageCursor(input.Before, conversationID)
 		if !valid {
 			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"before": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
 		actionInput.Before = &point
 	}
 	if input.After != "" {
-		point, valid := decodeWebsiteMessageCursor(input.After, conversationID)
+		point, valid := decodeConversationMessageCursor(input.After, conversationID)
 		if !valid {
 			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"after": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
@@ -102,36 +100,14 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 		result.Messages = append(result.Messages, websiteVisitorMessageFromAction(message))
 	}
 	if page.Before != nil {
-		value := encodeWebsiteMessageCursor(conversationID, *page.Before)
+		value := encodeConversationMessageCursor(conversationID, *page.Before)
 		result.Before = &value
 	}
 	if page.After != nil {
-		value := encodeWebsiteMessageCursor(conversationID, *page.After)
+		value := encodeConversationMessageCursor(conversationID, *page.After)
 		result.After = &value
 	}
 	return result, nil
-}
-
-// encodeWebsiteMessageCursor 编码绑定 Conversation 的消息位置。
-func encodeWebsiteMessageCursor(conversationID string, point conversationaction.MessageCursorPoint) string {
-	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + strconv.FormatInt(point.SourceOrder, 10) + "." + point.ID
-}
-
-// decodeWebsiteMessageCursor 解析当前 Conversation 的消息位置。
-func decodeWebsiteMessageCursor(value, conversationID string) (conversationaction.MessageCursorPoint, bool) {
-	parts := strings.Split(value, ".")
-	if len(parts) != 4 || parts[0] != conversationID {
-		return conversationaction.MessageCursorPoint{}, false
-	}
-	originatedAt, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil || originatedAt <= 0 {
-		return conversationaction.MessageCursorPoint{}, false
-	}
-	sourceOrder, err := strconv.ParseInt(parts[2], 10, 64)
-	if err != nil || sourceOrder < 0 {
-		return conversationaction.MessageCursorPoint{}, false
-	}
-	return conversationaction.MessageCursorPoint{OriginatedAt: time.Unix(0, originatedAt).UTC(), SourceOrder: sourceOrder, ID: parts[3]}, true
 }
 
 // websiteVisitorError 把语言无关访客错误映射为本地化应用错误。
@@ -176,7 +152,7 @@ var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii1
 // websiteVisitorConversationFromAction 转换访客会话摘要。
 func websiteVisitorConversationFromAction(value conversationaction.ConversationSummary) WebsiteVisitorConversation {
 	return WebsiteVisitorConversation{
-		ID: value.ID, Title: value.Title, Preview: value.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(value.PreviewSenderIdentityType), LastMessageAt: value.LastMessageAt,
+		ID: value.ID, Title: value.Title, Preview: value.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(value.PreviewSenderIdentityType), LastMessageSeq: strconv.FormatInt(value.LastMessageSeq, 10), LastMessageAt: value.LastMessageAt,
 		ServiceSession: WebsiteVisitorServiceSession{ID: value.ServiceSessionID, Status: string(value.ServiceSessionStatus)},
 	}
 }
@@ -194,6 +170,6 @@ func websiteVisitorMessageFromAction(value conversationaction.Message) WebsiteVi
 	return WebsiteVisitorMessage{
 		ReplyTo: replyTo,
 		ID:      value.ID, Author: string(value.Author), Body: value.Body, SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
-		OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
+		MessageSeq: strconv.FormatInt(value.MessageSeq, 10), OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
 	}
 }

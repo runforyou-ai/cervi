@@ -417,7 +417,7 @@ func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessage
 		Message: Message{
 			ReplyTo: replyTo,
 			ID:      received.Message.ID, Author: domain.MessageAuthorVisitor,
-			Body: received.Message.Body, OriginatedAt: received.Message.OriginatedAt,
+			MessageSeq: received.Message.MessageSeq, Body: received.Message.Body, OriginatedAt: received.Message.OriginatedAt,
 			CreatedAt: received.Message.CreatedAt,
 		},
 	}
@@ -431,6 +431,7 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("msg.originated_at AS last_message_at").
+		ColumnExpr("msg.message_seq AS last_message_seq").
 		ColumnExpr("msg.body AS preview").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("current.id AS service_session_id").
@@ -438,7 +439,7 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		Join(`JOIN LATERAL (
  SELECT visible.* FROM messages AS visible
  WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type = ? AND visible.deleted_at IS NULL
- ORDER BY visible.originated_at DESC, visible.source_order DESC, visible.id DESC LIMIT 1
+ ORDER BY visible.message_seq DESC LIMIT 1
  ) AS msg ON TRUE`, domain.MessageTypeText).
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").

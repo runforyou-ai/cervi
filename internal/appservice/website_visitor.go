@@ -18,6 +18,7 @@ type WebsiteVisitorServiceSession struct {
 
 // WebsiteVisitorConversation 定义网站访客会话摘要。
 type WebsiteVisitorConversation struct {
+	LastMessageSeq            string                       `json:"lastMessageSeq"`
 	ID                        string                       `json:"id"`
 	Title                     string                       `json:"title"`
 	Preview                   string                       `json:"preview"`
@@ -51,6 +52,7 @@ type WebsiteVisitorMessageReference struct {
 
 // WebsiteVisitorMessage 定义网站访客可见消息。
 type WebsiteVisitorMessage struct {
+	MessageSeq         string                          `json:"messageSeq"`
 	ReplyTo            *WebsiteVisitorMessageReference `json:"replyTo"`
 	ID                 string                          `json:"id"`
 	Author             string                          `json:"author"`

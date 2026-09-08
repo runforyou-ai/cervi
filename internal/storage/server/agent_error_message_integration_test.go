@@ -59,7 +59,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 		if message.AgentProcess != nil || message.Sender == nil || message.Sender.IdentityType == nil || *message.Sender.IdentityType != domain.OrganizationIdentityTypeAgent {
 			t.Fatalf("failure sender = %+v", message)
 		}
-		cursor := &conversationaction.MessageCursorPoint{ID: message.ID, OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder}
+		cursor := &conversationaction.MessageCursorPoint{ID: message.ID, MessageSeq: message.MessageSeq}
 		earlier, err := query.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID, Before: cursor})
 		if err != nil || earlier.After == nil {
 			t.Fatalf("error message pagination = %+v, %v", earlier, err)

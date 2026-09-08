@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -437,7 +436,7 @@ func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMe
 	if err != nil {
 		return ConversationReadState{}, conversationReadError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	return ConversationReadState{LastReadMessageID: state.LastReadMessageID, LastReadAt: state.LastReadAt}, nil
+	return ConversationReadState{ReadSeq: strconv.FormatInt(state.ReadSeq, 10), LastReadMessageID: state.LastReadMessageID, LastReadAt: state.LastReadAt}, nil
 }
 
 // UpdateConversationUnreadMark 保存个人未读标记，不改变已读和提及查看水位。
@@ -552,7 +551,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		Attachment:   attachment,
 		AgentProcess: conversationAgentProcessFromAction(message.AgentProcess),
 		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body,
-		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, GroupMessageSequence: groupMessageSequenceString(message.GroupMessageSequence),
+		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MessageSeq: strconv.FormatInt(message.MessageSeq, 10),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
 	}
@@ -659,36 +658,22 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 	}
 }
 
-// encodeConversationMessageCursor 编码绑定会话的成员消息游标。
+// encodeConversationMessageCursor 编码绑定会话的消息序号与定位编号。
 func encodeConversationMessageCursor(conversationID string, point conversationaction.MessageCursorPoint) string {
-	if point.GroupMessageSequence != nil {
-		return conversationID + ".group." + strconv.FormatInt(*point.GroupMessageSequence, 10) + "." + point.ID
-	}
-	return conversationID + "." + strconv.FormatInt(point.OriginatedAt.UnixNano(), 10) + "." + strconv.FormatInt(point.SourceOrder, 10) + "." + point.ID
+	return conversationID + "." + strconv.FormatInt(point.MessageSeq, 10) + "." + point.ID
 }
 
-// decodeConversationMessageCursor 解码并校验成员消息游标所属会话。
+// decodeConversationMessageCursor 校验消息游标的会话、序号和定位编号。
 func decodeConversationMessageCursor(value, conversationID string) (conversationaction.MessageCursorPoint, bool) {
 	parts := strings.Split(value, ".")
-	if len(parts) != 4 || parts[0] != conversationID || !common.ValidUUID(parts[3]) {
+	if len(parts) != 3 || parts[0] != conversationID || !common.ValidUUID(parts[2]) {
 		return conversationaction.MessageCursorPoint{}, false
 	}
-	if parts[1] == "group" {
-		sequence, err := strconv.ParseInt(parts[2], 10, 64)
-		if err != nil || sequence <= 0 {
-			return conversationaction.MessageCursorPoint{}, false
-		}
-		return conversationaction.MessageCursorPoint{ID: parts[3], GroupMessageSequence: &sequence}, true
-	}
-	originatedAt, err := strconv.ParseInt(parts[1], 10, 64)
-	if err != nil || originatedAt <= 0 {
+	sequence, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil || sequence <= 0 {
 		return conversationaction.MessageCursorPoint{}, false
 	}
-	sourceOrder, err := strconv.ParseInt(parts[2], 10, 64)
-	if err != nil || sourceOrder < 0 {
-		return conversationaction.MessageCursorPoint{}, false
-	}
-	return conversationaction.MessageCursorPoint{OriginatedAt: time.Unix(0, originatedAt).UTC(), SourceOrder: sourceOrder, ID: parts[3]}, true
+	return conversationaction.MessageCursorPoint{ID: parts[2], MessageSeq: sequence}, true
 }
 
 // conversationMessageError 转换成员消息读取错误。

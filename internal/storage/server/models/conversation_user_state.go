@@ -12,6 +12,7 @@ import (
 type ConversationUserState struct {
 	bun.BaseModel `bun:"table:conversation_user_states,alias:cus"`
 
+	ReadSeq                      int64      `bun:"read_seq"`
 	ID                           string     `bun:"id,pk"`
 	CreatedAt                    time.Time  `bun:"created_at"`
 	UpdatedAt                    time.Time  `bun:"updated_at"`

@@ -111,9 +111,7 @@ func TestCustomerReplyBoundaries(t *testing.T) {
 	}
 	other := f.send(t, f.owner, "同企业其他会话", false)
 	system := &servermodels.Message{OrganizationID: f.owner.Organization.ID, ConversationID: f.conversationID, Type: "system", Body: "系统事件", OriginatedAt: time.Now().UTC()}
-	if _, err := f.db.NewInsert().Model(system).Column("organization_id", "conversation_id", "type", "body", "originated_at").Returning("id").Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
+	appendTestMessage(t, f.db, system)
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", original.Message.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -286,9 +284,7 @@ func TestWebsiteVisitorReplyBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	system := &servermodels.Message{OrganizationID: f.owner.Organization.ID, ConversationID: f.conversationID, Type: "system", Body: "系统事件", OriginatedAt: time.Now().UTC()}
-	if _, err := f.db.NewInsert().Model(system).Column("organization_id", "conversation_id", "type", "body", "originated_at").Returning("id").Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
+	appendTestMessage(t, f.db, system)
 	before, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", f.conversationID).Count(ctx)
 	if err != nil {
 		t.Fatal(err)
