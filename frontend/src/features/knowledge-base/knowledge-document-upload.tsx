@@ -2,6 +2,7 @@
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
+import { AttachmentName } from "@/components/attachment-name"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { formatFileSize } from "@/lib/file-size"
 import { useKnowledgeDocumentUpload, knowledgeDocumentFormats } from "./use-knowledge-document-upload"
@@ -79,8 +80,8 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
             {items.map((item, index) => (
               <div key={index} className="space-y-2">
                 <div className="flex items-center justify-between gap-4 text-sm">
-                  <span className="truncate" title={item.file.name}>
-                    {item.file.name}
+                  <span className="min-w-0 flex-1" title={item.file.name}>
+                    <AttachmentName name={item.file.name} />
                   </span>
                   <span className="shrink-0 text-muted-foreground">{t(`documents.upload.${item.stage}`)}</span>
                 </div>
