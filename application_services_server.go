@@ -4,14 +4,13 @@ package main
 
 import (
 	"context"
-	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
-	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
+	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -20,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/ingress"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -29,20 +29,29 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// applicationServices 创建企业服务端 HTTPS 入口、绑定服务、HTTP API 和网站渠道入口。
+// applicationServices 组装企业服务端入口、业务服务和后台任务。
 func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
+	// 按请求域名解析企业，并为 HTTPS 入口提供证书缓存。
 	tenantResolver := serverstorage.NewTenantResolver(appStorage.DB())
 	httpsEntry := ingress.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()), tenantResolver)
+
+	// 初始化本地文件存储和按企业读取的对象存储配置。
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, err
 	}
 	resolveFileS3 := newFileContentS3ConfigResolver(appStorage.DB())
+
+	// 创建各业务共用的可靠任务运行时，由服务生命周期统一启停。
 	tasks := servertask.New(appStorage.DB(), config.NATS)
+
+	// 注册 MCP 工具目录更新任务及最终失败时的状态处理。
 	updateMCPTools := mcpserveraction.NewUpdateToolsAction(appStorage.DB(), mcpintegration.NewClient())
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, updateMCPTools.Execute, updateMCPTools.FinalizeFailure); err != nil {
 		return nil, err
 	}
+
+	// 初始化智能体运行环境，注册执行任务及最终失败处理。
 	agentRuntime, err := agentruntime.New()
 	if err != nil {
 		return nil, err
@@ -52,6 +61,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, err
 	}
+
+	// 注册过期文件扫描与删除任务，每小时触发一次扫描。
 	scanExpired := filemaintenance.NewScanExpiredAction(appStorage.DB(), tasks)
 	deleteExpired := filemaintenance.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, resolveFileS3))
 	if err := tasks.Registry().RegisterJSON(filemaintenance.ScanExpiredActionName, scanExpired.Execute); err != nil {
@@ -65,10 +76,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: filemaintenance.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,
 	})
+
+	// 组装企业成员与网站匿名访客各自的业务入口。
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
+
+	// 注册客户消息发送与扫描任务，每五秒扫描一次待投递消息。
 	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
 	deliveryWorker := deliveryaction.NewWorker(appStorage.DB(), telegramAPI, tasks)
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, deliveryWorker.Execute); err != nil {
@@ -81,6 +96,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Key: "customer-delivery-scan", ActionName: deliveryaction.ScanActionName, Queue: "maintenance",
 		Payload: struct{}{}, CronExpression: "@every 5s", Timezone: "UTC", Enabled: true, MaxAttempts: 1, StartImmediately: true,
 	})
+
+	// 按企业存储设置导入 Telegram 头像，并接入渠道 Webhook。
 	getS3Setting := settingaction.NewGetS3SettingQuery(appStorage.DB())
 	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
 		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
@@ -93,6 +110,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return domain.FileStorageBackendLocal, nil
 	}, serverfilecontent.NewWriter(localFiles, resolveFileS3))
 	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, telegramAPI, telegramAvatarFiles)
+
+	// 将业务入口适配为 HTTP API，并为公开网站渠道提供配置查询。
 	httpAPI := api.NewService(
 		boundService,
 		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),
@@ -100,6 +119,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	)
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
 
+	// 注册健康检查、业务与文件路由、公开聊天入口及后台服务生命周期。
 	return []application.Service{
 		application.NewServiceWithOptions(api.NewLiveness(), application.ServiceOptions{Route: "/healthz"}),
 		application.NewServiceWithOptions(api.NewReadiness(appStorage.DB()), application.ServiceOptions{Route: "/readyz"}),
