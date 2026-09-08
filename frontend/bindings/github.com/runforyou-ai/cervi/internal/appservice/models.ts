@@ -763,6 +763,10 @@ export enum ConversationMentionReviewOutcome {
  * ConversationMessage 定义成员可见的会话消息。
  */
 export interface ConversationMessage {
+    /**
+     * ClientMessageID 仅向原发送身份返回。
+     */
+    "clientMessageId": string | null;
     "attachment": MessageAttachment | null;
     "agentProcess": ConversationAgentProcess | null;
     "messageSeq": string;

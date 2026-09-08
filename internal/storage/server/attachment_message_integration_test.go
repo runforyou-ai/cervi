@@ -52,13 +52,14 @@ func TestAttachmentMessages(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if result.Message.Type != domain.MessageTypeAttachment || result.Message.Body != "" || result.Message.Attachment == nil || result.Message.Attachment.ID != file.ID {
+		if result.Message.ClientMessageID == nil || *result.Message.ClientMessageID != input.ClientMessageID || result.Message.Type != domain.MessageTypeAttachment || result.Message.Body != "" || result.Message.Attachment == nil || result.Message.Attachment.ID != file.ID {
 			t.Fatalf("result=%+v", result)
 		}
 		repeated, err := send.Execute(ctx, f.owner, input)
-		if err != nil || repeated.Message.ID != result.Message.ID || repeated.Message.Attachment == nil {
+		if err != nil || repeated.Message.ID != result.Message.ID || repeated.Message.Attachment == nil || repeated.Message.ClientMessageID == nil || *repeated.Message.ClientMessageID != input.ClientMessageID {
 			t.Fatalf("repeat=%+v err=%v", repeated, err)
 		}
+		assertMemberClientAssociation(t, f.db, f.owner, result.ConversationID, result.Message.ID, input.ClientMessageID, f.member)
 		changed := input
 		changed.FileID = uuid.NewV7().String()
 		var conflict *conversationaction.ConflictError
@@ -157,9 +158,10 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	}
 	for index := 0; index < 2; index++ {
 		message := result.Messages[index]
-		if message.Attachment.UploadStatus != domain.AttachmentUploading || message.Attachment.ID == "" {
+		if message.ClientMessageID == nil || *message.ClientMessageID != input.Attachments[index].ClientMessageID || message.Attachment.UploadStatus != domain.AttachmentUploading || message.Attachment.ID == "" {
 			t.Fatalf("pending=%+v", message)
 		}
+		assertMemberClientAssociation(t, f.db, f.owner, result.ConversationID, message.ID, input.Attachments[index].ClientMessageID, f.member)
 		if index > 0 {
 			previous := result.Messages[index-1]
 			if message.OriginatedAt.Before(previous.OriginatedAt) || (message.OriginatedAt.Equal(previous.OriginatedAt) && message.ID <= previous.ID) {
@@ -173,6 +175,11 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	repeated, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
 	if err != nil || len(repeated.Messages) != 2 || repeated.Messages[0].ID != result.Messages[0].ID || repeated.Messages[1].Body != "文件说明" {
 		t.Fatalf("repeat=%+v %v", repeated, err)
+	}
+	for index, message := range repeated.Messages {
+		if message.ClientMessageID == nil || *message.ClientMessageID != input.Attachments[index].ClientMessageID {
+			t.Fatalf("batch replay association=%+v", message)
+		}
 	}
 	changed := input
 	changed.Attachments = append([]conversationaction.AttachmentBatchItem(nil), input.Attachments...)

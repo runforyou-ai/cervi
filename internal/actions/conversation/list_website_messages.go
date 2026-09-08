@@ -25,6 +25,7 @@ type ListWebsiteMessagesQuery struct {
 }
 
 type websiteMessageRow struct {
+	ClientMessageID         *string                          `bun:"client_message_id"`
 	MessageSeq              int64                            `bun:"message_seq"`
 	ID                      string                           `bun:"id"`
 	Body                    string                           `bun:"body"`
@@ -84,6 +85,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 	query := q.db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
+		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? AND ss.contact_channel_identity_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindContact, identity.ContactID, identity.ID).
 		ColumnExpr("msg.message_seq").
 		ColumnExpr("msg.body AS body").
 		ColumnExpr("oi.type AS sender_identity_type").
@@ -96,6 +98,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
 		ColumnExpr("reply_cs.kind AS reply_subject_kind").
 		ColumnExpr("reply_oi.type AS reply_sender_identity_type").
+		Join("JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
@@ -162,7 +165,7 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 			author = domain.MessageAuthorVisitor
 		}
 		message := Message{
-			MessageSeq: row.MessageSeq, ID: row.ID, Author: author, Body: row.Body, SenderIdentityType: row.SenderIdentityType,
+			ClientMessageID: row.ClientMessageID, MessageSeq: row.MessageSeq, ID: row.ID, Author: author, Body: row.Body, SenderIdentityType: row.SenderIdentityType,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
 		}
 		if row.ReplyToMessageID != nil {

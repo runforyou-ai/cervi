@@ -31,7 +31,7 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID,
 		ConversationID: input.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
 		Type: string(domain.MessageTypeText), Body: input.Body,
-		IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
+		ClientMessageID: &input.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
 	}
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID

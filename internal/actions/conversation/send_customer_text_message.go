@@ -46,6 +46,7 @@ type memberReplySessionPlan struct {
 }
 
 type idempotentMemberMessageRow struct {
+	ClientMessageID        *string    `bun:"client_message_id"`
 	ReplyToMessageID       *string    `bun:"reply_to_message_id"`
 	MessageSeq             int64      `bun:"message_seq"`
 	ID                     string     `bun:"id"`
@@ -174,7 +175,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	message := &servermodels.Message{
 		ID: ids.message, OrganizationID: identity.Organization.ID, ConversationID: conversation.ID,
 		ServiceSessionID: &session.ID, SenderParticipantID: &participant.ID,
-		Type: string(domain.MessageTypeText), Body: input.Body, IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
+		Type: string(domain.MessageTypeText), Body: input.Body, ClientMessageID: &input.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
 	}
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID
@@ -239,6 +240,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
+		ColumnExpr("msg.client_message_id").
 		ColumnExpr("msg.created_at AS created_at").
 		ColumnExpr("msg.conversation_id AS conversation_id").
 		ColumnExpr("msg.service_session_id AS service_session_id").
@@ -282,7 +284,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		return ConversationMessage{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	message := &servermodels.Message{
-		ID: row.ID, CreatedAt: row.CreatedAt, ConversationID: row.ConversationID,
+		ClientMessageID: row.ClientMessageID, ID: row.ID, CreatedAt: row.CreatedAt, ConversationID: row.ConversationID,
 		ServiceSessionID: row.ServiceSessionID, SenderParticipantID: row.SenderParticipantID,
 		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, MessageSeq: row.MessageSeq,
 	}
@@ -366,7 +368,7 @@ func memberConversationMessage(message *servermodels.Message, subjectID string, 
 	name := identity.DisplayName
 	identityType := domain.OrganizationIdentityType(identity.Type)
 	return ConversationMessage{
-		ID: message.ID, Type: domain.MessageType(message.Type), Body: message.Body,
+		ClientMessageID: message.ClientMessageID, ID: message.ID, Type: domain.MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll, MessageSeq: message.MessageSeq,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,

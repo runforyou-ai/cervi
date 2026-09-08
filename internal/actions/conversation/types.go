@@ -119,6 +119,7 @@ type MessageReference struct {
 
 // Message 定义访客可见消息。
 type Message struct {
+	ClientMessageID    *string
 	MessageSeq         int64
 	ReplyTo            *MessageReference
 	ID                 string
@@ -211,21 +212,22 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	Attachment   *MessageAttachment
-	AgentProcess *ConversationAgentProcess
-	MessageSeq   int64
-	ID           string
-	Type         domain.MessageType
-	Body         string
-	OriginatedAt time.Time
-	SourceOrder  int64
-	CreatedAt    time.Time
-	Sender       *ConversationMessageSender
-	SessionStart *ConversationMessageSessionStart
-	SystemEvent  *ConversationSystemEvent
-	ReplyTo      *ConversationMessageReference
-	Mentions     []ConversationMessageMention
-	MentionAll   bool
+	ClientMessageID *string
+	Attachment      *MessageAttachment
+	AgentProcess    *ConversationAgentProcess
+	MessageSeq      int64
+	ID              string
+	Type            domain.MessageType
+	Body            string
+	OriginatedAt    time.Time
+	SourceOrder     int64
+	CreatedAt       time.Time
+	Sender          *ConversationMessageSender
+	SessionStart    *ConversationMessageSessionStart
+	SystemEvent     *ConversationSystemEvent
+	ReplyTo         *ConversationMessageReference
+	Mentions        []ConversationMessageMention
+	MentionAll      bool
 }
 
 // ConversationMessageHistoryInput 定义成员消息历史查询方向。

@@ -27,6 +27,7 @@ type Message struct {
 	ReplyToMessageID    *string         `bun:"reply_to_message_id"`
 	MentionAll          bool            `bun:"mention_all"`
 	ThreadRootMessageID *string         `bun:"thread_root_message_id"`
+	ClientMessageID     *string         `bun:"client_message_id"`
 	IdempotencyKey      *string         `bun:"idempotency_key"`
 	OriginatedAt        time.Time       `bun:"originated_at"`
 	MessageSeq          int64           `bun:"message_seq"`

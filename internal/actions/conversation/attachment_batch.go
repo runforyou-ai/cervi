@@ -28,7 +28,9 @@ func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity
 	seen := map[string]bool{}
 	for index, item := range input.Attachments {
 		item.Body = strings.TrimSpace(item.Body)
-		if !common.ValidUUID(item.ClientMessageID) || seen[item.ClientMessageID] || item.ImageWidth < 0 || item.ImageHeight < 0 || utf8.RuneCountInString(item.Body) > 4000 {
+		clientMessageID, valid := common.NormalizeUUID(item.ClientMessageID)
+		item.ClientMessageID = clientMessageID
+		if !valid || seen[item.ClientMessageID] || item.ImageWidth < 0 || item.ImageHeight < 0 || utf8.RuneCountInString(item.Body) > 4000 {
 			return AttachmentBatchResult{}, ErrConversationNotFound
 		}
 		seen[item.ClientMessageID] = true

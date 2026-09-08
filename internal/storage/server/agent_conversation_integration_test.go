@@ -116,11 +116,12 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	}
 	wg.Wait()
 	for i, result := range results {
-		if failures[i] != nil || result.Conversation.ID != firstInput.ConversationID || result.Message.ID != results[0].Message.ID {
+		if failures[i] != nil || result.Conversation.ID != firstInput.ConversationID || result.Message.ID != results[0].Message.ID || result.Message.ClientMessageID == nil || *result.Message.ClientMessageID != firstInput.ClientMessageID {
 			t.Fatalf("retry %d: %+v %v", i, result, failures[i])
 		}
 	}
 	first := results[0]
+	assertMemberClientAssociation(t, db, identity, first.Conversation.ID, first.Message.ID, firstInput.ClientMessageID)
 	secondInput := firstInput
 	secondInput.ConversationID, secondInput.ClientMessageID, secondInput.Body = uuid.NewV7().String(), uuid.NewV7().String(), "任务乙"
 	second, err := start.Execute(ctx, identity, secondInput)
@@ -222,7 +223,7 @@ func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodel
 	history := conversationaction.NewListConversationMessagesQuery(db)
 	for _, result := range []conversationaction.FirstAgentTextMessageResult{first, second} {
 		page, err := history.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: result.Conversation.ID})
-		if err != nil || len(page.Messages) != 2 || page.Messages[1].Body != "答复："+result.Message.Body {
+		if err != nil || len(page.Messages) != 2 || page.Messages[1].Body != "答复："+result.Message.Body || page.Messages[1].ClientMessageID != nil || page.Messages[0].ClientMessageID == nil || *page.Messages[0].ClientMessageID != *result.Message.ClientMessageID {
 			t.Fatalf("history: %+v %v", page, err)
 		}
 	}
