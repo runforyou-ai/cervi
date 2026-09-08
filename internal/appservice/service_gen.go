@@ -109,6 +109,11 @@ func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta
 	return s.backend.ListConversationMessages(ctx, meta, conversationID, input)
 }
 
+// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
+func (s *Service) ListConversationMessageReferences(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error) {
+	return s.backend.ListConversationMessageReferences(ctx, meta, conversationID, input)
+}
+
 // GetConversationMessageContext 返回目标消息及其前后上下文。
 func (s *Service) GetConversationMessageContext(ctx context.Context, meta RequestMeta, conversationID string, messageID string) (ConversationMessageList, error) {
 	return s.backend.GetConversationMessageContext(ctx, meta, conversationID, messageID)
@@ -444,6 +449,36 @@ func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamI
 	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
 }
 
+// ListKnowledgeDocuments 返回当前分组的文档列表。
+func (s *Service) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
+	return s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
+}
+
+// GetKnowledgeDocument 返回文档详情。
+func (s *Service) GetKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocument, error) {
+	return s.backend.GetKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
+}
+
+// CreateKnowledgeDocuments 保存最多十个已上传的文档原件。
+func (s *Service) CreateKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error) {
+	return s.backend.CreateKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
+}
+
+// MoveKnowledgeDocument 移动文档到同库分组。
+func (s *Service) MoveKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentMoveInput) error {
+	return s.backend.MoveKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID, input)
+}
+
+// DeleteKnowledgeDocument 删除文档并释放原件。
+func (s *Service) DeleteKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) error {
+	return s.backend.DeleteKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
+}
+
+// GetKnowledgeDocumentPreview 签发当前文档的原件预览请求。
+func (s *Service) GetKnowledgeDocumentPreview(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocumentPreviewRequest, error) {
+	return s.backend.GetKnowledgeDocumentPreview(ctx, meta, knowledgeBaseID, documentID)
+}
+
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (s *Service) ListKnowledgeQAEntries(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAListInput) (KnowledgeQAList, error) {
 	return s.backend.ListKnowledgeQAEntries(ctx, meta, knowledgeBaseID, input)
@@ -622,6 +657,31 @@ func (s *Service) UpdateBusinessSystem(ctx context.Context, meta RequestMeta, bu
 // DeleteBusinessSystem 删除业务系统。
 func (s *Service) DeleteBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) error {
 	return s.backend.DeleteBusinessSystem(ctx, meta, businessSystemID)
+}
+
+// ListMCPServers 返回当前企业配置的 MCP 服务。
+func (s *Service) ListMCPServers(ctx context.Context, meta RequestMeta) (MCPServerList, error) {
+	return s.backend.ListMCPServers(ctx, meta)
+}
+
+// GetMCPServer 返回当前企业中的 MCP 服务详情。
+func (s *Service) GetMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string) (MCPServer, error) {
+	return s.backend.GetMCPServer(ctx, meta, mcpServerID)
+}
+
+// CreateMCPServer 创建 MCP 服务。
+func (s *Service) CreateMCPServer(ctx context.Context, meta RequestMeta, input MCPServerInput) (MCPServer, error) {
+	return s.backend.CreateMCPServer(ctx, meta, input)
+}
+
+// UpdateMCPServer 修改 MCP 服务。
+func (s *Service) UpdateMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string, input MCPServerInput) (MCPServer, error) {
+	return s.backend.UpdateMCPServer(ctx, meta, mcpServerID, input)
+}
+
+// DeleteMCPServer 删除 MCP 服务。
+func (s *Service) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string) error {
+	return s.backend.DeleteMCPServer(ctx, meta, mcpServerID)
 }
 
 // UpdateOrganization 修改当前企业通用设置。

@@ -117,6 +117,20 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 // normalizeOutput 按响应类型将远程响应中的相对文件地址转换为企业服务器绝对地址。
 func (b *Backend) normalizeOutput(output any) {
 	switch value := output.(type) {
+	case *appservice.MCPServerList:
+		if value.MCPServers == nil {
+			value.MCPServers = []appservice.MCPServer{}
+		}
+	case *appservice.KnowledgeDocumentList:
+		if value.Documents == nil {
+			value.Documents = []appservice.KnowledgeDocument{}
+		}
+	case *appservice.KnowledgeDocumentBatch:
+		if value.Documents == nil {
+			value.Documents = []appservice.KnowledgeDocument{}
+		}
+	case *appservice.KnowledgeDocumentPreviewRequest:
+		value.URL = b.absoluteContentURL(value.URL)
 	case *appservice.KnowledgeQAEntry:
 		if value.SimilarQuestions == nil {
 			value.SimilarQuestions = []appservice.KnowledgeQASimilarQuestion{}
@@ -192,6 +206,15 @@ func (b *Backend) normalizeOutput(output any) {
 		b.normalizeConversationMessage(&value.Message)
 	case *appservice.ConversationMessage:
 		b.normalizeConversationMessage(value)
+	case *appservice.ConversationMessageReferenceList:
+		if value.States == nil {
+			value.States = []appservice.ConversationMessageReferenceState{}
+		}
+		for index := range value.States {
+			if reply := value.States[index].ReplyTo; reply != nil && reply.Sender != nil {
+				reply.Sender.AvatarURL = b.absoluteContentURL(reply.Sender.AvatarURL)
+			}
+		}
 	case *appservice.CustomerDeliveryList:
 		if value.Deliveries == nil {
 			value.Deliveries = []appservice.CustomerMessageDelivery{}

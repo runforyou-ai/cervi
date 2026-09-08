@@ -40,3 +40,19 @@ func TestNormalizeUploadInput(t *testing.T) {
 		t.Fatalf("imported contact avatar fields = %#v", fields)
 	}
 }
+
+// TestKnowledgeDocumentUploadFormats 验证允许格式、内容类型归一化和大文件不受头像上限限制。
+func TestKnowledgeDocumentUploadFormats(t *testing.T) {
+	for _, name := range []string{"a.txt", "a.md", "a.markdown", "a.htm", "a.html", "a.PDF", "a.docx", "a.pptx", "a.xlsx", "a.csv", "a.json"} {
+		input, fields := NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: name, ContentType: "application/octet-stream", ByteSize: 1 << 40})
+		if len(fields) != 0 || input.ContentType == "" || input.ContentType == "application/octet-stream" {
+			t.Fatalf("%s: %+v %+v", name, input, fields)
+		}
+	}
+	for _, name := range []string{"a.doc", "a.xls", "a.ppt", "a.exe", "a.pdf.exe", "a"} {
+		_, fields := NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: name, ByteSize: 12})
+		if fields["contentType"] != ValidationContentTypeInvalid {
+			t.Fatalf("accepted %s", name)
+		}
+	}
+}

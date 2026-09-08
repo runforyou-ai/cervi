@@ -48,7 +48,7 @@ export function ProfileSettingsForm({
   user: CurrentUser
   onUpdated: (user: CurrentUser) => void
 }) {
-  const { t } = useTranslation("settings")
+  const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const avatarRequestID = useRef(0)
@@ -311,7 +311,7 @@ export function ProfileSettingsForm({
           {isSubmitting ? (
             <LoaderCircleIcon className="animate-spin" />
           ) : null}
-          {isSubmitting ? t("profile.saving") : t("profile.save")}
+          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>
       </div>
     </form>

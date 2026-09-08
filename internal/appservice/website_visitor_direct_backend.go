@@ -51,7 +51,7 @@ func (b *WebsiteVisitorDirectBackend) SendTextMessage(ctx context.Context, meta 
 		ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
-		return WebsiteVisitorTextMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessageSendFailed, "send_text_message", "channel_id", channelID)
+		return WebsiteVisitorTextMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorMessageSendFailed, "send_text_message", "channel_id", channelID)
 	}
 	slog.Info("网站访客文本消息已保存",
 		"channel_id", channelID,
@@ -75,25 +75,25 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 		ChannelID: channelID, ExternalID: externalID, ConversationID: conversationID,
 	}
 	if input.Before != "" && input.After != "" {
-		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	if input.Before != "" {
 		point, valid := decodeConversationMessageCursor(input.Before, conversationID)
 		if !valid {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"before": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"before": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
 		actionInput.Before = &point
 	}
 	if input.After != "" {
 		point, valid := decodeConversationMessageCursor(input.After, conversationID)
 		if !valid {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"after": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"after": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
 		actionInput.After = &point
 	}
 	page, err := b.listMessages.Execute(ctx, actionInput)
 	if err != nil {
-		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	result := WebsiteVisitorMessageHistory{Messages: make([]WebsiteVisitorMessage, 0, len(page.Messages))}
 	for _, message := range page.Messages {
@@ -120,13 +120,13 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 		return NotFoundError(requestMeta, cervii18n.ErrorChannelNotFound)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return NotFoundError(requestMeta, cervii18n.ErrorWebsiteConversationNotFound)
+		return NotFoundError(requestMeta, cervii18n.ErrorConversationNotFound)
 	}
 	if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		if conflict.Reason == conversationaction.ConflictReasonReplyTargetInvalid {
 			return ConflictError(requestMeta, cervii18n.ErrorReplyTargetInvalid, conflict.Reason)
 		}
-		return ConflictError(requestMeta, cervii18n.ErrorWebsiteMessageConflict, conflict.Reason)
+		return ConflictError(requestMeta, cervii18n.ErrorMessageConflict, conflict.Reason)
 	}
 	// 请求被取消不属于业务失败，不产生告警日志。
 	if ctx.Err() == nil {

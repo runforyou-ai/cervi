@@ -12,6 +12,7 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -546,7 +547,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	var replyTo *ConversationMessageReference
 	if message.ReplyTo != nil {
 		replyTo = &ConversationMessageReference{
-			ID: message.ReplyTo.ID, Type: MessageType(message.ReplyTo.Type), Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
+			ExternalSenderName: message.ReplyTo.ExternalSenderName, ID: message.ReplyTo.ID, Type: MessageType(message.ReplyTo.Type), Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
 			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender, avatarURLs),
 		}
 	}
@@ -562,6 +563,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		attachment = &MessageAttachment{File: File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize}, UploadStatus: AttachmentUploadStatus(message.Attachment.UploadStatus), ImageWidth: message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight}
 	}
 	return ConversationMessage{
+		CanReply:        !message.ReplyUnavailable && (message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment),
 		ClientMessageID: message.ClientMessageID,
 		Attachment:      attachment,
 		AgentProcess:    conversationAgentProcessFromAction(message.AgentProcess),
@@ -608,7 +610,7 @@ func individualConversationError(ctx context.Context, meta RequestMeta, err erro
 		if conflictError.Reason == conversationaction.ConflictReasonReplyTargetInvalid {
 			return ConflictError(meta, cervii18n.ErrorReplyTargetInvalid, conflictError.Reason)
 		}
-		return ConflictError(meta, cervii18n.ErrorDirectMessageConflict, conflictError.Reason)
+		return ConflictError(meta, cervii18n.ErrorMessageConflict, conflictError.Reason)
 	}
 	slog.Warn("双方聊天操作失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
 	if operation == "find" {
@@ -641,7 +643,7 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
-		messageKey := cervii18n.ErrorGroupMessageConflict
+		messageKey := cervii18n.ErrorMessageConflict
 		switch conflictError.Reason {
 		case conversationaction.ConflictReasonGroupMemberAlreadyActive:
 			messageKey = cervii18n.ErrorGroupMemberAlreadyActive
@@ -730,7 +732,7 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
-		messageKey := cervii18n.ErrorCustomerMessageConflict
+		messageKey := cervii18n.ErrorMessageConflict
 		switch conflictError.Reason {
 		case conversationaction.ConflictReasonServiceSessionOwned:
 			messageKey = cervii18n.ErrorServiceSessionOwned
@@ -746,7 +748,7 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 		return ConflictError(meta, messageKey, conflictError.Reason)
 	}
 	slog.Warn("发送成员客户消息失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
-	return FailedError(meta, cervii18n.ErrorCustomerMessageSendFailed)
+	return FailedError(meta, cervii18n.ErrorMessageSendFailed)
 }
 
 var conversationMessageValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{

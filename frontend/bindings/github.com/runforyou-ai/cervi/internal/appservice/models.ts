@@ -763,6 +763,8 @@ export enum ConversationMentionReviewOutcome {
  * ConversationMessage 定义成员可见的会话消息。
  */
 export interface ConversationMessage {
+    "canReply": boolean;
+
     /**
      * ClientMessageID 仅向原发送身份返回。
      */
@@ -818,11 +820,38 @@ export interface ConversationMessageMention {
  * ConversationMessageReference 定义引用消息的一层摘要。
  */
 export interface ConversationMessageReference {
+    /**
+     * ExternalSenderName 仅未关联本地原消息的引用返回平台名称，此时 ID 为空。
+     */
+    "externalSenderName"?: string;
     "type": MessageType;
     "deleted": boolean;
     "id": string;
     "body": string;
     "sender": ConversationMessageSender | null;
+}
+
+/**
+ * ConversationMessageReferenceList 返回窗口内的引用状态。
+ */
+export interface ConversationMessageReferenceList {
+    "states": ConversationMessageReferenceState[] | null;
+}
+
+/**
+ * ConversationMessageReferenceListInput 定义窗口内需要刷新引用状态的消息编号。
+ */
+export interface ConversationMessageReferenceListInput {
+    "messageIds": string;
+}
+
+/**
+ * ConversationMessageReferenceState 定义一条消息的最新引用与回复可用状态。
+ */
+export interface ConversationMessageReferenceState {
+    "messageId": string;
+    "canReply": boolean;
+    "replyTo": ConversationMessageReference | null;
 }
 
 /**
@@ -1200,6 +1229,7 @@ export enum FilePurpose {
     $zero = "",
 
     FilePurposeMessageAttachment = "message_attachment",
+    FilePurposeKnowledgeDocument = "knowledge_document",
     FilePurposeUserAvatar = "user_avatar",
     FilePurposeGroupImage = "group_image",
 };
@@ -1537,6 +1567,102 @@ export interface KnowledgeBaseList {
 }
 
 /**
+ * KnowledgeDocument 定义文档列表与预览页使用的元数据。
+ */
+export interface KnowledgeDocument {
+    "format": KnowledgeDocumentFormat;
+    "id": string;
+    "groupId": string;
+    "name": string;
+    "contentType": string;
+    "byteSize": number;
+    "status": KnowledgeDocumentStatus;
+    "createdAt": string;
+}
+
+/**
+ * KnowledgeDocumentBatch 返回已保存文档，供重试核对。
+ */
+export interface KnowledgeDocumentBatch {
+    "documents": KnowledgeDocument[] | null;
+}
+
+/**
+ * KnowledgeDocumentBatchInput 将最多十个已上传原件保存到分组。
+ */
+export interface KnowledgeDocumentBatchInput {
+    "groupId": string;
+    "fileIds": string[] | null;
+}
+
+/**
+ * KnowledgeDocumentFormat 定义允许上传的文档扩展名。
+ */
+export enum KnowledgeDocumentFormat {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeDocumentTXT = ".txt",
+    KnowledgeDocumentMD = ".md",
+    KnowledgeDocumentMarkdown = ".markdown",
+    KnowledgeDocumentHTML = ".html",
+    KnowledgeDocumentHTM = ".htm",
+    KnowledgeDocumentPDF = ".pdf",
+    KnowledgeDocumentDOCX = ".docx",
+    KnowledgeDocumentPPTX = ".pptx",
+    KnowledgeDocumentXLSX = ".xlsx",
+    KnowledgeDocumentCSV = ".csv",
+    KnowledgeDocumentJSON = ".json",
+};
+
+/**
+ * KnowledgeDocumentList 返回文档及分页信息。
+ */
+export interface KnowledgeDocumentList {
+    "documents": KnowledgeDocument[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * KnowledgeDocumentListInput 定义分组文档的查询参数。
+ */
+export interface KnowledgeDocumentListInput {
+    "groupId": string;
+    "keyword": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * KnowledgeDocumentMoveInput 定义目标分组。
+ */
+export interface KnowledgeDocumentMoveInput {
+    "groupId": string;
+}
+
+/**
+ * KnowledgeDocumentPreviewRequest 定义读取原件用于本地预览的请求。
+ */
+export interface KnowledgeDocumentPreviewRequest {
+    "url": string;
+    "headers": { [_ in string]?: string } | null;
+}
+
+/**
+ * KnowledgeDocumentStatus 定义文档处理状态。
+ */
+export enum KnowledgeDocumentStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeDocumentInitial = "initial",
+};
+
+/**
  * KnowledgeGroup 定义知识库分组树节点。
  */
 export interface KnowledgeGroup {
@@ -1645,6 +1771,49 @@ export interface LoginInput {
     "email": string;
     "password": string;
 }
+
+/**
+ * MCPServer 定义企业配置的 MCP 服务。
+ */
+export interface MCPServer {
+    "id": string;
+    "name": string;
+    "url": string;
+    "serverType": MCPServerType;
+    "authorizationToken": string;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * MCPServerInput 定义 MCP 服务可编辑字段。
+ */
+export interface MCPServerInput {
+    "name": string;
+    "url": string;
+    "serverType": MCPServerType;
+    "authorizationToken": string;
+}
+
+/**
+ * MCPServerList 定义企业 MCP 服务列表。
+ */
+export interface MCPServerList {
+    "mcpServers": MCPServer[] | null;
+}
+
+/**
+ * MCPServerType 定义 MCP 服务的传输类型。
+ */
+export enum MCPServerType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MCPServerTypeSSE = "sse",
+    MCPServerTypeStreamableHTTP = "streamable-http",
+};
 
 /**
  * MarkConversationMentionReviewedInput 定义待确认的提及目标。

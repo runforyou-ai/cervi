@@ -91,7 +91,7 @@ export function CreateGroupConversationDialog({
   onOpenChange: (open: boolean) => void
   onCreated: (conversation: GroupInboxConversationData) => void
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const [query, setQuery] = useState("")
@@ -371,7 +371,7 @@ export function CreateGroupConversationDialog({
                       className="mt-3"
                       onClick={() => void refresh()}
                     >
-                      {t("messagesRetry")}
+                      {t("common:actions.retry")}
                     </Button>
                   </div>
                 ) : candidates.length === 0 ? (
@@ -434,13 +434,13 @@ export function CreateGroupConversationDialog({
               disabled={isSubmitting}
               onClick={() => changeOpen(false)}
             >
-              {t("groupCreateCancel")}
+              {t("common:actions.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : null}
-              {t("groupCreateSubmit")}
+              {t("common:actions.create")}
             </Button>
           </div>
         </form>

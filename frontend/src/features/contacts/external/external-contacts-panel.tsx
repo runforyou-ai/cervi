@@ -87,7 +87,7 @@ export function ExternalContactsPanel({
   roles: RoleData[]
   teams: Team[]
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
@@ -362,7 +362,7 @@ export function ExternalContactsPanel({
                   {deleted ? t("columns.deletedAt") : t("columns.addedAt")}
                 </TableHead>
                 <TableHead className="w-px">
-                  {t("columns.actions")}
+                  {t("common:table.actions")}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -409,15 +409,15 @@ export function ExternalContactsPanel({
                             setParameters({ selected: contact.id })
                           }
                         >
-                          {t("detail.action")}
+                          {t("common:actions.view")}
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label={t("list.more")}
-                              title={t("list.more")}
+                              aria-label={t("common:actions.more")}
+                              title={t("common:actions.more")}
                             >
                               <MoreHorizontalIcon />
                             </Button>
@@ -427,7 +427,7 @@ export function ExternalContactsPanel({
                               destructive
                               onSelect={() => setDeletingContact(contact)}
                             >
-                              {t("delete.action")}
+                              {t("common:actions.delete")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -495,12 +495,12 @@ export function ExternalContactsPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("delete.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void removeContact()}
             >
-              {deleting ? t("delete.deleting") : t("delete.confirm")}
+              {deleting ? t("common:actions.deleting") : t("delete.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -522,7 +522,7 @@ export function ExternalContactsPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("trash.restoreCancel")}</AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void restore()}

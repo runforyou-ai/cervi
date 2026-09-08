@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -32,8 +33,17 @@ type TelegramWebhookInput struct {
 	Message      *TelegramWebhookMessage
 }
 
+// TelegramWebhookReply 保存 Telegram 引用消息的编号与一层快照。
+type TelegramWebhookReply struct {
+	MessageID   int64
+	Body        string
+	SenderName  string
+	SenderIsBot bool
+}
+
 // TelegramWebhookMessage 定义已归一化的 Telegram 私聊文本消息。
 type TelegramWebhookMessage struct {
+	Reply        *TelegramWebhookReply
 	ChatID       int64
 	MessageID    int64
 	SenderID     int64
@@ -101,8 +111,15 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 				return fmt.Errorf("load Telegram webhook channel: %w", err)
 			}
 			displayName := input.Message.DisplayName
+			platformMessage := &channelmessage.Inbound{
+				AccountID: strconv.FormatInt(*setting.BotID, 10), ConversationID: strconv.FormatInt(input.Message.ChatID, 10), MessageID: strconv.FormatInt(input.Message.MessageID, 10),
+			}
+			if reply := input.Message.Reply; reply != nil {
+				platformMessage.Reply = &channelmessage.Reply{MessageID: strconv.FormatInt(reply.MessageID, 10), Body: reply.Body, SenderName: reply.SenderName, SenderIsBot: reply.SenderIsBot}
+			}
 			received, err := conversationaction.ReceiveInboundCustomerTextMessage(ctx, tx, channel, conversationaction.InboundCustomerTextMessageInput{
 				ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
+				ChannelMessage:     platformMessage,
 				SingleConversation: true, Body: input.Message.Body,
 				IdempotencyKey: "chmsg:" + channelID + ":tg:" + strconv.FormatInt(*setting.BotID, 10) + ":" + strconv.FormatInt(input.Message.ChatID, 10) + ":" + strconv.FormatInt(input.Message.MessageID, 10),
 				OriginatedAt:   input.Message.OriginatedAt, SourceOrder: input.Message.MessageID,

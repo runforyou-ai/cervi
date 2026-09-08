@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -92,6 +93,12 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 			return executeErr
 		})
 		if err == nil {
+			// 发送结果与历史查询使用同一引用能力判定，未取得平台回执时不可被引用。
+			var row conversationMessageRow
+			if err := conversationMessagesQuery(a.db, identity, normalized.ConversationID).Where("msg.id = ?", result.ID).Scan(ctx, &row); err != nil {
+				return ConversationMessage{}, fmt.Errorf("load sent message reference state: %w", err)
+			}
+			result.ReplyUnavailable = row.ReplyUnavailable
 			return result, nil
 		}
 		constraint, retryable := retryableUniqueViolation(err, memberMessageRetryableConstraintNames)
@@ -138,7 +145,21 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelOutboundUnavailable}
 		}
 		if input.ReplyToMessageID != "" {
-			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
+			// 引用必须具有当前机器人、同一聊天内的确定平台消息身份。
+			var providerID string
+			err := tx.NewSelect().TableExpr("channel_messages AS cm").ColumnExpr("cm.provider_message_id").
+				Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cm.organization_id AND cci.channel_id = cm.channel_id AND cci.external_id = cm.provider_conversation_id").
+				Join("JOIN messages AS msg ON msg.id = cm.message_id AND msg.organization_id = cm.organization_id AND msg.conversation_id = cm.conversation_id").
+				Where("cm.organization_id = ? AND cm.conversation_id = ? AND cm.message_id = ?", identity.Organization.ID, conversation.ID, input.ReplyToMessageID).
+				Where("cm.channel_id = ? AND cm.provider_account_id = ? AND cci.id = ?", route.ChannelID, strconv.FormatInt(*route.BotID, 10), route.IdentityID).
+				Where("msg.type = ? AND msg.deleted_at IS NULL", domain.MessageTypeText).Scan(ctx, &providerID)
+			if errors.Is(err, sql.ErrNoRows) {
+				return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
+			}
+			if err != nil {
+				return ConversationMessage{}, err
+			}
+			route.ReplyProviderMessageID = &providerID
 		}
 	}
 	// 取得客服周期锁后生成消息时间，避免等待期间的消息落到已读水位之前。

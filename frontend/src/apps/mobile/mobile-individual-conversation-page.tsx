@@ -15,8 +15,6 @@ import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { Button } from "@/components/ui/button"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { ProfileAvatar } from "@/components/profile-avatar"
-import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 type MobileIndividualLocationState = { memberUserID?: string }
 
@@ -42,26 +40,14 @@ function MobileIndividualHeader({
     <MobilePageHeader
       backTo={memberUserID ? `/contacts/employees/${memberUserID}` : inboxURL}
       title={
-        <span className="flex items-center gap-3">
-          {conversation ? (
-            <ConversationAvatar
-              conversation={conversation}
-              className="size-9"
-            />
-          ) : (
-            <ProfileAvatar name={peerName} className="size-9" />
-          )}
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-base font-semibold">
-              {peerName}
+        <span className="block min-w-0">
+          <span className="block truncate">{peerName}</span>
+          {conversation?.agent ? (
+            <span className="block truncate text-xs font-normal text-muted-foreground">
+              {conversation.agent.agentName}
+              {agentRunLabel ? ` · ${agentRunLabel}` : ""}
             </span>
-            {conversation?.agent ? (
-              <span className="block text-xs font-normal text-muted-foreground">
-                {conversation.agent.agentName}
-                {agentRunLabel ? ` · ${agentRunLabel}` : ""}
-              </span>
-            ) : null}
-          </span>
+          ) : null}
         </span>
       }
     />
@@ -74,7 +60,7 @@ export function MobileIndividualConversationPage({
 }: {
   conversationType: ConversationType
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const { inboxURL } = useMobileNavigation()
   const { conversationID = "" } = useParams()
   const summary = useConversationSummary(conversationID, false)
@@ -95,7 +81,7 @@ export function MobileIndividualConversationPage({
       ) : !conversation ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
           <p>{t(summary.error ? "conversationLoadError" : "conversationUnavailable")}</p>
-          {summary.error ? <Button variant="outline" size="sm" onClick={() => void summary.refresh()}>{t("messagesRetry")}</Button> : null}
+          {summary.error ? <Button variant="outline" size="sm" onClick={() => void summary.refresh()}>{t("common:actions.retry")}</Button> : null}
         </div>
       ) : (
         <MobileIndividualThread

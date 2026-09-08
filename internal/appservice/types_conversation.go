@@ -91,11 +91,13 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
-	Type    MessageType                `json:"type"`
-	Deleted bool                       `json:"deleted"`
-	ID      string                     `json:"id"`
-	Body    string                     `json:"body"`
-	Sender  *ConversationMessageSender `json:"sender"`
+	// ExternalSenderName 仅未关联本地原消息的引用返回平台名称，此时 ID 为空。
+	ExternalSenderName string                     `json:"externalSenderName,omitempty"`
+	Type               MessageType                `json:"type"`
+	Deleted            bool                       `json:"deleted"`
+	ID                 string                     `json:"id"`
+	Body               string                     `json:"body"`
+	Sender             *ConversationMessageSender `json:"sender"`
 }
 
 // ConversationMessageMention 定义消息提醒的聊天主体。
@@ -130,6 +132,7 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
+	CanReply bool `json:"canReply"`
 	// ClientMessageID 仅向原发送身份返回。
 	ClientMessageID *string                          `json:"clientMessageId"`
 	Attachment      *MessageAttachment               `json:"attachment"`
@@ -410,4 +413,21 @@ type AttachmentMessageState struct {
 // AttachmentStateList 返回当前窗口已有附件的状态。
 type AttachmentStateList struct {
 	States []AttachmentMessageState `json:"states"`
+}
+
+// ConversationMessageReferenceListInput 定义窗口内需要刷新引用状态的消息编号。
+type ConversationMessageReferenceListInput struct {
+	MessageIDs string `json:"messageIds" query:"messageIds"`
+}
+
+// ConversationMessageReferenceState 定义一条消息的最新引用与回复可用状态。
+type ConversationMessageReferenceState struct {
+	MessageID string                        `json:"messageId"`
+	CanReply  bool                          `json:"canReply"`
+	ReplyTo   *ConversationMessageReference `json:"replyTo"`
+}
+
+// ConversationMessageReferenceList 返回窗口内的引用状态。
+type ConversationMessageReferenceList struct {
+	States []ConversationMessageReferenceState `json:"states"`
 }

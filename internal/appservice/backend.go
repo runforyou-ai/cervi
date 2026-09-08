@@ -86,6 +86,9 @@ type Backend interface {
 	// ListConversationMessages 返回成员可见的会话消息。
 	//cervi:route GET /conversations/:conversationID/messages
 	ListConversationMessages(context.Context, RequestMeta, string, ConversationMessageListInput) (ConversationMessageList, error)
+	// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
+	//cervi:route GET /conversations/:conversationID/message-references
+	ListConversationMessageReferences(context.Context, RequestMeta, string, ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error)
 	// GetConversationMessageContext 返回目标消息及其前后上下文。
 	//cervi:route GET /conversations/:conversationID/messages/:messageID/context
 	GetConversationMessageContext(context.Context, RequestMeta, string, string) (ConversationMessageList, error)
@@ -287,6 +290,25 @@ type Backend interface {
 	// RemoveTeamMembers 将企业身份批量移出团队。
 	//cervi:route POST /teams/:teamID/members/remove
 	RemoveTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
+	// ListKnowledgeDocuments 返回当前分组的文档列表。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents
+	ListKnowledgeDocuments(context.Context, RequestMeta, string, KnowledgeDocumentListInput) (KnowledgeDocumentList, error)
+	// GetKnowledgeDocument 返回文档详情。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID
+	GetKnowledgeDocument(context.Context, RequestMeta, string, string) (KnowledgeDocument, error)
+	// CreateKnowledgeDocuments 保存最多十个已上传的文档原件。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/documents status=201
+	CreateKnowledgeDocuments(context.Context, RequestMeta, string, KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error)
+	// MoveKnowledgeDocument 移动文档到同库分组。
+	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/documents/:documentID/group
+	MoveKnowledgeDocument(context.Context, RequestMeta, string, string, KnowledgeDocumentMoveInput) error
+	// DeleteKnowledgeDocument 删除文档并释放原件。
+	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID/documents/:documentID
+	DeleteKnowledgeDocument(context.Context, RequestMeta, string, string) error
+	// GetKnowledgeDocumentPreview 签发当前文档的原件预览请求。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/preview
+	GetKnowledgeDocumentPreview(context.Context, RequestMeta, string, string) (KnowledgeDocumentPreviewRequest, error)
+
 	// ListKnowledgeQAEntries 返回分组中的本地问答列表。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/qa-entries
 	ListKnowledgeQAEntries(context.Context, RequestMeta, string, KnowledgeQAListInput) (KnowledgeQAList, error)
@@ -395,6 +417,22 @@ type Backend interface {
 	// DeleteBusinessSystem 删除业务系统。
 	//cervi:route DELETE /integrations/business-systems/:businessSystemID
 	DeleteBusinessSystem(context.Context, RequestMeta, string) error
+
+	// ListMCPServers 返回当前企业配置的 MCP 服务。
+	//cervi:route GET /integrations/mcp-servers
+	ListMCPServers(context.Context, RequestMeta) (MCPServerList, error)
+	// GetMCPServer 返回当前企业中的 MCP 服务详情。
+	//cervi:route GET /integrations/mcp-servers/:mcpServerID
+	GetMCPServer(context.Context, RequestMeta, string) (MCPServer, error)
+	// CreateMCPServer 创建 MCP 服务。
+	//cervi:route POST /integrations/mcp-servers status=201
+	CreateMCPServer(context.Context, RequestMeta, MCPServerInput) (MCPServer, error)
+	// UpdateMCPServer 修改 MCP 服务。
+	//cervi:route PUT /integrations/mcp-servers/:mcpServerID
+	UpdateMCPServer(context.Context, RequestMeta, string, MCPServerInput) (MCPServer, error)
+	// DeleteMCPServer 删除 MCP 服务。
+	//cervi:route DELETE /integrations/mcp-servers/:mcpServerID
+	DeleteMCPServer(context.Context, RequestMeta, string) error
 	// UpdateOrganization 修改当前企业通用设置。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)

@@ -23,7 +23,7 @@ import { openExternalPage } from "@/platform/external-navigation"
 
 /** 陈列启用的业务系统并支持打开自定义网址。 */
 export function AppsPage() {
-  const { t } = useTranslation("apps")
+  const { t } = useTranslation(["apps", "common"])
   const navigate = useNavigate()
   const { identity } = useWorkspace()
   const [openUrlDialogOpen, setOpenUrlDialogOpen] = useState(false)
@@ -71,7 +71,7 @@ export function AppsPage() {
       <PageContent>
         {showLoading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -81,7 +81,7 @@ export function AppsPage() {
               variant="outline"
               onClick={() => void refresh()}
             >
-              {t("retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : businessSystems.length === 0 ? (

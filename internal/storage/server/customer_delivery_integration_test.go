@@ -28,20 +28,22 @@ type customerDeliveryFixture struct {
 	worker *deliveryaction.Worker
 }
 type deliverySender struct {
-	mu     sync.Mutex
-	bodies []string
-	err    error
+	mu      sync.Mutex
+	bodies  []string
+	replies []*string
+	err     error
 }
 
 // SendText 记录平台调用并返回可控制的发送结果。
-func (s *deliverySender) SendText(_ context.Context, _, recipient, body string) (int64, error) {
+func (s *deliverySender) SendText(_ context.Context, _ string, message telegram.TextMessage) (int64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.bodies = append(s.bodies, body)
-	if recipient != "12345" {
+	s.bodies = append(s.bodies, message.Body)
+	s.replies = append(s.replies, message.ReplyMessageID)
+	if message.ChatID != "12345" {
 		return 0, errors.New("unexpected recipient")
 	}
-	return int64(len(s.bodies)), s.err
+	return int64(1000 + len(s.bodies)), s.err
 }
 
 // newCustomerDeliveryFixture 建立已配置的 Telegram 私聊和两个客服身份。
@@ -402,7 +404,7 @@ func TestCustomerDeliveryBotMessageNamespace(t *testing.T) {
 	f.sender.bodies = nil
 	second := f.send(t, "新机器人回复", uuid.NewV7().String())
 	got := f.execute(t, second.ID)
-	if got.Status != domain.CustomerDeliverySent || got.ProviderMessageID == nil || *got.ProviderMessageID != 1 {
+	if got.Status != domain.CustomerDeliverySent || got.ProviderMessageID == nil || *got.ProviderMessageID != 1001 {
 		t.Fatalf("new bot result=%+v", got)
 	}
 }

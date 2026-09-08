@@ -48,6 +48,13 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 			if occupied {
 				return ErrBaseHasContent
 			}
+			occupied, err = tx.NewSelect().Model((*servermodels.KnowledgeDocument)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exists(ctx)
+			if err != nil {
+				return err
+			}
+			if occupied {
+				return ErrBaseHasContent
+			}
 		}
 		result, err := tx.NewUpdate().Model((*servermodels.KnowledgeBase)(nil)).
 			Set("name = ?", input.Name).

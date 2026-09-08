@@ -14,10 +14,8 @@ const workspace = {
   logout: "退出登录",
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",
-  loading: "正在加载…",
   identityLoadError: "无法读取登录状态。",
   inboxLoadError: "消息加载失败。",
-  retry: "重试",
   tabs: {
     label: "已打开页面",
     close: "关闭{{title}}",
@@ -44,6 +42,7 @@ const workspace = {
       apps: "应用",
       channels: "消息渠道",
       businessSystems: "业务系统",
+      mcpServers: "MCP 服务",
       modelServices: "模型服务",
     },
   },

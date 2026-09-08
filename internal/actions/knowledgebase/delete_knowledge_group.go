@@ -50,6 +50,13 @@ func (a *DeleteKnowledgeGroupAction) Execute(ctx context.Context, identity *serv
 		if occupied {
 			return ErrGroupNotEmpty
 		}
+		occupied, err = tx.NewSelect().Model((*servermodels.KnowledgeDocument)(nil)).Where("group_id = ?", group.ID).Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if occupied {
+			return ErrGroupNotEmpty
+		}
 		result, err := tx.NewDelete().Model((*servermodels.KnowledgeGroup)(nil)).
 			Where("id = ?", group.ID).
 			Where("knowledge_base_id = ?", knowledgeBaseID).

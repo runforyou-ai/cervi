@@ -21,6 +21,7 @@ type CustomerMessageDelivery struct {
 	Position                 int64                         `bun:"position"`
 	Status                   domain.CustomerDeliveryStatus `bun:"status"`
 	Attempt                  int                           `bun:"attempt"`
+	ReplyProviderMessageID   *string                       `bun:"reply_provider_message_id"`
 	ProviderMessageID        *int64                        `bun:"provider_message_id"`
 	LeaseWorker              *string                       `bun:"lease_worker"`
 	LeaseExpiresAt           *time.Time                    `bun:"lease_expires_at"`

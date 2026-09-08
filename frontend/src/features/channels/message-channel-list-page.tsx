@@ -68,7 +68,7 @@ function MessageChannelRow({
   updating: boolean
   onStatusChange: (channel: MessageChannelSummary) => void
 }) {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation(["channels", "common"])
   const typeDefinition = messageChannelTypeDefinition(channel.type)
   if (!typeDefinition) {
     console.warn("未知的消息渠道类型", channel.type)
@@ -91,7 +91,7 @@ function MessageChannelRow({
         <div className="inline-flex gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to={`/integrations/channels/${channel.type}/${channel.id}`}>
-              {t("list.edit")}
+              {t("common:actions.edit")}
             </Link>
           </Button>
           <DropdownMenu>
@@ -99,8 +99,8 @@ function MessageChannelRow({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label={t("list.more")}
-                title={t("list.more")}
+                aria-label={t("common:actions.more")}
+                title={t("common:actions.more")}
               >
                 <MoreHorizontalIcon />
               </Button>
@@ -127,7 +127,7 @@ function MessageChannelRow({
 
 /** 加载并管理消息渠道列表。 */
 export function MessageChannelListPage() {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const [search, setSearch] = useState("")
@@ -243,7 +243,7 @@ export function MessageChannelListPage() {
               setEnabledStatus("enabled")
             }}
           >
-            {t("filters.clear")}
+            {t("common:actions.clearFilters")}
           </ListToolbarReset>
         ) : null}
       </ListToolbar>
@@ -251,7 +251,7 @@ export function MessageChannelListPage() {
       <PageContent>
         {showLoading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : error ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border p-6 text-center">
@@ -261,7 +261,7 @@ export function MessageChannelListPage() {
               variant="outline"
               onClick={() => void refresh()}
             >
-              {t("retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : (
@@ -273,7 +273,7 @@ export function MessageChannelListPage() {
                   <TableHead>{t("list.columns.category")}</TableHead>
                   <TableHead>{t("list.columns.language")}</TableHead>
                   <TableHead className="w-px">
-                    {t("list.columns.actions")}
+                    {t("common:table.actions")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -334,7 +334,7 @@ export function MessageChannelListPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>
-                {t("statusConfirmation.cancel")}
+                {t("common:actions.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction
                 className={

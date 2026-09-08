@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -140,6 +141,18 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, fileaction.ErrFileNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
+	}
+	if errors.Is(err, knowledgebaseaction.ErrDocumentNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentNotFound)
+	}
+	if errors.Is(err, knowledgebaseaction.ErrDocumentUnsupported) {
+		return InvalidError(meta, cervii18n.ErrorKnowledgeDocumentUnsupported, nil)
+	}
+	if errors.Is(err, knowledgebaseaction.ErrDocumentBatchInvalid) {
+		return InvalidError(meta, cervii18n.ErrorKnowledgeDocumentBatchInvalid, nil)
 	}
 	if errors.Is(err, knowledgebaseaction.ErrQANotFound) {
 		return NotFoundError(meta, cervii18n.ErrorKnowledgeQANotFound)

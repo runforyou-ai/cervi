@@ -24,8 +24,6 @@ const settings = {
     avatarUploadError: "Could not upload the profile image. Try again.",
     avatarTypeError: "Select a JPEG, PNG, or WebP image.",
     avatarSizeError: "The image cannot exceed 5 MB.",
-    save: "Save",
-    saving: "Saving…",
     saveSuccess: "Profile saved.",
     saveError: "Could not save the profile. Try again.",
     validation: {
@@ -96,8 +94,6 @@ const settings = {
           "Could not open notification settings. Open them manually in system settings.",
       },
     },
-    save: "Save",
-    saving: "Saving…",
     saveSuccess: "Preferences saved.",
     saveError: "Could not save preferences. Try again.",
     validation: {
@@ -119,14 +115,11 @@ const settings = {
     form: {
       name: "Company name",
       allowArbitraryUrl: "Allow opening any URL",
-      save: "Save",
-      saving: "Saving…",
     },
     confirm: {
       title: "Allow opening any URL?",
       description:
         "Members will be able to visit sites that the company has not configured or verified. This may expose them to phishing, malicious content, or sensitive-data leaks. Confirm that your company has appropriate usage policies.",
-      cancel: "Cancel",
       enable: "Enable",
     },
     validation: {
@@ -136,8 +129,6 @@ const settings = {
   },
   roles: {
     title: "Roles and permissions",
-    loading: "Loading…",
-    retry: "Retry",
     kindsDescriptions: {
       admin: "Manages the company and can use every feature",
       customerService:
@@ -146,9 +137,6 @@ const settings = {
     },
     list: {
       create: "New role",
-      view: "Details",
-      delete: "Delete",
-      more: "More",
       loadError: "Could not load roles.",
       limitReached: "A company cannot have more than 20 roles.",
       empty: "No roles yet",
@@ -160,7 +148,6 @@ const settings = {
         description: "Description",
         memberCount: "Members",
         permissions: "Permissions",
-        actions: "Actions",
       },
     },
     form: {
@@ -168,9 +155,6 @@ const settings = {
       detailTitle: "Role details",
       name: "Role name",
       description: "Description",
-      save: "Save",
-      cancel: "Cancel",
-      saving: "Saving…",
       loadError: "Could not load the role.",
       createSuccess: "Role created.",
       updateSuccess: "Role saved.",
@@ -211,8 +195,6 @@ const settings = {
       assignedTo: "Already in “{{role}}”",
       aiEmployee: "AI employee",
       add: "Add",
-      remove: "Remove",
-      cancel: "Cancel",
       confirm: "Confirm",
     },
     validation: {
@@ -224,16 +206,12 @@ const settings = {
     delete: {
       title: "Delete “{{name}}”?",
       description: "This action cannot be undone.",
-      cancel: "Cancel",
-      confirm: "Delete",
-      deleting: "Deleting…",
       success: "Role deleted.",
       error: "Could not delete the role. Try again.",
     },
   },
   storage: {
     title: "Storage settings",
-    loading: "Loading…",
     loadError: "Could not load storage settings.",
     saveError: "Could not save storage settings. Try again.",
     saveSuccess: "Storage settings saved.",
@@ -244,7 +222,6 @@ const settings = {
     disableError: "Could not disable object storage. Try again.",
     disableSuccess: "Object storage disabled.",
     openDocumentationError: "Could not open the integration documentation.",
-    retry: "Try again",
     state: {
       unconfiguredDescription: "Object storage has not been configured.",
     },
@@ -266,11 +243,8 @@ const settings = {
       forcePathStyle: "Use path-style access",
       forcePathStyleDescription:
         "S3-compatible services such as MinIO commonly require this option.",
-      save: "Save",
-      saving: "Saving…",
       test: "Test",
       testing: "Testing…",
-      cancel: "Cancel",
     },
     detail: {
       title: "Current configuration",
@@ -284,14 +258,12 @@ const settings = {
       configure: "Configure object storage",
       enable: "Enable",
       enabling: "Testing and enabling…",
-      edit: "Edit",
       disable: "Disable",
       disabling: "Disabling…",
     },
     disableDialog: {
       title: "Disable object storage?",
       description: "The system will stop using this object storage service.",
-      cancel: "Cancel",
       confirm: "Disable",
     },
     validation: {

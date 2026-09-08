@@ -62,7 +62,7 @@ export function DetailEditRow({
               aria-label={t("actions.editField", { field: label })}
               onClick={onEdit}
             >
-              {t("actions.edit")}
+              {t("actions.modify")}
             </Button>
           ) : null}
         </div>

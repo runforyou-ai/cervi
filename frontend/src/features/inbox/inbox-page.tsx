@@ -1130,7 +1130,7 @@ function ConversationThread({
         }
         groupParticipants={groupResource.data?.participants}
         onReplyMessage={
-          conversation && replySupported && !replyDisabledReason && !telegramConversation
+          conversation && replySupported && !replyDisabledReason
             ? setReplyTo
             : undefined
         }
@@ -1243,7 +1243,7 @@ export function InboxPage({
     replace?: boolean
   }) => void
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const { identity } = useWorkspace()
   const isNarrowViewport = useIsNarrowViewport()
   const invalidate = useResourceInvalidator()
@@ -1365,7 +1365,7 @@ export function InboxPage({
       {summary.loading ? <LoadingIndicator>{t("messagesLoading")}</LoadingIndicator> : (
         <>
           <p>{t(summary.data === null ? "conversationUnavailable" : "conversationLoadError")}</p>
-          {summary.data !== null ? <Button variant="outline" size="sm" onClick={() => void summary.refresh()}>{t("messagesRetry")}</Button> : null}
+          {summary.data !== null ? <Button variant="outline" size="sm" onClick={() => void summary.refresh()}>{t("common:actions.retry")}</Button> : null}
         </>
       )}
     </div>

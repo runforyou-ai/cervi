@@ -2,12 +2,9 @@
 const mobile = {
   unavailable: "Not available yet",
   apply: "Apply filters",
-  cancel: "Cancel",
   logout: "Log out",
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",
-  loading: "Loading…",
-  retry: "Try again",
   identityLoadError: "Could not load the login status.",
   contacts: {
     loadingMore: "Loading more…",
@@ -51,7 +48,6 @@ const mobile = {
     emptyDescription: "No conversations match this category and its filters.",
   },
   group: {
-    add: "Add",
     addMembers: "Add group members",
     addOwnerOnly: "Only the group owner can add members.",
     addArchived: "This group has been dissolved. Members cannot be added.",
@@ -67,7 +63,6 @@ const mobile = {
     complete: "Done",
     selectedMembers: "Selected members",
     removeMember: "Remove {{name}}",
-    remove: "Remove",
     noSelection: "No members selected",
     searchMembers: "Search member names",
     title: "Group chat",
@@ -81,12 +76,9 @@ const mobile = {
     logoutDescription:
       "You will need to sign in again. Your server connection will be kept.",
     logoutTitle: "Log out of this account?",
-    settingsUnavailable: "Mobile personal settings are not available yet.",
-    settings: "Personal settings",
-    organization: "Connected organization",
+    security: "Login and security",
     title: "Me",
     profile: "Profile",
-    displayName: "Name",
     email: "Email",
   },
 }

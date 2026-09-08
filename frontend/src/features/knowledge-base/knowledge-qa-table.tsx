@@ -43,7 +43,7 @@ export function KnowledgeQATable({
   onDelete: (entry: KnowledgeQASummaryData) => void
   onPageChange: (page: number) => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const pageNumber = data.page.number
   const totalPages = Math.max(1, Math.ceil(data.page.total / data.page.size))
   return (
@@ -64,7 +64,7 @@ export function KnowledgeQATable({
             <TableHead>{t("qa.answer")}</TableHead>
             <TableHead>{t("qa.createdAt")}</TableHead>
             <TableHead>
-              {t("qa.actions")}
+              {t("common:table.actions")}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -99,10 +99,10 @@ export function KnowledgeQATable({
             disabled={loading || pageNumber <= 1}
             onClick={() => onPageChange(pageNumber - 1)}
           >
-            {t("qa.previous")}
+            {t("common:pagination.previous")}
           </Button>
           <span>
-            {t("qa.page", {
+            {t("common:pagination.page", {
               current: pageNumber,
               total: totalPages,
             })}
@@ -113,7 +113,7 @@ export function KnowledgeQATable({
             disabled={loading || pageNumber >= totalPages}
             onClick={() => onPageChange(pageNumber + 1)}
           >
-            {t("qa.next")}
+            {t("common:pagination.next")}
           </Button>
         </div>
       </div>
@@ -131,7 +131,7 @@ function KnowledgeQARow({
   editPath: string
   onDelete: () => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const { formatDateTime } = useDateTime()
   return (
     <TableRow>
@@ -170,7 +170,7 @@ function KnowledgeQARow({
       <TableCell className="whitespace-nowrap">
         <div className="inline-flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link to={editPath}>{t("qa.edit")}</Link>
+            <Link to={editPath}>{t("common:actions.edit")}</Link>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -186,7 +186,7 @@ function KnowledgeQARow({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem destructive onSelect={onDelete}>
-                {t("qa.delete")}
+                {t("common:actions.delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

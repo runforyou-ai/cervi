@@ -1,8 +1,6 @@
 /** 简体中文·应用文案。 */
 const apps = {
   title: "应用",
-  loading: "正在加载…",
-  retry: "重试",
   loadError: "业务系统加载失败。",
   open: "打开{{name}}",
   openError: "打开业务系统失败，请重试。",
@@ -15,7 +13,6 @@ const apps = {
     title: "打开网址",
     label: "网址",
     invalid: "请输入完整的 HTTP 或 HTTPS 地址。",
-    cancel: "取消",
     open: "打开",
     opening: "正在打开…",
     error: "打开网址失败，请重试。",

@@ -23,6 +23,7 @@ export {
 export * from "@/api/agents"
 export * from "@/api/ai-providers"
 export * from "@/api/business-systems"
+export * from "@/api/mcp-servers"
 export * from "@/api/channels"
 export * from "@/api/contacts"
 export * from "@/api/external-pages"

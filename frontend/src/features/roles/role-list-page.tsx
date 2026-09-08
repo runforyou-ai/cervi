@@ -142,7 +142,7 @@ export function RoleListPage() {
       <PageContent>
         {showLoading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("roles.loading")}
+            {tCommon("status.loading")}
           </LoadingIndicator>
         ) : error ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -154,7 +154,7 @@ export function RoleListPage() {
               variant="outline"
               onClick={() => void refresh()}
             >
-              {t("roles.retry")}
+              {tCommon("actions.retry")}
             </Button>
           </div>
         ) : (
@@ -171,7 +171,7 @@ export function RoleListPage() {
                     {t("roles.list.columns.permissions")}
                   </TableHead>
                   <TableHead className="w-px">
-                    {t("roles.list.columns.actions")}
+                    {tCommon("table.actions")}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -208,7 +208,7 @@ export function RoleListPage() {
                           <div className="inline-flex gap-2">
                             <Button variant="outline" size="sm" asChild>
                               <Link to={`/settings/roles/${role.id}`}>
-                                {t("roles.list.view")}
+                                {tCommon("actions.view")}
                               </Link>
                             </Button>
                             <DropdownMenu>
@@ -216,8 +216,8 @@ export function RoleListPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon-sm"
-                                  aria-label={t("roles.list.more")}
-                                  title={t("roles.list.more")}
+                                  aria-label={tCommon("actions.more")}
+                                  title={tCommon("actions.more")}
                                 >
                                   <MoreHorizontalIcon />
                                 </Button>
@@ -228,7 +228,7 @@ export function RoleListPage() {
                                   className="text-destructive focus:text-destructive"
                                   onSelect={() => setDeletingRole(role)}
                                 >
-                                  {t("roles.list.delete")}
+                                  {tCommon("actions.delete")}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -263,13 +263,13 @@ export function RoleListPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>
-              {t("roles.delete.cancel")}
+              {tCommon("actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void confirmDelete()}
             >
-              {deleting ? t("roles.delete.deleting") : t("roles.delete.confirm")}
+              {deleting ? tCommon("actions.deleting") : tCommon("actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

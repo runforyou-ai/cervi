@@ -14,7 +14,11 @@ import { MobileGroupMembersPage } from "@/apps/mobile/mobile-group-members"
 import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
 import { MobileEmployeesPage } from "@/apps/mobile/mobile-employees-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
-import { MobileMePage, MobileSettingsPage } from "@/apps/mobile/mobile-me-page"
+import {
+  MobileMePage,
+  MobileProfilePage,
+  MobileSecurityPage,
+} from "@/apps/mobile/mobile-me-page"
 import {
   MobileContactCategoryPage,
   MobileContactsPage,
@@ -103,7 +107,8 @@ export default function MobileApp() {
                 />
               }
             />
-            <Route path="/me/settings" element={<MobileSettingsPage />} />
+            <Route path="/me/profile" element={<MobileProfilePage />} />
+            <Route path="/me/security" element={<MobileSecurityPage />} />
             <Route
               path="/contacts/employees"
               element={<MobileEmployeesPage />}

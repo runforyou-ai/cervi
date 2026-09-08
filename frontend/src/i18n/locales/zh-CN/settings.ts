@@ -24,8 +24,6 @@ const settings = {
     avatarUploadError: "上传头像失败，请重试。",
     avatarTypeError: "请选择 JPEG、PNG 或 WebP 图片。",
     avatarSizeError: "图片大小不能超过 5 MB。",
-    save: "保存",
-    saving: "正在保存…",
     saveSuccess: "个人资料已保存。",
     saveError: "保存个人资料失败，请重试。",
     validation: {
@@ -91,8 +89,6 @@ const settings = {
         settingsOpenError: "无法打开系统通知设置，请手动前往系统设置。",
       },
     },
-    save: "保存",
-    saving: "正在保存…",
     saveSuccess: "偏好设置已保存。",
     saveError: "保存偏好设置失败，请重试。",
     validation: {
@@ -114,14 +110,11 @@ const settings = {
     form: {
       name: "企业名称",
       allowArbitraryUrl: "允许打开任意网址",
-      save: "保存",
-      saving: "保存中…",
     },
     confirm: {
       title: "允许打开任意网址？",
       description:
         "开启后，成员可以访问未经企业配置和验证的网站，可能面临钓鱼网站、恶意内容或敏感信息泄露风险。请确认企业已制定相应的使用规范。",
-      cancel: "取消",
       enable: "确认开启",
     },
     validation: {
@@ -131,8 +124,6 @@ const settings = {
   },
   roles: {
     title: "角色与权限",
-    loading: "正在加载…",
-    retry: "重试",
     kindsDescriptions: {
       admin: "负责企业管理，可使用全部功能",
       customerService: "负责接待和服务客户，处理客户咨询与沟通",
@@ -140,9 +131,6 @@ const settings = {
     },
     list: {
       create: "新建角色",
-      view: "详情",
-      delete: "删除",
-      more: "更多",
       loadError: "角色列表加载失败。",
       limitReached: "企业角色数量不能超过 20 个。",
       empty: "还没有角色",
@@ -154,7 +142,6 @@ const settings = {
         description: "角色说明",
         memberCount: "成员数",
         permissions: "权限",
-        actions: "操作",
       },
     },
     form: {
@@ -162,9 +149,6 @@ const settings = {
       detailTitle: "角色详情",
       name: "角色名称",
       description: "角色说明",
-      save: "保存",
-      cancel: "取消",
-      saving: "正在保存…",
       loadError: "角色加载失败。",
       createSuccess: "角色已创建。",
       updateSuccess: "角色已保存。",
@@ -205,8 +189,6 @@ const settings = {
       assignedTo: "已属于“{{role}}”",
       aiEmployee: "AI 员工",
       add: "加入",
-      remove: "移除",
-      cancel: "取消",
       confirm: "确定",
     },
     validation: {
@@ -217,16 +199,12 @@ const settings = {
     delete: {
       title: "删除“{{name}}”？",
       description: "删除后无法恢复。",
-      cancel: "取消",
-      confirm: "删除",
-      deleting: "正在删除…",
       success: "角色已删除。",
       error: "删除角色失败，请重试。",
     },
   },
   storage: {
     title: "存储设置",
-    loading: "正在加载…",
     loadError: "存储设置加载失败。",
     saveError: "保存存储设置失败，请重试。",
     saveSuccess: "存储设置已保存。",
@@ -237,7 +215,6 @@ const settings = {
     disableError: "停用对象存储失败，请重试。",
     disableSuccess: "对象存储已停用。",
     openDocumentationError: "无法打开接入文档，请重试。",
-    retry: "重试",
     state: {
       unconfiguredDescription: "尚未配置对象存储。",
     },
@@ -258,11 +235,8 @@ const settings = {
       hideSecretAccessKey: "隐藏 Secret Access Key",
       forcePathStyle: "使用路径形式访问",
       forcePathStyleDescription: "MinIO 等 S3 兼容服务通常需要开启此选项。",
-      save: "保存",
-      saving: "正在保存…",
       test: "测试",
       testing: "正在测试…",
-      cancel: "取消",
     },
     detail: {
       title: "当前配置",
@@ -276,14 +250,12 @@ const settings = {
       configure: "配置对象存储",
       enable: "启用",
       enabling: "正在测试并启用…",
-      edit: "修改",
       disable: "停用",
       disabling: "正在停用…",
     },
     disableDialog: {
       title: "停用对象存储？",
       description: "停用后，系统将不再使用此对象存储服务。",
-      cancel: "取消",
       confirm: "确认停用",
     },
     validation: {

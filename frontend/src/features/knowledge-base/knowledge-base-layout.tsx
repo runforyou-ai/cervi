@@ -46,7 +46,7 @@ import {
   type KnowledgeGroupDialogState,
 } from "@/features/knowledge-base/knowledge-group-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
@@ -58,9 +58,10 @@ type DeleteGroupTarget = {
 
 /** 显示知识库资源树和管理页面。 */
 export function KnowledgeBaseLayout() {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
   const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const [groupDialog, setGroupDialog] =
     useState<KnowledgeGroupDialogState | null>(null)
   const [deletingKnowledgeBase, setDeletingKnowledgeBase] =
@@ -92,10 +93,11 @@ export function KnowledgeBaseLayout() {
 
   /** 把创建、保存或分组结果同步到窄侧栏。 */
   const upsertKnowledgeBase = useCallback(
-    (_knowledgeBase: KnowledgeBaseData) => {
+    (knowledgeBase: KnowledgeBaseData) => {
       void refresh()
+      void invalidate(resourceKeys.knowledgeBase(knowledgeBase.id))
     },
-    [refresh],
+    [refresh, invalidate],
   )
 
   /** 删除当前选中的知识库。 */
@@ -176,8 +178,8 @@ export function KnowledgeBaseLayout() {
                     variant="ghost"
                     size="icon-sm"
                     className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
-                    aria-label={t("sidebar.create")}
-                    title={t("sidebar.create")}
+                    aria-label={t("common:actions.new")}
+                    title={t("common:actions.new")}
                   >
                     <PlusIcon />
                   </Button>
@@ -201,7 +203,7 @@ export function KnowledgeBaseLayout() {
           >
             {showLoading ? (
               <LoadingIndicator className="h-20 justify-center">
-                {t("loading")}
+                {t("common:status.loading")}
               </LoadingIndicator>
             ) : loadError ? (
               <div className="flex flex-col items-center px-2 py-6 text-center">
@@ -214,7 +216,7 @@ export function KnowledgeBaseLayout() {
                   size="sm"
                   onClick={() => void refresh()}
                 >
-                  {t("retry")}
+                  {t("common:actions.retry")}
                 </Button>
               </div>
             ) : knowledgeBases.length === 0 ? (
@@ -279,13 +281,13 @@ export function KnowledgeBaseLayout() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>
-              {t("delete.cancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void confirmDeleteKnowledgeBase()}
             >
-              {deleting ? t("delete.deleting") : t("delete.confirm")}
+              {deleting ? t("common:actions.deleting") : t("common:actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -304,13 +306,13 @@ export function KnowledgeBaseLayout() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>
-              {t("group.cancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void confirmDeleteGroup()}
             >
-              {deleting ? t("group.deleting") : t("group.delete")}
+              {deleting ? t("common:actions.deleting") : t("common:actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -335,7 +337,7 @@ function KnowledgeBaseTree({
   onDeleteGroup: (group: KnowledgeGroupData) => void
   onDeleteKnowledgeBase: () => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const path = `/knowledge-bases/${knowledgeBase.id}`
   const isQA =
     knowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
@@ -383,19 +385,19 @@ function KnowledgeBaseTree({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem destructive onSelect={onDeleteKnowledgeBase}>
-              {t("sidebar.delete")}
+              {t("common:actions.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       <div className="mt-1 ml-3 border-l pl-2">
-        {isQA && defaultGroup ? (
+        {defaultGroup ? (
           <Link
-            to={`${path}/groups/${defaultGroup.id}/qa`}
+            to={`${path}/groups/${defaultGroup.id}/${isQA ? "qa" : "documents"}`}
             className={cn(
               "flex h-8 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent",
-              currentPath.startsWith(`${path}/groups/${defaultGroup.id}/qa`) &&
+              currentPath.startsWith(`${path}/groups/${defaultGroup.id}/${isQA ? "qa" : "documents"}`) &&
                 "bg-sidebar-accent/60 font-medium text-sidebar-accent-foreground",
             )}
           >
@@ -415,7 +417,7 @@ function KnowledgeBaseTree({
               contentPath={
                 isQA
                   ? `${path}/groups/${group.id}/qa`
-                  : undefined
+                  : `${path}/groups/${group.id}/documents`
               }
               currentPath={currentPath}
               onAddChild={() => onCreateGroup(group.id)}
@@ -429,7 +431,7 @@ function KnowledgeBaseTree({
                   contentPath={
                     isQA
                       ? `${path}/groups/${child.id}/qa`
-                      : undefined
+                      : `${path}/groups/${child.id}/documents`
                   }
                   currentPath={currentPath}
                   onEdit={() => onEditGroup(child)}
@@ -460,7 +462,7 @@ function KnowledgeGroupTreeRow({
   onEdit: () => void
   onDelete: () => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   return (
     <div className="group/tree flex h-8 items-center rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
       <FolderIcon className="size-3.5 shrink-0" />
@@ -495,9 +497,9 @@ function KnowledgeGroupTreeRow({
               {t("group.addChild")}
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem onSelect={onEdit}>{t("group.edit")}</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onEdit}>{t("common:actions.edit")}</DropdownMenuItem>
           <DropdownMenuItem destructive onSelect={onDelete}>
-            {t("group.delete")}
+            {t("common:actions.delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

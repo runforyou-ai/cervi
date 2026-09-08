@@ -54,7 +54,7 @@ export function TeamMemberPicker({
   onSaved: (team: Team) => void
   onCancel: () => void
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   const invalidate = useResourceInvalidator()
   const [search, setSearch] = useState("")
   const [query, setQuery] = useState("")
@@ -152,7 +152,7 @@ export function TeamMemberPicker({
       <div className="max-h-[min(24rem,50svh)] min-h-56 overflow-y-auto rounded-md border">
         {loading ? (
           <LoadingIndicator className="min-h-56 justify-center">
-            {t("loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : failed ? (
           <div className="flex min-h-56 flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
@@ -162,7 +162,7 @@ export function TeamMemberPicker({
               size="sm"
               onClick={() => void candidates.refresh()}
             >
-              {t("retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : members.length === 0 ? (
@@ -216,7 +216,7 @@ export function TeamMemberPicker({
 
       {totalPages > 1 ? (
         <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-          <span>{t("pagination.total", { count: pageInfo.total })}</span>
+          <span>{t("common:pagination.total", { count: pageInfo.total })}</span>
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -225,10 +225,10 @@ export function TeamMemberPicker({
               disabled={currentPage <= 1 || loading}
               onClick={() => setCurrentPage((page) => page - 1)}
             >
-              {t("pagination.previous")}
+              {t("common:pagination.previous")}
             </Button>
             <span>
-              {t("pagination.page", {
+              {t("common:pagination.page", {
                 current: pageInfo.number,
                 total: totalPages,
               })}
@@ -240,7 +240,7 @@ export function TeamMemberPicker({
               disabled={currentPage >= totalPages || loading}
               onClick={() => setCurrentPage((page) => page + 1)}
             >
-              {t("pagination.next")}
+              {t("common:pagination.next")}
             </Button>
           </div>
         </div>
@@ -252,7 +252,7 @@ export function TeamMemberPicker({
         </span>
         <div className="flex items-center gap-2">
           <Button type="button" variant="outline" onClick={onCancel}>
-            {t("teams.form.cancel")}
+            {t("common:actions.cancel")}
           </Button>
           <Button
             type="button"

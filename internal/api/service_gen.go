@@ -37,6 +37,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
+	router.GET("/conversations/:conversationID/message-references", s.listConversationMessageReferences)
 	router.GET("/conversations/:conversationID/messages/:messageID/context", s.getConversationMessageContext)
 	router.GET("/conversations/:conversationID/navigation", s.getConversationNavigationState)
 	router.GET("/conversations/:conversationID/mentions/pending", s.listPendingConversationMentions)
@@ -104,6 +105,12 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/teams/:teamID/member-candidates", s.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", s.addTeamMembers)
 	router.POST("/teams/:teamID/members/remove", s.removeTeamMembers)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
+	router.POST("/knowledge-bases/:knowledgeBaseID/documents", s.createKnowledgeDocuments)
+	router.PUT("/knowledge-bases/:knowledgeBaseID/documents/:documentID/group", s.moveKnowledgeDocument)
+	router.DELETE("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.deleteKnowledgeDocument)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/preview", s.getKnowledgeDocumentPreview)
 	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries", s.listKnowledgeQAEntries)
 	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.getKnowledgeQAEntry)
 	router.POST("/knowledge-bases/:knowledgeBaseID/qa-entries", s.createKnowledgeQAEntry)
@@ -139,6 +146,11 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/integrations/business-systems", s.createBusinessSystem)
 	router.PUT("/integrations/business-systems/:businessSystemID", s.updateBusinessSystem)
 	router.DELETE("/integrations/business-systems/:businessSystemID", s.deleteBusinessSystem)
+	router.GET("/integrations/mcp-servers", s.listMCPServers)
+	router.GET("/integrations/mcp-servers/:mcpServerID", s.getMCPServer)
+	router.POST("/integrations/mcp-servers", s.createMCPServer)
+	router.PUT("/integrations/mcp-servers/:mcpServerID", s.updateMCPServer)
+	router.DELETE("/integrations/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
 	router.GET("/settings/storage/s3", s.getS3Setting)
 	router.PUT("/settings/storage/s3", s.saveS3Setting)
@@ -337,6 +349,16 @@ func (s *Service) listConversationMessages(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListConversationMessages(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
+func (s *Service) listConversationMessageReferences(c *gin.Context) {
+	input, ok := bindConversationMessageReferenceListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListConversationMessageReferences(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -900,6 +922,52 @@ func (s *Service) removeTeamMembers(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listKnowledgeDocuments 返回当前分组的文档列表。
+func (s *Service) listKnowledgeDocuments(c *gin.Context) {
+	input, ok := bindKnowledgeDocumentListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListKnowledgeDocuments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getKnowledgeDocument 返回文档详情。
+func (s *Service) getKnowledgeDocument(c *gin.Context) {
+	output, err := s.application.GetKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createKnowledgeDocuments 保存最多十个已上传的文档原件。
+func (s *Service) createKnowledgeDocuments(c *gin.Context) {
+	var input appservice.KnowledgeDocumentBatchInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateKnowledgeDocuments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// moveKnowledgeDocument 移动文档到同库分组。
+func (s *Service) moveKnowledgeDocument(c *gin.Context) {
+	var input appservice.KnowledgeDocumentMoveInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.MoveKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input))
+}
+
+// deleteKnowledgeDocument 删除文档并释放原件。
+func (s *Service) deleteKnowledgeDocument(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID")))
+}
+
+// getKnowledgeDocumentPreview 签发当前文档的原件预览请求。
+func (s *Service) getKnowledgeDocumentPreview(c *gin.Context) {
+	output, err := s.application.GetKnowledgeDocumentPreview(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listKnowledgeQAEntries 返回分组中的本地问答列表。
 func (s *Service) listKnowledgeQAEntries(c *gin.Context) {
 	input, ok := bindKnowledgeQAListInputQuery(c)
@@ -1167,6 +1235,43 @@ func (s *Service) deleteBusinessSystem(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID")))
 }
 
+// listMCPServers 返回当前企业配置的 MCP 服务。
+func (s *Service) listMCPServers(c *gin.Context) {
+	output, err := s.application.ListMCPServers(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getMCPServer 返回当前企业中的 MCP 服务详情。
+func (s *Service) getMCPServer(c *gin.Context) {
+	output, err := s.application.GetMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createMCPServer 创建 MCP 服务。
+func (s *Service) createMCPServer(c *gin.Context) {
+	var input appservice.MCPServerInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateMCPServer(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateMCPServer 修改 MCP 服务。
+func (s *Service) updateMCPServer(c *gin.Context) {
+	var input appservice.MCPServerInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteMCPServer 删除 MCP 服务。
+func (s *Service) deleteMCPServer(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID")))
+}
+
 // updateOrganization 修改当前企业通用设置。
 func (s *Service) updateOrganization(c *gin.Context) {
 	var input appservice.OrganizationInput
@@ -1235,10 +1340,35 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 	}, true
 }
 
+// bindConversationMessageReferenceListInputQuery 从查询参数解析 appservice.ConversationMessageReferenceListInput。
+func bindConversationMessageReferenceListInputQuery(c *gin.Context) (appservice.ConversationMessageReferenceListInput, bool) {
+	return appservice.ConversationMessageReferenceListInput{
+		MessageIDs: c.Query("messageIds"),
+	}, true
+}
+
 // bindCustomerDeliveryListInputQuery 从查询参数解析 appservice.CustomerDeliveryListInput。
 func bindCustomerDeliveryListInputQuery(c *gin.Context) (appservice.CustomerDeliveryListInput, bool) {
 	return appservice.CustomerDeliveryListInput{
 		MessageIDs: c.Query("messageIds"),
+	}, true
+}
+
+// bindKnowledgeDocumentListInputQuery 从查询参数解析 appservice.KnowledgeDocumentListInput。
+func bindKnowledgeDocumentListInputQuery(c *gin.Context) (appservice.KnowledgeDocumentListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.KnowledgeDocumentListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 20)
+	if !ok {
+		return appservice.KnowledgeDocumentListInput{}, false
+	}
+	return appservice.KnowledgeDocumentListInput{
+		GroupID:  c.Query("groupId"),
+		Keyword:  c.Query("keyword"),
+		Page:     page,
+		PageSize: pageSize,
 	}, true
 }
 

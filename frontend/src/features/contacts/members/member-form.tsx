@@ -199,11 +199,11 @@ export function MemberForm({
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting
-            ? t("members.form.saving")
-            : t("members.form.save")}
+            ? tCommon("actions.saving")
+            : tCommon("actions.save")}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          {t("members.form.cancel")}
+          {tCommon("actions.cancel")}
         </Button>
       </div>
     </form>

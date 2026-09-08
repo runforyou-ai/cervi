@@ -34,7 +34,7 @@ export function MobileGroupMemberPicker({
   selectionLimit?: number
   showSelectionSummary?: boolean
 }) {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const { t: tInbox } = useTranslation("inbox")
   const [search, setSearch] = useState("")
   const { data, loading, refreshing, error, refresh } = useResource(
@@ -79,7 +79,7 @@ export function MobileGroupMemberPicker({
                       onClick={() => onChange(selected.filter((item) => item.id !== member.id))}
                     >
                       <span className="truncate">{member.displayName}</span>
-                      <span className="text-muted-foreground">{t("group.remove")}</span>
+                      <span className="text-muted-foreground">{t("common:actions.remove")}</span>
                     </Button>
                   </li>
                 ))}
@@ -108,7 +108,7 @@ export function MobileGroupMemberPicker({
       </div>
       <div className="h-64 overflow-y-auto overscroll-contain rounded-md border">
         {loading && !data ? (
-          <LoadingIndicator className="h-full justify-center">{t("loading")}</LoadingIndicator>
+          <LoadingIndicator className="h-full justify-center">{t("common:status.loading")}</LoadingIndicator>
         ) : null}
         {error ? (
           <div className="space-y-3 p-4 text-sm">
@@ -120,7 +120,7 @@ export function MobileGroupMemberPicker({
               disabled={refreshing || disabled}
               onClick={() => void refresh()}
             >
-              {t("retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : null}

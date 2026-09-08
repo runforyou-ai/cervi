@@ -36,7 +36,7 @@ export function GroupDissolveDialog({
   onOpenChange: (open: boolean) => void
   trigger?: HTMLElement | null
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const save = useImmediateSave()
   const invalidate = useResourceInvalidator()
@@ -92,7 +92,7 @@ export function GroupDissolveDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel className="min-h-11" disabled={save.saving}>
-            {t("groupCreateCancel")}
+            {t("common:actions.cancel")}
           </AlertDialogCancel>
           <Button
             className="min-h-11"

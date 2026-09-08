@@ -28,6 +28,8 @@ export const resourceKeys = {
   conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
   /** 指定会话的列表资格。 */
   inboxConversations: (parameters?: KeyParameters) => listKey("inbox-conversations", parameters),
+  /** 当前窗口内消息的引用状态。 */
+  conversationMessageReferences: (conversationId: string, messageIds?: string) => scopedListKey("conversation-message-references", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 当前会话窗口的外部投递状态。 */
   customerDeliveries: (conversationId: string, messageIds?: string) =>
     scopedListKey("customer-deliveries", conversationId, messageIds === undefined ? undefined : { messageIds }),
@@ -90,6 +92,10 @@ export const resourceKeys = {
   businessSystems: () => ["business-systems"],
   /** 单个业务系统。 */
   businessSystem: (id?: string) => itemKey("business-system", id),
+  /** MCP 服务列表。 */
+  mcpServers: () => ["mcp-servers"],
+  /** 单个 MCP 服务。 */
+  mcpServer: (id?: string) => itemKey("mcp-server", id),
   /** 知识库列表。 */
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */
@@ -102,6 +108,12 @@ export const resourceKeys = {
     entryId === undefined
       ? ["knowledge-qa-entry", knowledgeBaseId]
       : ["knowledge-qa-entry", knowledgeBaseId, entryId],
+  /** 指定知识库及分组条件的文档列表。 */
+  knowledgeDocuments: (baseId?: string, parameters?: KeyParameters) => scopedListKey("knowledge-documents", baseId, parameters),
+  /** 单个文档详情。 */
+  knowledgeDocument: (baseId: string, documentId: string) => ["knowledge-document", baseId, documentId],
+  /** 文档原件的客户端预览。 */
+  knowledgeDocumentFile: (baseId: string, documentId: string) => ["knowledge-document-file", baseId, documentId],
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */
