@@ -4,39 +4,45 @@ package conversation
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"fmt"
+	"strings"
+	"unicode/utf8"
+
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
-	"strings"
-	"unicode/utf8"
 )
 
-// ExecuteBatch 在同一事务内按选择顺序保存附件，最后保存说明。
-func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity *servermodels.Identity, input AttachmentBatchInput) (AttachmentBatchResult, error) {
+// ExecuteBatch 在同一事务中按顺序创建文件和消息，重试复用每条消息的发送编号。
+func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity *servermodels.Identity, input AttachmentBatchInput, backend domain.FileStorageBackend) (AttachmentBatchResult, error) {
 	input.Body = strings.TrimSpace(input.Body)
-	if !common.ValidUUID(input.BatchID) || len(input.Attachments) == 0 || len(input.Attachments) > 100 || utf8.RuneCountInString(input.Body) > 4000 ||
+	if len(input.Attachments) == 0 || len(input.Attachments) > 100 || utf8.RuneCountInString(input.Body) > 4000 ||
+		(input.Body != "" && !common.ValidUUID(input.CaptionMessageID)) ||
 		(input.ConversationID == "") == (input.TargetIdentityID == "") ||
 		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) || (input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) {
 		return AttachmentBatchResult{}, ErrConversationNotFound
 	}
-	seen := map[string]bool{input.BatchID: true}
-	for _, item := range input.Attachments {
-		if !common.ValidUUID(item.FileID) || !common.ValidUUID(item.ClientMessageID) || seen[item.ClientMessageID] || seen[item.FileID] || item.ImageWidth < 0 || item.ImageHeight < 0 {
+	seen := map[string]bool{}
+	if input.Body != "" {
+		seen[input.CaptionMessageID] = true
+	}
+	for index, item := range input.Attachments {
+		if !common.ValidUUID(item.ClientMessageID) || seen[item.ClientMessageID] || item.ImageWidth < 0 || item.ImageHeight < 0 {
 			return AttachmentBatchResult{}, ErrConversationNotFound
 		}
 		seen[item.ClientMessageID] = true
-		seen[item.FileID] = true
+		item.File.Purpose = domain.FilePurposeMessageAttachment
+		normalized, fields := fileaction.NormalizeUploadInput(item.File)
+		if len(fields) > 0 {
+			return AttachmentBatchResult{}, &fileaction.ValidationError{Fields: fields}
+		}
+		input.Attachments[index].File = normalized
 	}
-	payload, _ := json.Marshal(input)
-	digest := fmt.Sprintf("%x", sha256.Sum256(payload))
 	var result AttachmentBatchResult
 	var err error
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
@@ -44,45 +50,24 @@ func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity
 			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 				return err
 			}
-			batch := &servermodels.MessageBatch{}
-			err := tx.NewSelect().Model(batch).Where("mb.id = ?", input.BatchID).Scan(ctx)
-			if err == nil {
-				if batch.OrganizationID != identity.Organization.ID || batch.SenderIdentityID != identity.OrganizationIdentity.ID || batch.RequestDigest != digest {
-					return &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
-				}
-				result, err = loadAttachmentBatch(ctx, tx, identity, batch, input.TargetIdentityID)
-				return err
-			}
-			if !errors.Is(err, sql.ErrNoRows) {
-				return err
-			}
 			member, err := lockAttachmentBatchConversation(ctx, tx, identity, input)
 			if err != nil {
 				return err
 			}
 			result = AttachmentBatchResult{ConversationID: member.Conversation.ID, Messages: []ConversationMessage{}}
-			ids := []string{}
 			for _, item := range input.Attachments {
-				item.ConversationID = member.Conversation.ID
-				item.Pending = true
-				message, err := saveAttachmentMessage(ctx, tx, identity, member, item)
+				message, err := savePendingAttachment(ctx, tx, identity, member, item, backend)
 				if err != nil {
 					return err
 				}
 				result.Messages = append(result.Messages, message)
-				ids = append(ids, message.ID)
 			}
 			if input.Body != "" {
-				message, err := saveInternalTextMessage(ctx, tx, identity, InternalTextMessageInput{ConversationID: member.Conversation.ID, ClientMessageID: input.BatchID, Body: input.Body}, internalMessageContext{ConversationID: member.Conversation.ID, ParticipantID: member.ParticipantID, SubjectID: member.SubjectID}, nil)
+				message, err := saveInternalTextMessage(ctx, tx, identity, InternalTextMessageInput{ConversationID: member.Conversation.ID, ClientMessageID: input.CaptionMessageID, Body: input.Body}, internalMessageContext{ConversationID: member.Conversation.ID, ParticipantID: member.ParticipantID, SubjectID: member.SubjectID}, nil)
 				if err != nil {
 					return err
 				}
 				result.Messages = append(result.Messages, message)
-				ids = append(ids, message.ID)
-			}
-			batch = &servermodels.MessageBatch{ID: input.BatchID, OrganizationID: identity.Organization.ID, SenderIdentityID: identity.OrganizationIdentity.ID, ConversationID: member.Conversation.ID, RequestDigest: digest, MessageIDs: ids}
-			if _, err := tx.NewInsert().Model(batch).Exec(ctx); err != nil {
-				return err
 			}
 			if input.TargetIdentityID != "" {
 				target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID)
@@ -100,11 +85,39 @@ func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity
 		if err == nil {
 			return result, nil
 		}
-		if _, ok := retryableUniqueViolation(err, map[string]struct{}{"message_batches_pkey": {}, "messages_organization_idempotency_unique": {}, "direct_conversations_organization_identity_pair_unique": {}}); !ok {
+		if _, ok := retryableUniqueViolation(err, map[string]struct{}{"messages_organization_idempotency_unique": {}, "direct_conversations_organization_identity_pair_unique": {}}); !ok {
 			return AttachmentBatchResult{}, err
 		}
 	}
 	return AttachmentBatchResult{}, err
+}
+
+// savePendingAttachment 先校验消息重放，再为首次发送创建临时文件，取消后的重放保持原状态。
+func savePendingAttachment(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, member chatstate.Member, item AttachmentBatchItem, backend domain.FileStorageBackend) (ConversationMessage, error) {
+	existing := &servermodels.Message{}
+	err := tx.NewSelect().Model(existing).Where("msg.organization_id = ? AND msg.idempotency_key = ?", identity.Organization.ID, "mmsg:"+identity.OrganizationIdentity.ID+":"+item.ClientMessageID).Scan(ctx)
+	if err == nil {
+		if existing.Type != string(domain.MessageTypeAttachment) || existing.ConversationID != member.Conversation.ID || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID {
+			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+		}
+		messages := []ConversationMessage{memberConversationMessage(existing, member.SubjectID, identity.OrganizationIdentity)}
+		if err := loadMessageAttachments(ctx, tx, identity.Organization.ID, messages); err != nil {
+			return ConversationMessage{}, err
+		}
+		attachment := messages[0].Attachment
+		if attachment.Name != item.File.FileName || attachment.ContentType != item.File.ContentType || attachment.ByteSize != item.File.ByteSize || attachment.ImageWidth != item.ImageWidth || attachment.ImageHeight != item.ImageHeight {
+			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+		}
+		return messages[0], nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return ConversationMessage{}, err
+	}
+	file, err := fileaction.CreatePending(ctx, tx, identity, backend, item.File)
+	if err != nil {
+		return ConversationMessage{}, err
+	}
+	return saveAttachmentMessage(ctx, tx, identity, member, AttachmentMessageInput{Pending: true, ConversationID: member.Conversation.ID, ClientMessageID: item.ClientMessageID, FileID: file.ID, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
 }
 
 // lockAttachmentBatchConversation 找到或创建成员单聊并锁定发送资格。
@@ -143,35 +156,4 @@ func lockAttachmentBatchConversation(ctx context.Context, tx bun.Tx, identity *s
 	}
 	_, err = loadDirectSendContext(ctx, tx, identity, conversationID)
 	return member, err
-}
-
-// loadAttachmentBatch 按原批次顺序返回已保存的发送结果。
-func loadAttachmentBatch(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, batch *servermodels.MessageBatch, targetID string) (AttachmentBatchResult, error) {
-	if err := authorizeConversationHistory(ctx, tx, identity, batch.ConversationID); err != nil {
-		return AttachmentBatchResult{}, err
-	}
-	rows := []conversationMessageRow{}
-	if err := conversationMessagesQuery(tx, identity, batch.ConversationID).Where("msg.id IN (?)", bun.In(batch.MessageIDs)).OrderExpr("msg.originated_at ASC, msg.source_order ASC, msg.id ASC").Scan(ctx, &rows); err != nil {
-		return AttachmentBatchResult{}, err
-	}
-	history, err := buildConversationMessageHistory(rows)
-	if err != nil {
-		return AttachmentBatchResult{}, err
-	}
-	if err := loadMessageAttachments(ctx, tx, identity.Organization.ID, history.Messages); err != nil {
-		return AttachmentBatchResult{}, err
-	}
-	result := AttachmentBatchResult{ConversationID: batch.ConversationID, Messages: history.Messages}
-	if targetID != "" {
-		target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, targetID)
-		if err != nil {
-			return result, err
-		}
-		summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, batch.ConversationID, target)
-		if err != nil {
-			return result, err
-		}
-		result.Conversation = &summary
-	}
-	return result, nil
 }

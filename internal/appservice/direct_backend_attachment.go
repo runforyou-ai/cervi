@@ -83,13 +83,21 @@ func (b *DirectBackend) SendAttachmentBatch(ctx context.Context, meta RequestMet
 	if err != nil {
 		return AttachmentBatchResult{}, err
 	}
-	items := make([]conversationaction.AttachmentMessageInput, 0, len(input.Attachments))
+	items := make([]conversationaction.AttachmentBatchItem, 0, len(input.Attachments))
 	for _, item := range input.Attachments {
-		items = append(items, conversationaction.AttachmentMessageInput{FileID: item.FileID, ClientMessageID: item.ClientMessageID, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
+		items = append(items, conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: item.FileName, ContentType: item.ContentType, ByteSize: item.ByteSize}, ClientMessageID: item.ClientMessageID, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
 	}
-	result, err := b.sendAttachmentMessage.ExecuteBatch(ctx, identity, conversationaction.AttachmentBatchInput{BatchID: input.BatchID, ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, Body: input.Body, Attachments: items})
-	if errors.Is(err, fileaction.ErrFileNotFound) {
-		return AttachmentBatchResult{}, NotFoundError(meta, cervii18n.ErrorFileNotFound)
+	setting, err := b.getS3Setting.Execute(ctx, identity)
+	if err != nil {
+		return AttachmentBatchResult{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+	}
+	backend := domain.FileStorageBackendLocal
+	if setting.Enabled {
+		backend = domain.FileStorageBackendS3
+	}
+	result, err := b.sendAttachmentMessage.ExecuteBatch(ctx, identity, conversationaction.AttachmentBatchInput{CaptionMessageID: input.CaptionMessageID, ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, Body: input.Body, Attachments: items}, backend)
+	if _, ok := errors.AsType[*fileaction.ValidationError](err); ok {
+		return AttachmentBatchResult{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
 	if err != nil {
 		return AttachmentBatchResult{}, individualConversationError(ctx, meta, err, identity.Organization.ID, input.ConversationID, "send_attachments")
@@ -106,7 +114,7 @@ func (b *DirectBackend) SendAttachmentBatch(ctx context.Context, meta RequestMet
 		conversation := directInboxConversationFromSummary(*result.Conversation, urls)
 		output.Conversation = &conversation
 	}
-	slog.Info("单聊附件批次已保存", "conversation_id", result.ConversationID, "batch_id", input.BatchID, "message_count", len(result.Messages))
+	slog.Info("单聊附件批次已保存", "conversation_id", result.ConversationID, "message_count", len(result.Messages))
 	return output, nil
 }
 
@@ -141,4 +149,22 @@ func (b *DirectBackend) ListAttachmentStates(ctx context.Context, meta RequestMe
 		output.States = append(output.States, AttachmentMessageState{MessageID: state.MessageID, Attachment: *mapped.Attachment, Deleted: state.Deleted})
 	}
 	return output, nil
+}
+
+// CompleteAttachmentUpload 完成传输后在事务中激活文件和附件消息。
+func (b *DirectBackend) CompleteAttachmentUpload(ctx context.Context, meta RequestMeta, fileID string) error {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	record, err := b.completeFileUpload.Execute(ctx, identity, fileID, b.finalizeFileContent)
+	if err != nil {
+		return b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
+	}
+	b.cleanupCompletedParts(record)
+	if err := b.sendAttachmentMessage.UpdateUploads(ctx, identity, []string{fileID}, domain.AttachmentReady); err != nil {
+		return b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
+	}
+	slog.Info("附件上传完成请求已处理", "organization_id", identity.Organization.ID, "file_id", fileID)
+	return nil
 }

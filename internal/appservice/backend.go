@@ -38,9 +38,12 @@ type Backend interface {
 	// CreateFilePartUpload 创建一个分片的直传请求。
 	//cervi:route POST /files/:fileID/parts
 	CreateFilePartUpload(context.Context, RequestMeta, string, FilePartUploadInput) (FileUploadRequest, error)
-	// CompleteFileMultipartUpload 合并分片并确认临时文件上传完成。
-	//cervi:route POST /files/:fileID/multipart/complete
-	CompleteFileMultipartUpload(context.Context, RequestMeta, string) (File, error)
+	// PrepareFileUpload 为已有文件记录准备直传请求。
+	//cervi:route POST /files/:fileID/upload
+	PrepareFileUpload(context.Context, RequestMeta, string) (FileUpload, error)
+	// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
+	//cervi:route POST /attachment-uploads/:fileID/complete
+	CompleteAttachmentUpload(context.Context, RequestMeta, string) error
 	// CancelFileUpload 将未发送的临时文件交给清理任务。
 	//cervi:route DELETE /files/:fileID/upload
 	CancelFileUpload(context.Context, RequestMeta, string) error

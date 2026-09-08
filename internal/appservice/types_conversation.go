@@ -366,7 +366,9 @@ type MessageAttachment struct {
 
 // AttachmentBatchItem 定义选定附件与图片展示尺寸。
 type AttachmentBatchItem struct {
-	FileID          string `json:"fileId"`
+	FileName        string `json:"fileName"`
+	ContentType     string `json:"contentType"`
+	ByteSize        int64  `json:"byteSize"`
 	ClientMessageID string `json:"clientMessageId"`
 	ImageWidth      int    `json:"imageWidth"`
 	ImageHeight     int    `json:"imageHeight"`
@@ -374,7 +376,7 @@ type AttachmentBatchItem struct {
 
 // AttachmentBatchInput 定义一批附件和末尾的独立说明消息。
 type AttachmentBatchInput struct {
-	BatchID          string                `json:"batchId"`
+	CaptionMessageID string                `json:"captionMessageId"`
 	ConversationID   string                `json:"conversationId"`
 	TargetIdentityID string                `json:"targetIdentityId"`
 	Attachments      []AttachmentBatchItem `json:"attachments"`

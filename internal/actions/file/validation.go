@@ -47,8 +47,8 @@ type UploadInput struct {
 	ByteSize    int64
 }
 
-// normalizeUploadInput 规范化并校验待上传文件元数据。
-func normalizeUploadInput(input UploadInput) (UploadInput, map[string]ValidationCode) {
+// NormalizeUploadInput 规范化并校验待上传文件元数据。
+func NormalizeUploadInput(input UploadInput) (UploadInput, map[string]ValidationCode) {
 	switch input.Purpose {
 	case domain.FilePurposeMessageAttachment:
 		return normalizeFileInput(input, domain.FilePurposeMessageAttachment)

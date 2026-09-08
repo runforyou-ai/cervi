@@ -34,9 +34,14 @@ func (s *Service) CreateFilePartUpload(ctx context.Context, meta RequestMeta, fi
 	return s.backend.CreateFilePartUpload(ctx, meta, fileID, input)
 }
 
-// CompleteFileMultipartUpload 合并分片并确认临时文件上传完成。
-func (s *Service) CompleteFileMultipartUpload(ctx context.Context, meta RequestMeta, fileID string) (File, error) {
-	return s.backend.CompleteFileMultipartUpload(ctx, meta, fileID)
+// PrepareFileUpload 为已有文件记录准备直传请求。
+func (s *Service) PrepareFileUpload(ctx context.Context, meta RequestMeta, fileID string) (FileUpload, error) {
+	return s.backend.PrepareFileUpload(ctx, meta, fileID)
+}
+
+// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
+func (s *Service) CompleteAttachmentUpload(ctx context.Context, meta RequestMeta, fileID string) error {
+	return s.backend.CompleteAttachmentUpload(ctx, meta, fileID)
 }
 
 // CancelFileUpload 将未发送的临时文件交给清理任务。

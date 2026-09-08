@@ -10,8 +10,10 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -102,7 +104,7 @@ func TestAttachmentMessages(t *testing.T) {
 				t.Fatalf("group preview=%+v", item.Group)
 			}
 		}
-		if err := upload.Cancel(ctx, f.owner, file.ID); err != nil {
+		if err := filemaintenance.NewCancelUploadAction(f.db).Execute(ctx, f.owner, file.ID); err != nil {
 			t.Fatal(err)
 		}
 		active := &servermodels.File{ID: file.ID}
@@ -116,18 +118,13 @@ func TestAttachmentMessages(t *testing.T) {
 func TestAttachmentBatchLifecycle(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	upload := fileaction.NewCreateUploadAction(f.db)
 	send := conversationaction.NewSendAttachmentMessageAction(f.db)
 	query := conversationaction.NewListConversationMessagesQuery(f.db)
-	input := conversationaction.AttachmentBatchInput{BatchID: uuid.NewV7().String(), TargetIdentityID: f.member.OrganizationIdentity.ID, Body: "两份文件的说明"}
+	input := conversationaction.AttachmentBatchInput{CaptionMessageID: uuid.NewV7().String(), TargetIdentityID: f.member.OrganizationIdentity.ID, Body: "两份文件的说明"}
 	for index := 0; index < 2; index++ {
-		file, err := upload.Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{Purpose: domain.FilePurposeMessageAttachment, FileName: "photo.png", ContentType: "image/png", ByteSize: domain.FilePartSize + 1})
-		if err != nil {
-			t.Fatal(err)
-		}
-		input.Attachments = append(input.Attachments, conversationaction.AttachmentMessageInput{FileID: file.ID, ClientMessageID: uuid.NewV7().String(), ImageWidth: 320, ImageHeight: 200})
+		input.Attachments = append(input.Attachments, conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: "photo.png", ContentType: "image/png", ByteSize: domain.FilePartSize + 1}, ClientMessageID: uuid.NewV7().String(), ImageWidth: 320, ImageHeight: 200})
 	}
-	result, err := send.ExecuteBatch(ctx, f.owner, input)
+	result, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +133,7 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	}
 	for index := 0; index < 2; index++ {
 		message := result.Messages[index]
-		if message.Attachment.UploadStatus != domain.AttachmentUploading || message.Attachment.ID != input.Attachments[index].FileID {
+		if message.Attachment.UploadStatus != domain.AttachmentUploading || message.Attachment.ID == "" {
 			t.Fatalf("pending=%+v", message)
 		}
 		next := result.Messages[index+1]
@@ -147,20 +144,20 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 			t.Fatal("incomplete attachment downloadable")
 		}
 	}
-	repeated, err := send.ExecuteBatch(ctx, f.owner, input)
+	repeated, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
 	if err != nil || len(repeated.Messages) != 3 || repeated.Messages[0].ID != result.Messages[0].ID {
 		t.Fatalf("repeat=%+v %v", repeated, err)
 	}
 	changed := input
 	changed.Body = "不同说明"
 	var conflict *conversationaction.ConflictError
-	if _, err := send.ExecuteBatch(ctx, f.owner, changed); !errors.As(err, &conflict) {
+	if _, err := send.ExecuteBatch(ctx, f.owner, changed, domain.FileStorageBackendLocal); !errors.As(err, &conflict) {
 		t.Fatalf("batch intent changed: %v", err)
 	}
-	first := input.Attachments[0].FileID
-	second := input.Attachments[1].FileID
+	first := result.Messages[0].Attachment.ID
+	second := result.Messages[1].Attachment.ID
 	// 通用临时文件取消接口不能绕过消息状态撤去已入库附件。
-	if err := upload.Cancel(ctx, f.owner, first); err != nil {
+	if err := filemaintenance.NewCancelUploadAction(f.db).Execute(ctx, f.owner, first); err != nil {
 		t.Fatal(err)
 	}
 	pending := &servermodels.File{ID: first}
@@ -240,10 +237,10 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 		t.Fatalf("cancelled attachment download=%v", err)
 	}
 	groupInput := input
-	groupInput.BatchID = uuid.NewV7().String()
+	groupInput.CaptionMessageID = uuid.NewV7().String()
 	groupInput.ConversationID = f.groupID
 	groupInput.TargetIdentityID = ""
-	if _, err := send.ExecuteBatch(ctx, f.owner, groupInput); err == nil {
+	if _, err := send.ExecuteBatch(ctx, f.owner, groupInput, domain.FileStorageBackendLocal); err == nil {
 		t.Fatal("group batch accepted")
 	}
 }
@@ -252,17 +249,13 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 func TestCancelOnlyAttachment(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	upload := fileaction.NewCreateUploadAction(f.db)
 	send := conversationaction.NewSendAttachmentMessageAction(f.db)
-	file, err := upload.Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{Purpose: domain.FilePurposeMessageAttachment, FileName: "empty", ByteSize: 0})
+	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{{File: fileaction.UploadInput{FileName: "empty", ByteSize: 0}, ClientMessageID: uuid.NewV7().String()}}}
+	result, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := send.ExecuteBatch(ctx, f.owner, conversationaction.AttachmentBatchInput{BatchID: uuid.NewV7().String(), TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentMessageInput{{FileID: file.ID, ClientMessageID: uuid.NewV7().String()}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := send.UpdateUploads(ctx, f.owner, []string{file.ID}, domain.AttachmentCancelled); err != nil {
+	if err := send.UpdateUploads(ctx, f.owner, []string{result.Messages[0].Attachment.ID}, domain.AttachmentCancelled); err != nil {
 		t.Fatal(err)
 	}
 	conversation := &servermodels.Conversation{ID: result.ConversationID}
@@ -271,5 +264,68 @@ func TestCancelOnlyAttachment(t *testing.T) {
 	}
 	if conversation.LastMessageID != nil || conversation.LastMessageAt != nil {
 		t.Fatalf("summary=%+v", conversation)
+	}
+}
+
+// TestAttachmentReplayAfterCleanup 验证取消和文件回收后的重放不创建文件或恢复消息。
+func TestAttachmentReplayAfterCleanup(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	send := conversationaction.NewSendAttachmentMessageAction(f.db)
+	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{{File: fileaction.UploadInput{FileName: "cancelled.txt", ByteSize: 7}, ClientMessageID: uuid.NewV7().String()}}}
+	result, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fileID := result.Messages[0].Attachment.ID
+	if err := send.UpdateUploads(ctx, f.owner, []string{fileID}, domain.AttachmentCancelled); err != nil {
+		t.Fatal(err)
+	}
+	local, err := serverfilecontent.NewLocalStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := filemaintenance.NewDeleteExpiredAction(f.db, serverfilecontent.NewDeleter(local, nil)).Execute(ctx, filemaintenance.DeleteExpiredInput{FileID: fileID}); err != nil {
+		t.Fatal(err)
+	}
+	repeated, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repeated.Messages[0].ID != result.Messages[0].ID || repeated.Messages[0].Attachment.ID != "" || repeated.Messages[0].Attachment.UploadStatus != domain.AttachmentCancelled {
+		t.Fatalf("replayed=%+v", repeated)
+	}
+	count, err := f.db.NewSelect().Model((*servermodels.File)(nil)).Where("organization_id = ?", f.owner.Organization.ID).Count(ctx)
+	if err != nil || count != 0 {
+		t.Fatalf("new file created: %d %v", count, err)
+	}
+}
+
+// TestAttachmentBatchRollback 验证后续消息冲突时撤销本次新建的文件和消息。
+func TestAttachmentBatchRollback(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	send := conversationaction.NewSendAttachmentMessageAction(f.db)
+	original := conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: "first.txt", ByteSize: 7}, ClientMessageID: uuid.NewV7().String()}
+	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{original}}
+	saved, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added := original
+	added.ClientMessageID = uuid.NewV7().String()
+	original.File.FileName = "changed.txt"
+	input.Attachments = []conversationaction.AttachmentBatchItem{added, original}
+	var conflict *conversationaction.ConflictError
+	if _, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal); !errors.As(err, &conflict) {
+		t.Fatalf("changed intent accepted: %v", err)
+	}
+	count, err := f.db.NewSelect().Model((*servermodels.File)(nil)).Where("organization_id = ?", f.owner.Organization.ID).Count(ctx)
+	if err != nil || count != 1 {
+		t.Fatalf("file rollback: %d %v", count, err)
+	}
+	count, err = f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", saved.ConversationID).Count(ctx)
+	if err != nil || count != 1 {
+		t.Fatalf("message rollback: %d %v", count, err)
 	}
 }

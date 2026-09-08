@@ -64,7 +64,7 @@ export function useAttachmentQueue() {
     queue?.subscribe ?? emptySubscribe,
     queue?.snapshot ?? emptySnapshot,
   )
-  return { queue, jobs }
+  return { queue, jobs, messages: queue?.messages() ?? [] }
 }
 const emptyJobs: ReturnType<AttachmentQueue["snapshot"]> = []
 /** 未提供附件队列时返回空订阅。 */

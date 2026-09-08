@@ -1,16 +1,11 @@
-/** 保存当前工作台内的附件队列，聊天切换不影响正在上传的文件。 */
+/** 保存工作台中的有序附件消息，切换聊天不影响当前上传。 */
 import {
   AttachmentUploadStatus,
-  FilePurpose,
-  cancelFileUpload,
-  completeFileMultipartUpload,
-  completeFileUpload,
-  createFilePartUpload,
-  createFileUpload,
+  FileTransfer,
+  prepareFileUpload,
+  completeAttachmentUpload,
   sendAttachmentBatch,
   updateAttachmentUploads,
-  uploadFileSlice,
-  type FileUpload,
   type InboxConversation,
 } from "@/api"
 import type { OutgoingConversationMessage } from "./use-outgoing-conversation-messages"
@@ -23,34 +18,36 @@ export type SelectedAttachment = {
   imageHeight: number
 }
 
-export type AttachmentJob = {
+type QueueMessage = {
   id: string
   batchID: string
   conversationID: string
   targetIdentityID: string
-  selected: SelectedAttachment | null
-  previewURL: string
-  upload: FileUpload | null
   message: OutgoingConversationMessage
   stage: "preparing" | "queued" | "uploading" | "ready" | "failed" | "cancelled"
+}
+
+export type AttachmentJob = QueueMessage & {
+  selected: SelectedAttachment | null
+  previewURL: string
+  transfer: FileTransfer | null
   bytes: number
-  nextPart: number
-  contentUploaded: boolean
   controller: AbortController
+  cancelRequested: boolean
 }
 
 type Batch = {
   id: string
   conversationID: string
   targetIdentityID: string
-  body: string
   jobs: AttachmentJob[]
+  caption: QueueMessage | null
   saved: boolean
   preparing: boolean
   onCreated: (conversation: InboxConversation | null) => void
 }
 
-/** 管理有序消息的本地展示、并发上传和当前页面重试。 */
+/** 调度消息入库和文件上传，文件传输由共享执行器处理。 */
 export class AttachmentQueue {
   private jobs: AttachmentJob[] = []
   private batches = new Map<string, Batch>()
@@ -78,24 +75,27 @@ export class AttachmentQueue {
       this.listeners.delete(listener)
     }
   }
-  /** 返回当前不可变队列快照。 */
+  /** 返回当前队列快照。 */
   snapshot = () => this.jobs
+  /** 返回附件和独立说明消息的本地展示。 */
+  messages = (): QueueMessage[] =>
+    [...this.batches.values()].flatMap((batch) => [
+      ...batch.jobs,
+      ...(batch.caption ? [batch.caption] : []),
+    ])
   /** 发布新的队列快照。 */
   private emit() {
     this.jobs = [...this.jobs]
     for (const listener of this.listeners) listener()
   }
 
-  /** 启动当前工作台的上传活跃确认。 */
+  /** 定期确认排队或上传中的附件仍由当前页面持有。 */
   start() {
     this.disposed = false
     this.heartbeat = setInterval(() => {
       const ids = this.jobs
-        .filter(
-          (job) =>
-            (job.stage === "queued" || job.stage === "uploading") && job.upload,
-        )
-        .map((job) => job.upload!.file.id)
+        .filter((job) => job.stage === "queued" || job.stage === "uploading")
+        .map((job) => job.message.saved!.attachment!.id)
       for (let index = 0; index < ids.length; index += 100) {
         void updateAttachmentUploads({
           fileIds: ids.slice(index, index + 100),
@@ -105,7 +105,7 @@ export class AttachmentQueue {
     }, 30000)
   }
 
-  /** 立即展示所选文件和说明，再请求服务端按顺序保存消息。 */
+  /** 立即展示附件和说明，以固定消息编号提交一次有序发送。 */
   enqueue(
     files: SelectedAttachment[],
     body: string,
@@ -122,12 +122,11 @@ export class AttachmentQueue {
       targetIdentityID,
       selected,
       previewURL: selected.previewURL,
-      upload: null,
-      stage: "preparing",
+      transfer: null,
       bytes: 0,
-      nextPart: 1,
-      contentUploaded: false,
       controller: new AbortController(),
+      cancelRequested: false,
+      stage: "preparing",
       message: {
         clientMessageID: selected.id,
         body: "",
@@ -151,39 +150,33 @@ export class AttachmentQueue {
         },
       },
     }))
-    if (body.trim())
-      jobs.push({
-        id: batchID,
-        batchID,
-        conversationID,
-        targetIdentityID,
-        selected: null,
-        previewURL: "",
-        upload: null,
-        stage: "preparing",
-        bytes: 0,
-        nextPart: 1,
-        contentUploaded: false,
-        controller: new AbortController(),
-        message: {
-          clientMessageID: batchID,
-          body: body.trim(),
-          originatedAt: new Date(now + files.length).toISOString(),
-          replyTo: null,
-          mentionSubjectIDs: [],
-          mentionAll: false,
-          mentionAllToken: null,
-          status: "sending",
-          showSending: true,
-          saved: null,
-        },
-      })
+    const caption: QueueMessage | null = body.trim()
+      ? {
+          id: batchID,
+          batchID,
+          conversationID,
+          targetIdentityID,
+          stage: "preparing",
+          message: {
+            clientMessageID: batchID,
+            body: body.trim(),
+            originatedAt: new Date(now + files.length).toISOString(),
+            replyTo: null,
+            mentionSubjectIDs: [],
+            mentionAll: false,
+            mentionAllToken: null,
+            status: "sending",
+            showSending: true,
+            saved: null,
+          },
+        }
+      : null
     const batch: Batch = {
       id: batchID,
       conversationID,
       targetIdentityID,
-      body: body.trim(),
       jobs,
+      caption,
       saved: false,
       preparing: false,
       onCreated,
@@ -194,61 +187,64 @@ export class AttachmentQueue {
     void this.prepare(batch)
   }
 
-  /** 为未保存的批次创建临时文件记录并幂等保存全部消息。 */
+  /** 先原子保存文件记录和消息，收到结果后才开始传输文件内容。 */
   private async prepare(batch: Batch) {
     if (batch.preparing || this.preparingBatch || this.disposed) return
     this.preparingBatch = true
     batch.preparing = true
-    for (const job of batch.jobs)
-      if (job.stage !== "cancelled") {
-        job.stage = "preparing"
-        job.message.status = "sending"
+    const messages: QueueMessage[] = [
+      ...batch.jobs,
+      ...(batch.caption ? [batch.caption] : []),
+    ]
+    for (const item of messages) {
+      if (item.stage !== "cancelled") {
+        item.stage = "preparing"
+        item.message.status = "sending"
       }
+    }
     this.emit()
     try {
-      const files = batch.jobs.filter((job) => job.message.attachment)
-      for (const job of files) {
-        const attachment = job.message.attachment!
-        job.upload ??= await createFileUpload({
-          purpose: FilePurpose.FilePurposeMessageAttachment,
-          fileName: attachment.name,
-          contentType: attachment.contentType,
-          byteSize: attachment.byteSize,
-        })
-        if (this.disposed) {
-          await this.abandon()
-          return
-        }
-      }
       const result = await sendAttachmentBatch({
-        batchId: batch.id,
+        captionMessageId: batch.caption?.id ?? "",
         conversationId: batch.targetIdentityID ? "" : batch.conversationID,
         targetIdentityId: batch.targetIdentityID,
-        body: batch.body,
-        attachments: files.map((job) => ({
-          fileId: job.upload!.file.id,
-          clientMessageId: job.id,
-          imageWidth: job.message.attachment!.imageWidth,
-          imageHeight: job.message.attachment!.imageHeight,
-        })),
+        body: batch.caption?.message.body ?? "",
+        attachments: batch.jobs.map((job) => {
+          const attachment = job.message.attachment!
+          return {
+            clientMessageId: job.id,
+            fileName: attachment.name,
+            contentType: attachment.contentType,
+            byteSize: attachment.byteSize,
+            imageWidth: attachment.imageWidth,
+            imageHeight: attachment.imageHeight,
+          }
+        }),
       })
       batch.saved = true
       batch.conversationID = result.conversationId
-      for (let index = 0; index < batch.jobs.length; index++) {
-        const job = batch.jobs[index]
-        job.conversationID = result.conversationId
-        job.message.saved = result.messages[index]
-        job.message.originatedAt = result.messages[index].originatedAt
-        job.message.status = "sent"
-        if (job.stage === "cancelled") {
-          if (job.upload)
-            await updateAttachmentUploads({
-              fileIds: [job.upload.file.id],
-              status: AttachmentUploadStatus.AttachmentCancelled,
-            })
-          continue
-        }
-        job.stage = job.message.attachment ? "queued" : "ready"
+      for (let index = 0; index < messages.length; index++) {
+        const item = messages[index]
+        item.conversationID = result.conversationId
+        item.message.saved = result.messages[index]
+        item.message.originatedAt = result.messages[index].originatedAt
+        item.message.status = "sent"
+      }
+      if (batch.caption) batch.caption.stage = "ready"
+      for (const job of batch.jobs) {
+        const status = job.message.saved!.attachment!.uploadStatus
+        if (
+          job.cancelRequested ||
+          status === AttachmentUploadStatus.AttachmentCancelled
+        ) {
+          job.cancelRequested = true
+          job.stage = "cancelled"
+          void this.cancel(job.id).catch(this.reportError)
+        } else if (status === AttachmentUploadStatus.AttachmentReady) {
+          job.stage = "ready"
+          job.selected = null
+          job.transfer = null
+        } else job.stage = "queued"
       }
       this.refresh(result.conversationId)
       if (this.disposed) {
@@ -256,21 +252,20 @@ export class AttachmentQueue {
         return
       }
       batch.onCreated(result.conversation)
-      this.emit()
       this.pump()
     } catch (error) {
-      console.warn("附件消息批次保存失败", error)
+      console.warn("附件消息保存失败", error)
       if (!this.disposed) this.reportError(error)
-      for (const job of batch.jobs)
-        if (job.stage !== "cancelled") {
-          job.stage = "failed"
-          job.message.status = "failed"
+      for (const item of messages) {
+        if (item.stage !== "cancelled") {
+          item.stage = "failed"
+          item.message.status = "failed"
         }
-      this.emit()
-      if (this.disposed) await this.abandon()
+      }
     } finally {
       batch.preparing = false
       this.preparingBatch = false
+      this.emit()
       const next = [...this.batches.values()].find(
         (item) =>
           !item.saved && item.jobs.some((job) => job.stage === "preparing"),
@@ -279,7 +274,7 @@ export class AttachmentQueue {
     }
   }
 
-  /** 同时处理最多三个文件，每个文件顺序上传分片。 */
+  /** 同时上传最多三个文件。 */
   private pump() {
     if (this.disposed) return
     for (const job of this.jobs) {
@@ -295,71 +290,39 @@ export class AttachmentQueue {
     this.emit()
   }
 
-  /** 从第一个未成功的分片开始上传，完成后激活原消息中的文件。 */
+  /** 上传文件后由服务端完成原附件消息，失败时保留执行器供手动重试。 */
   private async upload(job: AttachmentJob) {
-    const session = job.upload!
-    const file = job.selected!.file
+    const fileID = job.message.saved!.attachment!.id
     try {
       await updateAttachmentUploads({
-        fileIds: [session.file.id],
+        fileIds: [fileID],
         status: AttachmentUploadStatus.AttachmentUploading,
       })
       job.controller.signal.throwIfAborted()
-      if (session.partSize > 0) {
-        while ((job.nextPart - 1) * session.partSize < file.size) {
-          const start = (job.nextPart - 1) * session.partSize
-          const end = Math.min(start + session.partSize, file.size)
-          const request = await createFilePartUpload(session.file.id, {
-            partNumber: job.nextPart,
-          })
-          job.controller.signal.throwIfAborted()
-          await uploadFileSlice(
-            request,
-            file.slice(start, end),
-            job.controller.signal,
-            (bytes) => {
-              job.bytes = start + bytes
-              this.emit()
-            },
-          )
-          job.bytes = end
-          job.nextPart++
-        }
-      } else if (!job.contentUploaded) {
-        await uploadFileSlice(
-          session.request,
-          file,
-          job.controller.signal,
-          (bytes) => {
-            job.bytes = bytes
-            this.emit()
-          },
-        )
-      }
-      job.controller.signal.throwIfAborted()
-      job.contentUploaded = true
-      if (session.partSize > 0)
-        await completeFileMultipartUpload(session.file.id)
-      else await completeFileUpload(session.file.id)
-      job.controller.signal.throwIfAborted()
-      await updateAttachmentUploads({
-        fileIds: [session.file.id],
-        status: AttachmentUploadStatus.AttachmentReady,
-      })
-      if (job.stage === "cancelled" || this.disposed) return
+      job.transfer ??= new FileTransfer(job.selected!.file, () =>
+        prepareFileUpload(fileID),
+      )
+      await job.transfer.run(
+        job.controller.signal,
+        (bytes) => {
+          job.bytes = bytes
+          this.emit()
+        },
+        completeAttachmentUpload,
+      )
+      if (job.cancelRequested || this.disposed) return
       job.stage = "ready"
       job.selected = null
-      if (job.message.saved?.attachment)
-        job.message.saved.attachment.uploadStatus =
-          AttachmentUploadStatus.AttachmentReady
+      job.transfer = null
+      job.message.saved!.attachment!.uploadStatus =
+        AttachmentUploadStatus.AttachmentReady
       this.refresh(job.conversationID)
     } catch (error) {
-      if (job.stage === "cancelled" || this.disposed) return
+      if (job.cancelRequested || this.disposed) return
       console.warn("附件上传失败", error)
       job.stage = "failed"
-      job.bytes = Math.min((job.nextPart - 1) * session.partSize, file.size)
       await updateAttachmentUploads({
-        fileIds: [session.file.id],
+        fileIds: [fileID],
         status: AttachmentUploadStatus.AttachmentFailed,
       }).catch(() => {})
       this.refresh(job.conversationID)
@@ -368,13 +331,19 @@ export class AttachmentQueue {
     }
   }
 
-  /** 重试当前页面仍持有内容的文件或尚未入库的完整批次。 */
+  /** 按当前失败阶段重试消息入库、取消或剩余文件内容。 */
   retry(id: string) {
-    const job = this.jobs.find((item) => item.id === id)
-    if (!job || job.stage !== "failed") return
-    const batch = this.batches.get(job.batchID)!
+    const item = this.messages().find((item) => item.id === id)
+    if (!item || item.stage !== "failed") return
+    const batch = this.batches.get(item.batchID)!
     if (!batch.saved) {
       void this.prepare(batch)
+      return
+    }
+    const job = batch.jobs.find((job) => job.id === id)
+    if (!job) return
+    if (job.cancelRequested) {
+      void this.cancel(id).catch(this.reportError)
       return
     }
     job.controller = new AbortController()
@@ -382,33 +351,35 @@ export class AttachmentQueue {
     this.pump()
   }
 
-  /** 取消未完成文件并从双方时间线撤去其消息。 */
+  /** 撤去未完成的附件，取消意图在入库请求返回后继续生效。 */
   async cancel(id: string) {
     const job = this.jobs.find((item) => item.id === id)
-    if (!job || job.stage === "ready" || job.stage === "cancelled") return
+    if (!job || (job.stage === "ready" && !job.cancelRequested)) return
+    job.cancelRequested = true
     job.stage = "cancelled"
     job.controller.abort()
     this.emit()
     try {
-      if (job.upload && this.batches.get(job.batchID)?.saved) {
+      if (job.message.saved?.attachment?.id) {
         await updateAttachmentUploads({
-          fileIds: [job.upload.file.id],
+          fileIds: [job.message.saved.attachment.id],
           status: AttachmentUploadStatus.AttachmentCancelled,
         })
         this.refresh(job.conversationID)
       }
-      if (job.previewURL) URL.revokeObjectURL(job.previewURL)
-      job.previewURL = ""
-      job.selected = null
     } catch (error) {
       job.stage = "failed"
       throw error
     } finally {
+      if (job.previewURL) URL.revokeObjectURL(job.previewURL)
+      job.previewURL = ""
+      job.selected = null
+      job.transfer = null
       this.emit()
     }
   }
 
-  /** 在远端图片可用后释放本地预览占用。 */
+  /** 远端图片可用后释放本地预览。 */
   releasePreview(id: string) {
     const job = this.jobs.find((item) => item.id === id)
     if (job?.stage === "ready" && job.previewURL) {
@@ -418,7 +389,7 @@ export class AttachmentQueue {
     }
   }
 
-  /** 结束本次页面持有的上传，不保留重启后续传信息。 */
+  /** 释放本页面的文件内容，关闭或重启后不续传。 */
   dispose() {
     this.disposed = true
     clearInterval(this.heartbeat)
@@ -427,35 +398,26 @@ export class AttachmentQueue {
       if (job.previewURL) URL.revokeObjectURL(job.previewURL)
       job.previewURL = ""
       job.selected = null
+      job.transfer = null
     }
     void this.abandon()
   }
 
-  /** 将已入库但尚未完成的附件标记为失败，异常退出由服务端活跃期限收敛。 */
+  /** 已入库的未完成附件保留失败消息，异常退出由服务端活跃期限收敛。 */
   private async abandon() {
-    // 未入库的临时文件直接交给清理；已入库文件保留失败消息。
-    const unused = this.jobs.filter(
-      (job) => job.upload && !this.batches.get(job.batchID)?.saved,
-    )
-    for (const job of unused) {
-      await cancelFileUpload(job.upload!.file.id).catch((error) => {
-        console.warn("清理未发送附件失败", error)
-      })
-      job.selected = null
-    }
     const ids = this.jobs
       .filter(
         (job) =>
-          job.upload &&
+          job.message.saved?.attachment?.id &&
           job.stage !== "ready" &&
-          job.stage !== "cancelled" &&
-          this.batches.get(job.batchID)?.saved,
+          !job.cancelRequested,
       )
-      .map((job) => job.upload!.file.id)
-    for (let index = 0; index < ids.length; index += 100)
+      .map((job) => job.message.saved!.attachment!.id)
+    for (let index = 0; index < ids.length; index += 100) {
       await updateAttachmentUploads({
         fileIds: ids.slice(index, index + 100),
         status: AttachmentUploadStatus.AttachmentFailed,
       }).catch(() => {})
+    }
   }
 }

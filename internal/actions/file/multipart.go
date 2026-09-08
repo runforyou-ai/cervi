@@ -4,7 +4,6 @@ package file
 
 import (
 	"context"
-	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -13,15 +12,16 @@ import (
 )
 
 // SetMultipartUpload 保存已创建的对象存储分片会话。
-func (a *CreateUploadAction) SetMultipartUpload(ctx context.Context, identity *servermodels.Identity, fileID, uploadID string) error {
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+func (a *CreateUploadAction) SetMultipartUpload(ctx context.Context, identity *servermodels.Identity, fileID, uploadID string) (bool, error) {
+	stored := false
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		result, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
 			Set("multipart_upload_id = ?", uploadID).
 			Where("id = ? AND organization_id = ? AND created_by_user_id = ?", fileID, identity.Organization.ID, identity.User.ID).
-			Where("status = ? AND expires_at > now()", domain.FileStatusPending).Exec(ctx)
+			Where("status = ? AND expires_at > now() AND multipart_upload_id IS NULL", domain.FileStatusPending).Exec(ctx)
 		if err != nil {
 			return err
 		}
@@ -29,30 +29,10 @@ func (a *CreateUploadAction) SetMultipartUpload(ctx context.Context, identity *s
 		if err != nil {
 			return err
 		}
-		if count != 1 {
-			return ErrFileNotFound
-		}
+		stored = count == 1
 		return nil
 	})
-}
-
-// Cancel 将当前用户尚未发送的文件标记为待清理。
-func (a *CreateUploadAction) Cancel(ctx context.Context, identity *servermodels.Identity, fileID string) error {
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-			return err
-		}
-		// 已关联消息的文件由附件状态接口管理，不能直接清理。
-		_, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
-			Set("status = ?", domain.FileStatusDeleting).Set("expires_at = now()").Set("updated_at = now()").
-			Where("id = ? AND organization_id = ? AND created_by_user_id = ?", fileID, identity.Organization.ID, identity.User.ID).
-			Where("status IN (?, ?)", domain.FileStatusPending, domain.FileStatusUploaded).
-			Where("NOT EXISTS (SELECT 1 FROM message_attachments ma WHERE ma.file_id = f.id)").Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("cancel file upload: %w", err)
-		}
-		return nil
-	})
+	return stored, err
 }
 
 // UploadPartSize 返回有效分片的预期字节数。

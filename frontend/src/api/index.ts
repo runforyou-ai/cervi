@@ -13,12 +13,12 @@ export { loadIdentity, loadStartup, sessionPath } from "@/api/session"
 export {
   completeFileUpload,
   createFilePartUpload,
-  completeFileMultipartUpload,
+  prepareFileUpload,
+  FileTransfer,
   cancelFileUpload,
   uploadFileSlice,
   createFileUpload,
   uploadFile,
-  uploadFileContent,
 } from "@/api/uploads"
 export * from "@/api/agents"
 export * from "@/api/ai-providers"

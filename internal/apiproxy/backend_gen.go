@@ -52,12 +52,17 @@ func (b *Backend) CreateFilePartUpload(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
-// CompleteFileMultipartUpload 合并分片并确认临时文件上传完成。
-func (b *Backend) CompleteFileMultipartUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) (appservice.File, error) {
-	var output appservice.File
-	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/multipart/complete", nil, nil, &output)
+// PrepareFileUpload 为已有文件记录准备直传请求。
+func (b *Backend) PrepareFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) (appservice.FileUpload, error) {
+	var output appservice.FileUpload
+	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/upload", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
+}
+
+// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
+func (b *Backend) CompleteAttachmentUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/attachment-uploads/"+url.PathEscape(fileID)+"/complete", nil, nil, nil)
 }
 
 // CancelFileUpload 将未发送的临时文件交给清理任务。

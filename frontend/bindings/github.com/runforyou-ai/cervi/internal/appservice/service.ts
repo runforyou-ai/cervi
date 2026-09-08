@@ -71,10 +71,10 @@ export function CloseServiceSession(meta: $models.RequestMeta, conversationID: s
 }
 
 /**
- * CompleteFileMultipartUpload 合并分片并确认临时文件上传完成。
+ * CompleteAttachmentUpload 完成文件上传并激活原附件消息。
  */
-export function CompleteFileMultipartUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<$models.File> {
-    return $Call.ByID(3966989268, meta, fileID);
+export function CompleteAttachmentUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<void> {
+    return $Call.ByID(901775053, meta, fileID);
 }
 
 /**
@@ -670,6 +670,13 @@ export function MarkConversationRead(meta: $models.RequestMeta, conversationID: 
  */
 export function OpenExternalPage(meta: $models.RequestMeta, input: $models.ExternalPageInput): $CancellablePromise<void> {
     return $Call.ByID(1306697186, meta, input);
+}
+
+/**
+ * PrepareFileUpload 为已有文件记录准备直传请求。
+ */
+export function PrepareFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<$models.FileUpload> {
+    return $Call.ByID(3661257970, meta, fileID);
 }
 
 /**

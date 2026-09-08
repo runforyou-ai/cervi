@@ -5,6 +5,7 @@ package conversation
 import (
 	"time"
 
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -419,12 +420,20 @@ type AttachmentMessageResult struct {
 	Message        ConversationMessage
 }
 
+// AttachmentBatchItem 定义一条待创建的附件消息。
+type AttachmentBatchItem struct {
+	File            fileaction.UploadInput
+	ClientMessageID string
+	ImageWidth      int
+	ImageHeight     int
+}
+
 // AttachmentBatchInput 定义按选择顺序发送的文件和末尾说明。
 type AttachmentBatchInput struct {
-	BatchID          string
+	CaptionMessageID string
 	ConversationID   string
 	TargetIdentityID string
-	Attachments      []AttachmentMessageInput
+	Attachments      []AttachmentBatchItem
 	Body             string
 }
 

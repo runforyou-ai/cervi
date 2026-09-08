@@ -1,6 +1,7 @@
 //go:build server
 
-package file
+// Package filemaintenance 协调临时文件回收与业务引用释放。
+package filemaintenance
 
 import (
 	"context"

@@ -1135,7 +1135,7 @@ function ConversationThread({
   const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
   const outgoing = useOutgoingConversationMessages()
-  const { queue: attachmentQueue, jobs: attachmentJobs } = useAttachmentQueue()
+  const { queue: attachmentQueue, messages: attachmentJobs } = useAttachmentQueue()
   const invalidate = useResourceInvalidator()
   const aliveRef = useRef(true)
   const conversationID = conversation?.id ?? ""

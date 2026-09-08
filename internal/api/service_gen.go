@@ -21,7 +21,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/files/uploads", s.createFileUpload)
 	router.POST("/files/:fileID/complete", s.completeFileUpload)
 	router.POST("/files/:fileID/parts", s.createFilePartUpload)
-	router.POST("/files/:fileID/multipart/complete", s.completeFileMultipartUpload)
+	router.POST("/files/:fileID/upload", s.prepareFileUpload)
+	router.POST("/attachment-uploads/:fileID/complete", s.completeAttachmentUpload)
 	router.DELETE("/files/:fileID/upload", s.cancelFileUpload)
 	router.POST("/conversation-attachments", s.sendAttachmentMessage)
 	router.POST("/direct-attachment-batches", s.sendAttachmentBatch)
@@ -215,10 +216,15 @@ func (s *Service) createFilePartUpload(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// completeFileMultipartUpload 合并分片并确认临时文件上传完成。
-func (s *Service) completeFileMultipartUpload(c *gin.Context) {
-	output, err := s.application.CompleteFileMultipartUpload(c.Request.Context(), requestMeta(c), c.Param("fileID"))
+// prepareFileUpload 为已有文件记录准备直传请求。
+func (s *Service) prepareFileUpload(c *gin.Context) {
+	output, err := s.application.PrepareFileUpload(c.Request.Context(), requestMeta(c), c.Param("fileID"))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// completeAttachmentUpload 完成文件上传并激活原附件消息。
+func (s *Service) completeAttachmentUpload(c *gin.Context) {
+	writeEmpty(c, s.application.CompleteAttachmentUpload(c.Request.Context(), requestMeta(c), c.Param("fileID")))
 }
 
 // cancelFileUpload 将未发送的临时文件交给清理任务。

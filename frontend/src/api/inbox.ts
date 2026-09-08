@@ -24,6 +24,7 @@ import {
   SendAttachmentBatch,
   UpdateAttachmentUploads,
   ListAttachmentStates,
+  CompleteAttachmentUpload,
   GetAttachmentDownload,
   SendFirstAgentTextMessage,
   SendAgentTextMessage,
@@ -548,3 +549,6 @@ export async function listAttachmentStates(conversationID: string, messageIDs: s
  const result = await bind(ListAttachmentStates)(conversationID, { messageIds: messageIDs })
  return { states: asList(result.states) }
 }
+
+/** 完成上传并激活原附件消息。 */
+export const completeAttachmentUpload = bind(CompleteAttachmentUpload)

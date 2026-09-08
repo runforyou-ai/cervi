@@ -41,23 +41,58 @@ func (b *DirectBackend) CreateFileUpload(ctx context.Context, meta RequestMeta, 
 	if err != nil {
 		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
+	return b.prepareFileUpload(ctx, meta, identity, record, setting)
+}
+
+// PrepareFileUpload 在实际开始传输时取得上传请求，并复用已创建的分片会话。
+func (b *DirectBackend) PrepareFileUpload(ctx context.Context, meta RequestMeta, fileID string) (FileUpload, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return FileUpload{}, err
+	}
+	record, err := b.getFile.Execute(ctx, identity, fileID)
+	if err == nil && (record.CreatedByUserID != identity.User.ID || record.Status != string(domain.FileStatusPending) || record.Expired) {
+		err = fileaction.ErrFileNotFound
+	}
+	if err != nil {
+		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+	}
+	setting, err := b.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
+	if err != nil {
+		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+	}
+	return b.prepareFileUpload(ctx, meta, identity, record, setting)
+}
+
+// prepareFileUpload 为已解析的文件位置准备普通上传请求或分片会话。
+func (b *DirectBackend) prepareFileUpload(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record *servermodels.File, setting settingaction.S3Setting) (FileUpload, error) {
 	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, setting.PublicBaseURL)
 	if err != nil {
 		return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
 	if record.PartSize > 0 {
-		if backend == domain.FileStorageBackendS3 {
+		if record.StorageBackend == string(domain.FileStorageBackendS3) && record.MultipartUploadID == nil {
 			uploadID, err := serverfilecontent.CreateMultipart(ctx, s3FileConfig(setting), record.StorageKey, record.ContentType)
 			if err != nil {
 				return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 			}
-			if err := b.createFileUpload.SetMultipartUpload(ctx, identity, record.ID, uploadID); err != nil {
-				// 保存会话失败时清除已创建的远端分片会话。
-				cleanupCtx := context.WithoutCancel(ctx)
-				if cleanupErr := serverfilecontent.AbortMultipart(cleanupCtx, s3FileConfig(setting), record.StorageKey, uploadID); cleanupErr != nil {
-					slog.Warn("清除未保存的分片会话失败", "file_id", record.ID, "upload_id", uploadID, "error", cleanupErr)
+			stored, saveErr := b.createFileUpload.SetMultipartUpload(ctx, identity, record.ID, uploadID)
+			if !stored {
+				// 并发准备只保留一个会话，未采用的远端会话立即清理。
+				if cleanupErr := serverfilecontent.AbortMultipart(context.WithoutCancel(ctx), s3FileConfig(setting), record.StorageKey, uploadID); cleanupErr != nil {
+					slog.Warn("清除未保存的分片会话失败", "file_id", record.ID, "error", cleanupErr)
 				}
-				return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+				if saveErr != nil {
+					return FileUpload{}, b.fileOperationError(ctx, meta, saveErr, cervii18n.ErrorFileUploadCreateFailed)
+				}
+				current, err := b.getFile.Execute(ctx, identity, record.ID)
+				if err == nil && (current.MultipartUploadID == nil || current.Status != string(domain.FileStatusPending) || current.Expired) {
+					err = fileaction.ErrFileNotFound
+				}
+				if err != nil {
+					return FileUpload{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+				}
+				record = current
 			}
 		}
 		return FileUpload{File: fileFromModel(record, contentURL), PartSize: record.PartSize}, nil
@@ -75,10 +110,11 @@ func (b *DirectBackend) CompleteFileUpload(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return File{}, err
 	}
-	record, err := b.completeFileUpload.Execute(ctx, identity, fileID, b.statFile)
+	record, err := b.completeFileUpload.Execute(ctx, identity, fileID, b.finalizeFileContent)
 	if err != nil {
 		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
+	b.cleanupCompletedParts(record)
 	return b.completedFile(ctx, meta, record)
 }
 
@@ -171,5 +207,14 @@ func s3FileConfig(setting settingaction.S3Setting) serverfilecontent.S3Config {
 	return serverfilecontent.S3Config{
 		Endpoint: setting.Endpoint, Region: setting.Region, Bucket: setting.Bucket,
 		AccessKeyID: setting.AccessKeyID, SecretAccessKey: setting.SecretAccessKey, ForcePathStyle: setting.ForcePathStyle,
+	}
+}
+
+// cleanupCompletedParts 清除已经合并且已确认完成的本地分片。
+func (b *DirectBackend) cleanupCompletedParts(record *servermodels.File) {
+	if record.PartSize > 0 && record.StorageBackend == string(domain.FileStorageBackendLocal) {
+		if err := b.localFiles.DeleteParts(record.StorageKey); err != nil {
+			slog.Warn("清理已合并分片失败", "file_id", record.ID, "error", err)
+		}
 	}
 }

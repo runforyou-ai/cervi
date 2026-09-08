@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -57,20 +56,9 @@ func (b *DirectBackend) CreateFilePartUpload(ctx context.Context, meta RequestMe
 	return FileUploadRequest{Method: request.Method, URL: request.URL, Headers: request.Headers}, nil
 }
 
-// CompleteFileMultipartUpload 合并有序分片并核验最终文件。
-func (b *DirectBackend) CompleteFileMultipartUpload(ctx context.Context, meta RequestMeta, fileID string) (File, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return File{}, err
-	}
-	record, err := b.getFile.Execute(ctx, identity, fileID)
-	if err == nil && (record.CreatedByUserID != identity.User.ID || record.PartSize <= 0) {
-		err = fileaction.ErrFileNotFound
-	}
-	if err != nil {
-		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
-	}
-	completed, err := b.completeFileUpload.Execute(ctx, identity, fileID, func(ctx context.Context, record *servermodels.File) (string, int64, error) {
+// finalizeFileContent 合并尚未完成的分片并核验最终对象。
+func (b *DirectBackend) finalizeFileContent(ctx context.Context, record *servermodels.File) (string, int64, error) {
+	if record.PartSize > 0 {
 		if record.StorageBackend == string(domain.FileStorageBackendLocal) {
 			if err := b.localFiles.CompleteMultipart(ctx, record.StorageKey, record.ByteSize, record.PartSize); err != nil {
 				return "", 0, err
@@ -85,22 +73,13 @@ func (b *DirectBackend) CompleteFileMultipartUpload(ctx context.Context, meta Re
 			}
 			err = serverfilecontent.CompleteMultipart(ctx, s3FileConfig(setting), record.StorageKey, *record.MultipartUploadID, record.ByteSize, record.PartSize)
 			var missing *types.NoSuchUpload
-			// 合并响应丢失后会话已消失，通过最终对象大小确认上次合并结果。
+			// 合并响应丢失后，最终对象用于确认上一次合并结果。
 			if err != nil && !errors.As(err, &missing) {
 				return "", 0, fmt.Errorf("complete multipart upload: %w", err)
 			}
 		}
-		return b.statFile(ctx, record)
-	})
-	if err != nil {
-		return File{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
-	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
-		if err := b.localFiles.DeleteParts(record.StorageKey); err != nil {
-			slog.Warn("清理已合并分片失败", "file_id", record.ID, "error", err)
-		}
-	}
-	return b.completedFile(ctx, meta, completed)
+	return b.statFile(ctx, record)
 }
 
 // CancelFileUpload 将当前用户取消的临时文件交给过期清理。
@@ -112,7 +91,7 @@ func (b *DirectBackend) CancelFileUpload(ctx context.Context, meta RequestMeta, 
 	if _, err := b.getFile.Execute(ctx, identity, fileID); err != nil {
 		return b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
-	if err := b.createFileUpload.Cancel(ctx, identity, fileID); err != nil {
+	if err := b.cancelFileUpload.Execute(ctx, identity, fileID); err != nil {
 		return b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
 	return nil

@@ -358,7 +358,7 @@ export interface AgentWorkStatusInput {
  * AttachmentBatchInput 定义一批附件和末尾的独立说明消息。
  */
 export interface AttachmentBatchInput {
-    "batchId": string;
+    "captionMessageId": string;
     "conversationId": string;
     "targetIdentityId": string;
     "attachments": AttachmentBatchItem[] | null;
@@ -369,7 +369,9 @@ export interface AttachmentBatchInput {
  * AttachmentBatchItem 定义选定附件与图片展示尺寸。
  */
 export interface AttachmentBatchItem {
-    "fileId": string;
+    "fileName": string;
+    "contentType": string;
+    "byteSize": number;
     "clientMessageId": string;
     "imageWidth": number;
     "imageHeight": number;
