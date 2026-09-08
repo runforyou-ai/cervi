@@ -13,6 +13,7 @@ import (
 	"time"
 	"uuid"
 
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
@@ -64,7 +65,7 @@ func newCustomerDeliveryFixture(t *testing.T) customerDeliveryFixture {
 	if _, err := f.db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = 123, bot_token = '123:token', webhook_secret = 'secret' WHERE channel_id = ?", channel.ID); err != nil {
 		t.Fatal(err)
 	}
-	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, nil, nil)
+	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil)
 	if err := receiver.Execute(ctx, channel.ID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "你好", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}
@@ -389,7 +390,7 @@ func TestCustomerDeliveryBotMessageNamespace(t *testing.T) {
 	if _, err := f.db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = 456, bot_token = '456:token' WHERE channel_id = ?", f.channelID); err != nil {
 		t.Fatal(err)
 	}
-	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, nil, nil)
+	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil)
 	if err := receiver.Execute(ctx, f.channelID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "新机器人首条消息", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}

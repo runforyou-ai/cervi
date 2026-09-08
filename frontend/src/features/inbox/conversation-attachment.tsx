@@ -1,5 +1,5 @@
 /** 在时间线中展示附件、图片、说明和原地上传状态。 */
-import { CheckIcon, ClockIcon, RotateCcwIcon, XIcon } from "lucide-react"
+import { ClockIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -149,13 +149,7 @@ export function ConversationAttachment({
       <time dateTime={originatedAt} title={timeTitle}>
         {timeLabel}
       </time>
-      {!incoming ? (
-        ready ? (
-          <CheckIcon className="size-3.5" aria-label={t("attachmentSent")} />
-        ) : (
-          <ClockIcon className="size-3.5" />
-        )
-      ) : null}
+      {!incoming && !ready ? <ClockIcon className="size-3.5" /> : null}
     </span>
   )
   const detail = ready

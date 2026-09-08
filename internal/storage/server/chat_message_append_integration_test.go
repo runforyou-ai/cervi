@@ -14,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -135,7 +136,7 @@ func TestTelegramAppendUsesLocalSequence(t *testing.T) {
 	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 2, Message: &channelaction.TelegramWebhookMessage{
 		ChatID: 12345, SenderID: 12345, MessageID: 2, DisplayName: "Telegram 客户", Body: "晚到的旧消息", OriginatedAt: before.LastMessageAt.Add(-time.Hour),
 	}}
-	receive := channelaction.NewReceiveTelegramWebhookAction(f.db, nil, nil)
+	receive := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil)
 	for range 2 {
 		if err := receive.Execute(ctx, f.channelID, input); err != nil {
 			t.Fatal(err)

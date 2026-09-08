@@ -49,14 +49,15 @@ type telegramContactAvatarImporter interface {
 
 // ReceiveTelegramWebhookAction 认证 Telegram 回调并更新连接状态。
 type ReceiveTelegramWebhookAction struct {
-	db          *bun.DB
-	avatarAPI   telegram.ProfilePhotoAPI
-	avatarFiles telegramContactAvatarImporter
+	db             *bun.DB
+	agentScheduler conversationaction.CustomerAgentMessageScheduler
+	avatarAPI      telegram.ProfilePhotoAPI
+	avatarFiles    telegramContactAvatarImporter
 }
 
 // NewReceiveTelegramWebhookAction 创建 Telegram Webhook 接收操作。
-func NewReceiveTelegramWebhookAction(db *bun.DB, avatarAPI telegram.ProfilePhotoAPI, avatarFiles telegramContactAvatarImporter) *ReceiveTelegramWebhookAction {
-	return &ReceiveTelegramWebhookAction{db: db, avatarAPI: avatarAPI, avatarFiles: avatarFiles}
+func NewReceiveTelegramWebhookAction(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, avatarAPI telegram.ProfilePhotoAPI, avatarFiles telegramContactAvatarImporter) *ReceiveTelegramWebhookAction {
+	return &ReceiveTelegramWebhookAction{db: db, agentScheduler: agentScheduler, avatarAPI: avatarAPI, avatarFiles: avatarFiles}
 }
 
 // Preflight 在读取请求体前校验渠道和当前 Secret。
@@ -113,6 +114,12 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 				}
 				ignoredConflict = true
 			} else {
+				// 仅新入站消息触发 AI 客服，回调重放不追加运行输入。
+				if received.Inserted {
+					if _, err := a.agentScheduler.ScheduleCustomerAuto(ctx, tx, channel.OrganizationID, received.Message.ConversationID, received.Session.ID, received.Message.ID); err != nil {
+						return fmt.Errorf("schedule Telegram customer agent: %w", err)
+					}
+				}
 				avatarIdentityID = received.ChannelIdentityID
 				avatarOrganizationID = channel.OrganizationID
 				avatarCreatedByUserID = channel.CreatedByUserID

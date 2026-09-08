@@ -134,23 +134,23 @@ function AgentTool({ call }: { call: AgentToolCall }) {
   )
 }
 
-/** 按服务端块顺序展示一个默认折叠的已完成思考区域。 */
+/** 沿头像侧对齐思考标题，按服务端块顺序展开思考过程。 */
 export function AgentProcess({ process, incoming }: { process: ConversationAgentProcessData; incoming: boolean }) {
   const { t, i18n } = useTranslation("inbox")
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
   return (
     <Collapsible className="mb-3 min-w-0">
       <CollapsibleTrigger className={cn(
-        "group flex w-full items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
-        incoming ? "text-muted-foreground" : "text-primary-foreground/75",
+        "group flex w-full cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
+        incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
       )}>
         <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
         <span>{t("agentThoughtCompleted", { seconds })}</span>
         <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>
       <CollapsibleContent className={cn(
-        "mt-2 space-y-3 border-l pl-3 text-sm",
-        incoming ? "border-border" : "border-primary-foreground/30",
+        "mt-2 space-y-3 text-left text-sm",
+        incoming ? "border-l border-border pl-3" : "border-r border-primary-foreground/30 pr-3",
       )}>
         {process.blocks.map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
@@ -179,7 +179,7 @@ export function AgentProcessUsage({ process, incoming }: { process: Conversation
   return (
     <div className={cn(
       "mt-2 flex gap-4 text-[11px]",
-      incoming ? "text-muted-foreground" : "text-primary-foreground/75",
+      incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
     )}>
       <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
       <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
@@ -204,7 +204,9 @@ export function AgentRunState({ run, incoming, conversationID, onStopped }: { ru
     ? t("agentRunAssigneeChanged")
     : run.errorCode === "session_closed"
       ? t("agentRunSessionClosed")
-      : run.lastError
+      : run.errorCode === "bot_changed"
+        ? t("agentRunBotChanged")
+        : run.lastError
   return (
     <div
       className={cn("mt-3 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}

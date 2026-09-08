@@ -42,12 +42,12 @@ type ReceiveWebsiteCustomerTextMessageAction struct {
 	agentScheduler CustomerAgentMessageScheduler
 }
 
-// CustomerAgentMessageScheduler 把网站客户消息加入当前 AI 客服的持久输入流。
+// CustomerAgentMessageScheduler 把渠道客户消息加入当前 AI 客服的持久输入流。
 type CustomerAgentMessageScheduler interface {
 	ScheduleCustomerAuto(context.Context, bun.IDB, string, string, string, string) (bool, error)
 }
 
-// AgentMessageScheduler 同时调度内部单聊和网站客户 Agent 输入。
+// AgentMessageScheduler 同时调度内部单聊和渠道客户 Agent 输入。
 type AgentMessageScheduler interface {
 	AgentChatMessageScheduler
 	CustomerAgentMessageScheduler

@@ -79,6 +79,8 @@ export function CustomerDeliveryState({
   const state = failed || uncertain || delivery?.paused || showLoadError
     ? "attention"
     : delivery?.status === CustomerDeliveryStatus.CustomerDeliverySent ? "sent" : "sending"
+  // 发送成功后只保留消息时间，发送中和异常状态继续提示。
+  if (state === "sent") return null
   let detail: string | undefined
   if (localFailed) detail = t("messageSendError")
   else if (showLoadError) detail = t("deliveryLoadError")

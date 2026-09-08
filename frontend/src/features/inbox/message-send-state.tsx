@@ -1,19 +1,19 @@
-/** 在消息气泡内用统一图标展示发送结果。 */
-import { CheckIcon, CircleAlertIcon, Clock3Icon } from "lucide-react"
+/** 在消息气泡内展示发送中和异常状态。 */
+import { CircleAlertIcon, Clock3Icon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
-/** 展示三种产品状态，并在悬停或聚焦时说明具体原因。 */
+/** 展示发送中或异常图标，并在悬停或聚焦时说明具体原因。 */
 export function MessageSendState({
   state, detail,
 }: {
-  state: "sending" | "sent" | "attention"
+  state: "sending" | "attention"
   detail?: string
 }) {
   const { t } = useTranslation("inbox")
   const label = t("messageSendState", { context: state })
-  const Icon = state === "sent" ? CheckIcon : state === "attention" ? CircleAlertIcon : Clock3Icon
+  const Icon = state === "attention" ? CircleAlertIcon : Clock3Icon
 
   return (
     <Tooltip>

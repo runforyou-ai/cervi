@@ -2,10 +2,12 @@
 
 ## 1. 文档状态
 
-- 状态：提案
+- 状态：网站首轮已完成；Telegram 扩展见 [Telegram 渠道方案](telegram-channel-integration-plan.md)
 - 目标阶段：Agent P1b
 - 交付范围：网站客户会话中的 AI 员工自动履职
 - 前置能力：Agent Direct 运行时、通用客户会话负责人工作流、网站访客轮询
+
+本文保留 P1b 网站首轮的设计边界。当前 Telegram 已支持人工与 AI 客服文本收发，文中仅网站开放 Agent 的限制不再代表当前实现。
 
 ## 2. 背景与原则
 

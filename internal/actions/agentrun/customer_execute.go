@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -26,6 +27,11 @@ type customerRunPolicy struct {
 
 // lockContext 锁定客户 Agent 所属会话的当前客服周期。
 func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentRunPolicyContext, error) {
+	// Telegram 先锁渠道和渠道身份，再锁会话，协调配置、入站和人工回复。
+	route, err := deliveryaction.Prepare(ctx, db, run.OrganizationID, run.ConversationID)
+	if err != nil {
+		return agentRunPolicyContext{}, err
+	}
 	conversation, err := chatstate.LockCustomerConversation(ctx, db, run.OrganizationID, run.ConversationID)
 	if err != nil {
 		return agentRunPolicyContext{}, err
@@ -34,7 +40,7 @@ func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *ser
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}
-	return agentRunPolicyContext{Conversation: conversation, ServiceSession: session}, nil
+	return agentRunPolicyContext{Conversation: conversation, ServiceSession: session, DeliveryRoute: route}, nil
 }
 
 // prepareLocked 校验客户运行仍属于当前负责人，并收敛已经失效的运行。
@@ -76,6 +82,12 @@ func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, polic
 	)
 	if err != nil || !inserted {
 		return err
+	}
+	// 正常回复与持久投递共享事务，内部失败消息不发送给客户。
+	if messageType == domain.MessageTypeText && policyContext.DeliveryRoute.ChannelType == domain.ChannelTypeTelegram {
+		if err := deliveryaction.Enqueue(ctx, db, p.enqueuer, policyContext.DeliveryRoute, message); err != nil {
+			return err
+		}
 	}
 	// 只有推进周期摘要的正常回复记录首响，失败消息不计入首响。
 	if message.Type == string(domain.MessageTypeText) {
