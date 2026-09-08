@@ -1,6 +1,5 @@
 /** 移动端统一会话摘要列表和内部聊天入口。 */
-import { useEffect, useMemo, useRef, useState } from "react"
-import type { TFunction } from "i18next"
+import { useEffect, useRef } from "react"
 import { PlusIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
@@ -41,8 +40,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { useUserTimeZone } from "@/contexts/user-preferences"
-import { previousDayKey } from "@/features/inbox/calendar"
+import { sessionStatusLabel } from "@/features/inbox/session-status-label"
+import { useConversationTime, useMinuteTick } from "@/features/inbox/use-conversation-time"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
   memberChatPollingInterval,
@@ -68,81 +67,6 @@ function isMobileInboxConversation(
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation)
   )
-}
-
-/** 返回客服处理状态的移动端文案。 */
-function sessionStatusLabel(
-  status: ServiceSessionStatus,
-  t: TFunction<"inbox">,
-) {
-  switch (status) {
-    case ServiceSessionStatus.ServiceSessionStatusOpen:
-      return t("sessionStatus.open")
-    case ServiceSessionStatus.ServiceSessionStatusClosed:
-      return t("sessionStatus.closed")
-    default:
-      console.warn("未知的客服处理状态", status)
-      return ""
-  }
-}
-
-/** 按移动端消息列表习惯格式化最近消息时间。 */
-function useConversationTime() {
-  const { t, i18n } = useTranslation("inbox")
-  const timeZone = useUserTimeZone()
-
-  return useMemo(() => {
-    const locale = i18n.resolvedLanguage
-    const relative = new Intl.RelativeTimeFormat(locale, { numeric: "always" })
-    const monthDay = new Intl.DateTimeFormat(locale, {
-      timeZone,
-      month: "numeric",
-      day: "numeric",
-    })
-    const fullDate = new Intl.DateTimeFormat(locale, {
-      timeZone,
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-    })
-    const dayKey = new Intl.DateTimeFormat("en-CA", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-
-    return (value: string | null) => {
-      if (!value) return ""
-      const date = new Date(value)
-      const now = new Date()
-      const elapsedMs = now.getTime() - date.getTime()
-      if (elapsedMs < 60_000) return t("justNow")
-      if (elapsedMs < 3_600_000) {
-        return relative.format(-Math.floor(elapsedMs / 60_000), "minute")
-      }
-      const day = dayKey.format(date)
-      if (day === dayKey.format(now)) {
-        return relative.format(-Math.floor(elapsedMs / 3_600_000), "hour")
-      }
-      if (day === previousDayKey(dayKey.format(now))) {
-        return t("yesterday")
-      }
-      if (day.slice(0, 4) === dayKey.format(now).slice(0, 4)) {
-        return monthDay.format(date)
-      }
-      return fullDate.format(date)
-    }
-  }, [i18n.resolvedLanguage, t, timeZone])
-}
-
-/** 每分钟刷新一次相对时间。 */
-function useMinuteTick() {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const timer = window.setInterval(() => setTick((tick) => tick + 1), 60_000)
-    return () => window.clearInterval(timer)
-  }, [])
 }
 
 /** 渲染会话摘要，内部聊天进入详情，客户会话保留只读摘要。 */

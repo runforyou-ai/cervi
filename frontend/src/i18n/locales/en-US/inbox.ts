@@ -94,7 +94,6 @@ const inbox = {
   groupMembersRequired: "Select at least one member",
   groupMembersTooMany: "A group chat can contain up to 100 members",
   groupMembersSelected: "{{count}} selected",
-  groupMembersLoading: "Loading members",
   groupMembersLoadError: "Could not load members",
   groupMembersEmpty: "No available members match your search",
   groupCreateError: "Could not create the group chat. Try again.",

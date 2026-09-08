@@ -15,6 +15,7 @@ import type { ContactScope } from "@/features/contacts/contact-scope"
 import { ContactForm } from "@/features/contacts/external/contact-form"
 import { MemberForm } from "@/features/contacts/members/member-form"
 import { TeamForm } from "@/features/contacts/teams/team-form"
+import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -39,6 +40,7 @@ export function ContactCreateDialogs({
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
+  const invalidateContact = useContactInvalidator()
   const creating = searchParams.get("new") === "1"
   const creatingAgent = searchParams.get("newAgent") === "1"
   const creatingTeam = searchParams.get("newTeam") === "1"
@@ -69,13 +71,7 @@ export function ContactCreateDialogs({
               defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
               onSaved={() => {
                 setParameters({ new: null })
-                void invalidate(resourceKeys.users())
-                void invalidate(resourceKeys.teamMembers())
-                void invalidate(resourceKeys.teamMemberCandidates())
-                void invalidate(resourceKeys.teams())
-                void invalidate(resourceKeys.roles())
-                void invalidate(resourceKeys.roleMembers())
-                void invalidate(resourceKeys.customerServiceAssignees())
+                void invalidateContact("user")
               }}
               onCancel={() => setParameters({ new: null })}
             />
@@ -109,13 +105,7 @@ export function ContactCreateDialogs({
             defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
             onSaved={() => {
               setParameters({ newAgent: null })
-              void invalidate(resourceKeys.agents())
-              void invalidate(resourceKeys.teamMembers())
-              void invalidate(resourceKeys.teamMemberCandidates())
-              void invalidate(resourceKeys.teams())
-              void invalidate(resourceKeys.roles())
-              void invalidate(resourceKeys.roleMembers())
-              void invalidate(resourceKeys.customerServiceAssignees())
+              void invalidateContact("agent")
             }}
             onCancel={() => setParameters({ newAgent: null })}
           />

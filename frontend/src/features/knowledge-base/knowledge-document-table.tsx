@@ -5,6 +5,7 @@ import { Link } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { KnowledgeDocumentData, KnowledgeDocumentListData } from "@/api"
 import { StatusBadge } from "@/components/status-badge"
+import { PageControls } from "@/components/page-controls"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -33,7 +34,6 @@ export function KnowledgeDocumentTable({
   onPage: (page: number) => void
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
-  const pages = Math.max(1, Math.ceil(data.page.total / data.page.size))
   return (
     <div className="overflow-hidden rounded-lg border bg-card" aria-busy={refreshing}>
       <Table>
@@ -68,28 +68,7 @@ export function KnowledgeDocumentTable({
           )}
         </TableBody>
       </Table>
-      <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
-        <span>{t("common:pagination.total", { count: data.page.total })}</span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={refreshing || data.page.number <= 1}
-            onClick={() => onPage(data.page.number - 1)}
-          >
-            {t("common:pagination.previous")}
-          </Button>
-          <span>{t("common:pagination.page", { current: data.page.number, total: pages })}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={refreshing || data.page.number >= pages}
-            onClick={() => onPage(data.page.number + 1)}
-          >
-            {t("common:pagination.next")}
-          </Button>
-        </div>
-      </div>
+      <PageControls page={data.page} disabled={refreshing} onPageChange={onPage} />
     </div>
   )
 }
