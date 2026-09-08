@@ -14,6 +14,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -263,8 +264,8 @@ func (a *ExecuteAction) policyForRun(run *servermodels.AgentRun) (agentRunPolicy
 	}
 }
 
-// insertAgentMessage 写入一条带运行幂等键的 Agent 结果消息。
-func insertAgentMessage(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, messageID, participantID string, messageType domain.MessageType, content string, serviceSessionID *string) (*servermodels.Message, error) {
+// appendAgentMessage 在 Run 终态门禁通过后追加结果消息，与运行终态共用事务。
+func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, run *servermodels.AgentRun, messageID, participantID string, messageType domain.MessageType, content string, serviceSessionID *string) (*servermodels.Message, bool, error) {
 	idempotencyKey := "agent:" + run.ID
 	message := &servermodels.Message{
 		ID: messageID, OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
@@ -272,28 +273,7 @@ func insertAgentMessage(ctx context.Context, db bun.IDB, run *servermodels.Agent
 		Type: string(messageType), Body: content, IdempotencyKey: &idempotencyKey,
 		OriginatedAt: time.Now().UTC(),
 	}
-	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at").
-		Returning("*").Exec(ctx); err != nil {
-		return nil, fmt.Errorf("create agent result message: %w", err)
-	}
-	return message, nil
-}
-
-// updateConversationAfterAgentResponse 按消息稳定顺序更新会话摘要。
-func updateConversationAfterAgentResponse(ctx context.Context, db bun.IDB, message *servermodels.Message) error {
-	if _, err := db.NewUpdate().Model((*servermodels.Conversation)(nil)).
-		Set("last_message_id = ?", message.ID).
-		Set("last_message_at = ?", message.OriginatedAt).
-		Set("last_message_source_order = ?", message.SourceOrder).
-		Set("updated_at = now()").
-		Where("id = ?", message.ConversationID).
-		Where("organization_id = ?", message.OrganizationID).
-		Where("last_message_at IS NULL OR (last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("update conversation after agent response: %w", err)
-	}
-	return nil
+	return chatstate.AppendMessage(ctx, db, conversation, message)
 }
 
 // complete 按运行策略抑制失效结果或原子写入回复并推进消费序号。

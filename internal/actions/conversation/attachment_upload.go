@@ -103,11 +103,7 @@ func updateAttachmentUpload(ctx context.Context, tx bun.Tx, identity *servermode
 		if _, err := tx.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Set("updated_at = now()").Where("id = ?", row.MessageID).Exec(ctx); err != nil {
 			return err
 		}
-		// 撤去尚未完成的末条附件时，摘要回到当前最后一条可见消息。
-		if _, err := tx.NewRaw(`UPDATE conversations SET (last_message_id, last_message_at, last_message_source_order) =
- (SELECT latest.id, latest.originated_at, COALESCE(latest.source_order, 0) FROM (SELECT 1) AS anchor LEFT JOIN LATERAL
- (SELECT id, originated_at, source_order FROM messages WHERE organization_id = ? AND conversation_id = ? AND deleted_at IS NULL ORDER BY originated_at DESC, source_order DESC, id DESC LIMIT 1) latest ON true), updated_at = now()
- WHERE organization_id = ? AND id = ? AND last_message_id = ?`, identity.Organization.ID, row.ConversationID, identity.Organization.ID, row.ConversationID, row.MessageID).Exec(ctx); err != nil {
+		if err := chatstate.RecomputeConversationSummary(ctx, tx, member.Conversation, row.MessageID); err != nil {
 			return err
 		}
 	}

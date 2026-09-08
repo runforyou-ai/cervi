@@ -22,6 +22,7 @@ import (
 var errAgentRunSuppressed = errors.New("agent run suppressed")
 
 type agentRunPolicyContext struct {
+	Conversation       *servermodels.Conversation
 	ServiceSession     *servermodels.ServiceSession
 	AgentParticipantID string
 }

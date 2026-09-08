@@ -179,11 +179,13 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID
 	}
-	if _, err := tx.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "reply_to_message_id", "idempotency_key", "originated_at").
-		Returning("*").
-		Exec(ctx); err != nil {
-		return ConversationMessage{}, fmt.Errorf("create member customer message: %w", err)
+	message, inserted, err := chatstate.AppendMessage(ctx, tx, conversation, message)
+	if err != nil {
+		return ConversationMessage{}, err
+	}
+	if !inserted {
+		saved, _, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, true)
+		return saved, err
 	}
 	if route.ChannelType == domain.ChannelTypeTelegram {
 		if err := deliveryaction.Enqueue(ctx, tx, a.enqueuer, route, message); err != nil {
@@ -198,12 +200,6 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		Where("organization_id = ?", session.OrganizationID).
 		Exec(ctx); err != nil {
 		return ConversationMessage{}, fmt.Errorf("record first member response: %w", err)
-	}
-	if err := updateSessionSummary(ctx, tx, session, message); err != nil {
-		return ConversationMessage{}, err
-	}
-	if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
-		return ConversationMessage{}, err
 	}
 	result := memberConversationMessage(message, subject.ID, identity.OrganizationIdentity)
 	result.ReplyTo = replyTo
