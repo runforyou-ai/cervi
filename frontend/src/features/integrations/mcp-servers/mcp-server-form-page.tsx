@@ -1,5 +1,5 @@
 /** MCP 服务新增与编辑页。 */
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -13,6 +13,7 @@ import {
   getMCPServer,
   isApiError,
   updateMCPServer,
+  testMCPServerConnection,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -39,6 +40,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
   const { mcpServerId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
   const mounted = useRef(true)
+  const [testing, setTesting] = useState(false)
   const schema = useMemo(
     () =>
       createMCPServerSchema({
@@ -95,8 +97,26 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
     }
   }, [])
 
-  /** 创建或保存 MCP 服务。 */
+  /** 测试当前未保存的连接配置。 */
+  async function testConnection() {
+    if (testing || form.formState.isSubmitting) return
+    if (!(await form.trigger(["url", "serverType", "authorizationToken"], { shouldFocus: true }))) return
+    setTesting(true)
+    try {
+      const { url, serverType, authorizationToken } = form.getValues()
+      await testMCPServerConnection({ url, serverType, authorizationToken })
+      if (mounted.current) toast.success(t("mcpServer.connection.success"))
+    } catch (error) {
+      if (!mounted.current || recoverSession(error, navigate)) return
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t("mcpServer.connection.error"))
+    } finally {
+      if (mounted.current) setTesting(false)
+    }
+  }
+
+  /** 创建或保存 MCP 服务，并由服务端提交工具更新任务。 */
   async function save(values: MCPServerFormValues) {
+    if (testing) return
     try {
       const saved =
         mode === "create"
@@ -175,12 +195,14 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
               <FormInputField
                 name="name"
                 control={form.control}
+                disabled={testing || form.formState.isSubmitting}
                 label={t("mcpServer.form.name")}
                 autoFocus={mode === "create"}
               />
               <FormInputField
                 name="url"
                 control={form.control}
+                disabled={testing || form.formState.isSubmitting}
                 label={t("mcpServer.form.url")}
                 inputMode="url"
               />
@@ -195,6 +217,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
                     <NativeSelect
                       {...field}
                       id="serverType"
+                      disabled={testing || form.formState.isSubmitting}
                       required
                       aria-invalid={fieldState.invalid}
                     >
@@ -213,6 +236,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
               <FormInputField
                 name="authorizationToken"
                 control={form.control}
+                disabled={testing || form.formState.isSubmitting}
                 label={t("mcpServer.form.authorizationToken")}
                 required={false}
                 autoComplete="new-password"
@@ -223,13 +247,21 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
               />
             </FieldGroup>
             <div className="flex items-center gap-2">
-              <Button type="submit" disabled={form.formState.isSubmitting}>
+              <Button type="submit" disabled={testing || form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? (
                   <LoaderCircleIcon className="animate-spin" />
                 ) : null}
                 {form.formState.isSubmitting
                   ? t("common:actions.saving")
                   : t("common:actions.save")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={testing || form.formState.isSubmitting}
+                onClick={() => void testConnection()}
+              >
+                {testing ? t("mcpServer.connection.testing") : t("mcpServer.connection.test")}
               </Button>
               <Button type="button" variant="outline" asChild>
                 <Link to={listPath}>{t("common:actions.cancel")}</Link>

@@ -148,6 +148,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.DELETE("/integrations/business-systems/:businessSystemID", s.deleteBusinessSystem)
 	router.GET("/integrations/mcp-servers", s.listMCPServers)
 	router.GET("/integrations/mcp-servers/:mcpServerID", s.getMCPServer)
+	router.POST("/integrations/mcp-servers/test-connection", s.testMCPServerConnection)
+	router.POST("/integrations/mcp-servers/:mcpServerID/test-connection", s.testSavedMCPServerConnection)
+	router.POST("/integrations/mcp-servers/refresh-tools", s.refreshMCPServerTools)
 	router.POST("/integrations/mcp-servers", s.createMCPServer)
 	router.PUT("/integrations/mcp-servers/:mcpServerID", s.updateMCPServer)
 	router.DELETE("/integrations/mcp-servers/:mcpServerID", s.deleteMCPServer)
@@ -1245,6 +1248,25 @@ func (s *Service) listMCPServers(c *gin.Context) {
 func (s *Service) getMCPServer(c *gin.Context) {
 	output, err := s.application.GetMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID"))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// testMCPServerConnection 测试 MCP 草稿连接配置。
+func (s *Service) testMCPServerConnection(c *gin.Context) {
+	var input appservice.MCPServerConnectionInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.TestMCPServerConnection(c.Request.Context(), requestMeta(c), input))
+}
+
+// testSavedMCPServerConnection 测试已保存的 MCP 服务。
+func (s *Service) testSavedMCPServerConnection(c *gin.Context) {
+	writeEmpty(c, s.application.TestSavedMCPServerConnection(c.Request.Context(), requestMeta(c), c.Param("mcpServerID")))
+}
+
+// refreshMCPServerTools 提交当前企业的 MCP 工具更新任务。
+func (s *Service) refreshMCPServerTools(c *gin.Context) {
+	writeEmpty(c, s.application.RefreshMCPServerTools(c.Request.Context(), requestMeta(c)))
 }
 
 // createMCPServer 创建 MCP 服务。

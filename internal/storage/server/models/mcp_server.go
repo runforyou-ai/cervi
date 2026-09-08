@@ -19,6 +19,11 @@ type MCPServer struct {
 	URL                string               `bun:"url"`
 	ServerType         domain.MCPServerType `bun:"server_type"`
 	AuthorizationToken string               `bun:"authorization_token"`
+	Tools              []domain.MCPTool     `bun:"tools,type:jsonb"`
+	ToolsUpdatedAt     *time.Time           `bun:"tools_updated_at"`
+	ToolsRefreshID     *string              `bun:"tools_refresh_id"`
+	ToolsFailure       string               `bun:"tools_failure"`
 	CreatedAt          time.Time            `bun:"created_at"`
-	UpdatedAt          time.Time            `bun:"updated_at"`
+	// UpdatedAt 记录配置保存时间，工具目录使用 ToolsUpdatedAt。
+	UpdatedAt time.Time `bun:"updated_at"`
 }

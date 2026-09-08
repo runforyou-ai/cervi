@@ -31,6 +31,7 @@ import (
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -166,6 +167,8 @@ type DirectBackend struct {
 	createMCPServer                   *mcpserveraction.CreateMCPServerAction
 	updateMCPServer                   *mcpserveraction.UpdateMCPServerAction
 	deleteMCPServer                   *mcpserveraction.DeleteMCPServerAction
+	testMCPServerConnection           *mcpserveraction.TestConnectionAction
+	refreshMCPServerTools             *mcpserveraction.RefreshToolsAction
 	updateOrganization                *organizationaction.UpdateOrganizationAction
 	getS3Setting                      *settingaction.GetS3SettingQuery
 	saveS3Setting                     *settingaction.SaveS3SettingAction
@@ -178,14 +181,16 @@ type DirectBackend struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, deliveryEnqueuer servertask.TxEnqueuer) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
 	telegramAPI := telegram.NewClient(connectionClient)
+	mcpTest := mcpserveraction.NewTestConnectionAction(mcpintegration.NewClient())
+	mcpScheduler := mcpserveraction.NewToolsScheduler(taskEnqueuer)
 	return &DirectBackend{
 		agentCoordinator:                  agentCoordinator,
-		customerDeliveries:                deliveryaction.NewManager(db, deliveryEnqueuer),
+		customerDeliveries:                deliveryaction.NewManager(db, taskEnqueuer),
 		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
 		login:                             authaction.NewLoginAction(db),
 		logout:                            authaction.NewLogoutAction(db),
@@ -200,7 +205,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		pendingConversationMentions:       conversationaction.NewListPendingConversationMentionsQuery(db),
 		reviewConversationMention:         conversationaction.NewMarkConversationMentionReviewedAction(db),
 		updateConversationNotifications:   conversationaction.NewUpdateConversationNotificationSettingsAction(db),
-		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db, deliveryEnqueuer),
+		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db, taskEnqueuer),
 		claimServiceSession:               conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),
 		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
 		closeServiceSession:               conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),
@@ -299,9 +304,11 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		deleteBusinessSystem:              businesssystemaction.NewDeleteBusinessSystemAction(db),
 		listMCPServers:                    mcpserveraction.NewListMCPServersQuery(db),
 		getMCPServer:                      mcpserveraction.NewGetMCPServerQuery(db),
-		createMCPServer:                   mcpserveraction.NewCreateMCPServerAction(db),
-		updateMCPServer:                   mcpserveraction.NewUpdateMCPServerAction(db),
+		createMCPServer:                   mcpserveraction.NewCreateMCPServerAction(db, mcpTest, mcpScheduler),
+		updateMCPServer:                   mcpserveraction.NewUpdateMCPServerAction(db, mcpTest, mcpScheduler),
 		deleteMCPServer:                   mcpserveraction.NewDeleteMCPServerAction(db),
+		testMCPServerConnection:           mcpTest,
+		refreshMCPServerTools:             mcpserveraction.NewRefreshToolsAction(db, mcpScheduler),
 		updateOrganization:                organizationaction.NewUpdateOrganizationAction(db),
 		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),

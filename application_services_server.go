@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
+	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
@@ -37,6 +39,10 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}
 	resolveFileS3 := newFileContentS3ConfigResolver(appStorage.DB())
 	tasks := servertask.New(appStorage.DB(), config.NATS)
+	updateMCPTools := mcpserveraction.NewUpdateToolsAction(appStorage.DB(), mcpintegration.NewClient())
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, updateMCPTools.Execute, updateMCPTools.FinalizeFailure); err != nil {
+		return nil, err
+	}
 	agentRuntime, err := agentruntime.New()
 	if err != nil {
 		return nil, err

@@ -5,6 +5,9 @@ import {
   GetMCPServer,
   ListMCPServers,
   UpdateMCPServer,
+  TestMCPServerConnection,
+  TestSavedMCPServerConnection,
+  RefreshMCPServerTools,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   MCPServer,
@@ -27,7 +30,7 @@ export function listMCPServers() {
   return listMCPServersBound().then(
     (output): MCPServerListData => ({
       ...output,
-      mcpServers: asList(output.mcpServers),
+      mcpServers: asList(output.mcpServers).map((server) => ({ ...server, tools: asList(server.tools) })),
     }),
   )
 }
@@ -43,3 +46,12 @@ export const updateMCPServer = bind(UpdateMCPServer)
 
 /** 删除 MCP 服务。 */
 export const deleteMCPServer = bind(DeleteMCPServer)
+
+/** 测试 MCP 草稿连接配置。 */
+export const testMCPServerConnection = bind(TestMCPServerConnection)
+
+/** 测试已保存的 MCP 服务连接。 */
+export const testSavedMCPServerConnection = bind(TestSavedMCPServerConnection)
+
+/** 提交全部 MCP 服务的工具更新任务。 */
+export const refreshMCPServerTools = bind(RefreshMCPServerTools)

@@ -736,6 +736,13 @@ export function ReadInboxConversations(meta: $models.RequestMeta, input: $models
 }
 
 /**
+ * RefreshMCPServerTools 提交当前企业的 MCP 工具更新任务。
+ */
+export function RefreshMCPServerTools(meta: $models.RequestMeta): $CancellablePromise<void> {
+    return $Call.ByID(3429373167, meta);
+}
+
+/**
  * RemoveGroupConversationMember 移除单个群聊成员。
  */
 export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {
@@ -883,10 +890,24 @@ export function TestAIProviderConnection(meta: $models.RequestMeta, input: $mode
 }
 
 /**
+ * TestMCPServerConnection 测试 MCP 草稿连接配置。
+ */
+export function TestMCPServerConnection(meta: $models.RequestMeta, input: $models.MCPServerConnectionInput): $CancellablePromise<void> {
+    return $Call.ByID(2900402005, meta, input);
+}
+
+/**
  * TestS3Setting 测试对象存储连接。
  */
 export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<void> {
     return $Call.ByID(944621916, meta, input);
+}
+
+/**
+ * TestSavedMCPServerConnection 测试已保存的 MCP 服务。
+ */
+export function TestSavedMCPServerConnection(meta: $models.RequestMeta, mcpServerID: string): $CancellablePromise<void> {
+    return $Call.ByID(2055787012, meta, mcpServerID);
 }
 
 /**

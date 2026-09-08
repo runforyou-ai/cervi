@@ -424,6 +424,16 @@ type Backend interface {
 	// GetMCPServer 返回当前企业中的 MCP 服务详情。
 	//cervi:route GET /integrations/mcp-servers/:mcpServerID
 	GetMCPServer(context.Context, RequestMeta, string) (MCPServer, error)
+	// TestMCPServerConnection 测试 MCP 草稿连接配置。
+	//cervi:route POST /integrations/mcp-servers/test-connection
+	TestMCPServerConnection(context.Context, RequestMeta, MCPServerConnectionInput) error
+	// TestSavedMCPServerConnection 测试已保存的 MCP 服务。
+	//cervi:route POST /integrations/mcp-servers/:mcpServerID/test-connection
+	TestSavedMCPServerConnection(context.Context, RequestMeta, string) error
+	// RefreshMCPServerTools 提交当前企业的 MCP 工具更新任务。
+	//cervi:route POST /integrations/mcp-servers/refresh-tools
+	RefreshMCPServerTools(context.Context, RequestMeta) error
+
 	// CreateMCPServer 创建 MCP 服务。
 	//cervi:route POST /integrations/mcp-servers status=201
 	CreateMCPServer(context.Context, RequestMeta, MCPServerInput) (MCPServer, error)

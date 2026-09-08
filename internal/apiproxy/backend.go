@@ -117,9 +117,16 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 // normalizeOutput 按响应类型将远程响应中的相对文件地址转换为企业服务器绝对地址。
 func (b *Backend) normalizeOutput(output any) {
 	switch value := output.(type) {
+	case *appservice.MCPServer:
+		if value.Tools == nil {
+			value.Tools = []appservice.MCPTool{}
+		}
 	case *appservice.MCPServerList:
 		if value.MCPServers == nil {
 			value.MCPServers = []appservice.MCPServer{}
+		}
+		for i := range value.MCPServers {
+			b.normalizeOutput(&value.MCPServers[i])
 		}
 	case *appservice.KnowledgeDocumentList:
 		if value.Documents == nil {

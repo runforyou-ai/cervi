@@ -14,12 +14,14 @@ import (
 
 // CreateMCPServerAction 创建 MCP 服务。
 type CreateMCPServerAction struct {
-	db *bun.DB
+	db        *bun.DB
+	test      *TestConnectionAction
+	scheduler *ToolsScheduler
 }
 
 // NewCreateMCPServerAction 创建 MCP 服务操作。
-func NewCreateMCPServerAction(db *bun.DB) *CreateMCPServerAction {
-	return &CreateMCPServerAction{db: db}
+func NewCreateMCPServerAction(db *bun.DB, test *TestConnectionAction, scheduler *ToolsScheduler) *CreateMCPServerAction {
+	return &CreateMCPServerAction{db: db, test: test, scheduler: scheduler}
 }
 
 // Execute 在当前企业中创建 MCP 服务。
@@ -27,6 +29,10 @@ func (a *CreateMCPServerAction) Execute(ctx context.Context, identity *servermod
 	input, fields := normalizeInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
+	}
+	// 网络探测在写事务外执行，失败时不保存配置。
+	if err := a.test.Execute(ctx, ConnectionInput{URL: input.URL, ServerType: input.ServerType, AuthorizationToken: input.AuthorizationToken}); err != nil {
+		return nil, err
 	}
 	var mcpServer servermodels.MCPServer
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -42,7 +48,10 @@ func (a *CreateMCPServerAction) Execute(ctx context.Context, identity *servermod
 			Column("organization_id", "name", "url", "server_type", "authorization_token").
 			Returning("*").
 			Exec(ctx)
-		return err
+		if err != nil {
+			return err
+		}
+		return a.scheduler.EnqueueIn(ctx, tx, &mcpServer)
 	})
 	// 企业内名称不区分大小写且保持唯一。
 	if pgerr.UniqueViolationOn(err, "mcp_servers_organization_name_unique") {

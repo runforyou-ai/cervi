@@ -20,6 +20,10 @@ type MCPServer struct {
 	URL                string        `json:"url"`
 	ServerType         MCPServerType `json:"serverType"`
 	AuthorizationToken string        `json:"authorizationToken"`
+	Tools              []MCPTool     `json:"tools"`
+	ToolsUpdatedAt     *time.Time    `json:"toolsUpdatedAt"`
+	ToolsUpdating      bool          `json:"toolsUpdating"`
+	ToolsError         string        `json:"toolsError"`
 	CreatedAt          time.Time     `json:"createdAt"`
 	UpdatedAt          time.Time     `json:"updatedAt"`
 }
@@ -35,4 +39,17 @@ type MCPServerInput struct {
 // MCPServerList 定义企业 MCP 服务列表。
 type MCPServerList struct {
 	MCPServers []MCPServer `json:"mcpServers"`
+}
+
+// MCPTool 定义工具目录的展示信息。
+type MCPTool struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// MCPServerConnectionInput 定义 MCP 连接测试字段。
+type MCPServerConnectionInput struct {
+	URL                string        `json:"url"`
+	ServerType         MCPServerType `json:"serverType"`
+	AuthorizationToken string        `json:"authorizationToken"`
 }

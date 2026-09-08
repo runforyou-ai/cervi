@@ -1,4 +1,10 @@
 {
+  "error.mcp_connection_failed": "Unable to connect to the MCP server or list its tools. Check the configuration.",
+  "error.mcp_authentication_failed": "MCP server authentication failed. Check the token.",
+  "error.mcp_authorization_failed": "Access to the MCP server tools was denied.",
+  "error.mcp_connection_timeout": "The MCP server connection timed out. Try again.",
+  "error.mcp_protocol_failed": "The MCP server could not negotiate the protocol or return its tools.",
+  "error.mcp_tools_refresh_failed": "Unable to submit the tools update. Try again.",
   "error.knowledge_document_not_found": "Document not found or deleted.",
   "error.knowledge_document_unsupported": "Only standard knowledge bases accept supported document formats.",
   "error.knowledge_document_batch_invalid": "Upload 1 to 10 files at a time.",

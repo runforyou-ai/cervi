@@ -1781,8 +1781,21 @@ export interface MCPServer {
     "url": string;
     "serverType": MCPServerType;
     "authorizationToken": string;
+    "tools": MCPTool[] | null;
+    "toolsUpdatedAt": string | null;
+    "toolsUpdating": boolean;
+    "toolsError": string;
     "createdAt": string;
     "updatedAt": string;
+}
+
+/**
+ * MCPServerConnectionInput 定义 MCP 连接测试字段。
+ */
+export interface MCPServerConnectionInput {
+    "url": string;
+    "serverType": MCPServerType;
+    "authorizationToken": string;
 }
 
 /**
@@ -1814,6 +1827,14 @@ export enum MCPServerType {
     MCPServerTypeSSE = "sse",
     MCPServerTypeStreamableHTTP = "streamable-http",
 };
+
+/**
+ * MCPTool 定义工具目录的展示信息。
+ */
+export interface MCPTool {
+    "name": string;
+    "description": string;
+}
 
 /**
  * MarkConversationMentionReviewedInput 定义待确认的提及目标。

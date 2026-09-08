@@ -57,10 +57,27 @@ const integrations = {
       loadError: "Could not load MCP servers.",
       empty: "No MCP servers configured",
       columns: {
+        tools: "Tools",
         name: "Name",
         url: "URL",
         serverType: "Server type",
       },
+    },
+    connection: {
+      test: "Test connection",
+      testing: "Testing…",
+      success: "Connected to the MCP server.",
+      error: "Unable to connect to the MCP server. Check the configuration.",
+    },
+    tools: {
+      refresh: "Update tools",
+      updating: "Updating tools…",
+      pending: "Tools have not been fetched yet",
+      count: "Tools: {{count}}",
+      empty: "No tools available",
+      noDescription: "No description",
+      failed: "Update failed: {{message}}",
+      submitError: "Unable to submit the tools update. Try again.",
     },
     form: {
       createTitle: "Add MCP server",

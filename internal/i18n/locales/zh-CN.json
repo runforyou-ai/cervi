@@ -1,4 +1,10 @@
 {
+  "error.mcp_connection_failed": "无法连接 MCP 服务或获取工具列表，请检查配置。",
+  "error.mcp_authentication_failed": "MCP 服务认证失败，请检查令牌。",
+  "error.mcp_authorization_failed": "无权访问 MCP 服务的工具列表。",
+  "error.mcp_connection_timeout": "MCP 服务连接超时，请重试。",
+  "error.mcp_protocol_failed": "MCP 服务未能完成协议协商或返回工具列表。",
+  "error.mcp_tools_refresh_failed": "提交工具更新失败，请重试。",
   "error.knowledge_document_not_found": "文档不存在或已删除。",
   "error.knowledge_document_unsupported": "仅标准知识库支持上传允许格式的文档。",
   "error.knowledge_document_batch_invalid": "每次请上传 1 至 10 个文件。",

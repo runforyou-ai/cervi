@@ -9,6 +9,7 @@ import {
   deleteMCPServer,
   isApiError,
   listMCPServers,
+  refreshMCPServerTools,
   type MCPServer,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -40,6 +41,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { MCPServerToolsCell } from "@/features/integrations/mcp-servers/mcp-server-tools-cell"
+import { MCPServerTestButton } from "@/features/integrations/mcp-servers/mcp-server-test-button"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -52,6 +55,7 @@ export function MCPServerListPage() {
   const [deletingMCPServer, setDeletingMCPServer] =
     useState<MCPServer | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [submittingRefresh, setSubmittingRefresh] = useState(false)
   const mounted = useRef(true)
   const {
     data,
@@ -59,9 +63,13 @@ export function MCPServerListPage() {
     refreshing,
     error: loadError,
     refresh,
-  } = useResource(resourceKeys.mcpServers(), () => listMCPServers())
+  } = useResource(resourceKeys.mcpServers(), () => listMCPServers(), {
+    staleTime: 0,
+    refetchInterval: (data) => data?.mcpServers.some((server) => server.toolsUpdating) ? 1000 : false,
+    refetchOnWindowFocus: true,
+  })
   const invalidate = useResourceInvalidator()
-  const showLoading = loading || (Boolean(loadError) && refreshing)
+  const showLoading = loading || (Boolean(loadError) && !data && refreshing)
   const mcpServers = data?.mcpServers ?? []
 
   useEffect(() => {
@@ -70,6 +78,21 @@ export function MCPServerListPage() {
       mounted.current = false
     }
   }, [])
+
+  /** 提交全部服务的更新任务，并读取服务端返回的更新状态。 */
+  async function updateTools() {
+    if (submittingRefresh) return
+    setSubmittingRefresh(true)
+    try {
+      await refreshMCPServerTools()
+      await refresh()
+    } catch (error) {
+      if (!mounted.current || recoverSession(error, navigate)) return
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t("mcpServer.tools.submitError"))
+    } finally {
+      if (mounted.current) setSubmittingRefresh(false)
+    }
+  }
 
   /** 删除选中的 MCP 服务。 */
   async function confirmDelete() {
@@ -105,6 +128,14 @@ export function MCPServerListPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={t("mcpServer.title")}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={submittingRefresh || !mcpServers.length || mcpServers.some((server) => server.toolsUpdating)}
+          onClick={() => void updateTools()}
+        >
+          {t("mcpServer.tools.refresh")}
+        </Button>
         <Button size="sm" asChild>
           <Link to="/integrations/mcp-servers/new">
             {t("mcpServer.list.create")}
@@ -116,7 +147,7 @@ export function MCPServerListPage() {
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {t("common:status.loading")}
           </LoadingIndicator>
-        ) : loadError ? (
+        ) : loadError && !data ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
             <p className="text-sm text-muted-foreground">
               {t("mcpServer.list.loadError")}
@@ -137,6 +168,7 @@ export function MCPServerListPage() {
                   <TableHead>{t("mcpServer.list.columns.name")}</TableHead>
                   <TableHead>{t("mcpServer.list.columns.url")}</TableHead>
                   <TableHead>{t("mcpServer.list.columns.serverType")}</TableHead>
+                  <TableHead className="w-20">{t("mcpServer.list.columns.tools")}</TableHead>
                   <TableHead className="w-px">
                     {t("common:table.actions")}
                   </TableHead>
@@ -146,7 +178,7 @@ export function MCPServerListPage() {
                 {mcpServers.length === 0 ? (
                   <TableRow className="hover:bg-transparent">
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="h-32 text-center text-muted-foreground"
                     >
                       {t("mcpServer.list.empty")}
@@ -164,8 +196,10 @@ export function MCPServerListPage() {
                       <TableCell>
                         <SelectableText>{mcpServer.serverType}</SelectableText>
                       </TableCell>
+                      <TableCell><MCPServerToolsCell server={mcpServer} /></TableCell>
                       <TableCell className="whitespace-nowrap">
                         <div className="inline-flex gap-2">
+                          <MCPServerTestButton serverId={mcpServer.id} />
                           <Button variant="outline" size="sm" asChild>
                             <Link
                               to={`/integrations/mcp-servers/${mcpServer.id}`}
