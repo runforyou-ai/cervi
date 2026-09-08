@@ -8,10 +8,12 @@ import (
 	"errors"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	"github.com/uptrace/bun"
 )
 
 type messageReferenceRow struct {
+	Type          domain.MessageType               `bun:"type"`
 	Deleted       bool                             `bun:"deleted"`
 	MessageID     string                           `bun:"message_id"`
 	Body          string                           `bun:"body"`
@@ -23,7 +25,7 @@ type messageReferenceRow struct {
 	IdentityType  *domain.OrganizationIdentityType `bun:"identity_type"`
 }
 
-// loadConversationReplyTarget 校验并读取同一会话中的文本引用目标。
+// loadConversationReplyTarget 校验并读取同一会话中的文本或附件引用目标。
 func loadConversationReplyTarget(ctx context.Context, db bun.IDB, organizationID, conversationID, messageID string) (*ConversationMessageReference, error) {
 	if messageID == "" {
 		return nil, nil
@@ -38,13 +40,13 @@ func loadConversationReplyTarget(ctx context.Context, db bun.IDB, organizationID
 	return reference, nil
 }
 
-// loadMessageReference 读取文本消息引用，并将软删除表示为不可用摘要。
+// loadMessageReference 读取文本或附件消息引用，并将软删除表示为不可用摘要。
 func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conversationID, messageID string) (*ConversationMessageReference, error) {
 	row := messageReferenceRow{}
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
-		ColumnExpr("msg.id AS message_id").
-		ColumnExpr("CASE WHEN msg.deleted_at IS NULL THEN msg.body ELSE '' END AS body").
+		ColumnExpr("msg.id AS message_id, msg.type").
+		ColumnExpr("? AS body", messagequery.Summary("msg")).
 		ColumnExpr("msg.deleted_at IS NOT NULL AS deleted").
 		ColumnExpr("cs.id AS chat_subject_id").
 		ColumnExpr("cs.kind AS kind").
@@ -61,19 +63,19 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		Where("msg.organization_id = ?", organizationID).
 		Where("msg.conversation_id = ?", conversationID).
 		Where("msg.id = ?", messageID).
-		Where("msg.type = ?", domain.MessageTypeText).
+		Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
 		Scan(ctx, &row)
 	if err != nil {
 		return nil, err
 	}
 	if row.Deleted {
-		return &ConversationMessageReference{ID: row.MessageID, Deleted: true}, nil
+		return &ConversationMessageReference{ID: row.MessageID, Type: row.Type, Deleted: true}, nil
 	}
 	if row.ChatSubjectID == nil || row.Kind == nil || row.SourceID == nil {
 		return nil, ErrDataInvariant
 	}
 	return &ConversationMessageReference{
-		ID: row.MessageID, Body: row.Body,
+		ID: row.MessageID, Type: row.Type, Body: row.Body,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: *row.ChatSubjectID, Kind: domain.ChatSubjectKind(*row.Kind),
 			SourceID: *row.SourceID, DisplayName: row.DisplayName, AvatarFileID: row.AvatarFileID, IdentityType: row.IdentityType,

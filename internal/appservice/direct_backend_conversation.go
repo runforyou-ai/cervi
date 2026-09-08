@@ -533,7 +533,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	var replyTo *ConversationMessageReference
 	if message.ReplyTo != nil {
 		replyTo = &ConversationMessageReference{
-			ID: message.ReplyTo.ID, Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
+			ID: message.ReplyTo.ID, Type: MessageType(message.ReplyTo.Type), Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
 			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender, avatarURLs),
 		}
 	}

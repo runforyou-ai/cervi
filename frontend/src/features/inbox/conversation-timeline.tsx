@@ -266,15 +266,22 @@ function ConversationTimelineContent({
     timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
-  // 单独读取已有附件状态，上传完成和取消不会生成新的消息游标。
-  const attachmentIDs = combinedMessages.flatMap(message => message.attachment && message.persistedMessageID ? [message.persistedMessageID] : []).sort().join(",")
+  // 刷新窗口内附件与引用目标的状态，上传完成和取消不会生成新的消息游标。
+  const attachmentIDs = [...new Set(combinedMessages.flatMap(message => [
+    ...(message.attachment && message.persistedMessageID ? [message.persistedMessageID] : []),
+    ...(message.replyTo?.type === MessageType.MessageTypeAttachment && !message.replyTo.deleted ? [message.replyTo.id] : []),
+  ]))].sort().join(",")
   const attachmentStates = useResource(resourceKeys.attachmentStates(conversationID, attachmentIDs), () => listAttachmentStates(conversationID, attachmentIDs), {
     enabled: enabled && Boolean(attachmentIDs), keepPreviousData: true, refetchInterval: pollingActive ? 2000 : false,
   })
   const attachmentsByMessage = new Map(attachmentStates.data?.states.map(state => [state.messageId, state]))
   const visibleMessages = combinedMessages.flatMap(message => {
     const state = attachmentsByMessage.get(message.persistedMessageID ?? "")
-    return state?.deleted ? [] : [{ ...message, attachment: state?.attachment ?? message.attachment }]
+    const replyDeleted = message.replyTo && attachmentsByMessage.get(message.replyTo.id)?.deleted
+    return state?.deleted ? [] : [{
+      ...message, attachment: state?.attachment ?? message.attachment,
+      replyTo: replyDeleted ? { ...message.replyTo!, body: "", sender: null, deleted: true } : message.replyTo,
+    }]
   })
   // 使用窗口内持久消息编号查询投递，历史窗口也能刷新原有消息的状态。
   const deliveryMessageIDs = visibleMessages
@@ -705,6 +712,8 @@ function ConversationTimelineContent({
                       mentionAllToken: message.mentionAllToken,
                     }
                   : null
+              // 回复与复制使用同一份消息摘要。
+              const referenceBody = message.body || message.attachment?.name || ""
               const systemEvent = message.systemEvent
               const systemEventText = systemEvent
                 ? formatGroupSystemEvent(systemEvent)
@@ -810,14 +819,15 @@ function ConversationTimelineContent({
                             ) : null}
                             <ContextMenuTrigger asChild>
                               <div className="group/message relative max-w-full">
-                                {incoming && !agentNotice && !message.attachment && onReplyMessage ? (
+                                {incoming && !agentNotice && onReplyMessage ? (
                                   <button
                                     type="button"
                                     className="pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                                     onClick={() =>
                                       onReplyMessage({
                                         id: message.id,
-                                        body: message.body,
+                                        type: message.type,
+                                        body: referenceBody,
                                         sender: message.sender,
                                         deleted: false,
                                       })
@@ -878,7 +888,7 @@ function ConversationTimelineContent({
                                     {agentNotice ? (
                                       <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
-                                      <ConversationAttachment attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
+                                      <ConversationAttachment body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
                                         originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
@@ -941,12 +951,13 @@ function ConversationTimelineContent({
                         </div>
                       </article>
                       <ContextMenuContent>
-                        {!message.local && !agentNotice && !message.attachment && onReplyMessage ? (
+                        {!message.local && !agentNotice && onReplyMessage ? (
                           <ContextMenuItem
                             onSelect={() =>
                               onReplyMessage({
                                 id: message.id,
-                                body: message.body,
+                                type: message.type,
+                                body: referenceBody,
                                 sender: message.sender,
                                 deleted: false,
                               })
@@ -956,7 +967,7 @@ function ConversationTimelineContent({
                           </ContextMenuItem>
                         ) : null}
                         <ContextMenuItem
-                          onSelect={() => void copyMessageText(agentNotice ? t(agentError ? "agentRunFailed" : "agentReplyStopped") : message.attachment?.name ?? message.body)}
+                          onSelect={() => void copyMessageText(agentNotice ? t(agentError ? "agentRunFailed" : "agentReplyStopped") : referenceBody)}
                         >
                           {t("messageCopyText")}
                         </ContextMenuItem>

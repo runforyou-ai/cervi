@@ -59,7 +59,7 @@ const (
 	ConflictReasonGroupOwnerCannotBeRemoved = "group_owner_cannot_be_removed"
 	// ConflictReasonGroupSuccessorRequired 表示群主退出前必须指定继任者。
 	ConflictReasonGroupSuccessorRequired = "group_successor_required"
-	// ConflictReasonReplyTargetInvalid 表示引用目标不是当前会话中的有效文本消息。
+	// ConflictReasonReplyTargetInvalid 表示引用目标不是当前会话中的有效文本或附件消息。
 	ConflictReasonReplyTargetInvalid = "reply_target_invalid"
 	// ConflictReasonGroupMentionTargetInvalid 表示提醒目标不是当前群聊中的有效参与者。
 	ConflictReasonGroupMentionTargetInvalid = "group_mention_target_invalid"
@@ -173,6 +173,7 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
+	Type    domain.MessageType
 	Deleted bool
 	ID      string
 	Body    string
@@ -404,9 +405,6 @@ type MessageAttachment struct {
 
 // AttachmentMessageInput 定义已有会话或单聊目标的附件发送意图。
 type AttachmentMessageInput struct {
-	Pending          bool
-	ImageWidth       int
-	ImageHeight      int
 	ConversationID   string
 	TargetIdentityID string
 	ClientMessageID  string
@@ -422,19 +420,18 @@ type AttachmentMessageResult struct {
 
 // AttachmentBatchItem 定义一条待创建的附件消息。
 type AttachmentBatchItem struct {
+	Body            string
 	File            fileaction.UploadInput
 	ClientMessageID string
 	ImageWidth      int
 	ImageHeight     int
 }
 
-// AttachmentBatchInput 定义按选择顺序发送的文件和末尾说明。
+// AttachmentBatchInput 定义按选择顺序发送的附件消息。
 type AttachmentBatchInput struct {
-	CaptionMessageID string
 	ConversationID   string
 	TargetIdentityID string
 	Attachments      []AttachmentBatchItem
-	Body             string
 }
 
 // AttachmentBatchResult 返回一次发送的全部消息。

@@ -243,7 +243,7 @@ func (s *Service) sendAttachmentMessage(c *gin.Context) {
 	writeResult(c, http.StatusCreated, output, err)
 }
 
-// sendAttachmentBatch 按选择顺序保存单聊附件和说明消息。
+// sendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
 func (s *Service) sendAttachmentBatch(c *gin.Context) {
 	var input appservice.AttachmentBatchInput
 	if !bindJSON(c, &input) {

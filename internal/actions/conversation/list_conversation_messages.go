@@ -15,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/schema"
@@ -28,6 +29,7 @@ type ListConversationMessagesQuery struct {
 }
 
 type conversationMessageRow struct {
+	ReplyToType                    domain.MessageType               `bun:"reply_to_type"`
 	ID                             string                           `bun:"id"`
 	Type                           string                           `bun:"type"`
 	Body                           string                           `bun:"body"`
@@ -137,8 +139,8 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("oi.type AS sender_identity_type").
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.mention_all AS mention_all").
-		ColumnExpr("CASE WHEN reply_msg.deleted_at IS NULL THEN reply_msg.body END AS reply_to_body").
-		ColumnExpr("reply_msg.deleted_at IS NOT NULL AS reply_to_deleted").
+		ColumnExpr("? AS reply_to_body", messagequery.Summary("reply_msg")).
+		ColumnExpr("reply_msg.deleted_at IS NOT NULL AS reply_to_deleted, reply_msg.type AS reply_to_type").
 		ColumnExpr("reply_cs.id AS reply_to_sender_subject_id").
 		ColumnExpr("reply_cs.kind AS reply_to_sender_kind").
 		ColumnExpr("reply_cs.source_id AS reply_to_sender_source_id").
@@ -156,7 +158,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN contacts AS c ON c.id = cs.source_id AND c.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("LEFT JOIN messages AS reply_msg ON reply_msg.organization_id = msg.organization_id AND reply_msg.conversation_id = msg.conversation_id AND reply_msg.id = msg.reply_to_message_id AND reply_msg.type = ?", domain.MessageTypeText).
+		Join("LEFT JOIN messages AS reply_msg ON reply_msg.organization_id = msg.organization_id AND reply_msg.conversation_id = msg.conversation_id AND reply_msg.id = msg.reply_to_message_id AND reply_msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.organization_id = reply_msg.organization_id AND reply_cp.conversation_id = reply_msg.conversation_id AND reply_cp.id = reply_msg.sender_participant_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.organization_id = reply_cp.organization_id AND reply_cs.id = reply_cp.subject_id").
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.organization_id = reply_cs.organization_id AND reply_oi.id = reply_cs.source_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
@@ -342,13 +344,13 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 			}
 		}
 		if row.ReplyToMessageID != nil && row.ReplyToDeleted {
-			message.ReplyTo = &ConversationMessageReference{ID: *row.ReplyToMessageID, Deleted: true}
+			message.ReplyTo = &ConversationMessageReference{ID: *row.ReplyToMessageID, Type: row.ReplyToType, Deleted: true}
 		} else if row.ReplyToMessageID != nil {
 			if row.ReplyToBody == nil || row.ReplyToSenderSubjectID == nil || row.ReplyToSenderKind == nil || row.ReplyToSenderSourceID == nil {
 				return ConversationMessageHistory{}, fmt.Errorf("load conversation reply reference: %w", ErrDataInvariant)
 			}
 			message.ReplyTo = &ConversationMessageReference{
-				ID: *row.ReplyToMessageID, Body: *row.ReplyToBody,
+				ID: *row.ReplyToMessageID, Type: row.ReplyToType, Body: *row.ReplyToBody,
 				Sender: &ConversationMessageSender{
 					ChatSubjectID: *row.ReplyToSenderSubjectID,
 					Kind:          domain.ChatSubjectKind(*row.ReplyToSenderKind),

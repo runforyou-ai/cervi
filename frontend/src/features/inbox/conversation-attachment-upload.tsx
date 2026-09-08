@@ -137,9 +137,12 @@ export function ConversationAttachmentUpload({
   /** 把文件所有权移交工作台队列，立即关闭选择框。 */
   function send(values: { description: string }) {
     if (!queue || selectedRef.current.length === 0) return
+    // 说明只随最后一个附件发送，其余附件保持独立消息。
     queue.enqueue(
-      selectedRef.current,
-      values.description,
+      selectedRef.current.map((item, index) => ({
+        ...item,
+        body: index === selectedRef.current.length - 1 ? values.description : "",
+      })),
       conversationID,
       targetIdentityID,
       (conversation) => {

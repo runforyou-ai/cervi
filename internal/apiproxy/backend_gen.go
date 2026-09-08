@@ -78,7 +78,7 @@ func (b *Backend) SendAttachmentMessage(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
-// SendAttachmentBatch 按选择顺序保存单聊附件和说明消息。
+// SendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
 func (b *Backend) SendAttachmentBatch(ctx context.Context, meta appservice.RequestMeta, input appservice.AttachmentBatchInput) (appservice.AttachmentBatchResult, error) {
 	var output appservice.AttachmentBatchResult
 	err := b.do(ctx, meta, http.MethodPost, "/direct-attachment-batches", nil, input, &output)
