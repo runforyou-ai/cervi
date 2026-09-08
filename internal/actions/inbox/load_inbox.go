@@ -5,6 +5,7 @@ package inbox
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -85,6 +86,7 @@ type GroupConversationSummary struct {
 
 // ConversationSummary 定义统一收件箱会话信封。
 type ConversationSummary struct {
+	LastActivityAt       *time.Time
 	LastMessageType      *domain.MessageType
 	ID                   string
 	Type                 domain.ConversationType
@@ -98,7 +100,6 @@ type ConversationSummary struct {
 	Agent                *AgentConversationSummary
 	Direct               *DirectConversationSummary
 	Group                *GroupConversationSummary
-	sortAt               *time.Time
 }
 
 // LoadInboxQuery 读取当前企业的统一收件箱。
@@ -128,7 +129,7 @@ type customerConversationRow struct {
 	AssigneeType              *string                          `bun:"assignee_type"`
 	AssigneeDisplayName       *string                          `bun:"assignee_display_name"`
 	AssigneeAvatarFileID      *string                          `bun:"assignee_avatar_file_id"`
-	SortAt                    *time.Time                       `bun:"sort_at"`
+	LastActivityAt            *time.Time                       `bun:"last_activity_at"`
 	UnreadCount               int                              `bun:"unread_count"`
 	LastReadMessageID         *string                          `bun:"last_read_message_id"`
 	LastMessageID             *string                          `bun:"last_message_id"`
@@ -144,7 +145,7 @@ type directConversationRow struct {
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
-	SortAt                    *time.Time                       `bun:"sort_at"`
+	LastActivityAt            *time.Time                       `bun:"last_activity_at"`
 	UnreadCount               int                              `bun:"unread_count"`
 	LastMessageID             *string                          `bun:"last_message_id"`
 	LastMessageType           *domain.MessageType              `bun:"last_message_type"`
@@ -163,7 +164,7 @@ type agentConversationRow struct {
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
 	AgentRunStatus            *string                          `bun:"agent_run_status"`
-	SortAt                    *time.Time                       `bun:"sort_at"`
+	LastActivityAt            *time.Time                       `bun:"last_activity_at"`
 	UnreadCount               int                              `bun:"unread_count"`
 	LastMessageID             *string                          `bun:"last_message_id"`
 	LastMessageType           *domain.MessageType              `bun:"last_message_type"`
@@ -181,7 +182,7 @@ type groupConversationRow struct {
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
 	MemberCount               int                              `bun:"member_count"`
-	SortAt                    *time.Time                       `bun:"sort_at"`
+	LastActivityAt            *time.Time                       `bun:"last_activity_at"`
 	UnreadCount               int                              `bun:"unread_count"`
 	MentionedUnreadCount      int                              `bun:"mentioned_unread_count"`
 	LastMessageID             *string                          `bun:"last_message_id"`
@@ -196,7 +197,7 @@ func NewLoadInboxQuery(db bun.IDB) *LoadInboxQuery {
 	return &LoadInboxQuery{db: db}
 }
 
-// Execute 分别读取客户会话、内部单聊和群聊后合并排序。
+// Execute 在同一只读快照中读取各类会话与完整未读总数。
 func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, UnreadCounts, error) {
 	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
 	input.CustomerView = domain.CustomerInboxView(strings.TrimSpace(string(input.CustomerView)))
@@ -213,6 +214,22 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		return nil, UnreadCounts{}, ErrQueryInvalid
 	}
 
+	var result []ConversationSummary
+	var counts UnreadCounts
+	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
+		snapshot := NewLoadInboxQuery(tx)
+		var err error
+		result, counts, err = snapshot.loadConversations(ctx, identity, input)
+		return err
+	})
+	if err != nil {
+		return nil, UnreadCounts{}, err
+	}
+	return result, counts, nil
+}
+
+// loadConversations 读取当前范围的会话并按精确活动时间合并排序。
+func (q *LoadInboxQuery) loadConversations(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, UnreadCounts, error) {
 	customers := make([]customerConversationRow, 0)
 	directs := make([]directConversationRow, 0)
 	groups := make([]groupConversationRow, 0)
@@ -246,7 +263,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			assignee = &AssigneeSummary{IdentityID: *row.AssigneeIdentityID, Type: domain.OrganizationIdentityType(*row.AssigneeType), DisplayName: *row.AssigneeDisplayName, AvatarFileID: row.AssigneeAvatarFileID}
 		}
 		result = append(result, ConversationSummary{
-			ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
+			ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 			Customer: &CustomerConversationSummary{
 				Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
 				ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
@@ -257,7 +274,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	}
 	for _, row := range directs {
 		result = append(result, ConversationSummary{
-			ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
+			ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 			Direct: &DirectConversationSummary{
 				PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID,
 				Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
@@ -269,7 +286,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	}
 	for _, row := range groups {
 		result = append(result, ConversationSummary{
-			ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
+			ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 			Group: &GroupConversationSummary{
 				Title: row.Title, ImageFileID: row.ImageFileID, Status: domain.ConversationStatus(row.Status), Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType,
 				LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount,
@@ -277,8 +294,8 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		})
 	}
 	sort.Slice(result, func(first, second int) bool {
-		firstTime := result[first].sortAt
-		secondTime := result[second].sortAt
+		firstTime := result[first].LastActivityAt
+		secondTime := result[second].LastActivityAt
 		if firstTime == nil || secondTime == nil {
 			if firstTime == nil && secondTime == nil {
 				return result[first].ID > result[second].ID
@@ -321,7 +338,7 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		ColumnExpr("assignee.type AS assignee_type").
 		ColumnExpr("assignee.display_name AS assignee_display_name").
 		ColumnExpr("assignee.avatar_file_id::text AS assignee_avatar_file_id").
-		ColumnExpr("cv.last_message_at AS sort_at").
+		ColumnExpr("cv.last_activity_at AS last_activity_at").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cc.organization_id").
@@ -379,7 +396,7 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 			query = query.Where("current.status = ?", domain.ServiceSessionStatusClosed)
 		}
 	}
-	err := query.OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
+	err := query.OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").
 		Limit(inboxConversationTypeLimit).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -392,7 +409,7 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizationID, identityID, userID string) ([]directConversationRow, error) {
 	var rows []directConversationRow
 	err := q.directConversationsQuery(organizationID, identityID, userID).
-		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
+		OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").
 		Limit(inboxConversationTypeLimit).Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("list direct inbox conversations: %w", err)
@@ -414,7 +431,7 @@ func (q *LoadInboxQuery) individualConversationsQuery(organizationID, identityID
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
-		ColumnExpr("cv.last_message_at AS sort_at").
+		ColumnExpr("cv.last_activity_at AS last_activity_at").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
@@ -461,15 +478,18 @@ func (q *LoadInboxQuery) agentConversationsQuery(organizationID, identityID, use
 // loadAgentConversations 读取当前成员的独立 AI 会话列表。
 func (q *LoadInboxQuery) loadAgentConversations(ctx context.Context, organizationID, identityID, userID string) ([]agentConversationRow, error) {
 	rows := make([]agentConversationRow, 0)
-	err := q.agentConversationsQuery(organizationID, identityID, userID).OrderExpr("cv.last_message_at DESC, cv.id DESC").Limit(inboxConversationTypeLimit).Scan(ctx, &rows)
-	return rows, err
+	err := q.agentConversationsQuery(organizationID, identityID, userID).OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").Limit(inboxConversationTypeLimit).Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("list agent inbox conversations: %w", err)
+	}
+	return rows, nil
 }
 
 // loadGroupConversations 读取当前成员参与的企业群聊，包括尚无消息的新群聊。
 func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizationID, identityID, userID string) ([]groupConversationRow, error) {
 	var rows []groupConversationRow
 	err := q.groupConversationsQuery(organizationID, identityID, userID).
-		OrderExpr("cv.last_message_at DESC NULLS LAST, cv.id DESC").
+		OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").
 		Limit(inboxConversationTypeLimit).Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("list group inbox conversations: %w", err)
@@ -496,7 +516,7 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
-		ColumnExpr("cv.last_message_at AS sort_at").
+		ColumnExpr("cv.last_activity_at AS last_activity_at").
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
 		Join("JOIN LATERAL (SELECT count(*) AS member_count FROM conversation_participants AS member_cp WHERE member_cp.organization_id = cv.organization_id AND member_cp.conversation_id = cv.id AND member_cp.left_at IS NULL) AS members ON TRUE").
@@ -548,7 +568,7 @@ func (row agentConversationRow) summary() ConversationSummary {
 		agentRunStatus = &status
 	}
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, sortAt: row.SortAt,
+		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Agent: &AgentConversationSummary{
 			Title: row.Title, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName, AgentAvatarFileID: row.AgentAvatarFileID,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,

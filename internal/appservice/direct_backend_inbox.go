@@ -97,7 +97,7 @@ func (b *DirectBackend) ListCustomerServiceAssignees(ctx context.Context, meta R
 
 // inboxConversationFromAction 转换完整会话摘要并填充头像地址。
 func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatarURLs map[string]string) InboxConversation {
-	conversation := InboxConversation{ID: summary.ID, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, LastMessageID: summary.LastMessageID, LastMessageType: (*MessageType)(summary.LastMessageType), LastReadMessageID: summary.LastReadMessageID}
+	conversation := InboxConversation{ID: summary.ID, LastActivityAt: summary.LastActivityAt, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, LastMessageID: summary.LastMessageID, LastMessageType: (*MessageType)(summary.LastMessageType), LastReadMessageID: summary.LastReadMessageID}
 	if summary.Customer != nil {
 		var assignee *InboxAssignee
 		if summary.Customer.Assignee != nil {
