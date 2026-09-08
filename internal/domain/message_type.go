@@ -8,4 +8,5 @@ const (
 	MessageTypeSystem         MessageType = "system"
 	MessageTypeAgentError     MessageType = "agent_error"
 	MessageTypeAgentCancelled MessageType = "agent_cancelled"
+	MessageTypeAttachment     MessageType = "attachment"
 )

@@ -28,6 +28,7 @@ import {
   type DirectTextMessageInput,
   OrganizationIdentityType,
   type GroupParticipant,
+  type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -44,6 +45,9 @@ import {
   conversationSendingIndicatorDelay,
   type OutgoingConversationDraft,
 } from "@/features/inbox/use-outgoing-conversation-messages"
+import { GroupAttachmentUpload } from "./group-attachment-upload"
+import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -97,7 +101,11 @@ export function ConversationComposer({
   onFailed,
   onSucceeded,
   sendIndividualMessage,
+  attachmentTargetIdentityID,
+  onAttachmentConversationCreated,
 }: {
+  attachmentTargetIdentityID?: string
+  onAttachmentConversationCreated?: (conversation: InboxConversation) => void
   conversationID: string
   conversationType: ConversationType
   submitOnEnter?: boolean
@@ -634,16 +642,43 @@ export function ConversationComposer({
             onKeyDown={submitFromKeyboard}
           />
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              disabled
-              aria-label={t("attachmentAdd")}
-              title={t("attachmentAdd")}
-            >
-              <PaperclipIcon />
-            </Button>
+            {resolveAppPlatform() !== "mobile" &&
+            (conversationType === ConversationType.ConversationTypeDirect ||
+              conversationType === ConversationType.ConversationTypeGroup) ? (
+              conversationType === ConversationType.ConversationTypeDirect ? (
+                <ConversationAttachmentUpload
+                  conversationID={conversationID}
+                  targetIdentityID={attachmentTargetIdentityID}
+                  disabled={isSubmitting}
+                  onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
+                />
+              ) : (
+                <GroupAttachmentUpload
+                  conversationID={conversationID}
+                  targetIdentityID={attachmentTargetIdentityID}
+                  disabled={isSubmitting}
+                  onSent={(clientMessageID, message, conversation) => {
+                    onSucceeded()
+                    if (conversation) onAttachmentConversationCreated?.(conversation)
+                    if (!aliveRef.current) return
+                    onSending({
+                      clientMessageID,
+                      body: "",
+                      originatedAt: message.originatedAt,
+                      replyTo: null,
+                      mentionSubjectIDs: [],
+                      mentionAll: false,
+                      mentionAllToken: null,
+                    })
+                    onSent(clientMessageID, message)
+                  }}
+                />
+              )
+            ) : (
+              <Button type="button" variant="ghost" size="icon-sm" disabled aria-label={t("attachmentAdd")}>
+                <PaperclipIcon />
+              </Button>
+            )}
             <Button type="submit" size="sm" disabled={isSubmitting || isBodyEmpty}>
               {isSubmitting && showSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />

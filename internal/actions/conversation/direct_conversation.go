@@ -317,7 +317,7 @@ func loadDirectConversationSummary(ctx context.Context, db bun.IDB, organization
 	err := db.NewSelect().
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
-		ColumnExpr("msg.body AS preview").
+		ColumnExpr("CASE WHEN msg.type = ? THEN (SELECT ma.name FROM message_attachments ma WHERE ma.message_id = msg.id AND ma.organization_id = msg.organization_id) ELSE msg.body END AS preview", domain.MessageTypeAttachment).
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").

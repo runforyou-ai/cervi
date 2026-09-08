@@ -544,7 +544,12 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			SourceID: mention.SourceID, DisplayName: mention.DisplayName,
 		})
 	}
+	var attachment *MessageAttachment
+	if message.Attachment != nil {
+		attachment = &MessageAttachment{File: File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize}, UploadStatus: AttachmentUploadStatus(message.Attachment.UploadStatus), ImageWidth: message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight}
+	}
 	return ConversationMessage{
+		Attachment:   attachment,
 		AgentProcess: conversationAgentProcessFromAction(message.AgentProcess),
 		ID:           message.ID, Type: MessageType(message.Type), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, GroupMessageSequence: groupMessageSequenceString(message.GroupMessageSequence),

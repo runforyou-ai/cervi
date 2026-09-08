@@ -309,7 +309,7 @@ func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organiza
 		ColumnExpr("cci.avatar_file_id AS contact_avatar_file_id").
 		ColumnExpr("ch.type AS channel_type").
 		ColumnExpr("ch.name AS channel_name").
-		ColumnExpr("msg.body AS preview").
+		ColumnExpr("CASE WHEN msg.type = ? THEN (SELECT ma.name FROM message_attachments ma WHERE ma.message_id = msg.id AND ma.organization_id = msg.organization_id) ELSE msg.body END AS preview", domain.MessageTypeAttachment).
 		ColumnExpr("msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").
@@ -405,7 +405,7 @@ func (q *LoadInboxQuery) individualConversationsQuery(organizationID, identityID
 	return q.db.NewSelect().
 		TableExpr("conversations AS cv").
 		ColumnExpr("cv.id AS id").
-		ColumnExpr("msg.body AS preview").
+		ColumnExpr("CASE WHEN msg.type = ? THEN (SELECT ma.name FROM message_attachments ma WHERE ma.message_id = msg.id AND ma.organization_id = msg.organization_id) ELSE msg.body END AS preview", domain.MessageTypeAttachment).
 		ColumnExpr("msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").
@@ -486,7 +486,7 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
-		ColumnExpr("msg.body AS preview").
+		ColumnExpr("CASE WHEN msg.type = ? THEN (SELECT ma.name FROM message_attachments ma WHERE ma.message_id = msg.id AND ma.organization_id = msg.organization_id) ELSE msg.body END AS preview", domain.MessageTypeAttachment).
 		ColumnExpr("msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("cv.last_message_at AS last_message_at").

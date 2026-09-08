@@ -18,6 +18,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	integrationconnectionaction "github.com/runforyou-ai/cervi/internal/actions/integrationconnection"
@@ -47,6 +48,7 @@ var (
 
 // DirectBackend 在服务端进程内直接调用 Action 和 Query。
 type DirectBackend struct {
+	sendAttachmentMessage             *conversationaction.SendAttachmentMessageAction
 	agentCoordinator                  *agentrunaction.ExecuteAction
 	customerDeliveries                *deliveryaction.Manager
 	installWorkspace                  *installationaction.InstallWorkspaceAction
@@ -172,6 +174,7 @@ type DirectBackend struct {
 	saveS3Setting                     *settingaction.SaveS3SettingAction
 	testS3Setting                     *settingaction.TestS3SettingAction
 	createFileUpload                  *fileaction.CreateUploadAction
+	cancelFileUpload                  *filemaintenance.CancelUploadAction
 	completeFileUpload                *fileaction.CompleteUploadAction
 	getFile                           *fileaction.GetQuery
 	localFiles                        *serverfilecontent.LocalStore
@@ -313,6 +316,8 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),
 		testS3Setting:                     settingaction.NewTestS3SettingAction(connectionRunner),
 		createFileUpload:                  fileaction.NewCreateUploadAction(db),
+		cancelFileUpload:                  filemaintenance.NewCancelUploadAction(db),
+		sendAttachmentMessage:             conversationaction.NewSendAttachmentMessageAction(db),
 		completeFileUpload:                fileaction.NewCompleteUploadAction(db),
 		getFile:                           fileaction.NewGetQuery(db),
 		localFiles:                        localFiles,

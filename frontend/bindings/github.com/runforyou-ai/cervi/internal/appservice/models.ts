@@ -355,6 +355,103 @@ export interface AgentWorkStatusInput {
 }
 
 /**
+ * AttachmentBatchInput 定义一批附件和末尾的独立说明消息。
+ */
+export interface AttachmentBatchInput {
+    "captionMessageId": string;
+    "conversationId": string;
+    "targetIdentityId": string;
+    "attachments": AttachmentBatchItem[] | null;
+    "body": string;
+}
+
+/**
+ * AttachmentBatchItem 定义选定附件与图片展示尺寸。
+ */
+export interface AttachmentBatchItem {
+    "fileName": string;
+    "contentType": string;
+    "byteSize": number;
+    "clientMessageId": string;
+    "imageWidth": number;
+    "imageHeight": number;
+}
+
+/**
+ * AttachmentBatchResult 返回已保存的有序消息。
+ */
+export interface AttachmentBatchResult {
+    "conversationId": string;
+    "conversation": InboxConversation | null;
+    "messages": ConversationMessage[] | null;
+}
+
+/**
+ * AttachmentMessageInput 定义发往已有会话或单聊目标的附件消息。
+ */
+export interface AttachmentMessageInput {
+    "conversationId": string;
+    "targetIdentityId": string;
+    "clientMessageId": string;
+    "fileId": string;
+}
+
+/**
+ * AttachmentMessageResult 定义附件消息及首发时创建的单聊。
+ */
+export interface AttachmentMessageResult {
+    "conversationId": string;
+    "conversation": InboxConversation | null;
+    "message": ConversationMessage;
+}
+
+/**
+ * AttachmentMessageState 定义消息窗口内附件的可见性和上传状态。
+ */
+export interface AttachmentMessageState {
+    "messageId": string;
+    "attachment": MessageAttachment;
+    "deleted": boolean;
+}
+
+/**
+ * AttachmentStateList 返回当前窗口已有附件的状态。
+ */
+export interface AttachmentStateList {
+    "states": AttachmentMessageState[] | null;
+}
+
+/**
+ * AttachmentStateListInput 指定当前消息窗口需要刷新的附件。
+ */
+export interface AttachmentStateListInput {
+    "messageIds": string;
+}
+
+/**
+ * AttachmentUploadStatus 定义附件消息的上传状态。
+ */
+export enum AttachmentUploadStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AttachmentUploading = "uploading",
+    AttachmentReady = "ready",
+    AttachmentFailed = "failed",
+    AttachmentCancelled = "cancelled",
+};
+
+/**
+ * AttachmentUploadUpdate 定义当前客户端上传的状态变更或活跃确认。
+ */
+export interface AttachmentUploadUpdate {
+    "fileIds": string[] | null;
+    "status": AttachmentUploadStatus;
+}
+
+/**
  * Auth 包含登录身份和访问令牌。
  */
 export interface Auth {
@@ -667,6 +764,7 @@ export enum ConversationMentionReviewOutcome {
  * ConversationMessage 定义成员可见的会话消息。
  */
 export interface ConversationMessage {
+    "attachment": MessageAttachment | null;
     "agentProcess": ConversationAgentProcess | null;
     "groupMessageSequence": string | null;
     "id": string;
@@ -1107,6 +1205,21 @@ export interface File {
 }
 
 /**
+ * FileDownload 定义附件的即时下载地址。
+ */
+export interface FileDownload {
+    "previewUrl": string;
+    "url": string;
+}
+
+/**
+ * FilePartUploadInput 定义待上传分片的序号。
+ */
+export interface FilePartUploadInput {
+    "partNumber": number;
+}
+
+/**
  * FilePurpose 表示文件上传用途。
  */
 export enum FilePurpose {
@@ -1115,6 +1228,7 @@ export enum FilePurpose {
      */
     $zero = "",
 
+    FilePurposeMessageAttachment = "message_attachment",
     FilePurposeUserAvatar = "user_avatar",
     FilePurposeGroupImage = "group_image",
 };
@@ -1123,6 +1237,7 @@ export enum FilePurpose {
  * FileUpload 包含待上传文件和内容上传请求。
  */
 export interface FileUpload {
+    "partSize": number;
     "file": File;
     "request": FileUploadRequest;
 }
@@ -1817,6 +1932,20 @@ export interface MemberOptionListInput {
 }
 
 /**
+ * MessageAttachment 定义消息的文件信息与上传状态。
+ */
+export interface MessageAttachment {
+    "id": string;
+    "name": string;
+    "contentType": string;
+    "byteSize": number;
+    "contentUrl": string;
+    "uploadStatus": AttachmentUploadStatus;
+    "imageWidth": number;
+    "imageHeight": number;
+}
+
+/**
  * MessageChannelInput 定义消息渠道可编辑的通用字段。
  */
 export interface MessageChannelInput {
@@ -1875,6 +2004,7 @@ export enum MessageType {
     MessageTypeSystem = "system",
     MessageTypeAgentError = "agent_error",
     MessageTypeAgentCancelled = "agent_cancelled",
+    MessageTypeAttachment = "attachment",
 };
 
 /**

@@ -28,11 +28,19 @@ func NewDeleter(local *LocalStore, resolveS3 S3ConfigResolver) *Deleter {
 func (d *Deleter) Delete(ctx context.Context, record *servermodels.File) error {
 	switch domain.FileStorageBackend(record.StorageBackend) {
 	case domain.FileStorageBackendLocal:
+		if err := d.local.DeleteParts(record.StorageKey); err != nil {
+			return err
+		}
 		return d.local.Delete(ctx, record.StorageKey)
 	case domain.FileStorageBackendS3:
 		config, err := d.resolveS3(ctx, record.OrganizationID)
 		if err != nil {
 			return err
+		}
+		if record.MultipartUploadID != nil {
+			if err := AbortMultipart(ctx, config, record.StorageKey, *record.MultipartUploadID); err != nil {
+				return err
+			}
 		}
 		return Delete(ctx, config, record.StorageKey)
 	default:

@@ -11,8 +11,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// StatFunc 按文件记录的存储类型核验已上传内容，返回 ETag 和实际字节数。
-type StatFunc func(ctx context.Context, record *servermodels.File) (etag string, byteSize int64, err error)
+// FinalizeFunc 完成文件内容写入并返回 ETag 和实际字节数。
+type FinalizeFunc func(ctx context.Context, record *servermodels.File) (etag string, byteSize int64, err error)
 
 // CompleteUploadAction 核验文件内容并将上传标记为完成。
 type CompleteUploadAction struct {
@@ -25,10 +25,13 @@ func NewCompleteUploadAction(db *bun.DB) *CompleteUploadAction {
 }
 
 // Execute 按文件当前状态推进上传流程：已激活或已上传且未过期时幂等返回，待上传时核验内容后标记完成。
-func (a *CompleteUploadAction) Execute(ctx context.Context, identity *servermodels.Identity, fileID string, stat StatFunc) (*servermodels.File, error) {
+func (a *CompleteUploadAction) Execute(ctx context.Context, identity *servermodels.Identity, fileID string, finalize FinalizeFunc) (*servermodels.File, error) {
 	record, err := get(ctx, a.db, identity.Organization.ID, fileID, "")
 	if err != nil {
 		return nil, err
+	}
+	if record.CreatedByUserID != identity.User.ID {
+		return nil, ErrFileNotFound
 	}
 	switch record.Status {
 	case string(domain.FileStatusActive):
@@ -45,9 +48,9 @@ func (a *CompleteUploadAction) Execute(ctx context.Context, identity *servermode
 	default:
 		return nil, ErrFileNotFound
 	}
-	etag, actualSize, err := stat(ctx, record)
+	etag, actualSize, err := finalize(ctx, record)
 	if err != nil {
-		return nil, fmt.Errorf("stat uploaded file: %w", err)
+		return nil, fmt.Errorf("finalize uploaded file: %w", err)
 	}
 	if actualSize != record.ByteSize {
 		return nil, fmt.Errorf("uploaded file size = %d, want %d", actualSize, record.ByteSize)

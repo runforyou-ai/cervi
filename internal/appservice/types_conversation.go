@@ -22,6 +22,7 @@ const (
 	MessageTypeSystem         MessageType = MessageType(domain.MessageTypeSystem)
 	MessageTypeAgentError     MessageType = MessageType(domain.MessageTypeAgentError)
 	MessageTypeAgentCancelled MessageType = MessageType(domain.MessageTypeAgentCancelled)
+	MessageTypeAttachment     MessageType = MessageType(domain.MessageTypeAttachment)
 )
 
 // ConversationStatus 表示会话生命周期状态。
@@ -128,6 +129,7 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
+	Attachment           *MessageAttachment               `json:"attachment"`
 	AgentProcess         *ConversationAgentProcess        `json:"agentProcess"`
 	GroupMessageSequence *string                          `json:"groupMessageSequence"`
 	ID                   string                           `json:"id"`
@@ -328,4 +330,86 @@ type AgentTextMessageInput struct {
 	ClientMessageID  string `json:"clientMessageId"`
 	Body             string `json:"body"`
 	ReplyToMessageID string `json:"replyToMessageId"`
+}
+
+// AttachmentMessageInput 定义发往已有会话或单聊目标的附件消息。
+type AttachmentMessageInput struct {
+	ConversationID   string `json:"conversationId"`
+	TargetIdentityID string `json:"targetIdentityId"`
+	ClientMessageID  string `json:"clientMessageId"`
+	FileID           string `json:"fileId"`
+}
+
+// AttachmentMessageResult 定义附件消息及首发时创建的单聊。
+type AttachmentMessageResult struct {
+	ConversationID string              `json:"conversationId"`
+	Conversation   *InboxConversation  `json:"conversation"`
+	Message        ConversationMessage `json:"message"`
+}
+
+// AttachmentUploadStatus 定义附件消息的上传状态。
+type AttachmentUploadStatus string
+
+const (
+	AttachmentUploading AttachmentUploadStatus = AttachmentUploadStatus(domain.AttachmentUploading)
+	AttachmentReady     AttachmentUploadStatus = AttachmentUploadStatus(domain.AttachmentReady)
+	AttachmentFailed    AttachmentUploadStatus = AttachmentUploadStatus(domain.AttachmentFailed)
+	AttachmentCancelled AttachmentUploadStatus = AttachmentUploadStatus(domain.AttachmentCancelled)
+)
+
+// MessageAttachment 定义消息的文件信息与上传状态。
+type MessageAttachment struct {
+	File
+	UploadStatus AttachmentUploadStatus `json:"uploadStatus"`
+	ImageWidth   int                    `json:"imageWidth"`
+	ImageHeight  int                    `json:"imageHeight"`
+}
+
+// AttachmentBatchItem 定义选定附件与图片展示尺寸。
+type AttachmentBatchItem struct {
+	FileName        string `json:"fileName"`
+	ContentType     string `json:"contentType"`
+	ByteSize        int64  `json:"byteSize"`
+	ClientMessageID string `json:"clientMessageId"`
+	ImageWidth      int    `json:"imageWidth"`
+	ImageHeight     int    `json:"imageHeight"`
+}
+
+// AttachmentBatchInput 定义一批附件和末尾的独立说明消息。
+type AttachmentBatchInput struct {
+	CaptionMessageID string                `json:"captionMessageId"`
+	ConversationID   string                `json:"conversationId"`
+	TargetIdentityID string                `json:"targetIdentityId"`
+	Attachments      []AttachmentBatchItem `json:"attachments"`
+	Body             string                `json:"body"`
+}
+
+// AttachmentBatchResult 返回已保存的有序消息。
+type AttachmentBatchResult struct {
+	ConversationID string                `json:"conversationId"`
+	Conversation   *InboxConversation    `json:"conversation"`
+	Messages       []ConversationMessage `json:"messages"`
+}
+
+// AttachmentUploadUpdate 定义当前客户端上传的状态变更或活跃确认。
+type AttachmentUploadUpdate struct {
+	FileIDs []string               `json:"fileIds"`
+	Status  AttachmentUploadStatus `json:"status"`
+}
+
+// AttachmentStateListInput 指定当前消息窗口需要刷新的附件。
+type AttachmentStateListInput struct {
+	MessageIDs string `json:"messageIds" query:"messageIds"`
+}
+
+// AttachmentMessageState 定义消息窗口内附件的可见性和上传状态。
+type AttachmentMessageState struct {
+	MessageID  string            `json:"messageId"`
+	Attachment MessageAttachment `json:"attachment"`
+	Deleted    bool              `json:"deleted"`
+}
+
+// AttachmentStateList 返回当前窗口已有附件的状态。
+type AttachmentStateList struct {
+	States []AttachmentMessageState `json:"states"`
 }
