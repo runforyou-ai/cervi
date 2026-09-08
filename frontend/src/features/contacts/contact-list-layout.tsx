@@ -19,7 +19,7 @@ function PageControls({
   page: PageInfo
   onPageChange: (page: number) => void
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("common")
   const totalPages = Math.max(1, Math.ceil(page.total / page.size))
   return (
     <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
@@ -67,12 +67,12 @@ export function ContactListLayout({
   onPageChange: (page: number) => void
   children: ReactNode
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   return (
     <PageContent>
       {loading ? (
         <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-          {t("loading")}
+          {t("common:status.loading")}
         </LoadingIndicator>
       ) : error ? (
         <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -80,7 +80,7 @@ export function ContactListLayout({
             {t("list.loadError")}
           </p>
           <Button className="mt-4" variant="outline" onClick={onRetry}>
-            {t("retry")}
+            {t("common:actions.retry")}
           </Button>
         </div>
       ) : (

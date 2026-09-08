@@ -127,7 +127,7 @@ func (s *Service) OpenExternalPage(ctx context.Context, meta RequestMeta, input 
 	input.Title = strings.TrimSpace(input.Title)
 	input.URL = strings.TrimSpace(input.URL)
 	if len(input.URL) > maxExternalPageURLBytes || !common.ValidHTTPURL(input.URL) {
-		return InvalidError(meta, cervii18n.ErrorExternalPageURLInvalid, nil)
+		return InvalidError(meta, cervii18n.FieldHTTPURLInvalid, nil)
 	}
 	return s.externalPageOpener.OpenExternalPage(ctx, meta, input)
 }

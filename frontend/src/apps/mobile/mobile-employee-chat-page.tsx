@@ -48,7 +48,7 @@ function MobileEmployeeChatLookup({
   userID: string
   onDraft: (user: UserData) => void
 }) {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const { identity } = useMobileWorkspace()
   const location = useLocation()
   const profileURL = `/contacts/employees/${userID}`
@@ -133,7 +133,7 @@ function MobileEmployeeChatLookup({
         <MobilePageState title={t("contacts.chatUnavailable")} />
       ) : (
         <LoadingIndicator className="min-h-0 flex-1 justify-center">
-          {t("loading")}
+          {t("common:status.loading")}
         </LoadingIndicator>
       )}
     </section>

@@ -136,7 +136,7 @@ export function MobilePageState({
   description?: string
   onRetry?: () => void
 }) {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation("common")
   return (
     <div
       className="flex min-h-64 flex-1 flex-col items-center justify-center px-6 py-12 text-center"
@@ -150,7 +150,7 @@ export function MobilePageState({
       ) : null}
       {onRetry ? (
         <Button className="mt-4 min-h-11" variant="outline" onClick={onRetry}>
-          {t("retry")}
+          {t("actions.retry")}
         </Button>
       ) : null}
     </div>

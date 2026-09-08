@@ -407,7 +407,7 @@ function GroupResourceState({
   failed: boolean
   onRetry: () => void
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   if (loading) {
     return (
       <LoadingIndicator className="min-h-48 justify-center">
@@ -428,7 +428,7 @@ function GroupResourceState({
         className="mt-3"
         onClick={onRetry}
       >
-        {t("messagesRetry")}
+        {t("common:actions.retry")}
       </Button>
     </div>
   )

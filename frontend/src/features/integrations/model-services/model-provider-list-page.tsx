@@ -109,7 +109,7 @@ export function ModelProviderListPage({
 }: {
   section: ModelServiceSection
 }) {
-  const { t } = useTranslation("integrations")
+  const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const [deletingProvider, setDeletingProvider] =
     useState<AIProviderSummaryData | null>(null)
@@ -191,7 +191,7 @@ export function ModelProviderListPage({
         <div className="mt-6">
           {showLoading ? (
             <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-              {t("modelServices.loading")}
+              {t("common:status.loading")}
             </LoadingIndicator>
           ) : error ? (
             <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -203,7 +203,7 @@ export function ModelProviderListPage({
                 variant="outline"
                 onClick={() => void refresh()}
               >
-                {t("modelServices.retry")}
+                {t("common:actions.retry")}
               </Button>
             </div>
           ) : (
@@ -216,7 +216,7 @@ export function ModelProviderListPage({
                     <TableHead>{t("modelServices.list.columns.models")}</TableHead>
                     <TableHead>{t("modelServices.list.columns.apiUrl")}</TableHead>
                     <TableHead className="w-px">
-                      {t("modelServices.list.columns.actions")}
+                      {t("common:table.actions")}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -257,7 +257,7 @@ export function ModelProviderListPage({
                               <Link
                                 to={`/integrations/model-services/${section}/${provider.id}`}
                               >
-                                {t("modelServices.list.edit")}
+                                {t("common:actions.edit")}
                               </Link>
                             </Button>
                             <DropdownMenu>
@@ -265,8 +265,8 @@ export function ModelProviderListPage({
                                 <Button
                                   variant="ghost"
                                   size="icon-sm"
-                                  aria-label={t("modelServices.list.more")}
-                                  title={t("modelServices.list.more")}
+                                  aria-label={t("common:actions.more")}
+                                  title={t("common:actions.more")}
                                 >
                                   <MoreHorizontalIcon />
                                 </Button>
@@ -276,7 +276,7 @@ export function ModelProviderListPage({
                                   className="text-destructive focus:text-destructive"
                                   onSelect={() => setDeletingProvider(provider)}
                                 >
-                                  {t("modelServices.list.delete")}
+                                  {t("common:actions.delete")}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -311,15 +311,15 @@ export function ModelProviderListPage({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>
-              {t("modelServices.delete.cancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void confirmDelete()}
             >
               {deleting
-                ? t("modelServices.delete.deleting")
-                : t("modelServices.delete.confirm")}
+                ? t("common:actions.deleting")
+                : t("common:actions.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

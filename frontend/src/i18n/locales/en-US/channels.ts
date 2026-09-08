@@ -5,8 +5,6 @@ const channels = {
     telegram: "Telegram",
     wechatOfficialAccount: "WeChat Official Account",
   },
-  loading: "Loading…",
-  retry: "Try again",
   locales: {
     zhCN: "Simplified Chinese",
     enUS: "English",
@@ -16,7 +14,6 @@ const channels = {
     category: "Channel category",
     allCategories: "All categories",
     status: "Channel status",
-    clear: "Clear filters",
   },
   statuses: {
     enabled: "Enabled",
@@ -32,8 +29,6 @@ const channels = {
   list: {
     title: "Message channels",
     create: "Add channel",
-    edit: "Edit",
-    more: "More",
     activate: "Activate",
     deactivate: "Deactivate",
     statusUpdateError: "Could not change the channel status. Try again.",
@@ -44,7 +39,6 @@ const channels = {
       name: "Name",
       category: "Channel category",
       language: "Default service language",
-      actions: "Actions",
     },
   },
   deactivation: {
@@ -56,9 +50,6 @@ const channels = {
     title: "Activate “{{name}}”?",
     description: "The channel status will change to enabled.",
     confirm: "Activate",
-  },
-  statusConfirmation: {
-    cancel: "Cancel",
   },
   create: {
     title: "Add channel",
@@ -73,10 +64,7 @@ const channels = {
     name: "Channel name",
     description: "Description",
     defaultLocale: "Default service language",
-    save: "Save",
-    saving: "Saving…",
     saved: "Basic information saved.",
-    cancel: "Cancel",
     loadError: "Could not load the message channel.",
     networkError: "Could not connect to the server. Try again later.",
   },
@@ -123,11 +111,8 @@ const channels = {
       botToken: "Bot token",
       showToken: "Show token",
       hideToken: "Hide token",
-      save: "Save",
-      saving: "Saving…",
       test: "Test connection",
       testing: "Testing…",
-      cancel: "Cancel",
     },
     saved: "Telegram connection saved.",
     tested: "Connection test succeeded.",
@@ -137,7 +122,6 @@ const channels = {
       title: "Reuse this Telegram bot?",
       description:
         "This bot is already used by another channel. Continuing will switch its Telegram webhook to this channel, and the previous channel will stop receiving updates.",
-      cancel: "Cancel",
       confirm: "Continue saving",
     },
     info: {
@@ -231,7 +215,6 @@ const channels = {
       frameTitle: "Visitor Messenger preview",
       loading: "Loading visitor Messenger…",
       loadFailed: "Could not load the visitor Messenger preview.",
-      retry: "Try again",
     },
   },
 }

@@ -137,7 +137,7 @@ function MobileEmployeePage({
   onReady: (page: number) => void
   onLoadMore: (page: number) => void
 }) {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const sentinel = useRef<HTMLDivElement>(null)
   const query = {
     query: queryText,
@@ -181,7 +181,7 @@ function MobileEmployeePage({
             page === 1 ? "min-h-64 justify-center" : "h-14 justify-center"
           }
         >
-          {t(page === 1 ? "loading" : "contacts.loadingMore")}
+          {t(page === 1 ? "common:status.loading" : "contacts.loadingMore")}
         </LoadingIndicator>
       ) : null}
       {error && !data && page === 1 ? (
@@ -197,7 +197,7 @@ function MobileEmployeePage({
             disabled={loading || refreshing}
             onClick={() => void refresh()}
           >
-            {t("contacts.loadMoreError")} · {t("retry")}
+            {t("contacts.loadMoreError")} · {t("common:actions.retry")}
           </Button>
         </div>
       ) : null}

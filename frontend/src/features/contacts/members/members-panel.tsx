@@ -275,7 +275,7 @@ export function MembersPanel({
                 <TableHead>{t("columns.workStatus")}</TableHead>
                 <TableHead>{t("columns.createdAt")}</TableHead>
                 <TableHead className="w-px">
-                  {t("columns.actions")}
+                  {tCommon("table.actions")}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -321,15 +321,15 @@ export function MembersPanel({
                         size="sm"
                         onClick={() => setParameters({ selected: user.id })}
                       >
-                        {t("detail.action")}
+                        {tCommon("actions.view")}
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label={t("list.more")}
-                            title={t("list.more")}
+                            aria-label={tCommon("actions.more")}
+                            title={tCommon("actions.more")}
                           >
                             <MoreHorizontalIcon />
                           </Button>
@@ -438,14 +438,14 @@ export function MembersPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("members.status.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void changeUserStatus()}
             >
               {deleting
                 ? t("members.status.saving")
-                : t("members.status.confirm")}
+                : tCommon("actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

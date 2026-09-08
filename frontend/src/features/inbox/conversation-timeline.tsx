@@ -241,7 +241,7 @@ function ConversationTimelineContent({
   enabled?: boolean
 }) {
   const currentIdentityID = currentUser.identityId
-  const { t, i18n } = useTranslation("inbox")
+  const { t, i18n } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
   const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
@@ -607,7 +607,7 @@ function ConversationTimelineContent({
             variant="outline"
             onClick={() => void refresh()}
           >
-            {t("messagesRetry")}
+            {t("common:actions.retry")}
           </Button>
         </div>
       </div>

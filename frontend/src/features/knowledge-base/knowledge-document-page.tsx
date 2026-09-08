@@ -12,7 +12,7 @@ import { KnowledgeDocumentPreview } from "./knowledge-document-preview"
 
 /** 显示原件预览和暂不可用的分段入口。 */
 export function KnowledgeDocumentPage() {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const { knowledgeBaseId = "", groupId = "", documentId = "" } = useParams()
   const location = useLocation()
   const document = useResource(
@@ -30,7 +30,7 @@ export function KnowledgeDocumentPage() {
         </Button>
         <Button variant="ghost" size="sm" asChild>
           <Link to={`/knowledge-bases/${knowledgeBaseId}/groups/${returnGroupId}/documents${returnSearch}`}>
-            {t("documents.back")}
+            {t("common:actions.back")}
           </Link>
         </Button>
       </PageHeader>

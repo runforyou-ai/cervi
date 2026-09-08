@@ -44,7 +44,7 @@ export function CustomerDeliveryState({
   onRetryLocal?: () => void
   retryLocalDisabled?: boolean
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const invalidate = useResourceInvalidator()
   const [busy, setBusy] = useState(false)
   const [confirmRetry, setConfirmRetry] = useState(false)
@@ -130,7 +130,7 @@ export function CustomerDeliveryState({
             <AlertDialogDescription>{t("deliveryRetryRisk")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>{t("deliveryCancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={busy}>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction disabled={busy} onClick={(event) => {
               event.preventDefault()
               void resolve(CustomerDeliveryResolution.CustomerDeliveryRetry, true)

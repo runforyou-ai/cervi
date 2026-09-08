@@ -106,7 +106,7 @@ function KnowledgeQAForm({
   groupId: string
   entry?: KnowledgeQAEntryData
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const navigate = useNavigate()
   const location = useLocation()
   const invalidate = useResourceInvalidator()
@@ -189,7 +189,7 @@ function KnowledgeQAForm({
       />
       <div className="flex gap-3">
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {t(form.formState.isSubmitting ? "qa.saving" : "qa.save")}
+          {t(form.formState.isSubmitting ? "common:actions.saving" : "common:actions.save")}
         </Button>
         <Button
           type="button"
@@ -197,7 +197,7 @@ function KnowledgeQAForm({
           disabled={form.formState.isSubmitting}
           onClick={() => navigate(returnPath, { replace: true })}
         >
-          {t("qa.cancel")}
+          {t("common:actions.cancel")}
         </Button>
       </div>
     </form>
@@ -212,7 +212,7 @@ function SimilarQuestionFields({
   control: Control<QAFormValues>
   disabled: boolean
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const id = useId()
   const { fields, append, remove } = useFieldArray({
     control,
@@ -244,7 +244,7 @@ function SimilarQuestionFields({
             aria-label={t("qa.removeSimilarQuestion", { number: index + 1 })}
             onClick={() => remove(index)}
           >
-            {t("qa.remove")}
+            {t("common:actions.remove")}
           </Button>
         </div>
       ))}

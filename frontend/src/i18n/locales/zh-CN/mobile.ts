@@ -2,12 +2,9 @@
 const mobile = {
   unavailable: "暂未开放",
   apply: "应用筛选",
-  cancel: "取消",
   logout: "退出登录",
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",
-  loading: "正在加载…",
-  retry: "重试",
   identityLoadError: "无法读取登录状态。",
   contacts: {
     loadingMore: "正在加载更多…",
@@ -51,7 +48,6 @@ const mobile = {
     emptyDescription: "当前分类和筛选条件下没有会话。",
   },
   group: {
-    add: "添加",
     addMembers: "添加群成员",
     addOwnerOnly: "仅群主可添加成员。",
     addArchived: "群聊已解散，无法添加成员。",
@@ -67,7 +63,6 @@ const mobile = {
     complete: "完成",
     selectedMembers: "已选成员",
     removeMember: "移除 {{name}}",
-    remove: "移除",
     noSelection: "尚未选择成员",
     searchMembers: "搜索成员姓名",
     title: "群聊",

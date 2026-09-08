@@ -28,7 +28,7 @@ export function TeamForm({
   onSaved: (team: Team) => void
   onCancel?: () => void
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
@@ -102,12 +102,12 @@ export function TeamForm({
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting
-            ? t("teams.form.saving")
-            : t("teams.form.save")}
+            ? t("common:actions.saving")
+            : t("common:actions.save")}
         </Button>
         {onCancel ? (
           <Button type="button" variant="outline" onClick={onCancel}>
-            {t("teams.form.cancel")}
+            {t("common:actions.cancel")}
           </Button>
         ) : null}
       </div>

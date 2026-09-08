@@ -61,7 +61,7 @@ function useClearSelectionOnNavigation() {
 export function WorkspaceLayout() {
   useClearSelectionOnNavigation()
   const location = useLocation()
-  const { t } = useTranslation("workspace")
+  const { t } = useTranslation(["workspace", "common"])
   const navigate = useNavigate()
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -304,7 +304,7 @@ export function WorkspaceLayout() {
   if (!identity) {
     return (
       <main className="flex min-h-svh items-center justify-center">
-        <LoadingIndicator>{t("loading")}</LoadingIndicator>
+        <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator>
       </main>
     )
   }

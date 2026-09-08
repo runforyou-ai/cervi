@@ -248,7 +248,7 @@ export function AgentsPanel({
                 <TableHead>{t("columns.workStatus")}</TableHead>
                 <TableHead>{t("columns.createdAt")}</TableHead>
                 <TableHead className="w-px">
-                  {t("columns.actions")}
+                  {tCommon("table.actions")}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -294,15 +294,15 @@ export function AgentsPanel({
                         size="sm"
                         onClick={() => setParameters({ selected: agent.id })}
                       >
-                        {t("detail.action")}
+                        {tCommon("actions.view")}
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label={t("list.more")}
-                            title={t("list.more")}
+                            aria-label={tCommon("actions.more")}
+                            title={tCommon("actions.more")}
                           >
                             <MoreHorizontalIcon />
                           </Button>
@@ -401,14 +401,14 @@ export function AgentsPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("agents.status.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void changeAgentStatus()}
             >
               {deleting
                 ? t("agents.status.saving")
-                : t("agents.status.confirm")}
+                : tCommon("actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

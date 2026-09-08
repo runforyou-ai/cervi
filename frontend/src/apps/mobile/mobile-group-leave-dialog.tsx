@@ -27,7 +27,7 @@ export function MobileGroupLeaveDialog({
   onSave: (action: () => Promise<unknown>, change: "leave") => Promise<boolean>
 }) {
   const { t } = useTranslation("inbox")
-  const { t: tm } = useTranslation("mobile")
+  const { t: tCommon } = useTranslation("common")
   return (
     <AlertDialog
       open
@@ -49,7 +49,7 @@ export function MobileGroupLeaveDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel className="min-h-11" disabled={busy}>
-            {tm("cancel")}
+            {tCommon("actions.cancel")}
           </AlertDialogCancel>
           <Button
             className="min-h-11"

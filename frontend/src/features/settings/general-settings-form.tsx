@@ -37,7 +37,7 @@ export function GeneralSettingsForm({
   organization: Organization
   onUpdated: (organization: Organization) => void
 }) {
-  const { t } = useTranslation("settings")
+  const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
   const mounted = useRef(true)
   const [confirmingArbitraryURL, setConfirmingArbitraryURL] = useState(false)
@@ -143,7 +143,7 @@ export function GeneralSettingsForm({
             {isSubmitting ? (
               <LoaderCircleIcon className="animate-spin" />
             ) : null}
-            {isSubmitting ? t("general.form.saving") : t("general.form.save")}
+            {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
           </Button>
         </div>
       </form>
@@ -160,7 +160,7 @@ export function GeneralSettingsForm({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("general.confirm.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 form.setValue("allowArbitraryUrl", true, {
