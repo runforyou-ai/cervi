@@ -15,16 +15,11 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
-import { NativeSelect } from "@/components/ui/native-select"
+import { FieldGroup } from "@/components/ui/field"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { roleDisplayName } from "@/features/roles/role-labels"
+import { RoleSelectField } from "@/features/contacts/role-select-field"
+import { TeamCheckboxField } from "@/features/contacts/team-checkbox-field"
 import {
   createMemberSchema,
   type MemberFormValues,
@@ -142,57 +137,26 @@ export function MemberForm({
           name="roleId"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={field.name} required>
-                {t("members.form.role")}
-              </FieldLabel>
-              <NativeSelect
-                {...field}
-                id={field.name}
-                aria-invalid={fieldState.invalid}
-              >
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {roleDisplayName(role, tCommon)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </Field>
+            <RoleSelectField
+              {...field}
+              id={field.name}
+              aria-invalid={fieldState.invalid}
+              roles={roles}
+            />
           )}
         />
         <Controller
           name="teamIds"
           control={form.control}
           render={({ field }) => (
-            <Field>
-              <FieldLabel>{t("members.form.teams")}</FieldLabel>
-              {teams.length === 0 ? (
-                <FieldDescription>{t("members.form.noTeams")}</FieldDescription>
-              ) : (
-                <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
-                  {teams.map((team) => (
-                    <label
-                      key={team.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        checked={field.value.includes(team.id)}
-                        onChange={(event) =>
-                          field.onChange(
-                            event.target.checked
-                              ? [...field.value, team.id]
-                              : field.value.filter((id) => id !== team.id),
-                          )
-                        }
-                      />
-                      <span>{team.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </Field>
+            <TeamCheckboxField
+              teams={teams}
+              label={t("members.form.teams")}
+              emptyMessage={t("members.form.noTeams")}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+            />
           )}
         />
       </FieldGroup>

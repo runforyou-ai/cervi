@@ -1,4 +1,5 @@
 /** 模型服务供应商表单校验规则。 */
+import { isHTTPEndpoint } from "@/lib/http-url"
 import { z } from "zod"
 
 import {
@@ -7,22 +8,6 @@ import {
   AIProviderBrand,
 } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
-
-/** 判断模型服务 API 地址是否完整有效。 */
-function validAPIURL(value: string) {
-  try {
-    const endpoint = new URL(value)
-    return (
-      (endpoint.protocol === "http:" || endpoint.protocol === "https:") &&
-      endpoint.username === "" &&
-      endpoint.password === "" &&
-      endpoint.search === "" &&
-      endpoint.hash === ""
-    )
-  } catch {
-    return false
-  }
-}
 
 /** 创建模型服务供应商表单校验。 */
 export function createAIProviderSchema(messages: {
@@ -61,7 +46,7 @@ export function createAIProviderSchema(messages: {
       .string()
       .trim()
       .min(1, messages.apiUrlRequired)
-      .refine(validAPIURL, messages.apiUrlInvalid),
+      .refine(isHTTPEndpoint, messages.apiUrlInvalid),
     models: z
       .array(
         z

@@ -97,7 +97,6 @@ const inbox = {
   groupMembersRequired: "请至少选择一位成员",
   groupMembersTooMany: "一个群聊最多包含 100 名成员",
   groupMembersSelected: "已选 {{count}} 人",
-  groupMembersLoading: "正在读取成员",
   groupMembersLoadError: "读取成员失败",
   groupMembersEmpty: "没有匹配的可用成员",
   groupCreateError: "无法创建群聊，请重试",

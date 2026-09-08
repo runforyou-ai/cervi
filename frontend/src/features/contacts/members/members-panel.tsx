@@ -63,8 +63,9 @@ import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { UserStatusBadge } from "@/features/contacts/user-status-badge"
 import { roleDisplayName } from "@/features/roles/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
+import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
@@ -83,7 +84,7 @@ export function MembersPanel({
   const { identity, updateUser: updateWorkspaceUser } = useWorkspace()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
-  const invalidate = useResourceInvalidator()
+  const invalidateContact = useContactInvalidator()
   const {
     searchParams,
     setParameters,
@@ -137,7 +138,7 @@ export function MembersPanel({
   /** 刷新列表并关闭详情。 */
   function refreshAndClose() {
     closeDetail()
-    void invalidate(resourceKeys.users())
+    void invalidateContact("user")
   }
 
   /** 禁用用户账号或恢复为正常状态。 */
@@ -162,9 +163,7 @@ export function MembersPanel({
         ),
       )
       setChangingUserStatus(null)
-      void invalidate(resourceKeys.user(saved.id))
-      void invalidate(resourceKeys.users())
-      void invalidate(resourceKeys.customerServiceAssignees())
+      void invalidateContact("user", saved.id)
     } catch (error) {
       if (recoverSession(error, navigate)) return
       console.warn("修改企业成员账号状态失败", {
@@ -383,14 +382,7 @@ export function MembersPanel({
             roles={roles}
             workStatus={memberWorkStatus(detailUser)}
             onSaved={(saved) => {
-              void invalidate(resourceKeys.user(saved.id))
-              void invalidate(resourceKeys.users())
-              void invalidate(resourceKeys.roles())
-              void invalidate(resourceKeys.teams())
-              void invalidate(resourceKeys.teamMembers())
-              void invalidate(resourceKeys.teamMemberCandidates())
-              void invalidate(resourceKeys.roleMembers())
-              void invalidate(resourceKeys.customerServiceAssignees())
+              void invalidateContact("user", saved.id)
               if (saved.id === identity.user.id) {
                 updateWorkspaceUser({
                   ...identity.user,

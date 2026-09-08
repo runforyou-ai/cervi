@@ -3,6 +3,7 @@ import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router"
 import type { KnowledgeQAListData, KnowledgeQASummaryData } from "@/api"
+import { PageControls } from "@/components/page-controls"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -44,8 +45,6 @@ export function KnowledgeQATable({
   onPageChange: (page: number) => void
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
-  const pageNumber = data.page.number
-  const totalPages = Math.max(1, Math.ceil(data.page.total / data.page.size))
   return (
     <div className="overflow-hidden rounded-lg border" aria-busy={loading}>
       <Table className="min-w-[900px] table-fixed">
@@ -90,33 +89,12 @@ export function KnowledgeQATable({
           )}
         </TableBody>
       </Table>
-      <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground">
-        <span>{t("qa.total", { count: data.page.total })}</span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={loading || pageNumber <= 1}
-            onClick={() => onPageChange(pageNumber - 1)}
-          >
-            {t("common:pagination.previous")}
-          </Button>
-          <span>
-            {t("common:pagination.page", {
-              current: pageNumber,
-              total: totalPages,
-            })}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={loading || pageNumber >= totalPages}
-            onClick={() => onPageChange(pageNumber + 1)}
-          >
-            {t("common:pagination.next")}
-          </Button>
-        </div>
-      </div>
+      <PageControls
+        page={data.page}
+        disabled={loading}
+        totalLabel={t("qa.total", { count: data.page.total })}
+        onPageChange={onPageChange}
+      />
     </div>
   )
 }

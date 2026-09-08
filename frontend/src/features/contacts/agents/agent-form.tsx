@@ -18,12 +18,10 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { NativeSelect } from "@/components/ui/native-select"
 import { AgentKnowledgeField } from "@/features/contacts/agents/agent-knowledge-field"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import { parseAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
@@ -33,7 +31,8 @@ import {
 } from "@/features/contacts/agents/agent-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { roleDisplayName } from "@/features/roles/role-labels"
+import { RoleSelectField } from "@/features/contacts/role-select-field"
+import { TeamCheckboxField } from "@/features/contacts/team-checkbox-field"
 
 /** 创建 AI 员工。 */
 export function AgentForm({
@@ -152,22 +151,12 @@ export function AgentForm({
           name="roleId"
           control={form.control}
           render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={field.name} required>
-                {t("members.form.role")}
-              </FieldLabel>
-              <NativeSelect
-                {...field}
-                id={field.name}
-                aria-invalid={fieldState.invalid}
-              >
-                {assignableRoles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {roleDisplayName(role, tCommon)}
-                  </option>
-                ))}
-              </NativeSelect>
-            </Field>
+            <RoleSelectField
+              {...field}
+              id={field.name}
+              aria-invalid={fieldState.invalid}
+              roles={assignableRoles}
+            />
           )}
         />
         <AgentManagedExecutionFields control={form.control} />
@@ -175,35 +164,14 @@ export function AgentForm({
           name="teamIds"
           control={form.control}
           render={({ field }) => (
-            <Field>
-              <FieldLabel>{t("agents.form.teams")}</FieldLabel>
-              {teams.length === 0 ? (
-                <FieldDescription>{t("agents.form.noTeams")}</FieldDescription>
-              ) : (
-                <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
-                  {teams.map((team) => (
-                    <label
-                      key={team.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        checked={field.value.includes(team.id)}
-                        onChange={(event) =>
-                          field.onChange(
-                            event.target.checked
-                              ? [...field.value, team.id]
-                              : field.value.filter((id) => id !== team.id),
-                          )
-                        }
-                      />
-                      <span>{team.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </Field>
+            <TeamCheckboxField
+              teams={teams}
+              label={t("agents.form.teams")}
+              emptyMessage={t("agents.form.noTeams")}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+            />
           )}
         />
       </FieldGroup>

@@ -1,4 +1,5 @@
 /** 输入自定义网址并按平台打开的弹窗。 */
+import { isHTTPURL } from "@/lib/http-url"
 import { useEffect, useMemo, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -23,22 +24,6 @@ import { openExternalPage } from "@/platform/external-navigation"
 
 const urlMaxLength = 2048
 
-/** 校验地址为不含认证信息的完整 HTTP 或 HTTPS 地址。 */
-function validExternalPageUrl(value: string) {
-  let parsed: URL
-  try {
-    parsed = new URL(value)
-  } catch {
-    return false
-  }
-  return (
-    (parsed.protocol === "http:" || parsed.protocol === "https:") &&
-    parsed.host !== "" &&
-    parsed.username === "" &&
-    parsed.password === ""
-  )
-}
-
 /** 输入网址后在应用内新窗口或新浏览器标签中打开。 */
 export function OpenUrlDialog({
   open,
@@ -57,7 +42,7 @@ export function OpenUrlDialog({
           .string()
           .trim()
           .max(urlMaxLength, t("openUrl.invalid"))
-          .refine(validExternalPageUrl, t("openUrl.invalid")),
+          .refine(isHTTPURL, t("openUrl.invalid")),
       }),
     [t],
   )
