@@ -194,10 +194,11 @@ func (a *SendAgentTextMessageAction) Execute(ctx context.Context, identity *serv
 // lockAgentSendContext 锁定会话与成员后复核 AI 会话归属和发送资格。
 func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string) (internalMessageContext, error) {
 	row := internalMessageContext{}
-	if _, err := chatstate.LockMember(ctx, tx, identity, conversationID); err != nil {
+	member, err := chatstate.LockMember(ctx, tx, identity, conversationID)
+	if err != nil {
 		return row, err
 	}
-	err := tx.NewSelect().TableExpr("agent_conversations AS ac").
+	err = tx.NewSelect().TableExpr("agent_conversations AS ac").
 		ColumnExpr("ac.conversation_id, mine.id AS participant_id, mine.subject_id, ac.agent_identity_id, agent.active_revision_id AS agent_revision_id").
 		Join("JOIN conversations AS cv ON cv.id = ac.conversation_id AND cv.organization_id = ac.organization_id").
 		Join("JOIN chat_subjects AS user_cs ON user_cs.organization_id = ac.organization_id AND user_cs.kind = ? AND user_cs.source_id = ac.user_identity_id", domain.ChatSubjectKindOrganizationIdentity).
@@ -213,5 +214,6 @@ func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels
 	if err != nil {
 		return row, fmt.Errorf("load AI conversation send context: %w", err)
 	}
+	row.Conversation = member.Conversation
 	return row, nil
 }

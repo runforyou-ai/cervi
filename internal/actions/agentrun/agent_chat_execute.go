@@ -39,7 +39,7 @@ func (p agentChatRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *se
 		For("UPDATE OF cp").Scan(ctx, &participantID); err != nil {
 		return agentRunPolicyContext{}, fmt.Errorf("lock AI conversation agent participant: %w", err)
 	}
-	return agentRunPolicyContext{AgentParticipantID: participantID}, nil
+	return agentRunPolicyContext{Conversation: cv, AgentParticipantID: participantID}, nil
 }
 
 // prepareLocked 确认 AI 聊天 Agent 可以继续执行。
@@ -52,13 +52,10 @@ func (p agentChatRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *s
 	return loadClaimedConversationMessages(ctx, db, run, endSeq)
 }
 
-// persistMessage 写入 Agent 结果消息并更新会话摘要。
+// persistMessage 追加独立 AI 会话的结果消息。
 func (p agentChatRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
-	message, err := insertAgentMessage(ctx, db, run, messageID, policyContext.AgentParticipantID, messageType, content, nil)
-	if err != nil {
-		return err
-	}
-	return updateConversationAfterAgentResponse(ctx, db, message)
+	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, run, messageID, policyContext.AgentParticipantID, messageType, content, nil)
+	return err
 }
 
 // enqueueNext 为 AI 聊天 Agent 的剩余输入创建下一次运行。

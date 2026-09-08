@@ -46,14 +46,44 @@ func (r *isolatedChatRuntime) Run(ctx context.Context, request agentruntime.RunR
 	return agentruntime.RunResult{Content: "答复：" + expected[0], EndSeq: claimed.EndSeq}, nil
 }
 
-type failingChatScheduler struct{ inner *agentrunaction.Scheduler }
+type failingMessageScheduler struct {
+	inner          *agentrunaction.Scheduler
+	taskIDs        []string
+	conversationID string
+	failure        error
+}
 
 // Schedule 在真实输入和任务创建后返回失败以验证整个首发事务回滚。
-func (s failingChatScheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentID, revisionID, messageID string) error {
+func (s *failingMessageScheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentID, revisionID, messageID string) error {
 	if err := s.inner.Schedule(ctx, db, organizationID, conversationID, agentID, revisionID, messageID); err != nil {
 		return err
 	}
-	return errors.New("test scheduling failure")
+	return s.failAfterSchedule(ctx, db, conversationID, messageID)
+}
+
+// ScheduleCustomerAuto 在真实访客输入和任务创建后返回失败。
+func (s *failingMessageScheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organizationID, conversationID, sessionID, messageID string) (bool, error) {
+	scheduled, err := s.inner.ScheduleCustomerAuto(ctx, db, organizationID, conversationID, sessionID, messageID)
+	if err != nil {
+		return false, err
+	}
+	return scheduled, s.failAfterSchedule(ctx, db, conversationID, messageID)
+}
+
+// failAfterSchedule 记录消息、摘要及任务在同一事务中的关联，再注入回滚错误。
+func (s *failingMessageScheduler) failAfterSchedule(ctx context.Context, db bun.IDB, conversationID, messageID string) error {
+	s.conversationID = conversationID
+	if err := db.NewSelect().TableExpr("task_runs tr").ColumnExpr("tr.id").
+		Join("JOIN task_outbox tob ON tob.task_run_id = tr.id").
+		Join("JOIN agent_runs agr ON tr.idempotency_key = 'agent:' || agr.id::text").
+		Join("JOIN conversation_agent_triggers cat ON cat.conversation_id = agr.conversation_id AND cat.organization_id = agr.organization_id").
+		Join("JOIN conversations cv ON cv.id = cat.conversation_id AND cv.last_message_id = cat.trigger_message_id").
+		Join("LEFT JOIN service_sessions ss ON ss.id = cat.service_session_id AND ss.organization_id = cat.organization_id").
+		Where("cat.service_session_id IS NULL OR ss.last_message_id = cat.trigger_message_id").
+		Where("agr.conversation_id = ? AND cat.trigger_message_id = ?", conversationID, messageID).Scan(ctx, &s.taskIDs); err != nil {
+		return err
+	}
+	return s.failure
 }
 
 // testAgentConversations 验证独立 AI 会话的创建幂等、上下文及访问边界。
@@ -150,8 +180,9 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	testAgentConversationAccess(t, db, identity, scheduler, first, second)
 	rollbackInput := firstInput
 	rollbackInput.ConversationID, rollbackInput.ClientMessageID = uuid.NewV7().String(), uuid.NewV7().String()
-	if _, err := conversationaction.NewSendFirstAgentTextMessageAction(db, failingChatScheduler{scheduler}).Execute(ctx, identity, rollbackInput); err == nil {
-		t.Fatal("scheduler failure ignored")
+	failing := &failingMessageScheduler{inner: scheduler, failure: errors.New("test scheduling failure")}
+	if _, err := conversationaction.NewSendFirstAgentTextMessageAction(db, failing).Execute(ctx, identity, rollbackInput); !errors.Is(err, failing.failure) {
+		t.Fatalf("expected scheduling failure: %v", err)
 	}
 	for _, table := range []string{"agent_conversations", "conversation_participants", "messages", "conversation_agent_states", "conversation_agent_triggers", "agent_runs"} {
 		count, err := db.NewSelect().TableExpr(table).Where("conversation_id = ?", rollbackInput.ConversationID).Count(ctx)
@@ -161,6 +192,15 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	}
 	if exists, err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Where("id = ?", rollbackInput.ConversationID).Exists(ctx); err != nil || exists {
 		t.Fatalf("empty conversation survived rollback: %v %v", exists, err)
+	}
+	if len(failing.taskIDs) != 1 {
+		t.Fatalf("atomic task rows were not observed: %v", failing.taskIDs)
+	}
+	for table, column := range map[string]string{"task_runs": "id", "task_outbox": "task_run_id"} {
+		count, err := db.NewSelect().TableExpr(table).Where("? IN (?)", bun.Ident(column), bun.In(failing.taskIDs)).Count(ctx)
+		if err != nil || count != 0 {
+			t.Fatalf("rollback %s rows=%d err=%v", table, count, err)
+		}
 	}
 	db.AddQueryHook(chatQueryHook{})
 	t.Run("主动停止回复", func(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -35,15 +36,13 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID
 	}
-	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "idempotency_key", "originated_at").
-		Returning("*").
-		Exec(ctx); err != nil {
-		return ConversationMessage{}, fmt.Errorf("create individual text message: %w", err)
-	}
-	conversation := &servermodels.Conversation{ID: input.ConversationID, OrganizationID: identity.Organization.ID}
-	if err := updateConversationSummary(ctx, db, conversation, message); err != nil {
+	message, inserted, err := chatstate.AppendMessage(ctx, db, sendContext.Conversation, message)
+	if err != nil {
 		return ConversationMessage{}, err
+	}
+	if !inserted {
+		saved, _, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, false)
+		return saved, err
 	}
 	if err := advanceConversationUserReadState(ctx, db, &servermodels.ConversationUserState{
 		OrganizationID: identity.Organization.ID, ConversationID: input.ConversationID,
@@ -70,11 +69,12 @@ type AgentChatMessageScheduler interface {
 }
 
 type internalMessageContext struct {
-	ConversationID  string  `bun:"conversation_id"`
-	ParticipantID   string  `bun:"participant_id"`
-	SubjectID       string  `bun:"subject_id"`
-	AgentIdentityID string  `bun:"agent_identity_id"`
-	AgentRevisionID *string `bun:"agent_revision_id"`
+	Conversation    *servermodels.Conversation `bun:"-"`
+	ConversationID  string                     `bun:"conversation_id"`
+	ParticipantID   string                     `bun:"participant_id"`
+	SubjectID       string                     `bun:"subject_id"`
+	AgentIdentityID string                     `bun:"agent_identity_id"`
+	AgentRevisionID *string                    `bun:"agent_revision_id"`
 }
 
 // normalizeInternalMessageInput 规范化双方聊天正文和引用。

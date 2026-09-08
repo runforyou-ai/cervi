@@ -271,6 +271,13 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	if !foundFirst || len(history.Messages) != 1 {
 		t.Fatalf("history=%+v", history.Messages)
 	}
+	var summary servermodels.Conversation
+	if err := f.db.NewSelect().Model(&summary).Where("id = ?", result.ConversationID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if summary.LastMessageID == nil || *summary.LastMessageID != result.Messages[0].ID {
+		t.Fatalf("cancelled last attachment did not restore previous summary: %+v", summary)
+	}
 	// 完成先提交时，随后到达的取消仍须撤去消息，迟到完成不能恢复它。
 	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentCancelled); err != nil {
 		t.Fatal(err)

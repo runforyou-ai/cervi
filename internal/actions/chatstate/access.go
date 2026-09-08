@@ -1,6 +1,6 @@
 //go:build server
 
-// Package chatstate 提供聊天 Action 与 Query 共用的访问资格和事务锁定能力。
+// Package chatstate 提供聊天 Action 与 Query 共用的访问资格、事务锁定与消息追加能力。
 package chatstate
 
 import (

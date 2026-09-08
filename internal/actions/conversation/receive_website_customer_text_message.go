@@ -396,45 +396,6 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 	}
 }
 
-// updateSessionSummary 按消息稳定顺序推进未结束批次摘要。
-func updateSessionSummary(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, message *servermodels.Message) error {
-	_, err := db.NewUpdate().Model(session).
-		Set("last_message_id = ?", message.ID).
-		Set("last_message_at = ?", message.OriginatedAt).
-		Set("last_message_source_order = ?", message.SourceOrder).
-		Set("updated_at = now()").
-		WherePK().
-		Where("organization_id = ?", message.OrganizationID).
-		Where("status = ?", domain.ServiceSessionStatusOpen).
-		Where("(last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("update service session summary: %w", err)
-	}
-	return nil
-}
-
-// updateConversationSummary 按消息稳定顺序推进会话摘要。
-func updateConversationSummary(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) error {
-	query := db.NewUpdate().Model(conversation).
-		Set("last_message_id = ?", message.ID).
-		Set("last_message_at = ?", message.OriginatedAt).
-		Set("last_message_source_order = ?", message.SourceOrder).
-		Set("updated_at = now()").
-		WherePK().
-		Where("organization_id = ?", message.OrganizationID)
-	if message.GroupMessageSequence != nil {
-		query = query.Where("last_group_message_sequence = ?", *message.GroupMessageSequence)
-	} else {
-		query = query.Where("last_message_at IS NULL OR (last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID)
-	}
-	_, err := query.Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("update conversation summary: %w", err)
-	}
-	return nil
-}
-
 // receiveWebsiteCustomerTextMessageResult 转换网站访客消息写入结果。
 func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessageResult) ReceiveWebsiteCustomerTextMessageResult {
 	var replyTo *MessageReference

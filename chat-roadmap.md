@@ -1291,7 +1291,7 @@ PR03 的停用生效边界已确认：目标停用只拒绝之后资格校验的
 
 锁序交叉检查不能只检查显式 `FOR UPDATE`：INSERT 的唯一冲突等待、UPDATE、头像文件激活、身份停用和渠道路由重置也会取锁。PR03 检查规范身份对与 ChatSubject 的创建顺序；PR04 共用 chatstate 的企业身份主体创建能力，并检查渠道／Bot 外层锁、凭据设置、渠道身份／联系人恢复、转交目标身份和文件前置关系；PR22 检查资料对象到多会话集合的顺序，禁止新增反向获取这些前置对象的路径。文件锁按稳定 ID 排序，网络下载和模型执行在事务外完成。上述现状中尚未满足目标的路径由对应 PR 修正，本次不宣称已经消除死锁。
 
-三条验收追踪：群移除沿 `RemoveGroupConversationMemberAction.Execute → chatstate.LockGroup → chatstate.LockMember → loadActiveGroupParticipant → leaveGroupParticipant → createGroupSystemEvent`；客服接管沿 `ClaimServiceSessionAction.Execute → lockOpenServiceSession → CancelForServiceSession`，提交后再调用 `finishServiceSessionAgentCancellation`；AI 写回沿 `ExecuteAction.complete → lockAgentRun → policy.prepareLocked → policy.persistMessage`，客服策略再进入 `ensureCustomerAgentParticipant / updateCustomerAgentSummaries`。PR03 已用数据库屏障覆盖真人单聊和独立 AI 聊天的发送与执行交错；PR04 已统一客服接管和写回的完整锁序，验证记录见 PR 实施清单。
+三条验收追踪：群移除沿 `RemoveGroupConversationMemberAction.Execute → chatstate.LockGroup → chatstate.LockMember → loadActiveGroupParticipant → leaveGroupParticipant → createGroupSystemEvent`；客服接管沿 `ClaimServiceSessionAction.Execute → lockOpenServiceSession → CancelForServiceSession`，提交后再调用 `finishServiceSessionAgentCancellation`；AI 写回沿 `ExecuteAction.complete → lockAgentRun → policy.prepareLocked → policy.persistMessage`，客服策略再进入 `ensureCustomerAgentParticipant → appendAgentMessage → chatstate.AppendMessage`。PR03 已用数据库屏障覆盖真人单聊和独立 AI 聊天的发送与执行交错；PR04 已统一客服接管和写回的完整锁序，验证记录见 PR 实施清单。
 
 ## 11. 数据隔离与长期规则
 

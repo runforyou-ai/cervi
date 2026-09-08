@@ -309,12 +309,24 @@ func TestCustomerDeliveryScanAndManualConfirmation(t *testing.T) {
 	}
 }
 
-type failingDeliveryEnqueuer struct{ observedAtomicRows bool }
+type failingDeliveryEnqueuer struct {
+	observedAtomicRows bool
+	inner              servertask.TxEnqueuer
+	taskID             string
+}
 
 // EnqueueIn 检查业务行与投递行已进入同一事务，再模拟唤醒写入失败。
-func (e *failingDeliveryEnqueuer) EnqueueIn(ctx context.Context, tx bun.IDB, _ string, input any, _ servertask.EnqueueOptions) (string, error) {
+func (e *failingDeliveryEnqueuer) EnqueueIn(ctx context.Context, tx bun.IDB, action string, input any, options servertask.EnqueueOptions) (string, error) {
 	id := input.(deliveryaction.Input).DeliveryID
-	e.observedAtomicRows, _ = tx.NewSelect().TableExpr("customer_message_deliveries AS d").Join("JOIN messages AS m ON m.id = d.message_id AND m.organization_id = d.organization_id").Where("d.id = ?", id).Exists(ctx)
+	var err error
+	e.observedAtomicRows, err = tx.NewSelect().TableExpr("customer_message_deliveries AS d").Join("JOIN messages AS m ON m.id = d.message_id AND m.organization_id = d.organization_id").Join("JOIN conversations cv ON cv.id = m.conversation_id AND cv.last_message_id = m.id").Join("JOIN service_sessions ss ON ss.id = m.service_session_id AND ss.last_message_id = m.id").Where("d.id = ?", id).Exists(ctx)
+	if err != nil {
+		return "", err
+	}
+	e.taskID, err = e.inner.EnqueueIn(ctx, tx, action, input, options)
+	if err != nil {
+		return "", err
+	}
 	return "", errors.New("enqueue failed")
 }
 
@@ -323,7 +335,15 @@ func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	input := conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "必须原子提交"}
-	failing := &failingDeliveryEnqueuer{}
+	runtime := servertask.New(f.db, serverconfig.NATSConfig{})
+	if err := runtime.Registry().RegisterJSON(deliveryaction.SendActionName, f.worker.Execute); err != nil {
+		t.Fatal(err)
+	}
+	before := &models.Conversation{ID: f.conversationID}
+	if err := f.db.NewSelect().Model(before).WherePK().Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	failing := &failingDeliveryEnqueuer{inner: runtime}
 	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, failing).Execute(ctx, f.owner, input); err == nil || !failing.observedAtomicRows {
 		t.Fatalf("atomic rows=%v err=%v", failing.observedAtomicRows, err)
 	}
@@ -333,10 +353,23 @@ func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
 	if exists, err := f.db.NewSelect().TableExpr("messages").Where("conversation_id = ? AND body = ?", f.conversationID, input.Body).Exists(ctx); err != nil || exists {
 		t.Fatalf("message survived rollback: %v %v", exists, err)
 	}
-	runtime := servertask.New(f.db, serverconfig.NATSConfig{})
-	if err := runtime.Registry().RegisterJSON(deliveryaction.SendActionName, f.worker.Execute); err != nil {
+	if failing.taskID == "" {
+		t.Fatal("task was not written before rollback")
+	}
+	for table, column := range map[string]string{"task_runs": "id", "task_outbox": "task_run_id"} {
+		count, err := f.db.NewSelect().TableExpr(table).Where("? = ?", bun.Ident(column), failing.taskID).Count(ctx)
+		if err != nil || count != 0 {
+			t.Fatalf("rollback %s rows=%d err=%v", table, count, err)
+		}
+	}
+	after := &models.Conversation{ID: f.conversationID}
+	if err := f.db.NewSelect().Model(after).WherePK().Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
+	if after.LastMessageID == nil || *after.LastMessageID != *before.LastMessageID || !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Fatalf("summary survived rollback: before=%+v after=%+v", before, after)
+	}
+	assertCustomerLockSummary(t, ctx, f.db, f.conversationID)
 	message, err := conversationaction.NewSendCustomerTextMessageAction(f.db, runtime).Execute(ctx, f.owner, input)
 	if err != nil {
 		t.Fatal(err)
