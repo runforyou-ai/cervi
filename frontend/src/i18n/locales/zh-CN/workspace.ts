@@ -42,6 +42,7 @@ const workspace = {
       apps: "应用",
       channels: "消息渠道",
       businessSystems: "业务系统",
+      mcpServers: "MCP 服务",
       modelServices: "模型服务",
     },
   },

@@ -22,6 +22,7 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
+	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
@@ -160,6 +161,11 @@ type DirectBackend struct {
 	createBusinessSystem              *businesssystemaction.CreateBusinessSystemAction
 	updateBusinessSystem              *businesssystemaction.UpdateBusinessSystemAction
 	deleteBusinessSystem              *businesssystemaction.DeleteBusinessSystemAction
+	listMCPServers                    *mcpserveraction.ListMCPServersQuery
+	getMCPServer                      *mcpserveraction.GetMCPServerQuery
+	createMCPServer                   *mcpserveraction.CreateMCPServerAction
+	updateMCPServer                   *mcpserveraction.UpdateMCPServerAction
+	deleteMCPServer                   *mcpserveraction.DeleteMCPServerAction
 	updateOrganization                *organizationaction.UpdateOrganizationAction
 	getS3Setting                      *settingaction.GetS3SettingQuery
 	saveS3Setting                     *settingaction.SaveS3SettingAction
@@ -291,6 +297,11 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		createBusinessSystem:              businesssystemaction.NewCreateBusinessSystemAction(db),
 		updateBusinessSystem:              businesssystemaction.NewUpdateBusinessSystemAction(db),
 		deleteBusinessSystem:              businesssystemaction.NewDeleteBusinessSystemAction(db),
+		listMCPServers:                    mcpserveraction.NewListMCPServersQuery(db),
+		getMCPServer:                      mcpserveraction.NewGetMCPServerQuery(db),
+		createMCPServer:                   mcpserveraction.NewCreateMCPServerAction(db),
+		updateMCPServer:                   mcpserveraction.NewUpdateMCPServerAction(db),
+		deleteMCPServer:                   mcpserveraction.NewDeleteMCPServerAction(db),
 		updateOrganization:                organizationaction.NewUpdateOrganizationAction(db),
 		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),

@@ -973,6 +973,43 @@ func (b *Backend) DeleteBusinessSystem(ctx context.Context, meta appservice.Requ
 	return b.do(ctx, meta, http.MethodDelete, "/integrations/business-systems/"+url.PathEscape(businessSystemID), nil, nil, nil)
 }
 
+// ListMCPServers 返回当前企业配置的 MCP 服务。
+func (b *Backend) ListMCPServers(ctx context.Context, meta appservice.RequestMeta) (appservice.MCPServerList, error) {
+	var output appservice.MCPServerList
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/mcp-servers", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetMCPServer 返回当前企业中的 MCP 服务详情。
+func (b *Backend) GetMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string) (appservice.MCPServer, error) {
+	var output appservice.MCPServer
+	err := b.do(ctx, meta, http.MethodGet, "/integrations/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateMCPServer 创建 MCP 服务。
+func (b *Backend) CreateMCPServer(ctx context.Context, meta appservice.RequestMeta, input appservice.MCPServerInput) (appservice.MCPServer, error) {
+	var output appservice.MCPServer
+	err := b.do(ctx, meta, http.MethodPost, "/integrations/mcp-servers", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateMCPServer 修改 MCP 服务。
+func (b *Backend) UpdateMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string, input appservice.MCPServerInput) (appservice.MCPServer, error) {
+	var output appservice.MCPServer
+	err := b.do(ctx, meta, http.MethodPut, "/integrations/mcp-servers/"+url.PathEscape(mcpServerID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteMCPServer 删除 MCP 服务。
+func (b *Backend) DeleteMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/integrations/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, nil)
+}
+
 // UpdateOrganization 修改当前企业通用设置。
 func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	var output appservice.Organization

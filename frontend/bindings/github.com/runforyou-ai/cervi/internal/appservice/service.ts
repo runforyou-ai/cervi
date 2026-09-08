@@ -169,6 +169,13 @@ export function CreateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseI
 }
 
 /**
+ * CreateMCPServer 创建 MCP 服务。
+ */
+export function CreateMCPServer(meta: $models.RequestMeta, input: $models.MCPServerInput): $CancellablePromise<$models.MCPServer> {
+    return $Call.ByID(1999587509, meta, input);
+}
+
+/**
  * CreateMessageChannel 创建消息渠道。
  */
 export function CreateMessageChannel(meta: $models.RequestMeta, input: $models.CreateMessageChannelInput): $CancellablePromise<$models.MessageChannelSummary> {
@@ -264,6 +271,13 @@ export function DeleteKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID:
  */
 export function DeleteKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<void> {
     return $Call.ByID(3628287475, meta, knowledgeBaseID, entryID);
+}
+
+/**
+ * DeleteMCPServer 删除 MCP 服务。
+ */
+export function DeleteMCPServer(meta: $models.RequestMeta, mcpServerID: string): $CancellablePromise<void> {
+    return $Call.ByID(4060692824, meta, mcpServerID);
 }
 
 /**
@@ -376,6 +390,13 @@ export function GetKnowledgeDocumentPreview(meta: $models.RequestMeta, knowledge
  */
 export function GetKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<$models.KnowledgeQAEntry> {
     return $Call.ByID(3966244004, meta, knowledgeBaseID, entryID);
+}
+
+/**
+ * GetMCPServer 返回当前企业中的 MCP 服务详情。
+ */
+export function GetMCPServer(meta: $models.RequestMeta, mcpServerID: string): $CancellablePromise<$models.MCPServer> {
+    return $Call.ByID(2191357229, meta, mcpServerID);
 }
 
 /**
@@ -537,6 +558,13 @@ export function ListKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBaseI
  */
 export function ListKnowledgeQAEntries(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeQAListInput): $CancellablePromise<$models.KnowledgeQAList> {
     return $Call.ByID(3867410272, meta, knowledgeBaseID, input);
+}
+
+/**
+ * ListMCPServers 返回当前企业配置的 MCP 服务。
+ */
+export function ListMCPServers(meta: $models.RequestMeta): $CancellablePromise<$models.MCPServerList> {
+    return $Call.ByID(3249929290, meta);
 }
 
 /**
@@ -950,6 +978,13 @@ export function UpdateKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID:
  */
 export function UpdateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string, input: $models.KnowledgeQAInput): $CancellablePromise<$models.KnowledgeQAEntry> {
     return $Call.ByID(137278157, meta, knowledgeBaseID, entryID, input);
+}
+
+/**
+ * UpdateMCPServer 修改 MCP 服务。
+ */
+export function UpdateMCPServer(meta: $models.RequestMeta, mcpServerID: string, input: $models.MCPServerInput): $CancellablePromise<$models.MCPServer> {
+    return $Call.ByID(4046277534, meta, mcpServerID, input);
 }
 
 /**

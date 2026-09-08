@@ -408,6 +408,22 @@ type Backend interface {
 	// DeleteBusinessSystem 删除业务系统。
 	//cervi:route DELETE /integrations/business-systems/:businessSystemID
 	DeleteBusinessSystem(context.Context, RequestMeta, string) error
+
+	// ListMCPServers 返回当前企业配置的 MCP 服务。
+	//cervi:route GET /integrations/mcp-servers
+	ListMCPServers(context.Context, RequestMeta) (MCPServerList, error)
+	// GetMCPServer 返回当前企业中的 MCP 服务详情。
+	//cervi:route GET /integrations/mcp-servers/:mcpServerID
+	GetMCPServer(context.Context, RequestMeta, string) (MCPServer, error)
+	// CreateMCPServer 创建 MCP 服务。
+	//cervi:route POST /integrations/mcp-servers status=201
+	CreateMCPServer(context.Context, RequestMeta, MCPServerInput) (MCPServer, error)
+	// UpdateMCPServer 修改 MCP 服务。
+	//cervi:route PUT /integrations/mcp-servers/:mcpServerID
+	UpdateMCPServer(context.Context, RequestMeta, string, MCPServerInput) (MCPServer, error)
+	// DeleteMCPServer 删除 MCP 服务。
+	//cervi:route DELETE /integrations/mcp-servers/:mcpServerID
+	DeleteMCPServer(context.Context, RequestMeta, string) error
 	// UpdateOrganization 修改当前企业通用设置。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)

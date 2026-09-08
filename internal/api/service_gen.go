@@ -143,6 +143,11 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/integrations/business-systems", s.createBusinessSystem)
 	router.PUT("/integrations/business-systems/:businessSystemID", s.updateBusinessSystem)
 	router.DELETE("/integrations/business-systems/:businessSystemID", s.deleteBusinessSystem)
+	router.GET("/integrations/mcp-servers", s.listMCPServers)
+	router.GET("/integrations/mcp-servers/:mcpServerID", s.getMCPServer)
+	router.POST("/integrations/mcp-servers", s.createMCPServer)
+	router.PUT("/integrations/mcp-servers/:mcpServerID", s.updateMCPServer)
+	router.DELETE("/integrations/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
 	router.GET("/settings/storage/s3", s.getS3Setting)
 	router.PUT("/settings/storage/s3", s.saveS3Setting)
@@ -1199,6 +1204,43 @@ func (s *Service) updateBusinessSystem(c *gin.Context) {
 // deleteBusinessSystem 删除业务系统。
 func (s *Service) deleteBusinessSystem(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID")))
+}
+
+// listMCPServers 返回当前企业配置的 MCP 服务。
+func (s *Service) listMCPServers(c *gin.Context) {
+	output, err := s.application.ListMCPServers(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getMCPServer 返回当前企业中的 MCP 服务详情。
+func (s *Service) getMCPServer(c *gin.Context) {
+	output, err := s.application.GetMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createMCPServer 创建 MCP 服务。
+func (s *Service) createMCPServer(c *gin.Context) {
+	var input appservice.MCPServerInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateMCPServer(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateMCPServer 修改 MCP 服务。
+func (s *Service) updateMCPServer(c *gin.Context) {
+	var input appservice.MCPServerInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteMCPServer 删除 MCP 服务。
+func (s *Service) deleteMCPServer(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID")))
 }
 
 // updateOrganization 修改当前企业通用设置。

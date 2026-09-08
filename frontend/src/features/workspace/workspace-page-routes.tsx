@@ -9,6 +9,8 @@ import { AppsPage } from "@/features/apps/apps-page"
 import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
 import { BusinessSystemFormPage } from "@/features/integrations/business-systems/business-system-form-page"
 import { BusinessSystemListPage } from "@/features/integrations/business-systems/business-system-list-page"
+import { MCPServerFormPage } from "@/features/integrations/mcp-servers/mcp-server-form-page"
+import { MCPServerListPage } from "@/features/integrations/mcp-servers/mcp-server-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
 import { KnowledgeDocumentListPage } from "@/features/knowledge-base/knowledge-document-list-page"
@@ -103,6 +105,20 @@ const workspaceRouteDefinitions = [
   {
     path: "/integrations/business-systems",
     titleKey: "tabs.routes.businessSystems",
+  },
+  {
+    path: "/integrations/mcp-servers/new",
+    tabPath: "/integrations/mcp-servers",
+    titleKey: "tabs.routes.mcpServers",
+  },
+  {
+    path: "/integrations/mcp-servers/:mcpServerId",
+    tabPath: "/integrations/mcp-servers",
+    titleKey: "tabs.routes.mcpServers",
+  },
+  {
+    path: "/integrations/mcp-servers",
+    titleKey: "tabs.routes.mcpServers",
   },
   {
     path: "/integrations/model-services/chat/new",
@@ -319,6 +335,18 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
         <Route
           path="business-systems/:businessSystemId"
           element={<BusinessSystemFormPage mode="edit" />}
+        />
+        <Route
+          path="mcp-servers"
+          element={<MCPServerListPage />}
+        />
+        <Route
+          path="mcp-servers/new"
+          element={<MCPServerFormPage mode="create" />}
+        />
+        <Route
+          path="mcp-servers/:mcpServerId"
+          element={<MCPServerFormPage mode="edit" />}
         />
         <Route
           path="model-services/chat"
