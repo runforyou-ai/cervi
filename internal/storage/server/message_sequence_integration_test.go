@@ -211,7 +211,7 @@ func TestMessageSequenceHTTPContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, nil, NewTenantResolver(f.db), nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, nil, NewTenantResolver(f.db), nil, nil, nil)
 	service := api.NewService(appservice.New(backend))
 	for _, route := range []string{"messages", "read"} {
 		t.Run(route, func(t *testing.T) {
