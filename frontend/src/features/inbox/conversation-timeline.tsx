@@ -625,7 +625,7 @@ function ConversationTimelineContent({
     <div className="relative min-h-0 flex-1 bg-background">
       <ScrollArea
         ref={scrollRootRef}
-        // 覆盖 Radix Viewport 的内联 table 布局，避免固定宽气泡撑出视口。
+        // 覆盖 Radix Viewport 的内联 table 布局，避免气泡撑出视口。
         className="h-full min-h-0 bg-background [&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!min-h-full [&>[data-slot=scroll-area-viewport]>div]:!flex-col"
       >
         <div className="flex w-full flex-1 flex-col px-4 pb-3 md:px-6">
@@ -785,7 +785,7 @@ function ConversationTimelineContent({
                         <div
                           className={cn(
                             "flex min-w-0 max-w-[75%] flex-col gap-1",
-                            message.agentProcess && "w-[36rem] max-w-[85%] sm:max-w-[75%]",
+                            message.agentProcess && "max-w-[min(36rem,85%)] sm:max-w-[min(36rem,75%)]",
                             incoming ? "ml-10 items-start" : "mr-10 items-end",
                           )}
                         >
@@ -797,7 +797,7 @@ function ConversationTimelineContent({
                               {senderName}
                             </span>
                           ) : null}
-                          <div className={cn("relative min-w-0 max-w-full", message.agentProcess && "w-full")}>
+                          <div className="relative min-w-0 max-w-full">
                             {endsGroup ? (
                               <ProfileAvatar
                                 title={senderName}
