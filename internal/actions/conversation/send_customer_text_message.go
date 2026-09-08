@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -145,12 +146,12 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		}
 		if input.ReplyToMessageID != "" {
 			// 引用必须具有当前机器人、同一聊天内的确定平台消息身份。
-			var providerID int64
-			err := tx.NewSelect().TableExpr("telegram_messages AS tm").ColumnExpr("tm.provider_message_id").
-				Join("JOIN contact_channel_identities AS cci ON cci.organization_id = tm.organization_id AND cci.channel_id = tm.channel_id AND cci.external_id = tm.chat_id::text").
-				Join("JOIN messages AS msg ON msg.id = tm.message_id AND msg.organization_id = tm.organization_id AND msg.conversation_id = tm.conversation_id").
-				Where("tm.organization_id = ? AND tm.conversation_id = ? AND tm.message_id = ?", identity.Organization.ID, conversation.ID, input.ReplyToMessageID).
-				Where("tm.channel_id = ? AND tm.bot_id = ? AND cci.id = ?", route.ChannelID, *route.BotID, route.IdentityID).
+			var providerID string
+			err := tx.NewSelect().TableExpr("channel_messages AS cm").ColumnExpr("cm.provider_message_id").
+				Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cm.organization_id AND cci.channel_id = cm.channel_id AND cci.external_id = cm.provider_conversation_id").
+				Join("JOIN messages AS msg ON msg.id = cm.message_id AND msg.organization_id = cm.organization_id AND msg.conversation_id = cm.conversation_id").
+				Where("cm.organization_id = ? AND cm.conversation_id = ? AND cm.message_id = ?", identity.Organization.ID, conversation.ID, input.ReplyToMessageID).
+				Where("cm.channel_id = ? AND cm.provider_account_id = ? AND cci.id = ?", route.ChannelID, strconv.FormatInt(*route.BotID, 10), route.IdentityID).
 				Where("msg.type = ? AND msg.deleted_at IS NULL", domain.MessageTypeText).Scan(ctx, &providerID)
 			if errors.Is(err, sql.ErrNoRows) {
 				return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}

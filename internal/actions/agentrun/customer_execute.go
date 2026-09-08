@@ -120,7 +120,7 @@ func (p customerRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, policyCo
 }
 
 type customerMessageRow struct {
-	ExternalReplyID          *int64  `bun:"external_reply_id"`
+	ExternalReplyID          *string `bun:"external_reply_id"`
 	ExternalReplyBody        string  `bun:"external_reply_body"`
 	ExternalReplySenderName  string  `bun:"external_reply_sender_name"`
 	ExternalReplySenderIsBot bool    `bun:"external_reply_sender_is_bot"`
@@ -158,8 +158,8 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id, msg.body, cs.kind").
 		ColumnExpr("msg.reply_to_message_id").
-		ColumnExpr("tm.reply_provider_message_id AS external_reply_id, tm.reply_body AS external_reply_body, tm.reply_sender_name AS external_reply_sender_name, tm.reply_sender_is_bot AS external_reply_sender_is_bot").
-		Join("LEFT JOIN telegram_messages AS tm ON tm.message_id = msg.id AND tm.organization_id = msg.organization_id AND tm.conversation_id = msg.conversation_id").
+		ColumnExpr("cm.reply_provider_message_id AS external_reply_id, cm.reply_body AS external_reply_body, cm.reply_sender_name AS external_reply_sender_name, cm.reply_sender_is_bot AS external_reply_sender_is_bot").
+		Join("LEFT JOIN channel_messages AS cm ON cm.message_id = msg.id AND cm.organization_id = msg.organization_id AND cm.conversation_id = msg.conversation_id").
 		ColumnExpr("reply.deleted_at IS NOT NULL AS reply_deleted").
 		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
 		ColumnExpr("reply_cs.kind AS reply_sender_kind, reply_cs.source_id AS reply_sender_id").

@@ -14,7 +14,6 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
-	"github.com/runforyou-ai/cervi/internal/actions/telegrammessage"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -110,7 +109,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			if external {
 				target = 9999
 			}
-			f.input.Message.Reply = &telegrammessage.Reply{MessageID: target, Body: "平台原文快照", SenderName: "外部机器人", SenderIsBot: true}
+			f.input.Message.Reply = &channelaction.TelegramWebhookReply{MessageID: target, Body: "平台原文快照", SenderName: "外部机器人", SenderIsBot: true}
 			f.receiveNext(t)
 			model := &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 				pending, err := feed.Peek(ctx, 0)

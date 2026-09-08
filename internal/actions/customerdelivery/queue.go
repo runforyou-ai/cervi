@@ -33,7 +33,7 @@ type Route struct {
 	ChannelType            domain.ChannelType `bun:"channel_type"`
 	Enabled                bool               `bun:"enabled"`
 	BotID                  *int64             `bun:"bot_id"`
-	ReplyProviderMessageID *int64
+	ReplyProviderMessageID *string
 }
 
 // Prepare 读取外发目标，Telegram 在客服周期之前锁定渠道身份。

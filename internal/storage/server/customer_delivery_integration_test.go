@@ -30,7 +30,7 @@ type customerDeliveryFixture struct {
 type deliverySender struct {
 	mu      sync.Mutex
 	bodies  []string
-	replies []*int64
+	replies []*string
 	err     error
 }
 

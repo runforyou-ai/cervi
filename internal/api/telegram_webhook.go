@@ -16,7 +16,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	"github.com/runforyou-ai/cervi/internal/actions/telegrammessage"
 )
 
 const telegramWebhookBodyLimit = 64 << 10
@@ -130,10 +129,10 @@ func normalizeTelegramWebhookMessage(message telegramWebhookMessage) (*channelac
 	if displayName == "" {
 		return nil, "missing_sender_name"
 	}
-	var reply *telegrammessage.Reply
+	var reply *channelaction.TelegramWebhookReply
 	// 原消息可由机器人发送，只读取同一聊天中的一层引用。
 	if original := message.ReplyTo; original != nil && original.Chat.ID == message.Chat.ID && original.MessageID > 0 && original.MessageID != message.MessageID {
-		reply = &telegrammessage.Reply{MessageID: original.MessageID, Body: original.Caption}
+		reply = &channelaction.TelegramWebhookReply{MessageID: original.MessageID, Body: original.Caption}
 		if original.Text != nil {
 			reply.Body = *original.Text
 		}

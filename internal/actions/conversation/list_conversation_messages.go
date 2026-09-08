@@ -29,7 +29,7 @@ type ListConversationMessagesQuery struct {
 
 type conversationMessageRow struct {
 	ReplyUnavailable               bool                             `bun:"reply_unavailable"`
-	ExternalReplyID                *int64                           `bun:"external_reply_id"`
+	ExternalReplyID                *string                          `bun:"external_reply_id"`
 	ExternalReplyBody              string                           `bun:"external_reply_body"`
 	ExternalReplySenderName        string                           `bun:"external_reply_sender_name"`
 	ClientMessageID                *string                          `bun:"client_message_id"`
@@ -118,8 +118,8 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 	return db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
-		ColumnExpr("tm.reply_provider_message_id AS external_reply_id, tm.reply_body AS external_reply_body, tm.reply_sender_name AS external_reply_sender_name").
-		ColumnExpr("COALESCE(ch.type = ? AND (tm.message_id IS NULL OR tm.bot_id <> tcs.bot_id OR tcs.bot_id IS NULL OR tm.channel_id <> ch.id OR tm.chat_id::text <> route_cci.external_id OR msg.type <> ?), FALSE) AS reply_unavailable", domain.ChannelTypeTelegram, domain.MessageTypeText).
+		ColumnExpr("cm.reply_provider_message_id AS external_reply_id, cm.reply_body AS external_reply_body, cm.reply_sender_name AS external_reply_sender_name").
+		ColumnExpr("COALESCE(ch.type = ? AND (cm.message_id IS NULL OR cm.provider_account_id <> tcs.bot_id::text OR tcs.bot_id IS NULL OR cm.channel_id <> ch.id OR cm.provider_conversation_id <> route_cci.external_id OR msg.type <> ?), FALSE) AS reply_unavailable", domain.ChannelTypeTelegram, domain.MessageTypeText).
 		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
@@ -157,7 +157,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Join("LEFT JOIN contact_channel_identities AS route_cci ON route_cci.id = cc.contact_channel_identity_id AND route_cci.organization_id = cc.organization_id").
 		Join("LEFT JOIN channels AS ch ON ch.id = route_cci.channel_id AND ch.organization_id = route_cci.organization_id").
 		Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = ch.id AND tcs.organization_id = ch.organization_id").
-		Join("LEFT JOIN telegram_messages AS tm ON tm.message_id = msg.id AND tm.organization_id = msg.organization_id AND tm.conversation_id = msg.conversation_id").
+		Join("LEFT JOIN channel_messages AS cm ON cm.message_id = msg.id AND cm.organization_id = msg.organization_id AND cm.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN contacts AS c ON c.id = cs.source_id AND c.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN messages AS reply_msg ON reply_msg.organization_id = msg.organization_id AND reply_msg.conversation_id = msg.conversation_id AND reply_msg.id = msg.reply_to_message_id AND reply_msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).

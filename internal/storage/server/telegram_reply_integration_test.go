@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 	"uuid"
@@ -13,7 +14,6 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
-	"github.com/runforyou-ai/cervi/internal/actions/telegrammessage"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -22,7 +22,7 @@ import (
 )
 
 // receiveReply 通过真实入站事务保存引用消息。
-func (f customerDeliveryFixture) receiveReply(t *testing.T, id int64, body string, reply *telegrammessage.Reply) {
+func (f customerDeliveryFixture) receiveReply(t *testing.T, id int64, body string, reply *channelaction.TelegramWebhookReply) {
 	t.Helper()
 	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil)
 	if err := receiver.Execute(context.Background(), f.channelID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: id,
@@ -63,7 +63,7 @@ func TestTelegramReplyRoundTrip(t *testing.T) {
 		t.Fatal("inbound message cannot be replied to")
 	}
 	delivery := f.sendReply(t, original.ID)
-	if delivery.ReplyProviderMessageID == nil || *delivery.ReplyProviderMessageID != 1 {
+	if delivery.ReplyProviderMessageID == nil || *delivery.ReplyProviderMessageID != "1" {
 		t.Fatalf("target=%+v", delivery)
 	}
 	states, err := conversationaction.NewListConversationMessagesQuery(f.db).ListReferences(context.Background(), f.owner, f.conversationID, []string{delivery.MessageID})
@@ -75,10 +75,10 @@ func TestTelegramReplyRoundTrip(t *testing.T) {
 	if err != nil || len(states) != 1 || states[0].ReplyUnavailable {
 		t.Fatalf("sent state=%+v err=%v", states, err)
 	}
-	if sent.Status != domain.CustomerDeliverySent || f.sender.replies[0] == nil || *f.sender.replies[0] != 1 {
+	if sent.Status != domain.CustomerDeliverySent || f.sender.replies[0] == nil || *f.sender.replies[0] != "1" {
 		t.Fatalf("sent=%+v", sent)
 	}
-	reply := &telegrammessage.Reply{MessageID: *sent.ProviderMessageID, Body: "引用回答", SenderName: "Bot", SenderIsBot: true}
+	reply := &channelaction.TelegramWebhookReply{MessageID: *sent.ProviderMessageID, Body: "引用回答", SenderName: "Bot", SenderIsBot: true}
 	f.receiveReply(t, 2, "我引用客服的回答", reply)
 	f.receiveReply(t, 2, "我引用客服的回答", reply)
 	history := f.replyHistory(t)
@@ -87,7 +87,7 @@ func TestTelegramReplyRoundTrip(t *testing.T) {
 	}
 	next := f.sendReply(t, delivery.MessageID)
 	f.execute(t, next.ID)
-	if next.ReplyProviderMessageID == nil || *next.ReplyProviderMessageID != *sent.ProviderMessageID {
+	if next.ReplyProviderMessageID == nil || *next.ReplyProviderMessageID != strconv.FormatInt(*sent.ProviderMessageID, 10) {
 		t.Fatal("outbound target lost")
 	}
 }
@@ -95,7 +95,7 @@ func TestTelegramReplyRoundTrip(t *testing.T) {
 // TestTelegramReplyLateMapping 验证乱序原消息、迟到回执、引用快照和重放关联稳定。
 func TestTelegramReplyLateMapping(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
-	reply := &telegrammessage.Reply{MessageID: 9, Body: "较早原文", SenderName: "外部客户"}
+	reply := &channelaction.TelegramWebhookReply{MessageID: 9, Body: "较早原文", SenderName: "外部客户"}
 	f.receiveReply(t, 10, "原消息后到", reply)
 	history := f.replyHistory(t)
 	if r := history[1].ReplyTo; r == nil || r.ID != "" || r.Body != reply.Body || r.ExternalSenderName != reply.SenderName {
@@ -108,14 +108,14 @@ func TestTelegramReplyLateMapping(t *testing.T) {
 		t.Fatalf("late original=%+v", history)
 	}
 	delivery := f.send(t, "稍后返回的客服回执", uuid.NewV7().String())
-	f.receiveReply(t, 11, "回复先于回执", &telegrammessage.Reply{MessageID: 1001, Body: "稍后返回的客服回执", SenderName: "Bot", SenderIsBot: true})
+	f.receiveReply(t, 11, "回复先于回执", &channelaction.TelegramWebhookReply{MessageID: 1001, Body: "稍后返回的客服回执", SenderName: "Bot", SenderIsBot: true})
 	f.execute(t, delivery.ID)
 	history = f.replyHistory(t)
 	if history[len(history)-1].ReplyTo.ID != delivery.MessageID {
 		t.Fatal("late receipt not linked")
 	}
 	// 重放的引用目标变化不能覆盖首次接收的平台事实。
-	f.receiveReply(t, 10, "原消息后到", &telegrammessage.Reply{MessageID: 1})
+	f.receiveReply(t, 10, "原消息后到", &channelaction.TelegramWebhookReply{MessageID: 1})
 	history = f.replyHistory(t)
 	if history[1].ReplyTo.ID != history[2].ID {
 		t.Fatal("conflicting replay changed target")
@@ -144,7 +144,7 @@ func TestTelegramReplyTargetBoundaries(t *testing.T) {
 	if !f.replyHistory(t)[1].ReplyUnavailable {
 		t.Fatal("manual confirmation invented platform identity")
 	}
-	f.receiveReply(t, 2, "引用后删除", &telegrammessage.Reply{MessageID: 1, Body: original.Body})
+	f.receiveReply(t, 2, "引用后删除", &channelaction.TelegramWebhookReply{MessageID: 1, Body: original.Body})
 	if _, err := f.db.ExecContext(context.Background(), "UPDATE messages SET deleted_at = now() WHERE id = ?", original.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +161,7 @@ func TestTelegramReplyTargetBoundaries(t *testing.T) {
 		}
 	}
 	// 新机器人相同编号不能连接到旧机器人的原消息。
-	f.receiveReply(t, 3, "新机器人的引用", &telegrammessage.Reply{MessageID: 2, Body: "新机器人原文"})
+	f.receiveReply(t, 3, "新机器人的引用", &channelaction.TelegramWebhookReply{MessageID: 2, Body: "新机器人原文"})
 	history = f.replyHistory(t)
 	if history[len(history)-1].ReplyTo.ID != "" {
 		t.Fatal("cross-bot reference")
@@ -186,7 +186,7 @@ func TestTelegramReplyDeliveryFailures(t *testing.T) {
 	if got := f.execute(t, delivery.ID); got.Status != domain.CustomerDeliveryFailed {
 		t.Fatalf("delivery=%+v", got)
 	}
-	if len(f.sender.replies) != 2 || *f.sender.replies[0] != 1 || *f.sender.replies[1] != 1 {
+	if len(f.sender.replies) != 2 || *f.sender.replies[0] != "1" || *f.sender.replies[1] != "1" {
 		t.Fatal("reply target changed")
 	}
 	f.execute(t, delivery.ID)

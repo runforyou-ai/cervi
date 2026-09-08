@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
-	"github.com/runforyou-ai/cervi/internal/actions/telegrammessage"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -19,7 +19,7 @@ import (
 
 // InboundCustomerTextMessageInput 定义渠道文本入站事务的稳定事实。
 type InboundCustomerTextMessageInput struct {
-	Telegram                *telegrammessage.Inbound
+	ChannelMessage          *channelmessage.Inbound
 	ClientMessageID         *string
 	ReplyToMessageID        string
 	ExternalID              string
@@ -181,8 +181,8 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 		saved, _, err := loadInboundCustomerTextMessage(ctx, db, channel, identity, input)
 		return saved, err
 	}
-	if input.Telegram != nil {
-		if err := telegrammessage.RecordInbound(ctx, db, channel.ID, message, input.Telegram); err != nil {
+	if input.ChannelMessage != nil {
+		if err := channelmessage.RecordInbound(ctx, db, channel.ID, message, input.ChannelMessage); err != nil {
 			return InboundCustomerTextMessageResult{}, err
 		}
 	}
@@ -225,8 +225,8 @@ func loadInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *se
 		storedReply = *message.ReplyToMessageID
 	}
 	replyMatches := storedReply == input.ReplyToMessageID
-	if input.Telegram != nil {
-		replyMatches, err = telegrammessage.MatchesInbound(ctx, db, message, channel.ID, input.Telegram)
+	if input.ChannelMessage != nil {
+		replyMatches, err = channelmessage.MatchesInbound(ctx, db, message, channel.ID, input.ChannelMessage)
 		if err != nil {
 			return InboundCustomerTextMessageResult{}, true, err
 		}

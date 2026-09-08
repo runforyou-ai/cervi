@@ -24,7 +24,7 @@ func (e *SendError) Error() string { return e.Code }
 type TextMessage struct {
 	ChatID         string
 	Body           string
-	ReplyMessageID *int64
+	ReplyMessageID *string
 }
 
 // TextSender 定义私聊文本投递依赖。
@@ -47,7 +47,11 @@ func (c *Client) SendText(ctx context.Context, token string, message TextMessage
 	}
 	var reply *replyParameters
 	if message.ReplyMessageID != nil {
-		reply = &replyParameters{MessageID: *message.ReplyMessageID}
+		messageID, err := strconv.ParseInt(*message.ReplyMessageID, 10, 64)
+		if err != nil || messageID <= 0 {
+			return 0, &SendError{Code: "invalid_message"}
+		}
+		reply = &replyParameters{MessageID: messageID}
 	}
 	payload, err := json.Marshal(struct {
 		ChatID int64            `json:"chat_id"`

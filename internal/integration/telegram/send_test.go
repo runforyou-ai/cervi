@@ -91,8 +91,23 @@ func TestSendTextReplyParameters(t *testing.T) {
 		_, _ = fmt.Fprint(w, `{"ok":true,"result":{"message_id":42,"chat":{"id":123}}}`)
 	}))
 	defer server.Close()
-	target := int64(7)
+	target := "7"
 	if _, err := NewClient(server.Client(), WithBaseURL(server.URL)).SendText(context.Background(), testBotToken, TextMessage{ChatID: "123", Body: "回答", ReplyMessageID: &target}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestSendTextInvalidReplyIdentifier 验证 Telegram 适配层拒绝无法转换的平台引用编号。
+func TestSendTextInvalidReplyIdentifier(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("invalid reference reached Telegram")
+	}))
+	defer server.Close()
+	for _, target := range []string{"message:opaque", "0", "-1", "9223372036854775808"} {
+		_, err := NewClient(server.Client(), WithBaseURL(server.URL)).SendText(context.Background(), testBotToken, TextMessage{ChatID: "123", Body: "回答", ReplyMessageID: &target})
+		var failure *SendError
+		if !errors.As(err, &failure) || failure.Code != "invalid_message" {
+			t.Fatalf("target=%s err=%v", target, err)
+		}
 	}
 }

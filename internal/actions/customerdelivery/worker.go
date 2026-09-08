@@ -11,8 +11,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	"github.com/runforyou-ai/cervi/internal/actions/channelstate"
-	"github.com/runforyou-ai/cervi/internal/actions/telegrammessage"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -203,13 +203,9 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
 		if sendErr == nil && messageID > 0 {
 			current.ProviderMessageID, current.SentAt = &messageID, &now
 			// 使用本次实际发送的聊天目标建立平台映射。
-			chatID, err := strconv.ParseInt(recipient, 10, 64)
-			if err != nil {
-				return err
-			}
-			if err := telegrammessage.Record(ctx, tx, &models.TelegramMessage{
+			if err := channelmessage.Record(ctx, tx, &models.ChannelMessage{
 				MessageID: current.MessageID, OrganizationID: current.OrganizationID, ConversationID: current.ConversationID,
-				ChannelID: current.ChannelID, BotID: current.BotID, ChatID: chatID, ProviderMessageID: messageID,
+				ChannelID: current.ChannelID, ProviderAccountID: strconv.FormatInt(current.BotID, 10), ProviderConversationID: recipient, ProviderMessageID: strconv.FormatInt(messageID, 10),
 			}); err != nil {
 				return err
 			}
