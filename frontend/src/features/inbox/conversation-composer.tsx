@@ -35,7 +35,7 @@ import {
   type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { ConversationComposerInput } from "./conversation-composer-input"
 import {
   createConversationComposerSchema,
   type ConversationComposerValues,
@@ -557,7 +557,7 @@ export function ConversationComposer({
     <form
       data-slot="conversation-composer"
       data-conversation-id={conversationID}
-      className="shrink-0 bg-background p-3"
+      className="shrink-0 bg-background px-2 py-3"
       onSubmit={form.handleSubmit(send)}
       noValidate
     >
@@ -597,7 +597,7 @@ export function ConversationComposer({
           onPointerCancel={stopInputResize}
           onKeyDown={resizeInputFromKeyboard}
         />
-        <div className="overflow-hidden rounded-xl border border-input bg-muted/15 shadow-xs">
+        <div className="overflow-hidden rounded-xl border border-input bg-background shadow-xs">
           {activeReplyTo ? (
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
               <div className="min-w-0">
@@ -624,7 +624,7 @@ export function ConversationComposer({
               </button>
             </div>
           ) : null}
-          <Textarea
+          <ConversationComposerInput
             {...bodyField}
             ref={(input) => {
               bodyField.ref(input)
@@ -637,7 +637,7 @@ export function ConversationComposer({
             aria-label={t("replyLabel")}
             aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
             aria-invalid={form.formState.errors.body ? true : undefined}
-            className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none focus-visible:ring-0"
+            className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none focus-visible:ring-0 dark:bg-transparent"
             onInput={(event) => {
               resizeComposerInput(
                 event.currentTarget,

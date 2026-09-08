@@ -299,8 +299,8 @@ export function ConversationContextPane({
     <>
       <div
         className={cn(
-          "relative h-full min-h-0 w-4 shrink-0 bg-background",
-          visible && "border-l",
+          "relative h-full min-h-0 shrink-0 bg-background",
+          visible ? "w-4 border-l" : "w-0",
         )}
       >
         {visible ? (
@@ -331,8 +331,8 @@ export function ConversationContextPane({
         <button
           type="button"
           className={cn(
-            "absolute top-1/2 left-0 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center border border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground",
-            visible ? "rounded-r-md border-l-0" : "rounded-l-md border-r-0",
+            "absolute top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center border border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground",
+            visible ? "left-0 rounded-r-md border-l-0" : "right-0 rounded-l-md border-r-0",
           )}
           aria-label={visible ? t("contextClose") : t("contextOpen")}
           title={visible ? t("contextClose") : t("contextOpen")}
