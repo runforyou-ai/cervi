@@ -36,6 +36,9 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("客服共享主体竞争", func(t *testing.T) {
+		testCustomerSharedAgentSubject(t, db, identity, created.IdentityID, tasks)
+	})
 	scheduler := agentrunaction.NewScheduler(tasks)
 	for _, scenario := range []struct{ earlierSession, deleted bool }{{false, false}, {false, true}, {true, false}, {true, true}} {
 		t.Run(fmt.Sprintf("earlierSession=%t/deleted=%t", scenario.earlierSession, scenario.deleted), func(t *testing.T) {
@@ -201,4 +204,5 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 		})
 	}
 	testCustomerFailureMessage(t, db, identity, tasks, created.IdentityID)
+	testCustomerAgentLocking(t, db, identity, created.IdentityID, tasks)
 }

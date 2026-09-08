@@ -11,6 +11,7 @@ import (
 	"slices"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -24,7 +25,7 @@ type customerRunPolicy struct {
 
 // lockContext 锁定客户 Agent 所属会话的当前客服周期。
 func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentRunPolicyContext, error) {
-	session, err := lockCurrentCustomerServiceSession(ctx, db, run.OrganizationID, run.ConversationID)
+	session, err := chatstate.LockCustomerServiceSession(ctx, db, run.OrganizationID, run.ConversationID)
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}
@@ -208,23 +209,9 @@ func suppressCustomerRun(ctx context.Context, db bun.IDB, run *servermodels.Agen
 
 // ensureCustomerAgentParticipant 取得或创建客户会话中的 Agent 参与者。
 func ensureCustomerAgentParticipant(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string) (string, error) {
-	subject := &servermodels.ChatSubject{}
-	err := db.NewSelect().Model(subject).
-		Where("cs.organization_id = ?", organizationID).
-		Where("cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Where("cs.source_id = ?", agentIdentityID).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		subject = &servermodels.ChatSubject{
-			ID: uuid.NewV7().String(), OrganizationID: organizationID,
-			Kind: string(domain.ChatSubjectKindOrganizationIdentity), SourceID: agentIdentityID,
-		}
-		if _, err := db.NewInsert().Model(subject).
-			Column("id", "organization_id", "kind", "source_id").Exec(ctx); err != nil {
-			return "", fmt.Errorf("create customer agent chat subject: %w", err)
-		}
-	} else if err != nil {
-		return "", fmt.Errorf("load customer agent chat subject: %w", err)
+	subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, db, organizationID, agentIdentityID, uuid.NewV7().String())
+	if err != nil {
+		return "", err
 	}
 	participant := &servermodels.ConversationParticipant{}
 	err = db.NewSelect().Model(participant).

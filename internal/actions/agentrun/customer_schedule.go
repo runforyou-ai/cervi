@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -24,7 +25,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 	if s == nil || s.enqueuer == nil {
 		return false, errors.New("agent run scheduler is unavailable")
 	}
-	session, err := lockCurrentCustomerServiceSession(ctx, db, organizationID, conversationID)
+	session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return false, err
 	}
@@ -86,33 +87,6 @@ func loadCustomerAssigneeType(ctx context.Context, db bun.IDB, session *servermo
 		return "", fmt.Errorf("load customer assignee identity type: %w", err)
 	}
 	return domain.OrganizationIdentityType(identityType), nil
-}
-
-// lockCurrentCustomerServiceSession 锁定会话当前客服处理周期。
-func lockCurrentCustomerServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	customer := &servermodels.CustomerConversation{}
-	err := db.NewSelect().Model(customer).
-		Where("cc.organization_id = ?", organizationID).
-		Where("cc.conversation_id = ?", conversationID).
-		For("UPDATE").
-		Scan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("lock customer conversation: %w", err)
-	}
-	if customer.CurrentServiceSessionID == nil {
-		return nil, errors.New("customer conversation has no current service session")
-	}
-	session := &servermodels.ServiceSession{}
-	err = db.NewSelect().Model(session).
-		Where("ss.organization_id = ?", organizationID).
-		Where("ss.conversation_id = ?", conversationID).
-		Where("ss.id = ?", *customer.CurrentServiceSessionID).
-		For("UPDATE").
-		Scan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("lock current customer service session: %w", err)
-	}
-	return session, nil
 }
 
 // customerTriggerMessageMatches 校验触发消息属于当前周期且来自客户。

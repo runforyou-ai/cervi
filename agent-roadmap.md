@@ -220,7 +220,7 @@ Revision 负责长期配置历史，Run 快照负责证明本次执行实际使�
 
 ## 6. 会话触发、游标与并发
 
-真人消息、网站入站、Agent 调度／认领／写回和客服取消共用聊天路线图第 10.14 节的锁序。PR03 基于独立 AI 聊天改为 `agentChatRunPolicy`：先锁 Conversation 与固定 Agent 的 Participant，再由 `lockAgentRun` 锁 State、Run 和 Task；`begin`、输入认领、成功、失败及最终失败均进入同一入口。客服策略仍先锁 CustomerConversation／ServiceSession，再锁 State、Run、Task，Conversation 前置由 PR04 完成。无当前用户的任务使用任务守卫，不套用 LockActiveUser。本轮并发与任务租约用例已于 2026-09-08 通过服务端全量测试，构建及界面回归记录见 PR 实施清单。
+真人消息、网站入站、Agent 调度／认领／写回和客服取消共用聊天路线图第 10.14 节的锁序。PR03 基于独立 AI 聊天改为 `agentChatRunPolicy`：先锁 Conversation 与固定 Agent 的 Participant，再由 `lockAgentRun` 锁 State、Run 和 Task；`begin`、输入认领、成功、失败及最终失败均进入同一入口。PR04 将客服策略统一为 Conversation → CustomerConversation → ServiceSession → State → Run → Task，开始、输入认领及各终态回调共用此入口。无当前用户的任务使用任务守卫，不套用 LockActiveUser。本轮并发与任务租约用例已于 2026-09-08 通过服务端全量测试，构建及界面回归记录见 PR 实施清单。
 
 停用 Agent 或归档 AI 会话不取消已提交输入：排队、运行中和尚待消费的输入继续处理，结果写回原 Conversation。之后资格校验的新发送拒绝；已经通过事务内资格校验的发送允许完成。此边界不改变客服的负责人、周期和取消门禁。
 
@@ -847,7 +847,7 @@ P1a 验证成功后立即交付网站客户自动响应：
 - Agent 最终回复仍是统一 Cervi Message。网站访客通过既有授权轮询直接读取该 Message，因此“写入 Message 并可被网站读取”就是网站路径的交付闭环，不创建外部 Delivery。
 - ServiceSession 的 `open/closed + assignee_identity_id` 是唯一客服状态。成员使用现有 Claim 接管，现有 Transfer 转交；最后一条来自 contact 时转交给 Agent 会补 Trigger，来自企业身份时等待客户下一条消息。不增加 AI 专属暂停、恢复、接管或状态。
 - `customer_auto` 复用 Eino TurnLoop：queued 时只冻结起点，Tool 或模型执行期间到达的新消息在下一个安全点由同一 Run 的下一 Turn Claim，最终只写一条文本 Message；完成边界后到达的消息进入下一 Run。
-- 当前完成前经 CustomerConversation／ServiceSession、State、Run 和 Task 锁后重新校验负责人、渠道、Agent 资格、Run Revision 和实际消费边界，接管、关闭或换负责人后的迟到结果不得写入；PR04 按第 6 节将客服 Conversation 锁前置。
+- 当前完成前经 CustomerConversation／ServiceSession、State、Run 和 Task 锁后重新校验负责人、渠道、Agent 资格、Run Revision 和实际消费边界，接管、关闭或换负责人后的迟到结果不得写入；PR04 已按第 6 节将客服 Conversation 锁前置，验证记录见 PR 实施清单。
 - 不流式输出、无设备、无审批，只记录 Token、耗时和错误，不计算金额；calculator 仅用于开发期延时并发测试，正式发布前删除。
 
 验收边界：符合负责人规则的网站客户新消息会自动得到一条可由访客轮询读取的 AI 回复；消息重放和 Task 重复不重复回复；运行中连续消息由同一 Run 在下一个安全点处理；接管、关闭、换负责人与模型完成并发时结果可确定且不会迟到发言；网站闭环在没有 Realtime 和第三方 Delivery 的情况下成立。
