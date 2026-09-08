@@ -9,7 +9,7 @@ import { useKnowledgeDocumentUpload, knowledgeDocumentFormats } from "./use-know
 
 /** 在文档列表中显示批次进度并保留失败重试入口。 */
 export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; groupId: string }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const picker = useRef<HTMLInputElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -107,7 +107,7 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
               <Button onClick={() => void run()}>{t("documents.upload.retry")}</Button>
             )}
             <Button variant="outline" disabled={busy} onClick={close}>
-              {t("documents.close")}
+              {t("common:actions.close")}
             </Button>
           </div>
         </DialogContent>

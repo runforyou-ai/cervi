@@ -39,7 +39,7 @@ export function ContactForm({
   onSaved: (detail: ContactDetail) => void
   onCancel: () => void
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
@@ -210,10 +210,10 @@ export function ContactForm({
       </FieldGroup>
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
+          {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
-          {t("form.cancel")}
+          {t("common:actions.cancel")}
         </Button>
       </div>
     </form>

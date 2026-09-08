@@ -114,7 +114,7 @@ func (b *DirectBackend) businessSystemMutationError(ctx context.Context, meta Re
 			businesssystemaction.ValidationNameDuplicate:      cervii18n.FieldBusinessSystemNameDuplicate,
 			businesssystemaction.ValidationDescriptionTooLong: cervii18n.FieldBusinessSystemDescriptionTooLong,
 			businesssystemaction.ValidationURLRequired:        cervii18n.FieldBusinessSystemURLRequired,
-			businesssystemaction.ValidationURLInvalid:         cervii18n.FieldBusinessSystemURLInvalid,
+			businesssystemaction.ValidationURLInvalid:         cervii18n.FieldHTTPURLInvalid,
 			businesssystemaction.ValidationURLTooLong:         cervii18n.FieldBusinessSystemURLTooLong,
 		}
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))

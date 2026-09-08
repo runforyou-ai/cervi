@@ -23,7 +23,7 @@ export function KnowledgeDocumentListPage() {
 
 /** 显示创建时间倒序的文档，返回时恢复原列表位置。 */
 function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; groupId: string }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
   const { documentListScrollPositions } = useKnowledgeBaseContext()
   const { searchParams, query, search, setSearch, setParameters } = useListSearchParams()
@@ -78,7 +78,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
               setParameters({ q: null, page: null })
             }}
           >
-            {t("documents.clearFilters")}
+            {t("common:actions.clearFilters")}
           </ListToolbarReset>
         )}
       </ListToolbar>

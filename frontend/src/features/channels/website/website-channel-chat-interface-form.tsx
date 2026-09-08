@@ -46,7 +46,7 @@ export function WebsiteChannelChatInterfaceForm({
   onPreviewChange: (value: WebsiteChannelChatInterfaceInput) => void
   onUpdated: (value: WebsiteChannelChatInterface) => void
 }) {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
@@ -225,10 +225,10 @@ export function WebsiteChannelChatInterfaceForm({
       </FieldGroup>
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? t("form.saving") : t("form.save")}
+          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>
         <Button variant="outline" asChild>
-          <Link to="/integrations/channels">{t("form.cancel")}</Link>
+          <Link to="/integrations/channels">{t("common:actions.cancel")}</Link>
         </Button>
       </div>
     </form>

@@ -44,7 +44,7 @@ function KnowledgeQAGroupList({
   knowledgeBaseId: string
   groupId: string
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
   const { qaListScrollPositions } = useKnowledgeBaseContext()
   const { searchParams, query, search, setSearch, setParameters } =
@@ -130,7 +130,7 @@ function KnowledgeQAGroupList({
               setParameters({ q: null, page: null })
             }}
           >
-            {t("qa.clearFilters")}
+            {t("common:actions.clearFilters")}
           </ListToolbarReset>
         ) : null}
       </ListToolbar>

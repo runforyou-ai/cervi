@@ -32,7 +32,7 @@ export function KnowledgeDocumentTable({
   onAction: (action: DocumentAction) => void
   onPage: (page: number) => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const pages = Math.max(1, Math.ceil(data.page.total / data.page.size))
   return (
     <div className="overflow-hidden rounded-lg border bg-card" aria-busy={refreshing}>
@@ -44,7 +44,7 @@ export function KnowledgeDocumentTable({
             <TableHead>{t("documents.columns.size")}</TableHead>
             <TableHead>{t("documents.columns.status")}</TableHead>
             <TableHead>{t("documents.columns.createdAt")}</TableHead>
-            <TableHead className="w-px">{t("documents.columns.actions")}</TableHead>
+            <TableHead className="w-px">{t("common:table.actions")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -69,7 +69,7 @@ export function KnowledgeDocumentTable({
         </TableBody>
       </Table>
       <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
-        <span>{t("documents.pagination.total", { count: data.page.total })}</span>
+        <span>{t("common:pagination.total", { count: data.page.total })}</span>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
@@ -77,16 +77,16 @@ export function KnowledgeDocumentTable({
             disabled={refreshing || data.page.number <= 1}
             onClick={() => onPage(data.page.number - 1)}
           >
-            {t("documents.pagination.previous")}
+            {t("common:pagination.previous")}
           </Button>
-          <span>{t("documents.pagination.page", { current: data.page.number, total: pages })}</span>
+          <span>{t("common:pagination.page", { current: data.page.number, total: pages })}</span>
           <Button
             variant="outline"
             size="sm"
             disabled={refreshing || data.page.number >= pages}
             onClick={() => onPage(data.page.number + 1)}
           >
-            {t("documents.pagination.next")}
+            {t("common:pagination.next")}
           </Button>
         </div>
       </div>
@@ -108,7 +108,7 @@ function KnowledgeDocumentRow({
   canMove: boolean
   onAction: (action: DocumentAction) => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const { formatDateTime } = useDateTime()
   const trigger = useRef<HTMLButtonElement>(null)
   return (
@@ -127,7 +127,7 @@ function KnowledgeDocumentRow({
       <TableCell className="whitespace-nowrap">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link to={`${listPath}/${document.id}${search}`}>{t("documents.view")}</Link>
+            <Link to={`${listPath}/${document.id}${search}`}>{t("common:actions.view")}</Link>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -151,7 +151,7 @@ function KnowledgeDocumentRow({
                 destructive
                 onSelect={() => onAction({ document, kind: "delete", trigger: trigger.current })}
               >
-                {t("documents.delete")}
+                {t("common:actions.delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

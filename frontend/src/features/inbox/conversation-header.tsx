@@ -72,7 +72,7 @@ export function ConversationHeader({
   ) => void
   narrowViewport?: boolean
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const [operation, setOperation] = useState("")
   const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false)
@@ -457,7 +457,7 @@ export function ConversationHeader({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {t("conversationCloseCancel")}
+              {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>

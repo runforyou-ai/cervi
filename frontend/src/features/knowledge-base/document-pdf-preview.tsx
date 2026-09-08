@@ -12,7 +12,7 @@ GlobalWorkerOptions.workerSrc = workerURL
 
 /** 初始化连续 PDF 阅读器，在离开预览时释放工作线程和文档资源。 */
 export function DocumentPDFPreview({ content }: { content: Uint8Array<ArrayBuffer> }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const container = useRef<HTMLDivElement>(null)
   const viewerElement = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<"loading" | "ready" | "error">("loading")
@@ -83,7 +83,7 @@ export function DocumentPDFPreview({ content }: { content: Uint8Array<ArrayBuffe
             <div className="space-y-4 text-center">
               <p className="text-sm text-muted-foreground">{t("documentDetail.previewError")}</p>
               <Button variant="outline" onClick={() => setAttempt((value) => value + 1)}>
-                {t("retry")}
+                {t("common:actions.retry")}
               </Button>
             </div>
           )}

@@ -17,7 +17,7 @@ export function WebsiteChatPreview({
 }: {
   value: WebsiteChannelChatInterfaceInput
 }) {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation(["channels", "common"])
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [status, setStatus] = useState<PreviewStatus>("loading")
   const [retryKey, setRetryKey] = useState(0)
@@ -142,7 +142,7 @@ export function WebsiteChatPreview({
                   className="mt-4"
                   onClick={retry}
                 >
-                  {t("chatInterface.preview.retry")}
+                  {t("common:actions.retry")}
                 </Button>
               </div>
             ) : (

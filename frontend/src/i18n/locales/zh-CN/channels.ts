@@ -5,8 +5,6 @@ const channels = {
     telegram: "Telegram",
     wechatOfficialAccount: "微信公众号",
   },
-  loading: "正在加载…",
-  retry: "重试",
   locales: {
     zhCN: "简体中文",
     enUS: "English",
@@ -16,7 +14,6 @@ const channels = {
     category: "渠道类别",
     allCategories: "全部类别",
     status: "渠道状态",
-    clear: "清除筛选",
   },
   statuses: {
     enabled: "已启用",
@@ -32,8 +29,6 @@ const channels = {
   list: {
     title: "消息渠道",
     create: "添加渠道",
-    edit: "编辑",
-    more: "更多",
     activate: "启用",
     deactivate: "停用",
     statusUpdateError: "切换渠道状态失败，请重试。",
@@ -44,7 +39,6 @@ const channels = {
       name: "名称",
       category: "渠道类别",
       language: "默认接待语言",
-      actions: "操作",
     },
   },
   deactivation: {
@@ -56,9 +50,6 @@ const channels = {
     title: "启用“{{name}}”？",
     description: "渠道状态将变为已启用。",
     confirm: "启用",
-  },
-  statusConfirmation: {
-    cancel: "取消",
   },
   create: {
     title: "添加渠道",
@@ -73,10 +64,7 @@ const channels = {
     name: "渠道名称",
     description: "说明",
     defaultLocale: "默认接待语言",
-    save: "保存",
-    saving: "正在保存…",
     saved: "基本信息已保存。",
-    cancel: "取消",
     loadError: "消息渠道详情加载失败。",
     networkError: "无法连接服务器，请稍后重试。",
   },
@@ -122,11 +110,8 @@ const channels = {
       botToken: "Bot Token",
       showToken: "显示 Token",
       hideToken: "隐藏 Token",
-      save: "保存",
-      saving: "正在保存…",
       test: "测试连接",
       testing: "正在测试…",
-      cancel: "取消",
     },
     saved: "Telegram 连接已保存。",
     tested: "连接测试成功。",
@@ -136,7 +121,6 @@ const channels = {
       title: "确认复用 Telegram Bot？",
       description:
         "这个 Bot 已被其他渠道使用。继续保存后，Telegram 会把 Webhook 切换到当前渠道，旧渠道将无法继续接收通知。",
-      cancel: "取消",
       confirm: "继续保存",
     },
     info: {
@@ -220,7 +204,6 @@ const channels = {
       frameTitle: "访客 Messenger 预览",
       loading: "正在加载访客 Messenger…",
       loadFailed: "无法加载访客 Messenger 预览。",
-      retry: "重试",
     },
   },
 }

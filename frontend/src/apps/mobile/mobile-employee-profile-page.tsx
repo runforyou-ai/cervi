@@ -17,7 +17,7 @@ import { useResource } from "@/hooks/use-resource"
 
 /** 展示姓名、邮箱、团队和工作状态，只允许向其他活跃成员发消息。 */
 export function MobileEmployeeProfilePage() {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const { userID = "" } = useParams()
   const { identity } = useMobileWorkspace()
   const {
@@ -37,7 +37,7 @@ export function MobileEmployeeProfilePage() {
         actions={
           error && user ? (
             <Button variant="outline" size="sm" onClick={() => void refresh()}>
-              {t("inbox.refreshFailed")} · {t("retry")}
+              {t("inbox.refreshFailed")} · {t("common:actions.retry")}
             </Button>
           ) : undefined
         }
@@ -49,7 +49,7 @@ export function MobileEmployeeProfilePage() {
       >
         {loading && !user ? (
           <LoadingIndicator className="min-h-64 justify-center">
-            {t("loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : null}
         {error && !user ? (

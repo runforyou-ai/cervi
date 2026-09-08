@@ -47,7 +47,7 @@ export function OpenUrlDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const { t } = useTranslation("apps")
+  const { t } = useTranslation(["apps", "common"])
   const navigate = useNavigate()
   const mounted = useRef(true)
   const schema = useMemo(
@@ -125,7 +125,7 @@ export function OpenUrlDialog({
               disabled={form.formState.isSubmitting}
               onClick={() => onOpenChange(false)}
             >
-              {t("openUrl.cancel")}
+              {t("common:actions.cancel")}
             </Button>
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting

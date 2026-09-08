@@ -45,7 +45,7 @@ export function KnowledgeGroupDialog({
   onOpenChange: (open: boolean) => void
   onSaved: (knowledgeBase: KnowledgeBaseData) => void
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const navigate = useNavigate()
   const mounted = useRef(true)
   const schema = useMemo(
@@ -172,12 +172,12 @@ export function KnowledgeGroupDialog({
               disabled={form.formState.isSubmitting}
               onClick={() => onOpenChange(false)}
             >
-              {t("group.cancel")}
+              {t("common:actions.cancel")}
             </Button>
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting
-                ? t("group.saving")
-                : t("group.save")}
+                ? t("common:actions.saving")
+                : t("common:actions.save")}
             </Button>
           </div>
         </form>

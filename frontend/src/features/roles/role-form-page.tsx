@@ -294,7 +294,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("roles.loading")}
+            {tCommon("status.loading")}
           </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -309,7 +309,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
                 if (mode === "detail") void roleResource.refresh()
               }}
             >
-              {t("roles.retry")}
+              {tCommon("actions.retry")}
             </Button>
           </div>
         ) : (
@@ -451,8 +451,8 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
                   <LoaderCircleIcon className="animate-spin" />
                 ) : null}
                 {form.formState.isSubmitting
-                  ? t("roles.form.saving")
-                  : t("roles.form.save")}
+                  ? tCommon("actions.saving")
+                  : tCommon("actions.save")}
               </Button>
               <Button
                 type="button"
@@ -460,7 +460,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
                 disabled={form.formState.isSubmitting}
                 onClick={cancel}
               >
-                {t("roles.form.cancel")}
+                {tCommon("actions.cancel")}
               </Button>
             </div>
           </form>

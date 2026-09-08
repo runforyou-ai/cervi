@@ -6,24 +6,18 @@ const integrations = {
   businessSystems: "Business systems",
   businessSystem: {
     title: "Business systems",
-    loading: "Loading…",
-    retry: "Retry",
     status: {
       enabled: "Enabled",
       disabled: "Disabled",
     },
     list: {
       create: "Add business system",
-      edit: "Edit",
-      delete: "Delete",
-      more: "More",
       loadError: "Could not load business systems.",
       empty: "No business systems configured",
       columns: {
         name: "Name",
         url: "Website URL",
         status: "Status",
-        actions: "Actions",
       },
     },
     form: {
@@ -33,9 +27,6 @@ const integrations = {
       description: "Description",
       url: "Website URL",
       enabled: "Enable business system",
-      save: "Save",
-      saving: "Saving…",
-      cancel: "Cancel",
       createSuccess: "Business system added.",
       updateSuccess: "Business system saved.",
       saveError: "Could not save the business system. Try again.",
@@ -44,9 +35,6 @@ const integrations = {
     delete: {
       title: "Delete “{{name}}”?",
       description: "This business system configuration cannot be recovered.",
-      cancel: "Cancel",
-      confirm: "Delete",
-      deleting: "Deleting…",
       success: "Business system deleted.",
       error: "Could not delete the business system. Try again.",
     },
@@ -121,8 +109,6 @@ const integrations = {
   modelServices: {
     navigation: "Model services",
     title: "Model services",
-    loading: "Loading…",
-    retry: "Retry",
     tabs: {
       chat: "Chat models",
       embedding: "Embedding models",
@@ -135,9 +121,6 @@ const integrations = {
     },
     list: {
       create: "Add provider",
-      edit: "Edit",
-      delete: "Delete",
-      more: "More",
       loadError: "Could not load model service providers.",
       empty: "No providers support {{type}} yet",
       modelSeparator: ", ",
@@ -147,7 +130,6 @@ const integrations = {
         name: "Name",
         models: "Models",
         apiUrl: "API URL",
-        actions: "Actions",
       },
     },
     form: {
@@ -159,11 +141,8 @@ const integrations = {
       apiUrl: "API URL",
       showAPIKey: "Show API key",
       hideAPIKey: "Hide API key",
-      save: "Save",
-      saving: "Saving…",
       test: "Test connection",
       testing: "Testing…",
-      cancel: "Cancel",
       testSuccess: "Model service connection succeeded.",
       testError: "Could not connect to the model service. Try again.",
       createSuccess: "Model service provider added.",
@@ -182,10 +161,7 @@ const integrations = {
       select: "Select",
       toggle: "Select {{name}}",
       editField: "{{field}}, row {{row}}",
-      delete: "Delete",
       clearAll: "Clear all",
-      cancel: "Cancel",
-      confirm: "Confirm",
       types: {
         chat: "Chat",
         embedding: "Embedding",
@@ -204,16 +180,12 @@ const integrations = {
         inputModalities: "Input types",
         contextWindow: "Context window",
         maxOutputTokens: "Maximum output tokens",
-        actions: "Actions",
       },
     },
     delete: {
       title: "Delete “{{name}}”?",
       description:
         "The provider and its model catalog will no longer be available.",
-      cancel: "Cancel",
-      confirm: "Delete",
-      deleting: "Deleting…",
       success: "Model service provider deleted.",
       error: "Could not delete the model service provider. Try again.",
     },

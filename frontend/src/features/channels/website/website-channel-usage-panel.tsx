@@ -159,7 +159,7 @@ export function WebsiteChannelUsagePanel({
   onAccessChange: (value: WebsiteChannelAccessTab) => void
   onUpdated: (value: WebsiteChannelAccessData) => void
 }) {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const [copied, setCopied] = useState<"snippet" | "link" | "">("")
   const [copyFailed, setCopyFailed] = useState(false)
@@ -293,7 +293,7 @@ export function WebsiteChannelUsagePanel({
   if (!origin && !error) {
     return (
       <LoadingIndicator className="py-6">
-        {t("loading")}
+        {t("common:status.loading")}
       </LoadingIndicator>
     )
   }
@@ -382,7 +382,7 @@ export function WebsiteChannelUsagePanel({
               </FieldGroup>
               <div>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? t("form.saving") : t("form.save")}
+                  {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
                 </Button>
               </div>
             </form>
@@ -453,7 +453,7 @@ export function WebsiteChannelUsagePanel({
                           size="sm"
                           onClick={() => setQrRetryKey((value) => value + 1)}
                         >
-                          {t("retry")}
+                          {t("common:actions.retry")}
                         </Button>
                       ) : null}
                     </div>

@@ -30,7 +30,7 @@ export function ChannelReceptionSettingsForm({
   channel: MessageChannelSummary
   onUpdated: (channel: MessageChannelSummary) => void
 }) {
-  const { t } = useTranslation("channels")
+  const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
@@ -101,10 +101,10 @@ export function ChannelReceptionSettingsForm({
       </FieldGroup>
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? t("form.saving") : t("form.save")}
+          {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>
         <Button variant="outline" asChild>
-          <Link to="/integrations/channels">{t("form.cancel")}</Link>
+          <Link to="/integrations/channels">{t("common:actions.cancel")}</Link>
         </Button>
       </div>
     </form>

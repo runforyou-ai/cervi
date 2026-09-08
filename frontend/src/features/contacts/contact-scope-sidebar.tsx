@@ -89,7 +89,7 @@ export function ContactScopeSidebar({
   teamId: string
   teams: Team[]
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
   const groupedChannels = useMemo(() => {
     const groups = new Map<ChannelType, ChannelOption[]>()
@@ -110,8 +110,8 @@ export function ContactScopeSidebar({
               variant="ghost"
               size="icon-sm"
               className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
-              aria-label={t("add.label")}
-              title={t("add.label")}
+              aria-label={t("common:actions.add")}
+              title={t("common:actions.add")}
             >
               <PlusIcon />
             </Button>

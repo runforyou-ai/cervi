@@ -286,7 +286,7 @@ export function ConversationAttachmentUpload({
                 disabled={selected.length >= 100 || selecting}
                 onClick={() => inputRef.current?.click()}
               >
-                {t("attachmentAppend")}
+                {tCommon("actions.add")}
               </Button>
               <div className="flex items-center gap-2">
                 <Button

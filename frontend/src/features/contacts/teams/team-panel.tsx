@@ -284,7 +284,7 @@ export function TeamPanel({
                   <DropdownMenuItem
                     onSelect={() => setParameters({ editTeam: "1" })}
                   >
-                    {t("teams.edit")}
+                    {tCommon("actions.edit")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     destructive
@@ -372,7 +372,7 @@ export function TeamPanel({
                 <TableHead>{t("columns.workStatus")}</TableHead>
                 <TableHead>{t("columns.joinedAt")}</TableHead>
                 <TableHead className="w-px">
-                  {t("columns.actions")}
+                  {tCommon("table.actions")}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -420,8 +420,8 @@ export function TeamPanel({
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label={t("list.more")}
-                          title={t("list.more")}
+                          aria-label={tCommon("actions.more")}
+                          title={tCommon("actions.more")}
                         >
                           <MoreHorizontalIcon />
                         </Button>
@@ -470,7 +470,7 @@ export function TeamPanel({
         >
           <DialogContent className="max-w-xl">
             <DialogHeader>
-              <DialogTitle>{t("teams.edit")}</DialogTitle>
+              <DialogTitle>{tCommon("actions.edit")}</DialogTitle>
               <DialogDescription>
                 {t("teams.createDescription")}
               </DialogDescription>
@@ -532,7 +532,7 @@ export function TeamPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("teams.form.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void removeCurrentTeam()}
@@ -567,7 +567,7 @@ export function TeamPanel({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("teams.form.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>{tCommon("actions.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={deleting}
               onClick={() => void removeMembersFromCurrentTeam()}

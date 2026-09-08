@@ -18,7 +18,7 @@ const MobileWorkspaceContext = createContext<Identity | null>(null)
 
 /** 加载当前身份并为所有移动端页面提供公共上下文。 */
 export function MobileWorkspaceLayout() {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const { status, identity, redirectPath } = useIdentityLoader()
   if (status === "anonymous") return <Navigate to="/login" replace />
   if (status === "redirect" && redirectPath)
@@ -33,7 +33,7 @@ export function MobileWorkspaceLayout() {
   if (!identity) {
     return (
       <main className="flex min-h-dvh items-center justify-center">
-        <LoadingIndicator>{t("loading")}</LoadingIndicator>
+        <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator>
       </main>
     )
   }

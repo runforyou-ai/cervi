@@ -45,7 +45,7 @@ export function KnowledgeBaseFormPage({
 }: {
   mode: "create" | "edit"
 }) {
-  const { t } = useTranslation("knowledgeBase")
+  const { t } = useTranslation(["knowledgeBase", "common"])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const requestedCategory =
@@ -171,7 +171,7 @@ export function KnowledgeBaseFormPage({
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("loading")}
+            {t("common:status.loading")}
           </LoadingIndicator>
         ) : loadError ? (
           <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
@@ -183,7 +183,7 @@ export function KnowledgeBaseFormPage({
               variant="outline"
               onClick={() => void refreshKnowledgeBase()}
             >
-              {t("retry")}
+              {t("common:actions.retry")}
             </Button>
           </div>
         ) : (
@@ -236,14 +236,14 @@ export function KnowledgeBaseFormPage({
                 disabled={form.formState.isSubmitting}
               >
                 {form.formState.isSubmitting
-                  ? t("form.saving")
+                  ? t("common:actions.saving")
                   : mode === "create"
-                    ? t("form.create")
-                    : t("form.save")}
+                    ? t("common:actions.create")
+                    : t("common:actions.save")}
               </Button>
               {mode === "create" ? (
                 <Button type="button" variant="outline" asChild>
-                  <Link to="/knowledge-bases">{t("form.cancel")}</Link>
+                  <Link to="/knowledge-bases">{t("common:actions.cancel")}</Link>
                 </Button>
               ) : null}
             </div>

@@ -25,7 +25,7 @@ export function MobileGroupMembersPreview({
   returnDepth: number
   canAdd: boolean
 }) {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const navigate = useNavigate()
   const visible = group.participants.slice(0, isOwner ? 8 : 9)
   return (
@@ -82,7 +82,7 @@ export function MobileGroupMembersPreview({
                   )}
                 </span>
                 <span className="text-xs">
-                  {t(action === "add" ? "group.add" : "group.remove")}
+                  {t(action === "add" ? "common:actions.add" : "common:actions.remove")}
                 </span>
               </button>
             </li>

@@ -14,10 +14,8 @@ const workspace = {
   logout: "Log out",
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",
-  loading: "Loading…",
   identityLoadError: "Could not load the login status.",
   inboxLoadError: "Could not load messages.",
-  retry: "Try again",
   tabs: {
     label: "Open pages",
     close: "Close {{title}}",

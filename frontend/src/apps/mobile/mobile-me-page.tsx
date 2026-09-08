@@ -28,7 +28,7 @@ import {
 
 /** 展示个人资料、登录与安全入口和退出操作。 */
 export function MobileMePage() {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "common"])
   const navigate = useNavigate()
   const { identity } = useMobileWorkspace()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -107,7 +107,7 @@ export function MobileMePage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel className="min-h-11">
-                    {t("cancel")}
+                    {t("common:actions.cancel")}
                   </AlertDialogCancel>
                   <AlertDialogAction
                     className="min-h-11"

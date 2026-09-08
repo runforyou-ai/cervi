@@ -28,7 +28,7 @@ export function ConversationTargetPickerDialog({
   onOpenChange: (open: boolean) => void
   onSelected: (member: MemberOption) => void
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const dialogRef = useRef<HTMLDivElement>(null)
   const { data, loading, error, refresh } = useResource(
     resourceKeys.memberOptions(),
@@ -74,7 +74,7 @@ export function ConversationTargetPickerDialog({
                 className="mt-3"
                 onClick={() => void refresh()}
               >
-                {t("messagesRetry")}
+                {t("common:actions.retry")}
               </Button>
             </div>
           ) : candidates.length === 0 ? (

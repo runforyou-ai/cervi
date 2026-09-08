@@ -24,7 +24,7 @@ import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 加载并显示消息页。 */
 export function InboxRoute() {
-  const { t } = useTranslation("workspace")
+  const { t } = useTranslation(["workspace", "common"])
   const { applyUnreadSnapshot, beginUnreadSnapshot } = useWorkspace()
   const pollingActive = useMemberChatPollingActive()
   const previousPollingActiveRef = useRef(pollingActive)
@@ -75,7 +75,7 @@ export function InboxRoute() {
   if (showLoading && !visibleData) {
     return (
       <LoadingIndicator className="flex-1 justify-center">
-        {t("loading")}
+        {t("common:status.loading")}
       </LoadingIndicator>
     )
   }
@@ -93,7 +93,7 @@ export function InboxRoute() {
             onClick={() => void refresh()}
           >
             <RefreshCwIcon />
-            {t("retry")}
+            {t("common:actions.retry")}
           </Button>
         </div>
       </div>

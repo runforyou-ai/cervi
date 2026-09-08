@@ -270,7 +270,7 @@ func userFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key 
 		useraction.ValidationPasswordTooShort:    cervii18n.FieldPasswordTooShort,
 		useraction.ValidationPasswordTooLong:     cervii18n.FieldPasswordTooLong,
 		useraction.ValidationRoleInvalid:         cervii18n.FieldMemberRoleInvalid,
-		useraction.ValidationTeamInvalid:         cervii18n.FieldUserTeamInvalid,
+		useraction.ValidationTeamInvalid:         cervii18n.FieldTeamInvalid,
 		useraction.ValidationStatusInvalid:       cervii18n.FieldUserStatusInvalid,
 	}
 	return translateValidationFields(fields, keys)
