@@ -832,7 +832,7 @@ Cervi Gateway
 - 使用不可变 `managed/v1` Revision 和同企业文本 Chat 模型，通过 Eino v0.10 Alpha 的 ChatModelAgent 与 TurnLoop 执行。
 - 增加最小 `conversation_agent_states`、`conversation_agent_triggers` 和 `agent_runs`，Message、Trigger、Run 与 Task 在同一事务收敛。
 - 注册纯函数计算器；运行期间的新消息通过持久 Trigger 推入当前 Run，并在下一次 Tool 或模型规划前从数据库重建最新上下文。
-- 一个 Run 可吸收连续 Trigger，最多生成一条结果 Message：成功为 `text`，失败为 `agent_error`，统一使用 `agent:<agent_run_id>` 业务幂等键并由 `response_message_id` 关联；结果消息、终态和消费水位在同一事务提交。
+- 一个 Run 可吸收连续 Trigger，最多生成一条结果 Message：成功为 `text`，失败为 `agent_error`，独立 AI 会话主动停止为 `agent_cancelled`，统一使用 `agent:<agent_run_id>` 业务幂等键并由 `response_message_id` 关联；结果消息、终态和消费水位在同一事务提交。
 - 不创建 Step、Tool Invocation、Approval、Device Invocation、Checkpoint 或本地 Runtime，不流式输出，不依赖 Realtime。
 - 只记录输入/输出 Token、耗时和错误，不计算金额；客户端通过普通业务查询刷新最终消息和 Run 结果。
 
@@ -957,3 +957,12 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 
 
 失败消息沿用消息时间线的发送者、头像、排序、分页与成员阅读状态。正文留空，客户端按 `agent_error` 类型显示本地化红色「出错了」；技术错误保存在 Run 中。模型上下文与引用仅接受文本消息，网站访客历史和摘要仅展示正常聊天内容。会话列表通过 `lastMessageType` 生成特殊消息摘要。
+
+
+## 独立 AI 会话主动停止
+
+成员可停止指定 Conversation 中的 queued 或 running Run，命令携带 conversationId 和 runId。停止按会话归属授权，不要求 Agent 仍为正常账号；旧请求和重复请求返回该 Run 的实际终态，不影响后续 Run 或其他会话。
+
+停止事务沿 Conversation、Participant、AgentState、Run 的锁序，将停止时已提交的连续 Trigger 绑定到该 Run、推进实际 trigger_end_seq 和 processed_seq，并将 Run 置为 cancelled（user_cancelled）。同事务写入空正文的 agent_cancelled 消息，以 agent:<runId> 幂等键和 response_message_id 关联。提交后尽力取消本进程的模型调用，迟到结果和任务重放按持久终态收敛；停止后提交的新消息开启新 Run。
+
+成员时间线以 Agent 身份显示灰色「已停止回复」，列表显示相同摘要，不再重复展示该 Run 的取消状态。停止消息不进入模型上下文或引用，未完成正文、思考与工具过程不持久化。客服因接管、转交或关闭取消仍沿用原语义，不新增停止消息。禁用后保留会话及统一禁用确认交互由聊天 PR00 实施。

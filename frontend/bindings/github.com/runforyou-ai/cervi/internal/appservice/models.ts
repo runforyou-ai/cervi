@@ -1874,6 +1874,7 @@ export enum MessageType {
     MessageTypeText = "text",
     MessageTypeSystem = "system",
     MessageTypeAgentError = "agent_error",
+    MessageTypeAgentCancelled = "agent_cancelled",
 };
 
 /**

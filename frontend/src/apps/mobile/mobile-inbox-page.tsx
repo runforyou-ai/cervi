@@ -199,15 +199,17 @@ function MobileConversationRow({
     groupConversation?.group.status ===
     ConversationStatus.ConversationStatusArchived
       ? t("groupDissolved")
-      : conversation.lastMessageType === MessageType.MessageTypeAgentError
-        ? t("agentRunFailed")
-        : messagePreview(
-          summary.preview ?? "",
-          summary.previewSenderIdentityType,
-        ) ||
-        (groupConversation && conversation.lastMessageId
-          ? t("groupSystemUpdated")
-          : t("messagesEmpty"))
+      : conversation.lastMessageType === MessageType.MessageTypeAgentCancelled
+        ? t("agentReplyStopped")
+        : conversation.lastMessageType === MessageType.MessageTypeAgentError
+          ? t("agentRunFailed")
+          : messagePreview(
+              summary.preview ?? "",
+              summary.previewSenderIdentityType,
+            ) ||
+            (groupConversation && conversation.lastMessageId
+              ? t("groupSystemUpdated")
+              : t("messagesEmpty"))
   const formattedTime = formatTime(summary.lastMessageAt)
   const internalConversation =
     directConversation ??

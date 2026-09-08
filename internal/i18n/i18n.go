@@ -13,6 +13,7 @@ import (
 type Key string
 
 const (
+	ErrorAgentReplyStopFailed        Key = "error.agent_reply_stop_failed"
 	ErrorKnowledgeQANotFound         Key = "error.knowledge_qa_not_found"
 	ErrorKnowledgeQAUnsupported      Key = "error.knowledge_qa_unsupported"
 	ErrorKnowledgeBaseHasContent     Key = "error.knowledge_base_has_content"

@@ -43,6 +43,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/direct-conversations/messages", s.sendFirstDirectTextMessage)
 	router.POST("/agent-conversations/messages", s.sendFirstAgentTextMessage)
 	router.POST("/agent-conversations/:conversationID/messages", s.sendAgentTextMessage)
+	router.POST("/agent-conversations/:conversationID/runs/:runID/stop", s.stopAgentReply)
 	router.GET("/direct-conversations/by-target/:targetIdentityID", s.findDirectConversation)
 	router.POST("/direct-conversations/:conversationID/messages", s.sendDirectTextMessage)
 	router.POST("/group-conversations", s.createGroupConversation)
@@ -393,6 +394,12 @@ func (s *Service) sendAgentTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendAgentTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// stopAgentReply 停止独立 AI 会话中指定的回复并返回实际运行状态。
+func (s *Service) stopAgentReply(c *gin.Context) {
+	output, err := s.application.StopAgentReply(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("runID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 

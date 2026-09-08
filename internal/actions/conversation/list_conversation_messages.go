@@ -161,7 +161,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.conversation_id = ?", conversationID).
-		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem, domain.MessageTypeAgentError})).
+		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem, domain.MessageTypeAgentError, domain.MessageTypeAgentCancelled})).
 		Where("msg.deleted_at IS NULL")
 }
 
