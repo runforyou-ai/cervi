@@ -1,20 +1,6 @@
 /** 业务系统表单校验规则。 */
+import { isHTTPURL } from "@/lib/http-url"
 import { z } from "zod"
-
-/** 判断地址是否为不含认证信息的完整 HTTP 或 HTTPS 地址。 */
-function isBusinessSystemURL(value: string) {
-  try {
-    const parsed = new URL(value)
-    return (
-      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
-      parsed.host !== "" &&
-      parsed.username === "" &&
-      parsed.password === ""
-    )
-  } catch {
-    return false
-  }
-}
 
 /** 业务系统描述允许的最大字符数。 */
 export const businessSystemDescriptionMaxLength = 200
@@ -43,7 +29,7 @@ export function createBusinessSystemSchema(messages: {
       .trim()
       .min(1, messages.urlRequired)
       .max(2048, messages.urlTooLong)
-      .refine(isBusinessSystemURL, messages.urlInvalid),
+      .refine(isHTTPURL, messages.urlInvalid),
     enabled: z.boolean(),
   })
 }

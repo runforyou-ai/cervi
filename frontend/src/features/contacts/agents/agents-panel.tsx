@@ -62,8 +62,9 @@ import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { UserStatusBadge } from "@/features/contacts/user-status-badge"
 import { roleDisplayName } from "@/features/roles/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
+import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
@@ -81,7 +82,7 @@ export function AgentsPanel({
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
-  const invalidate = useResourceInvalidator()
+  const invalidateContact = useContactInvalidator()
   const {
     searchParams,
     setParameters,
@@ -127,10 +128,7 @@ export function AgentsPanel({
   /** 刷新列表并关闭详情。 */
   function refreshAndClose() {
     closeDetail()
-    void invalidate(resourceKeys.agents())
-    void invalidate(resourceKeys.roles())
-    void invalidate(resourceKeys.roleMembers())
-    void invalidate(resourceKeys.customerServiceAssignees())
+    void invalidateContact("agent")
   }
 
   /** 禁用 AI 员工账号或恢复为正常状态。 */
@@ -155,9 +153,7 @@ export function AgentsPanel({
         ),
       )
       setChangingAgentStatus(null)
-      void invalidate(resourceKeys.agent(saved.id))
-      void invalidate(resourceKeys.agents())
-      void invalidate(resourceKeys.customerServiceAssignees())
+      void invalidateContact("agent", saved.id)
     } catch (error) {
       if (recoverSession(error, navigate)) return
       console.warn("修改 AI 员工状态失败", {
@@ -355,14 +351,7 @@ export function AgentsPanel({
             roles={roles}
             teams={teams}
             onSaved={(saved) => {
-              void invalidate(resourceKeys.agent(saved.id))
-              void invalidate(resourceKeys.agents())
-              void invalidate(resourceKeys.teams())
-              void invalidate(resourceKeys.teamMembers())
-              void invalidate(resourceKeys.teamMemberCandidates())
-              void invalidate(resourceKeys.roles())
-              void invalidate(resourceKeys.roleMembers())
-              void invalidate(resourceKeys.customerServiceAssignees())
+              void invalidateContact("agent", saved.id)
             }}
             onNotFound={refreshAndClose}
           />

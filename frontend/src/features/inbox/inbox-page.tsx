@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from "react"
-import type { TFunction } from "i18next"
 import {
   BellOffIcon,
   CheckIcon,
@@ -86,9 +85,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { useUserTimeZone } from "@/contexts/user-preferences"
 import { useWorkspace } from "@/contexts/workspace-context"
-import { previousDayKey } from "@/features/inbox/calendar"
+import { sessionStatusLabel } from "@/features/inbox/session-status-label"
+import { useConversationTime, useMinuteTick } from "@/features/inbox/use-conversation-time"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
   ConversationComposer,
@@ -214,22 +213,6 @@ const scopes = [
   },
 ] as const
 
-/** 客服处理状态文案。 */
-function sessionStatusLabel(
-  status: ServiceSessionStatus,
-  t: TFunction<"inbox">,
-) {
-  switch (status) {
-    case ServiceSessionStatus.ServiceSessionStatusOpen:
-      return t("sessionStatus.open")
-    case ServiceSessionStatus.ServiceSessionStatusClosed:
-      return t("sessionStatus.closed")
-    default:
-      console.warn("未知的客服处理状态", status)
-      return ""
-  }
-}
-
 /** 会话在列表和主区中的显示名。 */
 function useConversationName() {
   const { t } = useTranslation("inbox")
@@ -252,75 +235,6 @@ function useConversationName() {
     },
     [t],
   )
-}
-
-/** 按会话列表习惯格式化最近消息时间。 */
-function useConversationTime() {
-  const { t, i18n } = useTranslation("inbox")
-  const timeZone = useUserTimeZone()
-
-  return useMemo(() => {
-    const locale = i18n.resolvedLanguage
-    const relative = new Intl.RelativeTimeFormat(locale, { numeric: "always" })
-    const weekday = new Intl.DateTimeFormat(locale, {
-      timeZone,
-      weekday: "short",
-    })
-    const monthDay = new Intl.DateTimeFormat(locale, {
-      timeZone,
-      month: "numeric",
-      day: "numeric",
-    })
-    const fullDate = new Intl.DateTimeFormat(locale, {
-      timeZone,
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-    })
-    /* en-CA 固定输出 YYYY-MM-DD，用于用户时区下的同日、昨天和同年比较。 */
-    const dayKey = new Intl.DateTimeFormat("en-CA", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-
-    return (value: string | null) => {
-      if (!value) return ""
-      const date = new Date(value)
-      const now = new Date()
-      const elapsedMs = now.getTime() - date.getTime()
-      if (elapsedMs < 60_000) {
-        return t("justNow")
-      }
-      if (elapsedMs < 3_600_000) {
-        return relative.format(-Math.floor(elapsedMs / 60_000), "minute")
-      }
-      const day = dayKey.format(date)
-      if (day === dayKey.format(now)) {
-        return relative.format(-Math.floor(elapsedMs / 3_600_000), "hour")
-      }
-      if (day === previousDayKey(dayKey.format(now))) {
-        return t("yesterday")
-      }
-      if (elapsedMs < 6 * 86_400_000) {
-        return weekday.format(date)
-      }
-      if (day.slice(0, 4) === dayKey.format(now).slice(0, 4)) {
-        return monthDay.format(date)
-      }
-      return fullDate.format(date)
-    }
-  }, [i18n.resolvedLanguage, t, timeZone])
-}
-
-/** 每分钟触发一次重渲染，保持相对时间新鲜。 */
-function useMinuteTick() {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const timer = window.setInterval(() => setTick((tick) => tick + 1), 60_000)
-    return () => window.clearInterval(timer)
-  }, [])
 }
 
 /** 顶部操作行：收纳范围栏、搜索占位和发起会话菜单。 */

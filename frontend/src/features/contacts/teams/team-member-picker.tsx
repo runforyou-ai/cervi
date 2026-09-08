@@ -12,7 +12,9 @@ import {
   type Team,
   type TeamMemberCandidate,
 } from "@/api"
+import { ProfileAvatar } from "@/components/profile-avatar"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageControls } from "@/components/page-controls"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,28 +23,6 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 const memberPageSize = 50
-
-/** 展示成员头像，图片不可用时回退到姓名首字。 */
-function MemberAvatar({ member }: { member: TeamMemberCandidate }) {
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => setFailed(false), [member.avatarUrl])
-
-  return (
-    <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
-      {member.avatarUrl && !failed ? (
-        <img
-          className="size-full object-cover"
-          src={member.avatarUrl}
-          alt={member.displayName}
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        member.displayName.slice(0, 1).toUpperCase()
-      )}
-    </span>
-  )
-}
 
 /** 搜索并批量选择尚未加入团队的企业身份。 */
 export function TeamMemberPicker({
@@ -191,7 +171,7 @@ export function TeamMemberPicker({
                       toggleMember(member, event.target.checked)
                     }
                   />
-                  <MemberAvatar member={member} />
+                  <ProfileAvatar name={member.displayName} imageURL={member.avatarUrl} className="size-9" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">
                       {member.displayName}
@@ -215,35 +195,12 @@ export function TeamMemberPicker({
       </div>
 
       {totalPages > 1 ? (
-        <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-          <span>{t("common:pagination.total", { count: pageInfo.total })}</span>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={currentPage <= 1 || loading}
-              onClick={() => setCurrentPage((page) => page - 1)}
-            >
-              {t("common:pagination.previous")}
-            </Button>
-            <span>
-              {t("common:pagination.page", {
-                current: pageInfo.number,
-                total: totalPages,
-              })}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={currentPage >= totalPages || loading}
-              onClick={() => setCurrentPage((page) => page + 1)}
-            >
-              {t("common:pagination.next")}
-            </Button>
-          </div>
-        </div>
+        <PageControls
+          page={pageInfo}
+          disabled={loading}
+          className="border-0 p-0"
+          onPageChange={setCurrentPage}
+        />
       ) : null}
 
       <div className="flex items-center justify-between gap-3">

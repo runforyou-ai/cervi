@@ -1,55 +1,12 @@
 /** 通讯录列表的加载、错误状态容器和分页控件。 */
 import type { ReactNode } from "react"
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
+import { PageControls } from "@/components/page-controls"
 import type { PageInfo } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { Button } from "@/components/ui/button"
-
-/** 联系人列表分页。 */
-function PageControls({
-  page,
-  onPageChange,
-}: {
-  page: PageInfo
-  onPageChange: (page: number) => void
-}) {
-  const { t } = useTranslation("common")
-  const totalPages = Math.max(1, Math.ceil(page.total / page.size))
-  return (
-    <div className="flex items-center justify-between border-t px-4 py-3 text-sm text-muted-foreground">
-      <span>{t("pagination.total", { count: page.total })}</span>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page.number <= 1}
-          onClick={() => onPageChange(page.number - 1)}
-        >
-          <ChevronLeftIcon />
-          {t("pagination.previous")}
-        </Button>
-        <span>
-          {t("pagination.page", { current: page.number, total: totalPages })}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page.number >= totalPages}
-          onClick={() => onPageChange(page.number + 1)}
-        >
-          {t("pagination.next")}
-          <ChevronRightIcon />
-        </Button>
-      </div>
-    </div>
-  )
-}
 
 /** 按加载状态包裹列表表格并渲染分页。 */
 export function ContactListLayout({
