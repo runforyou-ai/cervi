@@ -67,6 +67,10 @@ func ReadHTTPResponse(ctx context.Context, client HTTPDoer, request *http.Reques
 		return HTTPStatusError(response.StatusCode, strings.TrimSpace(string(responseBody)))
 	}
 	if err := decode(bytes.NewReader(responseBody)); err != nil {
+		// 保留已分类的探测错误。
+		if _, ok := errors.AsType[*Error](err); ok {
+			return err
+		}
 		return NewError(StageCapability, FailureProtocol, err)
 	}
 	return nil

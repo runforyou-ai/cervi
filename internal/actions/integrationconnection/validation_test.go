@@ -25,3 +25,20 @@ func TestNormalizeInput(t *testing.T) {
 		t.Fatalf("unexpected normalized configuration: %#v", input.Configuration)
 	}
 }
+
+// TestNormalizeRAGFlowInput 验证 RAGFlow 保存和草稿测试接受相同的实例配置。
+func TestNormalizeRAGFlowInput(t *testing.T) {
+	configuration := Configuration{APIURL: " http://ragflow.local/instance/ ", APIKey: " ragflow-test-key "}
+	input, fields := normalizeInput(Input{
+		Type: domain.IntegrationConnectionTypeRAGFlow, Name: "RAGFlow", Configuration: configuration,
+	})
+	if len(fields) != 0 || input.Configuration.APIURL != "http://ragflow.local/instance/" || input.Configuration.APIKey != "ragflow-test-key" {
+		t.Fatalf("unexpected saved configuration: %#v, fields: %v", input, fields)
+	}
+	draft, fields := normalizeConnectionInput(ConnectionInput{
+		Type: domain.IntegrationConnectionTypeRAGFlow, Configuration: configuration,
+	})
+	if len(fields) != 0 || draft.Type != input.Type || draft.Configuration != input.Configuration {
+		t.Fatalf("unexpected draft configuration: %#v, fields: %v", draft, fields)
+	}
+}

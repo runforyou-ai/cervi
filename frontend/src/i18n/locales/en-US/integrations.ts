@@ -193,6 +193,7 @@ const integrations = {
     types: {
       dify: "Dify",
       n8n: "n8n",
+      ragflow: "RAGFlow",
     },
     status: {
       untested: "Not tested",

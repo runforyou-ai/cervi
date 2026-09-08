@@ -10,8 +10,9 @@ import (
 type IntegrationConnectionType string
 
 const (
-	IntegrationConnectionTypeDify IntegrationConnectionType = IntegrationConnectionType(domain.IntegrationConnectionTypeDify)
-	IntegrationConnectionTypeN8N  IntegrationConnectionType = IntegrationConnectionType(domain.IntegrationConnectionTypeN8N)
+	IntegrationConnectionTypeDify    IntegrationConnectionType = IntegrationConnectionType(domain.IntegrationConnectionTypeDify)
+	IntegrationConnectionTypeN8N     IntegrationConnectionType = IntegrationConnectionType(domain.IntegrationConnectionTypeN8N)
+	IntegrationConnectionTypeRAGFlow IntegrationConnectionType = IntegrationConnectionType(domain.IntegrationConnectionTypeRAGFlow)
 )
 
 // IntegrationConnectionStatus 表示连接器最近一次测试状态。
