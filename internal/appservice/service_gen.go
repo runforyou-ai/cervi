@@ -459,36 +459,6 @@ func (s *Service) ListKnowledgeBases(ctx context.Context, meta RequestMeta) (Kno
 	return s.backend.ListKnowledgeBases(ctx, meta)
 }
 
-// ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
-func (s *Service) ListExternalKnowledgeBaseOptions(ctx context.Context, meta RequestMeta, connectionID string) (ExternalKnowledgeBaseOptionList, error) {
-	return s.backend.ListExternalKnowledgeBaseOptions(ctx, meta, connectionID)
-}
-
-// ListKnowledgeDocuments 返回指定外部知识库的文档列表。
-func (s *Service) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
-	return s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
-}
-
-// GetKnowledgeDocument 返回指定外部知识文档详情。
-func (s *Service) GetKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocument, error) {
-	return s.backend.GetKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
-}
-
-// GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
-func (s *Service) GetKnowledgeDocumentFile(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocumentFile, error) {
-	return s.backend.GetKnowledgeDocumentFile(ctx, meta, knowledgeBaseID, documentID)
-}
-
-// ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
-func (s *Service) ListKnowledgeDocumentSegments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentSegmentListInput) (KnowledgeDocumentSegmentList, error) {
-	return s.backend.ListKnowledgeDocumentSegments(ctx, meta, knowledgeBaseID, documentID, input)
-}
-
-// RetrieveKnowledgeBase 检索指定外部知识库。
-func (s *Service) RetrieveKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error) {
-	return s.backend.RetrieveKnowledgeBase(ctx, meta, knowledgeBaseID, input)
-}
-
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (s *Service) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBase, error) {
 	return s.backend.GetKnowledgeBase(ctx, meta, knowledgeBaseID)
@@ -637,36 +607,6 @@ func (s *Service) UpdateBusinessSystem(ctx context.Context, meta RequestMeta, bu
 // DeleteBusinessSystem 删除业务系统。
 func (s *Service) DeleteBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) error {
 	return s.backend.DeleteBusinessSystem(ctx, meta, businessSystemID)
-}
-
-// ListIntegrationConnections 返回当前企业的连接器列表。
-func (s *Service) ListIntegrationConnections(ctx context.Context, meta RequestMeta) (IntegrationConnectionList, error) {
-	return s.backend.ListIntegrationConnections(ctx, meta)
-}
-
-// GetIntegrationConnection 返回当前企业中的连接器详情。
-func (s *Service) GetIntegrationConnection(ctx context.Context, meta RequestMeta, connectionID string) (IntegrationConnection, error) {
-	return s.backend.GetIntegrationConnection(ctx, meta, connectionID)
-}
-
-// TestIntegrationConnection 测试连接器草稿配置。
-func (s *Service) TestIntegrationConnection(ctx context.Context, meta RequestMeta, input IntegrationConnectionTestInput) error {
-	return s.backend.TestIntegrationConnection(ctx, meta, input)
-}
-
-// CreateIntegrationConnection 创建外部系统连接器。
-func (s *Service) CreateIntegrationConnection(ctx context.Context, meta RequestMeta, input IntegrationConnectionInput) (IntegrationConnection, error) {
-	return s.backend.CreateIntegrationConnection(ctx, meta, input)
-}
-
-// UpdateIntegrationConnection 修改外部系统连接器。
-func (s *Service) UpdateIntegrationConnection(ctx context.Context, meta RequestMeta, connectionID string, input IntegrationConnectionInput) (IntegrationConnection, error) {
-	return s.backend.UpdateIntegrationConnection(ctx, meta, connectionID, input)
-}
-
-// DeleteIntegrationConnection 删除外部系统连接器。
-func (s *Service) DeleteIntegrationConnection(ctx context.Context, meta RequestMeta, connectionID string) error {
-	return s.backend.DeleteIntegrationConnection(ctx, meta, connectionID)
 }
 
 // UpdateOrganization 修改当前企业通用设置。

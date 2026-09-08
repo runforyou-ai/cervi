@@ -33,24 +33,16 @@ func (a *CreateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := validateDifyConnection(ctx, tx, identity.Organization.ID, input.IntegrationConnectionID); err != nil {
-			return err
-		}
 		knowledgeBase := &servermodels.KnowledgeBase{
 			OrganizationID: identity.Organization.ID, CreatedByUserID: identity.User.ID,
 			Name: input.Name, Category: string(input.Category), Description: input.Description,
-			IntegrationConnectionID: common.OptionalString(input.IntegrationConnectionID),
-			ExternalResourceID:      common.OptionalString(input.ExternalResourceID),
 		}
 		_, err := tx.NewInsert().Model(knowledgeBase).
-			Column("organization_id", "created_by_user_id", "name", "category", "description", "integration_connection_id", "external_resource_id").
-			Returning("id, name, category, description, integration_connection_id, external_resource_id, created_at, updated_at").
+			Column("organization_id", "created_by_user_id", "name", "category", "description").
+			Returning("id, name, category, description, created_at, updated_at").
 			Exec(ctx)
 		if isConstraintConflict(err, "knowledge_bases_organization_name_unique") {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"name": ValidationNameDuplicate}}
-		}
-		if isConstraintConflict(err, "knowledge_bases_external_resource_unique") {
-			return &common.FieldError{Fields: map[string]common.FieldCode{"externalResourceId": ValidationExternalResourceDuplicate}}
 		}
 		if err != nil {
 			return err

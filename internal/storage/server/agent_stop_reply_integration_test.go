@@ -29,7 +29,7 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "补充输入"}); err != nil {
 		t.Fatal(err)
 	}
-	executor := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
+	executor := agentrunaction.NewExecuteAction(db, tasks, nil)
 	for range 2 {
 		status, err := executor.StopAgentReply(ctx, identity, run.ConversationID, run.ID)
 		if err != nil || status != domain.AgentRunStatusCancelled {
@@ -91,7 +91,7 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		}
 		return agentruntime.RunResult{Content: "继续后的回复", EndSeq: claimed.EndSeq}, nil
 	}}
-	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, nil).Execute(ctx, agentrunaction.RunInput{RunID: next.ID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(db, tasks, runtime).Execute(ctx, agentrunaction.RunInput{RunID: next.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if status, err := executor.StopAgentReply(ctx, identity, run.ConversationID, next.ID); err != nil || status != domain.AgentRunStatusSucceeded {
@@ -178,7 +178,7 @@ func testStopRunningAgentReply(t *testing.T, db *bun.DB, identity *servermodels.
 			}
 			return agentruntime.RunResult{}, ctx.Err()
 		}}
-		executor := agentrunaction.NewExecuteAction(db, tasks, runtime, nil)
+		executor := agentrunaction.NewExecuteAction(db, tasks, runtime)
 		finished := make(chan error, 1)
 		go func() { finished <- executor.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}) }()
 		waitChatSignal(t, ctx, claimed)
@@ -198,7 +198,7 @@ func testStopAgentReplyWithSend(t *testing.T, db *bun.DB, identity *servermodels
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_, run := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
-		executor := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
+		executor := agentrunaction.NewExecuteAction(db, tasks, nil)
 		gate := newChatQueryGate(t, true, 1, func(event *bun.QueryEvent) bool {
 			return strings.Contains(event.Query, "conversation_agent_states")
 		})

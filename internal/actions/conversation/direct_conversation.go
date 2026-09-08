@@ -220,6 +220,7 @@ func sendDirectTextMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	if err != nil {
 		return ConversationMessage{}, err
 	}
+	sendContext.Conversation = conversation
 	return saveInternalTextMessage(ctx, tx, identity, input, sendContext, nil)
 }
 

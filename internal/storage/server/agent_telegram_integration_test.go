@@ -138,7 +138,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			}
 			return agentruntime.RunResult{Content: "产品及使用方式", EndSeq: claimed.EndSeq}, nil
 		}}
-		executor := agentrunaction.NewExecuteAction(db, f.tasks, model, nil)
+		executor := agentrunaction.NewExecuteAction(db, f.tasks, model)
 		for range 2 {
 			if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: f.run.ID}); err != nil {
 				t.Fatal(err)
@@ -189,7 +189,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 		t.Run(scenario, func(t *testing.T) {
 			f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
 			ctx := context.Background()
-			coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, nil)
+			coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil)
 			model := &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 				pending, err := feed.Peek(ctx, 0)
 				if err != nil {
@@ -222,11 +222,11 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 				return agentruntime.RunResult{Content: "不应外发的回答", EndSeq: claimed.EndSeq}, nil
 			}}
 			var enqueuer servertask.TxEnqueuer = f.tasks
-			failing := &failingDeliveryEnqueuer{}
+			failing := &failingDeliveryEnqueuer{inner: f.tasks}
 			if scenario == "投递入队失败" {
 				enqueuer = failing
 			}
-			err := agentrunaction.NewExecuteAction(db, enqueuer, model, nil).Execute(ctx, agentrunaction.RunInput{RunID: f.run.ID})
+			err := agentrunaction.NewExecuteAction(db, enqueuer, model).Execute(ctx, agentrunaction.RunInput{RunID: f.run.ID})
 			if (scenario == "失败" || scenario == "投递入队失败") != (err != nil) {
 				t.Fatalf("execution err=%v", err)
 			}

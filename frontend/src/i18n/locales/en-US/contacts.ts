@@ -165,7 +165,7 @@ const contacts = {
     },
     execution: {
       knowledgeBases: "Knowledge bases",
-      knowledgeDisabled: "Knowledge search disabled",
+      knowledgeDisabled: "No knowledge bases bound",
       knowledgeEmpty: "No knowledge bases",
       knowledgeLoading: "Loading knowledge bases…",
       knowledgeLoadError: "Failed to load knowledge bases",

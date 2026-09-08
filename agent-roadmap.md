@@ -32,7 +32,7 @@
 - `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊与网站、Telegram 客服自动触发、单在途 Run、成功或失败水位及最终消息幂等。
 - `agent_run_blocks` 保存成功 Run 的有序中间内容；运行中使用按尝试隔离的内存快照，工具普通错误反馈给模型以便修正。
 - 成员消息时间线可展开成功回复的思考和工具详情，显示输入、输出用量及最近运行状态；完整过程随消息查询返回。
-- `search_knowledge` 已支持多知识库、多查询融合和游标读取；单聊、网站和 Telegram 客服均使用 Run 绑定的 Revision 所配置的知识库范围，空范围不注册检索 Tool。
+- `search_knowledge` 已支持多知识库、多查询融合和游标读取。本地索引与检索尚未接通，当前不注册检索 Tool；接通后使用 Run 绑定 Revision 中保存的本地知识库范围。
 - Web 端 Bearer Token 保存在 `localStorage`；桌面端和移动端由 Go `clientsession` 持久化当前凭据，API Proxy 调用时注入 Bearer Token。
 - 文件模块已有临时上传、激活、过期清理、本地存储和对象存储路径。
 
@@ -179,9 +179,9 @@ agent_revisions
 └── created_at
 ```
 
-`execution_mode` 表示 AI 员工的执行方式，当前只接受 `managed`。未来接入外部平台时增加 `connected`，Dify、n8n 等具体平台属于该模式下的适配器或调用目标，不成为 Agent 身份类型。代码只在真实模式可用时增加对应枚举值和强类型配置，不接受尚未实现的空配置。
+`execution_mode` 表示 AI 员工的执行方式，当前只接受 `managed`。外部平台后续统一通过 MCP 提供工具，由托管 Agent 自主调用，不因接入工具而增加执行模式或 Agent 身份类型。代码只在真实模式可用时增加对应枚举值和强类型配置，不接受尚未实现的空配置。
 
-`configuration` 是按 `(execution_mode, schema_version)` 解释的完整、规范化、非敏感 JSON 快照。当前 `managed/v1` 保存模型服务编号与名称快照、模型标识与名称快照、系统指令以及 `knowledgeBaseIds`。Action 必须使用对应版本的强类型编解码器严格校验，未知模式、未知结构版本和未知字段都必须失败，不能静默降级。项目不创建数据库外键，因此 Action 仍须在事务中校验企业、Agent、Provider、模型和配置版本的关联；平台托管配置选择的模型必须对应现有模型目录中的同企业文本 Chat 模型。
+`configuration` 是按 `(execution_mode, schema_version)` 解释的完整、规范化、非敏感 JSON 快照。当前 `managed/v1` 保存模型服务编号与名称快照、模型标识与名称快照、系统指令和 `knowledgeBaseIds`。Action 必须使用对应版本的强类型编解码器严格校验，未知模式、未知结构版本和未知字段都必须失败，不能静默降级。项目不创建数据库外键，因此 Action 仍须在事务中校验企业、Agent、Provider、模型和配置版本的关联；平台托管配置选择的模型必须对应现有模型目录中的同企业文本 Chat 模型。
 
 ```json
 {
@@ -200,9 +200,8 @@ agent_revisions
 
 - Revision 创建后不可修改；编辑 Agent 配置时创建新 Revision 并切换当前版本。
 - 已被 Run 引用的 Revision 不物理删除。
-- 知识库范围按明确编号保存；空列表表示关闭知识检索，新增企业知识库不会自动进入已有配置。保存时在事务中校验并锁定同企业知识库。
-- Run 使用自身 Revision 的绑定；修改当前版本不改变在途 Run。绑定知识库被删除时，详情保留失效编号供移除，新运行以配置失效结束并推进消费水位。
-- 查询与游标读取共用相同知识库范围，不允许通过游标访问未绑定知识库。
+- Agent 支持绑定当前企业的本地知识库，范围随 Revision 固定；保存时校验并锁定知识库，失效绑定可从详情移除。本地检索接入遵循 [知识库 Agent Tool 方案](knowledge-base-agent-tool-plan.md)，查询与游标读取使用相同范围。
+- Run 使用自身 Revision 的配置；修改当前版本不改变在途 Run。
 - Revision 保存管理员当时配置的完整业务快照和非敏感名称快照；当前详情可以继续解析模型目录中的最新显示名称。
 - Provider 密钥和 Endpoint 仍属于 Provider 配置，不复制到 Revision 或 Run；未来外部平台凭据同样通过独立调用目标与凭据配置解析。
 - Tool Policy 保存产品能力标识和策略，不保存 Eino Tool 实例或 Go 类型。
@@ -969,7 +968,7 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 
 ## Telegram AI 客服文本接待
 
-Telegram 私聊文本复用网站客服的负责人、Revision、知识库范围、连续 Trigger 和 customer_auto 执行。只有首次落库的客户消息追加 Trigger；渠道接待配置与人工转交均允许同企业有效 AI 客服。
+Telegram 私聊文本复用网站客服的负责人、Revision、连续 Trigger 和 customer_auto 执行。本地知识库绑定保存在 Revision 中，检索尚未接通。只有首次落库的客户消息追加 Trigger；渠道接待配置与人工转交均允许同企业有效 AI 客服。
 
 成功回复、Run 终态、消费水位、Telegram 投递及任务唤醒在同一事务提交。Telegram 执行各阶段先取得渠道共享锁和渠道身份锁，再按 Conversation → CustomerConversation → ServiceSession → AgentState → Run → Task 锁序处理；网络发送交由现有投递 Worker。失败仅保存内部 agent_error 消息，不创建外部投递。
 

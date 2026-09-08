@@ -166,19 +166,13 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID
 	}
-	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "reply_to_message_id", "idempotency_key", "originated_at", "source_order").
-		Returning("*").
-		Exec(ctx); err != nil {
-		return InboundCustomerTextMessageResult{}, fmt.Errorf("create inbound customer message: %w", err)
-	}
-	if !createSession {
-		if err := updateSessionSummary(ctx, db, session, message); err != nil {
-			return InboundCustomerTextMessageResult{}, err
-		}
-	}
-	if err := updateConversationSummary(ctx, db, conversation, message); err != nil {
+	message, inserted, err := chatstate.AppendMessage(ctx, db, conversation, message)
+	if err != nil {
 		return InboundCustomerTextMessageResult{}, err
+	}
+	if !inserted {
+		saved, _, err := loadInboundCustomerTextMessage(ctx, db, channel, identity, input)
+		return saved, err
 	}
 	if _, err := db.NewUpdate().Model(identity).
 		Set("last_seen_at = CASE WHEN last_seen_at IS NULL OR last_seen_at < ? THEN ? ELSE last_seen_at END", input.OriginatedAt, input.OriginatedAt).

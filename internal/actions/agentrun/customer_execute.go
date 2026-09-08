@@ -32,11 +32,15 @@ func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *ser
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}
-	session, err := chatstate.LockCustomerServiceSession(ctx, db, run.OrganizationID, run.ConversationID)
+	conversation, err := chatstate.LockCustomerConversation(ctx, db, run.OrganizationID, run.ConversationID)
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}
-	return agentRunPolicyContext{ServiceSession: session, DeliveryRoute: route}, nil
+	session, err := chatstate.LockCurrentServiceSession(ctx, db, run.OrganizationID, run.ConversationID)
+	if err != nil {
+		return agentRunPolicyContext{}, err
+	}
+	return agentRunPolicyContext{Conversation: conversation, ServiceSession: session, DeliveryRoute: route}, nil
 }
 
 // prepareLocked 校验客户运行仍属于当前负责人，并收敛已经失效的运行。
@@ -67,16 +71,16 @@ func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *se
 	return loadClaimedCustomerMessages(ctx, db, run, endSeq)
 }
 
-// persistMessage 写入客服 Agent 结果消息并更新会话摘要。
+// persistMessage 追加客服 Agent 结果并记录有效首响。
 func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
 	participantID, err := ensureCustomerAgentParticipant(ctx, db, run.OrganizationID, run.ConversationID, run.AgentIdentityID)
 	if err != nil {
 		return err
 	}
-	message, err := insertAgentMessage(
-		ctx, db, run, messageID, participantID, messageType, content, &policyContext.ServiceSession.ID,
+	message, inserted, err := appendAgentMessage(
+		ctx, db, policyContext.Conversation, run, messageID, participantID, messageType, content, &policyContext.ServiceSession.ID,
 	)
-	if err != nil {
+	if err != nil || !inserted {
 		return err
 	}
 	// 正常回复与持久投递共享事务，内部失败消息不发送给客户。
@@ -85,7 +89,16 @@ func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, polic
 			return err
 		}
 	}
-	return updateCustomerAgentSummaries(ctx, db, policyContext.ServiceSession, message)
+	// 只有推进周期摘要的正常回复记录首响，失败消息不计入首响。
+	if message.Type == string(domain.MessageTypeText) {
+		if _, err := db.NewUpdate().Model(policyContext.ServiceSession).
+			Set("first_response_at = COALESCE(first_response_at, ?)", message.OriginatedAt).
+			WherePK().Where("organization_id = ? AND status = ? AND last_message_id = ?", message.OrganizationID, domain.ServiceSessionStatusOpen, message.ID).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("record customer agent first response: %w", err)
+		}
+	}
+	return nil
 }
 
 // enqueueNext 在当前负责人仍合格时投递客户 Agent 的剩余输入。
@@ -253,25 +266,4 @@ func ensureCustomerAgentParticipant(ctx context.Context, db bun.IDB, organizatio
 		}
 	}
 	return participant.ID, nil
-}
-
-// updateCustomerAgentSummaries 更新客服首响和会话消息摘要。
-func updateCustomerAgentSummaries(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, message *servermodels.Message) error {
-	query := db.NewUpdate().Model(session).
-		Set("last_message_id = ?", message.ID).
-		Set("last_message_at = ?", message.OriginatedAt).
-		Set("last_message_source_order = ?", message.SourceOrder).
-		Set("updated_at = now()").
-		WherePK().
-		Where("organization_id = ?", message.OrganizationID).
-		Where("status = ?", domain.ServiceSessionStatusOpen).
-		Where("(last_message_at, last_message_source_order, last_message_id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID)
-	// 客服首响仅由访客可见的正常回复确认。
-	if message.Type == string(domain.MessageTypeText) {
-		query = query.Set("first_response_at = COALESCE(first_response_at, ?)", message.OriginatedAt)
-	}
-	if _, err := query.Exec(ctx); err != nil {
-		return fmt.Errorf("update service session after customer agent response: %w", err)
-	}
-	return updateConversationAfterAgentResponse(ctx, db, message)
 }

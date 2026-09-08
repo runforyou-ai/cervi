@@ -253,28 +253,21 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 		if reply != nil {
 			replyToMessageID = &reply.ID
 		}
-		sequence, err := nextGroupMessageSequence(ctx, tx, identity.Organization.ID, normalized.ConversationID)
-		if err != nil {
-			return err
-		}
 		message := &servermodels.Message{
-			GroupMessageSequence: &sequence,
-			ID:                   messageID.String(), OrganizationID: identity.Organization.ID,
+			ID: messageID.String(), OrganizationID: identity.Organization.ID,
 			ConversationID: normalized.ConversationID, SenderParticipantID: &sendContext.ParticipantID,
 			Type: string(domain.MessageTypeText), Body: normalized.Body, ReplyToMessageID: replyToMessageID, MentionAll: normalized.MentionAll,
 			IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
 		}
-		if _, err := tx.NewInsert().Model(message).
-			Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "reply_to_message_id", "mention_all", "idempotency_key", "originated_at", "group_message_sequence").
-			Returning("*").
-			Exec(ctx); err != nil {
-			return fmt.Errorf("create group text message: %w", err)
-		}
-		if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
+		message, inserted, err := chatstate.AppendMessage(ctx, tx, sendContext.Conversation, message)
+		if err != nil {
 			return err
 		}
-		conversation := &servermodels.Conversation{ID: normalized.ConversationID, OrganizationID: identity.Organization.ID}
-		if err := updateConversationSummary(ctx, tx, conversation, message); err != nil {
+		if !inserted {
+			result, _, err = loadIdempotentGroupMessage(ctx, tx, identity, normalized, idempotencyKey)
+			return err
+		}
+		if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
 			return err
 		}
 		if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{

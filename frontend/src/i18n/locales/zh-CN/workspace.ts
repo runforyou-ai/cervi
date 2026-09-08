@@ -45,7 +45,6 @@ const workspace = {
       channels: "消息渠道",
       businessSystems: "业务系统",
       modelServices: "模型服务",
-      connectors: "连接器",
     },
   },
 }

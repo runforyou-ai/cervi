@@ -130,7 +130,7 @@ function KnowledgeQAGroupList({
               setParameters({ q: null, page: null })
             }}
           >
-            {t("documents.filters.clear")}
+            {t("qa.clearFilters")}
           </ListToolbarReset>
         ) : null}
       </ListToolbar>

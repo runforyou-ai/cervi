@@ -162,14 +162,9 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 		SenderParticipantID: &member.ParticipantID, Type: string(domain.MessageTypeAttachment), Body: input.Body,
 		IdempotencyKey: &key, OriginatedAt: time.Now().UTC(),
 	}
-	if member.Conversation.Type == string(domain.ConversationTypeGroup) {
-		sequence, err := nextGroupMessageSequence(ctx, tx, identity.Organization.ID, member.Conversation.ID)
-		if err != nil {
-			return ConversationMessage{}, err
-		}
-		message.GroupMessageSequence = &sequence
-	}
-	if _, err := tx.NewInsert().Model(message).Column("id", "organization_id", "conversation_id", "sender_participant_id", "type", "body", "idempotency_key", "originated_at", "group_message_sequence").Returning("*").Exec(ctx); err != nil {
+	// 会话锁内已完成完整幂等校验，已有附件在文件状态检查前返回。
+	message, _, err = chatstate.AppendMessage(ctx, tx, member.Conversation, message)
+	if err != nil {
 		return ConversationMessage{}, err
 	}
 	status := domain.AttachmentReady
@@ -186,9 +181,6 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 		if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 			return ConversationMessage{}, err
 		}
-	}
-	if err := updateConversationSummary(ctx, tx, member.Conversation, message); err != nil {
-		return ConversationMessage{}, err
 	}
 	if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
 		OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID, UserID: identity.User.ID, LastReadMessageID: &message.ID,

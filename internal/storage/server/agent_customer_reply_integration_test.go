@@ -39,6 +39,9 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 	t.Run("客服共享主体竞争", func(t *testing.T) {
 		testCustomerSharedAgentSubject(t, db, identity, created.IdentityID, tasks)
 	})
+	t.Run("访客输入回滚", func(t *testing.T) {
+		testWebsiteAppendRollback(t, db, identity, created.IdentityID, tasks)
+	})
 	scheduler := agentrunaction.NewScheduler(tasks)
 	for _, scenario := range []struct{ earlierSession, deleted bool }{{false, false}, {false, true}, {true, false}, {true, true}} {
 		t.Run(fmt.Sprintf("earlierSession=%t/deleted=%t", scenario.earlierSession, scenario.deleted), func(t *testing.T) {
@@ -63,7 +66,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 					t.Fatal(err)
 				}
 			}
-			coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
+			coordinator := agentrunaction.NewExecuteAction(db, tasks, nil)
 			if scenario.earlierSession {
 				if _, err := conversationaction.NewCloseServiceSessionAction(db, coordinator).Execute(ctx, identity, original.Conversation.ID); err != nil {
 					t.Fatal(err)
@@ -176,7 +179,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 			if err := db.NewSelect().Model(run).Where("agr.conversation_id = ? AND agr.status = ?", original.Conversation.ID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if err := agentrunaction.NewExecuteAction(db, tasks, runtime, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+			if err := agentrunaction.NewExecuteAction(db, tasks, runtime).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 				t.Fatal(err)
 			}
 			if calls != 1 {

@@ -115,7 +115,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 		if title != normalized.Title {
 			previousTitle := title
 			eventTitle := normalized.Title
-			if _, err := createGroupSystemEvent(ctx, tx, identity, normalized.ConversationID, ConversationSystemEvent{
+			if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 				Type:          domain.ConversationSystemEventGroupRenamed,
 				Actor:         groupActorSnapshot(identity),
 				PreviousTitle: &previousTitle,
@@ -149,7 +149,7 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		_, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
+		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
 		if err != nil {
 			return err
 		}
@@ -186,7 +186,7 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 			}
 			targets = append(targets, ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName})
 		}
-		eventMessage, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+		eventMessage, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMembersAdded, Actor: groupActorSnapshot(identity), Targets: targets,
 		})
 		if err != nil {
@@ -230,7 +230,7 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		_, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
+		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
 		if err != nil {
 			return err
 		}
@@ -244,7 +244,7 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, target.ParticipantID); err != nil {
 			return err
 		}
-		if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+		if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMemberRemoved, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
 		}); err != nil {
 			return err
@@ -284,7 +284,7 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 		if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.ParticipantID, target.ParticipantID); err != nil {
 			return err
 		}
-		if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+		if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupOwnerTransferred, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
 		}); err != nil {
 			return err
@@ -338,7 +338,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 				if otherUsers {
 					return &ConflictError{Reason: ConflictReasonGroupSuccessorRequired}
 				}
-				if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+				if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 					Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),
 				}); err != nil {
 					return err
@@ -355,7 +355,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 			if err := transferGroupOwner(ctx, tx, identity.Organization.ID, group.ParticipantID, target.ParticipantID); err != nil {
 				return err
 			}
-			if _, err := createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+			if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 				Type: domain.ConversationSystemEventGroupOwnerTransferred, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
 			}); err != nil {
 				return err
@@ -366,7 +366,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, group.ParticipantID); err != nil {
 			return err
 		}
-		_, err = createGroupSystemEvent(ctx, tx, identity, conversationID, ConversationSystemEvent{
+		_, err = createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMemberLeft, Actor: groupActorSnapshot(identity),
 		})
 		return err
@@ -578,7 +578,7 @@ func archiveGroupConversation(ctx context.Context, db bun.IDB, organizationID, c
 }
 
 // createGroupSystemEvent 写入类型化系统事件并推进会话摘要。
-func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string, event ConversationSystemEvent) (*servermodels.Message, error) {
+func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversation *servermodels.Conversation, event ConversationSystemEvent) (*servermodels.Message, error) {
 	if event.Targets == nil {
 		event.Targets = make([]ConversationSystemEventParticipant, 0)
 	}
@@ -586,28 +586,18 @@ func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermod
 	if err != nil {
 		return nil, fmt.Errorf("marshal group system event: %w", err)
 	}
-	sequence, err := nextGroupMessageSequence(ctx, db, identity.Organization.ID, conversationID)
-	if err != nil {
-		return nil, err
-	}
 	eventType := string(event.Type)
 	message := &servermodels.Message{
-		GroupMessageSequence: &sequence,
-		ID:                   uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: conversationID,
+		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: conversation.ID,
 		Type: string(domain.MessageTypeSystem), Body: "", SystemEventType: &eventType, SystemEventPayload: payload,
 		OriginatedAt: time.Now().UTC(),
 	}
-	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "type", "body", "system_event_type", "system_event_payload", "originated_at", "group_message_sequence").
-		Exec(ctx); err != nil {
-		return nil, fmt.Errorf("create group system event: %w", err)
-	}
-	conversation := &servermodels.Conversation{ID: conversationID, OrganizationID: identity.Organization.ID}
-	if err := updateConversationSummary(ctx, db, conversation, message); err != nil {
+	message, _, err = chatstate.AppendMessage(ctx, db, conversation, message)
+	if err != nil {
 		return nil, err
 	}
 	state := &servermodels.ConversationUserState{
-		OrganizationID: identity.Organization.ID, ConversationID: conversationID,
+		OrganizationID: identity.Organization.ID, ConversationID: conversation.ID,
 		UserID: identity.User.ID, LastReadMessageID: &message.ID,
 	}
 	if err := advanceConversationUserReadState(ctx, db, state, message); err != nil {

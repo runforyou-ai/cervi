@@ -84,10 +84,6 @@ export const resourceKeys = {
   businessSystems: () => ["business-systems"],
   /** 单个业务系统。 */
   businessSystem: (id?: string) => itemKey("business-system", id),
-  /** 连接器列表。 */
-  connectors: () => ["connectors"],
-  /** 单个连接器。 */
-  connector: (id?: string) => itemKey("connector", id),
   /** 知识库列表。 */
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */
@@ -100,22 +96,6 @@ export const resourceKeys = {
     entryId === undefined
       ? ["knowledge-qa-entry", knowledgeBaseId]
       : ["knowledge-qa-entry", knowledgeBaseId, entryId],
-  /** 指定连接可访问的外部知识库选项。 */
-  externalKnowledgeBaseOptions: (connectionId?: string) =>
-    itemKey("external-knowledge-base-options", connectionId),
-  /** 指定知识库及查询条件的文档列表。 */
-  knowledgeDocuments: (knowledgeBaseId?: string, parameters?: KeyParameters) =>
-    scopedListKey("knowledge-documents", knowledgeBaseId, parameters),
-  /** 指定知识库中的单个知识文档。 */
-  knowledgeDocument: (knowledgeBaseId: string, documentId: string) => [
-    "knowledge-document",
-    knowledgeBaseId,
-    documentId,
-  ],
-  /** 原始文档的预览内容。 */
-  knowledgeDocumentFile: (knowledgeBaseId: string, documentId: string) => ["knowledge-document-file", knowledgeBaseId, documentId],
-  /** 连续浏览的文档分段，命中位置作为初始页定位条件。 */
-  knowledgeDocumentSegmentWindow: (knowledgeBaseId: string, documentId: string, segmentId?: string, position?: number) => ["knowledge-document-segment-window", knowledgeBaseId, documentId, segmentId, position],
   /** 角色列表。 */
   roles: () => ["roles"],
   /** 单个角色。 */
