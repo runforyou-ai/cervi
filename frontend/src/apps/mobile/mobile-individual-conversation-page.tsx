@@ -18,8 +18,6 @@ import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { ProfileAvatar } from "@/components/profile-avatar"
-import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
   memberChatPollingInterval,
@@ -61,26 +59,14 @@ function MobileIndividualHeader({
     <MobilePageHeader
       backTo={memberUserID ? `/contacts/employees/${memberUserID}` : inboxURL}
       title={
-        <span className="flex items-center gap-3">
-          {conversation ? (
-            <ConversationAvatar
-              conversation={conversation}
-              className="size-9"
-            />
-          ) : (
-            <ProfileAvatar name={peerName} className="size-9" />
-          )}
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-base font-semibold">
-              {peerName}
+        <span className="block min-w-0">
+          <span className="block truncate">{peerName}</span>
+          {conversation?.agent ? (
+            <span className="block truncate text-xs font-normal text-muted-foreground">
+              {conversation.agent.agentName}
+              {agentRunLabel ? ` · ${agentRunLabel}` : ""}
             </span>
-            {conversation?.agent ? (
-              <span className="block text-xs font-normal text-muted-foreground">
-                {conversation.agent.agentName}
-                {agentRunLabel ? ` · ${agentRunLabel}` : ""}
-              </span>
-            ) : null}
-          </span>
+          ) : null}
         </span>
       }
     />

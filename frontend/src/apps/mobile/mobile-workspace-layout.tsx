@@ -41,7 +41,7 @@ export function MobileWorkspaceLayout() {
     <MobileWorkspaceContext value={identity}>
       <UserPreferencesProvider user={identity.user}>
         <MobileNavigationProvider>
-          <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)]">
+          <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
             <Outlet />
           </div>
         </MobileNavigationProvider>
@@ -61,12 +61,12 @@ export function MobileTabLayout() {
   ]
   return (
     <>
-      <main className="min-h-0 flex-1 overflow-hidden">
+      <main className="min-h-0 flex-1 overflow-hidden bg-background">
         <Outlet />
       </main>
       <nav
         aria-label={t("tabs.label")}
-        className="shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom)]"
+        className="shrink-0 border-t bg-sidebar pb-[env(safe-area-inset-bottom)]"
       >
         <div className="grid grid-cols-3">
           {tabs.map(({ path, label, icon: Icon }) => (
@@ -94,7 +94,7 @@ export function MobileTabLayout() {
 /** 为详情页面保留底部安全区并隐藏一级导航。 */
 export function MobileDetailLayout() {
   return (
-    <main className="min-h-0 flex-1 overflow-hidden pb-[env(safe-area-inset-bottom)]">
+    <main className="min-h-0 flex-1 overflow-hidden bg-background pb-[env(safe-area-inset-bottom)]">
       <Outlet />
     </main>
   )

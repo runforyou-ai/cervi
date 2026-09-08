@@ -80,12 +80,9 @@ const mobile = {
   me: {
     logoutDescription: "退出后需要重新登录，企业服务器连接将保留。",
     logoutTitle: "退出当前账号？",
-    settingsUnavailable: "移动端个人设置暂未开放。",
-    settings: "个人设置",
-    organization: "当前企业",
+    security: "登录与安全",
     title: "我的",
-    profile: "基础资料",
-    displayName: "姓名",
+    profile: "个人资料",
     email: "邮箱",
   },
 }
