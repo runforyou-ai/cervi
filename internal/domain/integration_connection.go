@@ -4,8 +4,9 @@ package domain
 type IntegrationConnectionType string
 
 const (
-	IntegrationConnectionTypeDify IntegrationConnectionType = "dify"
-	IntegrationConnectionTypeN8N  IntegrationConnectionType = "n8n"
+	IntegrationConnectionTypeDify    IntegrationConnectionType = "dify"
+	IntegrationConnectionTypeN8N     IntegrationConnectionType = "n8n"
+	IntegrationConnectionTypeRAGFlow IntegrationConnectionType = "ragflow"
 )
 
 // IntegrationConnectionStatus 定义连接器最近一次测试状态。

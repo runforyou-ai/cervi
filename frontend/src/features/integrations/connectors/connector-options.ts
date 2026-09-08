@@ -5,7 +5,7 @@ import {
 } from "@/api"
 
 type ConnectorTypeConfig = {
-  nameKey: `connectors.types.${"dify" | "n8n"}`
+  nameKey: `connectors.types.${"dify" | "n8n" | "ragflow"}`
   apiURLLabelKey: `connectors.form.${"apiUrl" | "instanceUrl"}`
   defaultAPIURL: string
 }
@@ -14,6 +14,7 @@ type ConnectorTypeConfig = {
 export const connectorTypeOrder: IntegrationConnectionTypeId[] = [
   IntegrationConnectionType.IntegrationConnectionTypeDify,
   IntegrationConnectionType.IntegrationConnectionTypeN8N,
+  IntegrationConnectionType.IntegrationConnectionTypeRAGFlow,
 ]
 
 /** 各连接器类型的表单显示配置。 */
@@ -28,6 +29,11 @@ export const connectorTypeConfigs: Record<
   },
   [IntegrationConnectionType.IntegrationConnectionTypeN8N]: {
     nameKey: "connectors.types.n8n",
+    apiURLLabelKey: "connectors.form.instanceUrl",
+    defaultAPIURL: "",
+  },
+  [IntegrationConnectionType.IntegrationConnectionTypeRAGFlow]: {
+    nameKey: "connectors.types.ragflow",
     apiURLLabelKey: "connectors.form.instanceUrl",
     defaultAPIURL: "",
   },

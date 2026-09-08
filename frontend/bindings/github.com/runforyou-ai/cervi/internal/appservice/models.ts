@@ -1467,6 +1467,7 @@ export enum IntegrationConnectionType {
 
     IntegrationConnectionTypeDify = "dify",
     IntegrationConnectionTypeN8N = "n8n",
+    IntegrationConnectionTypeRAGFlow = "ragflow",
 };
 
 /**
