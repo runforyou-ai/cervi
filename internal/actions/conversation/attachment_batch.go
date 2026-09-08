@@ -20,19 +20,15 @@ import (
 
 // ExecuteBatch 在同一事务中按顺序创建文件和消息，重试复用每条消息的发送编号。
 func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity *servermodels.Identity, input AttachmentBatchInput, backend domain.FileStorageBackend) (AttachmentBatchResult, error) {
-	input.Body = strings.TrimSpace(input.Body)
-	if len(input.Attachments) == 0 || len(input.Attachments) > 100 || utf8.RuneCountInString(input.Body) > 4000 ||
-		(input.Body != "" && !common.ValidUUID(input.CaptionMessageID)) ||
+	if len(input.Attachments) == 0 || len(input.Attachments) > 100 ||
 		(input.ConversationID == "") == (input.TargetIdentityID == "") ||
 		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) || (input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) {
 		return AttachmentBatchResult{}, ErrConversationNotFound
 	}
 	seen := map[string]bool{}
-	if input.Body != "" {
-		seen[input.CaptionMessageID] = true
-	}
 	for index, item := range input.Attachments {
-		if !common.ValidUUID(item.ClientMessageID) || seen[item.ClientMessageID] || item.ImageWidth < 0 || item.ImageHeight < 0 {
+		item.Body = strings.TrimSpace(item.Body)
+		if !common.ValidUUID(item.ClientMessageID) || seen[item.ClientMessageID] || item.ImageWidth < 0 || item.ImageHeight < 0 || utf8.RuneCountInString(item.Body) > 4000 {
 			return AttachmentBatchResult{}, ErrConversationNotFound
 		}
 		seen[item.ClientMessageID] = true
@@ -41,7 +37,8 @@ func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity
 		if len(fields) > 0 {
 			return AttachmentBatchResult{}, &fileaction.ValidationError{Fields: fields}
 		}
-		input.Attachments[index].File = normalized
+		item.File = normalized
+		input.Attachments[index] = item
 	}
 	var result AttachmentBatchResult
 	var err error
@@ -57,13 +54,6 @@ func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity
 			result = AttachmentBatchResult{ConversationID: member.Conversation.ID, Messages: []ConversationMessage{}}
 			for _, item := range input.Attachments {
 				message, err := savePendingAttachment(ctx, tx, identity, member, item, backend)
-				if err != nil {
-					return err
-				}
-				result.Messages = append(result.Messages, message)
-			}
-			if input.Body != "" {
-				message, err := saveInternalTextMessage(ctx, tx, identity, InternalTextMessageInput{ConversationID: member.Conversation.ID, ClientMessageID: input.CaptionMessageID, Body: input.Body}, internalMessageContext{ConversationID: member.Conversation.ID, ParticipantID: member.ParticipantID, SubjectID: member.SubjectID}, nil)
 				if err != nil {
 					return err
 				}
@@ -97,7 +87,7 @@ func savePendingAttachment(ctx context.Context, tx bun.Tx, identity *servermodel
 	existing := &servermodels.Message{}
 	err := tx.NewSelect().Model(existing).Where("msg.organization_id = ? AND msg.idempotency_key = ?", identity.Organization.ID, "mmsg:"+identity.OrganizationIdentity.ID+":"+item.ClientMessageID).Scan(ctx)
 	if err == nil {
-		if existing.Type != string(domain.MessageTypeAttachment) || existing.ConversationID != member.Conversation.ID || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID {
+		if existing.Type != string(domain.MessageTypeAttachment) || existing.Body != item.Body || existing.ConversationID != member.Conversation.ID || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID {
 			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 		}
 		messages := []ConversationMessage{memberConversationMessage(existing, member.SubjectID, identity.OrganizationIdentity)}
@@ -117,7 +107,7 @@ func savePendingAttachment(ctx context.Context, tx bun.Tx, identity *servermodel
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	return saveAttachmentMessage(ctx, tx, identity, member, AttachmentMessageInput{Pending: true, ConversationID: member.Conversation.ID, ClientMessageID: item.ClientMessageID, FileID: file.ID, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
+	return saveAttachmentMessage(ctx, tx, identity, member, attachmentMessageContent{Pending: true, Body: item.Body, ClientMessageID: item.ClientMessageID, FileID: file.ID, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
 }
 
 // lockAttachmentBatchConversation 找到或创建成员单聊并锁定发送资格。

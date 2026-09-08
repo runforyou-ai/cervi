@@ -355,20 +355,19 @@ export interface AgentWorkStatusInput {
 }
 
 /**
- * AttachmentBatchInput 定义一批附件和末尾的独立说明消息。
+ * AttachmentBatchInput 定义按顺序发送的附件消息。
  */
 export interface AttachmentBatchInput {
-    "captionMessageId": string;
     "conversationId": string;
     "targetIdentityId": string;
     "attachments": AttachmentBatchItem[] | null;
-    "body": string;
 }
 
 /**
- * AttachmentBatchItem 定义选定附件与图片展示尺寸。
+ * AttachmentBatchItem 定义一条附件消息的文件、说明和图片展示尺寸。
  */
 export interface AttachmentBatchItem {
+    "body": string;
     "fileName": string;
     "contentType": string;
     "byteSize": number;
@@ -815,6 +814,7 @@ export interface ConversationMessageMention {
  * ConversationMessageReference 定义引用消息的一层摘要。
  */
 export interface ConversationMessageReference {
+    "type": MessageType;
     "deleted": boolean;
     "id": string;
     "body": string;

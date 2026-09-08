@@ -778,7 +778,7 @@ export function SendAgentTextMessage(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
- * SendAttachmentBatch 按选择顺序保存单聊附件和说明消息。
+ * SendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
  */
 export function SendAttachmentBatch(meta: $models.RequestMeta, input: $models.AttachmentBatchInput): $CancellablePromise<$models.AttachmentBatchResult> {
     return $Call.ByID(294445027, meta, input);

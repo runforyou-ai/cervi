@@ -1,4 +1,4 @@
-/** 在时间线中展示无气泡附件、图片和原地上传状态。 */
+/** 在时间线中展示附件、图片、说明和原地上传状态。 */
 import { CheckIcon, ClockIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -21,6 +21,7 @@ import { useAttachmentQueue } from "./attachment-queue-context"
 /** 用圆环表示上传进度，发送者可在原位置取消或重试。 */
 export function ConversationAttachment({
   attachment,
+  body,
   conversationID,
   messageID,
   originatedAt,
@@ -29,6 +30,7 @@ export function ConversationAttachment({
   incoming,
 }: {
   attachment: MessageAttachment
+  body: string
   conversationID: string
   messageID: string
   originatedAt: string
@@ -168,6 +170,7 @@ export function ConversationAttachment({
       className={cn(
         "min-w-0 max-w-full text-foreground",
         !image && "w-80 rounded-xl border border-border bg-muted px-3 py-2",
+        image && body && "w-80 rounded-xl border border-border bg-muted",
       )}
       data-attachment-status={ready ? "ready" : failed ? "failed" : "uploading"}
     >
@@ -179,7 +182,8 @@ export function ConversationAttachment({
         previewURL={preview.data?.previewUrl || job?.previewURL}
         action={control}
         detail={detail}
-        footer={footer}
+        footer={body ? undefined : footer}
+        imageClassName={body ? "mx-auto rounded-b-none ring-0" : undefined}
         imageFooterClassName={
           ready
             ? "opacity-0 group-hover/message-row:opacity-100 group-focus-within/message-row:opacity-100"
@@ -203,6 +207,12 @@ export function ConversationAttachment({
         >
           {t("attachmentPreviewRetry")}
         </button>
+      ) : null}
+      {body ? (
+        <div className={cn("space-y-1 pt-2", image && "px-3 pb-2")}>
+          <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{body}</p>
+          <div className="flex justify-end text-muted-foreground">{footer}</div>
+        </div>
       ) : null}
     </div>
   )

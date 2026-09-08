@@ -86,7 +86,7 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 			default:
 				return ErrConversationNotFound
 			}
-			message, err := saveAttachmentMessage(ctx, tx, identity, member, input)
+			message, err := saveAttachmentMessage(ctx, tx, identity, member, attachmentMessageContent{ClientMessageID: input.ClientMessageID, FileID: input.FileID})
 			if err != nil {
 				return err
 			}
@@ -113,8 +113,18 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 	return AttachmentMessageResult{}, err
 }
 
+// attachmentMessageContent 定义已确认会话内待保存的附件消息内容。
+type attachmentMessageContent struct {
+	ClientMessageID string
+	FileID          string
+	Body            string
+	Pending         bool
+	ImageWidth      int
+	ImageHeight     int
+}
+
 // saveAttachmentMessage 校验完整发送意图并在同一事务内保存消息、附件和阅读位置。
-func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, member chatstate.Member, input AttachmentMessageInput) (ConversationMessage, error) {
+func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, member chatstate.Member, input attachmentMessageContent) (ConversationMessage, error) {
 	key := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
 	existing := &servermodels.Message{}
 	err := tx.NewSelect().Model(existing).Where("msg.organization_id = ? AND msg.idempotency_key = ?", identity.Organization.ID, key).Scan(ctx)
@@ -124,7 +134,7 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 			return ConversationMessage{}, err
 		}
 		if existing.Type != string(domain.MessageTypeAttachment) || existing.ConversationID != member.Conversation.ID ||
-			existing.DeletedAt != nil || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID || fileID != input.FileID {
+			existing.Body != input.Body || existing.DeletedAt != nil || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID || fileID != input.FileID {
 			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 		}
 		messages := []ConversationMessage{memberConversationMessage(existing, member.SubjectID, identity.OrganizationIdentity)}
@@ -149,7 +159,7 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	}
 	message := &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID,
-		SenderParticipantID: &member.ParticipantID, Type: string(domain.MessageTypeAttachment),
+		SenderParticipantID: &member.ParticipantID, Type: string(domain.MessageTypeAttachment), Body: input.Body,
 		IdempotencyKey: &key, OriginatedAt: time.Now().UTC(),
 	}
 	if member.Conversation.Type == string(domain.ConversationTypeGroup) {

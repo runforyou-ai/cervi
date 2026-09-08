@@ -18,16 +18,13 @@ export type SelectedAttachment = {
   imageHeight: number
 }
 
-type QueueMessage = {
+export type AttachmentJob = {
   id: string
   batchID: string
   conversationID: string
   targetIdentityID: string
   message: OutgoingConversationMessage
   stage: "preparing" | "queued" | "uploading" | "ready" | "failed" | "cancelled"
-}
-
-export type AttachmentJob = QueueMessage & {
   selected: SelectedAttachment | null
   previewURL: string
   transfer: FileTransfer | null
@@ -41,7 +38,6 @@ type Batch = {
   conversationID: string
   targetIdentityID: string
   jobs: AttachmentJob[]
-  caption: QueueMessage | null
   saved: boolean
   preparing: boolean
   onCreated: (conversation: InboxConversation | null) => void
@@ -77,12 +73,6 @@ export class AttachmentQueue {
   }
   /** 返回当前队列快照。 */
   snapshot = () => this.jobs
-  /** 返回附件和独立说明消息的本地展示。 */
-  messages = (): QueueMessage[] =>
-    [...this.batches.values()].flatMap((batch) => [
-      ...batch.jobs,
-      ...(batch.caption ? [batch.caption] : []),
-    ])
   /** 发布新的队列快照。 */
   private emit() {
     this.jobs = [...this.jobs]
@@ -105,10 +95,9 @@ export class AttachmentQueue {
     }, 30000)
   }
 
-  /** 立即展示附件和说明，以固定消息编号提交一次有序发送。 */
+  /** 立即展示附件消息，以固定消息编号提交一次有序发送。 */
   enqueue(
-    files: SelectedAttachment[],
-    body: string,
+    files: (SelectedAttachment & { body: string })[],
     conversationID: string,
     targetIdentityID: string,
     onCreated: Batch["onCreated"],
@@ -129,7 +118,7 @@ export class AttachmentQueue {
       stage: "preparing",
       message: {
         clientMessageID: selected.id,
-        body: "",
+        body: selected.body.trim(),
         originatedAt: new Date(now + index).toISOString(),
         replyTo: null,
         mentionSubjectIDs: [],
@@ -150,33 +139,11 @@ export class AttachmentQueue {
         },
       },
     }))
-    const caption: QueueMessage | null = body.trim()
-      ? {
-          id: batchID,
-          batchID,
-          conversationID,
-          targetIdentityID,
-          stage: "preparing",
-          message: {
-            clientMessageID: batchID,
-            body: body.trim(),
-            originatedAt: new Date(now + files.length).toISOString(),
-            replyTo: null,
-            mentionSubjectIDs: [],
-            mentionAll: false,
-            mentionAllToken: null,
-            status: "sending",
-            showSending: true,
-            saved: null,
-          },
-        }
-      : null
     const batch: Batch = {
       id: batchID,
       conversationID,
       targetIdentityID,
       jobs,
-      caption,
       saved: false,
       preparing: false,
       onCreated,
@@ -192,11 +159,7 @@ export class AttachmentQueue {
     if (batch.preparing || this.preparingBatch || this.disposed) return
     this.preparingBatch = true
     batch.preparing = true
-    const messages: QueueMessage[] = [
-      ...batch.jobs,
-      ...(batch.caption ? [batch.caption] : []),
-    ]
-    for (const item of messages) {
+    for (const item of batch.jobs) {
       if (item.stage !== "cancelled") {
         item.stage = "preparing"
         item.message.status = "sending"
@@ -205,14 +168,13 @@ export class AttachmentQueue {
     this.emit()
     try {
       const result = await sendAttachmentBatch({
-        captionMessageId: batch.caption?.id ?? "",
         conversationId: batch.targetIdentityID ? "" : batch.conversationID,
         targetIdentityId: batch.targetIdentityID,
-        body: batch.caption?.message.body ?? "",
         attachments: batch.jobs.map((job) => {
           const attachment = job.message.attachment!
           return {
             clientMessageId: job.id,
+            body: job.message.body,
             fileName: attachment.name,
             contentType: attachment.contentType,
             byteSize: attachment.byteSize,
@@ -223,14 +185,13 @@ export class AttachmentQueue {
       })
       batch.saved = true
       batch.conversationID = result.conversationId
-      for (let index = 0; index < messages.length; index++) {
-        const item = messages[index]
+      for (let index = 0; index < batch.jobs.length; index++) {
+        const item = batch.jobs[index]
         item.conversationID = result.conversationId
         item.message.saved = result.messages[index]
         item.message.originatedAt = result.messages[index].originatedAt
         item.message.status = "sent"
       }
-      if (batch.caption) batch.caption.stage = "ready"
       for (const job of batch.jobs) {
         const status = job.message.saved!.attachment!.uploadStatus
         if (
@@ -256,7 +217,7 @@ export class AttachmentQueue {
     } catch (error) {
       console.warn("附件消息保存失败", error)
       if (!this.disposed) this.reportError(error)
-      for (const item of messages) {
+      for (const item of batch.jobs) {
         if (item.stage !== "cancelled") {
           item.stage = "failed"
           item.message.status = "failed"
@@ -333,15 +294,13 @@ export class AttachmentQueue {
 
   /** 按当前失败阶段重试消息入库、取消或剩余文件内容。 */
   retry(id: string) {
-    const item = this.messages().find((item) => item.id === id)
-    if (!item || item.stage !== "failed") return
-    const batch = this.batches.get(item.batchID)!
+    const job = this.jobs.find((job) => job.id === id)
+    if (!job || job.stage !== "failed") return
+    const batch = this.batches.get(job.batchID)!
     if (!batch.saved) {
       void this.prepare(batch)
       return
     }
-    const job = batch.jobs.find((job) => job.id === id)
-    if (!job) return
     if (job.cancelRequested) {
       void this.cancel(id).catch(this.reportError)
       return

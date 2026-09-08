@@ -64,21 +64,14 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
         messages: [
           ...input.attachments.map((item: any) => ({
             id: item.clientMessageId,
+            body: item.body,
             originatedAt: new Date().toISOString(),
             attachment: {
               id: `file-${item.clientMessageId}`,
               uploadStatus: "uploading",
             },
           })),
-          ...(input.body
-            ? [
-                {
-                  id: input.captionMessageId,
-                  body: input.body,
-                  originatedAt: new Date().toISOString(),
-                },
-              ]
-            : []),
+
         ],
       }
     },
@@ -107,6 +100,7 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
   )
   const files = [1, 2].map((index) => ({
     id: `message-${index}`,
+    body: index === 2 ? "说明" : "",
     file: new File(["contents"], `${index}.csv`),
     previewURL: "",
     imageWidth: 0,
@@ -141,17 +135,30 @@ test("消息尚未入库时不准备上传，会在返回后继续执行单个�
   }
   // 绑定函数在队列加载时已捕获，使用第二个宿主注入阻塞请求。
   const q = host({ sendAttachmentBatch: h.api.sendAttachmentBatch })
-  q.queue.enqueue(q.files, "说明", "conversation", "", () => {})
+  q.queue.enqueue(q.files, "conversation", "", () => {})
   await q.queue.cancel("message-1")
   assert.equal(q.counts().prepared, 0)
   gate.resolve()
   await settled(() => q.queue.snapshot()[1].stage === "ready")
   assert.equal(q.queue.snapshot().length, 2)
-  assert.equal(q.queue.messages().length, 3)
+  assert.equal(q.queue.snapshot()[0].message.body, "")
+  assert.equal(q.queue.snapshot()[1].message.body, "说明")
+  assert.equal(q.queue.snapshot()[1].message.saved.body, "说明")
   assert.equal(q.queue.snapshot()[0].stage, "cancelled")
   assert.equal(q.counts().prepared, 1)
   assert.equal(q.counts().transfers, 1)
   assert.ok(q.updates.some((item) => item.status === "cancelled"))
+})
+
+test("单个附件的说明在本地和保存后始终属于同一条消息", async () => {
+  const h = host()
+  const file = { ...h.files[0], body: "  单个附件说明\n第二行  " }
+  h.queue.enqueue([file], "conversation", "", () => {})
+  assert.equal(h.queue.snapshot().length, 1)
+  assert.equal(h.queue.snapshot()[0].message.body, "单个附件说明\n第二行")
+  await settled(() => h.queue.snapshot()[0].stage === "ready")
+  assert.equal(h.queue.snapshot().length, 1)
+  assert.equal(h.queue.snapshot()[0].message.saved.body, "单个附件说明\n第二行")
 })
 
 test("完成请求期间取消会释放文件，迟到的完成响应不能恢复本地消息", async () => {
@@ -163,7 +170,7 @@ test("完成请求期间取消会释放文件，迟到的完成响应不能恢�
       await gate.promise
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), "", "conversation", "", () => {})
+  h.queue.enqueue(h.files.slice(0, 1), "conversation", "", () => {})
   await settled(() => entered)
   await h.queue.cancel("message-1")
   gate.resolve()
@@ -182,7 +189,7 @@ test("离开页面后入库响应才返回，附件标记失败且不会开始�
       return h.api.sendAttachmentBatch(input)
     },
   })
-  q.queue.enqueue(q.files, "", "conversation", "", () => {})
+  q.queue.enqueue(q.files, "conversation", "", () => {})
   q.queue.dispose()
   gate.resolve()
   await settled(() =>
@@ -206,7 +213,7 @@ test("完成失败后重试复用成功分片，仅重新确认完成", async ()
       if (++completed === 1) throw new Error("完成暂时失败")
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), "", "conversation", "", () => {})
+  h.queue.enqueue(h.files.slice(0, 1), "conversation", "", () => {})
   await settled(() => h.queue.snapshot()[0].stage === "failed")
   assert.equal(h.counts().transfers, 4)
   h.queue.retry("message-1")
@@ -215,7 +222,7 @@ test("完成失败后重试复用成功分片，仅重新确认完成", async ()
   assert.equal(h.queue.snapshot()[0].transfer, null)
 })
 
-test("入库响应丢失后重试沿用附件和说明的消息编号", async () => {
+test("入库响应丢失后重试沿用带说明附件的消息编号", async () => {
   const requests: any[] = []
   const h = host()
   const q = host({
@@ -225,12 +232,16 @@ test("入库响应丢失后重试沿用附件和说明的消息编号", async ()
       return h.api.sendAttachmentBatch(input)
     },
   })
-  q.queue.enqueue(q.files, "说明", "conversation", "", () => {})
+  q.queue.enqueue(q.files, "conversation", "", () => {})
   await settled(() => q.queue.snapshot()[0].stage === "failed")
-  q.queue.retry(q.queue.messages()[2].id)
+  q.queue.retry(q.queue.snapshot()[1].id)
   await settled(() => q.queue.snapshot()[1].stage === "ready")
   assert.equal(JSON.stringify(requests[0]), JSON.stringify(requests[1]))
-  assert.equal(q.queue.messages()[2].stage, "ready")
+  assert.equal(q.queue.snapshot()[1].stage, "ready")
+  assert.equal(q.queue.snapshot()[1].message.saved.body, "说明")
+  assert.equal(requests[0].attachments.length, 2)
+  assert.equal(requests[0].attachments[0].body, "")
+  assert.equal(requests[0].attachments[1].body, "说明")
 })
 
 test("失败分片重试跳过已成功的片", async () => {
@@ -258,7 +269,7 @@ test("失败分片重试跳过已成功的片", async () => {
       }
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), "", "conversation", "", () => {})
+  h.queue.enqueue(h.files.slice(0, 1), "conversation", "", () => {})
   await settled(() => h.queue.snapshot()[0].stage === "failed")
   h.queue.retry("message-1")
   await settled(() => h.queue.snapshot()[0].stage === "ready")

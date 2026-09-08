@@ -91,6 +91,7 @@ type ConversationMessageSender struct {
 
 // ConversationMessageReference 定义引用消息的一层摘要。
 type ConversationMessageReference struct {
+	Type    MessageType                `json:"type"`
 	Deleted bool                       `json:"deleted"`
 	ID      string                     `json:"id"`
 	Body    string                     `json:"body"`
@@ -365,8 +366,9 @@ type MessageAttachment struct {
 	ImageHeight  int                    `json:"imageHeight"`
 }
 
-// AttachmentBatchItem 定义选定附件与图片展示尺寸。
+// AttachmentBatchItem 定义一条附件消息的文件、说明和图片展示尺寸。
 type AttachmentBatchItem struct {
+	Body            string `json:"body"`
 	FileName        string `json:"fileName"`
 	ContentType     string `json:"contentType"`
 	ByteSize        int64  `json:"byteSize"`
@@ -375,13 +377,11 @@ type AttachmentBatchItem struct {
 	ImageHeight     int    `json:"imageHeight"`
 }
 
-// AttachmentBatchInput 定义一批附件和末尾的独立说明消息。
+// AttachmentBatchInput 定义按顺序发送的附件消息。
 type AttachmentBatchInput struct {
-	CaptionMessageID string                `json:"captionMessageId"`
 	ConversationID   string                `json:"conversationId"`
 	TargetIdentityID string                `json:"targetIdentityId"`
 	Attachments      []AttachmentBatchItem `json:"attachments"`
-	Body             string                `json:"body"`
 }
 
 // AttachmentBatchResult 返回已保存的有序消息。

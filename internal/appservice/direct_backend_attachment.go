@@ -77,7 +77,7 @@ func (b *DirectBackend) GetAttachmentDownload(ctx context.Context, meta RequestM
 	return FileDownload{URL: request.URL, PreviewURL: preview.URL}, nil
 }
 
-// SendAttachmentBatch 保存单聊中的有序附件消息和说明文字。
+// SendAttachmentBatch 按顺序保存可带说明的单聊附件消息。
 func (b *DirectBackend) SendAttachmentBatch(ctx context.Context, meta RequestMeta, input AttachmentBatchInput) (AttachmentBatchResult, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
@@ -85,7 +85,7 @@ func (b *DirectBackend) SendAttachmentBatch(ctx context.Context, meta RequestMet
 	}
 	items := make([]conversationaction.AttachmentBatchItem, 0, len(input.Attachments))
 	for _, item := range input.Attachments {
-		items = append(items, conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: item.FileName, ContentType: item.ContentType, ByteSize: item.ByteSize}, ClientMessageID: item.ClientMessageID, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
+		items = append(items, conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: item.FileName, ContentType: item.ContentType, ByteSize: item.ByteSize}, ClientMessageID: item.ClientMessageID, Body: item.Body, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
 	}
 	setting, err := b.getS3Setting.Execute(ctx, identity)
 	if err != nil {
@@ -95,7 +95,7 @@ func (b *DirectBackend) SendAttachmentBatch(ctx context.Context, meta RequestMet
 	if setting.Enabled {
 		backend = domain.FileStorageBackendS3
 	}
-	result, err := b.sendAttachmentMessage.ExecuteBatch(ctx, identity, conversationaction.AttachmentBatchInput{CaptionMessageID: input.CaptionMessageID, ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, Body: input.Body, Attachments: items}, backend)
+	result, err := b.sendAttachmentMessage.ExecuteBatch(ctx, identity, conversationaction.AttachmentBatchInput{ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, Attachments: items}, backend)
 	if _, ok := errors.AsType[*fileaction.ValidationError](err); ok {
 		return AttachmentBatchResult{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}

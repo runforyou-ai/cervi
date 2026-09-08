@@ -50,7 +50,7 @@ type Backend interface {
 	// SendAttachmentMessage 发送内部单聊或群聊附件消息。
 	//cervi:route POST /conversation-attachments status=201
 	SendAttachmentMessage(context.Context, RequestMeta, AttachmentMessageInput) (AttachmentMessageResult, error)
-	// SendAttachmentBatch 按选择顺序保存单聊附件和说明消息。
+	// SendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
 	//cervi:route POST /direct-attachment-batches status=201
 	SendAttachmentBatch(context.Context, RequestMeta, AttachmentBatchInput) (AttachmentBatchResult, error)
 	// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。

@@ -16,6 +16,7 @@ export function AttachmentContent({
   detail,
   footer,
   imageFooterClassName,
+  imageClassName,
   onOpen,
   onImageLoad,
 }: {
@@ -28,13 +29,14 @@ export function AttachmentContent({
   detail?: ReactNode
   footer?: ReactNode
   imageFooterClassName?: string
+  imageClassName?: string
   onOpen?: () => void
   onImageLoad?: () => void
 }) {
   if (imageWidth > 0 && imageHeight > 0) {
     return (
       <div
-        className="relative max-w-full overflow-hidden rounded-xl ring-1 ring-border"
+        className={cn("relative max-w-full overflow-hidden rounded-xl ring-1 ring-border", imageClassName)}
         style={{
           width: Math.min(imageWidth, 320, (320 * imageWidth) / imageHeight),
           aspectRatio: `${imageWidth} / ${imageHeight}`,
