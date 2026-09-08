@@ -20,24 +20,44 @@ type SendError struct {
 // Error 返回不含 Token 和平台响应正文的错误码。
 func (e *SendError) Error() string { return e.Code }
 
+// TextMessage 定义纯文本投递及其可选引用目标。
+type TextMessage struct {
+	ChatID         string
+	Body           string
+	ReplyMessageID *string
+}
+
 // TextSender 定义私聊文本投递依赖。
 type TextSender interface {
-	SendText(context.Context, string, string, string) (int64, error)
+	SendText(context.Context, string, TextMessage) (int64, error)
 }
 
 // SendText 发送纯文本并保留平台拒绝与结果未知的区别。
-func (c *Client) SendText(ctx context.Context, token, chatID, body string) (int64, error) {
+func (c *Client) SendText(ctx context.Context, token string, message TextMessage) (int64, error) {
 	if !botTokenPattern.MatchString(token) {
 		return 0, &SendError{Code: "invalid_token"}
 	}
-	chat, err := strconv.ParseInt(chatID, 10, 64)
+	chat, err := strconv.ParseInt(message.ChatID, 10, 64)
 	if err != nil || chat <= 0 {
 		return 0, &SendError{Code: "invalid_recipient"}
 	}
+	type replyParameters struct {
+		MessageID                int64 `json:"message_id"`
+		AllowSendingWithoutReply bool  `json:"allow_sending_without_reply"`
+	}
+	var reply *replyParameters
+	if message.ReplyMessageID != nil {
+		messageID, err := strconv.ParseInt(*message.ReplyMessageID, 10, 64)
+		if err != nil || messageID <= 0 {
+			return 0, &SendError{Code: "invalid_message"}
+		}
+		reply = &replyParameters{MessageID: messageID}
+	}
 	payload, err := json.Marshal(struct {
-		ChatID int64  `json:"chat_id"`
-		Text   string `json:"text"`
-	}{chat, body})
+		ChatID int64            `json:"chat_id"`
+		Text   string           `json:"text"`
+		Reply  *replyParameters `json:"reply_parameters,omitempty"`
+	}{chat, message.Body, reply})
 	if err != nil {
 		return 0, &SendError{Code: "invalid_message"}
 	}

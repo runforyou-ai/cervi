@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -18,6 +19,7 @@ import (
 
 // InboundCustomerTextMessageInput 定义渠道文本入站事务的稳定事实。
 type InboundCustomerTextMessageInput struct {
+	ChannelMessage          *channelmessage.Inbound
 	ClientMessageID         *string
 	ReplyToMessageID        string
 	ExternalID              string
@@ -179,6 +181,11 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 		saved, _, err := loadInboundCustomerTextMessage(ctx, db, channel, identity, input)
 		return saved, err
 	}
+	if input.ChannelMessage != nil {
+		if err := channelmessage.RecordInbound(ctx, db, channel.ID, message, input.ChannelMessage); err != nil {
+			return InboundCustomerTextMessageResult{}, err
+		}
+	}
 	if _, err := db.NewUpdate().Model(identity).
 		Set("last_seen_at = CASE WHEN last_seen_at IS NULL OR last_seen_at < ? THEN ? ELSE last_seen_at END", input.OriginatedAt, input.OriginatedAt).
 		Set("updated_at = now()").
@@ -217,7 +224,14 @@ func loadInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *se
 	if message.ReplyToMessageID != nil {
 		storedReply = *message.ReplyToMessageID
 	}
-	if storedReply != input.ReplyToMessageID || message.Body != input.Body || (input.RequestedConversationID != nil && *input.RequestedConversationID != message.ConversationID) {
+	replyMatches := storedReply == input.ReplyToMessageID
+	if input.ChannelMessage != nil {
+		replyMatches, err = channelmessage.MatchesInbound(ctx, db, message, channel.ID, input.ChannelMessage)
+		if err != nil {
+			return InboundCustomerTextMessageResult{}, true, err
+		}
+	}
+	if !replyMatches || message.Body != input.Body || (input.RequestedConversationID != nil && *input.RequestedConversationID != message.ConversationID) {
 		return InboundCustomerTextMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	session := &servermodels.ServiceSession{}

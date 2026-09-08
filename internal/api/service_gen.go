@@ -35,6 +35,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/inbox", s.loadInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
+	router.GET("/conversations/:conversationID/message-references", s.listConversationMessageReferences)
 	router.GET("/conversations/:conversationID/messages/:messageID/context", s.getConversationMessageContext)
 	router.GET("/conversations/:conversationID/navigation", s.getConversationNavigationState)
 	router.GET("/conversations/:conversationID/mentions/pending", s.listPendingConversationMentions)
@@ -330,6 +331,16 @@ func (s *Service) listConversationMessages(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListConversationMessages(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
+func (s *Service) listConversationMessageReferences(c *gin.Context) {
+	input, ok := bindConversationMessageReferenceListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListConversationMessageReferences(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1308,6 +1319,13 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 	return appservice.ConversationMessageListInput{
 		Before: c.Query("before"),
 		After:  c.Query("after"),
+	}, true
+}
+
+// bindConversationMessageReferenceListInputQuery 从查询参数解析 appservice.ConversationMessageReferenceListInput。
+func bindConversationMessageReferenceListInputQuery(c *gin.Context) (appservice.ConversationMessageReferenceListInput, bool) {
+	return appservice.ConversationMessageReferenceListInput{
+		MessageIDs: c.Query("messageIds"),
 	}, true
 }
 

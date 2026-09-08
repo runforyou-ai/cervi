@@ -152,6 +152,14 @@ func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.
 	return output, err
 }
 
+// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
+func (b *Backend) ListConversationMessageReferences(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageReferenceListInput) (appservice.ConversationMessageReferenceList, error) {
+	var output appservice.ConversationMessageReferenceList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/message-references", encodeConversationMessageReferenceListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetConversationMessageContext 返回目标消息及其前后上下文。
 func (b *Backend) GetConversationMessageContext(ctx context.Context, meta appservice.RequestMeta, conversationID string, messageID string) (appservice.ConversationMessageList, error) {
 	var output appservice.ConversationMessageList
@@ -1061,6 +1069,13 @@ func encodeConversationMessageListInputQuery(input appservice.ConversationMessag
 	query := url.Values{}
 	setQuery(query, "before", input.Before)
 	setQuery(query, "after", input.After)
+	return query
+}
+
+// encodeConversationMessageReferenceListInputQuery 将 appservice.ConversationMessageReferenceListInput 编码为查询参数。
+func encodeConversationMessageReferenceListInputQuery(input appservice.ConversationMessageReferenceListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "messageIds", input.MessageIDs)
 	return query
 }
 

@@ -24,6 +24,8 @@ function scopedListKey(
 }
 
 export const resourceKeys = {
+  /** 当前窗口内消息的引用状态。 */
+  conversationMessageReferences: (conversationId: string, messageIds: string) => scopedListKey("conversation-message-references", conversationId, { messageIds }),
   /** 当前会话窗口的外部投递状态。 */
   customerDeliveries: (conversationId: string, messageIds?: string) =>
     scopedListKey("customer-deliveries", conversationId, messageIds === undefined ? undefined : { messageIds }),

@@ -28,11 +28,12 @@ var (
 
 // Route 保存本次发送所属的渠道身份与机器人。
 type Route struct {
-	ChannelID   string             `bun:"channel_id"`
-	IdentityID  string             `bun:"identity_id"`
-	ChannelType domain.ChannelType `bun:"channel_type"`
-	Enabled     bool               `bun:"enabled"`
-	BotID       *int64             `bun:"bot_id"`
+	ChannelID              string             `bun:"channel_id"`
+	IdentityID             string             `bun:"identity_id"`
+	ChannelType            domain.ChannelType `bun:"channel_type"`
+	Enabled                bool               `bun:"enabled"`
+	BotID                  *int64             `bun:"bot_id"`
+	ReplyProviderMessageID *string
 }
 
 // Prepare 读取外发目标，Telegram 在客服周期之前锁定渠道身份。
@@ -77,7 +78,7 @@ func Enqueue(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, ro
 	delivery := &models.CustomerMessageDelivery{
 		ID: uuid.NewV7().String(), OrganizationID: message.OrganizationID, ConversationID: message.ConversationID,
 		MessageID: message.ID, ChannelID: route.ChannelID, ContactChannelIdentityID: route.IdentityID,
-		BotID: *route.BotID, Position: position, Status: domain.CustomerDeliveryPending,
+		BotID: *route.BotID, ReplyProviderMessageID: route.ReplyProviderMessageID, Position: position, Status: domain.CustomerDeliveryPending,
 		AvailableAt: now, CreatedAt: now, UpdatedAt: now,
 	}
 	if _, err := db.NewInsert().Model(delivery).Exec(ctx); err != nil {

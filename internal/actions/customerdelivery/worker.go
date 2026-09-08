@@ -7,9 +7,11 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"strconv"
 	"time"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	"github.com/runforyou-ai/cervi/internal/actions/channelstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -73,12 +75,12 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 			return err
 		}
 		sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
-		messageID, sendErr := w.sender.SendText(sendCtx, token, recipient, body)
+		messageID, sendErr := w.sender.SendText(sendCtx, token, telegram.TextMessage{ChatID: recipient, Body: body, ReplyMessageID: delivery.ReplyProviderMessageID})
 		cancel()
 		// 请求结束或服务关闭后仍尝试落下平台结果，避免成功结果仅留在内存。
 		saveCtx, saveCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer saveCancel()
-		return w.finish(saveCtx, conn, delivery, messageID, sendErr)
+		return w.finish(saveCtx, conn, delivery, recipient, messageID, sendErr)
 	})
 }
 
@@ -181,8 +183,12 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 }
 
 // finish 保存带认领标识的平台结果，未知结果绝不自动重发。
-func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.CustomerMessageDelivery, messageID int64, sendErr error) error {
+func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.CustomerMessageDelivery, recipient string, messageID int64, sendErr error) error {
 	return conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// 与入站共用渠道身份锁，使映射写入和迟到引用关联串行提交。
+		if _, err := tx.ExecContext(ctx, "SELECT id FROM contact_channel_identities WHERE id = ? AND organization_id = ? FOR UPDATE", delivery.ContactChannelIdentityID, delivery.OrganizationID); err != nil {
+			return err
+		}
 		worker := delivery.LeaseWorker
 		current := &models.CustomerMessageDelivery{}
 		if err := tx.NewSelect().Model(current).Where("cmd.id = ?", delivery.ID).For("UPDATE").Scan(ctx); err != nil {
@@ -196,6 +202,13 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
 		current.Status = domain.CustomerDeliverySent
 		if sendErr == nil && messageID > 0 {
 			current.ProviderMessageID, current.SentAt = &messageID, &now
+			// 使用本次实际发送的聊天目标建立平台映射。
+			if err := channelmessage.Record(ctx, tx, &models.ChannelMessage{
+				MessageID: current.MessageID, OrganizationID: current.OrganizationID, ConversationID: current.ConversationID,
+				ChannelID: current.ChannelID, ProviderAccountID: strconv.FormatInt(current.BotID, 10), ProviderConversationID: recipient, ProviderMessageID: strconv.FormatInt(messageID, 10),
+			}); err != nil {
+				return err
+			}
 		} else {
 			var failure *telegram.SendError
 			if !errors.As(sendErr, &failure) {

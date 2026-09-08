@@ -572,11 +572,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
 			ConversationID:   telegramConversation.ID,
 			ClientMessageID:  "019d4e1c-40a5-77dd-82e6-6951f9957ba5",
-			Body:             "Telegram 暂不支持引用",
+			Body:             "Telegram 引用回复",
 			ReplyToMessageID: telegramMessages[0].ID,
 		})
-		var replyConflict *conversationaction.ConflictError
-		if !errors.As(err, &replyConflict) || replyConflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
+		if err != nil {
 			t.Fatalf("Telegram reply error = %#v", err)
 		}
 		messageCountAfterReply, err := db.NewSelect().Model((*servermodels.Message)(nil)).
@@ -586,8 +585,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if messageCountAfterReply != messageCountBeforeReply {
-			t.Fatalf("Telegram message count after rejected reply = %d, want %d", messageCountAfterReply, messageCountBeforeReply)
+		if messageCountAfterReply != messageCountBeforeReply+1 {
+			t.Fatalf("Telegram message count after reply = %d, want %d", messageCountAfterReply, messageCountBeforeReply+1)
 		}
 		sameAvatarMessage := *telegramMessage.Message
 		sameAvatarMessage.MessageID = 43

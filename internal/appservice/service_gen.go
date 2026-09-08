@@ -99,6 +99,11 @@ func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta
 	return s.backend.ListConversationMessages(ctx, meta, conversationID, input)
 }
 
+// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
+func (s *Service) ListConversationMessageReferences(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error) {
+	return s.backend.ListConversationMessageReferences(ctx, meta, conversationID, input)
+}
+
 // GetConversationMessageContext 返回目标消息及其前后上下文。
 func (s *Service) GetConversationMessageContext(ctx context.Context, meta RequestMeta, conversationID string, messageID string) (ConversationMessageList, error) {
 	return s.backend.GetConversationMessageContext(ctx, meta, conversationID, messageID)

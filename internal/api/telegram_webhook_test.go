@@ -4,7 +4,9 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -139,3 +141,29 @@ func telegramWebhookMessagesEqual(left, right *channelaction.TelegramWebhookMess
 }
 
 var _ TelegramWebhookReceiver = (*telegramWebhookReceiverStub)(nil)
+
+// TestTelegramWebhookReplyNormalization 验证机器人原文、跨聊天引用与部分引用的整条语义。
+func TestTelegramWebhookReplyNormalization(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		chat int64
+		want bool
+	}{
+		{"same chat bot reply", 123, true}, {"another chat", 456, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var message telegramWebhookMessage
+			body := fmt.Sprintf(`{"message_id":9,"date":1788880000,"text":"客户回答","chat":{"id":123,"type":"private"},"from":{"id":123,"first_name":"客户"},"quote":{"text":"部分"},"reply_to_message":{"message_id":7,"text":"完整原文","chat":{"id":%d,"type":"private"},"from":{"id":999,"is_bot":true,"first_name":"客服 Bot"}}}`, test.chat)
+			if err := json.Unmarshal([]byte(body), &message); err != nil {
+				t.Fatal(err)
+			}
+			result, reason := normalizeTelegramWebhookMessage(message)
+			if result == nil || reason != "" || (result.Reply != nil) != test.want {
+				t.Fatalf("result=%+v reason=%s", result, reason)
+			}
+			if test.want && (result.Reply.MessageID != 7 || result.Reply.Body != "完整原文" || !result.Reply.SenderIsBot || result.Reply.SenderName != "客服 Bot") {
+				t.Fatalf("reply=%+v", result.Reply)
+			}
+		})
+	}
+}

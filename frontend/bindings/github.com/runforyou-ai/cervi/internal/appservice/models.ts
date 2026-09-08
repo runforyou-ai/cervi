@@ -763,6 +763,8 @@ export enum ConversationMentionReviewOutcome {
  * ConversationMessage 定义成员可见的会话消息。
  */
 export interface ConversationMessage {
+    "canReply": boolean;
+
     /**
      * ClientMessageID 仅向原发送身份返回。
      */
@@ -818,11 +820,38 @@ export interface ConversationMessageMention {
  * ConversationMessageReference 定义引用消息的一层摘要。
  */
 export interface ConversationMessageReference {
+    /**
+     * ExternalSenderName 仅未关联本地原消息的引用返回平台名称，此时 ID 为空。
+     */
+    "externalSenderName"?: string;
     "type": MessageType;
     "deleted": boolean;
     "id": string;
     "body": string;
     "sender": ConversationMessageSender | null;
+}
+
+/**
+ * ConversationMessageReferenceList 返回窗口内的引用状态。
+ */
+export interface ConversationMessageReferenceList {
+    "states": ConversationMessageReferenceState[] | null;
+}
+
+/**
+ * ConversationMessageReferenceListInput 定义窗口内需要刷新引用状态的消息编号。
+ */
+export interface ConversationMessageReferenceListInput {
+    "messageIds": string;
+}
+
+/**
+ * ConversationMessageReferenceState 定义一条消息的最新引用与回复可用状态。
+ */
+export interface ConversationMessageReferenceState {
+    "messageId": string;
+    "canReply": boolean;
+    "replyTo": ConversationMessageReference | null;
 }
 
 /**
