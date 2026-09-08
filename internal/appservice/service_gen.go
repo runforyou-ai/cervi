@@ -89,6 +89,16 @@ func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta, input LoadInb
 	return s.backend.LoadInbox(ctx, meta, input)
 }
 
+// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
+func (s *Service) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
+	return s.backend.GetInboxConversation(ctx, meta, conversationID)
+}
+
+// ReadInboxConversations 按 ID 批量返回会话摘要及当前筛选资格。
+func (s *Service) ReadInboxConversations(ctx context.Context, meta RequestMeta, input ReadInboxConversationsInput) (InboxConversationResults, error) {
+	return s.backend.ReadInboxConversations(ctx, meta, input)
+}
+
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (s *Service) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta) (CustomerServiceAssigneeList, error) {
 	return s.backend.ListCustomerServiceAssignees(ctx, meta)

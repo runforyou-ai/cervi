@@ -1,43 +1,24 @@
 /** 移动端真人单聊与 AI 聊天详情。 */
-import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useParams } from "react-router"
 
 import {
   ConversationType,
-  CustomerInboxView,
-  InboxScope,
   isAgentInboxConversation,
   isDirectInboxConversation,
-  loadInbox,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
-  type InboxConversation,
 } from "@/api"
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
+import { Button } from "@/components/ui/button"
+import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import {
-  memberChatPollingInterval,
-  useMemberChatPollingActive,
-} from "@/features/inbox/use-member-chat-polling"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
-
-const individualInboxQuery = {
-  scope: InboxScope.InboxScopeInternal,
-  customerView: CustomerInboxView.CustomerInboxViewQueue,
-  assigneeIdentityId: "",
-}
-
-type MobileIndividualLocationState = {
-  conversation?: InboxConversation
-  memberUserID?: string
-}
+type MobileIndividualLocationState = { memberUserID?: string }
 
 /** 展示当前双方会话的移动端头部。 */
 function MobileIndividualHeader({
@@ -95,49 +76,11 @@ export function MobileIndividualConversationPage({
 }) {
   const { t } = useTranslation("inbox")
   const { inboxURL } = useMobileNavigation()
-  const location = useLocation()
   const { conversationID = "" } = useParams()
-  const stateConversation = useMemo(() => {
-    // 从路由状态读取本次打开的会话摘要。
-    const candidate = (location.state as MobileIndividualLocationState | null)
-      ?.conversation
-    return candidate?.id === conversationID &&
-      (isDirectInboxConversation(candidate) ||
-        isAgentInboxConversation(candidate))
-      ? candidate
-      : null
-  }, [conversationID, location.state])
-  const pollingActive = useMemberChatPollingActive({
-    requireWindowFocus: false,
-  })
-  const { data, loading } = useResource(
-    resourceKeys.inbox(individualInboxQuery),
-    () => loadInbox(individualInboxQuery),
-    {
-      staleTime: 0,
-      refetchInterval: pollingActive ? memberChatPollingInterval : false,
-      refetchOnWindowFocus: false,
-    },
-  )
-
+  const summary = useConversationSummary(conversationID, false)
   if (!conversationID) return <Navigate to={inboxURL} replace />
-
-  const matchedConversation = data?.conversations.find(
-    (conversation) => conversation.id === conversationID,
-  )
-  if (
-    matchedConversation &&
-    !isDirectInboxConversation(matchedConversation) &&
-    !isAgentInboxConversation(matchedConversation)
-  ) {
-    return <Navigate to={inboxURL} replace />
-  }
-  const conversation =
-    (matchedConversation &&
-    (isDirectInboxConversation(matchedConversation) ||
-      isAgentInboxConversation(matchedConversation))
-      ? matchedConversation
-      : null) ?? stateConversation
+  const conversation = summary.data && summary.data.type === conversationType &&
+    (isDirectInboxConversation(summary.data) || isAgentInboxConversation(summary.data)) ? summary.data : null
   const peerName =
     (conversation?.agent?.title ?? conversation?.direct?.peerName)?.trim() ||
     t("unknownSender")
@@ -145,10 +88,15 @@ export function MobileIndividualConversationPage({
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
       <MobileIndividualHeader conversation={conversation} peerName={peerName} />
-      {loading && !conversation ? (
+      {summary.loading && !conversation ? (
         <LoadingIndicator className="min-h-0 flex-1 justify-center">
           {t("messagesLoading")}
         </LoadingIndicator>
+      ) : !conversation ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+          <p>{t(summary.error ? "conversationLoadError" : "conversationUnavailable")}</p>
+          {summary.error ? <Button variant="outline" size="sm" onClick={() => void summary.refresh()}>{t("messagesRetry")}</Button> : null}
+        </div>
       ) : (
         <MobileIndividualThread
           key={conversationID}

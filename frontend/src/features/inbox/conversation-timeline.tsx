@@ -1,7 +1,7 @@
 /** 展示各类会话的成员消息时间线、Agent 结果与发送状态。 */
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
-import { useNavigate, useSearchParams } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -13,6 +13,7 @@ import {
   OrganizationIdentityType,
   ServiceSessionStatus,
   isApiError,
+  isNotFoundApiError,
   type CurrentUser,
   type ConversationMessageData,
   type ConversationMessageReference,
@@ -25,7 +26,7 @@ import { CustomerDeliveryState } from "./customer-delivery-state"
 import { ConversationAttachment } from "./conversation-attachment"
 import { MessageSendState } from "./message-send-state"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { messagePreview } from "@/lib/message-preview"
 import { openExternalURL } from "@/platform/external-navigation"
@@ -246,7 +247,7 @@ function ConversationTimelineContent({
   const timeZone = useUserTimeZone()
   const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
   const scrollRootRef = useRef<HTMLDivElement>(null)
-  const [, setSearchParams] = useSearchParams()
+  const invalidate = useResourceInvalidator()
   const timeline = useConversationTimeline(
     conversationID,
     pollingActive,
@@ -326,15 +327,12 @@ function ConversationTimelineContent({
       onUnavailable()
       return
     }
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current)
-        next.delete("conversation")
-        return next
-      },
-      { replace: true },
-    )
-  }, [onUnavailable, setSearchParams])
+    void invalidate(resourceKeys.conversationSummary(conversationID))
+  }, [conversationID, invalidate, onUnavailable])
+
+  useEffect(() => {
+    if (isNotFoundApiError(error) || isNotFoundApiError(timeline.pollingError)) handleUnavailable()
+  }, [error, timeline.pollingError, handleUnavailable])
 
   const mentions = useConversationMentionNavigation({
     conversationID,

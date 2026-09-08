@@ -183,6 +183,7 @@ export class AttachmentQueue {
           }
         }),
       })
+      if (!this.batches.has(batch.id)) return
       batch.saved = true
       batch.conversationID = result.conversationId
       for (let index = 0; index < batch.jobs.length; index++) {
@@ -215,6 +216,7 @@ export class AttachmentQueue {
       batch.onCreated(result.conversation)
       this.pump()
     } catch (error) {
+      if (!this.batches.has(batch.id)) return
       console.warn("附件消息保存失败", error)
       if (!this.disposed) this.reportError(error)
       for (const item of batch.jobs) {
@@ -271,7 +273,7 @@ export class AttachmentQueue {
         },
         completeAttachmentUpload,
       )
-      if (job.cancelRequested || this.disposed) return
+      if (job.cancelRequested || this.disposed || !this.batches.has(job.batchID)) return
       job.stage = "ready"
       job.selected = null
       job.transfer = null
@@ -279,7 +281,7 @@ export class AttachmentQueue {
         AttachmentUploadStatus.AttachmentReady
       this.refresh(job.conversationID)
     } catch (error) {
-      if (job.cancelRequested || this.disposed) return
+      if (job.cancelRequested || this.disposed || !this.batches.has(job.batchID)) return
       console.warn("附件上传失败", error)
       job.stage = "failed"
       await updateAttachmentUploads({
@@ -346,6 +348,20 @@ export class AttachmentQueue {
       job.previewURL = ""
       this.emit()
     }
+  }
+
+  /** 失权后释放本地文件与队列，未完成上传由服务端活跃期限收敛。 */
+  forgetConversation(conversationID: string) {
+    for (const job of this.jobs.filter((item) => item.conversationID === conversationID)) {
+      job.controller.abort()
+      if (job.previewURL) URL.revokeObjectURL(job.previewURL)
+      job.previewURL = ""
+      job.selected = null
+      job.transfer = null
+      this.batches.delete(job.batchID)
+    }
+    this.jobs = this.jobs.filter((job) => job.conversationID !== conversationID)
+    this.emit()
   }
 
   /** 释放本页面的文件内容，关闭或重启后不续传。 */

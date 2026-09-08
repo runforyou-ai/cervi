@@ -10,6 +10,7 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // LoadInbox 返回当前企业的统一会话工作队列。
@@ -29,6 +30,15 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 		slog.Warn("读取收件箱会话列表失败", "organization_id", identity.Organization.ID, "error", err)
 		return Inbox{}, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
 	}
+	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, summaries)
+	if err != nil {
+		return Inbox{}, err
+	}
+	return Inbox{Conversations: conversations, UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention}, nil
+}
+
+// inboxConversationsFromActions 为会话摘要统一解析头像并转换传输契约。
+func (b *DirectBackend) inboxConversationsFromActions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, summaries []inboxaction.ConversationSummary) ([]InboxConversation, error) {
 	avatarFileIDs := make([]string, 0, len(summaries))
 	for _, summary := range summaries {
 		if summary.Group != nil && summary.Group.ImageFileID != nil {
@@ -53,14 +63,14 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取收件箱会话图片失败", "organization_id", identity.Organization.ID, "error", err)
-		return Inbox{}, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
+		return nil, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
 	}
 	conversations := make([]InboxConversation, 0, len(summaries))
 	for _, summary := range summaries {
 		conversation := inboxConversationFromAction(summary, avatarURLs)
 		conversations = append(conversations, conversation)
 	}
-	return Inbox{Conversations: conversations, UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention}, nil
+	return conversations, nil
 }
 
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
@@ -136,4 +146,73 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 		}
 	}
 	return conversation
+}
+
+// GetInboxConversation 独立读取当前用户可见的会话，不依赖列表筛选或分页。
+func (b *DirectBackend) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return InboxConversation{}, err
+	}
+	results, err := b.loadInbox.ReadByIDs(ctx, identity, []string{conversationID}, nil)
+	if err != nil {
+		return InboxConversation{}, inboxReadError(ctx, meta, identity.Organization.ID, err)
+	}
+	if results[0].Conversation == nil {
+		return InboxConversation{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+	}
+	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, []inboxaction.ConversationSummary{*results[0].Conversation})
+	if err != nil {
+		return InboxConversation{}, err
+	}
+	return conversations[0], nil
+}
+
+// ReadInboxConversations 在每项中区分匹配、筛选外可读及不可用的会话。
+func (b *DirectBackend) ReadInboxConversations(ctx context.Context, meta RequestMeta, input ReadInboxConversationsInput) (InboxConversationResults, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return InboxConversationResults{}, err
+	}
+	results, err := b.loadInbox.ReadByIDs(ctx, identity, input.ConversationIDs, &inboxaction.LoadInput{Scope: domain.InboxScope(input.Query.Scope), CustomerView: domain.CustomerInboxView(input.Query.CustomerView), AssigneeIdentityID: input.Query.AssigneeIdentityID})
+	if err != nil {
+		return InboxConversationResults{}, inboxReadError(ctx, meta, identity.Organization.ID, err)
+	}
+	summaries := make([]inboxaction.ConversationSummary, 0, len(results))
+	for _, result := range results {
+		if result.Conversation != nil {
+			summaries = append(summaries, *result.Conversation)
+		}
+	}
+	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, summaries)
+	if err != nil {
+		return InboxConversationResults{}, err
+	}
+	output := InboxConversationResults{Results: make([]InboxConversationResult, 0, len(results))}
+	readable := 0
+	for _, result := range results {
+		item := InboxConversationResult{ID: result.ID, Availability: InboxConversationUnavailable}
+		if result.Conversation != nil {
+			item.Conversation = &conversations[readable]
+			readable++
+			item.Availability = InboxConversationOutsideQuery
+			if result.MatchesQuery {
+				item.Availability = InboxConversationMatching
+			}
+		}
+		output.Results = append(output.Results, item)
+	}
+	return output, nil
+}
+
+// inboxReadError 将会话摘要查询错误转换为本地化应用服务错误。
+func inboxReadError(ctx context.Context, meta RequestMeta, organizationID string, err error) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, inboxaction.ErrQueryInvalid) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+	}
+	slog.Warn("读取独立会话摘要失败", "organization_id", organizationID, "error", err)
+	return FailedError(meta, cervii18n.ErrorInboxLoadFailed)
 }

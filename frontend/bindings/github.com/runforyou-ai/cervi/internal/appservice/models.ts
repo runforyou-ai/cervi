@@ -1431,6 +1431,36 @@ export interface InboxConversation {
 }
 
 /**
+ * InboxConversationAvailability 表示指定会话的阅读和列表资格。
+ */
+export enum InboxConversationAvailability {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxConversationMatching = "matching",
+    InboxConversationOutsideQuery = "outside_query",
+    InboxConversationUnavailable = "unavailable",
+};
+
+/**
+ * InboxConversationResult 不可用时仅保留请求 ID 和资格，不返回实体信息。
+ */
+export interface InboxConversationResult {
+    "id": string;
+    "availability": InboxConversationAvailability;
+    "conversation": InboxConversation | null;
+}
+
+/**
+ * InboxConversationResults 按请求顺序返回每项结果。
+ */
+export interface InboxConversationResults {
+    "results": InboxConversationResult[] | null;
+}
+
+/**
  * InboxScope 表示统一收件箱读取范围。
  */
 export enum InboxScope {
@@ -1865,6 +1895,14 @@ export interface ProfileInput {
     "displayName": string;
     "email": string;
     "avatarFileId": string;
+}
+
+/**
+ * ReadInboxConversationsInput 指定待核对的会话及完整列表筛选。
+ */
+export interface ReadInboxConversationsInput {
+    "conversationIds": string[] | null;
+    "query": LoadInboxInput;
 }
 
 /**

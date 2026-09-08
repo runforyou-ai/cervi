@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { clearConversationResources } from "./conversation-resources"
 import type { TFunction } from "i18next"
 import {
   BellOffIcon,
@@ -20,6 +22,7 @@ import {
   UsersRoundIcon,
 } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
+import { useConversationSummary, readConversationSummary } from "./use-conversation-summary"
 import { useAttachmentQueue } from "./attachment-queue-context"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -48,13 +51,11 @@ import {
   updateConversationUnreadMark,
   type ConversationMessageReference,
   type CustomerInboxConversationData,
-  type CustomerServiceSession,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
   type InboxAssignee,
   type InboxConversation,
-  type LoadInboxQuery,
   type MemberOption,
 } from "@/api"
 import {
@@ -92,7 +93,6 @@ import { previousDayKey } from "@/features/inbox/calendar"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
   ConversationComposer,
-  ConversationComposerUnavailable,
 } from "@/features/inbox/conversation-composer"
 import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
@@ -127,74 +127,6 @@ type InternalInboxConversationData =
   | AgentInboxConversationData
   | DirectInboxConversationData
   | GroupInboxConversationData
-
-/** 生成字段完整且可精确失效的收件箱查询。 */
-function inboxQuery(
-  scope: InboxScope,
-  customerView = CustomerInboxView.CustomerInboxViewQueue,
-  assigneeIdentityId = "",
-): LoadInboxQuery {
-  return { scope, customerView, assigneeIdentityId }
-}
-
-/** 返回完整查询的稳定标识。 */
-function inboxQueryIdentity(query: LoadInboxQuery) {
-  return `${query.scope}\u0000${query.customerView}\u0000${query.assigneeIdentityId}`
-}
-
-/** 返回客服处理周期当前所属的筛选查询。 */
-function customerPlacementQueries(
-  status: ServiceSessionStatus,
-  assigneeIdentityId: string,
-  currentIdentityId: string,
-) {
-  if (status === ServiceSessionStatus.ServiceSessionStatusClosed) {
-    return [
-      inboxQuery(
-        InboxScope.InboxScopeCustomer,
-        CustomerInboxView.CustomerInboxViewClosed,
-      ),
-    ]
-  }
-  if (!assigneeIdentityId) {
-    return [inboxQuery(InboxScope.InboxScopeCustomer)]
-  }
-  if (assigneeIdentityId === currentIdentityId) {
-    return [
-      inboxQuery(
-        InboxScope.InboxScopeCustomer,
-        CustomerInboxView.CustomerInboxViewMine,
-      ),
-    ]
-  }
-  return [
-    inboxQuery(
-      InboxScope.InboxScopeCustomer,
-      CustomerInboxView.CustomerInboxViewCoworkers,
-    ),
-    inboxQuery(
-      InboxScope.InboxScopeCustomer,
-      CustomerInboxView.CustomerInboxViewCoworkers,
-      assigneeIdentityId,
-    ),
-  ]
-}
-
-/** 把处理周期命令结果合并到当前客户会话摘要。 */
-function customerConversationWithServiceSession(
-  conversation: CustomerInboxConversationData,
-  session: Pick<CustomerServiceSession, "id" | "status" | "assignee">,
-): CustomerInboxConversationData {
-  return {
-    ...conversation,
-    customer: {
-      ...conversation.customer,
-      serviceSessionId: session.id,
-      serviceSessionStatus: session.status,
-      assignee: session.assignee,
-    },
-  }
-}
 
 const scopes = [
   {
@@ -899,19 +831,14 @@ function InboxConversationList({
 /** 组合当前 Conversation 工作区和独立联系人上下文栏。 */
 function ConversationMain({
   selection,
-  onSessionMoved,
+  onSessionChanged,
   onConversationChanged,
   onGroupLeft,
   onChatStarted,
   narrowViewport = false,
 }: {
   selection: ConversationSelection
-  onSessionMoved: (
-    conversation: CustomerInboxConversationData,
-    session: CustomerServiceSession,
-    view: CustomerInboxView,
-    assigneeIdentityId?: string,
-  ) => void
+  onSessionChanged: (conversation: CustomerInboxConversationData) => void
   onConversationChanged: (
     conversation:
       | CustomerInboxConversationData
@@ -1026,14 +953,8 @@ function ConversationMain({
             contactName={contactName}
             sessionStatus={sessionStatus}
             currentIdentityId={identity.user.identityId}
-            onSessionMoved={(session, view, assigneeIdentityId) => {
-              if (!customerConversation) return
-              onSessionMoved(
-                customerConversation,
-                session,
-                view,
-                assigneeIdentityId,
-              )
+            onSessionChanged={() => {
+              if (customerConversation) onSessionChanged(customerConversation)
             }}
             narrowViewport={narrowViewport}
           />
@@ -1177,7 +1098,10 @@ function ConversationThread({
         lastReadMessageId: messageID,
         clearUnreadMark: false,
       })
-        .then(() => invalidate(resourceKeys.inbox()))
+        .then(() => {
+          void invalidate(resourceKeys.inbox())
+          void invalidate(resourceKeys.conversationSummary(conversation.id))
+        })
         .catch((error: unknown) =>
           console.warn("标记会话已读失败", {
             conversationId: conversation.id,
@@ -1214,75 +1138,70 @@ function ConversationThread({
         readThroughMessageID={conversation?.lastReadMessageId}
         enabled={Boolean(conversation)}
       />
-      {!replySupported || replyDisabledReason ? (
-        <ConversationComposerUnavailable
-          conversationID={conversationID}
-          reason={replyDisabledReason ?? t("channelReplyUnsupported")}
-        />
-      ) : (
-        <ConversationComposer
-          onBeforeSend={() =>
-            prepareSendRef.current?.() ?? Promise.resolve(true)
-          }
-          conversationID={conversationID}
-          conversationType={conversationType}
-          submitOnEnter
-          refocusAfterSubmit
-          retryFailedMessage
-          retryDraft={retryDraft}
-          replyTo={replyTo}
-          groupParticipants={groupResource.data?.participants}
-          currentIdentityID={identity.user.identityId}
-          onRetryDraftHandled={() => setRetryDraft(null)}
-          onReplyToChange={setReplyTo}
-          onSending={outgoing.start}
-          onSent={outgoing.succeed}
-          onFailed={(clientMessageID) => {
-            outgoing.fail(clientMessageID)
-            // 发送被拒绝后同步群资料，及时关闭解散群的发送区。
-            if (groupConversation)
-              void invalidate(resourceKeys.groupConversation(groupConversation.id))
-          }}
-          onSucceeded={onConversationChanged}
-          attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
-          onAttachmentConversationCreated={(created) => {
-            if (directTarget) void invalidate(resourceKeys.directConversation(directTarget.id))
-            void invalidate(resourceKeys.conversationMessages(created.id))
-            if (aliveRef.current && isDirectInboxConversation(created)) onChatStarted(created)
-          }}
-          sendIndividualMessage={
-            directTarget
-              ? async (input) => {
-                  const result = agentDraftID
-                    ? await sendFirstAgentTextMessage({
-                        conversationId: agentDraftID,
-                        agentIdentityId: directTarget.id,
-                        clientMessageId: input.clientMessageId,
-                        body: input.body,
-                      })
-                    : await sendFirstDirectTextMessage({
-                        targetIdentityId: directTarget.id,
-                        ...input,
-                      })
-                  if (!agentDraftID)
-                    void invalidate(
-                      resourceKeys.directConversation(directTarget.id),
-                    )
+      <ConversationComposer
+        disabledReason={!replySupported ? t("channelReplyUnsupported") : replyDisabledReason}
+        onBeforeSend={() =>
+          prepareSendRef.current?.() ?? Promise.resolve(true)
+        }
+        conversationID={conversationID}
+        conversationType={conversationType}
+        submitOnEnter
+        refocusAfterSubmit
+        retryFailedMessage
+        retryDraft={retryDraft}
+        replyTo={replyTo}
+        groupParticipants={groupResource.data?.participants}
+        currentIdentityID={identity.user.identityId}
+        onRetryDraftHandled={() => setRetryDraft(null)}
+        onReplyToChange={setReplyTo}
+        onSending={outgoing.start}
+        onSent={outgoing.succeed}
+        onFailed={(clientMessageID) => {
+          outgoing.fail(clientMessageID)
+          if (conversationID) void invalidate(resourceKeys.conversationSummary(conversationID))
+          // 发送被拒绝后同步群资料，及时关闭解散群的发送区。
+          if (groupConversation)
+            void invalidate(resourceKeys.groupConversation(groupConversation.id))
+        }}
+        onSucceeded={onConversationChanged}
+        attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
+        onAttachmentConversationCreated={(created) => {
+          if (directTarget) void invalidate(resourceKeys.directConversation(directTarget.id))
+          void invalidate(resourceKeys.conversationMessages(created.id))
+          if (aliveRef.current && isDirectInboxConversation(created)) onChatStarted(created)
+        }}
+        sendIndividualMessage={
+          directTarget
+            ? async (input) => {
+                const result = agentDraftID
+                  ? await sendFirstAgentTextMessage({
+                      conversationId: agentDraftID,
+                      agentIdentityId: directTarget.id,
+                      clientMessageId: input.clientMessageId,
+                      body: input.body,
+                    })
+                  : await sendFirstDirectTextMessage({
+                      targetIdentityId: directTarget.id,
+                      ...input,
+                    })
+                if (!agentDraftID)
                   void invalidate(
-                    resourceKeys.conversationMessages(result.conversation.id),
+                    resourceKeys.directConversation(directTarget.id),
                   )
-                  // 离开原线程后只刷新列表，不改变当前选择。
-                  if (aliveRef.current) {
-                    onChatStarted(result.conversation)
-                  } else {
-                    void invalidate(resourceKeys.inbox())
-                  }
-                  return result.message
+                void invalidate(
+                  resourceKeys.conversationMessages(result.conversation.id),
+                )
+                // 离开原线程后只刷新列表，不改变当前选择。
+                if (aliveRef.current) {
+                  onChatStarted(result.conversation)
+                } else {
+                  void invalidate(resourceKeys.inbox())
                 }
-              : undefined
-          }
-        />
-      )}
+                return result.message
+              }
+            : undefined
+        }
+      />
     </>
   )
 }
@@ -1328,98 +1247,29 @@ export function InboxPage({
   const { identity } = useWorkspace()
   const isNarrowViewport = useIsNarrowViewport()
   const invalidate = useResourceInvalidator()
+  const queryClient = useQueryClient()
+  const { queue } = useAttachmentQueue()
   const [railCollapsed, setRailCollapsed] = useState(false)
   const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null)
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [agentDialogOpen, setAgentDialogOpen] = useState(false)
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
-  const [startedConversations, setStartedConversations] = useState<
-    InternalInboxConversationData[]
-  >([])
-  const [leftGroupConversationIDs, setLeftGroupConversationIDs] = useState<
-    Set<string>
-  >(new Set())
-  const [selectedConversationSnapshot, setSelectedConversationSnapshot] =
-    useState<InboxConversation | null>(null)
+  const navigationGeneration = useRef(0)
+  const summary = useConversationSummary(targetIdentityId ? "" : selectedConversationId)
+  const selectedConversation = summary.data ?? undefined
+  useEffect(() => {
+    navigationGeneration.current++
+    return () => { navigationGeneration.current++ }
+  }, [scope, customerView, assigneeIdentityId, selectedConversationId, targetIdentityId, chatDraft])
+  useEffect(() => {
+    if (isNarrowViewport && selectedConversationId) setIsNarrowDetailOpen(true)
+  }, [isNarrowViewport, selectedConversationId])
   const conversationName = useConversationName()
-  const currentInboxQuery = inboxQuery(scope, customerView, assigneeIdentityId)
   const { data: customerServiceAssignees = [] } = useResource(
     resourceKeys.customerServiceAssignees(),
     () => listCustomerServiceAssignees(),
     { enabled: scope === InboxScope.InboxScopeCustomer },
   )
-
-  const validConversations = useMemo(
-    () =>
-      conversations.filter(
-        (conversation) =>
-          !leftGroupConversationIDs.has(conversation.id) &&
-          (isCustomerInboxConversation(conversation) ||
-            isAgentInboxConversation(conversation) ||
-            isDirectInboxConversation(conversation) ||
-            isGroupInboxConversation(conversation)),
-      ),
-    [conversations, leftGroupConversationIDs],
-  )
-  // 临时会话保持可达，列表响应接管后沿用服务端顺序。
-  const allConversations = useMemo(
-    () =>
-      [
-        ...startedConversations.filter(
-          (started) =>
-            !validConversations.some(
-              (conversation) => conversation.id === started.id,
-            ),
-        ),
-        ...validConversations,
-      ],
-    [startedConversations, validConversations],
-  )
-  const scopedConversations = useMemo(() => {
-    switch (scope) {
-      case InboxScope.InboxScopeCustomer:
-        return allConversations.filter(isCustomerInboxConversation)
-      case InboxScope.InboxScopeInternal:
-        return allConversations.filter(
-          (conversation) =>
-            isAgentInboxConversation(conversation) ||
-            isDirectInboxConversation(conversation) ||
-            isGroupInboxConversation(conversation),
-        )
-      default:
-        return allConversations
-    }
-  }, [allConversations, scope])
-
-  useEffect(() => {
-    if (!isNarrowViewport) {
-      setIsNarrowDetailOpen(false)
-    }
-  }, [isNarrowViewport])
-
-  useEffect(() => {
-    setStartedConversations((current) => {
-      const pending = current.filter(
-        (started) =>
-          !validConversations.some(
-            (conversation) => conversation.id === started.id,
-          ),
-      )
-      return pending.length === current.length ? current : pending
-    })
-  }, [validConversations])
-
-  useEffect(() => {
-    const listedIDs = new Set(
-      conversations.map((conversation) => conversation.id),
-    )
-    setLeftGroupConversationIDs((current) => {
-      const pending = new Set(
-        [...current].filter((conversationID) => listedIDs.has(conversationID)),
-      )
-      return pending.size === current.size ? current : pending
-    })
-  }, [conversations])
 
   const activeChatDraft =
     !targetIdentityId &&
@@ -1432,50 +1282,9 @@ export function InboxPage({
       setChatDraft(null)
     }
   }, [scope, selectedConversationId])
-  const selectedPool = listLoading ? allConversations : scopedConversations
-  const selectedFromPool = targetIdentityId || activeChatDraft
-    ? undefined
-    : (selectedPool.find(
-        (conversation) => conversation.id === selectedConversationId,
-      ) ?? (selectedConversationId ? undefined : selectedPool[0]))
-  useEffect(() => {
-    if (selectedFromPool) setSelectedConversationSnapshot(selectedFromPool)
-  }, [selectedFromPool])
-  useEffect(() => {
-    if (
-      targetIdentityId ||
-      activeChatDraft ||
-      listLoading ||
-      (selectedConversationId &&
-        scopedConversations.some(
-          (conversation) => conversation.id === selectedConversationId,
-        ))
-    ) {
-      return
-    }
-    const nextConversationID = scopedConversations[0]?.id ?? ""
-    if (nextConversationID === selectedConversationId) return
-    setSelectedConversationSnapshot(null)
-    onSelectedConversationChange(nextConversationID, true)
-  }, [
-    targetIdentityId,
-    activeChatDraft,
-    listLoading,
-    onSelectedConversationChange,
-    scopedConversations,
-    selectedConversationId,
-  ])
-  const selectedConversation = targetIdentityId || activeChatDraft
-    ? undefined
-    : selectedConversationSnapshot?.id === selectedConversationId &&
-        selectedPool.some(
-          (conversation) => conversation.id === selectedConversationId,
-        )
-      ? selectedConversationSnapshot
-      : selectedFromPool
-
   /** 选中一个会话。 */
   function selectConversation(conversationId: string) {
+    navigationGeneration.current++
     setChatDraft(null)
     onSelectedConversationChange(conversationId)
 
@@ -1493,55 +1302,18 @@ export function InboxPage({
     })
   }
 
-  /** 标旧受影响的精确查询，仅让最终可见视图立即重新读取。 */
-  function refreshAffectedInboxQueries(
-    queries: LoadInboxQuery[],
-    destination: LoadInboxQuery,
-    nextConversationId?: string,
-  ) {
-    const destinationIdentity = inboxQueryIdentity(destination)
-    const affected = new Map(
-      queries.map((query) => [inboxQueryIdentity(query), query]),
-    )
-    affected.set(destinationIdentity, destination)
-    for (const [identity, query] of affected) {
-      if (identity === destinationIdentity) continue
-      void invalidate(resourceKeys.inbox(query), {
-        exact: true,
-        refetchType: "none",
-      })
+  /** 新建后先读取权威摘要，再将草稿连续切换为正式会话。 */
+  async function showStartedConversation(conversation: InternalInboxConversationData) {
+    const generation = navigationGeneration.current
+    try {
+      await summary.read(resourceKeys.conversationSummary(conversation.id), (signal) => readConversationSummary(conversation.id, signal))
+    } catch (error) {
+      console.warn("读取新建会话摘要失败", { conversationId: conversation.id, error })
     }
-    void invalidate(resourceKeys.inbox(destination), { exact: true })
-    if (destinationIdentity === inboxQueryIdentity(currentInboxQuery)) {
-      if (nextConversationId) {
-        onSelectedConversationChange(nextConversationId, Boolean(targetIdentityId))
-      }
-      return
-    }
-    onQueryChange({
-      scope: destination.scope,
-      customerView: destination.customerView,
-      assigneeIdentityId: destination.assigneeIdentityId,
-      conversationId: nextConversationId,
-      replace: nextConversationId ? Boolean(targetIdentityId) : undefined,
-    })
-  }
-
-  /** 将新建或新打开的内部会话放入列表并选中。 */
-  function showStartedConversation(
-    conversation: InternalInboxConversationData,
-  ) {
+    void invalidate(resourceKeys.inbox())
+    if (generation !== navigationGeneration.current) return
     setChatDraft(null)
-    setStartedConversations((current) => [
-      conversation,
-      ...current.filter((item) => item.id !== conversation.id),
-    ])
-    const destination = inboxQuery(InboxScope.InboxScopeInternal)
-    refreshAffectedInboxQueries(
-      [inboxQuery(InboxScope.InboxScopeAll), destination],
-      destination,
-      conversation.id,
-    )
+    onQueryChange({ scope: InboxScope.InboxScopeInternal, conversationId: conversation.id, replace: Boolean(targetIdentityId) })
     setIsNarrowDetailOpen(isNarrowViewport)
   }
 
@@ -1566,121 +1338,20 @@ export function InboxPage({
     setIsNarrowDetailOpen(isNarrowViewport)
   }
 
-  /** 会话命令改变归属后刷新源、目标与全部视图。 */
-  function showMovedCustomerConversation(
-    conversation: CustomerInboxConversationData,
-    session: CustomerServiceSession,
-    view: CustomerInboxView,
-    nextAssigneeIdentityId = "",
-  ) {
-    setSelectedConversationSnapshot(
-      customerConversationWithServiceSession(conversation, session),
-    )
-    const destination =
-      scope === InboxScope.InboxScopeCustomer ||
-      view === CustomerInboxView.CustomerInboxViewClosed
-        ? inboxQuery(
-            InboxScope.InboxScopeCustomer,
-            view,
-            nextAssigneeIdentityId,
-          )
-        : currentInboxQuery
-    refreshAffectedInboxQueries(
-      [
-        inboxQuery(InboxScope.InboxScopeAll),
-        ...customerPlacementQueries(
-          conversation.customer.serviceSessionStatus,
-          conversation.customer.assignee?.identityId ?? "",
-          identity.user.identityId,
-        ),
-        ...customerPlacementQueries(
-          session.status,
-          session.assignee?.identityId ?? "",
-          identity.user.identityId,
-        ),
-      ],
-      destination,
-    )
+  /** 消息或客服处理保存后刷新列表与详情，保持当前筛选和选择。 */
+  function refreshConversationAfterMessage(conversation: InboxConversation) {
+    void invalidate(resourceKeys.inbox())
+    void invalidate(resourceKeys.conversationSummary(conversation.id))
   }
 
-  /** 回复成功后只刷新会话会出现或排序变化的精确视图。 */
-  function refreshConversationAfterMessage(
-    conversation:
-      | CustomerInboxConversationData
-      | AgentInboxConversationData
-      | DirectInboxConversationData
-      | GroupInboxConversationData,
-  ) {
-    if (
-      isAgentInboxConversation(conversation) ||
-      isDirectInboxConversation(conversation) ||
-      isGroupInboxConversation(conversation)
-    ) {
-      refreshAffectedInboxQueries(
-        [
-          inboxQuery(InboxScope.InboxScopeAll),
-          inboxQuery(InboxScope.InboxScopeInternal),
-        ],
-        currentInboxQuery,
-      )
-      return
-    }
-    const implicitlyClaimed = !conversation.customer.assignee
-    if (implicitlyClaimed) {
-      setSelectedConversationSnapshot(
-        customerConversationWithServiceSession(conversation, {
-          id: conversation.customer.serviceSessionId,
-          status: ServiceSessionStatus.ServiceSessionStatusOpen,
-          assignee: {
-            identityId: identity.user.identityId,
-            type: OrganizationIdentityType.OrganizationIdentityTypeUser,
-            displayName: identity.user.displayName,
-            avatarUrl: identity.user.avatarUrl,
-          },
-        }),
-      )
-    }
-    const destination =
-      implicitlyClaimed && scope === InboxScope.InboxScopeCustomer
-        ? inboxQuery(
-            InboxScope.InboxScopeCustomer,
-            CustomerInboxView.CustomerInboxViewMine,
-          )
-        : currentInboxQuery
-    refreshAffectedInboxQueries(
-      [
-        inboxQuery(InboxScope.InboxScopeAll),
-        ...customerPlacementQueries(
-          conversation.customer.serviceSessionStatus,
-          conversation.customer.assignee?.identityId ?? "",
-          identity.user.identityId,
-        ),
-        ...(implicitlyClaimed
-          ? customerPlacementQueries(
-              ServiceSessionStatus.ServiceSessionStatusOpen,
-              identity.user.identityId,
-              identity.user.identityId,
-            )
-          : []),
-      ],
-      destination,
-    )
-  }
-
-  /** 群聊退出后立即切换到下一条仍可访问的会话。 */
+  /** 主动退群后清空选择并关闭窄屏详情，不打开其他会话。 */
   function showConversationAfterGroupLeft(conversationID: string) {
-    setLeftGroupConversationIDs((current) =>
-      new Set(current).add(conversationID),
-    )
-    setStartedConversations((current) =>
-      current.filter((conversation) => conversation.id !== conversationID),
-    )
-    setSelectedConversationSnapshot(null)
+    queue?.forgetConversation(conversationID)
+    clearConversationResources(queryClient, conversationID)
+    void queryClient.resetQueries({ queryKey: resourceKeys.conversationSummary(conversationID) })
+    setChatDraft(null)
     setIsNarrowDetailOpen(false)
-    const nextConversationID = scopedConversations.find(
-      (conversation) => conversation.id !== conversationID,
-    )?.id
-    onSelectedConversationChange(nextConversationID ?? "", true)
+    onSelectedConversationChange("", true)
   }
 
   const selection: ConversationSelection | null = activeChatDraft
@@ -1688,6 +1359,17 @@ export function InboxPage({
     : selectedConversation
       ? { kind: "conversation", conversation: selectedConversation }
       : null
+
+  const detailState = selectedConversationId && !selection ? (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+      {summary.loading ? <LoadingIndicator>{t("messagesLoading")}</LoadingIndicator> : (
+        <>
+          <p>{t(summary.data === null ? "conversationUnavailable" : "conversationLoadError")}</p>
+          {summary.data !== null ? <Button variant="outline" size="sm" onClick={() => void summary.refresh()}>{t("messagesRetry")}</Button> : null}
+        </>
+      )}
+    </div>
+  ) : null
 
   const pane = (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1697,13 +1379,13 @@ export function InboxPage({
         onCreateGroup={() => setGroupDialogOpen(true)}
         onCreateAgent={() => setAgentDialogOpen(true)}
       />
-      {listError ? (
+      {listError || summary.error ? (
         <button
           type="button"
           className="min-h-9 w-full shrink-0 border-b bg-warning/10 px-3 py-2 text-center text-xs text-warning"
-          onClick={onListRefresh}
+          onClick={() => { onListRefresh(); if (selectedConversationId) void summary.refresh() }}
         >
-          {t("inboxRefreshError")}
+          {t(summary.error ? "conversationLoadError" : "inboxRefreshError")}
         </button>
       ) : null}
       <div className="flex min-h-0 flex-1">
@@ -1733,9 +1415,9 @@ export function InboxPage({
             />
           ) : null}
           <InboxConversationList
-            conversations={scopedConversations}
+            conversations={conversations}
             loading={listLoading}
-            selectedId={selectedConversationId}
+            selectedId={selectedConversation?.id}
             onSelect={selectConversation}
             onMarkRead={markConversationAsRead}
           />
@@ -1757,11 +1439,11 @@ export function InboxPage({
           <LoadingIndicator className="flex-1 justify-center">
             {t("chatTargetLoading")}
           </LoadingIndicator>
-        ) : selection ? (
+        ) : detailState ? detailState : selection ? (
           <section className="min-h-0 flex-1">
             <ConversationMain
               selection={selection}
-              onSessionMoved={showMovedCustomerConversation}
+              onSessionChanged={refreshConversationAfterMessage}
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
               onChatStarted={showStartedConversation}
@@ -1777,17 +1459,17 @@ export function InboxPage({
                 <MessagesSquareIcon className="size-5 text-muted-foreground" />
               </div>
               <h2 className="text-base font-semibold tracking-tight">
-                {t("emptyTitle")}
+                {t(conversations.length ? "selectConversationTitle" : "emptyTitle")}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {t("emptyDescription")}
+                {t(conversations.length ? "selectConversationDescription" : "emptyDescription")}
               </p>
             </div>
           </div>
         )}
       </PageSplit>
 
-      {selection ? (
+      {isNarrowViewport && (selection || detailState) ? (
         <Sheet
           open={isNarrowDetailOpen}
           onOpenChange={(open) => {
@@ -1808,14 +1490,16 @@ export function InboxPage({
               </SheetTitle>
               <SheetDescription>{t("detailDescription")}</SheetDescription>
             </SheetHeader>
+            {selection ? (
             <ConversationMain
               selection={selection}
-              onSessionMoved={showMovedCustomerConversation}
+              onSessionChanged={refreshConversationAfterMessage}
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
               onChatStarted={showStartedConversation}
               narrowViewport
             />
+            ) : detailState}
           </SheetContent>
         </Sheet>
       ) : null}

@@ -1,5 +1,9 @@
 /** 简体中文·收件箱文案。 */
 const inbox = {
+  selectConversationTitle: "选择会话",
+  selectConversationDescription: "从列表选择会话，或发起新的聊天。",
+  conversationUnavailable: "会话不可用",
+  conversationLoadError: "会话读取失败，请重试",
   attachmentSend: "发送附件",
   attachmentCancel: "取消",
   attachmentUploadProgress: "上传进度",

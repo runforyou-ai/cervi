@@ -1,5 +1,9 @@
 /** 美式英语·收件箱文案。 */
 const inbox = {
+  selectConversationTitle: "Select a conversation",
+  selectConversationDescription: "Choose a conversation from the list or start a new chat.",
+  conversationUnavailable: "Conversation unavailable",
+  conversationLoadError: "Could not load the conversation. Please retry.",
   attachmentSend: "Send attachment",
   attachmentCancel: "Cancel",
   attachmentUploadProgress: "Upload progress",

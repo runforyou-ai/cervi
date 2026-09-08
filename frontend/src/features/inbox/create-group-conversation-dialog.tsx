@@ -33,7 +33,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { GroupImagePicker } from "@/features/inbox/group-avatar"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -93,8 +93,10 @@ export function CreateGroupConversationDialog({
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const [query, setQuery] = useState("")
   const imageRequestID = useRef(0)
+  const createRequestID = useRef(0)
   const [pendingImage, setPendingImage] =
     useState<PendingGroupImage | null>(null)
   const schema = useMemo(
@@ -124,6 +126,7 @@ export function CreateGroupConversationDialog({
   useEffect(() => {
     return () => {
       imageRequestID.current += 1
+      createRequestID.current += 1
     }
   }, [])
   const { field: memberIdentityIDsField } = useController({
@@ -208,6 +211,7 @@ export function CreateGroupConversationDialog({
 
   /** 创建群聊并关闭表单。 */
   async function create(values: GroupConversationValues) {
+    const requestID = ++createRequestID.current
     let uploadingImage = false
     try {
       let imageFileId = pendingImage?.fileID ?? ""
@@ -218,18 +222,25 @@ export function CreateGroupConversationDialog({
         )
         uploadingImage = false
       }
+      if (requestID !== createRequestID.current) return
       const conversation = await createGroupConversation({
         title: values.title.trim(),
         description: values.description.trim(),
         imageFileId,
         memberIdentityIds: values.memberIdentityIds,
       })
+      // 关闭表单或离开页面后忽略迟到结果，不重新打开已放弃的会话。
+      if (requestID !== createRequestID.current) {
+        void invalidate(resourceKeys.inbox())
+        return
+      }
       if (!isGroupInboxConversation(conversation)) {
         throw new Error("企业群聊响应结构无效")
       }
       onCreated(conversation)
       changeOpen(false)
     } catch (createError) {
+      if (requestID !== createRequestID.current) return
       if (recoverSession(createError, navigate)) return
       console.warn("创建企业内部群聊失败", { error: createError })
       if (uploadingImage) return
@@ -249,6 +260,7 @@ export function CreateGroupConversationDialog({
   /** 关闭时清空尚未提交的群聊表单。 */
   function changeOpen(nextOpen: boolean) {
     if (!nextOpen) {
+      createRequestID.current += 1
       form.reset()
       setQuery("")
       imageRequestID.current += 1

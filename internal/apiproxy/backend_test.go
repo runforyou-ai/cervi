@@ -384,18 +384,19 @@ func TestConversationAvatarURLs(t *testing.T) {
 				Sender:  &appservice.ConversationMessageSender{AvatarURL: sourceURL},
 				ReplyTo: &appservice.ConversationMessageReference{Sender: &appservice.ConversationMessageSender{AvatarURL: sourceURL}},
 			}
+			batch := appservice.InboxConversationResults{Results: []appservice.InboxConversationResult{{Conversation: &conversation}, {Conversation: nil}}}
 			inbox := appservice.Inbox{Conversations: []appservice.InboxConversation{conversation}}
 			lookup := appservice.DirectConversationLookup{Conversation: &conversation}
 			first := appservice.FirstDirectTextMessageResult{Conversation: conversation, Message: message}
 			history := appservice.ConversationMessageList{Messages: []appservice.ConversationMessage{message}}
-			for _, output := range []any{&inbox, &lookup, &first, &history, &message} {
+			for _, output := range []any{&batch, &conversation, &inbox, &lookup, &first, &history, &message} {
 				// 每次恢复相对地址，验证各响应入口都完成转换。
 				conversation.Direct.PeerAvatarURL = sourceURL
 				message.Sender.AvatarURL = sourceURL
 				message.ReplyTo.Sender.AvatarURL = sourceURL
 				backend.normalizeOutput(output)
 				switch output.(type) {
-				case *appservice.Inbox, *appservice.DirectConversationLookup, *appservice.FirstDirectTextMessageResult:
+				case *appservice.InboxConversationResults, *appservice.InboxConversation, *appservice.Inbox, *appservice.DirectConversationLookup, *appservice.FirstDirectTextMessageResult:
 					if conversation.Direct.PeerAvatarURL != want {
 						t.Fatalf("%T peer avatar=%q, want=%q", output, conversation.Direct.PeerAvatarURL, want)
 					}

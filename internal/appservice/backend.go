@@ -74,6 +74,12 @@ type Backend interface {
 	// LoadInbox 返回当前用户的统一收件箱。
 	//cervi:route GET /inbox
 	LoadInbox(context.Context, RequestMeta, LoadInboxInput) (Inbox, error)
+	// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
+	//cervi:route GET /conversations/:conversationID/summary
+	GetInboxConversation(context.Context, RequestMeta, string) (InboxConversation, error)
+	// ReadInboxConversations 按 ID 批量返回会话摘要及当前筛选资格。
+	//cervi:route POST /inbox/conversations/query
+	ReadInboxConversations(context.Context, RequestMeta, ReadInboxConversationsInput) (InboxConversationResults, error)
 	// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 	//cervi:route GET /inbox/assignees
 	ListCustomerServiceAssignees(context.Context, RequestMeta) (CustomerServiceAssigneeList, error)

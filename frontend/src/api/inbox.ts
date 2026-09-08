@@ -18,6 +18,8 @@ import {
   MarkConversationRead,
   ListCustomerServiceAssignees,
   LoadInbox,
+  GetInboxConversation,
+  ReadInboxConversations,
   ReopenServiceSession,
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
@@ -67,6 +69,7 @@ import type {
   GroupParticipant,
   GroupTextMessageInput,
   Inbox,
+  ReadInboxConversationsInput,
   InboxConversation,
   LoadInboxInput,
   MarkConversationReadInput,
@@ -562,3 +565,12 @@ export const completeAttachmentUpload = bind(CompleteAttachmentUpload)
 
 /** 停止指定 AI 回复并读取实际运行状态。 */
 export const stopAgentReply = bind(StopAgentReply)
+
+/** 独立读取当前用户可见的会话摘要。 */
+export const getInboxConversation = bind(GetInboxConversation)
+
+/** 批量核对指定会话的阅读和列表资格。 */
+export async function readInboxConversations(input: ReadInboxConversationsInput, signal?: AbortSignal) {
+  const output = await bind(ReadInboxConversations)(input, signal)
+  return { ...output, results: asList(output.results) }
+}

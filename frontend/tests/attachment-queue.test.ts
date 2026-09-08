@@ -275,3 +275,20 @@ test("失败分片重试跳过已成功的片", async () => {
   await settled(() => h.queue.snapshot()[0].stage === "ready")
   assert.deepEqual(parts, [1, 2, 2, 3, 4])
 })
+
+test("失权时清除排队附件，迟到的保存结果不能恢复队列或打开详情", async () => {
+  const gate = Promise.withResolvers<void>()
+  const h = host()
+  const q = host({ sendAttachmentBatch: async (input: any) => { await gate.promise; return h.api.sendAttachmentBatch(input) } })
+  let opened = 0
+  q.queue.enqueue(q.files, "removed", "", () => { opened++ })
+  q.queue.forgetConversation("removed")
+  assert.equal(q.queue.snapshot().length, 0)
+  gate.resolve()
+  await settled(() => h.counts().batches === 1)
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(q.queue.snapshot().length, 0)
+  assert.equal(opened, 0)
+  assert.equal(q.counts().transfers, 0)
+  assert.equal(q.errors.length, 0)
+})

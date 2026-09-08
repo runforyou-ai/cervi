@@ -136,6 +136,22 @@ func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta, in
 	return output, err
 }
 
+// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
+func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.InboxConversation, error) {
+	var output appservice.InboxConversation
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/summary", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ReadInboxConversations 按 ID 批量返回会话摘要及当前筛选资格。
+func (b *Backend) ReadInboxConversations(ctx context.Context, meta appservice.RequestMeta, input appservice.ReadInboxConversationsInput) (appservice.InboxConversationResults, error) {
+	var output appservice.InboxConversationResults
+	err := b.do(ctx, meta, http.MethodPost, "/inbox/conversations/query", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (b *Backend) ListCustomerServiceAssignees(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerServiceAssigneeList, error) {
 	var output appservice.CustomerServiceAssigneeList

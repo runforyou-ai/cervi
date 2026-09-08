@@ -337,6 +337,13 @@ export function GetGroupConversation(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
+ * GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
+ */
+export function GetInboxConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.InboxConversation> {
+    return $Call.ByID(3164550357, meta, conversationID);
+}
+
+/**
  * GetKnowledgeBase 返回当前企业中的知识库详情。
  */
 export function GetKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<$models.KnowledgeBase> {
@@ -642,6 +649,13 @@ export function ReactivateAgent(meta: $models.RequestMeta, agentID: string): $Ca
  */
 export function ReactivateUser(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.User> {
     return $Call.ByID(2986051725, meta, userID);
+}
+
+/**
+ * ReadInboxConversations 按 ID 批量返回会话摘要及当前筛选资格。
+ */
+export function ReadInboxConversations(meta: $models.RequestMeta, input: $models.ReadInboxConversationsInput): $CancellablePromise<$models.InboxConversationResults> {
+    return $Call.ByID(2030324742, meta, input);
 }
 
 /**

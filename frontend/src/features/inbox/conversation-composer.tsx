@@ -93,6 +93,7 @@ export function ConversationComposer({
   conversationType,
   submitOnEnter = false,
   refocusAfterSubmit = false,
+  disabledReason = null,
   retryFailedMessage = false,
   retryDraft = null,
   replyTo = null,
@@ -115,6 +116,7 @@ export function ConversationComposer({
   conversationType: ConversationType
   submitOnEnter?: boolean
   refocusAfterSubmit?: boolean
+  disabledReason?: string | null
   retryFailedMessage?: boolean
   retryDraft?: OutgoingConversationDraft | null
   replyTo?: ConversationMessageReference | null
@@ -333,6 +335,7 @@ export function ConversationComposer({
 
   /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
+    if (disabledReason) return
     const body = values.body.trim()
     if (!body || activeReplyTo?.deleted) return
     if (onBeforeSend && !(await onBeforeSend())) return
@@ -442,6 +445,7 @@ export function ConversationComposer({
 
   /** 在桌面键盘上提交消息，并保留 Shift+Enter 换行。 */
   function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (disabledReason) return
     const composing =
       event.keyCode === 229 || event.nativeEvent.isComposing
     if (!composing && mentionQuery && mentionCandidates.length > 0) {
@@ -558,7 +562,7 @@ export function ConversationComposer({
       noValidate
     >
       <div className="relative">
-        {mentionQuery && mentionCandidates.length > 0 ? (
+        {!disabledReason && mentionQuery && mentionCandidates.length > 0 ? (
           <div
             role="listbox"
             aria-label={t("messageMentionCandidates")}
@@ -613,6 +617,7 @@ export function ConversationComposer({
               <button
                 type="button"
                 className="shrink-0 text-muted-foreground hover:text-foreground"
+                disabled={Boolean(disabledReason)}
                 onClick={() => onReplyToChange?.(null)}
               >
                 {t("messageReplyCancel")}
@@ -627,8 +632,10 @@ export function ConversationComposer({
             }}
             id={inputID}
             disabled={isSubmitting}
+            readOnly={Boolean(disabledReason)}
             rows={3}
             aria-label={t("replyLabel")}
+            aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
             aria-invalid={form.formState.errors.body ? true : undefined}
             className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none focus-visible:ring-0"
             onInput={(event) => {
@@ -665,7 +672,9 @@ export function ConversationComposer({
             onKeyDown={submitFromKeyboard}
           />
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
-            {resolveAppPlatform() !== "mobile" &&
+            {disabledReason ? (
+              <p id={`${inputID}-reason`} className="text-xs text-muted-foreground">{disabledReason}</p>
+            ) : resolveAppPlatform() !== "mobile" &&
             (conversationType === ConversationType.ConversationTypeDirect ||
               conversationType === ConversationType.ConversationTypeGroup) ? (
               conversationType === ConversationType.ConversationTypeDirect ? (
@@ -702,7 +711,7 @@ export function ConversationComposer({
                 <PaperclipIcon />
               </Button>
             )}
-            <Button type="submit" size="sm" disabled={isSubmitting || isBodyEmpty || activeReplyTo?.deleted}>
+            <Button type="submit" size="sm" disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || activeReplyTo?.deleted}>
               {isSubmitting && showSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : null}
@@ -714,46 +723,5 @@ export function ConversationComposer({
         </div>
       </div>
     </form>
-  )
-}
-
-/** 展示保持工作区高度稳定的不可用回复区。 */
-export function ConversationComposerUnavailable({
-  conversationID,
-  reason,
-}: {
-  conversationID: string
-  reason: string
-}) {
-  const { t } = useTranslation("inbox")
-  const inputID = `conversation-reply-${conversationID}`
-  const reasonID = `${inputID}-reason`
-
-  return (
-    <div
-      data-slot="conversation-composer"
-      data-conversation-id={conversationID}
-      aria-disabled="true"
-      className="shrink-0 bg-background p-3"
-    >
-      <div className="overflow-hidden rounded-xl border border-input bg-muted/25 shadow-xs">
-        <Textarea
-          id={inputID}
-          disabled
-          rows={3}
-          aria-label={t("replyLabel")}
-          aria-describedby={reasonID}
-          className="min-h-20 resize-none rounded-none border-0 bg-transparent py-2 shadow-none disabled:opacity-100"
-        />
-        <div className="flex min-h-8 items-center justify-between gap-3 px-3 pb-2.5">
-          <p id={reasonID} className="text-xs text-muted-foreground">
-            {reason}
-          </p>
-          <Button type="button" size="sm" disabled>
-            {t("messageSend")}
-          </Button>
-        </div>
-      </div>
-    </div>
   )
 }

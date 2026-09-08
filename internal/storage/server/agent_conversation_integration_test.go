@@ -169,6 +169,16 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 			t.Fatalf("run failed: %+v %v", saved, err)
 		}
 	}
+	// 独立摘要与批量资格不依赖列表页，两个 AI 会话分别返回自己的最新结果。
+	details, err := inboxaction.NewLoadInboxQuery(db).ReadByIDs(ctx, identity, []string{first.Conversation.ID, second.Conversation.ID}, &inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	if err != nil || len(details) != 2 {
+		t.Fatalf("agent summaries=%+v err=%v", details, err)
+	}
+	for index, detail := range details {
+		if !detail.MatchesQuery || detail.Conversation == nil || detail.Conversation.Agent == nil || detail.Conversation.Agent.AgentRunStatus == nil || *detail.Conversation.Agent.AgentRunStatus != domain.AgentRunStatusSucceeded {
+			t.Fatalf("agent detail %d=%+v", index, detail)
+		}
+	}
 	// Agent 已回复后重放首发，确认消息不变，摘要保留当前水位和运行状态。
 	replay, err := start.Execute(ctx, identity, firstInput)
 	if err != nil {
