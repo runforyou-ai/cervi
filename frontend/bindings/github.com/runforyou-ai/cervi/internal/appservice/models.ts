@@ -1714,6 +1714,49 @@ export interface LoginInput {
 }
 
 /**
+ * MCPServer 定义企业配置的 MCP 服务。
+ */
+export interface MCPServer {
+    "id": string;
+    "name": string;
+    "url": string;
+    "serverType": MCPServerType;
+    "authorizationToken": string;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * MCPServerInput 定义 MCP 服务可编辑字段。
+ */
+export interface MCPServerInput {
+    "name": string;
+    "url": string;
+    "serverType": MCPServerType;
+    "authorizationToken": string;
+}
+
+/**
+ * MCPServerList 定义企业 MCP 服务列表。
+ */
+export interface MCPServerList {
+    "mcpServers": MCPServer[] | null;
+}
+
+/**
+ * MCPServerType 定义 MCP 服务的传输类型。
+ */
+export enum MCPServerType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MCPServerTypeSSE = "sse",
+    MCPServerTypeStreamableHTTP = "streamable-http",
+};
+
+/**
  * MarkConversationMentionReviewedInput 定义待确认的提及目标。
  */
 export interface MarkConversationMentionReviewedInput {

@@ -84,6 +84,10 @@ export const resourceKeys = {
   businessSystems: () => ["business-systems"],
   /** 单个业务系统。 */
   businessSystem: (id?: string) => itemKey("business-system", id),
+  /** MCP 服务列表。 */
+  mcpServers: () => ["mcp-servers"],
+  /** 单个 MCP 服务。 */
+  mcpServer: (id?: string) => itemKey("mcp-server", id),
   /** 知识库列表。 */
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */

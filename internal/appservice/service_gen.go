@@ -644,6 +644,31 @@ func (s *Service) DeleteBusinessSystem(ctx context.Context, meta RequestMeta, bu
 	return s.backend.DeleteBusinessSystem(ctx, meta, businessSystemID)
 }
 
+// ListMCPServers 返回当前企业配置的 MCP 服务。
+func (s *Service) ListMCPServers(ctx context.Context, meta RequestMeta) (MCPServerList, error) {
+	return s.backend.ListMCPServers(ctx, meta)
+}
+
+// GetMCPServer 返回当前企业中的 MCP 服务详情。
+func (s *Service) GetMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string) (MCPServer, error) {
+	return s.backend.GetMCPServer(ctx, meta, mcpServerID)
+}
+
+// CreateMCPServer 创建 MCP 服务。
+func (s *Service) CreateMCPServer(ctx context.Context, meta RequestMeta, input MCPServerInput) (MCPServer, error) {
+	return s.backend.CreateMCPServer(ctx, meta, input)
+}
+
+// UpdateMCPServer 修改 MCP 服务。
+func (s *Service) UpdateMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string, input MCPServerInput) (MCPServer, error) {
+	return s.backend.UpdateMCPServer(ctx, meta, mcpServerID, input)
+}
+
+// DeleteMCPServer 删除 MCP 服务。
+func (s *Service) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string) error {
+	return s.backend.DeleteMCPServer(ctx, meta, mcpServerID)
+}
+
 // UpdateOrganization 修改当前企业通用设置。
 func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	return s.backend.UpdateOrganization(ctx, meta, input)

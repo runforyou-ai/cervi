@@ -30,6 +30,9 @@ export function IntegrationsLayout() {
           <PagePaneLink to="/integrations/business-systems">
             {t("businessSystems")}
           </PagePaneLink>
+          <PagePaneLink to="/integrations/mcp-servers">
+            {t("mcpServers")}
+          </PagePaneLink>
           <PagePaneLink>{t("webhooks")}</PagePaneLink>
           <PagePaneLink>{t("openApi")}</PagePaneLink>
         </PagePaneNav>

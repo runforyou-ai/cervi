@@ -44,6 +44,7 @@ const workspace = {
       apps: "Apps",
       channels: "Message channels",
       businessSystems: "Business systems",
+      mcpServers: "MCP servers",
       modelServices: "Model services",
     },
   },
