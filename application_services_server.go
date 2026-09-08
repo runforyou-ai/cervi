@@ -9,7 +9,6 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
-	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -18,7 +17,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/ingress"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
-	"github.com/runforyou-ai/cervi/internal/integration/connector"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -43,12 +41,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, err
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
-	knowledgeClient := connectiontest.NewHTTPClient()
-	knowledgeGetter := connector.NewDifyKnowledgeBaseGetter(knowledgeClient)
-	knowledgeRetriever := connector.NewDifyKnowledgeRetriever(knowledgeClient)
-	knowledgeSegments := connector.NewDifyKnowledgeDocumentLister(knowledgeClient)
-	knowledgeSearch := knowledgebaseaction.NewSearchService(appStorage.DB(), knowledgeGetter, knowledgeRetriever, knowledgeSegments)
-	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, knowledgeSearch)
+	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, err
 	}
@@ -65,7 +58,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: fileaction.ScanExpiredInput{}, CronExpression: "@hourly", Timezone: "UTC",
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,
 	})
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, knowledgeSearch, tasks)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

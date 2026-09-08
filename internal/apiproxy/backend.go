@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
@@ -349,13 +348,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	if authenticated {
 		request.Header.Set("Authorization", "Bearer "+credential.Token)
 	}
-	// 原文件预览包含完整二进制内容，使用下载超时且不套用普通 JSON 大小上限。
-	_, documentFile := output.(*appservice.KnowledgeDocumentFile)
-	client := *state.client
-	if documentFile {
-		client.Timeout = 3 * time.Minute
-	}
-	response, err := client.Do(request)
+	response, err := state.client.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -364,10 +357,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
 	defer response.Body.Close()
-	var limited io.Reader = response.Body
-	if !documentFile || response.StatusCode >= http.StatusMultipleChoices {
-		limited = io.LimitReader(response.Body, maxResponseBytes)
-	}
+	limited := io.LimitReader(response.Body, maxResponseBytes)
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		var payload errorBody
 		if err := json.NewDecoder(limited).Decode(&payload); err != nil {

@@ -20,7 +20,6 @@ type Category string
 const (
 	CategoryObjectStorage Category = "object_storage"
 	CategoryModelProvider Category = "model_provider"
-	CategoryConnector     Category = "connector"
 	CategoryTelegram      Category = "telegram"
 )
 

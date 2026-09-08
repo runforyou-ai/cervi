@@ -16,7 +16,7 @@ import (
 
 // validateQAKnowledgeBase 确认当前知识库支持本地问答维护。
 func validateQAKnowledgeBase(record *servermodels.KnowledgeBase) error {
-	if record.Category != string(domain.KnowledgeBaseCategoryQA) || record.IntegrationConnectionID != nil {
+	if record.Category != string(domain.KnowledgeBaseCategoryQA) {
 		return ErrQAUnsupported
 	}
 	return nil

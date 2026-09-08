@@ -1054,40 +1054,6 @@ export interface DirectTextMessageInput {
 }
 
 /**
- * ExternalKnowledgeBaseConfiguration 定义外部知识库的主要运行配置。
- */
-export interface ExternalKnowledgeBaseConfiguration {
-    "indexingTechnique": string;
-    "documentCount": number;
-    "wordCount": number;
-    "embeddingModel": string;
-    "embeddingModelProvider": string;
-    "retrievalMethod": string;
-    "topK": number;
-    "scoreThresholdEnabled": boolean;
-    "scoreThreshold": number | null;
-    "rerankingEnabled": boolean;
-    "rerankingModel": string;
-    "rerankingProvider": string;
-}
-
-/**
- * ExternalKnowledgeBaseOption 定义外部知识库选择项。
- */
-export interface ExternalKnowledgeBaseOption {
-    "id": string;
-    "name": string;
-    "category": KnowledgeBaseCategory;
-}
-
-/**
- * ExternalKnowledgeBaseOptionList 定义外部知识库选择项列表。
- */
-export interface ExternalKnowledgeBaseOptionList {
-    "knowledgeBases": ExternalKnowledgeBaseOption[] | null;
-}
-
-/**
  * ExternalPageInput 定义原生端打开外部页面窗口的输入。
  */
 export interface ExternalPageInput {
@@ -1385,92 +1351,6 @@ export interface InstallationStatus {
 }
 
 /**
- * IntegrationConnection 定义连接器详情。
- */
-export interface IntegrationConnection {
-    "id": string;
-    "type": IntegrationConnectionType;
-    "name": string;
-    "description": string;
-    "configuration": IntegrationConnectionConfiguration;
-    "status": IntegrationConnectionStatus;
-    "lastTestedAt": string | null;
-}
-
-/**
- * IntegrationConnectionConfiguration 定义连接器认证配置。
- */
-export interface IntegrationConnectionConfiguration {
-    "apiUrl": string;
-    "apiKey": string;
-}
-
-/**
- * IntegrationConnectionInput 定义连接器可编辑字段。
- */
-export interface IntegrationConnectionInput {
-    "type": IntegrationConnectionType;
-    "name": string;
-    "description": string;
-    "configuration": IntegrationConnectionConfiguration;
-}
-
-/**
- * IntegrationConnectionList 定义连接器列表。
- */
-export interface IntegrationConnectionList {
-    "connections": IntegrationConnectionSummary[] | null;
-}
-
-/**
- * IntegrationConnectionStatus 表示连接器最近一次测试状态。
- */
-export enum IntegrationConnectionStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    IntegrationConnectionStatusUntested = "untested",
-    IntegrationConnectionStatusAvailable = "available",
-    IntegrationConnectionStatusUnavailable = "unavailable",
-};
-
-/**
- * IntegrationConnectionSummary 定义连接器列表项。
- */
-export interface IntegrationConnectionSummary {
-    "id": string;
-    "type": IntegrationConnectionType;
-    "name": string;
-    "description": string;
-    "status": IntegrationConnectionStatus;
-    "lastTestedAt": string | null;
-}
-
-/**
- * IntegrationConnectionTestInput 定义连接器草稿测试字段。
- */
-export interface IntegrationConnectionTestInput {
-    "type": IntegrationConnectionType;
-    "configuration": IntegrationConnectionConfiguration;
-}
-
-/**
- * IntegrationConnectionType 表示外部系统连接器类型。
- */
-export enum IntegrationConnectionType {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    IntegrationConnectionTypeDify = "dify",
-    IntegrationConnectionTypeN8N = "n8n",
-    IntegrationConnectionTypeRAGFlow = "ragflow",
-};
-
-/**
  * KnowledgeBase 定义知识库详情。
  */
 export interface KnowledgeBase {
@@ -1478,9 +1358,6 @@ export interface KnowledgeBase {
     "name": string;
     "category": KnowledgeBaseCategory;
     "description": string;
-    "integrationConnectionId": string;
-    "externalResourceId": string;
-    "externalConfiguration": ExternalKnowledgeBaseConfiguration | null;
     "groups": KnowledgeGroup[] | null;
     "createdAt": string;
     "updatedAt": string;
@@ -1506,8 +1383,6 @@ export interface KnowledgeBaseInput {
     "name": string;
     "category": KnowledgeBaseCategory;
     "description": string;
-    "integrationConnectionId": string;
-    "externalResourceId": string;
 }
 
 /**
@@ -1515,126 +1390,6 @@ export interface KnowledgeBaseInput {
  */
 export interface KnowledgeBaseList {
     "knowledgeBases": KnowledgeBase[] | null;
-}
-
-/**
- * KnowledgeDocument 定义知识文档详情。
- */
-export interface KnowledgeDocument {
-    "id": string;
-    "name": string;
-    "status": KnowledgeDocumentStatus;
-    "wordCount": number | null;
-    "hitCount": number;
-    "createdAt": string | null;
-}
-
-/**
- * KnowledgeDocumentFile 定义原文件预览响应，Content 为 Base64 编码的原始内容。
- */
-export interface KnowledgeDocumentFile {
-    "available": boolean;
-    "name": string;
-    "content": string;
-}
-
-/**
- * KnowledgeDocumentList 定义知识文档分页结果。
- */
-export interface KnowledgeDocumentList {
-    "documents": KnowledgeDocumentSummary[] | null;
-    "page": PageInfo;
-}
-
-/**
- * KnowledgeDocumentListInput 定义知识文档列表查询条件。
- */
-export interface KnowledgeDocumentListInput {
-    "keyword": string;
-    "status"?: KnowledgeDocumentStatus | null;
-    "page": number;
-    "pageSize": number;
-}
-
-/**
- * KnowledgeDocumentSegment 定义知识文档分段列表项。
- */
-export interface KnowledgeDocumentSegment {
-    "id": string;
-    "position": number;
-    "content": string;
-    "answer": string | null;
-    "wordCount": number;
-    "hitCount": number;
-    "indexStatus": KnowledgeDocumentSegmentIndexStatus;
-    "createdAt": string | null;
-}
-
-/**
- * KnowledgeDocumentSegmentIndexStatus 表示知识文档分段的索引状态。
- */
-export enum KnowledgeDocumentSegmentIndexStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    KnowledgeDocumentSegmentIndexStatusWaiting = "waiting",
-    KnowledgeDocumentSegmentIndexStatusIndexing = "indexing",
-    KnowledgeDocumentSegmentIndexStatusCompleted = "completed",
-    KnowledgeDocumentSegmentIndexStatusError = "error",
-    KnowledgeDocumentSegmentIndexStatusPaused = "paused",
-    KnowledgeDocumentSegmentIndexStatusResegment = "re_segment",
-};
-
-/**
- * KnowledgeDocumentSegmentList 定义知识文档分段分页结果。
- */
-export interface KnowledgeDocumentSegmentList {
-    "segments": KnowledgeDocumentSegment[] | null;
-    "page": PageInfo;
-}
-
-/**
- * KnowledgeDocumentSegmentListInput 定义知识文档分段列表查询条件。
- */
-export interface KnowledgeDocumentSegmentListInput {
-    "segmentId": string;
-    "position": number;
-    "keyword": string;
-    "status"?: KnowledgeDocumentSegmentIndexStatus | null;
-    "page": number;
-    "pageSize": number;
-}
-
-/**
- * KnowledgeDocumentStatus 表示知识文档的统一状态。
- */
-export enum KnowledgeDocumentStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    KnowledgeDocumentStatusQueued = "queued",
-    KnowledgeDocumentStatusProcessing = "processing",
-    KnowledgeDocumentStatusReady = "ready",
-    KnowledgeDocumentStatusPaused = "paused",
-    KnowledgeDocumentStatusError = "error",
-    KnowledgeDocumentStatusDisabled = "disabled",
-    KnowledgeDocumentStatusArchived = "archived",
-};
-
-/**
- * KnowledgeDocumentSummary 定义知识文档列表项。
- */
-export interface KnowledgeDocumentSummary {
-    "id": string;
-    "name": string;
-    "status": KnowledgeDocumentStatus;
-    "wordCount": number | null;
-    "hitCount": number;
-    "createdAt": string | null;
 }
 
 /**
@@ -1715,33 +1470,6 @@ export interface KnowledgeQASummary {
     "similarQuestions": string[] | null;
     "answer": string;
     "createdAt": string;
-}
-
-/**
- * KnowledgeRetrievalInput 定义知识库检索条件。
- */
-export interface KnowledgeRetrievalInput {
-    "query": string;
-}
-
-/**
- * KnowledgeRetrievalRecord 定义知识库检索命中项。
- */
-export interface KnowledgeRetrievalRecord {
-    "documentId": string;
-    "documentName": string;
-    "segmentId": string;
-    "position": number;
-    "content": string;
-    "answer": string | null;
-    "score": number | null;
-}
-
-/**
- * KnowledgeRetrievalResult 定义知识库检索结果。
- */
-export interface KnowledgeRetrievalResult {
-    "records": KnowledgeRetrievalRecord[] | null;
 }
 
 /**

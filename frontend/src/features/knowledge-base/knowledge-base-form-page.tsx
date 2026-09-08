@@ -12,15 +12,12 @@ import {
 import { toast } from "sonner"
 
 import {
-  IntegrationConnectionType,
   KnowledgeBaseCategory,
   type KnowledgeBaseCategoryId,
   type KnowledgeBaseData,
   createKnowledgeBase,
   getKnowledgeBase,
   isApiError,
-  listExternalKnowledgeBaseOptions,
-  listIntegrationConnections,
   updateKnowledgeBase,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
@@ -29,7 +26,6 @@ import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import {
   createKnowledgeBaseSchema,
@@ -52,8 +48,6 @@ export function KnowledgeBaseFormPage({
   const { t } = useTranslation("knowledgeBase")
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const requestedExternal =
-    mode === "create" && searchParams.get("source") === "dify"
   const requestedCategory =
     searchParams.get("category") ===
     KnowledgeBaseCategory.KnowledgeBaseCategoryQA
@@ -62,24 +56,17 @@ export function KnowledgeBaseFormPage({
   const { upsertKnowledgeBase } = useKnowledgeBaseContext()
   const { knowledgeBaseId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
-  const [external, setExternal] = useState(requestedExternal)
   const [category, setCategory] =
     useState<KnowledgeBaseCategoryId>(requestedCategory)
   const mounted = useRef(true)
   const schema = useMemo(
     () =>
-      createKnowledgeBaseSchema(
-        {
-          nameRequired: t("validation.nameRequired"),
-          nameTooLong: t("validation.nameTooLong"),
-          descriptionTooLong: t("validation.descriptionTooLong"),
-          integrationRequired: t("validation.integrationRequired"),
-          externalResourceRequired: t("validation.externalResourceRequired"),
-          externalResourceTooLong: t("validation.externalResourceTooLong"),
-        },
-        external,
-      ),
-    [external, t],
+      createKnowledgeBaseSchema({
+        nameRequired: t("validation.nameRequired"),
+        nameTooLong: t("validation.nameTooLong"),
+        descriptionTooLong: t("validation.descriptionTooLong"),
+      }),
+    [t],
   )
   const form = useForm<KnowledgeBaseFormValues>({
     resolver: zodResolver(schema),
@@ -87,23 +74,16 @@ export function KnowledgeBaseFormPage({
     defaultValues: {
       name: "",
       description: "",
-      integrationConnectionId: "",
-      externalResourceId: "",
     },
   })
-  const selectedConnectionId = form.watch("integrationConnectionId")
-  const selectedExternalResourceId = form.watch("externalResourceId")
   useEffect(() => {
     if (mode !== "create") return
-    setExternal(requestedExternal)
     setCategory(requestedCategory)
     form.reset({
       name: "",
       description: "",
-      integrationConnectionId: "",
-      externalResourceId: "",
     })
-  }, [form, mode, requestedCategory, requestedExternal])
+  }, [form, mode, requestedCategory])
 
   const {
     data: loadedKnowledgeBase,
@@ -120,94 +100,14 @@ export function KnowledgeBaseFormPage({
     mode === "edit" &&
     (detailLoading || (Boolean(detailError) && detailRefreshing))
   const loadError = mode === "edit" && Boolean(detailError) && !loading
-  const {
-    data: connectionList,
-    loading: connectionLoading,
-    refreshing: connectionRefreshing,
-    error: connectionError,
-    refresh: refreshConnections,
-  } = useResource(
-    resourceKeys.connectors(),
-    () => listIntegrationConnections(),
-    { enabled: external, staleTime: 0 },
-  )
-  const difyConnections = (connectionList?.connections ?? []).filter(
-    (connection) =>
-      connection.type ===
-      IntegrationConnectionType.IntegrationConnectionTypeDify,
-  )
-  const showConnectionLoading =
-    external &&
-    (connectionLoading || (Boolean(connectionError) && connectionRefreshing))
-  const {
-    data: externalOptionList,
-    loading: externalOptionLoading,
-    refreshing: externalOptionRefreshing,
-    error: externalOptionError,
-    refresh: refreshExternalOptions,
-  } = useResource(
-    resourceKeys.externalKnowledgeBaseOptions(selectedConnectionId),
-    () => listExternalKnowledgeBaseOptions(selectedConnectionId),
-    { enabled: external && selectedConnectionId !== "", staleTime: 0 },
-  )
-  const externalOptions = useMemo(
-    () => externalOptionList?.knowledgeBases ?? [],
-    [externalOptionList],
-  )
-
-  /** 远端列表刷新后，把失效选择同步到当前首个可用知识库。 */
-  useEffect(() => {
-    if (!externalOptionList || selectedConnectionId === "") return
-    if (
-      externalOptions.some(
-        (knowledgeBase) => knowledgeBase.id === selectedExternalResourceId,
-      )
-    ) {
-      return
-    }
-    const nextExternalResourceId = externalOptions[0]?.id ?? ""
-    if (nextExternalResourceId === selectedExternalResourceId) return
-    form.setValue("externalResourceId", nextExternalResourceId, {
-      shouldDirty: selectedExternalResourceId !== "",
-    })
-  }, [
-    externalOptionList,
-    externalOptions,
-    form,
-    selectedConnectionId,
-    selectedExternalResourceId,
-  ])
-
-  const selectedExternalOption = externalOptions.find(
-    (knowledgeBase) => knowledgeBase.id === selectedExternalResourceId,
-  )
-  const effectiveCategory = selectedExternalOption?.category ?? category
-  const isQACategory =
-    effectiveCategory === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
-  const showExternalOptionLoading =
-    external &&
-    selectedConnectionId !== "" &&
-    (externalOptionLoading ||
-      (Boolean(externalOptionError) && externalOptionRefreshing))
-  const externalConfigurationReady =
-    !external ||
-    (!showConnectionLoading &&
-      !connectionError &&
-      !showExternalOptionLoading &&
-      !externalOptionError &&
-      Boolean(selectedExternalOption))
-
   /** 详情就绪后回填知识库表单和派生状态。 */
   useEffect(() => {
     if (!loadedKnowledgeBase) return
     form.reset({
       name: loadedKnowledgeBase.name,
       description: loadedKnowledgeBase.description,
-      integrationConnectionId: loadedKnowledgeBase.integrationConnectionId,
-      externalResourceId: loadedKnowledgeBase.externalResourceId,
     })
     setCategory(loadedKnowledgeBase.category)
-    setExternal(loadedKnowledgeBase.integrationConnectionId !== "")
   }, [form, loadedKnowledgeBase])
 
   useEffect(() => {
@@ -221,7 +121,7 @@ export function KnowledgeBaseFormPage({
   async function save(values: KnowledgeBaseFormValues) {
     try {
       let knowledgeBase: KnowledgeBaseData
-      const input = { ...values, category: effectiveCategory }
+      const input = { ...values, category }
       if (mode === "create") {
         knowledgeBase = await createKnowledgeBase(input)
       } else {
@@ -256,8 +156,6 @@ export function KnowledgeBaseFormPage({
               "name",
               "category",
               "description",
-              "integrationConnectionId",
-              "externalResourceId",
             ])
           : t("form.saveError"),
       )
@@ -298,13 +196,9 @@ export function KnowledgeBaseFormPage({
               <Field>
                 <FieldLabel>{t("form.category")}</FieldLabel>
                 <p className="text-sm">
-                  {isQACategory ? t("category.qa") : t("category.standard")}
-                </p>
-              </Field>
-              <Field>
-                <FieldLabel>{t("form.source")}</FieldLabel>
-                <p className="text-sm">
-                  {external ? t("source.dify") : t("source.internal")}
+                  {category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
+                    ? t("category.qa")
+                    : t("category.standard")}
                 </p>
               </Field>
               <FormInputField
@@ -335,145 +229,11 @@ export function KnowledgeBaseFormPage({
                   </Field>
                 )}
               />
-              {external ? (
-                <>
-                  <Controller
-                    name="integrationConnectionId"
-                    control={form.control}
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={fieldState.invalid}>
-                        <FieldLabel htmlFor={field.name} required>
-                          {t("form.integration")}
-                        </FieldLabel>
-                        {showConnectionLoading ? (
-                          <NativeSelect id={field.name} disabled>
-                            <option>{t("form.connectionsLoading")}</option>
-                          </NativeSelect>
-                        ) : connectionError ? (
-                          <div className="flex items-center gap-3">
-                            <p className="text-sm text-muted-foreground">
-                              {t("form.connectionsLoadError")}
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void refreshConnections()}
-                            >
-                              {t("retry")}
-                            </Button>
-                          </div>
-                        ) : difyConnections.length === 0 ? (
-                          <div className="flex items-center gap-3">
-                            <p className="text-sm text-muted-foreground">
-                              {t("form.noDifyConnections")}
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              asChild
-                            >
-                              <Link to="/integrations/connectors/new">
-                                {t("form.addDifyConnection")}
-                              </Link>
-                            </Button>
-                          </div>
-                        ) : (
-                          <NativeSelect
-                            {...field}
-                            id={field.name}
-                            required
-                            aria-invalid={fieldState.invalid}
-                            onChange={(event) => {
-                              field.onChange(event)
-                              form.setValue("externalResourceId", "", {
-                                shouldDirty: true,
-                              })
-                              setCategory(
-                                KnowledgeBaseCategory.KnowledgeBaseCategoryStandard,
-                              )
-                            }}
-                          >
-                            <option value="" disabled>
-                              {t("form.selectIntegration")}
-                            </option>
-                            {difyConnections.map((connection) => (
-                              <option key={connection.id} value={connection.id}>
-                                {connection.name}
-                              </option>
-                            ))}
-                          </NativeSelect>
-                        )}
-                      </Field>
-                    )}
-                  />
-                  <Controller
-                    name="externalResourceId"
-                    control={form.control}
-                    render={({ field, fieldState }) => (
-                      <Field data-invalid={fieldState.invalid}>
-                        <FieldLabel htmlFor={field.name} required>
-                          {t("form.difyKnowledgeBase")}
-                        </FieldLabel>
-                        {selectedConnectionId === "" ? (
-                          <NativeSelect id={field.name} disabled>
-                            <option>{t("form.selectIntegrationFirst")}</option>
-                          </NativeSelect>
-                        ) : showExternalOptionLoading ? (
-                          <NativeSelect id={field.name} disabled>
-                            <option>{t("form.knowledgeBasesLoading")}</option>
-                          </NativeSelect>
-                        ) : externalOptionError ? (
-                          <div className="flex items-center gap-3">
-                            <p className="text-sm text-muted-foreground">
-                              {t("form.knowledgeBasesLoadError")}
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void refreshExternalOptions()}
-                            >
-                              {t("retry")}
-                            </Button>
-                          </div>
-                        ) : externalOptions.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            {t("form.noDifyKnowledgeBases")}
-                          </p>
-                        ) : (
-                          <NativeSelect
-                            {...field}
-                            id={field.name}
-                            required
-                            aria-invalid={fieldState.invalid}
-                          >
-                            <option value="" disabled>
-                              {t("form.selectDifyKnowledgeBase")}
-                            </option>
-                            {externalOptions.map((knowledgeBase) => (
-                              <option
-                                key={knowledgeBase.id}
-                                value={knowledgeBase.id}
-                              >
-                                {knowledgeBase.name}
-                              </option>
-                            ))}
-                          </NativeSelect>
-                        )}
-                      </Field>
-                    )}
-                  />
-                </>
-              ) : null}
             </FieldGroup>
             <div className="flex items-center gap-3">
               <Button
                 type="submit"
-                disabled={
-                  form.formState.isSubmitting || !externalConfigurationReady
-                }
+                disabled={form.formState.isSubmitting}
               >
                 {form.formState.isSubmitting
                   ? t("form.saving")

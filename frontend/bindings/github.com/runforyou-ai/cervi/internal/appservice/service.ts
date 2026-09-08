@@ -120,13 +120,6 @@ export function CreateGroupConversation(meta: $models.RequestMeta, input: $model
 }
 
 /**
- * CreateIntegrationConnection 创建外部系统连接器。
- */
-export function CreateIntegrationConnection(meta: $models.RequestMeta, input: $models.IntegrationConnectionInput): $CancellablePromise<$models.IntegrationConnection> {
-    return $Call.ByID(1136226000, meta, input);
-}
-
-/**
  * CreateKnowledgeBase 创建企业知识库。
  */
 export function CreateKnowledgeBase(meta: $models.RequestMeta, input: $models.KnowledgeBaseInput): $CancellablePromise<$models.KnowledgeBase> {
@@ -215,13 +208,6 @@ export function DeleteBusinessSystem(meta: $models.RequestMeta, businessSystemID
  */
 export function DeleteContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<void> {
     return $Call.ByID(1228681067, meta, contactID);
-}
-
-/**
- * DeleteIntegrationConnection 删除外部系统连接器。
- */
-export function DeleteIntegrationConnection(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<void> {
-    return $Call.ByID(873054297, meta, connectionID);
 }
 
 /**
@@ -316,31 +302,10 @@ export function GetGroupConversation(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
- * GetIntegrationConnection 返回当前企业中的连接器详情。
- */
-export function GetIntegrationConnection(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<$models.IntegrationConnection> {
-    return $Call.ByID(2403609160, meta, connectionID);
-}
-
-/**
  * GetKnowledgeBase 返回当前企业中的知识库详情。
  */
 export function GetKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<$models.KnowledgeBase> {
     return $Call.ByID(3589389559, meta, knowledgeBaseID);
-}
-
-/**
- * GetKnowledgeDocument 返回指定外部知识文档详情。
- */
-export function GetKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocument> {
-    return $Call.ByID(593812391, meta, knowledgeBaseID, documentID);
-}
-
-/**
- * GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
- */
-export function GetKnowledgeDocumentFile(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocumentFile> {
-    return $Call.ByID(1892761017, meta, knowledgeBaseID, documentID);
 }
 
 /**
@@ -484,38 +449,10 @@ export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $Cancel
 }
 
 /**
- * ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
- */
-export function ListExternalKnowledgeBaseOptions(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<$models.ExternalKnowledgeBaseOptionList> {
-    return $Call.ByID(1363605376, meta, connectionID);
-}
-
-/**
- * ListIntegrationConnections 返回当前企业的连接器列表。
- */
-export function ListIntegrationConnections(meta: $models.RequestMeta): $CancellablePromise<$models.IntegrationConnectionList> {
-    return $Call.ByID(3631406929, meta);
-}
-
-/**
  * ListKnowledgeBases 返回当前企业的知识库列表。
  */
 export function ListKnowledgeBases(meta: $models.RequestMeta): $CancellablePromise<$models.KnowledgeBaseList> {
     return $Call.ByID(2416994044, meta);
-}
-
-/**
- * ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
- */
-export function ListKnowledgeDocumentSegments(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentSegmentListInput): $CancellablePromise<$models.KnowledgeDocumentSegmentList> {
-    return $Call.ByID(63381217, meta, knowledgeBaseID, documentID, input);
-}
-
-/**
- * ListKnowledgeDocuments 返回指定外部知识库的文档列表。
- */
-export function ListKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeDocumentListInput): $CancellablePromise<$models.KnowledgeDocumentList> {
-    return $Call.ByID(4195704972, meta, knowledgeBaseID, input);
 }
 
 /**
@@ -701,13 +638,6 @@ export function RestoreContact(meta: $models.RequestMeta, contactID: string): $C
 }
 
 /**
- * RetrieveKnowledgeBase 检索指定外部知识库。
- */
-export function RetrieveKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeRetrievalInput): $CancellablePromise<$models.KnowledgeRetrievalResult> {
-    return $Call.ByID(720738771, meta, knowledgeBaseID, input);
-}
-
-/**
  * SaveS3Setting 保存当前企业的对象存储设置。
  */
 export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<$models.S3Setting> {
@@ -789,13 +719,6 @@ export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string
  */
 export function TestAIProviderConnection(meta: $models.RequestMeta, input: $models.AIProviderConnectionInput): $CancellablePromise<void> {
     return $Call.ByID(840788545, meta, input);
-}
-
-/**
- * TestIntegrationConnection 测试连接器草稿配置。
- */
-export function TestIntegrationConnection(meta: $models.RequestMeta, input: $models.IntegrationConnectionTestInput): $CancellablePromise<void> {
-    return $Call.ByID(1043008548, meta, input);
 }
 
 /**
@@ -887,13 +810,6 @@ export function UpdateConversationUnreadMark(meta: $models.RequestMeta, conversa
  */
 export function UpdateGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationProfileInput): $CancellablePromise<$models.GroupConversation> {
     return $Call.ByID(1492390913, meta, conversationID, input);
-}
-
-/**
- * UpdateIntegrationConnection 修改外部系统连接器。
- */
-export function UpdateIntegrationConnection(meta: $models.RequestMeta, connectionID: string, input: $models.IntegrationConnectionInput): $CancellablePromise<$models.IntegrationConnection> {
-    return $Call.ByID(4167671323, meta, connectionID, input);
 }
 
 /**

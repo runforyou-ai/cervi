@@ -19,7 +19,6 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
-	integrationconnectionaction "github.com/runforyou-ai/cervi/internal/actions/integrationconnection"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
@@ -29,7 +28,6 @@ import (
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
-	"github.com/runforyou-ai/cervi/internal/integration/connector"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -116,12 +114,6 @@ type DirectBackend struct {
 	saveQAEntry                       *knowledgebaseaction.SaveQAEntryAction
 	deleteQAEntry                     *knowledgebaseaction.DeleteQAEntryAction
 	listKnowledgeBases                *knowledgebaseaction.ListKnowledgeBasesQuery
-	listExternalKnowledgeBaseOptions  *knowledgebaseaction.ListExternalOptionsQuery
-	listKnowledgeDocuments            *knowledgebaseaction.ListKnowledgeDocumentsQuery
-	getKnowledgeDocument              *knowledgebaseaction.GetKnowledgeDocumentQuery
-	listKnowledgeDocumentSegments     *knowledgebaseaction.ListKnowledgeDocumentSegmentsQuery
-	getKnowledgeDocumentFile          *knowledgebaseaction.GetKnowledgeDocumentFileQuery
-	retrieveKnowledgeBase             *knowledgebaseaction.RetrieveKnowledgeBaseQuery
 	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
 	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
 	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
@@ -159,12 +151,6 @@ type DirectBackend struct {
 	createBusinessSystem              *businesssystemaction.CreateBusinessSystemAction
 	updateBusinessSystem              *businesssystemaction.UpdateBusinessSystemAction
 	deleteBusinessSystem              *businesssystemaction.DeleteBusinessSystemAction
-	listIntegrationConnections        *integrationconnectionaction.ListIntegrationConnectionsQuery
-	getIntegrationConnection          *integrationconnectionaction.GetIntegrationConnectionQuery
-	testIntegrationConnection         *integrationconnectionaction.TestConnectionAction
-	createIntegrationConnection       *integrationconnectionaction.CreateIntegrationConnectionAction
-	updateIntegrationConnection       *integrationconnectionaction.UpdateIntegrationConnectionAction
-	deleteIntegrationConnection       *integrationconnectionaction.DeleteIntegrationConnectionAction
 	updateOrganization                *organizationaction.UpdateOrganizationAction
 	getS3Setting                      *settingaction.GetS3SettingQuery
 	saveS3Setting                     *settingaction.SaveS3SettingAction
@@ -176,14 +162,10 @@ type DirectBackend struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator, knowledgeSearch *knowledgebaseaction.SearchService, deliveryEnqueuer servertask.TxEnqueuer) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator conversationaction.ServiceSessionAgentRunCoordinator, deliveryEnqueuer servertask.TxEnqueuer) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
-	connectorClient := connectionClient
-	connectorRegistry := connector.NewRegistry(connectorClient)
-	difyKnowledgeDocuments := connector.NewDifyKnowledgeDocumentLister(connectorClient)
-	difyKnowledgeBaseGetter := connector.NewDifyKnowledgeBaseGetter(connectorClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	return &DirectBackend{
 		customerDeliveries:                deliveryaction.NewManager(db, deliveryEnqueuer),
@@ -256,13 +238,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		saveQAEntry:                       knowledgebaseaction.NewSaveQAEntryAction(db),
 		deleteQAEntry:                     knowledgebaseaction.NewDeleteQAEntryAction(db),
 		listKnowledgeBases:                knowledgebaseaction.NewListKnowledgeBasesQuery(db),
-		listExternalKnowledgeBaseOptions:  knowledgebaseaction.NewListExternalOptionsQuery(db, connector.NewDifyKnowledgeBaseLister(connectorClient)),
-		listKnowledgeDocuments:            knowledgebaseaction.NewListKnowledgeDocumentsQuery(db, difyKnowledgeDocuments),
-		getKnowledgeDocument:              knowledgebaseaction.NewGetKnowledgeDocumentQuery(db, difyKnowledgeDocuments),
-		listKnowledgeDocumentSegments:     knowledgebaseaction.NewListKnowledgeDocumentSegmentsQuery(db, difyKnowledgeDocuments),
-		getKnowledgeDocumentFile:          knowledgebaseaction.NewGetKnowledgeDocumentFileQuery(db, difyKnowledgeDocuments),
-		retrieveKnowledgeBase:             knowledgebaseaction.NewRetrieveKnowledgeBaseQuery(knowledgeSearch),
-		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db, difyKnowledgeBaseGetter),
+		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
 		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),
 		deleteKnowledgeBase:               knowledgebaseaction.NewDeleteKnowledgeBaseAction(db),
@@ -299,12 +275,6 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		createBusinessSystem:              businesssystemaction.NewCreateBusinessSystemAction(db),
 		updateBusinessSystem:              businesssystemaction.NewUpdateBusinessSystemAction(db),
 		deleteBusinessSystem:              businesssystemaction.NewDeleteBusinessSystemAction(db),
-		listIntegrationConnections:        integrationconnectionaction.NewListIntegrationConnectionsQuery(db),
-		getIntegrationConnection:          integrationconnectionaction.NewGetIntegrationConnectionQuery(db),
-		testIntegrationConnection:         integrationconnectionaction.NewTestConnectionAction(db, connectionRunner, connectorRegistry),
-		createIntegrationConnection:       integrationconnectionaction.NewCreateIntegrationConnectionAction(db),
-		updateIntegrationConnection:       integrationconnectionaction.NewUpdateIntegrationConnectionAction(db),
-		deleteIntegrationConnection:       integrationconnectionaction.NewDeleteIntegrationConnectionAction(db),
 		updateOrganization:                organizationaction.NewUpdateOrganizationAction(db),
 		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
 		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),

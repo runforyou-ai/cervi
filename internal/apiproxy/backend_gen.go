@@ -636,54 +636,6 @@ func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
-// ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
-func (b *Backend) ListExternalKnowledgeBaseOptions(ctx context.Context, meta appservice.RequestMeta, connectionID string) (appservice.ExternalKnowledgeBaseOptionList, error) {
-	var output appservice.ExternalKnowledgeBaseOptionList
-	err := b.do(ctx, meta, http.MethodGet, "/integration-connections/"+url.PathEscape(connectionID)+"/knowledge-bases", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// ListKnowledgeDocuments 返回指定外部知识库的文档列表。
-func (b *Backend) ListKnowledgeDocuments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeDocumentListInput) (appservice.KnowledgeDocumentList, error) {
-	var output appservice.KnowledgeDocumentList
-	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents", encodeKnowledgeDocumentListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// GetKnowledgeDocument 返回指定外部知识文档详情。
-func (b *Backend) GetKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocument, error) {
-	var output appservice.KnowledgeDocument
-	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID), nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
-func (b *Backend) GetKnowledgeDocumentFile(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocumentFile, error) {
-	var output appservice.KnowledgeDocumentFile
-	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/file", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
-func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentSegmentListInput) (appservice.KnowledgeDocumentSegmentList, error) {
-	var output appservice.KnowledgeDocumentSegmentList
-	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/segments", encodeKnowledgeDocumentSegmentListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// RetrieveKnowledgeBase 检索指定外部知识库。
-func (b *Backend) RetrieveKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeRetrievalInput) (appservice.KnowledgeRetrievalResult, error) {
-	var output appservice.KnowledgeRetrievalResult
-	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/retrieve", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase
@@ -900,48 +852,6 @@ func (b *Backend) DeleteBusinessSystem(ctx context.Context, meta appservice.Requ
 	return b.do(ctx, meta, http.MethodDelete, "/integrations/business-systems/"+url.PathEscape(businessSystemID), nil, nil, nil)
 }
 
-// ListIntegrationConnections 返回当前企业的连接器列表。
-func (b *Backend) ListIntegrationConnections(ctx context.Context, meta appservice.RequestMeta) (appservice.IntegrationConnectionList, error) {
-	var output appservice.IntegrationConnectionList
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/connectors", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// GetIntegrationConnection 返回当前企业中的连接器详情。
-func (b *Backend) GetIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, connectionID string) (appservice.IntegrationConnection, error) {
-	var output appservice.IntegrationConnection
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/connectors/"+url.PathEscape(connectionID), nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// TestIntegrationConnection 测试连接器草稿配置。
-func (b *Backend) TestIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.IntegrationConnectionTestInput) error {
-	return b.do(ctx, meta, http.MethodPost, "/integrations/connectors/test", nil, input, nil)
-}
-
-// CreateIntegrationConnection 创建外部系统连接器。
-func (b *Backend) CreateIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.IntegrationConnectionInput) (appservice.IntegrationConnection, error) {
-	var output appservice.IntegrationConnection
-	err := b.do(ctx, meta, http.MethodPost, "/integrations/connectors", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// UpdateIntegrationConnection 修改外部系统连接器。
-func (b *Backend) UpdateIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, connectionID string, input appservice.IntegrationConnectionInput) (appservice.IntegrationConnection, error) {
-	var output appservice.IntegrationConnection
-	err := b.do(ctx, meta, http.MethodPut, "/integrations/connectors/"+url.PathEscape(connectionID), nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// DeleteIntegrationConnection 删除外部系统连接器。
-func (b *Backend) DeleteIntegrationConnection(ctx context.Context, meta appservice.RequestMeta, connectionID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/integrations/connectors/"+url.PathEscape(connectionID), nil, nil, nil)
-}
-
 // UpdateOrganization 修改当前企业通用设置。
 func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	var output appservice.Organization
@@ -993,28 +903,6 @@ func encodeConversationMessageListInputQuery(input appservice.ConversationMessag
 func encodeCustomerDeliveryListInputQuery(input appservice.CustomerDeliveryListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "messageIds", input.MessageIDs)
-	return query
-}
-
-// encodeKnowledgeDocumentListInputQuery 将 appservice.KnowledgeDocumentListInput 编码为查询参数。
-func encodeKnowledgeDocumentListInputQuery(input appservice.KnowledgeDocumentListInput) url.Values {
-	query := url.Values{}
-	setQuery(query, "keyword", input.Keyword)
-	setOptionalQuery(query, "status", input.Status)
-	setPositiveQuery(query, "page", input.Page)
-	setPositiveQuery(query, "pageSize", input.PageSize)
-	return query
-}
-
-// encodeKnowledgeDocumentSegmentListInputQuery 将 appservice.KnowledgeDocumentSegmentListInput 编码为查询参数。
-func encodeKnowledgeDocumentSegmentListInputQuery(input appservice.KnowledgeDocumentSegmentListInput) url.Values {
-	query := url.Values{}
-	setQuery(query, "segmentId", input.SegmentID)
-	setPositiveQuery(query, "position", input.Position)
-	setQuery(query, "keyword", input.Keyword)
-	setOptionalQuery(query, "status", input.Status)
-	setPositiveQuery(query, "page", input.Page)
-	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query
 }
 

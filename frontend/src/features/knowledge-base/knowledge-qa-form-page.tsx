@@ -69,8 +69,7 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
   const error = base.error ?? entry.error
   const ready = base.data && (mode === "create" || entry.data)
   const supported =
-    base.data?.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA &&
-    base.data.integrationConnectionId === ""
+    base.data?.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
   return (
     <>
       <PageHeader

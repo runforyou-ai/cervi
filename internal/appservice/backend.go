@@ -266,24 +266,6 @@ type Backend interface {
 	// ListKnowledgeBases 返回当前企业的知识库列表。
 	//cervi:route GET /knowledge-bases
 	ListKnowledgeBases(context.Context, RequestMeta) (KnowledgeBaseList, error)
-	// ListExternalKnowledgeBaseOptions 返回指定连接可访问的外部知识库选项。
-	//cervi:route GET /integration-connections/:connectionID/knowledge-bases
-	ListExternalKnowledgeBaseOptions(context.Context, RequestMeta, string) (ExternalKnowledgeBaseOptionList, error)
-	// ListKnowledgeDocuments 返回指定外部知识库的文档列表。
-	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents
-	ListKnowledgeDocuments(context.Context, RequestMeta, string, KnowledgeDocumentListInput) (KnowledgeDocumentList, error)
-	// GetKnowledgeDocument 返回指定外部知识文档详情。
-	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID
-	GetKnowledgeDocument(context.Context, RequestMeta, string, string) (KnowledgeDocument, error)
-	// GetKnowledgeDocumentFile 返回指定文档的原始文件供预览。
-	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/file
-	GetKnowledgeDocumentFile(context.Context, RequestMeta, string, string) (KnowledgeDocumentFile, error)
-	// ListKnowledgeDocumentSegments 返回指定外部知识文档的分段列表。
-	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/segments
-	ListKnowledgeDocumentSegments(context.Context, RequestMeta, string, string, KnowledgeDocumentSegmentListInput) (KnowledgeDocumentSegmentList, error)
-	// RetrieveKnowledgeBase 检索指定外部知识库。
-	//cervi:route POST /knowledge-bases/:knowledgeBaseID/retrieve
-	RetrieveKnowledgeBase(context.Context, RequestMeta, string, KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error)
 	// GetKnowledgeBase 返回当前企业中的知识库详情。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID
 	GetKnowledgeBase(context.Context, RequestMeta, string) (KnowledgeBase, error)
@@ -374,24 +356,6 @@ type Backend interface {
 	// DeleteBusinessSystem 删除业务系统。
 	//cervi:route DELETE /integrations/business-systems/:businessSystemID
 	DeleteBusinessSystem(context.Context, RequestMeta, string) error
-	// ListIntegrationConnections 返回当前企业的连接器列表。
-	//cervi:route GET /integrations/connectors
-	ListIntegrationConnections(context.Context, RequestMeta) (IntegrationConnectionList, error)
-	// GetIntegrationConnection 返回当前企业中的连接器详情。
-	//cervi:route GET /integrations/connectors/:connectionID
-	GetIntegrationConnection(context.Context, RequestMeta, string) (IntegrationConnection, error)
-	// TestIntegrationConnection 测试连接器草稿配置。
-	//cervi:route POST /integrations/connectors/test
-	TestIntegrationConnection(context.Context, RequestMeta, IntegrationConnectionTestInput) error
-	// CreateIntegrationConnection 创建外部系统连接器。
-	//cervi:route POST /integrations/connectors status=201
-	CreateIntegrationConnection(context.Context, RequestMeta, IntegrationConnectionInput) (IntegrationConnection, error)
-	// UpdateIntegrationConnection 修改外部系统连接器。
-	//cervi:route PUT /integrations/connectors/:connectionID
-	UpdateIntegrationConnection(context.Context, RequestMeta, string, IntegrationConnectionInput) (IntegrationConnection, error)
-	// DeleteIntegrationConnection 删除外部系统连接器。
-	//cervi:route DELETE /integrations/connectors/:connectionID
-	DeleteIntegrationConnection(context.Context, RequestMeta, string) error
 	// UpdateOrganization 修改当前企业通用设置。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)

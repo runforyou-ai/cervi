@@ -25,7 +25,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 	ctx := context.Background()
 	query := conversationaction.NewListConversationMessagesQuery(db)
 	failures := make(map[string]bool)
-	finalizer := agentrunaction.NewExecuteAction(db, tasks, nil, nil)
+	finalizer := agentrunaction.NewExecuteAction(db, tasks, nil)
 	for _, runID := range []string{firstRunID, secondRunID} {
 		var run servermodels.AgentRun
 		if err := db.NewSelect().Model(&run).Where("agr.id = ?", runID).Scan(ctx); err != nil {
@@ -88,7 +88,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 		}
 		return agentruntime.RunResult{EndSeq: claimed.EndSeq, Content: "恢复后的回复"}, nil
 	}}
-	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, nil).Execute(ctx, agentrunaction.RunInput{RunID: nextRunID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(db, tasks, runtime).Execute(ctx, agentrunaction.RunInput{RunID: nextRunID}); err != nil {
 		t.Fatal(err)
 	}
 	restored, err := query.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID})
@@ -128,7 +128,7 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 	if err := db.NewSelect().Model(&run).Where("agr.conversation_id = ? AND agr.status = ?", sent.Conversation.ID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunaction.NewExecuteAction(db, tasks, nil, nil).FinalizeFailure(ctx, agentrunaction.RunInput{RunID: run.ID}, errors.New("model failure details")); err != nil {
+	if err := agentrunaction.NewExecuteAction(db, tasks, nil).FinalizeFailure(ctx, agentrunaction.RunInput{RunID: run.ID}, errors.New("model failure details")); err != nil {
 		t.Fatal(err)
 	}
 	var session servermodels.ServiceSession

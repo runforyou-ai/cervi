@@ -1,4 +1,4 @@
-/** 展示和选择 AI 员工可使用的企业知识库。 */
+/** 展示和选择 AI 员工绑定的企业本地知识库。 */
 import { useTranslation } from "react-i18next"
 
 import { listKnowledgeBases } from "@/api"
@@ -68,11 +68,10 @@ export function AgentKnowledgeField({
         <label key={option.ids[0]} className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            className="size-4 accent-primary aria-disabled:cursor-wait aria-disabled:opacity-60"
-            aria-disabled={disabled}
+            className="size-4 accent-primary disabled:cursor-wait disabled:opacity-60"
+            disabled={disabled}
             checked={option.ids.every((id) => value.includes(id))}
             onChange={(event) => {
-              if (disabled) return
               onChange(event.target.checked ? [...value, ...option.ids] : value.filter((id) => !option.ids.includes(id)))
             }}
           />

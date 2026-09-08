@@ -11,34 +11,25 @@ import (
 )
 
 const (
-	ValidationQAQuestionRequired           common.FieldCode = "KNOWLEDGE_QA_QUESTION_REQUIRED"
-	ValidationQAAnswerRequired             common.FieldCode = "KNOWLEDGE_QA_ANSWER_REQUIRED"
-	ValidationQAGroupInvalid               common.FieldCode = "KNOWLEDGE_QA_GROUP_INVALID"
-	ValidationQAContentInvalid             common.FieldCode = "KNOWLEDGE_QA_CONTENT_INVALID"
-	ValidationNameRequired                 common.FieldCode = "KNOWLEDGE_BASE_NAME_REQUIRED"
-	ValidationNameTooLong                  common.FieldCode = "KNOWLEDGE_BASE_NAME_TOO_LONG"
-	ValidationNameDuplicate                common.FieldCode = "KNOWLEDGE_BASE_NAME_DUPLICATE"
-	ValidationCategoryInvalid              common.FieldCode = "KNOWLEDGE_BASE_CATEGORY_INVALID"
-	ValidationDescriptionTooLong           common.FieldCode = "KNOWLEDGE_BASE_DESCRIPTION_TOO_LONG"
-	ValidationIntegrationConnectionInvalid common.FieldCode = "KNOWLEDGE_BASE_INTEGRATION_CONNECTION_INVALID"
-	ValidationExternalResourceRequired     common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_REQUIRED"
-	ValidationExternalResourceTooLong      common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_TOO_LONG"
-	ValidationExternalResourceDuplicate    common.FieldCode = "KNOWLEDGE_BASE_EXTERNAL_RESOURCE_DUPLICATE"
-	ValidationGroupNameRequired            common.FieldCode = "KNOWLEDGE_GROUP_NAME_REQUIRED"
-	ValidationGroupNameTooLong             common.FieldCode = "KNOWLEDGE_GROUP_NAME_TOO_LONG"
-	ValidationGroupNameDuplicate           common.FieldCode = "KNOWLEDGE_GROUP_NAME_DUPLICATE"
-	ValidationGroupParentInvalid           common.FieldCode = "KNOWLEDGE_GROUP_PARENT_INVALID"
-	ValidationDocumentQueryInvalid         common.FieldCode = "KNOWLEDGE_DOCUMENT_QUERY_INVALID"
-	ValidationRetrievalQueryRequired       common.FieldCode = "KNOWLEDGE_RETRIEVAL_QUERY_REQUIRED"
-	ValidationRetrievalQueryTooLong        common.FieldCode = "KNOWLEDGE_RETRIEVAL_QUERY_TOO_LONG"
+	ValidationQAQuestionRequired common.FieldCode = "KNOWLEDGE_QA_QUESTION_REQUIRED"
+	ValidationQAAnswerRequired   common.FieldCode = "KNOWLEDGE_QA_ANSWER_REQUIRED"
+	ValidationQAGroupInvalid     common.FieldCode = "KNOWLEDGE_QA_GROUP_INVALID"
+	ValidationQAContentInvalid   common.FieldCode = "KNOWLEDGE_QA_CONTENT_INVALID"
+	ValidationNameRequired       common.FieldCode = "KNOWLEDGE_BASE_NAME_REQUIRED"
+	ValidationNameTooLong        common.FieldCode = "KNOWLEDGE_BASE_NAME_TOO_LONG"
+	ValidationNameDuplicate      common.FieldCode = "KNOWLEDGE_BASE_NAME_DUPLICATE"
+	ValidationCategoryInvalid    common.FieldCode = "KNOWLEDGE_BASE_CATEGORY_INVALID"
+	ValidationDescriptionTooLong common.FieldCode = "KNOWLEDGE_BASE_DESCRIPTION_TOO_LONG"
+	ValidationGroupNameRequired  common.FieldCode = "KNOWLEDGE_GROUP_NAME_REQUIRED"
+	ValidationGroupNameTooLong   common.FieldCode = "KNOWLEDGE_GROUP_NAME_TOO_LONG"
+	ValidationGroupNameDuplicate common.FieldCode = "KNOWLEDGE_GROUP_NAME_DUPLICATE"
+	ValidationGroupParentInvalid common.FieldCode = "KNOWLEDGE_GROUP_PARENT_INVALID"
 )
 
 // normalizeInput 规范化并校验知识库字段。
 func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
-	input.IntegrationConnectionID = strings.TrimSpace(input.IntegrationConnectionID)
-	input.ExternalResourceID = strings.TrimSpace(input.ExternalResourceID)
 	fields := make(map[string]common.FieldCode)
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
@@ -50,18 +41,6 @@ func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
 	}
 	if utf8.RuneCountInString(input.Description) > domain.KnowledgeBaseDescriptionMaxLength {
 		fields["description"] = ValidationDescriptionTooLong
-	}
-	hasIntegration := input.IntegrationConnectionID != ""
-	hasExternalResource := input.ExternalResourceID != ""
-	if hasIntegration && !common.ValidUUID(input.IntegrationConnectionID) {
-		fields["integrationConnectionId"] = ValidationIntegrationConnectionInvalid
-	} else if !hasIntegration && hasExternalResource {
-		fields["integrationConnectionId"] = ValidationIntegrationConnectionInvalid
-	}
-	if hasIntegration && !hasExternalResource {
-		fields["externalResourceId"] = ValidationExternalResourceRequired
-	} else if utf8.RuneCountInString(input.ExternalResourceID) > domain.KnowledgeBaseExternalResourceIDMaxLength {
-		fields["externalResourceId"] = ValidationExternalResourceTooLong
 	}
 	return input, fields
 }
@@ -78,18 +57,6 @@ func normalizeGroupInput(input GroupInput) (GroupInput, map[string]common.FieldC
 	}
 	if input.ParentID != "" && !common.ValidUUID(input.ParentID) {
 		fields["parentId"] = ValidationGroupParentInvalid
-	}
-	return input, fields
-}
-
-// normalizeRetrievalInput 规范化并校验知识库检索条件。
-func normalizeRetrievalInput(input RetrievalInput) (RetrievalInput, map[string]common.FieldCode) {
-	input.Query = strings.TrimSpace(input.Query)
-	fields := make(map[string]common.FieldCode)
-	if input.Query == "" {
-		fields["query"] = ValidationRetrievalQueryRequired
-	} else if utf8.RuneCountInString(input.Query) > domain.KnowledgeRetrievalQueryMaxLength {
-		fields["query"] = ValidationRetrievalQueryTooLong
 	}
 	return input, fields
 }
