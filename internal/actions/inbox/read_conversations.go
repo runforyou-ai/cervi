@@ -7,7 +7,6 @@ import (
 	"database/sql"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -98,25 +97,15 @@ func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermode
 	return summaries, nil
 }
 
-// matchInboxIDs 复用列表筛选核对指定 ID，不受当前页和每类条数限制。
+// matchInboxIDs 复用列表筛选核对指定 ID，不受分页边界限制。
 func (q *LoadInboxQuery) matchInboxIDs(ctx context.Context, identity *servermodels.Identity, ids []string, input LoadInput) (map[string]bool, error) {
-	organizationID, identityID, userID := identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID
-	queries := make([]*bun.SelectQuery, 0, 4)
-	if input.Scope != domain.InboxScopeInternal {
-		queries = append(queries, filterCustomerInbox(q.customerConversationDetailsQuery(organizationID, identityID, userID), identityID, input))
+	var matched []string
+	if err := q.db.NewSelect().TableExpr("(?) AS candidates", q.listCandidates(identity, input)).ColumnExpr("id").Where("id IN (?)", bun.In(ids)).Scan(ctx, &matched); err != nil {
+		return nil, err
 	}
-	if input.Scope != domain.InboxScopeCustomer {
-		queries = append(queries, q.directConversationsQuery(organizationID, identityID, userID), q.agentConversationsQuery(organizationID, identityID, userID), q.groupConversationsQuery(organizationID, identityID, userID))
-	}
-	matches := make(map[string]bool)
-	for _, query := range queries {
-		var matched []string
-		if err := q.db.NewSelect().TableExpr("(?) AS matched", query.Where("cv.id IN (?)", bun.In(ids))).ColumnExpr("matched.id").Scan(ctx, &matched); err != nil {
-			return nil, err
-		}
-		for _, id := range matched {
-			matches[id] = true
-		}
+	matches := make(map[string]bool, len(matched))
+	for _, id := range matched {
+		matches[id] = true
 	}
 	return matches, nil
 }

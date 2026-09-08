@@ -1414,10 +1414,16 @@ func bindKnowledgeQAListInputQuery(c *gin.Context) (appservice.KnowledgeQAListIn
 
 // bindLoadInboxInputQuery 从查询参数解析 appservice.LoadInboxInput。
 func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
+	limit, ok := positiveQueryInteger(c, "limit", 50)
+	if !ok {
+		return appservice.LoadInboxInput{}, false
+	}
 	return appservice.LoadInboxInput{
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
+		Cursor:             c.Query("cursor"),
+		Limit:              limit,
 	}, true
 }
 

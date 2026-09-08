@@ -189,6 +189,7 @@ const (
 	ErrorServerInitializationRequired     Key = "error.server_initialization_required"
 	ErrorRemoteRequestCreateFailed        Key = "error.remote_request_create_failed"
 	ErrorServerConnectionFailed           Key = "error.server_connection_failed"
+	ErrorInboxCursorInvalid               Key = "error.inbox_cursor_invalid"
 	ErrorInboxLoadFailed                  Key = "error.inbox_load_failed"
 	ErrorConversationNotFound             Key = "error.conversation_not_found"
 	ErrorConversationMessageListFailed    Key = "error.conversation_message_list_failed"

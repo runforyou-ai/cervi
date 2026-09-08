@@ -257,6 +257,7 @@
   "error.server_initialization_required": "企业服务器尚未初始化，请先通过 Web 完成初始化。",
   "error.remote_request_create_failed": "创建企业服务器请求失败。",
   "error.server_connection_failed": "企业服务器连接失败。",
+  "error.inbox_cursor_invalid": "会话列表位置已失效，请刷新列表。",
   "error.inbox_load_failed": "读取会话列表失败，请重试。",
   "error.conversation_not_found": "没有找到这条会话。",
   "error.conversation_message_list_failed": "读取会话消息失败，请重试。",

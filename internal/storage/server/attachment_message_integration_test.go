@@ -90,7 +90,8 @@ func TestAttachmentMessages(t *testing.T) {
 		if err != nil || downloaded.ID != file.ID {
 			t.Fatalf("download=%+v err=%v", downloaded, err)
 		}
-		items, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		items := itemsPage.Conversations
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,7 +197,8 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	if err != nil || len(captionHistory.Messages) != 2 || captionHistory.Messages[1].Body != "文件说明" || captionHistory.Messages[1].Attachment == nil {
 		t.Fatalf("caption history=%+v %v", captionHistory, err)
 	}
-	items, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+	itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+	items := itemsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}

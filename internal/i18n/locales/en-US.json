@@ -257,6 +257,7 @@
   "error.server_initialization_required": "The company server has not been initialized. Complete setup in a web browser first.",
   "error.remote_request_create_failed": "Could not create the company server request.",
   "error.server_connection_failed": "The company server connection failed.",
+  "error.inbox_cursor_invalid": "The conversation list position is invalid. Refresh the list.",
   "error.inbox_load_failed": "Could not load the conversation list. Try again.",
   "error.conversation_not_found": "This conversation could not be found.",
   "error.conversation_message_list_failed": "Could not load the conversation messages. Try again.",

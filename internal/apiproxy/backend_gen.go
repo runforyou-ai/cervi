@@ -1143,6 +1143,8 @@ func encodeLoadInboxInputQuery(input appservice.LoadInboxInput) url.Values {
 	setQuery(query, "scope", string(input.Scope))
 	setQuery(query, "customerView", string(input.CustomerView))
 	setQuery(query, "assigneeIdentityId", input.AssigneeIdentityID)
+	setQuery(query, "cursor", input.Cursor)
+	setPositiveQuery(query, "limit", input.Limit)
 	return query
 }
 

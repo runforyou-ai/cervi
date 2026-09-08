@@ -7,7 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
+	"math"
 	"strings"
 	"time"
 
@@ -18,10 +18,12 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const inboxConversationTypeLimit = 50
+const defaultInboxPageSize = 50
 
-// LoadInput 定义统一收件箱范围和客户队列筛选。
+// LoadInput 定义统一收件箱筛选、页大小和分页边界。
 type LoadInput struct {
+	Cursor             string
+	Limit              int
 	Scope              domain.InboxScope
 	CustomerView       domain.CustomerInboxView
 	AssigneeIdentityID string
@@ -197,94 +199,92 @@ func NewLoadInboxQuery(db bun.IDB) *LoadInboxQuery {
 	return &LoadInboxQuery{db: db}
 }
 
-// Execute 在同一只读快照中读取各类会话与完整未读总数。
-func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, UnreadCounts, error) {
+// ConversationPage 保存统一排序的一页会话及后续边界。
+type ConversationPage struct {
+	Conversations []ConversationSummary
+	NextCursor    string
+	HasMore       bool
+}
+
+// Execute 在同一只读快照中读取会话分页与完整未读总数。
+func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Identity, input LoadInput) (ConversationPage, UnreadCounts, error) {
 	input, err := normalizeLoadInput(input)
 	if err != nil {
-		return nil, UnreadCounts{}, err
+		return ConversationPage{}, UnreadCounts{}, err
 	}
-
-	var result []ConversationSummary
+	// 为 limit + 1 的续页探测保留一个整数位置。
+	if input.Limit < 0 || input.Limit == math.MaxInt {
+		return ConversationPage{}, UnreadCounts{}, ErrQueryInvalid
+	}
+	if input.Limit == 0 {
+		input.Limit = defaultInboxPageSize
+	}
+	var boundary *inboxCursor
+	if input.Cursor != "" {
+		boundary, err = decodeInboxCursor(input.Cursor, identity, input)
+		if err != nil {
+			return ConversationPage{}, UnreadCounts{}, err
+		}
+	}
+	var page ConversationPage
 	var counts UnreadCounts
 	err = q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
 		snapshot := NewLoadInboxQuery(tx)
 		var err error
-		result, counts, err = snapshot.loadConversations(ctx, identity, input)
+		page, err = snapshot.loadConversationPage(ctx, identity, input, boundary)
+		if err != nil {
+			return err
+		}
+		counts, err = snapshot.loadUnreadCounts(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
 		return err
 	})
-	if err != nil {
-		return nil, UnreadCounts{}, err
-	}
-	return result, counts, nil
+	return page, counts, err
 }
 
-// loadConversations 读取当前范围的会话并按精确活动时间合并排序。
-func (q *LoadInboxQuery) loadConversations(ctx context.Context, identity *servermodels.Identity, input LoadInput) ([]ConversationSummary, UnreadCounts, error) {
-	customers := make([]customerConversationRow, 0)
-	directs := make([]directConversationRow, 0)
-	groups := make([]groupConversationRow, 0)
-	agents := make([]agentConversationRow, 0)
-	var err error
-	if input.Scope != domain.InboxScopeInternal {
-		customers, err = q.loadCustomerConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID, input)
+// loadConversationPage 按精确活动边界取整页，边界行移除不影响后续读取。
+func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *servermodels.Identity, input LoadInput, boundary *inboxCursor) (ConversationPage, error) {
+	query := q.db.NewSelect().TableExpr("(?) AS candidates", q.listCandidates(identity, input)).ColumnExpr("id, last_activity_at")
+	if boundary != nil {
+		if boundary.LastActivityAt == nil {
+			query.Where("last_activity_at IS NULL AND id < ?", boundary.ID)
+		} else {
+			query.Where("(last_activity_at, id) < (?, ?) OR last_activity_at IS NULL", *boundary.LastActivityAt, boundary.ID)
+		}
+	}
+	var points []inboxCursorPoint
+	if err := query.OrderExpr("last_activity_at DESC NULLS LAST, id DESC").Limit(input.Limit+1).Scan(ctx, &points); err != nil {
+		return ConversationPage{}, fmt.Errorf("list inbox page: %w", err)
+	}
+	page := ConversationPage{Conversations: make([]ConversationSummary, 0, min(len(points), input.Limit)), HasMore: len(points) > input.Limit}
+	if page.HasMore {
+		points = points[:input.Limit]
+		var err error
+		page.NextCursor, err = encodeInboxCursor(identity, input, points[len(points)-1])
 		if err != nil {
-			return nil, UnreadCounts{}, err
+			return ConversationPage{}, err
 		}
 	}
-	if input.Scope != domain.InboxScopeCustomer {
-		directs, err = q.loadDirectConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
-		if err != nil {
-			return nil, UnreadCounts{}, err
-		}
-		agents, err = q.loadAgentConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
-		if err != nil {
-			return nil, UnreadCounts{}, err
-		}
-		groups, err = q.loadGroupConversations(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
-		if err != nil {
-			return nil, UnreadCounts{}, err
-		}
+	if len(points) == 0 {
+		return page, nil
 	}
-
-	result := make([]ConversationSummary, 0, len(customers)+len(directs)+len(groups)+len(agents))
-	for _, row := range customers {
-		result = append(result, row.summary())
+	ids := make([]string, len(points))
+	for index, point := range points {
+		ids[index] = point.ID
 	}
-	for _, row := range directs {
-		result = append(result, row.summary())
-	}
-	for _, row := range agents {
-		result = append(result, row.summary())
-	}
-	for _, row := range groups {
-		result = append(result, row.summary())
-	}
-	sort.Slice(result, func(first, second int) bool {
-		firstTime := result[first].LastActivityAt
-		secondTime := result[second].LastActivityAt
-		if firstTime == nil || secondTime == nil {
-			if firstTime == nil && secondTime == nil {
-				return result[first].ID > result[second].ID
-			}
-			return firstTime != nil
-		}
-		if firstTime.Equal(*secondTime) {
-			return result[first].ID > result[second].ID
-		}
-		return firstTime.After(*secondTime)
-	})
-	unreadCounts, err := q.loadUnreadCounts(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
+	summaries, err := q.readSummaries(ctx, identity, ids)
 	if err != nil {
-		return nil, UnreadCounts{}, err
+		return ConversationPage{}, err
 	}
-	return result, unreadCounts, nil
+	// 候选与摘要共用阅读资格并在同一快照内读取，每个编号都有对应摘要。
+	for _, id := range ids {
+		page.Conversations = append(page.Conversations, *summaries[id])
+	}
+	return page, nil
 }
 
 // customerConversationDetailsQuery 读取企业内客户会话摘要，不按处理队列限制阅读。
 func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, currentIdentityID, userID string) *bun.SelectQuery {
-	return q.db.NewSelect().
-		TableExpr("customer_conversations AS cc").
-		ColumnExpr("cv.id AS id").
+	return q.customerConversationAccessQuery(organizationID).
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("cv.title AS title").
@@ -303,16 +303,9 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 		ColumnExpr("assignee.type AS assignee_type").
 		ColumnExpr("assignee.display_name AS assignee_display_name").
 		ColumnExpr("assignee.avatar_file_id::text AS assignee_avatar_file_id").
-		ColumnExpr("cv.last_activity_at AS last_activity_at").
-		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
-		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cc.organization_id").
-		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cc.organization_id").
-		Join("LEFT JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
 		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = current.assignee_identity_id").
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
 		Join(`JOIN LATERAL (
@@ -324,9 +317,7 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 				AND unread_msg.type IN (?) AND unread_msg.deleted_at IS NULL
 				AND NOT (sender_cs.kind = ? AND sender_cs.source_id = ?)
 				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		) AS unread ON TRUE`, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID).
-		Where("cc.organization_id = ?", organizationID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer)
+		) AS unread ON TRUE`, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID)
 }
 
 // filterCustomerInbox 为客户摘要追加当前列表的筛选条件。
@@ -369,36 +360,9 @@ func filterCustomerInbox(query *bun.SelectQuery, currentIdentityID string, input
 	return query
 }
 
-// loadCustomerConversations 按客户视图读取当前处理周期对应的会话。
-func (q *LoadInboxQuery) loadCustomerConversations(ctx context.Context, organizationID, currentIdentityID, userID string, input LoadInput) ([]customerConversationRow, error) {
-	var rows []customerConversationRow
-	query := filterCustomerInbox(q.customerConversationDetailsQuery(organizationID, currentIdentityID, userID), currentIdentityID, input)
-	err := query.OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").
-		Limit(inboxConversationTypeLimit).
-		Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("list customer inbox conversations: %w", err)
-	}
-	return rows, nil
-}
-
-// loadDirectConversations 读取当前成员参与的内部单聊。
-func (q *LoadInboxQuery) loadDirectConversations(ctx context.Context, organizationID, identityID, userID string) ([]directConversationRow, error) {
-	var rows []directConversationRow
-	err := q.directConversationsQuery(organizationID, identityID, userID).
-		OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").
-		Limit(inboxConversationTypeLimit).Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("list direct inbox conversations: %w", err)
-	}
-	return rows, nil
-}
-
-// individualConversationsQuery 共用双方聊天的消息摘要、成员范围和个人未读状态。
-func (q *LoadInboxQuery) individualConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
-	return q.db.NewSelect().
-		TableExpr("conversations AS cv").
-		ColumnExpr("cv.id AS id").
+// withIndividualConversationDetails 为单聊阅读基线追加消息预览和个人未读状态。
+func withIndividualConversationDetails(query *bun.SelectQuery, identityID, userID string) *bun.SelectQuery {
+	return query.
 		ColumnExpr("? AS preview", messagequery.Summary("msg")).
 		ColumnExpr("msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
@@ -408,7 +372,6 @@ func (q *LoadInboxQuery) individualConversationsQuery(organizationID, identityID
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
-		ColumnExpr("cv.last_activity_at AS last_activity_at").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
@@ -422,63 +385,30 @@ func (q *LoadInboxQuery) individualConversationsQuery(organizationID, identityID
 			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id AND unread_msg.deleted_at IS NULL
 				AND (unread_msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?)
 				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		) AS unread ON TRUE`, identityID).
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS mine_cs ON mine_cs.id = mine.subject_id AND mine_cs.organization_id = mine.organization_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
-		Where("cv.organization_id = ?", organizationID).
-		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived)
+		) AS unread ON TRUE`, identityID)
 }
 
 // directConversationDetailsQuery 按真人身份对及有效成员关系读取长期单聊。
 func (q *LoadInboxQuery) directConversationDetailsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
-	return q.individualConversationsQuery(organizationID, identityID, userID).
-		ColumnExpr("peer_oi.id AS peer_identity_id, peer_oi.type AS peer_type, peer_oi.display_name AS peer_name, peer_oi.avatar_file_id AS peer_avatar_file_id").
-		Join("JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
-		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identityID).
-		Join("JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id").
-		Where("cv.type = ?", domain.ConversationTypeDirect).
-		Where("? IN (dc.first_identity_id, dc.second_identity_id)", identityID).
-		Where("peer_oi.type = ?", domain.OrganizationIdentityTypeUser)
+	return withIndividualConversationDetails(q.directConversationAccessQuery(organizationID, identityID), identityID, userID).
+		ColumnExpr("peer_oi.id AS peer_identity_id, peer_oi.type AS peer_type, peer_oi.display_name AS peer_name, peer_oi.avatar_file_id AS peer_avatar_file_id")
 }
 
 // agentConversationDetailsQuery 按业务归属和有效成员关系读取独立 AI 聊天。
 func (q *LoadInboxQuery) agentConversationDetailsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
-	return q.individualConversationsQuery(organizationID, identityID, userID).
+	return withAgentConversationDetails(q.agentConversationAccessQuery(organizationID, identityID), identityID, userID)
+}
+
+// withAgentConversationDetails 为 AI 会话阅读基线追加消息摘要及当前运行状态。
+func withAgentConversationDetails(query *bun.SelectQuery, identityID, userID string) *bun.SelectQuery {
+	return withIndividualConversationDetails(query, identityID, userID).
 		ColumnExpr("cv.title, oi.id AS agent_identity_id, oi.display_name AS agent_name, oi.avatar_file_id AS agent_avatar_file_id, latest_agent_run.status AS agent_run_status").
-		Join("JOIN agent_conversations AS ac ON ac.organization_id = cv.organization_id AND ac.conversation_id = cv.id").
-		Join("JOIN organization_identities AS oi ON oi.organization_id = ac.organization_id AND oi.id = ac.agent_identity_id").
-		Join("JOIN agents AS agent ON agent.organization_id = oi.organization_id AND agent.identity_id = oi.id").
-		Join("LEFT JOIN LATERAL (SELECT agr.status FROM agent_runs AS agr WHERE agr.organization_id = cv.organization_id AND agr.conversation_id = cv.id AND agr.agent_identity_id = ac.agent_identity_id ORDER BY agr.created_at DESC, agr.id DESC LIMIT 1) AS latest_agent_run ON TRUE").
-		Where("cv.type = ? AND ac.user_identity_id = ? AND oi.type = ?", domain.ConversationTypeAgent, identityID, domain.OrganizationIdentityTypeAgent)
-}
-
-// loadAgentConversations 读取当前成员的独立 AI 会话列表。
-func (q *LoadInboxQuery) loadAgentConversations(ctx context.Context, organizationID, identityID, userID string) ([]agentConversationRow, error) {
-	rows := make([]agentConversationRow, 0)
-	err := q.agentConversationsQuery(organizationID, identityID, userID).OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").Limit(inboxConversationTypeLimit).Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("list agent inbox conversations: %w", err)
-	}
-	return rows, nil
-}
-
-// loadGroupConversations 读取当前成员参与的企业群聊，包括尚无消息的新群聊。
-func (q *LoadInboxQuery) loadGroupConversations(ctx context.Context, organizationID, identityID, userID string) ([]groupConversationRow, error) {
-	var rows []groupConversationRow
-	err := q.groupConversationsQuery(organizationID, identityID, userID).
-		OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").
-		Limit(inboxConversationTypeLimit).Scan(ctx, &rows)
-	if err != nil {
-		return nil, fmt.Errorf("list group inbox conversations: %w", err)
-	}
-	return rows, nil
+		Join("LEFT JOIN LATERAL (SELECT agr.status FROM agent_runs AS agr WHERE agr.organization_id = cv.organization_id AND agr.conversation_id = cv.id AND agr.agent_identity_id = ac.agent_identity_id ORDER BY agr.created_at DESC, agr.id DESC LIMIT 1) AS latest_agent_run ON TRUE")
 }
 
 // groupConversationsQuery 共用群聊成员范围、个人状态和未读统计。
 func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
-	return q.db.NewSelect().
-		TableExpr("conversations AS cv").
-		ColumnExpr("cv.id AS id").
+	return q.groupConversationAccessQuery(organizationID, identityID).
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
@@ -493,9 +423,6 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
-		ColumnExpr("cv.last_activity_at AS last_activity_at").
-		Join("JOIN conversation_participants AS mine ON mine.organization_id = cv.organization_id AND mine.conversation_id = cv.id AND mine.left_at IS NULL").
-		Join("JOIN chat_subjects AS mine_cs ON mine_cs.organization_id = mine.organization_id AND mine_cs.id = mine.subject_id AND mine_cs.kind = ? AND mine_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
 		Join("JOIN LATERAL (SELECT count(*) AS member_count FROM conversation_participants AS member_cp WHERE member_cp.organization_id = cv.organization_id AND member_cp.conversation_id = cv.id AND member_cp.left_at IS NULL) AS members ON TRUE").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
@@ -512,19 +439,16 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id AND unread_msg.deleted_at IS NULL
 				AND (unread_msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?)
 				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		) AS unread ON TRUE`, identityID).
-		Where("cv.organization_id = ?", organizationID).
-		Where("cv.type = ?", domain.ConversationTypeGroup).
-		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived)
+		) AS unread ON TRUE`, identityID)
 }
 
 // loadUnreadCounts 按完整会话范围汇总提醒，不受当前筛选和列表条数限制。
 func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, identityID, userID string) (UnreadCounts, error) {
-	direct := q.db.NewSelect().TableExpr("(?) AS direct", q.directConversationsQuery(organizationID, identityID, userID)).
+	direct := q.db.NewSelect().TableExpr("(?) AS direct", withIndividualConversationDetails(q.directConversationsQuery(organizationID, identityID), identityID, userID)).
 		ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread")
 	group := q.db.NewSelect().TableExpr("(?) AS groups", q.groupConversationsQuery(organizationID, identityID, userID)).
 		ColumnExpr("unread_count, mentioned_unread_count, muted, marked_unread")
-	agent := q.db.NewSelect().TableExpr("(?) AS agents", q.agentConversationsQuery(organizationID, identityID, userID)).ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread")
+	agent := q.db.NewSelect().TableExpr("(?) AS agents", withIndividualConversationDetails(q.agentConversationsQuery(organizationID, identityID), identityID, userID)).ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread")
 	counts := UnreadCounts{}
 	err := q.db.NewSelect().TableExpr("(?) AS internal", direct.UnionAll(group).UnionAll(agent)).
 		ColumnExpr("COALESCE(sum(unread_count), 0) AS unread_count").
@@ -556,7 +480,7 @@ func (row agentConversationRow) summary() ConversationSummary {
 // LoadAgentConversation 读取当前成员指定 AI 会话的完整收件箱摘要。
 func (q *LoadInboxQuery) LoadAgentConversation(ctx context.Context, identity *servermodels.Identity, conversationID string) (ConversationSummary, error) {
 	var row agentConversationRow
-	err := q.agentConversationsQuery(identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID).Where("cv.id = ?", conversationID).Scan(ctx, &row)
+	err := withAgentConversationDetails(q.agentConversationsQuery(identity.Organization.ID, identity.OrganizationIdentity.ID), identity.OrganizationIdentity.ID, identity.User.ID).Where("cv.id = ?", conversationID).Scan(ctx, &row)
 	if err != nil {
 		return ConversationSummary{}, err
 	}
@@ -619,15 +543,8 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 		return input, ErrQueryInvalid
 	}
 
+	if input.Scope != domain.InboxScopeCustomer {
+		input.CustomerView = domain.CustomerInboxViewQueue
+	}
 	return input, nil
-}
-
-// directConversationsQuery 限定当前列表中的活跃真人单聊。
-func (q *LoadInboxQuery) directConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
-	return q.directConversationDetailsQuery(organizationID, identityID, userID).Where("cv.status = ? AND peer_u.status = ?", domain.ConversationStatusActive, domain.UserStatusActive)
-}
-
-// agentConversationsQuery 限定当前列表中的活跃 AI 聊天。
-func (q *LoadInboxQuery) agentConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
-	return q.agentConversationDetailsQuery(organizationID, identityID, userID).Where("cv.status = ? AND agent.status = ?", domain.ConversationStatusActive, domain.UserStatusActive)
 }

@@ -143,7 +143,8 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 	if err != nil || len(history.Messages) == 0 || history.Messages[len(history.Messages)-1].Type != domain.MessageTypeAgentError {
 		t.Fatalf("member error history = %+v, %v", history, err)
 	}
-	inbox, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: run.AgentIdentityID})
+	inboxPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: run.AgentIdentityID})
+	inbox := inboxPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}

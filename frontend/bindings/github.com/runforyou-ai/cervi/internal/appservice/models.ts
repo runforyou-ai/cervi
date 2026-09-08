@@ -1426,6 +1426,8 @@ export interface ImageFile {
  */
 export interface Inbox {
     "conversations": InboxConversation[] | null;
+    "nextCursor": string;
+    "hasMore": boolean;
     "unreadCount": number;
     "attentionUnreadCount": number;
 }
@@ -1488,6 +1490,15 @@ export interface InboxConversationResult {
  */
 export interface InboxConversationResults {
     "results": InboxConversationResult[] | null;
+}
+
+/**
+ * InboxQuery 定义与分页边界无关的会话筛选。
+ */
+export interface InboxQuery {
+    "scope": InboxScope;
+    "customerView": CustomerInboxView;
+    "assigneeIdentityId": string;
 }
 
 /**
@@ -1743,12 +1754,14 @@ export interface KnowledgeQASummary {
 }
 
 /**
- * LoadInboxInput 定义统一收件箱查询条件。
+ * LoadInboxInput 定义统一收件箱筛选和分页边界。
  */
 export interface LoadInboxInput {
     "scope": InboxScope;
     "customerView": CustomerInboxView;
     "assigneeIdentityId": string;
+    "cursor": string;
+    "limit": number;
 }
 
 /**
@@ -2092,7 +2105,7 @@ export interface ProfileInput {
  */
 export interface ReadInboxConversationsInput {
     "conversationIds": string[] | null;
-    "query": LoadInboxInput;
+    "query": InboxQuery;
 }
 
 /**

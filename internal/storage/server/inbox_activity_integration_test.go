@@ -142,7 +142,7 @@ func TestInboxSnapshot(t *testing.T) {
 	ctx = tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost)
 	f.db.AddQueryHook(chatQueryHook{})
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
-		return event.Operation() == "SELECT" && strings.Contains(event.Query, "AS member_count") && strings.Contains(event.Query, "LIMIT 50")
+		return event.Operation() == "SELECT" && strings.Contains(event.Query, "AS candidates") && strings.Contains(event.Query, "LIMIT 51")
 	})
 	var snapshot appservice.Inbox
 	done := make(chan error, 1)
@@ -197,7 +197,8 @@ func TestInboxActivityOrder(t *testing.T) {
 		}
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	rows, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rowsPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rows := rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +215,8 @@ func TestInboxActivityOrder(t *testing.T) {
 	if _, err := f.db.NewUpdate().Model((*servermodels.Conversation)(nil)).Set("last_activity_at = ?", base).Where("id IN (?)", bun.In(ids)).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	rows, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rowsPage, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rows = rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +257,8 @@ func TestInboxActivityOrder(t *testing.T) {
 	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: empty.ID, Title: "新群名", Description: "仅资料"}); err != nil {
 		t.Fatal(err)
 	}
-	rows, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rowsPage, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rows = rowsPage.Conversations
 	if err != nil || rows[0].ID != empty.ID || rows[0].LastActivityAt == nil {
 		t.Fatalf("system activity=%+v err=%v", rows, err)
 	}
@@ -286,7 +289,8 @@ func TestInboxTelegramActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	rows, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue})
+	rowsPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue})
+	rows := rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +301,8 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if err := receiver.Execute(ctx, channel.ID, input); err != nil {
 		t.Fatal(err)
 	}
-	all, _, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	allPage, _, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	all := allPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +319,8 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.owner, telegram.ID); err != nil {
 		t.Fatal(err)
 	}
-	closed, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewClosed})
+	closedPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewClosed})
+	closed := closedPage.Conversations
 	if err != nil || len(closed) != 1 || !closed[0].LastActivityAt.Equal(*telegram.LastActivityAt) || closed[0].UnreadCount != 0 || counts.Attention != 0 {
 		t.Fatalf("closed=%+v counts=%+v err=%v", closed, counts, err)
 	}
