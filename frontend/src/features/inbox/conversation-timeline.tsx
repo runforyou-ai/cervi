@@ -67,8 +67,6 @@ type TimelineMessage = Pick<
   | "body"
   | "attachment"
   | "originatedAt"
-  | "sourceOrder"
-  | "groupMessageSequence"
   | "sender"
   | "sessionStart"
   | "systemEvent"
@@ -114,7 +112,7 @@ function mergeTimelineMessages(
       participant,
     ]),
   )
-  const messages: TimelineMessage[] = current.map((message) => ({
+  const messages: TimelineMessage[] = [...current].sort(compareConversationMessages).map((message) => ({
     ...message,
     persistedMessageID: message.id,
     clientMessageID: null,
@@ -136,8 +134,6 @@ function mergeTimelineMessages(
       attachment: message.saved?.attachment ?? message.attachment ?? null,
       body: message.body,
       originatedAt: message.originatedAt,
-      sourceOrder: 0,
-      groupMessageSequence: null,
       sender: null,
       agentProcess: null,
       sessionStart: null,
@@ -170,10 +166,7 @@ function mergeTimelineMessages(
     })
   }
   // 服务端消息只来自连续窗口，尚未补入窗口的发送结果继续作为本地项目展示。
-  return messages.sort((left, right) => {
-    if (left.local !== right.local) return left.local ? 1 : -1
-    return compareConversationMessages(left, right)
-  })
+  return messages
 }
 
 /** 在消息正文中强调结构化提醒。 */
@@ -358,9 +351,9 @@ function ConversationTimelineContent({
     onUnavailable: handleUnavailable,
   })
 
-  // 结合分页边界和群聊尾端序号判断是否仍有后续消息。
+  // 按分页边界判断后续消息，群聊同时比较导航态的最新序号。
   const windowLastSequence =
-    currentPage?.messages[currentPage.messages.length - 1]?.groupMessageSequence
+    currentPage?.messages[currentPage.messages.length - 1]?.messageSeq
   const hasLaterMessages = Boolean(
     currentPage?.hasLater ||
     (windowLastSequence &&

@@ -130,21 +130,21 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	Attachment           *MessageAttachment               `json:"attachment"`
-	AgentProcess         *ConversationAgentProcess        `json:"agentProcess"`
-	GroupMessageSequence *string                          `json:"groupMessageSequence"`
-	ID                   string                           `json:"id"`
-	Type                 MessageType                      `json:"type"`
-	Body                 string                           `json:"body"`
-	OriginatedAt         time.Time                        `json:"originatedAt"`
-	SourceOrder          int64                            `json:"sourceOrder"`
-	CreatedAt            time.Time                        `json:"createdAt"`
-	Sender               *ConversationMessageSender       `json:"sender"`
-	SessionStart         *ConversationMessageSessionStart `json:"sessionStart"`
-	SystemEvent          *ConversationSystemEvent         `json:"systemEvent"`
-	ReplyTo              *ConversationMessageReference    `json:"replyTo"`
-	Mentions             []ConversationMessageMention     `json:"mentions"`
-	MentionAll           bool                             `json:"mentionAll"`
+	Attachment   *MessageAttachment               `json:"attachment"`
+	AgentProcess *ConversationAgentProcess        `json:"agentProcess"`
+	MessageSeq   string                           `json:"messageSeq"`
+	ID           string                           `json:"id"`
+	Type         MessageType                      `json:"type"`
+	Body         string                           `json:"body"`
+	OriginatedAt time.Time                        `json:"originatedAt"`
+	SourceOrder  int64                            `json:"sourceOrder"`
+	CreatedAt    time.Time                        `json:"createdAt"`
+	Sender       *ConversationMessageSender       `json:"sender"`
+	SessionStart *ConversationMessageSessionStart `json:"sessionStart"`
+	SystemEvent  *ConversationSystemEvent         `json:"systemEvent"`
+	ReplyTo      *ConversationMessageReference    `json:"replyTo"`
+	Mentions     []ConversationMessageMention     `json:"mentions"`
+	MentionAll   bool                             `json:"mentionAll"`
 }
 
 // ConversationMessageList 定义成员消息页。
@@ -165,6 +165,7 @@ type MarkConversationReadInput struct {
 
 // ConversationReadState 定义用户会话的已读水位。
 type ConversationReadState struct {
+	ReadSeq           string    `json:"readSeq"`
 	LastReadMessageID string    `json:"lastReadMessageId"`
 	LastReadAt        time.Time `json:"lastReadAt"`
 }

@@ -484,7 +484,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 			Where("cci.channel_id = ?", telegramChannel.ID).
 			Where("cci.external_id = ?", "998877").
-			OrderExpr("msg.originated_at ASC, msg.source_order ASC, msg.id ASC").
+			OrderExpr("msg.message_seq ASC").
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
@@ -536,7 +536,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 			Where("cci.channel_id = ?", telegramChannel.ID).
 			Where("cci.external_id = ?", "998877").
-			OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC").
+			OrderExpr("msg.message_seq DESC").
 			Limit(1).
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)

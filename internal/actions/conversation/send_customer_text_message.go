@@ -47,7 +47,7 @@ type memberReplySessionPlan struct {
 
 type idempotentMemberMessageRow struct {
 	ReplyToMessageID       *string    `bun:"reply_to_message_id"`
-	GroupMessageSequence   *int64     `bun:"group_message_sequence"`
+	MessageSeq             int64      `bun:"message_seq"`
 	ID                     string     `bun:"id"`
 	CreatedAt              time.Time  `bun:"created_at"`
 	ConversationID         string     `bun:"conversation_id"`
@@ -248,7 +248,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.deleted_at AS deleted_at").
-		ColumnExpr("msg.group_message_sequence AS group_message_sequence").
+		ColumnExpr("msg.message_seq AS message_seq").
 		ColumnExpr("cs.id AS sender_subject_id").
 		ColumnExpr("cs.kind AS sender_subject_kind").
 		ColumnExpr("cs.source_id AS sender_subject_source_id").
@@ -284,7 +284,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	message := &servermodels.Message{
 		ID: row.ID, CreatedAt: row.CreatedAt, ConversationID: row.ConversationID,
 		ServiceSessionID: row.ServiceSessionID, SenderParticipantID: row.SenderParticipantID,
-		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, GroupMessageSequence: row.GroupMessageSequence,
+		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, MessageSeq: row.MessageSeq,
 	}
 	result := memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity)
 	if storedReply != "" {
@@ -367,7 +367,7 @@ func memberConversationMessage(message *servermodels.Message, subjectID string, 
 	identityType := domain.OrganizationIdentityType(identity.Type)
 	return ConversationMessage{
 		ID: message.ID, Type: domain.MessageType(message.Type), Body: message.Body,
-		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll, GroupMessageSequence: message.GroupMessageSequence,
+		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll, MessageSeq: message.MessageSeq,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,
 			SourceID: identity.ID, DisplayName: &name, AvatarFileID: identity.AvatarFileID, IdentityType: &identityType,

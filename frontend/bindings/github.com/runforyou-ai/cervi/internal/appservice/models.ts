@@ -765,7 +765,7 @@ export enum ConversationMentionReviewOutcome {
 export interface ConversationMessage {
     "attachment": MessageAttachment | null;
     "agentProcess": ConversationAgentProcess | null;
-    "groupMessageSequence": string | null;
+    "messageSeq": string;
     "id": string;
     "type": MessageType;
     "body": string;
@@ -871,6 +871,7 @@ export interface ConversationNotificationSettingsInput {
  * ConversationReadState 定义用户会话的已读水位。
  */
 export interface ConversationReadState {
+    "readSeq": string;
     "lastReadMessageId": string;
     "lastReadAt": string;
 }

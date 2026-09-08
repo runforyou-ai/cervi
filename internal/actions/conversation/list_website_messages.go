@@ -25,6 +25,7 @@ type ListWebsiteMessagesQuery struct {
 }
 
 type websiteMessageRow struct {
+	MessageSeq              int64                            `bun:"message_seq"`
 	ID                      string                           `bun:"id"`
 	Body                    string                           `bun:"body"`
 	SenderIdentityType      *domain.OrganizationIdentityType `bun:"sender_identity_type"`
@@ -83,6 +84,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 	query := q.db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
+		ColumnExpr("msg.message_seq").
 		ColumnExpr("msg.body AS body").
 		ColumnExpr("oi.type AS sender_identity_type").
 		ColumnExpr("msg.originated_at AS originated_at").
@@ -106,13 +108,13 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL")
 	if input.Before != nil {
-		query = query.Where("(msg.originated_at, msg.source_order, msg.id) < (?, ?, ?)", input.Before.OriginatedAt, input.Before.SourceOrder, input.Before.ID).
-			OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC")
+		query = query.Where("msg.message_seq < ?", input.Before.MessageSeq).
+			OrderExpr("msg.message_seq DESC")
 	} else if input.After != nil {
-		query = query.Where("(msg.originated_at, msg.source_order, msg.id) > (?, ?, ?)", input.After.OriginatedAt, input.After.SourceOrder, input.After.ID).
-			OrderExpr("msg.originated_at ASC, msg.source_order ASC, msg.id ASC")
+		query = query.Where("msg.message_seq > ?", input.After.MessageSeq).
+			OrderExpr("msg.message_seq ASC")
 	} else {
-		query = query.OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC")
+		query = query.OrderExpr("msg.message_seq DESC")
 	}
 	var rows []websiteMessageRow
 	if err := query.Limit(websiteMessagePageSize+1).Scan(ctx, &rows); err != nil {
@@ -137,7 +139,7 @@ func validateMessageHistoryInput(input MessageHistoryInput) map[string]Validatio
 		fields["cursor"] = ValidationCursorInvalid
 	}
 	for _, cursor := range []*MessageCursorPoint{input.Before, input.After} {
-		if cursor != nil && (cursor.OriginatedAt.IsZero() || cursor.SourceOrder < 0 || !common.ValidUUID(cursor.ID)) {
+		if cursor != nil && (cursor.MessageSeq <= 0 || !common.ValidUUID(cursor.ID)) {
 			fields["cursor"] = ValidationCursorInvalid
 		}
 	}
@@ -160,7 +162,7 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 			author = domain.MessageAuthorVisitor
 		}
 		message := Message{
-			ID: row.ID, Author: author, Body: row.Body, SenderIdentityType: row.SenderIdentityType,
+			MessageSeq: row.MessageSeq, ID: row.ID, Author: author, Body: row.Body, SenderIdentityType: row.SenderIdentityType,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
 		}
 		if row.ReplyToMessageID != nil {
@@ -180,8 +182,8 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 	if len(rows) == 0 {
 		return result
 	}
-	first := MessageCursorPoint{OriginatedAt: rows[0].OriginatedAt, SourceOrder: rows[0].SourceOrder, ID: rows[0].ID}
-	last := MessageCursorPoint{OriginatedAt: rows[len(rows)-1].OriginatedAt, SourceOrder: rows[len(rows)-1].SourceOrder, ID: rows[len(rows)-1].ID}
+	first := MessageCursorPoint{MessageSeq: rows[0].MessageSeq, ID: rows[0].ID}
+	last := MessageCursorPoint{MessageSeq: rows[len(rows)-1].MessageSeq, ID: rows[len(rows)-1].ID}
 	switch {
 	case input.Before != nil:
 		if hasMore {

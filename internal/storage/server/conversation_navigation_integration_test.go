@@ -102,7 +102,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 	f.send(t, f.member, "自己的所有人消息", true)
 	last := f.send(t, f.owner, "普通消息", false)
 	queue, err := pending.Execute(ctx, f.member, f.groupID)
-	if err != nil || !slices.Equal(queue.MessageIDs, []string{first.ID, second.ID}) || queue.LastTargetSequence == nil || *queue.LastTargetSequence != *second.GroupMessageSequence {
+	if err != nil || !slices.Equal(queue.MessageIDs, []string{first.ID, second.ID}) || queue.LastTargetSequence == nil || *queue.LastTargetSequence != second.MessageSeq {
 		t.Fatalf("queue=%+v err=%v", queue, err)
 	}
 	if _, err := read.Execute(ctx, f.member, f.groupID, last.ID, false); err != nil {
@@ -131,7 +131,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, err = review.Execute(ctx, f.member, f.groupID, second.ID)
-	if err != nil || result.Outcome != "unavailable" || result.ReviewedThroughSequence != *first.GroupMessageSequence {
+	if err != nil || result.Outcome != "unavailable" || result.ReviewedThroughSequence != first.MessageSeq {
 		t.Fatalf("deleted review=%+v err=%v", result, err)
 	}
 	third := f.send(t, f.owner, "删除后继续", false, f.subjectID)
@@ -255,7 +255,7 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 		}
 	}
 	var sequences []int64
-	if err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Column("group_message_sequence").Where("conversation_id = ?", f.groupID).Order("group_message_sequence ASC").Scan(ctx, &sequences); err != nil {
+	if err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Column("message_seq").Where("conversation_id = ?", f.groupID).Order("message_seq ASC").Scan(ctx, &sequences); err != nil {
 		t.Fatal(err)
 	}
 	if len(sequences) != 78 {
@@ -271,7 +271,7 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID})
-	if err != nil || *latest.Messages[len(latest.Messages)-1].GroupMessageSequence != 78 {
+	if err != nil || latest.Messages[len(latest.Messages)-1].MessageSeq != 78 {
 		t.Fatalf("latest order err=%v", err)
 	}
 }
@@ -342,7 +342,7 @@ func TestGroupSequenceCommitBarrier(t *testing.T) {
 	}
 	release.Do(func() { close(barrier.release) })
 	first, second := <-firstDone, <-secondDone
-	if first.err != nil || second.err != nil || *first.message.GroupMessageSequence != 1 || *second.message.GroupMessageSequence != 2 {
+	if first.err != nil || second.err != nil || first.message.MessageSeq != 1 || second.message.MessageSeq != 2 {
 		t.Fatalf("commit order: %+v %+v", first, second)
 	}
 	// 两端同时确认同一条提醒，恰好一次推进且两次都成功。
@@ -416,11 +416,11 @@ func TestVisibleMentionsCanBeReviewedOutOfOrder(t *testing.T) {
 		t.Fatalf("sparse count=%+v err=%v", status, err)
 	}
 	result, err = review.Execute(ctx, f.member, f.groupID, first.ID)
-	if err != nil || result.ReviewedThroughSequence != *first.GroupMessageSequence {
+	if err != nil || result.ReviewedThroughSequence != first.MessageSeq {
 		t.Fatalf("first review=%+v err=%v", result, err)
 	}
 	result, err = review.Execute(ctx, f.member, f.groupID, second.ID)
-	if err != nil || result.ReviewedThroughSequence != *third.GroupMessageSequence {
+	if err != nil || result.ReviewedThroughSequence != third.MessageSeq {
 		t.Fatalf("merged review=%+v err=%v", result, err)
 	}
 	var receipts int
@@ -441,7 +441,7 @@ func TestVisibleMentionsCanBeReviewedOutOfOrder(t *testing.T) {
 	}
 	sixth := f.send(t, f.owner, "删除后继续确认", true)
 	result, err = review.Execute(ctx, f.member, f.groupID, sixth.ID)
-	if err != nil || result.ReviewedThroughSequence != *sixth.GroupMessageSequence {
+	if err != nil || result.ReviewedThroughSequence != sixth.MessageSeq {
 		t.Fatalf("deleted gap blocks review=%+v err=%v", result, err)
 	}
 	// 重新入群建立新基线，并清除上一轮尚未合并的单条记录。

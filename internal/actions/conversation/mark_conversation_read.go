@@ -19,6 +19,7 @@ import (
 
 // ConversationReadState 表示用户会话的已读水位。
 type ConversationReadState struct {
+	ReadSeq           int64
 	LastReadMessageID string
 	LastReadAt        time.Time
 }
@@ -95,7 +96,7 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		}
 		if err := tx.NewSelect().
 			TableExpr("conversation_user_states AS cus").
-			ColumnExpr("cus.last_read_message_id, cus.last_read_at").
+			ColumnExpr("cus.read_seq, cus.last_read_message_id, cus.last_read_at").
 			Where("cus.organization_id = ?", identity.Organization.ID).
 			Where("cus.conversation_id = ?", conversationID).
 			Where("cus.user_id = ?", identity.User.ID).
@@ -114,22 +115,15 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *servermodels.ConversationUserState, message *servermodels.Message) error {
 	readAt := time.Now().UTC()
 	state.LastReadAt = &readAt
-	orderCondition := bun.SafeQuery("(current_message.originated_at, current_message.source_order, current_message.id) < (?, ?, ?)", message.OriginatedAt, message.SourceOrder, message.ID)
-	if message.GroupMessageSequence != nil {
-		orderCondition = bun.SafeQuery("current_message.group_message_sequence < ?", *message.GroupMessageSequence)
-	}
+	state.ReadSeq = message.MessageSeq
 	if _, err := db.NewInsert().Model(state).
-		Column("organization_id", "conversation_id", "user_id", "last_read_message_id", "last_read_at").
+		Column("organization_id", "conversation_id", "user_id", "last_read_message_id", "last_read_at", "read_seq").
 		On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
 		Set("last_read_message_id = EXCLUDED.last_read_message_id").
+		Set("read_seq = EXCLUDED.read_seq").
 		Set("last_read_at = now()").
 		Set("updated_at = now()").
-		Where(`cus.last_read_message_id IS NULL OR EXISTS (
-			SELECT 1 FROM messages AS current_message
-			WHERE current_message.organization_id = cus.organization_id
-				AND current_message.conversation_id = cus.conversation_id
-				AND current_message.id = cus.last_read_message_id AND ?
-		)`, orderCondition).
+		Where("cus.read_seq < EXCLUDED.read_seq").
 		Exec(ctx); err != nil {
 		return fmt.Errorf("advance conversation user read state: %w", err)
 	}

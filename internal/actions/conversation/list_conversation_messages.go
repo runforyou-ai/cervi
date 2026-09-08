@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
@@ -36,7 +35,7 @@ type conversationMessageRow struct {
 	SystemEventType                *string                          `bun:"system_event_type"`
 	SystemEventPayload             json.RawMessage                  `bun:"system_event_payload"`
 	OriginatedAt                   time.Time                        `bun:"originated_at"`
-	GroupMessageSequence           *int64                           `bun:"group_message_sequence"`
+	MessageSeq                     int64                            `bun:"message_seq"`
 	SourceOrder                    int64                            `bun:"source_order"`
 	CreatedAt                      time.Time                        `bun:"created_at"`
 	SenderSubjectID                *string                          `bun:"sender_subject_id"`
@@ -76,17 +75,8 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		if err := authorizeConversationHistory(ctx, tx, identity, input.ConversationID); err != nil {
 			return err
 		}
-		var conversationType domain.ConversationType
-		if err := tx.NewSelect().TableExpr("conversations").Column("type").Where("organization_id = ? AND id = ?", identity.Organization.ID, input.ConversationID).Scan(ctx, &conversationType); err != nil {
-			return err
-		}
-		group := conversationType == domain.ConversationTypeGroup
-		for _, cursor := range []*MessageCursorPoint{input.Before, input.After} {
-			if cursor != nil && (cursor.GroupMessageSequence != nil) != group {
-				return &ValidationError{Fields: map[string]ValidationCode{"cursor": ValidationCursorInvalid}}
-			}
-		}
-		rows, err := loadConversationWindowRows(ctx, tx, identity, input, group)
+
+		rows, err := loadConversationWindowRows(ctx, tx, identity, input)
 		if err != nil {
 			return err
 		}
@@ -129,7 +119,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("msg.system_event_payload AS system_event_payload").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.source_order AS source_order").
-		ColumnExpr("msg.group_message_sequence AS group_message_sequence").
+		ColumnExpr("msg.message_seq AS message_seq").
 		ColumnExpr("msg.created_at AS created_at").
 		ColumnExpr("cs.id AS sender_subject_id").
 		ColumnExpr("cs.kind AS sender_kind").
@@ -170,20 +160,14 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Where("msg.deleted_at IS NULL")
 }
 
-// messageCursorCondition 根据游标类型构造时间线边界。
+// messageCursorCondition 按消息序号构造时间线边界。
 func messageCursorCondition(point MessageCursorPoint, operator string) schema.QueryWithArgs {
-	if point.GroupMessageSequence != nil {
-		return bun.SafeQuery("msg.group_message_sequence "+operator+" ?", *point.GroupMessageSequence)
-	}
-	return bun.SafeQuery("(msg.originated_at, msg.source_order, msg.id) "+operator+" (?, ?, ?)", point.OriginatedAt, point.SourceOrder, point.ID)
+	return bun.SafeQuery("msg.message_seq "+operator+" ?", point.MessageSeq)
 }
 
 // loadConversationWindowRows 按当前方向或目标读取连续消息行。
-func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input ConversationMessageHistoryInput, group bool) ([]conversationMessageRow, error) {
-	order := "msg.originated_at, msg.source_order, msg.id"
-	if group {
-		order = "msg.group_message_sequence"
-	}
+func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input ConversationMessageHistoryInput) ([]conversationMessageRow, error) {
+	order := "msg.message_seq"
 	var rows []conversationMessageRow
 	if input.AroundMessageID != "" {
 		var target conversationMessageRow
@@ -194,11 +178,8 @@ func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *serve
 		if err != nil {
 			return nil, err
 		}
-		point := MessageCursorPoint{ID: target.ID, OriginatedAt: target.OriginatedAt, SourceOrder: target.SourceOrder, GroupMessageSequence: target.GroupMessageSequence}
-		if group && target.GroupMessageSequence == nil {
-			return nil, ErrDataInvariant
-		}
-		if err := conversationMessagesQuery(db, identity, input.ConversationID).Where("?", messageCursorCondition(point, "<")).OrderExpr(orderDescending(order)).Limit(25).Scan(ctx, &rows); err != nil {
+		point := MessageCursorPoint{ID: target.ID, MessageSeq: target.MessageSeq}
+		if err := conversationMessagesQuery(db, identity, input.ConversationID).Where("?", messageCursorCondition(point, "<")).OrderExpr(order+" DESC").Limit(25).Scan(ctx, &rows); err != nil {
 			return nil, err
 		}
 		slices.Reverse(rows)
@@ -216,7 +197,7 @@ func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *serve
 	if input.After != nil {
 		query = query.Where("?", messageCursorCondition(*input.After, ">"))
 	} else {
-		order = orderDescending(order)
+		order = order + " DESC"
 	}
 	if err := query.OrderExpr(order).Limit(conversationMessagePageSize).Scan(ctx, &rows); err != nil {
 		return nil, err
@@ -224,19 +205,7 @@ func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *serve
 	if input.After == nil {
 		slices.Reverse(rows)
 	}
-	if group {
-		for _, row := range rows {
-			if row.GroupMessageSequence == nil {
-				return nil, ErrDataInvariant
-			}
-		}
-	}
 	return rows, nil
-}
-
-// orderDescending 将固定时间线排序列转换为倒序。
-func orderDescending(columns string) string {
-	return strings.ReplaceAll(columns, ", ", " DESC, ") + " DESC"
 }
 
 // authorizeConversationHistory 对不同会话类型应用各自的成员可见性规则。
@@ -310,7 +279,7 @@ func validateConversationMessageHistoryInput(input ConversationMessageHistoryInp
 		fields["cursor"] = ValidationCursorInvalid
 	}
 	for _, cursor := range []*MessageCursorPoint{input.Before, input.After} {
-		if cursor != nil && (!common.ValidUUID(cursor.ID) || (cursor.GroupMessageSequence == nil && (cursor.OriginatedAt.IsZero() || cursor.SourceOrder < 0)) || (cursor.GroupMessageSequence != nil && *cursor.GroupMessageSequence <= 0)) {
+		if cursor != nil && (!common.ValidUUID(cursor.ID) || cursor.MessageSeq <= 0) {
 			fields["cursor"] = ValidationCursorInvalid
 		}
 	}
@@ -323,7 +292,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	for _, row := range rows {
 		message := ConversationMessage{
 			ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
-			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, GroupMessageSequence: row.GroupMessageSequence,
+			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, MessageSeq: row.MessageSeq,
 		}
 		if message.Type == domain.MessageTypeSystem {
 			if row.SystemEventType == nil || len(row.SystemEventPayload) == 0 {
@@ -375,7 +344,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	}
 	first := rows[0]
 	last := rows[len(rows)-1]
-	result.Before = &MessageCursorPoint{OriginatedAt: first.OriginatedAt, SourceOrder: first.SourceOrder, ID: first.ID, GroupMessageSequence: first.GroupMessageSequence}
-	result.After = &MessageCursorPoint{OriginatedAt: last.OriginatedAt, SourceOrder: last.SourceOrder, ID: last.ID, GroupMessageSequence: last.GroupMessageSequence}
+	result.Before = &MessageCursorPoint{ID: first.ID, MessageSeq: first.MessageSeq}
+	result.After = &MessageCursorPoint{ID: last.ID, MessageSeq: last.MessageSeq}
 	return result, nil
 }

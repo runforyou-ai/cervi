@@ -294,7 +294,7 @@ func TestCustomerConversationDelayedMessage(t *testing.T) {
 			if err := f.db.NewSelect().Model(&earlier).Where("msg.id = ?", earlierID).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
-			history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.conversationID, After: &conversationaction.MessageCursorPoint{ID: earlier.ID, OriginatedAt: earlier.OriginatedAt, SourceOrder: earlier.SourceOrder}})
+			history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.conversationID, After: &conversationaction.MessageCursorPoint{ID: earlier.ID, MessageSeq: earlier.MessageSeq}})
 			if err != nil || len(history.Messages) != 1 {
 				t.Fatalf("late commit missing from after: %+v %v", history, err)
 			}

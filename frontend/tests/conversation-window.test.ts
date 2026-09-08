@@ -13,12 +13,12 @@ import type {
 /** 构造具有真实传输字段的消息。 */
 function message(
   id: string,
-  sequence: string | null,
+  sequence: string,
   originatedAt = "2026-09-05T00:00:00Z",
 ): ConversationMessageData {
   return {
     id,
-    groupMessageSequence: sequence,
+    messageSeq: sequence,
     originatedAt,
     sourceOrder: 0,
   } as ConversationMessageData
@@ -40,14 +40,14 @@ function page(
   }
 }
 
-test("群聊使用超过 JavaScript 安全整数的服务端序号", () => {
+test("所有会话使用超过 JavaScript 安全整数的服务端序号", () => {
   const first = message("z", "9007199254740992", "2026-09-06T00:00:00Z")
   const second = message("a", "9007199254740993", "2026-09-05T00:00:00Z")
   assert.equal(compareConversationMessages(first, second), -1)
 })
 
 test("没有新消息的页面仍更新运行终态并保留既有消息", () => {
-  const current = page([message("reply", null)], false, false)
+  const current = page([message("reply", "1")], false, false)
   const incoming = page([], false, false)
   incoming.latestAgentRun = {
     id: "run", agentName: "AI 助手", status: "cancelled", errorCode: "session_closed", lastError: "session closed",
@@ -58,20 +58,11 @@ test("没有新消息的页面仍更新运行终态并保留既有消息", () =>
   assert.equal(merged.after, current.after)
 })
 
-test("单聊和客服保留微秒时间、来源序号和 ID 的排序", () => {
-  const first = message("z", null, "2026-09-05T00:00:00.123001Z")
-  const second = message("a", null, "2026-09-05T00:00:00.123002Z")
-  assert.ok(compareConversationMessages(first, second) < 0)
-  assert.ok(
-    compareConversationMessages(
-      { ...first, sourceOrder: 1 },
-      { ...first, sourceOrder: 2 },
-    ) < 0,
-  )
-  assert.ok(
-    compareConversationMessages({ ...first, id: "a" }, { ...first, id: "b" }) <
-      0,
-  )
+test("消息排序忽略来源时间、来源编号和 UUID", () => {
+  const first = message("z", "1", "2026-09-06T00:00:00Z")
+  const second = message("a", "2", "2026-09-05T00:00:00Z")
+  assert.equal(compareConversationMessages(first, second), -1)
+  assert.equal(compareConversationMessages({ ...first, sourceOrder: 100 }, second), -1)
 })
 
 test("历史页前插与后续页追加各自保留另一端边界", () => {
@@ -120,10 +111,10 @@ test("空轮询不会清掉端点，重复页不会重复消息", () => {
 
 
 test("失败消息沿用消息分页并在新一轮消息后保留", () => {
-  const question = message("question", null, "2026-09-05T00:00:00Z")
-  const failure = { ...message("failure", null, "2026-09-05T00:00:01Z"), type: "agent_error", body: "", sender: { sourceId: "agent", identityType: "agent", avatarUrl: "/avatar" } } as ConversationMessageData
+  const question = message("question", "1", "2026-09-05T00:00:00Z")
+  const failure = { ...message("failure", "2", "2026-09-05T00:00:01Z"), type: "agent_error", body: "", sender: { sourceId: "agent", identityType: "agent", avatarUrl: "/avatar" } } as ConversationMessageData
   const first = mergeConversationPage(page([question], false, false), page([failure], false, false), "after")
-  const next = mergeConversationPage(first, page([message("next", null, "2026-09-05T00:00:02Z")], false, false), "after")
+  const next = mergeConversationPage(first, page([message("next", "3", "2026-09-05T00:00:02Z")], false, false), "after")
   assert.deepEqual(next.messages.map((row) => row.id), ["question", "failure", "next"])
   assert.equal(next.messages[1].sender?.avatarUrl, "/avatar")
   assert.deepEqual(mergeConversationPage(next, page([failure]), "before").messages, next.messages)

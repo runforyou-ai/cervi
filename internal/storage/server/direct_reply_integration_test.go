@@ -80,9 +80,7 @@ func TestDirectReplyBoundaries(t *testing.T) {
 	otherConversation := f.send(t, f.owner, "同企业群消息", false)
 	otherOrganization := foreign.send(t, foreign.owner, "其他企业消息", false)
 	system := &servermodels.Message{OrganizationID: f.owner.Organization.ID, ConversationID: first.Conversation.ID, Type: "system", Body: "系统事件", OriginatedAt: time.Now().UTC()}
-	if _, err := f.db.NewInsert().Model(system).Column("organization_id", "conversation_id", "type", "body", "originated_at").Returning("id").Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
+	appendTestMessage(t, f.db, system)
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", first.Message.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

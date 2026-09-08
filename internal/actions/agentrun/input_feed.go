@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
-	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -239,9 +238,7 @@ func assignAgentTriggers(ctx context.Context, db bun.IDB, run *servermodels.Agen
 }
 
 type messageBoundary struct {
-	OriginatedAt time.Time `bun:"originated_at"`
-	SourceOrder  int64     `bun:"source_order"`
-	ID           string    `bun:"id"`
+	MessageSeq int64 `bun:"message_seq"`
 }
 
 // loadClaimedMessageBoundary 读取一次已认领输入对应的稳定消息边界。
@@ -252,7 +249,7 @@ func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermode
 	}
 	boundary := messageBoundary{}
 	query := db.NewSelect().TableExpr("conversation_agent_triggers AS cat").
-		ColumnExpr("msg.originated_at, msg.source_order, msg.id").
+		ColumnExpr("msg.message_seq").
 		Join("JOIN messages AS msg ON msg.id = cat.trigger_message_id AND msg.organization_id = cat.organization_id AND msg.conversation_id = cat.conversation_id").
 		Where("cat.organization_id = ?", run.OrganizationID).
 		Where("cat.conversation_id = ?", run.ConversationID).
@@ -309,8 +306,8 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		Where("msg.conversation_id = ?", run.ConversationID).
 		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL").
-		Where("(msg.originated_at, msg.source_order, msg.id) <= (?, ?, ?)", boundary.OriginatedAt, boundary.SourceOrder, boundary.ID).
-		OrderExpr("msg.originated_at DESC, msg.source_order DESC, msg.id DESC").
+		Where("msg.message_seq <= ?", boundary.MessageSeq).
+		OrderExpr("msg.message_seq DESC").
 		Limit(agentHistoryLimit).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("load claimed conversation context: %w", err)

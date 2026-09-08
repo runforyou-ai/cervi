@@ -51,7 +51,7 @@ func TestChatMessageAppendReplay(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if inserted || message.ID != first.ID || !message.CreatedAt.Equal(first.CreatedAt) || message.GroupMessageSequence == nil || *message.GroupMessageSequence != *first.GroupMessageSequence {
+		if inserted || message.ID != first.ID || !message.CreatedAt.Equal(first.CreatedAt) || message.MessageSeq != first.MessageSeq {
 			t.Fatalf("replayed message=%+v inserted=%v", message, inserted)
 		}
 		return nil
@@ -63,7 +63,7 @@ func TestChatMessageAppendReplay(t *testing.T) {
 	if err := f.db.NewSelect().Model(after).WherePK().Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if after.LastMessageID == nil || *after.LastMessageID != latest.ID || after.LastGroupMessageSequence != before.LastGroupMessageSequence || !after.UpdatedAt.Equal(before.UpdatedAt) {
+	if after.LastMessageID == nil || *after.LastMessageID != latest.ID || after.LastMessageSeq != before.LastMessageSeq || !after.UpdatedAt.Equal(before.UpdatedAt) {
 		t.Fatalf("replay changed summary: before=%+v after=%+v", before, after)
 	}
 	if count, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", f.groupID).Count(ctx); err != nil || count != 2 {
@@ -93,7 +93,7 @@ func TestChatMessageAppendRollback(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if !inserted || message.CreatedAt.IsZero() || message.GroupMessageSequence == nil || *message.GroupMessageSequence != *before.GroupMessageSequence+1 {
+		if !inserted || message.CreatedAt.IsZero() || message.MessageSeq != before.MessageSeq+1 {
 			t.Fatalf("appended message=%+v inserted=%v", message, inserted)
 		}
 		var lastID string
@@ -115,17 +115,17 @@ func TestChatMessageAppendRollback(t *testing.T) {
 	if err := f.db.NewSelect().Model(&cv).Where("id = ?", f.groupID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if cv.LastMessageID == nil || *cv.LastMessageID != before.ID || cv.LastGroupMessageSequence != *before.GroupMessageSequence {
+	if cv.LastMessageID == nil || *cv.LastMessageID != before.ID || cv.LastMessageSeq != before.MessageSeq {
 		t.Fatalf("summary survived rollback: %+v", cv)
 	}
 	next := f.send(t, f.owner, "回滚后的消息", false)
-	if *next.GroupMessageSequence != *before.GroupMessageSequence+1 {
+	if next.MessageSeq != before.MessageSeq+1 {
 		t.Fatalf("allocator did not roll back: %+v", next)
 	}
 }
 
-// TestTelegramAppendKeepsSourceOrder 验证晚到渠道消息保留来源时间，且不回退现有会话和周期摘要。
-func TestTelegramAppendKeepsSourceOrder(t *testing.T) {
+// TestTelegramAppendUsesLocalSequence 验证晚到渠道消息保留来源时间，并按本地顺序推进会话和周期摘要。
+func TestTelegramAppendUsesLocalSequence(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	before := &servermodels.Conversation{ID: f.conversationID}
@@ -152,8 +152,8 @@ func TestTelegramAppendKeepsSourceOrder(t *testing.T) {
 	if err := f.db.NewSelect().Model(after).WherePK().Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if after.LastMessageID == nil || *after.LastMessageID != *before.LastMessageID || !after.UpdatedAt.Equal(before.UpdatedAt) {
-		t.Fatalf("late message changed summary: before=%+v after=%+v", before, after)
+	if after.LastMessageID == nil || *after.LastMessageID != messages[0].ID || after.LastMessageSeq != before.LastMessageSeq+1 || messages[0].MessageSeq != after.LastMessageSeq {
+		t.Fatalf("late message did not advance summary: before=%+v after=%+v", before, after)
 	}
 	assertCustomerLockSummary(t, ctx, f.db, f.conversationID)
 }
@@ -208,7 +208,7 @@ func TestGroupSystemMessageSummary(t *testing.T) {
 		}
 	}
 	var messages []servermodels.Message
-	if err := f.db.NewSelect().Model(&messages).Where("conversation_id = ?", f.groupID).OrderExpr("group_message_sequence").Scan(ctx); err != nil {
+	if err := f.db.NewSelect().Model(&messages).Where("conversation_id = ?", f.groupID).OrderExpr("message_seq").Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if len(messages) != 2 || messages[1].Type != string(domain.MessageTypeSystem) || messages[1].SystemEventType == nil || *messages[1].SystemEventType != string(domain.ConversationSystemEventGroupRenamed) {
@@ -218,7 +218,24 @@ func TestGroupSystemMessageSummary(t *testing.T) {
 	if err := f.db.NewSelect().Model(&cv).Where("id = ?", f.groupID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if cv.LastMessageID == nil || *cv.LastMessageID != messages[1].ID || cv.LastGroupMessageSequence != *first.GroupMessageSequence+1 {
+	if cv.LastMessageID == nil || *cv.LastMessageID != messages[1].ID || cv.LastMessageSeq != first.MessageSeq+1 {
 		t.Fatalf("system summary=%+v", cv)
+	}
+}
+
+// appendTestMessage 在会话锁内通过共用追加入口创建引用边界夹具。
+func appendTestMessage(t *testing.T, db *bun.DB, message *servermodels.Message) {
+	t.Helper()
+	message.ID = uuid.NewV7().String()
+	err := db.RunInTx(context.Background(), nil, func(ctx context.Context, tx bun.Tx) error {
+		cv := &servermodels.Conversation{ID: message.ConversationID}
+		if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
+			return err
+		}
+		_, _, err := chatstate.AppendMessage(ctx, tx, cv, message)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
