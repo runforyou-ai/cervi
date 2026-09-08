@@ -173,12 +173,19 @@ func TestCustomerCallbacksFenceTaskAttempts(t *testing.T) {
 	run := seedAgentExecution(t, ctx, db)
 	sessionID, identityID := uuid.NewV7().String(), uuid.NewV7().String()
 	t.Cleanup(func() {
-		for _, table := range []string{"service_sessions", "customer_conversations"} {
+		for _, table := range []string{"service_sessions", "customer_conversations", "contact_channel_identities", "channels"} {
 			if _, err := db.NewDelete().TableExpr(table).Where("organization_id = ?", run.OrganizationID).Exec(context.Background()); err != nil {
 				t.Error(err)
 			}
 		}
 	})
+	channelID := uuid.NewV7().String()
+	if _, err := db.ExecContext(ctx, "INSERT INTO channels (id, organization_id, created_by_user_id, type, name) VALUES (?, ?, ?, 'website', '客服任务围栏')", channelID, run.OrganizationID, uuid.NewV7().String()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO contact_channel_identities (id, organization_id, contact_id, channel_id, external_id) VALUES (?, ?, ?, ?, 'test-visitor')", identityID, run.OrganizationID, uuid.NewV7().String(), channelID); err != nil {
+		t.Fatal(err)
+	}
 	// 已关闭周期使有效最终回调只收敛取消，不需要外部模型或执行配置。
 	if _, err := db.ExecContext(ctx, "UPDATE conversations SET type = 'customer' WHERE id = ?", run.ConversationID); err != nil {
 		t.Fatal(err)

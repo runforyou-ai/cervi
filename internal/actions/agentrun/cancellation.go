@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -24,6 +25,11 @@ type runningAgentRun struct {
 
 // CancelForServiceSession 在客服事务内取消原负责人尚未结束的运行。
 func (a *ExecuteAction) CancelForServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
+	return cancelServiceSessionRuns(ctx, db, organizationID, conversationID, agentIdentityID, reason)
+}
+
+// cancelServiceSessionRuns 取消客服负责人的在途运行并推进已提交输入水位。
+func cancelServiceSessionRuns(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
 	agent, err := db.NewSelect().Model((*servermodels.Agent)(nil)).
 		Where("a.organization_id = ?", organizationID).
 		Where("a.identity_id = ?", agentIdentityID).
@@ -66,6 +72,33 @@ func (a *ExecuteAction) CancelForServiceSession(ctx context.Context, db bun.IDB,
 		}
 	}
 	return runIDs, nil
+}
+
+// CancelTelegramChannelRuns 在机器人更换事务中取消旧渠道输入，调用方已锁定渠道和连接设置。
+func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, channelID string) (int, error) {
+	cancelled := 0
+	var conversationIDs []string
+	if err := db.NewSelect().TableExpr("customer_conversations AS cc").
+		ColumnExpr("cc.conversation_id").
+		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+		Where("cc.organization_id = ? AND cci.channel_id = ?", organizationID, channelID).
+		OrderExpr("cc.conversation_id").Scan(ctx, &conversationIDs); err != nil {
+		return 0, err
+	}
+	for _, conversationID := range conversationIDs {
+		session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
+		if err != nil {
+			return 0, err
+		}
+		if session.AssigneeIdentityID != nil {
+			runIDs, err := cancelServiceSessionRuns(ctx, db, organizationID, conversationID, *session.AssigneeIdentityID, domain.AgentRunErrorCodeBotChanged)
+			if err != nil {
+				return 0, err
+			}
+			cancelled += len(runIDs)
+		}
+	}
+	return cancelled, nil
 }
 
 // CancelRunContexts 尽力取消本进程中正在执行的模型调用。

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/actions/channelstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -67,6 +68,7 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 			var oldBotUsedByOtherChannel bool
 			var enabled bool
 			var secret string
+			var cancelledRuns int
 			err := conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 				if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 					return err
@@ -101,6 +103,10 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 				oldToken = optionalStringValue(setting.BotToken)
 				oldBotID = setting.BotID
 				if oldBotID != nil && *oldBotID != bot.ID {
+					cancelledRuns, err = agentrun.CancelTelegramChannelRuns(ctx, tx, identity.Organization.ID, channelID)
+					if err != nil {
+						return err
+					}
 					// 更换机器人终止尚未发出的旧机器人消息，重新切回也不会恢复旧队列。
 					if _, err := tx.ExecContext(ctx, "UPDATE customer_message_deliveries SET status = 'failed', last_error = 'bot_changed', updated_at = now() WHERE channel_id = ? AND organization_id = ? AND status IN ('pending', 'retry_wait')", channelID, identity.Organization.ID); err != nil {
 						return err
@@ -143,6 +149,10 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 			})
 			if err != nil {
 				return err
+			}
+
+			if cancelledRuns > 0 {
+				slog.Info("Telegram 更换机器人后取消客服运行", "organization_id", identity.Organization.ID, "channel_id", channelID, "cancelled_run_count", cancelledRuns, "reason", domain.AgentRunErrorCodeBotChanged)
 			}
 
 			if oldBotID != nil && *oldBotID != bot.ID && oldToken != "" && !oldBotUsedByOtherChannel {

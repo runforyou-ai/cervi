@@ -185,6 +185,7 @@ export function ChannelReceptionSettingsFields<
   const assignees = (options?.assignees ?? []).filter(
     (assignee) =>
       channelType === ChannelType.ChannelTypeWebsite ||
+      channelType === ChannelType.ChannelTypeTelegram ||
       assignee.type !==
         OrganizationIdentityType.OrganizationIdentityTypeAgent,
   )

@@ -204,7 +204,9 @@ export function AgentRunState({ run, incoming, conversationID, onStopped }: { ru
     ? t("agentRunAssigneeChanged")
     : run.errorCode === "session_closed"
       ? t("agentRunSessionClosed")
-      : run.lastError
+      : run.errorCode === "bot_changed"
+        ? t("agentRunBotChanged")
+        : run.lastError
   return (
     <div
       className={cn("mt-3 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}

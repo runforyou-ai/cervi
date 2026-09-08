@@ -106,6 +106,7 @@ export function ConversationHeader({
     (assignee) =>
       assignee.identityId !== currentIdentityId &&
       (customer?.channelType === ChannelType.ChannelTypeWebsite ||
+        customer?.channelType === ChannelType.ChannelTypeTelegram ||
         assignee.type !==
           OrganizationIdentityType.OrganizationIdentityTypeAgent),
   )

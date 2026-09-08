@@ -20,7 +20,7 @@ type customerAgentEligibility struct {
 	RevisionID string `bun:"revision_id"`
 }
 
-// ScheduleCustomerAuto 把一条网站客户消息追加到当前 AI 客服的持久输入流。
+// ScheduleCustomerAuto 把一条客户消息追加到当前 AI 客服的持久输入流。
 func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID, messageID string) (bool, error) {
 	if s == nil || s.enqueuer == nil {
 		return false, errors.New("agent run scheduler is unavailable")
@@ -54,7 +54,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 		return false, err
 	}
 	if !eligible {
-		slog.Warn("网站客户会话负责人不满足 Agent 执行资格",
+		slog.Warn("客户会话负责人不满足 Agent 执行资格",
 			"organization_id", organizationID,
 			"conversation_id", conversationID,
 			"service_session_id", serviceSessionID,
@@ -109,7 +109,7 @@ func customerTriggerMessageMatches(ctx context.Context, db bun.IDB, session *ser
 	return matched, nil
 }
 
-// loadCustomerAgentEligibility 校验当前负责人及指定运行 Revision 可以执行网站客服会话。
+// loadCustomerAgentEligibility 校验当前负责人及指定运行 Revision 可以执行渠道客服会话。
 func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, runRevisionID string) (customerAgentEligibility, bool, error) {
 	if session.AssigneeIdentityID == nil {
 		return customerAgentEligibility{}, false, nil
@@ -120,7 +120,9 @@ func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *serv
 		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id AND r.kind = ?", domain.RoleKindCustomerService).
 		Join("JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id AND a.status = ?", domain.UserStatusActive).
 		Join("JOIN contact_channel_identities AS cci ON cci.id = ? AND cci.organization_id = oi.organization_id", session.ContactChannelIdentityID).
-		Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id AND c.type = ?", domain.ChannelTypeWebsite).
+		Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
+		Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = c.id AND tcs.organization_id = c.organization_id").
+		Where("c.type = ? OR (c.type = ? AND tcs.bot_id IS NOT NULL)", domain.ChannelTypeWebsite, domain.ChannelTypeTelegram).
 		Where("oi.organization_id = ?", session.OrganizationID).
 		Where("oi.id = ?", *session.AssigneeIdentityID).
 		Where("oi.type = ?", domain.OrganizationIdentityTypeAgent)

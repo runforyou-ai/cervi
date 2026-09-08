@@ -26,4 +26,5 @@ const (
 	AgentRunErrorCodeAssigneeChanged AgentRunErrorCode = "assignee_changed"
 	AgentRunErrorCodeSessionClosed   AgentRunErrorCode = "session_closed"
 	AgentRunErrorCodeUserCancelled   AgentRunErrorCode = "user_cancelled"
+	AgentRunErrorCodeBotChanged      AgentRunErrorCode = "bot_changed"
 )

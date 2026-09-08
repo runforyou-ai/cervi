@@ -27,12 +27,12 @@
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；`direct_conversations` 已用企业内规范身份对唯一约束收敛首发，Agent 复用同一 ChatSubject、Participant 和 Message 路径。
-- Telegram Bot 私聊文本入站已共用客户文本事务；Telegram 外发和 Agent 响应尚未实现，网站 AI 客服不依赖它们。
+- Telegram Bot 私聊文本双向收发已接入客户会话；AI 客服复用 customer_auto 运行，成功文本与持久投递同事务提交。接管前未提交的结果被抑制，已提交投递继续发送；更换 Bot 取消旧在途运行。
 - Agent 任务使用独立 Worker 队列。本阶段已精确锁定 Eino v0.10 Alpha，通过 eino-ext 接入 OpenAI 兼容模型，并以纯函数计算器验证 Tool 与 TurnLoop 安全点补入。
-- `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊与网站客服自动触发、单在途 Run、成功或失败水位及最终消息幂等。
+- `conversation_agent_states`、`conversation_agent_triggers` 和最小 `agent_runs` 已支持 Agent 单聊与网站、Telegram 客服自动触发、单在途 Run、成功或失败水位及最终消息幂等。
 - `agent_run_blocks` 保存成功 Run 的有序中间内容；运行中使用按尝试隔离的内存快照，工具普通错误反馈给模型以便修正。
 - 成员消息时间线可展开成功回复的思考和工具详情，显示输入、输出用量及最近运行状态；完整过程随消息查询返回。
-- `search_knowledge` 已支持多知识库、多查询融合和游标读取；单聊和网站客服均使用 Run 绑定的 Revision 所配置的知识库范围，空范围不注册检索 Tool。
+- `search_knowledge` 已支持多知识库、多查询融合和游标读取；单聊、网站和 Telegram 客服均使用 Run 绑定的 Revision 所配置的知识库范围，空范围不注册检索 Tool。
 - Web 端 Bearer Token 保存在 `localStorage`；桌面端和移动端由 Go `clientsession` 持久化当前凭据，API Proxy 调用时注入 Bearer Token。
 - 文件模块已有临时上传、激活、过期清理、本地存储和对象存储路径。
 
@@ -966,3 +966,11 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 停止事务沿 Conversation、Participant、AgentState、Run 的锁序，将停止时已提交的连续 Trigger 绑定到该 Run、推进实际 trigger_end_seq 和 processed_seq，并将 Run 置为 cancelled（user_cancelled）。同事务写入空正文的 agent_cancelled 消息，以 agent:<runId> 幂等键和 response_message_id 关联。提交后尽力取消本进程的模型调用，迟到结果和任务重放按持久终态收敛；停止后提交的新消息开启新 Run。
 
 成员时间线以 Agent 身份显示灰色「已停止回复」，列表显示相同摘要，不再重复展示该 Run 的取消状态。停止消息不进入模型上下文或引用，未完成正文、思考与工具过程不持久化。客服因接管、转交或关闭取消仍沿用原语义，不新增停止消息。禁用后保留会话及统一禁用确认交互由聊天 PR00 实施。
+
+## Telegram AI 客服文本接待
+
+Telegram 私聊文本复用网站客服的负责人、Revision、知识库范围、连续 Trigger 和 customer_auto 执行。只有首次落库的客户消息追加 Trigger；渠道接待配置与人工转交均允许同企业有效 AI 客服。
+
+成功回复、Run 终态、消费水位、Telegram 投递及任务唤醒在同一事务提交。Telegram 执行各阶段先取得渠道共享锁和渠道身份锁，再按 Conversation → CustomerConversation → ServiceSession → AgentState → Run → Task 锁序处理；网络发送交由现有投递 Worker。失败仅保存内部 agent_error 消息，不创建外部投递。
+
+人工接管、转交或关闭先提交时，未提交回答按现有资格守卫被抑制；已经提交的回答按原投递记录继续发送。停用渠道暂停投递，恢复后继续。更换 Bot 时，在渠道及连接设置锁内按会话编号锁定客户会话，取消旧客服 Run 并推进已提交输入水位，随后终止旧机器人的待发送投递；重新切回旧 Bot 不恢复已取消运行。同一 Bot 更换 Token 不取消运行。

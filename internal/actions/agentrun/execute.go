@@ -380,7 +380,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	}
 	if suppressed && execution.Run.ServiceSessionID != nil {
 		// 记录客服门禁抑制的迟到结果。
-		slog.Warn("网站客户 Agent 迟到结果已抑制",
+		slog.Warn("客户 Agent 迟到结果已抑制",
 			"agent_run_id", execution.Run.ID,
 			"conversation_id", execution.Run.ConversationID,
 		)
@@ -396,7 +396,7 @@ func logCompletedRun(execution executionContext, endSeq int64, messageID string)
 	if execution.Run.ServiceSessionID == nil {
 		return
 	}
-	slog.Info("网站客户 Agent 运行完成",
+	slog.Info("客户 Agent 运行完成",
 		"agent_run_id", execution.Run.ID,
 		"conversation_id", execution.Run.ConversationID,
 		"service_session_id", *execution.Run.ServiceSessionID,

@@ -11,6 +11,7 @@ import (
 	"slices"
 	"time"
 
+	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -24,6 +25,7 @@ var errAgentRunSuppressed = errors.New("agent run suppressed")
 type agentRunPolicyContext struct {
 	ServiceSession     *servermodels.ServiceSession
 	AgentParticipantID string
+	DeliveryRoute      deliveryaction.Route
 }
 
 type agentRunPolicy interface {
@@ -142,7 +144,7 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 		return agentruntime.ClaimedInput{}, errAgentRunSuppressed
 	}
 	if scope.TriggerType == domain.AgentTriggerTypeCustomerAuto {
-		slog.Info("网站客户 Agent 输入已认领",
+		slog.Info("客户 Agent 输入已认领",
 			"agent_run_id", f.execution.Run.ID,
 			"conversation_id", f.execution.Run.ConversationID,
 			"service_session_id", *scope.ServiceSessionID,

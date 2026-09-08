@@ -93,7 +93,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		}
 		return domain.FileStorageBackendLocal, nil
 	}, serverfilecontent.NewWriter(localFiles, resolveFileS3))
-	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), telegramAPI, telegramAvatarFiles)
+	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, telegramAPI, telegramAvatarFiles)
 	httpAPI := api.NewService(
 		boundService,
 		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),

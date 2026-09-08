@@ -169,6 +169,7 @@ const inbox = {
   agentRunCancelled: "Interrupted",
   agentRunAssigneeChanged: "Conversation reassigned",
   agentRunSessionClosed: "Conversation closed",
+  agentRunBotChanged: "Bot replaced",
   agentThoughtRunning: "Thinking",
   agentThoughtCompleted: "Thought for {{seconds}}s",
   agentToolQueued: "Queued",

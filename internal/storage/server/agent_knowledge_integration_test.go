@@ -9,12 +9,14 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
@@ -39,7 +41,7 @@ func (testKnowledgeBackend) Retrieve(_ context.Context, _ connector.DifyKnowledg
 	return []connector.DifyKnowledgeRetrievalRecord{{DocumentID: "document", SegmentID: dataset, Position: 1, Content: dataset}}, nil
 }
 
-// testAgentKnowledgeScopes 验证两个入口的版本冻结、企业隔离和失效绑定恢复。
+// testAgentKnowledgeScopes 验证单聊和客服入口的版本冻结、企业隔离和失效绑定恢复。
 func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
 	t.Helper()
 	ctx := context.Background()
@@ -83,20 +85,19 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
+	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, func(context.Context, deliveryaction.Input) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	for _, website := range []bool{false, true} {
-		name := "单聊"
-		if website {
-			name = "网站客服"
-		}
-		t.Run(name, func(t *testing.T) {
-			testAgentKnowledgeRuns(t, db, identity, roleID, providerID, modelID, bases, tasks, scheduler, searchService, website)
+	for _, channelType := range []domain.ChannelType{"", domain.ChannelTypeWebsite, domain.ChannelTypeTelegram} {
+		t.Run("入口_"+string(channelType), func(t *testing.T) {
+			testAgentKnowledgeRuns(t, db, identity, roleID, providerID, modelID, bases, tasks, scheduler, searchService, channelType)
 		})
 	}
 }
 
 // testAgentKnowledgeRuns 验证一个会话入口在切换配置与删除知识库后的运行行为。
-func testAgentKnowledgeRuns(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string, bases []servermodels.KnowledgeBase, tasks *servertask.Runtime, scheduler *agentrunaction.Scheduler, searchService *knowledgeaction.SearchService, website bool) {
+func testAgentKnowledgeRuns(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string, bases []servermodels.KnowledgeBase, tasks *servertask.Runtime, scheduler *agentrunaction.Scheduler, searchService *knowledgeaction.SearchService, channelType domain.ChannelType) {
 	t.Helper()
 	ctx := context.Background()
 	input := agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
@@ -120,9 +121,9 @@ func testAgentKnowledgeRuns(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		t.Fatalf("foreign create error = %v", err)
 	}
 	var conversationID, channelID string
-	if website {
+	if channelType != "" {
 		channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
-			Type: domain.ChannelTypeWebsite, Name: "知识测试网站", DefaultLocale: domain.LocaleChineseSimplified,
+			Type: channelType, Name: "知识测试渠道", DefaultLocale: domain.LocaleChineseSimplified,
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: created.IdentityID},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
@@ -130,11 +131,26 @@ func testAgentKnowledgeRuns(t *testing.T, db *bun.DB, identity *servermodels.Ide
 			t.Fatal(err)
 		}
 		channelID = channel.ID
+		if channelType == domain.ChannelTypeTelegram {
+			if _, err := db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = ?, bot_token = '123:token', webhook_secret = 'knowledge-secret' WHERE channel_id = ?", time.Now().UnixNano(), channelID); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
+	var telegramMessageID int64
 	// 通过真实消息入口创建每个 Run。
 	send := func() *servermodels.AgentRun {
 		t.Helper()
-		if website {
+		if channelType == domain.ChannelTypeTelegram {
+			telegramMessageID++
+			receiver := channelaction.NewReceiveTelegramWebhookAction(db, scheduler, nil, nil)
+			if err := receiver.Execute(ctx, channelID, channelaction.TelegramWebhookInput{Secret: "knowledge-secret", UpdateID: telegramMessageID, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: telegramMessageID, DisplayName: "知识客户", Body: "查询知识", OriginatedAt: time.Now().UTC()}}); err != nil {
+				t.Fatal(err)
+			}
+			if err := db.NewSelect().TableExpr("customer_conversations AS cc").ColumnExpr("cc.conversation_id").Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id").Where("cci.channel_id = ?", channelID).Scan(ctx, &conversationID); err != nil {
+				t.Fatal(err)
+			}
+		} else if channelType == domain.ChannelTypeWebsite {
 			var previous *string
 			if conversationID != "" {
 				previous = &conversationID

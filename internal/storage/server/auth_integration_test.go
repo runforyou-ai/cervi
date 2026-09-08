@@ -430,7 +430,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 			return domain.FileStorageBackendLocal, nil
 		}, importedAvatarWriter)
-		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, telegramAvatarAPI, telegramAvatarFiles)
+		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(servertask.New(db, serverconfig.NATSConfig{})), telegramAvatarAPI, telegramAvatarFiles)
 		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
 		}
@@ -1631,8 +1631,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.IdentityID},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
-		var telegramRouteValidation *channelaction.ValidationError
-		if !errors.As(err, &telegramRouteValidation) || telegramRouteValidation.Fields["newConversationTarget"] != channelaction.ValidationRoutingTargetInvalid {
+		if err != nil {
 			t.Fatalf("Telegram agent route error = %#v", err)
 		}
 
@@ -1653,8 +1652,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		_, err = transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
 			ConversationID: telegramConversationID, AssigneeIdentityID: createdAgent.IdentityID,
 		})
-		var telegramTransferValidation *conversationaction.ValidationError
-		if !errors.As(err, &telegramTransferValidation) || telegramTransferValidation.Fields["assigneeIdentityId"] != conversationaction.ValidationTargetIdentityIDInvalid {
+		if err != nil {
 			t.Fatalf("Telegram agent transfer error = %#v", err)
 		}
 		channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
@@ -2289,6 +2287,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		t.Run("Agent 客服引用", func(t *testing.T) {
 			testAgentCustomerReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
+		t.Run("Telegram AI 客服", func(t *testing.T) {
+			testAgentTelegramReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 知识库范围", func(t *testing.T) {
