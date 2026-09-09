@@ -18,6 +18,7 @@ export function useIntegrationDeletion<T extends { id: string }>({
   entityName,
   successMessage,
   errorMessage,
+  relatedKeys = [],
 }: {
   deleteItem: (id: string) => Promise<unknown>
   listKey: QueryKey
@@ -25,6 +26,7 @@ export function useIntegrationDeletion<T extends { id: string }>({
   entityName: string
   successMessage: string
   errorMessage: string
+  relatedKeys?: QueryKey[]
 }) {
   const [item, setItem] = useState<T | null>(null)
   const save = useImmediateSave()
@@ -40,6 +42,7 @@ export function useIntegrationDeletion<T extends { id: string }>({
       await deleteItem(item.id)
       void invalidate(listKey)
       void invalidate(detailKey(item.id))
+      for (const key of relatedKeys) void invalidate(key)
       console.info(`${entityName}已删除`, { id: item.id })
       if (!save.isCurrent(request)) return
       setItem(null)

@@ -98,6 +98,7 @@ type DirectBackend struct {
 	updateMessageChannelStatus        *channelaction.UpdateMessageChannelStatusAction
 	listChannelOptions                *channelaction.ListChannelOptionsQuery
 	listMemberOptions                 *memberaction.ListOptionsQuery
+	listAgentMCPServerOptions         *agentaction.ListMCPServerOptionsQuery
 	listAgentModelOptions             *agentaction.ListModelOptionsQuery
 	createAgent                       *agentaction.CreateAgentAction
 	listAgents                        *agentaction.ListAgentsQuery
@@ -237,6 +238,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		updateMessageChannelStatus:        channelaction.NewUpdateMessageChannelStatusAction(db),
 		listChannelOptions:                channelaction.NewListChannelOptionsQuery(db),
 		listMemberOptions:                 memberaction.NewListOptionsQuery(db),
+		listAgentMCPServerOptions:         agentaction.NewListMCPServerOptionsQuery(db),
 		listAgentModelOptions:             agentaction.NewListModelOptionsQuery(db),
 		createAgent:                       agentaction.NewCreateAgentAction(db),
 		listAgents:                        agentaction.NewListAgentsQuery(db),

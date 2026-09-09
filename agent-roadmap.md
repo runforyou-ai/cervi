@@ -24,6 +24,7 @@
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
 - Web 与桌面端创建群聊和添加成员支持同企业活跃 Agent，成员列表展示 AI 员工标识。群主仍由真人担任；群聊消息不触发 Agent，群内 @Agent 与响应策略留待后续设计。
 - Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
+- AI 员工编辑页的运行配置支持通过三列卡片模态框选择 MCP 服务，确认只回写表单，页面保存时整体提交。创建页保留必要字段。`agent_mcp_servers` 独立保存当前服务绑定；删除服务同事务清除全部员工绑定，不测试远端可用性，也不改写历史 Revision。MCP 工具调用尚未接入。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；`direct_conversations` 已用企业内规范身份对唯一约束收敛首发，Agent 复用同一 ChatSubject、Participant 和 Message 路径。
@@ -202,7 +203,8 @@ agent_revisions
 - 已被 Run 引用的 Revision 不物理删除。
 - Agent 支持绑定当前企业的本地知识库，范围随 Revision 固定；保存时校验并锁定知识库，失效绑定可从详情移除。本地检索接入遵循 [知识库 Agent Tool 方案](knowledge-base-agent-tool-plan.md)，查询与游标读取使用相同范围。
 - Run 使用自身 Revision 的配置；修改当前版本不改变在途 Run。
-- Revision 保存管理员当时配置的完整业务快照和非敏感名称快照；当前详情可以继续解析模型目录中的最新显示名称。
+- Revision 保存模型、指令、知识库等版本配置及非敏感名称快照；当前详情可以继续解析模型目录中的最新显示名称。
+- 当前 MCP 服务绑定属于可撤销的服务关联，由 `agent_mcp_servers` 单独保存，不复制到 Revision。运行配置表单在同一事务保存版本配置与服务关系；后续工具调用按真实运行场景记录实际工具范围，历史运行记录与当前关联分别维护。
 - Provider 密钥和 Endpoint 仍属于 Provider 配置，不复制到 Revision 或 Run；未来外部平台凭据同样通过独立调用目标与凭据配置解析。
 - Tool Policy 保存产品能力标识和策略，不保存 Eino Tool 实例或 Go 类型。
 - Eino 是 `managed` 模式的内部执行适配器，不写入 `execution_mode`。Eino 升级不能改变历史 Revision 的业务含义；必要时通过 `schema_version` 解释。

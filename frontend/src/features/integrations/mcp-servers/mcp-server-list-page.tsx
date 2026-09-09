@@ -86,6 +86,7 @@ export function MCPServerListPage() {
     deleteItem: deleteMCPServer,
     listKey: resourceKeys.mcpServers(),
     detailKey: resourceKeys.mcpServer,
+    relatedKeys: [resourceKeys.agentMCPServerOptions(), resourceKeys.agent()],
     entityName: "MCP 服务",
     successMessage: t("mcpServer.delete.success"),
     errorMessage: t("mcpServer.delete.error"),

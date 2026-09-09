@@ -48,6 +48,23 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 	return agentFromAction(*created), nil
 }
 
+// ListAgentMCPServerOptions 读取企业 MCP 服务摘要，不测试连接。
+func (b *DirectBackend) ListAgentMCPServerOptions(ctx context.Context, meta RequestMeta) (AgentMCPServerOptionList, error) {
+	identity, err := b.authenticate(ctx, meta)
+	if err != nil {
+		return AgentMCPServerOptionList{}, err
+	}
+	options, err := b.listAgentMCPServerOptions.Execute(ctx, identity)
+	if err != nil {
+		return AgentMCPServerOptionList{}, b.agentError(ctx, meta, err, cervii18n.ErrorMCPServerListFailed, identity.Organization.ID, "", nil)
+	}
+	output := make([]AgentMCPServerOption, 0, len(options))
+	for _, option := range options {
+		output = append(output, AgentMCPServerOption{ID: option.ID, Name: option.Name, ServerType: MCPServerType(option.ServerType), ToolCount: option.ToolCount})
+	}
+	return AgentMCPServerOptionList{MCPServers: output}, nil
+}
+
 // ListAgentModelOptions 返回企业 AI 员工可使用的对话模型。
 func (b *DirectBackend) ListAgentModelOptions(ctx context.Context, meta RequestMeta) (AgentModelOptionList, error) {
 	identity, err := b.authenticate(ctx, meta)
@@ -138,14 +155,18 @@ func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agent
 }
 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
-func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMeta, agentID string, input AgentExecutionInput) (Agent, error) {
+func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentExecutionInput) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Agent{}, err
 	}
-	agent, err := b.updateAgentExecution.Execute(ctx, identity, agentID, agentExecutionInput(input))
+	agent, err := b.updateAgentExecution.Execute(ctx, identity, agentID, agentaction.UpdateExecutionInput{
+		ExecutionInput: agentExecutionInput(AgentExecutionInput{Mode: input.Mode, Managed: input.Managed}),
+		MCPServerIDs:   input.MCPServerIDs,
+	})
 	if err != nil {
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentExecutionUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+			agentaction.ValidationMCPServerInvalid:          cervii18n.FieldAgentMCPServerInvalid,
 			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
 			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
@@ -162,6 +183,7 @@ func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMe
 		"provider_id", agent.Execution.Managed.ProviderID,
 		"model_identifier", agent.Execution.Managed.ModelIdentifier,
 		"knowledge_base_count", len(agent.Execution.Managed.KnowledgeBaseIDs),
+		"mcp_server_count", len(agent.Execution.MCPServerIDs),
 	)
 	return agentFromAction(*agent), nil
 }
@@ -208,7 +230,7 @@ func agentFromAction(agent agentaction.Agent) Agent {
 			KnowledgeBaseIDs:  agent.Execution.Managed.KnowledgeBaseIDs,
 		}
 	}
-	execution := AgentExecution{RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
+	execution := AgentExecution{MCPServerIDs: agent.Execution.MCPServerIDs, RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
 	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, CreatedAt: agent.CreatedAt}
 }
 

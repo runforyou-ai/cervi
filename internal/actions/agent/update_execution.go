@@ -15,6 +15,12 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// UpdateExecutionInput 定义一起保存的版本配置和当前 MCP 服务绑定。
+type UpdateExecutionInput struct {
+	ExecutionInput
+	MCPServerIDs []string
+}
+
 // UpdateExecutionAction 修改 AI 员工当前生效的执行配置。
 type UpdateExecutionAction struct{ db *bun.DB }
 
@@ -24,11 +30,11 @@ func NewUpdateExecutionAction(db *bun.DB) *UpdateExecutionAction {
 }
 
 // Execute 创建新执行配置版本并切换 AI 员工的当前版本。
-func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input ExecutionInput) (*Agent, error) {
+func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input UpdateExecutionInput) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}
-	input, err := normalizeExecutionInput(input)
+	executionInput, err := normalizeExecutionInput(input.ExecutionInput)
 	if err != nil {
 		return nil, err
 	}
@@ -50,12 +56,15 @@ func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
-		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *input.Managed)
+		if err := replaceMCPServers(ctx, tx, identity.Organization.ID, agentID, input.MCPServerIDs); err != nil {
+			return err
+		}
+		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *executionInput.Managed)
 		if err != nil {
 			return err
 		}
 		revisionID := uuid.NewV7()
-		execution, err := insertExecutionRevision(ctx, tx, identity, agentID, revisionID.String(), input, model)
+		execution, err := insertExecutionRevision(ctx, tx, identity, agentID, revisionID.String(), executionInput, model)
 		if err != nil {
 			return err
 		}

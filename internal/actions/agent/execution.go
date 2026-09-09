@@ -40,9 +40,10 @@ type ManagedExecutionInput struct {
 
 // Execution 定义 AI 员工当前生效的执行配置。
 type Execution struct {
-	RevisionID string
-	Mode       domain.AgentExecutionMode
-	Managed    *ManagedExecution
+	MCPServerIDs []string
+	RevisionID   string
+	Mode         domain.AgentExecutionMode
+	Managed      *ManagedExecution
 }
 
 // ManagedExecution 定义平台托管执行配置。
@@ -268,7 +269,12 @@ func loadAgentExecution(ctx context.Context, db bun.IDB, organizationID, agentID
 	}
 	execution.Managed.ProviderName = model.ProviderName
 	execution.Managed.ModelName = model.ModelName
-	return execution, nil
+	// 当前服务绑定独立于不可变 Revision，删除服务后关系同步移除。
+	execution.MCPServerIDs = make([]string, 0)
+	err = db.NewSelect().Model((*servermodels.AgentMCPServer)(nil)).Column("mcp_server_id").
+		Where("ams.organization_id = ?", organizationID).Where("ams.agent_id = ?", agentID).
+		OrderExpr("ams.mcp_server_id ASC").Scan(ctx, &execution.MCPServerIDs)
+	return execution, err
 }
 
 // loadAgentExecutionSummaries 批量读取 AI 员工当前执行配置摘要。

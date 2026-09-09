@@ -95,7 +95,7 @@ const integrations = {
     },
     delete: {
       title: "Delete “{{name}}”?",
-      description: "This MCP server configuration cannot be recovered.",
+      description: "This MCP server configuration cannot be recovered. It will also be removed from AI employee settings.",
       success: "MCP server deleted.",
       error: "Could not delete the MCP server. Try again.",
     },

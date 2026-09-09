@@ -31,6 +31,12 @@ func (a *DeleteMCPServerAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
+		// 与服务删除一起清除全部员工绑定，不改写历史执行配置。
+		if _, err := tx.NewDelete().Model((*servermodels.AgentMCPServer)(nil)).
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("mcp_server_id = ?", mcpServerID).Exec(ctx); err != nil {
+			return err
+		}
 		_, err = tx.NewDelete().
 			Model(mcpServer).
 			Where("organization_id = ?", identity.Organization.ID).

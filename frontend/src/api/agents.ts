@@ -4,6 +4,7 @@ import {
   DeactivateAgent,
   GetAgent,
   ListAgentModelOptions,
+  ListAgentMCPServerOptions,
   ListAgents,
   ReactivateAgent,
   UpdateAgent,
@@ -12,7 +13,7 @@ import {
 import {
   AgentExecutionMode,
   type Agent,
-  type AgentExecutionInput,
+  type UpdateAgentExecutionInput,
   type AgentList,
   type AgentListInput,
   type AgentListItem,
@@ -26,8 +27,9 @@ export type AgentListQuery = Partial<AgentListInput>
 
 export type ManagedAgentExecutionData = Omit<
   Agent["execution"],
-  "mode" | "managed"
+  "mode" | "managed" | "mcpServerIds"
 > & {
+  mcpServerIds: NonNullable<Agent["execution"]["mcpServerIds"]>
   mode: AgentExecutionMode.AgentExecutionModeManaged
   managed: Omit<
     NonNullable<Agent["execution"]["managed"]>,
@@ -61,6 +63,7 @@ export type AgentListData = Omit<AgentList, "agents"> & {
   agents: AgentListItemData[]
 }
 
+const listAgentMCPServerOptionsBound = bind(ListAgentMCPServerOptions)
 const listAgentsBound = bind(ListAgents)
 const listAgentModelOptionsBound = bind(ListAgentModelOptions)
 const getAgentBound = bind(GetAgent)
@@ -80,6 +83,11 @@ export function listAgentModelOptions() {
   return listAgentModelOptionsBound().then((output) => asList(output.models))
 }
 
+/** 读取企业 MCP 服务的配置选项。 */
+export function listAgentMCPServerOptions() {
+  return listAgentMCPServerOptionsBound().then((output) => asList(output.mcpServers))
+}
+
 /** 读取企业 AI 员工详情。 */
 export function getAgent(agentId: string, signal?: AbortSignal) {
   return getAgentBound(agentId, signal).then(normalizeAgent)
@@ -93,7 +101,7 @@ export function updateAgent(agentId: string, input: UpdateAgentInput) {
 /** 修改企业 AI 员工的执行配置。 */
 export function updateAgentExecution(
   agentId: string,
-  input: AgentExecutionInput,
+  input: UpdateAgentExecutionInput,
 ) {
   return updateAgentExecutionBound(agentId, input).then(normalizeAgent)
 }
@@ -161,6 +169,7 @@ function normalizeAgent(agent: Agent): AgentData {
     execution: {
       ...execution,
       mode: execution.mode,
+      mcpServerIds: asList(execution.mcpServerIds),
       managed: {
         ...execution.managed,
         knowledgeBaseIds: asList(execution.managed.knowledgeBaseIds),

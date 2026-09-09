@@ -524,6 +524,14 @@ func (b *Backend) ListMemberOptions(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
+// ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
+func (b *Backend) ListAgentMCPServerOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.AgentMCPServerOptionList, error) {
+	var output appservice.AgentMCPServerOptionList
+	err := b.do(ctx, meta, http.MethodGet, "/agents/mcp-server-options", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListAgentModelOptions 返回 AI 员工可使用的对话模型。
 func (b *Backend) ListAgentModelOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.AgentModelOptionList, error) {
 	var output appservice.AgentModelOptionList
@@ -565,7 +573,7 @@ func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, 
 }
 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
-func (b *Backend) UpdateAgentExecution(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentExecutionInput) (appservice.Agent, error) {
+func (b *Backend) UpdateAgentExecution(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.UpdateAgentExecutionInput) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPut, "/agents/"+url.PathEscape(agentID)+"/execution", nil, input, &output)
 	b.normalizeOutput(&output)

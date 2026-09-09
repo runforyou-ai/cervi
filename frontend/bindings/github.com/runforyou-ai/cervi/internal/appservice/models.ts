@@ -141,6 +141,7 @@ export interface Agent {
  * AgentExecution 定义 AI 员工当前生效的执行配置。
  */
 export interface AgentExecution {
+    "mcpServerIds": string[] | null;
     "revisionId": string;
     "mode": AgentExecutionMode;
     "managed"?: AgentManagedExecution | null;
@@ -220,6 +221,23 @@ export interface AgentListItem {
     "teams": TeamSummary[] | null;
     "execution": AgentExecutionSummary;
     "createdAt": string;
+}
+
+/**
+ * AgentMCPServerOption 定义不含凭据的 MCP 服务选择项。
+ */
+export interface AgentMCPServerOption {
+    "id": string;
+    "name": string;
+    "serverType": MCPServerType;
+    "toolCount": number;
+}
+
+/**
+ * AgentMCPServerOptionList 定义当前企业的 MCP 服务选择列表。
+ */
+export interface AgentMCPServerOptionList {
+    "mcpServers": AgentMCPServerOption[] | null;
 }
 
 /**
@@ -2522,6 +2540,15 @@ export interface UnreadIndicatorState {
     "count": number;
     "attentionEnabled": boolean;
     "attentionPending": boolean;
+}
+
+/**
+ * UpdateAgentExecutionInput 定义运行配置表单整体保存的字段。
+ */
+export interface UpdateAgentExecutionInput {
+    "mode": AgentExecutionMode;
+    "managed"?: AgentManagedExecutionInput | null;
+    "mcpServerIds": string[] | null;
 }
 
 /**

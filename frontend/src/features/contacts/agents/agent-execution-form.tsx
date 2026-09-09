@@ -1,5 +1,5 @@
 /** AI 员工运行配置表单。 */
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -11,20 +11,21 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import { AgentKnowledgeField } from "@/features/contacts/agents/agent-knowledge-field"
+import { AgentMCPField } from "@/features/contacts/agents/agent-mcp-field"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import {
   agentModelSelection,
   parseAgentModelSelection,
 } from "@/features/contacts/agents/agent-model-selection"
 import {
-  createAgentManagedExecutionSchema,
-  type AgentManagedExecutionFormValues,
+  createAgentExecutionSchema,
+  type AgentExecutionFormValues,
 } from "@/features/contacts/agents/agent-schema"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 整体保存对话模型、工作指令和知识库绑定。 */
+/** 整体保存模型、指令、知识库和 MCP 服务绑定。 */
 export function AgentExecutionForm({
   agent,
   onSaved,
@@ -38,7 +39,7 @@ export function AgentExecutionForm({
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
-      createAgentManagedExecutionSchema({
+      createAgentExecutionSchema({
         modelRequired: t("agents.validation.modelRequired"),
         instructionRequired: t("agents.validation.instructionRequired"),
         instructionTooLong: t("agents.validation.instructionTooLong"),
@@ -46,7 +47,7 @@ export function AgentExecutionForm({
     [t],
   )
   const managed = agent.execution.managed
-  const form = useForm<AgentManagedExecutionFormValues>({
+  const form = useForm<AgentExecutionFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: {
@@ -56,15 +57,24 @@ export function AgentExecutionForm({
       ),
       systemInstruction: managed.systemInstruction,
       knowledgeBaseIds: managed.knowledgeBaseIds,
+      mcpServerIds: agent.execution.mcpServerIds,
     },
   })
   const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
 
+  // 外部删除服务后只同步未编辑的绑定，保留其他表单草稿。
+  useEffect(() => {
+    if (!form.getFieldState("mcpServerIds").isDirty) {
+      form.resetField("mcpServerIds", { defaultValue: agent.execution.mcpServerIds })
+    }
+  }, [agent.execution.mcpServerIds, form])
+
   /** 提交当前运行配置并生成一个生效版本。 */
-  async function submit(values: AgentManagedExecutionFormValues) {
+  async function submit(values: AgentExecutionFormValues) {
     try {
       const saved = await updateAgentExecution(agent.id, {
         mode: agent.execution.mode,
+        mcpServerIds: values.mcpServerIds,
         managed: {
           ...parseAgentModelSelection(values.modelSelection),
           systemInstruction: values.systemInstruction,
@@ -74,7 +84,7 @@ export function AgentExecutionForm({
       onSaved()
       if (!mounted.current) return
       dirty.current = false
-      form.reset(values)
+      form.reset({ ...values, mcpServerIds: saved.execution.mcpServerIds })
       console.info("AI 员工运行配置已保存", {
         agent_id: saved.id,
         revision_id: saved.execution.revisionId,
@@ -91,6 +101,7 @@ export function AgentExecutionForm({
               "modelIdentifier",
               "systemInstruction",
               "knowledgeBaseIds",
+              "mcpServerIds",
             ])
           : t("agents.execution.saveError"),
       )
@@ -135,6 +146,16 @@ export function AgentExecutionForm({
                 onChange={field.onChange}
                 disabled={form.formState.isSubmitting}
               />
+            </Field>
+          )}
+        />
+        <Controller
+          name="mcpServerIds"
+          control={form.control}
+          render={({ field }) => (
+            <Field>
+              <FieldLabel>{t("agents.mcp.services")}</FieldLabel>
+              <AgentMCPField value={field.value} onChange={field.onChange} disabled={form.formState.isSubmitting} />
             </Field>
           )}
         />
