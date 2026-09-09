@@ -1019,14 +1019,17 @@ function ConversationTimelineContent({
           ) : null}
         </div>
       </ScrollArea>
-      {timeline.pollingError &&
+      {(timeline.pollingError || (error && !currentPage)) &&
       timeline.mode === "latest" ? (
         <button
           type="button"
           className="absolute top-2 left-1/2 z-10 min-h-8 -translate-x-1/2 rounded-full border bg-background/95 px-3 text-xs text-warning shadow-sm backdrop-blur"
-          onClick={() => void timeline.poll()}
+          disabled={loading}
+          onClick={() => void (currentPage ? timeline.poll() : refresh())}
         >
-          {t("messagesRefreshError")}
+          {currentPage
+            ? t("messagesRefreshError")
+            : `${t("messagesLoadError")} · ${t("common:actions.retry")}`}
         </button>
       ) : null}
       <ConversationMentionNavigator

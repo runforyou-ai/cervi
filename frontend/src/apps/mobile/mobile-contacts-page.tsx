@@ -43,7 +43,7 @@ export function MobileContactsPage() {
                 <span className="min-w-0 flex-1 text-[15px] font-medium">
                   {t(`contacts.${label}`)}
                 </span>
-                {path !== "employees" ? (
+                {path !== "employees" && path !== "ai-employees" ? (
                   <span className="text-xs text-muted-foreground">
                     {t("unavailable")}
                   </span>
