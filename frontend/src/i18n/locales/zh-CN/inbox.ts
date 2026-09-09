@@ -1,5 +1,8 @@
 /** 简体中文·收件箱文案。 */
 const inbox = {
+  listPendingChanges: "有新动态",
+  listViewLatest: "查看最新",
+  listWindowEmpty: "此处暂无会话",
   selectConversationTitle: "选择会话",
   selectConversationDescription: "从列表选择会话，或发起新的聊天。",
   conversationUnavailable: "会话不可用",

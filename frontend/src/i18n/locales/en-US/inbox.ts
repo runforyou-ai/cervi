@@ -1,5 +1,8 @@
 /** 美式英语·收件箱文案。 */
 const inbox = {
+  listPendingChanges: "Updates available",
+  listViewLatest: "View latest",
+  listWindowEmpty: "No conversations in this area",
   selectConversationTitle: "Select a conversation",
   selectConversationDescription: "Choose a conversation from the list or start a new chat.",
   conversationUnavailable: "Conversation unavailable",
