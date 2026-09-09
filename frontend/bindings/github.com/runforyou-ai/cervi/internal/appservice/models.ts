@@ -1660,6 +1660,10 @@ export interface KnowledgeDocument {
     "contentType": string;
     "byteSize": number;
     "status": KnowledgeDocumentStatus;
+    "processingStatus": KnowledgeDocumentProcessingStatus;
+    "segmentBatchId": string;
+    "segmentCount": number;
+    "failureMessage": string;
     "createdAt": string;
 }
 
@@ -1734,7 +1738,64 @@ export interface KnowledgeDocumentPreviewRequest {
 }
 
 /**
- * KnowledgeDocumentStatus 定义文档处理状态。
+ * KnowledgeDocumentProcessingStatus 定义持久化的技术状态。
+ */
+export enum KnowledgeDocumentProcessingStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeProcessingInitial = "initial",
+    KnowledgeProcessingQueued = "queued",
+    KnowledgeProcessingFetching = "fetching",
+    KnowledgeProcessingConverting = "converting",
+    KnowledgeProcessingExtracting = "extracting",
+    KnowledgeProcessingRecognizing = "recognizing",
+    KnowledgeProcessingSplitting = "splitting",
+    KnowledgeProcessingEmbedding = "embedding",
+    KnowledgeProcessingIndexing = "indexing",
+    KnowledgeProcessingPublishing = "publishing",
+    KnowledgeProcessingSucceeded = "succeeded",
+    KnowledgeProcessingFailed = "failed",
+    KnowledgeProcessingCancelled = "cancelled",
+};
+
+/**
+ * KnowledgeDocumentSegment 定义可阅读和定位的分段正文。
+ */
+export interface KnowledgeDocumentSegment {
+    "id": string;
+    "position": number;
+    "content": string;
+    "characterCount": number;
+    "pageNumber": number | null;
+    "sourceLabel": string;
+}
+
+/**
+ * KnowledgeDocumentSegmentInput 定义固定批次中的分页和锚点定位。
+ */
+export interface KnowledgeDocumentSegmentInput {
+    "segmentBatchId": string;
+    "anchorSegmentId": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * KnowledgeDocumentSegmentPage 返回一页分段及真实锚点位置。
+ */
+export interface KnowledgeDocumentSegmentPage {
+    "segmentBatchId": string;
+    "segments": KnowledgeDocumentSegment[] | null;
+    "page": PageInfo;
+    "anchorSegmentId": string;
+    "anchorPosition": number;
+}
+
+/**
+ * KnowledgeDocumentStatus 定义仅用于产品展示的派生状态。
  */
 export enum KnowledgeDocumentStatus {
     /**
@@ -1743,6 +1804,11 @@ export enum KnowledgeDocumentStatus {
     $zero = "",
 
     KnowledgeDocumentInitial = "initial",
+    KnowledgeDocumentQueued = "queued",
+    KnowledgeDocumentRunning = "running",
+    KnowledgeDocumentSucceeded = "succeeded",
+    KnowledgeDocumentFailed = "failed",
+    KnowledgeDocumentCancelled = "cancelled",
 };
 
 /**

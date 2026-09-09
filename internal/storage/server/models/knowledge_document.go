@@ -16,6 +16,12 @@ type KnowledgeDocument struct {
 	GroupID         string                         `bun:"group_id"`
 	FileID          string                         `bun:"file_id"`
 	Status          domain.KnowledgeDocumentStatus `bun:"status"`
+	ProcessingID    string                         `bun:"processing_id,nullzero"`
+	SegmentBatchID  string                         `bun:"segment_batch_id,nullzero"`
+	SegmentCount    int                            `bun:"segment_count"`
+	FailureCode     string                         `bun:"failure_code"`
+	ChunkLength     int                            `bun:"chunk_length"`
+	ChunkOverlap    int                            `bun:"chunk_overlap"`
 	CreatedByUserID string                         `bun:"created_by_user_id"`
 	CreatedAt       time.Time                      `bun:"created_at"`
 	UpdatedAt       time.Time                      `bun:"updated_at"`

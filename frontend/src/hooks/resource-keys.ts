@@ -119,6 +119,8 @@ export const resourceKeys = {
   /** 单个文档详情。 */
   knowledgeDocument: (baseId: string, documentId: string) => ["knowledge-document", baseId, documentId],
   /** 文档原件的客户端预览。 */
+  /** 固定文档批次和首次阅读锚点，避免混合不同分段结果。 */
+  knowledgeDocumentSegments: (baseId: string, documentId: string, batchId: string, anchorSegmentId = "") => ["knowledge-document-segments", baseId, documentId, batchId, anchorSegmentId],
   knowledgeDocumentFile: (baseId: string, documentId: string) => ["knowledge-document-file", baseId, documentId],
   /** 角色列表。 */
   roles: () => ["roles"],

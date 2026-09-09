@@ -1,6 +1,7 @@
 /** 美式英语·知识库文案。 */
 const knowledgeBase = {
   documents: {
+    retryFailed: "Could not retry document processing.",
     title: "Documents",
     more: "More actions for {{name}}",
     search: "Search document names",
@@ -14,7 +15,12 @@ const knowledgeBase = {
     deleteDescription: "Delete “{{name}}”? This cannot be undone.",
     operationFailed: "Operation failed. Please retry.",
     status: {
-      initial: "Initial",
+      initial: "Not processed",
+      queued: "Queued",
+      running: "Processing",
+      succeeded: "Completed",
+      failed: "Failed",
+      cancelled: "Cancelled",
     },
     columns: {
       name: "Name",
@@ -40,6 +46,17 @@ const knowledgeBase = {
     },
   },
   documentDetail: {
+    segments: {
+      position: "Segment {{position}}",
+      matched: "Match",
+      characters: "{{count}} characters",
+      page: "Page {{number}}",
+      total: "{{count}} segments",
+      error: "Could not load segments. Please try again.",
+      retryPrevious: "Retry previous page",
+      retryNext: "Retry next page",
+      empty: "No segments",
+    },
     viewSegments: "View segments",
     preview: "Document preview",
     previewLoading: "Downloading and preparing preview…",
@@ -104,8 +121,8 @@ const knowledgeBase = {
   form: {
     embeddingModel: "Embedding model",
     embeddingDimension: "Embedding dimension",
-    chunkLength: "Chunk length",
-    chunkOverlap: "Chunk overlap",
+    chunkLength: "Chunk length (characters)",
+    chunkOverlap: "Chunk overlap (characters)",
     retrievalCount: "Retrieval count",
     rerankModel: "Rerank model",
     selectEmbeddingModel: "Select an embedding model",

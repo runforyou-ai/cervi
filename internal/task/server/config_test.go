@@ -19,8 +19,8 @@ func TestNewConfigAddsRuntimeDefaults(t *testing.T) {
 		config.Replicas != taskReplicas {
 		t.Fatalf("NATS 任务配置 = %#v", config)
 	}
-	if len(config.WorkerPools) != 2 {
-		t.Fatalf("Worker Pool 数量 = %d，期望 2", len(config.WorkerPools))
+	if len(config.WorkerPools) != 3 {
+		t.Fatalf("Worker Pool 数量 = %d，期望 3", len(config.WorkerPools))
 	}
 	if standard, agent := config.WorkerPools[0], config.WorkerPools[1]; standard.Name != workerPoolStandard || standard.Workers != standardTaskWorkers || standard.MaxAckPending != taskPoolMaxAckPending ||
 		agent.Name != workerPoolAgent || agent.Workers != agentTaskWorkers || agent.MaxAckPending != taskPoolMaxAckPending {
@@ -48,11 +48,14 @@ func TestConfigBuildsIsolatedConsumerNames(t *testing.T) {
 	}
 }
 
-// TestTaskSubjectRoutesOnlyAgentQueueToAgentPool 验证未知队列仍由标准 Worker Pool 消费。
-func TestTaskSubjectRoutesOnlyAgentQueueToAgentPool(t *testing.T) {
+// TestTaskSubjectRoutesDedicatedQueues 验证专用队列独立消费，未知队列仍使用标准 Worker Pool。
+func TestTaskSubjectRoutesDedicatedQueues(t *testing.T) {
 	config := runtimeConfig{Namespace: "test_runtime"}
 	if subject := config.taskSubject(QueueAgent); subject != "cervi.test_runtime.tasks.agent.agent" {
 		t.Fatalf("Agent Subject = %q", subject)
+	}
+	if subject := config.taskSubject(QueueKnowledge); subject != "cervi.test_runtime.tasks.knowledge.knowledge" {
+		t.Fatalf("knowledge subject=%s", subject)
 	}
 	for _, queue := range []string{defaultQueue, "files", "maintenance", "future_queue"} {
 		want := "cervi.test_runtime.tasks.standard." + queue

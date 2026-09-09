@@ -6,6 +6,7 @@ package server
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -18,11 +19,12 @@ var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 // Config 定义服务端运行配置。
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	NATS     NATSConfig     `yaml:"nats"`
-	TLS      TLSConfig      `yaml:"tls"`
-	Storage  StorageConfig  `yaml:"storage"`
+	HaystackURL string         `yaml:"haystackURL"`
+	Server      ServerConfig   `yaml:"server"`
+	Database    DatabaseConfig `yaml:"database"`
+	NATS        NATSConfig     `yaml:"nats"`
+	TLS         TLSConfig      `yaml:"tls"`
+	Storage     StorageConfig  `yaml:"storage"`
 }
 
 // ServerConfig 定义 HTTP 服务监听配置。
@@ -82,6 +84,7 @@ func Load(path string) (Config, error) {
 
 // normalize 统一配置中的枚举和空白字符。
 func (config *Config) normalize() {
+	config.HaystackURL = strings.TrimRight(strings.TrimSpace(config.HaystackURL), "/")
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Database.Host = strings.TrimSpace(config.Database.Host)
 	config.Database.User = strings.TrimSpace(config.Database.User)
@@ -111,6 +114,7 @@ func defaultConfig() Config {
 
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
 func applyEnvironment(config *Config) error {
+	applyStringEnvironment("HAYSTACK_URL", &config.HaystackURL)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.TLS.ACMEEmail)
@@ -138,6 +142,12 @@ func applyEnvironment(config *Config) error {
 
 // validate 校验服务端配置。
 func (config Config) validate() error {
+	if config.HaystackURL != "" {
+		address, err := url.Parse(config.HaystackURL)
+		if err != nil || address.Host == "" || (address.Scheme != "http" && address.Scheme != "https") || address.User != nil || address.RawQuery != "" || address.Fragment != "" {
+			return fmt.Errorf("Haystack 服务地址无效")
+		}
+	}
 	// 校验监听主机名、IPv4 地址和带方括号的 IPv6 地址。
 	host := config.Server.Host
 	validHost := host != "" && !strings.ContainsAny(host, "/\\ \t\r\n")

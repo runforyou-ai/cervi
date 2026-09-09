@@ -710,6 +710,19 @@ func (b *Backend) RemoveTeamMembers(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
+// RetryKnowledgeDocument 按当前配置重新处理文档。
+func (b *Backend) RetryKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/retry", nil, nil, nil)
+}
+
+// ListKnowledgeDocumentSegments 返回固定批次的分段页或锚点所在页。
+func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentSegmentInput) (appservice.KnowledgeDocumentSegmentPage, error) {
+	var output appservice.KnowledgeDocumentSegmentPage
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/segments", encodeKnowledgeDocumentSegmentInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListKnowledgeDocuments 返回当前分组的文档列表。
 func (b *Backend) ListKnowledgeDocuments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeDocumentListInput) (appservice.KnowledgeDocumentList, error) {
 	var output appservice.KnowledgeDocumentList
@@ -1138,6 +1151,16 @@ func encodeKnowledgeDocumentListInputQuery(input appservice.KnowledgeDocumentLis
 	query := url.Values{}
 	setQuery(query, "groupId", input.GroupID)
 	setQuery(query, "keyword", input.Keyword)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeKnowledgeDocumentSegmentInputQuery 将 appservice.KnowledgeDocumentSegmentInput 编码为查询参数。
+func encodeKnowledgeDocumentSegmentInputQuery(input appservice.KnowledgeDocumentSegmentInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "segmentBatchId", input.SegmentBatchID)
+	setQuery(query, "anchorSegmentId", input.AnchorSegmentID)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query

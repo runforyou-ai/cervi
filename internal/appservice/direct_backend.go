@@ -31,6 +31,7 @@ import (
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -118,6 +119,8 @@ type DirectBackend struct {
 	deleteTeam                        *teamaction.DeleteTeamAction
 	documentQuery                     *knowledgebaseaction.DocumentQuery
 	createDocuments                   *knowledgebaseaction.CreateDocumentsAction
+	documentProcessing                *knowledgebaseaction.DocumentProcessing
+	knowledgeProcessor                *knowledgeprocessing.Client
 	moveDocument                      *knowledgebaseaction.MoveDocumentAction
 	deleteDocument                    *knowledgebaseaction.DeleteDocumentAction
 	listQAEntries                     *knowledgebaseaction.ListQAEntriesQuery
@@ -257,7 +260,9 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		updateTeam:                        teamaction.NewUpdateTeamAction(db),
 		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
 		documentQuery:                     knowledgebaseaction.NewDocumentQuery(db),
-		createDocuments:                   knowledgebaseaction.NewCreateDocumentsAction(db),
+		documentProcessing:                knowledgebaseaction.NewDocumentProcessing(db, taskEnqueuer),
+		knowledgeProcessor:                knowledgeprocessing.NewClient(""),
+		createDocuments:                   knowledgebaseaction.NewCreateDocumentsAction(db, taskEnqueuer),
 		moveDocument:                      knowledgebaseaction.NewMoveDocumentAction(db),
 		deleteDocument:                    knowledgebaseaction.NewDeleteDocumentAction(db),
 		listQAEntries:                     knowledgebaseaction.NewListQAEntriesQuery(db),

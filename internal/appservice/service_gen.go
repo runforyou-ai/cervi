@@ -459,6 +459,16 @@ func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamI
 	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
 }
 
+// RetryKnowledgeDocument 按当前配置重新处理文档。
+func (s *Service) RetryKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) error {
+	return s.backend.RetryKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
+}
+
+// ListKnowledgeDocumentSegments 返回固定批次的分段页或锚点所在页。
+func (s *Service) ListKnowledgeDocumentSegments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentSegmentInput) (KnowledgeDocumentSegmentPage, error) {
+	return s.backend.ListKnowledgeDocumentSegments(ctx, meta, knowledgeBaseID, documentID, input)
+}
+
 // ListKnowledgeDocuments 返回当前分组的文档列表。
 func (s *Service) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
 	return s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)

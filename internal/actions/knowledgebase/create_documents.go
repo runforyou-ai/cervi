@@ -13,15 +13,19 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
 // CreateDocumentsAction 激活上传原件并创建知识文档。
-type CreateDocumentsAction struct{ db *bun.DB }
+type CreateDocumentsAction struct {
+	db         *bun.DB
+	processing *DocumentProcessing
+}
 
 // NewCreateDocumentsAction 创建文档批次保存操作。
-func NewCreateDocumentsAction(db *bun.DB) *CreateDocumentsAction {
-	return &CreateDocumentsAction{db: db}
+func NewCreateDocumentsAction(db *bun.DB, tasks servertask.TxEnqueuer) *CreateDocumentsAction {
+	return &CreateDocumentsAction{db: db, processing: NewDocumentProcessing(db, tasks)}
 }
 
 // Execute 在同一事务中保存最多十个文件，文件编号用于重复提交幂等。
@@ -85,6 +89,9 @@ func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermod
 				return err
 			}
 			if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+				return err
+			}
+			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, document); err != nil {
 				return err
 			}
 			record, err := loadDocumentRecord(ctx, tx, baseID, document.ID)

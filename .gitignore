@@ -19,3 +19,7 @@ build/android/app/build/
 build/android/app/src/main/jniLibs/
 .idea/
 .codex/
+
+# Python processing artifacts
+__pycache__/
+*.pyc

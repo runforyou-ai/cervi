@@ -136,6 +136,8 @@ func (r *Runtime) Start(parent context.Context) error {
 		"standard_workers", r.workerCount(workerPoolStandard),
 		"agent_consumer", r.config.consumerName(workerPoolAgent),
 		"agent_workers", r.workerCount(workerPoolAgent),
+		"knowledge_consumer", r.config.consumerName(workerPoolKnowledge),
+		"knowledge_workers", r.workerCount(workerPoolKnowledge),
 		"schedules", len(r.schedules),
 	)
 	return nil

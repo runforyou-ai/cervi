@@ -1,4 +1,4 @@
-"""在当前工作区的 haystack schema 中写入示例向量并验证 pgvector 检索。"""
+"""在当前工作区的 public schema 中写入示例向量并验证 pgvector 检索。"""
 
 from hayhooks import BasePipelineWrapper
 from haystack import Document, Pipeline
@@ -11,7 +11,7 @@ class PipelineWrapper(BasePipelineWrapper):
     def setup(self) -> None:
         """连接 PostgreSQL，写入两条固定的三维示例向量。"""
         document_store = PgvectorDocumentStore(
-            schema_name="haystack",
+            schema_name="public",
             table_name="pgvector_check",
             embedding_dimension=3,
             create_extension=False,

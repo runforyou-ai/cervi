@@ -6,10 +6,36 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// KnowledgeDocumentStatus 定义文档处理状态。
+// KnowledgeDocumentStatus 定义仅用于产品展示的派生状态。
 type KnowledgeDocumentStatus string
 
-const KnowledgeDocumentInitial KnowledgeDocumentStatus = KnowledgeDocumentStatus(domain.KnowledgeDocumentInitial)
+const (
+	KnowledgeDocumentInitial   KnowledgeDocumentStatus = "initial"
+	KnowledgeDocumentQueued    KnowledgeDocumentStatus = "queued"
+	KnowledgeDocumentRunning   KnowledgeDocumentStatus = "running"
+	KnowledgeDocumentSucceeded KnowledgeDocumentStatus = "succeeded"
+	KnowledgeDocumentFailed    KnowledgeDocumentStatus = "failed"
+	KnowledgeDocumentCancelled KnowledgeDocumentStatus = "cancelled"
+)
+
+// KnowledgeDocumentProcessingStatus 定义持久化的技术状态。
+type KnowledgeDocumentProcessingStatus string
+
+const (
+	KnowledgeProcessingInitial     KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentInitial)
+	KnowledgeProcessingQueued      KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentQueued)
+	KnowledgeProcessingFetching    KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentFetching)
+	KnowledgeProcessingConverting  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentConverting)
+	KnowledgeProcessingExtracting  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentExtracting)
+	KnowledgeProcessingRecognizing KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentRecognizing)
+	KnowledgeProcessingSplitting   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentSplitting)
+	KnowledgeProcessingEmbedding   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentEmbedding)
+	KnowledgeProcessingIndexing    KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentIndexing)
+	KnowledgeProcessingPublishing  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentPublishing)
+	KnowledgeProcessingSucceeded   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentSucceeded)
+	KnowledgeProcessingFailed      KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentFailed)
+	KnowledgeProcessingCancelled   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentCancelled)
+)
 
 // KnowledgeDocumentFormat 定义允许上传的文档扩展名。
 type KnowledgeDocumentFormat string
@@ -30,14 +56,18 @@ const (
 
 // KnowledgeDocument 定义文档列表与预览页使用的元数据。
 type KnowledgeDocument struct {
-	Format      KnowledgeDocumentFormat `json:"format"`
-	ID          string                  `json:"id"`
-	GroupID     string                  `json:"groupId"`
-	Name        string                  `json:"name"`
-	ContentType string                  `json:"contentType"`
-	ByteSize    int64                   `json:"byteSize"`
-	Status      KnowledgeDocumentStatus `json:"status"`
-	CreatedAt   time.Time               `json:"createdAt"`
+	Format           KnowledgeDocumentFormat           `json:"format"`
+	ID               string                            `json:"id"`
+	GroupID          string                            `json:"groupId"`
+	Name             string                            `json:"name"`
+	ContentType      string                            `json:"contentType"`
+	ByteSize         int64                             `json:"byteSize"`
+	Status           KnowledgeDocumentStatus           `json:"status"`
+	ProcessingStatus KnowledgeDocumentProcessingStatus `json:"processingStatus"`
+	SegmentBatchID   string                            `json:"segmentBatchId"`
+	SegmentCount     int                               `json:"segmentCount"`
+	FailureMessage   string                            `json:"failureMessage"`
+	CreatedAt        time.Time                         `json:"createdAt"`
 }
 
 // KnowledgeDocumentListInput 定义分组文档的查询参数。
@@ -74,4 +104,31 @@ type KnowledgeDocumentMoveInput struct {
 type KnowledgeDocumentPreviewRequest struct {
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers"`
+}
+
+// KnowledgeDocumentSegmentInput 定义固定批次中的分页和锚点定位。
+type KnowledgeDocumentSegmentInput struct {
+	SegmentBatchID  string `json:"segmentBatchId" query:"segmentBatchId"`
+	AnchorSegmentID string `json:"anchorSegmentId" query:"anchorSegmentId"`
+	Page            int    `json:"page" query:"page,default=0"`
+	PageSize        int    `json:"pageSize" query:"pageSize,default=20"`
+}
+
+// KnowledgeDocumentSegment 定义可阅读和定位的分段正文。
+type KnowledgeDocumentSegment struct {
+	ID             string `json:"id"`
+	Position       int    `json:"position"`
+	Content        string `json:"content"`
+	CharacterCount int    `json:"characterCount"`
+	PageNumber     *int   `json:"pageNumber"`
+	SourceLabel    string `json:"sourceLabel"`
+}
+
+// KnowledgeDocumentSegmentPage 返回一页分段及真实锚点位置。
+type KnowledgeDocumentSegmentPage struct {
+	SegmentBatchID  string                     `json:"segmentBatchId"`
+	Segments        []KnowledgeDocumentSegment `json:"segments"`
+	Page            PageInfo                   `json:"page"`
+	AnchorSegmentID string                     `json:"anchorSegmentId"`
+	AnchorPosition  int                        `json:"anchorPosition"`
 }

@@ -2,6 +2,7 @@
 import { useCallback, useEffect } from "react"
 import {
   useQuery,
+  useInfiniteQuery,
   useQueryClient,
   keepPreviousData,
   type QueryKey,
@@ -96,4 +97,27 @@ export function useResourceInvalidator() {
       client.invalidateQueries({ queryKey: key, ...options }),
     [client],
   )
+}
+
+/** 读取可双向追加的分页资源，并统一恢复失效会话。 */
+export function useInfiniteResource<T>(
+  key: QueryKey,
+  load: (page: number, signal: AbortSignal) => Promise<T>,
+  options: { getNextPage: (page: T) => number | undefined; getPreviousPage: (page: T) => number | undefined },
+) {
+  const navigate = useNavigate()
+  const query = useInfiniteQuery({
+    queryKey: key,
+    queryFn: ({ pageParam, signal }) => load(pageParam, signal),
+    initialPageParam: 0,
+    getNextPageParam: options.getNextPage,
+    getPreviousPageParam: options.getPreviousPage,
+    refetchOnWindowFocus: false,
+    staleTime: Infinity,
+    gcTime: 0,
+  })
+  useEffect(() => {
+    if (query.error) recoverSession(query.error, navigate)
+  }, [query.error, navigate])
+  return query
 }

@@ -296,6 +296,12 @@ type Backend interface {
 	// RemoveTeamMembers 将企业身份批量移出团队。
 	//cervi:route POST /teams/:teamID/members/remove
 	RemoveTeamMembers(context.Context, RequestMeta, string, TeamMemberInput) (Team, error)
+	// RetryKnowledgeDocument 按当前配置重新处理文档。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/documents/:documentID/retry
+	RetryKnowledgeDocument(context.Context, RequestMeta, string, string) error
+	// ListKnowledgeDocumentSegments 返回固定批次的分段页或锚点所在页。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/segments
+	ListKnowledgeDocumentSegments(context.Context, RequestMeta, string, string, KnowledgeDocumentSegmentInput) (KnowledgeDocumentSegmentPage, error)
 	// ListKnowledgeDocuments 返回当前分组的文档列表。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents
 	ListKnowledgeDocuments(context.Context, RequestMeta, string, KnowledgeDocumentListInput) (KnowledgeDocumentList, error)

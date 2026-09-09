@@ -1,10 +1,15 @@
 /** 文档表格展示元数据、创建时间及固定操作栏。 */
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { MoreHorizontalIcon } from "lucide-react"
-import { Link } from "react-router"
+import { toast } from "sonner"
+import { retryKnowledgeDocument, isApiError } from "@/api"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
+import { recoverSession } from "@/lib/session-navigation"
+import { apiErrorMessage } from "@/lib/form-errors"
+import { Link, useNavigate, useParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { KnowledgeDocumentData, KnowledgeDocumentListData } from "@/api"
-import { StatusBadge } from "@/components/status-badge"
 import { PageControls } from "@/components/page-controls"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -12,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useDateTime } from "@/hooks/use-date-time"
 import { formatFileSize } from "@/lib/file-size"
 import type { DocumentAction } from "./knowledge-document-actions"
+import { KnowledgeDocumentStatus } from "./knowledge-document-status"
 
 /** 显示文档列表，保持详情和三点菜单的位置一致。 */
 export function KnowledgeDocumentTable({
@@ -90,6 +96,27 @@ function KnowledgeDocumentRow({
   const { t } = useTranslation(["knowledgeBase", "common"])
   const { formatDateTime } = useDateTime()
   const trigger = useRef<HTMLButtonElement>(null)
+  const { knowledgeBaseId = "" } = useParams()
+  const invalidate = useResourceInvalidator()
+  const navigate = useNavigate()
+  const [retrying, setRetrying] = useState(false)
+
+  /** 提交重试并刷新文档状态，保留列表位置。 */
+  async function retry() {
+    setRetrying(true)
+    try {
+      await retryKnowledgeDocument(knowledgeBaseId, document.id)
+    } catch (error) {
+      if (!recoverSession(error, navigate)) toast.error(isApiError(error) ? apiErrorMessage(error) : t("documents.retryFailed"))
+    } finally {
+      // 连接失败也会更新服务端状态，请求结束后统一重新读取。
+      await Promise.all([
+        invalidate(resourceKeys.knowledgeDocuments(knowledgeBaseId)),
+        invalidate(resourceKeys.knowledgeDocument(knowledgeBaseId, document.id)),
+      ])
+      setRetrying(false)
+    }
+  }
   return (
     <TableRow>
       <TableCell className="max-w-80 truncate font-medium" title={document.name}>
@@ -98,9 +125,7 @@ function KnowledgeDocumentRow({
       <TableCell>{document.format.slice(1).toUpperCase()}</TableCell>
       <TableCell className="whitespace-nowrap tabular-nums">{formatFileSize(document.byteSize)}</TableCell>
       <TableCell>
-        <StatusBadge variant="muted" showDot={false}>
-          {t(`documents.status.${document.status}`)}
-        </StatusBadge>
+        <KnowledgeDocumentStatus document={document} />
       </TableCell>
       <TableCell className="whitespace-nowrap text-muted-foreground">{formatDateTime(document.createdAt)}</TableCell>
       <TableCell className="whitespace-nowrap">
@@ -120,6 +145,9 @@ function KnowledgeDocumentRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled={retrying} onSelect={() => void retry()}>
+                {t("common:actions.retry")}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!canMove}
                 onSelect={() => onAction({ document, kind: "move", trigger: trigger.current })}

@@ -575,6 +575,13 @@ export function ListKnowledgeBases(meta: $models.RequestMeta): $CancellablePromi
 }
 
 /**
+ * ListKnowledgeDocumentSegments 返回固定批次的分段页或锚点所在页。
+ */
+export function ListKnowledgeDocumentSegments(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentSegmentInput): $CancellablePromise<$models.KnowledgeDocumentSegmentPage> {
+    return $Call.ByID(63381217, meta, knowledgeBaseID, documentID, input);
+}
+
+/**
  * ListKnowledgeDocuments 返回当前分组的文档列表。
  */
 export function ListKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeDocumentListInput): $CancellablePromise<$models.KnowledgeDocumentList> {
@@ -803,6 +810,13 @@ export function ResolveCustomerMessageDelivery(meta: $models.RequestMeta, conver
  */
 export function RestoreContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
     return $Call.ByID(468810132, meta, contactID);
+}
+
+/**
+ * RetryKnowledgeDocument 按当前配置重新处理文档。
+ */
+export function RetryKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<void> {
+    return $Call.ByID(1935547685, meta, knowledgeBaseID, documentID);
 }
 
 /**
