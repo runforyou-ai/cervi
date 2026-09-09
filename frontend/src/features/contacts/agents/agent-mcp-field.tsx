@@ -90,7 +90,7 @@ function AgentMCPDialog({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3" role="group" aria-label={t("agents.mcp.services")}>
             {services.map((service) => (
               <label key={service.id} className={cn(
-                "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border bg-card p-4 focus-within:ring-2 focus-within:ring-ring",
+                "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border bg-card p-4 focus-within:border-primary",
                 selected.includes(service.id) ? "border-primary bg-primary/5" : "hover:bg-accent/50",
               )}>
                 <input
