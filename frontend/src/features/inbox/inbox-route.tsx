@@ -6,6 +6,9 @@ import {
   CustomerInboxView,
   InboxScope,
 } from "@/api"
+import { useWorkspace } from "@/contexts/workspace-context"
+import { useAttachmentQueue } from "./attachment-queue-context"
+import { useMemberChatPollingActive } from "./use-member-chat-polling"
 import { InboxPage } from "@/features/inbox/inbox-page"
 import { useInboxList } from "./use-inbox-list"
 import { useInboxListViewport } from "./use-inbox-list-viewport"
@@ -29,8 +32,14 @@ export function InboxRoute() {
       : ""
   const query = { scope, customerView, assigneeIdentityId }
   const viewport = useInboxListViewport()
-  const list = useInboxList(query, viewport)
-  viewport.positions.current = list.positions
+  const { identity, beginUnreadSnapshot, applyUnreadSnapshot } = useWorkspace()
+  const { queue } = useAttachmentQueue()
+  const active = useMemberChatPollingActive()
+  const list = useInboxList(query, viewport, {
+    identity, active,
+    unread: (count) => applyUnreadSnapshot(count, beginUnreadSnapshot()),
+    unavailable: (id) => queue?.forgetConversation(id),
+  })
 
   /** 更新收件箱范围和客户视图查询参数。 */
   function updateQuery(changes: {

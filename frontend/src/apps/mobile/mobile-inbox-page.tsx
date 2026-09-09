@@ -1,5 +1,4 @@
 /** 移动端统一会话摘要列表和内部聊天入口。 */
-import { useEffect, useRef } from "react"
 import { PlusIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
@@ -13,7 +12,6 @@ import {
   InboxScope,
   ConversationStatus,
   MessageType,
-  loadInbox,
   ServiceSessionStatus,
   type CustomerInboxConversationData,
   type AgentInboxConversationData,
@@ -29,7 +27,6 @@ import {
 import {
   MobilePageHeader,
   MobilePageState,
-  MobileScrollArea,
 } from "@/apps/mobile/mobile-page"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { Button } from "@/components/ui/button"
@@ -44,11 +41,13 @@ import { sessionStatusLabel } from "@/features/inbox/session-status-label"
 import { useConversationTime, useMinuteTick } from "@/features/inbox/use-conversation-time"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
-  memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useMobileWorkspace } from "./mobile-workspace-layout"
+import { useMobileNavigation } from "./mobile-navigation"
+import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
+import { useInboxList } from "@/features/inbox/use-inbox-list"
+import { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { cn } from "@/lib/utils"
 
 type MobileInboxConversation =
@@ -198,7 +197,7 @@ function MobileConversationRow({
   )
 
   return (
-    <li className="border-b last:border-b-0">
+    <li data-inbox-id={conversation.id} className="border-b last:border-b-0">
       {internalConversation ? (
         <button
           type="button"
@@ -217,39 +216,31 @@ function MobileConversationRow({
 
 /** 加载当前范围的真实会话摘要并恢复列表浏览位置。 */
 export function MobileInboxPage() {
+  const navigation = useMobileInboxQuery()
+  return <MobileInboxList key={JSON.stringify(navigation.query)} {...navigation} />
+}
+
+/** 每个移动筛选独立挂载窗口，离开时保存原邻域。 */
+function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInboxQuery>) {
   const { t } = useTranslation(["mobile", "common"])
   const navigate = useNavigate()
-  const { query, changeQuery } = useMobileInboxQuery()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })
-  const previousPollingActiveRef = useRef(pollingActive)
-  const { data, loading, refresh } = useResource(
-    resourceKeys.inbox(query),
-    () => loadInbox(query),
-    {
-      staleTime: 0,
-      refetchInterval: pollingActive ? memberChatPollingInterval : false,
-      refetchOnWindowFocus: false,
-    },
-  )
+  const { identity } = useMobileWorkspace()
+  const { inboxWindows } = useMobileNavigation()
+  const viewport = useInboxListViewport()
+  const list = useInboxList(query, viewport, { identity, active: pollingActive, history: inboxWindows })
   useMinuteTick()
-  const conversations =
-    data?.conversations.filter(isMobileInboxConversation) ?? []
-  const scrollKey = `inbox:${query.scope}:${query.customerView}:${query.assigneeIdentityId}`
-
-  useEffect(() => {
-    if (pollingActive && !previousPollingActiveRef.current && data)
-      void refresh()
-    previousPollingActiveRef.current = pollingActive
-  }, [data, pollingActive, refresh])
+  const conversations = list.conversations.filter(isMobileInboxConversation)
+  const initial = list.revision === 0
 
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader
         title={t("inbox.title")}
         actions={
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={viewport.setMenu}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
@@ -276,32 +267,28 @@ export function MobileInboxPage() {
       <MobileInboxScopes scope={query.scope} onChange={changeQuery} />
       {query.scope === InboxScope.InboxScopeCustomer ? (
         <div className="flex h-11 shrink-0 items-center border-b">
-          <MobileCustomerFilter query={query} onChange={changeQuery} />
+          <MobileCustomerFilter query={query} onChange={changeQuery} onOpenChange={viewport.setMenu} />
         </div>
       ) : null}
-      <MobileScrollArea
-        storageKey={scrollKey}
-        ready={Boolean(data)}
-        className="flex flex-col"
-      >
-        {loading && !data ? (
+      <InboxListPanel list={list} viewport={viewport} mobile>
+        {initial && !list.error ? (
           <LoadingIndicator className="min-h-64 flex-1 justify-center">
             {t("common:status.loading")}
           </LoadingIndicator>
         ) : null}
-        {!loading && !data ? (
+        {initial && list.error ? (
           <MobilePageState
             title={t("inbox.loadError")}
-            onRetry={() => void refresh()}
+            onRetry={() => void list.retry()}
           />
         ) : null}
-        {data && conversations.length === 0 ? (
+        {!initial && conversations.length === 0 && !list.hasBefore && !list.hasAfter ? (
           <MobilePageState
             title={t("inbox.emptyTitle")}
             description={t("inbox.emptyDescription")}
           />
         ) : null}
-        {data && conversations.length > 0 ? (
+        {conversations.length > 0 ? (
           <ul>
             {conversations.map((conversation) => (
               <MobileConversationRow
@@ -321,7 +308,7 @@ export function MobileInboxPage() {
             ))}
           </ul>
         ) : null}
-      </MobileScrollArea>
+      </InboxListPanel>
     </section>
   )
 }

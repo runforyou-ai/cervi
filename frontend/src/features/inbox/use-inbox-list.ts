@@ -1,32 +1,41 @@
 /** 将列表控制器接入统一 Query 缓存、前台轮询和会话资源清理。 */
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { getInboxContext, loadInbox, readInboxConversations, readInboxWindow, type InboxQuery, type InboxConversationResults } from "@/api"
-import { useWorkspace } from "@/contexts/workspace-context"
+import { getInboxContext, loadInbox, readInboxConversations, readInboxWindow, type InboxQuery, type Identity, type InboxConversationResults } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { useAttachmentQueue } from "./attachment-queue-context"
 import { clearConversationResources } from "./conversation-resources"
-import { InboxListController, normalizeInboxListQuery, type InboxListPorts } from "./inbox-list-controller"
-import { memberChatPollingInterval, useMemberChatPollingActive } from "./use-member-chat-polling"
+import { InboxListController, normalizeInboxListQuery, type InboxListBookmark } from "./inbox-list-controller"
+import { memberChatPollingInterval } from "./use-member-chat-polling"
 
-export type InboxListViewport = Pick<InboxListPorts, "capture" | "atTop" | "interacting" | "restore">
+import type { useInboxListViewport } from "./use-inbox-list-viewport"
+
+export type InboxListViewport = ReturnType<typeof useInboxListViewport>
+type InboxListOptions = {
+  identity: Identity
+  active: boolean
+  unread?: (count: number) => void
+  unavailable?: (id: string) => void
+  history?: Map<string, InboxListBookmark>
+}
 
 /** 每个查询持有独立浏览状态，业务摘要仅从当前批量 Query 读取。 */
-export function useInboxList(input: InboxQuery, viewport: InboxListViewport) {
-  const { identity, beginUnreadSnapshot, applyUnreadSnapshot } = useWorkspace()
-  const { queue } = useAttachmentQueue()
+export function useInboxList(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions) {
+  const { identity, active, history } = options
   const client = useQueryClient()
-  const active = useMemberChatPollingActive()
   const scope = normalizeInboxListQuery(input)
   const query = useMemo(() => scope, [scope.scope, scope.customerView, scope.assigneeIdentityId])
   const owner = useMemo(() => ({ organizationId: identity.organization.id, userId: identity.user.id }), [identity.organization.id, identity.user.id])
   const headKey = resourceKeys.inbox({ ...owner, ...query })
   const resource = useResource(headKey, () => loadInbox(query), { enabled: false })
   const { read } = resource
-  const callbacks = useRef({ viewport, queue, beginUnreadSnapshot, applyUnreadSnapshot })
-  callbacks.current = { viewport, queue, beginUnreadSnapshot, applyUnreadSnapshot }
-  const controller = useMemo(() => new InboxListController({
+  const historyKey = JSON.stringify({ ...owner, ...query })
+  const callbacks = useRef({ viewport, options })
+  callbacks.current = { viewport, options }
+  const controller = useMemo(() => {
+    const bookmark = history?.get(historyKey)
+    const cached = bookmark && client.getQueryData(resourceKeys.inboxConversations({ ...owner, query, conversationIds: bookmark.state.rowIds })) !== undefined
+    return new InboxListController({
     page: (cursor = "", beforeCursor = "") => read(
       resourceKeys.inbox({ ...owner, ...query, ...(cursor || beforeCursor ? { cursor, beforeCursor } : {}) }),
       () => loadInbox({ ...query, cursor, beforeCursor }),
@@ -49,16 +58,16 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport) {
     restore: (...args) => callbacks.current.viewport.restore(...args),
     unavailable: (ids) => {
       for (const id of ids) {
-        callbacks.current.queue?.forgetConversation(id)
+        callbacks.current.options.unavailable?.(id)
         clearConversationResources(client, id)
         void client.resetQueries({ queryKey: resourceKeys.conversationSummary(id) })
       }
     },
     unread: (count) => {
-      const current = callbacks.current
-      current.applyUnreadSnapshot(count, current.beginUnreadSnapshot())
+      callbacks.current.options.unread?.(count)
     },
-  }, query), [client, owner, query, read])
+  }, query, bookmark, cached)
+  }, [client, owner, query, read, history, historyKey])
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
   const rows = useResource(
     resourceKeys.inboxConversations({ ...owner, query, conversationIds: state.rowIds }),
@@ -66,6 +75,20 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport) {
     { enabled: false },
   )
 
+  viewport.positions.current = state.positions
+  viewport.events.current = {
+    idle: controller.settle,
+    scroll: (container, enteredTop) => {
+      const current = controller.getSnapshot()
+      if (current.error || !container.clientHeight) return
+      if (container.scrollTop <= 120 && current.hasBefore) void controller.request("before")
+      else if (enteredTop) void controller.request("refresh")
+      else if (container.scrollHeight - container.scrollTop - container.clientHeight <= 120 && current.hasAfter) void controller.request("after")
+    },
+  }
+  useLayoutEffect(() => () => {
+    if (history) history.set(historyKey, controller.remember())
+  }, [controller, history, historyKey])
   useEffect(() => {
     void controller.request("initial")
     return () => controller.dispose()

@@ -65,3 +65,102 @@ test("上方插入、锚点移走、后继消失时仅补偿一次，并保留�
     dom.window.close()
   }
 })
+
+test("指针取消后的惯性滚动延后恢复，旋转和字体变化按行位置重测", async () => {
+  const dom = new JSDOM('<div id="root"></div>')
+  const previous = { window: globalThis.window, document: globalThis.document, ResizeObserver: globalThis.ResizeObserver }
+  Object.assign(globalThis, { window: dom.window, document: dom.window.document, IS_REACT_ACT_ENVIRONMENT: true })
+  let resize = () => {}
+  const timers = new Map<number, () => void>()
+  let timerID = 0
+  let now = performance.now()
+  const originalNow = performance.now
+  performance.now = () => now
+  window.setTimeout = ((callback: () => void) => { timers.set(++timerID, callback); return timerID }) as typeof window.setTimeout
+  window.clearTimeout = (id) => { timers.delete(id) }
+  globalThis.ResizeObserver = class {
+    constructor(callback: () => void) { resize = callback }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as typeof ResizeObserver
+  let viewport: ReturnType<typeof useInboxListViewport>
+  /** 使用原生移动滚动容器验证交互和尺寸通知。 */
+  function Harness() {
+    viewport = useInboxListViewport()
+    return createElement("div", { ref: viewport.root }, createElement("div", { "data-inbox-viewport": true }, createElement("div")))
+  }
+  const root = createRoot(document.getElementById("root")!)
+  try {
+    await act(async () => root.render(createElement(Harness)))
+    const container = viewport!.element()!
+    let width = 390
+    let rowHeight = 68
+    Object.defineProperties(container, {
+      clientWidth: { get: () => width }, clientHeight: { value: 150 }, scrollHeight: { get: () => rowHeight * 20 },
+    })
+    container.getBoundingClientRect = () => ({ top: 0, bottom: 150 } as DOMRect)
+    for (let index = 0; index < 20; index++) {
+      const row = document.createElement("button")
+      row.dataset.inboxId = String(index)
+      row.getBoundingClientRect = () => ({ top: index * rowHeight - container.scrollTop, bottom: (index + 1) * rowHeight - container.scrollTop, height: rowHeight } as DOMRect)
+      container.firstElementChild!.append(row)
+    }
+    container.scrollTop = 350
+    const anchor = viewport!.capture()!
+    assert.equal(anchor.id, "5")
+    viewport!.root.current!.dispatchEvent(new window.Event("pointerdown", { bubbles: true }))
+    viewport!.restore(anchor, new Set(), false)
+    rowHeight = 80
+    await act(async () => root.render(createElement(Harness)))
+    assert.equal(container.scrollTop, 350)
+    window.dispatchEvent(new window.Event("pointercancel"))
+    container.scrollTop = 430
+    container.dispatchEvent(new window.Event("scroll"))
+    assert.equal(viewport!.interacting(), true)
+    let idle = 0
+    viewport!.events.current.idle = () => { idle++ }
+    now += 181
+    await act(async () => { for (const [id, callback] of [...timers]) { timers.delete(id); callback() } })
+    assert.equal(idle, 1)
+    assert.equal(container.scrollTop, 430)
+    const currentAnchor = viewport!.capture()!
+    width = 844
+    rowHeight = 60
+    await act(async () => resize())
+    assert.equal(container.scrollTop, 330)
+    assert.equal(viewport!.capture()!.id, currentAnchor.id)
+    assert.equal(viewport!.capture()!.neighbors[0].offset, currentAnchor.neighbors[0].offset)
+    await act(async () => resize())
+    assert.equal(container.scrollTop, 330)
+    // 菜单、覆盖层和键盘关闭后各自唤醒一次恢复，操作中不改位。
+    for (const kind of ["menu", "covered", "keyboard"] as const) {
+      container.scrollTop = 330
+      if (kind === "menu") viewport!.setMenu(true)
+      else if (kind === "covered") viewport!.setCovered(true)
+      else viewport!.root.current!.dispatchEvent(new window.Event("keydown", { bubbles: true }))
+      viewport!.restore(null, new Set(), true)
+      now += 181
+      await act(async () => { for (const [id, callback] of [...timers]) { timers.delete(id); callback() } })
+      assert.equal(container.scrollTop, 330)
+      if (kind === "menu") viewport!.setMenu(false)
+      else if (kind === "covered") viewport!.setCovered(false)
+      else window.dispatchEvent(new window.Event("keyup"))
+      now += 181
+      await act(async () => { for (const [id, callback] of [...timers]) { timers.delete(id); callback() } })
+      assert.equal(container.scrollTop, 0)
+    }
+    const edges: boolean[] = []
+    viewport!.events.current.scroll = (_element, entered) => { edges.push(entered) }
+    for (const offset of [500, 100, 20, 130, 80]) {
+      container.scrollTop = offset
+      container.dispatchEvent(new window.Event("scroll"))
+    }
+    assert.deepEqual(edges, [false, true, false, false, true])
+  } finally {
+    await act(async () => root.unmount())
+    performance.now = originalNow
+    Object.assign(globalThis, previous)
+    dom.window.close()
+  }
+})

@@ -7,12 +7,14 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import type { InboxListBookmark } from "@/features/inbox/inbox-list-controller"
 import { useLocation, useNavigate } from "react-router"
 
 type MobileNavigationState = {
   inboxURL: string
   scrollPositions: Map<string, number>
   listPageCounts: Map<string, number>
+  inboxWindows: Map<string, InboxListBookmark>
 }
 
 const MobileNavigationContext = createContext<MobileNavigationState | null>(
@@ -28,6 +30,7 @@ export function MobileNavigationProvider({
   const [inboxURL, setInboxURL] = useState("/inbox")
   const scrollPositions = useRef(new Map<string, number>())
   const listPageCounts = useRef(new Map<string, number>())
+  const inboxWindows = useRef(new Map<string, InboxListBookmark>())
   const location = useLocation()
   useLayoutEffect(() => {
     if (location.pathname === "/inbox") {
@@ -40,6 +43,7 @@ export function MobileNavigationProvider({
         inboxURL,
         scrollPositions: scrollPositions.current,
         listPageCounts: listPageCounts.current,
+        inboxWindows: inboxWindows.current,
       }}
     >
       {children}

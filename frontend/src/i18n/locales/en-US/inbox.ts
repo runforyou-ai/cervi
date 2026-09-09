@@ -1,7 +1,5 @@
 /** 美式英语·收件箱文案。 */
 const inbox = {
-  listPendingChanges: "Updates available",
-  listViewLatest: "View latest",
   listWindowEmpty: "No conversations in this area",
   selectConversationTitle: "Select a conversation",
   selectConversationDescription: "Choose a conversation from the list or start a new chat.",
@@ -259,7 +257,7 @@ const inbox = {
   replyAssignedUnavailable:
     "{{name}} is handling this conversation. Take it over to reply.",
   channelReplyUnsupported: "Replies are not supported for this message channel yet.",
-  inboxRefreshError: "Could not refresh conversations. Click to retry.",
+  inboxLoadError: "Could not load conversations.",
   contextOpen: "Expand details panel",
   contextClose: "Collapse details panel",
   contextResize: "Resize details panel",

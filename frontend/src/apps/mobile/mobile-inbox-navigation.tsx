@@ -178,9 +178,11 @@ function MobileCustomerAssignee({
 export function MobileCustomerFilter({
   query,
   onChange,
+  onOpenChange,
 }: {
   query: Required<LoadInboxQuery>
   onChange: (query: LoadInboxQuery) => void
+  onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation("inbox")
   const { t: tMobile } = useTranslation(["mobile", "common"])
@@ -207,6 +209,7 @@ export function MobileCustomerFilter({
           setAssignee(query.assigneeIdentityId)
         }
         setOpen(next)
+        onOpenChange(next)
       }}
     >
       <SheetTrigger asChild>
@@ -272,6 +275,7 @@ export function MobileCustomerFilter({
                     : "",
               })
               setOpen(false)
+              onOpenChange(false)
             }}
           >
             {tMobile("apply")}
