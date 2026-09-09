@@ -229,7 +229,6 @@ export interface AgentListItem {
 export interface AgentMCPServerOption {
     "id": string;
     "name": string;
-    "serverType": MCPServerType;
     "toolCount": number;
 }
 

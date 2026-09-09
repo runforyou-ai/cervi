@@ -71,11 +71,12 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 	if slices.ContainsFunc(options, func(o agentaction.MCPServerOption) bool { return o.ID == foreignID }) {
 		t.Fatal("foreign service leaked")
 	}
-	for _, agent := range agents {
+	for i, agent := range agents {
 		saved, err := update.Execute(ctx, owner, agent.ID, agentaction.UpdateExecutionInput{ExecutionInput: execution, MCPServerIDs: []string{ids[1], ids[0], ids[0]}})
 		if err != nil || !slices.Equal(saved.Execution.MCPServerIDs, ids) {
 			t.Fatalf("save=%+v err=%v", saved, err)
 		}
+		agents[i] = saved
 	}
 	var before servermodels.AgentRevision
 	if err := db.NewSelect().Model(&before).Where("agent_id = ?", agents[0].ID).OrderExpr("created_at DESC, id DESC").Limit(1).Scan(ctx); err != nil {
@@ -85,8 +86,9 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 	if err := json.Unmarshal(before.Configuration, &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if _, exists := snapshot["mcpServerIds"]; exists {
-		t.Fatal("current MCP bindings copied into immutable revision")
+	var snapshotIDs []string
+	if err := json.Unmarshal(snapshot["mcpServerIds"], &snapshotIDs); err != nil || !slices.Equal(snapshotIDs, ids) {
+		t.Fatalf("revision MCP selection=%v err=%v", snapshotIDs, err)
 	}
 	for _, id := range []string{foreignID, uuid.NewV7().String(), "invalid"} {
 		_, err := update.Execute(ctx, owner, agents[0].ID, agentaction.UpdateExecutionInput{ExecutionInput: execution, MCPServerIDs: []string{id}})
@@ -95,7 +97,7 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 			t.Fatalf("invalid binding: %v", err)
 		}
 	}
-	// 关系更新后的其他字段校验失败，也必须回滚绑定和版本。
+	// 其他字段校验失败不得切换当前版本或留下新版本。
 	invalid := agentaction.ExecutionInput{Mode: execution.Mode, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: "missing-model", SystemInstruction: "新指令"}}
 	if _, err := update.Execute(ctx, owner, agents[0].ID, agentaction.UpdateExecutionInput{ExecutionInput: invalid}); err == nil {
 		t.Fatal("invalid model saved")
@@ -112,8 +114,25 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 	}
 	for _, agent := range agents {
 		detail, err := get.Execute(ctx, owner, agent.ID)
-		if err != nil || !slices.Equal(detail.Execution.MCPServerIDs, ids[1:]) {
+		if err != nil || detail.Execution.RevisionID == agent.Execution.RevisionID || !slices.Equal(detail.Execution.MCPServerIDs, ids[1:]) {
 			t.Fatalf("deleted binding detail=%+v err=%v", detail, err)
+		}
+		var current servermodels.AgentRevision
+		if err := db.NewSelect().Model(&current).Where("id = ?", detail.Execution.RevisionID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var configuration map[string]json.RawMessage
+		if err := json.Unmarshal(current.Configuration, &configuration); err != nil {
+			t.Fatal(err)
+		}
+		for key, value := range snapshot {
+			if key != "mcpServerIds" && string(value) != string(configuration[key]) {
+				t.Fatalf("deletion changed %s: %s", key, configuration[key])
+			}
+		}
+		count, err := db.NewSelect().Model((*servermodels.AgentRevision)(nil)).Where("agent_id = ?", agent.ID).Count(ctx)
+		if err != nil || count != 3 || current.CreatedByUserID != owner.User.ID {
+			t.Fatalf("delete revision count=%d author=%s err=%v", count, current.CreatedByUserID, err)
 		}
 	}
 	var after servermodels.AgentRevision
@@ -128,6 +147,18 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 		t.Fatalf("clear=%+v err=%v", cleared, err)
 	}
 
+	if err := remove.Execute(ctx, owner, ids[1]); err != nil {
+		t.Fatal(err)
+	}
+	detail, err = get.Execute(ctx, owner, agents[0].ID)
+	if err != nil || detail.Execution.RevisionID != cleared.Execution.RevisionID {
+		t.Fatalf("historical-only reference created revision: %+v err=%v", detail, err)
+	}
+	detail, err = get.Execute(ctx, owner, agents[1].ID)
+	if err != nil || len(detail.Execution.MCPServerIDs) != 0 {
+		t.Fatalf("last service deletion=%+v err=%v", detail, err)
+	}
+
 	// 使用两个真实用户和查询屏障，避免用户行锁掩盖服务及员工行锁。
 	colleague := newChatLockUser(t, db, owner)
 	db.AddQueryHook(chatQueryHook{})
@@ -140,6 +171,15 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 			testAgentMCPDeleteRace(t, db, owner, colleague, agents[0].ID, execution, saveFirst)
 		})
 	}
+	t.Run("删除失败回滚版本", func(t *testing.T) {
+		testAgentMCPDeleteRollback(t, db, owner, agents[0].ID, execution)
+	})
+	t.Run("同时删除两个服务", func(t *testing.T) {
+		testAgentMCPConcurrentDeletes(t, db, owner, colleague, agents[0].ID, execution)
+	})
+	t.Run("删除等待最新配置", func(t *testing.T) {
+		testAgentMCPDeleteLatestRevision(t, db, owner, colleague, agents[0].ID, execution)
+	})
 	t.Run("两次保存串行替换", func(t *testing.T) {
 		testAgentMCPSaveRace(t, db, owner, colleague, agents[0].ID, execution)
 	})
@@ -194,7 +234,10 @@ func testAgentMCPDeleteRace(t *testing.T, db *bun.DB, owner, colleague *servermo
 	if err := waitChatResult(t, ctx, deleted); err != nil {
 		t.Fatal(err)
 	}
-	count, err := db.NewSelect().Model((*servermodels.AgentMCPServer)(nil)).Where("mcp_server_id = ?", id).Count(ctx)
+	count, err := db.NewSelect().Model((*servermodels.Agent)(nil)).
+		Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.organization_id = a.organization_id AND ar.agent_id = a.id").
+		Where("a.organization_id = ?", owner.Organization.ID).
+		Where("ar.configuration->'mcpServerIds' @> jsonb_build_array(?::text)", id).Count(ctx)
 	if err != nil || count != 0 {
 		t.Fatalf("dangling bindings=%d err=%v", count, err)
 	}
@@ -231,5 +274,114 @@ func testAgentMCPSaveRace(t *testing.T, db *bun.DB, owner, colleague *servermode
 	detail, err := agentaction.NewGetAgentQuery(db).Execute(ctx, owner, agentID)
 	if err != nil || !slices.Equal(detail.Execution.MCPServerIDs, ids[1:]) {
 		t.Fatalf("concurrent save=%+v err=%v", detail, err)
+	}
+}
+
+// testAgentMCPDeleteRollback 验证删除末尾失败会回滚服务、所有新版本和当前版本指针。
+func testAgentMCPDeleteRollback(t *testing.T, db *bun.DB, owner *servermodels.Identity, agentID string, execution agentaction.ExecutionInput) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	id := newAgentMCPService(t, db, owner)
+	saved, err := agentaction.NewUpdateExecutionAction(db).Execute(ctx, owner, agentID, agentaction.UpdateExecutionInput{ExecutionInput: execution, MCPServerIDs: []string{id}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := db.NewSelect().Model((*servermodels.AgentRevision)(nil)).Where("agent_id = ?", agentID).Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gate := newChatQueryGate(t, true, 1, func(e *bun.QueryEvent) bool {
+		return strings.Contains(e.Query, `DELETE FROM "mcp_servers"`) && strings.Contains(e.Query, id)
+	})
+	defer gate.open()
+	deleteCtx, cancelDelete := context.WithCancel(context.WithValue(ctx, chatQueryGateKey{}, gate))
+	defer cancelDelete()
+	result := make(chan error, 1)
+	go func() { result <- mcpaction.NewDeleteMCPServerAction(db).Execute(deleteCtx, owner, id) }()
+	waitChatSignal(t, ctx, gate.reached)
+	cancelDelete()
+	if err := waitChatResult(t, ctx, result); err == nil {
+		t.Fatal("cancelled deletion succeeded")
+	}
+	detail, err := agentaction.NewGetAgentQuery(db).Execute(ctx, owner, agentID)
+	if err != nil || detail.Execution.RevisionID != saved.Execution.RevisionID || !slices.Equal(detail.Execution.MCPServerIDs, []string{id}) {
+		t.Fatalf("rollback detail=%+v err=%v", detail, err)
+	}
+	after, err := db.NewSelect().Model((*servermodels.AgentRevision)(nil)).Where("agent_id = ?", agentID).Count(ctx)
+	if err != nil || after != before {
+		t.Fatalf("rollback revision count=%d want=%d err=%v", after, before, err)
+	}
+	if exists, err := db.NewSelect().Model((*servermodels.MCPServer)(nil)).Where("id = ?", id).Exists(ctx); err != nil || !exists {
+		t.Fatalf("service after rollback=%v err=%v", exists, err)
+	}
+}
+
+// testAgentMCPConcurrentDeletes 验证两个服务同时删除时基于最新版本累积移除。
+func testAgentMCPConcurrentDeletes(t *testing.T, db *bun.DB, owner, colleague *servermodels.Identity, agentID string, execution agentaction.ExecutionInput) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ids := []string{newAgentMCPService(t, db, owner), newAgentMCPService(t, db, owner)}
+	if _, err := agentaction.NewUpdateExecutionAction(db).Execute(ctx, owner, agentID, agentaction.UpdateExecutionInput{ExecutionInput: execution, MCPServerIDs: ids}); err != nil {
+		t.Fatal(err)
+	}
+	gate := newChatQueryGate(t, false, 1, func(e *bun.QueryEvent) bool {
+		return strings.Contains(e.Query, `FROM "agents"`) && strings.Contains(e.Query, "FOR UPDATE") && strings.Contains(e.Query, agentID)
+	})
+	defer gate.open()
+	remove := mcpaction.NewDeleteMCPServerAction(db)
+	first, second := make(chan error, 1), make(chan error, 1)
+	go func() { first <- remove.Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), owner, ids[0]) }()
+	waitChatSignal(t, ctx, gate.reached)
+	go func() { second <- remove.Execute(ctx, colleague, ids[1]) }()
+	waitChatDatabaseLock(t, ctx, db, `FROM "agents"`, agentID)
+	gate.open()
+	if err := waitChatResult(t, ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := waitChatResult(t, ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	detail, err := agentaction.NewGetAgentQuery(db).Execute(ctx, owner, agentID)
+	if err != nil || len(detail.Execution.MCPServerIDs) != 0 {
+		t.Fatalf("concurrent delete=%+v err=%v", detail, err)
+	}
+}
+
+// testAgentMCPDeleteLatestRevision 验证删除等待保存时保留新指令，且不为已解除的绑定创建版本。
+func testAgentMCPDeleteLatestRevision(t *testing.T, db *bun.DB, owner, colleague *servermodels.Identity, agentID string, execution agentaction.ExecutionInput) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	id := newAgentMCPService(t, db, owner)
+	update := agentaction.NewUpdateExecutionAction(db)
+	if _, err := update.Execute(ctx, owner, agentID, agentaction.UpdateExecutionInput{ExecutionInput: execution, MCPServerIDs: []string{id}}); err != nil {
+		t.Fatal(err)
+	}
+	gate := newChatQueryGate(t, false, 1, func(e *bun.QueryEvent) bool {
+		return strings.Contains(e.Query, `FROM "agents"`) && strings.Contains(e.Query, "FOR UPDATE") && strings.Contains(e.Query, agentID)
+	})
+	defer gate.open()
+	managed := *execution.Managed
+	managed.SystemInstruction = "并发保存的新指令"
+	execution.Managed = &managed
+	var saved *agentaction.Agent
+	first, second := make(chan error, 1), make(chan error, 1)
+	go func() {
+		var err error
+		saved, err = update.Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), owner, agentID, agentaction.UpdateExecutionInput{ExecutionInput: execution})
+		first <- err
+	}()
+	waitChatSignal(t, ctx, gate.reached)
+	go func() { second <- mcpaction.NewDeleteMCPServerAction(db).Execute(ctx, colleague, id) }()
+	waitChatDatabaseLock(t, ctx, db, `FROM "agents"`, agentID)
+	gate.open()
+	if err := waitChatResult(t, ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := waitChatResult(t, ctx, second); err != nil {
+		t.Fatal(err)
+	}
+	detail, err := agentaction.NewGetAgentQuery(db).Execute(ctx, owner, agentID)
+	if err != nil || detail.Execution.RevisionID != saved.Execution.RevisionID || detail.Execution.Managed.SystemInstruction != managed.SystemInstruction || len(detail.Execution.MCPServerIDs) != 0 {
+		t.Fatalf("delete after save=%+v err=%v", detail, err)
 	}
 }

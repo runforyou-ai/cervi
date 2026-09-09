@@ -80,6 +80,7 @@ type ModelOption struct {
 }
 
 type managedRevisionConfigurationV1 struct {
+	MCPServerIDs      []string               `json:"mcpServerIds"`
 	Model             managedRevisionModelV1 `json:"model"`
 	SystemInstruction string                 `json:"systemInstruction"`
 	KnowledgeBaseIDs  []string               `json:"knowledgeBaseIds"`
@@ -166,7 +167,7 @@ func managedExecutionModelQuery(db bun.IDB, organizationID, providerID, modelIde
 }
 
 // insertExecutionRevision 创建 AI 员工执行配置版本。
-func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermodels.Identity, agentID, revisionID string, input ExecutionInput, model ModelOption) (Execution, error) {
+func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermodels.Identity, agentID, revisionID string, input ExecutionInput, model ModelOption, mcpServerIDs []string) (Execution, error) {
 	// 锁定绑定记录，保证校验与版本写入之间知识库不会被删除。
 	if len(input.Managed.KnowledgeBaseIDs) > 0 {
 		ids := make([]string, 0, len(input.Managed.KnowledgeBaseIDs))
@@ -181,6 +182,7 @@ func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermo
 		}
 	}
 	configuration, err := json.Marshal(managedRevisionConfigurationV1{
+		MCPServerIDs: mcpServerIDs,
 		Model: managedRevisionModelV1{
 			ProviderID: model.ProviderID, ProviderName: model.ProviderName,
 			Identifier: model.ModelIdentifier, Name: model.ModelName,
@@ -202,7 +204,7 @@ func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermo
 		return Execution{}, err
 	}
 	return Execution{
-		RevisionID: revision.ID, Mode: input.Mode,
+		RevisionID: revision.ID, Mode: input.Mode, MCPServerIDs: mcpServerIDs,
 		Managed: &ManagedExecution{
 			ProviderID: model.ProviderID, ProviderName: model.ProviderName,
 			ModelIdentifier: model.ModelIdentifier, ModelName: model.ModelName,
@@ -236,7 +238,7 @@ func decodeRevisionExecution(revision servermodels.AgentRevision) (Execution, er
 		return Execution{}, errors.New("managed execution configuration is invalid")
 	}
 	return Execution{
-		RevisionID: revision.ID, Mode: mode,
+		RevisionID: revision.ID, Mode: mode, MCPServerIDs: configuration.MCPServerIDs,
 		Managed: &ManagedExecution{
 			ProviderID: configuration.Model.ProviderID, ProviderName: configuration.Model.ProviderName,
 			ModelIdentifier: configuration.Model.Identifier, ModelName: configuration.Model.Name,
@@ -269,12 +271,7 @@ func loadAgentExecution(ctx context.Context, db bun.IDB, organizationID, agentID
 	}
 	execution.Managed.ProviderName = model.ProviderName
 	execution.Managed.ModelName = model.ModelName
-	// 当前服务绑定独立于不可变 Revision，删除服务后关系同步移除。
-	execution.MCPServerIDs = make([]string, 0)
-	err = db.NewSelect().Model((*servermodels.AgentMCPServer)(nil)).Column("mcp_server_id").
-		Where("ams.organization_id = ?", organizationID).Where("ams.agent_id = ?", agentID).
-		OrderExpr("ams.mcp_server_id ASC").Scan(ctx, &execution.MCPServerIDs)
-	return execution, err
+	return execution, nil
 }
 
 // loadAgentExecutionSummaries 批量读取 AI 员工当前执行配置摘要。

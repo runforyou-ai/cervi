@@ -102,7 +102,6 @@ function AgentMCPDialog({
                 />
                 <span className="min-w-0 space-y-2">
                   <span className="line-clamp-2 break-all text-sm font-medium" title={service.name}>{service.name}</span>
-                  <span className="block text-xs text-muted-foreground">{service.serverType}</span>
                   <span className="block text-xs text-muted-foreground">{t("agents.mcp.tools", { count: service.toolCount })}</span>
                 </span>
               </label>

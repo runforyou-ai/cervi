@@ -102,7 +102,6 @@ func (b *DirectBackend) DeleteMCPServer(ctx context.Context, meta RequestMeta, m
 			"mcp_server_id", mcpServerID,
 		)
 	}
-	slog.Info("MCP 服务删除成功", "organization_id", identity.Organization.ID, "mcp_server_id", mcpServerID)
 	return nil
 }
 

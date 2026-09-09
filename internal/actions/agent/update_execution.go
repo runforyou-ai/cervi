@@ -15,7 +15,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdateExecutionInput 定义一起保存的版本配置和当前 MCP 服务绑定。
+// UpdateExecutionInput 定义编辑页保存的完整执行配置。
 type UpdateExecutionInput struct {
 	ExecutionInput
 	MCPServerIDs []string
@@ -43,6 +43,11 @@ func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermod
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
+		// 保存与删除均先锁服务、再锁员工，避免反向取锁。
+		mcpServerIDs, err := validateAndLockMCPServers(ctx, tx, identity.Organization.ID, input.MCPServerIDs)
+		if err != nil {
+			return err
+		}
 		stored := &servermodels.Agent{}
 		err = tx.NewSelect().Model(stored).
 			Column("id").
@@ -56,15 +61,12 @@ func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
-		if err := replaceMCPServers(ctx, tx, identity.Organization.ID, agentID, input.MCPServerIDs); err != nil {
-			return err
-		}
 		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *executionInput.Managed)
 		if err != nil {
 			return err
 		}
 		revisionID := uuid.NewV7()
-		execution, err := insertExecutionRevision(ctx, tx, identity, agentID, revisionID.String(), executionInput, model)
+		execution, err := insertExecutionRevision(ctx, tx, identity, agentID, revisionID.String(), executionInput, model, mcpServerIDs)
 		if err != nil {
 			return err
 		}
