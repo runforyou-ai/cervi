@@ -142,7 +142,7 @@ func TestInboxSnapshot(t *testing.T) {
 	ctx = tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost)
 	f.db.AddQueryHook(chatQueryHook{})
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
-		return event.Operation() == "SELECT" && strings.Contains(event.Query, "AS candidates") && strings.Contains(event.Query, "LIMIT 51")
+		return event.Operation() == "SELECT" && strings.Contains(event.Query, "AS candidates") && strings.Contains(event.Query, "LIMIT 50")
 	})
 	var snapshot appservice.Inbox
 	done := make(chan error, 1)

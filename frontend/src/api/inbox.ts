@@ -19,6 +19,8 @@ import {
   MarkConversationRead,
   ListCustomerServiceAssignees,
   LoadInbox,
+  GetInboxContext,
+  ReadInboxWindow,
   GetInboxConversation,
   ReadInboxConversations,
   ReopenServiceSession,
@@ -73,6 +75,8 @@ import type {
   ReadInboxConversationsInput,
   InboxConversation,
   LoadInboxInput,
+  InboxContextInput,
+  InboxWindowInput,
   InboxQuery,
   MarkConversationReadInput,
   TransferServiceSessionInput,
@@ -273,6 +277,7 @@ export async function loadInbox(
       query.customerView ?? CustomerInboxView.CustomerInboxViewQueue,
     assigneeIdentityId: query.assigneeIdentityId ?? "",
     cursor: query.cursor ?? "",
+    beforeCursor: query.beforeCursor ?? "",
     limit: query.limit ?? 50,
   })
   return {
@@ -584,4 +589,16 @@ const listConversationMessageReferencesBound = bind(ListConversationMessageRefer
 export async function listConversationMessageReferences(conversationID: string, messageIds: string) {
   const result = await listConversationMessageReferencesBound(conversationID, { messageIds })
   return { ...result, states: result.states ?? [] }
+}
+
+/** 读取会话原位置附近的列表窗口及当前资格。 */
+export async function getInboxContext(input: InboxContextInput) {
+  const output = await bind(GetInboxContext)(input)
+  return { ...output, window: { ...output.window, conversations: asList(output.window.conversations) } }
+}
+
+/** 重读已加载首尾边界之间的完整列表范围。 */
+export async function readInboxWindow(input: InboxWindowInput) {
+  const output = await bind(ReadInboxWindow)(input)
+  return { ...output, conversations: asList(output.conversations) }
 }

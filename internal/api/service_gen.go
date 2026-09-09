@@ -33,6 +33,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/preferences", s.updateUserPreferences)
 	router.PATCH("/work-status", s.updateUserWorkStatus)
 	router.GET("/inbox", s.loadInbox)
+	router.POST("/inbox/context/query", s.getInboxContext)
+	router.POST("/inbox/window/query", s.readInboxWindow)
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
@@ -320,6 +322,26 @@ func (s *Service) loadInbox(c *gin.Context) {
 		return
 	}
 	output, err := s.application.LoadInbox(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getInboxContext 返回会话锚点的当前资格和原位置邻域。
+func (s *Service) getInboxContext(c *gin.Context) {
+	var input appservice.InboxContextInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.GetInboxContext(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// readInboxWindow 重读已加载双向边界之间的完整列表范围。
+func (s *Service) readInboxWindow(c *gin.Context) {
+	var input appservice.InboxWindowInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.ReadInboxWindow(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1423,6 +1445,7 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		Cursor:             c.Query("cursor"),
+		BeforeCursor:       c.Query("beforeCursor"),
 		Limit:              limit,
 	}, true
 }

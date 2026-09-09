@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +28,17 @@ func TestInboxCursor(t *testing.T) {
 		decoded, err := decodeInboxCursor(encoded, identity, input)
 		if err != nil || decoded.ID != point.ID || (decoded.LastActivityAt == nil) != (value == nil) || (value != nil && !decoded.LastActivityAt.Equal(*value)) {
 			t.Fatalf("round trip=%+v err=%v", decoded, err)
+		}
+		// 接受的 UUID 大小写形式统一回数据库小写值，保证区间比较与锚点匹配一致。
+		uppercase := *decoded
+		uppercase.ID = strings.ToUpper(point.ID)
+		data, err := json.Marshal(uppercase)
+		if err != nil {
+			t.Fatal(err)
+		}
+		canonical, err := decodeInboxCursor(base64.RawURLEncoding.EncodeToString(data), identity, input)
+		if err != nil || canonical.ID != point.ID {
+			t.Fatalf("uppercase cursor=%+v err=%v", canonical, err)
 		}
 		// 页大小不属于筛选身份，续页可调整条数而不改变边界。
 		resized := input

@@ -1425,6 +1425,9 @@ export interface ImageFile {
  * Inbox 定义成员收件箱查询结果。
  */
 export interface Inbox {
+    "startCursor": string;
+    "endCursor": string;
+    "hasBefore": boolean;
     "conversations": InboxConversation[] | null;
     "nextCursor": string;
     "hasMore": boolean;
@@ -1443,9 +1446,32 @@ export interface InboxAssignee {
 }
 
 /**
+ * InboxContext 独立返回锚点资格，列表只渲染 Window，Anchor 可与窗口行重叠。
+ */
+export interface InboxContext {
+    "anchor": InboxConversationResult;
+    "window": InboxWindow;
+}
+
+/**
+ * InboxContextInput 按会话当前位置或原查询位置读取邻域，前后数量零值均为二十五。
+ */
+export interface InboxContextInput {
+    "query": InboxQuery;
+    "anchorId": string;
+    "anchorCursor": string;
+    "beforeLimit": number;
+    "afterLimit": number;
+}
+
+/**
  * InboxConversation 定义成员统一收件箱列表项。
  */
 export interface InboxConversation {
+    /**
+     * PositionCursor 仅在列表窗口和匹配的锚点中返回，独立摘要不携带查询位置。
+     */
+    "positionCursor": string;
     "lastActivityAt": string | null;
     "lastMessageType": MessageType | null;
     "id": string;
@@ -1514,6 +1540,26 @@ export enum InboxScope {
     InboxScopeCustomer = "customer",
     InboxScopeInternal = "internal",
 };
+
+/**
+ * InboxWindow 保存连续范围和双向续读位置，空范围仍可保留原边界。
+ */
+export interface InboxWindow {
+    "conversations": InboxConversation[] | null;
+    "startCursor": string;
+    "endCursor": string;
+    "hasBefore": boolean;
+    "hasAfter": boolean;
+}
+
+/**
+ * InboxWindowInput 指定同一查询已加载范围的首尾游标，包含两侧边界。
+ */
+export interface InboxWindowInput {
+    "query": InboxQuery;
+    "startCursor": string;
+    "endCursor": string;
+}
 
 /**
  * InstallWorkspaceInput 定义企业初始化输入。
@@ -1761,6 +1807,7 @@ export interface LoadInboxInput {
     "customerView": CustomerInboxView;
     "assigneeIdentityId": string;
     "cursor": string;
+    "beforeCursor": string;
     "limit": number;
 }
 

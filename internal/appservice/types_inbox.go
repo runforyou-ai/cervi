@@ -57,6 +57,7 @@ type LoadInboxInput struct {
 	CustomerView       CustomerInboxView `json:"customerView" query:"customerView"`
 	AssigneeIdentityID string            `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	Cursor             string            `json:"cursor" query:"cursor"`
+	BeforeCursor       string            `json:"beforeCursor" query:"beforeCursor"`
 	Limit              int               `json:"limit" query:"limit,default=50"`
 }
 
@@ -134,6 +135,8 @@ type GroupInboxConversation struct {
 
 // InboxConversation 定义成员统一收件箱列表项。
 type InboxConversation struct {
+	// PositionCursor 仅在列表窗口和匹配的锚点中返回，独立摘要不携带查询位置。
+	PositionCursor       string                     `json:"positionCursor"`
 	LastActivityAt       *time.Time                 `json:"lastActivityAt"`
 	LastMessageType      *MessageType               `json:"lastMessageType"`
 	ID                   string                     `json:"id"`
@@ -152,6 +155,9 @@ type InboxConversation struct {
 
 // Inbox 定义成员收件箱查询结果。
 type Inbox struct {
+	StartCursor          string              `json:"startCursor"`
+	EndCursor            string              `json:"endCursor"`
+	HasBefore            bool                `json:"hasBefore"`
 	Conversations        []InboxConversation `json:"conversations"`
 	NextCursor           string              `json:"nextCursor"`
 	HasMore              bool                `json:"hasMore"`
@@ -184,4 +190,35 @@ type InboxConversationResult struct {
 // InboxConversationResults 按请求顺序返回每项结果。
 type InboxConversationResults struct {
 	Results []InboxConversationResult `json:"results"`
+}
+
+// InboxContextInput 按会话当前位置或原查询位置读取邻域，前后数量零值均为二十五。
+type InboxContextInput struct {
+	Query        InboxQuery `json:"query"`
+	AnchorID     string     `json:"anchorId"`
+	AnchorCursor string     `json:"anchorCursor"`
+	BeforeLimit  int        `json:"beforeLimit"`
+	AfterLimit   int        `json:"afterLimit"`
+}
+
+// InboxWindowInput 指定同一查询已加载范围的首尾游标，包含两侧边界。
+type InboxWindowInput struct {
+	Query       InboxQuery `json:"query"`
+	StartCursor string     `json:"startCursor"`
+	EndCursor   string     `json:"endCursor"`
+}
+
+// InboxWindow 保存连续范围和双向续读位置，空范围仍可保留原边界。
+type InboxWindow struct {
+	Conversations []InboxConversation `json:"conversations"`
+	StartCursor   string              `json:"startCursor"`
+	EndCursor     string              `json:"endCursor"`
+	HasBefore     bool                `json:"hasBefore"`
+	HasAfter      bool                `json:"hasAfter"`
+}
+
+// InboxContext 独立返回锚点资格，列表只渲染 Window，Anchor 可与窗口行重叠。
+type InboxContext struct {
+	Anchor InboxConversationResult `json:"anchor"`
+	Window InboxWindow             `json:"window"`
 }

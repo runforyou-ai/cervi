@@ -89,6 +89,16 @@ func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta, input LoadInb
 	return s.backend.LoadInbox(ctx, meta, input)
 }
 
+// GetInboxContext 返回会话锚点的当前资格和原位置邻域。
+func (s *Service) GetInboxContext(ctx context.Context, meta RequestMeta, input InboxContextInput) (InboxContext, error) {
+	return s.backend.GetInboxContext(ctx, meta, input)
+}
+
+// ReadInboxWindow 重读已加载双向边界之间的完整列表范围。
+func (s *Service) ReadInboxWindow(ctx context.Context, meta RequestMeta, input InboxWindowInput) (InboxWindow, error) {
+	return s.backend.ReadInboxWindow(ctx, meta, input)
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (s *Service) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	return s.backend.GetInboxConversation(ctx, meta, conversationID)
