@@ -136,6 +136,22 @@ func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta, in
 	return output, err
 }
 
+// GetInboxContext 返回会话锚点的当前资格和原位置邻域。
+func (b *Backend) GetInboxContext(ctx context.Context, meta appservice.RequestMeta, input appservice.InboxContextInput) (appservice.InboxContext, error) {
+	var output appservice.InboxContext
+	err := b.do(ctx, meta, http.MethodPost, "/inbox/context/query", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ReadInboxWindow 重读已加载双向边界之间的完整列表范围。
+func (b *Backend) ReadInboxWindow(ctx context.Context, meta appservice.RequestMeta, input appservice.InboxWindowInput) (appservice.InboxWindow, error) {
+	var output appservice.InboxWindow
+	err := b.do(ctx, meta, http.MethodPost, "/inbox/window/query", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.InboxConversation, error) {
 	var output appservice.InboxConversation
@@ -1144,6 +1160,7 @@ func encodeLoadInboxInputQuery(input appservice.LoadInboxInput) url.Values {
 	setQuery(query, "customerView", string(input.CustomerView))
 	setQuery(query, "assigneeIdentityId", input.AssigneeIdentityID)
 	setQuery(query, "cursor", input.Cursor)
+	setQuery(query, "beforeCursor", input.BeforeCursor)
 	setPositiveQuery(query, "limit", input.Limit)
 	return query
 }

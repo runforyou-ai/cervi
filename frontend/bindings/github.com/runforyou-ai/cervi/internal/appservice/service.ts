@@ -365,6 +365,13 @@ export function GetGroupConversation(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
+ * GetInboxContext 返回会话锚点的当前资格和原位置邻域。
+ */
+export function GetInboxContext(meta: $models.RequestMeta, input: $models.InboxContextInput): $CancellablePromise<$models.InboxContext> {
+    return $Call.ByID(3985152105, meta, input);
+}
+
+/**
  * GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
  */
 export function GetInboxConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.InboxConversation> {
@@ -733,6 +740,13 @@ export function ReactivateUser(meta: $models.RequestMeta, userID: string): $Canc
  */
 export function ReadInboxConversations(meta: $models.RequestMeta, input: $models.ReadInboxConversationsInput): $CancellablePromise<$models.InboxConversationResults> {
     return $Call.ByID(2030324742, meta, input);
+}
+
+/**
+ * ReadInboxWindow 重读已加载双向边界之间的完整列表范围。
+ */
+export function ReadInboxWindow(meta: $models.RequestMeta, input: $models.InboxWindowInput): $CancellablePromise<$models.InboxWindow> {
+    return $Call.ByID(2805575182, meta, input);
 }
 
 /**

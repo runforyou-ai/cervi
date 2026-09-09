@@ -195,6 +195,15 @@ func (b *Backend) normalizeOutput(output any) {
 				b.normalizeOutput(value.Results[index].Conversation)
 			}
 		}
+	case *appservice.InboxContext:
+		b.normalizeOutput(&value.Window)
+		if value.Anchor.Conversation != nil {
+			b.normalizeConversation(value.Anchor.Conversation)
+		}
+	case *appservice.InboxWindow:
+		for index := range value.Conversations {
+			b.normalizeConversation(&value.Conversations[index])
+		}
 	case *appservice.Inbox:
 		for index := range value.Conversations {
 			b.normalizeConversation(&value.Conversations[index])

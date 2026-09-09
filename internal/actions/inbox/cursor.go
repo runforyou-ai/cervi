@@ -5,6 +5,7 @@ package inbox
 import (
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -13,6 +14,22 @@ import (
 )
 
 const inboxSortVersion = 1
+
+// compareInboxPoints 按活动降序和编号降序比较位置，空活动时间排在最后。
+func compareInboxPoints(left, right inboxCursorPoint) int {
+	if left.LastActivityAt == nil && right.LastActivityAt != nil {
+		return 1
+	}
+	if left.LastActivityAt != nil && right.LastActivityAt == nil {
+		return -1
+	}
+	if left.LastActivityAt != nil && right.LastActivityAt != nil {
+		if order := left.LastActivityAt.Compare(*right.LastActivityAt); order != 0 {
+			return -order
+		}
+	}
+	return -strings.Compare(left.ID, right.ID)
+}
 
 // inboxCursorPoint 保存数据库原始活动时间，空时间使用独立的编号边界。
 type inboxCursorPoint struct {
@@ -57,5 +74,7 @@ func decodeInboxCursor(value string, identity *servermodels.Identity, input Load
 		!common.ValidUUID(cursor.ID) {
 		return nil, ErrCursorInvalid
 	}
+	// 数据库 UUID 返回小写，统一比较与锚点匹配所用的编号。
+	cursor.ID = strings.ToLower(cursor.ID)
 	return &cursor, nil
 }

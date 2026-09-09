@@ -74,6 +74,12 @@ type Backend interface {
 	// LoadInbox 返回当前用户的统一收件箱。
 	//cervi:route GET /inbox
 	LoadInbox(context.Context, RequestMeta, LoadInboxInput) (Inbox, error)
+	// GetInboxContext 返回会话锚点的当前资格和原位置邻域。
+	//cervi:route POST /inbox/context/query
+	GetInboxContext(context.Context, RequestMeta, InboxContextInput) (InboxContext, error)
+	// ReadInboxWindow 重读已加载双向边界之间的完整列表范围。
+	//cervi:route POST /inbox/window/query
+	ReadInboxWindow(context.Context, RequestMeta, InboxWindowInput) (InboxWindow, error)
 	// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 	//cervi:route GET /conversations/:conversationID/summary
 	GetInboxConversation(context.Context, RequestMeta, string) (InboxConversation, error)

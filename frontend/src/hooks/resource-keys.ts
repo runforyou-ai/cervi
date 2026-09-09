@@ -35,6 +35,10 @@ export const resourceKeys = {
     scopedListKey("customer-deliveries", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 收件箱数据。 */
   inbox: (parameters?: KeyParameters) => listKey("inbox", parameters),
+  /** 原查询位置及前后窗口大小限定的会话邻域。 */
+  inboxContext: (parameters?: KeyParameters) => listKey("inbox-context", parameters),
+  /** 已加载双向边界限定的完整列表窗口。 */
+  inboxWindow: (parameters?: KeyParameters) => listKey("inbox-window", parameters),
   /** 客服筛选候选。 */
   customerServiceAssignees: () => ["customer-service-assignees"],
   /** 窗口内附件的上传状态。 */

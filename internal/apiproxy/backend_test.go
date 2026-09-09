@@ -431,18 +431,24 @@ func TestFileRequestURLs(t *testing.T) {
 func TestBackendInboxPagination(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		query := request.URL.Query()
-		if request.URL.Path != "/api/inbox" || query.Get("scope") != "customer" || query.Get("customerView") != "coworkers" || query.Get("assigneeIdentityId") != "peer" || query.Get("cursor") != "boundary-value" || query.Get("limit") != "7" || request.Header.Get("Authorization") != "Bearer page-token" {
+		if request.URL.Path != "/api/inbox" || query.Get("scope") != "customer" || query.Get("customerView") != "coworkers" || query.Get("assigneeIdentityId") != "peer" || (query.Get("cursor") != "boundary-value" || query.Get("beforeCursor") != "") && (query.Get("beforeCursor") != "boundary-value" || query.Get("cursor") != "") || query.Get("limit") != "7" || request.Header.Get("Authorization") != "Bearer page-token" {
 			t.Errorf("request=%s authorization=%s", request.URL, request.Header.Get("Authorization"))
 		}
-		_ = json.NewEncoder(writer).Encode(appservice.Inbox{Conversations: []appservice.InboxConversation{}, NextCursor: "next-boundary", HasMore: true, UnreadCount: 80, AttentionUnreadCount: 70})
+		_ = json.NewEncoder(writer).Encode(appservice.Inbox{Conversations: []appservice.InboxConversation{}, StartCursor: "first", EndCursor: "last", HasBefore: true, NextCursor: "next-boundary", HasMore: true, UnreadCount: 80, AttentionUnreadCount: 70})
 	}))
 	defer remote.Close()
 	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{ServerURL: remote.URL, Token: "page-token", UserID: "user", OrganizationID: "organization", ExpiresAt: time.Now().Add(time.Hour)}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	page, err := backend.LoadInbox(context.Background(), appservice.RequestMeta{}, appservice.LoadInboxInput{Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer", Cursor: "boundary-value", Limit: 7})
-	if err != nil || page.NextCursor != "next-boundary" || !page.HasMore || page.UnreadCount != 80 || page.AttentionUnreadCount != 70 {
-		t.Fatalf("page=%+v err=%v", page, err)
+	for _, before := range []bool{false, true} {
+		input := appservice.LoadInboxInput{Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer", Cursor: "boundary-value", Limit: 7}
+		if before {
+			input.Cursor, input.BeforeCursor = "", "boundary-value"
+		}
+		page, err := backend.LoadInbox(context.Background(), appservice.RequestMeta{}, input)
+		if err != nil || page.NextCursor != "next-boundary" || !page.HasMore || !page.HasBefore || page.StartCursor != "first" || page.EndCursor != "last" || page.UnreadCount != 80 || page.AttentionUnreadCount != 70 {
+			t.Fatalf("page=%+v err=%v", page, err)
+		}
 	}
 }

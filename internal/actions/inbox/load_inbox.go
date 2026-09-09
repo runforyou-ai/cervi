@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
@@ -23,6 +22,7 @@ const defaultInboxPageSize = 50
 // LoadInput 定义统一收件箱筛选、页大小和分页边界。
 type LoadInput struct {
 	Cursor             string
+	BeforeCursor       string
 	Limit              int
 	Scope              domain.InboxScope
 	CustomerView       domain.CustomerInboxView
@@ -88,6 +88,7 @@ type GroupConversationSummary struct {
 
 // ConversationSummary 定义统一收件箱会话信封。
 type ConversationSummary struct {
+	PositionCursor       string
 	LastActivityAt       *time.Time
 	LastMessageType      *domain.MessageType
 	ID                   string
@@ -201,9 +202,9 @@ func NewLoadInboxQuery(db bun.IDB) *LoadInboxQuery {
 
 // ConversationPage 保存统一排序的一页会话及后续边界。
 type ConversationPage struct {
-	Conversations []ConversationSummary
-	NextCursor    string
-	HasMore       bool
+	ConversationWindow
+	NextCursor string
+	HasMore    bool
 }
 
 // Execute 在同一只读快照中读取会话分页与完整未读总数。
@@ -212,16 +213,19 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	if err != nil {
 		return ConversationPage{}, UnreadCounts{}, err
 	}
-	// 为 limit + 1 的续页探测保留一个整数位置。
-	if input.Limit < 0 || input.Limit == math.MaxInt {
+	if input.Limit < 0 || (input.Cursor != "" && input.BeforeCursor != "") {
 		return ConversationPage{}, UnreadCounts{}, ErrQueryInvalid
 	}
 	if input.Limit == 0 {
 		input.Limit = defaultInboxPageSize
 	}
 	var boundary *inboxCursor
-	if input.Cursor != "" {
-		boundary, err = decodeInboxCursor(input.Cursor, identity, input)
+	cursor := input.Cursor
+	if input.BeforeCursor != "" {
+		cursor = input.BeforeCursor
+	}
+	if cursor != "" {
+		boundary, err = decodeInboxCursor(cursor, identity, input)
 		if err != nil {
 			return ConversationPage{}, UnreadCounts{}, err
 		}
@@ -243,41 +247,24 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 
 // loadConversationPage 按精确活动边界取整页，边界行移除不影响后续读取。
 func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *servermodels.Identity, input LoadInput, boundary *inboxCursor) (ConversationPage, error) {
-	query := q.db.NewSelect().TableExpr("(?) AS candidates", q.listCandidates(identity, input)).ColumnExpr("id, last_activity_at")
+	var start, end *inboxCursorPoint
 	if boundary != nil {
-		if boundary.LastActivityAt == nil {
-			query.Where("last_activity_at IS NULL AND id < ?", boundary.ID)
-		} else {
-			query.Where("(last_activity_at, id) < (?, ?) OR last_activity_at IS NULL", *boundary.LastActivityAt, boundary.ID)
-		}
+		start, end = &boundary.inboxCursorPoint, &boundary.inboxCursorPoint
 	}
-	var points []inboxCursorPoint
-	if err := query.OrderExpr("last_activity_at DESC NULLS LAST, id DESC").Limit(input.Limit+1).Scan(ctx, &points); err != nil {
-		return ConversationPage{}, fmt.Errorf("list inbox page: %w", err)
-	}
-	page := ConversationPage{Conversations: make([]ConversationSummary, 0, min(len(points), input.Limit)), HasMore: len(points) > input.Limit}
-	if page.HasMore {
-		points = points[:input.Limit]
-		var err error
-		page.NextCursor, err = encodeInboxCursor(identity, input, points[len(points)-1])
-		if err != nil {
-			return ConversationPage{}, err
-		}
-	}
-	if len(points) == 0 {
-		return page, nil
-	}
-	ids := make([]string, len(points))
-	for index, point := range points {
-		ids[index] = point.ID
-	}
-	summaries, err := q.readSummaries(ctx, identity, ids)
+	points, err := q.readNeighborPoints(ctx, identity, input, start, input.BeforeCursor != "", input.Limit)
 	if err != nil {
 		return ConversationPage{}, err
 	}
-	// 候选与摘要共用阅读资格并在同一快照内读取，每个编号都有对应摘要。
-	for _, id := range ids {
-		page.Conversations = append(page.Conversations, *summaries[id])
+	if len(points) > 0 {
+		start, end = &points[0], &points[len(points)-1]
+	}
+	window, err := q.buildConversationWindow(ctx, identity, input, points, start, end)
+	if err != nil {
+		return ConversationPage{}, err
+	}
+	page := ConversationPage{ConversationWindow: window, HasMore: window.HasAfter}
+	if page.HasMore {
+		page.NextCursor = window.EndCursor
 	}
 	return page, nil
 }
